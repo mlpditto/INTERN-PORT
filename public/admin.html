@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.57</title>
+    <title>Nika V97.58</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -2103,6 +2103,50 @@
         }
 
         .alabasta-filter-pill .pill-count {
+            font-size: 0.85em;
+            font-weight: 900;
+            opacity: 0.85;
+        }
+
+        /* V97.58: Alabasta sub-tabs — switch the card between the Case and Product
+           review queues. Same warm-amber family as the filter pills, one size up so
+           it reads as a tab rail rather than yet another filter. */
+        .alabasta-subtab-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            margin: 4px 0 12px;
+        }
+
+        .alabasta-subtab {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.82em;
+            font-weight: 800;
+            padding: 7px 16px;
+            border-radius: 999px;
+            border: 1px solid #fcd34d;
+            background: #fff;
+            color: #92400e;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .alabasta-subtab:hover {
+            background: #fef3c7;
+            border-color: #f59e0b;
+        }
+
+        .alabasta-subtab.active {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #fff;
+            border-color: transparent;
+            box-shadow: 0 4px 12px rgba(217, 119, 6, 0.22);
+        }
+
+        .alabasta-subtab .subtab-count {
             font-size: 0.85em;
             font-weight: 900;
             opacity: 0.85;
@@ -10816,7 +10860,7 @@
                                 aria-label="Edit Case Taxonomy"
                                 class="case-taxonomy-gear">⚙️</button>
                     </div>
-                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <div id="alabasta-case-toolbar" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                         <input type="text" id="alabasta-case-search" placeholder="🔎 Search case, user, disease · 케이스 · 사용자 · 질병 검색..." onkeyup="renderAlabastaCases()" style="margin:0; width:280px; max-width:100%; padding:5px 12px; font-size:0.8em; border-radius:20px; border:1px solid #fcd34d;">
                         <!-- V91.93: Show Archived collapsed to icon toggle (tooltip retains bilingual label) -->
                         <button type="button"
@@ -10839,6 +10883,15 @@
                         <span style="font-size:0.72em; color:#166534; font-weight:700; background:#fff; border:1px solid #86efac; border-radius:999px; padding:3px 10px;">Reviewed · 검토 완료 <b id="alabasta-case-reviewed">0</b></span>
                     </div>
                 </div>
+                <!-- V97.58 Product Listing Phase 2: sub-tab rail. The card now hosts two
+                     review queues — Cases and the LINE MAN product submissions. -->
+                <div class="alabasta-subtab-row" role="tablist" aria-label="Alabasta review queue">
+                    <button type="button" id="alabasta-subtab-case" class="alabasta-subtab active" role="tab"
+                            aria-selected="true" onclick="setAlabastaSubtab('case')">🩺 Case · 케이스 <span class="subtab-count" id="alabasta-subtab-case-count">0</span></button>
+                    <button type="button" id="alabasta-subtab-product" class="alabasta-subtab" role="tab"
+                            aria-selected="false" onclick="setAlabastaSubtab('product')">🛒 Product · 상품 <span class="subtab-count" id="alabasta-subtab-product-count">0</span></button>
+                </div>
+                <div id="alabasta-case-pane">
                 <!-- V91.93: Date range filter as popover — single trigger button replaces inline 4-chip row -->
                 <div class="alabasta-date-popover-wrap">
                     <button type="button"
@@ -10911,6 +10964,43 @@
                         </thead>
                         <tbody></tbody>
                     </table>
+                </div>
+                </div><!-- /#alabasta-case-pane -->
+
+                <!-- V97.58 Product Listing Phase 2: intern-submitted products for the shop's
+                     LINE MAN storefront. Reviewing here awards a bonus and syncs the
+                     `submissions` mirror, same contract as the Case queue. -->
+                <div id="alabasta-product-pane" style="display:none;">
+                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+                        <input type="text" id="alabasta-product-search" placeholder="🔎 Search product, user, category · 상품 · 사용자 · 카테고리 검색..." onkeyup="renderAlabastaProducts()" style="margin:0; width:280px; max-width:100%; padding:5px 12px; font-size:0.8em; border-radius:20px; border:1px solid #fcd34d;">
+                        <button type="button" id="alabasta-product-archived-toggle" class="alabasta-icon-toggle" onclick="toggleAlabastaProductArchived()" title="Show Reviewed · 검토 완료 표시" aria-pressed="false" aria-label="Show Reviewed · 검토 완료 표시">
+                            <i class="fa-solid fa-box-archive" aria-hidden="true"></i>
+                        </button>
+                        <input type="checkbox" id="alabasta-product-show-archived" onchange="renderAlabastaProducts()" hidden>
+                        <span style="font-size:0.72em; color:#92400e; font-weight:700; background:#fff; border:1px solid #fcd34d; border-radius:999px; padding:3px 10px;">Total · 전체 <b id="alabasta-product-total">0</b></span>
+                        <span style="font-size:0.72em; color:#92400e; font-weight:700; background:#fff; border:1px solid #fcd34d; border-radius:999px; padding:3px 10px;">Pending · 대기 <b id="alabasta-product-pending">0</b></span>
+                        <span style="font-size:0.72em; color:#166534; font-weight:700; background:#fff; border:1px solid #86efac; border-radius:999px; padding:3px 10px;">Reviewed · 검토 완료 <b id="alabasta-product-reviewed">0</b></span>
+                    </div>
+                    <div id="alabasta-product-category-pills" class="alabasta-filter-pills-row" aria-label="Filter by product category"></div>
+                    <div style="overflow-x:auto;">
+                        <table id="alabastaProductTable" class="admin-table">
+                            <thead>
+                                <tr style="background:#fef3c7;">
+                                    <th>Time · 시간</th>
+                                    <th>User · 사용자</th>
+                                    <th>Product · 상품</th>
+                                    <th>Category · 카테고리</th>
+                                    <th>Price · 가격</th>
+                                    <th>Description · 설명</th>
+                                    <th>Platform · 플랫폼</th>
+                                    <th>Score · 점수</th>
+                                    <th>Status · 상태</th>
+                                    <th>Action · 작업</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -20391,7 +20481,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e => console.warn('[admin auth] setPersistence failed', e));
         const GOOGLE_POPUP_TIMEOUT_MS = 7000;
 
-        var usersData = [], worksData = [], casesData = [], quizApprovedData = [], sideQuestsCache = {}, questsCache = [], questsSubCache = {}, questsSubList = [];
+        var usersData = [], worksData = [], casesData = [], productListingsData = [], quizApprovedData = [], sideQuestsCache = {}, questsCache = [], questsSubCache = {}, questsSubList = [];
         var knowledgeBaseCache = []; // Required by PDF-to-Quiz and Research grounding
         var reflectiveLogsCache = [];
         var learningNotesCache = []; // V91.71: Section 9 — Learning Note submissions for admin Kanban review
@@ -30541,6 +30631,17 @@ RULES:
                 }
             });
 
+            // V97.58 Product Listing Phase 2: second Alabasta queue.
+            db.collection("product_listings").orderBy("timestamp", "desc").limit(200).onSnapshot(s => {
+                productListingsData = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderAlabastaProducts();
+            }, e => {
+                console.error("🔥 [Firestore Error] product_listings:", e);
+                if (e.code === 'permission-denied') {
+                    showToast("⚠️ Permission denied for Alabasta Products", "error");
+                }
+            });
+
             db.collection("users").orderBy("score", "desc").onSnapshot(s => {
                 usersData = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderUserGroupTabs();
@@ -31637,7 +31738,337 @@ RULES:
             // V91.91: keep bulk toolbar count + select-all tri-state in sync after every render.
             renderAlabastaBulkToolbar();
             syncAlabastaSelectAllCheckbox();
+            syncAlabastaSubtabCounts();
         }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // 🛒 PRODUCT LISTING REVIEW — [Version: V97.58 Phase 2]
+        // Second queue inside the Alabasta card, for the intern-submitted
+        // products that feed the shop's LINE MAN storefront. Review awards a
+        // bonus and stages the `submissions` mirror through stageSubmissionMirror
+        // — skipping that is what leaves an intern's card stuck on "pending".
+        // ═══════════════════════════════════════════════════════════════════
+        // Keys mirror PRODUCT_CATEGORIES in public/index.html.
+        const ALABASTA_PRODUCT_CATEGORIES = [
+            { key: 'otc', emoji: '💊', label: 'OTC' },
+            { key: 'supplement', emoji: '🌿', label: 'Supplement' },
+            { key: 'cosmeceutical', emoji: '🧴', label: 'Cosmeceutical' },
+            { key: 'medical_supply', emoji: '🩹', label: 'Medical Supply' },
+            { key: 'mother_baby', emoji: '👶', label: 'Mother & Baby' },
+            { key: 'personal_care', emoji: '🪥', label: 'Personal Care' },
+            { key: 'other', emoji: '📦', label: 'Other' }
+        ];
+
+        window.alabastaSubtab = 'case';
+        window.alabastaProductCategoryFilter = 'all';
+
+        function isAlabastaProductReviewed(p) {
+            return !!p.isArchived || (p.status || '') === 'reviewed';
+        }
+
+        // Both sub-tab chips show their PENDING count — the actionable number.
+        function syncAlabastaSubtabCounts() {
+            const caseEl = document.getElementById('alabasta-subtab-case-count');
+            const prodEl = document.getElementById('alabasta-subtab-product-count');
+            if (caseEl) caseEl.textContent = (casesData || []).filter(c => !c.isArchived && (c.status || 'pending') !== 'reviewed').length;
+            if (prodEl) prodEl.textContent = (productListingsData || []).filter(p => !isAlabastaProductReviewed(p)).length;
+        }
+
+        function setAlabastaSubtab(tab) {
+            window.alabastaSubtab = tab;
+            const isCase = tab === 'case';
+            ['case', 'product'].forEach(t => {
+                const btn = document.getElementById(`alabasta-subtab-${t}`);
+                if (btn) {
+                    btn.classList.toggle('active', t === tab);
+                    btn.setAttribute('aria-selected', t === tab ? 'true' : 'false');
+                }
+            });
+            const casePane = document.getElementById('alabasta-case-pane');
+            const productPane = document.getElementById('alabasta-product-pane');
+            // The header toolbar holds the case search + case counters, so it
+            // belongs to the Case pane; the Product pane carries its own.
+            const caseToolbar = document.getElementById('alabasta-case-toolbar');
+            if (casePane) casePane.style.display = isCase ? '' : 'none';
+            if (productPane) productPane.style.display = isCase ? 'none' : '';
+            if (caseToolbar) caseToolbar.style.display = isCase ? 'flex' : 'none';
+            if (!isCase) renderAlabastaProducts();
+        }
+
+        function toggleAlabastaProductArchived() {
+            const cb = document.getElementById('alabasta-product-show-archived');
+            const btn = document.getElementById('alabasta-product-archived-toggle');
+            if (!cb || !btn) return;
+            cb.checked = !cb.checked;
+            btn.setAttribute('aria-pressed', cb.checked ? 'true' : 'false');
+            cb.dispatchEvent(new Event('change'));
+        }
+
+        function setAlabastaProductCategoryFilter(key) {
+            window.alabastaProductCategoryFilter = key;
+            renderAlabastaProducts();
+        }
+
+        function getAlabastaProductCategory(key) {
+            return ALABASTA_PRODUCT_CATEGORIES.find(c => c.key === key) || null;
+        }
+
+        function renderAlabastaProductCategoryPills(baseFiltered) {
+            const row = document.getElementById('alabasta-product-category-pills');
+            if (!row) return;
+            const active = window.alabastaProductCategoryFilter || 'all';
+            const counts = {};
+            baseFiltered.forEach(p => {
+                const k = p.categoryKey || 'other';
+                counts[k] = (counts[k] || 0) + 1;
+            });
+            const pills = [
+                `<button type="button" class="alabasta-filter-pill ${active === 'all' ? 'active' : ''}" onclick="setAlabastaProductCategoryFilter('all')">All · 전체 <span class="pill-count">${baseFiltered.length}</span></button>`
+            ];
+            ALABASTA_PRODUCT_CATEGORIES.forEach(c => {
+                const n = counts[c.key] || 0;
+                // Hide empty categories unless one is the active filter, so the rail
+                // doesn't carry seven dead chips on a queue of three products.
+                if (!n && active !== c.key) return;
+                pills.push(`<button type="button" class="alabasta-filter-pill ${active === c.key ? 'active' : ''}" onclick="setAlabastaProductCategoryFilter('${c.key}')">${c.emoji} ${c.label} <span class="pill-count">${n}</span></button>`);
+            });
+            row.innerHTML = pills.join('');
+        }
+
+        function renderAlabastaProducts() {
+            syncAlabastaSubtabCounts();
+            const tbody = document.querySelector('#alabastaProductTable tbody');
+            if (!tbody) return;
+
+            const safe = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            const showArchived = !!document.getElementById('alabasta-product-show-archived')?.checked;
+            const keyword = ((document.getElementById('alabasta-product-search') || {}).value || '').toLowerCase().trim();
+
+            const baseFiltered = (productListingsData || []).filter(p => showArchived || !p.isArchived).filter(p => {
+                if (activeBoardGroup !== 'All') {
+                    const user = usersData.find(u => u.id === p.userId);
+                    if ((user?.group || 'Public') !== activeBoardGroup) return false;
+                }
+                if (!keyword) return true;
+                const text = [p.name, p.displayName, p.categoryLabel, p.description, p.packSize, p.note, p.userId, p.status]
+                    .map(x => String(x || '').toLowerCase()).join(' ');
+                return text.includes(keyword);
+            });
+
+            const catFilter = window.alabastaProductCategoryFilter || 'all';
+            const filtered = catFilter === 'all'
+                ? baseFiltered
+                : baseFiltered.filter(p => (p.categoryKey || 'other') === catFilter);
+
+            renderAlabastaProductCategoryPills(baseFiltered);
+
+            const totalEl = document.getElementById('alabasta-product-total');
+            const pendingEl = document.getElementById('alabasta-product-pending');
+            const reviewedEl = document.getElementById('alabasta-product-reviewed');
+            if (totalEl) totalEl.textContent = filtered.length;
+            if (pendingEl) pendingEl.textContent = filtered.filter(p => !isAlabastaProductReviewed(p)).length;
+            if (reviewedEl) reviewedEl.textContent = filtered.filter(p => isAlabastaProductReviewed(p)).length;
+
+            if (filtered.length === 0) {
+                const emptyMsg = catFilter === 'all'
+                    ? 'No product submissions found · 상품이 없습니다'
+                    : 'No products in the selected category · 선택된 카테고리에 해당하는 상품이 없습니다';
+                tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:#94a3b8; padding:14px;">${emptyMsg}</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(p => {
+                const isReviewed = isAlabastaProductReviewed(p);
+                const ts = p.timestamp && p.timestamp.toDate ? p.timestamp.toDate().toLocaleString('th-TH') : '-';
+                const statusColor = isReviewed ? '#16a34a' : '#d97706';
+                const statusBg = isReviewed ? '#ecfdf5' : '#fffbeb';
+                const bonus = Number(p.adminBonus || 0);
+                const scoreHtml = isReviewed
+                    ? `<span class="badge" style="background:#ecfdf5; color:#166534; border:1px solid rgba(22,101,52,0.18); font-weight:800;">${bonus.toFixed(2)} pts</span>`
+                    : `<span style="color:#94a3b8; font-size:0.82em;">-</span>`;
+                const cat = getAlabastaProductCategory(p.categoryKey);
+                const catHtml = cat ? `${cat.emoji} ${safe(cat.label)}` : safe(p.categoryLabel || '-');
+                const hasPromo = p.promoPrice !== null && p.promoPrice !== undefined && p.promoPrice !== '';
+                const promoHtml = hasPromo
+                    ? ` <span style="color:#dc2626; font-weight:800;">→ ฿${safe(Number(p.promoPrice).toFixed(2))}</span>`
+                    : '';
+                const platforms = Array.isArray(p.platforms) && p.platforms.length ? safe(p.platforms.join(', ')) : '-';
+                const statusBtn = isReviewed
+                    ? `<button class="btn-sm alabasta-action-btn is-reopen" title="Reopen product · 상품 재개" onclick="updateProductListingStatus('${p.id}', 'pending')"><span class="alabasta-emoji">↩️</span></button>`
+                    : `<button class="btn-sm alabasta-action-btn is-review" title="Mark reviewed · 검토 완료로 표시" onclick="updateProductListingStatus('${p.id}', 'reviewed')"><span class="alabasta-emoji">✅</span></button>`;
+                const deleteBtn = `<button class="btn-sm alabasta-action-btn is-delete" title="Delete product · 상품 삭제" onclick="deleteProductListing('${p.id}')"><span class="alabasta-emoji">🗑️</span></button>`;
+
+                return `
+                    <tr>
+                        <td style="font-size:0.8em; white-space:nowrap;">${safe(ts)}</td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <img src="${safe(p.pictureUrl || '')}" style="width:28px; height:28px; border-radius:50%; object-fit:cover; background:#e2e8f0;" onerror="this.style.display='none'">
+                                <div style="font-weight:700;">${safe(p.displayName || p.userId || '-')}</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div style="font-weight:700;">${safe(p.name || '-')}</div>
+                            ${p.packSize ? `<div style="font-size:0.78em; color:#64748b;">${safe(p.packSize)}</div>` : ''}
+                        </td>
+                        <td style="white-space:nowrap;">${catHtml}</td>
+                        <td style="white-space:nowrap; font-weight:700;">฿${safe(Number(p.price || 0).toFixed(2))}${promoHtml}</td>
+                        <td style="max-width:280px; white-space:normal;">${safe(p.description || '-')}</td>
+                        <td style="font-size:0.8em;">${platforms}</td>
+                        <td>${scoreHtml}</td>
+                        <td><span class="badge" style="background:${statusBg}; color:${statusColor}; border:1px solid ${statusColor}33;">${isReviewed ? 'reviewed · 검토 완료' : 'pending · 대기'}</span></td>
+                        <td><div class="alabasta-action-row">${statusBtn}${deleteBtn}</div></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function updateProductListingStatus(productDocId, status) {
+            try {
+                const item = (productListingsData || []).find(p => p.id === productDocId) || {};
+                const ref = db.collection('product_listings').doc(productDocId);
+
+                if (status === 'reviewed') {
+                    // Reuses the Case score modal — it only reads `caseId` (label) and
+                    // `adminBonus` (prefill), so the product name stands in for the HN.
+                    const input = await openCaseReviewScoreModal({ caseId: item.name || productDocId, adminBonus: item.adminBonus });
+                    if (input === null) return;
+
+                    const bonus = parseFloat(String(input).trim());
+                    if (!Number.isFinite(bonus) || bonus < 0) {
+                        alert('Please enter a score (0 or higher).');
+                        return;
+                    }
+
+                    const batch = db.batch();
+                    batch.update(ref, {
+                        status: 'reviewed',
+                        isArchived: true,
+                        archivedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        adminBonus: bonus,
+                        adminUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        adminReviewedBy: ALLOWED_EMAIL || 'admin'
+                    });
+
+                    if (bonus > 0 && item.userId) {
+                        batch.update(db.collection('users').doc(item.userId), {
+                            score: firebase.firestore.FieldValue.increment(bonus)
+                        });
+                        const logRef = db.collection('checkin_logs').doc();
+                        batch.set(logRef, {
+                            userId: item.userId,
+                            type: 'product_review_bonus',
+                            amount: bonus,
+                            note: `Product reviewed: ${item.name || productDocId}`,
+                            sourceProductDocId: productDocId,
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        batch.update(ref, { reviewLogId: logRef.id });
+                    }
+
+                    // Sync the mirror so the intern's pending state clears.
+                    await stageSubmissionMirror(batch, productDocId, submissionReviewedFields(bonus));
+
+                    await batch.commit();
+                    if (typeof showToast === 'function') showToast(`Reviewed +${bonus.toFixed(2)} pts · 검토 완료`, 'success');
+                    return;
+                }
+
+                // Reopen reverts the awarded score and writes a compensating log, same
+                // contract as the case reopen path — without it, re-reviewing would
+                // stack a second bonus on top of the first.
+                const previousBonus = parseFloat(item.adminBonus) || 0;
+                const previousLogId = item.reviewLogId || null;
+
+                if (previousBonus > 0 && item.userId) {
+                    const ok = confirm(`Reopen this product? · 상품을 재개하시겠습니까?\n\nThis will revert ${previousBonus.toFixed(2)} pts from the user. · 사용자에게서 ${previousBonus.toFixed(2)}점이 회수됩니다.`);
+                    if (!ok) return;
+                }
+
+                const reopenBatch = db.batch();
+                const reopenUpdate = {
+                    status: 'pending',
+                    isArchived: false,
+                    adminBonus: 0,
+                    adminUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    adminReviewedBy: ALLOWED_EMAIL || 'admin'
+                };
+                if (previousLogId) reopenUpdate.reviewLogId = firebase.firestore.FieldValue.delete();
+                reopenBatch.update(ref, reopenUpdate);
+
+                if (previousBonus > 0 && item.userId) {
+                    reopenBatch.update(db.collection('users').doc(item.userId), {
+                        score: firebase.firestore.FieldValue.increment(-previousBonus)
+                    });
+                    reopenBatch.set(db.collection('checkin_logs').doc(), {
+                        userId: item.userId,
+                        type: 'product_review_revert',
+                        amount: -previousBonus,
+                        note: `Product reopened: ${item.name || productDocId}`,
+                        sourceProductDocId: productDocId,
+                        revertOfLogId: previousLogId,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+
+                await stageSubmissionMirror(reopenBatch, productDocId, {
+                    status: 'pending', score: 0, adminBonus: 0, pointsAwarded: false, pointsAmount: 0
+                });
+
+                await reopenBatch.commit();
+                const revertSuffix = previousBonus > 0 && item.userId
+                    ? ` · −${previousBonus.toFixed(2)} pts reverted · ${previousBonus.toFixed(2)}점 회수`
+                    : '';
+                if (typeof showToast === 'function') showToast(`Product reopened · 상품 재개${revertSuffix}`, 'success');
+            } catch (e) {
+                console.error('Failed to update product status:', e);
+                alert('Failed to update product status: ' + e.message);
+            }
+        }
+
+        async function deleteProductListing(productDocId) {
+            const item = (productListingsData || []).find(p => p.id === productDocId);
+            if (!item) {
+                alert('Product not found');
+                return;
+            }
+            const bonus = Number(item.adminBonus || 0);
+            const confirmText = bonus > 0
+                ? `Delete this product submission and revert ${bonus.toFixed(2)} pts? This cannot be undone.`
+                : 'Delete this product submission? This cannot be undone.';
+            if (!confirm(confirmText)) return;
+
+            try {
+                const batch = db.batch();
+                batch.delete(db.collection('product_listings').doc(productDocId));
+
+                if (bonus > 0 && item.userId) {
+                    batch.update(db.collection('users').doc(item.userId), {
+                        score: firebase.firestore.FieldValue.increment(-bonus)
+                    });
+                }
+                if (item.reviewLogId) {
+                    batch.delete(db.collection('checkin_logs').doc(item.reviewLogId));
+                }
+
+                // Remove the mirror twin too, or the intern keeps seeing the card in
+                // Work History for a product that no longer exists.
+                const mirrorCount = await stageSubmissionMirrorDelete(batch, productDocId);
+
+                await batch.commit();
+                productListingsData = productListingsData.filter(p => p.id !== productDocId);
+                renderAlabastaProducts();
+                if (typeof showToast === 'function') {
+                    showToast((bonus > 0 ? `Product deleted and reverted ${bonus.toFixed(2)} pts` : 'Product deleted')
+                        + (mirrorCount ? ` · cleared ${mirrorCount} history entr${mirrorCount === 1 ? 'y' : 'ies'}` : ''), 'success');
+                }
+            } catch (e) {
+                console.error('Failed to delete product:', e);
+                alert('Failed to delete product: ' + e.message);
+            }
+        }
+        // ─── end Product Listing Review ─────────────────────────────────────
 
         // V91.82: alabastaTaxonomyCatalog now provided by public/case-taxonomy.js
         // (compat shim from CASE_SYSTEMS — 12 systems unified with LIFF, adds
@@ -33287,7 +33718,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         const ORPHAN_MIRROR_TYPES = [
             { submissionType: 'reflective', sourceCollection: 'reflective_logs' },
             { submissionType: 'case',       sourceCollection: 'cases' },
-            { submissionType: 'work',       sourceCollection: 'works' }
+            { submissionType: 'work',       sourceCollection: 'works' },
+            { submissionType: 'product',    sourceCollection: 'product_listings' }
         ];
 
         async function _findOrphanMirrors() {
@@ -33380,6 +33812,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (sourceType === 'cases')           return { reviewed: src.status === 'reviewed' || !!src.isArchived, bonus: parseFloat(src.adminBonus) || 0 };
             if (sourceType === 'works')           return { reviewed: src.status === 'ตรวจแล้ว', bonus: parseFloat(src.score) || 0 };
             if (sourceType === 'reflective_logs') return { reviewed: (src.adminBonus !== undefined && src.adminBonus !== null) || !!(src.adminComment && String(src.adminComment).trim()), bonus: parseFloat(src.adminBonus) || 0 };
+            if (sourceType === 'product_listings') return { reviewed: src.status === 'reviewed' || !!src.isArchived, bonus: parseFloat(src.adminBonus) || 0 };
             return { reviewed: false, bonus: 0 };
         }
 
@@ -33394,7 +33827,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; }
             try {
                 const snap = await db.collection('submissions').where('status', '==', 'pending').get();
-                const targets = snap.docs.filter(d => ['case', 'work', 'reflective'].includes(d.data().submissionType));
+                const targets = snap.docs.filter(d => ['case', 'work', 'reflective', 'product'].includes(d.data().submissionType));
                 let fixed = 0;
                 let batch = db.batch(), ops = 0;
                 for (const doc of targets) {
