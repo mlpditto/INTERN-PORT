@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.36)</title>
+    <title>Internship Portfolio (V96.37)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -1593,10 +1593,53 @@
             font-size: 0.92em;
         }
 
+        /* ── Product Listing Submit UI (V96.37) ───────────────────
+           Reuses .cs-step / .cs-num / .cs-badge / .cs-req-input from the Case
+           step UI above; only the field grid and the chip rails are new. */
+        .pl-form-grid {
+            display: grid;
+            grid-template-columns: minmax(160px, 1.6fr) minmax(110px, 1fr) minmax(110px, 1fr);
+            gap: 12px;
+        }
+
+        .pl-chip {
+            /* V96.14 button-trap: defeat the global `button { width:100%; min-height:48px }`
+               (index.html:341) that would otherwise stack each chip full-width. */
+            width: auto;
+            min-height: 0;
+            border: 1.5px solid #dbeafe;
+            background: #fff;
+            color: #4361ee;
+            border-radius: 999px;
+            padding: 8px 14px;
+            font-size: 0.8em;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .pl-chip:hover {
+            border-color: #93c5fd;
+            background: #f0f7ff;
+        }
+
+        .pl-chip.selected {
+            background: #4361ee;
+            border-color: #4361ee;
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(67, 97, 238, 0.18);
+        }
+        /* ── end Product Listing UI ───────────────────────────── */
+
         @media (max-width: 640px) {
 
             .case-form-grid,
-            .case-taxonomy-row {
+            .case-taxonomy-row,
+            .pl-form-grid {
                 grid-template-columns: 1fr;
             }
 
@@ -4052,6 +4095,143 @@
                         <div id="case-pane-stats" class="case-tab-pane">
                             <div class="case-pane-shell">
                                 <div id="case-stats-pane-content"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══════════════════════════════════════════════════════════
+                 🛒 PRODUCT LISTING (V96.37 Phase 1) — intern logs a product
+                 for the shop's LINE MAN storefront. Text-only; photo upload
+                 and AI auto-fill are later phases. Writes `product_listings`
+                 + the unified `submissions` mirror (submissionType:'product').
+                 ═══════════════════════════════════════════════════════════ -->
+            <div id="section-products" style="margin-bottom: 25px;">
+                <div class="card"
+                    style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #f59e0b;">
+                    <div class="gl-minimal-header" onclick="toggleProductSection()"
+                        style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #fffbeb;">
+                        <h4 style="margin: 0; font-size: 1.1em; color: #b45309;"><i
+                                class="fa-solid fa-cart-shopping"></i>
+                            Product Listing 상품 등록</h4>
+                        <i id="product-section-icon" class="fa-solid fa-chevron-down"
+                            style="color: #b45309; transition: 0.3s; font-size: 0.9em;"></i>
+                    </div>
+                    <div id="product-section-content"
+                        style="display: none; border-top: 1px solid #f0f0f0; background: #fff;">
+                        <div class="case-pane-shell">
+
+                            <!-- STEP 1: Product Info (Required) -->
+                            <div class="cs-step">
+                                <div class="cs-step-head">
+                                    <span class="cs-num">1</span>
+                                    <span class="cs-label">Product Info 상품 정보</span>
+                                    <span class="cs-badge req">Required 필수</span>
+                                </div>
+                                <div class="pl-form-grid">
+                                    <div>
+                                        <label
+                                            style="font-size:0.8em; font-weight:700; color:#b45309; display:block; margin-bottom:5px;">🏷️
+                                            Product Name* 상품명</label>
+                                        <input type="text" id="p-name" placeholder="e.g. Paracetamol 500mg"
+                                            class="cs-req-input" style="margin:0;" maxlength="120"
+                                            oninput="onProductFieldInput()">
+                                    </div>
+                                    <div>
+                                        <label
+                                            style="font-size:0.8em; font-weight:700; color:#b45309; display:block; margin-bottom:5px;">💰
+                                            Price ฿* 가격</label>
+                                        <input type="number" id="p-price" placeholder="e.g. 35" class="cs-req-input"
+                                            style="margin:0;" min="0" step="0.01" inputmode="decimal"
+                                            oninput="onProductFieldInput()">
+                                    </div>
+                                    <div>
+                                        <label
+                                            style="font-size:0.8em; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">🔖
+                                            Promo Price ฿ 할인가</label>
+                                        <input type="number" id="p-promo" placeholder="optional" style="margin:0;"
+                                            min="0" step="0.01" inputmode="decimal">
+                                    </div>
+                                </div>
+                                <div style="margin-top:12px;">
+                                    <label
+                                        style="font-size:0.8em; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">📦
+                                        Pack Size 포장 단위</label>
+                                    <input type="text" id="p-size" placeholder="e.g. 10 tablets/strip · 60 ml"
+                                        style="margin:0;" maxlength="80">
+                                </div>
+                            </div>
+
+                            <!-- STEP 2: Category (Required) -->
+                            <div class="cs-step">
+                                <div class="cs-step-head">
+                                    <span class="cs-num">2</span>
+                                    <span class="cs-label">Category 카테고리</span>
+                                    <span class="cs-badge req">Required 필수</span>
+                                </div>
+                                <input type="hidden" id="p-category">
+                                <div id="product-category-chips" class="case-chip-group" style="margin-top:0;">
+                                    <!-- rendered by renderProductCategoryChips() -->
+                                </div>
+                            </div>
+
+                            <!-- STEP 3: Description (Required) -->
+                            <div class="cs-step">
+                                <div class="cs-step-head">
+                                    <span class="cs-num">3</span>
+                                    <span class="cs-label">Description 상품 설명</span>
+                                    <span class="cs-badge req">Required 필수</span>
+                                </div>
+                                <textarea id="p-description" rows="4" maxlength="500"
+                                    placeholder="What it is, what it's for, how to take it, any warning... 효능, 복용법, 주의사항..."
+                                    style="margin:0;" oninput="onProductFieldInput()"></textarea>
+                                <div
+                                    style="text-align: right; font-size: 0.75em; color: #64748b; margin-top: 4px;">
+                                    <span id="p-desc-count" style="font-weight: 600;">0</span>/500 characters 글자
+                                </div>
+                            </div>
+
+                            <!-- STEP 4: Platform + note (Optional) -->
+                            <div class="cs-step">
+                                <div class="cs-step-head">
+                                    <span class="cs-num opt">4</span>
+                                    <span class="cs-label">Platform &amp; Note 플랫폼 및 메모</span>
+                                    <span class="cs-badge opt">Optional 선택</span>
+                                </div>
+                                <div id="product-platform-chips" class="case-chip-group" style="margin-top:0;">
+                                    <!-- rendered by renderProductPlatformChips() -->
+                                </div>
+                                <textarea id="p-note" rows="2" maxlength="300"
+                                    placeholder="Anything the admin should know... 관리자에게 남길 메모..."
+                                    style="margin-top:10px;"></textarea>
+                            </div>
+
+                            <div id="product-cta-row" style="display:flex; gap:8px; margin-top:4px;">
+                                <button class="btn-secondary" onclick="clearProductForm()" id="product-clear-btn"
+                                    style="flex:1; font-weight:600; border-radius:12px; height:48px; background:#f1f5f9; border:2px solid #e2e8f0; color:#64748b; cursor:pointer; transition:all 0.2s ease;">
+                                    🗑️ Clear 초기화
+                                </button>
+                                <button class="btn-primary" onclick="submitProduct()" id="product-submit-btn"
+                                    style="flex:1; font-weight:bold; border-radius:12px; height:48px; opacity:0.5; cursor:not-allowed;"
+                                    disabled>
+                                    🚀 Submit 제출
+                                </button>
+                            </div>
+
+                            <div id="product-success-card"
+                                style="display:none; margin-top:8px; padding:18px; background:linear-gradient(135deg,#fffbeb,#fef3c7); border:1px solid #f59e0b; border-radius:12px; text-align:center;">
+                                <div style="font-size:1.8em; line-height:1; margin-bottom:6px;">✅</div>
+                                <div style="font-weight:800; color:#b45309; font-size:1.05em; margin-bottom:6px;">
+                                    Product submitted · 상품 등록됨</div>
+                                <div id="product-success-summary"
+                                    style="font-size:0.85em; color:#92400e; margin-bottom:14px; line-height:1.55;">
+                                    <!-- populated by showProductSuccess() -->
+                                </div>
+                                <button type="button" onclick="hideProductSuccess()"
+                                    style="width:100%; height:44px; border-radius:10px; font-weight:700; background:#f59e0b; color:white; border:none; cursor:pointer; font-size:0.88em;">
+                                    📝 Log another · 새로 등록
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -10778,7 +10958,8 @@
                 ['case-section-content', 'case-section-icon'],
                 ['work-section-content', 'work-section-icon'],
                 ['dc-section-content', 'dc-section-icon'],
-                ['dx-section-content', 'dx-section-icon']
+                ['dx-section-content', 'dx-section-icon'],
+                ['product-section-content', 'product-section-icon']
             ];
 
             sectionMap.forEach(([contentId, iconId]) => {
@@ -11129,6 +11310,342 @@
             }
             updateGrandLineDashboard();
         }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // 🛒 PRODUCT LISTING — [Version: V96.37 Phase 1]
+        // Intern-side form for the shop's LINE MAN storefront. Mirrors the Case
+        // submit flow: validation-gated submit button, inline success card, and
+        // a dual write to `product_listings` + the unified `submissions` mirror.
+        // Photo upload and AI description are later phases (see plan).
+        // ═══════════════════════════════════════════════════════════════════
+        const PRODUCT_CATEGORIES = [
+            { key: 'otc', emoji: '💊', label: 'OTC Medicine 일반의약품' },
+            { key: 'supplement', emoji: '🌿', label: 'Supplement 건강기능식품' },
+            { key: 'cosmeceutical', emoji: '🧴', label: 'Cosmeceutical 기능성화장품' },
+            { key: 'medical_supply', emoji: '🩹', label: 'Medical Supply 의료용품' },
+            { key: 'mother_baby', emoji: '👶', label: 'Mother & Baby 유아용품' },
+            { key: 'personal_care', emoji: '🪥', label: 'Personal Care 생활용품' },
+            { key: 'other', emoji: '📦', label: 'Other 기타' }
+        ];
+        const PRODUCT_PLATFORMS = ['LINE MAN', 'Grab', 'Shopee', 'Robinhood'];
+        const PRODUCT_SUBMIT_AUTO_BONUS = 0.01;
+
+        window.productSelectedPlatforms = [];
+        let _productComposerReady = false;
+
+        function toggleProductSection() {
+            const content = document.getElementById('product-section-content');
+            const icon = document.getElementById('product-section-icon');
+            if (!content) return;
+            if (content.style.display === 'none') {
+                closeOtherGrandLineSections('product-section-content');
+                content.style.display = 'block';
+                if (icon) icon.style.transform = 'rotate(180deg)';
+                initProductComposer();
+            } else {
+                content.style.display = 'none';
+                if (icon) icon.style.transform = 'rotate(0deg)';
+            }
+            updateGrandLineDashboard();
+        }
+
+        function initProductComposer() {
+            if (_productComposerReady) return;
+            renderProductCategoryChips();
+            renderProductPlatformChips();
+            updateProductSubmitState();
+            _productComposerReady = true;
+        }
+
+        function renderProductCategoryChips() {
+            const box = document.getElementById('product-category-chips');
+            if (!box) return;
+            const current = (document.getElementById('p-category') || {}).value || '';
+            box.innerHTML = PRODUCT_CATEGORIES.map(c => `
+                <button type="button" class="pl-chip${c.key === current ? ' selected' : ''}"
+                    onclick="selectProductCategory('${c.key}')">
+                    <span>${c.emoji}</span><span>${escapeHtml(c.label)}</span>
+                </button>`).join('');
+        }
+
+        function selectProductCategory(key) {
+            const input = document.getElementById('p-category');
+            if (!input) return;
+            input.value = input.value === key ? '' : key; // tap the selected chip again to clear
+            renderProductCategoryChips();
+            updateProductSubmitState();
+        }
+
+        function renderProductPlatformChips() {
+            const box = document.getElementById('product-platform-chips');
+            if (!box) return;
+            box.innerHTML = PRODUCT_PLATFORMS.map(p => `
+                <button type="button" class="pl-chip${window.productSelectedPlatforms.includes(p) ? ' selected' : ''}"
+                    onclick="toggleProductPlatform('${p}')">${escapeHtml(p)}</button>`).join('');
+        }
+
+        function toggleProductPlatform(name) {
+            const list = window.productSelectedPlatforms;
+            const i = list.indexOf(name);
+            if (i >= 0) list.splice(i, 1); else list.push(name);
+            renderProductPlatformChips();
+        }
+
+        function onProductFieldInput() {
+            const descEl = document.getElementById('p-description');
+            const countEl = document.getElementById('p-desc-count');
+            if (descEl && countEl) countEl.textContent = String(descEl.value.length);
+            updateProductSubmitState();
+        }
+
+        function getProductFormState() {
+            const val = id => (document.getElementById(id) || {}).value || '';
+            const priceRaw = val('p-price').trim();
+            return {
+                name: val('p-name').trim(),
+                priceRaw,
+                price: priceRaw === '' ? NaN : Number(priceRaw),
+                promoRaw: val('p-promo').trim(),
+                packSize: val('p-size').trim(),
+                category: val('p-category'),
+                description: val('p-description').trim(),
+                note: val('p-note').trim()
+            };
+        }
+
+        // Green/red cue on a required text input, but only once the user has
+        // typed something — an untouched field should look neutral, not wrong.
+        function markProductField(id, ok) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const touched = el.value.trim() !== '';
+            el.classList.toggle('valid', ok && touched);
+            el.classList.toggle('invalid', !ok && touched);
+        }
+
+        function updateProductSubmitState() {
+            const btn = document.getElementById('product-submit-btn');
+            if (!btn) return;
+            const s = getProductFormState();
+            const priceOk = Number.isFinite(s.price) && s.price >= 0;
+
+            markProductField('p-name', !!s.name);
+            markProductField('p-price', priceOk);
+
+            const missing = [];
+            if (!s.name) missing.push('Name 상품명');
+            if (!priceOk) missing.push('Price 가격');
+            if (!s.category) missing.push('Category 카테고리');
+            if (!s.description) missing.push('Description 설명');
+
+            if (!missing.length) {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
+                btn.innerHTML = '🚀 Submit 제출';
+            } else {
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+                btn.style.cursor = 'not-allowed';
+                btn.innerHTML = `⚠️ Complete 작성 필요: ${missing.join(', ')}`;
+            }
+        }
+
+        async function awardProductSubmitBonus(productName) {
+            if (!userId) return;
+            try {
+                const b = db.batch();
+                b.update(db.collection('users').doc(userId), {
+                    score: firebase.firestore.FieldValue.increment(PRODUCT_SUBMIT_AUTO_BONUS)
+                });
+                b.set(db.collection('checkin_logs').doc(), {
+                    userId,
+                    type: 'product_submit_bonus',
+                    amount: PRODUCT_SUBMIT_AUTO_BONUS,
+                    note: `Product listing: ${productName}`,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                await b.commit();
+            } catch (bonusErr) {
+                console.warn('Auto bonus failed for product submit:', bonusErr);
+            }
+        }
+
+        async function submitProduct() {
+            const s = getProductFormState();
+            if (!s.name || !Number.isFinite(s.price) || !s.category || !s.description) return;
+
+            const promoPrice = s.promoRaw === '' ? null : Number(s.promoRaw);
+            if (promoPrice !== null && (!Number.isFinite(promoPrice) || promoPrice < 0)) {
+                return alert('Promo price must be a positive number.\n할인가는 0 이상의 숫자여야 합니다.');
+            }
+            if (promoPrice !== null && promoPrice > s.price) {
+                return alert('Promo price is higher than the normal price — please check.\n할인가가 정가보다 높습니다.');
+            }
+
+            const cat = PRODUCT_CATEGORIES.find(c => c.key === s.category);
+            const btn = document.getElementById('product-submit-btn');
+            if (btn) {
+                btn.disabled = true;
+                btn.style.opacity = '0.7';
+                btn.style.cursor = 'wait';
+                btn.innerHTML = '<span style="display:inline-block; animation:spin 1s linear infinite;">⏳</span> Saving 저장 중...';
+            }
+
+            try {
+                const authUser = await ensureFirebaseAuthReady(10000);
+                if (!authUser) throw new Error('Firebase auth is required');
+
+                const productData = {
+                    authUid: authUser.uid,
+                    userId,
+                    displayName: userProfile.displayName,
+                    pictureUrl: userProfile.pictureUrl || '',
+                    name: s.name,
+                    price: s.price,
+                    promoPrice,
+                    packSize: s.packSize,
+                    categoryKey: s.category,
+                    categoryLabel: cat ? cat.label : s.category,
+                    description: s.description,
+                    platforms: [...window.productSelectedPlatforms],
+                    note: s.note,
+                    status: 'pending',
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                const sourceRef = await db.collection('product_listings').add(productData);
+
+                // Unified submissions mirror — same shape submitCase() writes, so
+                // the admin queue can list every submission type from one place.
+                // NOTE: admin review must write BOTH the source doc and this mirror
+                // (via metadata.sourceId) or the row sticks on "pending".
+                try {
+                    await db.collection('submissions').add({
+                        submissionType: 'product',
+                        authUid: authUser.uid,
+                        userId,
+                        displayName: userProfile.displayName,
+                        pictureUrl: userProfile.pictureUrl || '',
+                        title: s.name,
+                        description: s.description,
+                        status: 'pending',
+                        score: 0,
+                        adminComment: '',
+                        adminBonus: 0,
+                        metadata: {
+                            name: s.name,
+                            price: s.price,
+                            promoPrice,
+                            packSize: s.packSize,
+                            categoryKey: s.category,
+                            categoryLabel: cat ? cat.label : s.category,
+                            platforms: [...window.productSelectedPlatforms],
+                            note: s.note,
+                            sourceType: 'product_listings',
+                            sourceId: sourceRef.id
+                        },
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        pointsAwarded: false,
+                        pointsAmount: PRODUCT_SUBMIT_AUTO_BONUS
+                    });
+                } catch (mirrorErr) {
+                    // Non-critical: the source doc is already saved.
+                    console.warn('[Unified] Failed to write product to submissions:', mirrorErr);
+                }
+
+                await awardProductSubmitBonus(s.name);
+                showProductSuccess(s, cat);
+                _silentClearProductForm();
+            } catch (err) {
+                console.error('submitProduct failed:', err);
+                alert('Could not save the product. Please try again.\n저장하지 못했습니다. 다시 시도해주세요.\n\n' + (err && err.message ? err.message : ''));
+            } finally {
+                // Reset every button style this call mutated, on ALL exit paths.
+                if (btn) {
+                    btn.style.opacity = '';
+                    btn.style.cursor = '';
+                }
+                updateProductSubmitState();
+            }
+        }
+
+        function getProductSuccessParts() {
+            return [
+                ...document.querySelectorAll('#product-section-content .cs-step'),
+                document.getElementById('product-cta-row')
+            ].filter(Boolean);
+        }
+
+        function showProductSuccess(s, cat) {
+            const card = document.getElementById('product-success-card');
+            const summaryEl = document.getElementById('product-success-summary');
+            if (!card || !summaryEl) return;
+
+            getProductSuccessParts().forEach(el => {
+                el.dataset.prevDisplay = el.style.display || '';
+                el.style.display = 'none';
+            });
+
+            const platforms = window.productSelectedPlatforms;
+            const promo = s.promoRaw === '' ? '' : ` → ฿${escapeHtml(s.promoRaw)}`;
+            summaryEl.innerHTML = `
+                <div><strong>${escapeHtml(s.name)}</strong></div>
+                <div style="margin-top:4px;">${cat ? cat.emoji + ' ' + escapeHtml(cat.label) : ''} · ฿${escapeHtml(s.priceRaw)}${promo}</div>
+                ${platforms.length ? `<div style="margin-top:4px;">📲 ${escapeHtml(platforms.join(', '))}</div>` : ''}
+            `;
+
+            card.style.display = 'block';
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function hideProductSuccess() {
+            const card = document.getElementById('product-success-card');
+            if (card) card.style.display = 'none';
+            getProductSuccessParts().forEach(el => {
+                if ('prevDisplay' in el.dataset) {
+                    el.style.display = el.dataset.prevDisplay;
+                    delete el.dataset.prevDisplay;
+                }
+            });
+        }
+
+        function _silentClearProductForm() {
+            ['p-name', 'p-price', 'p-promo', 'p-size', 'p-category', 'p-description', 'p-note']
+                .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+            ['p-name', 'p-price'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.remove('valid', 'invalid');
+            });
+            window.productSelectedPlatforms = [];
+            renderProductCategoryChips();
+            renderProductPlatformChips();
+            const countEl = document.getElementById('p-desc-count');
+            if (countEl) countEl.textContent = '0';
+            updateProductSubmitState();
+        }
+
+        function clearProductForm() {
+            if (!confirm('Clear all fields? 모든 필드를 초기화하시겠습니까?\n\nAll data will be lost. 모든 데이터가 사라집니다.')) return;
+            _silentClearProductForm();
+
+            const clearBtn = document.getElementById('product-clear-btn');
+            if (clearBtn) {
+                const originalText = clearBtn.innerHTML;
+                clearBtn.innerHTML = '✅ Cleared 초기화됨!';
+                clearBtn.style.background = '#dcfce7';
+                clearBtn.style.borderColor = '#22c55e';
+                clearBtn.style.color = '#16a34a';
+                setTimeout(() => {
+                    clearBtn.innerHTML = originalText;
+                    clearBtn.style.background = '#f1f5f9';
+                    clearBtn.style.borderColor = '#e2e8f0';
+                    clearBtn.style.color = '#64748b';
+                }, 1500);
+            }
+        }
+        // ─── end Product Listing ────────────────────────────────────────────
 
         function toggleWorkSection() {
             const content = document.getElementById('work-section-content');
