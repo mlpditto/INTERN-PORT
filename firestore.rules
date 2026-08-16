@@ -434,5 +434,14 @@ service cloud.firestore {
     match /cert_meta/{docId} {
       allow read, write: if isAdmin();
     }
+
+    // 34. Product Listings (V96.37 Phase 1) — intern-submitted products for the
+    // shop's LINE MAN storefront. Same ownership model as /cases (rule 17):
+    // owner reads their own, admin reads all, only admin can moderate.
+    match /product_listings/{docId} {
+      allow read: if isAdmin() || isOwnerByAuthUid() || hasLinkedEffectiveUserId();
+      allow create: if isSignedIn() && request.resource.data.authUid == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
   }
 }
