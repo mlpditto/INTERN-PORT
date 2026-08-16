@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.37)</title>
+    <title>Internship Portfolio (V96.38)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -1632,6 +1632,33 @@
             border-color: #4361ee;
             color: #fff;
             box-shadow: 0 4px 12px rgba(67, 97, 238, 0.18);
+        }
+
+        /* V96.38: ✨ AI draft button, sits in the Description step head. */
+        .pl-ai-btn {
+            /* width:auto + min-height:0 defeat the global button rule (index.html:341) */
+            width: auto;
+            min-height: 0;
+            padding: 5px 12px;
+            border: 1px solid #c7d2fe;
+            border-radius: 999px;
+            background: #eef2ff;
+            color: #4338ca;
+            font-size: 0.72em;
+            font-weight: 800;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.15s ease;
+        }
+
+        .pl-ai-btn:hover:not(:disabled) {
+            background: #e0e7ff;
+            border-color: #818cf8;
+        }
+
+        .pl-ai-btn:disabled {
+            opacity: 0.6;
+            cursor: wait;
         }
         /* ── end Product Listing UI ───────────────────────────── */
 
@@ -4181,11 +4208,19 @@
                                 <div class="cs-step-head">
                                     <span class="cs-num">3</span>
                                     <span class="cs-label">Description 상품 설명</span>
+                                    <!-- V96.38 Phase 4: Typhoon draft, same proxy path the quiz
+                                         translator uses. Plain prose, so nothing to JSON-parse. -->
+                                    <button type="button" id="p-ai-btn" class="pl-ai-btn"
+                                        onclick="draftProductDescription()"
+                                        title="Let AI write a first draft from the name and category">✨ AI draft
+                                        초안</button>
                                     <span class="cs-badge req">Required 필수</span>
                                 </div>
                                 <textarea id="p-description" rows="4" maxlength="500"
                                     placeholder="What it is, what it's for, how to take it, any warning... 효능, 복용법, 주의사항..."
                                     style="margin:0;" oninput="onProductFieldInput()"></textarea>
+                                <div id="p-ai-note"
+                                    style="display:none; margin-top:8px; padding:8px 12px; border:1px solid; border-radius:10px; font-size:0.78em; line-height:1.5;"></div>
                                 <div
                                     style="text-align: right; font-size: 0.75em; color: #64748b; margin-top: 4px;">
                                     <span id="p-desc-count" style="font-weight: 600;">0</span>/500 characters 글자
@@ -11451,6 +11486,121 @@
             }
         }
 
+        // ─── ✨ AI draft description (V96.38 Phase 4) ────────────────────────
+        // Same proxy path the quiz translator uses (Typhoon is the only provider
+        // a non-admin caller is allowed). isJson:false on purpose — a blurb is
+        // prose, so there is no JSON to truncate or fail to parse.
+        const PRODUCT_AI_PROXY_URL = 'https://us-central1-intern-port-edfa7.cloudfunctions.net/callAIProxy';
+        const PRODUCT_AI_MODEL = 'typhoon-v2.5-30b-a3b-instruct';
+
+        // Set when AI fills the box, compared on submit — a draft must not reach
+        // the storefront without a human having passed over it.
+        window.productAiDraftText = '';
+
+        function setProductAiNote(msg, kind) {
+            const el = document.getElementById('p-ai-note');
+            if (!el) return;
+            if (!msg) {
+                el.style.display = 'none';
+                el.textContent = '';
+                return;
+            }
+            const palette = {
+                warn: { bg: '#fffbeb', border: '#fcd34d', color: '#92400e' },
+                error: { bg: '#fef2f2', border: '#fecaca', color: '#b91c1c' }
+            }[kind] || { bg: '#eff6ff', border: '#bfdbfe', color: '#1e40af' };
+            el.style.display = 'block';
+            el.style.background = palette.bg;
+            el.style.borderColor = palette.border;
+            el.style.color = palette.color;
+            el.textContent = msg;
+        }
+
+        // Language rule FIRST and neutral <<<markers>>> around the data — an
+        // English-only template biases the model into answering in English.
+        // The blurb is customer-facing on a Thai storefront, so it must be Thai.
+        function buildProductDescriptionPrompt(name, categoryLabel, packSize) {
+            return [
+                'ตอบเป็นภาษาไทยเท่านั้น',
+                '',
+                'You are helping a Thai pharmacy write a short product blurb for its LINE MAN storefront.',
+                '',
+                'RULES:',
+                '- 2 to 3 short sentences, under 400 characters in total.',
+                '- Describe only what the product plainly is and what it is generally used for.',
+                '- Do NOT invent dosing, indications, medical claims, ingredients, or any number that was not given to you.',
+                '- If you are not sure what the product is, say so plainly instead of guessing.',
+                '- Plain sentences only. No markdown, no bullets, no headings, no surrounding quotes.',
+                '',
+                'PRODUCT:',
+                `<<<name>>> ${name}`,
+                `<<<category>>> ${categoryLabel}`,
+                `<<<pack>>> ${packSize || '-'}`,
+                '',
+                'SELF-CHECK before answering: is every sentence Thai, and is every claim traceable to the PRODUCT block above?'
+            ].join('\n');
+        }
+
+        async function draftProductDescription() {
+            const btn = document.getElementById('p-ai-btn');
+            const descEl = document.getElementById('p-description');
+            if (!btn || !descEl) return;
+
+            const s = getProductFormState();
+            const cat = PRODUCT_CATEGORIES.find(c => c.key === s.category);
+            if (!s.name || !cat) {
+                setProductAiNote('Fill in the product name and pick a category first. 상품명과 카테고리를 먼저 입력해주세요.', 'warn');
+                return;
+            }
+            if (s.description && !confirm('Replace what you have written? 작성한 내용을 대체하시겠습니까?')) return;
+
+            const originalLabel = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Drafting 생성 중...';
+            setProductAiNote('', '');
+
+            try {
+                const authUser = await ensureFirebaseAuthReady(10000);
+                if (!authUser) throw new Error('Firebase auth is required');
+                const idToken = await authUser.getIdToken();
+
+                const resp = await fetch(PRODUCT_AI_PROXY_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken },
+                    body: JSON.stringify({
+                        provider: 'typhoon',
+                        model: PRODUCT_AI_MODEL,
+                        prompt: buildProductDescriptionPrompt(s.name, cat.label, s.packSize),
+                        isJson: false,
+                        feature: 'intern_product_description'
+                    })
+                });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                if (data.error) throw new Error(data.error);
+
+                const draft = String(data.text || '')
+                    .trim()
+                    .replace(/^```[a-z]*\s*/i, '').replace(/\s*```$/, '')  // stray fences
+                    .replace(/^["']|["']$/g, '')
+                    .trim()
+                    .slice(0, 500);                                        // textarea maxlength
+                if (!draft) throw new Error('Empty response');
+
+                descEl.value = draft;
+                window.productAiDraftText = draft;
+                onProductFieldInput();
+                setProductAiNote('AI wrote this draft — check every claim against the box, and edit at least one part before you submit. AI 초안입니다 · 확인 후 수정해주세요.', 'warn');
+            } catch (err) {
+                console.warn('draftProductDescription failed:', err);
+                setProductAiNote('Could not draft right now — please write it yourself or try again. 지금은 생성할 수 없습니다.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalLabel;
+            }
+        }
+        // ────────────────────────────────────────────────────────────────────
+
         async function awardProductSubmitBonus(productName) {
             if (!userId) return;
             try {
@@ -11474,6 +11624,14 @@
         async function submitProduct() {
             const s = getProductFormState();
             if (!s.name || !Number.isFinite(s.price) || !s.category || !s.description) return;
+
+            // V96.38: an untouched AI draft must not reach the storefront. This is a
+            // pharmacy listing — a hallucinated indication would go public verbatim.
+            if (window.productAiDraftText && s.description === window.productAiDraftText) {
+                setProductAiNote('Review the AI draft and edit at least one part before submitting. AI 초안을 확인하고 최소 한 부분은 수정해주세요.', 'error');
+                document.getElementById('p-description')?.focus();
+                return;
+            }
 
             const promoPrice = s.promoRaw === '' ? null : Number(s.promoRaw);
             if (promoPrice !== null && (!Number.isFinite(promoPrice) || promoPrice < 0)) {
@@ -11619,6 +11777,8 @@
                 if (el) el.classList.remove('valid', 'invalid');
             });
             window.productSelectedPlatforms = [];
+            window.productAiDraftText = '';
+            setProductAiNote('', '');
             renderProductCategoryChips();
             renderProductPlatformChips();
             const countEl = document.getElementById('p-desc-count');
