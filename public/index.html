@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.39)</title>
+    <title>Internship Portfolio (V96.40)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4249,6 +4249,12 @@
                                         <div
                                             style="display:flex; align-items:center; gap:10px; margin-top:8px; flex-wrap:wrap;">
                                             <span id="p-photo-meta" style="font-size:0.75em; color:#64748b;"></span>
+                                            <!-- V96.40 Phase 6: Typhoon vision reads the box and fills
+                                                 the form. Price is deliberately never filled. -->
+                                            <button type="button" id="p-vision-btn" class="pl-ai-btn"
+                                                onclick="readProductPhotoWithAI()"
+                                                title="Let AI read the box and fill in name, pack size, category and description">🔎
+                                                Read label 라벨 읽기</button>
                                             <button type="button" class="pl-photo-remove"
                                                 onclick="clearProductPhoto()">✕ Remove 삭제</button>
                                         </div>
@@ -11691,6 +11697,7 @@
                 return;
             }
             const palette = {
+                warn: { bg: '#fffbeb', border: '#fcd34d', color: '#92400e' },
                 error: { bg: '#fef2f2', border: '#fecaca', color: '#b91c1c' }
             }[kind] || { bg: '#eff6ff', border: '#bfdbfe', color: '#1e40af' };
             el.style.display = 'block';
@@ -11787,6 +11794,142 @@
             if (btn) btn.innerHTML = '📷 Take or choose a photo 사진 선택';
             setProductPhotoNote('', '');
         }
+
+        // ─── 🔎 Read the label with AI (V96.40 Phase 6) ──────────────────────
+        // callAIProxy already has a Typhoon vision branch (it switches to
+        // typhoon-v2.5-vision-instruct whenever visionData is present), and the
+        // proxy's non-admin gate only blocks providers OTHER than typhoon — so this
+        // needs no server change and no new provider permission.
+        //
+        // The reply is line-based, NOT JSON. Typhoon has burned this repo before by
+        // emitting unescaped quotes and newlines inside JSON string values, and
+        // index.html has no safeJsonParse to defend with. Four short fields on four
+        // labelled lines have nothing to escape.
+        function blobToBase64(blob) {
+            return new Promise((resolve, reject) => {
+                const fr = new FileReader();
+                fr.onload = () => resolve(String(fr.result).split(',')[1] || '');
+                fr.onerror = () => reject(new Error('Could not read the photo'));
+                fr.readAsDataURL(blob);
+            });
+        }
+
+        function buildProductVisionPrompt() {
+            return [
+                'บรรทัด DESC ต้องเป็นภาษาไทยเท่านั้น',
+                '',
+                "You are reading a photo of a product box for a Thai pharmacy's storefront listing.",
+                '',
+                'Reply with EXACTLY these four lines and nothing else. No markdown, no fences, no commentary.',
+                'NAME: <product name exactly as printed on the box, keeping its original language>',
+                'PACK: <pack size printed on the box, e.g. 10 tablets/strip or 60 ml>',
+                'CATEGORY: <one of: ' + PRODUCT_CATEGORIES.map(c => c.key).join(' | ') + '>',
+                'DESC: <2-3 short Thai sentences on what it is and what it is generally used for>',
+                '',
+                'RULES:',
+                '- Read ONLY what is visible in the photo.',
+                '- Do NOT invent dosing, indications, ingredients, or any number that is not printed.',
+                '- If a field is not legible, write exactly "-" for it. "-" is a correct answer; guessing is not.',
+                '- Never state a price.',
+                '',
+                'SELF-CHECK before answering: are there exactly four lines, is DESC Thai, and is every word traceable to the photo?'
+            ].join('\n');
+        }
+
+        // Lenient on purpose: take the first occurrence of each label, ignore anything
+        // else the model volunteers, and treat "-" as "not legible" rather than a value.
+        function parseProductVisionReply(text) {
+            const out = {};
+            String(text || '').split(/\r?\n/).forEach(line => {
+                const m = line.match(/^\s*(NAME|PACK|CATEGORY|DESC)\s*:\s*(.*)$/i);
+                if (!m) return;
+                const key = m[1].toUpperCase();
+                const val = m[2].trim().replace(/^["']|["']$/g, '').trim();
+                if (!val || /^-+$/.test(val)) return;
+                if (!out[key]) out[key] = val;
+            });
+            return out;
+        }
+
+        async function readProductPhotoWithAI() {
+            const btn = document.getElementById('p-vision-btn');
+            if (!window.productPhotoBlob) {
+                setProductPhotoNote('Attach a photo first. 사진을 먼저 첨부해주세요.', 'error');
+                return;
+            }
+
+            const targets = ['p-name', 'p-size', 'p-description'];
+            const occupied = targets.some(id => (document.getElementById(id) || {}).value) || getProductFormState().category;
+            if (occupied && !confirm('Replace what you have filled in? 입력한 내용을 대체하시겠습니까?')) return;
+
+            const previousLabel = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Reading 읽는 중...'; }
+            setProductPhotoNote('', '');
+
+            try {
+                const authUser = await ensureFirebaseAuthReady(10000);
+                if (!authUser) throw new Error('Firebase auth is required');
+                const idToken = await authUser.getIdToken();
+                const image_base64 = await blobToBase64(window.productPhotoBlob);
+
+                const resp = await fetch(PRODUCT_AI_PROXY_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken },
+                    body: JSON.stringify({
+                        provider: 'typhoon',
+                        prompt: buildProductVisionPrompt(),
+                        isJson: false,
+                        visionData: { image_base64, image_mimetype: 'image/jpeg' },
+                        feature: 'intern_product_vision'
+                    })
+                });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                if (data.error) throw new Error(data.error);
+
+                const fields = parseProductVisionReply(data.text);
+                const filled = [];
+
+                if (fields.NAME) {
+                    document.getElementById('p-name').value = fields.NAME.slice(0, 120);
+                    filled.push('name 상품명');
+                }
+                if (fields.PACK) {
+                    document.getElementById('p-size').value = fields.PACK.slice(0, 80);
+                    filled.push('pack size 포장');
+                }
+                if (fields.CATEGORY) {
+                    const key = fields.CATEGORY.toLowerCase().replace(/[^a-z_]/g, '');
+                    if (PRODUCT_CATEGORIES.some(c => c.key === key)) {
+                        document.getElementById('p-category').value = key;
+                        renderProductCategoryChips();
+                        filled.push('category 카테고리');
+                    }
+                }
+                if (fields.DESC) {
+                    const desc = fields.DESC.slice(0, 500);
+                    document.getElementById('p-description').value = desc;
+                    // Reuse the Phase 4 gate: an AI-written description still cannot be
+                    // submitted untouched.
+                    window.productAiDraftText = desc;
+                    filled.push('description 설명');
+                }
+
+                onProductFieldInput();
+
+                if (!filled.length) {
+                    setProductPhotoNote('AI could not read anything usable from that photo — try a sharper shot of the front of the box. 사진에서 읽어낼 수 없습니다.', 'error');
+                    return;
+                }
+                setProductPhotoNote(`AI filled: ${filled.join(', ')}. Check every field against the box — and note the price is never read from a photo, you must enter it yourself. AI가 입력했습니다 · 반드시 확인하세요.`, 'warn');
+            } catch (err) {
+                console.warn('readProductPhotoWithAI failed:', err);
+                setProductPhotoNote('Could not read the photo right now — please fill the form in yourself or try again. 지금은 읽을 수 없습니다.', 'error');
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = previousLabel; }
+            }
+        }
+        // ────────────────────────────────────────────────────────────────────
 
         async function _productSha256Hex(blob) {
             const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
