@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.61</title>
+    <title>Nika V97.62</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6418,6 +6418,23 @@
                             <div id="line-usage-bar" style="height:100%; width:0%; border-radius:999px; background:#22c55e; transition:width 0.3s;"></div>
                         </div>
                         <div id="line-usage-note" style="margin-top:6px; font-size:0.72em; color:#94a3b8;"></div>
+                    </div>
+
+                    <!-- V97.62 Product Listing Phase 7: this month's storefront submissions.
+                         Reads the productListingsData snapshot the Alabasta queue already
+                         streams — no extra Firestore read. Hidden until the first product
+                         of the month lands. Thai here must stay free of Latin characters
+                         and must never sit after a digit run, for the same reason the LINE
+                         panel above documents: a Thai run backward-absorbs preceding
+                         'other' chars and digits count as 'other'. -->
+                    <div id="product-stats-panel" style="display:none; margin-top:10px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; padding:12px 14px;">
+                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                            <span style="font-weight:700; color:var(--primary);"><i class="fa-solid fa-cart-shopping"></i> Product listings this month เดือนนี้</span>
+                            <span id="product-stats-count" style="font-weight:800; font-size:0.95em;"></span>
+                            <span id="product-stats-breakdown" style="font-size:0.78em; color:#64748b; margin-left:auto;"></span>
+                        </div>
+                        <div id="product-stats-categories" style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;"></div>
+                        <div id="product-stats-note" style="margin-top:6px; font-size:0.72em; color:#94a3b8;"></div>
                     </div>
 
                     <!-- 🔥 Relocated Review Sections inside Dashboard Kanban area -->
@@ -31788,6 +31805,93 @@ RULES:
             return !!p.isArchived || (p.status || '') === 'reviewed';
         }
 
+        // V97.62: name-level duplicate detection across the whole product queue.
+        // This lives on the ADMIN side by necessity, not preference: firestore rule 34
+        // lets an intern read only their OWN listings, so a check on the intern form
+        // structurally cannot see another intern's product — it would miss exactly the
+        // duplicates that matter. Admin streams all of them already.
+        // Threshold is a starting guess, not calibrated: product names are short, so
+        // containment runs high ("Paracetamol 500mg" vs "…250mg" scores well above a
+        // quiz stem would). Tune once there is real data.
+        const PRODUCT_DUP_THRESHOLD = 0.6;
+
+        // Keyed by product id, not array index, so the filtered table can look a row up
+        // while the pairs stay computed over the FULL queue — a duplicate the current
+        // filter hides is still a duplicate.
+        window.computeProductDuplicates = function(list) {
+            const items = (list || []).map(p => ({ id: p.id, name: p.name, key: quizCompareStripMd(p.name || '') }));
+            const byId = new Map();
+            const push = (a, b, score) => {
+                if (!byId.has(a.id)) byId.set(a.id, []);
+                byId.get(a.id).push({ id: b.id, name: b.name, score });
+            };
+            for (let i = 0; i < items.length; i++) {
+                if (!items[i].key) continue;
+                for (let j = i + 1; j < items.length; j++) {
+                    if (!items[j].key) continue;
+                    const score = quizCompareSimilarity(items[i].key, items[j].key);
+                    if (score < PRODUCT_DUP_THRESHOLD) continue;
+                    push(items[i], items[j], score);
+                    push(items[j], items[i], score);
+                }
+            }
+            byId.forEach(l => l.sort((a, b) => b.score - a.score));
+            return byId;
+        };
+
+        // Unlike the Quality Audit chips (V97.61), the peer here is another row in the
+        // same compact table, so scrolling to it keeps both in view — no side-by-side
+        // panel needed. It can still be filtered out of the current view, which is the
+        // one case worth saying out loud rather than silently doing nothing.
+        window.flashProductRow = function(id) {
+            const row = document.querySelector(`#alabastaProductTable tbody tr[data-product-id="${id}"]`);
+            if (!row) {
+                if (typeof showToast === 'function') showToast('That product is hidden by the current search or category filter.', 'info');
+                return;
+            }
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const original = row.style.background;
+            row.style.transition = 'background 0.25s';
+            row.style.background = '#fef3c7';
+            setTimeout(() => { row.style.background = original; }, 1600);
+        };
+
+        // V97.62: dashboard card. Feeds off the snapshot the queue already streams, so
+        // it costs no extra Firestore read.
+        window.renderProductStatsCard = function() {
+            const panel = document.getElementById('product-stats-panel');
+            if (!panel) return;
+            const all = window.productListingsData || [];
+            // Bangkok month, matching the idiom the LINE quota card uses.
+            const month = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }).slice(0, 7);
+            const thisMonth = all.filter(p => {
+                const d = p.timestamp && p.timestamp.toDate ? p.timestamp.toDate() : null;
+                return d && d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }).slice(0, 7) === month;
+            });
+            if (!thisMonth.length) { panel.style.display = 'none'; return; }
+
+            const reviewed = thisMonth.filter(isAlabastaProductReviewed).length;
+            const pending = thisMonth.length - reviewed;
+            const withPhoto = thisMonth.filter(p => !!p.photoUrl).length;
+
+            const counts = {};
+            thisMonth.forEach(p => { const k = p.categoryKey || 'other'; counts[k] = (counts[k] || 0) + 1; });
+            const chips = ALABASTA_PRODUCT_CATEGORIES
+                .filter(c => counts[c.key])
+                .sort((a, b) => counts[b.key] - counts[a.key])
+                .map(c => `<span style="font-size:0.72em; font-weight:700; color:#92400e; background:#fffbeb; border:1px solid #fcd34d; border-radius:999px; padding:2px 9px;">${c.emoji} ${c.label} ${counts[c.key]}</span>`)
+                .join('');
+
+            const contributors = new Set(thisMonth.map(p => p.userId).filter(Boolean)).size;
+            document.getElementById('product-stats-count').textContent = String(thisMonth.length);
+            document.getElementById('product-stats-breakdown').textContent =
+                `${pending} pending · ${reviewed} reviewed · ${withPhoto} with a photo`;
+            document.getElementById('product-stats-categories').innerHTML = chips;
+            document.getElementById('product-stats-note').textContent =
+                `${contributors} contributor${contributors === 1 ? '' : 's'} · counted from the ${all.length} most recent submissions`;
+            panel.style.display = 'block';
+        };
+
         // Both sub-tab chips show their PENDING count — the actionable number.
         function syncAlabastaSubtabCounts() {
             const caseEl = document.getElementById('alabasta-subtab-case-count');
@@ -31885,8 +31989,12 @@ RULES:
 
         function renderAlabastaProducts() {
             syncAlabastaSubtabCounts();
+            window.renderProductStatsCard();
             const tbody = document.querySelector('#alabastaProductTable tbody');
             if (!tbody) return;
+
+            // Computed over the FULL queue, not the filtered view.
+            const dupMap = window.computeProductDuplicates(window.productListingsData || []);
 
             const safe = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
             const { base: baseFiltered, visible: filtered, catFilter } = getFilteredAlabastaProducts();
@@ -31926,12 +32034,28 @@ RULES:
                     : '';
                 const platforms = Array.isArray(p.platforms) && p.platforms.length ? safe(p.platforms.join(', ')) : '-';
                 const statusBtn = isReviewed
-                    ? `<button class="btn-sm alabasta-action-btn is-reopen" title="Reopen product · 상품 재개" onclick="updateProductListingStatus('${p.id}', 'pending')"><span class="alabasta-emoji">↩️</span></button>`
-                    : `<button class="btn-sm alabasta-action-btn is-review" title="Mark reviewed · 검토 완료로 표시" onclick="updateProductListingStatus('${p.id}', 'reviewed')"><span class="alabasta-emoji">✅</span></button>`;
-                const deleteBtn = `<button class="btn-sm alabasta-action-btn is-delete" title="Delete product · 상품 삭제" onclick="deleteProductListing('${p.id}')"><span class="alabasta-emoji">🗑️</span></button>`;
+                    // V97.62: safe() on the id — these land inside onclick attributes and
+                    // V97.62 shipped with them raw. Firestore auto-ids are alphanumeric so
+                    // it was never reachable in practice, but the render should not depend
+                    // on that.
+                    ? `<button class="btn-sm alabasta-action-btn is-reopen" title="Reopen product · 상품 재개" onclick="updateProductListingStatus('${safe(p.id)}', 'pending')"><span class="alabasta-emoji">↩️</span></button>`
+                    : `<button class="btn-sm alabasta-action-btn is-review" title="Mark reviewed · 검토 완료로 표시" onclick="updateProductListingStatus('${safe(p.id)}', 'reviewed')"><span class="alabasta-emoji">✅</span></button>`;
+                const deleteBtn = `<button class="btn-sm alabasta-action-btn is-delete" title="Delete product · 상품 삭제" onclick="deleteProductListing('${safe(p.id)}')"><span class="alabasta-emoji">🗑️</span></button>`;
+
+                const dupHits = dupMap.get(p.id) || [];
+                const dupChipsHtml = dupHits.slice(0, 2).map(h => {
+                    const dp = Math.round(h.score * 100);
+                    // safe() on the id too, not just the name: it lands inside an onclick
+                    // attribute, so an unescaped quote would break out of it. Firestore
+                    // auto-ids are alphanumeric in practice, but that is not a guarantee
+                    // this render should depend on.
+                    return `<button type="button" onclick="flashProductRow('${safe(h.id)}')"
+                        title="Same-looking product already in the queue: ${safe(h.name)} (${dp}% alike) — click to jump to it"
+                        style="margin-top:4px; width:auto; min-height:0; background:rgba(245,158,11,0.12); color:#92400e; border:1px solid rgba(245,158,11,0.30); border-radius:20px; padding:1px 9px; font-size:0.68em; font-weight:800; cursor:pointer;">⚠️ ซ้ำ ${safe(h.name.length > 22 ? h.name.slice(0, 22) + '…' : h.name)} · ${dp}%</button>`;
+                }).join(' ');
 
                 return `
-                    <tr>
+                    <tr data-product-id="${safe(p.id)}">
                         <td style="font-size:0.8em; white-space:nowrap;">${safe(ts)}</td>
                         <td>
                             <div style="display:flex; align-items:center; gap:8px;">
@@ -31945,6 +32069,7 @@ RULES:
                         <td>
                             <div style="font-weight:700;">${safe(p.name || '-')}</div>
                             ${p.packSize ? `<div style="font-size:0.78em; color:#64748b;">${safe(p.packSize)}</div>` : ''}
+                            ${dupChipsHtml}
                         </td>
                         <td style="white-space:nowrap;">${catHtml}</td>
                         <td style="white-space:nowrap; font-weight:700;">฿${safe(Number(p.price || 0).toFixed(2))}${promoHtml}</td>
