@@ -2434,7 +2434,34 @@ exports.notifyQuizDigest = onSchedule({
         console.error('[notifyQuizDigest] pending scan failed:', err.message);
     }
 
-    if (!doneRows.length && !pendingBlocks.length && !newlyLive.length) {
+    // --- section 4: product listings submitted in the same 24h window ---
+    // Product Listing Phase 7. Storefront work is the second thing interns do
+    // besides quizzes and it was invisible here. Same `timestamp >= cutoff`
+    // window as the quiz half, so both halves mean the same "today".
+    // Single-field range + orderBy on that field → auto-indexed, no composite.
+    // Non-fatal on purpose: a product read failing must not cost the quiz half.
+    const productRows = [];
+    let productPendingCount = 0;
+    try {
+        const snap = await db.collection('product_listings')
+            .where('timestamp', '>=', cutoff)
+            .orderBy('timestamp', 'asc')
+            .get();
+        snap.forEach(doc => {
+            const p = doc.data() || {};
+            const reviewed = p.status === 'reviewed' || p.isArchived === true;
+            if (!reviewed) productPendingCount++;
+            productRows.push({
+                name: String(p.name || 'Product').slice(0, 40),
+                who: userNames.get(p.userId) || String(p.userId || '').slice(0, 8),
+                reviewed: reviewed
+            });
+        });
+    } catch (err) {
+        console.error('[notifyQuizDigest] product_listings read failed:', err.message);
+    }
+
+    if (!doneRows.length && !pendingBlocks.length && !newlyLive.length && !productRows.length) {
         console.log('[notifyQuizDigest] nothing to report — no push');
         return;
     }
@@ -2491,6 +2518,29 @@ exports.notifyQuizDigest = onSchedule({
             body.push({ type: 'text', text: 'No submissions today', size: 'sm', color: '#94a3b8', margin: 'xs' });
         }
 
+        // Sits with "Done today" — both are "what happened in the last 24h" —
+        // and above the deadline nags, which are about what still has to happen.
+        if (productRows.length) {
+            body.push({ type: 'separator', margin: 'md' });
+            body.push({
+                type: 'text',
+                text: `🛒 Products today · ${productRows.length}${productPendingCount ? ` · ${productPendingCount} awaiting review` : ''}`,
+                size: 'xs', weight: 'bold', color: '#b45309', margin: 'md', wrap: true
+            });
+            productRows.slice(0, DIGEST_MAX_ROWS).forEach(p => {
+                body.push({
+                    type: 'text',
+                    // `who` is empty when the doc carries no userId — drop the
+                    // separator with it rather than printing a dangling " · ".
+                    text: `${p.reviewed ? '✅' : '⏳'} ${p.name}${p.who ? ` · ${p.who}` : ''}`,
+                    size: 'sm', color: '#1f2937', wrap: true, margin: 'xs'
+                });
+            });
+            if (productRows.length > DIGEST_MAX_ROWS) {
+                body.push({ type: 'text', text: `+${productRows.length - DIGEST_MAX_ROWS} more`, size: 'xs', color: '#94a3b8', margin: 'xs' });
+            }
+        }
+
         urgentBlocks.forEach(blk => {
             body.push({ type: 'separator', margin: 'md' });
             body.push({ type: 'text', text: `⏳ ${blk.quiz} · due ${blk.deadline} · ${blk.doneCount}/${blk.totalCount}`, size: 'xs', weight: 'bold', color: '#b45309', margin: 'md', wrap: true });
@@ -2524,7 +2574,7 @@ exports.notifyQuizDigest = onSchedule({
 
         return {
             type: 'flex',
-            altText: `📊 Quiz digest — ${newlyLive.length ? `${newlyLive.length} new · ` : ''}${doneQuizzes.length} done today`.slice(0, 400),
+            altText: `📊 Quiz digest — ${newlyLive.length ? `${newlyLive.length} new · ` : ''}${doneQuizzes.length} done today${productRows.length ? ` · ${productRows.length} products` : ''}`.slice(0, 400),
             contents: {
                 type: 'bubble',
                 size: 'kilo',
@@ -2540,5 +2590,5 @@ exports.notifyQuizDigest = onSchedule({
         };
     };
 
-    await pushLineFlex('notifyQuizDigest', targets, buildFlex, `newlyLive=${newlyLive.length}  doneQuizzes=${doneQuizzes.length} donePeople=${donePeopleCount} (attempts=${doneRows.length})  urgent=${urgentBlocks.length}  later=${laterBlocks.length}  cohort=${activeUsers.length}/${users.length}`);
+    await pushLineFlex('notifyQuizDigest', targets, buildFlex, `newlyLive=${newlyLive.length}  doneQuizzes=${doneQuizzes.length} donePeople=${donePeopleCount} (attempts=${doneRows.length})  products=${productRows.length} (pending=${productPendingCount})  urgent=${urgentBlocks.length}  later=${laterBlocks.length}  cohort=${activeUsers.length}/${users.length}`);
 });
