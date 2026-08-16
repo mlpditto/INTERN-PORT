@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.58</title>
+    <title>Nika V97.59</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -10980,6 +10980,10 @@
                         <span style="font-size:0.72em; color:#92400e; font-weight:700; background:#fff; border:1px solid #fcd34d; border-radius:999px; padding:3px 10px;">Total · 전체 <b id="alabasta-product-total">0</b></span>
                         <span style="font-size:0.72em; color:#92400e; font-weight:700; background:#fff; border:1px solid #fcd34d; border-radius:999px; padding:3px 10px;">Pending · 대기 <b id="alabasta-product-pending">0</b></span>
                         <span style="font-size:0.72em; color:#166534; font-weight:700; background:#fff; border:1px solid #86efac; border-radius:999px; padding:3px 10px;">Reviewed · 검토 완료 <b id="alabasta-product-reviewed">0</b></span>
+                        <!-- V97.59 Phase 3: exports whatever the current filters show. -->
+                        <button type="button" id="alabasta-product-export-btn" onclick="exportProductListingsCsv()"
+                                title="Export the products currently shown as CSV · 현재 목록을 CSV로 내보내기"
+                                style="margin:0; padding:4px 11px; font-size:0.72em; font-weight:800; color:#166534; background:#fff; border:1px solid #86efac; border-radius:999px; cursor:pointer;">⬇️ Export CSV (0)</button>
                     </div>
                     <div id="alabasta-product-category-pills" class="alabasta-filter-pills-row" aria-label="Filter by product category"></div>
                     <div style="overflow-x:auto;">
@@ -31835,16 +31839,14 @@ RULES:
             row.innerHTML = pills.join('');
         }
 
-        function renderAlabastaProducts() {
-            syncAlabastaSubtabCounts();
-            const tbody = document.querySelector('#alabastaProductTable tbody');
-            if (!tbody) return;
-
-            const safe = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        // V97.59: single source of truth for "which products are on screen right
+        // now". The table, the counters and the CSV export all read from here, so
+        // an export can never disagree with what the admin is looking at.
+        function getFilteredAlabastaProducts() {
             const showArchived = !!document.getElementById('alabasta-product-show-archived')?.checked;
             const keyword = ((document.getElementById('alabasta-product-search') || {}).value || '').toLowerCase().trim();
 
-            const baseFiltered = (productListingsData || []).filter(p => showArchived || !p.isArchived).filter(p => {
+            const base = (productListingsData || []).filter(p => showArchived || !p.isArchived).filter(p => {
                 if (activeBoardGroup !== 'All') {
                     const user = usersData.find(u => u.id === p.userId);
                     if ((user?.group || 'Public') !== activeBoardGroup) return false;
@@ -31856,11 +31858,23 @@ RULES:
             });
 
             const catFilter = window.alabastaProductCategoryFilter || 'all';
-            const filtered = catFilter === 'all'
-                ? baseFiltered
-                : baseFiltered.filter(p => (p.categoryKey || 'other') === catFilter);
+            const visible = catFilter === 'all'
+                ? base
+                : base.filter(p => (p.categoryKey || 'other') === catFilter);
+
+            return { base, visible, catFilter };
+        }
+
+        function renderAlabastaProducts() {
+            syncAlabastaSubtabCounts();
+            const tbody = document.querySelector('#alabastaProductTable tbody');
+            if (!tbody) return;
+
+            const safe = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            const { base: baseFiltered, visible: filtered, catFilter } = getFilteredAlabastaProducts();
 
             renderAlabastaProductCategoryPills(baseFiltered);
+            syncProductExportButton(filtered.length);
 
             const totalEl = document.getElementById('alabasta-product-total');
             const pendingEl = document.getElementById('alabasta-product-pending');
@@ -31921,6 +31935,72 @@ RULES:
                     </tr>
                 `;
             }).join('');
+        }
+
+        // ─── CSV export (V97.59 Phase 3) ────────────────────────────────────
+        // Placeholder column set: LINE MAN Mart's real bulk-upload template
+        // hasn't been sourced yet, so these are plain English headers an admin
+        // can remap by hand. Every field the intern captures is already here —
+        // when the real template arrives, only this list changes.
+        const PRODUCT_CSV_COLUMNS = [
+            ['Product Name', p => p.name || ''],
+            ['Category', p => { const c = getAlabastaProductCategory(p.categoryKey); return c ? c.label : (p.categoryLabel || ''); }],
+            ['Price', p => Number(p.price || 0).toFixed(2)],
+            ['Promo Price', p => (p.promoPrice === null || p.promoPrice === undefined || p.promoPrice === '') ? '' : Number(p.promoPrice).toFixed(2)],
+            ['Pack Size', p => p.packSize || ''],
+            ['Description', p => p.description || ''],
+            ['Platforms', p => Array.isArray(p.platforms) ? p.platforms.join(' / ') : ''],
+            ['Submitted By', p => p.displayName || p.userId || ''],
+            ['Submitted At', p => (p.timestamp && p.timestamp.toDate) ? p.timestamp.toDate().toISOString() : ''],
+            ['Status', p => isAlabastaProductReviewed(p) ? 'reviewed' : 'pending'],
+            ['Admin Score', p => isAlabastaProductReviewed(p) ? Number(p.adminBonus || 0).toFixed(2) : ''],
+            ['Intern Note', p => p.note || '']
+        ];
+
+        // RFC-4180: quote any field carrying a comma, quote or newline, and
+        // double the internal quotes. A product description is free text, so all
+        // three show up in practice.
+        function toCsvField(v) {
+            const s = (v === null || v === undefined) ? '' : String(v);
+            return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+        }
+
+        function syncProductExportButton(count) {
+            const btn = document.getElementById('alabasta-product-export-btn');
+            if (!btn) return;
+            btn.textContent = `⬇️ Export CSV (${count})`;
+            btn.disabled = count === 0;
+            btn.style.opacity = count === 0 ? '0.5' : '1';
+            btn.style.cursor = count === 0 ? 'not-allowed' : 'pointer';
+        }
+
+        // Exports exactly what the current filters show — search, category pill
+        // and the reviewed toggle all apply, so narrowing the view narrows the file.
+        function exportProductListingsCsv() {
+            const { visible } = getFilteredAlabastaProducts();
+            if (!visible.length) {
+                if (typeof showToast === 'function') showToast('Nothing to export — the current filter is empty.', 'info');
+                return;
+            }
+
+            const rows = [PRODUCT_CSV_COLUMNS.map(c => c[0])]
+                .concat(visible.map(p => PRODUCT_CSV_COLUMNS.map(c => c[1](p))));
+            // CRLF line endings + a UTF-8 BOM so Excel opens Thai and Korean text
+            // as text instead of mojibake.
+            // The BOM and the CRLF are built with fromCharCode rather than written
+            // as literals: an invisible U+FEFF in the source is unreadable, and a real
+            // CR in a string literal would break the line.
+            const CRLF = String.fromCharCode(13, 10);
+            const csv = String.fromCharCode(0xFEFF) + rows.map(r => r.map(toCsvField).join(',')).join(CRLF);
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `product-listings_${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            if (typeof showToast === 'function') showToast(`📥 Exported ${visible.length} product(s) to CSV`, 'success');
         }
 
         async function updateProductListingStatus(productDocId, status) {
