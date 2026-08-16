@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.38)</title>
+    <title>Internship Portfolio (V96.39)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -18,6 +18,9 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <!-- V96.39: needed by the Product Listing photo upload. This page previously
+         loaded no Storage SDK at all — `firebase.storage` was undefined. -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
 
     <!-- Markdown rendering for Quiz content (Phase 3, V94.04) -->
     <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
@@ -1659,6 +1662,44 @@
         .pl-ai-btn:disabled {
             opacity: 0.6;
             cursor: wait;
+        }
+
+        /* V96.39: photo picker + remove. Both defeat the global button rule. */
+        .pl-photo-btn {
+            width: auto;
+            min-height: 0;
+            padding: 10px 16px;
+            border: 1.5px dashed #cbd5e1;
+            border-radius: 12px;
+            background: #f8fafc;
+            color: #475569;
+            font-size: 0.82em;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .pl-photo-btn:hover {
+            border-color: #93c5fd;
+            background: #f0f7ff;
+            color: #1e40af;
+        }
+
+        .pl-photo-remove {
+            width: auto;
+            min-height: 0;
+            padding: 5px 12px;
+            border: 1px solid #fecaca;
+            border-radius: 999px;
+            background: #fff;
+            color: #b91c1c;
+            font-size: 0.72em;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .pl-photo-remove:hover {
+            background: #fef2f2;
         }
         /* ── end Product Listing UI ───────────────────────────── */
 
@@ -4187,6 +4228,34 @@
                                         Pack Size 포장 단위</label>
                                     <input type="text" id="p-size" placeholder="e.g. 10 tablets/strip · 60 ml"
                                         style="margin:0;" maxlength="80">
+                                </div>
+
+                                <!-- V96.39 Phase 5: product photo. Resized client-side and
+                                     uploaded at submit time, so an abandoned form leaves
+                                     nothing behind in Storage. -->
+                                <div style="margin-top:12px;">
+                                    <label
+                                        style="font-size:0.8em; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">📷
+                                        Photo 사진</label>
+                                    <input type="file" id="p-photo-input" accept="image/jpeg,image/png,image/webp"
+                                        style="display:none;" onchange="onProductPhotoPicked(event)">
+                                    <button type="button" id="p-photo-pick-btn" class="pl-photo-btn"
+                                        onclick="document.getElementById('p-photo-input').click()">
+                                        📷 Take or choose a photo 사진 선택
+                                    </button>
+                                    <div id="p-photo-preview" style="display:none; margin-top:10px;">
+                                        <img id="p-photo-img" alt="Product photo preview"
+                                            style="max-width:100%; max-height:220px; border-radius:12px; border:1px solid #e2e8f0; display:block;">
+                                        <div
+                                            style="display:flex; align-items:center; gap:10px; margin-top:8px; flex-wrap:wrap;">
+                                            <span id="p-photo-meta" style="font-size:0.75em; color:#64748b;"></span>
+                                            <button type="button" class="pl-photo-remove"
+                                                onclick="clearProductPhoto()">✕ Remove 삭제</button>
+                                        </div>
+                                    </div>
+                                    <div id="p-photo-note"
+                                        style="display:none; margin-top:8px; padding:8px 12px; border:1px solid; border-radius:10px; font-size:0.78em; line-height:1.5;">
+                                    </div>
                                 </div>
                             </div>
 
@@ -11601,6 +11670,147 @@
         }
         // ────────────────────────────────────────────────────────────────────
 
+        // ─── 📷 Product photo (V96.39 Phase 5) ───────────────────────────────
+        // First image-upload path on the intern page — this file had no Storage
+        // SDK at all before V96.39. The picked file is resized in a canvas and
+        // held in memory; the actual upload happens at submit time, so a form the
+        // intern abandons leaves nothing behind in Storage to orphan-scan later.
+        const PRODUCT_PHOTO_MAX_INPUT = 12 * 1024 * 1024;   // reject absurd files before decoding
+        const PRODUCT_PHOTO_MAX_UPLOAD = 2 * 1024 * 1024;   // must stay under the storage.rules cap
+        const PRODUCT_PHOTO_MAX_DIM = 1280;
+
+        window.productPhotoBlob = null;
+        window.productPhotoPreviewUrl = '';
+
+        function setProductPhotoNote(msg, kind) {
+            const el = document.getElementById('p-photo-note');
+            if (!el) return;
+            if (!msg) {
+                el.style.display = 'none';
+                el.textContent = '';
+                return;
+            }
+            const palette = {
+                error: { bg: '#fef2f2', border: '#fecaca', color: '#b91c1c' }
+            }[kind] || { bg: '#eff6ff', border: '#bfdbfe', color: '#1e40af' };
+            el.style.display = 'block';
+            el.style.background = palette.bg;
+            el.style.borderColor = palette.border;
+            el.style.color = palette.color;
+            el.textContent = msg;
+        }
+
+        // Phone cameras hand back 3-5 MB files, far over the 2 MB Storage cap.
+        // Browsers apply EXIF orientation to <img> themselves, so drawing the
+        // already-oriented image keeps the photo the right way up.
+        function resizeProductPhoto(file) {
+            return new Promise((resolve, reject) => {
+                const url = URL.createObjectURL(file);
+                const img = new Image();
+                img.onload = () => {
+                    URL.revokeObjectURL(url);
+                    const scale = Math.min(1, PRODUCT_PHOTO_MAX_DIM / Math.max(img.width, img.height));
+                    const w = Math.max(1, Math.round(img.width * scale));
+                    const h = Math.max(1, Math.round(img.height * scale));
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w;
+                    canvas.height = h;
+                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                    canvas.toBlob(
+                        blob => blob ? resolve({ blob, width: w, height: h }) : reject(new Error('Canvas encode failed')),
+                        'image/jpeg',
+                        0.82
+                    );
+                };
+                img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read that image')); };
+                img.src = url;
+            });
+        }
+
+        async function onProductPhotoPicked(ev) {
+            const file = ev.target.files && ev.target.files[0];
+            ev.target.value = '';   // so re-picking the same file still fires change
+            if (!file) return;
+
+            setProductPhotoNote('', '');
+            if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+                setProductPhotoNote('Please pick a JPEG, PNG or WebP image. JPEG · PNG · WebP만 가능합니다.', 'error');
+                return;
+            }
+            if (file.size > PRODUCT_PHOTO_MAX_INPUT) {
+                setProductPhotoNote('That image is too large to process. 이미지가 너무 큽니다.', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('p-photo-pick-btn');
+            const previousLabel = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Processing 처리 중...'; }
+            try {
+                const { blob, width, height } = await resizeProductPhoto(file);
+                if (blob.size > PRODUCT_PHOTO_MAX_UPLOAD) throw new Error('Still too large after resizing');
+
+                clearProductPhotoPreviewUrl();
+                window.productPhotoBlob = blob;
+                window.productPhotoPreviewUrl = URL.createObjectURL(blob);
+
+                const img = document.getElementById('p-photo-img');
+                if (img) img.src = window.productPhotoPreviewUrl;
+                const preview = document.getElementById('p-photo-preview');
+                if (preview) preview.style.display = 'block';
+                const meta = document.getElementById('p-photo-meta');
+                if (meta) meta.textContent = `${width}×${height} · ${(blob.size / 1024).toFixed(0)} KB`;
+                if (btn) btn.innerHTML = '📷 Change photo 사진 변경';
+            } catch (err) {
+                console.warn('onProductPhotoPicked failed:', err);
+                setProductPhotoNote('Could not process that photo — please try another one. 처리하지 못했습니다.', 'error');
+                if (btn) btn.innerHTML = previousLabel;
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        function clearProductPhotoPreviewUrl() {
+            if (window.productPhotoPreviewUrl) {
+                URL.revokeObjectURL(window.productPhotoPreviewUrl);
+                window.productPhotoPreviewUrl = '';
+            }
+        }
+
+        function clearProductPhoto() {
+            clearProductPhotoPreviewUrl();
+            window.productPhotoBlob = null;
+            const preview = document.getElementById('p-photo-preview');
+            if (preview) preview.style.display = 'none';
+            const img = document.getElementById('p-photo-img');
+            if (img) img.removeAttribute('src');
+            const btn = document.getElementById('p-photo-pick-btn');
+            if (btn) btn.innerHTML = '📷 Take or choose a photo 사진 선택';
+            setProductPhotoNote('', '');
+        }
+
+        async function _productSha256Hex(blob) {
+            const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
+            return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        // Content-addressed, mirroring the admin quiz-image uploader: probe for an
+        // existing object first, so re-submitting the same photo costs no upload
+        // and cannot pile up duplicates.
+        async function uploadProductPhoto(blob) {
+            if (!firebase.storage) throw new Error('Storage SDK not loaded');
+            const hash = await _productSha256Hex(blob);
+            const path = `product-images/${hash}.jpg`;
+            const ref = firebase.storage().ref(path);
+            try {
+                return { url: await ref.getDownloadURL(), path };
+            } catch (probeErr) {
+                if (probeErr && probeErr.code !== 'storage/object-not-found') throw probeErr;
+                const snap = await ref.put(blob, { contentType: 'image/jpeg' });
+                return { url: await snap.ref.getDownloadURL(), path };
+            }
+        }
+        // ────────────────────────────────────────────────────────────────────
+
         async function awardProductSubmitBonus(productName) {
             if (!userId) return;
             try {
@@ -11654,6 +11864,18 @@
                 const authUser = await ensureFirebaseAuthReady(10000);
                 if (!authUser) throw new Error('Firebase auth is required');
 
+                // V96.39: upload the photo first. Doing it here rather than at pick
+                // time means an abandoned form never leaves a file behind; if this
+                // throws, nothing is written and the form is preserved intact.
+                let photoUrl = '', photoPath = '';
+                if (window.productPhotoBlob) {
+                    if (btn) btn.innerHTML = '<span style="display:inline-block; animation:spin 1s linear infinite;">⏳</span> Uploading photo 업로드 중...';
+                    const uploaded = await uploadProductPhoto(window.productPhotoBlob);
+                    photoUrl = uploaded.url;
+                    photoPath = uploaded.path;
+                    if (btn) btn.innerHTML = '<span style="display:inline-block; animation:spin 1s linear infinite;">⏳</span> Saving 저장 중...';
+                }
+
                 const productData = {
                     authUid: authUser.uid,
                     userId,
@@ -11668,6 +11890,8 @@
                     description: s.description,
                     platforms: [...window.productSelectedPlatforms],
                     note: s.note,
+                    photoUrl,
+                    photoPath,
                     status: 'pending',
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 };
@@ -11700,6 +11924,8 @@
                             categoryLabel: cat ? cat.label : s.category,
                             platforms: [...window.productSelectedPlatforms],
                             note: s.note,
+                            photoUrl,
+                            photoPath,
                             sourceType: 'product_listings',
                             sourceId: sourceRef.id
                         },
@@ -11779,6 +12005,7 @@
             window.productSelectedPlatforms = [];
             window.productAiDraftText = '';
             setProductAiNote('', '');
+            clearProductPhoto();
             renderProductCategoryChips();
             renderProductPlatformChips();
             const countEl = document.getElementById('p-desc-count');

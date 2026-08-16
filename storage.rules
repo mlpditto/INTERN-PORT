@@ -11,6 +11,10 @@ service firebase.storage {
       );
     }
 
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
     // OmniVoice Phase 2.1 — voice-clone reference audio (content-addressed by SHA-256).
     match /voice-refs/{fileName} {
       allow read, write: if isAdmin();
@@ -39,6 +43,25 @@ service firebase.storage {
     // download tokens (no rule read needed); admin write + admin read for re-fetch.
     match /patho-visuals/{fileName} {
       allow read, write: if isAdmin();
+    }
+
+    // Product Listing photos (V96.39 Phase 5), content-addressed by SHA-256.
+    // This is the FIRST non-admin write path in this file — interns authenticate
+    // anonymously, so "signed in" is the strongest identity gate available. The
+    // real protection is the pair of hard caps below plus create-only access:
+    //   - 2 MB ceiling; the client resizes to <=1280px JPEG before uploading, so
+    //     a real photo lands far under it and anything larger is not a photo.
+    //   - image/jpeg|png|webp only.
+    //   - create but NOT update or delete, so one intern can never overwrite or
+    //     remove another listing's photo. Admin retains both for cleanup.
+    // Content addressing means a re-upload of the same bytes resolves to the same
+    // object, which the client probes for before uploading at all.
+    match /product-images/{fileName} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.size < 2 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+      allow update, delete: if isAdmin();
     }
 
     match /{allPaths=**} {
