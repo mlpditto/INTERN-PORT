@@ -2242,18 +2242,32 @@ function digestWentLiveMs(q) {
     return NaN;
 }
 
-exports.notifyQuizDigest = onSchedule({
-    schedule: '0 16 * * *',
-    timeZone: 'Asia/Bangkok',
-    region: 'us-central1',
-    secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID']
-}, async (event) => {
+// Two paths send this digest: the 16:00 schedule, and the admin "Send digest
+// now" button in the dashboard LINE panel. They share this one body so they can
+// never drift apart — `kind` picks the usage-counter bucket and the duplicate
+// marker's label, and changes nothing about the message itself.
+const DIGEST_TAGS = { scheduled: 'notifyQuizDigest', manual: 'notifyQuizDigestManual' };
+
+// Bangkok calendar day, same convention as recordLinePush's byDay key. Used for
+// the duplicate-send marker, which has to roll over at Bangkok midnight or the
+// 16:00 digest and the guard would disagree about which day it is.
+function digestDayKey() {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+}
+
+// Returns a result object rather than nothing, because the manual path has a UI
+// waiting on an answer: every early exit has to name its reason so the button
+// can say "nothing to report" instead of a bare failure.
+async function runQuizDigest(kind) {
+    const tag = DIGEST_TAGS[kind] || DIGEST_TAGS.scheduled;
     if (!process.env.LINE_CHANNEL_ACCESS_TOKEN) {
         console.warn('[notifyQuizDigest] LINE_CHANNEL_ACCESS_TOKEN missing — skipping');
-        return;
+        return { sent: false, reason: 'token-missing' };
     }
+    // Deliberately still the scheduled tag: this resolves WHERE to push, which
+    // must be identical for both paths.
     const targets = resolveLineTargets('notifyQuizDigest');
-    if (!targets.length) return;
+    if (!targets.length) return { sent: false, reason: 'no-targets' };
 
     const db = admin.firestore();
     const now = admin.firestore.Timestamp.now();
@@ -2287,7 +2301,7 @@ exports.notifyQuizDigest = onSchedule({
         activeUsers = activeCohort(users);
     } catch (err) {
         console.error('[notifyQuizDigest] users read failed:', err.message);
-        return;
+        return { sent: false, reason: 'users-read-failed', error: err.message };
     }
     const hiddenUserCount = users.length - activeUsers.length;
     // Break the hidden count down by reason — "hidden 21" alone can't tell you
@@ -2334,7 +2348,7 @@ exports.notifyQuizDigest = onSchedule({
         }
     } catch (err) {
         console.error('[notifyQuizDigest] quiz_attempts read failed:', err.message);
-        return;
+        return { sent: false, reason: 'attempts-read-failed', error: err.message };
     }
 
     // V97.51 (C) folded one entry per ATTEMPT into one per PERSON. 2026-08-15
@@ -2466,7 +2480,7 @@ exports.notifyQuizDigest = onSchedule({
 
     if (!doneRows.length && !pendingBlocks.length && !newlyLive.length && !productRows.length) {
         console.log('[notifyQuizDigest] nothing to report — no push');
-        return;
+        return { sent: false, reason: 'nothing-to-report' };
     }
 
     // (B) Only the near-deadline quizzes get a full name list; the rest collapse
@@ -2611,5 +2625,83 @@ exports.notifyQuizDigest = onSchedule({
         };
     };
 
-    await pushLineFlex('notifyQuizDigest', targets, buildFlex, `newlyLive=${newlyLive.length}  doneQuizzes=${doneQuizzes.length} donePeople=${donePeopleCount} (attempts=${doneRows.length})  products=${productRows.length} (pending=${productPendingCount})  urgent=${urgentBlocks.length}  later=${laterBlocks.length}  cohort=${activeUsers.length}/${users.length}`);
+    const results = await pushLineFlex(tag, targets, buildFlex, `kind=${kind}  newlyLive=${newlyLive.length}  doneQuizzes=${doneQuizzes.length} donePeople=${donePeopleCount} (attempts=${doneRows.length})  products=${productRows.length} (pending=${productPendingCount})  urgent=${urgentBlocks.length}  later=${laterBlocks.length}  cohort=${activeUsers.length}/${users.length}`);
+    const pushed = results.filter(r => r.ok).length;
+
+    // Marks the day as sent so the manual button can warn about a duplicate.
+    // Written by BOTH paths from this single place, so the schedule and the
+    // button can never disagree about whether today's digest already went out.
+    // Only on a real push — a failed send must not block a retry. Non-fatal:
+    // losing the marker costs a warning, never the digest.
+    if (pushed) {
+        try {
+            await admin.firestore().collection('digest_runs').doc(digestDayKey()).set({
+                count: admin.firestore.FieldValue.increment(1),
+                lastAt: admin.firestore.FieldValue.serverTimestamp(),
+                lastKind: kind === 'manual' ? 'manual' : 'scheduled'
+            }, { merge: true });
+        } catch (e) {
+            console.warn('[notifyQuizDigest] digest_runs marker write failed:', e && e.message);
+        }
+    }
+
+    return {
+        sent: pushed > 0,
+        reason: pushed ? null : 'push-failed',
+        pushed: pushed,
+        failed: results.length - pushed,
+        results: results,
+        counts: {
+            newlyLive: newlyLive.length,
+            doneQuizzes: doneQuizzes.length,
+            donePeople: donePeopleCount,
+            products: productRows.length,
+            urgent: urgentBlocks.length,
+            later: laterBlocks.length
+        }
+    };
+}
+
+exports.notifyQuizDigest = onSchedule({
+    schedule: '0 16 * * *',
+    timeZone: 'Asia/Bangkok',
+    region: 'us-central1',
+    secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID']
+}, async (event) => {
+    await runQuizDigest('scheduled');
+});
+
+// Admin "Send digest now" button — public/admin.html, the LINE usage panel.
+// Identical body to the schedule; the only thing recipients can tell is that it
+// arrived off-cycle. Exists because the digest is assembled from live data, so
+// there is no way to reproduce it by hand.
+exports.sendQuizDigestNow = onCall({
+    secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID'],
+    timeoutSeconds: 120
+}, async (request) => {
+    if (!request.auth || request.auth.token.admin !== true) {
+        throw new HttpsError('permission-denied', 'Admin required');
+    }
+    // One click costs one push PER TARGET (admin chat + group) against a 300/mo
+    // plan, and the content is the same all day — so a second send is far more
+    // likely a mis-click than an intent. Report it and let the UI confirm before
+    // forcing, rather than silently spending quota.
+    if ((request.data || {}).force !== true) {
+        try {
+            const snap = await admin.firestore().collection('digest_runs').doc(digestDayKey()).get();
+            if (snap.exists) {
+                const d = snap.data() || {};
+                return {
+                    sent: false,
+                    reason: 'already-sent-today',
+                    count: Number(d.count || 0),
+                    lastKind: d.lastKind || null
+                };
+            }
+        } catch (e) {
+            // A marker read failure must never block a send the admin asked for.
+            console.warn('[sendQuizDigestNow] digest_runs read failed:', e && e.message);
+        }
+    }
+    return await runQuizDigest('manual');
 });

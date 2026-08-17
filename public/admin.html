@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.62</title>
+    <title>Nika V97.63</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6418,6 +6418,19 @@
                             <div id="line-usage-bar" style="height:100%; width:0%; border-radius:999px; background:#22c55e; transition:width 0.3s;"></div>
                         </div>
                         <div id="line-usage-note" style="margin-top:6px; font-size:0.72em; color:#94a3b8;"></div>
+                        <!-- V97.63: manual digest send. Deliberately under the quota bar —
+                             the cost of the click is the number directly above it, and one
+                             click spends one push PER TARGET (admin chat + group). Label is
+                             English-only for the same reason the panel comment above gives:
+                             Thai here must carry no Latin characters and must never follow
+                             a digit run. -->
+                        <div style="margin-top:10px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                            <button id="line-digest-now-btn" onclick="sendDigestNow()"
+                                style="padding:7px 14px; border:1px solid #0f766e; border-radius:10px; background:#0f766e; color:#fff; font-size:0.78em; font-weight:700; cursor:pointer;">
+                                <i class="fa-solid fa-paper-plane"></i> Send digest now
+                            </button>
+                            <span id="line-digest-now-status" style="font-size:0.74em; color:#64748b;"></span>
+                        </div>
                     </div>
 
                     <!-- V97.62 Product Listing Phase 7: this month's storefront submissions.
@@ -30810,6 +30823,9 @@ RULES:
             const LINE_COUNT_START_MONTH = '2026-08';
             const LINE_TAG_LABELS = {
                 notifyQuizDigest: 'digest',
+                // V97.63: manual sends carry their own tag server-side, so the existing
+                // byTag breakdown separates them from the 16:00 runs with no extra UI.
+                notifyQuizDigestManual: 'manual',
                 notifyQuizSubmitted: 'milestone',
                 notifyAdminOnNewCase: 'case',
                 notifyQuizReminder: 'reminder'
@@ -30821,11 +30837,13 @@ RULES:
                     // Bangkok month — must match the key recordLinePush writes, otherwise
                     // the card silently reads a doc that will never exist near month end.
                     const month = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }).slice(0, 7);
+                    // V97.63: this used to hide the panel until the month's first push.
+                    // The Send button now lives here, so hiding on zero would take the
+                    // button away for the first days of every month — exactly when the
+                    // quota is safest to spend. Render 0/300 instead.
                     const snap = await db.collection('line_usage').doc(month).get();
-                    if (!snap.exists) { panel.style.display = 'none'; return; }
-                    const d = snap.data() || {};
+                    const d = snap.exists ? (snap.data() || {}) : {};
                     const total = Number(d.total || 0);
-                    if (!total) { panel.style.display = 'none'; return; }
 
                     const pct = Math.min(100, Math.round((total / LINE_MONTHLY_QUOTA) * 100));
                     const color = pct >= 90 ? '#dc2626' : (pct >= 70 ? '#f59e0b' : '#22c55e');
@@ -30837,6 +30855,20 @@ RULES:
                     }
                     const bar = document.getElementById('line-usage-bar');
                     if (bar) { bar.style.width = pct + '%'; bar.style.background = color; }
+
+                    // V97.63: the Send button sits in this panel, so gate it on the very
+                    // number the panel just drew. At the cap a manual push would only fail
+                    // at LINE — refusing before spending the call is cheaper and clearer.
+                    const sendBtn = document.getElementById('line-digest-now-btn');
+                    if (sendBtn) {
+                        const atCap = total >= LINE_MONTHLY_QUOTA;
+                        sendBtn.disabled = atCap;
+                        sendBtn.style.opacity = atCap ? '0.45' : '1';
+                        sendBtn.style.cursor = atCap ? 'not-allowed' : 'pointer';
+                        sendBtn.title = atCap
+                            ? 'Monthly LINE quota reached'
+                            : "Send today's digest to the admin chat and the intern group";
+                    }
 
                     const byTag = d.byTag || {};
                     const parts = Object.keys(byTag)
@@ -30866,6 +30898,63 @@ RULES:
                     // Never let an observability widget break the dashboard.
                     console.warn('loadLineUsage failed:', e && e.message);
                     panel.style.display = 'none';
+                }
+            };
+
+            // V97.63: manual digest send. The duplicate guard lives server-side; this
+            // only relays it. Note the asymmetry in how the two confirmations are asked:
+            // the first is a native confirm() raised straight from the click, which is
+            // safe, while the "send anyway" step is in-DOM on purpose — Chrome silently
+            // drops confirm() called after an await, so a dialog there would never show
+            // and the second click would push unconfirmed.
+            window._digestForceNext = false;
+            window.sendDigestNow = async function () {
+                const btn = document.getElementById('line-digest-now-btn');
+                const status = document.getElementById('line-digest-now-status');
+                const setStatus = (text, color) => {
+                    if (status) { status.textContent = text; status.style.color = color || '#64748b'; }
+                };
+
+                const force = window._digestForceNext === true;
+                if (!force && !confirm("Send today's digest now?\n\nIt goes to the admin chat AND the intern group — that is 2 pushes off the monthly quota.")) return;
+
+                if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...'; }
+                setStatus('');
+                try {
+                    const fn = adminApp.functions().httpsCallable('sendQuizDigestNow');
+                    const res = await fn(force ? { force: true } : {});
+                    const data = (res && res.data) ? res.data : {};
+
+                    if (data.sent) {
+                        window._digestForceNext = false;
+                        const c = data.counts || {};
+                        showToast(`✓ Digest sent — ${data.pushed} push${data.pushed === 1 ? '' : 'es'}`);
+                        setStatus(`sent · ${c.doneQuizzes || 0} done · ${c.products || 0} products · ${c.urgent || 0} due soon`, '#059669');
+                    } else if (data.reason === 'already-sent-today') {
+                        window._digestForceNext = true;
+                        setStatus(`Already sent today (${data.count}× · last: ${data.lastKind || '?'}) — click again to send anyway.`, '#b45309');
+                    } else {
+                        window._digestForceNext = false;
+                        const map = {
+                            'nothing-to-report': 'Nothing to report today — no push sent.',
+                            'token-missing': 'LINE token not configured server-side.',
+                            'no-targets': 'No LINE targets configured.',
+                            'push-failed': 'LINE rejected every push — check the functions log.',
+                            'users-read-failed': 'Could not read users.',
+                            'attempts-read-failed': 'Could not read quiz attempts.'
+                        };
+                        setStatus(map[data.reason] || `Not sent (${data.reason || 'unknown'}).`, '#dc2626');
+                    }
+                } catch (err) {
+                    window._digestForceNext = false;
+                    console.error('[sendDigestNow] failed:', err);
+                    setStatus(`Error: ${(err && err.message) || 'unknown'}`, '#dc2626');
+                } finally {
+                    // Must restore on EVERY path — this panel is never re-rendered from
+                    // scratch, so a spinner left behind would be permanent. loadLineUsage
+                    // runs last and re-applies the at-cap gate over this enable.
+                    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send digest now'; }
+                    if (typeof loadLineUsage === 'function') loadLineUsage();
                 }
             };
 
