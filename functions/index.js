@@ -2416,13 +2416,16 @@ exports.notifyQuizDigest = onSchedule({
             if (!missing.length) continue;
             // doneIds counts every submitter; intersect with the active cohort so
             // "done/total" can't read like 9/6 once the denominator is narrowed.
-            const doneActive = eligible.filter(u => doneIds.has(u.id)).length;
+            // Kept as a name list, not a count: the group copy names who is DONE
+            // where the admin copy names who is behind — see buildFlex.
+            const doneNames = eligible.filter(u => doneIds.has(u.id)).map(u => u.name);
             pendingBlocks.push({
                 quiz: String(q.title || 'Quiz').slice(0, 60),
                 deadlineMs: deadlineMs,
                 deadline: new Date(deadlineMs).toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', day: '2-digit', month: 'short' }),
                 names: missing.map(u => u.name),
-                doneCount: doneActive,
+                doneNames: doneNames,
+                doneCount: doneNames.length,
                 totalCount: eligible.length
             });
         }
@@ -2541,12 +2544,30 @@ exports.notifyQuizDigest = onSchedule({
             }
         }
 
+        // The roster under each deadline flips by target. The admin 1-on-1 copy
+        // lists who is BEHIND, which is what chasing needs. The group copy goes
+        // to the chat every intern reads, so naming the laggards there is a
+        // public callout — it lists who is DONE instead. The ✅ prefix is load
+        // bearing: without it the names sit under a ⏳ header and read as the
+        // opposite of what they are.
         urgentBlocks.forEach(blk => {
             body.push({ type: 'separator', margin: 'md' });
             body.push({ type: 'text', text: `⏳ ${blk.quiz} · due ${blk.deadline} · ${blk.doneCount}/${blk.totalCount}`, size: 'xs', weight: 'bold', color: '#b45309', margin: 'md', wrap: true });
-            const shown = blk.names.slice(0, DIGEST_MAX_ROWS).join(', ');
-            const overflow = blk.names.length > DIGEST_MAX_ROWS ? ` +${blk.names.length - DIGEST_MAX_ROWS} more` : '';
-            body.push({ type: 'text', text: `${shown}${overflow}`, size: 'sm', color: '#1f2937', wrap: true, margin: 'xs' });
+            const roster = target.withScores ? blk.names : blk.doneNames;
+            if (roster.length) {
+                const shown = roster.slice(0, DIGEST_MAX_ROWS).join(', ');
+                const overflow = roster.length > DIGEST_MAX_ROWS ? ` +${roster.length - DIGEST_MAX_ROWS} more` : '';
+                body.push({
+                    type: 'text',
+                    text: target.withScores ? `${shown}${overflow}` : `✅ ${shown}${overflow}`,
+                    size: 'sm', color: '#1f2937', wrap: true, margin: 'xs'
+                });
+            } else {
+                // Only reachable on the group copy — `missing` is non-empty by
+                // construction above, so the admin roster never is. An empty
+                // text node is a hard LINE API error, so this must not be blank.
+                body.push({ type: 'text', text: 'No one yet', size: 'sm', color: '#94a3b8', wrap: true, margin: 'xs' });
+            }
         });
 
         if (laterBlocks.length) {
