@@ -2258,7 +2258,7 @@ function digestDayKey() {
 // Returns a result object rather than nothing, because the manual path has a UI
 // waiting on an answer: every early exit has to name its reason so the button
 // can say "nothing to report" instead of a bare failure.
-async function runQuizDigest(kind) {
+async function runQuizDigest(kind, options) {
     const tag = DIGEST_TAGS[kind] || DIGEST_TAGS.scheduled;
     if (!process.env.LINE_CHANNEL_ACCESS_TOKEN) {
         console.warn('[notifyQuizDigest] LINE_CHANNEL_ACCESS_TOKEN missing — skipping');
@@ -2625,6 +2625,34 @@ async function runQuizDigest(kind) {
         };
     };
 
+    const counts = {
+        newlyLive: newlyLive.length,
+        doneQuizzes: doneQuizzes.length,
+        donePeople: donePeopleCount,
+        products: productRows.length,
+        urgent: urgentBlocks.length,
+        later: laterBlocks.length
+    };
+
+    // Preview stops here: build exactly what WOULD be pushed, for every target,
+    // and return it. Not touching pushLineFlex is what makes a preview free —
+    // no recordLinePush, no digest_runs marker, no quota, no LINE call. The UI
+    // walks these bodies instead of re-rendering them, so what the admin reads
+    // can never drift from what the interns would receive.
+    if (options && options.preview === true) {
+        return {
+            sent: false,
+            preview: true,
+            builtAt: Date.now(),
+            targets: targets.map(t => ({
+                label: t.label,
+                withScores: t.withScores === true,
+                body: buildFlex(t).contents.body.contents
+            })),
+            counts: counts
+        };
+    }
+
     const results = await pushLineFlex(tag, targets, buildFlex, `kind=${kind}  newlyLive=${newlyLive.length}  doneQuizzes=${doneQuizzes.length} donePeople=${donePeopleCount} (attempts=${doneRows.length})  products=${productRows.length} (pending=${productPendingCount})  urgent=${urgentBlocks.length}  later=${laterBlocks.length}  cohort=${activeUsers.length}/${users.length}`);
     const pushed = results.filter(r => r.ok).length;
 
@@ -2651,14 +2679,7 @@ async function runQuizDigest(kind) {
         pushed: pushed,
         failed: results.length - pushed,
         results: results,
-        counts: {
-            newlyLive: newlyLive.length,
-            doneQuizzes: doneQuizzes.length,
-            donePeople: donePeopleCount,
-            products: productRows.length,
-            urgent: urgentBlocks.length,
-            later: laterBlocks.length
-        }
+        counts: counts
     };
 }
 
@@ -2669,6 +2690,20 @@ exports.notifyQuizDigest = onSchedule({
     secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID']
 }, async (event) => {
     await runQuizDigest('scheduled');
+});
+
+// Preview for the admin send flow. A separate endpoint rather than a flag on
+// sendQuizDigestNow on purpose: this one holds no code path that can push, so a
+// preview cannot turn into a send through a mistyped argument. Costs Firestore
+// reads only — no LINE call, no quota, no duplicate marker.
+exports.previewQuizDigest = onCall({
+    secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID'],
+    timeoutSeconds: 120
+}, async (request) => {
+    if (!request.auth || request.auth.token.admin !== true) {
+        throw new HttpsError('permission-denied', 'Admin required');
+    }
+    return await runQuizDigest('manual', { preview: true });
 });
 
 // Admin "Send digest now" button — public/admin.html, the LINE usage panel.
