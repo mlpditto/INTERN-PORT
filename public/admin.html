@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.63</title>
+    <title>Nika V97.64</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6418,18 +6418,36 @@
                             <div id="line-usage-bar" style="height:100%; width:0%; border-radius:999px; background:#22c55e; transition:width 0.3s;"></div>
                         </div>
                         <div id="line-usage-note" style="margin-top:6px; font-size:0.72em; color:#94a3b8;"></div>
-                        <!-- V97.63: manual digest send. Deliberately under the quota bar —
-                             the cost of the click is the number directly above it, and one
-                             click spends one push PER TARGET (admin chat + group). Label is
-                             English-only for the same reason the panel comment above gives:
-                             Thai here must carry no Latin characters and must never follow
-                             a digit run. -->
+                        <!-- V97.64: preview-then-send. The panel offers only Preview; the
+                             Send button lives inside the preview box and is unreachable
+                             until a preview has rendered. A digest push is irreversible
+                             (it lands in the intern group), spends one push PER TARGET off
+                             a 300/month plan, and is assembled server-side from live data,
+                             so there is no way to know what it says without building it.
+                             Sits under the quota bar so the cost of the click is the number
+                             directly above it. Labels are English-only for the reason the
+                             panel comment above gives: Thai here must carry no Latin
+                             characters and must never follow a digit run. -->
                         <div style="margin-top:10px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                            <button id="line-digest-now-btn" onclick="sendDigestNow()"
+                            <button id="line-digest-preview-btn" onclick="previewDigest()"
                                 style="padding:7px 14px; border:1px solid #0f766e; border-radius:10px; background:#0f766e; color:#fff; font-size:0.78em; font-weight:700; cursor:pointer;">
-                                <i class="fa-solid fa-paper-plane"></i> Send digest now
+                                <i class="fa-solid fa-eye"></i> Preview digest
                             </button>
                             <span id="line-digest-now-status" style="font-size:0.74em; color:#64748b;"></span>
+                        </div>
+                        <div id="line-digest-preview-box" style="display:none; margin-top:10px; border:1px solid #d8dee7; border-radius:10px; background:#f8fafc; padding:10px 12px;">
+                            <div id="line-digest-preview-meta" style="font-size:0.72em; color:#64748b; margin-bottom:8px;"></div>
+                            <div id="line-digest-preview-copies" style="display:flex; gap:12px; flex-wrap:wrap;"></div>
+                            <div style="margin-top:10px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                                <button id="line-digest-now-btn" onclick="sendDigestNow()"
+                                    style="padding:7px 14px; border:1px solid #b45309; border-radius:10px; background:#b45309; color:#fff; font-size:0.78em; font-weight:700; cursor:pointer;">
+                                    <i class="fa-solid fa-paper-plane"></i> Send this now
+                                </button>
+                                <button onclick="closeDigestPreview()"
+                                    style="padding:7px 12px; border:1px solid #cbd5e1; border-radius:10px; background:#fff; color:#475569; font-size:0.78em; font-weight:600; cursor:pointer;">
+                                    Close
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -30859,9 +30877,12 @@ RULES:
                     // V97.63: the Send button sits in this panel, so gate it on the very
                     // number the panel just drew. At the cap a manual push would only fail
                     // at LINE — refusing before spending the call is cheaper and clearer.
+                    // V97.64: the flag has to outlive this call — the Send button now lives
+                    // inside the preview box, which renders long after loadLineUsage ran.
+                    const atCap = total >= LINE_MONTHLY_QUOTA;
+                    window._lineDigestAtCap = atCap;
                     const sendBtn = document.getElementById('line-digest-now-btn');
                     if (sendBtn) {
-                        const atCap = total >= LINE_MONTHLY_QUOTA;
                         sendBtn.disabled = atCap;
                         sendBtn.style.opacity = atCap ? '0.45' : '1';
                         sendBtn.style.cursor = atCap ? 'not-allowed' : 'pointer';
@@ -30901,6 +30922,103 @@ RULES:
                 }
             };
 
+            // V97.64: digest preview. Walks the very Flex body the server would push and
+            // renders its text nodes — deliberately NOT a second renderer, because a
+            // preview that draws the message its own way will eventually disagree with
+            // what actually gets sent, which is worse than having no preview at all.
+            // Costs Firestore reads only; the endpoint has no path that can push.
+            window.previewDigest = async function () {
+                const btn = document.getElementById('line-digest-preview-btn');
+                const box = document.getElementById('line-digest-preview-box');
+                const meta = document.getElementById('line-digest-preview-meta');
+                const copies = document.getElementById('line-digest-preview-copies');
+                const status = document.getElementById('line-digest-now-status');
+                const setStatus = (text, color) => {
+                    if (status) { status.textContent = text; status.style.color = color || '#64748b'; }
+                };
+                if (!btn || !box || !copies) return;
+
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Building...';
+                setStatus('');
+                try {
+                    const fn = adminApp.functions().httpsCallable('previewQuizDigest');
+                    const res = await fn({});
+                    const data = (res && res.data) ? res.data : {};
+
+                    if (!data.preview) {
+                        closeDigestPreview();
+                        const map = {
+                            'nothing-to-report': 'Nothing to report today — nothing would be sent.',
+                            'token-missing': 'LINE token not configured server-side.',
+                            'no-targets': 'No LINE targets configured.',
+                            'users-read-failed': 'Could not read users.',
+                            'attempts-read-failed': 'Could not read quiz attempts.'
+                        };
+                        setStatus(map[data.reason] || `No preview (${data.reason || 'unknown'}).`, '#b45309');
+                        return;
+                    }
+
+                    // Quiz titles and display names land in here, so escaping is not
+                    // optional — a title with a tag would otherwise eat the preview.
+                    const esc = (v) => String(v == null ? '' : v)
+                        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    const RECIPIENT = { 'admin-1on1': 'Admin chat (you)', 'group': 'Intern group' };
+
+                    copies.innerHTML = (data.targets || []).map(t => {
+                        const lines = (t.body || []).map(n => {
+                            if (n.type === 'separator') return '<div style="border-top:1px solid #e2e8f0; margin:6px 0;"></div>';
+                            if (n.type !== 'text') return '';
+                            const bold = n.weight === 'bold' ? 'font-weight:700;' : '';
+                            const color = n.color ? `color:${esc(n.color)};` : '';
+                            return `<div style="${bold}${color} font-size:0.76em; line-height:1.5; word-break:break-word;">${esc(n.text)}</div>`;
+                        }).join('');
+                        return `<div style="flex:1 1 260px; min-width:240px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; padding:10px;">`
+                            + `<div style="font-size:0.7em; font-weight:800; color:#0f766e; margin-bottom:6px; letter-spacing:0.03em;">${esc(RECIPIENT[t.label] || t.label)}</div>`
+                            + lines + `</div>`;
+                    }).join('');
+
+                    const c = data.counts || {};
+                    if (meta) {
+                        meta.textContent = `Built ${new Date(data.builtAt || Date.now()).toLocaleTimeString()}`
+                            + ` · ${(data.targets || []).length} recipients`
+                            + ` · ${c.doneQuizzes || 0} done · ${c.products || 0} products · ${c.urgent || 0} due soon`
+                            + ' · nothing sent yet';
+                    }
+                    box.style.display = 'block';
+
+                    // The Send button only exists on screen now, so re-assert the at-cap
+                    // gate that loadLineUsage recorded the last time it ran.
+                    const sendBtn = document.getElementById('line-digest-now-btn');
+                    if (sendBtn && window._lineDigestAtCap) {
+                        sendBtn.disabled = true;
+                        sendBtn.style.opacity = '0.45';
+                        sendBtn.style.cursor = 'not-allowed';
+                        sendBtn.title = 'Monthly LINE quota reached';
+                    }
+                } catch (err) {
+                    console.error('[previewDigest] failed:', err);
+                    closeDigestPreview();
+                    setStatus(`Error: ${(err && err.message) || 'unknown'}`, '#dc2626');
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-eye"></i> Preview digest';
+                }
+            };
+
+            // Clears the rendered copy as well as hiding it, so a stale preview can never
+            // be reopened and sent as if it were current.
+            window.closeDigestPreview = function () {
+                const box = document.getElementById('line-digest-preview-box');
+                const copies = document.getElementById('line-digest-preview-copies');
+                const meta = document.getElementById('line-digest-preview-meta');
+                if (box) box.style.display = 'none';
+                if (copies) copies.innerHTML = '';
+                if (meta) meta.textContent = '';
+                window._digestForceNext = false;
+            };
+
             // V97.63: manual digest send. The duplicate guard lives server-side; this
             // only relays it. Note the asymmetry in how the two confirmations are asked:
             // the first is a native confirm() raised straight from the click, which is
@@ -30915,8 +31033,17 @@ RULES:
                     if (status) { status.textContent = text; status.style.color = color || '#64748b'; }
                 };
 
+                // V97.64: send is only reachable from a rendered preview. The button lives
+                // inside the preview box already, so this is belt-and-braces — but it puts
+                // the rule in code rather than leaving it to DOM placement.
+                const box = document.getElementById('line-digest-preview-box');
+                if (!box || box.style.display === 'none') {
+                    setStatus('Preview first — Send only works from a rendered preview.', '#b45309');
+                    return;
+                }
+
                 const force = window._digestForceNext === true;
-                if (!force && !confirm("Send today's digest now?\n\nIt goes to the admin chat AND the intern group — that is 2 pushes off the monthly quota.")) return;
+                if (!force && !confirm("Send this digest now?\n\nIt goes to the admin chat AND the intern group — that is 2 pushes off the monthly quota, and it cannot be unsent.")) return;
 
                 if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...'; }
                 setStatus('');
@@ -30926,8 +31053,11 @@ RULES:
                     const data = (res && res.data) ? res.data : {};
 
                     if (data.sent) {
-                        window._digestForceNext = false;
                         const c = data.counts || {};
+                        // The preview described a message that has now gone out — leaving it
+                        // on screen would invite sending the same thing a second time.
+                        // Runs before setStatus so it does not wipe the result line.
+                        closeDigestPreview();
                         showToast(`✓ Digest sent — ${data.pushed} push${data.pushed === 1 ? '' : 'es'}`);
                         setStatus(`sent · ${c.doneQuizzes || 0} done · ${c.products || 0} products · ${c.urgent || 0} due soon`, '#059669');
                     } else if (data.reason === 'already-sent-today') {
@@ -30953,7 +31083,7 @@ RULES:
                     // Must restore on EVERY path — this panel is never re-rendered from
                     // scratch, so a spinner left behind would be permanent. loadLineUsage
                     // runs last and re-applies the at-cap gate over this enable.
-                    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send digest now'; }
+                    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send this now'; }
                     if (typeof loadLineUsage === 'function') loadLineUsage();
                 }
             };
