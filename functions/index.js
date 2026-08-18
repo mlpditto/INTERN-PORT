@@ -176,9 +176,7 @@ exports.setAdminClaim = onCall(async (request) => {
 
 // === Admin Security: Generate Preview Token for cross-user LIFF preview ===
 exports.generatePreviewToken = onCall(async (request) => {
-    if (!request.auth || request.auth.token.admin !== true) {
-        throw new HttpsError('permission-denied', 'Admin required');
-    }
+    requireAdminCallable(request);
     const token = await admin.auth().createCustomToken(request.auth.uid, {
         admin: true,
         previewMode: true
@@ -268,6 +266,20 @@ async function verifyIdTokenFromHeader(req, res) {
 }
 function isAdminToken(decoded) {
     return !!decoded && (decoded.admin === true || decoded.email === "medlifeplus@gmail.com");
+}
+// Callable-side gate. The custom claim stays the primary check, but it is set
+// once per uid by setAdminClaim and nothing in the admin UI ever calls that, so
+// an admin uid without the claim silently loses EVERY admin callable at once —
+// preview/send digest, quiz reminder, review-message notify, admin-edit notify,
+// preview token. That is what happened on 2026-08-18: signed in as the admin
+// with a valid token, no `admin` claim on it, and all six answered
+// "Admin required". The HTTP endpoints have always accepted the admin email via
+// isAdminToken; use the same rule here so one missing claim cannot take the
+// whole admin surface down again.
+function requireAdminCallable(request) {
+    if (!request || !request.auth || !isAdminToken(request.auth.token)) {
+        throw new HttpsError('permission-denied', 'Admin required');
+    }
 }
 
 // V95.96: observability — per-day AI token aggregation. One doc per Bangkok day in
@@ -951,9 +963,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
 exports.notifyOnReviewMessage = onCall(
     { secrets: ['LINE_CHANNEL_ACCESS_TOKEN'] },
     async (request) => {
-    if (!request.auth || request.auth.token.admin !== true) {
-        throw new HttpsError('permission-denied', 'Admin required');
-    }
+    requireAdminCallable(request);
 
     const data = request.data || {};
     const submissionId = data.submissionId || '';
@@ -1154,9 +1164,7 @@ exports.notifyOnReviewMessage = onCall(
 exports.notifyQuizReminder = onCall(
     { secrets: ['LINE_CHANNEL_ACCESS_TOKEN'] },
     async (request) => {
-    if (!request.auth || request.auth.token.admin !== true) {
-        throw new HttpsError('permission-denied', 'Admin required');
-    }
+    requireAdminCallable(request);
 
     const data = request.data || {};
     const userId = typeof data.userId === 'string' ? data.userId.trim() : '';
@@ -1285,9 +1293,7 @@ exports.notifyQuizReminder = onCall(
 exports.notifyOnAdminEdit = onCall(
     { secrets: ['LINE_CHANNEL_ACCESS_TOKEN'] },
     async (request) => {
-    if (!request.auth || request.auth.token.admin !== true) {
-        throw new HttpsError('permission-denied', 'Admin required');
-    }
+    requireAdminCallable(request);
 
     const data = request.data || {};
     const entryId = data.entryId || '';
@@ -2700,9 +2706,7 @@ exports.previewQuizDigest = onCall({
     secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID'],
     timeoutSeconds: 120
 }, async (request) => {
-    if (!request.auth || request.auth.token.admin !== true) {
-        throw new HttpsError('permission-denied', 'Admin required');
-    }
+    requireAdminCallable(request);
     return await runQuizDigest('manual', { preview: true });
 });
 
@@ -2714,9 +2718,7 @@ exports.sendQuizDigestNow = onCall({
     secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID'],
     timeoutSeconds: 120
 }, async (request) => {
-    if (!request.auth || request.auth.token.admin !== true) {
-        throw new HttpsError('permission-denied', 'Admin required');
-    }
+    requireAdminCallable(request);
     // One click costs one push PER TARGET (admin chat + group) against a 300/mo
     // plan, and the content is the same all day — so a second send is far more
     // likely a mis-click than an intent. Report it and let the UI confirm before
