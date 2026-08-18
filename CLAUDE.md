@@ -4,6 +4,8 @@ Behavioral guidelines to reduce common LLM coding mistakes, customized for the I
 
 **Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
 
+**Read [THINKING-PLAYBOOK.md](THINKING-PLAYBOOK.md) alongside this file.** This file says what the rules are for this codebase; the playbook says how to work — build a model before editing, cut the task into slices you can prove done, verify at the surface the user actually sees, and report what you observed rather than what you hoped. Where the two overlap, this file wins on project specifics.
+
 ---
 
 ## Karpathy-Inspired Core Principles
