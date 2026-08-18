@@ -1976,6 +1976,16 @@ const NOTIFY_ACTIVE_DAYS = 30;
 // Not the audience being chased on Public quizzes. Non-Public quizzes are
 // already scoped by targetGroup, so this only bites on Public.
 const NOTIFY_EXCLUDE_GROUPS = ['staff', 'preceptor'];
+// Groups that are never NAMED in the group copy of the digest. The intern chat
+// is where the roster is read out loud, and Pharmacists / Public are not part
+// of that audience — a pharmacist's name in the intern group is noise to every
+// reader and exposure to the one named. They stay in the cohort: still counted
+// in done/total, still chased in the admin 1-on-1 copy, just not named in the
+// group. Compared lowercase because users.group is admin-typed free text.
+const DIGEST_UNNAMED_IN_GROUP = ['pharmacists', 'public'];
+function unnamedInGroupCopy(group) {
+    return DIGEST_UNNAMED_IN_GROUP.includes(String(group || '').trim().toLowerCase());
+}
 
 function userLastSeenMs(u) {
     if (u && u.lastSeen && typeof u.lastSeen.toMillis === 'function') return u.lastSeen.toMillis();
@@ -2332,6 +2342,7 @@ async function runQuizDigest(kind, options) {
     // The window is `now - 24h`, so a 16:00 run reports 16:00 yesterday through
     // 16:00 today — exactly the day boundary the admin thinks in.
     const activeIds = new Set(activeUsers.map(u => u.id));
+    const unnamedIds = new Set(users.filter(u => unnamedInGroupCopy(u.group)).map(u => u.id));
     const doneRows = [];
     try {
         const snap = await db.collection('quiz_attempts')
@@ -2360,6 +2371,7 @@ async function runQuizDigest(kind, options) {
                 name: userNames.get(userId) || userId.slice(0, 8),
                 quiz: quizTitleCache.get(quizId),
                 inCohort: activeIds.has(userId),
+                unnamed: unnamedIds.has(userId),
                 score: a.isPoll === true ? 'poll' : (totalQ > 0 ? `${Math.round(correct * 10) / 10}/${totalQ}` : '—')
             });
         }
@@ -2388,7 +2400,7 @@ async function runQuizDigest(kind, options) {
                 doneQuizzes.push(entry);
             }
             const e = byQuiz.get(r.quizId);
-            if (r.inCohort) e.people.push({ name: r.name, score: r.score });
+            if (r.inCohort) e.people.push({ name: r.name, score: r.score, unnamed: r.unnamed });
             else e.others++;
         });
     }
@@ -2455,7 +2467,10 @@ async function runQuizDigest(kind, options) {
                 deadlineMs: deadlineMs,
                 deadline: new Date(deadlineMs).toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', day: '2-digit', month: 'short' }),
                 names: missing.map(u => u.name),
-                doneNames: doneNames,
+                // Who is done, minus the groups the intern chat does not name.
+                // doneCount below stays the FULL figure, so both copies print the
+                // same done/total and only the roster differs.
+                doneNamesGroup: eligible.filter(u => doneIds.has(u.id) && !unnamedInGroupCopy(u.group)).map(u => u.name),
                 doneCount: doneNames.length,
                 totalCount: eligible.length
             });
@@ -2534,8 +2549,13 @@ async function runQuizDigest(kind, options) {
         body.push({ type: 'text', text: doneHeader, size: 'xs', weight: 'bold', color: '#059669', margin: newlyLive.length ? 'md' : 'none' });
         if (doneQuizzes.length) {
             doneQuizzes.slice(0, DIGEST_MAX_ROWS).forEach(q => {
-                const who = q.people.map(p => target.withScores ? `${p.name} ${p.score}` : p.name);
-                if (q.others) who.push(`+${q.others} ${q.others === 1 ? 'other' : 'others'}`);
+                // The group copy drops Pharmacists / Public names and folds them
+                // into the same "+N others" tail the non-cohort submitters use,
+                // so the line still accounts for everyone who worked today.
+                const named = target.withScores ? q.people : q.people.filter(p => !p.unnamed);
+                const who = named.map(p => target.withScores ? `${p.name} ${p.score}` : p.name);
+                const others = q.others + (q.people.length - named.length);
+                if (others) who.push(`+${others} ${others === 1 ? 'other' : 'others'}`);
                 // `who` can only be empty if a quiz had no rows at all, which can't
                 // happen — but an empty text node is a hard LINE API error, so the
                 // title alone is the fallback rather than a dangling separator.
@@ -2584,7 +2604,7 @@ async function runQuizDigest(kind, options) {
         urgentBlocks.forEach(blk => {
             body.push({ type: 'separator', margin: 'md' });
             body.push({ type: 'text', text: `⏳ ${blk.quiz} · due ${blk.deadline} · ${blk.doneCount}/${blk.totalCount}`, size: 'xs', weight: 'bold', color: '#b45309', margin: 'md', wrap: true });
-            const roster = target.withScores ? blk.names : blk.doneNames;
+            const roster = target.withScores ? blk.names : blk.doneNamesGroup;
             if (roster.length) {
                 const shown = roster.slice(0, DIGEST_MAX_ROWS).join(', ');
                 const overflow = roster.length > DIGEST_MAX_ROWS ? ` +${roster.length - DIGEST_MAX_ROWS} more` : '';
@@ -2597,7 +2617,13 @@ async function runQuizDigest(kind, options) {
                 // Only reachable on the group copy — `missing` is non-empty by
                 // construction above, so the admin roster never is. An empty
                 // text node is a hard LINE API error, so this must not be blank.
-                body.push({ type: 'text', text: 'No one yet', size: 'sm', color: '#94a3b8', wrap: true, margin: 'xs' });
+                // "No one yet" would contradict the header when the only people
+                // done are ones this copy does not name, so say the count alone.
+                body.push({
+                    type: 'text',
+                    text: blk.doneCount > 0 ? `✅ ${blk.doneCount} done` : 'No one yet',
+                    size: 'sm', color: '#94a3b8', wrap: true, margin: 'xs'
+                });
             }
         });
 
