@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.71</title>
+    <title>Nika V97.72</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -17119,6 +17119,12 @@ RULES:
                                 result,
                                 model: aiModel || selectedModel || null,
                                 tokens: aiTokens || 0,
+                                // V97.72: fingerprint of the question set this audit judged, so the
+                                // quiz-list badge can tell "audited" from "audited, then edited".
+                                // updatedAt is useless for that — it also moves on points tweaks,
+                                // Go Live, template toggle, coverage assignment.
+                                qCount: (formData.questions || []).length,
+                                qFingerprint: window.quizQuestionsFingerprint(formData.questions),
                                 savedAt: firebase.firestore.FieldValue.serverTimestamp()
                             }
                         }).catch(e => console.warn('Failed to save AI audit to quiz doc:', e));
@@ -28783,6 +28789,7 @@ ${JSON.stringify(sourceObj)}`;
                                 <input type="checkbox" class="quiz-bulk-cb" onchange="toggleQuizSelection('${q.id}', this.checked)" ${selectedQuizIds.has(q.id) ? 'checked' : ''} title="Select for bulk action" style="width:15px; height:15px; cursor:pointer; flex-shrink:0;">
                                 ${q.title ? q.title.replace(/\s*\(Template\)$/i, '') : '-'}
                                 <span id="fb-badge-${q.id}" style="font-size:0.7em; background:#fff7ed; color:#b45309; border:1px solid #fed7aa; border-radius:8px; padding:2px 7px; font-weight:800; cursor:pointer; white-space:nowrap;" onclick="event.stopPropagation(); showQuizFeedbackPanel('${q.id}')" title="View user feedback">⭐ —</span>
+                                ${window.quizAuditBadgeHtml(q)}
                                 ${_easyBadge}${_hardBadge}${_cheatBadge}
                             </div>
                             <div style="display:flex; flex-wrap:wrap; gap:3px; align-items:center;">
@@ -28972,6 +28979,64 @@ ${JSON.stringify(sourceObj)}`;
             inactiveQuizPage += dir;
             renderQuizzes();
         }
+
+        // V97.72: Quality Audit badge for the quiz rows. Reads quizzes/{id}.lastAiAudit,
+        // which auditQuizAI has auto-saved since V97.41 — quizzesData already holds the
+        // whole doc from the onSnapshot at loadQuizzes, so the badge costs zero extra
+        // Firestore reads and zero AI tokens. Audits run BEFORE V97.41 were never
+        // persisted and will correctly read as "never audited"; there is nothing to
+        // backfill from. Defined on window because auditQuizAI (which writes the
+        // fingerprint) lives in an earlier <script> block than this one.
+        window.quizQuestionsFingerprint = function(questions) {
+            const list = Array.isArray(questions) ? questions : [];
+            const src = list.map(q => `${q.q || ''}|${(q.options || []).join('~')}|${JSON.stringify(q.correct)}`).join('||');
+            let h = 5381;
+            for (let i = 0; i < src.length; i++) h = ((h * 33) ^ src.charCodeAt(i)) >>> 0;
+            return `${list.length}:${h.toString(36)}`;
+        };
+
+        // Stale = the audit was run, then the questions changed. Audits saved between
+        // V97.41 and V97.72 have no fingerprint, so fall back to comparing how many
+        // questions were judged against how many the quiz has now — catches add/delete
+        // but not a silent reword. Those get re-fingerprinted on the next Audit run.
+        window.quizAuditIsStale = function(q) {
+            const a = q && q.lastAiAudit;
+            if (!a) return false;
+            const qs = Array.isArray(q.questions) ? q.questions : [];
+            if (a.qFingerprint) return a.qFingerprint !== window.quizQuestionsFingerprint(qs);
+            const savedCount = typeof a.qCount === 'number'
+                ? a.qCount
+                : (a.result && Array.isArray(a.result.perQuestionAudit) ? a.result.perQuestionAudit.length : null);
+            return savedCount !== null && savedCount !== qs.length;
+        };
+
+        window.quizAuditBadgeHtml = function(q) {
+            const base = 'font-size:0.7em; border-radius:8px; padding:2px 7px; font-weight:800; white-space:nowrap;';
+            const a = q && q.lastAiAudit;
+            const score = a && a.result ? Number(a.result.overallScore) : NaN;
+            if (!a || !a.result || isNaN(score)) {
+                return `<span title="Never audited — open the quiz and press ✅ Audit&#10;ยังไม่เคยรัน Quality Audit" style="${base} background:#f8fafc; color:#94a3b8; border:1px solid #e2e8f0;">🧪 —</span>`;
+            }
+            const stale = window.quizAuditIsStale(q);
+            // Same thresholds/palette as renderAuditScorecard's overall pill, so the badge
+            // and the scorecard never disagree on what counts as a good score.
+            const skin = stale
+                ? 'background:#ffedd5; color:#c2410c; border:1px solid #fed7aa;'
+                : score >= 4 ? 'background:#dcfce7; color:#15803d; border:1px solid #86efac;'
+                : score >= 3 ? 'background:#fef9c3; color:#a16207; border:1px solid #fde68a;'
+                : 'background:#fee2e2; color:#b91c1c; border:1px solid #fecaca;';
+            const nQ = a.result && Array.isArray(a.result.perQuestionAudit) ? a.result.perQuestionAudit.length : (a.qCount || 0);
+            let when = '';
+            if (a.savedAt && typeof a.savedAt.toDate === 'function') when = a.savedAt.toDate().toLocaleString();
+            const tip = [
+                `Quality Audit ${score.toFixed(1)} / 5`,
+                nQ ? `${nQ} question(s) audited` : '',
+                a.model ? `model: ${a.model}` : '',
+                when,
+                stale ? 'STALE — the questions changed after this audit ran. Re-run ✅ Audit.' : ''
+            ].filter(Boolean).join(' · ');
+            return `<span title="${escapeHtml(tip)}" style="${base} ${skin}">🧪 ${score.toFixed(1)}${stale ? ' ⚠' : ''}</span>`;
+        };
 
         // V93.27 PR #13 Phase 4B+4C: filter pill + sort dropdown handlers for the
         // Quiz Engine global toolbar. State lives on window so a single source of truth
@@ -53986,7 +54051,7 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
                     <b style="color:${accent}; font-size:0.9em;">Q${qNumber}${(opts && opts.recommend === 'keep') ? ` <span style="margin-left:6px; background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; border-radius:20px; padding:1px 8px; font-size:0.75em; font-weight:800;">✅ แนะนำให้เก็บ</span>` : ''}</b>
                     ${(opts && opts.hideDelete) ? '' : `<button onclick="auditDeleteQuestion(${qNumber})" title="Delete Q${qNumber} from the form (not saved until Save Quiz)"
-                        style="padding:3px 10px; border-radius:7px; border:none; ${(opts && opts.recommend === 'drop') ? 'background:#dc2626; color:#fff;' : (opts && opts.recommend === 'keep') ? 'background:#f8fafc; color:#94a3b8; border:1px solid #e2e8f0;' : 'background:rgba(239,68,68,0.12); color:#dc2626;'} cursor:pointer; font-size:0.7em; font-weight:800;">🗑️ ลบ Q${qNumber}</button>`}
+                        style="padding:3px 10px; border-radius:7px; border:none; ${(opts && opts.recommend === 'drop') ? 'background:#dc2626; color:#fff;' : (opts && opts.recommend === 'keep') ? 'background:#f8fafc; color:#94a3b8; border:1px solid #e2e8f0;' : 'background:rgba(239,68,68,0.12); color:#dc2626;'} cursor:pointer; font-size:0.7em; font-weight:800;">🗑️ Q${qNumber}</button>`}
                 </div>
                 <div style="white-space:pre-wrap; line-height:1.5; font-weight:600; font-size:0.84em; color:#1e293b; margin-bottom:8px;">${window._auditHighlightShared(question.q || '', peerText)}</div>
                 <div style="font-size:0.8em;">${optionsHtml}</div>
