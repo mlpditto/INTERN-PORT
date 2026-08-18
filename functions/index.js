@@ -321,7 +321,14 @@ async function recordAiUsage(provider, model, tokens, isAdmin, feature) {
 async function postWithRetry(url, data, config = {}) {
     const retries = 2;
     const baseDelayMs = 700;
-    const cfg = { timeout: 80000, ...config };
+    // 2026-08-18: was 80000, which is shorter than a legitimate full-quiz audit.
+    // A 10-question analysis asks for up to 32768 output tokens and routinely runs
+    // past 80s, so axios aborted it, the abort was retried as if it were a network
+    // blip, and the model restarted from scratch — three times, none of which could
+    // beat the same clock. 240s sits under this function's own timeoutSeconds: 300
+    // so a real upstream stall still surfaces as an error instead of a killed
+    // container. Fast providers are unaffected; this only moves the ceiling.
+    const cfg = { timeout: 240000, ...config };
     let lastErr;
     for (let attempt = 0; attempt <= retries; attempt++) {
         try {
@@ -329,7 +336,11 @@ async function postWithRetry(url, data, config = {}) {
         } catch (err) {
             lastErr = err;
             const status = err && err.response && err.response.status;
-            const retryable = !status || status === 429 || (status >= 500 && status <= 599);
+            // Our own timeout is not a transient failure — the next attempt starts
+            // the same generation from zero against the same deadline, so it burns
+            // another full run of tokens and wall-clock to fail identically.
+            const ownTimeout = err && (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT');
+            const retryable = !ownTimeout && (!status || status === 429 || (status >= 500 && status <= 599));
             if (!retryable || attempt === retries) throw err;
             const retryAfter = Number(err && err.response && err.response.headers && err.response.headers["retry-after"]);
             const backoff = (retryAfter > 0 ? Math.min(retryAfter * 1000, 10000) : baseDelayMs * Math.pow(2, attempt)) + Math.floor(Math.random() * 250);

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.65</title>
+    <title>Nika V97.67</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -16550,8 +16550,14 @@
             let analyzeProgressTimer = null;
             // V97.09: callUniversalAI's fetch has no client-side timeout, so a hung proxy/
             // network call left the button frozen at "Analyzing 95%" forever with no error.
-            // Race each attempt against a 2-minute cap so the catch block always fires and
-            // the button resets — full-quiz audits normally finish in well under this.
+            // Race each attempt against a cap so the catch block always fires and the button
+            // resets.
+            // 2026-08-18: the cap was 2 minutes on the assumption that full-quiz audits
+            // finish well inside it. They don't — a 10-question review asking for 32768
+            // output tokens regularly runs longer, so the guard was aborting healthy work
+            // and reporting it as "switch model", which points the blame at the model. The
+            // cap now sits just under callAIProxy's own timeoutSeconds: 300, so a real
+            // server-side failure arrives as an error message before this fires.
             const withTimeout = (promise, ms) => Promise.race([
                 promise,
                 new Promise((_, reject) => setTimeout(() => reject(new Error(`Timed out after ${Math.round(ms / 1000)}s waiting for the AI proxy. Try again or switch model.`)), ms))
@@ -16597,7 +16603,7 @@
                         // can exceed the proxy's default 8192-token cap and truncate mid-JSON,
                         // surfacing as a false "prose instead of JSON" banner. Request a larger
                         // output budget (proxy caps it server-side).
-                        const aiResp = await withTimeout(callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768, feature: 'quiz_analyzer' }), 120000);
+                        const aiResp = await withTimeout(callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768, feature: 'quiz_analyzer' }), 280000);
                         resultRaw = aiResp.text;
                         aiTokens = aiResp.tokens;
                         aiModel = aiResp.model;
