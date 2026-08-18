@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.67</title>
+    <title>Nika V97.68</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -12345,7 +12345,7 @@
                             <div class="glass-toggle-container" id="ai-analyze-model-toggle" style="margin:0; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.05); padding:3px; height:32px; border-radius:10px; gap:2px;">
                                 <div class="glass-toggle-item" data-value="gemini-3.5-flash" onclick="window.selectAiToolbarToggle(this,'ai-analyzer-model-val')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#fbbf24;">Flash</div>
                                 <div class="glass-toggle-item active" data-value="gemini-3.6-flash" onclick="window.selectAiToolbarToggle(this,'ai-analyzer-model-val')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#94a3b8;">Pro</div>
-                                <div class="glass-toggle-item" data-value="gpt-4o" onclick="window.selectAiToolbarToggle(this,'ai-analyzer-model-val')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#94a3b8;">GPT</div>
+                                <div class="glass-toggle-item" data-value="gpt-5.4" onclick="window.selectAiToolbarToggle(this,'ai-analyzer-model-val')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#94a3b8;">GPT</div>
                                 <div class="glass-toggle-item" data-value="claude-4-sonnet-latest" onclick="window.selectAiToolbarToggle(this,'ai-analyzer-model-val')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#94a3b8;">Claude</div>
                                 <div class="glass-toggle-item" data-value="typhoon-v2.5-30b-a3b-instruct" onclick="window.selectAiToolbarToggle(this,'ai-analyzer-model-val')" title="Typhoon" style="font-size:0.7em; padding:2px 8px; border-radius:8px; color:#94a3b8;">🌀</div>
                                 <div class="glass-toggle-item" data-value="meta-llama/Llama-3.3-70B-Instruct-Turbo" onclick="window.selectAiToolbarToggle(this,'ai-analyzer-model-val')" title="Llama" style="font-size:0.75em; padding:2px 8px; border-radius:8px; color:#94a3b8;">🦙</div>
@@ -53315,6 +53315,8 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 Identified Issue: ${issue || ''}
                 Previous Suggestion: ${suggestion || ''}
 
+                ANSWER KEY: "correct" holds ZERO-BASED INDEXES into the "options" array YOU output — the first option is 0, not 1. Assemble the options first, then count the index of the correct one. An improved question with a mis-indexed answer key is worse than no improvement at all.
+
                 Output ONLY a JSON object representing the improved question:
                 {
                   "q": "...",
@@ -53346,7 +53348,12 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         };
 
         window._compareModelB = function() {
-            return localStorage.getItem('ai_default_2model_b') || 'claude-4-sonnet-latest';
+            const saved = localStorage.getItem('ai_default_2model_b') || 'claude-4-sonnet-latest';
+            // The GPT chip's id moved off the legacy gpt-4o on 2026-08-18. Anyone who
+            // had picked GPT before that has the old id in localStorage, which now
+            // matches no chip — it would render with nothing highlighted AND still
+            // route to the mini tier. Map it forward on read.
+            return saved === 'gpt-4o' ? 'gpt-5.4' : saved;
         };
         window.setCompareModelB = function(chip) {
             localStorage.setItem('ai_default_2model_b', chip.dataset.value);
@@ -53356,7 +53363,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             const cur = window._compareModelB();
             const chips = [
                 { v: 'gemini-3.6-flash', t: 'Pro' },
-                { v: 'gpt-4o', t: 'GPT' },
+                { v: 'gpt-5.4', t: 'GPT' },
                 { v: 'claude-4-sonnet-latest', t: 'Claude' },
                 { v: 'typhoon-v2.5-30b-a3b-instruct', t: '🌀' },
                 { v: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', t: '🦙' },
@@ -54672,6 +54679,8 @@ RULES:
                 Identified Issue: ${item.issue}
                 Previous Suggestion: ${item.suggestion}
                 
+                ANSWER KEY: "correct" holds ZERO-BASED INDEXES into the "options" array YOU output — the first option is 0, not 1. Assemble the options first, then count the index of the correct one. An improved question with a mis-indexed answer key is worse than no improvement at all.
+
                 Output ONLY a JSON object representing the improved question:
                 {
                   "q": "...",
