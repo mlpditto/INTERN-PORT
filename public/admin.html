@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.68</title>
+    <title>Nika V97.69</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -16738,6 +16738,7 @@
                                             <div style="font-size:0.95em; color:#4a5568; margin-bottom:10px; line-height: 1.5;">
                                                 <b style="color: #ef4444;"><i class="fa-solid fa-circle-exclamation"></i> Issue:</b> ${item.issue}
                                             </div>
+                                            ${window._aiIssuePeerChipsHtml(item.issue, qIdx + 1, formData.questions, arrIdx)}
                                             <div id="ai-suggestion-text-${arrIdx}" style="font-size:0.95em; color:#4361ee; line-height: 1.5; background: rgba(67, 97, 238, 0.05); padding: 10px; border-radius: 10px;">
                                                 <b><i class="fa-solid fa-lightbulb"></i> Suggestion:</b> ${item.suggestion}
                                             </div>
@@ -53964,7 +53965,12 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
         // One side of the compare panel. Deliberately renders the stem AND the options:
         // two stems can read differently while the option sets give the answer away as
         // the same item.
-        window._auditDupSideHtml = function(question, qNumber, peerText, accent) {
+        // `opts.hideDelete` — the AI-analysis reuse of this panel has its own delete
+        // button on the card, and the one below calls auditDeleteQuestion, which gates
+        // on window._lastAuditFull (set by an Audit run, not by an Analysis run). In
+        // that context it would either warn about a scorecard the admin never opened or
+        // sit next to a second, different delete. Callers outside the audit pass it.
+        window._auditDupSideHtml = function(question, qNumber, peerText, accent, opts) {
             if (!question) {
                 return `<div style="flex:1; min-width:0; padding:12px; border:1px dashed #e2e8f0; border-radius:10px; color:#94a3b8; font-size:0.82em;">Q${qNumber} not available in this snapshot</div>`;
             }
@@ -53976,8 +53982,8 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
             return `<div style="flex:1; min-width:0; padding:12px; background:#fff; border:1.5px solid ${accent}; border-radius:10px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
                     <b style="color:${accent}; font-size:0.9em;">Q${qNumber}</b>
-                    <button onclick="auditDeleteQuestion(${qNumber})" title="Delete Q${qNumber} from the form (not saved until Save Quiz)"
-                        style="padding:3px 10px; border-radius:7px; border:none; background:rgba(239,68,68,0.12); color:#dc2626; cursor:pointer; font-size:0.7em; font-weight:800;">🗑️ ลบ Q${qNumber}</button>
+                    ${(opts && opts.hideDelete) ? '' : `<button onclick="auditDeleteQuestion(${qNumber})" title="Delete Q${qNumber} from the form (not saved until Save Quiz)"
+                        style="padding:3px 10px; border-radius:7px; border:none; background:rgba(239,68,68,0.12); color:#dc2626; cursor:pointer; font-size:0.7em; font-weight:800;">🗑️ ลบ Q${qNumber}</button>`}
                 </div>
                 <div style="white-space:pre-wrap; line-height:1.5; font-weight:600; font-size:0.84em; color:#1e293b; margin-bottom:8px;">${window._auditHighlightShared(question.q || '', peerText)}</div>
                 <div style="font-size:0.8em;">${optionsHtml}</div>
@@ -54024,6 +54030,47 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
 
                 return chip + panel;
             }).join('');
+        };
+
+        // V97.69: an Analysis issue that reads "มีความซ้ำซ้อนกับ Q18" names a question the
+        // admin then has to go find by hand — behind a modal that covers the form. The
+        // judgement being asked for is "are these two actually the same item", and it
+        // cannot be made from one of the two. Parse the peer numbers out of the issue
+        // text and offer the same side-by-side panel the audit dup chips use, including
+        // its shared-wording highlight.
+        //
+        // Only `Q<number>` is matched. Thai "ข้อ 3" also appears in sentences about
+        // OPTIONS ("ตัวเลือกข้อ 3"), so matching that too would open panels for questions
+        // the issue never referred to.
+        window._aiIssuePeerChipsHtml = function(issueText, selfQNumber, questions, arrIdx) {
+            const peers = [];
+            String(issueText || '').replace(/Q\s*(\d{1,3})/gi, (m, n) => {
+                const num = parseInt(n, 10);
+                if (num && num !== selfQNumber && peers.indexOf(num) === -1) peers.push(num);
+                return m;
+            });
+            const self = (questions && questions[selfQNumber - 1]) || null;
+            const html = peers.slice(0, 3).map(peerNumber => {
+                const peer = (questions && questions[peerNumber - 1]) || null;
+                // A number the model made up, or one left over from a question since
+                // deleted, gets no chip rather than a panel saying "not available".
+                if (!peer) return '';
+                const panelId = `ai-issue-cmp-${arrIdx}-${peerNumber}`;
+                const chip = `<button type="button" onclick="toggleAuditDupCompare('${panelId}', this)" aria-expanded="false"
+                    title="กาง Q${selfQNumber} กับ Q${peerNumber} เทียบกันเคียงข้าง"
+                    style="background:rgba(67,97,238,0.10); color:#3730a3; padding:2px 10px; border-radius:20px; font-size:0.72em; font-weight:800; border:1px solid rgba(67,97,238,0.25); cursor:pointer; width:auto; min-height:0;">⇄ เทียบกับ Q${peerNumber}</button>`;
+                const panel = `<div id="${panelId}" class="lang-no-toggle" style="display:none; width:100%; margin-top:8px; padding:12px; background:#f8faff; border:1px solid #c7d2fe; border-radius:12px;">
+                    <div style="font-size:0.75em; color:#3730a3; font-weight:700; margin-bottom:10px; line-height:1.5;">
+                        <mark style="background:#fde68a; color:#78350f; padding:0 3px; border-radius:3px;">ไฮไลต์</mark> คือถ้อยคำที่สองข้อใช้ร่วมกัน — ตัดสินเองว่าซ้ำจริงไหมก่อนกด Fix
+                    </div>
+                    <div class="audit-dup-cmp-grid">
+                        ${window._auditDupSideHtml(self, selfQNumber, (peer.q || ''), '#0f766e', { hideDelete: true })}
+                        ${window._auditDupSideHtml(peer, peerNumber, (self && self.q) || '', '#4361ee', { hideDelete: true })}
+                    </div>
+                </div>`;
+                return chip + panel;
+            }).join('');
+            return html ? `<div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">${html}</div>` : '';
         };
 
         // Concept-level pass. The n-gram pass structurally cannot see "same fact, other
