@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.69</title>
+    <title>Nika V97.70</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -54052,9 +54052,18 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
             const self = (questions && questions[selfQNumber - 1]) || null;
             const html = peers.slice(0, 3).map(peerNumber => {
                 const peer = (questions && questions[peerNumber - 1]) || null;
-                // A number the model made up, or one left over from a question since
-                // deleted, gets no chip rather than a panel saying "not available".
-                if (!peer) return '';
+                // V97.70: a number naming no existing question used to render nothing.
+                // Found live the same day: the Q1 card on a 13-question quiz claimed
+                // "ซ้ำซ้อนกับ Q18". Silence there is the worst of both — the admin cannot
+                // tell an absent chip from a feature that failed, and misses the actual
+                // headline, which is that THIS ISSUE IS UNRELIABLE. A whole suggestion
+                // built on a question that does not exist should not be applied with Fix.
+                // Say so, in a chip that deliberately cannot be clicked.
+                if (!peer) {
+                    const total = (questions || []).length;
+                    return `<span title="Issue นี้อ้างถึง Q${peerNumber} ซึ่งไม่มีอยู่ในชุดนี้ (มี ${total} ข้อ) — คำแนะนำที่ตั้งอยู่บนข้อที่ไม่มีจริง ไม่ควรกด Fix ตามโดยไม่อ่านเอง"
+                        style="background:#f1f5f9; color:#64748b; padding:2px 10px; border-radius:20px; font-size:0.72em; font-weight:800; border:1px dashed #cbd5e1; cursor:help;">⚠️ อ้าง Q${peerNumber} · ชุดนี้มี ${total} ข้อ</span>`;
+                }
                 const panelId = `ai-issue-cmp-${arrIdx}-${peerNumber}`;
                 const chip = `<button type="button" onclick="toggleAuditDupCompare('${panelId}', this)" aria-expanded="false"
                     title="กาง Q${selfQNumber} กับ Q${peerNumber} เทียบกันเคียงข้าง"
