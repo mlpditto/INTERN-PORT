@@ -2510,7 +2510,71 @@ async function runQuizDigest(kind, options) {
         console.error('[notifyQuizDigest] product_listings read failed:', err.message);
     }
 
-    if (!doneRows.length && !pendingBlocks.length && !newlyLive.length && !productRows.length) {
+    // --- section 5: queues waiting on the ADMIN (1-on-1 copy only) ---
+    // Everything above reports what the interns did. These three are the reverse:
+    // work sitting on the admin, invisible until someone opens the right tab.
+    // A late-quiz request in particular blocks a student from starting at all —
+    // see feedback_quiz_interrupted_started_invisible.
+    // Each read is independent and non-fatal: a broken queue must not cost the
+    // rest of the digest, same rule as the product read above.
+    // All three are single-field queries (equality, or one range on one field) so
+    // Firestore auto-indexes them — no composite index to deploy.
+    const adminQueue = [];
+    const queueCounts = { requests: 0, escalated: 0, followUp: 0 };
+    try {
+        const snap = await db.collection('quiz_attempts').where('status', '==', 'requesting').get();
+        queueCounts.requests = snap.size;
+        const titleCache = new Map();
+        for (const doc of snap.docs.slice(0, DIGEST_MAX_ROWS)) {
+            const { quizId, userId } = splitAttemptId(doc.id);
+            if (!titleCache.has(quizId)) {
+                try {
+                    const q = await db.collection('quizzes').doc(quizId).get();
+                    titleCache.set(quizId, q.exists ? String((q.data() || {}).title || 'Quiz').slice(0, 40) : 'Quiz');
+                } catch (e) { titleCache.set(quizId, 'Quiz'); }
+            }
+            adminQueue.push({ text: `🕐 ${titleCache.get(quizId)} · ${userNames.get(userId) || String(userId).slice(0, 8)}` });
+        }
+    } catch (err) {
+        console.error('[notifyQuizDigest] requesting-attempts read failed:', err.message);
+    }
+    try {
+        const snap = await db.collection('submissions').where('reviewState', '==', 'escalated').get();
+        queueCounts.escalated = snap.size;
+        const rows = [];
+        snap.forEach(doc => {
+            const s = doc.data() || {};
+            const ms = (s.escalatedAt && s.escalatedAt.toMillis) ? s.escalatedAt.toMillis()
+                : (s.timestamp && s.timestamp.toMillis ? s.timestamp.toMillis() : 0);
+            rows.push({ ms: ms, text: `🚀 ${String(s.title || 'Learning note').slice(0, 40)} · ${digestCleanName(String(s.displayName || 'student')).slice(0, 20)}` });
+        });
+        // Oldest first — an escalated note that has sat for a week is the one that
+        // needs the admin, not the one flagged an hour ago.
+        rows.sort((a, b) => a.ms - b.ms);
+        adminQueue.push(...rows.slice(0, DIGEST_MAX_ROWS));
+    } catch (err) {
+        console.error('[notifyQuizDigest] escalated-notes read failed:', err.message);
+    }
+    try {
+        // followUpAt is deliberately never cleared (the kanban badge resurfaces a
+        // check-in even after a note is Done), so "<= now" would grow forever.
+        // Bound it to the Bangkok calendar day the digest is reporting on.
+        const bkkDay = digestDayKey();
+        const snap = await db.collection('submissions')
+            .where('followUpAt', '>=', new Date(`${bkkDay}T00:00:00+07:00`))
+            .where('followUpAt', '<=', new Date(`${bkkDay}T23:59:59.999+07:00`))
+            .get();
+        queueCounts.followUp = snap.size;
+        snap.docs.slice(0, DIGEST_MAX_ROWS).forEach(doc => {
+            const s = doc.data() || {};
+            adminQueue.push({ text: `⏰ ${String(s.title || 'Learning note').slice(0, 40)} · ${digestCleanName(String(s.displayName || 'student')).slice(0, 20)}` });
+        });
+    } catch (err) {
+        console.error('[notifyQuizDigest] follow-up read failed:', err.message);
+    }
+    const adminQueueTotal = queueCounts.requests + queueCounts.escalated + queueCounts.followUp;
+
+    if (!doneRows.length && !pendingBlocks.length && !newlyLive.length && !productRows.length && !adminQueue.length) {
         console.log('[notifyQuizDigest] nothing to report — no push');
         return { sent: false, reason: 'nothing-to-report' };
     }
@@ -2524,6 +2588,27 @@ async function runQuizDigest(kind, options) {
 
     const buildFlex = (target) => {
         const body = [];
+
+        // Admin 1-on-1 only, and first: this is the one block the admin has to DO
+        // something about. The group chat has no business seeing who asked for a
+        // late attempt or which note was escalated.
+        const showQueue = target.withScores && adminQueue.length > 0;
+        if (showQueue) {
+            const parts = [];
+            if (queueCounts.requests) parts.push(`${queueCounts.requests} request${queueCounts.requests === 1 ? '' : 's'}`);
+            if (queueCounts.escalated) parts.push(`${queueCounts.escalated} escalated`);
+            if (queueCounts.followUp) parts.push(`${queueCounts.followUp} follow-up`);
+            body.push({ type: 'text', text: `🔔 Waiting on you · ${parts.join(' · ')}`, size: 'xs', weight: 'bold', color: '#dc2626' });
+            adminQueue.slice(0, DIGEST_MAX_ROWS).forEach(r => {
+                body.push({ type: 'text', text: r.text, size: 'sm', color: '#1f2937', wrap: true, margin: 'xs' });
+            });
+            // The counts above are unbounded; the rows are not. Say so rather than
+            // letting a 30-item queue look like a 12-item one.
+            if (adminQueueTotal > adminQueue.slice(0, DIGEST_MAX_ROWS).length) {
+                body.push({ type: 'text', text: `+${adminQueueTotal - adminQueue.slice(0, DIGEST_MAX_ROWS).length} more · open the app`, size: 'xs', color: '#94a3b8', margin: 'xs' });
+            }
+            body.push({ type: 'separator', margin: 'md' });
+        }
 
         // Leads the message: a quiz opening is the one item here that needs
         // action rather than review, and it is short enough not to push the
@@ -2546,7 +2631,7 @@ async function runQuizDigest(kind, options) {
         const doneHeader = doneQuizzes.length
             ? `✅ Done today · ${doneQuizzes.length} ${doneQuizzes.length === 1 ? 'quiz' : 'quizzes'} · ${donePeopleCount} ${donePeopleCount === 1 ? 'person' : 'people'}`
             : '✅ Done today · 0';
-        body.push({ type: 'text', text: doneHeader, size: 'xs', weight: 'bold', color: '#059669', margin: newlyLive.length ? 'md' : 'none' });
+        body.push({ type: 'text', text: doneHeader, size: 'xs', weight: 'bold', color: '#059669', margin: (newlyLive.length || showQueue) ? 'md' : 'none' });
         if (doneQuizzes.length) {
             doneQuizzes.slice(0, DIGEST_MAX_ROWS).forEach(q => {
                 // The group copy drops Pharmacists / Public names and folds them
@@ -2674,7 +2759,8 @@ async function runQuizDigest(kind, options) {
         donePeople: donePeopleCount,
         products: productRows.length,
         urgent: urgentBlocks.length,
-        later: laterBlocks.length
+        later: laterBlocks.length,
+        waitingOnAdmin: adminQueueTotal
     };
 
     // Preview stops here: build exactly what WOULD be pushed, for every target,
@@ -2696,7 +2782,7 @@ async function runQuizDigest(kind, options) {
         };
     }
 
-    const results = await pushLineFlex(tag, targets, buildFlex, `kind=${kind}  newlyLive=${newlyLive.length}  doneQuizzes=${doneQuizzes.length} donePeople=${donePeopleCount} (attempts=${doneRows.length})  products=${productRows.length} (pending=${productPendingCount})  urgent=${urgentBlocks.length}  later=${laterBlocks.length}  cohort=${activeUsers.length}/${users.length}`);
+    const results = await pushLineFlex(tag, targets, buildFlex, `kind=${kind}  newlyLive=${newlyLive.length}  doneQuizzes=${doneQuizzes.length} donePeople=${donePeopleCount} (attempts=${doneRows.length})  products=${productRows.length} (pending=${productPendingCount})  urgent=${urgentBlocks.length}  later=${laterBlocks.length}  waitingOnAdmin=${adminQueueTotal} (req=${queueCounts.requests} esc=${queueCounts.escalated} fu=${queueCounts.followUp})  cohort=${activeUsers.length}/${users.length}`);
     const pushed = results.filter(r => r.ok).length;
 
     // Marks the day as sent so the manual button can warn about a duplicate.
