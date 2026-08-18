@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.70</title>
+    <title>Nika V97.71</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -17192,6 +17192,9 @@ RULES:
             const overallBg = result.overallScore >= 4 ? '#dcfce7' : result.overallScore >= 3 ? '#fef9c3' : '#fee2e2';
             const overallColor = result.overallScore >= 4 ? '#15803d' : result.overallScore >= 3 ? '#a16207' : '#b91c1c';
 
+            // V97.71: the dup panel recommends which of a pair to delete, and the numbers
+            // it argues from are these ones — hand them over instead of re-deriving.
+            const scoreByQ = new Map((result.perQuestionAudit || []).map(entry => [entry.qNumber, entry]));
             const perQHtml = result.perQuestionAudit.map(q => {
                 const dims = q.scores || {};
                 const dimRows = Object.keys(dimLabel).map(k => {
@@ -17232,7 +17235,7 @@ RULES:
                 // needs this question's number and the questions snapshot to build it.
                 const dupHits = dupMap ? (dupMap.get(q.qNumber - 1) || []) : [];
                 const dupChipsHtml = dupHits.length
-                    ? `<div style="margin-bottom:10px; display:flex; flex-wrap:wrap; gap:6px;">${window._auditDupChipsHtml(dupHits, q.qNumber, questions)}</div>`
+                    ? `<div style="margin-bottom:10px; display:flex; flex-wrap:wrap; gap:6px;">${window._auditDupChipsHtml(dupHits, q.qNumber, questions, scoreByQ)}</div>`
                     : '';
 
                 return `<div style="background:#fcfdff; border:1.5px solid #e2e8f0; border-radius:14px; padding:14px; margin-bottom:10px;">
@@ -53981,9 +53984,9 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
                 </div>`).join('');
             return `<div style="flex:1; min-width:0; padding:12px; background:#fff; border:1.5px solid ${accent}; border-radius:10px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
-                    <b style="color:${accent}; font-size:0.9em;">Q${qNumber}</b>
+                    <b style="color:${accent}; font-size:0.9em;">Q${qNumber}${(opts && opts.recommend === 'keep') ? ` <span style="margin-left:6px; background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; border-radius:20px; padding:1px 8px; font-size:0.75em; font-weight:800;">✅ แนะนำให้เก็บ</span>` : ''}</b>
                     ${(opts && opts.hideDelete) ? '' : `<button onclick="auditDeleteQuestion(${qNumber})" title="Delete Q${qNumber} from the form (not saved until Save Quiz)"
-                        style="padding:3px 10px; border-radius:7px; border:none; background:rgba(239,68,68,0.12); color:#dc2626; cursor:pointer; font-size:0.7em; font-weight:800;">🗑️ ลบ Q${qNumber}</button>`}
+                        style="padding:3px 10px; border-radius:7px; border:none; ${(opts && opts.recommend === 'drop') ? 'background:#dc2626; color:#fff;' : (opts && opts.recommend === 'keep') ? 'background:#f8fafc; color:#94a3b8; border:1px solid #e2e8f0;' : 'background:rgba(239,68,68,0.12); color:#dc2626;'} cursor:pointer; font-size:0.7em; font-weight:800;">🗑️ ลบ Q${qNumber}</button>`}
                 </div>
                 <div style="white-space:pre-wrap; line-height:1.5; font-weight:600; font-size:0.84em; color:#1e293b; margin-bottom:8px;">${window._auditHighlightShared(question.q || '', peerText)}</div>
                 <div style="font-size:0.8em;">${optionsHtml}</div>
@@ -54002,7 +54005,74 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
         // built here, inside the audit card, rather than as a floating overlay — the
         // scorecard re-renders itself after auditDeleteQuestion renumbers the questions,
         // so anything detached would immediately show stale Q numbers.
-        window._auditDupChipsHtml = function(hits, qNumber, questions) {
+        // V97.71: which of the two should go? The audit already scored both questions on
+        // the same five axes — the numbers to answer this were being computed and then
+        // left on the other side of the modal. No extra AI call, and the verdict shows
+        // the deltas it was derived from so it can be argued with.
+        //
+        // Three states, and the third one is the point. The n-gram pass flags a pair at
+        // 31% for sharing "ในแมทริกซ์ของกระดูก" while one asks WHICH protein and the other
+        // asks BY WHAT MECHANISM — two different questions. A feature that always names a
+        // question to delete would quietly eat the bank one honest pair at a time.
+        const AUDIT_DUP_PICK_DELTA = 0.8;   // avg gap on a 1-5 scale that counts as decisive
+        window._auditDupVerdict = function(overlap, self, peer, selfAudit, peerAudit, selfNumber, peerNumber) {
+            if (!selfAudit || !peerAudit) {
+                return { state: 'no-scores', text: `ยังไม่มีคะแนน Audit ของ Q${!selfAudit ? selfNumber : peerNumber} — รัน Audit ใหม่ให้ครบทั้งสองข้อ ถึงจะแนะนำได้ว่าควรลบข้อไหน` };
+            }
+            const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+            const correctText = (q) => {
+                if (!q) return '';
+                const idx = Array.isArray(q.correct) ? q.correct : [q.correct];
+                return idx.map(i => norm((q.options || [])[i])).filter(Boolean).sort().join(' | ');
+            };
+            const sameAnswer = correctText(self) && correctText(self) === correctText(peer);
+            // Weak overlap AND different answers = the two questions are asking for
+            // different things and merely share vocabulary. Say keep both, out loud.
+            if (overlap < QUIZ_SET_DUP_STRONG && !sameAnswer) {
+                return { state: 'not-dup', text: `น่าจะ<b>ไม่ใช่ข้อซ้ำ</b> — ตรงกันแค่ ${Math.round(overlap * 100)}% และเฉลยคนละข้อ เก็บไว้ทั้งคู่ได้` };
+            }
+            const sAvg = Number(selfAudit.averageScore || 0), pAvg = Number(peerAudit.averageScore || 0);
+            const delta = Math.abs(sAvg - pAvg);
+            if (delta < AUDIT_DUP_PICK_DELTA) {
+                return { state: 'close', sameAnswer: sameAnswer, text: `คะแนนใกล้กัน (${sAvg.toFixed(1)} vs ${pAvg.toFixed(1)}) — <b>ตัดสินเอง</b> ดูตารางด้านล่างว่าข้อไหนถามได้ลึกกว่า` };
+            }
+            const keep = sAvg > pAvg ? selfNumber : peerNumber;
+            const drop = sAvg > pAvg ? peerNumber : selfNumber;
+            const keepA = sAvg > pAvg ? selfAudit : peerAudit;
+            const dropA = sAvg > pAvg ? peerAudit : selfAudit;
+            // Name the axes that actually decided it, not just the average.
+            const reasons = ['bloomLevel', 'clinicalDepth', 'distractorQuality']
+                .map(k => ({ k: k, d: Number((keepA.scores || {})[k] || 0) - Number((dropA.scores || {})[k] || 0) }))
+                .filter(r => r.d > 0).sort((a, b) => b.d - a.d).slice(0, 2)
+                .map(r => `${({ bloomLevel: 'Bloom', clinicalDepth: 'Clinical', distractorQuality: 'ตัวลวง' })[r.k]} +${r.d}`);
+            return {
+                state: 'pick', keep: keep, drop: drop,
+                text: `แนะนำให้เก็บ <b>Q${keep}</b> · ลบ <b>Q${drop}</b> — avg ${Math.max(sAvg, pAvg).toFixed(1)} vs ${Math.min(sAvg, pAvg).toFixed(1)}${reasons.length ? ' · ' + reasons.join(', ') : ''}`
+            };
+        };
+
+        // The evidence behind the verdict: same five axes the scorecard already shows,
+        // put side by side so the recommendation can be checked rather than trusted.
+        window._auditDupScoreTableHtml = function(selfAudit, peerAudit, selfNumber, peerNumber) {
+            if (!selfAudit || !peerAudit) return '';
+            const dims = [['bloomLevel', 'Bloom'], ['clinicalDepth', 'Clinical Depth'], ['distractorQuality', 'Distractor'], ['clarity', 'Clarity'], ['languageConsistency', 'Language']];
+            const rows = dims.map(([k, label]) => {
+                const a = Number((selfAudit.scores || {})[k] || 0), b = Number((peerAudit.scores || {})[k] || 0);
+                const gap = Math.abs(a - b) >= 2;
+                const cell = (v, win) => `<td style="text-align:center; padding:3px 6px; ${win ? 'font-weight:900; color:#15803d;' : 'color:#64748b;'}">${v}</td>`;
+                return `<tr style="${gap ? 'background:#fef3c7;' : ''}">
+                    <td style="padding:3px 6px; color:#475569;">${label}</td>${cell(a, a > b)}${cell(b, b > a)}</tr>`;
+            }).join('');
+            return `<table style="width:100%; border-collapse:collapse; font-size:0.72em; margin-bottom:10px; background:#fff; border:1px solid #e2e8f0; border-radius:8px;">
+                <tr style="font-weight:800; color:#334155;"><td style="padding:3px 6px;">&nbsp;</td><td style="text-align:center; padding:3px 6px;">Q${selfNumber}</td><td style="text-align:center; padding:3px 6px;">Q${peerNumber}</td></tr>
+                ${rows}
+                <tr style="border-top:1px solid #e2e8f0; font-weight:800;"><td style="padding:3px 6px; color:#334155;">avg</td>
+                    <td style="text-align:center; padding:3px 6px;">${Number(selfAudit.averageScore || 0).toFixed(1)}</td>
+                    <td style="text-align:center; padding:3px 6px;">${Number(peerAudit.averageScore || 0).toFixed(1)}</td></tr>
+            </table>`;
+        };
+
+        window._auditDupChipsHtml = function(hits, qNumber, questions, scoreByQ) {
             const self = (questions && questions[qNumber - 1]) || null;
             return (hits || []).slice(0, 3).map(h => {
                 const peerNumber = h.qIndex + 1;
@@ -54018,13 +54088,21 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
                     title="เทียบ Q${qNumber} กับ Q${peerNumber} แบบเคียงข้าง"
                     style="background:${strong ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.12)'}; color:${accent}; padding:2px 10px; border-radius:20px; font-size:0.7em; font-weight:800; border:1px solid ${strong ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.30)'}; cursor:pointer; width:auto; min-height:0;">⚠️ ซ้ำ Q${peerNumber} · ${pct}% ⇄</button>`;
 
+                const selfAudit = scoreByQ ? scoreByQ.get(qNumber) : null;
+                const peerAudit = scoreByQ ? scoreByQ.get(peerNumber) : null;
+                const verdict = window._auditDupVerdict(h.score, self, peer, selfAudit, peerAudit, qNumber, peerNumber);
+                const vTone = { pick: ['#065f46', '#ecfdf5', '#a7f3d0'], close: ['#92400e', '#fffbeb', '#fde68a'], 'not-dup': ['#1e40af', '#eff6ff', '#bfdbfe'], 'no-scores': ['#475569', '#f8fafc', '#e2e8f0'] }[verdict.state];
+                const recFor = (n) => verdict.state === 'pick' ? (verdict.keep === n ? 'keep' : 'drop') : null;
+
                 const panel = `<div id="${panelId}" class="lang-no-toggle" style="display:none; width:100%; margin-top:8px; padding:12px; background:#fffbeb; border:1px solid ${strong ? 'rgba(239,68,68,0.30)' : '#fcd34d'}; border-radius:12px;">
+                    <div style="font-size:0.78em; color:${vTone[0]}; font-weight:700; margin-bottom:10px; line-height:1.55; padding:8px 10px; background:${vTone[1]}; border:1px solid ${vTone[2]}; border-radius:9px;">${verdict.text}</div>
+                    ${window._auditDupScoreTableHtml(selfAudit, peerAudit, qNumber, peerNumber)}
                     <div style="font-size:0.75em; color:${accent}; font-weight:700; margin-bottom:10px; line-height:1.5;">
                         ตรงกัน ${pct}% · <mark style="background:#fde68a; color:#78350f; padding:0 3px; border-radius:3px;">ไฮไลต์</mark> คือส่วนที่ทำให้ระบบมองว่าซ้ำ — ถ้าซ้ำแค่ศัพท์เฉพาะ แปลว่าไม่ใช่ข้อซ้ำจริง
                     </div>
                     <div class="audit-dup-cmp-grid">
-                        ${window._auditDupSideHtml(self, qNumber, peerText, '#0f766e')}
-                        ${window._auditDupSideHtml(peer, peerNumber, selfText, accent)}
+                        ${window._auditDupSideHtml(self, qNumber, peerText, '#0f766e', { recommend: recFor(qNumber) })}
+                        ${window._auditDupSideHtml(peer, peerNumber, selfText, accent, { recommend: recFor(peerNumber) })}
                     </div>
                 </div>`;
 
