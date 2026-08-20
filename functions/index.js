@@ -2242,6 +2242,11 @@ const DIGEST_MAX_ROWS = 12;
 // (B) Only quizzes due within this many days get a full name list; everything
 // else collapses to one summary line so the message stays skimmable.
 const DIGEST_URGENT_DAYS = 3;
+// V97.76: cap for the who-COMPLETED roster. Deliberately tighter than
+// DIGEST_MAX_ROWS (12): that cap sized a list of who was MISSING, which
+// shrinks toward zero as a deadline nears. This list runs the other way —
+// it grows to the whole cohort — so it needs to stop sooner.
+const DIGEST_DONE_NAMES = 6;
 
 // (C) LINE display names often carry a trailing decoration run ("ชัญญาญ์ญา ❤️❤️💠🍀🦋✨").
 // Strip it for the digest only — the stored profile is untouched. \u escapes on
@@ -2463,13 +2468,17 @@ async function runQuizDigest(kind, options) {
             // where the admin copy names who is behind — see buildFlex.
             const doneNames = eligible.filter(u => doneIds.has(u.id)).map(u => u.name);
             pendingBlocks.push({
-                quiz: String(q.title || 'Quiz').slice(0, 60),
+                // V97.76: full title, no truncation. slice(0,60) cut Thai titles
+                // mid-word ("...ภาวะตกเลือดหลังคลอ") which is unreadable; the title
+                // now owns its own wrapped line so it has the room.
+                quiz: String(q.title || 'Quiz'),
                 deadlineMs: deadlineMs,
                 deadline: new Date(deadlineMs).toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', day: '2-digit', month: 'short' }),
                 names: missing.map(u => u.name),
                 // Who is done, minus the groups the intern chat does not name.
                 // doneCount below stays the FULL figure, so both copies print the
                 // same done/total and only the roster differs.
+                doneNames: doneNames,
                 doneNamesGroup: eligible.filter(u => doneIds.has(u.id) && !unnamedInGroupCopy(u.group)).map(u => u.name),
                 doneCount: doneNames.length,
                 totalCount: eligible.length
@@ -2586,6 +2595,21 @@ async function runQuizDigest(kind, options) {
     const urgentBlocks = pendingBlocks.filter(b => b.deadlineMs <= urgentCutoffMs);
     const laterBlocks = pendingBlocks.filter(b => b.deadlineMs > urgentCutoffMs);
 
+    // V97.76: one consolidated "Behind" tally replacing the per-quiz missing lists.
+    // Counted across EVERY pending quiz, not just the urgent ones rendered above —
+    // otherwise the quizzes folded into "N more due …" would silently drop out of
+    // the chase list. The header says "across N pending" so the total can never
+    // look inconsistent with the handful of quizzes printed above it.
+    // Sorted desc: the person who owes the most is the one worth a nudge.
+    const behindTally = [];
+    {
+        const perPerson = new Map();
+        pendingBlocks.forEach(blk => blk.names.forEach(n => perPerson.set(n, (perPerson.get(n) || 0) + 1)));
+        behindTally.push(...[...perPerson.entries()]
+            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+            .map(([name, count]) => ({ name, count })));
+    }
+
     const buildFlex = (target) => {
         const body = [];
 
@@ -2686,30 +2710,47 @@ async function runQuizDigest(kind, options) {
         // public callout — it lists who is DONE instead. The ✅ prefix is load
         // bearing: without it the names sit under a ⏳ header and read as the
         // opposite of what they are.
+        // V97.76: BOTH copies now name who has COMPLETED the quiz. The admin copy
+        // used to name who was behind; that list is gone from here and survives as
+        // the single Behind tally below, which is a better chase tool anyway (one
+        // line, sorted by who owes most, spanning every pending quiz rather than
+        // repeating names under each one).
+        //
+        // "2/8" was replaced by "done: <names> · N left" on the user's call: the
+        // bare ratio read as unexplained, but dropping the number entirely would
+        // hide how many still owe it — which is what decides a deadline extension.
         urgentBlocks.forEach(blk => {
+            const left = Math.max(0, blk.totalCount - blk.doneCount);
+            // Title owns its own line now that it is untruncated — a full Thai
+            // title plus the meta on one line wrapped into an unreadable block.
             body.push({ type: 'separator', margin: 'md' });
-            body.push({ type: 'text', text: `⏳ ${blk.quiz} · due ${blk.deadline} · ${blk.doneCount}/${blk.totalCount}`, size: 'xs', weight: 'bold', color: '#b45309', margin: 'md', wrap: true });
-            const roster = target.withScores ? blk.names : blk.doneNamesGroup;
+            body.push({ type: 'text', text: `⏳ ${blk.quiz}`, size: 'xs', weight: 'bold', color: '#b45309', margin: 'md', wrap: true });
+
+            const roster = target.withScores ? blk.doneNames : blk.doneNamesGroup;
+            let donePart;
             if (roster.length) {
-                const shown = roster.slice(0, DIGEST_MAX_ROWS).join(', ');
-                const overflow = roster.length > DIGEST_MAX_ROWS ? ` +${roster.length - DIGEST_MAX_ROWS} more` : '';
-                body.push({
-                    type: 'text',
-                    text: target.withScores ? `${shown}${overflow}` : `✅ ${shown}${overflow}`,
-                    size: 'sm', color: '#1f2937', wrap: true, margin: 'xs'
-                });
+                const shown = roster.slice(0, DIGEST_DONE_NAMES).join(', ');
+                // This list GROWS as completion rises (the old missing-list shrank),
+                // so it needs a tighter cap than DIGEST_MAX_ROWS.
+                donePart = roster.length > DIGEST_DONE_NAMES
+                    ? `${shown} +${roster.length - DIGEST_DONE_NAMES}`
+                    : shown;
+            } else if (blk.doneCount > 0) {
+                // Group copy only: people are done but all of them sit in groups
+                // this copy does not name. Saying "no one yet" would contradict
+                // the count, so state the count instead.
+                donePart = `${blk.doneCount} so far`;
             } else {
-                // Only reachable on the group copy — `missing` is non-empty by
-                // construction above, so the admin roster never is. An empty
-                // text node is a hard LINE API error, so this must not be blank.
-                // "No one yet" would contradict the header when the only people
-                // done are ones this copy does not name, so say the count alone.
-                body.push({
-                    type: 'text',
-                    text: blk.doneCount > 0 ? `✅ ${blk.doneCount} done` : 'No one yet',
-                    size: 'sm', color: '#94a3b8', wrap: true, margin: 'xs'
-                });
+                // Never an empty string — an empty Flex text node is a hard LINE
+                // API error, and this is the branch a brand-new quiz always hits.
+                donePart = 'no one yet';
             }
+
+            body.push({
+                type: 'text',
+                text: `${blk.deadline} · done: ${donePart} · ${left} left`,
+                size: 'sm', color: '#1f2937', wrap: true, margin: 'xs'
+            });
         });
 
         if (laterBlocks.length) {
@@ -2721,6 +2762,30 @@ async function runQuizDigest(kind, options) {
                 type: 'text',
                 text: `📌 ${laterBlocks.length} more due ${span} · see the app`,
                 size: 'xs', color: '#64748b', margin: 'md', wrap: true
+            });
+        }
+
+        // V97.76: the Behind tally. ADMIN COPY ONLY, and that is the whole point of
+        // the privacy split this file has carried since the group push shipped —
+        // the group chat is read by every intern, so a ranked list of who is
+        // furthest behind is a public callout. `target.withScores` is the existing
+        // admin-only flag; keeping the tally behind the same gate means the two
+        // copies cannot drift apart the next time either is touched.
+        if (target.withScores && behindTally.length) {
+            body.push({ type: 'separator', margin: 'md' });
+            body.push({
+                type: 'text',
+                text: `Behind · across ${pendingBlocks.length} pending`,
+                size: 'xs', weight: 'bold', color: '#b45309', margin: 'md', wrap: true
+            });
+            const shown = behindTally.slice(0, DIGEST_MAX_ROWS).map(b => `${b.name} ${b.count}`).join(' · ');
+            const overflow = behindTally.length > DIGEST_MAX_ROWS
+                ? ` +${behindTally.length - DIGEST_MAX_ROWS} more`
+                : '';
+            body.push({
+                type: 'text',
+                text: `${shown}${overflow}`,
+                size: 'sm', color: '#1f2937', wrap: true, margin: 'xs'
             });
         }
 
