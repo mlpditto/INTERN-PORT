@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.44)</title>
+    <title>Internship Portfolio (V96.45)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -21,6 +21,13 @@
     <!-- V96.39: needed by the Product Listing photo upload. This page previously
          loaded no Storage SDK at all — `firebase.storage` was undefined. -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+    <!-- V96.45: this page has called firebase.functions().httpsCallable() in four
+         places (adjustQuizDeadline, notifyQuizSubmitted, notifyAdminOnNewCase ×2)
+         without ever loading the SDK for it. Every call site is guarded, so they
+         all no-opped in silence — which is why the instant LINE pushes were never
+         seen firing. Loading it turns those on for real, against the OA's
+         300-messages/month quota tracked in line_usage/{YYYY-MM}. -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-functions.js"></script>
 
     <!-- Markdown rendering for Quiz content (Phase 3, V94.04) -->
     <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
@@ -12092,6 +12099,20 @@
                 } catch (mirrorErr) {
                     // Non-critical: the source doc is already saved.
                     console.warn('[Unified] Failed to write product to submissions:', mirrorErr);
+                }
+
+                // V96.45: instant LINE Flex to the admin + team group, the Case
+                // equivalent of which has existed since V94.40. Best-effort and
+                // non-blocking in spirit — the listing is already written, so a
+                // notify failure is logged and the flow continues.
+                try {
+                    if (typeof firebase !== 'undefined' && firebase.functions) {
+                        const notifyFn = firebase.functions().httpsCallable('notifyAdminOnNewProduct');
+                        const res = await notifyFn({ productDocId: sourceRef.id });
+                        console.log('[notifyAdminOnNewProduct]', res && res.data);
+                    }
+                } catch (notifyErr) {
+                    console.warn('[notifyAdminOnNewProduct] non-critical:', (notifyErr && notifyErr.message) || notifyErr);
                 }
 
                 await awardProductSubmitBonus(s.name);

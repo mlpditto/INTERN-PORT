@@ -1653,6 +1653,165 @@ exports.notifyAdminOnNewCase = onCall(
 });
 
 // ============================================================
+// notifyAdminOnNewProduct  (Product Listing instant notify)
+// ------------------------------------------------------------
+// The Case sibling of this function shipped with Alabasta Phase 2b;
+// Product Listing (V96.36-V96.40) never got one, so a submitted
+// listing was invisible until the 16:00 digest. Same caller-side
+// shape as notifyAdminOnNewCase — asia-southeast3 has no Eventarc,
+// so no Firestore trigger is possible. See memory
+// `feedback_firestore_trigger_region_limitation`.
+//
+// Caller: public/index.html  submitProduct()
+//
+// Input:  { productDocId: string }
+// Auth:   signed-in, and the caller must own the listing.
+// Output: { ok, pushed, pushedCount, results, productDocId } — or
+//         { skipped, reason }. Best-effort: the listing is already
+//         written when this runs, so the LIFF side logs and moves on.
+//
+// Unlike notifyAdminOnNewCase this routes through resolveLineTargets
+// + pushLineFlex (both hoisted declarations further down the file),
+// which the Case function predates. That buys the line_usage quota
+// counter for free — Case pushes are still uncounted.
+//
+// Both targets get the SAME bubble. Nothing here is a score or a
+// ranking, so the #862 rule about not naming people in the group
+// does not apply: a new listing is the intern's own work, exactly
+// like the Case notify that already names them.
+//
+// Secrets: LINE_CHANNEL_ACCESS_TOKEN, ADMIN_LINE_USER_ID,
+//          ADMIN_LINE_GROUP_ID  (all already provisioned)
+// ============================================================
+exports.notifyAdminOnNewProduct = onCall(
+    { secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID'] },
+    async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'Login required');
+    }
+
+    const productDocId = (request.data || {}).productDocId || '';
+    if (!productDocId) {
+        throw new HttpsError('invalid-argument', 'productDocId required');
+    }
+
+    let p;
+    try {
+        const doc = await admin.firestore()
+            .collection('product_listings').doc(productDocId).get();
+        if (!doc.exists) {
+            console.warn(`[notifyAdminOnNewProduct] product ${productDocId} not found`);
+            return { skipped: true, reason: 'product-not-found' };
+        }
+        p = doc.data() || {};
+    } catch (err) {
+        console.error(`[notifyAdminOnNewProduct] failed to read product ${productDocId}:`, err.message);
+        throw new HttpsError('internal', 'failed to read product');
+    }
+
+    // Ownership check (the Case function has no equivalent). Every push spends
+    // one of the OA's 300 monthly messages, so a signed-in client must not be
+    // able to announce a listing that is not theirs.
+    if (p.authUid && p.authUid !== request.auth.uid) {
+        console.warn(`[notifyAdminOnNewProduct] caller ${request.auth.uid} does not own product ${productDocId}`);
+        return { skipped: true, reason: 'not-owner' };
+    }
+
+    if (!process.env.LINE_CHANNEL_ACCESS_TOKEN) {
+        console.warn(`[notifyAdminOnNewProduct] LINE_CHANNEL_ACCESS_TOKEN missing — skipping push for product=${productDocId}`);
+        return { skipped: true, reason: 'token-missing' };
+    }
+    const targets = resolveLineTargets('notifyAdminOnNewProduct');
+    if (!targets.length) return { skipped: true, reason: 'admin-id-missing' };
+
+    // Sanitize + truncate everything that reaches the bubble. `price` is a
+    // number in the doc but is rendered from the raw value the intern typed,
+    // so the message and the intern's success card cannot disagree.
+    const displayName = String(p.displayName || 'Unknown').slice(0, 60);
+    const name = String(p.name || 'Untitled').slice(0, 80);
+    const category = String(p.categoryLabel || p.categoryKey || '').slice(0, 40);
+    const packSize = String(p.packSize || '').slice(0, 40);
+    const platforms = Array.isArray(p.platforms) ? p.platforms.map(x => String(x).slice(0, 20)).slice(0, 4) : [];
+    const priceText = Number.isFinite(Number(p.price)) ? `฿${Number(p.price).toLocaleString('en-US')}` : '';
+    const promoText = (p.promoPrice !== null && p.promoPrice !== undefined && Number.isFinite(Number(p.promoPrice)))
+        ? ` → ฿${Number(p.promoPrice).toLocaleString('en-US')}` : '';
+    const descRaw = String(p.description || '').replace(/\s+/g, ' ').trim();
+    const descText = descRaw.length > 200 ? descRaw.slice(0, 197) + '…' : (descRaw || '(no description)');
+    // Only an https URL can be a Flex hero; anything else renders as a broken box.
+    const photoUrl = /^https:\/\//.test(String(p.photoUrl || '')) ? String(p.photoUrl) : '';
+
+    const altText = `🛒 New product: ${name} from ${displayName}`.slice(0, 400);
+    const adminUri = 'https://mlpditto.github.io/INTERN-PORT/admin.html';
+
+    const subtitleParts = [];
+    if (category) subtitleParts.push(category);
+    if (packSize) subtitleParts.push(packSize);
+    const subtitle = subtitleParts.length ? subtitleParts.join(' · ') : 'New submission';
+
+    const detailRows = [
+        { type: 'text', text: name, size: 'sm', color: '#14532d', weight: 'bold', wrap: true }
+    ];
+    if (priceText) {
+        detailRows.push({ type: 'text', text: `💰 ${priceText}${promoText}`, size: 'sm', color: '#166534', wrap: true });
+    }
+    if (platforms.length) {
+        detailRows.push({ type: 'text', text: `📲 ${platforms.join(', ')}`, size: 'xs', color: '#94a3b8', wrap: true });
+    }
+    detailRows.push({ type: 'separator', margin: 'sm' });
+    detailRows.push({ type: 'text', text: descText, wrap: true, size: 'sm', color: '#1f2937', margin: 'sm' });
+
+    const bubble = {
+        type: 'bubble',
+        size: 'kilo',
+        header: {
+            type: 'box',
+            layout: 'vertical',
+            backgroundColor: '#16a34a',
+            paddingAll: '12px',
+            contents: [
+                { type: 'text', text: '🛒 New Product Listing', weight: 'bold', size: 'sm', color: '#ffffff' },
+                { type: 'text', text: `${displayName} · ${subtitle}`, size: 'xs', color: '#dcfce7', margin: 'xs', wrap: true }
+            ]
+        },
+        body: {
+            type: 'box',
+            layout: 'vertical',
+            paddingAll: '16px',
+            spacing: 'sm',
+            contents: detailRows
+        },
+        footer: {
+            type: 'box',
+            layout: 'vertical',
+            paddingAll: '12px',
+            contents: [
+                {
+                    type: 'button',
+                    style: 'primary',
+                    color: '#16a34a',
+                    height: 'sm',
+                    action: { type: 'uri', label: 'Review in Admin →', uri: adminUri }
+                }
+            ]
+        }
+    };
+    if (photoUrl) {
+        bubble.hero = { type: 'image', url: photoUrl, size: 'full', aspectRatio: '20:13', aspectMode: 'cover' };
+    }
+
+    const flex = { type: 'flex', altText: altText, contents: bubble };
+    const results = await pushLineFlex(
+        'notifyAdminOnNewProduct',
+        targets,
+        () => flex,
+        `product=${productDocId}  user=${displayName}  name=${name}`
+    );
+
+    const pushedCount = results.filter(r => r.ok).length;
+    return { ok: pushedCount > 0, pushed: pushedCount > 0, pushedCount, results, productDocId };
+});
+
+// ============================================================
 // notifyPurgeDigest (V93.20 / Phase B of V92.16 Trash series)
 // ------------------------------------------------------------
 // Weekly Cloud Scheduler job that scans `learning_path_entries`
