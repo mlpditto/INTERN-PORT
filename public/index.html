@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.42)</title>
+    <title>Internship Portfolio (V96.43)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -12095,6 +12095,16 @@
                 }
 
                 await awardProductSubmitBonus(s.name);
+                // V96.43: a product listing is a submission, so it counts as the day's
+                // check-in like a quiz / log / learning note / case do — it stamps
+                // checkinLastDate, which is the only field the daily-decay function reads.
+                // Missed when V96.41 wired the other four; without it an intern could
+                // submit a product and still lose 0.1 that night.
+                // Awaited (unlike the other four call sites) because collectActivityDates
+                // has no product source: the engagement streak can only see today through
+                // the checkinLastDate this writes, so the bonus must be judged after it.
+                await tryDailyCheckin('activity');
+                await awardEngagementBonusIfDue();
                 showProductSuccess(s, cat);
                 _silentClearProductForm();
             } catch (err) {
