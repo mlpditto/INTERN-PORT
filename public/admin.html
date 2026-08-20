@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.78</title>
+    <title>Nika V97.79</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -25065,15 +25065,29 @@ ${JSON.stringify(sourceObj)}`;
 
                 // Stats Calculation (Only for non-dismissed)
                 const activeAttempts = attempts.filter(a => !a.isDismissed);
-                const participantCount = activeAttempts.length;
+                // V97.79: average over the attempts that actually HAVE a score, not over
+                // every active attempt. The numerator was already guarded to `approved`,
+                // but the denominator counted allowed / completed / requesting / started
+                // rows too — each of which silently entered the mean as a 0%. On a quiz
+                // with 5 graded and 2 ungraded attempts that reported 45.2% where the
+                // real class average was 63.3%.
+                //
+                // `approved` is deliberately the only scoring status here, matching the
+                // table's score column: practice_done shows its score with a "(P)" mark
+                // and must stay out of the class average.
                 let totalScorePct = 0;
+                let scoredCount = 0;
                 activeAttempts.forEach(a => {
                     if (a.status === 'approved' && a.totalQuestions > 0) {
                         totalScorePct += (a.correctCount / a.totalQuestions);
+                        scoredCount++;
                     }
                 });
-                const avgPct = participantCount > 0 ? (totalScorePct / participantCount * 100).toFixed(1) : 0;
-                avgBadge.innerText = `Avg: ${avgPct}% (${participantCount}/${attempts.length})`;
+                // The count now reads "graded / total attempts", so the badge explains
+                // its own denominator instead of implying every attempt was graded.
+                avgBadge.innerText = scoredCount > 0
+                    ? `Avg: ${(totalScorePct / scoredCount * 100).toFixed(1)}% (${scoredCount}/${attempts.length})`
+                    : `Avg: — (0/${attempts.length})`;
 
                 // V93.91 Quiz Quality Q6: per-question stats panel (10+ attempt low-N gate inside)
                 const statsContainer = document.getElementById('quiz-question-stats');
