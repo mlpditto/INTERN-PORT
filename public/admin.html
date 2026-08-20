@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.77</title>
+    <title>Nika V97.78</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -25937,7 +25937,7 @@ ${JSON.stringify(sourceObj)}`;
                     </div>
                     <hr style="border:none; border-top:1px solid #dcdcdc; margin:0 0 16px;">
                     ${incorrectBlocks.map(b => `
-                        <div style="margin-bottom:18px; page-break-inside:avoid;">
+                        <div class="pdf-qblock" style="margin-bottom:18px;">
                             <div style="font-weight:700; color:#222; font-size:13px; margin-bottom:6px;">Q${b.idx}: ${window.renderMdInline(b.q)}</div>
                             <div style="color:#dc3545; font-size:12px; margin-bottom:4px;"><strong>Student Answer:</strong> ${window.renderMdInline(b.studentText)}</div>
                             <div style="color:#28a745; font-size:12px;"><strong>Correct Answer:</strong> ${window.renderMdInline(b.correctText)}</div>
@@ -25970,9 +25970,16 @@ ${JSON.stringify(sourceObj)}`;
                 `;
                 document.body.appendChild(container);
 
-                let canvas;
+                let canvas, blockTops = [];
                 try {
                     canvas = await html2canvas(container, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+                    // V97.78: read where each question starts, in canvas pixels. This has
+                    // to happen while the container is still in the DOM, hence inside the
+                    // try rather than after it.
+                    const cTop = container.getBoundingClientRect().top;
+                    const pxToCanvas = canvas.height / container.offsetHeight;
+                    blockTops = Array.from(container.querySelectorAll('.pdf-qblock'))
+                        .map(el => Math.round((el.getBoundingClientRect().top - cTop) * pxToCanvas));
                 } finally {
                     container.remove();
                 }
@@ -25981,21 +25988,55 @@ ${JSON.stringify(sourceObj)}`;
                 const pdfW = doc.internal.pageSize.getWidth();
                 const pdfH = doc.internal.pageSize.getHeight();
                 const imgW = pdfW;
-                const imgH = (canvas.height * imgW) / canvas.width;
-                const imgData = canvas.toDataURL('image/jpeg', 0.95);
 
-                let heightLeft = imgH;
-                let position = 0;
-                doc.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
-                heightLeft -= pdfH;
-                // V97.35: tolerate sub-mm rounding leftover (html2canvas scale + trailing
-                // element margins) so it doesn't spawn a wasted blank page.
-                while (heightLeft > 2) {
-                    position -= pdfH;
-                    doc.addPage();
-                    doc.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
-                    heightLeft -= pdfH;
+                // V97.78: break pages at question boundaries instead of every pdfH.
+                // html2canvas flattens the whole review into ONE bitmap, so the old
+                // `position -= pdfH` loop cut at whatever pixel row the boundary landed
+                // on — Thai explanation lines came out sliced through the middle with
+                // their tail word orphaned at the top of the next page. The markup's
+                // `page-break-inside:avoid` never helped: it is a paged-media rule and
+                // there is no paged media here, only an image.
+                //
+                // Candidate cuts are the TOP of every question after the first, so the
+                // previous page keeps that question's 18px lead margin as trailing
+                // whitespace and the new page opens flush on "Qn:".
+                const pagePx = Math.floor((pdfH * canvas.width) / pdfW);
+                const candidates = blockTops.slice(1);
+                const slices = [];
+                let start = 0;
+                while (start < canvas.height) {
+                    const limit = start + pagePx;
+                    if (limit >= canvas.height) { slices.push([start, canvas.height]); break; }
+                    // Last boundary that still fits. None means a single question is
+                    // taller than a page — then a hard cut is the only option, same as
+                    // the old behaviour, but now it is the exception rather than every page.
+                    const fits = candidates.filter(c => c > start && c <= limit);
+                    const cut = fits.length ? fits[fits.length - 1] : limit;
+                    slices.push([start, cut]);
+                    start = cut;
                 }
+                // The V97.35 `heightLeft > 2` guard against a wasted blank last page is
+                // not needed any more and is deliberately not carried over: the old loop
+                // always advanced a full pdfH, so a few pixels of trailing margin bought
+                // a whole empty page. Here the tail is only ever a separate page when it
+                // genuinely did not fit, and folding it back into the previous page would
+                // mean clipping real content — the exact bug being fixed.
+
+                // Each page is cut out into its own canvas and added whole, so nothing
+                // from the next page can bleed into the bottom of this one.
+                const sliceCanvas = document.createElement('canvas');
+                const sliceCtx = sliceCanvas.getContext('2d');
+                sliceCanvas.width = canvas.width;
+                slices.forEach(([sTop, sBottom], i) => {
+                    const sliceH = sBottom - sTop;
+                    sliceCanvas.height = sliceH;
+                    sliceCtx.fillStyle = '#ffffff';
+                    sliceCtx.fillRect(0, 0, sliceCanvas.width, sliceH);
+                    sliceCtx.drawImage(canvas, 0, -sTop);
+                    if (i > 0) doc.addPage();
+                    doc.addImage(sliceCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0,
+                        imgW, (sliceH * imgW) / canvas.width);
+                });
 
                 const filename = `Review_Incorrect_${(att.displayName || 'Attempt').replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`;
                 doc.save(filename);
