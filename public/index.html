@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.43)</title>
+    <title>Internship Portfolio (V96.44)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -12105,6 +12105,23 @@
                 // the checkinLastDate this writes, so the bonus must be judged after it.
                 await tryDailyCheckin('activity');
                 await awardEngagementBonusIfDue();
+
+                // V96.44: echo the submission into the intern's own LINE chat, the same
+                // way submitCase() has since V94.19. THIS is what an intern actually sees
+                // "pop up" in LINE — it is a liff.sendMessages() sent as the user, not a
+                // server push, so it costs nothing against the OA's monthly push quota.
+                // Product had no echo at all, which is why submitting one felt silent
+                // next to a case. isInClient() is inside the try: this runs after the
+                // write succeeded, so a LINE hiccup must never reach the outer catch and
+                // raise a "could not save" alert for a product that IS saved.
+                try {
+                    if (liff.isInClient()) {
+                        const promoPart = s.promoRaw === '' ? '' : ` → ฿${s.promoRaw}`;
+                        const msg = `🛒 New Product Listed!\n\n👤 ${userProfile.displayName}\n📦 ${s.name}\n💰 ฿${s.priceRaw}${promoPart}\n🗂️ ${cat ? cat.label : s.category}`;
+                        await liff.sendMessages([{ type: "text", text: msg }]);
+                    }
+                } catch (err) { console.error("LINE Notify Error:", err); }
+
                 showProductSuccess(s, cat);
                 _silentClearProductForm();
             } catch (err) {
