@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.72</title>
+    <title>Nika V97.73</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6904,9 +6904,31 @@
                          button now opens a small chooser (Bulk / PharmCamp / Paste). -->
                     <button class="btn-sm" onclick="openCertMenuModal()"
                         style="background:#f59e0b; color:white; border:none; border-radius:14px; padding:8px 18px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">📜 Certs</button>
+                    <!-- V97.73: manual runner for the nightly check-in decay. Preview-then-
+                         apply, same shape as the digest panel: the endpoint behind Preview
+                         holds no write path at all, and Apply only appears once a preview
+                         has rendered — because this one takes points off real people. -->
+                    <button class="btn-sm" onclick="previewCheckinDecay()"
+                        style="background:#64748b; color:white; border:none; border-radius:14px; padding:8px 18px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'" title="Preview the daily no-check-in decay">⏳ Decay</button>
                 </div>
             </div>
-            
+
+            <div id="decay-box" class="lang-no-toggle" style="display:none; margin-bottom:18px; border:1px solid #d8dee7; border-radius:12px; background:#f8fafc; padding:12px 14px;">
+                <div id="decay-meta" style="font-size:0.78em; color:#475569; font-weight:700; margin-bottom:8px;"></div>
+                <div id="decay-list" style="max-height:220px; overflow:auto; font-size:0.76em;"></div>
+                <div style="margin-top:10px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <button id="decay-apply-btn" onclick="applyCheckinDecay()"
+                        style="padding:7px 14px; border:1px solid #b45309; border-radius:10px; background:#b45309; color:#fff; font-size:0.78em; font-weight:700; cursor:pointer;">
+                        <i class="fa-solid fa-hourglass-end"></i> Apply now
+                    </button>
+                    <button onclick="document.getElementById('decay-box').style.display='none'"
+                        style="padding:7px 12px; border:1px solid #cbd5e1; border-radius:10px; background:#fff; color:#475569; font-size:0.78em; font-weight:600; cursor:pointer;">
+                        Close
+                    </button>
+                    <span id="decay-status" style="font-size:0.74em; color:#64748b;"></span>
+                </div>
+            </div>
+
             <div id="user-group-tabs"
                 style="display:flex; gap:8px; overflow-x:auto; padding-bottom:10px; margin-bottom:15px; border-bottom:2px solid #f0f0f0;"></div>
             <div id="leaderboardList" style="margin-bottom:25px; overflow-x:auto;"></div>
@@ -42704,6 +42726,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     } else if (x.type === 'reflective_bonus') {
                         all.push({ t: x.timestamp?.toDate(), type: 'bonus', text: `🎁 Reflective Bonus: ${x.note}`, score: score, docId: d.id, source: 'checkin_logs' });
                         dash.bonus += score;
+                    } else if (x.type === 'daily_decay') {
+                        // V97.73: negative — the daily check-in decay. Bucketed with manual
+                        // adjustments because to an audit it is the same kind of event: a
+                        // score change with no submission behind it. Without this branch the
+                        // points would just vanish from the breakdown with no explanation.
+                        all.push({ t: x.timestamp?.toDate(), type: 'manual', text: `⏳ No check-in ${x.dateKey || ''}`, score: score, docId: d.id, source: 'checkin_logs' });
+                        dash.manual += score;
                     }
                 });
                 
@@ -44224,6 +44253,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     else if (d.type === 'case_review_bonus') { dash.works += s; dash.wc++; }
                     else if (d.type === 'reflective_log' || d.type === 'reflective_bonus') { dash.logs += s; dash.lc++; dash.logsDR += s; dash.lcDR++; }
                     else if (d.type === 'learning_note') { dash.logs += s; dash.lc++; dash.logsLN += s; dash.lcLN++; }
+                    else if (d.type === 'daily_decay') { dash.manual += s; dash.mc++; } // V97.73: negative check-in decay, audited as a manual-style adjustment
                 });
 
                 qAzSnap.forEach(doc => {
@@ -47864,6 +47894,72 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
         }
         function toggleIgnoreUser(id, s) { db.collection("users").doc(id).update({ isIgnored: !s }); }
+
+        // V97.73: manual runner for the nightly no-check-in decay (applyCheckinDecay,
+        // 00:05 Asia/Bangkok). Exists to recover a day the schedule missed and to let
+        // the admin see who a run would hit before it hits them. Both buttons call the
+        // SAME server-side selector, so the preview cannot drift from the charge.
+        let decayPreviewKey = null; // the day the rendered preview was built for
+
+        async function previewCheckinDecay() {
+            const box = document.getElementById('decay-box');
+            const meta = document.getElementById('decay-meta');
+            const list = document.getElementById('decay-list');
+            const status = document.getElementById('decay-status');
+            if (!box || !meta || !list) return;
+
+            box.style.display = 'block';
+            if (status) status.textContent = '';
+            meta.textContent = 'Building preview…';
+            list.innerHTML = '';
+            decayPreviewKey = null;
+
+            try {
+                const res = await adminApp.functions().httpsCallable('previewCheckinDecay')({});
+                const d = (res && res.data) || {};
+                decayPreviewKey = d.missedKey || null;
+
+                meta.textContent = `Missed day ${d.missedKey} · ${d.charged} of ${d.scanned} users`
+                    + ` · −${Number(d.totalDeducted || 0).toFixed(2)} total`
+                    + ` · ${d.exemptIgnored} ignored, ${d.notStarted} never checked in`;
+
+                if (!d.charged) {
+                    list.innerHTML = '<div style="color:#16a34a; font-weight:700;">Nobody to charge — everyone active checked in or submitted something.</div>';
+                    return;
+                }
+                // Display names come from user docs, so escaping is not optional.
+                list.innerHTML = (d.users || []).map(u =>
+                    `<div style="display:flex; gap:10px; padding:3px 0; border-bottom:1px solid #eef2f7;">`
+                    + `<span style="flex:1; font-weight:700; color:#334155;">${escapeHtml(u.displayName)}</span>`
+                    + `<span style="color:#94a3b8;">last ${escapeHtml(u.lastCheckin || '—')}</span>`
+                    + `<span style="width:100px; text-align:right; color:#b45309; font-weight:800;">${u.scoreBefore.toFixed(2)} → ${(u.scoreBefore - u.amount).toFixed(2)}</span>`
+                    + `</div>`).join('');
+            } catch (e) {
+                meta.textContent = 'Preview failed: ' + ((e && e.message) || e);
+                meta.style.color = '#dc2626';
+            }
+        }
+
+        async function applyCheckinDecay() {
+            const btn = document.getElementById('decay-apply-btn');
+            const status = document.getElementById('decay-status');
+            if (!decayPreviewKey) { if (status) status.textContent = 'Preview first.'; return; }
+            if (!confirm(`Deduct points for ${decayPreviewKey}?\n\nThis writes to user scores. Re-running the same day charges nobody twice.`)) return;
+
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Applying…'; }
+            try {
+                const res = await adminApp.functions().httpsCallable('runCheckinDecayNow')({});
+                const d = (res && res.data) || {};
+                if (status) {
+                    status.textContent = `Charged ${d.charged} users −${Number(d.totalDeducted || 0).toFixed(2)} for ${d.missedKey}.`;
+                    status.style.color = '#15803d';
+                }
+                await previewCheckinDecay(); // re-read: a correct second preview now shows nobody left
+            } catch (e) {
+                if (status) { status.textContent = 'Failed: ' + ((e && e.message) || e); status.style.color = '#dc2626'; }
+            }
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-hourglass-end"></i> Apply now'; }
+        }
         function toggleHidePeriod(id, s) { db.collection("users").doc(id).update({ hidePeriod: !s }); }
         function toggleForm() { const f = document.getElementById('sq-form'); f.style.display = f.style.display === 'none' ? 'block' : 'none'; }
         function filterBoard() { drawKanban(); }

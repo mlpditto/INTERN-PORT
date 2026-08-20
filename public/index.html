@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.40)</title>
+    <title>Internship Portfolio (V96.41)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -10216,6 +10216,11 @@
 
                 // --- 5. Start Background Tasks (Non-blocking) ---
                 if (!isPracticeMode) {
+                    // V96.41: a real attempt counts as the day's check-in for the daily
+                    // decay — sitting a quiz is showing up. Practice runs are excluded on
+                    // purpose: they record no attempt and carry no score.
+                    tryDailyCheckin('activity');
+
                     // A. Kanban Sync
                     if (currentQuiz.isHomework) {
                         db.collection("side_quests").where("linkedQuizId", "==", currentQuiz.id).get()
@@ -14811,9 +14816,17 @@
                 </div>`;
         }
 
-        async function tryDailyCheckin() {
+        // V96.41: `source` is 'manual' when the ✅ chip is tapped, 'activity' when a
+        // submission auto-checks the intern in. Both paths stamp checkinLastDate, which
+        // is the ONLY field the daily-decay function reads to decide who showed up — so
+        // "submitting work counts as a check-in" costs no extra field here and no
+        // four-collection scan per user per day server-side.
+        async function tryDailyCheckin(source) {
             if (!userId) return;
-            const btn = document.getElementById('daily-checkin-btn');
+            const isManual = source !== 'activity';
+            // Auto calls have no button press behind them; grabbing the chip would
+            // flip it to "Checking in…" while the intern is looking at a save toast.
+            const btn = isManual ? document.getElementById('daily-checkin-btn') : null;
             if (btn) { btn.disabled = true; btn.textContent = 'Checking in…'; }
 
             const authUser = await ensureFirebaseAuthReady(10000);
@@ -14851,6 +14864,7 @@
                         type: 'daily_checkin',
                         dateKey: todayKey,
                         streak: newStreak,
+                        source: isManual ? 'manual' : 'activity', // V96.41: tapped the chip vs. auto-credited by a submission
                         amount,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     });
@@ -14869,7 +14883,9 @@
                     // update local state immediately (listener will refresh again)
                     myCheckin = { currentStreak: result.streak, bestStreak: result.best, lastDate: todayKey };
                     renderDailyCheckinCard();
-                    await awardEngagementBonusIfDue(); // pay the +0.05 if this push hit a 7-day multiple
+                    // V96.41: the 'activity' callers already fire this themselves right
+                    // after their own submit, so paying it here too would be a duplicate.
+                    if (isManual) await awardEngagementBonusIfDue(); // pay the +0.05 if this push hit a 7-day multiple
                 }
             } catch (err) {
                 console.warn('Daily check-in transaction failed:', err);
@@ -15367,6 +15383,9 @@
                 }
 
                 // V95.45: a log counts toward the unified daily streak
+                // V96.41: ...and now also counts as the day's check-in, so writing a log
+                // instead of tapping ✅ no longer costs the intern the daily decay.
+                tryDailyCheckin('activity');
                 renderDailyCheckinCard();
                 awardEngagementBonusIfDue();
 
@@ -16053,6 +16072,8 @@
 
                 // V94.31: NO immediate score, NO checkin_log — admin will set adminBonus on entry to award pts
                 // V95.88: a Learning Note counts toward the unified daily streak — pay the +0.05 if this hits a 7-day multiple
+                // V96.41: and counts as the day's check-in for the daily decay
+                tryDailyCheckin('activity');
                 awardEngagementBonusIfDue();
 
                 // Reset form
@@ -19350,6 +19371,7 @@ async function archiveDoneCard(cardId) {
                 }
 
                 await awardCaseSubmitBonus();
+                tryDailyCheckin('activity'); // V96.41: a case counts as the day's check-in for the daily decay
                 awardEngagementBonusIfDue(); // V95.45: a case counts toward the unified daily streak
 
                 // Notify LINE

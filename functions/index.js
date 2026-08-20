@@ -2865,3 +2865,145 @@ exports.sendQuizDigestNow = onCall({
     }
     return await runQuizDigest('manual');
 });
+
+// ============================================================
+// V97.73: Daily check-in decay.
+//
+// Rule: an intern who did not "show up" yesterday loses CHECKIN_DECAY_AMOUNT.
+// "Showed up" is read off users/{id}.checkinLastDate alone — the intern app
+// stamps that field both when the ✅ Check in chip is tapped AND after any
+// reflective log / learning note / case submission (tryDailyCheckin('activity')),
+// so submitting work counts as a check-in without this function having to scan
+// four more collections per user per day.
+//
+// Exempt: isIgnored === true only. `status` is deliberately NOT consulted —
+// isIgnored is the one flag the admin actually toggles (User Hub status button)
+// and the one every leaderboard/stat filter already agrees on.
+//
+// Deliberate limits, so a bad day cannot wipe the board:
+//   - charges for YESTERDAY only, never backfills. Someone last seen 30 days ago
+//     loses 0.1, not 3.0. Re-runs are free: the decayLastDate guard plus the
+//     deterministic log id daily_decay_{uid}_{dateKey} make a second run a no-op.
+//   - never takes a score below 0, and skips anyone already at/below 0.
+//   - never starts before the intern's first check-in (no checkinLastDate = the
+//     clock has not started), so a fresh signup does not go negative unused.
+// ============================================================
+const CHECKIN_DECAY_AMOUNT = 0.1;
+
+// Calendar arithmetic on a Bangkok YYYY-MM-DD key. Noon UTC dodges tz/DST drift —
+// same trick as _shiftDateKey in public/index.html, which produces these keys.
+function shiftDayKey(key, deltaDays) {
+    const d = new Date(key + 'T12:00:00Z');
+    d.setUTCDate(d.getUTCDate() + deltaDays);
+    return d.toISOString().slice(0, 10);
+}
+
+// Shared by the schedule, the preview and the admin "apply now" button, so a
+// preview cannot disagree with what the run actually charges. `apply=false`
+// performs zero writes.
+async function runCheckinDecay(mode, opts = {}) {
+    const apply = opts.apply === true;
+    const db = admin.firestore();
+    const missedKey = shiftDayKey(digestDayKey(), -1); // the day being charged for
+
+    const snap = await db.collection('users').get();
+    const targets = [];
+    let exemptIgnored = 0;
+    let notStarted = 0;
+
+    snap.forEach(doc => {
+        const u = doc.data() || {};
+        if (u.isIgnored === true) { exemptIgnored++; return; }
+        if (!u.checkinLastDate) { notStarted++; return; }
+        // String compare is safe: every key is a zero-padded YYYY-MM-DD.
+        if (u.checkinLastDate >= missedKey) return;   // showed up that day (or later)
+        if (u.decayLastDate === missedKey) return;    // already charged for that day
+        const score = Number(u.score || 0);
+        if (!(score > 0)) return;                     // floor at 0
+        targets.push({
+            id: doc.id,
+            displayName: u.displayName || '(no name)',
+            score: score,
+            lastCheckin: u.checkinLastDate,
+            amount: Math.min(CHECKIN_DECAY_AMOUNT, score) // partial charge rather than negative
+        });
+    });
+
+    const summary = {
+        missedKey,
+        amount: CHECKIN_DECAY_AMOUNT,
+        scanned: snap.size,
+        charged: targets.length,
+        totalDeducted: Number(targets.reduce((s, t) => s + t.amount, 0).toFixed(2)),
+        exemptIgnored,
+        notStarted,
+        applied: apply,
+        users: targets.map(t => ({
+            id: t.id,
+            displayName: t.displayName,
+            lastCheckin: t.lastCheckin,
+            amount: Number(t.amount.toFixed(2)),
+            scoreBefore: Number(t.score.toFixed(2))
+        }))
+    };
+
+    if (!apply || targets.length === 0) {
+        console.log(`[checkinDecay:${mode}] preview for ${missedKey}: ${summary.charged}/${summary.scanned} would lose ${summary.totalDeducted}`);
+        return summary;
+    }
+
+    // 2 writes per user; 200 users per batch keeps every commit under the 500 cap.
+    for (let i = 0; i < targets.length; i += 200) {
+        const batch = db.batch();
+        targets.slice(i, i + 200).forEach(t => {
+            batch.set(db.collection('users').doc(t.id), {
+                score: admin.firestore.FieldValue.increment(-t.amount),
+                decayLastDate: missedKey
+            }, { merge: true });
+            // Deterministic id = the idempotency key. Same trick the intern app
+            // uses for daily_checkin_{uid}_{dateKey}.
+            batch.set(db.collection('checkin_logs').doc(`daily_decay_${t.id}_${missedKey}`), {
+                userId: t.id,
+                displayName: t.displayName,
+                type: 'daily_decay',
+                dateKey: missedKey,
+                amount: -t.amount,
+                note: `No check-in on ${missedKey}`,
+                mode,
+                timestamp: admin.firestore.FieldValue.serverTimestamp()
+            });
+        });
+        await batch.commit();
+    }
+
+    console.log(`[checkinDecay:${mode}] charged ${summary.charged} users ${summary.totalDeducted} for ${missedKey}`);
+    return summary;
+}
+
+// 00:05 Bangkok — just past midnight, so "yesterday" is a closed day and an
+// intern who checks in at 23:59 is safe. us-central1 matches the other two
+// schedules; the Firestore read crosses into asia-southeast3, which costs
+// latency only (see notifyQuizDigest).
+exports.applyCheckinDecay = onSchedule({
+    schedule: '5 0 * * *',
+    timeZone: 'Asia/Bangkok',
+    region: 'us-central1',
+    timeoutSeconds: 300,
+    memory: '256MiB'
+}, async (event) => {
+    await runCheckinDecay('scheduled', { apply: true });
+});
+
+// Admin "⏳ Decay" panel — preview holds no write path at all, so a mistyped
+// argument cannot turn a look into a charge.
+exports.previewCheckinDecay = onCall({ timeoutSeconds: 120 }, async (request) => {
+    requireAdminCallable(request);
+    return await runCheckinDecay('manual', { apply: false });
+});
+
+// Recovers a day the schedule missed. Safe to double-tap: the same-day guard
+// means the second press charges nobody.
+exports.runCheckinDecayNow = onCall({ timeoutSeconds: 300 }, async (request) => {
+    requireAdminCallable(request);
+    return await runCheckinDecay('manual', { apply: true });
+});
