@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.86</title>
+    <title>Nika V97.87</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -54205,9 +54205,19 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
         // would actually collide with, not the saved Q17 that's about to be replaced.
         window.buildQuizSetPeerPool = function(excludeIdx) {
             const qs = getQuizFormData().questions || [];
+            // V97.87: a proposal that is already sitting in the form as a real question is
+            // no longer "pending" — ➕ Add New put it there. Substituting it on TOP of that
+            // made the freshly added question collide with its own source at 100%
+            // ("⚠️ ซ้ำ Q3 · 100%"), warning about a duplicate the admin had deliberately
+            // created one second earlier. Nothing is lost by skipping it: the identical
+            // real question is in the pool anyway, so a genuine collision still shows —
+            // including the real one that appears if the original is later Applied too.
+            const liveStems = new Set(qs.map(q => quizCompareStripMd((q && q.q) || '')).filter(Boolean));
             const pending = new Map();
             (window._aiAnalysisItems || []).forEach((it, ai) => {
-                if (it && it.improvedQuestion) pending.set(window.getAiItemQIndex(ai), it.improvedQuestion);
+                if (!it || !it.improvedQuestion) return;
+                if (liveStems.has(quizCompareStripMd(it.improvedQuestion.q || ''))) return;
+                pending.set(window.getAiItemQIndex(ai), it.improvedQuestion);
             });
             const pool = [];
             qs.forEach((q, i) => {
@@ -55049,6 +55059,20 @@ RULES:
                 if (mode === 'end') insertAt = allQs.length;
 
                 allQs.splice(insertAt, 0, improvedQ);
+
+                // V97.87: renumber the analysis queue for the insert, mirroring what the
+                // delete path has always done (deleteAiAnalysisItem decrements qNumber for
+                // items past the removed one). Nothing did it for insertions, so every item
+                // pointing at or past insertAt was left one short: the compare modal's
+                // Prev/Next resolves through getAiItemQIndex, so it opened the question next
+                // door and showed the newly inserted one as the next "ORIGINAL".
+                // `>= insertAt` because the question sitting AT that position is pushed down
+                // too — only the ones strictly before it keep their number.
+                (window._aiAnalysisItems || []).forEach(it => {
+                    if (!it) return;
+                    if (it.qNumber !== undefined) { if (it.qNumber - 1 >= insertAt) it.qNumber += 1; }
+                    else if (it.index !== undefined) { if (it.index >= insertAt) it.index += 1; }
+                });
 
                 const container = document.getElementById('quiz-questions-container');
                 container.innerHTML = "";
