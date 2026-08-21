@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.81</title>
+    <title>Nika V97.82</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -29133,8 +29133,15 @@ ${JSON.stringify(sourceObj)}`;
             const base = 'font-size:0.7em; border-radius:8px; padding:2px 7px; font-weight:800; white-space:nowrap;';
             const a = q && q.lastAiAudit;
             const score = a && a.result ? Number(a.result.overallScore) : NaN;
+            // V97.82: the badge is the way into the saved scorecard. Id travels in a data
+            // attribute rather than inlined into the onclick string — an id inside a JS
+            // string literal in an HTML attribute survives HTML-decoding, so escapeHtml
+            // there would not actually stop a quote from breaking out. As a plain
+            // attribute value it is escaped correctly and the handler reads it back.
+            const qid = q && q.id ? ` data-qid="${escapeHtml(String(q.id))}" onclick="event.stopPropagation(); quizOpenSavedAudit(this.dataset.qid)" ` : ' ';
+            const hand = q && q.id ? ' cursor:pointer;' : '';
             if (!a || !a.result || isNaN(score)) {
-                return `<span title="Never audited — open the quiz and press ✅ Audit&#10;ยังไม่เคยรัน Quality Audit" style="${base} background:#f8fafc; color:#94a3b8; border:1px solid #e2e8f0;">🧪 —</span>`;
+                return `<span${qid}title="Never audited — click to open this quiz, then press ✅ Audit&#10;ยังไม่เคยรัน Quality Audit — คลิกเพื่อเปิดควิซ" style="${base}${hand} background:#f8fafc; color:#94a3b8; border:1px solid #e2e8f0;">🧪 —</span>`;
             }
             const stale = window.quizAuditIsStale(q);
             // Same thresholds/palette as renderAuditScorecard's overall pill, so the badge
@@ -29152,9 +29159,39 @@ ${JSON.stringify(sourceObj)}`;
                 nQ ? `${nQ} question(s) audited` : '',
                 a.model ? `model: ${a.model}` : '',
                 when,
-                stale ? 'STALE — the questions changed after this audit ran. Re-run ✅ Audit.' : ''
+                stale ? 'STALE — the questions changed after this audit ran. Re-run ✅ Audit.' : '',
+                'Click to reopen this scorecard (free — nothing is re-run)'
             ].filter(Boolean).join(' · ');
-            return `<span title="${escapeHtml(tip)}" style="${base} ${skin}">🧪 ${score.toFixed(1)}${stale ? ' ⚠' : ''}</span>`;
+            return `<span${qid}title="${escapeHtml(tip)}" style="${base}${hand} ${skin}">🧪 ${score.toFixed(1)}${stale ? ' ⚠' : ''}</span>`;
+        };
+
+        // V97.82: click the 🧪 badge → open that quiz and re-render its saved scorecard.
+        // Free: auditQuizAI has defaulted to "show me what's already there" since V97.44,
+        // reading quizzes/{id}.lastAiAudit rather than calling a model.
+        //
+        // The quiz MUST be fully loaded into the form first. The scorecard's own buttons
+        // (auditDeleteQuestion, auditSuggestFix) edit the live form directly, and
+        // auditQuizAI itself starts with getQuizFormData() + reads #edit-quiz-id — fire it
+        // early and it either bails on an empty form or wires those buttons to the wrong
+        // quiz. openQuizModal is async but its id branch is synchronous (fillQuizForm off
+        // the in-memory quizzesData), so awaiting it is enough.
+        window.quizOpenSavedAudit = async function(quizId) {
+            const q = (typeof quizzesData !== 'undefined' ? quizzesData : []).find(x => x.id === quizId);
+            if (!q) { showToast('Quiz not found — refresh and try again', 'error'); return; }
+
+            await openQuizModal(quizId);
+
+            // Never audited: there is nothing saved to reopen, and auditQuizAI would fall
+            // straight through to a FRESH run — a click that only asked to look would
+            // silently spend tokens. Leave the admin in the open quiz instead.
+            if (window.quizAuditScore(q) === null) {
+                showToast('🧪 Never audited — press ✅ Audit in this quiz to run one', 'warning');
+                return;
+            }
+            // Detached button as the spinner target, the same idiom quizFullReview uses:
+            // passing null makes auditQuizAI fall back to window.event and paint a spinner
+            // on whatever button happened to be clicked.
+            window.auditQuizAI(document.createElement('button'), {});
         };
 
         // V97.80: the score a quiz was last audited at, or null when it has never been
