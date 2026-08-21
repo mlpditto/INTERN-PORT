@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.82</title>
+    <title>Nika V97.83</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -53627,7 +53627,29 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         // (already in _aiAnalysisItems[arrIdx].improvedQuestion); Model B is picked in the
         // compare modal (persisted in localStorage). Single-question scope → no truncation.
         // See [[project_quality_audit_suggest_plan]].
-        window._buildSingleQImprovePrompt = function(originalQ, issue, suggestion) {
+        // V97.83: read the compare modal's steer box, falling back to whatever was last
+        // saved on the item — previewAiFix tears the overlay down and rebuilds it on every
+        // render, so the input only exists some of the time, and regenerate is also
+        // reachable from the analysis list where the modal is not open at all.
+        // Mirrors how the 🧬 merge box is read (`#ai-merge-instruction` → item.mergeInstruction).
+        window._compareImproveInstruction = function(item) {
+            const el = document.getElementById('ai-improve-instruction');
+            const raw = el ? el.value : ((item && item.improveInstruction) || '');
+            return String(raw || '').trim().slice(0, 500);
+        };
+
+        // V97.83: `adminSteer` is a free-text line the admin types in the compare modal.
+        // It lands AFTER the numbered requirements and is given explicit precedence over
+        // them, because the requirements are opinionated in one direction — always harder,
+        // always a patient case — and the whole point of the steer is to be able to say
+        // "no, keep the stem, just fix the distractors". Placed before it, the model reads
+        // the requirements last and follows those instead.
+        window._buildSingleQImprovePrompt = function(originalQ, issue, suggestion, adminSteer) {
+            const steer = String(adminSteer || '').trim().slice(0, 500);
+            const steerBlock = steer ? `
+                ADMIN STEER — HIGHEST PRIORITY. This overrides any CRITICAL REQUIREMENT above that contradicts it, including the instruction to increase difficulty. Follow it literally, even when it asks for a smaller, narrower or easier change than the requirements do:
+                <<<${steer}>>>
+` : '';
             return `Based on this question and the identified issue, provide a DIFFERENT and MORE CHALLENGING improved version.
 
                 CRITICAL REQUIREMENTS:
@@ -53637,7 +53659,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 4. NO EASY CLUES: Ensure the correct answer requires synthesis of information, not just simple recall.
                 5. "explanation" is shown to LEARNERS after they submit — write it as concise teaching, NOT as a critique. "suggestion" stays admin-facing.
                 6. If the original question has only 2 options (True/False), upgrade "options" to 4 well-reasoned, plausible distractors instead of keeping it at 2 — a 2-choice format caps guessability at 50% and is one of the easiest formats to game.
-
+${steerBlock}
                 Question to improve: ${JSON.stringify(originalQ)}
                 Identified Issue: ${issue || ''}
                 Previous Suggestion: ${suggestion || ''}
@@ -53710,7 +53732,11 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 const item = window._aiAnalysisItems[arrIdx];
                 const originalQ = getQuizFormData().questions[qIdx];
                 const modelB = window._compareModelB();
-                const prompt = window._buildSingleQImprovePrompt(originalQ, item.issue, item.suggestion);
+                // V97.83: same steer A ran on, so the A|B columns stay a like-for-like
+                // model comparison instead of quietly becoming a comparison of two briefs.
+                const instruction = window._compareImproveInstruction(item);
+                item.improveInstruction = instruction;
+                const prompt = window._buildSingleQImprovePrompt(originalQ, item.issue, item.suggestion, instruction);
                 let parsed = null, actual = modelB, raw = '';
                 for (let attempt = 1; attempt <= 2; attempt++) {
                     const r = await callUniversalAI(modelB, prompt, true, null, '', { feature: 'quiz_2model_compare', maxOutputTokens: 8192 });
@@ -54746,6 +54772,7 @@ RULES:
                         <div style="padding:14px 24px; background:#fff; border-top:1.5px solid #edf2f7; display:flex; flex-direction:column; gap:8px;">
                             <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                                 ${window._compareModelBPickerHtml()}
+                                ${(improvedB || mergedQV) ? '' : `<input id="ai-improve-instruction" type="text" value="${escapeHtml(item.improveInstruction || '')}" placeholder="Steer the rewrite" title="Optional — one line telling the AI how to rewrite, e.g. &quot;keep the stem, only fix the distractors&quot; or &quot;do not turn it into a patient case&quot;.&#10;It overrides the built-in brief, which otherwise always pushes for harder + a case vignette.&#10;Used by BOTH 🔄 Regenerate and ⚖️ Compare B, so A and B stay comparable." style="width:150px; padding:7px 9px; border-radius:10px; border:1px solid #e2e8f0; background:#f8fafc; font-size:0.76em; font-family:inherit; color:#334155;">`}
                                 ${(improvedB || mergedQV) ? '' : `<button class="btn" onclick="generateAiProposalB(${index}, ${arrIdx}, this)" style="padding:7px 11px; border-radius:10px; font-weight:800; font-size:0.76em; background:linear-gradient(135deg,#0891b2,#0e7490); color:white; border:none; box-shadow:0 3px 10px rgba(8,145,178,0.3); display:flex; align-items:center; gap:4px; white-space:nowrap;">⚖️ Compare B</button>`}
                                 <button class="btn" onclick="checkQuizSetDupAI(${index}, ${arrIdx}, this)" title="Ask AI whether this question tests the same concept as another one in the set — the chips above only catch wording overlap. Uses tokens." style="padding:7px 11px; border-radius:10px; font-weight:800; font-size:0.76em; background:linear-gradient(135deg,#7c3aed,#a855f7); color:white; border:none; box-shadow:0 3px 10px rgba(124,58,237,0.3); display:flex; align-items:center; gap:4px; white-space:nowrap;">🔎 Dup Check</button>
                                 ${improvedB ? '' : `
@@ -55123,29 +55150,17 @@ RULES:
                 const currentQs = getQuizFormData().questions;
                 const originalQ = currentQs[qIdx];
                 
-                const prompt = `Based on this question and the identified issue, provide a DIFFERENT and MORE CHALLENGING improved version.
-                
-                CRITICAL REQUIREMENTS:
-                1. INCREASE DIFFICULTY: Use high-order clinical reasoning (Bloom's Taxonomy: Analysis/Evaluation).
-                2. DEEP INTEGRATION: If it's a medical/clinical question, provide a rich, realistic patient case with subtle clues.
-                3. PLAUSIBLE DISTRACTORS: All options must be highly plausible to someone with only superficial knowledge. Avoid "none of the above" or obviously wrong answers.
-                4. NO EASY CLUES: Ensure the correct answer requires synthesis of information, not just simple recall.
-                5. If the original question has only 2 options (True/False), upgrade "options" to 4 well-reasoned, plausible distractors instead of keeping it at 2 — a 2-choice format caps guessability at 50% and is one of the easiest formats to game.
+                // V97.83: this used to carry its own inline copy of the improve prompt,
+                // which had drifted from _buildSingleQImprovePrompt — it was missing the
+                // rule about "explanation" being learner-facing and left "explanation" out
+                // of the requested JSON entirely. So a regenerated A and a Compare-B were
+                // never running the same brief, which is precisely what the A|B view claims
+                // to hold constant. Both now build from the one function, and both take the
+                // admin's steer.
+                const instruction = window._compareImproveInstruction(item);
+                item.improveInstruction = instruction;
+                const prompt = window._buildSingleQImprovePrompt(originalQ, item.issue, item.suggestion, instruction);
 
-                Question to improve: ${JSON.stringify(originalQ)}
-                Identified Issue: ${item.issue}
-                Previous Suggestion: ${item.suggestion}
-                
-                ANSWER KEY: "correct" holds ZERO-BASED INDEXES into the "options" array YOU output — the first option is 0, not 1. Assemble the options first, then count the index of the correct one. An improved question with a mis-indexed answer key is worse than no improvement at all.
-
-                Output ONLY a JSON object representing the improved question:
-                {
-                  "q": "...",
-                  "options": [...],
-                  "correct": [...],
-                  "suggestion": "Brief explanation of how this version increases challenge and addresses the issue..."
-                }`;
-                
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-3.5-flash';
                 const { text: resultJson } = await callUniversalAI(selectedModel, prompt, true, null, '', { feature: 'quiz_regen_suggestion' });
                 // V92.35: use shared safeJsonParse with bracket-extraction fallback
