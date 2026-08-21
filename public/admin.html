@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.84</title>
+    <title>Nika V97.85</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -16979,11 +16979,35 @@
         // fixed rubric and surfaces raw scores so admin can prioritise fixes. 1-pass for now;
         // self-confirmation bias monitored, 2nd critic pass deferred.
         window.auditQuizAI = async function(clickedBtn, opts = {}) {
-            const oldModal = document.getElementById('ai-audit-popup');
-            if (oldModal) oldModal.remove();
-
             const formData = getQuizFormData();
             if (!formData.questions || formData.questions.length < 1) return alert('Add at least 1 question to audit.');
+
+            // V97.85: 🔄 Regenerate lives INSIDE this popup and calls in with clickedBtn
+            // null, so the spinner fell back to `event.target.closest('button')` — the
+            // Regenerate button, which the old unconditional remove() on the line above had
+            // just detached. The popup vanished and a fresh audit then ran for tens of
+            // seconds with nothing on screen at all: "กด Regenerate แล้ว popup หายไป".
+            //
+            // Keep it mounted and make it the progress surface instead. It is renamed off
+            // `ai-audit-popup` first because renderAuditScorecard appends a NEW element with
+            // that id and two would collide; the finally block clears it on every path,
+            // success or throw.
+            const oldModal = document.getElementById('ai-audit-popup');
+            let regenHost = null;
+            if (oldModal) {
+                if (opts && opts.cachedResult) {
+                    oldModal.remove();
+                } else {
+                    regenHost = oldModal;
+                    regenHost.id = 'ai-audit-popup-regen';
+                    regenHost.innerHTML = `
+                        <div style="display:flex; flex-direction:column; align-items:center; gap:12px; padding:28px 10px; text-align:center;">
+                            <i class="fa-solid fa-spinner fa-spin" style="font-size:1.8em; color:#0891b2;"></i>
+                            <div style="font-weight:800; color:#0891b2;">${(opts && opts.forceNew) ? 'Running a fresh Quality Audit…' : 'Loading the Quality Audit…'}</div>
+                            <div style="font-size:0.82em; color:#64748b;">${(opts && opts.forceNew) ? 'Judging every question on 5 dimensions — this takes a moment.' : 'Fetching the saved audit, or running one if there is none.'}</div>
+                        </div>`;
+                }
+            }
 
             // V97.44: Audit now defaults to "show me what's already there" — mirrors the
             // same change on analyzeQuizAI (V97.44). opts.forceNew (🔄 Regenerate, inside
@@ -17175,6 +17199,10 @@ RULES:
                 alert('Audit error: ' + e.message);
             } finally {
                 if (auditProgressTimer) clearInterval(auditProgressTimer); // V96.45: stop the progress ticker
+                // V97.85: clear the regenerate placeholder on EVERY path. On success the new
+                // scorecard has already been appended above, so this just drops the old
+                // shell; on a throw it stops a dead "Running…" box being left behind.
+                if (regenHost) regenHost.remove();
                 if (btn) { btn.innerHTML = oldText; btn.disabled = false; }
             }
         };
