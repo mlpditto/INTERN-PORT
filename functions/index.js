@@ -2412,6 +2412,25 @@ const DIGEST_DONE_NAMES = 6;
 // purpose: a literal emoji/invisible char inside a regex literal has broken this
 // codebase before (V91.95 SyntaxError incident).
 const DIGEST_NAME_TAIL_RE = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE00}-\u{FE0F}\u{200D}\s]+$/u;
+// V97.84: one place that decides what a quiz is CALLED in the digest. Prefers
+// `shortTitle`, the same `shortTitle || title` display rule index.html already uses
+// for quiz cards and push notifications — the full titles are long Thai sentences
+// that wrap to three lines each and pushed the rest of the bubble off screen.
+//
+// Applied to every quiz name in the message, not just the newly-live rows: a quiz
+// that goes live WITH a deadline appears in both that section and the deadline
+// roster, so naming it two different ways in one bubble would read as two quizzes.
+// `max` of 0 means no truncation (the deadline roster wraps its own line by design).
+// Each candidate is trimmed BEFORE the choice, not after. A whitespace-only
+// shortTitle is truthy, so picking first and trimming second collapsed it to ''
+// and printed the fallback "Quiz" — losing a title that was sitting right there.
+function digestQuizName(q, max) {
+    const short = String((q && q.shortTitle) || '').trim();
+    const full = String((q && q.title) || '').trim();
+    const raw = short || full || 'Quiz';
+    return max > 0 ? raw.slice(0, max) : raw;
+}
+
 function digestCleanName(raw) {
     const cleaned = String(raw || '').replace(DIGEST_NAME_TAIL_RE, '').trim();
     return cleaned || String(raw || '').trim();
@@ -2523,7 +2542,7 @@ async function runQuizDigest(kind, options) {
             if (!quizTitleCache.has(quizId)) {
                 try {
                     const qDoc = await db.collection('quizzes').doc(quizId).get();
-                    quizTitleCache.set(quizId, qDoc.exists ? String((qDoc.data() || {}).title || 'Quiz').slice(0, 60) : 'Quiz');
+                    quizTitleCache.set(quizId, qDoc.exists ? digestQuizName(qDoc.data(), 60) : 'Quiz');
                 } catch (err) {
                     quizTitleCache.set(quizId, 'Quiz');
                 }
@@ -2588,7 +2607,7 @@ async function runQuizDigest(kind, options) {
             if (!isNaN(wentLiveMs) && wentLiveMs >= cutoff.toMillis()) {
                 const dueSoon = deadlineMs && !isNaN(deadlineMs) && deadlineMs > now.toMillis();
                 newlyLive.push({
-                    quiz: String(q.title || 'Quiz').slice(0, 60),
+                    quiz: digestQuizName(q, 60),
                     deadline: dueSoon
                         ? new Date(deadlineMs).toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', day: '2-digit', month: 'short' })
                         : ''
@@ -2630,7 +2649,7 @@ async function runQuizDigest(kind, options) {
                 // V97.76: full title, no truncation. slice(0,60) cut Thai titles
                 // mid-word ("...ภาวะตกเลือดหลังคลอ") which is unreadable; the title
                 // now owns its own wrapped line so it has the room.
-                quiz: String(q.title || 'Quiz'),
+                quiz: digestQuizName(q, 0),
                 deadlineMs: deadlineMs,
                 deadline: new Date(deadlineMs).toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', day: '2-digit', month: 'short' }),
                 names: missing.map(u => u.name),
@@ -2698,7 +2717,7 @@ async function runQuizDigest(kind, options) {
             if (!titleCache.has(quizId)) {
                 try {
                     const q = await db.collection('quizzes').doc(quizId).get();
-                    titleCache.set(quizId, q.exists ? String((q.data() || {}).title || 'Quiz').slice(0, 40) : 'Quiz');
+                    titleCache.set(quizId, q.exists ? digestQuizName(q.data(), 40) : 'Quiz');
                 } catch (e) { titleCache.set(quizId, 'Quiz'); }
             }
             adminQueue.push({ text: `🕐 ${titleCache.get(quizId)} · ${userNames.get(userId) || String(userId).slice(0, 8)}` });
@@ -2842,7 +2861,11 @@ async function runQuizDigest(kind, options) {
 
         // Sits with "Done today" — both are "what happened in the last 24h" —
         // and above the deadline nags, which are about what still has to happen.
-        if (productRows.length) {
+        // V97.84: admin copy only. "1 awaiting review" is a queue the interns cannot
+        // act on, and the listing itself is shop back-office work rather than
+        // coursework, so in the group chat it was noise between two things that
+        // actually concern them.
+        if (target.withScores && productRows.length) {
             body.push({ type: 'separator', margin: 'md' });
             body.push({
                 type: 'text',
@@ -2950,7 +2973,10 @@ async function runQuizDigest(kind, options) {
 
         // Never let the active-cohort filter shrink things silently — if this
         // number looks wrong, that's the signal to retune NOTIFY_ACTIVE_DAYS.
-        if (hiddenUserCount > 0) {
+        // V97.84: admin copy only. It is a tripwire for whoever tunes that constant,
+        // and it stays for them — but in the intern group "6/29 people · 23 hidden"
+        // reads as "23 of you were left out", which is not what it means.
+        if (target.withScores && hiddenUserCount > 0) {
             body.push({ type: 'separator', margin: 'md' });
             body.push({
                 type: 'text',
@@ -2961,7 +2987,10 @@ async function runQuizDigest(kind, options) {
 
         return {
             type: 'flex',
-            altText: `📊 Quiz digest — ${newlyLive.length ? `${newlyLive.length} new · ` : ''}${doneQuizzes.length} done today${productRows.length ? ` · ${productRows.length} products` : ''}`.slice(0, 400),
+            // V97.84: the group's altText must not advertise a products count its
+            // bubble no longer contains — altText is what shows in the chat list and
+            // on the lock screen, so a mismatch is visible before the bubble is opened.
+            altText: `📊 Quiz digest — ${newlyLive.length ? `${newlyLive.length} new · ` : ''}${doneQuizzes.length} done today${(target.withScores && productRows.length) ? ` · ${productRows.length} products` : ''}`.slice(0, 400),
             contents: {
                 type: 'bubble',
                 size: 'kilo',
@@ -2976,6 +3005,18 @@ async function runQuizDigest(kind, options) {
             }
         };
     };
+
+    // V97.84: products and the admin queue are both admin-only sections now, so a day
+    // whose ONLY content is one of those would still pass the nothing-to-report guard
+    // above and push a bubble to the intern group reading nothing but
+    // "✅ Done today · 0 / No submissions today". Drop the group target on such a day
+    // rather than spending a push on noise. The admin copy still goes out.
+    const groupHasContent = newlyLive.length > 0 || doneQuizzes.length > 0 || pendingBlocks.length > 0;
+    const sendTargets = targets.filter(t => t.withScores || groupHasContent);
+    if (!sendTargets.length) {
+        console.log('[notifyQuizDigest] nothing for any configured target — no push');
+        return { sent: false, reason: 'nothing-for-any-target' };
+    }
 
     const counts = {
         newlyLive: newlyLive.length,
@@ -2997,7 +3038,7 @@ async function runQuizDigest(kind, options) {
             sent: false,
             preview: true,
             builtAt: Date.now(),
-            targets: targets.map(t => ({
+            targets: sendTargets.map(t => ({
                 label: t.label,
                 withScores: t.withScores === true,
                 body: buildFlex(t).contents.body.contents
@@ -3006,7 +3047,7 @@ async function runQuizDigest(kind, options) {
         };
     }
 
-    const results = await pushLineFlex(tag, targets, buildFlex, `kind=${kind}  newlyLive=${newlyLive.length}  doneQuizzes=${doneQuizzes.length} donePeople=${donePeopleCount} (attempts=${doneRows.length})  products=${productRows.length} (pending=${productPendingCount})  urgent=${urgentBlocks.length}  later=${laterBlocks.length}  waitingOnAdmin=${adminQueueTotal} (req=${queueCounts.requests} esc=${queueCounts.escalated} fu=${queueCounts.followUp})  cohort=${activeUsers.length}/${users.length}`);
+    const results = await pushLineFlex(tag, sendTargets, buildFlex, `kind=${kind}  newlyLive=${newlyLive.length}  doneQuizzes=${doneQuizzes.length} donePeople=${donePeopleCount} (attempts=${doneRows.length})  products=${productRows.length} (pending=${productPendingCount})  urgent=${urgentBlocks.length}  later=${laterBlocks.length}  waitingOnAdmin=${adminQueueTotal} (req=${queueCounts.requests} esc=${queueCounts.escalated} fu=${queueCounts.followUp})  cohort=${activeUsers.length}/${users.length}`);
     const pushed = results.filter(r => r.ok).length;
 
     // Marks the day as sent so the manual button can warn about a duplicate.
