@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.87</title>
+    <title>Nika V97.88</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -53667,10 +53667,13 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         // saved on the item — previewAiFix tears the overlay down and rebuilds it on every
         // render, so the input only exists some of the time, and regenerate is also
         // reachable from the analysis list where the modal is not open at all.
-        // Mirrors how the 🧬 merge box is read (`#ai-merge-instruction` → item.mergeInstruction).
-        window._compareImproveInstruction = function(item) {
-            const el = document.getElementById('ai-improve-instruction');
-            const raw = el ? el.value : ((item && item.improveInstruction) || '');
+        // V97.88: ONE box for all three AI actions. The bar used to carry two always-visible
+        // text inputs (steer + merge instruction) that were empty most of the time, and no
+        // state ever needs both at once — whichever button the admin presses reads this
+        // single field, and the placeholder says which action is currently on offer.
+        window._compareInstruction = function(item) {
+            const el = document.getElementById('ai-compare-instruction');
+            const raw = el ? el.value : ((item && item.compareInstruction) || '');
             return String(raw || '').trim().slice(0, 500);
         };
 
@@ -53771,8 +53774,8 @@ ${steerBlock}
                 const modelB = window._compareModelB();
                 // V97.83: same steer A ran on, so the A|B columns stay a like-for-like
                 // model comparison instead of quietly becoming a comparison of two briefs.
-                const instruction = window._compareImproveInstruction(item);
-                item.improveInstruction = instruction;
+                const instruction = window._compareInstruction(item);
+                item.compareInstruction = instruction;
                 const prompt = window._buildSingleQImprovePrompt(originalQ, item.issue, item.suggestion, instruction);
                 let parsed = null, actual = modelB, raw = '';
                 for (let attempt = 1; attempt <= 2; attempt++) {
@@ -53809,8 +53812,7 @@ ${steerBlock}
                 if (!item || !item.improvedQuestion) return alert('No improvement data found.');
                 const originalQ = (getQuizFormData().questions || [])[qIdx];
                 if (!originalQ) return alert('Question index out of sync.');
-                const instrEl = document.getElementById('ai-merge-instruction');
-                const instruction = (instrEl ? instrEl.value : (item.mergeInstruction || '')).trim();
+                const instruction = window._compareInstruction(item);
                 if (btn) { btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังผสม…'; btn.disabled = true; }
 
                 const prompt = `You are merging TWO versions of the SAME multiple-choice question into ONE. Version A is the question as it stands today, written by a human; Version B is an AI rewrite of it. Produce a single question that takes the strongest parts of each — not a copy of either.
@@ -53866,7 +53868,7 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
 
                 item.mergedQuestion = { ...parsed, options: mergedOptions, correct: mergedCorrect };
                 item.mergedQuestionModel = actual;
-                item.mergeInstruction = instruction;
+                item.compareInstruction = instruction;
                 if (typeof recordAiEval === 'function') recordAiEval('quiz_merge', window._compareModelMeta(actual).label, 'suggested');
                 document.getElementById('ai-compare-overlay').remove();
                 window.previewAiFix(qIdx, arrIdx);
@@ -54783,21 +54785,38 @@ RULES:
                 overlay.className = "lang-no-toggle"; // V92.98: shield Thai user-content + AI-generated text inside this modal from lang-toggle.js auto-wrap (per feedback_lang_toggle_thai_blank.md)
                 overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.85); backdrop-filter:blur(8px); z-index:20000; display:flex; align-items:center; justify-content:center; padding:20px;";
 
+                // V97.88: one shell for every header utility chip. They were five copies of
+                // the same 200-char style string; the only thing that ever differed is the
+                // text colour, which now carries a single rule across the whole modal —
+                // slate text = free/local action, coloured text = spends AI tokens.
+                const hdrChip = 'padding:8px 12px; border-radius:12px; font-weight:800; font-size:0.78em; background:#f1f5f9; border:1px solid #e2e8f0; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap;';
+                // The same shell one size down, for the AI actions in the footer bar. They
+                // used to be filled cyan/purple/pink gradients that shouted as loudly as the
+                // green ✅ Apply, even though none of them changes the question — only the
+                // buttons on the commit row do.
+                const barChip = 'padding:7px 11px; border-radius:10px; font-weight:800; font-size:0.76em; background:#f1f5f9; border:1px solid #e2e8f0; cursor:pointer; display:flex; align-items:center; gap:4px; white-space:nowrap;';
+
                 overlay.innerHTML = `
                     <div style="width:100%; max-width:950px; background:#f8fafc; border-radius:32px; overflow:hidden; box-shadow:0 25px 70px rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.1); display:flex; flex-direction:column; max-height:90vh;">
-                        <div style="padding:20px 30px; background:white; border-bottom:1.5px solid #edf2f7; display:flex; justify-content:space-between; align-items:center;">
-                            <div>
+                        <div style="padding:20px 30px; background:white; border-bottom:1.5px solid #edf2f7; display:flex; flex-direction:column; gap:10px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:16px;">
                                 <h3 style="margin:0; font-size:1.3em; color:#1e293b;">🛠️ Quality Improvement Comparison</h3>
-                                <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; align-items:center;">${statusHtml}${modelChipHtml ? `<span style="color:#cbd5e1; font-weight:800; margin:0 2px; user-select:none;">·</span>${modelChipHtml}` : ''}${dupChipsHtml}</div>
-                                <div id="ai-dup-result" style="display:none; margin-top:8px; max-width:620px;"></div>
+                                <div style="display:flex; align-items:center; gap:12px; flex-shrink:0;">
+                                    ${navHtml}
+                                    <button onclick="document.getElementById('ai-compare-overlay').remove()" style="width:40px; height:40px; border-radius:50%; border:none; background:#f1f5f9; color:#64748b; cursor:pointer; font-size:1.3em; display:flex; align-items:center; justify-content:center; transition:0.2s; flex-shrink:0;" onmouseover="this.style.background='#e2e8f0'; this.style.color='#0f172a'">✕</button>
+                                </div>
                             </div>
-                            <div style="display:flex; align-items:center; gap:12px;">
-                                <button onclick="showFullQuizPreview()" title="Preview all current questions in one page" style="padding:8px 14px; border-radius:12px; font-weight:800; font-size:0.78em; background:#f1f5f9; color:#334155; border:1px solid #e2e8f0; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap;">👁️ Preview</button>
-                                <button onclick="copyAllCompareOriginals()" title="Copy every ORIGINAL question in this analysis (Q+options, no answer key)" style="padding:8px 14px; border-radius:12px; font-weight:800; font-size:0.78em; background:#f1f5f9; color:#334155; border:1px solid #e2e8f0; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap;">📋 All Original</button>
-                                <button onclick="copyAllCompareImproved()" title="Copy every IMPROVED question proposed so far (Q+options, no answer key)" style="padding:8px 14px; border-radius:12px; font-weight:800; font-size:0.78em; background:#f1f5f9; color:#334155; border:1px solid #e2e8f0; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap;">📋 All Improved</button>
-                                ${navHtml}
-                                <button onclick="document.getElementById('ai-compare-overlay').remove()" style="width:40px; height:40px; border-radius:50%; border:none; background:#f1f5f9; color:#64748b; cursor:pointer; font-size:1.3em; display:flex; align-items:center; justify-content:center; transition:0.2s; flex-shrink:0;" onmouseover="this.style.background='#e2e8f0'; this.style.color='#0f172a'">✕</button>
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;">
+                                <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; flex:1 1 240px; min-width:0;">${statusHtml}${modelChipHtml ? `<span style="color:#cbd5e1; font-weight:800; margin:0 2px; user-select:none;">·</span>${modelChipHtml}` : ''}${dupChipsHtml}</div>
+                                <div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; flex-shrink:0; margin-left:auto;">
+                                    <button onclick="showFullQuizPreview()" title="Preview all current questions in one page" style="${hdrChip} color:#334155;">👁️ Preview</button>
+                                    <button onclick="copyAllCompareOriginals()" title="Copy every ORIGINAL question in this analysis (Q+options, no answer key)" style="${hdrChip} color:#334155;">📋 Original</button>
+                                    <button onclick="copyAllCompareImproved()" title="Copy every IMPROVED question proposed so far (Q+options, no answer key)" style="${hdrChip} color:#334155;">📋 Improved</button>
+                                    <button class="btn" onclick="checkQuizSetDupAI(${index}, ${arrIdx}, this)" title="Ask AI whether this question tests the same concept as another one in the set — the chips on the left only catch wording overlap. Uses tokens." style="${hdrChip} color:#7c3aed;">🔎 Dup Check</button>
+                                    <button class="btn" onclick="openMergeBuilder(${index}, ${arrIdx})" title="Manually pick options from every version and set the answer — no AI, no tokens used." style="${hdrChip} color:#334155;">🧩 Build</button>
+                                </div>
                             </div>
+                            <div id="ai-dup-result" style="display:none; max-width:620px;"></div>
                         </div>
 
                         <div style="padding:30px; overflow-y:auto; flex:1; display:flex; flex-wrap:wrap; gap:20px; align-items:stretch; background:linear-gradient(to bottom right, #f8fafc, #eff6ff);">
@@ -54819,17 +54838,13 @@ RULES:
                         <div style="padding:14px 24px; background:#fff; border-top:1.5px solid #edf2f7; display:flex; flex-direction:column; gap:8px;">
                             <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                                 ${window._compareModelBPickerHtml()}
-                                ${(improvedB || mergedQV) ? '' : `<input id="ai-improve-instruction" type="text" value="${escapeHtml(item.improveInstruction || '')}" placeholder="Steer the rewrite" title="Optional — one line telling the AI how to rewrite, e.g. &quot;keep the stem, only fix the distractors&quot; or &quot;do not turn it into a patient case&quot;.&#10;It overrides the built-in brief, which otherwise always pushes for harder + a case vignette.&#10;Used by BOTH 🔄 Regenerate and ⚖️ Compare B, so A and B stay comparable." style="width:150px; padding:7px 9px; border-radius:10px; border:1px solid #e2e8f0; background:#f8fafc; font-size:0.76em; font-family:inherit; color:#334155;">`}
-                                ${(improvedB || mergedQV) ? '' : `<button class="btn" onclick="generateAiProposalB(${index}, ${arrIdx}, this)" style="padding:7px 11px; border-radius:10px; font-weight:800; font-size:0.76em; background:linear-gradient(135deg,#0891b2,#0e7490); color:white; border:none; box-shadow:0 3px 10px rgba(8,145,178,0.3); display:flex; align-items:center; gap:4px; white-space:nowrap;">⚖️ Compare B</button>`}
-                                <button class="btn" onclick="checkQuizSetDupAI(${index}, ${arrIdx}, this)" title="Ask AI whether this question tests the same concept as another one in the set — the chips above only catch wording overlap. Uses tokens." style="padding:7px 11px; border-radius:10px; font-weight:800; font-size:0.76em; background:linear-gradient(135deg,#7c3aed,#a855f7); color:white; border:none; box-shadow:0 3px 10px rgba(124,58,237,0.3); display:flex; align-items:center; gap:4px; white-space:nowrap;">🔎 Dup Check</button>
-                                ${improvedB ? '' : `
-                                <input id="ai-merge-instruction" type="text" value="${escapeHtml(item.mergeInstruction || '')}" placeholder="Merge instructions" title="Optional — AI will use the default merge rule: keep the original wording, adopt the improved version's depth." style="width:120px; padding:7px 9px; border-radius:10px; border:1px solid #e2e8f0; background:#f8fafc; font-size:0.76em; font-family:inherit; color:#334155;">
-                                <button class="btn" onclick="mergeAiVersions(${index}, ${arrIdx}, this)" title="Let AI merge ORIGINAL + IMPROVED into one version, shown as a 3rd column. Uses tokens." style="padding:7px 11px; border-radius:10px; font-weight:800; font-size:0.76em; background:linear-gradient(135deg,#db2777,#9d174d); color:white; border:none; box-shadow:0 3px 10px rgba(219,39,119,0.3); display:flex; align-items:center; gap:4px; white-space:nowrap;">🧬 ${mergedQV ? 'Re-merge' : 'Merge'}</button>`}
-                                <button class="btn" onclick="openMergeBuilder(${index}, ${arrIdx})" title="Manually pick options from every version and set the answer — no AI, no tokens used." style="padding:7px 11px; border-radius:10px; font-weight:800; font-size:0.76em; background:#fff; color:#9d174d; border:1.5px solid #fbcfe8; display:flex; align-items:center; gap:4px; white-space:nowrap;">🧩 Build</button>
+                                ${improvedB ? '' : `<input id="ai-compare-instruction" type="text" value="${escapeHtml(item.compareInstruction || '')}" placeholder="${mergedQV ? 'Re-merge instruction' : 'Steer the rewrite / merge'}" title="Optional, one line — it applies to whichever AI action you press next.&#10;🔄 Regenerate / ⚖️ Compare B: how to rewrite, e.g. &quot;keep the stem, only fix the distractors&quot;. It overrides the built-in brief, which otherwise always pushes for harder + a case vignette. Both read the same line, so A and B stay comparable.&#10;🧬 Merge: how to blend. Left empty, the default rule applies — keep the original wording, adopt the improved version's depth." style="width:190px; padding:7px 9px; border-radius:10px; border:1px solid #e2e8f0; background:#f8fafc; font-size:0.76em; font-family:inherit; color:#334155;">`}
+                                ${(improvedB || mergedQV) ? '' : `<button class="btn" onclick="generateAiProposalB(${index}, ${arrIdx}, this)" title="Run the same brief through Model B and show its proposal as a 3rd column. Uses tokens." style="${barChip} color:#0e7490;">⚖️ Compare B</button>`}
+                                ${improvedB ? '' : `<button class="btn" onclick="mergeAiVersions(${index}, ${arrIdx}, this)" title="Let AI merge ORIGINAL + IMPROVED into one version, shown as a 3rd column. Uses tokens." style="${barChip} color:#9d174d;">🧬 ${mergedQV ? 'Re-merge' : 'Merge'}</button>`}
                             </div>
                             <div style="display:flex; gap:8px; align-items:center; justify-content:flex-end; flex-wrap:wrap;">
                                 <button class="btn btn-secondary" onclick="document.getElementById('ai-compare-overlay').remove()" style="padding:8px 16px; border-radius:10px; font-weight:700; font-size:0.82em; white-space:nowrap;">Keep Original</button>
-                                ${(improvedB || mergedQV) ? '' : `<button class="btn" style="padding:8px 16px; border-radius:10px; font-weight:700; font-size:0.82em; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; display:flex; align-items:center; gap:6px; white-space:nowrap;" onclick="regenerateSingleAiSuggestion(${index}, ${arrIdx}, true, this)">🔄 Regenerate</button>${addButtonHtml}${applyButtonHtml}`}
+                                ${(improvedB || mergedQV) ? '' : `<button class="btn" style="padding:8px 16px; border-radius:10px; font-weight:700; font-size:0.82em; background:#f1f5f9; color:#4338ca; border:1px solid #e2e8f0; display:flex; align-items:center; gap:6px; white-space:nowrap;" onclick="regenerateSingleAiSuggestion(${index}, ${arrIdx}, true, this)">🔄 Regenerate</button>${addButtonHtml}${applyButtonHtml}`}
                             </div>
                         </div>
                     </div>
@@ -55218,8 +55233,8 @@ RULES:
                 // never running the same brief, which is precisely what the A|B view claims
                 // to hold constant. Both now build from the one function, and both take the
                 // admin's steer.
-                const instruction = window._compareImproveInstruction(item);
-                item.improveInstruction = instruction;
+                const instruction = window._compareInstruction(item);
+                item.compareInstruction = instruction;
                 const prompt = window._buildSingleQImprovePrompt(originalQ, item.issue, item.suggestion, instruction);
 
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-3.5-flash';
