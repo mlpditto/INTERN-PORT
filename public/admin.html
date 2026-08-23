@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.88</title>
+    <title>Nika V97.89</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -16439,13 +16439,73 @@
         // quiz-analyzer (Assessment Specialist) prompt. Called by BOTH analyzeQuizAI and
         // the offline AI-eval golden set, so the harness exercises the REAL prompt, not a
         // representative copy. Pure: same (questions, tags) in → byte-identical prompt out.
+        // ── V97.89: ONE source for the Quality Audit rubric ──────────────────────────────
+        // The five dimensions used to be spelled out in eight places that all had to agree:
+        // the prompt rubric, the prompt's JSON sample, the "mean of the N scores" rule, the
+        // "Suggest fix" label map, the scorecard label map, the duplicate-compare table, the
+        // keep/drop tie-break list, and the loading copy. Adding one meant editing all eight,
+        // and a miss surfaced as a silent 0-star row rather than an error. Everything is now
+        // generated from this table, so a new dimension is one entry.
+        //   label        — scorecard row label
+        //   suggestLabel — used by "Suggest fix" when it needs more words than the row does
+        //   dupLabel     — the narrow duplicate-compare table
+        //   dupRank      — row order in that table (most decisive first, NOT rubric order)
+        //   tieShort     — set only on axes allowed to explain a keep/drop recommendation
+        //   example      — the value this dimension shows in the prompt's JSON sample
+        //   desc         — rubric wording; an array becomes an indented continuation block
+        // On window because this block is a <script type="module"> and the duplicate-compare
+        // consumers live in the classic block below (see [[feedback_admin_module_vs_classic_scope]]).
+        window.AUDIT_DIMS = [
+            { key: 'clarity', label: 'Clarity', dupRank: 4, example: 4,
+              desc: 'Is the stem unambiguous, well-worded, free of double-barrel?' },
+            { key: 'distractorQuality', label: 'Distractor Quality', dupLabel: 'Distractor', dupRank: 3, tieShort: 'ตัวลวง', example: 2,
+              desc: 'Are wrong options plausible to a learner? 1 = obvious giveaways, 5 = distractors that test real understanding' },
+            { key: 'bloomLevel', label: 'Bloom Level', suggestLabel: 'Bloom Level (cognitive demand)', dupLabel: 'Bloom', dupRank: 1, tieShort: 'Bloom', example: 3,
+              desc: ['Cognitive demand of the question:',
+                     '1 = Remember (recall facts),',
+                     '2 = Understand (explain in own words),',
+                     '3 = Apply (use in a new situation),',
+                     '4 = Analyze (break down, compare),',
+                     '5 = Evaluate or Create (judge / design)'] },
+            { key: 'clinicalDepth', label: 'Clinical Depth', dupRank: 2, tieShort: 'Clinical', example: 5,
+              desc: 'Clinical reasoning required: 1 = pure factoid, 3 = single-step clinical inference, 5 = multi-step synthesis (diagnose + plan)' },
+            { key: 'languageConsistency', label: 'Language Consistency', dupLabel: 'Language', dupRank: 5, example: 5,
+              desc: 'Polish and consistency: 1 = mixed languages / typos / jargon errors, 5 = clean polished prose throughout' }
+        ];
+
+        // Numbered rubric block for the audit prompt. Keys are padded to a fixed column so
+        // every description starts in the same place, and a multi-line desc continues under
+        // that column instead of wrapping back to the margin.
+        window.auditRubricText = function() {
+            return (window.AUDIT_DIMS || []).map((d, i) => {
+                const head = `  ${i + 1}. ${d.key.padEnd(20)}— `;
+                const lines = Array.isArray(d.desc) ? d.desc : [d.desc];
+                return head + lines.join('\n' + ' '.repeat(head.length));
+            }).join('\n');
+        };
+        // The "scores" object in the prompt's JSON sample — the shape the model must echo.
+        window.auditScoresExample = function() {
+            return '{ ' + (window.AUDIT_DIMS || []).map(d => `"${d.key}": ${d.example}`).join(', ') + ' }';
+        };
+        // key → label maps, and the duplicate-table order, all derived from the one table.
+        window.auditDimLabels = function(field) {
+            const out = {};
+            (window.AUDIT_DIMS || []).forEach(d => { out[d.key] = d[field] || d.label; });
+            return out;
+        };
+        window.auditDupDims = function() {
+            return (window.AUDIT_DIMS || []).slice()
+                .sort((a, b) => (a.dupRank || 99) - (b.dupRank || 99))
+                .map(d => [d.key, d.dupLabel || d.label]);
+        };
+
         function buildQuizAnalyzePrompt(questions, tags, auditNote) {
             const qList = questions.map((q, i) => `Q${i+1} (${q.type}): ${q.q}\nOptions: ${q.options ? q.options.join(', ') : 'N/A'}`).join('\n\n');
             const tagStr = Array.isArray(tags) ? tags.join(', ') : (tags || '');
             // V96.49 Phase 2-full: when launched from the Quality Audit "Suggest fix",
             // inject the audit's weakest dimension + Thai reviewer note so the rewrite
             // targets that specific finding instead of a generic "make it harder".
-            const _auditDimNames = { clarity: 'Clarity', distractorQuality: 'Distractor Quality', bloomLevel: 'Bloom Level (cognitive demand)', clinicalDepth: 'Clinical Depth', languageConsistency: 'Language Consistency' };
+            const _auditDimNames = window.auditDimLabels('suggestLabel');
             const _hasAudit = auditNote && (auditNote.rationale || auditNote.weakestDim);
             const auditBlock = _hasAudit ? `
 
@@ -17004,7 +17064,7 @@
                         <div style="display:flex; flex-direction:column; align-items:center; gap:12px; padding:28px 10px; text-align:center;">
                             <i class="fa-solid fa-spinner fa-spin" style="font-size:1.8em; color:#0891b2;"></i>
                             <div style="font-weight:800; color:#0891b2;">${(opts && opts.forceNew) ? 'Running a fresh Quality Audit…' : 'Loading the Quality Audit…'}</div>
-                            <div style="font-size:0.82em; color:#64748b;">${(opts && opts.forceNew) ? 'Judging every question on 5 dimensions — this takes a moment.' : 'Fetching the saved audit, or running one if there is none.'}</div>
+                            <div style="font-size:0.82em; color:#64748b;">${(opts && opts.forceNew) ? `Judging every question on ${(window.AUDIT_DIMS || []).length} dimensions — this takes a moment.` : 'Fetching the saved audit, or running one if there is none.'}</div>
                         </div>`;
                 }
             }
@@ -17090,17 +17150,8 @@
 
                     const prompt = `You are a Quality Auditor for medical-education multiple-choice questions.
 
-RUBRIC — score each question on 5 dimensions, INTEGER 1-5 (1 = poor, 5 = excellent):
-  1. clarity             — Is the stem unambiguous, well-worded, free of double-barrel?
-  2. distractorQuality   — Are wrong options plausible to a learner? 1 = obvious giveaways, 5 = distractors that test real understanding
-  3. bloomLevel          — Cognitive demand of the question:
-                           1 = Remember (recall facts),
-                           2 = Understand (explain in own words),
-                           3 = Apply (use in a new situation),
-                           4 = Analyze (break down, compare),
-                           5 = Evaluate or Create (judge / design)
-  4. clinicalDepth       — Clinical reasoning required: 1 = pure factoid, 3 = single-step clinical inference, 5 = multi-step synthesis (diagnose + plan)
-  5. languageConsistency — Polish and consistency: 1 = mixed languages / typos / jargon errors, 5 = clean polished prose throughout
+RUBRIC — score each question on ${window.AUDIT_DIMS.length} dimensions, INTEGER 1-5 (1 = poor, 5 = excellent):
+${window.auditRubricText()}
 ${blueprintBlock}
 QUESTIONS:
 ${qList}
@@ -17111,7 +17162,7 @@ OUTPUT FORMAT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
   "perQuestionAudit": [
     {
       "qNumber": 1,
-      "scores": { "clarity": 4, "distractorQuality": 2, "bloomLevel": 3, "clinicalDepth": 5, "languageConsistency": 5 },
+      "scores": ${window.auditScoresExample()},
       "averageScore": 3.8,
       "detectedBloomName": "Apply",
       "rationale": "Thai feedback ≤200 chars: cite the lowest-scoring dim and ONE concrete fix."
@@ -17121,7 +17172,7 @@ OUTPUT FORMAT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
 
 RULES:
 - "rationale" MUST be in Thai (admin-facing).
-- Scores are INTEGERS 1-5 only. averageScore = mean of the 5 scores rounded to 1 decimal.
+- Scores are INTEGERS 1-5 only. averageScore = mean of the ${window.AUDIT_DIMS.length} scores rounded to 1 decimal.
 - overallScore = mean of all perQuestionAudit[].averageScore rounded to 1 decimal.
 - "detectedBloomName" is one of: Remember, Understand, Apply, Analyze, Evaluate, Create (descriptive label of the bloomLevel score).
 - Return one entry per question in input order. Do NOT skip any.`;
@@ -17248,13 +17299,7 @@ RULES:
                 const v = Math.max(0, Math.min(5, Math.round(n)));
                 return '<span style="color:#fbbf24; letter-spacing:1px;">' + '★'.repeat(v) + '<span style="color:#cbd5e1;">' + '☆'.repeat(5 - v) + '</span></span>';
             };
-            const dimLabel = {
-                clarity: 'Clarity',
-                distractorQuality: 'Distractor Quality',
-                bloomLevel: 'Bloom Level',
-                clinicalDepth: 'Clinical Depth',
-                languageConsistency: 'Language Consistency'
-            };
+            const dimLabel = window.auditDimLabels('label');
             const overall = Number(result.overallScore || 0).toFixed(1);
             const overallBg = result.overallScore >= 4 ? '#dcfce7' : result.overallScore >= 3 ? '#fef9c3' : '#fee2e2';
             const overallColor = result.overallScore >= 4 ? '#15803d' : result.overallScore >= 3 ? '#a16207' : '#b91c1c';
@@ -54439,21 +54484,23 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
             const keepA = sAvg > pAvg ? selfAudit : peerAudit;
             const dropA = sAvg > pAvg ? peerAudit : selfAudit;
             // Name the axes that actually decided it, not just the average.
-            const reasons = ['bloomLevel', 'clinicalDepth', 'distractorQuality']
-                .map(k => ({ k: k, d: Number((keepA.scores || {})[k] || 0) - Number((dropA.scores || {})[k] || 0) }))
+            const reasons = (window.AUDIT_DIMS || []).filter(d => d.tieShort)
+                .sort((a, b) => (a.dupRank || 99) - (b.dupRank || 99))
+                .map(d => ({ short: d.tieShort, d: Number((keepA.scores || {})[d.key] || 0) - Number((dropA.scores || {})[d.key] || 0) }))
                 .filter(r => r.d > 0).sort((a, b) => b.d - a.d).slice(0, 2)
-                .map(r => `${({ bloomLevel: 'Bloom', clinicalDepth: 'Clinical', distractorQuality: 'ตัวลวง' })[r.k]} +${r.d}`);
+                .map(r => `${r.short} +${r.d}`);
             return {
                 state: 'pick', keep: keep, drop: drop,
                 text: `แนะนำให้เก็บ <b>Q${keep}</b> · ลบ <b>Q${drop}</b> — avg ${Math.max(sAvg, pAvg).toFixed(1)} vs ${Math.min(sAvg, pAvg).toFixed(1)}${reasons.length ? ' · ' + reasons.join(', ') : ''}`
             };
         };
 
-        // The evidence behind the verdict: same five axes the scorecard already shows,
-        // put side by side so the recommendation can be checked rather than trusted.
+        // The evidence behind the verdict: the same axes the scorecard already shows, put
+        // side by side so the recommendation can be checked rather than trusted. Ordered
+        // most-decisive-first by dupRank, not in rubric order.
         window._auditDupScoreTableHtml = function(selfAudit, peerAudit, selfNumber, peerNumber) {
             if (!selfAudit || !peerAudit) return '';
-            const dims = [['bloomLevel', 'Bloom'], ['clinicalDepth', 'Clinical Depth'], ['distractorQuality', 'Distractor'], ['clarity', 'Clarity'], ['languageConsistency', 'Language']];
+            const dims = window.auditDupDims();
             const rows = dims.map(([k, label]) => {
                 const a = Number((selfAudit.scores || {})[k] || 0), b = Number((peerAudit.scores || {})[k] || 0);
                 const gap = Math.abs(a - b) >= 2;
