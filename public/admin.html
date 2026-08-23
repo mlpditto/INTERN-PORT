@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.92</title>
+    <title>Nika V97.93</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -35461,6 +35461,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (!collected) return;
 
             const axis = lptEditorState.axis;
+            // V97.93: the form is applied to the in-memory axis BEFORE the write, because the
+            // write sends the whole array. Keep the previous copy so a failed save can put it
+            // back — otherwise a retry re-pushes the same new system and then trips the
+            // "Key already exists at row N" check, which reads as a different bug entirely.
+            const rollback = JSON.parse(JSON.stringify(lptEditorState.systems[axis]));
             if (lptEditorState.editingIndex === -1) {
                 lptEditorState.systems[axis].push(collected);
             } else {
@@ -35475,12 +35480,40 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (backBtn) { backBtn.disabled = true; backBtn.style.opacity = '0.5'; }
 
             try {
-                await db.collection('taxonomy').doc('lp_' + axis).set({
+                const docRef = db.collection('taxonomy').doc('lp_' + axis);
+                const expectedTags = lptEditorState.systems[axis]
+                    .reduce((n, s) => n + ((Array.isArray(s.tags) ? s.tags : []).length), 0);
+                // V97.93: log what this save is about to do. A save reported "✅ Saved tool"
+                // on 2026-08-23 while `taxonomy/lp_tool` stayed on its 2026-05-12
+                // `migration-script-V94.55` write — nothing in the collection had been
+                // touched. Whatever the cause, the next occurrence should say which project,
+                // which app and which identity the write went out under.
+                console.debug('[lp-taxonomy] saving', docRef.path,
+                    '| project:', db.app.options.projectId, '| app:', db.app.name,
+                    '| as:', (auth.currentUser && auth.currentUser.email) || '(not signed in)',
+                    '| systems:', lptEditorState.systems[axis].length, '| tags:', expectedTags);
+
+                await docRef.set({
                     systems: lptEditorState.systems[axis],
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     updatedBy: (auth.currentUser && auth.currentUser.email) || 'admin-ui',
                     schemaVersion: 1
                 });
+
+                // V97.93: read it straight back FROM THE SERVER and count. `set()` resolving
+                // is supposed to mean the backend acknowledged the write, so this should be a
+                // formality — it is here precisely because that guarantee visibly failed once,
+                // and a green toast over an unwritten document is worse than an error.
+                const verify = await docRef.get({ source: 'server' });
+                const storedTags = (((verify.data() || {}).systems) || [])
+                    .reduce((n, s) => n + ((Array.isArray(s.tags) ? s.tags : []).length), 0);
+                if (!verify.exists || storedTags !== expectedTags) {
+                    console.error('[lp-taxonomy] WRITE DID NOT LAND —', docRef.path,
+                        'expected', expectedTags, 'tags, server has', storedTags,
+                        '| exists:', verify.exists, '| updatedBy:', (verify.data() || {}).updatedBy);
+                    throw new Error(`write did not land — server still shows ${storedTags} tags, expected ${expectedTags}. Nothing was saved. ดู Console (F12) แล้วส่งบรรทัด [lp-taxonomy] ให้ dev`);
+                }
+
                 // Update in-memory global so admin LP review immediately reflects the change.
                 if (window.LP_TAXONOMY && window.LP_TAXONOMY[axis]) {
                     window.LP_TAXONOMY[axis].systems = JSON.parse(JSON.stringify(lptEditorState.systems[axis]));
@@ -35494,6 +35527,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 lptEditorShowList();
                 if (typeof showToast === 'function') showToast(`✅ Saved ${axis} (${lptEditorState.systems[axis].length} systems)`);
             } catch (err) {
+                lptEditorState.systems[axis] = rollback; // V97.93: see the note above
                 const errEl = document.getElementById('lpt-form-error');
                 errEl.innerText = 'Save failed: ' + (err && err.message ? err.message : 'unknown error');
                 errEl.style.display = 'block';
