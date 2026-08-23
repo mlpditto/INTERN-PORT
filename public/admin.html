@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.89</title>
+    <title>Nika V97.90</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -16456,20 +16456,37 @@
         // On window because this block is a <script type="module"> and the duplicate-compare
         // consumers live in the classic block below (see [[feedback_admin_module_vs_classic_scope]]).
         window.AUDIT_DIMS = [
-            { key: 'clarity', label: 'Clarity', dupRank: 4, example: 4,
+            // V97.90: the rubric graded how well a question was WRITTEN and never whether it
+            // was RIGHT — a question with a wrong answer key could score 5/5. First axis now,
+            // because nothing else about an item matters if the key cannot be defended.
+            { key: 'keyDefensibility', label: 'Key Defensibility', suggestLabel: 'Key Defensibility (is the marked answer right?)', dupLabel: 'Key', dupRank: 1, tieShort: 'เฉลย', example: 5,
+              desc: ['Is the marked answer defensible? Judge the "correct:" line given below, not what you wish it said.',
+                     '1 = the key is wrong, or another option is equally correct,',
+                     '3 = correct but arguable — an expert could defend a second option,',
+                     '5 = unambiguously single-best under current practice'] },
+            { key: 'clarity', label: 'Clarity', dupRank: 6, example: 4,
               desc: 'Is the stem unambiguous, well-worded, free of double-barrel?' },
-            { key: 'distractorQuality', label: 'Distractor Quality', dupLabel: 'Distractor', dupRank: 3, tieShort: 'ตัวลวง', example: 2,
+            { key: 'distractorQuality', label: 'Distractor Quality', dupLabel: 'Distractor', dupRank: 4, tieShort: 'ตัวลวง', example: 2,
               desc: 'Are wrong options plausible to a learner? 1 = obvious giveaways, 5 = distractors that test real understanding' },
-            { key: 'bloomLevel', label: 'Bloom Level', suggestLabel: 'Bloom Level (cognitive demand)', dupLabel: 'Bloom', dupRank: 1, tieShort: 'Bloom', example: 3,
+            // V97.90: the improve prompt has enforced this checklist for a while (its rule 4b
+            // on self-eliminating stems); the audit never measured it, so the two halves of
+            // the workflow disagreed about what a good item is.
+            { key: 'itemFlaws', label: 'Item Flaws', suggestLabel: 'Item Flaws (technical item-writing defects)', dupLabel: 'Flaws', dupRank: 5, tieShort: 'ข้อบกพร่อง', example: 3,
+              desc: ['Technical item-writing flaws (NBME-style). Scan for: cueing between stem and key;',
+                     'an option the stem itself rules out ("X was already tried"); "all/none of the above";',
+                     'the correct option being conspicuously the longest or most qualified; absolutes',
+                     '(always / never); a negative stem; overlapping or heterogeneous options.',
+                     '1 = a flaw that hands the answer away, 3 = one cosmetic flaw, 5 = clean'] },
+            { key: 'bloomLevel', label: 'Bloom Level', suggestLabel: 'Bloom Level (cognitive demand)', dupLabel: 'Bloom', dupRank: 2, tieShort: 'Bloom', example: 3,
               desc: ['Cognitive demand of the question:',
                      '1 = Remember (recall facts),',
                      '2 = Understand (explain in own words),',
                      '3 = Apply (use in a new situation),',
                      '4 = Analyze (break down, compare),',
                      '5 = Evaluate or Create (judge / design)'] },
-            { key: 'clinicalDepth', label: 'Clinical Depth', dupRank: 2, tieShort: 'Clinical', example: 5,
+            { key: 'clinicalDepth', label: 'Clinical Depth', dupRank: 3, tieShort: 'Clinical', example: 5,
               desc: 'Clinical reasoning required: 1 = pure factoid, 3 = single-step clinical inference, 5 = multi-step synthesis (diagnose + plan)' },
-            { key: 'languageConsistency', label: 'Language Consistency', dupLabel: 'Language', dupRank: 5, example: 5,
+            { key: 'languageConsistency', label: 'Language Consistency', dupLabel: 'Language', dupRank: 7, example: 5,
               desc: 'Polish and consistency: 1 = mixed languages / typos / jargon errors, 5 = clean polished prose throughout' }
         ];
 
@@ -17175,6 +17192,7 @@ RULES:
 - Scores are INTEGERS 1-5 only. averageScore = mean of the ${window.AUDIT_DIMS.length} scores rounded to 1 decimal.
 - overallScore = mean of all perQuestionAudit[].averageScore rounded to 1 decimal.
 - "detectedBloomName" is one of: Remember, Understand, Apply, Analyze, Evaluate, Create (descriptive label of the bloomLevel score).
+- If you score "keyDefensibility" 1 or 2, the rationale MUST name the option letter you believe is correct and why — a bare "the key looks wrong" is not actionable.
 - Return one entry per question in input order. Do NOT skip any.`;
 
                     for (let attempt = 1; attempt <= 2; attempt++) {
@@ -17233,6 +17251,11 @@ RULES:
                                 // Go Live, template toggle, coverage assignment.
                                 qCount: (formData.questions || []).length,
                                 qFingerprint: window.quizQuestionsFingerprint(formData.questions),
+                                // V97.90: which rubric generation produced these numbers.
+                                // averageScore is a mean over the dimensions that existed at
+                                // the time, so a 5-dim average and a 7-dim one are not the
+                                // same measurement even though both read "x / 5".
+                                dimCount: (window.AUDIT_DIMS || []).length,
                                 savedAt: firebase.firestore.FieldValue.serverTimestamp()
                             }
                         }).catch(e => console.warn('Failed to save AI audit to quiz doc:', e));
@@ -17310,6 +17333,11 @@ RULES:
             const perQHtml = result.perQuestionAudit.map(q => {
                 const dims = q.scores || {};
                 const dimRows = Object.keys(dimLabel).map(k => {
+                    // V97.90: an audit saved before a dimension existed simply has no key for
+                    // it. `Number(undefined) || 0` used to render that as a real-looking 0/5
+                    // ★☆☆☆☆ — a rubric change would have retroactively failed every stored
+                    // audit. Absent scores show as "—" instead.
+                    const scored = dims[k] !== undefined && dims[k] !== null && dims[k] !== '';
                     const v = Number(dims[k]) || 0;
                     let badge = '';
                     if (k === 'bloomLevel' && blueprintBloom && q.detectedBloomName) {
@@ -17322,7 +17350,9 @@ RULES:
                     }
                     return `<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid #f1f5f9; font-size:0.85em;">
                         <span style="color:#475569; font-weight:500;">${dimLabel[k]}${badge}</span>
-                        <span>${stars(v)} <span style="color:#475569; font-weight:700; margin-left:6px;">${v}</span></span>
+                        ${scored
+                            ? `<span>${stars(v)} <span style="color:#475569; font-weight:700; margin-left:6px;">${v}</span></span>`
+                            : `<span style="color:#94a3b8; font-size:0.9em;" title="This audit ran before the ${escapeHtml(dimLabel[k])} dimension existed — re-run ✅ Audit to score it.">— not in this audit</span>`}
                     </div>`;
                 }).join('');
                 const avg = Number(q.averageScore || 0).toFixed(1);
@@ -29238,6 +29268,10 @@ ${JSON.stringify(sourceObj)}`;
             const tip = [
                 `Quality Audit ${score.toFixed(1)} / 5`,
                 nQ ? `${nQ} question(s) audited` : '',
+                // V97.90: name the rubric generation. The score is always out of 5, but it
+                // averages a different set of axes now, so an old number is not comparable
+                // with a fresh one. Audits saved before V97.90 carry no dimCount.
+                `${a.dimCount || 5}-dimension rubric${a.dimCount ? '' : ' (pre-V97.90)'}`,
                 a.model ? `model: ${a.model}` : '',
                 when,
                 stale ? 'STALE — the questions changed after this audit ran. Re-run ✅ Audit.' : '',
