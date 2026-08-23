@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.91</title>
+    <title>Nika V97.92</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -52570,12 +52570,14 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     loudWarn('taxonomy data is empty');
                     return;
                 }
+                let tagTotal = 0;
                 const html = axes.map(axis => {
                     const c = axis.colors || { border: '#d8b4fe', text: '#6b21a8', hoverBg: '#f3e8ff' };
                     const egg = axis.easterEgg ? ` ${axis.easterEgg}` : '';
                     const axisLabel = `${axis.icon} ${axis.label.en} ${axis.label.ko} ${axis.label.th}${egg}`;
                     const systems = Array.isArray(axis.systems) ? axis.systems : [];
                     const allTags = systems.reduce((acc, sys) => acc.concat(Array.isArray(sys.tags) ? sys.tags : []), []);
+                    tagTotal += allTags.length;
                     const chips = allTags.map(tag => {
                         const safe = String(tag).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
                         return `<button type="button" onclick="lnrAddTag('${safe}')" style="width:auto; padding:4px 10px; background:#fff; border:1px solid ${c.border}; border-radius:14px; font-size:0.75em; color:${c.text}; cursor:pointer; flex-shrink:0; white-space:nowrap; min-height:auto;" onmouseover="this.style.background='${c.hoverBg}'" onmouseout="this.style.background='#fff'">${tag}</button>`;
@@ -52583,6 +52585,21 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     return `<div style="margin-bottom:8px;"><div style="font-size:0.7em; color:#666; margin-bottom:4px; font-weight:600;">${axisLabel}</div><div style="display:flex; flex-wrap:wrap; gap:4px;">${chips}</div></div>`;
                 }).join('');
                 container.innerHTML = html;
+                // V97.92: the chips live inside a COLLAPSED <details>, so a working panel and
+                // a broken one look identical until you expand it — which is how "the box is
+                // blank" survived several investigations against code that renders 97 chips
+                // every time. Put the count where it is visible without expanding.
+                const summary = container.closest('details') && container.closest('details').querySelector('summary');
+                if (summary) {
+                    let badge = summary.querySelector('.lnr-suggested-count');
+                    if (!badge) {
+                        badge = document.createElement('span');
+                        badge.className = 'lnr-suggested-count';
+                        badge.style.cssText = 'margin-left:6px; font-weight:800; opacity:0.75;';
+                        summary.appendChild(badge);
+                    }
+                    badge.textContent = tagTotal ? `(${tagTotal})` : '(0 — ยังไม่มีข้อมูล taxonomy)';
+                }
             } catch (e) {
                 console.error('[lnr-taxonomy] render threw — see stack below:', e);
                 loudWarn('render error: ' + (e && e.message ? e.message : 'unknown'));

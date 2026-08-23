@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.45)</title>
+    <title>Internship Portfolio (V96.46)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -15988,15 +15988,26 @@
         }
 
         // V94.15 Phase A polish: Render Suggested taxonomy chips with per-axis Straw Hat easter-egg colors
+        // V96.46: three fixes, all in the class of "the panel looks empty and says nothing":
+        //  1. the count now goes in the <summary>, because the chips live inside a COLLAPSED
+        //     <details> — a working panel and a broken one looked identical from the outside.
+        //  2. Array.isArray guards on systems/tags, matching the admin twin (V96.97). Without
+        //     them one overlay doc missing `tags` throws, and the caller's try/catch swallows
+        //     it, blanking the panel silently.
+        //  3. re-renders on `lp-taxonomy-loaded` (wired below) instead of only at
+        //     DOMContentLoaded off the static bundle.
         function lpRenderSuggestedChips(scope) {
             const containerId = scope === 'note' ? 'lp-note-suggested' : 'lp-inline-suggested';
             const container = document.getElementById(containerId);
             if (!container || !window.LP_TAXONOMY) return;
+            let tagTotal = 0;
             const html = Object.values(window.LP_TAXONOMY).map(axis => {
                 const c = axis.colors || { border: '#d8b4fe', text: '#6b21a8', hoverBg: '#f3e8ff' };
                 const egg = axis.easterEgg ? ` ${axis.easterEgg}` : '';
                 const axisLabel = `${axis.icon} ${axis.label.en} ${axis.label.ko} ${axis.label.th}${egg}`;
-                const allTags = axis.systems.reduce((acc, sys) => acc.concat(sys.tags), []);
+                const systems = Array.isArray(axis.systems) ? axis.systems : [];
+                const allTags = systems.reduce((acc, sys) => acc.concat(Array.isArray(sys.tags) ? sys.tags : []), []);
+                tagTotal += allTags.length;
                 const chips = allTags.map(tag => {
                     const safe = String(tag).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
                     return `<button type="button" onclick="lpAddTag('${scope}','${safe}')" style="width:auto; padding:4px 10px; background:#fff; border:1px solid ${c.border}; border-radius:14px; font-size:0.75em; color:${c.text}; cursor:pointer; flex-shrink:0; white-space:nowrap; min-height:auto;" onmouseover="this.style.background='${c.hoverBg}'" onmouseout="this.style.background='#fff'">${tag}</button>`;
@@ -16004,7 +16015,39 @@
                 return `<div style="margin-bottom:8px;"><div style="font-size:0.7em; color:#666; margin-bottom:4px; font-weight:600;">${axisLabel}</div><div style="display:flex; flex-wrap:wrap; gap:4px;">${chips}</div></div>`;
             }).join('');
             container.innerHTML = html;
+            lpSetSuggestedCount(container, tagTotal);
         }
+
+        // Write the tag count into the parent <details>'s summary. The chips are collapsed by
+        // default, so without this an empty panel and a full one are indistinguishable until
+        // you expand it — which is exactly how a "the box is blank" report can survive for
+        // months against code that was rendering fine all along.
+        function lpSetSuggestedCount(container, total) {
+            const details = container && container.closest ? container.closest('details') : null;
+            const summary = details ? details.querySelector('summary') : null;
+            if (!summary) return;
+            let badge = summary.querySelector('.lp-suggested-count');
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'lp-suggested-count';
+                badge.style.cssText = 'margin-left:6px; font-weight:800; opacity:0.75;';
+                summary.appendChild(badge);
+            }
+            badge.textContent = total ? `(${total})` : '(0 — ยังไม่มีข้อมูล taxonomy)';
+        }
+
+        // V96.46: taxonomy.js loads the bundled tags synchronously, then overlays the three
+        // Firestore `taxonomy/lp_*` docs asynchronously and fires this event. Nothing on the
+        // intern page listened for it, so the chips were always the STATIC bundle — an admin
+        // editing the taxonomy would never see the change reach an intern. Invisible so far
+        // only because the Firestore docs happen to match the bundle exactly (9/44, 7/42, 1/11).
+        document.addEventListener('lp-taxonomy-loaded', function () {
+            ['note', 'inline'].forEach(scope => {
+                try {
+                    if (typeof lpRenderSuggestedChips === 'function') lpRenderSuggestedChips(scope);
+                } catch (e) { console.warn(`LP Suggested chips overlay refresh failed for "${scope}":`, e); }
+            });
+        });
 
         // V94.14 Phase A: Soft fuzzy-match hint — shows "Did you mean: X?" if input typo'd
         function lpCheckFuzzyMatch(scope, input) {
@@ -19758,14 +19801,16 @@ async function archiveDoneCard(cardId) {
                 revealBootActions();
             }
             // V94.03: render summary immediately (shows empty state before Firebase loads)
-            renderProfileLeaderboard();
+            // V96.46: guarded. It sat unguarded directly above the Suggested-chips call, so a
+            // throw in here took the chips down with it and the panel just stayed empty.
+            try { renderProfileLeaderboard(); } catch (e) { console.warn('renderProfileLeaderboard failed (non-critical):', e); }
             // V94.14 Phase A: render Suggested taxonomy chips for both LP forms
-            try {
-                if (typeof lpRenderSuggestedChips === 'function') {
-                    lpRenderSuggestedChips('note');
-                    lpRenderSuggestedChips('inline');
-                }
-            } catch (e) { console.warn('LP Suggested chips init failed (non-critical):', e); }
+            // V96.46: one try per scope — a throw in 'note' used to skip 'inline' too.
+            ['note', 'inline'].forEach(scope => {
+                try {
+                    if (typeof lpRenderSuggestedChips === 'function') lpRenderSuggestedChips(scope);
+                } catch (e) { console.warn(`LP Suggested chips init failed for "${scope}" (non-critical):`, e); }
+            });
         }, { once: true });
 
         window.addEventListener('load', function () {
