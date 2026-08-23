@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.90</title>
+    <title>Nika V97.91</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -12387,9 +12387,11 @@
                             </div>
                             <input type="hidden" id="ai-analyzer-model-val" value="gemini-3.6-flash">
                             <div style="display:flex; gap:4px;">
-                                <button class="btn-sm" onclick="analyzeQuizAI(this)" title="Opens a saved analysis for free if one exists, otherwise runs fresh (rewrite suggestions)" style="background:#7c3aed; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-brain"></i> Specialist</button>
-                                <button class="btn-sm" onclick="auditQuizAI(this)" title="Opens a saved audit for free if one exists, otherwise runs fresh — 5-dim scorecard per question (V93.88 Q3)" style="background:#0891b2; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-clipboard-check"></i> Audit</button>
-                                <button class="btn-sm" onclick="runFullReview(this)" title="Run Specialist + Audit together (parallel, faster than back-to-back clicks)" style="background:linear-gradient(135deg,#7c3aed,#0891b2); color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-layer-group"></i> Full Review</button>
+                                <!-- V97.91: Specialist + Audit + Full Review collapsed into one
+                                     button. It opens the 🧪 Scorecard; the chip rail in that
+                                     popup's header switches to 🪄 Rewrites, loading it only if
+                                     asked. Saved results still open free (V97.39 / V97.41). -->
+                                <button class="btn-sm" onclick="openQuizReview(this)" title="Score every question, then switch to rewrites in the same popup — opens saved results for free when they exist" style="background:linear-gradient(135deg,#7c3aed,#0891b2); color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-clipboard-check"></i> Review</button>
                                 <button class="btn-sm" onclick="openPdfToQuizModal()" title="Import PDF" style="background:#0ea5e9; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-file-pdf"></i> PDF</button>
                                 <button class="btn-sm" onclick="openSuggestMoreModal()" title="Expand" style="background:#f59e0b; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-sparkles"></i> Expand</button>
                             </div>
@@ -16736,8 +16738,8 @@
                         fallbackDiv.style = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:90%; max-width:850px; max-height:85vh; background:white; padding:30px; border-radius:30px; box-shadow:0 20px 60px rgba(0,0,0,0.3); z-index:10001; overflow-y:auto; font-family:'Inter', sans-serif; border: 1px solid #eee;";
                         fallbackDiv.innerHTML = `
                             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #f8f9fa; padding-bottom:15px; margin-bottom:15px;">
-                                <h2 style="margin:0; color:var(--primary); font-size:1.5em;"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Quiz Analysis</h2>
-                                <button onclick="this.parentElement.parentElement.remove(); restoreAuditPopupIfHidden();" style="border:none; background:#f8f9fa; color:#666; width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:1.2em; display:flex; align-items:center; justify-content:center;">✕</button>
+                                ${window.reviewTabsHtml('specialist')}
+                                <button onclick="closeQuizReview();" style="border:none; background:#f8f9fa; color:#666; width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:1.2em; display:flex; align-items:center; justify-content:center;">✕</button>
                             </div>
                             <div style="background:#fef3c7; border:1px solid #fcd34d; color:#92400e; padding:14px 18px; border-radius:14px; margin-bottom:18px; font-size:0.95em; line-height:1.5;">
                                 <b><i class="fa-solid fa-triangle-exclamation"></i> Model returned prose instead of JSON.</b><br>
@@ -16746,7 +16748,7 @@
                             <div style="white-space:pre-wrap; line-height:1.8; color:#333; font-size:1em; margin-bottom:20px; background:#fafafa; padding:20px; border-radius:20px; border:1px solid #f0f0f0;">${escapeHtml(String(resultRaw || ''))}</div>
                             <div style="text-align:right; display:flex; gap:10px; justify-content:flex-end;">
                                 <button class="btn-sm" style="background:#4361ee; color:white; border:none; padding:8px 22px; border-radius:10px; font-weight:600; cursor:pointer;" onclick="this.parentElement.parentElement.remove(); analyzeQuizAI();"><i class="fa-solid fa-arrows-rotate"></i> Retry</button>
-                                <button class="btn-sm btn-dark" onclick="this.parentElement.parentElement.remove(); restoreAuditPopupIfHidden();" style="padding:8px 25px; border-radius:10px;">Close</button>
+                                <button class="btn-sm btn-dark" onclick="closeQuizReview();" style="padding:8px 25px; border-radius:10px;">Close</button>
                             </div>
                             <div style="margin-top:20px; padding-top:15px; border-top:1px solid #eee; font-size:0.7em; color:#999;">
                                 🚀 Model: <b>${escapeHtml(aiModel || selectedModel || 'unknown')}</b> | 💡 Tokens: <b>${(aiTokens || 0).toLocaleString()}</b> | Mode: prose-fallback
@@ -16883,17 +16885,17 @@
                 // still live-actionable, but the analysis text itself is not brand new.
                 const savedBannerHtml = (opts && opts.cachedResult) ? `
                     <div style="background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; padding:10px 16px; border-radius:12px; margin-bottom:16px; font-size:0.85em; display:flex; align-items:center; gap:8px;">
-                        <i class="fa-solid fa-clock-rotate-left"></i> Showing a saved analysis${opts.cachedSavedAtLabel ? ` from ${opts.cachedSavedAtLabel}` : ''} — no tokens spent. Click 🪄 Specialist for a fresh run.
+                        <i class="fa-solid fa-clock-rotate-left"></i> Showing a saved analysis${opts.cachedSavedAtLabel ? ` from ${opts.cachedSavedAtLabel}` : ''} — no tokens spent. Hit 🔄 Regenerate for a fresh run.
                     </div>
                 ` : '';
 
                 resultDiv.innerHTML = `
                     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #f8f9fa; padding-bottom:15px; margin-bottom:15px;">
-                        <h2 style="margin:0; color:var(--primary); font-size:1.5em;"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Quiz Analysis</h2>
+                        ${window.reviewTabsHtml('specialist')}
                         <div style="display:flex; align-items:center; gap:8px;">
-                            <button onclick="analyzeQuizAI(null, { forceNew: true })" title="Run a fresh Specialist analysis (spends tokens) — Specialist itself now opens a saved analysis for free when one exists" style="border:1px solid #e2e8f0; background:#f8fafc; color:#475569; padding:0 14px; height:36px; border-radius:10px; cursor:pointer; font-size:0.8em; font-weight:700; display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-arrows-rotate"></i> Regenerate</button>
+                            <button onclick="analyzeQuizAI(null, { forceNew: true })" title="Run a fresh Specialist analysis (spends tokens) — the 🪄 Rewrites tab itself opens a saved analysis for free when one exists" style="border:1px solid #e2e8f0; background:#f8fafc; color:#475569; padding:0 14px; height:36px; border-radius:10px; cursor:pointer; font-size:0.8em; font-weight:700; display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-arrows-rotate"></i> Regenerate</button>
                             <button onclick="exportAiAnalysisMd()" title="Download this analysis as a Markdown file" style="border:1px solid #e2e8f0; background:#f8fafc; color:#475569; padding:0 14px; height:36px; border-radius:10px; cursor:pointer; font-size:0.8em; font-weight:700; display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-download"></i> Export</button>
-                            <button onclick="document.getElementById('ai-analysis-popup').remove(); restoreAuditPopupIfHidden();" style="border:none; background:#f8f9fa; color:#666; width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:1.2em; display:flex; align-items:center; justify-content:center;">✕</button>
+                            <button onclick="closeQuizReview();" style="border:none; background:#f8f9fa; color:#666; width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:1.2em; display:flex; align-items:center; justify-content:center;">✕</button>
                         </div>
                     </div>
 
@@ -16925,7 +16927,7 @@
                     </div>
 
                     <div style="text-align:right;">
-                        <button class="btn-sm btn-dark" onclick="this.parentElement.parentElement.remove(); restoreAuditPopupIfHidden();" style="padding:8px 25px; border-radius:10px;">Close</button>
+                        <button class="btn-sm btn-dark" onclick="closeQuizReview();" style="padding:8px 25px; border-radius:10px;">Close</button>
                     </div>
 
                     <div style="margin-top:20px; padding-top:15px; border-top:1px solid #eee; font-size:0.7em; color:#999; display:flex; justify-content:space-between;">
@@ -17004,7 +17006,7 @@
             let snapshotLen = null;
             try { snapshotLen = JSON.parse(window._aiOriginalQsJson || '[]').length; } catch (e) { /* ignore */ }
             if (snapshotLen !== null && snapshotLen !== formItems.length) {
-                alert('The form has changed since this analysis ran, so question numbers may no longer line up. Close this popup and run 🪄 Specialist again before deleting.');
+                alert('The form has changed since this analysis ran, so question numbers may no longer line up. Close this popup and re-run 🪄 Rewrites before deleting.');
                 return;
             }
 
@@ -17281,36 +17283,83 @@ RULES:
             }
         };
 
-        // V97.31: "Full Review" — run Specialist (analyzeQuizAI) + Audit (auditQuizAI) in
-        // parallel from one click instead of two back-to-back button presses. Both AI calls
-        // are independent (different prompts, no shared data), so Promise.allSettled halves
-        // the wait vs sequential — and .allSettled (not .all) means a failure in one still
-        // lets the other's popup render, since each already alerts its own errors internally.
-        // Each function grabs a button for its own spinner/disable state (clickedBtn, or
-        // window.event's target as a fallback) — passing a detached dummy <button> keeps
-        // that off the real "Full Review" button, which we drive ourselves below.
-        window.runFullReview = async function(clickedBtn) {
-            const btn = clickedBtn || (event && event.target ? event.target.closest('button') : null);
-            const oldText = btn ? btn.innerHTML : 'Full Review';
+        // ── V97.91: ONE Review surface ───────────────────────────────────────────────────
+        // The toolbar used to carry three buttons — Specialist (rewrites), Audit (scorecard)
+        // and Full Review (both at once, V97.31). Full Review fired both AI calls in parallel
+        // and then had to cascade the two fixed-centre popups 36px apart so both title bars
+        // stayed reachable, and a separate hide/restore dance (V96.44 → V97.16 → V97.75) kept
+        // the scorecard alive underneath whenever the Specialist popup opened on top of it.
+        // All of that existed only because the two tools rendered two modals.
+        //
+        // Now: one 🔍 Review button opens the scorecard, and a chip rail in the popup header
+        // switches to the rewrites view. Exactly one popup is on screen at a time, so the
+        // cascade and the restore dance are gone. The second view is loaded on demand rather
+        // than up front — both renderers already open a SAVED result for free when one exists
+        // (V97.39 / V97.41), so switching tabs is usually free, and a review that only needed
+        // the scorecard never pays for a Specialist run it will not read.
+        window.REVIEW_TABS = [
+            { id: 'audit', icon: '🧪', label: 'Scorecard', popupId: 'ai-audit-popup', color: '#0891b2',
+              title: 'Score every question on the audit rubric — judgement only, nothing is rewritten',
+              run: (btn) => window.auditQuizAI(btn) },
+            { id: 'specialist', icon: '🪄', label: 'Rewrites', popupId: 'ai-analysis-popup', color: '#7c3aed',
+              title: 'Ask the Specialist for a concrete rewrite of each question',
+              run: (btn) => window.analyzeQuizAI(btn) }
+        ];
+
+        // The rail is rendered INTO each popup's header, in place of the <h2> each one used
+        // to carry — so the two modals read as two tabs of one surface. The active chip keeps
+        // its tool's own colour instead of the global --primary the .active class would give.
+        window.reviewTabsHtml = function(activeId) {
+            const items = window.REVIEW_TABS.map(t => {
+                const on = t.id === activeId;
+                return `<div class="glass-toggle-item${on ? ' active' : ''}" data-review-tab="${t.id}" onclick="window.showReviewTab('${t.id}')" title="${escapeHtml(t.title)}" style="font-size:0.82em; font-weight:800; padding:5px 13px; border-radius:9px; ${on ? `background:${t.color}; border-color:${t.color}; color:#fff; box-shadow:0 4px 12px ${t.color}33;` : 'color:#475569;'}">${t.icon} ${t.label}</div>`;
+            }).join('');
+            return `<div class="glass-toggle-container" style="margin:0; background:rgba(0,0,0,0.04); border:1px solid rgba(0,0,0,0.06); padding:3px; border-radius:11px; gap:2px;">${items}</div>`;
+        };
+
+        // Show one tab, creating it if this is the first visit. The other popup is hidden
+        // rather than removed: it holds a whole AI run, and destroying it would mean paying
+        // for the same answer twice (the mistake V97.16 was written to fix).
+        window.showReviewTab = async function(tabId) {
+            const tab = window.REVIEW_TABS.find(t => t.id === tabId);
+            if (!tab) return;
+            const others = window.REVIEW_TABS.filter(t => t.id !== tabId);
+            const setOthers = (display) => others.forEach(t => {
+                const el = document.getElementById(t.popupId);
+                if (el) el.style.display = display;
+            });
+
+            if (!document.getElementById(tab.popupId)) {
+                // Leave the current view up while the other one loads — each renderer shows
+                // its own spinner, and blanking the screen first (V96.44) removed the only
+                // sign anything was running. A detached button absorbs the renderer's
+                // spinner/disable handling so it never lands on a chip.
+                await tab.run(document.createElement('button'));
+                // A renderer can finish without a popup: a hard error alerts and returns, and
+                // the Specialist's prose-fallback path builds one only sometimes. Stay where
+                // we were rather than leaving the admin on a blank screen.
+                if (!document.getElementById(tab.popupId)) { setOthers('block'); return; }
+            }
+            document.getElementById(tab.popupId).style.display = 'block';
+            setOthers('none');
+        };
+
+        // ✕ on either popup closes the whole surface — they are one thing to the admin now.
+        window.closeQuizReview = function() {
+            window.REVIEW_TABS.forEach(t => {
+                const el = document.getElementById(t.popupId);
+                if (el) el.remove();
+            });
+        };
+
+        window.openQuizReview = async function(clickedBtn) {
+            const btn = clickedBtn || null;
+            const oldText = btn ? btn.innerHTML : '';
             const formData = getQuizFormData();
             if (!formData.questions || formData.questions.length < 1) return alert('Add at least 1 question to review.');
             if (btn) { btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Reviewing...'; btn.disabled = true; }
             try {
-                await Promise.allSettled([
-                    window.analyzeQuizAI(document.createElement('button')),
-                    window.auditQuizAI(document.createElement('button'))
-                ]);
-                // Both popups render fixed-centered and would land exactly on top of each
-                // other — cascade them so both title bars (and close buttons) stay visible.
-                const specialistPopup = document.getElementById('ai-analysis-popup');
-                const auditPopup = document.getElementById('ai-audit-popup');
-                if (specialistPopup && auditPopup) {
-                    auditPopup.style.top = 'calc(50% - 36px)';
-                    auditPopup.style.left = 'calc(50% - 36px)';
-                    specialistPopup.style.top = 'calc(50% + 36px)';
-                    specialistPopup.style.left = 'calc(50% + 36px)';
-                    specialistPopup.style.zIndex = '10002';
-                }
+                await window.showReviewTab('audit');
             } finally {
                 if (btn) { btn.innerHTML = oldText; btn.disabled = false; }
             }
@@ -17410,16 +17459,16 @@ RULES:
             // AI call — mirrors analyzeQuizAI's savedBannerHtml (V97.39).
             const savedBannerHtml = savedAtLabel !== null && savedAtLabel !== undefined ? `
                 <div style="background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; padding:10px 16px; border-radius:12px; margin-bottom:16px; font-size:0.85em; display:flex; align-items:center; gap:8px;">
-                    <i class="fa-solid fa-clock-rotate-left"></i> Showing a saved audit${savedAtLabel ? ` from ${savedAtLabel}` : ''} — no tokens spent. Click ✅ Audit for a fresh run.
+                    <i class="fa-solid fa-clock-rotate-left"></i> Showing a saved audit${savedAtLabel ? ` from ${savedAtLabel}` : ''} — no tokens spent. Hit 🔄 Regenerate for a fresh run.
                 </div>
             ` : '';
 
             modal.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #f1f5f9; padding-bottom:14px; margin-bottom:18px;">
-                    <h2 style="margin:0; color:#0891b2; font-size:1.4em;"><i class="fa-solid fa-clipboard-check"></i> Quality Audit</h2>
+                    ${window.reviewTabsHtml('audit')}
                     <div style="display:flex; align-items:center; gap:8px;">
-                        <button onclick="auditQuizAI(null, { forceNew: true })" title="Run a fresh Audit (spends tokens) — Audit itself now opens a saved audit for free when one exists" style="border:1px solid #e2e8f0; background:#f8fafc; color:#475569; padding:0 12px; height:34px; border-radius:10px; cursor:pointer; font-size:0.78em; font-weight:700; display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-arrows-rotate"></i> Regenerate</button>
-                        <button onclick="document.getElementById('ai-audit-popup').remove()" style="border:none; background:#f1f5f9; color:#64748b; width:34px; height:34px; border-radius:50%; cursor:pointer; font-size:1.1em;">✕</button>
+                        <button onclick="auditQuizAI(null, { forceNew: true })" title="Run a fresh Audit (spends tokens) — the 🧪 Scorecard tab itself opens a saved audit for free when one exists" style="border:1px solid #e2e8f0; background:#f8fafc; color:#475569; padding:0 12px; height:34px; border-radius:10px; cursor:pointer; font-size:0.78em; font-weight:700; display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-arrows-rotate"></i> Regenerate</button>
+                        <button onclick="closeQuizReview()" title="Close the review" style="border:none; background:#f1f5f9; color:#64748b; width:34px; height:34px; border-radius:50%; cursor:pointer; font-size:1.1em;">✕</button>
                     </div>
                 </div>
                 ${savedBannerHtml}
@@ -17512,15 +17561,11 @@ RULES:
             showToast(`🗑️ Q${qNumber} removed from form`);
         };
 
-        // V97.16: auditSuggestFix used to permanently destroy the Audit scorecard
-        // (.remove()) with no way back — admins who fixed one question and closed
-        // the Specialist popup lost the whole audit run (all 16 questions' scores)
-        // and had to pay for a fresh AI call just to see the rest again. Hide it
-        // instead and bring it back once the Specialist popup is dismissed.
-        window.restoreAuditPopupIfHidden = function() {
-            const p = document.getElementById('ai-audit-popup');
-            if (p) p.style.display = 'block';
-        };
+        // V97.91: restoreAuditPopupIfHidden lived here. It existed because auditSuggestFix
+        // opened the Specialist on top of the scorecard and something had to bring the
+        // scorecard back — V97.16 after an earlier version destroyed it outright and cost a
+        // repeat AI call to see the other questions again. showReviewTab owns that rule now:
+        // the inactive view is always hidden, never removed, and the 🧪 chip brings it back.
 
         // V96.44 Quality Audit "Suggest fix": bridge a weak audit question into the
         // existing Specialist (analyzeQuizAI) improve flow — the audit scorecard is
@@ -17539,20 +17584,17 @@ RULES:
             // but nothing here guaranteed it.
             await window.analyzeQuizAI(clickedBtn || null, { onlyQNumber: qNumber, auditNote: auditNote });
 
-            // analyzeQuizAI shows its own banner on prose-fallback / error — bail quietly then.
-            // V97.16: no Specialist popup means no close button will ever fire the restore,
-            // so bring the audit scorecard back right here instead of leaving it stranded hidden.
+            // analyzeQuizAI shows its own banner on prose-fallback / error — bail quietly then,
+            // leaving the admin on the scorecard they started from rather than a blank screen.
             const popup = document.getElementById('ai-analysis-popup');
-            if (!popup) { window.restoreAuditPopupIfHidden(); return; }
+            if (!popup) { await window.showReviewTab('audit'); return; }
 
-            // V97.75: hide the audit scorecard only NOW, once the Specialist popup exists to
-            // take its place. Hiding it up-front (V96.44) blanked the screen for the entire AI
-            // call — and because the "Analyzing N%" spinner sits on the Suggest fix button
-            // INSIDE this popup, hiding it first removed the only sign anything was running.
-            // Both popups coexist for this one synchronous stretch; the browser cannot repaint
-            // between these statements, so there is no overlap flash.
-            const auditPopup = document.getElementById('ai-audit-popup');
-            if (auditPopup) auditPopup.style.display = 'none'; // V97.16: hide, don't destroy — restored on Specialist close
+            // V97.91: the Specialist popup exists now, so switch the surface to it. The
+            // scorecard is hidden, not destroyed — the 🧪 chip in the header brings it back
+            // with every score intact. Switching only now (V97.75) also means the scorecard
+            // stays on screen for the whole AI call, keeping the "Analyzing N%" spinner on
+            // the Suggest fix button visible.
+            await window.showReviewTab('specialist');
 
             const items = window._aiAnalysisItems || [];
             const arrIdx = items.findIndex(it => {
