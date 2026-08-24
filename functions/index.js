@@ -2465,6 +2465,61 @@ function digestDayKey() {
     return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
 }
 
+// Same key for an arbitrary instant rather than "now", so a deadline can be
+// bucketed into the same Bangkok calendar days the rest of the digest counts in.
+function bkkDayKey(ms) {
+    return new Date(ms).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+}
+
+// Whole Bangkok calendar days between two YYYY-MM-DD keys. Anchoring both at
+// noon UTC is the trick shiftDayKey() already uses: it keeps the subtraction
+// away from any midnight boundary, so the result is an exact integer count of
+// day flips rather than a rounded elapsed-hours figure.
+function bkkDayGap(fromKey, toKey) {
+    return Math.round((Date.parse(toKey + 'T12:00:00Z') - Date.parse(fromKey + 'T12:00:00Z')) / 86400000);
+}
+
+// How a deadline is phrased in the digest.
+//
+// Deadlines are real timestamps — the editor's field is `datetime-local`, and
+// the "open for N hours" paths set a genuine clock time — but the digest only
+// ever printed the DATE, so "23 Aug" gave no way to tell 09:00 from 23:59.
+//
+// The relative half is deliberately day-granular. A bubble is pushed once at
+// 16:00 and then sits in the chat unchanged forever: LINE never re-renders it,
+// so anything finer ("4h left") is already wrong for whoever opens the chat
+// that evening, and wrong in the direction that makes people relax. "today
+// 23:59" is still true at 22:00, and the clock time is the part that can be
+// acted on anyway.
+//
+// `gap` can only go negative for a deadline that passed between the Firestore
+// read and this call — pendingBlocks filters those out — but treating it as
+// "today" keeps the fallback honest rather than printing "in -1 days".
+function digestDueLabel(deadlineMs, nowMs) {
+    const gap = bkkDayGap(bkkDayKey(nowMs), bkkDayKey(deadlineMs));
+    const clock = new Date(deadlineMs).toLocaleTimeString('en-GB', {
+        timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit'
+    });
+    if (gap <= 0) return { text: `today ${clock}`, short: `today ${clock}`, gap: 0 };
+    if (gap === 1) return { text: `tomorrow ${clock}`, short: `tomorrow ${clock}`, gap: 1 };
+    const date = new Date(deadlineMs).toLocaleDateString('en-GB', {
+        timeZone: 'Asia/Bangkok', day: '2-digit', month: 'short'
+    });
+    // `short` drops the countdown for callers that print the deadline inline with
+    // a title, where "· in 4 days · 28 Aug 23:59" is three separators of meta
+    // hanging off one quiz name. Under two days the two forms are identical:
+    // "today"/"tomorrow" IS the short way to say it.
+    return { text: `in ${gap} days · ${date} ${clock}`, short: `${date} ${clock}`, gap: gap };
+}
+
+// One colour ramp for deadline pressure, shared by every row that prints a
+// due label so two sections can never disagree about what counts as urgent.
+function digestDueColor(gap) {
+    if (gap <= 0) return '#dc2626';
+    if (gap === 1) return '#b45309';
+    return '#64748b';
+}
+
 // Returns a result object rather than nothing, because the manual path has a UI
 // waiting on an answer: every early exit has to name its reason so the button
 // can say "nothing to report" instead of a bare failure.
@@ -2606,11 +2661,14 @@ async function runQuizDigest(kind, options) {
             const wentLiveMs = digestWentLiveMs(q);
             if (!isNaN(wentLiveMs) && wentLiveMs >= cutoff.toMillis()) {
                 const dueSoon = deadlineMs && !isNaN(deadlineMs) && deadlineMs > now.toMillis();
+                // Same phrasing as the pending roster below — a quiz that goes
+                // live WITH a deadline appears in both sections, and printing
+                // "28 Aug" here next to "in 4 days · 28 Aug 23:59" there read as
+                // two different facts about the same quiz.
+                const newDue = dueSoon ? digestDueLabel(deadlineMs, now.toMillis()) : null;
                 newlyLive.push({
                     quiz: digestQuizName(q, 60),
-                    deadline: dueSoon
-                        ? new Date(deadlineMs).toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', day: '2-digit', month: 'short' })
-                        : ''
+                    deadline: newDue ? newDue.short : ''
                 });
             }
 
@@ -2791,6 +2849,19 @@ async function runQuizDigest(kind, options) {
     const buildFlex = (target) => {
         const body = [];
 
+        // Terms are dropped when they are zero rather than printed as "0 new", so
+        // the line stays short on a quiet day. "done" is the exception: it is the
+        // number the group is being asked about, and hiding a 0 there would read
+        // as the section being missing rather than empty. Products are admin-only
+        // downstream (V97.84), so the term is too — the group copy must not
+        // advertise a count its body does not contain.
+        const summaryParts = [];
+        if (newlyLive.length) summaryParts.push(`${newlyLive.length} new`);
+        summaryParts.push(`${doneQuizzes.length} done`);
+        if (pendingBlocks.length) summaryParts.push(`${pendingBlocks.length} pending`);
+        if (target.withScores && productRows.length) summaryParts.push(`${productRows.length} products`);
+        const headerSummary = summaryParts.join(' · ');
+
         // Admin 1-on-1 only, and first: this is the one block the admin has to DO
         // something about. The group chat has no business seeing who asked for a
         // late attempt or which note was escalated.
@@ -2901,48 +2972,88 @@ async function runQuizDigest(kind, options) {
         // "2/8" was replaced by "done: <names> · N left" on the user's call: the
         // bare ratio read as unexplained, but dropping the number entirely would
         // hide how many still owe it — which is what decides a deadline extension.
+        // Both of those still hold below; the bar is what carries the ratio now.
+        //
+        // The section used to render one separator and one amber title PER quiz,
+        // so five pending quizzes came out as five equal-weight blocks and there
+        // was no way to see which was due tonight and which was due Friday — the
+        // whole thing read as undifferentiated nagging. It is now one header plus
+        // a compact three-line row per quiz: urgency lives in the due label's
+        // colour, completion in a bar, so the rows rank themselves before they
+        // are read.
+        if (urgentBlocks.length) {
+            body.push({ type: 'separator', margin: 'md' });
+            body.push({
+                type: 'text',
+                text: `⏳ Due soon · ${urgentBlocks.length}`,
+                size: 'xs', weight: 'bold', color: '#b45309', margin: 'md'
+            });
+        }
         urgentBlocks.forEach(blk => {
             const left = Math.max(0, blk.totalCount - blk.doneCount);
+            const due = digestDueLabel(blk.deadlineMs, now.toMillis());
             // Title owns its own line now that it is untruncated — a full Thai
             // title plus the meta on one line wrapped into an unreadable block.
-            body.push({ type: 'separator', margin: 'md' });
-            body.push({ type: 'text', text: `⏳ ${blk.quiz}`, size: 'xs', weight: 'bold', color: '#b45309', margin: 'md', wrap: true });
+            body.push({ type: 'text', text: blk.quiz, size: 'sm', color: '#1f2937', wrap: true, margin: 'md' });
+
+            // totalCount is the active cohort and can't be 0 here — pendingBlocks
+            // skips a quiz with no eligible users — but the guard keeps a NaN out
+            // of the width string even if that ever stops being true.
+            const pct = blk.totalCount > 0
+                ? Math.min(100, Math.round((blk.doneCount / blk.totalCount) * 100))
+                : 0;
+            body.push({
+                type: 'box', layout: 'horizontal', height: '6px', margin: 'sm',
+                backgroundColor: '#e5e7eb', cornerRadius: '3px',
+                // An empty `contents` array is a hard LINE API error and a
+                // zero-width child is not worth asking it to render, so the
+                // nobody-has-done-it bar carries a filler instead of a 0% fill.
+                contents: pct > 0
+                    ? [{
+                        type: 'box', layout: 'vertical', width: `${pct}%`,
+                        backgroundColor: '#0f766e', cornerRadius: '3px',
+                        contents: [{ type: 'filler' }]
+                    }]
+                    : [{ type: 'filler' }]
+            });
 
             const roster = target.withScores ? blk.doneNames : blk.doneNamesGroup;
-            let donePart;
+            // Deadline first: it is the half that carries the row's colour, so
+            // leading with it puts the coloured words where the eye lands.
+            const parts = [`due ${due.text}`, `${left} left`];
             if (roster.length) {
                 const shown = roster.slice(0, DIGEST_DONE_NAMES).join(', ');
                 // This list GROWS as completion rises (the old missing-list shrank),
                 // so it needs a tighter cap than DIGEST_MAX_ROWS.
-                donePart = roster.length > DIGEST_DONE_NAMES
+                parts.push(`done: ${roster.length > DIGEST_DONE_NAMES
                     ? `${shown} +${roster.length - DIGEST_DONE_NAMES}`
-                    : shown;
-            } else if (blk.doneCount > 0) {
-                // Group copy only: people are done but all of them sit in groups
-                // this copy does not name. Saying "no one yet" would contradict
-                // the count, so state the count instead.
-                donePart = `${blk.doneCount} so far`;
-            } else {
-                // Never an empty string — an empty Flex text node is a hard LINE
-                // API error, and this is the branch a brand-new quiz always hits.
-                donePart = 'no one yet';
+                    : shown}`);
             }
-
+            // The old "done: no one yet" and the group copy's "N so far" are both
+            // gone: the bar and "N left" already say what they said, and printing
+            // them cost a full line on every brand-new quiz. `parts` always has
+            // the two leading entries, so this can never be the empty string that
+            // LINE rejects.
             body.push({
                 type: 'text',
-                text: `${blk.deadline} · done: ${donePart} · ${left} left`,
-                size: 'sm', color: '#1f2937', wrap: true, margin: 'xs'
+                text: parts.join(' · '),
+                size: 'xs', color: digestDueColor(due.gap), wrap: true, margin: 'xs'
             });
         });
 
         if (laterBlocks.length) {
-            const span = laterBlocks.length === 1
-                ? laterBlocks[0].deadline
-                : `${laterBlocks[0].deadline}-${laterBlocks[laterBlocks.length - 1].deadline}`;
+            // Collapse on the DATES being equal, not on there being one block:
+            // two quizzes that share a deadline printed "28 Aug-28 Aug", because
+            // the old guard only caught a list of length 1.
+            const first = laterBlocks[0].deadline;
+            const last = laterBlocks[laterBlocks.length - 1].deadline;
+            const span = first === last ? first : `${first}-${last}`;
             body.push({ type: 'separator', margin: 'md' });
             body.push({
                 type: 'text',
-                text: `📌 ${laterBlocks.length} more due ${span} · see the app`,
+                // "see the app" dropped — the footer button below is the app link
+                // now, and it is tappable where this line never was.
+                text: `📌 ${laterBlocks.length} more due ${span}`,
                 size: 'xs', color: '#64748b', margin: 'md', wrap: true
             });
         }
@@ -2998,10 +3109,32 @@ async function runQuizDigest(kind, options) {
                     type: 'box', layout: 'vertical', backgroundColor: '#0f766e', paddingAll: '12px',
                     contents: [
                         { type: 'text', text: '📊 Daily Quiz Digest', weight: 'bold', size: 'sm', color: '#ffffff' },
-                        { type: 'text', text: new Date(now.toMillis()).toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', weekday: 'short', day: '2-digit', month: 'short' }), size: 'xs', color: '#ccfbf1', margin: 'xs' }
+                        { type: 'text', text: new Date(now.toMillis()).toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', weekday: 'short', day: '2-digit', month: 'short' }), size: 'xs', color: '#ccfbf1', margin: 'xs' },
+                        // The whole state in one line, so the bubble answers "is
+                        // there anything for me today" before it is scrolled. Every
+                        // figure here is one the body already prints, so the two can
+                        // only disagree if a section is added without a term.
+                        // Deliberately a text line rather than the pill row this was
+                        // mocked as: pills mean three nested boxes per pill, and a
+                        // malformed header costs the whole push, not just its looks.
+                        { type: 'text', text: headerSummary, size: 'xs', color: '#99f6e4', margin: 'sm', wrap: true }
                     ]
                 },
-                body: { type: 'box', layout: 'vertical', paddingAll: '16px', spacing: 'none', contents: body }
+                body: { type: 'box', layout: 'vertical', paddingAll: '16px', spacing: 'none', contents: body },
+                // The bubble's whole job is to move people into the app, and until
+                // now it ended on the words "see the app" set in unfollowable grey
+                // text. The destination splits by target for the same reason every
+                // other section does: the admin copy is a chase tool and belongs on
+                // the dashboard, the group copy belongs on the intern quiz tab.
+                footer: {
+                    type: 'box', layout: 'vertical', paddingAll: '12px',
+                    contents: [{
+                        type: 'button', style: 'primary', color: '#0f766e', height: 'sm',
+                        action: target.withScores
+                            ? { type: 'uri', label: 'Open dashboard', uri: 'https://mlpditto.github.io/INTERN-PORT/admin.html' }
+                            : { type: 'uri', label: 'Open quizzes', uri: 'https://liff.line.me/2008959998-yjcNpaGt?tab=quiz' }
+                    }]
+                }
             }
         };
     };
