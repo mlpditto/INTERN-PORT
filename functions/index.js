@@ -2575,10 +2575,28 @@ const DIGEST_NAME_TAIL_RE = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2B
 // Each candidate is trimmed BEFORE the choice, not after. A whitespace-only
 // shortTitle is truthy, so picking first and trimming second collapsed it to ''
 // and printed the fallback "Quiz" — losing a title that was sitting right there.
+//
+// EXCEPT when the shortTitle is a course code. A handful of quizzes name that
+// field "CPA01-2026-MELATONIN & SEA" while the title reads "A Pharmacist's Guide
+// to Prolonged-Release Melatonin" — the code is for the admin's own lists and
+// export filenames, and preferring it published a catalogue number to the intern
+// chat instead of the readable name sitting right beside it. Three E4/DRSP
+// quizzes were also reduced to CPA09/CPA10/CPA13-2025-E4/DRSP, which differ only
+// by a module number and read as the same quiz listed three times.
+//
+// Matched on the whole `PREFIX##-YYYY-` shape, not on a bare year, because the
+// year alone would also strike a legitimate name like "GOLD 2025 Guidelines".
+// Every short name that is NOT this shape stays preferred — "UTI-1", "NAC-2",
+// "Antiplatelet-1", "Chest Pain Evaluation" are exactly what this function is for.
+// (9 of 157 quizzes carry the code shape today, 6 of them active.)
+const DIGEST_COURSE_CODE_RE = /^[A-Za-z]{2,}\d{1,3}-(19|20)\d{2}-/;
 function digestQuizName(q, max) {
     const short = String((q && q.shortTitle) || '').trim();
     const full = String((q && q.title) || '').trim();
-    const raw = short || full || 'Quiz';
+    // The title only wins if there IS one — a quiz carrying nothing but a course
+    // code still gets the code rather than falling through to "Quiz".
+    const preferFull = full && DIGEST_COURSE_CODE_RE.test(short);
+    const raw = (preferFull ? full : (short || full)) || 'Quiz';
     return max > 0 ? raw.slice(0, max) : raw;
 }
 
