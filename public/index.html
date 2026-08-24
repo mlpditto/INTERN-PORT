@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.47)</title>
+    <title>Internship Portfolio (V96.48)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5599,12 +5599,35 @@
         // group id" screen (admin setup for group push notifications). The param
         // arrives either directly or wrapped in liff.state depending on how the
         // liff.line.me link was resolved.
+        // Every query param this page reads, with liff.state unwrapped.
+        //
+        // A liff.line.me link delivers its params either directly on the query
+        // string or wrapped inside `liff.state`, depending on how LINE resolved
+        // the link — isLineGroupIdMode has known that since V95.66, but it knew it
+        // alone. Every other deep link read window.location.search directly and so
+        // silently did nothing in the wrapped case: ?tab=history from the review
+        // and score pushes, ?entryId from notifyOnAdminEdit, even ?mode=preview.
+        //
+        // Direct params win a collision: those are the ones actually on the URL we
+        // were opened with, so they are the more specific instruction.
+        function liffDeepLinkParams() {
+            try {
+                const direct = new URLSearchParams(window.location.search || '');
+                const wrapped = direct.get('liff.state');
+                if (!wrapped) return direct;
+                // liff.state holds its own query string, sometimes with the leading
+                // "?" and sometimes without.
+                const inner = new URLSearchParams(decodeURIComponent(wrapped).replace(/^\?/, ''));
+                inner.forEach((v, k) => { if (!direct.has(k)) direct.set(k, v); });
+                return direct;
+            } catch (_) {
+                return new URLSearchParams('');
+            }
+        }
+
         function isLineGroupIdMode() {
             try {
-                const search = window.location.search || '';
-                if (/[?&]lgid=1(?:&|$)/.test(search)) return true;
-                const m = search.match(/[?&]liff\.state=([^&]+)/);
-                return !!(m && /lgid=1/.test(decodeURIComponent(m[1])));
+                return liffDeepLinkParams().get('lgid') === '1';
             } catch (_) { return false; }
         }
 
@@ -5929,7 +5952,10 @@
 
         async function main() {
             try {
-                const urlParams = new URLSearchParams(window.location.search);
+                // Unwraps liff.state — see liffDeepLinkParams. Everything main()
+                // reads off this (mode, previewToken, userId) and everything it
+                // hands downstream now survives a wrapped link.
+                const urlParams = liffDeepLinkParams();
                 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
                 isPreview = urlParams.get('mode') === 'preview' || isLocal;
                 const isAdminPreview = urlParams.get('adminPreview') === '1';
@@ -15974,7 +16000,7 @@
         window.lnInternHandleDeepLink = function() {
             if (window._lnHistoryDeepLinkHandled) return;
             try {
-                const params = new URLSearchParams(window.location.search);
+                const params = liffDeepLinkParams();
                 const entryId = params.get('entryId');
                 const showHistory = params.get('showHistory') === '1';
                 if (!entryId || !showHistory) return;
@@ -16883,9 +16909,25 @@ async function archiveDoneCard(cardId) {
 
         // V94.30 — deep link from LINE notification (γ.4b.4): expand Work section + switch to History sub-tab + scroll into view.
         function applyTabDeepLink(urlParams) {
-            const tab = urlParams && urlParams.get && urlParams.get('tab');
-            if (tab !== 'history') return;
+            const params = (urlParams && typeof urlParams.get === 'function') ? urlParams : liffDeepLinkParams();
+            const tab = params.get('tab');
+            if (tab !== 'history' && tab !== 'quiz') return;
             setTimeout(() => {
+                // ?tab=quiz has been sent by notifyQuizReminder since it shipped, and
+                // by the digest's footer button since V97.9x, but nothing here ever
+                // handled it — the reader landed on the app home with Mission still
+                // collapsed, because kanban-content ships display:none. Same three
+                // moves as the history branch: expand, switch, scroll.
+                if (tab === 'quiz') {
+                    const kanban = document.getElementById('kanban-content');
+                    if (kanban && kanban.style.display === 'none') toggleKanban();
+                    // toggleKanban already re-switches to whatever tab is active, and
+                    // Quiz is the default — but say it out loud so this does not
+                    // depend on which tab happens to carry the `active` class.
+                    switchMissionTab('quiz');
+                    document.getElementById('section-kanban')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    return;
+                }
                 const content = document.getElementById('work-section-content');
                 if (content && content.style.display === 'none') toggleWorkSection();
                 switchWorkTab('history');
