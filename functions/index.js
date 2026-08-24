@@ -82,6 +82,19 @@ const LINE_I18N = {
         button:           { en: 'Open quiz in LIFF →',         th: 'เปิดในแอป →',                kr: 'LIFF에서 열기 →' },
         subtitleFallback: { en: 'Practice suggestion',         th: 'คำแนะนำสำหรับฝึก',           kr: '연습 추천' }
     },
+    // The intern's own score, pushed 1-on-1 the moment they submit. Nothing here
+    // names or ranks anyone else: the same privacy split the digest keeps (scores
+    // are admin-only in the group copy) is what makes this channel the right place
+    // for a score in the first place.
+    quizScore: {
+        title:     { en: '🎯 Your score',      th: '🎯 คะแนนของคุณ',        kr: '🎯 내 점수' },
+        altPrefix: { en: 'Your score: ',       th: 'คะแนนของคุณ: ',         kr: '내 점수: ' },
+        // ?tab=history opens Work > History, whose unified timeline carries quiz
+        // attempts since V95.16 — it lists the attempt and its score, it is NOT a
+        // per-question answer review, so the label must not promise one. Wording
+        // matches adminEdit.btnHistory, which lands on the same view.
+        button:    { en: 'View History →',     th: 'ดูประวัติ →',           kr: '기록 보기 →' }
+    },
     adminEdit: {
         headerDelete:  { en: '🗑️ Admin Deleted Your Note',  th: '🗑️ แอดมินลบโน้ตของคุณ',   kr: '🗑️ 관리자가 노트를 삭제했습니다' },
         headerRestore: { en: '↩️ Admin Restored Your Note', th: '↩️ แอดมินกู้คืนโน้ต',      kr: '↩️ 관리자가 노트를 복원했습니다' },
@@ -2230,6 +2243,104 @@ async function claimQuizMilestone(db, quizId, milestone) {
     }
 }
 
+// ============================================================
+// pushQuizScoreToIntern  (the 1-on-1 half of notifyQuizSubmitted)
+// ------------------------------------------------------------
+// Sends the submitter their OWN score, to their OWN chat, the moment they
+// submit. This is the answer to "should the digest show scores": no — the
+// group copy deliberately carries none, because a six-person cohort can
+// identify everyone in it and a ranked score list there is a public callout.
+// A 1-on-1 push gives the intern the number without giving it to the room.
+//
+// Nothing in this bubble names, ranks or counts anybody else. Keep it that
+// way: the moment it says "3rd of 6" it becomes the thing the split exists
+// to prevent.
+//
+// Runs BEFORE every admin-side gate in notifyQuizSubmitted, and that ordering
+// is the whole point. Those gates ask "is this submission newsworthy to the
+// admin" — first submitter, everyone finished, quiz still live — and the answer
+// is no for most submissions. But EVERY submission is newsworthy to the person
+// who made it, so sharing the milestone gate would have delivered a score to
+// roughly the first and last intern only.
+//
+// `users/{lineUserId}` is keyed by the LINE user id (see
+// isLineNotifyOptedOut), so the submitter's userId IS the push target and no
+// extra lookup is needed.
+//
+// Best-effort by contract: the attempt is already written and graded when this
+// runs, so every failure path returns a reason instead of throwing. A push to
+// someone who never added the OA as a friend comes back 403 and pushLineFlex
+// records it as `no-friend` — normal, not an error to chase.
+// ============================================================
+async function pushQuizScoreToIntern(opts) {
+    const { attemptId, userId, quizTitle, correct, totalQ, isPoll } = opts;
+
+    // A poll has no right answer and an ungraded attempt has no number yet;
+    // "🎯 Your score — awaiting grading" is a notification that says nothing.
+    if (isPoll) return { pushed: false, reason: 'poll' };
+    if (!(totalQ > 0)) return { pushed: false, reason: 'ungraded' };
+    if (await isLineNotifyOptedOut(userId)) return { pushed: false, reason: 'opted-out' };
+
+    const lang = await resolvePreferredLanguage(userId);
+    // Halves score to one decimal the same way the digest and the admin bubble
+    // do — partial credit exists, and 6.5/10 must not render as 6.5000000001.
+    const scoreText = `${Math.round(correct * 10) / 10}/${totalQ}`;
+    const pct = Math.round((correct / totalQ) * 100);
+
+    // Three bands, and deliberately no red and no "fail": this is private
+    // feedback on work just finished, not a verdict. Amber is the floor.
+    const band = pct >= 80 ? '#0f766e' : (pct >= 50 ? '#6366f1' : '#b45309');
+
+    const buildFlex = () => ({
+        type: 'flex',
+        altText: `${lineT('quizScore', 'altPrefix', lang)}${scoreText} — ${quizTitle}`.slice(0, 400),
+        contents: {
+            type: 'bubble',
+            size: 'kilo',
+            header: {
+                type: 'box', layout: 'vertical', backgroundColor: band, paddingAll: '12px',
+                contents: [
+                    { type: 'text', text: lineT('quizScore', 'title', lang), weight: 'bold', size: 'sm', color: '#ffffff' },
+                    { type: 'text', text: quizTitle, size: 'xs', color: '#ffffff', margin: 'xs', wrap: true }
+                ]
+            },
+            body: {
+                type: 'box', layout: 'vertical', paddingAll: '16px',
+                contents: [
+                    { type: 'text', text: scoreText, size: 'xxl', weight: 'bold', color: band },
+                    // Bare percent on purpose: the score sits directly above it, so
+                    // a "correct" suffix adds nothing and reads badly in TH and KR,
+                    // where the word does not follow the number.
+                    { type: 'text', text: `${pct}%`, size: 'sm', color: '#64748b', margin: 'xs' }
+                ]
+            },
+            footer: {
+                type: 'box', layout: 'vertical', paddingAll: '12px',
+                contents: [{
+                    type: 'button', style: 'primary', color: band, height: 'sm',
+                    action: {
+                        type: 'uri',
+                        label: lineT('quizScore', 'button', lang),
+                        uri: 'https://liff.line.me/2008959998-yjcNpaGt?tab=history'
+                    }
+                }]
+            }
+        }
+    });
+
+    // Its own tag so the dashboard's LINE usage panel can tell intern score
+    // pushes apart from the admin/group announcements they ride along with —
+    // one submission can now cost two pushes and the counter must show that.
+    const results = await pushLineFlex(
+        'notifyQuizScore',
+        [{ to: userId, label: 'intern-1on1' }],
+        buildFlex,
+        `attempt=${attemptId}  score=${scoreText}`
+    );
+    const ok = results.filter(r => r.ok).length > 0;
+    return { pushed: ok, reason: ok ? null : ((results[0] && results[0].code) || 'push-failed'), score: scoreText };
+}
+
 exports.notifyQuizSubmitted = onCall(
     { secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID'] },
     async (request) => {
@@ -2264,13 +2375,37 @@ exports.notifyQuizSubmitted = onCall(
 
     if (attemptData.isPractice === true) return { skipped: true, reason: 'practice' };
 
+    // Hoisted above the admin gates below because the intern's own push needs
+    // the title and the score too, and one definition is what stops the two
+    // bubbles from ever quoting different numbers for the same attempt.
+    const quizTitle = String(quizData.title || quizData.shortTitle || 'Quiz').slice(0, 80);
+    const totalQ = Number(attemptData.totalQuestions || 0);
+    const correct = Number(attemptData.correctCount || 0);
+    const scoreText = attemptData.isPoll === true
+        ? 'Poll submitted'
+        : (totalQ > 0 ? `${Math.round(correct * 10) / 10}/${totalQ}` : 'awaiting grading');
+
+    // The intern's own score, before anything that can early-return. Every
+    // submission is news to the person who made it, even when it is news to
+    // nobody else — see pushQuizScoreToIntern for why the gates below must not
+    // apply to it. Never throws, so the admin half is unaffected either way.
+    let personal;
+    try {
+        personal = await pushQuizScoreToIntern({
+            attemptId, userId, quizTitle, correct, totalQ, isPoll: attemptData.isPoll === true
+        });
+    } catch (err) {
+        console.error(`[notifyQuizScore] unexpected failure for ${attemptId}:`, err.message);
+        personal = { pushed: false, reason: 'error' };
+    }
+
     const alwaysNotify = quizData.notifyGroup === true;
     // Milestone mode only watches quizzes that are live; the override
     // stays usable on a quiz the admin has already closed.
-    if (!alwaysNotify && quizData.isActive !== true) return { skipped: true, reason: 'inactive' };
+    if (!alwaysNotify && quizData.isActive !== true) return { skipped: true, reason: 'inactive', personal };
 
     const targets = resolveLineTargets('notifyQuizSubmitted');
-    if (!targets.length) return { skipped: true, reason: 'no-target' };
+    if (!targets.length) return { skipped: true, reason: 'no-target', personal };
 
     let displayName = 'Unknown';
     try {
@@ -2280,13 +2415,6 @@ exports.notifyQuizSubmitted = onCall(
         console.warn(`[notifyQuizSubmitted] user read failed for ${userId}:`, err.message);
     }
     displayName = displayName.slice(0, 60);
-
-    const quizTitle = String(quizData.title || quizData.shortTitle || 'Quiz').slice(0, 80);
-    const totalQ = Number(attemptData.totalQuestions || 0);
-    const correct = Number(attemptData.correctCount || 0);
-    const scoreText = attemptData.isPoll === true
-        ? 'Poll submitted'
-        : (totalQ > 0 ? `${Math.round(correct * 10) / 10}/${totalQ}` : 'awaiting grading');
 
     // ---- decide whether this submission is worth a message ----
     let milestone = null;          // 'first' | 'complete' | null
@@ -2317,11 +2445,11 @@ exports.notifyQuizSubmitted = onCall(
             }
         } catch (err) {
             console.error(`[notifyQuizSubmitted] milestone scan failed quiz=${quizId}:`, err.message);
-            return { skipped: true, reason: 'scan-failed' };
+            return { skipped: true, reason: 'scan-failed', personal };
         }
-        if (!milestone) return { skipped: true, reason: 'no-milestone', submittedCount };
+        if (!milestone) return { skipped: true, reason: 'no-milestone', submittedCount, personal };
         const won = await claimQuizMilestone(db, quizId, milestone);
-        if (!won) return { skipped: true, reason: 'already-announced', milestone };
+        if (!won) return { skipped: true, reason: 'already-announced', milestone, personal };
     }
 
     const headline = milestone === 'first'
@@ -2358,7 +2486,7 @@ exports.notifyQuizSubmitted = onCall(
 
     const results = await pushLineFlex('notifyQuizSubmitted', targets, buildFlex, `attempt=${attemptId}  milestone=${milestone || 'override'}  user=${displayName}`);
     const pushedCount = results.filter(r => r.ok).length;
-    return { ok: pushedCount > 0, pushedCount, results, attemptId, milestone: milestone || 'override' };
+    return { ok: pushedCount > 0, pushedCount, results, attemptId, milestone: milestone || 'override', personal };
 });
 
 // ============================================================
