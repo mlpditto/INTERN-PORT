@@ -91,9 +91,12 @@ const LINE_I18N = {
         altPrefix: { en: 'Your score: ',       th: 'คะแนนของคุณ: ',         kr: '내 점수: ' },
         // ?tab=history opens Work > History, whose unified timeline carries quiz
         // attempts since V95.16 — it lists the attempt and its score, it is NOT a
-        // per-question answer review, so the label must not promise one. Wording
-        // matches adminEdit.btnHistory, which lands on the same view.
-        button:    { en: 'View History →',     th: 'ดูประวัติ →',           kr: '기록 보기 →' }
+        // per-question answer review, so the label must not promise one.
+        //
+        // One word, unlike adminEdit.btnHistory which lands on the same view: this
+        // button shares a line with the title instead of owning a footer, so it has
+        // roughly half the width to fit into.
+        button:    { en: 'History →',          th: 'ประวัติ →',             kr: '기록 →' }
     },
     adminEdit: {
         headerDelete:  { en: '🗑️ Admin Deleted Your Note',  th: '🗑️ แอดมินลบโน้ตของคุณ',   kr: '🗑️ 관리자가 노트를 삭제했습니다' },
@@ -2297,32 +2300,52 @@ async function pushQuizScoreToIntern(opts) {
         contents: {
             type: 'bubble',
             size: 'kilo',
+            // Title and button share the top line, and the whole bubble is three
+            // lines because of it. The button used to own a footer, which on a
+            // message this short meant a third of the height went to one link.
+            //
+            // `secondary` rather than `primary`: a primary button takes `color` as
+            // its FILL, so on a coloured header it would be the same colour as the
+            // header and disappear. Secondary is LINE's own light pill, which reads
+            // as tappable against all three bands.
             header: {
                 type: 'box', layout: 'vertical', backgroundColor: band, paddingAll: '12px',
                 contents: [
-                    { type: 'text', text: lineT('quizScore', 'title', lang), weight: 'bold', size: 'sm', color: '#ffffff' },
-                    { type: 'text', text: quizTitle, size: 'xs', color: '#ffffff', margin: 'xs', wrap: true }
+                    {
+                        type: 'box', layout: 'horizontal',
+                        contents: [
+                            {
+                                type: 'text', text: lineT('quizScore', 'title', lang),
+                                weight: 'bold', size: 'sm', color: '#ffffff',
+                                // Centred against a 40px button so the title does not
+                                // sit at the top of a row taller than itself.
+                                gravity: 'center', flex: 3
+                            },
+                            {
+                                type: 'button', style: 'secondary', height: 'sm', flex: 2,
+                                action: {
+                                    type: 'uri',
+                                    label: lineT('quizScore', 'button', lang),
+                                    uri: 'https://liff.line.me/2008959998-yjcNpaGt?tab=history'
+                                }
+                            }
+                        ]
+                    },
+                    { type: 'text', text: quizTitle, size: 'xs', color: '#ffffff', margin: 'sm', wrap: true }
                 ]
             },
+            // Score and percent on one line via spans, so the two keep their
+            // different weights without costing a second line. The percent is
+            // parenthesised rather than labelled: a "correct" suffix reads badly in
+            // TH and KR, where the word does not follow the number.
             body: {
                 type: 'box', layout: 'vertical', paddingAll: '16px',
-                contents: [
-                    { type: 'text', text: scoreText, size: 'xxl', weight: 'bold', color: band },
-                    // Bare percent on purpose: the score sits directly above it, so
-                    // a "correct" suffix adds nothing and reads badly in TH and KR,
-                    // where the word does not follow the number.
-                    { type: 'text', text: `${pct}%`, size: 'sm', color: '#64748b', margin: 'xs' }
-                ]
-            },
-            footer: {
-                type: 'box', layout: 'vertical', paddingAll: '12px',
                 contents: [{
-                    type: 'button', style: 'primary', color: band, height: 'sm',
-                    action: {
-                        type: 'uri',
-                        label: lineT('quizScore', 'button', lang),
-                        uri: 'https://liff.line.me/2008959998-yjcNpaGt?tab=history'
-                    }
+                    type: 'text', wrap: true,
+                    contents: [
+                        { type: 'span', text: scoreText, size: 'xxl', weight: 'bold', color: band },
+                        { type: 'span', text: `  (${pct}%)`, size: 'md', color: '#64748b' }
+                    ]
                 }]
             }
         }
