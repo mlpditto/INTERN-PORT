@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.00</title>
+    <title>Nika V98.01</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6851,6 +6851,18 @@
                      already has 20+ prior fix-comments for, missed on this specific container. -->
                 <div id="review-links-list" class="lang-no-toggle" style="display:flex; flex-direction:column; gap:10px;">
                     <div style="padding:30px; text-align:center; color:#94a3b8; font-size:0.86em;">Loading...</div>
+                </div>
+
+                <!-- V96.5x: Explore link reviews — intern writes a short text
+                     review per link (index.html openExploreReviewModal); admin
+                     approves here before 1 Beri credits. Approved reviews then
+                     show as a public feed under that link's card on the intern
+                     side (index.html renderExploreLinks). -->
+                <h4 style="color:#c2410c; margin:22px 0 10px 0; font-size:0.95em; font-weight:800;">
+                    <i class="fa-solid fa-comment-dots" style="color:#ea580c;"></i> Pending Reviews
+                </h4>
+                <div id="explore-reviews-pending-list" class="lang-no-toggle" style="display:flex; flex-direction:column; gap:10px; background:white; padding:15px; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.05); min-height:60px;">
+                    <div style="padding:20px; text-align:center; color:#94a3b8; font-size:0.86em;">No pending reviews.</div>
                 </div>
             </div>
             </div><!-- /subtab-review-links -->
@@ -20916,6 +20928,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         var accessRequestsCache = []; 
         var pendingQuizzesCache = [];
         var reviewLinksCache = []; // V96.50: Beri Phase 1 — Explore Links admin catalog
+        var pendingExploreReviewsCache = []; // V96.5x: Explore link reviews awaiting approval
         var beriRewardsCache = []; // V96.51: Beri Phase 2 — shop catalog (all, not just active)
         var beriRedemptionsCache = []; // V96.51: Beri Phase 2 — pending (status='requesting') fulfillment queue
         var pointsClaimedCache = [];   
@@ -31800,6 +31813,11 @@ RULES:
                 reviewLinksCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderReviewLinksAdmin();
             }, e => console.error("🔥 [Firestore Error] review_links:", e));
+            // V96.5x: Explore link reviews awaiting approval (1 Beri on approve)
+            db.collection("review_link_reviews").where("status", "==", "pending").onSnapshot(s => {
+                pendingExploreReviewsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderPendingExploreReviews();
+            }, e => console.error("🔥 [Firestore Error] review_link_reviews:", e));
             // V96.51: Beri Phase 2 — shop catalog (all, admin sees paused too) + fulfillment queue
             db.collection("beri_rewards").orderBy("createdAt", "desc").onSnapshot(s => {
                 beriRewardsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -32048,6 +32066,61 @@ RULES:
             try {
                 await db.collection('review_links').doc(id).delete();
                 showToast('Link deleted');
+            } catch (e) { alert(e.message); }
+        }
+
+        // ===================================================================
+        // 📝 V96.5x: Explore link reviews — approval queue. Approve credits 1
+        // Beri (batched with the status flip so they never drift apart); Deny
+        // just marks rejected, no Beri, no resubmit path for the intern.
+        // ===================================================================
+        function renderPendingExploreReviews() {
+            const list = document.getElementById('explore-reviews-pending-list');
+            if (!list) return;
+            if (!pendingExploreReviewsCache.length) {
+                list.innerHTML = '<div style="padding:20px; text-align:center; color:#94a3b8; font-size:0.86em;">No pending reviews.</div>';
+                return;
+            }
+            list.innerHTML = pendingExploreReviewsCache.map(r => {
+                const link = reviewLinksCache.find(l => l.id === r.linkId) || {};
+                return `
+                    <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px 12px;">
+                        <div style="font-size:0.78em; color:#94a3b8; font-weight:700;">${escapeHtml(r.displayName || 'Unknown')} → ${escapeHtml(link.title || 'Unknown link')}</div>
+                        <div style="font-size:0.86em; color:#334155; margin:4px 0;">${escapeHtml(r.text || '')}</div>
+                        <div style="display:flex; gap:6px; margin-top:6px;">
+                            <button class="btn-sm btn-success" onclick="approveExploreReview('${r.id}')">Approve (+1 Beri)</button>
+                            <button class="btn-sm btn-danger" onclick="denyExploreReview('${r.id}')">Deny</button>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        async function approveExploreReview(id) {
+            const r = pendingExploreReviewsCache.find(x => x.id === id);
+            if (!r) return;
+            if (!confirm(`Approve this review by ${r.displayName || 'this user'}? Awards 1 Beri.`)) return;
+            try {
+                const batch = db.batch();
+                batch.update(db.collection('review_link_reviews').doc(id), {
+                    status: 'approved',
+                    reviewedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                batch.set(db.collection('users').doc(r.userId), {
+                    beri: firebase.firestore.FieldValue.increment(1)
+                }, { merge: true });
+                await batch.commit();
+                showToast('Review approved, Beri awarded!');
+            } catch (e) { alert(e.message); }
+        }
+
+        async function denyExploreReview(id) {
+            if (!confirm('Deny this review? No Beri will be awarded.')) return;
+            try {
+                await db.collection('review_link_reviews').doc(id).update({
+                    status: 'rejected',
+                    reviewedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                showToast('Review denied');
             } catch (e) { alert(e.message); }
         }
 
