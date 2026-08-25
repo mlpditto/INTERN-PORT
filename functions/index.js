@@ -3138,10 +3138,10 @@ async function runQuizDigest(kind, options) {
         // line, sorted by who owes most, spanning every pending quiz rather than
         // repeating names under each one).
         //
-        // "2/8" was replaced by "done: <names> · N left" on the user's call: the
-        // bare ratio read as unexplained, but dropping the number entirely would
-        // hide how many still owe it — which is what decides a deadline extension.
-        // Both of those still hold below; the bar is what carries the ratio now.
+        // "2/8" was replaced by "done: <names>" on the user's call: the bare ratio
+        // read as unexplained. It briefly carried a "· N left" suffix too, but
+        // that was dropped on a later call — the bar already carries the ratio,
+        // so spelling out the remaining count was redundant.
         //
         // The section used to render one separator and one amber title PER quiz,
         // so five pending quizzes came out as five equal-weight blocks and there
@@ -3159,7 +3159,6 @@ async function runQuizDigest(kind, options) {
             });
         }
         urgentBlocks.forEach(blk => {
-            const left = Math.max(0, blk.totalCount - blk.doneCount);
             const due = digestDueLabel(blk.deadlineMs, now.toMillis());
             // Title owns its own line now that it is untruncated — a full Thai
             // title plus the meta on one line wrapped into an unreadable block.
@@ -3189,7 +3188,7 @@ async function runQuizDigest(kind, options) {
             const roster = target.withScores ? blk.doneNames : blk.doneNamesGroup;
             // Deadline first: it is the half that carries the row's colour, so
             // leading with it puts the coloured words where the eye lands.
-            const parts = [`due ${due.text}`, `${left} left`];
+            const parts = [`due ${due.text}`];
             if (roster.length) {
                 const shown = roster.slice(0, DIGEST_DONE_NAMES).join(', ');
                 // This list GROWS as completion rises (the old missing-list shrank),
@@ -3198,11 +3197,10 @@ async function runQuizDigest(kind, options) {
                     ? `${shown} +${roster.length - DIGEST_DONE_NAMES}`
                     : shown}`);
             }
-            // The old "done: no one yet" and the group copy's "N so far" are both
-            // gone: the bar and "N left" already say what they said, and printing
-            // them cost a full line on every brand-new quiz. `parts` always has
-            // the two leading entries, so this can never be the empty string that
-            // LINE rejects.
+            // The old "done: no one yet", the group copy's "N so far", and "N left"
+            // are all gone: the bar already says what they said, and printing them
+            // cost a full line on every brand-new quiz. `parts` always has at least
+            // `due ...`, so this can never be the empty string that LINE rejects.
             body.push({
                 type: 'text',
                 text: parts.join(' · '),
