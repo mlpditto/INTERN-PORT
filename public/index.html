@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.58)</title>
+    <title>Internship Portfolio (V96.59)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -7303,19 +7303,23 @@
                     ? `<span style="color:#16a34a; font-weight:800;">✓ ได้รับ ${link.beriReward || 0} Beri แล้ว</span>`
                     : `<span style="color:#b45309; font-weight:800;">+${link.beriReward || 0} Beri</span>`;
 
-                // V96.5x: review status for this link — write once (no resubmit),
-                // admin-approved before the 1 Beri credits (see admin.html
-                // approveExploreReview). Separate from the open/click Beri above.
+                // V96.5x lean UI: review status collapses to one 36x36 icon slot
+                // (button when actionable, static span otherwise) — was a separate
+                // full row with text ("✍️ เขียนรีวิว (+1 Beri)"), now joins the
+                // copy/open row so the card is one button-row shorter. Meaning
+                // rides the `title` tooltip instead of visible label text, same
+                // "icon over label" direction as the copy button below.
                 const myReview = myExploreReviewsCache[link.id];
+                const reviewIconBase = 'width:36px; height:36px; flex-shrink:0; display:flex; align-items:center; justify-content:center; border-radius:10px; font-size:0.95em; box-sizing:border-box;';
                 let reviewStatusHtml;
                 if (!myReview) {
-                    reviewStatusHtml = `<button onclick="openExploreReviewModal('${link.id}')" style="width:auto; min-height:auto; padding:6px 10px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; color:#1d4ed8; font-weight:700; font-size:0.74em; cursor:pointer;">✍️ เขียนรีวิว (+1 Beri)</button>`;
+                    reviewStatusHtml = `<button onclick="openExploreReviewModal('${link.id}')" title="เขียนรีวิว ได้ +1 Beri · Write a review, +1 Beri" style="${reviewIconBase} min-height:auto; padding:0; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; cursor:pointer;">✍️</button>`;
                 } else if (myReview.status === 'pending') {
-                    reviewStatusHtml = `<span style="font-size:0.74em; color:#b45309; font-weight:700;">⏳ รีวิวรอตรวจ</span>`;
+                    reviewStatusHtml = `<span title="รีวิวรอตรวจ · Review pending" style="${reviewIconBase} background:#fffbeb; border:1px solid #fde68a;">⏳</span>`;
                 } else if (myReview.status === 'approved') {
-                    reviewStatusHtml = `<span style="font-size:0.74em; color:#16a34a; font-weight:700;">✓ รีวิวแล้ว (+1 Beri)</span>`;
+                    reviewStatusHtml = `<span title="รีวิวผ่านแล้ว ได้ +1 Beri · Review approved, +1 Beri" style="${reviewIconBase} background:#dcfce7; border:1px solid #bbf7d0;">✅</span>`;
                 } else {
-                    reviewStatusHtml = `<span style="font-size:0.74em; color:#94a3b8; font-weight:700;">รีวิวไม่ผ่าน</span>`;
+                    reviewStatusHtml = `<span title="รีวิวไม่ผ่าน · Review rejected" style="${reviewIconBase} background:#f1f5f9; border:1px solid #e2e8f0;">❌</span>`;
                 }
 
                 // Public feed: other users' APPROVED reviews for this same link.
@@ -7334,18 +7338,21 @@
                             <div style="font-weight:800; color:#334155; font-size:0.92em;">${icon} ${safeTitle}</div>
                             <div style="font-size:0.78em;">${beriBadge}</div>
                         </div>
-                        <div>${reviewStatusHtml}</div>
                         ${reviewsListHtml}
-                        <!-- V96.5x: global button width/min-height rule (index.html:341) stretches
-                             buttons full-width by default — negate explicitly on both (known trap,
-                             see feedback_global_button_width_trap). Copy is a plain clipboard action
-                             (no Beri — copying isn't opening/viewing); Open is unchanged from before
-                             (still the one that credits Beri via explOpenLink). -->
+                        <!-- V96.5x lean UI: one row now instead of two — review status
+                             (icon-only, was its own full-text row above) + copy (icon-only,
+                             was "📋 คัดลอก") + open (still labeled — the one actual primary
+                             action). All three fixed at 36px height so the icon-only slots
+                             and the text button align. global button width/min-height rule
+                             (index.html:341) still needs explicit negation on all three
+                             (known trap, see feedback_global_button_width_trap). Copy/review
+                             icon never credit Beri themselves — only explOpenLink does. -->
                         <div style="display:flex; gap:6px;">
-                            <button onclick="explCopyLink('${link.id}')" style="width:auto; min-height:auto; flex:1; padding:8px 6px; background:#f1f5f9; border:none; border-radius:10px; color:#475569; font-weight:700; font-size:0.78em; cursor:pointer;">
-                                📋 คัดลอก
+                            ${reviewStatusHtml}
+                            <button onclick="explCopyLink('${link.id}')" title="คัดลอกลิงก์ · Copy link" style="width:36px; height:36px; min-height:auto; flex-shrink:0; padding:0; background:#f1f5f9; border:none; border-radius:10px; color:#475569; font-size:0.95em; cursor:pointer; box-sizing:border-box;">
+                                📋
                             </button>
-                            <button onclick="explOpenLink('${link.id}')" style="width:auto; min-height:auto; flex:1; padding:8px 6px; background:linear-gradient(135deg,#f59e0b,#ea580c); border:none; border-radius:10px; color:white; font-weight:800; font-size:0.78em; cursor:pointer;">
+                            <button onclick="explOpenLink('${link.id}')" style="width:auto; height:36px; min-height:auto; flex:1; padding:0 6px; background:linear-gradient(135deg,#f59e0b,#ea580c); border:none; border-radius:10px; color:white; font-weight:800; font-size:0.78em; cursor:pointer; box-sizing:border-box;">
                                 🚀 เปิด
                             </button>
                         </div>
