@@ -5084,7 +5084,14 @@
             <h3 style="margin:0 0 4px 0; color:#c2410c; font-weight:900;">✍️ เขียนรีวิว</h3>
             <div id="er-link-title" style="font-size:0.85em; color:#64748b; margin-bottom:14px;"></div>
             <input type="hidden" id="er-link-id">
-            <textarea id="er-text" rows="4" placeholder="แชร์ประสบการณ์ของคุณ..." style="width:100%; border-radius:12px; resize:none; font-size:0.9em; padding:12px; border:1.5px solid #cbd5e1; box-sizing:border-box; margin-bottom:14px;"></textarea>
+            <textarea id="er-text" rows="4" placeholder="แชร์ประสบการณ์ของคุณ..." style="width:100%; border-radius:12px; resize:none; font-size:0.9em; padding:12px; border:1.5px solid #cbd5e1; box-sizing:border-box; margin-bottom:10px;"></textarea>
+            <!-- V96.5x: optional spend amount — not required, no automatic Beri
+                 formula. Just extra info for admin to see alongside the review;
+                 any bonus Beri for a verified purchase is awarded separately via
+                 the existing manual adjBeri() tool in Elite Board, not computed
+                 here. -->
+            <label style="display:block; font-size:0.72em; font-weight:700; color:#78716c; margin-bottom:6px;">ยอดใช้จ่าย (บาท) — ไม่บังคับ · Amount spent (฿) — optional</label>
+            <input type="number" id="er-spend" min="0" step="1" placeholder="เช่น 250" style="width:100%; border-radius:10px; font-size:0.9em; padding:10px 12px; border:1.5px solid #cbd5e1; box-sizing:border-box; margin-bottom:14px;">
             <div style="display:flex; gap:8px; justify-content:flex-end;">
                 <button onclick="document.getElementById('exploreReviewModal').style.display='none'" style="width:auto; min-height:auto; padding:9px 18px; border-radius:10px; border:1px solid #e2e8f0; background:#fff; cursor:pointer; font-weight:700; color:#64748b;">ยกเลิก</button>
                 <button onclick="submitExploreReview()" style="width:auto; min-height:auto; padding:9px 22px; background:linear-gradient(135deg, #ea580c, #c2410c); border:none; border-radius:10px; color:white; font-weight:900; font-size:0.88em; cursor:pointer;">ส่งรีวิว</button>
@@ -7457,6 +7464,7 @@
             document.getElementById('er-link-id').value = linkId;
             document.getElementById('er-link-title').textContent = link.title || 'Untitled';
             document.getElementById('er-text').value = '';
+            document.getElementById('er-spend').value = '';
             document.getElementById('exploreReviewModal').style.display = 'flex';
         }
 
@@ -7464,12 +7472,18 @@
             const linkId = document.getElementById('er-link-id').value;
             const text = document.getElementById('er-text').value.trim();
             if (!text) { alert('กรุณาเขียนรีวิวก่อนส่ง · Please write a review first'); return; }
+            // Optional, not required — no automatic Beri formula from this. Just
+            // extra info for admin; a verified purchase gets bonus Beri separately
+            // via the manual adjBeri() tool, not computed here.
+            const spendRaw = document.getElementById('er-spend').value.trim();
+            const spendAmount = spendRaw === '' ? null : (parseFloat(spendRaw) || 0);
             try {
                 await db.collection('review_link_reviews').doc(`${linkId}_${userId}`).set({
                     linkId, userId,
                     displayName: (userProfile && userProfile.displayName) || '',
                     pictureUrl: (userProfile && userProfile.pictureUrl) || '',
                     text,
+                    spendAmount,
                     status: 'pending',
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
