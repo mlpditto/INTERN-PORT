@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.95</title>
+    <title>Nika V97.96</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6614,6 +6614,10 @@
                 <button type="button" class="subtab-btn" data-subtab="subtab-review-links" onclick="switchAssignmentsSubtab('subtab-review-links')" role="tab">
                     🔗 Explore Links
                 </button>
+                <!-- V96.51: Beri Phase 2 — redemption shop catalog + fulfillment queue -->
+                <button type="button" class="subtab-btn" data-subtab="subtab-beri-shop" onclick="switchAssignmentsSubtab('subtab-beri-shop')" role="tab">
+                    🏪 A Shop for Killers
+                </button>
             </div>
 
             <div id="subtab-quiz-engine" class="subtab-content active">
@@ -6847,6 +6851,36 @@
                 </div>
             </div>
             </div><!-- /subtab-review-links -->
+
+            <!-- V96.51: Beri Phase 2 — "A Shop for Killers" redemption shop.
+                 Catalog CRUD (beri_rewards) + a fulfillment queue for pending
+                 redemptions (beri_redemptions, status='requesting'). Redeeming
+                 itself happens client-side on the intern (index.html
+                 redeemBeriReward, inside a transaction) — this screen only
+                 manages the catalog and fulfills/denies requests already made. -->
+            <div id="subtab-beri-shop" class="subtab-content">
+            <div style="background:#fdf4ff; padding:20px; border-radius:12px; margin-bottom:30px; border:1px solid #f0abfc;">
+                <div class="flex-between" style="border-bottom:1px solid #e9d5ff; padding-bottom:15px; margin-bottom:20px;">
+                    <h3 style="margin:0; color:#86198f; display:flex; align-items:center; gap:12px; font-weight:900; font-size:1.3em;">
+                        🏪 A Shop for Killers <span style="font-size:0.55em; font-weight:700; color:#a21caf; text-transform:uppercase; letter-spacing:0.4px;">Beri Phase 2</span>
+                    </h3>
+                    <button class="magic-btn" onclick="openBeriRewardModal()" style="background:linear-gradient(135deg, #a21caf, #86198f); padding:10px 22px; border-radius:14px; font-weight:900;">➕ Add Reward</button>
+                </div>
+                <p style="margin:0 0 18px 0; color:#78716c; font-size:0.85em; line-height:1.5;">
+                    Interns spend Beri here. Stock is optional (blank = unlimited) — leaving it blank skips the stock counter entirely.
+                </p>
+                <div id="beri-rewards-list" style="display:flex; flex-direction:column; gap:10px; margin-bottom:26px;">
+                    <div style="padding:30px; text-align:center; color:#94a3b8; font-size:0.86em;">Loading...</div>
+                </div>
+
+                <h4 style="color:#86198f; margin:0 0 10px 0; font-size:0.95em; font-weight:800;">
+                    <i class="fa-solid fa-hand-holding-dollar" style="color:#a21caf;"></i> Pending Redemptions
+                </h4>
+                <div id="beri-redemptions-list" style="display:flex; flex-direction:column; gap:10px; background:white; padding:15px; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.05); min-height:60px;">
+                    <div style="padding:20px; text-align:center; color:#94a3b8; font-size:0.86em;">No pending redemptions.</div>
+                </div>
+            </div>
+            </div><!-- /subtab-beri-shop -->
         </div>
 
         <!-- V96.50: Review Link create/edit modal (Beri Phase 1) -->
@@ -6885,6 +6919,44 @@
                 <div style="display:flex; gap:8px; justify-content:flex-end;">
                     <button type="button" onclick="forceHideModal('reviewLinkModal')" style="padding:9px 18px; border-radius:10px; border:1px solid #e2e8f0; background:#fff; cursor:pointer; font-weight:700; color:#64748b;">Cancel</button>
                     <button type="button" onclick="saveReviewLink()" class="magic-btn" style="background:linear-gradient(135deg, #ea580c, #c2410c); padding:9px 22px; border-radius:10px; font-weight:900; font-size:0.88em;">
+                        <i class="fa-solid fa-floppy-disk"></i> Save
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- V96.51: Beri Reward create/edit modal (Beri Phase 2) -->
+        <div id="beriRewardModal" class="modal" style="display:none; z-index:9200;">
+            <div class="modal-content" style="max-width:460px; padding:22px; border-radius:16px;">
+                <span class="close-modal" onclick="forceHideModal('beriRewardModal')" style="position:absolute; top:14px; right:16px; cursor:pointer; font-size:1.4em; color:#64748b;">&times;</span>
+                <h3 style="margin:0 0 16px 0; color:#86198f; display:flex; align-items:center; gap:10px; font-weight:900;">
+                    🎁 Beri Reward
+                </h3>
+                <input type="hidden" id="br-edit-id">
+                <div style="margin-bottom:14px;">
+                    <label style="display:block; font-size:0.72em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Name <span style="color:#ef4444;">*</span></label>
+                    <input type="text" id="br-name" placeholder="e.g. สติกเกอร์ LINE" style="width:100%; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em; box-sizing:border-box;">
+                </div>
+                <div style="margin-bottom:14px;">
+                    <label style="display:block; font-size:0.72em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Description</label>
+                    <input type="text" id="br-desc" placeholder="optional" style="width:100%; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em; box-sizing:border-box;">
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+                    <div>
+                        <label style="display:block; font-size:0.72em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Beri Cost <span style="color:#ef4444;">*</span></label>
+                        <input type="number" id="br-cost" value="50" min="1" step="1" style="width:100%; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em; box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:0.72em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Stock (blank = unlimited)</label>
+                        <input type="number" id="br-stock" placeholder="∞" min="0" step="1" style="width:100%; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em; box-sizing:border-box;">
+                    </div>
+                </div>
+                <label style="display:flex; align-items:center; gap:8px; font-size:0.85em; font-weight:700; color:#475569; margin-bottom:18px; cursor:pointer;">
+                    <input type="checkbox" id="br-active" checked> Active (visible in the shop)
+                </label>
+                <div style="display:flex; gap:8px; justify-content:flex-end;">
+                    <button type="button" onclick="forceHideModal('beriRewardModal')" style="padding:9px 18px; border-radius:10px; border:1px solid #e2e8f0; background:#fff; cursor:pointer; font-weight:700; color:#64748b;">Cancel</button>
+                    <button type="button" onclick="saveBeriReward()" class="magic-btn" style="background:linear-gradient(135deg, #a21caf, #86198f); padding:9px 22px; border-radius:10px; font-weight:900; font-size:0.88em;">
                         <i class="fa-solid fa-floppy-disk"></i> Save
                     </button>
                 </div>
@@ -20831,6 +20903,8 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         var accessRequestsCache = []; 
         var pendingQuizzesCache = [];
         var reviewLinksCache = []; // V96.50: Beri Phase 1 — Explore Links admin catalog
+        var beriRewardsCache = []; // V96.51: Beri Phase 2 — shop catalog (all, not just active)
+        var beriRedemptionsCache = []; // V96.51: Beri Phase 2 — pending (status='requesting') fulfillment queue
         var pointsClaimedCache = [];   
         var quizAttemptsAllCache = []; // 🔥 [Version: V88.50] Global Cache for all attempts to fix visibility bug
         let hideCompletedWorks = true;
@@ -31713,6 +31787,15 @@ RULES:
                 reviewLinksCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderReviewLinksAdmin();
             }, e => console.error("🔥 [Firestore Error] review_links:", e));
+            // V96.51: Beri Phase 2 — shop catalog (all, admin sees paused too) + fulfillment queue
+            db.collection("beri_rewards").orderBy("createdAt", "desc").onSnapshot(s => {
+                beriRewardsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderBeriRewardsAdmin();
+            }, e => console.error("🔥 [Firestore Error] beri_rewards:", e));
+            db.collection("beri_redemptions").where("status", "==", "requesting").onSnapshot(s => {
+                beriRedemptionsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderBeriRedemptionsAdmin();
+            }, e => console.error("🔥 [Firestore Error] beri_redemptions:", e));
             // 🔥 [Version: V77.16] Load ALL quiz attempts for counting and full history (Authorized for Admin)
             db.collection("quiz_attempts").orderBy("timestamp", "desc").onSnapshot(s => {
                 const allAttempts = s.docs.map(d => ({ id: d.id, ...d.data(), isQuiz: true, collection: 'quiz_attempts' }));
@@ -31952,6 +32035,157 @@ RULES:
             try {
                 await db.collection('review_links').doc(id).delete();
                 showToast('Link deleted');
+            } catch (e) { alert(e.message); }
+        }
+
+        // ===================================================================
+        // 🏪 V96.51: A Shop for Killers — Beri Phase 2 (Assignments subtab).
+        // Catalog CRUD mirrors the Explore Links pattern above. The fulfillment
+        // queue below is the admin-review counterpart to the intern's client-side
+        // redeemBeriReward() transaction (index.html) — that transaction already
+        // debited Beri + decremented stock at request time, so Fulfill here is a
+        // pure status flip, while Deny must REFUND both (see denyBeriRedemption).
+        // ===================================================================
+        function renderBeriRewardsAdmin() {
+            const list = document.getElementById('beri-rewards-list');
+            if (!list) return;
+            if (!beriRewardsCache.length) {
+                list.innerHTML = '<div style="padding:30px; text-align:center; color:#94a3b8; font-size:0.86em;">No rewards yet — click ➕ Add Reward to create the first one.</div>';
+                return;
+            }
+            list.innerHTML = beriRewardsCache.map(r => {
+                const active = r.isActive !== false;
+                const stockText = (r.stock === null || r.stock === undefined) ? '∞' : r.stock;
+                return `
+                    <div style="display:flex; align-items:center; gap:12px; background:white; border:1px solid #f1f5f9; border-radius:12px; padding:12px 14px; ${active ? '' : 'opacity:0.55;'}">
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-weight:800; color:#334155; font-size:0.92em;">🎁 ${escapeHtml(r.name || 'Untitled')}</div>
+                            ${r.description ? `<div style="font-size:0.76em; color:#94a3b8; margin-top:2px;">${escapeHtml(r.description)}</div>` : ''}
+                        </div>
+                        <div style="font-weight:900; color:#b45309; font-size:0.85em; white-space:nowrap;">¥${r.beriCost || 0}</div>
+                        <div style="font-size:0.78em; color:#64748b; font-weight:700; white-space:nowrap;">Stock: ${stockText}</div>
+                        <button class="btn-sm" onclick='toggleBeriRewardActive(${JSON.stringify(r.id)}, ${active})' style="background:${active ? '#dcfce7' : '#f1f5f9'}; color:${active ? '#15803d' : '#64748b'}; border:none; border-radius:10px; padding:6px 12px; font-weight:700; cursor:pointer;">${active ? 'Active' : 'Paused'}</button>
+                        <button class="btn-sm btn-info" onclick='openBeriRewardModal(${JSON.stringify(r.id)})'>Edit</button>
+                        <button class="btn-sm btn-danger" onclick='deleteBeriReward(${JSON.stringify(r.id)})'>Delete</button>
+                    </div>`;
+            }).join('');
+        }
+
+        function openBeriRewardModal(id = null) {
+            const r = id ? beriRewardsCache.find(x => x.id === id) : null;
+            document.getElementById('br-edit-id').value = id || '';
+            document.getElementById('br-name').value = r ? (r.name || '') : '';
+            document.getElementById('br-desc').value = r ? (r.description || '') : '';
+            document.getElementById('br-cost').value = r ? (r.beriCost || 50) : 50;
+            document.getElementById('br-stock').value = (r && r.stock != null) ? r.stock : '';
+            document.getElementById('br-active').checked = r ? (r.isActive !== false) : true;
+            forceShowModal('beriRewardModal');
+        }
+
+        async function saveBeriReward() {
+            const id = document.getElementById('br-edit-id').value;
+            const name = document.getElementById('br-name').value.trim();
+            const description = document.getElementById('br-desc').value.trim();
+            const beriCost = parseInt(document.getElementById('br-cost').value, 10) || 0;
+            const stockRaw = document.getElementById('br-stock').value.trim();
+            const stock = stockRaw === '' ? null : (parseInt(stockRaw, 10) || 0); // blank = unlimited
+            if (!name) { alert('Name is required.'); return; }
+            if (beriCost < 1) { alert('Beri cost must be at least 1.'); return; }
+            const data = {
+                name, description, beriCost, stock,
+                isActive: document.getElementById('br-active').checked
+            };
+            try {
+                if (id) {
+                    await db.collection('beri_rewards').doc(id).update(data);
+                } else {
+                    data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                    await db.collection('beri_rewards').add(data);
+                }
+                forceHideModal('beriRewardModal');
+                showToast('Reward saved!');
+            } catch (e) { alert(e.message); }
+        }
+
+        async function toggleBeriRewardActive(id, current) {
+            try {
+                await db.collection('beri_rewards').doc(id).update({ isActive: !current });
+            } catch (e) { alert(e.message); }
+        }
+
+        async function deleteBeriReward(id) {
+            if (!confirm('Delete this reward? Interns will no longer see it (existing redemption requests are not affected).')) return;
+            try {
+                await db.collection('beri_rewards').doc(id).delete();
+                showToast('Reward deleted');
+            } catch (e) { alert(e.message); }
+        }
+
+        function renderBeriRedemptionsAdmin() {
+            const list = document.getElementById('beri-redemptions-list');
+            if (!list) return;
+            if (!beriRedemptionsCache.length) {
+                list.innerHTML = '<div style="padding:20px; text-align:center; color:#94a3b8; font-size:0.86em;">No pending redemptions.</div>';
+                return;
+            }
+            list.innerHTML = beriRedemptionsCache.map(r => {
+                let uImg = r.pictureUrl || '';
+                let uName = r.displayName || 'Unknown';
+                if (r.userId) {
+                    const u = usersData.find(x => x.id === r.userId);
+                    if (u) {
+                        if (!uImg) uImg = u.pictureUrl || '';
+                        if (!uName || uName === 'Unknown') uName = u.displayName || 'Unknown';
+                    }
+                }
+                return `
+                    <div style="display:flex; align-items:center; gap:10px; background:#fdf4ff; border:1px solid #f0abfc; border-radius:10px; padding:10px 12px;">
+                        <img src="${uImg}" class="user-pic">
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-weight:800; color:#334155; font-size:0.9em;">${escapeHtml(uName)}</div>
+                            <div style="font-size:0.8em; color:#86198f; font-weight:700;">🎁 ${escapeHtml(r.rewardName || '')} — ¥${r.beriCost || 0}</div>
+                        </div>
+                        <button class="btn-sm btn-success" onclick="fulfillBeriRedemption('${r.id}')">Fulfill</button>
+                        <button class="btn-sm btn-danger" onclick="denyBeriRedemption('${r.id}')">Deny &amp; Refund</button>
+                    </div>`;
+            }).join('');
+        }
+
+        async function fulfillBeriRedemption(id) {
+            if (!confirm('Mark this redemption as fulfilled? (Confirms you have handed over the reward)')) return;
+            try {
+                await db.collection('beri_redemptions').doc(id).update({
+                    status: 'fulfilled',
+                    fulfilledAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                showToast('Marked fulfilled!');
+            } catch (e) { alert(e.message); }
+        }
+
+        // Refunds the Beri (and restocks, if that reward tracks stock) — the
+        // intern's redeem transaction already debited both at request time, so
+        // denying without this would silently keep their Beri gone for nothing.
+        async function denyBeriRedemption(id) {
+            const r = beriRedemptionsCache.find(x => x.id === id);
+            if (!r) return;
+            if (!confirm(`Deny this redemption? ${r.beriCost} Beri will be refunded to ${r.displayName || 'the intern'}.`)) return;
+            try {
+                const rewardRef = db.collection('beri_rewards').doc(r.rewardId);
+                const rewardSnap = await rewardRef.get();
+                const hasStock = rewardSnap.exists && rewardSnap.data().stock != null;
+                const batch = db.batch();
+                batch.update(db.collection('beri_redemptions').doc(id), {
+                    status: 'denied',
+                    deniedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                batch.set(db.collection('users').doc(r.userId), {
+                    beri: firebase.firestore.FieldValue.increment(r.beriCost)
+                }, { merge: true });
+                if (hasStock) {
+                    batch.update(rewardRef, { stock: firebase.firestore.FieldValue.increment(1) });
+                }
+                await batch.commit();
+                showToast('Denied & refunded');
             } catch (e) { alert(e.message); }
         }
 
