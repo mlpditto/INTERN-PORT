@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.96</title>
+    <title>Nika V97.98</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -43220,6 +43220,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 <input type="number" step="0.1" id="adj-${d.id}" placeholder="0.0" style="width:62px; margin:0; height:24px; font-size:0.75em;" onkeypress="if(event.key==='Enter')adjDec('${d.id}')">
                                 <button class="btn-sm btn-success" style="height:24px; min-height:auto; padding:0 8px; font-size:0.72em;" onclick="adjDec('${d.id}')">Adj</button>
                             </div>
+                            <!-- V96.52: manual Beri adjust — e.g. crediting an offline/real-world
+                                 purchase. Mirrors the score Adj control above exactly (same
+                                 prompt-for-reason flow) but writes users.beri + a separate
+                                 beri_adjustments audit doc, kept OUT of checkin_logs so it can
+                                 never get summed into the score-denominated dashboards that
+                                 already read that collection (manual_adjust type, dashboard
+                                 totals, etc.). -->
+                            <div style="display:flex; align-items:center; gap:4px; background:rgba(255, 251, 235, 0.85); border:1px solid #fde68a; border-radius:8px; padding:4px;">
+                                <input type="number" step="1" id="beri-adj-${d.id}" placeholder="¥0" style="width:62px; margin:0; height:24px; font-size:0.75em;" onkeypress="if(event.key==='Enter')adjBeri('${d.id}')">
+                                <button class="btn-sm" style="height:24px; min-height:auto; padding:0 8px; font-size:0.72em; background:#ea580c; color:white;" onclick="adjBeri('${d.id}')" title="Adjust Beri (e.g. offline purchase credit)">Beri</button>
+                            </div>
                         </div>`;
 
                     tbody.innerHTML += `<tr class="${ignored ? 'u-ignored' : ''}">
@@ -43262,6 +43273,34 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
         function toggleWorkArchive() { hideCompletedWorks = !hideCompletedWorks; document.getElementById('btn-toggle-work-archive').classList.toggle('active'); renderTable('works'); }
         async function adjDec(id) { try { const valInput = document.getElementById(`adj-${id}`); let v = valInput.value; if (!v) return alert("Please specify score."); v = v.replace(',', '.'); const scoreVal = parseFloat(v); if (isNaN(scoreVal)) return alert("Invalid score value."); const n = prompt("Reason (Note):"); if (!n) return; const editor = (auth && auth.currentUser) || {}; await db.collection("users").doc(id).update({ score: firebase.firestore.FieldValue.increment(scoreVal) }); await db.collection("checkin_logs").add({ userId: id, type: 'manual_adjust', amount: scoreVal, note: n, timestamp: firebase.firestore.FieldValue.serverTimestamp(), createdByUid: editor.uid || 'unknown', createdByEmail: editor.email || ALLOWED_EMAIL }); showToast("Saved!"); valInput.value = ""; valInput.blur(); } catch (e) { alert("Error saving score: " + e.message); } }
+
+        // V96.52: manual Beri adjust — e.g. crediting Beri for a real-world/offline
+        // purchase. Same flow as adjDec (signed number + required reason prompt),
+        // but the audit doc lands in its own beri_adjustments collection rather
+        // than checkin_logs, since several existing dashboards sum checkin_logs
+        // amounts assuming they're score-denominated (see e.g. line ~44763) — a
+        // shared collection risks a Beri delta silently corrupting a score total.
+        async function adjBeri(id) {
+            try {
+                const valInput = document.getElementById(`beri-adj-${id}`);
+                let v = valInput.value;
+                if (!v) return alert("Please specify a Beri amount.");
+                v = v.replace(',', '.');
+                const beriVal = parseInt(v, 10);
+                if (isNaN(beriVal) || beriVal === 0) return alert("Invalid Beri amount.");
+                const n = prompt("Reason (Note) — e.g. offline purchase amount:");
+                if (!n) return;
+                const editor = (auth && auth.currentUser) || {};
+                await db.collection("users").doc(id).update({ beri: firebase.firestore.FieldValue.increment(beriVal) });
+                await db.collection("beri_adjustments").add({
+                    userId: id, amount: beriVal, note: n,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdByUid: editor.uid || 'unknown', createdByEmail: editor.email || ALLOWED_EMAIL
+                });
+                showToast("Beri saved!");
+                valInput.value = ""; valInput.blur();
+            } catch (e) { alert("Error saving Beri: " + e.message); }
+        }
 
         function renderCertTable() {
             // 🔥 [Version: V79.5] Certificates merged into Users tab — this is now a no-op
