@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.03</title>
+    <title>Nika V98.04</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6851,6 +6851,18 @@
                      already has 20+ prior fix-comments for, missed on this specific container. -->
                 <div id="review-links-list" class="lang-no-toggle" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px;">
                     <div style="grid-column:1/-1; padding:30px; text-align:center; color:#94a3b8; font-size:0.86em;">Loading...</div>
+                </div>
+
+                <!-- V98.04: user-suggested links — intern proposes title/url/type
+                     (index.html openSuggestLinkModal); admin may edit any field
+                     right here before Approve (creates the live review_links doc)
+                     or Reject. See renderPendingLinkSuggestions/approveLinkSuggestion
+                     below. -->
+                <h4 style="color:#c2410c; margin:22px 0 10px 0; font-size:0.95em; font-weight:800;">
+                    <i class="fa-solid fa-lightbulb" style="color:#ea580c;"></i> Pending Link Suggestions
+                </h4>
+                <div id="link-suggestions-pending-list" class="lang-no-toggle" style="display:flex; flex-direction:column; gap:10px; background:white; padding:15px; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.05); min-height:60px; margin-bottom:22px;">
+                    <div style="padding:20px; text-align:center; color:#94a3b8; font-size:0.86em;">No pending suggestions.</div>
                 </div>
 
                 <!-- V96.5x: Explore link reviews — intern writes a short text
@@ -20949,6 +20961,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         var pendingQuizzesCache = [];
         var reviewLinksCache = []; // V96.50: Beri Phase 1 — Explore Links admin catalog
         var pendingExploreReviewsCache = []; // V96.5x: Explore link reviews awaiting approval
+        var linkSuggestionsCache = []; // V98.04: intern-suggested Explore links awaiting approval
         var beriRewardsCache = []; // V96.51: Beri Phase 2 — shop catalog (all, not just active)
         var beriRedemptionsCache = []; // V96.51: Beri Phase 2 — pending (status='requesting') fulfillment queue
         var pointsClaimedCache = [];   
@@ -31838,6 +31851,11 @@ RULES:
                 pendingExploreReviewsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderPendingExploreReviews();
             }, e => console.error("🔥 [Firestore Error] review_link_reviews:", e));
+            // V98.04: intern-suggested Explore links awaiting approval
+            db.collection("review_link_suggestions").where("status", "==", "pending").onSnapshot(s => {
+                linkSuggestionsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderPendingLinkSuggestions();
+            }, e => console.error("🔥 [Firestore Error] review_link_suggestions:", e));
             // V96.51: Beri Phase 2 — shop catalog (all, admin sees paused too) + fulfillment queue
             db.collection("beri_rewards").orderBy("createdAt", "desc").onSnapshot(s => {
                 beriRewardsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -32150,6 +32168,76 @@ RULES:
                     reviewedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 showToast('Review denied');
+            } catch (e) { alert(e.message); }
+        }
+
+        // ===================================================================
+        // 💡 V98.04: intern-suggested Explore links — admin may edit any field
+        // right on the pending card before Approve (creates the live
+        // review_links doc, isActive:true) or Reject. Inputs are id-suffixed
+        // per suggestion so multiple pending cards don't collide.
+        // ===================================================================
+        function renderPendingLinkSuggestions() {
+            const list = document.getElementById('link-suggestions-pending-list');
+            if (!list) return;
+            if (!linkSuggestionsCache.length) {
+                list.innerHTML = '<div style="padding:20px; text-align:center; color:#94a3b8; font-size:0.86em;">No pending suggestions.</div>';
+                return;
+            }
+            list.innerHTML = linkSuggestionsCache.map(s => `
+                <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px 12px;">
+                    <div style="font-size:0.76em; color:#94a3b8; font-weight:700; margin-bottom:8px;">${escapeHtml(s.displayName || 'Unknown')} เสนอ</div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+                        <input type="text" id="ls-title-${s.id}" value="${escapeHtml(s.title || '')}" placeholder="Title" style="flex:2; min-width:160px; padding:7px 9px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:0.85em;">
+                        <input type="url" id="ls-url-${s.id}" value="${escapeHtml(s.url || '')}" placeholder="URL" style="flex:3; min-width:200px; padding:7px 9px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:0.85em;">
+                        <select id="ls-type-${s.id}" style="padding:7px 9px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:0.85em; background:#fff;">
+                            <option value="line_man" ${s.type === 'line_man' ? 'selected' : ''}>🛍️ LINE MAN</option>
+                            <option value="youtube" ${s.type === 'youtube' ? 'selected' : ''}>▶️ YouTube</option>
+                            <option value="other" ${(s.type || 'other') === 'other' ? 'selected' : ''}>🔗 Other</option>
+                        </select>
+                        <input type="number" id="ls-beri-${s.id}" value="10" min="1" step="1" placeholder="Beri" style="width:70px; padding:7px 9px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:0.85em;">
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <button class="btn-sm btn-success" onclick="approveLinkSuggestion('${s.id}')">Approve</button>
+                        <button class="btn-sm btn-danger" onclick="rejectLinkSuggestion('${s.id}')">Reject</button>
+                    </div>
+                </div>`).join('');
+        }
+
+        async function approveLinkSuggestion(id) {
+            const s = linkSuggestionsCache.find(x => x.id === id);
+            if (!s) return;
+            const title = document.getElementById(`ls-title-${id}`).value.trim();
+            const url = document.getElementById(`ls-url-${id}`).value.trim();
+            const type = document.getElementById(`ls-type-${id}`).value;
+            const beriReward = parseInt(document.getElementById(`ls-beri-${id}`).value, 10) || 0;
+            if (!title || !url) { alert('Title and URL are required.'); return; }
+            if (beriReward < 1) { alert('Beri reward must be at least 1.'); return; }
+            if (!confirm(`Approve "${title}" and add it to the live Explore Links catalog?`)) return;
+            try {
+                const batch = db.batch();
+                batch.set(db.collection('review_links').doc(), {
+                    title, url, type, beriReward,
+                    isActive: true,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                batch.update(db.collection('review_link_suggestions').doc(id), {
+                    status: 'approved',
+                    reviewedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                await batch.commit();
+                showToast('Link approved and published!');
+            } catch (e) { alert(e.message); }
+        }
+
+        async function rejectLinkSuggestion(id) {
+            if (!confirm('Reject this suggestion? It will not be added to the catalog.')) return;
+            try {
+                await db.collection('review_link_suggestions').doc(id).update({
+                    status: 'rejected',
+                    reviewedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                showToast('Suggestion rejected');
             } catch (e) { alert(e.message); }
         }
 
