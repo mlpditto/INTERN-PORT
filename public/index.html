@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.59)</title>
+    <title>Internship Portfolio (V96.60)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3892,6 +3892,13 @@
                                     <span class="lang-th">🔗 กดเปิดลิงก์ครั้งแรก รับ <strong>Beri</strong> ทันที (แต่ละร้านได้ครั้งเดียว จำกัดวันละ <span id="explore-daily-cap-text">0</span> Beri)</span><br>
                                     Open a link for the first time to earn Beri instantly (once per shop, up to the daily cap)
                                 </div>
+                                <!-- V98.04: let interns suggest a shop/link for the catalog —
+                                     admin approves (and may edit the fields) before it goes live.
+                                     See openSuggestLinkModal / submitLinkSuggestion below and
+                                     admin.html's renderPendingLinkSuggestions. -->
+                                <div class="lang-no-toggle" style="display:flex; justify-content:flex-end; margin-bottom:10px;">
+                                    <button onclick="openSuggestLinkModal()" style="width:auto; min-height:auto; padding:7px 14px; background:linear-gradient(135deg,#f59e0b,#ea580c); border:none; border-radius:10px; color:white; font-weight:800; font-size:0.78em; cursor:pointer;">➕ เสนอ Link ใหม่ · Suggest a link</button>
+                                </div>
                                 <!-- V96.5x fix: missed this container in the earlier lang-toggle
                                      hotfix (#913) — the intro banner/empty-state siblings got
                                      lang-no-toggle but this actual card list, holding pure-Thai
@@ -3903,10 +3910,20 @@
                                     ยังไม่มีลิงก์ · No links yet
                                 </div>
 
-                                <!-- V96.51: Beri Phase 2 — "A Shop for Killers" redemption shop.
-                                     Second section inside Explore, below the links. Catalog +
-                                     redemption fulfillment managed in admin.html > Assignments >
-                                     A Shop for Killers. See redeemBeriReward / renderBeriShop. -->
+                                <!-- V98.04: interns' own suggested links + review status (pending/
+                                     approved/rejected). Same collapsible-history convention as
+                                     "My redemption requests" below. -->
+                                <details class="lang-no-toggle" style="margin-top:10px;">
+                                    <summary style="cursor:pointer; font-size:0.82em; font-weight:700; color:#78716c; outline:none; user-select:none;">📋 Link ที่ฉันเสนอ · My suggested links</summary>
+                                    <div id="my-link-suggestions-history" style="display:flex; flex-direction:column; gap:6px; margin-top:8px;"></div>
+                                </details>
+
+                                <!-- V96.51: Beri Phase 2 — "Murthehelp" redemption shop (renamed
+                                     from "A Shop for Killers" on the intern side only, V98.04 —
+                                     admin.html keeps the original name/track label). Second
+                                     section inside Explore, below the links. Catalog + redemption
+                                     fulfillment managed in admin.html > Assignments > A Shop for
+                                     Killers. See redeemBeriReward / renderBeriShop. -->
                                 <!-- lang-no-toggle on this whole wrapper (not just the static text)
                                      exempts every descendant, including the dynamically-rendered
                                      shop grid cards + redemption history — lang-toggle.js walks
@@ -3915,15 +3932,21 @@
                                      had to be hotfixed live — see PR #913). -->
                                 <div class="lang-no-toggle" style="margin-top:22px; padding-top:16px; border-top:1px solid #f1f5f9;">
                                     <div style="font-size:0.9em; font-weight:800; color:#475569; margin-bottom:10px;">
-                                        🏪 A Shop for Killers
+                                        🏪 Murthehelp
                                     </div>
-                                    <!-- V96.5x: locked until myBeri > BERI_SHOP_UNLOCK_THRESHOLD (500) —
-                                         same "explain why + how to unlock" convention as the quiz
+                                    <!-- V96.5x: locked until myBeri > BERI_SHOP_UNLOCK_THRESHOLD (500)
+                                         — same "explain why + how to unlock" convention as the quiz
                                          unlockScore gate (renderAssignments' 🔒 message), rather than
-                                         just hiding the section outright. -->
+                                         just hiding the section outright. V98.04: once unlocked, stays
+                                         unlocked forever (myEverUnlockedBeriShop, persisted to
+                                         users/{uid}.beriShopUnlocked) even if Beri later drops back
+                                         under the threshold from spending — this banner then only
+                                         shows for someone who has genuinely never crossed it. Message
+                                         now leads with how much MORE Beri is needed, not the current
+                                         balance. -->
                                     <div id="beri-shop-locked" style="display:none; padding:16px; text-align:center; background:#fafaf9; border:1px dashed #d6d3d1; border-radius:12px; color:#78716c; font-size:0.84em; line-height:1.6;">
-                                        🔒 ปลดล็อกเมื่อสะสม Beri เกิน <span id="beri-shop-locked-threshold">500</span> · <span id="beri-shop-locked-current"></span><br>
-                                        Unlock once you've saved up more than <span id="beri-shop-locked-threshold-en">500</span> Beri
+                                        🔒 ขาดอีก <span id="beri-shop-locked-remaining">500</span> Beri จะปลดล็อก (ต้องมีมากกว่า <span id="beri-shop-locked-threshold">500</span>)<br>
+                                        <span id="beri-shop-locked-remaining-en">500</span> more Beri needed to unlock (need more than <span id="beri-shop-locked-threshold-en">500</span> Beri)
                                     </div>
                                     <div id="beri-shop-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px;"></div>
                                     <div id="beri-shop-empty" style="display:none; padding:20px; text-align:center; color:#94a3b8; font-size:0.86em;">
@@ -5113,6 +5136,27 @@
         </div>
     </div>
 
+    <!-- V98.04: Suggest a new Explore link — intern proposes title/url/type;
+         admin reviews + may edit before approving (admin.html
+         renderPendingLinkSuggestions / approveLinkSuggestion). -->
+    <div id="suggestLinkModal" class="modal lang-no-toggle" style="z-index: 10001;">
+        <div class="modal-content" style="max-width:420px; padding:20px; border-radius:16px;">
+            <span onclick="document.getElementById('suggestLinkModal').style.display='none'" style="position:absolute; top:14px; right:16px; cursor:pointer; font-size:1.4em; color:#64748b;">&times;</span>
+            <h3 style="margin:0 0 14px 0; color:#c2410c; font-weight:900;">➕ เสนอ Link ใหม่</h3>
+            <label style="display:block; font-size:0.72em; font-weight:700; color:#78716c; margin-bottom:6px;">ชื่อร้าน/ลิงก์ · Title</label>
+            <input type="text" id="sl-title" placeholder="เช่น ร้านยา XYZ บน LINE MAN" style="width:100%; border-radius:10px; font-size:0.9em; padding:10px 12px; border:1.5px solid #cbd5e1; box-sizing:border-box; margin-bottom:12px;">
+            <label style="display:block; font-size:0.72em; font-weight:700; color:#78716c; margin-bottom:6px;">URL</label>
+            <input type="url" id="sl-url" placeholder="https://..." style="width:100%; border-radius:10px; font-size:0.9em; padding:10px 12px; border:1.5px solid #cbd5e1; box-sizing:border-box; margin-bottom:12px;">
+            <label style="display:block; font-size:0.72em; font-weight:700; color:#78716c; margin-bottom:6px;">ประเภท · Type</label>
+            <input type="hidden" id="sl-type" value="line_man">
+            <div id="sl-type-chips" style="display:flex; gap:6px; margin-bottom:16px;"></div>
+            <div style="display:flex; gap:8px; justify-content:flex-end;">
+                <button onclick="document.getElementById('suggestLinkModal').style.display='none'" style="width:auto; min-height:auto; padding:9px 18px; border-radius:10px; border:1px solid #e2e8f0; background:#fff; cursor:pointer; font-weight:700; color:#64748b;">ยกเลิก</button>
+                <button onclick="submitLinkSuggestion()" style="width:auto; min-height:auto; padding:9px 22px; background:linear-gradient(135deg, #ea580c, #c2410c); border:none; border-radius:10px; color:white; font-weight:900; font-size:0.88em; cursor:pointer;">ส่ง · Submit</button>
+            </div>
+        </div>
+    </div>
+
     <div id="discussion-modal" class="modal" style="z-index: 10001;">
         <div class="modal-content"
             style="max-width:450px; padding:0; overflow:hidden; display:flex; flex-direction:column; height:80vh; max-height:600px;">
@@ -5649,6 +5693,7 @@
         let userId = "", userProfile = {}, userSubmissions = {};
         let questsCache = [], mySubmissionsCache = {}, myWorksCache = [], sideQuestsCache = {}, myGroup = "Public", myScore = 0;
         let myBeri = 0; // V96.50: Beri Phase 1 — separate currency from `score`, see users/{uid}.beri
+        let myEverUnlockedBeriShop = false; // V98.04: once true (persisted to users/{uid}.beriShopUnlocked), the Murthehelp shop stays visible even if myBeri later drops back under the threshold
         let quizzesCache = [], quizAttemptsCache = {}, allUsersData = [], divisionConfig = {}, groupSettings = {}; // 🔥 Added Settings V69
         let usersWorksCache = []; // V90.63: declared global to avoid ReferenceError before loadMyWorks
         window.myCasesCache = window.myCasesCache || []; // V90.63: guard for renderCases
@@ -6163,6 +6208,7 @@
                     loadReviewLinks(); // V96.50: Beri Phase 1 — Explore tab
                     loadBeriShop(); // V96.51: Beri Phase 2 — A Shop for Killers
                     loadExploreReviews(); // V96.5x: Explore link reviews (+1 Beri, admin-approved)
+                    loadMyLinkSuggestions(); // V98.04: user-suggested Explore links (admin-approved)
                     loadDivisionConfig();
                     loadGroupSettings();
                     loadMyCases();
@@ -6274,6 +6320,7 @@
                 loadReviewLinks(); // V96.50: Beri Phase 1 — Explore tab
                 loadBeriShop(); // V96.51: Beri Phase 2 — A Shop for Killers
                 loadExploreReviews(); // V96.5x: Explore link reviews (+1 Beri, admin-approved)
+                loadMyLinkSuggestions(); // V98.04: user-suggested Explore links (admin-approved)
                 loadDivisionConfig();
                 loadGroupSettings();
                 loadMyCases(); // 🔥 Added V84.1
@@ -6377,6 +6424,16 @@
                     myBeri = parseInt(da.beri || 0, 10);
                     const beriEl = document.getElementById('u-beri');
                     if (beriEl) beriEl.innerText = '¥' + myBeri;
+                    // V98.04: sync the persistent "ever unlocked" flag; if this is the FIRST
+                    // time myBeri crosses the threshold, persist it once so the shop never
+                    // re-locks later just because the user spent Beri back down. Guarded on
+                    // !da.beriShopUnlocked so this only fires once — the resulting write
+                    // re-triggers this same onSnapshot with the flag already true.
+                    myEverUnlockedBeriShop = !!da.beriShopUnlocked;
+                    if (!myEverUnlockedBeriShop && myBeri > BERI_SHOP_UNLOCK_THRESHOLD) {
+                        myEverUnlockedBeriShop = true;
+                        db.collection('users').doc(userId).update({ beriShopUnlocked: true }).catch(() => {});
+                    }
                     // V96.51: shop card afford/disabled state depends on myBeri — refresh on live change
                     if (typeof renderBeriShop === 'function') renderBeriShop();
                     // V95.43: keep daily check-in card in sync with live user doc
@@ -7515,6 +7572,85 @@
             }
         }
 
+        // ===================================================================
+        // ➕ V98.04: Suggest a new Explore link — intern proposes title/url/type;
+        // admin reviews (may edit the fields) before approving into the live
+        // review_links catalog, or rejects. See firestore.rules rule 38 and
+        // admin.html renderPendingLinkSuggestions/approveLinkSuggestion.
+        // ===================================================================
+        let myLinkSuggestionsCache = [];
+
+        function loadMyLinkSuggestions() {
+            db.collection('review_link_suggestions').where('userId', '==', userId).onSnapshot(s => {
+                myLinkSuggestionsCache = s.docs.map(d => ({ id: d.id, ...d.data() }))
+                    .sort((a, b) => (b.createdAt ? b.createdAt.toMillis() : 0) - (a.createdAt ? a.createdAt.toMillis() : 0));
+                renderMyLinkSuggestions();
+            }, e => handleFirestoreListenerError('my link suggestions listener', e));
+        }
+
+        function openSuggestLinkModal() {
+            document.getElementById('sl-title').value = '';
+            document.getElementById('sl-url').value = '';
+            slSetType('line_man');
+            document.getElementById('suggestLinkModal').style.display = 'flex';
+        }
+
+        function slSetType(type) {
+            document.getElementById('sl-type').value = type;
+            const box = document.getElementById('sl-type-chips');
+            if (!box) return;
+            const typeLabel = { line_man: 'LINE MAN', youtube: 'YouTube', other: 'Other' };
+            box.innerHTML = Object.keys(REVIEW_LINK_TYPE_ICON).map(t => {
+                const active = t === type;
+                return `<button type="button" onclick="slSetType('${t}')" style="width:auto; min-height:auto; flex:1; padding:8px 6px; border-radius:10px; border:1.5px solid ${active ? '#ea580c' : '#e2e8f0'}; background:${active ? '#fff7ed' : '#fff'}; color:${active ? '#c2410c' : '#64748b'}; font-weight:700; font-size:0.82em; cursor:pointer;">${REVIEW_LINK_TYPE_ICON[t]} ${typeLabel[t] || t}</button>`;
+            }).join('');
+        }
+
+        async function submitLinkSuggestion() {
+            const title = document.getElementById('sl-title').value.trim();
+            const url = document.getElementById('sl-url').value.trim();
+            const type = document.getElementById('sl-type').value || 'line_man';
+            if (!title || !url) { alert('กรอกชื่อและ URL ก่อนส่ง · Title and URL are required'); return; }
+            try {
+                await db.collection('review_link_suggestions').add({
+                    title, url, type,
+                    userId,
+                    displayName: (userProfile && userProfile.displayName) || '',
+                    pictureUrl: (userProfile && userProfile.pictureUrl) || '',
+                    status: 'pending',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                document.getElementById('suggestLinkModal').style.display = 'none';
+                alert('ส่งข้อเสนอแล้ว! รอแอดมินตรวจ · Suggestion submitted! Waiting for admin approval.');
+            } catch (e) {
+                alert('ส่งไม่สำเร็จ · Submit failed: ' + e.message);
+            }
+        }
+
+        const LINK_SUGGESTION_STATUS_LABEL = {
+            pending: { text: 'รอตรวจ · Pending', color: '#b45309', bg: '#fffbeb' },
+            approved: { text: 'อนุมัติแล้ว · Approved', color: '#15803d', bg: '#dcfce7' },
+            rejected: { text: 'ไม่ผ่าน · Rejected', color: '#991b1b', bg: '#fee2e2' }
+        };
+
+        function renderMyLinkSuggestions() {
+            const list = document.getElementById('my-link-suggestions-history');
+            if (!list) return;
+            if (!myLinkSuggestionsCache.length) {
+                list.innerHTML = '<div style="padding:10px; text-align:center; color:#94a3b8; font-size:0.85em;">ยังไม่มีข้อเสนอ · No suggestions yet</div>';
+                return;
+            }
+            list.innerHTML = myLinkSuggestionsCache.map(s => {
+                const st = LINK_SUGGESTION_STATUS_LABEL[s.status] || LINK_SUGGESTION_STATUS_LABEL.pending;
+                const icon = REVIEW_LINK_TYPE_ICON[s.type] || '🔗';
+                return `
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 12px; background:#fff; border:1px solid #f1f5f9; border-radius:10px;">
+                        <div style="font-size:0.82em; font-weight:700; color:#334155; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${icon} ${escapeHtml(s.title || '')}</div>
+                        <span style="font-size:0.72em; font-weight:800; color:${st.color}; background:${st.bg}; padding:2px 9px; border-radius:999px; white-space:nowrap;">${st.text}</span>
+                    </div>`;
+            }).join('');
+        }
+
         const BERI_REDEMPTION_STATUS_LABEL = {
             requesting: { text: 'รอมอบของ · Pending', color: '#b45309', bg: '#fffbeb' },
             fulfilled: { text: 'มอบแล้ว · Fulfilled', color: '#15803d', bg: '#dcfce7' },
@@ -7529,15 +7665,23 @@
 
             // V96.5x: shop locked until myBeri > BERI_SHOP_UNLOCK_THRESHOLD. Redemption
             // history stays visible regardless — it's about past requests, not access.
-            const isLocked = myBeri <= BERI_SHOP_UNLOCK_THRESHOLD;
+            // V98.04: myEverUnlockedBeriShop short-circuits this to permanently-unlocked
+            // once crossed once, regardless of current myBeri (see the onSnapshot sync above).
+            const isLocked = !myEverUnlockedBeriShop && myBeri <= BERI_SHOP_UNLOCK_THRESHOLD;
             if (locked) {
                 locked.style.display = isLocked ? 'block' : 'none';
-                const cur = document.getElementById('beri-shop-locked-current');
-                if (cur) cur.textContent = `ตอนนี้มี ${myBeri} Beri · currently ${myBeri} Beri`;
-                ['beri-shop-locked-threshold', 'beri-shop-locked-threshold-en'].forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) el.textContent = BERI_SHOP_UNLOCK_THRESHOLD;
-                });
+                if (isLocked) {
+                    // V98.04: lead with how many MORE Beri are needed, not the raw balance.
+                    const remaining = Math.max(1, BERI_SHOP_UNLOCK_THRESHOLD - myBeri + 1);
+                    ['beri-shop-locked-remaining', 'beri-shop-locked-remaining-en'].forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) el.textContent = remaining;
+                    });
+                    ['beri-shop-locked-threshold', 'beri-shop-locked-threshold-en'].forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) el.textContent = BERI_SHOP_UNLOCK_THRESHOLD;
+                    });
+                }
             }
             if (isLocked) {
                 grid.innerHTML = '';
@@ -7586,8 +7730,9 @@
         async function redeemBeriReward(rewardId) {
             // Mirrors the shop's own render-time lock — the button isn't in the DOM while
             // locked, but this guards a direct console call too (same posture as the quiz
-            // unlockScore gate: client-side only, no rules-level enforcement).
-            if (myBeri <= BERI_SHOP_UNLOCK_THRESHOLD) {
+            // unlockScore gate: client-side only, no rules-level enforcement). V98.04:
+            // myEverUnlockedBeriShop bypasses this the same way renderBeriShop does.
+            if (!myEverUnlockedBeriShop && myBeri <= BERI_SHOP_UNLOCK_THRESHOLD) {
                 alert(`🔒 ร้านนี้ยังล็อกอยู่ ต้องมี Beri เกิน ${BERI_SHOP_UNLOCK_THRESHOLD}\nShop is locked — need more than ${BERI_SHOP_UNLOCK_THRESHOLD} Beri`);
                 return;
             }
