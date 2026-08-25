@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.52)</title>
+    <title>Internship Portfolio (V96.53)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3882,6 +3882,31 @@
                                 <div id="explore-links-empty" class="lang-no-toggle" style="display:none; padding:30px; text-align:center; color:#94a3b8; font-size:0.86em;">
                                     ยังไม่มีลิงก์ · No links yet
                                 </div>
+
+                                <!-- V96.51: Beri Phase 2 — "A Shop for Killers" redemption shop.
+                                     Second section inside Explore, below the links. Catalog +
+                                     redemption fulfillment managed in admin.html > Assignments >
+                                     A Shop for Killers. See redeemBeriReward / renderBeriShop. -->
+                                <!-- lang-no-toggle on this whole wrapper (not just the static text)
+                                     exempts every descendant, including the dynamically-rendered
+                                     shop grid cards + redemption history — lang-toggle.js walks
+                                     ancestors on both static AND innerHTML-inserted text (same fix
+                                     as the links-list block above, which shipped without it and
+                                     had to be hotfixed live — see PR #913). -->
+                                <div class="lang-no-toggle" style="margin-top:22px; padding-top:16px; border-top:1px solid #f1f5f9;">
+                                    <div style="font-size:0.9em; font-weight:800; color:#475569; margin-bottom:10px;">
+                                        🏪 A Shop for Killers
+                                    </div>
+                                    <div id="beri-shop-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px;"></div>
+                                    <div id="beri-shop-empty" style="display:none; padding:20px; text-align:center; color:#94a3b8; font-size:0.86em;">
+                                        ยังไม่มีของรางวัล · No rewards yet
+                                    </div>
+
+                                    <details style="margin-top:14px;">
+                                        <summary style="cursor:pointer; font-size:0.82em; font-weight:700; color:#78716c; outline:none; user-select:none;">📋 คำขอแลกของของฉัน · My redemption requests</summary>
+                                        <div id="beri-redemptions-history" style="display:flex; flex-direction:column; gap:6px; margin-top:8px;"></div>
+                                    </details>
+                                </div>
                             </div>
 
                         </div>
@@ -6085,6 +6110,7 @@
                     loadSideQuests();
                     loadQuizzes();
                     loadReviewLinks(); // V96.50: Beri Phase 1 — Explore tab
+                    loadBeriShop(); // V96.51: Beri Phase 2 — A Shop for Killers
                     loadDivisionConfig();
                     loadGroupSettings();
                     loadMyCases();
@@ -6194,6 +6220,7 @@
                 loadSideQuests();
                 loadQuizzes();
                 loadReviewLinks(); // V96.50: Beri Phase 1 — Explore tab
+                loadBeriShop(); // V96.51: Beri Phase 2 — A Shop for Killers
                 loadDivisionConfig();
                 loadGroupSettings();
                 loadMyCases(); // 🔥 Added V84.1
@@ -6297,6 +6324,8 @@
                     myBeri = parseInt(da.beri || 0, 10);
                     const beriEl = document.getElementById('u-beri');
                     if (beriEl) beriEl.innerText = '¥' + myBeri;
+                    // V96.51: shop card afford/disabled state depends on myBeri — refresh on live change
+                    if (typeof renderBeriShop === 'function') renderBeriShop();
                     // V95.43: keep daily check-in card in sync with live user doc
                     myCheckin = {
                         currentStreak: da.checkinCurrentStreak || 0,
@@ -7271,6 +7300,118 @@
                 });
             } catch (e) {
                 console.error('Explore link Beri credit error:', e); // best-effort — link already opened
+            }
+        }
+
+        // ===================================================================
+        // 🏪 V96.51: A Shop for Killers — Beri Phase 2. Redemption shop, lives as
+        // a second section inside the Explore tab (below the links list). Unlike
+        // Phase 1's earn-only increment(), redeeming SPENDS Beri + stock, so the
+        // whole thing (redemption doc + users/{uid}.beri debit + beri_rewards
+        // stock decrement) runs in one Firestore transaction — otherwise two
+        // concurrent redeems (e.g. two open tabs) could both read a sufficient
+        // balance and both deduct, taking the user negative. Verified server-
+        // side truth for both balance and stock is re-read inside the
+        // transaction, not trusted from the (possibly stale) local cache.
+        // ===================================================================
+        let beriRewardsCache = [], myRedemptionsCache = [];
+
+        function loadBeriShop() {
+            db.collection('beri_rewards').where('isActive', '==', true).onSnapshot(s => {
+                beriRewardsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderBeriShop();
+            }, e => handleFirestoreListenerError('beri rewards listener', e));
+            db.collection('beri_redemptions').where('userId', '==', userId).onSnapshot(s => {
+                myRedemptionsCache = s.docs.map(d => ({ id: d.id, ...d.data() }))
+                    .sort((a, b) => (b.requestedAt ? b.requestedAt.toMillis() : 0) - (a.requestedAt ? a.requestedAt.toMillis() : 0));
+                renderBeriShop();
+            }, e => handleFirestoreListenerError('my redemptions listener', e));
+        }
+
+        const BERI_REDEMPTION_STATUS_LABEL = {
+            requesting: { text: 'รอมอบของ · Pending', color: '#b45309', bg: '#fffbeb' },
+            fulfilled: { text: 'มอบแล้ว · Fulfilled', color: '#15803d', bg: '#dcfce7' },
+            denied: { text: 'ปฏิเสธ (คืน Beri แล้ว) · Denied (refunded)', color: '#991b1b', bg: '#fee2e2' }
+        };
+
+        function renderBeriShop() {
+            const grid = document.getElementById('beri-shop-grid');
+            const empty = document.getElementById('beri-shop-empty');
+            if (!grid) return; // tab not in DOM yet
+            if (!beriRewardsCache.length) {
+                grid.innerHTML = '';
+                if (empty) empty.style.display = 'block';
+            } else {
+                if (empty) empty.style.display = 'none';
+                grid.innerHTML = beriRewardsCache.map(r => {
+                    const outOfStock = r.stock != null && r.stock <= 0;
+                    const canAfford = myBeri >= (r.beriCost || 0);
+                    const disabled = outOfStock || !canAfford;
+                    const stockBadge = r.stock != null ? `<span style="font-size:0.72em; color:#94a3b8; font-weight:700;">${outOfStock ? 'หมดแล้ว · Out of stock' : `เหลือ ${r.stock} · ${r.stock} left`}</span>` : '';
+                    return `
+                        <div style="background:#fff; border:1px solid #f1f5f9; border-radius:12px; padding:12px 14px; ${disabled ? 'opacity:0.6;' : ''}">
+                            <div style="font-weight:800; color:#334155; font-size:0.92em;">🎁 ${escapeHtml(r.name || 'Untitled')}</div>
+                            ${r.description ? `<div style="font-size:0.78em; color:#64748b; margin-top:2px;">${escapeHtml(r.description)}</div>` : ''}
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:8px;">
+                                <div style="font-weight:900; color:#b45309; font-size:0.85em;">¥${r.beriCost || 0}</div>
+                                ${stockBadge}
+                            </div>
+                            <button onclick="redeemBeriReward('${r.id}')" ${disabled ? 'disabled' : ''} style="width:100%; margin-top:8px; padding:8px 12px; background:${disabled ? '#e2e8f0' : 'linear-gradient(135deg,#f59e0b,#ea580c)'}; border:none; border-radius:10px; color:${disabled ? '#94a3b8' : 'white'}; font-weight:800; font-size:0.85em; cursor:${disabled ? 'not-allowed' : 'pointer'};">
+                                ${outOfStock ? 'หมดแล้ว' : (!canAfford ? 'Beri ไม่พอ' : 'แลกเลย · Redeem')}
+                            </button>
+                        </div>`;
+                }).join('');
+            }
+
+            const historyList = document.getElementById('beri-redemptions-history');
+            if (historyList) {
+                historyList.innerHTML = myRedemptionsCache.map(r => {
+                    const st = BERI_REDEMPTION_STATUS_LABEL[r.status] || BERI_REDEMPTION_STATUS_LABEL.requesting;
+                    return `
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 12px; background:#fff; border:1px solid #f1f5f9; border-radius:10px;">
+                            <div style="font-size:0.82em; font-weight:700; color:#334155;">${escapeHtml(r.rewardName || '')} <span style="color:#b45309;">¥${r.beriCost || 0}</span></div>
+                            <span style="font-size:0.72em; font-weight:800; color:${st.color}; background:${st.bg}; padding:2px 9px; border-radius:999px;">${st.text}</span>
+                        </div>`;
+                }).join('');
+            }
+        }
+
+        // Reads server-truth balance/stock inside the transaction (never trusts
+        // the local myBeri/beriRewardsCache mirrors, which can be stale) so two
+        // concurrent redemptions can never both succeed past the real balance.
+        async function redeemBeriReward(rewardId) {
+            const reward = beriRewardsCache.find(r => r.id === rewardId);
+            if (!reward) return;
+            if (!confirm(`แลก "${reward.name}" ด้วย ${reward.beriCost} Beri?\nRedeem "${reward.name}" for ${reward.beriCost} Beri?`)) return;
+            try {
+                const rewardRef = db.collection('beri_rewards').doc(rewardId);
+                const userRef = db.collection('users').doc(userId);
+                const redemptionRef = db.collection('beri_redemptions').doc();
+                await db.runTransaction(async tx => {
+                    const rewardSnap = await tx.get(rewardRef);
+                    if (!rewardSnap.exists) throw new Error('ของรางวัลนี้ไม่มีแล้ว · No longer available');
+                    const rd = rewardSnap.data();
+                    if (rd.isActive === false) throw new Error('ของรางวัลนี้ปิดใช้งานแล้ว · No longer active');
+                    if (rd.stock != null && rd.stock <= 0) throw new Error('ของรางวัลหมดแล้ว · Out of stock');
+                    const userSnap = await tx.get(userRef);
+                    const currentBeri = parseInt((userSnap.exists && userSnap.data().beri) || 0, 10);
+                    const cost = parseInt(rd.beriCost, 10) || 0;
+                    if (currentBeri < cost) throw new Error('Beri ไม่พอ · Not enough Beri');
+                    tx.set(redemptionRef, {
+                        userId,
+                        displayName: (userProfile && userProfile.displayName) || '',
+                        rewardId, rewardName: rd.name || '', beriCost: cost,
+                        status: 'requesting',
+                        requestedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    tx.set(userRef, { beri: firebase.firestore.FieldValue.increment(-cost) }, { merge: true });
+                    if (rd.stock != null) {
+                        tx.update(rewardRef, { stock: firebase.firestore.FieldValue.increment(-1) });
+                    }
+                });
+                alert('แลกสำเร็จ! รอแอดมินมอบของรางวัล · Redeemed! Waiting for admin to fulfill');
+            } catch (e) {
+                alert('แลกไม่สำเร็จ · Redeem failed: ' + e.message);
             }
         }
 
@@ -11589,6 +11730,8 @@
             } else if (tab === 'explore') {
                 // V96.50: Beri Phase 1 — refresh Explore Links list when entering tab
                 if (typeof renderExploreLinks === 'function') renderExploreLinks();
+                // V96.51: Beri Phase 2 — refresh the shop + redemption history too
+                if (typeof renderBeriShop === 'function') renderBeriShop();
             }
         }
 

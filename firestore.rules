@@ -468,6 +468,28 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // 36. Beri Rewards (Phase 2 shop catalog, "A Shop for Killers") — admin CRUD
+    // catalog. `stock` is the one field a non-admin may touch via update,
+    // decremented atomically inside the same client transaction as the
+    // redemption doc + users/{uid}.beri debit (see index.html redeemBeriReward)
+    // — this SDK (firestore-compat v8) has no query-inside-transaction support,
+    // so a live stock counter field is the only way to enforce it atomically.
+    match /beri_rewards/{rewardId} {
+      allow read: if true;
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+        || (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']));
+    }
+
+    // 36b. Beri Redemptions — intern creates their own request (inside the same
+    // transaction as the beri_rewards stock decrement + users/{uid}.beri debit);
+    // only admin can update (fulfill/deny) or delete, so an intern can never
+    // self-approve or self-refund their own request.
+    match /beri_redemptions/{redemptionId} {
+      allow create, read: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
     // 35d. Beri Adjustments — admin-only audit log for manually crediting/debiting
     // a user's Beri (e.g. an offline/real-world purchase). Kept out of
     // checkin_logs deliberately — several dashboards sum checkin_logs amounts
