@@ -443,5 +443,29 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.resource.data.authUid == request.auth.uid;
       allow update, delete: if isAdmin();
     }
+
+    // 35. Review Links (Explore tab, Beri Phase 1) — admin-curated external
+    // links (LINE MAN shops, YouTube, etc.). Same posture as /quizzes (rule 8).
+    match /review_links/{linkId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 35b. Review Link Clicks — one doc per (link, user), id `${linkId}_${userId}`,
+    // dedupes the one-time Beri credit and lets the client check "already earned"
+    // for its own doc by direct get(). Same posture as /quiz_attempts (rule 9).
+    match /review_link_clicks/{clickId} {
+      allow create, update, read: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // 35c. Beri daily cap counter — one doc per user per Bangkok day, id
+    // `${userId}_${dateKey}`, written inside the same client transaction as
+    // review_link_clicks + users/{uid}.beri (see index.html explOpenLink) so the
+    // per-day Beri cap from Explore Links is enforced atomically.
+    match /beri_daily/{docId} {
+      allow create, update, read: if isSignedIn();
+      allow delete: if isAdmin();
+    }
   }
 }

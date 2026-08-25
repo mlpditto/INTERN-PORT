@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.93</title>
+    <title>Nika V97.95</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6610,6 +6610,10 @@
                 <button type="button" class="subtab-btn" data-subtab="subtab-exam-sessions" onclick="switchAssignmentsSubtab('subtab-exam-sessions')" role="tab">
                     🎓 Exam
                 </button>
+                <!-- V96.50: Beri Phase 1 — admin-curated external links (Explore tab) -->
+                <button type="button" class="subtab-btn" data-subtab="subtab-review-links" onclick="switchAssignmentsSubtab('subtab-review-links')" role="tab">
+                    🔗 Explore Links
+                </button>
             </div>
 
             <div id="subtab-quiz-engine" class="subtab-content active">
@@ -6820,6 +6824,71 @@
                 </details>
             </div>
             </div><!-- /subtab-exam-sessions -->
+
+            <!-- V96.50: Beri Phase 1 — Review Links (Explore tab source content).
+                 Lightweight CRUD, side_quest-style: title/url/type/beriReward/isActive.
+                 Interns earn Beri (see users/{uid}.beri) the first time they open each
+                 link — no admin approval step, credited client-side in a transaction
+                 (index.html explOpenLink) against review_link_clicks + a daily cap
+                 counter in beri_daily. -->
+            <div id="subtab-review-links" class="subtab-content">
+            <div style="background:#fff7ed; padding:20px; border-radius:12px; margin-bottom:30px; border:1px solid #fed7aa;">
+                <div class="flex-between" style="border-bottom:1px solid #fdba74; padding-bottom:15px; margin-bottom:20px;">
+                    <h3 style="margin:0; color:#c2410c; display:flex; align-items:center; gap:12px; font-weight:900; font-size:1.3em;">
+                        🔗 Explore Links <span style="font-size:0.55em; font-weight:700; color:#ea580c; text-transform:uppercase; letter-spacing:0.4px;">Beri Phase 1</span>
+                    </h3>
+                    <button class="magic-btn" onclick="openReviewLinkModal()" style="background:linear-gradient(135deg, #ea580c, #c2410c); padding:10px 22px; border-radius:14px; font-weight:900;">➕ Add Link</button>
+                </div>
+                <p style="margin:0 0 18px 0; color:#78716c; font-size:0.85em; line-height:1.5;">
+                    LINE MAN shops, YouTube, or any external link worth an intern's time. First open of each link earns the Beri set below (subject to each intern's daily cap) — no review queue, credited immediately.
+                </p>
+                <div id="review-links-list" style="display:flex; flex-direction:column; gap:10px;">
+                    <div style="padding:30px; text-align:center; color:#94a3b8; font-size:0.86em;">Loading...</div>
+                </div>
+            </div>
+            </div><!-- /subtab-review-links -->
+        </div>
+
+        <!-- V96.50: Review Link create/edit modal (Beri Phase 1) -->
+        <div id="reviewLinkModal" class="modal" style="display:none; z-index:9200;">
+            <div class="modal-content" style="max-width:460px; padding:22px; border-radius:16px;">
+                <span class="close-modal" onclick="forceHideModal('reviewLinkModal')" style="position:absolute; top:14px; right:16px; cursor:pointer; font-size:1.4em; color:#64748b;">&times;</span>
+                <h3 style="margin:0 0 16px 0; color:#c2410c; display:flex; align-items:center; gap:10px; font-weight:900;">
+                    🔗 Review Link
+                </h3>
+                <input type="hidden" id="rl-edit-id">
+                <div style="margin-bottom:14px;">
+                    <label style="display:block; font-size:0.72em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Title <span style="color:#ef4444;">*</span></label>
+                    <input type="text" id="rl-title" placeholder="e.g. ร้านยา XYZ บน LINE MAN" style="width:100%; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em; box-sizing:border-box;">
+                </div>
+                <div style="margin-bottom:14px;">
+                    <label style="display:block; font-size:0.72em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">URL <span style="color:#ef4444;">*</span></label>
+                    <input type="url" id="rl-url" placeholder="https://..." style="width:100%; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em; box-sizing:border-box;">
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+                    <div>
+                        <label style="display:block; font-size:0.72em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Type</label>
+                        <select id="rl-type" style="width:100%; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em; background:#fff;">
+                            <option value="line_man">🛍️ LINE MAN</option>
+                            <option value="youtube">▶️ YouTube</option>
+                            <option value="other">🔗 Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:0.72em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Beri Reward</label>
+                        <input type="number" id="rl-beri" value="10" min="1" step="1" style="width:100%; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em; box-sizing:border-box;">
+                    </div>
+                </div>
+                <label style="display:flex; align-items:center; gap:8px; font-size:0.85em; font-weight:700; color:#475569; margin-bottom:18px; cursor:pointer;">
+                    <input type="checkbox" id="rl-active" checked> Active (visible in the Explore tab)
+                </label>
+                <div style="display:flex; gap:8px; justify-content:flex-end;">
+                    <button type="button" onclick="forceHideModal('reviewLinkModal')" style="padding:9px 18px; border-radius:10px; border:1px solid #e2e8f0; background:#fff; cursor:pointer; font-weight:700; color:#64748b;">Cancel</button>
+                    <button type="button" onclick="saveReviewLink()" class="magic-btn" style="background:linear-gradient(135deg, #ea580c, #c2410c); padding:9px 22px; border-radius:10px; font-weight:900; font-size:0.88em;">
+                        <i class="fa-solid fa-floppy-disk"></i> Save
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- V92.72: Quick Launch Exam modal — opened from 🎓 button on each Quiz Engine row -->
@@ -20760,7 +20829,8 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         var reflectiveLogsCache = [];
         var learningNotesCache = []; // V91.71: Section 9 — Learning Note submissions for admin Kanban review
         var accessRequestsCache = []; 
-        var pendingQuizzesCache = [];  
+        var pendingQuizzesCache = [];
+        var reviewLinksCache = []; // V96.50: Beri Phase 1 — Explore Links admin catalog
         var pointsClaimedCache = [];   
         var quizAttemptsAllCache = []; // 🔥 [Version: V88.50] Global Cache for all attempts to fix visibility bug
         let hideCompletedWorks = true;
@@ -31638,6 +31708,11 @@ RULES:
                     badge.style.display = n > 0 ? 'inline-block' : 'none';
                 }
             });
+            // V96.50: Beri Phase 1 — Explore Links catalog (Assignments > Explore Links subtab)
+            db.collection("review_links").orderBy("createdAt", "desc").onSnapshot(s => {
+                reviewLinksCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderReviewLinksAdmin();
+            }, e => console.error("🔥 [Firestore Error] review_links:", e));
             // 🔥 [Version: V77.16] Load ALL quiz attempts for counting and full history (Authorized for Admin)
             db.collection("quiz_attempts").orderBy("timestamp", "desc").onSnapshot(s => {
                 const allAttempts = s.docs.map(d => ({ id: d.id, ...d.data(), isQuiz: true, collection: 'quiz_attempts' }));
@@ -31794,6 +31869,89 @@ RULES:
                     allowedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 showToast("Request Allowed!");
+            } catch (e) { alert(e.message); }
+        }
+
+        // ===================================================================
+        // 🔗 V96.50: Explore Links — Beri Phase 1 (Assignments > Explore Links subtab)
+        // Lightweight CRUD, same shape as saveSideQuest(): one modal, create-or-update
+        // by presence of #rl-edit-id. No admin-review workflow — interns earn Beri
+        // immediately on first open (index.html explOpenLink), so this screen only
+        // manages the catalog, not any per-intern completion state.
+        // ===================================================================
+        const REVIEW_LINK_TYPE_ICON = { line_man: '🛍️', youtube: '▶️', other: '🔗' };
+
+        function renderReviewLinksAdmin() {
+            const list = document.getElementById('review-links-list');
+            if (!list) return;
+            if (!reviewLinksCache.length) {
+                list.innerHTML = '<div style="padding:30px; text-align:center; color:#94a3b8; font-size:0.86em;">No links yet — click ➕ Add Link to create the first one.</div>';
+                return;
+            }
+            list.innerHTML = reviewLinksCache.map(l => {
+                const icon = REVIEW_LINK_TYPE_ICON[l.type] || '🔗';
+                const active = l.isActive !== false;
+                return `
+                    <div style="display:flex; align-items:center; gap:12px; background:white; border:1px solid #f1f5f9; border-radius:12px; padding:12px 14px; ${active ? '' : 'opacity:0.55;'}">
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-weight:800; color:#334155; font-size:0.92em;">${icon} ${escapeHtml(l.title || 'Untitled')}</div>
+                            <div style="font-size:0.76em; color:#94a3b8; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(l.url || '')}</div>
+                        </div>
+                        <div style="font-weight:900; color:#b45309; font-size:0.85em; white-space:nowrap;">+${l.beriReward || 0} Beri</div>
+                        <button class="btn-sm" onclick='toggleReviewLinkActive(${JSON.stringify(l.id)}, ${active})' style="background:${active ? '#dcfce7' : '#f1f5f9'}; color:${active ? '#15803d' : '#64748b'}; border:none; border-radius:10px; padding:6px 12px; font-weight:700; cursor:pointer;">${active ? 'Active' : 'Paused'}</button>
+                        <button class="btn-sm btn-info" onclick='openReviewLinkModal(${JSON.stringify(l.id)})'>Edit</button>
+                        <button class="btn-sm btn-danger" onclick='deleteReviewLink(${JSON.stringify(l.id)})'>Delete</button>
+                    </div>`;
+            }).join('');
+        }
+
+        function openReviewLinkModal(id = null) {
+            const l = id ? reviewLinksCache.find(x => x.id === id) : null;
+            document.getElementById('rl-edit-id').value = id || '';
+            document.getElementById('rl-title').value = l ? (l.title || '') : '';
+            document.getElementById('rl-url').value = l ? (l.url || '') : '';
+            document.getElementById('rl-type').value = l ? (l.type || 'line_man') : 'line_man';
+            document.getElementById('rl-beri').value = l ? (l.beriReward || 10) : 10;
+            document.getElementById('rl-active').checked = l ? (l.isActive !== false) : true;
+            forceShowModal('reviewLinkModal');
+        }
+
+        async function saveReviewLink() {
+            const id = document.getElementById('rl-edit-id').value;
+            const title = document.getElementById('rl-title').value.trim();
+            const url = document.getElementById('rl-url').value.trim();
+            const beriReward = parseInt(document.getElementById('rl-beri').value, 10) || 0;
+            if (!title || !url) { alert('Title and URL are required.'); return; }
+            if (beriReward < 1) { alert('Beri reward must be at least 1.'); return; }
+            const data = {
+                title, url,
+                type: document.getElementById('rl-type').value,
+                beriReward,
+                isActive: document.getElementById('rl-active').checked
+            };
+            try {
+                if (id) {
+                    await db.collection('review_links').doc(id).update(data);
+                } else {
+                    data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                    await db.collection('review_links').add(data);
+                }
+                forceHideModal('reviewLinkModal');
+                showToast('Link saved!');
+            } catch (e) { alert(e.message); }
+        }
+
+        async function toggleReviewLinkActive(id, current) {
+            try {
+                await db.collection('review_links').doc(id).update({ isActive: !current });
+            } catch (e) { alert(e.message); }
+        }
+
+        async function deleteReviewLink(id) {
+            if (!confirm('Delete this link? Interns will no longer see it (already-earned Beri is not affected).')) return;
+            try {
+                await db.collection('review_links').doc(id).delete();
+                showToast('Link deleted');
             } catch (e) { alert(e.message); }
         }
 
