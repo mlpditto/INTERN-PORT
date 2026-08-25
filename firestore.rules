@@ -498,5 +498,16 @@ service cloud.firestore {
     match /beri_adjustments/{docId} {
       allow read, write: if isAdmin();
     }
+
+    // 37. Review Link Reviews — intern writes their own pending review (one
+    // per link, doc id `${linkId}_${userId}`, dedup like review_link_clicks);
+    // approved reviews are a public feed visible to any signed-in user under
+    // each link. Only admin can update (approve/deny, awards 1 Beri client-side
+    // via admin.html) or delete — an intern can never self-approve or edit
+    // after submitting (no resubmit path in this version).
+    match /review_link_reviews/{reviewId} {
+      allow create, read: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
   }
 }
