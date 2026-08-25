@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V96.76)</title>
+    <title>Internship Portfolio (V96.77)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -8810,12 +8810,19 @@
             // only. Single chokepoint every take-path funnels through, so this
             // covers fresh starts, resumes, ONE-TIME practice/real-exam, and
             // late-submission runs alike.
+            // V96.49: an admin-approved out-of-hours request (outOfHoursApproved,
+            // scoped to this one attempt doc — see requestOutOfHours) bypasses the
+            // window once. The flag is consumed where the attempt is (re)started
+            // below so a later run is gated again like normal.
             {
                 const _now = new Date();
                 const _hour = _now.getHours();
                 const _inWindow = _hour >= 9 && _hour < 21;
-                if (!_inWindow) {
-                    alert("⛔ ทำ Quiz ได้เฉพาะเวลา 09:00-21:00 เท่านั้น\nQuizzes can only be taken 09:00-21:00.");
+                const _oohApproved = quizAttemptsCache[quizId] && quizAttemptsCache[quizId].outOfHoursApproved === true;
+                if (!_inWindow && !_oohApproved) {
+                    if (confirm("⛔ ทำ Quiz ได้เฉพาะเวลา 09:00-21:00 เท่านั้น\nQuizzes can only be taken 09:00-21:00.\n\nต้องการขอทำนอกเวลาหรือไม่? แอดมินต้องอนุมัติก่อน\nRequest permission to take outside these hours? (Requires admin approval)")) {
+                        requestOutOfHours(quizId);
+                    }
                     currentQuiz = null;
                     return;
                 }
@@ -8917,7 +8924,8 @@
                     status: 'started',
                     startTime: firebase.firestore.FieldValue.serverTimestamp(),
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    answers: userAnswers
+                    answers: userAnswers,
+                    outOfHoursApproved: firebase.firestore.FieldValue.delete() // V96.49: consume the one-time bypass
                 });
             } else {
                 currentStep = 0;
@@ -9064,6 +9072,29 @@
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 }, { merge: true });
                 alert(isRetake ? "Retake request submitted! Please wait for admin approval." : "Request submitted! Please wait for admin approval.");
+                loadQuizzes();
+            } catch (e) {
+                alert("Request Error: " + e.message);
+            }
+        }
+
+        // V96.49: request permission to take a quiz outside the 09:00-21:00 window
+        // (see runQuiz). Separate from `status` (which drives the late/retake state
+        // machine above) so it doesn't disturb an in-progress/interrupted attempt —
+        // admin approval just sets outOfHoursApproved:true, consumed on next start.
+        async function requestOutOfHours(quizId) {
+            const q = quizzesCache.find(x => x.id === quizId);
+            if (!q) return;
+            try {
+                await db.collection("quiz_attempts").doc(`${quizId}_${userId}`).set({
+                    quizId,
+                    userId,
+                    displayName: userProfile.displayName,
+                    pictureUrl: userProfile.pictureUrl || "",
+                    outOfHoursRequested: true,
+                    outOfHoursRequestedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+                alert("ส่งคำขอทำนอกเวลาแล้ว รอแอดมินอนุมัติ\nRequest submitted! Please wait for admin approval.");
                 loadQuizzes();
             } catch (e) {
                 alert("Request Error: " + e.message);

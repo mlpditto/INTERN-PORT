@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.32</title>
+    <title>Nika V98.33</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -21065,6 +21065,8 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         var linkSuggestionsCache = []; // V98.04: intern-suggested Explore links awaiting approval
         var beriRewardsCache = []; // V96.51: Beri Phase 2 — shop catalog (all, not just active)
         var beriRedemptionsCache = []; // V96.51: Beri Phase 2 — pending (status='requesting') fulfillment queue
+        var statusPendingDocsCache = []; // V96.49: split out of the merged onSnapshot below
+        var oohPendingDocsCache = [];    // V96.49: out-of-hours (outOfHoursRequested) requests, merged into pendingQuizzesCache
         var pointsClaimedCache = [];   
         var quizAttemptsAllCache = []; // 🔥 [Version: V88.50] Global Cache for all attempts to fix visibility bug
         let hideCompletedWorks = true;
@@ -25035,11 +25037,22 @@ ${JSON.stringify(sourceObj)}`;
                 const isPoll = q.isPoll === true;
                 const isRequest = att.status === 'requesting';
                 const isPracticeRequest = att.status === 'requesting' && att.isPractice;
+                // V96.49: out-of-hours (09:00-21:00) request — a separate flag from
+                // `status`, so it can surface here even mid-attempt without disturbing
+                // the real status. Checked first: routes straight to Allow/Deny instead
+                // of falling into the grading branch below.
+                const isOutOfHours = att.outOfHoursRequested === true;
 
                 let actionHtml = "";
                 let pointsToAdd = 0;
 
-                if (isRequest) {
+                if (isOutOfHours) {
+                    actionHtml = `
+                            <div style="font-size:0.8em; color:#856404; margin-bottom:4px;">⏰ ขอทำนอกเวลา 09:00-21:00</div>
+                            <button class="btn-sm btn-success" onclick="allowOutOfHours('${att.id}')">Allow Once</button>
+                            <button class="btn-sm btn-danger" onclick="denyOutOfHours('${att.id}')">Deny</button>
+                        `;
+                } else if (isRequest) {
                     const practiceInfo = att.practiceScore !== undefined
                         ? `<div style="font-size:0.8em; color:#856404; margin-bottom:4px;">🔄 Practice Score: ${att.practiceScore}/${att.practiceTotalQ || '?'}</div>`
                         : '';
@@ -25098,12 +25111,12 @@ ${JSON.stringify(sourceObj)}`;
                 }
 
                 tbody.innerHTML += `
-                    <tr style="${isRequest ? 'background:#fff8e1;' : ''}">
+                    <tr style="${(isRequest || isOutOfHours) ? 'background:#fff8e1;' : ''}">
                         <td>${att.timestamp ? att.timestamp.toDate().toLocaleString('en-US', { weekday: 'short', day: 'numeric', month: 'numeric', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}</td>
                         <td class="lang-no-toggle" style="display:flex; align-items:center; gap:8px;"><img src="${uImg}" class="user-pic"> <span>${uName}</span></td>
                         <td class="lang-no-toggle">${qTitle}</td>
-                        <td>${isPoll || isRequest ? '-' : `${att.correctCount}/${att.totalQuestions}`}</td>
-                        <td style="font-weight:bold; color:var(--primary);">${isRequest ? 'Request' : pointsToAdd.toFixed(3)}</td>
+                        <td>${isPoll || isRequest || isOutOfHours ? '-' : `${att.correctCount}/${att.totalQuestions}`}</td>
+                        <td style="font-weight:bold; color:var(--primary);">${isRequest || isOutOfHours ? 'Request' : pointsToAdd.toFixed(3)}</td>
                         <td>${actionHtml}</td>
                     </tr>
                 `;
@@ -32069,9 +32082,9 @@ RULES:
                 if (window.renderQuizCoverage) window.renderQuizCoverage(); // V95.22 dashboard coverage widget
             }, e => console.error("🔥 [Firestore Error] quizzes:", e));
             // 🔥 Refined [Version: V77.6] Listen only for actionable items (Pending Review or New Request)
-            db.collection("quiz_attempts").where("status", "in", ["pending", "requesting"]).onSnapshot(s => {
-                const pendingDocs = s.docs.map(d => ({ id: d.id, ...d.data() }));
-                renderPendingQuizzes(pendingDocs);
+            function renderCombinedPending() {
+                const combined = statusPendingDocsCache.concat(oohPendingDocsCache);
+                renderPendingQuizzes(combined);
                 // V93.24 (PR #13 Phase 3A): red badge count on the 📦 Assignments
                 // top-nav tab button. Spec said `status === 'submitted' && !adminAcknowledged`
                 // but quiz_attempts uses status state machine (pending/requesting → approved)
@@ -32079,10 +32092,22 @@ RULES:
                 // the exact same set.
                 const badge = document.getElementById('pending-review-badge');
                 if (badge) {
-                    const n = pendingDocs.length;
+                    const n = combined.length;
                     badge.textContent = n;
                     badge.style.display = n > 0 ? 'inline-block' : 'none';
                 }
+            }
+            db.collection("quiz_attempts").where("status", "in", ["pending", "requesting"]).onSnapshot(s => {
+                statusPendingDocsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderCombinedPending();
+            });
+            // V96.49: out-of-hours (09:00-21:00) requests — a separate field from
+            // `status` above, so an in-progress/interrupted attempt can request an
+            // out-of-hours window without touching its real status. Merged into the
+            // same Pending table/badge via renderCombinedPending.
+            db.collection("quiz_attempts").where("outOfHoursRequested", "==", true).onSnapshot(s => {
+                oohPendingDocsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderCombinedPending();
             });
             // V96.50: Beri Phase 1 — Explore Links catalog (Assignments > Explore Links subtab)
             db.collection("review_links").orderBy("createdAt", "desc").onSnapshot(s => {
@@ -32767,6 +32792,31 @@ RULES:
             if (btn) btn.innerHTML = on
                 ? '<i class="fa-solid fa-check"></i> Done'
                 : '<i class="fa-solid fa-gear"></i> Manage groups';
+        }
+
+        // V96.49: approve/deny a request to take a quiz outside 09:00-21:00. Deliberately
+        // does NOT touch `status` or delete the doc — the same attempt may carry real
+        // in-progress data (e.g. an interrupted graded attempt asking to resume late).
+        // outOfHoursApproved is consumed client-side (index.html runQuiz) on next start,
+        // so approval is good for exactly one attempt, matching the intended scope.
+        async function allowOutOfHours(id) {
+            if (!confirm("Allow this user to take the quiz outside 09:00-21:00 (one time)?")) return;
+            try {
+                await db.collection("quiz_attempts").doc(id).update({
+                    outOfHoursApproved: true,
+                    outOfHoursRequested: false,
+                    outOfHoursApprovedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                showToast("Out-of-hours request allowed!");
+            } catch (e) { alert(e.message); }
+        }
+
+        async function denyOutOfHours(id) {
+            if (!confirm("Deny this out-of-hours request?")) return;
+            try {
+                await db.collection("quiz_attempts").doc(id).update({ outOfHoursRequested: false });
+                showToast("Denied");
+            } catch (e) { alert(e.message); }
         }
 
         function setUserGroup(uid, current) {
