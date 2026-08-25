@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.56)</title>
+    <title>Internship Portfolio (V96.57)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5076,6 +5076,29 @@
     </div>
 
     <!-- 🔥 V80: Discussion Modal for Read-only Mode -->
+    <!-- V96.5x: Explore link review — writes a pending review, admin approves
+         (admin.html approveExploreReview) before the 1 Beri credits. -->
+    <div id="exploreReviewModal" class="modal lang-no-toggle" style="z-index: 10001;">
+        <div class="modal-content" style="max-width:420px; padding:20px; border-radius:16px;">
+            <span onclick="document.getElementById('exploreReviewModal').style.display='none'" style="position:absolute; top:14px; right:16px; cursor:pointer; font-size:1.4em; color:#64748b;">&times;</span>
+            <h3 style="margin:0 0 4px 0; color:#c2410c; font-weight:900;">✍️ เขียนรีวิว</h3>
+            <div id="er-link-title" style="font-size:0.85em; color:#64748b; margin-bottom:14px;"></div>
+            <input type="hidden" id="er-link-id">
+            <textarea id="er-text" rows="4" placeholder="แชร์ประสบการณ์ของคุณ..." style="width:100%; border-radius:12px; resize:none; font-size:0.9em; padding:12px; border:1.5px solid #cbd5e1; box-sizing:border-box; margin-bottom:10px;"></textarea>
+            <!-- V96.5x: optional spend amount — not required, no automatic Beri
+                 formula. Just extra info for admin to see alongside the review;
+                 any bonus Beri for a verified purchase is awarded separately via
+                 the existing manual adjBeri() tool in Elite Board, not computed
+                 here. -->
+            <label style="display:block; font-size:0.72em; font-weight:700; color:#78716c; margin-bottom:6px;">ยอดใช้จ่าย (บาท) — ไม่บังคับ · Amount spent (฿) — optional</label>
+            <input type="number" id="er-spend" min="0" step="1" placeholder="เช่น 250" style="width:100%; border-radius:10px; font-size:0.9em; padding:10px 12px; border:1.5px solid #cbd5e1; box-sizing:border-box; margin-bottom:14px;">
+            <div style="display:flex; gap:8px; justify-content:flex-end;">
+                <button onclick="document.getElementById('exploreReviewModal').style.display='none'" style="width:auto; min-height:auto; padding:9px 18px; border-radius:10px; border:1px solid #e2e8f0; background:#fff; cursor:pointer; font-weight:700; color:#64748b;">ยกเลิก</button>
+                <button onclick="submitExploreReview()" style="width:auto; min-height:auto; padding:9px 22px; background:linear-gradient(135deg, #ea580c, #c2410c); border:none; border-radius:10px; color:white; font-weight:900; font-size:0.88em; cursor:pointer;">ส่งรีวิว</button>
+            </div>
+        </div>
+    </div>
+
     <div id="discussion-modal" class="modal" style="z-index: 10001;">
         <div class="modal-content"
             style="max-width:450px; padding:0; overflow:hidden; display:flex; flex-direction:column; height:80vh; max-height:600px;">
@@ -6125,6 +6148,7 @@
                     loadQuizzes();
                     loadReviewLinks(); // V96.50: Beri Phase 1 — Explore tab
                     loadBeriShop(); // V96.51: Beri Phase 2 — A Shop for Killers
+                    loadExploreReviews(); // V96.5x: Explore link reviews (+1 Beri, admin-approved)
                     loadDivisionConfig();
                     loadGroupSettings();
                     loadMyCases();
@@ -6235,6 +6259,7 @@
                 loadQuizzes();
                 loadReviewLinks(); // V96.50: Beri Phase 1 — Explore tab
                 loadBeriShop(); // V96.51: Beri Phase 2 — A Shop for Killers
+                loadExploreReviews(); // V96.5x: Explore link reviews (+1 Beri, admin-approved)
                 loadDivisionConfig();
                 loadGroupSettings();
                 loadMyCases(); // 🔥 Added V84.1
@@ -7263,12 +7288,40 @@
                 const beriBadge = clicked
                     ? `<span style="color:#16a34a; font-weight:800;">✓ ได้รับ ${link.beriReward || 0} Beri แล้ว</span>`
                     : `<span style="color:#b45309; font-weight:800;">+${link.beriReward || 0} Beri</span>`;
+
+                // V96.5x: review status for this link — write once (no resubmit),
+                // admin-approved before the 1 Beri credits (see admin.html
+                // approveExploreReview). Separate from the open/click Beri above.
+                const myReview = myExploreReviewsCache[link.id];
+                let reviewStatusHtml;
+                if (!myReview) {
+                    reviewStatusHtml = `<button onclick="openExploreReviewModal('${link.id}')" style="width:auto; min-height:auto; padding:6px 10px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; color:#1d4ed8; font-weight:700; font-size:0.74em; cursor:pointer;">✍️ เขียนรีวิว (+1 Beri)</button>`;
+                } else if (myReview.status === 'pending') {
+                    reviewStatusHtml = `<span style="font-size:0.74em; color:#b45309; font-weight:700;">⏳ รีวิวรอตรวจ</span>`;
+                } else if (myReview.status === 'approved') {
+                    reviewStatusHtml = `<span style="font-size:0.74em; color:#16a34a; font-weight:700;">✓ รีวิวแล้ว (+1 Beri)</span>`;
+                } else {
+                    reviewStatusHtml = `<span style="font-size:0.74em; color:#94a3b8; font-weight:700;">รีวิวไม่ผ่าน</span>`;
+                }
+
+                // Public feed: other users' APPROVED reviews for this same link.
+                const linkReviews = exploreReviewsCache.filter(r => r.linkId === link.id);
+                const reviewsListHtml = linkReviews.length ? `
+                    <details>
+                        <summary style="cursor:pointer; font-size:0.74em; font-weight:700; color:#78716c; outline:none;">👀 รีวิวจากเพื่อน (${linkReviews.length})</summary>
+                        <div style="display:flex; flex-direction:column; gap:6px; margin-top:6px;">
+                            ${linkReviews.map(r => `<div style="background:#f8fafc; border-radius:8px; padding:6px 8px; font-size:0.76em; color:#475569;"><strong>${escapeHtml(r.displayName || 'Anonymous')}</strong>: ${escapeHtml(r.text || '')}</div>`).join('')}
+                        </div>
+                    </details>` : '';
+
                 return `
                     <div style="display:flex; flex-direction:column; gap:8px; background:#fff; border:1px solid #f1f5f9; border-radius:12px; padding:12px 14px;">
                         <div style="display:flex; align-items:baseline; flex-wrap:wrap; gap:6px; min-width:0;">
                             <div style="font-weight:800; color:#334155; font-size:0.92em;">${icon} ${safeTitle}</div>
                             <div style="font-size:0.78em;">${beriBadge}</div>
                         </div>
+                        <div>${reviewStatusHtml}</div>
+                        ${reviewsListHtml}
                         <!-- V96.5x: global button width/min-height rule (index.html:341) stretches
                              buttons full-width by default — negate explicitly on both (known trap,
                              see feedback_global_button_width_trap). Copy is a plain clipboard action
@@ -7383,6 +7436,62 @@
                     .sort((a, b) => (b.requestedAt ? b.requestedAt.toMillis() : 0) - (a.requestedAt ? a.requestedAt.toMillis() : 0));
                 renderBeriShop();
             }, e => handleFirestoreListenerError('my redemptions listener', e));
+        }
+
+        // V96.5x: Explore link reviews — user writes a short text review of a
+        // link (1 per link, dedup via doc id `${linkId}_${userId}`), admin
+        // approves before 1 Beri is credited (see admin.html approveExploreReview).
+        // Two listeners: all APPROVED reviews (public feed, grouped by linkId at
+        // render time) + the current user's OWN reviews regardless of status (to
+        // show pending/approved/rejected state on their own card).
+        let exploreReviewsCache = [], myExploreReviewsCache = {};
+
+        function loadExploreReviews() {
+            db.collection('review_link_reviews').where('status', '==', 'approved').onSnapshot(s => {
+                exploreReviewsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderExploreLinks();
+            }, e => handleFirestoreListenerError('explore reviews listener', e));
+            db.collection('review_link_reviews').where('userId', '==', userId).onSnapshot(s => {
+                myExploreReviewsCache = {};
+                s.forEach(d => { myExploreReviewsCache[d.data().linkId] = d.data(); });
+                renderExploreLinks();
+            }, e => handleFirestoreListenerError('my explore reviews listener', e));
+        }
+
+        function openExploreReviewModal(linkId) {
+            const link = reviewLinksCache.find(l => l.id === linkId);
+            if (!link) return;
+            document.getElementById('er-link-id').value = linkId;
+            document.getElementById('er-link-title').textContent = link.title || 'Untitled';
+            document.getElementById('er-text').value = '';
+            document.getElementById('er-spend').value = '';
+            document.getElementById('exploreReviewModal').style.display = 'flex';
+        }
+
+        async function submitExploreReview() {
+            const linkId = document.getElementById('er-link-id').value;
+            const text = document.getElementById('er-text').value.trim();
+            if (!text) { alert('กรุณาเขียนรีวิวก่อนส่ง · Please write a review first'); return; }
+            // Optional, not required — no automatic Beri formula from this. Just
+            // extra info for admin; a verified purchase gets bonus Beri separately
+            // via the manual adjBeri() tool, not computed here.
+            const spendRaw = document.getElementById('er-spend').value.trim();
+            const spendAmount = spendRaw === '' ? null : (parseFloat(spendRaw) || 0);
+            try {
+                await db.collection('review_link_reviews').doc(`${linkId}_${userId}`).set({
+                    linkId, userId,
+                    displayName: (userProfile && userProfile.displayName) || '',
+                    pictureUrl: (userProfile && userProfile.pictureUrl) || '',
+                    text,
+                    spendAmount,
+                    status: 'pending',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                document.getElementById('exploreReviewModal').style.display = 'none';
+                alert('ส่งรีวิวแล้ว! รอแอดมินตรวจ · Review submitted! Waiting for admin approval.');
+            } catch (e) {
+                alert('ส่งรีวิวไม่สำเร็จ · Submit failed: ' + e.message);
+            }
         }
 
         const BERI_REDEMPTION_STATUS_LABEL = {
