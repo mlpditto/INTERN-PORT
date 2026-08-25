@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.02</title>
+    <title>Nika V98.03</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6888,6 +6888,26 @@
                 <p style="margin:0 0 18px 0; color:#78716c; font-size:0.85em; line-height:1.5;">
                     Interns spend Beri here. Stock is optional (blank = unlimited) — leaving it blank skips the stock counter entirely.
                 </p>
+
+                <!-- V98.03: manual Beri gift — type-to-search picker (same suggest-box pattern
+                     as the Drug Codex contributor picker at #dca-helper-input) + amount + reason.
+                     Writes through adjBeriCore, the same Firestore logic the per-row Users-table
+                     Beri Adj control already uses — no duplicated increment/audit-doc code. -->
+                <div class="lang-no-toggle" style="background:white; border:1px solid #f0abfc; border-radius:12px; padding:14px; margin-bottom:20px;">
+                    <label style="display:block; font-size:0.72em; font-weight:700; color:#86198f; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:8px;">🎁 Give Beri to a User</label>
+                    <div id="beri-gift-chip" style="margin-bottom:8px;"></div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start;">
+                        <div style="position:relative; flex:1; min-width:180px;">
+                            <input type="text" id="beri-gift-input" placeholder="🔍 พิมพ์ชื่อ user…" autocomplete="off"
+                                   oninput="beriGiftInputHandler()" onblur="setTimeout(beriGiftHideSuggest, 150)"
+                                   style="width:100%; box-sizing:border-box;">
+                            <div id="beri-gift-suggest" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:10; background:#fff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.1); max-height:220px; overflow-y:auto;"></div>
+                        </div>
+                        <input type="number" step="1" id="beri-gift-amount" placeholder="¥ Beri" style="width:100px;">
+                        <button class="btn-sm" onclick="giveBeriToUser()" style="background:#b45309; color:white; padding:8px 16px; border-radius:10px; font-weight:800;">Give</button>
+                    </div>
+                </div>
+
                 <div id="beri-rewards-list" style="display:flex; flex-direction:column; gap:10px; margin-bottom:26px;">
                     <div style="padding:30px; text-align:center; color:#94a3b8; font-size:0.86em;">Loading...</div>
                 </div>
@@ -43375,6 +43395,20 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // than checkin_logs, since several existing dashboards sum checkin_logs
         // amounts assuming they're score-denominated (see e.g. line ~44763) — a
         // shared collection risks a Beri delta silently corrupting a score total.
+        // Shared write: users.beri increment + beri_adjustments audit doc. Split out
+        // of adjBeri (V98.03) so the Beri Shop tab's "Give Beri to a User" picker
+        // (giveBeriToUser below) can reuse the exact same Firestore logic instead
+        // of duplicating it.
+        async function adjBeriCore(id, beriVal, note) {
+            const editor = (auth && auth.currentUser) || {};
+            await db.collection("users").doc(id).update({ beri: firebase.firestore.FieldValue.increment(beriVal) });
+            await db.collection("beri_adjustments").add({
+                userId: id, amount: beriVal, note,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                createdByUid: editor.uid || 'unknown', createdByEmail: editor.email || ALLOWED_EMAIL
+            });
+        }
+
         async function adjBeri(id) {
             try {
                 const valInput = document.getElementById(`beri-adj-${id}`);
@@ -43385,16 +43419,92 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 if (isNaN(beriVal) || beriVal === 0) return alert("Invalid Beri amount.");
                 const n = prompt("Reason (Note) — e.g. offline purchase amount:");
                 if (!n) return;
-                const editor = (auth && auth.currentUser) || {};
-                await db.collection("users").doc(id).update({ beri: firebase.firestore.FieldValue.increment(beriVal) });
-                await db.collection("beri_adjustments").add({
-                    userId: id, amount: beriVal, note: n,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    createdByUid: editor.uid || 'unknown', createdByEmail: editor.email || ALLOWED_EMAIL
-                });
+                await adjBeriCore(id, beriVal, n);
                 showToast("Beri saved!");
                 valInput.value = ""; valInput.blur();
             } catch (e) { alert("Error saving Beri: " + e.message); }
+        }
+
+        // ===================================================================
+        // 🎁 V98.03: Give Beri to a user — search picker on the Beri Shop tab
+        // (Assignments > A Shop for Killers). Same suggest-box pattern as the
+        // Drug Codex contributor picker (dcaHelperInput/dcaAddHelper); writes
+        // through adjBeriCore above.
+        // ===================================================================
+        let beriGiftUser = null;
+
+        function beriGiftInputHandler() {
+            const input = document.getElementById('beri-gift-input');
+            const box = document.getElementById('beri-gift-suggest');
+            if (!input || !box) return;
+            const term = String(input.value || '').trim().toLowerCase();
+            if (!term) { box.style.display = 'none'; box.innerHTML = ''; return; }
+            const pool = (typeof usersData !== 'undefined' ? usersData : []);
+            const matches = pool
+                .filter(u => u && u.id
+                    && String(u.group || 'Public').toUpperCase() !== 'PUBLIC'
+                    && String(u.displayName || '').toLowerCase().includes(term))
+                .slice(0, 8);
+            if (matches.length === 0) {
+                box.innerHTML = '<div style="padding:6px 10px; color:#94a3b8; font-size:0.85em;">ไม่พบ user</div>';
+                box.style.display = 'block';
+                return;
+            }
+            box.innerHTML = matches.map(u => {
+                const pic = u.pictureUrl
+                    ? `<img src="${escapeHtml(u.pictureUrl)}" alt="" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;">`
+                    : '👤 ';
+                return `<div onclick="beriGiftSelectUser('${escapeHtml(u.id)}')" style="padding:6px 10px; cursor:pointer; border-bottom:1px solid #f1f5f9; font-size:0.9em;">${pic}${escapeHtml(u.displayName || u.id)}</div>`;
+            }).join('');
+            box.style.display = 'block';
+        }
+
+        function beriGiftHideSuggest() {
+            const box = document.getElementById('beri-gift-suggest');
+            if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+        }
+
+        function beriGiftSelectUser(id) {
+            const u = (typeof usersData !== 'undefined' ? usersData : []).find(x => x.id === id);
+            if (!u) return;
+            beriGiftUser = u;
+            const input = document.getElementById('beri-gift-input');
+            if (input) input.value = '';
+            beriGiftHideSuggest();
+            renderBeriGiftChip();
+        }
+
+        function beriGiftClearUser() {
+            beriGiftUser = null;
+            renderBeriGiftChip();
+        }
+
+        function renderBeriGiftChip() {
+            const chip = document.getElementById('beri-gift-chip');
+            if (!chip) return;
+            if (!beriGiftUser) { chip.innerHTML = ''; return; }
+            const pic = beriGiftUser.pictureUrl
+                ? `<img src="${escapeHtml(beriGiftUser.pictureUrl)}" alt="" style="width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;">`
+                : '👤 ';
+            chip.innerHTML = `<span style="display:inline-flex; align-items:center; gap:4px; background:#fdf4ff; border:1px solid #f0abfc; border-radius:999px; padding:4px 10px 4px 6px; font-size:0.85em; font-weight:700; color:#86198f;">${pic}${escapeHtml(beriGiftUser.displayName || beriGiftUser.id)} <span onclick="beriGiftClearUser()" style="cursor:pointer; color:#a21caf; margin-left:4px;">&times;</span></span>`;
+        }
+
+        async function giveBeriToUser() {
+            try {
+                if (!beriGiftUser) return alert("Search and select a user first.");
+                const amtInput = document.getElementById('beri-gift-amount');
+                let v = amtInput.value;
+                if (!v) return alert("Please specify a Beri amount.");
+                v = v.replace(',', '.');
+                const beriVal = parseInt(v, 10);
+                if (isNaN(beriVal) || beriVal === 0) return alert("Invalid Beri amount.");
+                const n = prompt(`Reason (Note) — Beri for ${beriGiftUser.displayName || beriGiftUser.id}:`);
+                if (!n) return;
+                await adjBeriCore(beriGiftUser.id, beriVal, n);
+                showToast("Beri given!");
+                amtInput.value = "";
+                beriGiftClearUser();
+            } catch (e) { alert("Error giving Beri: " + e.message); }
         }
 
         function renderCertTable() {
