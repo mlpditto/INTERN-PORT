@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.54)</title>
+    <title>Internship Portfolio (V96.55)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3878,7 +3878,13 @@
                                     🔗 กดดูลิงก์ที่น่าสนใจ ได้รับ <strong>Beri</strong> ครั้งแรกที่กดแต่ละลิงก์ (จำกัด <span id="explore-daily-cap-text">0</span> Beri/วัน)<br>
                                     Open interesting links, earn Beri the first time you open each one (daily cap applies)
                                 </div>
-                                <div id="explore-links-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+                                <!-- V96.5x fix: missed this container in the earlier lang-toggle
+                                     hotfix (#913) — the intro banner/empty-state siblings got
+                                     lang-no-toggle but this actual card list, holding pure-Thai
+                                     button text ("เปิดลิงก์") and admin-entered Thai link titles,
+                                     did not. Collapsed the button to ~32x18px (no visible text) and
+                                     hid Thai titles entirely under the EN-default body. -->
+                                <div id="explore-links-list" class="lang-no-toggle" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px;"></div>
                                 <div id="explore-links-empty" class="lang-no-toggle" style="display:none; padding:30px; text-align:center; color:#94a3b8; font-size:0.86em;">
                                     ยังไม่มีลิงก์ · No links yet
                                 </div>
@@ -7258,19 +7264,58 @@
                     ? `<span style="color:#16a34a; font-weight:800;">✓ ได้รับ ${link.beriReward || 0} Beri แล้ว</span>`
                     : `<span style="color:#b45309; font-weight:800;">+${link.beriReward || 0} Beri</span>`;
                 return `
-                    <div style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #f1f5f9; border-radius:12px; padding:12px 14px;">
-                        <div style="flex:1; min-width:0;">
+                    <div style="display:flex; flex-direction:column; gap:8px; background:#fff; border:1px solid #f1f5f9; border-radius:12px; padding:12px 14px;">
+                        <div style="min-width:0;">
                             <div style="font-weight:800; color:#334155; font-size:0.92em;">${icon} ${safeTitle}</div>
                             <div style="font-size:0.78em; margin-top:2px;">${beriBadge}</div>
                         </div>
-                        <!-- V96.5x fix: global button width/min-height rule (index.html:341)
-                             was stretching this to full row width, covering the title/reward text.
-                             Negate explicitly — known trap, see feedback_global_button_width_trap. -->
-                        <button onclick="explOpenLink('${link.id}')" style="width:auto; min-height:auto; flex-shrink:0; padding:9px 16px; background:linear-gradient(135deg,#f59e0b,#ea580c); border:none; border-radius:12px; color:white; font-weight:800; font-size:0.85em; cursor:pointer;">
-                            เปิดลิงก์
-                        </button>
+                        <!-- V96.5x: global button width/min-height rule (index.html:341) stretches
+                             buttons full-width by default — negate explicitly on both (known trap,
+                             see feedback_global_button_width_trap). Copy is a plain clipboard action
+                             (no Beri — copying isn't opening/viewing); Open is unchanged from before
+                             (still the one that credits Beri via explOpenLink). -->
+                        <div style="display:flex; gap:6px;">
+                            <button onclick="explCopyLink('${link.id}')" style="width:auto; min-height:auto; flex:1; padding:8px 6px; background:#f1f5f9; border:none; border-radius:10px; color:#475569; font-weight:700; font-size:0.78em; cursor:pointer;">
+                                📋 คัดลอก
+                            </button>
+                            <button onclick="explOpenLink('${link.id}')" style="width:auto; min-height:auto; flex:1; padding:8px 6px; background:linear-gradient(135deg,#f59e0b,#ea580c); border:none; border-radius:10px; color:white; font-weight:800; font-size:0.78em; cursor:pointer;">
+                                🚀 เปิด
+                            </button>
+                        </div>
                     </div>`;
             }).join('');
+        }
+
+        // Plain clipboard copy — no Beri credit (copying isn't opening/viewing the
+        // link). Falls back to execCommand for LIFF webviews that lack the async
+        // Clipboard API (still common in older LINE in-app browsers).
+        function explCopyLink(linkId) {
+            const link = reviewLinksCache.find(l => l.id === linkId);
+            if (!link || !link.url) return;
+            const done = () => alert('คัดลอกลิงก์แล้ว · Link copied');
+            const fail = () => alert('คัดลอกไม่สำเร็จ · Copy failed');
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(link.url).then(done).catch(() => {
+                    explCopyLinkFallback(link.url, done, fail);
+                });
+            } else {
+                explCopyLinkFallback(link.url, done, fail);
+            }
+        }
+
+        function explCopyLinkFallback(url, done, fail) {
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = url;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.focus();
+                ta.select();
+                const ok = document.execCommand('copy');
+                document.body.removeChild(ta);
+                ok ? done() : fail();
+            } catch (e) { fail(); }
         }
 
         // Never blocks the link — opens immediately regardless of whether the Beri
