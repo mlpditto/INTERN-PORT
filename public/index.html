@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.48)</title>
+    <title>Internship Portfolio (V96.50)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -2137,6 +2137,11 @@
                             style="font-size: 0.54em; color: #64748b; font-weight: 700; margin-top: 4px; white-space: nowrap;">
                             LV.1 Rookie Navigator</div>
                         <div id="u-division-rank-badge" style="display:none; margin-top:3px;"></div>
+                        <!-- V96.50: Beri (Explore tab currency, separate from POINTS above) -->
+                        <div id="u-beri-box" title="Beri — earned from the Explore tab · เบลลี่ จากแท็บ Explore" style="margin-top:6px; padding-top:6px; border-top:1px dashed #e2e8f0;">
+                            <div id="u-beri" class="score-text" style="font-size: 0.85em; line-height: 1; color:#b45309;">¥0</div>
+                            <div style="font-size: 0.5em; color: #999; font-weight: bold; letter-spacing: 0.5px; margin-top: 2px;">BERI</div>
+                        </div>
                     </div>
                 </div>
 
@@ -3562,6 +3567,11 @@
                                 <i class="fa-solid fa-graduation-cap"></i>
                                 <span>Learning Note 학습 노트</span>
                             </button>
+                            <!-- V96.50: Beri Phase 1 — admin-curated external links (LINE MAN shops, YouTube) -->
+                            <button class="mission-tab-btn" id="mtab-explore" onclick="switchMissionTab('explore')">
+                                <i class="fa-solid fa-compass"></i>
+                                <span>Explore</span>
+                            </button>
                         </div>
 
                         <div style="padding: 15px;">
@@ -3856,6 +3866,21 @@
                                     <div id="ln-history-filter" style="display:none; gap:6px; margin-bottom:12px; flex-wrap:wrap; padding:8px; background:#f8fafc; border:1px solid #f1f5f9; border-radius:12px;"></div>
                                     <div id="ln-history-list" style="display:flex; flex-direction:column; gap:10px;"></div>
                                     <div id="ln-history-pagination" style="margin-top:12px; display:flex; justify-content:center; gap:6px;"></div>
+                                </div>
+                            </div>
+
+                            <!-- V96.50: Beri Phase 1 — Explore tab. Admin-curated external links
+                                 (review_links, managed in admin.html > Assignments > Explore
+                                 Links). Opening a link earns Beri once per (link, user); see
+                                 explOpenLink / renderExploreLinks below. -->
+                            <div id="pane-mission-explore" class="mission-tab-pane">
+                                <div style="font-size:0.82em; color:#78716c; margin-bottom:12px; line-height:1.5; background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:10px 14px;">
+                                    🔗 กดดูลิงก์ที่น่าสนใจ ได้รับ <strong>Beri</strong> ครั้งแรกที่กดแต่ละลิงก์ (จำกัด <span id="explore-daily-cap-text">0</span> Beri/วัน)<br>
+                                    Open interesting links, earn Beri the first time you open each one (daily cap applies)
+                                </div>
+                                <div id="explore-links-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+                                <div id="explore-links-empty" style="display:none; padding:30px; text-align:center; color:#94a3b8; font-size:0.86em;">
+                                    ยังไม่มีลิงก์ · No links yet
                                 </div>
                             </div>
 
@@ -5547,6 +5572,7 @@
 
         let userId = "", userProfile = {}, userSubmissions = {};
         let questsCache = [], mySubmissionsCache = {}, myWorksCache = [], sideQuestsCache = {}, myGroup = "Public", myScore = 0;
+        let myBeri = 0; // V96.50: Beri Phase 1 — separate currency from `score`, see users/{uid}.beri
         let quizzesCache = [], quizAttemptsCache = {}, allUsersData = [], divisionConfig = {}, groupSettings = {}; // 🔥 Added Settings V69
         let usersWorksCache = []; // V90.63: declared global to avoid ReferenceError before loadMyWorks
         window.myCasesCache = window.myCasesCache || []; // V90.63: guard for renderCases
@@ -6058,6 +6084,7 @@
                     loadMyReflectiveLogs();
                     loadSideQuests();
                     loadQuizzes();
+                    loadReviewLinks(); // V96.50: Beri Phase 1 — Explore tab
                     loadDivisionConfig();
                     loadGroupSettings();
                     loadMyCases();
@@ -6166,6 +6193,7 @@
                 loadMyReflectiveLogs();
                 loadSideQuests();
                 loadQuizzes();
+                loadReviewLinks(); // V96.50: Beri Phase 1 — Explore tab
                 loadDivisionConfig();
                 loadGroupSettings();
                 loadMyCases(); // 🔥 Added V84.1
@@ -6265,6 +6293,10 @@
                     myGroup = da.group || "Public"; // 🔥 Sync group V77.7
                     myScore = score; // V95.33: live score drives quiz unlock gate (renderAssignments runs below)
                     document.getElementById('u-score').innerText = score.toFixed(2);
+                    // V96.50: Beri (Explore tab currency, separate from score above)
+                    myBeri = parseInt(da.beri || 0, 10);
+                    const beriEl = document.getElementById('u-beri');
+                    if (beriEl) beriEl.innerText = '¥' + myBeri;
                     // V95.43: keep daily check-in card in sync with live user doc
                     myCheckin = {
                         currentStreak: da.checkinCurrentStreak || 0,
@@ -7141,6 +7173,105 @@
                 // V96.27: quiz completion feeds the Mission "Done" badge too.
                 if (typeof updateMissionDoneBadge === 'function') updateMissionDoneBadge();
             }, e => handleFirestoreListenerError('quiz attempts listener', e));
+        }
+
+        // ===================================================================
+        // 🔗 V96.50: Explore tab — Beri Phase 1. Admin-curated external links
+        // (review_links, managed in admin.html > Assignments > Explore Links).
+        // First open of each link earns Beri immediately (no admin review, unlike
+        // the Learning Note pending-review flow) — dedup + the daily cap are
+        // enforced together in one Firestore transaction in explOpenLink below,
+        // mirroring the daily check-in transaction pattern (see tryDailyCheckin).
+        // ===================================================================
+        let reviewLinksCache = [], reviewLinkClicksCache = {}; // clicksCache: linkId -> own click doc
+        const REVIEW_LINK_DAILY_BERI_CAP = 30; // Beri/Bangkok-day cap from Explore Links, across all links
+
+        function loadReviewLinks() {
+            db.collection('review_links').where('isActive', '==', true).onSnapshot(s => {
+                reviewLinksCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderExploreLinks();
+            }, e => handleFirestoreListenerError('review links listener', e));
+            db.collection('review_link_clicks').where('userId', '==', userId).onSnapshot(s => {
+                reviewLinkClicksCache = {};
+                s.forEach(d => { reviewLinkClicksCache[d.data().linkId] = d.data(); });
+                renderExploreLinks();
+            }, e => handleFirestoreListenerError('review link clicks listener', e));
+        }
+
+        const REVIEW_LINK_TYPE_ICON = { line_man: '🛍️', youtube: '▶️', other: '🔗' };
+
+        function renderExploreLinks() {
+            const container = document.getElementById('explore-links-list');
+            const empty = document.getElementById('explore-links-empty');
+            const capText = document.getElementById('explore-daily-cap-text');
+            if (!container) return; // tab not in DOM yet / not on this page
+            if (capText) capText.textContent = REVIEW_LINK_DAILY_BERI_CAP;
+            if (!reviewLinksCache.length) {
+                container.innerHTML = '';
+                if (empty) empty.style.display = 'block';
+                return;
+            }
+            if (empty) empty.style.display = 'none';
+            container.innerHTML = reviewLinksCache.map(link => {
+                const clicked = !!reviewLinkClicksCache[link.id];
+                const icon = REVIEW_LINK_TYPE_ICON[link.type] || '🔗';
+                const safeTitle = escapeHtml(link.title || 'Untitled');
+                const beriBadge = clicked
+                    ? `<span style="color:#16a34a; font-weight:800;">✓ ได้รับ ${link.beriReward || 0} Beri แล้ว</span>`
+                    : `<span style="color:#b45309; font-weight:800;">+${link.beriReward || 0} Beri</span>`;
+                return `
+                    <div style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #f1f5f9; border-radius:12px; padding:12px 14px;">
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-weight:800; color:#334155; font-size:0.92em;">${icon} ${safeTitle}</div>
+                            <div style="font-size:0.78em; margin-top:2px;">${beriBadge}</div>
+                        </div>
+                        <button onclick="explOpenLink('${link.id}')" style="flex-shrink:0; padding:9px 16px; background:linear-gradient(135deg,#f59e0b,#ea580c); border:none; border-radius:12px; color:white; font-weight:800; font-size:0.85em; cursor:pointer;">
+                            เปิดลิงก์
+                        </button>
+                    </div>`;
+            }).join('');
+        }
+
+        // Never blocks the link — opens immediately regardless of whether the Beri
+        // credit succeeds (same "never block the download" rule as qzLogMaterialClick).
+        async function explOpenLink(linkId) {
+            const link = reviewLinksCache.find(l => l.id === linkId);
+            if (!link || !link.url) return;
+            window.open(link.url, '_blank', 'noopener,noreferrer');
+            if (reviewLinkClicksCache[linkId]) return; // already credited — nothing more to do
+            try {
+                const clickRef = db.collection('review_link_clicks').doc(`${linkId}_${userId}`);
+                const dateKey = getBangkokDateTimeParts().dateKey;
+                const dailyRef = db.collection('beri_daily').doc(`${userId}_${dateKey}`);
+                const userRef = db.collection('users').doc(userId);
+                const reward = parseInt(link.beriReward, 10) || 0;
+                await db.runTransaction(async tx => {
+                    const clickSnap = await tx.get(clickRef);
+                    if (clickSnap.exists) return; // race: another tab already credited it
+                    const dailySnap = await tx.get(dailyRef);
+                    const earnedToday = (dailySnap.exists && dailySnap.data().amount) || 0;
+                    // All-or-nothing: skip entirely once today's cap would be exceeded,
+                    // rather than a confusing partial credit. No doc is written in that
+                    // case, so the same link can still earn full Beri on a later day.
+                    if (reward <= 0 || earnedToday + reward > REVIEW_LINK_DAILY_BERI_CAP) return;
+                    tx.set(clickRef, {
+                        linkId, userId,
+                        displayName: (userProfile && userProfile.displayName) || '',
+                        beriAwarded: reward,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    tx.set(dailyRef, {
+                        userId, dateKey,
+                        amount: firebase.firestore.FieldValue.increment(reward),
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
+                    tx.set(userRef, {
+                        beri: firebase.firestore.FieldValue.increment(reward)
+                    }, { merge: true });
+                });
+            } catch (e) {
+                console.error('Explore link Beri credit error:', e); // best-effort — link already opened
+            }
         }
 
         // V94.89: tie quiz card icon to CASE_SYSTEMS disease taxonomy. The same
@@ -11455,6 +11586,9 @@
                 // V94.31/V94.32: refresh LN counter + history when entering tab
                 if (typeof renderLnCounter === 'function') renderLnCounter();
                 if (typeof renderLnHistory === 'function') renderLnHistory();
+            } else if (tab === 'explore') {
+                // V96.50: Beri Phase 1 — refresh Explore Links list when entering tab
+                if (typeof renderExploreLinks === 'function') renderExploreLinks();
             }
         }
 
