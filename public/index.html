@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.53)</title>
+    <title>Internship Portfolio (V96.54)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3897,6 +3897,14 @@
                                     <div style="font-size:0.9em; font-weight:800; color:#475569; margin-bottom:10px;">
                                         🏪 A Shop for Killers
                                     </div>
+                                    <!-- V96.5x: locked until myBeri > BERI_SHOP_UNLOCK_THRESHOLD (500) —
+                                         same "explain why + how to unlock" convention as the quiz
+                                         unlockScore gate (renderAssignments' 🔒 message), rather than
+                                         just hiding the section outright. -->
+                                    <div id="beri-shop-locked" style="display:none; padding:16px; text-align:center; background:#fafaf9; border:1px dashed #d6d3d1; border-radius:12px; color:#78716c; font-size:0.84em; line-height:1.6;">
+                                        🔒 ปลดล็อกเมื่อสะสม Beri เกิน <span id="beri-shop-locked-threshold">500</span> · <span id="beri-shop-locked-current"></span><br>
+                                        Unlock once you've saved up more than <span id="beri-shop-locked-threshold-en">500</span> Beri
+                                    </div>
                                     <div id="beri-shop-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px;"></div>
                                     <div id="beri-shop-empty" style="display:none; padding:20px; text-align:center; color:#94a3b8; font-size:0.86em;">
                                         ยังไม่มีของรางวัล · No rewards yet
@@ -7213,7 +7221,8 @@
         // mirroring the daily check-in transaction pattern (see tryDailyCheckin).
         // ===================================================================
         let reviewLinksCache = [], reviewLinkClicksCache = {}; // clicksCache: linkId -> own click doc
-        const REVIEW_LINK_DAILY_BERI_CAP = 30; // Beri/Bangkok-day cap from Explore Links, across all links
+        const REVIEW_LINK_DAILY_BERI_CAP = 100; // Beri/Bangkok-day cap from Explore Links, across all links
+        const BERI_SHOP_UNLOCK_THRESHOLD = 500; // Shop is locked until myBeri exceeds this (current balance, not lifetime-earned)
 
         function loadReviewLinks() {
             db.collection('review_links').where('isActive', '==', true).onSnapshot(s => {
@@ -7254,7 +7263,10 @@
                             <div style="font-weight:800; color:#334155; font-size:0.92em;">${icon} ${safeTitle}</div>
                             <div style="font-size:0.78em; margin-top:2px;">${beriBadge}</div>
                         </div>
-                        <button onclick="explOpenLink('${link.id}')" style="flex-shrink:0; padding:9px 16px; background:linear-gradient(135deg,#f59e0b,#ea580c); border:none; border-radius:12px; color:white; font-weight:800; font-size:0.85em; cursor:pointer;">
+                        <!-- V96.5x fix: global button width/min-height rule (index.html:341)
+                             was stretching this to full row width, covering the title/reward text.
+                             Negate explicitly — known trap, see feedback_global_button_width_trap. -->
+                        <button onclick="explOpenLink('${link.id}')" style="width:auto; min-height:auto; flex-shrink:0; padding:9px 16px; background:linear-gradient(135deg,#f59e0b,#ea580c); border:none; border-radius:12px; color:white; font-weight:800; font-size:0.85em; cursor:pointer;">
                             เปิดลิงก์
                         </button>
                     </div>`;
@@ -7337,8 +7349,25 @@
         function renderBeriShop() {
             const grid = document.getElementById('beri-shop-grid');
             const empty = document.getElementById('beri-shop-empty');
+            const locked = document.getElementById('beri-shop-locked');
             if (!grid) return; // tab not in DOM yet
-            if (!beriRewardsCache.length) {
+
+            // V96.5x: shop locked until myBeri > BERI_SHOP_UNLOCK_THRESHOLD. Redemption
+            // history stays visible regardless — it's about past requests, not access.
+            const isLocked = myBeri <= BERI_SHOP_UNLOCK_THRESHOLD;
+            if (locked) {
+                locked.style.display = isLocked ? 'block' : 'none';
+                const cur = document.getElementById('beri-shop-locked-current');
+                if (cur) cur.textContent = `ตอนนี้มี ${myBeri} Beri · currently ${myBeri} Beri`;
+                ['beri-shop-locked-threshold', 'beri-shop-locked-threshold-en'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = BERI_SHOP_UNLOCK_THRESHOLD;
+                });
+            }
+            if (isLocked) {
+                grid.innerHTML = '';
+                if (empty) empty.style.display = 'none';
+            } else if (!beriRewardsCache.length) {
                 grid.innerHTML = '';
                 if (empty) empty.style.display = 'block';
             } else {
@@ -7380,6 +7409,13 @@
         // the local myBeri/beriRewardsCache mirrors, which can be stale) so two
         // concurrent redemptions can never both succeed past the real balance.
         async function redeemBeriReward(rewardId) {
+            // Mirrors the shop's own render-time lock — the button isn't in the DOM while
+            // locked, but this guards a direct console call too (same posture as the quiz
+            // unlockScore gate: client-side only, no rules-level enforcement).
+            if (myBeri <= BERI_SHOP_UNLOCK_THRESHOLD) {
+                alert(`🔒 ร้านนี้ยังล็อกอยู่ ต้องมี Beri เกิน ${BERI_SHOP_UNLOCK_THRESHOLD}\nShop is locked — need more than ${BERI_SHOP_UNLOCK_THRESHOLD} Beri`);
+                return;
+            }
             const reward = beriRewardsCache.find(r => r.id === rewardId);
             if (!reward) return;
             if (!confirm(`แลก "${reward.name}" ด้วย ${reward.beriCost} Beri?\nRedeem "${reward.name}" for ${reward.beriCost} Beri?`)) return;
