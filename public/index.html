@@ -8891,7 +8891,17 @@
                     while (userAnswers.length < currentQuiz.questions.length) userAnswers.push(null);
                     timeLeftForStep = 3600;
                     if (existing.status === 'abandoned') {
-                        db.collection("quiz_attempts").doc(`${quizId}_${userId}`).update({ status: 'started' });
+                        db.collection("quiz_attempts").doc(`${quizId}_${userId}`).update({
+                            status: 'started',
+                            outOfHoursApproved: firebase.firestore.FieldValue.delete() // V96.49 fix: consume a resumed one-time bypass too
+                        });
+                    } else if (existing.outOfHoursApproved === true) {
+                        // V96.49 fix: resuming an already-'started' attempt otherwise writes
+                        // nothing here, so a one-time out-of-hours approval would survive
+                        // indefinitely instead of being consumed on this (re)start.
+                        db.collection("quiz_attempts").doc(`${quizId}_${userId}`).update({
+                            outOfHoursApproved: firebase.firestore.FieldValue.delete()
+                        }).catch(e => console.error("Out-of-hours consume error:", e));
                     }
                 } else {
                     // 🔥 Refined V77.24: graded quizzes treat exits/reloads as completed
