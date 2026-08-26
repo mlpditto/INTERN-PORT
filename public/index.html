@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.63)</title>
+    <title>Internship Portfolio (V96.64)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -7489,10 +7489,19 @@
                 const dateKey = getBangkokDateTimeParts().dateKey;
                 const dailyRef = db.collection('beri_daily').doc(`${userId}_${dateKey}`);
                 const userRef = db.collection('users').doc(userId);
-                const reward = parseInt(link.beriReward, 10) || 0;
+                const linkRef = db.collection('review_links').doc(linkId);
                 await db.runTransaction(async tx => {
                     const clickSnap = await tx.get(clickRef);
                     if (clickSnap.exists) return; // race: another tab already credited it
+                    // Shrinking shop reward: read the CURRENT beriReward from the doc
+                    // itself, not the (possibly stale) local cache, so two people
+                    // opening the same link near-simultaneously each get the true
+                    // value at their turn rather than both reading the same starting
+                    // number. Each new person to earn credit drops it by 1, floor 1 —
+                    // the first opener gets the most, later openers get less.
+                    const linkSnap = await tx.get(linkRef);
+                    if (!linkSnap.exists) return;
+                    const reward = parseInt(linkSnap.data().beriReward, 10) || 0;
                     const dailySnap = await tx.get(dailyRef);
                     const earnedToday = (dailySnap.exists && dailySnap.data().amount) || 0;
                     // All-or-nothing: skip entirely once today's cap would be exceeded,
@@ -7513,6 +7522,9 @@
                     tx.set(userRef, {
                         beri: firebase.firestore.FieldValue.increment(reward)
                     }, { merge: true });
+                    if (reward > 1) {
+                        tx.set(linkRef, { beriReward: reward - 1 }, { merge: true });
+                    }
                 });
             } catch (e) {
                 console.error('Explore link Beri credit error:', e); // best-effort — link already opened
