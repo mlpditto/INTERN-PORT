@@ -3910,13 +3910,11 @@
                                     ยังไม่มีลิงก์ · No links yet
                                 </div>
 
-                                <!-- V98.04: interns' own suggested links + review status (pending/
-                                     approved/rejected). Same collapsible-history convention as
-                                     "My redemption requests" below. -->
-                                <details class="lang-no-toggle" style="margin-top:10px;">
-                                    <summary style="cursor:pointer; font-size:0.82em; font-weight:700; color:#78716c; outline:none; user-select:none;">📋 Link ที่ฉันเสนอ · My suggested links</summary>
-                                    <div id="my-link-suggestions-history" style="display:flex; flex-direction:column; gap:6px; margin-top:8px;"></div>
-                                </details>
+                                <!-- V96.64: "Link ที่ฉันเสนอ · My suggested links" used to have its
+                                     own collapsible section here — moved into the Work tab's unified
+                                     History timeline instead (submissionType 'explore_link'), so all
+                                     of an intern's submitted items live in one place. See
+                                     mapLinkSuggestionsToUnified / getUnifiedAllItems. -->
 
                                 <!-- V96.51: Beri Phase 2 — "Murthehelp" redemption shop (renamed
                                      from "A Shop for Killers" on the intern side only, V98.04 —
@@ -7617,6 +7615,8 @@
         // admin reviews (may edit the fields) before approving into the live
         // review_links catalog, or rejects. See firestore.rules rule 38 and
         // admin.html renderPendingLinkSuggestions/approveLinkSuggestion.
+        // V96.64: no longer rendered as its own list — folded into the Work tab's
+        // unified History timeline instead, see mapLinkSuggestionsToUnified.
         // ===================================================================
         let myLinkSuggestionsCache = [];
 
@@ -7624,7 +7624,7 @@
             db.collection('review_link_suggestions').where('userId', '==', userId).onSnapshot(s => {
                 myLinkSuggestionsCache = s.docs.map(d => ({ id: d.id, ...d.data() }))
                     .sort((a, b) => (b.createdAt ? b.createdAt.toMillis() : 0) - (a.createdAt ? a.createdAt.toMillis() : 0));
-                renderMyLinkSuggestions();
+                if (typeof renderUnifiedHistory === 'function') renderUnifiedHistory();
             }, e => handleFirestoreListenerError('my link suggestions listener', e));
         }
 
@@ -7671,24 +7671,6 @@
             approved: { text: 'อนุมัติแล้ว · Approved', color: '#15803d', bg: '#dcfce7' },
             rejected: { text: 'ไม่ผ่าน · Rejected', color: '#991b1b', bg: '#fee2e2' }
         };
-
-        function renderMyLinkSuggestions() {
-            const list = document.getElementById('my-link-suggestions-history');
-            if (!list) return;
-            if (!myLinkSuggestionsCache.length) {
-                list.innerHTML = '<div style="padding:10px; text-align:center; color:#94a3b8; font-size:0.85em;">ยังไม่มีข้อเสนอ · No suggestions yet</div>';
-                return;
-            }
-            list.innerHTML = myLinkSuggestionsCache.map(s => {
-                const st = LINK_SUGGESTION_STATUS_LABEL[s.status] || LINK_SUGGESTION_STATUS_LABEL.pending;
-                const icon = REVIEW_LINK_TYPE_ICON[s.type] || '🔗';
-                return `
-                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 12px; background:#fff; border:1px solid #f1f5f9; border-radius:10px;">
-                        <div style="font-size:0.82em; font-weight:700; color:#334155; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${icon} ${escapeHtml(s.title || '')}</div>
-                        <span style="font-size:0.72em; font-weight:800; color:${st.color}; background:${st.bg}; padding:2px 9px; border-radius:999px; white-space:nowrap;">${st.text}</span>
-                    </div>`;
-            }).join('');
-        }
 
         const BERI_REDEMPTION_STATUS_LABEL = {
             requesting: { text: 'รอมอบของ · Pending', color: '#b45309', bg: '#fffbeb' },
@@ -18541,9 +18523,27 @@ async function archiveDoneCard(cardId) {
             return out;
         }
 
+        // V96.64: interns' own suggested Explore links (review_link_suggestions),
+        // folded into the unified timeline instead of their own list on the
+        // Explore tab — same shape-mapping convention as mapQuizAttemptsToUnified.
+        function mapLinkSuggestionsToUnified() {
+            const cache = (typeof myLinkSuggestionsCache !== 'undefined' && myLinkSuggestionsCache) ? myLinkSuggestionsCache : [];
+            return cache.map(s => ({
+                id: s.id,
+                submissionType: 'explore_link',
+                title: s.title || 'Untitled link',
+                score: 0,
+                status: s.status || 'pending',
+                timestamp: s.createdAt,
+                adminComment: '',
+                adminBonus: 0,
+                metadata: { url: s.url, type: s.type }
+            }));
+        }
+
         // V95.16: Single source for the unified timeline — submissions + quiz attempts.
         function getUnifiedAllItems() {
-            return (unifiedSubmissionsCache || []).concat(mapQuizAttemptsToUnified());
+            return (unifiedSubmissionsCache || []).concat(mapQuizAttemptsToUnified(), mapLinkSuggestionsToUnified());
         }
 
         // V95.16: Toggle empty-state hero vs stats/search/filters based on whether the
@@ -18563,7 +18563,7 @@ async function archiveDoneCard(cardId) {
 
         // 🔥 [V91.62] Count submissions per type (for pill badges)
         function getUnifiedTypeCounts() {
-            const counts = { all: 0, case: 0, work: 0, quiz: 0, quest: 0, reflective: 0 };
+            const counts = { all: 0, case: 0, work: 0, quiz: 0, quest: 0, reflective: 0, explore_link: 0 };
             getUnifiedAllItems().forEach(s => {
                 counts.all++;
                 if (counts[s.submissionType] !== undefined) counts[s.submissionType]++;
@@ -18617,7 +18617,8 @@ async function archiveDoneCard(cardId) {
                 { key: 'work',       emoji: '📝', label: 'Work / 워크' },
                 { key: 'quiz',       emoji: '🧠', label: 'Quiz / 퀴즈' },
                 { key: 'quest',      emoji: '⭐', label: 'Quest / 퀘스트' },
-                { key: 'reflective', emoji: '😊', label: 'Log / 로그' }
+                { key: 'reflective', emoji: '😊', label: 'Log / 로그' },
+                { key: 'explore_link', emoji: '🔗', label: 'Link / 링크' }
             ];
             wrap.innerHTML = meta.map(m => {
                 const active = unifiedCurrentFilter === m.key;
@@ -18684,7 +18685,7 @@ async function archiveDoneCard(cardId) {
             if (filtered.length === 0) {
                 const typeLabels = {
                     case: '🏥 case', work: '📝 work', quiz: '🧠 quiz',
-                    quest: '⭐ quest', reflective: '😊 reflective log'
+                    quest: '⭐ quest', reflective: '😊 reflective log', explore_link: '🔗 explore link'
                 };
                 let emptyTitle, emptyHint;
                 if (unifiedSearchQuery) {
@@ -18781,7 +18782,18 @@ async function archiveDoneCard(cardId) {
                             link: null,
                             detail: sub.metadata?.learningTools?.length > 0 ? `Tools: ${sub.metadata.learningTools.join(', ')}` : 'Daily reflection'
                         };
-                    
+
+                    case 'explore_link':
+                        return {
+                            ...baseItem,
+                            title: `🔗 ${sub.title}`,
+                            type: 'Explore Link 링크',
+                            icon: 'fa-link',
+                            color: '#ea580c',
+                            link: sub.metadata?.url || null,
+                            detail: (LINK_SUGGESTION_STATUS_LABEL[sub.status] || LINK_SUGGESTION_STATUS_LABEL.pending).text
+                        };
+
                     default:
                         return {
                             ...baseItem,
