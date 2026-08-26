@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.06</title>
+    <title>Nika V98.07</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -32196,6 +32196,29 @@ RULES:
         // review_links doc, isActive:true) or Reject. Inputs are id-suffixed
         // per suggestion so multiple pending cards don't collide.
         // ===================================================================
+        // V98.07: type was a bare <select> — with no explicit width override it
+        // fell into this file's global `input,select,textarea{width:100%}` rule
+        // (line ~4719) and claimed its own full-width row (measured: 1614px on a
+        // 1670px container), bumping the Beri-reward field down onto a third row
+        // too. Chip rail fixes the width-trap AND matches the house preference for
+        // tap-a-chip over dropdowns (see the intern-side sl-type-chips this
+        // mirrors) — Title/URL/chips/Beri/Approve/Reject now fit in 2 rows.
+        const LINK_SUGGESTION_TYPE_LABEL = { line_man: 'LINE MAN', youtube: 'YouTube', other: 'Other' };
+
+        function lsChipHtml(id, type, active) {
+            return `<button type="button" data-type="${type}" onclick="lsSetType('${id}', '${type}')" style="padding:7px 10px; border-radius:8px; border:1.5px solid ${active ? '#ea580c' : '#e2e8f0'}; background:${active ? '#fff7ed' : '#fff'}; color:${active ? '#c2410c' : '#64748b'}; font-weight:700; font-size:0.8em; cursor:pointer; white-space:nowrap;">${REVIEW_LINK_TYPE_ICON[type]} ${LINK_SUGGESTION_TYPE_LABEL[type]}</button>`;
+        }
+
+        function lsSetType(id, type) {
+            document.getElementById(`ls-type-${id}`).value = type;
+            document.querySelectorAll(`#ls-card-${id} button[data-type]`).forEach(btn => {
+                const active = btn.dataset.type === type;
+                btn.style.borderColor = active ? '#ea580c' : '#e2e8f0';
+                btn.style.background = active ? '#fff7ed' : '#fff';
+                btn.style.color = active ? '#c2410c' : '#64748b';
+            });
+        }
+
         function renderPendingLinkSuggestions() {
             const list = document.getElementById('link-suggestions-pending-list');
             if (!list) return;
@@ -32203,24 +32226,25 @@ RULES:
                 list.innerHTML = '<div style="padding:20px; text-align:center; color:#94a3b8; font-size:0.86em;">No pending suggestions.</div>';
                 return;
             }
-            list.innerHTML = linkSuggestionsCache.map(s => `
-                <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px 12px;">
+            list.innerHTML = linkSuggestionsCache.map(s => {
+                const type = s.type || 'other';
+                const chips = Object.keys(REVIEW_LINK_TYPE_ICON).map(t => lsChipHtml(s.id, t, t === type)).join('');
+                return `
+                <div id="ls-card-${s.id}" style="background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px 12px;">
                     <div style="font-size:0.76em; color:#94a3b8; font-weight:700; margin-bottom:8px;">${escapeHtml(s.displayName || 'Unknown')} เสนอ</div>
                     <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
                         <input type="text" id="ls-title-${s.id}" value="${escapeHtml(s.title || '')}" placeholder="Title" style="flex:2; min-width:160px; padding:7px 9px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:0.85em;">
                         <input type="url" id="ls-url-${s.id}" value="${escapeHtml(s.url || '')}" placeholder="URL" style="flex:3; min-width:200px; padding:7px 9px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:0.85em;">
-                        <select id="ls-type-${s.id}" style="padding:7px 9px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:0.85em; background:#fff;">
-                            <option value="line_man" ${s.type === 'line_man' ? 'selected' : ''}>🛍️ LINE MAN</option>
-                            <option value="youtube" ${s.type === 'youtube' ? 'selected' : ''}>▶️ YouTube</option>
-                            <option value="other" ${(s.type || 'other') === 'other' ? 'selected' : ''}>🔗 Other</option>
-                        </select>
-                        <input type="number" id="ls-beri-${s.id}" value="10" min="1" step="1" placeholder="Beri" style="width:70px; padding:7px 9px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:0.85em;">
                     </div>
-                    <div style="display:flex; gap:6px;">
-                        <button class="btn-sm btn-success" onclick="approveLinkSuggestion('${s.id}')">Approve</button>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                        <input type="hidden" id="ls-type-${s.id}" value="${type}">
+                        ${chips}
+                        <input type="number" id="ls-beri-${s.id}" value="10" min="1" step="1" placeholder="Beri" style="width:70px; padding:7px 9px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:0.85em;">
+                        <button class="btn-sm btn-success" onclick="approveLinkSuggestion('${s.id}')" style="margin-left:auto;">Approve</button>
                         <button class="btn-sm btn-danger" onclick="rejectLinkSuggestion('${s.id}')">Reject</button>
                     </div>
-                </div>`).join('');
+                </div>`;
+            }).join('');
         }
 
         async function approveLinkSuggestion(id) {
