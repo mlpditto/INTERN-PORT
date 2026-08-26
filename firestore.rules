@@ -446,9 +446,20 @@ service cloud.firestore {
 
     // 35. Review Links (Explore tab, Beri Phase 1) — admin-curated external
     // links (LINE MAN shops, YouTube, etc.). Same posture as /quizzes (rule 8).
+    // Narrow exception: the client transaction that credits a click (index.html
+    // explOpenLink) also shrinks the shop's own beriReward by exactly 1 (floor
+    // 1) so later openers earn less than the first. The rule below only lets a
+    // signed-in user touch that one field, by exactly -1, never below 1 —
+    // everything else on the doc (title/url/type/isActive) still needs admin.
     match /review_links/{linkId} {
       allow read: if true;
       allow write: if isAdmin();
+      allow update: if isSignedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['beriReward'])
+        && request.resource.data.beriReward is int
+        && resource.data.beriReward is int
+        && resource.data.beriReward > 1
+        && request.resource.data.beriReward == resource.data.beriReward - 1;
     }
 
     // 35b. Review Link Clicks — one doc per (link, user), id `${linkId}_${userId}`,
