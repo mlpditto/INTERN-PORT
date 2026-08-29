@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.64)</title>
+    <title>Internship Portfolio (V96.65)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -8193,7 +8193,7 @@
                     let statusBadge = "";
                     let bodyHtml = "";
                     let actionHtml = "";
-                    let footerDeadline = ""; // V95.94: deadline countdown shares the footer row with the CTA
+                    let ctaCountdown = ""; // V96.65: deadline countdown now rides INSIDE the Start Quiz button
                     const isOneTime = q.oneTimeMode === true;
                     const isHomework = q.isHomework === true;
                     let quizMetaTitleSuffix = "";
@@ -8336,9 +8336,12 @@
                         // V94.87: dropped the "Not Started ยังไม่ทำ" status badge — it was redundant
                         // with the Start Quiz CTA at the bottom of the card. Type now lives in the
                         // meta line below alongside items / pts (separated by · for readability).
-                        if (dead) {
-                            // V95.94 lean: deadline rides the footer row next to the CTA (was its own body row).
-                            footerDeadline = `<div class="meta-item quiz-global-expiry" data-dead="${dead.getTime()}" style="color:#ef233c; font-weight:bold; font-size:0.85em; flex-shrink:0; white-space:nowrap;"><i class="fa-solid fa-circle-exclamation"></i> Loading...</div>`;
+                        // V96.65: the countdown rides INSIDE the not-started CTA (was a
+                        // separate chip left of it). Only the not-yet-expired button
+                        // carries it — an expired quiz flips to the orange "ทำเลทได้เลย"
+                        // CTA, which needs no countdown. Text filled by the timer tick.
+                        if (dead && now <= dead) {
+                            ctaCountdown = ` <span class="quiz-cta-countdown" data-dead="${dead.getTime()}" style="font-weight:600; opacity:0.9;"></span>`;
                         }
 
                         // 🔥 V78: Show ONE-TIME badge
@@ -8378,7 +8381,7 @@
                             actionHtml = `<button class="btn-primary btn-quiz-cta" onclick="confirmRunQuiz('${q.id}')" style="flex:1; background:linear-gradient(135deg, #f39c12 0%, #e67e22 100%); border:none;">🚀 Start Quiz ทำเลทได้เลย</button>`;
                         } else {
                             const btnText = q.quizType === 'read_only' ? '📖 Start Learning' : '🚀 Start Quiz';
-                            actionHtml = `<button class="btn-primary btn-quiz-cta" onclick="confirmRunQuiz('${q.id}')" style="flex:1; background:linear-gradient(135deg, #4361ee 0%, #4cc9f0 100%); border:none;">${btnText}</button>`;
+                            actionHtml = `<button class="btn-primary btn-quiz-cta" onclick="confirmRunQuiz('${q.id}')" style="flex:1; background:linear-gradient(135deg, #4361ee 0%, #4cc9f0 100%); border:none;">${btnText}${ctaCountdown}</button>`;
                         }
                     }
 
@@ -8443,7 +8446,7 @@
                             ${isCollapsed ? '<i class="fa-solid fa-chevron-down" style="color:#ccc; font-size:0.9em; margin-left:10px;"></i>' : ''}
                         </div>
                         <div class="assign-body" style="${isCollapsed ? 'display:none;' : ''}">${(bodyHtml + quizMaterialsHtml(q, quizMaterialsDone)).trim()}</div>
-                        <div class="assign-footer" style="${isCollapsed ? 'display:none;' : (footerDeadline ? 'display:flex; align-items:center; gap:10px;' : '')}">${footerDeadline}${actionHtml}</div>
+                        <div class="assign-footer" style="${isCollapsed ? 'display:none;' : ''}">${actionHtml}</div>
                     `;
                 }
 
@@ -17119,20 +17122,19 @@
                 }
             });
 
-            // 🔥 Quiz Global Expiry (V77.24)
-            // V94.50: include EN text so the live countdown stays visible when
-            // Thai display is OFF (lang-toggle hides .lang-th spans by default).
-            // Previously rendered only Thai → only the trailing "." was visible.
-            document.querySelectorAll('.quiz-global-expiry').forEach(el => {
+            // Quiz CTA countdown (V77.24, moved inside the button V96.65). Text is
+            // language-neutral ("3h 12m"), so no lang-toggle concern. On expiry the
+            // card re-renders to the orange "ทำเลทได้เลย" CTA on the next data tick;
+            // until then just clear the in-button countdown.
+            document.querySelectorAll('.quiz-cta-countdown').forEach(el => {
                 const d = parseInt(el.dataset.dead);
                 const diff = d - now;
                 if (diff <= 0) {
-                    el.innerText = "Expired หมดเวลา";
-                    el.style.color = "#ccc";
+                    el.textContent = "";
                 } else {
                     const h = Math.floor(diff / 3600000);
                     const m = Math.floor((diff % 3600000) / 60000);
-                    el.innerHTML = `<i class="fa-solid fa-hourglass-half"></i> ${h}h ${m}m left`;
+                    el.innerHTML = `<i class="fa-solid fa-hourglass-half"></i> ${h}h ${m}m`;
                 }
             });
 
