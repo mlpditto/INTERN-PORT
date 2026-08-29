@@ -2552,11 +2552,6 @@ const DIGEST_MAX_ROWS = 12;
 // (B) Only quizzes due within this many days get a full name list; everything
 // else collapses to one summary line so the message stays skimmable.
 const DIGEST_URGENT_DAYS = 3;
-// V97.76: cap for the who-COMPLETED roster. Deliberately tighter than
-// DIGEST_MAX_ROWS (12): that cap sized a list of who was MISSING, which
-// shrinks toward zero as a deadline nears. This list runs the other way —
-// it grows to the whole cohort — so it needs to stop sooner.
-const DIGEST_DONE_NAMES = 6;
 
 // (C) LINE display names often carry a trailing decoration run ("ชัญญาญ์ญา ❤️❤️💠🍀🦋✨").
 // Strip it for the digest only — the stored profile is untouched. \u escapes on
@@ -2868,10 +2863,8 @@ async function runQuizDigest(kind, options) {
             const missing = eligible.filter(u => !doneIds.has(u.id));
             if (!missing.length) continue;
             // doneIds counts every submitter; intersect with the active cohort so
-            // "done/total" can't read like 9/6 once the denominator is narrowed.
-            // Kept as a name list, not a count: the group copy names who is DONE
-            // where the admin copy names who is behind — see buildFlex.
-            const doneNames = eligible.filter(u => doneIds.has(u.id)).map(u => u.name);
+            // the completion bar can't read like 9/6 once the denominator narrows.
+            const doneCount = eligible.filter(u => doneIds.has(u.id)).length;
             pendingBlocks.push({
                 // V97.76: full title, no truncation. slice(0,60) cut Thai titles
                 // mid-word ("...ภาวะตกเลือดหลังคลอ") which is unreadable; the title
@@ -2880,12 +2873,7 @@ async function runQuizDigest(kind, options) {
                 deadlineMs: deadlineMs,
                 deadline: new Date(deadlineMs).toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', day: '2-digit', month: 'short' }),
                 names: missing.map(u => u.name),
-                // Who is done, minus the groups the intern chat does not name.
-                // doneCount below stays the FULL figure, so both copies print the
-                // same done/total and only the roster differs.
-                doneNames: doneNames,
-                doneNamesGroup: eligible.filter(u => doneIds.has(u.id) && !unnamedInGroupCopy(u.group)).map(u => u.name),
-                doneCount: doneNames.length,
+                doneCount: doneCount,
                 totalCount: eligible.length
             });
         }
@@ -3126,22 +3114,12 @@ async function runQuizDigest(kind, options) {
             }
         }
 
-        // The roster under each deadline flips by target. The admin 1-on-1 copy
-        // lists who is BEHIND, which is what chasing needs. The group copy goes
-        // to the chat every intern reads, so naming the laggards there is a
-        // public callout — it lists who is DONE instead. The ✅ prefix is load
-        // bearing: without it the names sit under a ⏳ header and read as the
-        // opposite of what they are.
-        // V97.76: BOTH copies now name who has COMPLETED the quiz. The admin copy
-        // used to name who was behind; that list is gone from here and survives as
-        // the single Behind tally below, which is a better chase tool anyway (one
-        // line, sorted by who owes most, spanning every pending quiz rather than
-        // repeating names under each one).
-        //
-        // "2/8" was replaced by "done: <names>" on the user's call: the bare ratio
-        // read as unexplained. It briefly carried a "· N left" suffix too, but
-        // that was dropped on a later call — the bar already carries the ratio,
-        // so spelling out the remaining count was redundant.
+        // Who is behind is collapsed into the single Behind tally below (admin
+        // copy only) — one line sorted by who owes most, spanning every pending
+        // quiz, which is a better chase tool than repeating names under each
+        // deadline. The per-quiz "done: <names>" roster that used to trail each
+        // due line, and the "· N left" and "2/8" suffixes before it, were all
+        // dropped on the user's call: the completion bar already carries the ratio.
         //
         // The section used to render one separator and one amber title PER quiz,
         // so five pending quizzes came out as five equal-weight blocks and there
@@ -3185,25 +3163,12 @@ async function runQuizDigest(kind, options) {
                     : [{ type: 'filler' }]
             });
 
-            const roster = target.withScores ? blk.doneNames : blk.doneNamesGroup;
-            // Deadline first: it is the half that carries the row's colour, so
-            // leading with it puts the coloured words where the eye lands.
-            const parts = [`due ${due.text}`];
-            if (roster.length) {
-                const shown = roster.slice(0, DIGEST_DONE_NAMES).join(', ');
-                // This list GROWS as completion rises (the old missing-list shrank),
-                // so it needs a tighter cap than DIGEST_MAX_ROWS.
-                parts.push(`done: ${roster.length > DIGEST_DONE_NAMES
-                    ? `${shown} +${roster.length - DIGEST_DONE_NAMES}`
-                    : shown}`);
-            }
-            // The old "done: no one yet", the group copy's "N so far", and "N left"
-            // are all gone: the bar already says what they said, and printing them
-            // cost a full line on every brand-new quiz. `parts` always has at least
-            // `due ...`, so this can never be the empty string that LINE rejects.
+            // Deadline only — it carries the row's colour, and the bar above
+            // already shows completion. The "done: <names>" roster that used to
+            // trail this line was dropped on the user's call to save a line.
             body.push({
                 type: 'text',
-                text: parts.join(' · '),
+                text: `due ${due.text}`,
                 size: 'xs', color: digestDueColor(due.gap), wrap: true, margin: 'xs'
             });
         });
