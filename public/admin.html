@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.10</title>
+    <title>Nika V98.11</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -21363,6 +21363,14 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             // 🔥 [Version: V68] Load Data First (Firefox Protection)
             loadData();
             initKanban();
+            // V98.11: reopen the tab that was active before the reload. Skipped for
+            // the Dashboard default (already active) and for an unknown/renamed id.
+            // switchTab is safe to call before data lands — its per-tab loaders
+            // behave exactly as a manual click right after login does.
+            try {
+                const savedTab = localStorage.getItem('adminActiveTab');
+                if (savedTab && savedTab !== 'tab-sidequest' && document.getElementById(savedTab)) switchTab(savedTab);
+            } catch (_) {}
             startCodexDraftBadges(); // V95.67: surface pending Drug/Disease drafts on the Dashboard
             if (window.loadLineUsage) window.loadLineUsage(); // V97.53: LINE push quota card
             setInterval(updateRealtimeTimers, 1000);
@@ -30625,6 +30633,9 @@ RULES:
         let activeTab = "tab-dashboard";
         function switchTab(id) {
             activeTab = id;
+            // V98.11: remember the tab so a reload (incl. the "new version" prompt)
+            // lands back here instead of the Dashboard — see initSystem().
+            try { localStorage.setItem('adminActiveTab', id); } catch (_) {}
             // Check if element exists before trying to access it
             const element = document.getElementById(id);
             if (!element) {
