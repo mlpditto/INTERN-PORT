@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.15</title>
+    <title>Nika V98.16</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -43282,6 +43282,24 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }, true);
         })();
 
+        // V98.16 lean: collapse per-row detail behind a chevron. The button's
+        // parent row is followed by a sibling .row-detail (fallback: nearest
+        // .row-detail under the shared parent). Used by the Name cell (English
+        // name / code / nickname) and the Period cell (full date range).
+        function toggleRowDetail(btn) {
+            const row = btn.parentElement;
+            let detail = row && row.nextElementSibling && row.nextElementSibling.classList
+                && row.nextElementSibling.classList.contains('row-detail')
+                ? row.nextElementSibling
+                : (row && row.parentElement ? row.parentElement.querySelector('.row-detail') : null);
+            if (!detail) return;
+            const open = detail.style.display !== 'none';
+            detail.style.display = open ? 'none' : 'block';
+            btn.innerHTML = open
+                ? '<i class="fa-solid fa-chevron-down"></i>'
+                : '<i class="fa-solid fa-chevron-up"></i>';
+        }
+
         function renderTable(type) {
             const tbody = document.querySelector(`#${type}Table tbody`);
             let data = (type === 'works') ? [...worksData] : [...usersData];
@@ -43459,13 +43477,23 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const userCode = d.enrollmentCode || preRegData.find(p => p.claimedBy === d.id)?.code || preRegData.find(p => p.sourceUserId === d.id)?.code || '';
                     const codeDisplay = userCode ? `<div style="font-size:0.75em; color:#6f42c1; font-weight:bold; margin-top:1px;"><i class="fa-solid fa-key"></i> Code: ${userCode}</div>` : '';
 
+                    // V98.16 lean: the dashed cert-name box was up to 5 stacked lines
+                    // on every row. Collapse to one — "ชื่อ · สถาบัน" — with the
+                    // English name / code / nickname behind a chevron (per row).
+                    const _instShort = d.institute || '';
+                    const _certSummary = `${d.fullName || '-'}${_instShort ? ` · ${_instShort}` : ''}`;
+                    const _certHasMore = d.fullNameEn || codeDisplay || (d.nickname && d.nickname !== '-');
                     const certNameDisplay = `
-                        <div style="cursor:pointer; margin-left: 35px; margin-top: 5px; background: #f8f9fa; padding: 4px 8px; border-radius: 6px; border: 1px dashed #ddd; display: inline-block;" onclick="setUserGroup('${d.id}', '${group}')">
-                            <div style="font-size:0.8em; font-weight:bold; color:#444; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:140px;" title="${(d.fullName || '-').replace(/"/g, '&quot;')}">${d.fullName || '-'} <i class="fa-solid fa-pen" style="font-size:0.8em; color:#ccc;"></i></div>
-                            ${d.fullNameEn ? `<div style="font-size:0.75em; color:var(--primary); font-style:italic; margin-bottom:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:140px;" title="${d.fullNameEn.replace(/"/g, '&quot;')}">${d.fullNameEn}</div>` : ''}
-                            ${codeDisplay}
-                            <div style="font-size:0.7em; color:#888;" title="${(d.nickname || '-').replace(/"/g, '&quot;')}">${d.nickname || '-'}</div>
-                            ${d.institute ? `<div style="font-size:0.65em; color:#999; margin-top:2px;" title="${d.institute.replace(/"/g, '&quot;')}"><i class="fa-solid fa-university"></i> ${d.institute}</div>` : ''}
+                        <div style="cursor:pointer; margin-left: 35px; margin-top: 5px; background: #f8f9fa; padding: 4px 8px; border-radius: 6px; border: 1px dashed #ddd; display: inline-block; max-width:230px;" onclick="setUserGroup('${d.id}', '${group}')">
+                            <div style="display:flex; align-items:center; gap:4px;">
+                                <span style="font-size:0.8em; font-weight:bold; color:#444; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:160px;" title="${_certSummary.replace(/"/g, '&quot;')}">${_certSummary} <i class="fa-solid fa-pen" style="font-size:0.8em; color:#ccc;"></i></span>
+                                ${_certHasMore ? `<button type="button" onclick="event.stopPropagation(); toggleRowDetail(this)" style="border:none; background:transparent; color:#94a3b8; cursor:pointer; font-size:0.8em; padding:0 2px; line-height:1;" title="More"><i class="fa-solid fa-chevron-down"></i></button>` : ''}
+                            </div>
+                            <div class="row-detail" style="display:none; margin-top:3px;">
+                                ${d.fullNameEn ? `<div style="font-size:0.75em; color:var(--primary); font-style:italic; margin-bottom:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:170px;" title="${d.fullNameEn.replace(/"/g, '&quot;')}">${d.fullNameEn}</div>` : ''}
+                                ${codeDisplay}
+                                <div style="font-size:0.7em; color:#888;" title="${(d.nickname || '-').replace(/"/g, '&quot;')}">${d.nickname || '-'}</div>
+                            </div>
                         </div>
                     `;
 
@@ -43527,11 +43555,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             </td>
                             <td style="font-size:0.84em;">
                                 <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-start;">
+                                    <!-- V98.16 lean: the full YYYY-MM-DD ~ YYYY-MM-DD string
+                                         folds behind a chevron; the ⏳rem/total pill (which
+                                         encodes the same window) stays, and so does the
+                                         Set / LIFF-visibility control row below. -->
                                     <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
                                         <i class="fa-solid fa-calendar-day" style="color:#64748b; font-size:0.92em; flex-shrink:0;"></i>
-                                        <span style="${d.hidePeriod ? 'text-decoration:line-through; color:#94a3b8;' : 'font-weight:700; color:#475569;'} font-family:monospace; font-size:0.92em;">${dateStr}</span>
-                                        ${daysRemainingHtml}
+                                        ${daysRemainingHtml || `<span style="${d.hidePeriod ? 'text-decoration:line-through; color:#94a3b8;' : 'font-weight:700; color:#475569;'} font-family:monospace; font-size:0.92em;">${dateStr}</span>`}
+                                        ${daysRemainingHtml ? `<button type="button" onclick="toggleRowDetail(this)" style="border:none; background:transparent; color:#94a3b8; cursor:pointer; font-size:0.8em; padding:0 2px; line-height:1;" title="Show dates"><i class="fa-solid fa-chevron-down"></i></button>` : ''}
                                     </div>
+                                    ${daysRemainingHtml ? `<div class="row-detail" style="display:none; margin-left:16px;"><span style="${d.hidePeriod ? 'text-decoration:line-through; color:#94a3b8;' : 'font-weight:700; color:#475569;'} font-family:monospace; font-size:0.92em;">${dateStr}</span></div>` : ''}
                                     <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap; margin-left:16px;">
                                         ${certStatus}
                                         <button class="btn-sm" onclick="openPeriodModal('${d.id}', '${d.displayName}', '${d.startDate || ''}', '${d.endDate || ''}')" style="font-size:0.68em; height:20px; padding:0 6px; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; border-radius:5px; display:flex; align-items:center; gap:3px; flex-shrink:0;" title="Adjust Period"><i class="fa-solid fa-calendar-plus"></i> Set</button>
