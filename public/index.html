@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.65)</title>
+    <title>Internship Portfolio (V96.66)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -7475,6 +7475,22 @@
             } catch (e) { fail(); }
         }
 
+        // V96.66: share a deep link to one quiz (?quiz=<id> → applyTabDeepLink
+        // scrolls that card into view). navigator.share (OS sheet) when available,
+        // else clipboard with the same execCommand fallback explCopyLink uses for
+        // older LINE webviews. Quiz ids are Firestore auto-ids ([A-Za-z0-9]).
+        function qzShareLink(quizId) {
+            const url = `https://liff.line.me/2008959998-yjcNpaGt?quiz=${encodeURIComponent(quizId)}`;
+            if (navigator.share) { navigator.share({ url }).catch(() => {}); return; }
+            const done = () => alert('คัดลอกลิงก์แล้ว · Link copied');
+            const fail = () => alert('คัดลอกไม่สำเร็จ · Copy failed');
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(url).then(done).catch(() => explCopyLinkFallback(url, done, fail));
+            } else {
+                explCopyLinkFallback(url, done, fail);
+            }
+        }
+
         // Never blocks the link — opens immediately regardless of whether the Beri
         // credit succeeds (same "never block the download" rule as qzLogMaterialClick).
         async function explOpenLink(linkId) {
@@ -8154,6 +8170,7 @@
                 } else if (item.type === 'quiz') {
                     // --- QUIZ UI ---
                     const q = item.data;
+                    card.dataset.quizId = q.id; // V96.66: target for ?quiz=<id> deep links (qzShareLink)
                     const attempt = item.myData;
                     const dead = q.deadline ? q.deadline.toDate() : null;
                     const qTitle = q.shortTitle || q.title;
@@ -8443,7 +8460,9 @@
                                 </h4>
                                 ${(quizMetaTitleSuffix || metaMaterialsChip || statusBadge || typeTags.length) ? `<div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; align-items:center;">${quizMetaTitleSuffix}${metaMaterialsChip}${statusBadge}${typeTags.join('')}</div>` : ''}
                             </div>
-                            ${isCollapsed ? '<i class="fa-solid fa-chevron-down" style="color:#ccc; font-size:0.9em; margin-left:10px;"></i>' : ''}
+                            ${isCollapsed
+                                ? '<i class="fa-solid fa-chevron-down" style="color:#ccc; font-size:0.9em; margin-left:10px;"></i>'
+                                : `<button onclick="event.stopPropagation(); qzShareLink('${q.id}')" title="แชร์ลิงก์ · Share link" style="width:32px; height:32px; min-height:auto; flex-shrink:0; padding:0; background:#f1f5f9; border:none; border-radius:9px; color:#475569; font-size:0.9em; cursor:pointer; box-sizing:border-box;">🔗</button>`}
                         </div>
                         <div class="assign-body" style="${isCollapsed ? 'display:none;' : ''}">${(bodyHtml + quizMaterialsHtml(q, quizMaterialsDone)).trim()}</div>
                         <div class="assign-footer" style="${isCollapsed ? 'display:none;' : ''}">${actionHtml}</div>
@@ -17576,21 +17595,43 @@ async function archiveDoneCard(cardId) {
         function applyTabDeepLink(urlParams) {
             const params = (urlParams && typeof urlParams.get === 'function') ? urlParams : liffDeepLinkParams();
             const tab = params.get('tab');
-            if (tab !== 'history' && tab !== 'quiz') return;
+            // V96.66: ?quiz=<id> (a shared card link from qzShareLink) implies the
+            // Quiz tab even without ?tab=quiz. Sanitised to the Firestore auto-id
+            // charset before it touches a selector.
+            const quizId = (params.get('quiz') || '').replace(/[^A-Za-z0-9_-]/g, '');
+            if (tab !== 'history' && tab !== 'quiz' && !quizId) return;
             setTimeout(() => {
                 // ?tab=quiz has been sent by notifyQuizReminder since it shipped, and
                 // by the digest's footer button since V97.9x, but nothing here ever
                 // handled it — the reader landed on the app home with Mission still
                 // collapsed, because kanban-content ships display:none. Same three
                 // moves as the history branch: expand, switch, scroll.
-                if (tab === 'quiz') {
+                if (tab === 'quiz' || quizId) {
                     const kanban = document.getElementById('kanban-content');
                     if (kanban && kanban.style.display === 'none') toggleKanban();
                     // toggleKanban already re-switches to whatever tab is active, and
                     // Quiz is the default — but say it out loud so this does not
                     // depend on which tab happens to carry the `active` class.
                     switchMissionTab('quiz');
-                    document.getElementById('section-kanban')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    if (quizId) {
+                        // The card list renders async after the quiz snapshot lands,
+                        // so poll briefly for the card rather than assume it's there.
+                        let tries = 0;
+                        (function findQuizCard() {
+                            const card = document.querySelector(`.assignment-card[data-quiz-id="${quizId}"]`);
+                            if (card) {
+                                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                const orig = card.style.boxShadow;
+                                card.style.transition = 'box-shadow 0.3s';
+                                card.style.boxShadow = '0 0 0 3px #4361ee';
+                                setTimeout(() => { card.style.boxShadow = orig; }, 1800);
+                            } else if (tries++ < 20) {
+                                setTimeout(findQuizCard, 300);
+                            }
+                        })();
+                    } else {
+                        document.getElementById('section-kanban')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
                     return;
                 }
                 const content = document.getElementById('work-section-content');
