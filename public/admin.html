@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.14</title>
+    <title>Nika V98.15</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -44017,7 +44017,23 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             renderUserStrip(lastDiv, users.slice(0, 20));
         }
 
+        function toggleEliteRest(btn, listId) {
+            const list = document.getElementById(listId);
+            if (!list) return;
+            const open = list.style.display === 'flex';
+            list.style.display = open ? 'none' : 'flex';
+            btn.innerHTML = open
+                ? `<i class="fa-solid fa-chevron-down"></i> Show ${list.children.length} more`
+                : `<i class="fa-solid fa-chevron-up"></i> Hide`;
+        }
+
+        // V98.15 lean: Elite Board shows the top 5 as rich cards; ranks 6+
+        // collapse into one-line rows behind a toggle (the sortable table
+        // below already carries the full detail). Hidden chart-/stats- divs
+        // on the compact rows keep loadLeaderboardCharts + _lbChartCache
+        // populated so openLbPopup still works for every rank.
         function renderUserStrip(container, users) {
+            const ELITE_RICH = 5;
             users.forEach((u, i) => {
                 const crewRank = typeof getCrewRankByScore === 'function' ? getCrewRankByScore(u.score || 0) : 'Rookie';
                 const lv = Math.floor((u.score || 0) / 10) + 1;
@@ -44030,6 +44046,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     else daysLeftHtml = `<span class="badge" style="background:#17a2b8">⌛ ${diff} Days Left</span>`;
                 }
                 const rankClass = i < 3 ? `rank-${i + 1}` : '';
+                if (i >= ELITE_RICH) return;
                 container.innerHTML += `
                     <div class="lb-row ${rankClass}" style="cursor:pointer; background:var(--bg-card); border:1px solid var(--border-color); box-shadow:0 2px 4px rgba(0,0,0,0.02);" onclick="openLbPopup('${u.id}')">
                         <div class="lb-left" style="gap:15px;">
@@ -44062,6 +44079,31 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         </div>
                     </div>`;
             });
+
+            if (users.length > ELITE_RICH) {
+                const rest = users.slice(ELITE_RICH);
+                const restId = 'lb-rest-' + Math.random().toString(36).slice(2, 9);
+                let restRows = '';
+                rest.forEach((u, k) => {
+                    const idx = ELITE_RICH + k;
+                    restRows += `
+                        <div style="display:flex; align-items:center; gap:10px; padding:6px 12px; cursor:pointer; background:var(--bg-card); border:1px solid var(--border-color); border-radius:8px;" onclick="openLbPopup('${u.id}')">
+                            <span style="font-weight:800; font-size:0.85em; color:#94a3b8; min-width:26px;">#${idx + 1}</span>
+                            <img src="${u.pictureUrl}" style="width:24px; height:24px; border-radius:7px; object-fit:cover; border:1px solid #fff;">
+                            <span style="font-size:0.9em; color:var(--text-main); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${u.displayName}</span>
+                            <span style="font-weight:800; font-size:0.9em; color:var(--primary);">${parseFloat((u.score || 0).toFixed(2))}</span>
+                            <span style="font-size:0.7em; font-weight:700; color:#c2410c; background:#fff7ed; border:1px solid #fed7aa; border-radius:5px; padding:1px 6px; white-space:nowrap;" title="Beri balance"><i class="fa-solid fa-coins" style="font-size:0.9em;"></i> ${Math.round(u.beri || 0)}</span>
+                            <div id="chart-${u.id}" style="display:none;"></div>
+                            <div id="stats-${u.id}" style="display:none;"></div>
+                        </div>`;
+                });
+                container.innerHTML += `
+                    <button type="button" onclick="toggleEliteRest(this, '${restId}')" style="width:100%; text-align:left; padding:7px 12px; margin-top:6px; background:var(--bg-card); border:1px dashed var(--border-color); border-radius:8px; color:var(--text-sub); font-size:0.8em; font-weight:700; cursor:pointer;">
+                        <i class="fa-solid fa-chevron-down"></i> Show ${rest.length} more
+                    </button>
+                    <div id="${restId}" style="display:none; flex-direction:column; gap:4px; margin-top:4px;">${restRows}</div>
+                `;
+            }
 
             const gStart = document.getElementById('lb-global-start').value;
             const gEnd = document.getElementById('lb-global-end').value;
