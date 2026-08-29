@@ -96,7 +96,8 @@ const LINE_I18N = {
         // One word, unlike adminEdit.btnHistory which lands on the same view: this
         // button shares a line with the title instead of owning a footer, so it has
         // roughly half the width to fit into.
-        button:    { en: 'History →',          th: 'ประวัติ →',             kr: '기록 →' }
+        button:    { en: 'History →',          th: 'ประวัติ →',             kr: '기록 →' },
+        materials: { en: '📎 Related materials', th: '📎 เอกสารประกอบ',       kr: '📎 관련 자료' }
     },
     adminEdit: {
         headerDelete:  { en: '🗑️ Admin Deleted Your Note',  th: '🗑️ แอดมินลบโน้ตของคุณ',   kr: '🗑️ 관리자가 노트를 삭제했습니다' },
@@ -2276,7 +2277,15 @@ async function claimQuizMilestone(db, quizId, milestone) {
 // records it as `no-friend` — normal, not an error to chase.
 // ============================================================
 async function pushQuizScoreToIntern(opts) {
-    const { attemptId, userId, quizTitle, correct, totalQ, isPoll } = opts;
+    const { attemptId, userId, quizTitle, correct, totalQ, isPoll, materials } = opts;
+
+    // The quiz's own reference links, if the admin attached any in the editor
+    // (quizzes/{id}.materials, "Name | URL" lines) — the same list the app shows
+    // on the results screen, surfaced here so the intern gets them without
+    // opening the app. http/https only, capped at 3 so the bubble stays a card.
+    const mats = (Array.isArray(materials) ? materials : [])
+        .filter(m => m && typeof m.url === 'string' && /^https?:\/\//i.test(m.url))
+        .slice(0, 3);
 
     // A poll has no right answer and an ungraded attempt has no number yet;
     // "🎯 Your score — awaiting grading" is a notification that says nothing.
@@ -2347,7 +2356,25 @@ async function pushQuizScoreToIntern(opts) {
                         { type: 'span', text: `  (${pct}%)`, size: 'md', color: '#64748b' }
                     ]
                 }]
-            }
+            },
+            // Reference links ride a footer, not the body — it only renders when
+            // the quiz has materials, so a plain score bubble is unchanged.
+            ...(mats.length ? {
+                footer: {
+                    type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '12px',
+                    contents: [
+                        { type: 'text', text: lineT('quizScore', 'materials', lang), size: 'xs', color: '#64748b' },
+                        ...mats.map((m, i) => ({
+                            type: 'button', style: 'link', height: 'sm',
+                            action: {
+                                type: 'uri',
+                                label: (m.name || `📎 ${i + 1}`).slice(0, 20),
+                                uri: m.url
+                            }
+                        }))
+                    ]
+                }
+            } : {})
         }
     });
 
@@ -2415,7 +2442,8 @@ exports.notifyQuizSubmitted = onCall(
     let personal;
     try {
         personal = await pushQuizScoreToIntern({
-            attemptId, userId, quizTitle, correct, totalQ, isPoll: attemptData.isPoll === true
+            attemptId, userId, quizTitle, correct, totalQ, isPoll: attemptData.isPoll === true,
+            materials: quizData.materials
         });
     } catch (err) {
         console.error(`[notifyQuizScore] unexpected failure for ${attemptId}:`, err.message);
