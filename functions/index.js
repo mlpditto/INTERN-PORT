@@ -2043,8 +2043,8 @@ function splitAttemptId(attemptId) {
 // recorded ONLY as a console.log line, which the admin browser cannot read
 // (Cloud Logging needs a service account + the Logging API), so there was no way
 // to answer "how many digests went out this month" or "how close are we to the
-// OA's 300-messages/month free-tier cap" — the cap that milestone mode exists to
-// protect. One doc per Bangkok MONTH in line_usage/{YYYY-MM}; atomic
+// OA's 300-messages/month free-tier cap" — the cap this whole
+// push channel stays opt-in to respect. One doc per Bangkok MONTH in line_usage/{YYYY-MM}; atomic
 // FieldValue.increment keeps it a cheap read-free merge, same shape as
 // recordAiUsage's ai_usage/{YYYY-MM-DD}.
 //
@@ -2108,7 +2108,7 @@ async function pushLineFlex(tag, targets, buildFlex, logSuffix) {
 }
 
 // ============================================================
-// notifyQuizSubmitted  (milestone push)
+// notifyQuizSubmitted  (opt-in per-submission admin/group push)
 // ------------------------------------------------------------
 // Caller: public/index.html submitQuiz(), fire-and-forget after the
 // attempt write, for every non-practice submission. Everything
@@ -2118,33 +2118,25 @@ async function pushLineFlex(tag, targets, buildFlex, logSuffix) {
 // Input:  { attemptId: string }   (`${quizId}_${userId}`)
 // Auth:   any signed-in user (the intern submitting)
 //
-// What actually gets pushed (user decision 2026-08-14): announcing
-// every submission would cost one message per intern per quiz, and the
-// OA's free plan carries 300 messages/month shared with the case /
-// review / digest pushes — a single PharmCamp-sized run (10 quizzes ×
-// 18 interns) would blow the month's budget on its own. So an ACTIVE
-// quiz announces two moments only:
+// Two independent halves:
+//   1. pushQuizScoreToIntern — the submitter's own score, 1-on-1, on
+//      EVERY non-practice submission. Always runs.
+//   2. the admin + group announce below — fires ONLY when the admin set
+//      quizzes.notifyGroup === true on that quiz. The OA's plan carries
+//      300 messages/month shared across every push, so this stays opt-in
+//      per quiz; the 16:00 digest already carries done-vs-pending for
+//      everything else.
 //
-//   first     — the first intern submits  → "someone has started"
-//   complete  — every eligible intern has submitted → "N/N done"
-//
-// = 2 messages per quiz no matter how many people take it. The daily
-// digest already carries the per-person detail.
-//
-// quizzes.notifyGroup === true keeps the old per-submission behaviour
-// as an explicit override for quizzes worth watching live.
-//
-// Milestones are claimed in a transaction on quiz_notify_state/{quizId}
-// so two interns submitting in the same second can't double-post.
+// V98.09: the automatic first-submitter / everyone-complete milestone
+// push was removed (LINE quota cut). The quiz_notify_state collection it
+// claimed against is no longer written.
 // ============================================================
-const QUIZ_NOTIFY_STATE = 'quiz_notify_state';
 
-// ---- shared "active cohort" definition (V97.51 digest, V97.52 milestone) ----
+// ---- shared "active cohort" definition (V97.51 digest) ----
 // `users` accumulates every account that ever opened the app, including admin
 // and staff logins, test accounts and one-time visitors. Counting those makes
-// "N/N" and the digest's nag list wrong in the same way, so both features now
-// narrow to the same cohort through the helpers below — one definition, so the
-// two notification paths can't drift apart again.
+// the digest's done/total and its nag list wrong, so it narrows to the cohort
+// through the helpers below.
 // `users/{uid}.lastSeen` is written on every intern LIFF open
 // (public/index.html), so it is an already-populated activity signal. No
 // lastSeen at all = treated as inactive.
@@ -2169,8 +2161,8 @@ function userLastSeenMs(u) {
     return NaN;
 }
 
-// Expects `active` and `ignored` already computed (loadUsersLite / the digest's
-// own reader both set them) so this stays a pure, cheap filter.
+// Expects `active` and `ignored` already computed (the digest's own reader
+// sets them) so this stays a pure, cheap filter.
 //
 // `ignored` is the admin's own call, made in User Hub (toggleIgnoreUser writes
 // users.isIgnored). Until 2026-08-15 the notify paths never read it, so the
@@ -2192,61 +2184,6 @@ function eligibleForQuiz(quizData, users) {
     return users.filter(u => targetGroup === 'Public' || u.group === targetGroup);
 }
 
-async function loadUsersLite(db) {
-    const snap = await db.collection('users').get();
-    const users = [];
-    const activeCutoffMs = Date.now() - NOTIFY_ACTIVE_DAYS * 24 * 60 * 60 * 1000;
-    snap.forEach(doc => {
-        const u = doc.data() || {};
-        const lastSeenMs = userLastSeenMs(u);
-        users.push({
-            id: doc.id,
-            name: (String(u.displayName || '').trim() || doc.id.slice(0, 8)).slice(0, 40),
-            group: u.group || 'Public',
-            active: Number.isFinite(lastSeenMs) && lastSeenMs >= activeCutoffMs,
-            ignored: u.isIgnored === true
-        });
-    });
-    return users;
-}
-
-// Every distinct user with a real (non-practice) submission for a quiz.
-// Attempt ids are `${quizId}_${userId}`, so a documentId range read
-// returns exactly this quiz's attempts — upper bound is the quiz id +
-// "`" (0x60), the character right after "_" (0x5F).
-async function submittersForQuiz(db, quizId) {
-    const snap = await db.collection('quiz_attempts')
-        .where(admin.firestore.FieldPath.documentId(), '>=', `${quizId}_`)
-        .where(admin.firestore.FieldPath.documentId(), '<', quizId + '`')
-        .get();
-    const ids = new Set();
-    snap.forEach(doc => {
-        const a = doc.data() || {};
-        if (a.isPractice === true) return;
-        if (!QUIZ_SUBMITTED_STATUSES.includes(a.status)) return;
-        const { userId } = splitAttemptId(doc.id);
-        if (userId) ids.add(userId);
-    });
-    return ids;
-}
-
-// Returns true if THIS call won the right to announce the milestone.
-async function claimQuizMilestone(db, quizId, milestone) {
-    const ref = db.collection(QUIZ_NOTIFY_STATE).doc(quizId);
-    try {
-        return await db.runTransaction(async tx => {
-            const doc = await tx.get(ref);
-            const data = doc.exists ? (doc.data() || {}) : {};
-            if (data[milestone]) return false;
-            tx.set(ref, { [milestone]: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-            return true;
-        });
-    } catch (err) {
-        console.error(`[notifyQuizSubmitted] milestone claim failed quiz=${quizId} milestone=${milestone}:`, err.message);
-        return false;
-    }
-}
-
 // ============================================================
 // pushQuizScoreToIntern  (the 1-on-1 half of notifyQuizSubmitted)
 // ------------------------------------------------------------
@@ -2260,12 +2197,9 @@ async function claimQuizMilestone(db, quizId, milestone) {
 // way: the moment it says "3rd of 6" it becomes the thing the split exists
 // to prevent.
 //
-// Runs BEFORE every admin-side gate in notifyQuizSubmitted, and that ordering
-// is the whole point. Those gates ask "is this submission newsworthy to the
-// admin" — first submitter, everyone finished, quiz still live — and the answer
-// is no for most submissions. But EVERY submission is newsworthy to the person
-// who made it, so sharing the milestone gate would have delivered a score to
-// roughly the first and last intern only.
+// Runs FIRST in notifyQuizSubmitted, before the opt-in notifyGroup:true
+// admin/group announce and independent of it: every submission is news to
+// the person who made it, even when it is news to nobody else.
 //
 // `users/{lineUserId}` is keyed by the LINE user id (see
 // isLineNotifyOptedOut), so the submitter's userId IS the push target and no
@@ -2450,10 +2384,14 @@ exports.notifyQuizSubmitted = onCall(
         personal = { pushed: false, reason: 'error' };
     }
 
-    const alwaysNotify = quizData.notifyGroup === true;
-    // Milestone mode only watches quizzes that are live; the override
-    // stays usable on a quiz the admin has already closed.
-    if (!alwaysNotify && quizData.isActive !== true) return { skipped: true, reason: 'inactive', personal };
+    // V98.09: the admin + group announce is opt-in per quiz now. The
+    // automatic first-submitter / everyone-complete milestone push is gone
+    // (LINE quota — the 16:00 digest already reports done-vs-pending).
+    // pushQuizScoreToIntern above still fires on every submission regardless.
+    // notifyGroup:true stays usable on a quiz the admin has already closed.
+    if (quizData.notifyGroup !== true) {
+        return { skipped: true, reason: 'not-opted-in', personal };
+    }
 
     const targets = resolveLineTargets('notifyQuizSubmitted');
     if (!targets.length) return { skipped: true, reason: 'no-target', personal };
@@ -2467,54 +2405,16 @@ exports.notifyQuizSubmitted = onCall(
     }
     displayName = displayName.slice(0, 60);
 
-    // ---- decide whether this submission is worth a message ----
-    let milestone = null;          // 'first' | 'complete' | null
-    let submittedCount = 0, eligibleCount = 0;
-    if (!alwaysNotify) {
-        try {
-            const submitters = await submittersForQuiz(db, quizId);
-            submittedCount = submitters.size;
-            if (submittedCount === 1) {
-                milestone = 'first';
-            } else if (submittedCount > 1) {
-                // V97.52: count against the SAME active cohort the digest uses, so
-                // "N/N" and the digest's "done/total" agree.
-                //
-                // Both sides must narrow together. Narrowing only the denominator
-                // would make 'complete' fire EARLY: submitters includes stale and
-                // staff accounts, so e.g. 8 raw submitters vs a 5-person active
-                // cohort satisfies `>=` while real actives are still missing.
-                // Intersecting first keeps the comparison like-for-like.
-                const users = await loadUsersLite(db);
-                const eligible = eligibleForQuiz(quizData, activeCohort(users));
-                eligibleCount = eligible.length;
-                const submittedActive = eligible.filter(u => submitters.has(u.id)).length;
-                if (eligibleCount > 0 && submittedActive >= eligibleCount) {
-                    milestone = 'complete';
-                    submittedCount = submittedActive;   // what the message renders
-                }
-            }
-        } catch (err) {
-            console.error(`[notifyQuizSubmitted] milestone scan failed quiz=${quizId}:`, err.message);
-            return { skipped: true, reason: 'scan-failed', personal };
-        }
-        if (!milestone) return { skipped: true, reason: 'no-milestone', submittedCount, personal };
-        const won = await claimQuizMilestone(db, quizId, milestone);
-        if (!won) return { skipped: true, reason: 'already-announced', milestone, personal };
-    }
+    const headline = '✅ Quiz Submitted';
 
-    const headline = milestone === 'first'
-        ? '🎬 เริ่มมีคนทำแล้ว'
-        : (milestone === 'complete' ? '✅ ทำครบทุกคนแล้ว' : '✅ Quiz Submitted');
-    const headerColor = milestone === 'complete' ? '#0f766e' : '#6366f1';
-
+    // Group copy carries no score — a small named cohort makes a score list a
+    // public callout (same privacy split the digest keeps). The admin 1-on-1
+    // copy does.
     const buildFlex = (target) => {
         const rows = [
             { type: 'text', text: `📚 ${quizTitle}`, size: 'sm', weight: 'bold', color: '#1f2937', wrap: true }
         ];
-        if (milestone === 'complete') {
-            rows.push({ type: 'text', text: `👥 ${submittedCount}/${eligibleCount} คน`, size: 'sm', color: '#0f766e', margin: 'sm', wrap: true });
-        } else if (target.withScores) {
+        if (target.withScores) {
             rows.push({ type: 'text', text: `🎯 ${scoreText}`, size: 'sm', color: '#4338ca', margin: 'sm', wrap: true });
         }
         return {
@@ -2524,10 +2424,10 @@ exports.notifyQuizSubmitted = onCall(
                 type: 'bubble',
                 size: 'kilo',
                 header: {
-                    type: 'box', layout: 'vertical', backgroundColor: headerColor, paddingAll: '12px',
+                    type: 'box', layout: 'vertical', backgroundColor: '#6366f1', paddingAll: '12px',
                     contents: [
                         { type: 'text', text: headline, weight: 'bold', size: 'sm', color: '#ffffff' },
-                        { type: 'text', text: milestone === 'complete' ? quizTitle : displayName, size: 'xs', color: '#e0e7ff', margin: 'xs', wrap: true }
+                        { type: 'text', text: displayName, size: 'xs', color: '#e0e7ff', margin: 'xs', wrap: true }
                     ]
                 },
                 body: { type: 'box', layout: 'vertical', paddingAll: '16px', contents: rows }
@@ -2535,9 +2435,9 @@ exports.notifyQuizSubmitted = onCall(
         };
     };
 
-    const results = await pushLineFlex('notifyQuizSubmitted', targets, buildFlex, `attempt=${attemptId}  milestone=${milestone || 'override'}  user=${displayName}`);
+    const results = await pushLineFlex('notifyQuizSubmitted', targets, buildFlex, `attempt=${attemptId}  opt-in  user=${displayName}`);
     const pushedCount = results.filter(r => r.ok).length;
-    return { ok: pushedCount > 0, pushedCount, results, attemptId, milestone: milestone || 'override', personal };
+    return { ok: pushedCount > 0, pushedCount, results, attemptId, personal };
 });
 
 // ============================================================
@@ -2573,10 +2473,8 @@ const DIGEST_MAX_ROWS = 12;
 // everyone for those. That swept in admin/test accounts, phone-number-named
 // throwaways and one-time visitors — reported as "/29" when the real cohort is
 // far smaller. The cohort rule now lives in NOTIFY_ACTIVE_DAYS / activeCohort()
-// near eligibleForQuiz (V97.52) because notifyQuizSubmitted's milestone counts
-// share it — one definition so the two paths can't drift apart. The footer
-// always prints how many were hidden, so the filter can never silently shrink
-// the cohort unnoticed.
+// near eligibleForQuiz. The footer always prints how many were hidden, so the
+// filter can never silently shrink the cohort unnoticed.
 // (B) Only quizzes due within this many days get a full name list; everything
 // else collapses to one summary line so the message stays skimmable.
 const DIGEST_URGENT_DAYS = 3;
@@ -2728,7 +2626,10 @@ async function runQuizDigest(kind, options) {
     }
     // Deliberately still the scheduled tag: this resolves WHERE to push, which
     // must be identical for both paths.
-    const targets = resolveLineTargets('notifyQuizDigest');
+    // V98.09: drop the scored admin 1-on-1 copy — the admin has the live
+    // dashboard (Preview digest, kanban, review sections) and the 16:00 LINE
+    // copy was ~30 pushes/month of the shared quota. The group copy stays.
+    const targets = resolveLineTargets('notifyQuizDigest').filter(t => !t.withScores);
     if (!targets.length) return { sent: false, reason: 'no-targets' };
 
     const db = admin.firestore();
@@ -2872,8 +2773,6 @@ async function runQuizDigest(kind, options) {
             if (!deadlineMs || isNaN(deadlineMs) || deadlineMs <= now.toMillis()) continue;
 
             // V97.51 (A): active cohort only — see NOTIFY_ACTIVE_DAYS.
-            // V97.52: notifyQuizSubmitted's milestone counts now use the same
-            // cohort, so "N/N" there and "done/total" here agree.
             const eligible = eligibleForQuiz(q, activeUsers);
             if (!eligible.length) continue;
 
@@ -3336,16 +3235,16 @@ async function runQuizDigest(kind, options) {
         };
     };
 
-    // V97.84: products and the admin queue are both admin-only sections now, so a day
-    // whose ONLY content is one of those would still pass the nothing-to-report guard
-    // above and push a bubble to the intern group reading nothing but
-    // "✅ Done today · 0 / No submissions today". Drop the group target on such a day
-    // rather than spending a push on noise. The admin copy still goes out.
+    // V97.84: products and the admin queue are admin-only sections, so a day
+    // whose ONLY content is one of those still passes the nothing-to-report
+    // guard above. Since V98.09 the digest goes to the group only, so skip it
+    // entirely on such a day rather than push a bubble reading nothing but
+    // "✅ Done today · 0 / No submissions today".
     const groupHasContent = newlyLive.length > 0 || doneQuizzes.length > 0 || pendingBlocks.length > 0;
-    const sendTargets = targets.filter(t => t.withScores || groupHasContent);
+    const sendTargets = groupHasContent ? targets : [];
     if (!sendTargets.length) {
-        console.log('[notifyQuizDigest] nothing for any configured target — no push');
-        return { sent: false, reason: 'nothing-for-any-target' };
+        console.log('[notifyQuizDigest] nothing for the group today — no push');
+        return { sent: false, reason: 'nothing-for-group' };
     }
 
     const counts = {
