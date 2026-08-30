@@ -510,6 +510,19 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // 35e. Beri Ledger — one row per Beri movement (earn or spend), written in
+    // the same client transaction / batch as the users/{uid}.beri change it
+    // mirrors (explOpenLink + redeemBeriReward on the intern side;
+    // approveExploreReview + adjBeriCore + denyBeriRedemption on the admin side).
+    // Deterministic id `${source}__${refId}` dedupes live writes against the
+    // one-time backfill. Same permissive posture as the other Beri collections
+    // above (client-side gated, trusted intern pool); admin-only update/delete
+    // so a ledger row can't be rewritten after the fact.
+    match /beri_ledger/{entryId} {
+      allow create, read: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
     // 37. Review Link Reviews — intern writes their own pending review (one
     // per link, doc id `${linkId}_${userId}`, dedup like review_link_clicks);
     // approved reviews are a public feed visible to any signed-in user under
