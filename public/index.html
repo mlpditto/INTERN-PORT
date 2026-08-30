@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V96.75)</title>
+    <title>Internship Portfolio (V96.76)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4022,14 +4022,13 @@
                         <!-- V94.92 Phase 5: tab bar split — Browse (Phase 4) vs My Drafts (Phase 5).
                              Both panels share the same Submit footer. My Drafts badge shows count
                              of intern's own pending+approved+rejected submissions. -->
-                        <div class="dc-view-tabs">
-                            <button type="button" class="dc-view-tab active" data-view="browse" onclick="dcSwitchView('browse')">
-                                📚 Browse
-                            </button>
-                            <button type="button" class="dc-view-tab" data-view="mydrafts" onclick="dcSwitchView('mydrafts')">
-                                📝 My Drafts
-                                <span id="dc-mydrafts-badge" class="dc-view-tab-badge" style="display:none;">0</span>
-                            </button>
+                        <!-- V96.76: was a full-width Browse / My-Drafts tab bar. Now Browse is
+                             the default view and My Drafts is a compact right-aligned button
+                             (hidden until the intern has ≥1 draft; becomes "← Browse" while in
+                             the drafts view). See dcToggleDrafts / dcRefreshDraftsToggle. -->
+                        <div style="display:flex; justify-content:flex-end; padding:8px 16px 0;">
+                            <button id="dc-drafts-toggle" type="button" onclick="dcToggleDrafts()"
+                                style="display:none; width:auto; min-height:0; align-items:center; gap:5px; font-size:0.8em; font-weight:700; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; padding:5px 10px; cursor:pointer;">📝 My Drafts</button>
                         </div>
 
                         <!-- Browse panel (Phase 4 content) -->
@@ -4060,14 +4059,11 @@
                         <!-- V95.12 Phase 5: tab bar split — Browse (Phase 2b) vs My Drafts (Phase 5).
                              Both panels share the same Submit footer. Mirrors Drug Codex Phase 5;
                              reuses the .dc-view-* / .dc-footer / .dc-submit-btn CSS. -->
-                        <div class="dc-view-tabs">
-                            <button type="button" class="dc-view-tab active" data-view="browse" onclick="dxSwitchView('browse')">
-                                📚 Browse
-                            </button>
-                            <button type="button" class="dc-view-tab" data-view="mydrafts" onclick="dxSwitchView('mydrafts')">
-                                📝 My Drafts
-                                <span id="dx-mydrafts-badge" class="dc-view-tab-badge" style="display:none;">0</span>
-                            </button>
+                        <!-- V96.76: compact right-aligned My Drafts button (was a tab bar) —
+                             see dxToggleDrafts / dxRefreshDraftsToggle. -->
+                        <div style="display:flex; justify-content:flex-end; padding:8px 16px 0;">
+                            <button id="dx-drafts-toggle" type="button" onclick="dxToggleDrafts()"
+                                style="display:none; width:auto; min-height:0; align-items:center; gap:5px; font-size:0.8em; font-weight:700; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; padding:5px 10px; cursor:pointer;">📝 My Drafts</button>
                         </div>
 
                         <!-- Browse panel (Phase 2b content) -->
@@ -13882,6 +13878,7 @@
         function dxSwitchView(view) {
             const browse = document.getElementById('dx-view-browse');
             const mydrafts = document.getElementById('dx-view-mydrafts');
+            // V96.76: the .dc-view-tab bar is gone; this sweep is now a harmless no-op.
             document.querySelectorAll('#dx-section-content .dc-view-tab').forEach(btn => {
                 btn.classList.toggle('active', btn.getAttribute('data-view') === view);
             });
@@ -13891,6 +13888,11 @@
                 // V95.72: restore the footer Submit (empty My Drafts hides it)
                 const footer = document.getElementById('dx-submit-footer');
                 if (footer) footer.style.display = '';
+                // V96.76: eager drafts listener so the toggle shows a count up front.
+                if (!dxMyDraftsState.loaded) {
+                    dxMyDraftsState.loaded = true;
+                    dxLoadMyDrafts();
+                }
             } else if (view === 'mydrafts') {
                 if (browse) browse.style.display = 'none';
                 if (mydrafts) mydrafts.style.display = 'block';
@@ -13898,6 +13900,27 @@
                     dxMyDraftsState.loaded = true;
                     dxLoadMyDrafts();
                 }
+            }
+            dxRefreshDraftsToggle();
+        }
+
+        function dxToggleDrafts() {
+            const md = document.getElementById('dx-view-mydrafts');
+            dxSwitchView((md && md.style.display !== 'none') ? 'browse' : 'mydrafts');
+        }
+
+        function dxRefreshDraftsToggle() {
+            const tgl = document.getElementById('dx-drafts-toggle');
+            if (!tgl) return;
+            const md = document.getElementById('dx-view-mydrafts');
+            const inDrafts = md && md.style.display !== 'none';
+            const n = (dxMyDraftsState && dxMyDraftsState.drafts) ? dxMyDraftsState.drafts.length : 0;
+            if (inDrafts) {
+                tgl.innerHTML = '<i class="fa-solid fa-arrow-left"></i> Browse';
+                tgl.style.display = 'inline-flex';
+            } else {
+                tgl.innerHTML = n ? `📝 My Drafts <span class="dc-view-tab-badge">${n}</span>` : '📝 My Drafts';
+                tgl.style.display = n ? 'inline-flex' : 'none';
             }
         }
 
@@ -13935,15 +13958,8 @@
         }
 
         function dxUpdateMyDraftsBadge() {
-            const badge = document.getElementById('dx-mydrafts-badge');
-            if (!badge) return;
-            const n = dxMyDraftsState.drafts.length;
-            if (n > 0) {
-                badge.style.display = 'inline-block';
-                badge.textContent = String(n);
-            } else {
-                badge.style.display = 'none';
-            }
+            // V96.76: the count now lives on the #dx-drafts-toggle button.
+            dxRefreshDraftsToggle();
         }
 
         function dxRenderMyDrafts() {
@@ -14784,6 +14800,7 @@
         function dcSwitchView(view) {
             const browse = document.getElementById('dc-view-browse');
             const mydrafts = document.getElementById('dc-view-mydrafts');
+            // V96.76: the .dc-view-tab bar is gone; this sweep is now a harmless no-op.
             document.querySelectorAll('.dc-view-tab').forEach(btn => {
                 btn.classList.toggle('active', btn.getAttribute('data-view') === view);
             });
@@ -14793,6 +14810,12 @@
                 // V95.72: restore the footer Submit (empty My Drafts hides it)
                 const footer = document.getElementById('dc-submit-footer');
                 if (footer) footer.style.display = '';
+                // V96.76: wire the drafts listener eagerly so the toggle can show a
+                // count without the user opening the drafts view first.
+                if (!dcMyDraftsState.loaded) {
+                    dcMyDraftsState.loaded = true;
+                    dcLoadMyDrafts();
+                }
             } else if (view === 'mydrafts') {
                 if (browse) browse.style.display = 'none';
                 if (mydrafts) mydrafts.style.display = 'block';
@@ -14800,6 +14823,29 @@
                     dcMyDraftsState.loaded = true;
                     dcLoadMyDrafts();
                 }
+            }
+            dcRefreshDraftsToggle();
+        }
+
+        function dcToggleDrafts() {
+            const md = document.getElementById('dc-view-mydrafts');
+            dcSwitchView((md && md.style.display !== 'none') ? 'browse' : 'mydrafts');
+        }
+
+        // V96.76: compact right-aligned My Drafts button — hidden until ≥1 draft;
+        // while viewing drafts it shows "← Browse".
+        function dcRefreshDraftsToggle() {
+            const tgl = document.getElementById('dc-drafts-toggle');
+            if (!tgl) return;
+            const md = document.getElementById('dc-view-mydrafts');
+            const inDrafts = md && md.style.display !== 'none';
+            const n = (dcMyDraftsState && dcMyDraftsState.drafts) ? dcMyDraftsState.drafts.length : 0;
+            if (inDrafts) {
+                tgl.innerHTML = '<i class="fa-solid fa-arrow-left"></i> Browse';
+                tgl.style.display = 'inline-flex';
+            } else {
+                tgl.innerHTML = n ? `📝 My Drafts <span class="dc-view-tab-badge">${n}</span>` : '📝 My Drafts';
+                tgl.style.display = n ? 'inline-flex' : 'none';
             }
         }
 
@@ -14837,15 +14883,8 @@
         }
 
         function dcUpdateMyDraftsBadge() {
-            const badge = document.getElementById('dc-mydrafts-badge');
-            if (!badge) return;
-            const n = dcMyDraftsState.drafts.length;
-            if (n > 0) {
-                badge.style.display = 'inline-block';
-                badge.textContent = String(n);
-            } else {
-                badge.style.display = 'none';
-            }
+            // V96.76: the count now lives on the #dc-drafts-toggle button.
+            dcRefreshDraftsToggle();
         }
 
         function dcRenderMyDrafts() {
