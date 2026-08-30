@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.26</title>
+    <title>Nika V98.28</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6459,6 +6459,10 @@
                                 <button id="line-digest-now-btn" onclick="sendDigestNow()"
                                     style="padding:7px 14px; border:1px solid #b45309; border-radius:10px; background:#b45309; color:#fff; font-size:0.78em; font-weight:700; cursor:pointer;">
                                     <i class="fa-solid fa-paper-plane"></i> Send this now
+                                </button>
+                                <button onclick="copyDigestText()" title="Copy the digest as plain text — paste it into the group yourself, 0 pushes"
+                                    style="padding:7px 12px; border:1px solid #0f766e; border-radius:10px; background:#fff; color:#0f766e; font-size:0.78em; font-weight:700; cursor:pointer;">
+                                    <i class="fa-solid fa-clipboard"></i> Copy text
                                 </button>
                                 <button onclick="closeDigestPreview()"
                                     style="padding:7px 12px; border:1px solid #cbd5e1; border-radius:10px; background:#fff; color:#475569; font-size:0.78em; font-weight:600; cursor:pointer;">
@@ -31670,6 +31674,8 @@ RULES:
                             + lines + `</div>`;
                     }).join('');
 
+                    window._digestPreviewData = data; // V98.28: for copyDigestText()
+
                     const c = data.counts || {};
                     if (meta) {
                         meta.textContent = `Built ${new Date(data.builtAt || Date.now()).toLocaleTimeString()}`
@@ -31708,6 +31714,42 @@ RULES:
                 if (copies) copies.innerHTML = '';
                 if (meta) meta.textContent = '';
                 window._digestForceNext = false;
+                window._digestPreviewData = null;
+            };
+
+            // V98.28: flatten the previewed digest into plain text so the admin can
+            // paste it into the intern group themselves — 0 pushes off the quota
+            // (vs. "Send this now" which spends 1). Loses the Flex bubble styling.
+            function digestTargetsToText(targets) {
+                return (targets || []).map(t => (t.body || []).map(n => {
+                    if (n && n.type === 'text') return n.text || '';
+                    return ''; // separators / non-text → blank line
+                }).join('\n').replace(/\n{3,}/g, '\n\n').trim()).join('\n\n———\n\n');
+            }
+
+            window.copyDigestText = function () {
+                const data = window._digestPreviewData;
+                const status = document.getElementById('line-digest-now-status');
+                const setStatus = (text, color) => { if (status) { status.textContent = text; status.style.color = color || '#64748b'; } };
+                if (!data || !data.targets || !data.targets.length) {
+                    setStatus('Preview first — nothing to copy.', '#b45309');
+                    return;
+                }
+                const text = digestTargetsToText(data.targets);
+                const done = () => setStatus('Copied — paste it into the intern group (0 pushes).', '#059669');
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(done).catch(() => {
+                        const ta = document.createElement('textarea');
+                        ta.value = text; document.body.appendChild(ta); ta.select();
+                        try { document.execCommand('copy'); done(); } catch (e) { setStatus('Copy failed — select the preview text manually.', '#dc2626'); }
+                        ta.remove();
+                    });
+                } else {
+                    const ta = document.createElement('textarea');
+                    ta.value = text; document.body.appendChild(ta); ta.select();
+                    try { document.execCommand('copy'); done(); } catch (e) { setStatus('Copy failed.', '#dc2626'); }
+                    ta.remove();
+                }
             };
 
             // V97.63: manual digest send. The duplicate guard lives server-side; this
@@ -31734,7 +31776,10 @@ RULES:
                 }
 
                 const force = window._digestForceNext === true;
-                if (!force && !confirm("Send this digest now?\n\nIt goes to the admin chat AND the intern group — that is 2 pushes off the monthly quota, and it cannot be unsent.")) return;
+                // V98.28: the admin 1-on-1 scored copy was dropped server-side in
+                // V98.09 (runQuizDigest filters `!withScores`), so a manual send is
+                // 1 push to the intern group — the old "2 pushes" text was stale.
+                if (!force && !confirm("Send this digest to the intern group now?\n\nThat's 1 push off the monthly quota, and it can't be unsent.\n\n(To send without spending a push: use “Copy text” and paste it into the group yourself.)")) return;
 
                 if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...'; }
                 setStatus('');
