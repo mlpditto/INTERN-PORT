@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.29</title>
+    <title>Nika V98.30</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13421,7 +13421,10 @@
                 </div>
             </div>
 
-            <div style="margin-bottom:15px;">
+            <!-- V98.30 lean: the chip rail below IS the group picker (since #954), so
+                 the text field is hidden — it stays only because confirmSetGroup reads
+                 #gs-input.value. Creating a new group is the "+ New" chip in the rail. -->
+            <div style="display:none;">
                 <label style="font-size:0.85em; color:#666; font-weight:bold;">🏷️ Group</label>
                 <input type="text" id="gs-input" placeholder="Type group name..." list="gs-suggestions"
                     style="margin-top:5px; width:100%; box-sizing:border-box; padding:8px;">
@@ -13429,7 +13432,8 @@
                     <!-- Dynamic suggestions injected here -->
                 </datalist>
             </div>
-            <div style="font-size:0.8em; color:#999; margin-bottom:8px;">เลือกกลุ่มแล้วกด <b>Save Info</b> · Pick a group, then Save</div>
+            <div style="font-size:0.8em; color:#999; margin-bottom:8px;">🏷️ เลือกกลุ่มแล้วกด <b>Save Info</b> · Pick a group, then Save — or <b>+ New</b> to create one</div>
+            <div id="gs-new-hint" style="display:none; font-size:0.78em; color:var(--primary); margin-bottom:8px;"></div>
             <!-- V98.18 lean: was a grid of 13 full-colour buttons (~450px tall)
                  each with a red deleteGroupGlobally button one mis-click away.
                  Now a chip rail; deletion moved behind the "Manage groups" toggle. -->
@@ -32710,6 +32714,38 @@ RULES:
             el.style.borderColor = 'var(--primary)';
         }
 
+        // V98.30: "+ New" chip → inline input → a dashed "pending" chip. The new
+        // group name lands in #gs-input.value; confirmSetGroup creates it on Save.
+        function gsNewGroup(chipEl) {
+            const list = document.getElementById('gs-list');
+            if (list && list.classList.contains('gs-managing')) return;
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.placeholder = 'new group name';
+            inp.style.cssText = 'width:140px; font-size:0.85em; padding:5px 8px; border:1px solid var(--primary); border-radius:8px; margin:0; min-height:0;';
+            const cancel = () => { if (inp.parentNode) inp.replaceWith(chipEl); };
+            const commit = () => {
+                if (!inp.parentNode) return;
+                const name = inp.value.trim();
+                if (!name) { cancel(); return; }
+                document.getElementById('gs-input').value = name;
+                list.querySelectorAll('.gs-chip').forEach(c => { c.style.background = '#fff'; c.style.color = '#334155'; c.style.borderColor = '#e2e8f0'; });
+                const pend = document.createElement('div');
+                pend.style.cssText = 'display:flex; align-items:center; gap:5px; font-size:0.85em; font-weight:700; padding:6px 12px; border-radius:8px; white-space:nowrap; border:1px dashed var(--primary); background:#eef2ff; color:var(--primary);';
+                pend.innerHTML = `<i class="fa-solid fa-plus"></i> ${escapeHtml(name)} <span style="font-size:0.72em; opacity:0.7;">new</span>`;
+                inp.replaceWith(pend);
+                const hint = document.getElementById('gs-new-hint');
+                if (hint) { hint.textContent = `New group “${name}” — it's created when you Save.`; hint.style.display = 'block'; }
+            };
+            inp.addEventListener('keydown', e => {
+                if (e.key === 'Enter') { e.preventDefault(); commit(); }
+                else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+            });
+            inp.addEventListener('blur', commit);
+            chipEl.replaceWith(inp);
+            inp.focus();
+        }
+
         function toggleGroupManageMode() {
             const list = document.getElementById('gs-list');
             if (!list) return;
@@ -32819,10 +32855,16 @@ RULES:
                         ${g !== 'Public' ? `<span class="gs-del" style="display:none; align-items:center; margin-left:2px;" onclick="event.stopPropagation(); deleteGroupGlobally('${g}')" title="Delete this group"><i class="fa-solid fa-xmark" style="color:#ef4444;"></i></span>` : ''}
                     </div>
                 `;
-            }).join('');
+            }).join('') + `
+                <div class="gs-chip-new" role="button" tabindex="0" onclick="gsNewGroup(this)"
+                    style="display:flex; align-items:center; gap:5px; font-size:0.85em; font-weight:700; padding:6px 12px; border-radius:8px; cursor:pointer; white-space:nowrap; border:1px dashed #cbd5e1; background:#fff; color:#64748b;">
+                    <i class="fa-solid fa-plus" style="font-size:0.85em;"></i> New
+                </div>`;
+
+            const _nh = document.getElementById('gs-new-hint');
+            if (_nh) { _nh.style.display = 'none'; _nh.textContent = ''; }
 
             forceShowModal('groupSelectModal', 'flex');
-            setTimeout(() => input.select(), 100);
         }
 
         // 🔥 Group Settings Functions ([Version: V69.0])
