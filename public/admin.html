@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.18</title>
+    <title>Nika V98.19</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13313,7 +13313,17 @@
             </div>
             <input type="hidden" id="gs-uid">
 
-            <div style="margin-bottom:15px; background:#f8f9fa; padding:12px; border-radius:8px; border:1px solid #eee; display:flex; flex-direction:column; gap:8px;">
+            <!-- V98.19 lean: this modal is opened mainly to reassign a group, so
+                 the 14-field profile form (#gs-profile-body) is collapsed by
+                 default behind this summary. Summary text + reset in setUserGroup;
+                 Save Info still reads every field whether open or not. -->
+            <div id="gs-profile-summary" class="lang-no-toggle" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:#f8f9fa; border:1px solid #eee; border-radius:8px; padding:10px 12px; margin-bottom:15px;">
+                <i class="fa-solid fa-user" style="color:#94a3b8; font-size:0.9em;"></i>
+                <span id="gs-profile-summary-text" style="font-size:0.9em; color:#334155;"></span>
+                <button type="button" id="gs-profile-toggle" onclick="toggleGsProfile()" style="margin-left:auto; background:none; border:1px solid #e2e8f0; border-radius:6px; color:#64748b; font-size:0.78em; cursor:pointer; padding:4px 10px;"><i class="fa-solid fa-pen"></i> Edit profile</button>
+            </div>
+
+            <div id="gs-profile-body" style="margin-bottom:15px; background:#f8f9fa; padding:12px; border-radius:8px; border:1px solid #eee; display:none; flex-direction:column; gap:8px;">
                 <!-- Row 1: full name + nickname -->
                 <div style="display:flex; gap:8px;">
                     <div style="flex:3;">
@@ -32457,6 +32467,18 @@ RULES:
             } catch (e) { alert(e.message); }
         }
 
+        // V98.19 lean: collapse/expand the User Hub profile form.
+        function toggleGsProfile() {
+            const body = document.getElementById('gs-profile-body');
+            const btn = document.getElementById('gs-profile-toggle');
+            if (!body) return;
+            const open = body.style.display !== 'none';
+            body.style.display = open ? 'none' : 'flex';
+            if (btn) btn.innerHTML = open
+                ? '<i class="fa-solid fa-pen"></i> Edit profile'
+                : '<i class="fa-solid fa-chevron-up"></i> Hide';
+        }
+
         // V98.18 lean: chip-rail group picker for the User Hub modal.
         function gsPickGroup(el, g) {
             const list = document.getElementById('gs-list');
@@ -32509,6 +32531,18 @@ RULES:
             document.getElementById('gs-email').value = user?.email || '';
             document.getElementById('gs-birthday').value = user?.birthday || '';
             document.getElementById('gs-address').value = user?.address || '';
+
+            // V98.19: profile form starts collapsed; show a one-line summary.
+            const _pfBits = [user?.fullName, user?.nickname || user?.nickName, user?.institute]
+                .map(x => (x || '').trim()).filter(Boolean);
+            const _pfText = document.getElementById('gs-profile-summary-text');
+            if (_pfText) _pfText.textContent = _pfBits.length
+                ? _pfBits.join('  ·  ')
+                : 'ยังไม่มีข้อมูลโปรไฟล์ · No profile info yet';
+            const _pfBody = document.getElementById('gs-profile-body');
+            if (_pfBody) _pfBody.style.display = 'none';
+            const _pfBtn = document.getElementById('gs-profile-toggle');
+            if (_pfBtn) _pfBtn.innerHTML = '<i class="fa-solid fa-pen"></i> Edit profile';
 
             // Helper to update full name preview
             const updateGsFullname = () => {
