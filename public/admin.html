@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.32</title>
+    <title>Nika V98.34</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -25033,6 +25033,11 @@ ${JSON.stringify(sourceObj)}`;
                 const q = quizzesData.find(x => x.id === att.quizId) || {};
                 const qTitle = q.shortTitle || q.title || "Unknown Quiz";
                 const isPoll = q.isPoll === true;
+                // V96.79: out-of-hours penalty. index.html stamps `scoreMultiplier` on the
+                // attempt when the intern accepts taking it outside 09:00-21:00. Read it,
+                // never re-derive it from the clock — the value agreed to at start time is
+                // the value awarded. Absent/garbage -> 1, so old attempts are unaffected.
+                const _oohMult = attemptScoreMultiplier(att);
                 const isRequest = att.status === 'requesting';
                 const isPracticeRequest = att.status === 'requesting' && att.isPractice;
 
@@ -25074,10 +25079,14 @@ ${JSON.stringify(sourceObj)}`;
                     // Use calculated correct count if questions exist, otherwise fallback
                     const finalCorrect = q.questions ? calcCorrect : att.correctCount;
                     const totalQ = att.totalQuestions || (q.questions ? q.questions.length : 1);
-                    pointsToAdd = isPoll ? (q.totalPoints || 1.0) : (finalCorrect / totalQ) * (q.totalPoints || 1.0);
+                    pointsToAdd = (isPoll ? (q.totalPoints || 1.0) : (finalCorrect / totalQ) * (q.totalPoints || 1.0))
+                                * _oohMult;
 
+                    const oohNote = _oohMult < 1
+                        ? `<div style="font-size:0.78em; color:#b45309; margin-bottom:4px;">⏰ Out of hours · ×${_oohMult} penalty applied</div>`
+                        : '';
                     actionHtml = `
-                            ${isPoll ? '<span class="badge" style="background:#6c757d">Poll Response</span>' : `<button class="btn-sm btn-info" onclick="reviewQuiz('${att.id}')">Review</button>`}
+                            ${oohNote}${isPoll ? '<span class="badge" style="background:#6c757d">Poll Response</span>' : `<button class="btn-sm btn-info" onclick="reviewQuiz('${att.id}')">Review</button>`}
                             <button class="btn-sm btn-success" onclick="approveQuiz('${att.id}', '${att.userId}', ${pointsToAdd})">Approve (${pointsToAdd.toFixed(2)} pts)</button>
                             <button class="btn-sm btn-danger" onclick="rejectQuiz('${att.id}')">Reject</button>
                         `;
@@ -28834,6 +28843,16 @@ ${JSON.stringify(sourceObj)}`;
             } catch (e) { console.warn('[quiz speed beri]', e); }
         }
 
+        // V96.79: out-of-hours penalty. index.html stamps `scoreMultiplier` on the attempt
+        // the moment the intern accepts taking it outside 09:00-21:00; every award path
+        // here multiplies by it. Read, never re-derived from the clock — the value agreed
+        // to at start time is the value awarded, whenever the admin gets round to approving.
+        // Absent/garbage -> 1, so every pre-V96.79 attempt is untouched.
+        function attemptScoreMultiplier(att) {
+            const m = Number(att && att.scoreMultiplier);
+            return (Number.isFinite(m) && m > 0 && m <= 1) ? m : 1;
+        }
+
         async function approveQuizAttempt(attemptId) {
             if (!confirm("Approve this attempt? This will mark all questions as manually CORRECT and update the score to 100%.")) return;
             try {
@@ -28852,9 +28871,14 @@ ${JSON.stringify(sourceObj)}`;
                 // V92.69: for exam-session attempts (Phase 4.a writes att.totalScore = sum of
                 // q.score across the locked questions), Manten = full possible group total.
                 // Solo quizzes still use quiz.totalPoints.
-                const pointsToAdd = (att.isExamSession && Number.isFinite(Number(att.totalScore)))
+                // V96.79: `att` is already in hand here, so the out-of-hours warning goes
+                // where the data is rather than at the opening confirm, which fires before
+                // the doc is fetched (and would cost an extra read to know).
+                const _m1 = attemptScoreMultiplier(att);
+                if (_m1 < 1 && !confirm(`⏰ This attempt was taken outside 09:00-21:00.\n\nThe award will be reduced ×${_m1}. Continue?`)) return;
+                const pointsToAdd = ((att.isExamSession && Number.isFinite(Number(att.totalScore)))
                     ? Number(att.totalScore)
-                    : parseFloat(quiz.totalPoints || 1.0);
+                    : parseFloat(quiz.totalPoints || 1.0)) * _m1;
                 const b = db.batch();
                 
                 b.update(docRef, {
@@ -28923,14 +28947,17 @@ ${JSON.stringify(sourceObj)}`;
                     ? (examGroupScore / examTotalScore)
                     : null;
                 const curCorrect = Number.isFinite(recalculated && recalculated.correctCount) ? recalculated.correctCount : fallbackCorrect;
-                const pointsToAdd = (isExam && Number.isFinite(examGroupScore))
+                const _m2 = attemptScoreMultiplier(att);
+                const pointsToAdd = ((isExam && Number.isFinite(examGroupScore))
                     ? examGroupScore
-                    : (Number.isFinite(recalculated && recalculated.score) ? recalculated.score : fallbackPoints);
+                    : (Number.isFinite(recalculated && recalculated.score) ? recalculated.score : fallbackPoints))
+                    * _m2;
                 const scoreRatio = examRatio != null
                     ? examRatio
                     : (totalQ > 0 ? (curCorrect / totalQ) : 0);
 
-                const confirmed = confirm(`Approve this attempt with ACTUAL score?\n\nAward: ${pointsToAdd.toFixed(2)} pts\nCorrect: ${curCorrect}/${totalQ}`);
+                const confirmed = confirm(`Approve this attempt with ACTUAL score?\n\nAward: ${pointsToAdd.toFixed(2)} pts\nCorrect: ${curCorrect}/${totalQ}`
+                    + (_m2 < 1 ? `\n\n⏰ Taken out of hours — already reduced ×${_m2}.` : ''));
                 if (!confirmed) return;
                 
                 const b = db.batch();
