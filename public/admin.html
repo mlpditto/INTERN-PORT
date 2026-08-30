@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.30</title>
+    <title>Nika V98.31</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -14841,6 +14841,16 @@
                     <button type="button" onclick="lnrAddTag()" style="width:auto; padding:8px 14px; background:#6c5ce7; border:none; border-radius:10px; color:white; font-size:0.82em; cursor:pointer; flex-shrink:0; white-space:nowrap;">+ Add</button>
                 </div>
                 <div id="lnr-tag-autosuggest" style="display:none; margin-top:8px; padding:8px 12px; background:#fef3c7; border:1px solid #fcd34d; border-radius:8px; font-size:0.78em; color:#92400e;"></div>
+                <!-- V98.31: on-device drug-name NER. lnr-tag-autosuggest above can only ever
+                     surface tags that already exist in LP_ALL_TAGS; this finds drug names the
+                     taxonomy has never heard of. Deliberately behind a button — the model is a
+                     34 MB download on first use (browser-cached after), so an admin who never
+                     clicks pays nothing. Runs locally: the note text is not sent anywhere. -->
+                <div style="margin-top:8px;">
+                    <button type="button" id="lnr-drug-scan-btn" onclick="lnrScanDrugs()" style="width:auto; min-height:auto; padding:6px 12px; background:#ecfdf5; border:1px solid #6ee7b7; border-radius:10px; color:#065f46; font-size:0.78em; font-weight:700; cursor:pointer;">💊 Scan for drug names</button>
+                    <span style="font-size:0.68em; color:#94a3b8; margin-left:8px;">on-device · first run downloads 34 MB</span>
+                    <div id="lnr-drug-hits" style="display:none; margin-top:8px; padding:8px 12px; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:8px; font-size:0.78em; color:#065f46;"></div>
+                </div>
                 <!-- V98.06: open by default. Live-verified 2026-08-25 (3 real notes,
                      authed admin console) that this panel was never actually broken —
                      it always rendered 97 real taxonomy chips correctly. The "blank box"
@@ -53782,6 +53792,10 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             lnrRenderSelectedTags();
             lnrRenderSuggestedTaxonomy();
             lnrAutoSuggestTags(content);
+            // V98.31: the drug-hit box is static modal DOM — clear it, or the previous
+            // note's chips sit there looking like results for the note just opened.
+            const lnrDrugBox = document.getElementById('lnr-drug-hits');
+            if (lnrDrugBox) { lnrDrugBox.innerHTML = ''; lnrDrugBox.style.display = 'none'; }
             lnrRenderStars();
             // γ.3: Render Feature/Escalate toggles
             lnrRenderToggles();
@@ -53955,6 +53969,109 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             hint.innerHTML = `💡 Detected in content — admin add as tags?<div style="margin-top:6px;">${chips}</div>`;
             hint.style.display = 'block';
         }
+
+        // V98.31: on-device drug-name NER for the Learning Note Review modal.
+        // Model: OpenMed PharmaDetect-ElectraMed-33M, int8 ONNX, see
+        // public/models/openmed-pharma/README.md for provenance + export steps.
+        // Loaded lazily on first click and memoised in _lnrDrugNer so the 34 MB
+        // fetch happens at most once per session (the browser HTTP-caches it after).
+        window._lnrDrugNer = null;
+        function lnrEnsureDrugNer() {
+            if (!window._lnrDrugNer) {
+                window._lnrDrugNer = (async () => {
+                    const { pipeline, env } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.6');
+                    // Pin to our own copy: never let the lib reach out to the HF hub.
+                    env.allowRemoteModels = false;
+                    env.allowLocalModels = true;
+                    env.localModelPath = 'models/';
+                    return pipeline('token-classification', 'openmed-pharma', { dtype: 'q8' });
+                })().catch(err => { window._lnrDrugNer = null; throw err; });
+            }
+            return window._lnrDrugNer;
+        }
+
+        const lnrNzDrug = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        // The pipeline emits raw wordpieces with no character offsets and drops any
+        // token the model scored as O — "metformin" can come back as just "##form".
+        // So: stitch each whole word's pieces back together, then snap that fragment
+        // to the word it came from in the source text.
+        function lnrMergeDrugRuns(raw) {
+            const runs = [];
+            let cur = null;
+            raw.forEach(t => {
+                const isPiece = t.word.startsWith('##');
+                const word = t.word.replace(/^##/, '');
+                if (!cur || t.index !== cur.last + 1 || !isPiece) {
+                    if (cur) runs.push(cur);
+                    cur = { frag: word, last: t.index, scores: [t.score] };
+                } else {
+                    cur.frag += word; cur.last = t.index; cur.scores.push(t.score);
+                }
+            });
+            if (cur) runs.push(cur);
+            return runs.map(r => ({
+                frag: lnrNzDrug(r.frag),
+                score: r.scores.reduce((a, b) => a + b, 0) / r.scores.length
+            }));
+        }
+
+        function lnrSnapDrugFragment(text, frag) {
+            const words = Array.from(text.matchAll(/[A-Za-z0-9][A-Za-z0-9\-']*/g)).map(m => m[0]);
+            // Smallest window that contains the fragment — "form" → "metformin".
+            for (let n = 1; n <= 2; n++) {
+                for (let i = 0; i + n <= words.length; i++) {
+                    const span = words.slice(i, i + n);
+                    if (lnrNzDrug(span.join('')).includes(frag)) return span.join(' ');
+                }
+            }
+            return null;
+        }
+
+        async function lnrScanDrugs() {
+            const btn = document.getElementById('lnr-drug-scan-btn');
+            const box = document.getElementById('lnr-drug-hits');
+            if (!btn || !box) return;
+            const note = window._lnrCurrent;
+            const text = note ? String(note.description || '') : '';
+            const show = (html) => { box.innerHTML = html; box.style.display = 'block'; };
+            if (!text.trim()) { show('Nothing to scan — this note has no content.'); return; }
+
+            const label = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '💊 Loading model…';
+            try {
+                const ner = await lnrEnsureDrugNer();
+                btn.textContent = '💊 Scanning…';
+                const current = (window._lnrTags || []).map(lnrNzDrug);
+                const seen = new Set();
+                const hits = [];
+                lnrMergeDrugRuns(await ner(text)).forEach(r => {
+                    if (r.score < 0.5 || r.frag.length < 3) return;
+                    const word = lnrSnapDrugFragment(text, r.frag);
+                    if (!word) return;
+                    const key = lnrNzDrug(word);
+                    if (!key || seen.has(key) || current.includes(key)) return;
+                    seen.add(key);
+                    hits.push(word);
+                });
+                if (!hits.length) { show('No drug names detected in this note.'); return; }
+                const chips = hits.slice(0, 12).map(w => {
+                    const safe = w.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+                    // Drop the chip once used — lnrAddTag re-renders the taxonomy box but not
+                    // this one, so without it an added tag stays on offer as if it were missing.
+                    return `<button type="button" onclick="lnrAddTag('${safe}'); this.remove();" style="width:auto; min-height:auto; padding:3px 10px; background:#34d399; border:none; border-radius:10px; color:#064e3b; font-size:0.78em; font-weight:700; cursor:pointer; margin:0 4px 4px 0;">+ ${safe}</button>`;
+                }).join('');
+                show(`💊 Detected on-device — add as tags?<div style="margin-top:6px;">${chips}</div>`);
+            } catch (err) {
+                console.error('[lnr-drug-ner]', err);
+                show('⚠️ Drug scan unavailable — ' + (err && err.message ? err.message : 'model failed to load') + '. See console.');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = label;
+            }
+        }
+        window.lnrScanDrugs = lnrScanDrugs;
 
         // V91.73 PR γ.2: Star rating
         function setLearningNoteStars(rating) {
