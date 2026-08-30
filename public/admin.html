@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.21</title>
+    <title>Nika V98.22</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13383,14 +13383,21 @@
                 </div>
 
                 <!-- Certificate Info (English) -->
+                <!-- V98.22 lean: the combined line (gs-cert-fullname) is what prints
+                     on the certificate — lead with it. First/Middle/Last are the
+                     split-entry helper, collapsed behind "Split" (auto-open in
+                     setUserGroup when any part already holds data). -->
                 <div style="border-top:1px solid #e2e8f0; padding-top:8px;">
-                    <label style="font-size:0.75em; color:#888; font-weight:bold;">🎓 Certificate Info (English)</label>
-                    <div style="display:flex; gap:5px; margin-top:5px; margin-bottom:5px;">
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:5px;">
+                        <label style="font-size:0.75em; color:#888; font-weight:bold;">🎓 Certificate Info (English)</label>
+                        <button type="button" id="gs-cert-split-btn" onclick="toggleCertSplit()" style="background:none; border:1px solid #e2e8f0; border-radius:6px; color:#64748b; font-size:0.7em; cursor:pointer; padding:2px 8px;"><i class="fa-solid fa-table-columns"></i> Split</button>
+                    </div>
+                    <input type="text" id="gs-cert-fullname" placeholder="Full Name for the Certificate" style="width:100%; box-sizing:border-box; font-size:0.85em; padding:8px; border:1px solid #ddd; border-radius:6px;" title="This field is used for Certificate Generation">
+                    <div id="gs-cert-split" style="display:none; gap:5px; margin-top:5px;">
                         <input type="text" id="gs-firstname-en" placeholder="FIRST NAME" style="flex:2; font-size:0.85em; padding:8px; border:1px solid #ddd; border-radius:6px;">
                         <input type="text" id="gs-middlename-en" placeholder="MIDDLE" style="flex:1; font-size:0.85em; padding:8px; border:1px solid #ddd; border-radius:6px;">
                         <input type="text" id="gs-lastname-en" placeholder="LAST NAME" style="flex:2; font-size:0.85em; padding:8px; border:1px solid #ddd; border-radius:6px;">
                     </div>
-                    <input type="text" id="gs-cert-fullname" placeholder="Full Name (Combined Preview / Manual Override)" style="width:100%; box-sizing:border-box; font-size:0.85em; padding:8px; border:1px solid #ddd; border-radius:6px;" title="This field is used for Certificate Generation">
                 </div>
             </div>
 
@@ -32487,6 +32494,18 @@ RULES:
             }
         }
 
+        // V98.22 lean: show/hide the First/Middle/Last certificate-name inputs.
+        function toggleCertSplit() {
+            const row = document.getElementById('gs-cert-split');
+            const btn = document.getElementById('gs-cert-split-btn');
+            if (!row) return;
+            const open = row.style.display !== 'none';
+            row.style.display = open ? 'none' : 'flex';
+            if (btn) btn.innerHTML = open
+                ? '<i class="fa-solid fa-table-columns"></i> Split'
+                : '<i class="fa-solid fa-chevron-up"></i> Hide parts';
+        }
+
         // V98.19 lean: collapse/expand the User Hub profile form.
         function toggleGsProfile() {
             const body = document.getElementById('gs-profile-body');
@@ -32556,6 +32575,16 @@ RULES:
             document.getElementById('gs-middlename-en').value = user?.middleNameEn || '';
             document.getElementById('gs-lastname-en').value = user?.lastNameEn || '';
             document.getElementById('gs-cert-fullname').value = user?.fullNameEn || '';
+
+            // V98.22 lean: First/Middle/Last collapse behind "Split" — auto-open
+            // when any part already holds data so existing entries aren't hidden.
+            const _certSplit = document.getElementById('gs-cert-split');
+            const _certSplitBtn = document.getElementById('gs-cert-split-btn');
+            const _certHasParts = !!((user?.firstNameEn || '').trim() || (user?.middleNameEn || '').trim() || (user?.lastNameEn || '').trim());
+            if (_certSplit) _certSplit.style.display = _certHasParts ? 'flex' : 'none';
+            if (_certSplitBtn) _certSplitBtn.innerHTML = _certHasParts
+                ? '<i class="fa-solid fa-chevron-up"></i> Hide parts'
+                : '<i class="fa-solid fa-table-columns"></i> Split';
             document.getElementById('gs-cert-nickname').value = user?.nickname || user?.nickName || '';
             document.getElementById('gs-institute').value = user?.institute || '';
             document.getElementById('gs-tel').value = user?.phone || user?.tel || '';
