@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.25</title>
+    <title>Nika V98.26</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -4485,6 +4485,8 @@
                     <div id="hub-filter-logs" onclick="setHubHistoryFilter('logs')" title="Show Logs only (📓 Daily Reflection + 🎓 Learning Note)" style="cursor:pointer; border-radius:999px; padding:4px 10px; font-size:0.78em; font-weight:800; transition:all 0.2s; display:inline-flex; align-items:center; gap:5px;"><span style="color:#94a3b8; text-transform:uppercase; font-size:0.85em;">L</span><b id="hub-dash-logs" style="color:#f43f5e;">0</b><small id="hub-dash-logs-count" style="font-size:0.85em; color:#94a3b8;">(0)</small><span id="hub-dash-logs-breakdown" style="font-size:0.78em; color:#94a3b8; font-weight:700; padding-left:4px; border-left:1px solid #e2e8f0; margin-left:2px;">📓 0 · 🎓 0</span></div>
                     <div id="hub-filter-bonus" onclick="setHubHistoryFilter('bonus')" title="Show Bonus only" style="cursor:pointer; border-radius:999px; padding:4px 10px; font-size:0.78em; font-weight:800; transition:all 0.2s; display:inline-flex; align-items:center; gap:5px;"><span style="color:#94a3b8; text-transform:uppercase; font-size:0.85em;">B</span><b id="hub-dash-bonus" style="color:#f59e0b;">0</b><small id="hub-dash-bonus-count" style="font-size:0.85em; color:#94a3b8;">(0)</small></div>
                     <div id="hub-filter-manual" onclick="setHubHistoryFilter('manual')" title="Show Manual only" style="cursor:pointer; border-radius:999px; padding:4px 10px; font-size:0.78em; font-weight:800; transition:all 0.2s; display:inline-flex; align-items:center; gap:5px;"><span style="color:#94a3b8; text-transform:uppercase; font-size:0.85em;">M</span><b id="hub-dash-manual" style="color:#8b5cf6;">0</b><small id="hub-dash-manual-count" style="font-size:0.85em; color:#94a3b8;">(0)</small></div>
+                    <!-- V98.26: Beri ledger — separate currency, kept out of the score total -->
+                    <div id="hub-filter-beri" onclick="setHubHistoryFilter('beri')" title="Show Beri movements only" style="cursor:pointer; border-radius:999px; padding:4px 10px; font-size:0.78em; font-weight:800; transition:all 0.2s; display:inline-flex; align-items:center; gap:5px;"><span style="font-size:0.9em;">🪙</span><b id="hub-dash-beri" style="color:#c2410c;">0</b><small id="hub-dash-beri-count" style="font-size:0.85em; color:#94a3b8;">(0)</small></div>
                 </div>
 
                 <!-- Writing Profile Card (V91.100, lean V92.18) — single inline row of stats -->
@@ -21034,6 +21036,14 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         let hideCompletedWorks = true;
         let showArchivedKanban = false;
         let historyCache = []; let historyPage = 1; const HISTORY_PER_PAGE = 10;
+        // V98.26: human labels for beri_ledger rows that have no `note` (fallback)
+        const BERI_LEDGER_SOURCE_LABEL = {
+            explore_link: '🧭 Gourmet World link',
+            review_approved: '✍️ Review approved',
+            manual_adjust: '👤 Manual adjust',
+            shop_redeem: '🛒 Shop redemption',
+            shop_refund: '↩️ Shop refund'
+        };
         let archiveCache = []; let archivePage = 1; const ARCHIVE_PER_PAGE = 10;
         let deleteCardId = null; let deleteTimer = null;
         let currentHistoryUserId = null;
@@ -45515,13 +45525,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             document.getElementById('lb-popup-header').innerHTML = `<div style="padding:20px; color:#94a3b8;"><i class="fa-solid fa-spinner fa-spin"></i> Initializing User Hub for ${u.displayName || 'User'}...</div>`;
             
             try {
-                const [worksSnap, questsSnap, logsSnap, qAzSnap, rLogsSnap, lpSnap] = await Promise.all([
+                const [worksSnap, questsSnap, logsSnap, qAzSnap, rLogsSnap, lpSnap, blSnap] = await Promise.all([
                     db.collection("works").where("userId", "==", userId).get(),
                     db.collection("quest_submissions").where("userId", "==", userId).get(),
                     db.collection("checkin_logs").where("userId", "==", userId).get(),
                     db.collection("quiz_attempts").where("userId", "==", userId).where("status", "==", "approved").get(),
                     db.collection("reflective_logs").where("userId", "==", userId).get(),
-                    db.collection("learning_path_entries").where("userId", "==", userId).get()
+                    db.collection("learning_path_entries").where("userId", "==", userId).get(),
+                    // V98.26: Beri ledger — a separate currency. Rows go into allLogs
+                    // for the History tab's 🪙 Beri filter but NEVER into `dash`
+                    // (score totals) or recalculateUserScore.
+                    db.collection("beri_ledger").where("userId", "==", userId).get()
                 ]);
 
                 const pointsMap = {};
@@ -45734,6 +45748,25 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     dash.lcLN++;
                 });
 
+                // V98.26: Beri ledger rows — carry `beriAmount` (NOT `score`) so
+                // they stay out of every score total, the dash breakdown, and
+                // recalculateUserScore. Rendered with a coin by renderHubHistoryPage;
+                // filtered by the 🪙 Beri chip.
+                blSnap.forEach(doc => {
+                    const x = doc.data();
+                    const ts = x.timestamp && x.timestamp.toDate ? x.timestamp.toDate()
+                             : (x.backfilledAt && x.backfilledAt.toDate ? x.backfilledAt.toDate() : null);
+                    allLogs.push({
+                        t: ts,
+                        type: 'beri',
+                        text: x.note || BERI_LEDGER_SOURCE_LABEL[x.source] || 'Beri',
+                        beriAmount: Number(x.amount) || 0,
+                        beriSource: x.source || '',
+                        isBeri: true,
+                        docId: doc.id
+                    });
+                });
+
                 allLogs.forEach(item => {
                     if (item.type === 'work' && item.docId && hubCaseReviewLogTextByDocId[item.docId]) {
                         item.text = hubCaseReviewLogTextByDocId[item.docId];
@@ -45937,6 +45970,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             document.getElementById('hub-dash-bonus-count').innerText = `(${dash.bc})`;
             document.getElementById('hub-dash-manual').innerText = dash.manual.toFixed(2);
             document.getElementById('hub-dash-manual-count').innerText = `(${dash.mc})`;
+            // V98.26: Beri chip — net movement + count, computed from historyCache
+            // (a separate currency, deliberately never folded into `dash`).
+            const beriRows = historyCache.filter(e => e.type === 'beri');
+            const beriNet = beriRows.reduce((s, e) => s + (Number(e.beriAmount) || 0), 0);
+            const beriEl = document.getElementById('hub-dash-beri');
+            const beriCntEl = document.getElementById('hub-dash-beri-count');
+            const beriChip = document.getElementById('hub-filter-beri');
+            if (beriEl) beriEl.innerText = (beriNet >= 0 ? '+' : '') + Math.round(beriNet);
+            if (beriCntEl) beriCntEl.innerText = `(${beriRows.length})`;
+            if (beriChip) beriChip.style.display = beriRows.length ? 'inline-flex' : 'none';
             const filteredCount = getHubFilteredHistory().length;
             document.getElementById('hub-history-summary').innerText = window._hubHistoryFilter === 'all'
                 ? `Activity Logs (${historyCache.length})`
@@ -45959,6 +46002,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (mode === 'logs') return historyCache.filter(e => e.type === 'reflective_log' || e.type === 'reflective_bonus' || e.type === 'learning_note');
             if (mode === 'bonus') return historyCache.filter(e => (e.type === 'bonus' && !e.isQuest && !String(e.text || '').includes('Quest Bonus')) || e.type === 'streak');
             if (mode === 'manual') return historyCache.filter(e => e.type === 'manual' || e.type === 'manual_adjust');
+            if (mode === 'beri') return historyCache.filter(e => e.type === 'beri');
             return historyCache;
         }
 
@@ -45969,7 +46013,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 works: 'hub-filter-works',
                 logs: 'hub-filter-logs',
                 bonus: 'hub-filter-bonus',
-                manual: 'hub-filter-manual'
+                manual: 'hub-filter-manual',
+                beri: 'hub-filter-beri'
             };
             Object.entries(map).forEach(([key, elId]) => {
                 const el = document.getElementById(elId);
@@ -46134,6 +46179,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const globalIdx = s + idx;
                 const seqNum = filteredLogs.length - globalIdx;
                 const d = window._fmtDate(e.t);
+                // V98.26: Beri rows carry beriAmount (integer, a separate currency),
+                // not score — render a coin, keep them un-clickable/informational.
+                const isBeri = e.type === 'beri';
+                const amtVal = isBeri ? (Number(e.beriAmount) || 0) : (Number(e.score) || 0);
+                const amtColor = amtVal >= 0 ? '#10b981' : '#ef4444';
+                const amtText = isBeri
+                    ? `🪙 ${amtVal >= 0 ? '+' : ''}${Math.round(amtVal)}`
+                    : `${amtVal >= 0 ? '+' : ''}${amtVal.toFixed(2)}`;
                 let delBtn = (e.source === 'checkin_logs' && e.docId) ? `<button class="btn-sm" style="background:none; color:#ef4444; border:none; padding:0; margin-left:8px; cursor:pointer;" onclick="deleteHubHistoryLog('${e.docId}', ${e.score})"><i class="fa-solid fa-trash-can"></i></button>` : "";
                 const isManualAdjust = e.type === 'manual' && !!e.docId;
                 // V92.50: quiz approval entries are now clickable — opens reviewQuiz overlay (read-only
@@ -46188,7 +46241,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             ${previewBlock}
                         </div>
                         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0;">
-                            <div title="${e.scoreBreakdown ? `Receive +${e.scoreBreakdown.receive.toFixed(2)} · Review +${e.scoreBreakdown.review.toFixed(2)}` : ''}" style="font-size:1em; font-weight:900; color:${e.score >=0 ? '#10b981' : '#ef4444'}; ${e.scoreBreakdown && e.scoreBreakdown.review > 0 ? 'cursor:help; border-bottom:1px dotted currentColor;' : ''}">${e.score >=0 ? '+' : ''}${e.score.toFixed(2)}</div>
+                            <div title="${e.scoreBreakdown ? `Receive +${e.scoreBreakdown.receive.toFixed(2)} · Review +${e.scoreBreakdown.review.toFixed(2)}` : ''}" style="font-size:1em; font-weight:900; color:${amtColor}; ${e.scoreBreakdown && e.scoreBreakdown.review > 0 ? 'cursor:help; border-bottom:1px dotted currentColor;' : ''}">${amtText}</div>
                             ${e.isReflective && e.mood ? `<div style="font-size:1.1em; line-height:1;" title="Mood">${e.mood}</div>` : ''}
                         </div>
                     </div>
