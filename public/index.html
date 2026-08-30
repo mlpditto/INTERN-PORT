@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V96.78)</title>
+    <title>Internship Portfolio (V96.79)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -8071,7 +8071,7 @@
                 // attempt.score is often empty, which let graded quizzes leak past the hide filter.
                 const score = attempt
                     ? (attempt.totalQuestions
-                        ? computeQuizScore(attempt.correctCount, attempt.totalQuestions, q.totalPoints)
+                        ? computeAttemptScore(attempt, q.totalPoints)
                         : (attempt.score || 0))
                     : 0;
 
@@ -8349,7 +8349,7 @@
                                 : `<button class="btn-primary" onclick="confirmRunQuiz('${q.id}')">🚀 ゲームスタート</button>`;
                         } else {
                             // Pending/Done
-                            const score = computeQuizScore(attempt.correctCount, attempt.totalQuestions, q.totalPoints);
+                            const score = computeAttemptScore(attempt, q.totalPoints);
                             const isApproved = attempt.status === 'approved';
                             // V94.54: badge text + score color now keyed off `isApproved` (strict),
                             // not `!isPending`. Previously `text = isPending ? 'Pending' : 'Approved'`
@@ -8800,6 +8800,11 @@
             }
         }
 
+        // V96.79: penalty multiplier for the run currently in progress. Set by runQuiz,
+        // read by submitQuiz — the attempt doc carries the same value, this just saves
+        // a re-read at submit time.
+        let currentQuizMultiplier = 1;
+
         async function runQuiz(quizId) {
             currentQuiz = quizzesCache.find(x => x.id === quizId);
             if (!currentQuiz) return;
@@ -8808,16 +8813,46 @@
             // only. Single chokepoint every take-path funnels through, so this
             // covers fresh starts, resumes, ONE-TIME practice/real-exam, and
             // late-submission runs alike.
+            // V96.79: outside the window the quiz is no longer a dead end — the intern
+            // may take it right away, no admin approval, in exchange for a 5% score
+            // penalty. The multiplier is locked in HERE, at the moment they accept, and
+            // stamped on the attempt (see OUT_OF_HOURS_MULTIPLIER / _oohAccepted below),
+            // so a run that starts at 21:30 stays penalised even if it is submitted
+            // after 09:00 — the clock cannot be waited out.
+            let _oohAccepted = false;
             {
                 const _now = new Date();
                 const _hour = _now.getHours();
                 const _inWindow = _hour >= 9 && _hour < 21;
                 if (!_inWindow) {
-                    alert("⛔ ทำ Quiz ได้เฉพาะเวลา 09:00-21:00 เท่านั้น\nQuizzes can only be taken 09:00-21:00.");
-                    currentQuiz = null;
-                    return;
+                    const pct = Math.round((1 - OUT_OF_HOURS_MULTIPLIER) * 100);
+                    if (!confirm(
+                        `⏰ ตอนนี้อยู่นอกเวลาทำ Quiz (09:00-21:00)\nYou are outside the 09:00-21:00 quiz window.\n\n` +
+                        `ทำตอนนี้ได้เลย แต่คะแนนที่ได้จะถูกหัก ${pct}% (×${OUT_OF_HOURS_MULTIPLIER})\n` +
+                        `You may take it now, but your score will be reduced by ${pct}% (×${OUT_OF_HOURS_MULTIPLIER}).\n\n` +
+                        `ต้องการทำต่อหรือไม่? / Continue?`
+                    )) {
+                        currentQuiz = null;
+                        return;
+                    }
+                    _oohAccepted = true;
                 }
             }
+
+            // Sticky: written only when the intern just accepted the penalty, never
+            // cleared. Resuming in-hours therefore cannot wash off a penalty already
+            // earned, and a resume accepted out-of-hours re-stamps the same value.
+            const _oohStamp = _oohAccepted ? {
+                outOfHours: true,
+                scoreMultiplier: OUT_OF_HOURS_MULTIPLIER,
+                outOfHoursAt: firebase.firestore.FieldValue.serverTimestamp()
+            } : null;
+            // Not `: 1` — an attempt penalised on an earlier out-of-hours run keeps its
+            // multiplier when resumed inside the window, so the submit screen shows the
+            // same number admin.html will award rather than an unpenalised one.
+            currentQuizMultiplier = _oohAccepted
+                ? OUT_OF_HOURS_MULTIPLIER
+                : attemptScoreMultiplier(quizAttemptsCache[quizId]);
 
             // V95.62 Phase 4 hardening: hard-block score-locked quizzes at the open
             // step. The Mission feed (renderAssignments) + Browse (qbRenderList)
@@ -8882,7 +8917,7 @@
                     while (userAnswers.length < currentQuiz.questions.length) userAnswers.push(null);
                     timeLeftForStep = 3600;
                     if (existing.status === 'abandoned') {
-                        db.collection("quiz_attempts").doc(`${quizId}_${userId}`).update({ status: 'started' });
+                        db.collection("quiz_attempts").doc(`${quizId}_${userId}`).update({ status: 'started', ...(_oohStamp || {}) });
                     }
                 } else {
                     // 🔥 Refined V77.24: graded quizzes treat exits/reloads as completed
@@ -8915,7 +8950,8 @@
                     status: 'started',
                     startTime: firebase.firestore.FieldValue.serverTimestamp(),
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    answers: userAnswers
+                    answers: userAnswers,
+                    ...(_oohStamp || {})
                 });
             } else {
                 currentStep = 0;
@@ -8941,6 +8977,7 @@
                         pictureUrl: userProfile.pictureUrl || "",
                         status: 'started',
                         isPractice: isPracticeMode,
+                        ...(_oohStamp || {}),
                         startTime: firebase.firestore.FieldValue.serverTimestamp(),
                         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                         answers: userAnswers
@@ -10491,6 +10528,29 @@
             return (correctCount / totalQuestions) * (totalPoints || 1.0);
         }
 
+        // V96.79: penalty for taking a quiz outside the 09:00-21:00 window. Stamped
+        // onto the attempt as `scoreMultiplier` at the moment the intern accepts it
+        // (runQuiz), never recomputed from the clock afterwards — so the value that
+        // was agreed to is the value that gets applied, and admin.html reads the same
+        // field instead of re-deriving the rule.
+        const OUT_OF_HOURS_MULTIPLIER = 0.95;
+
+        // Reads the stamped multiplier off an attempt. Absent/garbage -> 1 (no penalty),
+        // so every pre-V96.79 attempt scores exactly as it did before.
+        function attemptScoreMultiplier(attempt) {
+            const m = Number(attempt && attempt.scoreMultiplier);
+            return (Number.isFinite(m) && m > 0 && m <= 1) ? m : 1;
+        }
+
+        // Score of an attempt as the intern actually receives it: the shared formula
+        // times whatever penalty is stamped on that attempt. Every display path goes
+        // through here so a penalised attempt can never show its unpenalised number.
+        function computeAttemptScore(attempt, totalPoints) {
+            if (!attempt) return 0;
+            return computeQuizScore(attempt.correctCount, attempt.totalQuestions, totalPoints)
+                 * attemptScoreMultiplier(attempt);
+        }
+
         // V95.73: partial credit for multi-answer choice questions (opt-in per quiz
         // via quiz.partialCredit). Formula B = (correct − wrong) / totalCorrect, floored
         // at 0. Returns a fraction in [0,1] added to correctCount like the ordering path.
@@ -10517,7 +10577,7 @@
             const attempt = quizAttemptsCache[quizId];
 
             if (!q || !attempt) return alert("Data not found");
-            const score = computeQuizScore(attempt.correctCount, attempt.totalQuestions, q.totalPoints);
+            const score = computeAttemptScore(attempt, q.totalPoints);
             // V94.74: score-0 attempts may still review which questions were wrong and
             // the explanation, but the correct-answer key stays hidden — a retake is
             // still on offer, and revealing the key would make it meaningless.
@@ -10943,7 +11003,9 @@
                     }
                 });
 
-                const pointsAwarded = computeQuizScore(correctCount, totalQ, currentQuiz.totalPoints);
+                // V96.79: show what they will actually be credited, penalty included.
+                const pointsAwarded = computeQuizScore(correctCount, totalQ, currentQuiz.totalPoints)
+                                    * currentQuizMultiplier;
                 const isPoll = currentQuiz.isPoll === true;
                 const finalAnswers = userAnswers.map(ans => Array.isArray(ans) ? ans.join("\n---\n") : ans);
 
@@ -11393,7 +11455,7 @@
 
             currentQuizIdForFeedback = quizId;
             currentPointsForFeedback = attempt.totalQuestions
-                ? computeQuizScore(attempt.correctCount, attempt.totalQuestions, q.totalPoints)
+                ? computeAttemptScore(attempt, q.totalPoints)
                 : (attempt.score || 0);
             // durations[] (per-question seconds) was already recorded at submission —
             // sum it instead of leaving timeUsedSeconds at 0 for retroactive feedback.
@@ -11696,7 +11758,7 @@
                     // Fallback to auto-calculated score if missing
                     if (!Number.isFinite(s) || s === 0) {
                         if (att.correctCount !== undefined && att.totalQuestions) {
-                            s = computeQuizScore(att.correctCount, att.totalQuestions, quiz && quiz.totalPoints);
+                            s = computeAttemptScore(att, quiz && quiz.totalPoints);
                         }
                     }
                     if (s > 0) {
@@ -17980,7 +18042,7 @@ async function archiveDoneCard(cardId) {
                         // V90.74: Fallback to calculation if score is missing but correctCount exists
                         if (!Number.isFinite(score) || score === 0) {
                             if (att.correctCount !== undefined && att.totalQuestions) {
-                                score = computeQuizScore(att.correctCount, att.totalQuestions, quiz && quiz.totalPoints);
+                                score = computeAttemptScore(att, quiz && quiz.totalPoints);
                             } else {
                                 score = 0;
                             }
@@ -18669,7 +18731,7 @@ async function archiveDoneCard(cardId) {
                     // totalQuestions (used by the expanded detail bar) were right all along.
                     if (!Number.isFinite(score) || score === 0) {
                         score = (att.correctCount !== undefined && att.totalQuestions)
-                            ? computeQuizScore(att.correctCount, att.totalQuestions, quiz && quiz.totalPoints)
+                            ? computeAttemptScore(att, quiz && quiz.totalPoints)
                             : 0;
                     }
                 }
