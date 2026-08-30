@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.24</title>
+    <title>Nika V98.25</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -32217,6 +32217,12 @@ RULES:
                 batch.set(db.collection('users').doc(r.userId), {
                     beri: firebase.firestore.FieldValue.increment(1)
                 }, { merge: true });
+                const bl = beriLedgerEntry({
+                    userId: r.userId, amount: 1, source: 'review_approved', refId: id,
+                    note: 'Review approved',
+                    createdByUid: (typeof auth !== 'undefined' && auth.currentUser && auth.currentUser.uid) || null
+                });
+                batch.set(bl.ref, bl.data);
                 await batch.commit();
                 showToast('Review approved, Beri awarded!');
             } catch (e) { alert(e.message); }
@@ -32470,6 +32476,12 @@ RULES:
                 batch.set(db.collection('users').doc(r.userId), {
                     beri: firebase.firestore.FieldValue.increment(r.beriCost)
                 }, { merge: true });
+                const bl = beriLedgerEntry({
+                    userId: r.userId, amount: r.beriCost, source: 'shop_refund', refId: id,
+                    note: `Refund: ${r.rewardName || r.rewardId || id}`,
+                    createdByUid: (typeof auth !== 'undefined' && auth.currentUser && auth.currentUser.uid) || null
+                });
+                batch.set(bl.ref, bl.data);
                 if (hasStock) {
                     batch.update(rewardRef, { stock: firebase.firestore.FieldValue.increment(1) });
                 }
@@ -43720,14 +43732,40 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // of adjBeri (V98.03) so the Beri Shop tab's "Give Beri to a User" picker
         // (giveBeriToUser below) can reuse the exact same Firestore logic instead
         // of duplicating it.
+        // V98.23: one beri_ledger row per Beri movement (earn or spend), written
+        // alongside every users/{uid}.beri change (see firestore.rules 35e).
+        // Deterministic id `${source}__${refId}` so live writes and the one-time
+        // backfill never double up. Returns { ref, data } so callers can slot it
+        // into their existing runTransaction / batch, or a plain .set().
+        // source ∈ explore_link | review_approved | manual_adjust | shop_redeem | shop_refund
+        function beriLedgerEntry(opts) {
+            const refId = String(opts.refId || '');
+            const ref = db.collection('beri_ledger').doc(`${opts.source}__${refId}`);
+            const data = {
+                userId: opts.userId,
+                amount: Number(opts.amount) || 0,
+                source: opts.source,
+                refId,
+                note: opts.note || '',
+                createdByUid: opts.createdByUid || null,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            return { ref, data };
+        }
+
         async function adjBeriCore(id, beriVal, note) {
             const editor = (auth && auth.currentUser) || {};
             await db.collection("users").doc(id).update({ beri: firebase.firestore.FieldValue.increment(beriVal) });
-            await db.collection("beri_adjustments").add({
+            const adjRef = await db.collection("beri_adjustments").add({
                 userId: id, amount: beriVal, note,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 createdByUid: editor.uid || 'unknown', createdByEmail: editor.email || ALLOWED_EMAIL
             });
+            const bl = beriLedgerEntry({
+                userId: id, amount: beriVal, source: 'manual_adjust',
+                refId: adjRef.id, note: note || 'Manual adjust', createdByUid: editor.uid || null
+            });
+            await bl.ref.set(bl.data);
         }
 
         async function adjBeri(id) {

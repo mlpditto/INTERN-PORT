@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V96.72)</title>
+    <title>Internship Portfolio (V96.73)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -7515,6 +7515,25 @@
             }
         }
 
+        // V96.71: one beri_ledger row per Beri movement, written in the same
+        // transaction / batch as the users/{uid}.beri change (see firestore.rules
+        // 35e). Deterministic id `${source}__${refId}` dedupes live writes against
+        // the one-time backfill. Mirrors beriLedgerEntry() in admin.html.
+        function beriLedgerEntry(opts) {
+            const refId = String(opts.refId || '');
+            const ref = db.collection('beri_ledger').doc(`${opts.source}__${refId}`);
+            const data = {
+                userId: opts.userId,
+                amount: Number(opts.amount) || 0,
+                source: opts.source,
+                refId,
+                note: opts.note || '',
+                createdByUid: opts.createdByUid || null,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            return { ref, data };
+        }
+
         // Never blocks the link — opens immediately regardless of whether the Beri
         // credit succeeds (same "never block the download" rule as qzLogMaterialClick).
         async function explOpenLink(linkId) {
@@ -7560,6 +7579,12 @@
                     tx.set(userRef, {
                         beri: firebase.firestore.FieldValue.increment(reward)
                     }, { merge: true });
+                    const bl = beriLedgerEntry({
+                        userId, amount: reward, source: 'explore_link',
+                        refId: `${linkId}_${userId}`,
+                        note: `Explore: ${link.title || linkId}`
+                    });
+                    tx.set(bl.ref, bl.data);
                     if (reward > 1) {
                         tx.set(linkRef, { beriReward: reward - 1 }, { merge: true });
                     }
@@ -7818,6 +7843,12 @@
                         requestedAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
                     tx.set(userRef, { beri: firebase.firestore.FieldValue.increment(-cost) }, { merge: true });
+                    const bl = beriLedgerEntry({
+                        userId, amount: -cost, source: 'shop_redeem',
+                        refId: redemptionRef.id,
+                        note: `Shop: ${rd.name || rewardId}`
+                    });
+                    tx.set(bl.ref, bl.data);
                     if (rd.stock != null) {
                         tx.update(rewardRef, { stock: firebase.firestore.FieldValue.increment(-1) });
                     }
