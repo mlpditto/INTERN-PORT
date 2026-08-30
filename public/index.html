@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V96.70)</title>
+    <title>Internship Portfolio (V96.72)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3300,7 +3300,12 @@
                     display: flex; gap: 4px; padding: 10px 12px 0;
                     border-bottom: 1px solid #e2e8f0;
                 }
-                .dc-view-tab {
+                /* .dd-type-tab (V96.72 DD Codex 💊/🩺 switch) shares this look.
+                   It needs a class distinct from .dc-view-tab because
+                   dcSwitchView/dxSwitchView do an UNSCOPED
+                   querySelectorAll('.dc-view-tab') and would strip its
+                   .active on every inner Browse/My-Drafts switch. */
+                .dc-view-tab, .dd-type-tab {
                     padding: 8px 14px; border: none; background: transparent;
                     color: #64748b; font-weight: 700; font-size: 0.85em;
                     cursor: pointer; border-bottom: 2px solid transparent;
@@ -3308,12 +3313,15 @@
                     display: inline-flex; align-items: center; gap: 6px;
                     font-family: inherit;
                 }
-                .dc-view-tab:hover {
+                .dc-view-tab:hover, .dd-type-tab:hover {
                     color: #1e40af; background: #eff6ff;
                 }
-                .dc-view-tab.active {
+                .dc-view-tab.active, .dd-type-tab.active {
                     color: #1d4ed8; background: #fff;
                     border-bottom-color: #1d4ed8;
+                }
+                #dd-type-tabs .dd-type-tab[data-ddtype="disease"].active {
+                    color: #0f766e; border-bottom-color: #0f766e;
                 }
                 .dc-view-tab-badge {
                     font-size: 0.72em; background: #1d4ed8; color: #fff;
@@ -3982,18 +3990,35 @@
                  read by any signed-in user per firestore.rules rule 28). Tap row
                  → detail modal (#drugCodexDetailModal) with 5 sections. Submit
                  Draft button stubbed until Phase 5 ships the intern submission UX. -->
-            <div id="section-drug-codex" style="margin-bottom: 20px;">
-                <div class="card"
+            <!-- V96.72: DD Codex — Drug Codex + Disease Codex folded into one
+                 accordion with a 💊/🩺 type switch. Both bodies keep their own ids
+                 (#dc-section-content / #dx-section-content) and every dc*/dx* JS,
+                 collection, detail modal and i18n path is unchanged — only the two
+                 outer cards/headers merged. ddSwitchType() shows one pane,
+                 lazy-loads that codex (dcState/dxState.loaded), resets it to
+                 Browse, and re-tints the card (blue = drugs, teal = diseases). -->
+            <div id="section-dd-codex" style="margin-bottom: 20px;">
+                <div class="card" id="dd-codex-card"
                     style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #1d4ed8;">
-                    <div class="gl-minimal-header" onclick="toggleDrugCodex()"
+                    <div class="gl-minimal-header" id="dd-codex-header" onclick="toggleDDCodex()"
                         style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #eff6ff;">
-                        <h4 style="margin: 0; font-size: 1.1em; color: #1d4ed8;">
-                            <i class="fa-solid fa-pills"></i> Drug Codex 약전
-                            <span id="dc-count-badge" style="font-size:0.7em; background:#dbeafe; color:#1e40af; padding:2px 8px; border-radius:10px; margin-left:6px; display:none;">0</span>
+                        <h4 id="dd-codex-title" style="margin: 0; font-size: 1.1em; color: #1d4ed8;">
+                            <i class="fa-solid fa-book-medical"></i> DD Codex
                         </h4>
-                        <i id="dc-section-icon" class="fa-solid fa-chevron-down" style="color:#1d4ed8; transition:0.3s; font-size:0.9em;"></i>
+                        <i id="dd-section-icon" class="fa-solid fa-chevron-down" style="color:#1d4ed8; transition:0.3s; font-size:0.9em;"></i>
                     </div>
-                    <div id="dc-section-content" style="display:none; border-top:1px solid #f0f0f0; background:#fff;">
+                    <div id="dd-section-content" style="display:none; border-top:1px solid #f0f0f0; background:#fff;">
+                        <div class="dc-view-tabs" id="dd-type-tabs">
+                            <button type="button" class="dd-type-tab active" data-ddtype="drug" onclick="ddSwitchType('drug')">
+                                💊 Drugs
+                                <span id="dc-count-badge" style="font-size:0.7em; background:#dbeafe; color:#1e40af; padding:2px 8px; border-radius:10px; margin-left:6px; display:none;">0</span>
+                            </button>
+                            <button type="button" class="dd-type-tab" data-ddtype="disease" onclick="ddSwitchType('disease')">
+                                🩺 Diseases
+                                <span id="dx-count-badge" style="font-size:0.7em; background:#ccfbf1; color:#0f766e; padding:2px 8px; border-radius:10px; margin-left:6px; display:none;">0</span>
+                            </button>
+                        </div>
+                    <div id="dc-section-content">
                         <!-- V94.92 Phase 5: tab bar split — Browse (Phase 4) vs My Drafts (Phase 5).
                              Both panels share the same Submit footer. My Drafts badge shows count
                              of intern's own pending+approved+rejected submissions. -->
@@ -4034,26 +4059,7 @@
                             </button>
                         </div>
                     </div>
-                </div>
-            </div>
-
-            <!-- Disease Codex Phase 2b: intern read-only view. A-Z list of
-                 admin-curated disease entries (disease_codex collection, read by
-                 any signed-in user per firestore.rules rule 30). Tap row → detail
-                 modal (#diseaseCodexDetailModal) with 8 read-only sections.
-                 Reuses the .dc-* CSS; dx-/dx prefixed IDs. No submit/i18n in MVP. -->
-            <div id="section-disease-codex" style="margin-bottom: 20px;">
-                <div class="card"
-                    style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #0f766e;">
-                    <div class="gl-minimal-header" onclick="toggleDiseaseCodex()"
-                        style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #f0fdfa;">
-                        <h4 style="margin: 0; font-size: 1.1em; color: #0f766e;">
-                            <i class="fa-solid fa-stethoscope"></i> Disease Codex 질병
-                            <span id="dx-count-badge" style="font-size:0.7em; background:#ccfbf1; color:#0f766e; padding:2px 8px; border-radius:10px; margin-left:6px; display:none;">0</span>
-                        </h4>
-                        <i id="dx-section-icon" class="fa-solid fa-chevron-down" style="color:#0f766e; transition:0.3s; font-size:0.9em;"></i>
-                    </div>
-                    <div id="dx-section-content" style="display:none; border-top:1px solid #f0f0f0; background:#fff;">
+                    <div id="dx-section-content" style="display:none;">
                         <!-- V95.12 Phase 5: tab bar split — Browse (Phase 2b) vs My Drafts (Phase 5).
                              Both panels share the same Submit footer. Mirrors Drug Codex Phase 5;
                              reuses the .dc-view-* / .dc-footer / .dc-submit-btn CSS. -->
@@ -4093,6 +4099,7 @@
                                 📥 Submit New Disease
                             </button>
                         </div>
+                    </div>
                     </div>
                 </div>
             </div>
@@ -11814,8 +11821,7 @@
                 ['kanban-content', 'kanban-icon'],
                 ['case-section-content', 'case-section-icon'],
                 ['work-section-content', 'work-section-icon'],
-                ['dc-section-content', 'dc-section-icon'],
-                ['dx-section-content', 'dx-section-icon'],
+                ['dd-section-content', 'dd-section-icon'],
                 ['product-section-content', 'product-section-icon']
             ];
 
@@ -13202,28 +13208,58 @@
             if (dcState.currentDrug) dcRenderDetail(dcState.currentDrug);
         }
 
-        function toggleDrugCodex() {
-            const content = document.getElementById('dc-section-content');
-            const icon = document.getElementById('dc-section-icon');
+        // V96.72: DD Codex — one accordion for Drug + Disease. window._ddCodexType
+        // remembers the last active pane across collapse/expand ('drug' default).
+        function toggleDDCodex() {
+            const content = document.getElementById('dd-section-content');
+            const icon = document.getElementById('dd-section-icon');
             if (!content) return;
             if (content.style.display === 'none') {
-                closeOtherGrandLineSections('dc-section-content');
+                closeOtherGrandLineSections('dd-section-content');
                 content.style.display = 'block';
                 if (icon) icon.style.transform = 'rotate(180deg)';
-                if (!dcState.loaded) {
-                    dcState.loaded = true;
-                    dcLoadCodex();
-                }
-                // V94.95: every expand resets to Browse — defense against the trap
-                // where an intern was last on My Drafts (e.g. auto-switched after
-                // submit per V94.92), then closed the section, and on reopen
-                // couldn't see admin-published drugs because My Drafts is empty.
-                if (typeof dcSwitchView === 'function') dcSwitchView('browse');
+                ddSwitchType(window._ddCodexType || 'drug');
             } else {
                 content.style.display = 'none';
                 if (icon) icon.style.transform = 'rotate(0deg)';
             }
             if (typeof updateGrandLineDashboard === 'function') updateGrandLineDashboard();
+        }
+
+        function ddSwitchType(type) {
+            const isDrug = type !== 'disease';
+            type = isDrug ? 'drug' : 'disease';
+            window._ddCodexType = type;
+
+            const drugPane = document.getElementById('dc-section-content');
+            const disPane = document.getElementById('dx-section-content');
+            if (drugPane) drugPane.style.display = isDrug ? 'block' : 'none';
+            if (disPane) disPane.style.display = isDrug ? 'none' : 'block';
+
+            document.querySelectorAll('#dd-type-tabs .dd-type-tab').forEach(b => {
+                b.classList.toggle('active', b.getAttribute('data-ddtype') === type);
+            });
+
+            // Re-tint the card to the active codex's accent (blue drugs / teal diseases)
+            const accent = isDrug ? '#1d4ed8' : '#0f766e';
+            const card = document.getElementById('dd-codex-card');
+            const header = document.getElementById('dd-codex-header');
+            const title = document.getElementById('dd-codex-title');
+            const secIcon = document.getElementById('dd-section-icon');
+            if (card) card.style.borderTopColor = accent;
+            if (header) header.style.background = isDrug ? '#eff6ff' : '#f0fdfa';
+            if (title) title.style.color = accent;
+            if (secIcon) secIcon.style.color = accent;
+
+            // Lazy-load that codex on first view, then reset it to Browse — same
+            // guard the old per-section toggles used (see V94.95 note).
+            if (isDrug) {
+                if (!dcState.loaded) { dcState.loaded = true; dcLoadCodex(); }
+                if (typeof dcSwitchView === 'function') dcSwitchView('browse');
+            } else {
+                if (!dxState.loaded) { dxState.loaded = true; dxLoadCodex(); }
+                if (typeof dxSwitchView === 'function') dxSwitchView('browse');
+            }
         }
 
         // ===================================================================
@@ -13243,24 +13279,8 @@
             currentDisease: null
         };
 
-        function toggleDiseaseCodex() {
-            const content = document.getElementById('dx-section-content');
-            const icon = document.getElementById('dx-section-icon');
-            if (!content) return;
-            if (content.style.display === 'none') {
-                closeOtherGrandLineSections('dx-section-content');
-                content.style.display = 'block';
-                if (icon) icon.style.transform = 'rotate(180deg)';
-                if (!dxState.loaded) {
-                    dxState.loaded = true;
-                    dxLoadCodex();
-                }
-            } else {
-                content.style.display = 'none';
-                if (icon) icon.style.transform = 'rotate(0deg)';
-            }
-            if (typeof updateGrandLineDashboard === 'function') updateGrandLineDashboard();
-        }
+        // V96.72: toggleDiseaseCodex removed — the Disease pane now lives inside
+        // toggleDDCodex + ddSwitchType('disease') above.
 
         function dxLoadCodex() {
             if (!window.db) return;
