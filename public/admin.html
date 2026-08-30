@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.19</title>
+    <title>Nika V98.20</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13284,12 +13284,16 @@
                     onclick="forceHideModal('groupSelectModal')">&times;</span>
                 <h2 style="margin-top:0; font-weight:900; color:var(--primary); display:flex; align-items:center; gap:15px; border-bottom:1px solid #f1f5f9; padding-bottom:15px; margin-bottom:20px;">🏷️ User Hub: <span id="gs-title-name" style="color:var(--text-main);">...</span></h2>
             <div style="font-size:0.85em; color:#64748b; margin-top:-10px; margin-bottom:15px; display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
-                <div style="display:flex; align-items:center; gap:6px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:999px; padding:5px 10px;">
+                <!-- V98.20 lean: short ID + click-to-copy the full value; the
+                     Enrollment CODE chip hides when the user has no code. -->
+                <button type="button" onclick="gsCopyLineId()" title="Click to copy the full LINE User ID"
+                    style="display:flex; align-items:center; gap:6px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:999px; padding:5px 10px; cursor:pointer; font:inherit; color:inherit;">
                     <i class="fa-solid fa-id-card" style="color:#475569;"></i>
-                    <span style="font-weight:700; color:#475569;">LINE User ID</span>
+                    <span style="font-weight:700; color:#475569;">LINE ID</span>
                     <code id="gs-line-id" style="background:#eef2ff; padding:2px 8px; border-radius:999px; color:#1e3a8a; font-weight:700;">...</code>
-                </div>
-                <div style="display:flex; align-items:center; gap:6px; background:#fffbeb; border:1px solid #fde68a; border-radius:999px; padding:5px 10px;">
+                    <i class="fa-solid fa-copy" style="color:#94a3b8; font-size:0.9em;"></i>
+                </button>
+                <div id="gs-enrollment-chip" style="display:flex; align-items:center; gap:6px; background:#fffbeb; border:1px solid #fde68a; border-radius:999px; padding:5px 10px;">
                     <i class="fa-solid fa-key" style="color:#b45309;"></i>
                     <span style="font-weight:700; color:#92400e;">Enrollment CODE</span>
                     <code id="gs-enrollment-code" style="background:#fef3c7; padding:2px 8px; border-radius:999px; color:#92400e; font-weight:800; letter-spacing:0.03em;">-</code>
@@ -32467,6 +32471,22 @@ RULES:
             } catch (e) { alert(e.message); }
         }
 
+        // V98.20 lean: copy the full LINE User ID (the chip only shows a short form).
+        function gsCopyLineId() {
+            const el = document.getElementById('gs-line-id');
+            const full = (el && el.dataset.full) || '';
+            if (!full) return;
+            const done = () => { if (typeof showToast === 'function') showToast('LINE ID copied'); };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(full).then(done).catch(() => {});
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = full; document.body.appendChild(ta); ta.select();
+                try { document.execCommand('copy'); done(); } catch (e) {}
+                ta.remove();
+            }
+        }
+
         // V98.19 lean: collapse/expand the User Hub profile form.
         function toggleGsProfile() {
             const body = document.getElementById('gs-profile-body');
@@ -32512,8 +32532,14 @@ RULES:
 
             document.getElementById('gs-uid').value = uid;
             document.getElementById('gs-title-name').innerText = userName;
-            document.getElementById('gs-line-id').innerText = uid;
+            // V98.20 lean: show a short ID, keep the full value for copy + tooltip
+            const _lineIdEl = document.getElementById('gs-line-id');
+            _lineIdEl.innerText = (uid && uid.length > 14) ? `${uid.slice(0, 6)}…${uid.slice(-6)}` : (uid || '-');
+            _lineIdEl.dataset.full = uid || '';
+            _lineIdEl.title = uid || '';
             document.getElementById('gs-enrollment-code').innerText = enrollmentCode;
+            document.getElementById('gs-enrollment-chip').style.display =
+                (enrollmentCode && enrollmentCode !== '-') ? 'flex' : 'none';
             document.getElementById('gs-user-score').innerText = parseFloat((user?.score || 0).toFixed(2));
             document.getElementById('gs-user-beri').innerText = user?.beri || 0;
 
