@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.28</title>
+    <title>Nika V98.29</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -12355,6 +12355,20 @@
                         </div>
                     </div>
 
+                    <!-- V98.27: per-quiz Beri for fast completion (never score). Blank = global
+                         default (🥇 10 / ⏱️ 5); 0 = off. Ratios fixed: podium 1/2/3 = ×1/0.6/0.4;
+                         buffer ≥48h/24h/6h = ×1/0.6/0.2. Beat-deadline needs a Deadline set. -->
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+                        <div>
+                            <label style="font-size:0.7em; color:#94a3b8; font-weight:600; display:block; margin-bottom:2px; text-transform:uppercase; letter-spacing:0.5px;">🥇 Early-bird Beri (1st place)</label>
+                            <input type="number" id="quiz-eb-beri" min="0" step="1" placeholder="10 (default)" title="Beri for the 1st submitter · 2nd = 60% · 3rd = 40% · blank = default · 0 = off" style="width:100%; padding:8px 12px; border:1px solid #334155; border-radius:10px; font-size:0.9em; background:#0f172a; color:#f1f5f9; color-scheme: dark;">
+                        </div>
+                        <div>
+                            <label style="font-size:0.7em; color:#94a3b8; font-weight:600; display:block; margin-bottom:2px; text-transform:uppercase; letter-spacing:0.5px;">⏱️ Beat-deadline Beri (≥48h)</label>
+                            <input type="number" id="quiz-db-beri" min="0" step="1" placeholder="5 (default)" title="Beri for submitting ≥48h before the deadline · ≥24h = 60% · ≥6h = 20% · needs a Deadline · blank = default · 0 = off" style="width:100%; padding:8px 12px; border:1px solid #334155; border-radius:10px; font-size:0.9em; background:#0f172a; color:#f1f5f9; color-scheme: dark;">
+                        </div>
+                    </div>
+
                     <!-- Row 3: Description (compact) -->
                     <div style="margin-bottom:8px;">
                         <label style="font-size:0.7em; color:#818cf8; font-weight:600; display:block; margin-bottom:2px; text-transform:uppercase; letter-spacing:0.5px;"><i class="fa-solid fa-align-left"></i> Description</label>
@@ -21046,8 +21060,15 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             review_approved: '✍️ Review approved',
             manual_adjust: '👤 Manual adjust',
             shop_redeem: '🛒 Shop redemption',
-            shop_refund: '↩️ Shop refund'
+            shop_refund: '↩️ Shop refund',
+            quiz_early_bird: '🥇 Early bird',
+            quiz_deadline_buffer: '⏱️ Beat deadline'
         };
+        // V98.27: Beri for fast quiz completion (never score). Per-quiz overrides
+        // quiz.earlyBirdBeriFirst / quiz.deadlineBeriMax (0 = off, null = use default).
+        // Ratios are fixed: podium 1st/2nd/3rd = ×1 / ×0.6 / ×0.4; buffer ≥48h/≥24h/≥6h = ×1 / ×0.6 / ×0.2.
+        const QUIZ_EARLYBIRD_BERI_DEFAULT = 10;
+        const QUIZ_DEADLINE_BERI_DEFAULT = 5;
         let archiveCache = []; let archivePage = 1; const ARCHIVE_PER_PAGE = 10;
         let deleteCardId = null; let deleteTimer = null;
         let currentHistoryUserId = null;
@@ -21660,6 +21681,8 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             // quiz B after quiz A silently saved A's leftover input value into B.
             if (document.getElementById('quiz-feedback-limit')) document.getElementById('quiz-feedback-limit').value = q.feedbackLimit || 280;
             document.getElementById('quiz-total-points').value = q.totalPoints || 1.0;
+            if (document.getElementById('quiz-eb-beri')) document.getElementById('quiz-eb-beri').value = (typeof q.earlyBirdBeriFirst === 'number') ? q.earlyBirdBeriFirst : '';
+            if (document.getElementById('quiz-db-beri')) document.getElementById('quiz-db-beri').value = (typeof q.deadlineBeriMax === 'number') ? q.deadlineBeriMax : '';
             document.getElementById('quiz-description').value = q.description || "";
             document.getElementById('quiz-tags').value = q.tags || "";
             if (document.getElementById('quiz-materials')) document.getElementById('quiz-materials').value = serializeQuizMaterials(q.materials);
@@ -21747,6 +21770,8 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             if (document.getElementById('quiz-unlock-score')) document.getElementById('quiz-unlock-score').value = 0;
             if (document.getElementById('quiz-feedback-limit')) document.getElementById('quiz-feedback-limit').value = 280;
             document.getElementById('quiz-total-points').value = 1.0;
+            if (document.getElementById('quiz-eb-beri')) document.getElementById('quiz-eb-beri').value = '';
+            if (document.getElementById('quiz-db-beri')) document.getElementById('quiz-db-beri').value = '';
             document.getElementById('quiz-description').value = "";
             document.getElementById('quiz-tags').value = "";
             if (document.getElementById('quiz-materials')) document.getElementById('quiz-materials').value = "";
@@ -22138,8 +22163,16 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 questions.push({ q: qText, content: qContent, type: qType, options: opts, correct, timer, tags: qTags, explanation: qExplanation });
             });
 
+            // V98.27: per-quiz Beri speed rewards. '' (blank) → null = use global
+            // default; an explicit 0 = off. Stored as a number or null.
+            const _ebV = document.getElementById('quiz-eb-beri');
+            const _dbV = document.getElementById('quiz-db-beri');
+            const earlyBirdBeriFirst = (_ebV && _ebV.value !== '') ? Math.max(0, parseInt(_ebV.value, 10) || 0) : null;
+            const deadlineBeriMax = (_dbV && _dbV.value !== '') ? Math.max(0, parseInt(_dbV.value, 10) || 0) : null;
+
             return {
                 title, shortTitle, targetGroup, unlockScore, description, tags, materials, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, partialCredit, notifyGroup, quizType, feedbackLimit, caseContent, questions, blueprint,
+                earlyBirdBeriFirst, deadlineBeriMax,
                 startTime: document.getElementById('quiz-start-time').value,
                 deadline: document.getElementById('quiz-deadline').value
             };
@@ -24796,6 +24829,8 @@ ${JSON.stringify(sourceObj)}`;
                 notifyGroup: formData.notifyGroup || false,
                 quizType: formData.quizType || 'standard',
                 feedbackLimit: formData.feedbackLimit || 280,
+                earlyBirdBeriFirst: (formData.earlyBirdBeriFirst === null || formData.earlyBirdBeriFirst === undefined) ? null : formData.earlyBirdBeriFirst,
+                deadlineBeriMax: (formData.deadlineBeriMax === null || formData.deadlineBeriMax === undefined) ? null : formData.deadlineBeriMax,
                 questions: validQuestions,
                 blueprint: formData.blueprint || null,
                 startTime: convertDate(formData.startTime),
@@ -28711,6 +28746,78 @@ ${JSON.stringify(sourceObj)}`;
             }
         }
 
+        // V98.27: best-effort Beri reward for finishing a quiz fast — called after
+        // each approve path commits. Solo quizzes only (skips poll + exam-session +
+        // practice). Rank is by SUBMIT time (`quiz_attempts.timestamp`, immutable).
+        // Deterministic beri_ledger id `${source}__${quizId}_${userId}` → re-approve
+        // never double-pays. Never touches score.
+        async function writeQuizSpeedBeri(source, quizId, userId, amount, note) {
+            const editor = (auth && auth.currentUser) || {};
+            const bl = beriLedgerEntry({ userId, amount, source, refId: `${quizId}_${userId}`, note, createdByUid: editor.uid || null });
+            if ((await bl.ref.get()).exists) return;
+            const b = db.batch();
+            b.set(bl.ref, bl.data);
+            b.set(db.collection('users').doc(userId), { beri: firebase.firestore.FieldValue.increment(amount) }, { merge: true });
+            await b.commit();
+        }
+
+        async function awardQuizSpeedBeri(quizId, userId) {
+            try {
+                if (!quizId || !userId) return;
+                const quiz = quizzesData.find(q => q.id === quizId);
+                if (!quiz || quiz.isPoll === true) return;
+
+                const ebFirst = (typeof quiz.earlyBirdBeriFirst === 'number') ? quiz.earlyBirdBeriFirst : QUIZ_EARLYBIRD_BERI_DEFAULT;
+                const dbMax = (typeof quiz.deadlineBeriMax === 'number') ? quiz.deadlineBeriMax : QUIZ_DEADLINE_BERI_DEFAULT;
+                const deadMs = quiz.deadline && quiz.deadline.toMillis ? quiz.deadline.toMillis() : null;
+                if (ebFirst <= 0 && !(dbMax > 0 && deadMs)) return;
+
+                const qName = quiz.shortTitle || quiz.title || quizId;
+                let mySubmitMs = null;
+
+                // Part 1 — early-bird podium
+                if (ebFirst > 0) {
+                    const snap = await db.collection('quiz_attempts').where('quizId', '==', quizId).get();
+                    const subs = [];
+                    snap.forEach(d => {
+                        const a = d.data();
+                        if (a.isExamSession || a.isPoll || a.isPractice) return;
+                        const ts = a.timestamp && a.timestamp.toMillis ? a.timestamp.toMillis() : null;
+                        if (!ts) return;
+                        subs.push({ uid: a.userId, ts });
+                        if (a.userId === userId) mySubmitMs = ts;
+                    });
+                    subs.sort((x, y) => x.ts - y.ts);
+                    const rank = subs.findIndex(s => s.uid === userId);
+                    if (rank >= 0 && rank <= 2) {
+                        const amt = Math.round(ebFirst * [1, 0.6, 0.4][rank]);
+                        if (amt > 0) await writeQuizSpeedBeri('quiz_early_bird', quizId, userId, amt,
+                            `${['🥇', '🥈', '🥉'][rank]} Early bird · ${qName}`);
+                    }
+                }
+
+                // Part 2 — beat the deadline (every solo submitter, needs a deadline)
+                if (dbMax > 0 && deadMs) {
+                    if (mySubmitMs == null) {
+                        const one = await db.collection('quiz_attempts').doc(`${quizId}_${userId}`).get();
+                        const a = one.exists ? one.data() : null;
+                        if (a && !a.isExamSession && !a.isPoll && !a.isPractice && a.timestamp && a.timestamp.toMillis) {
+                            mySubmitMs = a.timestamp.toMillis();
+                        }
+                    }
+                    if (mySubmitMs != null) {
+                        const hoursEarly = (deadMs - mySubmitMs) / 3600000;
+                        let amt = 0, tier = '';
+                        if (hoursEarly >= 48) { amt = Math.round(dbMax); tier = '48h'; }
+                        else if (hoursEarly >= 24) { amt = Math.round(dbMax * 0.6); tier = '24h'; }
+                        else if (hoursEarly >= 6) { amt = Math.round(dbMax * 0.2); tier = '6h'; }
+                        if (amt > 0) await writeQuizSpeedBeri('quiz_deadline_buffer', quizId, userId, amt,
+                            `⏱️ Beat deadline (${tier}+) · ${qName}`);
+                    }
+                }
+            } catch (e) { console.warn('[quiz speed beri]', e); }
+        }
+
         async function approveQuizAttempt(attemptId) {
             if (!confirm("Approve this attempt? This will mark all questions as manually CORRECT and update the score to 100%.")) return;
             try {
@@ -28755,12 +28862,13 @@ ${JSON.stringify(sourceObj)}`;
                 }
                 
                 await b.commit();
-                
+                awardQuizSpeedBeri(att.quizId, att.userId); // V98.27: fire-and-forget
+
                 if (typeof pendingQuizzesCache !== 'undefined') {
                     const cacheIndex = pendingQuizzesCache.findIndex(x => x.id === attemptId);
                     if (cacheIndex !== -1) pendingQuizzesCache.splice(cacheIndex, 1);
                 }
-                
+
                 showToast("✅ Attempt Approved & Points Added!");
                 closeReviewOverlay();
 
@@ -28827,9 +28935,10 @@ ${JSON.stringify(sourceObj)}`;
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     });
                 }
-                
+
                 await b.commit();
-                
+                awardQuizSpeedBeri(att.quizId, att.userId); // V98.27: fire-and-forget
+
                 if (typeof pendingQuizzesCache !== 'undefined') {
                     const cacheIndex = pendingQuizzesCache.findIndex(x => x.id === attemptId);
                     if (cacheIndex !== -1) pendingQuizzesCache.splice(cacheIndex, 1);
@@ -28963,6 +29072,7 @@ ${JSON.stringify(sourceObj)}`;
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 await b.commit();
+                awardQuizSpeedBeri(quizId, uid); // V98.27: fire-and-forget (quizId set above)
                 showToast("Approved & Points added!");
 
                 // 🔥 [Version: V78.2] Auto-move linked Kanban card for homework
