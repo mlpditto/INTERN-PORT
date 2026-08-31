@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.42</title>
+    <title>Nika V98.43</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -20828,7 +20828,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const menu = chip.closest('.q-improve-menu');
             if (menu) menu.style.display = 'none';
             const ctx = window._qImproveCtx(item);
-            if (!ctx.question) return alert('กรุณากรอกโจทย์ก่อนครับ');
+            if (!ctx.question) return alert('Please fill in the question first.');
             const model = window._qImproveModel(item);
             try {
                 window._qImproveChipBusy(chip, true);
@@ -20980,7 +20980,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const res = await window.callUniversalAI(model, prompt, true, null, ctx.quickApiKey, { feature: 'question_polish' });
             const data = safeJsonParse(res.text);
             if (!data || typeof data.question !== 'string' || !Array.isArray(data.options)) throw new Error('AI ส่งรูปแบบไม่ถูกต้อง');
-            if (data.options.length !== ctx.options.length) throw new Error('จำนวนตัวเลือกไม่ตรงกับเดิม (AI ส่ง ' + data.options.length + ' จากเดิม ' + ctx.options.length + ') — ลองใหม่อีกครั้ง');
+            if (data.options.length !== ctx.options.length) throw new Error('Option count changed (AI returned ' + data.options.length + ', was ' + ctx.options.length + ') — try again.');
             const newOpts = data.options.map(o => String(o));
             const rows = ctx.options.map((o, i) =>
                 '<tr><td style="padding:3px 8px; color:#94a3b8; vertical-align:top;">' + (i + 1) + '</td>' +
@@ -20991,7 +20991,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 ctx.qTa.value = data.question;
                 if (window.renderQTextPreview) window.renderQTextPreview(ctx.qTa);
                 ctx.optTas.forEach((ta, i) => { if (typeof newOpts[i] === 'string') window._qImproveSetOpt(ta, newOpts[i]); });
-                showToast('✅ เกลาภาษาเรียบร้อย');
+                showToast('✅ Wording polished');
             };
             let html = '<div style="margin-bottom:6px;"><strong>✏️ Polished wording — check before applying</strong></div>';
             html += '<div style="margin-bottom:4px; color:#64748b;">New question stem:</div><div style="padding:6px 8px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:8px;">' + escapeHtml(data.question) + '</div>';
@@ -21001,7 +21001,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         };
 
         window._qImproveDistractors = async function(item, ctx, model) {
-            if (!ctx.correctIndices.length) throw new Error('กรุณาติ๊กคำตอบที่ถูกอย่างน้อย 1 ข้อก่อน');
+            if (!ctx.correctIndices.length) throw new Error('Tick at least one correct answer first.');
             const correctSet = ctx.correctIndices;
             const prompt = [
                 'ภาษา: คงภาษาเดิมของข้อความ (ไทยคงไทย, ศัพท์อังกฤษคงอังกฤษ) ห้ามแปลข้ามภาษา',
@@ -21024,7 +21024,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             }).join('');
             const applyFn = () => {
                 ctx.optTas.forEach((ta, i) => { if (!correctSet.includes(i) && typeof newOpts[i] === 'string') window._qImproveSetOpt(ta, newOpts[i]); });
-                showToast('✅ ปรับตัวลวงเรียบร้อย');
+                showToast('✅ Distractors adjusted');
             };
             let html = '<div style="margin-bottom:6px;"><strong>🎯 Reworked distractors — check before applying</strong></div>';
             html += '<table style="width:100%; border-collapse:collapse;"><tr><th style="text-align:left; padding:3px 8px; color:#94a3b8;">#</th><th style="text-align:left; padding:3px 8px; color:#94a3b8;">Before</th><th style="text-align:left; padding:3px 8px; color:#94a3b8;">After</th></tr>' + rows + '</table>';
@@ -21033,7 +21033,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         };
 
         window._qImproveExplanation = async function(item, ctx, model) {
-            if (!ctx.expTa) throw new Error('ไม่พบช่อง Explanation ของข้อนี้');
+            if (!ctx.expTa) throw new Error('No Explanation field found for this question.');
             const prompt = [
                 'ภาษา: เขียนคำอธิบายเป็นภาษาเดียวกับโจทย์ (โจทย์ไทย→อธิบายไทย) คงศัพท์เทคนิค/ชื่อยาเป็นอังกฤษได้',
                 'งานของคุณ: เขียนคำอธิบายเฉลยสำหรับผู้เรียน อธิบายว่าทำไมคำตอบที่ถูกจึงถูก และทำไมตัวลวงจึงผิด',
@@ -21052,13 +21052,13 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const existing = (ctx.expTa.value || '').trim();
             if (!existing) {
                 ctx.expTa.value = expl;
-                showToast('✅ สร้างคำอธิบายแล้ว');
+                showToast('✅ Explanation generated');
                 let html = '<div style="margin-bottom:6px;"><strong>💡 Explanation written — filled in for you</strong> <button type="button" class="q-improve-cancel" style="float:right; background:none; border:none; color:#94a3b8; cursor:pointer; font-size:1.05em; line-height:1;">✕</button></div>';
                 html += '<div style="padding:6px 8px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; white-space:pre-wrap;">' + escapeHtml(expl) + '</div>';
                 window._qImproveShowPanel(item, html, '#16a34a');
                 return;
             }
-            const applyFn = () => { ctx.expTa.value = expl; showToast('✅ แทนที่คำอธิบายแล้ว'); };
+            const applyFn = () => { ctx.expTa.value = expl; showToast('✅ Explanation replaced'); };
             let html = '<div style="margin-bottom:6px;"><strong>💡 There is already an explanation — replace it?</strong></div>';
             html += '<div style="color:#64748b; margin-bottom:4px;">The new one:</div><div style="padding:6px 8px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; white-space:pre-wrap; margin-bottom:8px;">' + escapeHtml(expl) + '</div>';
             html += window._qImproveActionBar('✅ แทนที่');
@@ -27481,7 +27481,7 @@ ${JSON.stringify(sourceObj)}`;
         function bulkPasteParse() {
             const text = document.getElementById('bp-textarea').value;
             const parsed = parseBulkQuestions(text);
-            if (parsed.length === 0) { showToast('ไม่พบข้อที่แยกได้ — ตรวจว่าคั่นแต่ละข้อด้วยบรรทัดว่าง', 'error'); return; }
+            if (parsed.length === 0) { showToast('No questions could be split out — check that each one is separated by a blank line', 'error'); return; }
             window._bulkPasteParsed = parsed;
             document.getElementById('bp-input-stage').style.display = 'none';
             document.getElementById('bp-preview-stage').style.display = 'block';
@@ -27551,7 +27551,7 @@ ${JSON.stringify(sourceObj)}`;
         function bulkPasteRemoveOption(idx, optIdx) {
             const r = window._bulkPasteParsed[idx];
             if (!r) return;
-            if (r.options.length <= 2) { showToast('ต้องเหลืออย่างน้อย 2 ตัวเลือก', 'error'); return; }
+            if (r.options.length <= 2) { showToast('At least 2 options must remain', 'error'); return; }
             r.options.splice(optIdx, 1);
             r.correct = r.correct.filter(c => c !== optIdx).map(c => (c > optIdx ? c - 1 : c));
             renderBulkPastePreview();
@@ -27607,7 +27607,7 @@ ${JSON.stringify(sourceObj)}`;
             const picked = window._bulkPasteParsed
                 .map((r, i) => ({ r: r, n: i + 1 }))
                 .filter(x => x.r.include);
-            if (picked.length === 0) { showToast('ยังไม่ได้เลือกข้อ', 'error'); return; }
+            if (picked.length === 0) { showToast('No question selected', 'error'); return; }
             const text = picked.map(x => bulkPasteRowText(x.r, true, x.n)).join('\n\n');
             bulkPasteCopyText(text, '📚 คัดลอก ' + picked.length + ' ข้อ พร้อมเฉลยแล้ว');
         }
@@ -27619,7 +27619,7 @@ ${JSON.stringify(sourceObj)}`;
             document.body.appendChild(ta);
             ta.select();
             try { document.execCommand('copy'); done(); }
-            catch (e) { showToast('คัดลอกไม่สำเร็จ: ' + e.message, 'error'); }
+            catch (e) { showToast('Copy failed: ' + e.message, 'error'); }
             ta.remove();
         }
 
@@ -27718,12 +27718,12 @@ ${JSON.stringify(sourceObj)}`;
                 if (extracted.startsWith('data:image/')) dataUrl = extracted;
                 else if (/^https?:\/\//i.test(extracted)) dataUrl = extracted;
                 else if (extracted.length > 100) dataUrl = 'data:image/png;base64,' + extracted;
-                if (!dataUrl) throw new Error('โมเดลไม่ได้ส่งรูปกลับมา — ลองเปลี่ยนโมเดลสร้างภาพ');
+                if (!dataUrl) throw new Error('The model returned no image — try a different image model.');
                 r.illustrationUrl = await bulkPasteUploadImage(dataUrl);
-                showToast('🎨 สร้างภาพประกอบข้อ ' + (idx + 1) + ' แล้ว', 'success');
+                showToast('🎨 Illustration generated for question ' + (idx + 1), 'success');
             } catch (e) {
                 console.warn('bulkPasteGenIllustration failed:', e);
-                showToast('สร้างภาพไม่สำเร็จ: ' + ((e && e.message) || e), 'error');
+                showToast('Image generation failed: ' + ((e && e.message) || e), 'error');
             }
             renderBulkPastePreview();   // also restores the button out of its ⏳ state
         }
@@ -27737,7 +27737,7 @@ ${JSON.stringify(sourceObj)}`;
 
         function bulkPasteInsert() {
             const rows = window._bulkPasteParsed.filter(r => r.include);
-            if (rows.length === 0) { showToast('ยังไม่ได้เลือกข้อ', 'error'); return; }
+            if (rows.length === 0) { showToast('No question selected', 'error'); return; }
             // V96.90: carry the AI rationale into the question's explanation field.
             // It was dropped here before, so the rationale the admin reviewed in the
             // preview vanished on insert even though addQuestionUI prefills
@@ -27756,7 +27756,7 @@ ${JSON.stringify(sourceObj)}`;
             const items = document.querySelectorAll('.quiz-q-item');
             quizQPageIndex = Math.max(0, items.length - rows.length);
             if (typeof updateQuizPagination === 'function') updateQuizPagination();
-            showToast('✅ เพิ่ม ' + rows.length + ' ข้อแล้ว', 'success');
+            showToast('✅ Added ' + rows.length + ' question(s)', 'success');
         }
 
         // ============================================================
@@ -27810,7 +27810,7 @@ ${JSON.stringify(sourceObj)}`;
             const cur = window._imgQuizModels;
             const at = cur.indexOf(id);
             // Keep at least one selected — an empty rail would silently generate nothing.
-            if (at >= 0) { if (cur.length === 1) { showToast('ต้องเลือกอย่างน้อย 1 โมเดล', 'error'); return; } cur.splice(at, 1); }
+            if (at >= 0) { if (cur.length === 1) { showToast('Select at least one model', 'error'); return; } cur.splice(at, 1); }
             else cur.push(id);
             imageQuizRenderModelRail();
         }
@@ -27870,20 +27870,20 @@ ${JSON.stringify(sourceObj)}`;
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = () => resolve(reader.result.split(',')[1]);
-                reader.onerror = () => reject(new Error('อ่านไฟล์รูปไม่สำเร็จ: ' + file.name));
+                reader.onerror = () => reject(new Error('Could not read the image file: ' + file.name));
                 reader.readAsDataURL(file);
             });
         }
 
         async function imageQuizGenerate() {
             const files = window._imgQuizFiles;
-            if (!files.length) { showToast('ยังไม่ได้เลือกรูป', 'error'); return; }
+            if (!files.length) { showToast('No image selected', 'error'); return; }
             if (typeof window.callUniversalAI !== 'function' || typeof window._aiFindAnswerCore !== 'function') {
-                showToast('AI engine ยังไม่พร้อม — reload แล้วลองใหม่', 'error'); return;
+                showToast('AI engine not ready — reload and try again', 'error'); return;
             }
 
             const models = window._imgQuizModels.slice();
-            if (!models.length) { showToast('ยังไม่ได้เลือกโมเดล', 'error'); return; }
+            if (!models.length) { showToast('No model selected', 'error'); return; }
             const selfContained = window._imgQuizSelfContained !== false;
 
             const btn = document.getElementById('img-quiz-generate-btn');
@@ -27957,13 +27957,13 @@ ${JSON.stringify(sourceObj)}`;
                     // callUniversalAI) produced a confident, fully-formed question about a
                     // picture that was never seen — far worse than a visible failure.
                     if (data && String(data.error || '').toUpperCase() === 'NO_IMAGE') {
-                        throw new Error('โมเดลแจ้งว่าไม่ได้รับรูป — ลองใหม่ หรือเปลี่ยนโมเดลที่รองรับ vision');
+                        throw new Error('The model reported it received no image — retry, or switch to a vision-capable model.');
                     }
                     if (!data || !data.q || !Array.isArray(data.options) || data.options.length < 2) {
                         throw new Error('AI ส่งค่าที่ใช้ไม่ได้: ' + String(genRes.text || '').slice(0, 160));
                     }
                     if (!String(data.imageSummary || '').trim()) {
-                        throw new Error('โมเดลไม่ได้ยืนยันว่าเห็นรูป (ไม่มี imageSummary) — ผลลัพธ์อาจถูกแต่งขึ้นเอง จึงข้ามรูปนี้');
+                        throw new Error('The model did not confirm it saw the image (no imageSummary) — the result may be fabricated, so this image was skipped.');
                     }
                     const genCorrect = (Array.isArray(data.correct) ? data.correct : [])
                         .map(n => Number(n)).filter(n => Number.isInteger(n) && n >= 0 && n < data.options.length);
@@ -27994,7 +27994,7 @@ ${JSON.stringify(sourceObj)}`;
                         conf = 55;
                     }
 
-                    if (finalCorrect.length === 0) throw new Error('ไม่พบเฉลยที่ใช้ได้ทั้งจากขั้นสร้างและขั้นตรวจทาน');
+                    if (finalCorrect.length === 0) throw new Error('No usable answer key from either the generate or the review pass.');
 
                     // V97.24: asking for a self-contained stem doesn't guarantee one, and
                     // a stem that still points at a picture the learner never sees is
@@ -28028,7 +28028,7 @@ ${JSON.stringify(sourceObj)}`;
             document.getElementById('img-quiz-progress-wrap').style.display = 'none';
 
             if (generated.length === 0) {
-                showToast('สร้างโจทย์ไม่สำเร็จเลย — ลองรูปอื่นหรือตรวจสอบ AI engine', 'error');
+                showToast('No questions could be generated — try other images or check the AI engine', 'error');
                 return;
             }
 
@@ -28040,7 +28040,7 @@ ${JSON.stringify(sourceObj)}`;
             document.getElementById('bp-input-stage').style.display = 'none';
             document.getElementById('bp-preview-stage').style.display = 'block';
             renderBulkPastePreview();
-            showToast(`🧩 สร้างโจทย์ได้ ${generated.length}/${files.length} ข้อ` + (failed ? ` (พลาด ${failed})` : '') + ' — ตรวจก่อนบันทึก', failed ? 'warning' : 'success');
+            showToast(`🧩 Generated ${generated.length}/${files.length} question(s)` + (failed ? ` (${failed} failed)` : '') + ' — check before saving', failed ? 'warning' : 'success');
         }
 
         function clearResearchChat() {
@@ -28785,7 +28785,7 @@ ${JSON.stringify(sourceObj)}`;
                 if (!snap.empty && typeof showQuizFeedbackPanel === 'function') {
                     showQuizFeedbackPanel(quizId, userId);
                 } else {
-                    showToast('⭐ ยังไม่มี feedback จาก user นี้สำหรับ quiz นี้');
+                    showToast('⭐ No feedback from this user for this quiz yet');
                 }
             } catch (e) {
                 console.warn('openFeedbackAfterApprove failed:', e);
@@ -29931,10 +29931,10 @@ ${JSON.stringify(sourceObj)}`;
             try {
                 await db.collection('quizzes').doc(quizId).update({ materials: newMaterials });
                 q.materials = newMaterials; // optimistic; the quizzes onSnapshot also reconciles
-                if (typeof showToast === 'function') showToast('✅ บันทึกชื่อไฟล์แล้ว');
+                if (typeof showToast === 'function') showToast('✅ File name saved');
                 adminOpenQuizMaterials(quizId);
             } catch (e) {
-                if (typeof showToast === 'function') showToast('❌ บันทึกไม่สำเร็จ: ' + e.message);
+                if (typeof showToast === 'function') showToast('❌ Save failed: ' + e.message);
             }
         }
 
@@ -30501,7 +30501,7 @@ RULES:
         async function toggleQuizNotify(id, current) {
             try {
                 await db.collection("quizzes").doc(id).update({ notifyGroup: !current });
-                showToast(!current ? '🔔 EVERY — แจ้ง LINE ทุกครั้งที่มีคนส่ง' : '🔔 MILESTONE — คนแรกส่ง + ครบทุกคน');
+                showToast(!current ? '🔔 EVERY — notify LINE on every submission' : '🔔 MILESTONE — first submission + when everyone is done');
             } catch (e) {
                 alert("Error: " + e.message);
             }
@@ -31220,7 +31220,7 @@ RULES:
                                     gdriveBackupError: String(backupErr?.message || backupErr || '').slice(0, 200),
                                     gdriveBackupFolderId: backupFolderId || ''
                                 });
-                                showToast('⚠️ Saved to Firebase, but Google Drive backup failed สำรอง Google Drive ไม่สำเร็จ', 'warning');
+                                showToast('⚠️ Saved to Firebase, but Google Drive backup failed', 'warning');
                             }
                         }
 
@@ -32107,8 +32107,8 @@ RULES:
                 if (window.renderQuizCoverage) window.renderQuizCoverage();
                 if (window._qcovOpenKey) window.openQuizCoverageList(window._qcovOpenKey);
                 db.collection('quizzes').doc(id).update({ coverageSystem: value })
-                    .then(() => { if (typeof showToast === 'function') showToast('✅ Category moved ย้ายหมวดแล้ว'); })
-                    .catch(e => { if (typeof showToast === 'function') showToast('❌ Could not move category ย้ายหมวดไม่สำเร็จ: ' + e.message); });
+                    .then(() => { if (typeof showToast === 'function') showToast('✅ Category moved'); })
+                    .catch(e => { if (typeof showToast === 'function') showToast('❌ Could not move category: ' + e.message); });
             };
 
             db.collection("quizzes").onSnapshot(s => {
@@ -35687,7 +35687,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 if (btn) { btn.disabled = false; btn.innerHTML = orig; }
 
                 if (!orphans.length) {
-                    showToast('✅ ไม่พบ history ค้าง — mirror ตรงกับต้นทางทั้งหมด', 'success');
+                    showToast('✅ No orphaned history — the mirror matches every source', 'success');
                     return;
                 }
 
@@ -35697,8 +35697,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const sample = orphans.slice(0, 8).map(o => `• [${o.type}] ${String(o.title).slice(0, 48)}`).join('\n');
                 const more = orphans.length > 8 ? `\n… และอีก ${orphans.length - 8} รายการ` : '';
 
-                if (!confirm(`พบ history ค้าง ${orphans.length} รายการ (${summary})\n\nรายการเหล่านี้ยังโผล่ใน Work History ของนักศึกษา ทั้งที่งานต้นทางถูกลบไปแล้ว\n\n${sample}${more}\n\nลบทิ้งทั้งหมด?`)) {
-                    showToast(`สแกนแล้วพบ ${orphans.length} รายการ — ยังไม่ได้ลบ`, 'warning');
+                if (!confirm(`Found ${orphans.length} orphaned history row(s) (${summary})\n\nThese still show in a student's Work History even though the source work was deleted.\n\n${sample}${more}\n\nDelete all of them?`)) {
+                    showToast(`Scan found ${orphans.length} row(s) — nothing deleted yet`, 'warning');
                     return;
                 }
 
@@ -35710,7 +35710,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     await batch.commit();
                     removed += Math.min(400, orphans.length - i);
                 }
-                showToast(`🧹 ลบ history ค้าง ${removed} รายการแล้ว`, 'success');
+                showToast(`🧹 Deleted ${removed} orphaned history row(s)`, 'success');
             } catch (e) {
                 if (btn) { btn.disabled = false; btn.innerHTML = orig; }
                 console.error('scanOrphanMirrors failed:', e);
@@ -37916,7 +37916,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             let pvVision = null;
             if (refineOn) {
                 if (!pvOpts.extra) {
-                    if (typeof showToast === 'function') showToast('✏️ Type what you want changed in Extra instructions first พิมพ์สิ่งที่อยากแก้ในช่องด้านบนก่อน');
+                    if (typeof showToast === 'function') showToast('✏️ Type what you want changed in Extra instructions first');
                     return;
                 }
                 pvOpts.refine = true;
@@ -38218,7 +38218,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 a.click();
                 a.remove();
                 setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
-                if (typeof showToast === 'function') showToast('⬇️ Downloaded ' + fname + ' ดาวน์โหลดแล้ว');
+                if (typeof showToast === 'function') showToast('⬇️ Downloaded ' + fname);
             } catch (err) {
                 console.error('[drug-codex pk-visual download]', err);
                 if (typeof showToast === 'function') showToast('⬇️ Download failed: ' + (err && err.message ? err.message : 'unknown error') + ' ดาวน์โหลดไม่สำเร็จ');
@@ -40446,7 +40446,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 next = f.proposed; // whole-field proposal
                 beforeShown = cur || '(empty)';
             } else {
-                if (typeof showToast === 'function') showToast('The field changed since the review ran — edit it yourself ข้อความเดิมเปลี่ยนไปแล้ว');
+                if (typeof showToast === 'function') showToast('The field changed since the review ran — edit it yourself');
                 return;
             }
             if (!confirm('Apply AI fix · ' + label + '\n\nBefore:\n' + beforeShown + '\n\nAfter:\n' + f.proposed + '\n\n⚠️ Always check the medical accuracy yourself first.')) return;
@@ -40455,7 +40455,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             f._applied = true;
             // V96.05 Evaluation pillar: this finding's proposed fix was accepted.
             if (typeof recordAiEval === 'function') recordAiEval('ai_review', dcaState._reviewModel, 'applied');
-            if (typeof showToast === 'function') showToast('✏️ Applied to ' + label + ' — verify before Save ตรวจก่อนบันทึก');
+            if (typeof showToast === 'function') showToast('✏️ Applied to ' + label + ' — verify before Save');
             dcaRenderReviewResults(dcaState.reviewFindingsFlat, dcaState._reviewOverall || '', dcaState._reviewSuggestedScore);
         }
 
@@ -42771,7 +42771,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 a.click();
                 a.remove();
                 setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
-                if (typeof showToast === 'function') showToast('⬇️ Downloaded ' + fname + ' ดาวน์โหลดแล้ว');
+                if (typeof showToast === 'function') showToast('⬇️ Downloaded ' + fname);
             } catch (err) {
                 console.error('[disease-codex patho-visual download]', err);
                 if (typeof showToast === 'function') showToast('⬇️ Download failed: ' + (err && err.message ? err.message : 'unknown error') + ' ดาวน์โหลดไม่สำเร็จ');
@@ -42928,7 +42928,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const btn = document.getElementById('dxa-icd-btn');
             const diseaseName = nameEl ? String(nameEl.value || '').trim() : '';
             if (!diseaseName) {
-                if (typeof showToast === 'function') showToast('🔍 Enter a Disease Name before searching ICD-10 กรอกชื่อโรคก่อน');
+                if (typeof showToast === 'function') showToast('🔍 Enter a Disease Name before searching ICD-10');
                 if (nameEl) nameEl.focus();
                 return;
             }
@@ -43012,7 +43012,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     c.classList.toggle('added', idx === i);
                 });
             }
-            if (typeof showToast === 'function') showToast('🔍 Inserted ' + it.code + ' into the ICD-10 field — check it before saving ตรวจก่อนบันทึก');
+            if (typeof showToast === 'function') showToast('🔍 Inserted ' + it.code + ' into the ICD-10 field — check it before saving');
         }
 
         function dxaDismissIcdResults() {
@@ -43619,7 +43619,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
         async function confirmAlabastaRejectCustom() {
             const reason = (document.getElementById('alabasta-reject-custom').value || '').trim();
-            if (!reason) { alert('กรุณาระบุเหตุผล · Please enter a reason'); return; }
+            if (!reason) { alert('Please enter a reason.'); return; }
             await _persistAlabastaReject(reason);
         }
 
@@ -49022,7 +49022,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         async function deleteChatMsg(commentId) {
             const id = document.getElementById('chat-card-id').value;
             if (!id || !commentId) return;
-            if (!confirm('ลบข้อความนี้?')) return;
+            if (!confirm('Delete this message?')) return;
             try {
                 await db.collection("side_quests").doc(id).collection("comments").doc(commentId).delete();
             } catch (e) {
@@ -50386,7 +50386,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     status: 'closed',
                     closedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                showToast("✅ Quest closed → Done ปิดแล้ว");
+                showToast("✅ Quest closed → Done");
             } catch (e) { alert("Error: " + e.message); }
         }
         // V96.74: the certificate wording was hard-coded for the internship programme,
@@ -51235,7 +51235,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
         function copyCertLink(no) {
             navigator.clipboard.writeText(CERT_VERIFY_BASE + no);
-            showToast('คัดลอกลิงก์ verify แล้ว!');
+            showToast('Verify link copied');
         }
         async function toggleRevokeCert(no) {
             const row = _certRegRows.find(r => r.no === no);
@@ -51250,7 +51250,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         revokedAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
                 } else {
-                    if (!confirm(`คืนสถานะ VALID ให้ ${no}?`)) return;
+                    if (!confirm(`Restore ${no} to VALID?`)) return;
                     await db.collection('certificates').doc(no).update({
                         status: 'valid',
                         revokedReason: firebase.firestore.FieldValue.delete(),
@@ -54583,7 +54583,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
         async function ltBulkDelete() {
             const ids = Array.from(window._ltSelected);
-            if (!ids.length) { showToast('ยังไม่ได้เลือกการ์ด', 'error'); return; }
+            if (!ids.length) { showToast('No card selected', 'error'); return; }
 
             // Show the total points about to be clawed back BEFORE confirming — the
             // number is the part that is hard to undo, so it belongs in the prompt.
@@ -54897,12 +54897,12 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             
             // Validate score
             if (newScore < 0 || newScore > 2.0) {
-                showToast("⚠️ Score must be between 0 and 2.0 คะแนนต้องอยู่ระหว่าง", "error");
+                showToast("⚠️ Score must be between 0 and 2.0", "error");
                 return;
             }
             
             if (!reason) {
-                showToast("⚠️ Please specify a reason for the adjustment กรุณาระบุเหตุผลการปรับคะแนน", "error");
+                showToast("⚠️ Please specify a reason for the adjustment", "error");
                 return;
             }
             
@@ -54938,11 +54938,11 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 // Clear form
                 document.getElementById('score-adjustment-reason').value = '';
                 
-                showToast(`✅ Score adjusted to +${newScore} ปรับคะแนนเรียบร้อย`, "success");
+                showToast(`✅ Score adjusted to +${newScore}`, "success");
                 
             } catch (error) {
                 console.error("Error adjusting score:", error);
-                showToast("❌ Could not adjust score — please try again ไม่สามารถปรับคะแนนได้ กรุณาลองใหม่", "error");
+                showToast("❌ Could not adjust score — please try again", "error");
             }
         }
 
@@ -54996,7 +54996,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 const reason = document.getElementById('period-adjustment-reason').value.trim();
                 
                 if (!userId) {
-                    showToast("❌ User data not found ไม่พบข้อมูล", "error");
+                    showToast("❌ User data not found", "error");
                     return;
                 }
                 
@@ -55007,12 +55007,12 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     const endDate = document.getElementById('period-end-date').value;
                     
                     if (!startDate || !endDate) {
-                        showToast("❌ Please specify start and end dates กรุณาระบุวันเริ่มต้นและวันสิ้นสุด", "error");
+                        showToast("❌ Please specify start and end dates", "error");
                         return;
                     }
                     
                     if (new Date(startDate) > new Date(endDate)) {
-                        showToast("❌ Start date must not be after end date วันเริ่มต้นต้องไม่เกินวันสิ้นสุด", "error");
+                        showToast("❌ Start date must not be after end date", "error");
                         return;
                     }
                     
@@ -55050,11 +55050,11 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 closePeriodAdjustmentModal();
                 renderTable('users');
                 
-                showToast(`✅ ${enabled ? 'Period set ตั้งค่า' : 'Period removed ลบ'} เรียบร้อย`, "success");
+                showToast(`✅ ${enabled ? 'Period set' : 'Period removed'}`, "success");
                 
             } catch (error) {
                 console.error("Error adjusting period:", error);
-                showToast("❌ Could not adjust Period — please try again ไม่สามารถปรับ Period ได้ กรุณาลองใหม่", "error");
+                showToast("❌ Could not adjust Period — please try again", "error");
             }
         }
 
@@ -55507,7 +55507,7 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
                 window.previewAiFix(qIdx, arrIdx);
             } catch (e) {
                 console.error('[mergeAiVersions]', e);
-                alert('ผสมไม่สำเร็จ: ' + e.message);
+                alert('Merge failed: ' + e.message);
                 if (btn) { btn.innerHTML = oldHtml; btn.disabled = false; }
             }
         };
@@ -55548,7 +55548,7 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
                     pool.push({ id: pool.length, text, from: [s.label], keyIn: isKey ? [s.label] : [], checked: false });
                 });
             });
-            if (!pool.length) return alert('ไม่มีตัวเลือกให้ประกอบ (โจทย์นี้ไม่ใช่แบบตัวเลือก)');
+            if (!pool.length) return alert('No options to assemble — this is not a multiple-choice question.');
 
             // Seed from the version under review so the work is swapping single options in
             // and out, not rebuilding from zero.
@@ -55651,12 +55651,12 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
             const st = window._mergeBuilder; if (!st) return;
             const stemSrc = st.sources.find(s => s.key === st.stemKey) || st.sources[0];
             const srcQ = stemSrc.q || {};
-            if (!String(srcQ.q || '').trim()) return alert('ฉบับที่เลือกเป็นโจทย์ไม่มีข้อความ');
+            if (!String(srcQ.q || '').trim()) return alert('The version you picked has no question text.');
             const chosen = st.pool.filter(p => p.checked);
-            if (chosen.length < 2) return alert('เลือกตัวเลือกอย่างน้อย 2 ข้อ');
+            if (chosen.length < 2) return alert('Pick at least 2 options.');
             // Recomputed from the ticked order — the whole point of this panel.
             const correct = chosen.map((p, i) => st.correctIds.has(p.id) ? i : -1).filter(i => i >= 0);
-            if (!correct.length) return alert('ยังไม่ได้ตั้งเฉลย — กดวงกลมหน้าตัวเลือกที่ถูก');
+            if (!correct.length) return alert('No answer key set — click the circle next to the correct option.');
 
             const built = { ...srcQ, q: srcQ.q, type: srcQ.type || 'choice', options: chosen.map(p => p.text), correct };
             const compareOverlay = () => document.getElementById('ai-compare-overlay');
@@ -56199,7 +56199,7 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
         window.checkQuizSetDupAI = async function(index, arrIdx, btn) {
             const panel = document.getElementById('ai-dup-result');
             const pool = window.buildQuizSetPeerPool(index);
-            if (!pool.length) return showToast('ชุดนี้ไม่มีข้ออื่นให้เทียบ');
+            if (!pool.length) return showToast('No other question in this set to compare against');
             const item = (window._aiAnalysisItems || [])[arrIdx] || {};
             const originalQ = (getQuizFormData().questions || [])[index] || {};
             const candidates = [
@@ -56279,7 +56279,7 @@ RULES:
         window.confirmAddAiAsNewQuestion = function(index, improvedJson) {
             const strong = (window._compareDupHits || [])
                 .find(h => h.score >= QUIZ_SET_DUP_STRONG && h.sides.includes('improved'));
-            if (strong && !confirm(`⚠️ โจทย์ที่จะเพิ่มใหม่ใกล้เคียงกับ Q${strong.qIndex + 1} ในชุดนี้ ${Math.round(strong.score * 100)}%\n\nยืนยันเพิ่มเป็นข้อใหม่?`)) return;
+            if (strong && !confirm(`⚠️ The question you are adding is ${Math.round(strong.score * 100)}% similar to Q${strong.qIndex + 1} in this set.\n\nAdd it as a new question anyway?`)) return;
             addSingleAiAsNewQuestion(index, improvedJson);
             const overlay = document.getElementById('ai-compare-overlay');
             if (overlay) overlay.remove();
@@ -57285,9 +57285,9 @@ RULES:
         async function qfpScoreAllUnscored() {
             if (_qfpBulkRunning) return;
             const targets = _qfpFeedbacks.filter(f => qfpNormalizeTopic(f.comment).length > 0 && typeof f.aiFeedbackScore !== 'number');
-            if (!targets.length) { if (typeof showToast === 'function') showToast('ไม่มี feedback ที่ยังไม่ตรวจ'); return; }
+            if (!targets.length) { if (typeof showToast === 'function') showToast('No unreviewed feedback'); return; }
             const model = document.getElementById('ai-model-selector') ? document.getElementById('ai-model-selector').value : 'the selected model';
-            if (!confirm(`ตรวจ feedback ที่ยังไม่ตรวจ ${targets.length} รายการด้วย AI?\nโมเดล: ${model}\n\nระบบจะตรวจทีละรายการ — อย่าปิดหน้าต่างจนกว่าจะเสร็จ`)) return;
+            if (!confirm(`Review ${targets.length} unreviewed feedback item(s) with AI?\nModel: ${model}\n\nThey are processed one at a time — do not close this window until it finishes.`)) return;
 
             _qfpBulkRunning = true;
             const btn = document.getElementById('qfp-bulk-score-btn');
@@ -57305,7 +57305,7 @@ RULES:
             if (btn) { btn.disabled = false; btn.style.cursor = 'pointer'; btn.style.opacity = '1'; btn.innerHTML = oldHtml; }
 
             const ok = targets.length - failed;
-            if (typeof showToast === 'function') showToast(`ตรวจเสร็จ ${ok}/${targets.length}${failed ? ` (ล้มเหลว ${failed})` : ''}`);
+            if (typeof showToast === 'function') showToast(`Reviewed ${ok}/${targets.length}${failed ? ` (${failed} failed)` : ''}`);
             // Scores are now in _qfpFeedbacks — refresh the visible cards + rail counts.
             qfpRenderComments();
             qfpRenderFilterRail();
