@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V96.88)</title>
+    <title>Internship Portfolio (V96.89)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -1988,6 +1988,69 @@
                 opacity: 0;
                 transform: translateY(-60px);
             }
+        }
+
+        /* V96.89 (intern port): toast. index.html called showToast() in 31 places
+           but never defined it or shipped the element, so every one was a silent
+           no-op — saving a draft, deleting a draft and unlocking a badge gave the
+           intern no feedback at all. Ported from admin.html verbatim. */
+        #toast {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #333;
+            color: #fff;
+            border-radius: 50px;
+            padding: 12px 25px;
+            position: fixed;
+            /* Above every overlay on this page (highest in use is 99999). */
+            z-index: 200000;
+            left: 50%;
+            bottom: 30px;
+            transform: translateX(-50%);
+            font-size: 14px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            transition: visibility 0s, opacity 0.5s linear;
+            font-weight: 500;
+            /* Persistent toast — flex for the ✕ button, selectable text so error
+               messages can be copied. */
+            display: inline-flex;
+            align-items: center;
+            gap: 14px;
+            max-width: min(90vw, 560px);
+            text-align: left;
+            user-select: text;
+            -webkit-user-select: text;
+        }
+
+        /* No fadeout — the toast stays until ✕ is clicked. */
+        #toast.show {
+            visibility: visible;
+            animation: toast-fadein 0.5s;
+        }
+
+        .toast-close {
+            flex: 0 0 auto;
+            width: 22px;
+            height: 22px;
+            padding: 0;
+            border: none;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.18);
+            color: #fff;
+            font-size: 13px;
+            line-height: 1;
+            cursor: pointer;
+            /* Button-trap: the global button{width:100%;min-height:48px} rule.
+               The explicit width:22px above already wins on specificity, but
+               min-height is not otherwise set here, so it needs the override. */
+            min-height: 0;
+        }
+
+        .toast-close:hover { background: rgba(255, 255, 255, 0.35); }
+
+        @keyframes toast-fadein {
+            from { bottom: 0; opacity: 0; }
+            to { bottom: 30px; opacity: 1; }
         }
     </style>
 </head>
@@ -5774,6 +5837,32 @@
 
     <script>
         const USER_LIFF_ID = "2008959998-yjcNpaGt"; // ✅ Updated ID
+
+        // Ported from admin.html. This page had 31 `typeof showToast === 'function'`
+        // call sites and no definition, so all of them silently did nothing.
+        // Declared here (classic script, top level) so every caller below sees it
+        // by bare identifier, and window.showToast exists for the guards.
+        function showToast(m) {
+            const x = document.getElementById("toast");
+            if (!x) return;
+            x.innerHTML = "";
+            const msg = document.createElement("span");
+            msg.className = "toast-msg";
+            msg.textContent = m;
+            const close = document.createElement("button");
+            close.type = "button";
+            close.className = "toast-close";
+            close.textContent = "✕";
+            close.setAttribute("aria-label", "Close");
+            // classList, not className: assigning className would wipe the
+            // lang-no-toggle shield on #toast, and it would do so BEFORE the
+            // MutationObserver reached the just-appended message (observer
+            // callbacks are microtasks), so Thai toasts would render blank.
+            close.onclick = () => { x.classList.remove("show"); };
+            x.appendChild(msg);
+            x.appendChild(close);
+            x.classList.add("show");
+        }
 
         // Markdown renderer for Quiz content (Phase 3, V94.04)
         // Returns sanitized HTML; safe for innerHTML / template literal interpolation.
@@ -21144,6 +21233,12 @@ async function archiveDoneCard(cardId) {
             window.addEventListener('focus', checkForUpdate);
         })();
     </script>
+
+    <!-- lang-no-toggle: showToast injects its message at runtime, so without the
+         shield lang-toggle.js wraps any Thai in <span class="lang-th"> and the
+         EN-default body hides it, leaving an empty pill with only the ✕.
+         Same reason admin.html shields its toast (V96.89). -->
+    <div id="toast" class="lang-no-toggle"></div>
 </body>
 
 </html>
