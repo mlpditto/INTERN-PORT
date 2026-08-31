@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V96.87)</title>
+    <title>Internship Portfolio (V96.88)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5729,6 +5729,26 @@
             firebase.initializeApp(firebaseConfig);
         }
         const db = firebase.firestore();
+
+        // V96.88: local Firestore emulator, opt-in and double-gated. Requires BOTH a
+        // loopback host AND ?emulator=1, so it cannot fire on GitHub Pages however the
+        // page is reached. Lets a change to the write paths be exercised end to end
+        // without putting test rows in the real collections — start it with
+        // `firebase emulators:start --only firestore,auth` (needs Java; JDK 21 is fine).
+        (function () {
+            try {
+                const local = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
+                const asked = new URLSearchParams(location.search).get('emulator') === '1';
+                if (!local || !asked) return;
+                db.useEmulator('127.0.0.1', 8085);   // 8080 is commonly taken (Apache/XAMPP)
+                if (firebase.auth) firebase.auth().useEmulator('http://127.0.0.1:9099', { disableWarnings: true });
+                window._usingEmulator = true;
+                console.warn('%c⚠ Firestore + Auth EMULATOR — nothing here touches production data',
+                    'background:#b45309;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700');
+            } catch (e) {
+                console.error('[emulator] could not attach:', e);
+            }
+        })();
         // V94.96 hotfix: Drug Codex intern code (V94.91 Phase 4 + V94.93 Phase 6) was
         // written referencing `window.db` (6 sites in dcLoadCodex / dcLoadMyDrafts /
         // dcDiscussionWire / dcSubmitComment / dcDeleteComment). Classic-script `const`
