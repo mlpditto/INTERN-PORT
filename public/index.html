@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V96.84)</title>
+    <title>Internship Portfolio (V96.85)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -16495,9 +16495,16 @@
         }
 
         // V94.31: Has user submitted Daily Reflection today (Bangkok)?
+        // V96.85: writing anything counts as the day's writing. A Learning Note now
+        // satisfies the daily entry just as a Daily Reflection does, so this reads the
+        // combined cache (_combinedLogCache normalises LP `createdAt` to `timestamp`).
+        // collectActivityDates() has counted notes since V95.88 — this check was the
+        // last date-based one still looking at reflective logs alone.
         function hasSubmittedDRToday() {
             const today = getBangkokDateStr(new Date());
-            const cache = window.myReflectiveLogsCache || [];
+            const cache = (typeof _combinedLogCache === 'function')
+                ? _combinedLogCache()
+                : (window.myReflectiveLogsCache || []);
             return cache.some(log => {
                 if (!log.timestamp) return false;
                 const ts = log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp);
@@ -17073,6 +17080,15 @@
                 if (!authUser) throw new Error('Missing Firebase auth. Please refresh and try again.');
                 window._fbAuthUser = authUser;
 
+                // V96.85: a Learning Note now earns the same +0.1 the Daily Reflection
+                // does — once a day, and only when nothing has been written yet. Computed
+                // here, before ANY write: myLpEntriesCache is filled by an onSnapshot
+                // listener, so reading it after the learning_path_entries add would be a
+                // race with the note seeing itself. The admin bonus still lands on top;
+                // this is the daily point, not a grade. It also makes deleteLearningNote's
+                // revert comment true — it has always claimed a +0.1 at submit time.
+                const earnsDailyPoint = !(typeof hasSubmittedDRToday === 'function' && hasSubmittedDRToday());
+
                 const noteTags = [...(window._lpNoteTags || [])];
                 const finalTitle = title || (content.split('\n')[0].slice(0, 80)) || 'Untitled Note';
 
@@ -17081,7 +17097,7 @@
                     _lpBuildEntry(finalTitle, content, noteTags)
                 );
 
-                // 2. Dual-write to unified submissions for admin review (V94.31: score=0, pointsAmount=0 — admin grades later)
+                // 2. Dual-write to unified submissions for admin review.
                 try {
                     await db.collection('submissions').add({
                         submissionType: 'learning_note',
@@ -17092,18 +17108,19 @@
                         title: finalTitle,
                         description: content,
                         status: 'pending',
-                        score: 0,
+                        score: earnsDailyPoint ? 0.1 : 0,
                         metadata: { tags: noteTags, sourceType: 'learning_path_entries', sourceId: lpRef.id },
                         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                         updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                         pointsAwarded: false,
-                        pointsAmount: 0
+                        pointsAmount: earnsDailyPoint ? 0.1 : 0
                     });
                 } catch (unifiedErr) {
                     console.warn('[Unified] Learning Note submissions write failed (non-critical):', unifiedErr);
                 }
 
-                // V94.31: NO immediate score, NO checkin_log — admin will set adminBonus on entry to award pts
+                // V96.85: the daily +0.1 is set above when this is the day's first entry.
+                // No checkin_log either way — admin still sets adminBonus to award more.
                 // V95.88: a Learning Note counts toward the unified daily streak — pay the +0.05 if this hits a 7-day multiple
                 // V96.41: and counts as the day's check-in for the daily decay
                 tryDailyCheckin('activity');
