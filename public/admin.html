@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.39</title>
+    <title>Nika V98.40</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -4568,6 +4568,26 @@
         // app ('admin') so its auth/Firestore/Storage persist in a separate slot.
         var adminApp = firebase.initializeApp(firebaseConfig, 'admin');
         var db = adminApp.firestore();
+
+        // V98.40: same double-gated emulator hook index.html got in V96.88 — loopback
+        // host AND ?emulator=1, so it cannot fire on GitHub Pages. Admin needs it too:
+        // half of what is worth testing (approving an attempt, applying the
+        // out-of-hours multiplier, grading a note) only happens on this page.
+        // Attached to the NAMED 'admin' app, matching the db above.
+        (function () {
+            try {
+                const local = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
+                const asked = new URLSearchParams(location.search).get('emulator') === '1';
+                if (!local || !asked) return;
+                db.useEmulator('127.0.0.1', 8085);
+                if (adminApp.auth) adminApp.auth().useEmulator('http://127.0.0.1:9099', { disableWarnings: true });
+                window._usingEmulator = true;
+                console.warn('%c⚠ Firestore + Auth EMULATOR — nothing here touches production data',
+                    'background:#b45309;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700');
+            } catch (e) {
+                console.error('[emulator] could not attach:', e);
+            }
+        })();
 
         // Google Drive Config ([Version: V87.67] Inlined for GitHub Pages)
         window.GDRIVE_CLIENT_ID = '367076866368-folligjcmmnrcu1u2tt3q9cvn9j5n2a6.apps.googleusercontent.com';
