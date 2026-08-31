@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V96.89)</title>
+    <title>Internship Portfolio (V96.90)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -7182,7 +7182,7 @@
                 // against a stale active button or a direct call submitting below the 30-pt gate.
                 const _certDoc = await db.collection("users").doc(userId).get();
                 if (((_certDoc.data() || {}).score || 0) < 30) {
-                    showToast("⚠️ ต้องมีคะแนนถึง 30 ก่อนจึงจะขอใบรับรองได้");
+                    showToast("⚠️ You need 30 points before you can request a certificate · ต้องมีคะแนนถึง 30 ก่อน");
                     checkUser();
                     return;
                 }
@@ -7617,8 +7617,8 @@
         function explCopyLink(linkId) {
             const link = reviewLinksCache.find(l => l.id === linkId);
             if (!link || !link.url) return;
-            const done = () => alert('คัดลอกลิงก์แล้ว · Link copied');
-            const fail = () => alert('คัดลอกไม่สำเร็จ · Copy failed');
+            const done = () => alert('Link copied · คัดลอกลิงก์แล้ว');
+            const fail = () => alert('Copy failed · คัดลอกไม่สำเร็จ');
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(link.url).then(done).catch(() => {
                     explCopyLinkFallback(link.url, done, fail);
@@ -7650,8 +7650,8 @@
         function qzShareLink(quizId) {
             const url = `https://liff.line.me/2008959998-yjcNpaGt?quiz=${encodeURIComponent(quizId)}`;
             if (navigator.share) { navigator.share({ url }).catch(() => {}); return; }
-            const done = () => alert('คัดลอกลิงก์แล้ว · Link copied');
-            const fail = () => alert('คัดลอกไม่สำเร็จ · Copy failed');
+            const done = () => alert('Link copied · คัดลอกลิงก์แล้ว');
+            const fail = () => alert('Copy failed · คัดลอกไม่สำเร็จ');
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(url).then(done).catch(() => explCopyLinkFallback(url, done, fail));
             } else {
@@ -7796,7 +7796,7 @@
         async function submitExploreReview() {
             const linkId = document.getElementById('er-link-id').value;
             const text = document.getElementById('er-text').value.trim();
-            if (!text) { alert('กรุณาเขียนรีวิวก่อนส่ง · Please write a review first'); return; }
+            if (!text) { alert('Please write a review first · กรุณาเขียนรีวิวก่อนส่ง'); return; }
             // Optional, not required — no automatic Beri formula from this. Just
             // extra info for admin; a verified purchase gets bonus Beri separately
             // via the manual adjBeri() tool, not computed here.
@@ -7813,9 +7813,9 @@
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 document.getElementById('exploreReviewModal').style.display = 'none';
-                alert('ส่งรีวิวแล้ว! รอแอดมินตรวจ · Review submitted! Waiting for admin approval.');
+                alert('Review submitted! Waiting for admin approval · ส่งรีวิวแล้ว รอแอดมินตรวจ');
             } catch (e) {
-                alert('ส่งรีวิวไม่สำเร็จ · Submit failed: ' + e.message);
+                alert('Submit failed · ส่งรีวิวไม่สำเร็จ: ' + e.message);
             }
         }
 
@@ -7860,8 +7860,8 @@
             const title = document.getElementById('sl-title').value.trim();
             const url = document.getElementById('sl-url').value.trim();
             const type = document.getElementById('sl-type').value || 'line_man';
-            if (!title) throw new Error('กรุณากรอกชื่อร้าน/ลิงก์ · Title is required');
-            if (!url) throw new Error('กรุณากรอก URL · URL is required');
+            if (!title) throw new Error('Title is required · กรุณากรอกชื่อร้าน/ลิงก์');
+            if (!url) throw new Error('URL is required · กรุณากรอก URL');
             await db.collection('review_link_suggestions').add({
                 title, url, type,
                 userId,
@@ -7959,22 +7959,22 @@
             // unlockScore gate: client-side only, no rules-level enforcement). V98.04:
             // myEverUnlockedBeriShop bypasses this the same way renderBeriShop does.
             if (!myEverUnlockedBeriShop && myBeri <= BERI_SHOP_UNLOCK_THRESHOLD) {
-                alert(`🔒 ร้านนี้ยังล็อกอยู่ ต้องมี Beri เกิน ${BERI_SHOP_UNLOCK_THRESHOLD}\nShop is locked — need more than ${BERI_SHOP_UNLOCK_THRESHOLD} Beri`);
+                alert(`🔒 Shop is locked — you need more than ${BERI_SHOP_UNLOCK_THRESHOLD} Beri\nร้านนี้ยังล็อกอยู่ ต้องมี Beri เกิน ${BERI_SHOP_UNLOCK_THRESHOLD}`);
                 return;
             }
             const reward = beriRewardsCache.find(r => r.id === rewardId);
             if (!reward) return;
-            if (!confirm(`แลก "${reward.name}" ด้วย ${reward.beriCost} Beri?\nRedeem "${reward.name}" for ${reward.beriCost} Beri?`)) return;
+            if (!confirm(`Redeem "${reward.name}" for ${reward.beriCost} Beri?\nแลก "${reward.name}" ด้วย ${reward.beriCost} Beri?`)) return;
             try {
                 const rewardRef = db.collection('beri_rewards').doc(rewardId);
                 const userRef = db.collection('users').doc(userId);
                 const redemptionRef = db.collection('beri_redemptions').doc();
                 await db.runTransaction(async tx => {
                     const rewardSnap = await tx.get(rewardRef);
-                    if (!rewardSnap.exists) throw new Error('ของรางวัลนี้ไม่มีแล้ว · No longer available');
+                    if (!rewardSnap.exists) throw new Error('No longer available · ของรางวัลนี้ไม่มีแล้ว');
                     const rd = rewardSnap.data();
-                    if (rd.isActive === false) throw new Error('ของรางวัลนี้ปิดใช้งานแล้ว · No longer active');
-                    if (rd.stock != null && rd.stock <= 0) throw new Error('ของรางวัลหมดแล้ว · Out of stock');
+                    if (rd.isActive === false) throw new Error('No longer active · ของรางวัลนี้ปิดใช้งานแล้ว');
+                    if (rd.stock != null && rd.stock <= 0) throw new Error('Out of stock · ของรางวัลหมดแล้ว');
                     const userSnap = await tx.get(userRef);
                     const currentBeri = parseInt((userSnap.exists && userSnap.data().beri) || 0, 10);
                     const cost = parseInt(rd.beriCost, 10) || 0;
@@ -7997,9 +7997,9 @@
                         tx.update(rewardRef, { stock: firebase.firestore.FieldValue.increment(-1) });
                     }
                 });
-                alert('แลกสำเร็จ! รอแอดมินมอบของรางวัล · Redeemed! Waiting for admin to fulfill');
+                alert('Redeemed! Waiting for admin to fulfill · แลกสำเร็จ รอแอดมินมอบของรางวัล');
             } catch (e) {
-                alert('แลกไม่สำเร็จ · Redeem failed: ' + e.message);
+                alert('Redeem failed · แลกไม่สำเร็จ: ' + e.message);
             }
         }
 
@@ -8996,7 +8996,7 @@
             {
                 const _lockAttempt = quizAttemptsCache[quizId];
                 if ((currentQuiz.unlockScore || 0) > (myScore || 0) && !_lockAttempt) {
-                    alert(`🔒 ข้อสอบนี้ยังล็อกอยู่\nต้องมีคะแนนสะสม ${currentQuiz.unlockScore} แต้มก่อนจึงจะทำได้\n(ตอนนี้คุณมี ${(myScore || 0).toFixed(2)} แต้ม)`);
+                    alert(`🔒 This quiz is locked\nYou need ${currentQuiz.unlockScore} points to unlock it — you have ${(myScore || 0).toFixed(2)}\nข้อสอบนี้ยังล็อกอยู่ ต้องมีคะแนนสะสมก่อน`);
                     currentQuiz = null;
                     return;
                 }
@@ -9004,7 +9004,7 @@
                 // must also refuse one that has not opened yet.
                 const _startAt = currentQuiz.startTime ? currentQuiz.startTime.toDate() : null;
                 if (_startAt && new Date() < _startAt && !_lockAttempt) {
-                    alert(`⏳ ข้อสอบนี้ยังไม่เปิด\nจะเปิดให้ทำวันที่ ${formatThaiDate(_startAt, { time: true })}`);
+                    alert(`⏳ This quiz has not opened yet\nIt opens on ${formatThaiDate(_startAt, { time: true })}\nข้อสอบนี้ยังไม่เปิด`);
                     currentQuiz = null;
                     return;
                 }
@@ -9484,11 +9484,11 @@
             if (!q) return;
             const existing = quizAttemptsCache[quizId];
             if (existing && existing.status && existing.status !== 'none') {
-                alert('ข้อสอบนี้มีสถานะอยู่แล้ว (' + existing.status + ')');
+                alert('This quiz already has a status (' + existing.status + ') · มีสถานะอยู่แล้ว');
                 qbRenderList();
                 return;
             }
-            if (!confirm('ขอทำข้อสอบ "' + (q.title || '') + '"?\nadmin จะได้รับคำขอและต้องอนุมัติก่อนถึงจะเริ่มทำได้')) return;
+            if (!confirm('Request to take "' + (q.title || '') + '"?\nThe admin receives the request and must approve it before you can start.\nadmin ต้องอนุมัติก่อนจึงจะเริ่มทำได้')) return;
             try {
                 await db.collection("quiz_attempts").doc(`${quizId}_${userId}`).set({
                     quizId: quizId,
@@ -9501,10 +9501,10 @@
                 }, { merge: true });
                 // Optimistic local update so the row flips immediately (onSnapshot reconciles).
                 quizAttemptsCache[quizId] = Object.assign({}, quizAttemptsCache[quizId], { status: 'requesting', quizId: quizId, userId: userId });
-                alert('📨 ส่งคำขอแล้ว · รอ admin อนุมัติ');
+                alert('📨 Request sent · รอ admin อนุมัติ');
                 qbRenderList();
             } catch (e) {
-                alert('ขอไม่สำเร็จ: ' + (e && e.message ? e.message : 'unknown error'));
+                alert('Request failed · ขอไม่สำเร็จ: ' + (e && e.message ? e.message : 'unknown error'));
             }
         }
 
@@ -10379,10 +10379,10 @@
                         if (timeLeftForStep <= 0) {
                             clearInterval(quizTimerInterval);
                             if (isTotalTimeMode) {
-                                alert("🍭 หมดเวลารวมแล้ว! ระบบจะส่งคำตอบให้อัตโนมัติ");
+                                alert("🍭 Total time is up — your answers will be submitted automatically · หมดเวลารวมแล้ว");
                                 submitQuiz();
                             } else {
-                                alert("🍭 หมดเวลาสำหรับข้อนี้!");
+                                alert("🍭 Time is up for this question · หมดเวลาสำหรับข้อนี้");
                                 if (currentStep < currentQuiz.questions.length - 1) {
                                     nextQuizStep();
                                 } else {
@@ -10516,7 +10516,7 @@
                 console.log(`[Quiz] Step ${currentStep + 1}/${totalSteps} rendered OK`);
             } catch (err) {
                 console.error('[Quiz] renderQuizStep Error:', err);
-                alert('เกิดข้อผิดพลาดในการแสดงคำถาม กรุณาปิดแล้วเปิดใหม่\n' + err.message);
+                alert('Could not display the question — close this and open it again · เกิดข้อผิดพลาด กรุณาปิดแล้วเปิดใหม่\n' + err.message);
             }
         }
 
@@ -10916,7 +10916,7 @@
         }
 
         function closeQuiz() {
-            if (confirm("คุณต้องการปิดแบบทดสอบหรือไม่? (ข้อมูลที่ทำไว้จะไม่ถูกบันทึก)")) {
+            if (confirm("Close this quiz? Your answers will NOT be saved.\nปิดแบบทดสอบหรือไม่ ข้อมูลที่ทำไว้จะไม่ถูกบันทึก")) {
                 clearInterval(quizTimerInterval);
                 document.getElementById('quizModal').style.display = 'none';
             }
@@ -10989,7 +10989,7 @@
                 }
             } catch (err) {
                 console.error('[Quiz] nextQuizStep Error:', err);
-                alert('เกิดข้อผิดพลาดในการไปข้อถัดไป\n' + err.message);
+                alert('Could not move to the next question · ไปข้อถัดไปไม่สำเร็จ\n' + err.message);
             }
         }
         // 🔥 V78.1: prevQuizStep also preserves timer in total_time mode
@@ -11048,9 +11048,9 @@
                     if (timeLeftForStep <= 0) {
                         clearInterval(quizTimerInterval);
                         if (currentQuiz.timerMode === 'total_time') {
-                            alert("🍭 หมดเวลารวมแล้ว!"); submitQuiz();
+                            alert("🍭 Total time is up · หมดเวลารวมแล้ว"); submitQuiz();
                         } else {
-                            alert("🍭 หมดเวลาสำหรับข้อนี้!");
+                            alert("🍭 Time is up for this question · หมดเวลาสำหรับข้อนี้");
                             if (currentStep < currentQuiz.questions.length - 1) { nextQuizStep(); } else { submitQuiz(); }
                         }
                     }
@@ -11282,7 +11282,7 @@
                     }, 100);
                 } else {
                     setTimeout(() => {
-                        alert(isPoll ? "ส่งโพลเรียบร้อย!" : `ส่งคำตอบเรียบร้อย!\nคะแนนที่คาดว่าจะได้รับ: ${pointsAwarded.toFixed(3)} แต้ม`);
+                        alert(isPoll ? "Poll submitted · ส่งโพลเรียบร้อย" : `Answers submitted\nExpected score: ${pointsAwarded.toFixed(3)} pts\nส่งคำตอบเรียบร้อย`);
                     }, 100);
                 }
 
@@ -11290,7 +11290,7 @@
                 console.error("Submission Error:", e);
                 clearTimeout(safetyTimeout);
                 isSubmittingQuiz = false;
-                alert("เกิดข้อผิดพลาดในการส่ง: " + e.message);
+                alert("Submit failed · ส่งไม่สำเร็จ: " + e.message);
                 if (btn) {
                     btn.disabled = false;
                     btn.innerText = "คลิกเพื่อลองส่งอีกครั้ง";
@@ -11578,7 +11578,7 @@
                     .limit(1)
                     .get();
                 if (!existing.empty) {
-                    alert("คุณให้ feedback ควิซนี้ไปแล้ว ขอบคุณครับ 🙏\nYou already gave feedback for this quiz.");
+                    alert("You already gave feedback for this quiz — thank you 🙏\nคุณให้ feedback ควิซนี้ไปแล้ว ขอบคุณครับ");
                     return;
                 }
             } catch (e) {
@@ -12305,7 +12305,7 @@
                 document.getElementById('analytics-note-text').value = '';
 
                 // Show success in main UI
-                showToast("📊 คำขอการวิเคราะห์ส่งให้ Admin แล้ว");
+                showToast("📊 Analysis request sent to the admin · ส่งคำขอแล้ว");
 
             } catch (error) {
                 console.error("Error requesting learning analytics:", error);
@@ -13989,7 +13989,7 @@
                     if (!window.db) return;
                     const snap = await db.collection('drug_codex').doc(drugId).get();
                     if (!snap.exists) {
-                        if (typeof showToast === 'function') showToast('ยานี้อาจถูกย้าย/ลบไปแล้ว');
+                        if (typeof showToast === 'function') showToast('This drug may have been moved or deleted · ยานี้อาจถูกย้ายหรือลบไปแล้ว');
                         return;
                     }
                     dcState.codex.push(Object.assign({ _id: snap.id }, snap.data()));
@@ -14350,7 +14350,7 @@
                 const authUser = (typeof ensureFirebaseAuthReady === 'function')
                     ? await ensureFirebaseAuthReady(10000)
                     : (firebase.auth && firebase.auth().currentUser);
-                if (!authUser || !authUser.uid) throw new Error('ยังไม่ได้ sign-in');
+                if (!authUser || !authUser.uid) throw new Error('Not signed in · ยังไม่ได้ sign-in');
 
                 const nowTs = firebase.firestore.FieldValue.serverTimestamp();
 
@@ -14364,7 +14364,7 @@
                     // Preserve targetDiseaseId if it was set (suggest-edit draft).
                     if (dxSubmitState.targetDiseaseId) updateData.targetDiseaseId = dxSubmitState.targetDiseaseId;
                     await db.collection('disease_codex_drafts').doc(dxSubmitState.editingId).update(updateData);
-                    if (typeof showToast === 'function') showToast('💾 บันทึก draft แล้ว');
+                    if (typeof showToast === 'function') showToast('💾 Draft saved · บันทึก draft แล้ว');
                 } else {
                     // CREATE a new draft (new or suggest-edit). Required by rules:
                     // submittedBy, status='pending', diseaseName non-empty.
@@ -14405,14 +14405,14 @@
         async function dxDeleteMyDraft(draftId, btn) {
             const draft = dxMyDraftsState.drafts.find(d => d._id === draftId);
             const name = (draft && draft.diseaseName) || draftId;
-            if (!confirm(`ลบ draft "${name}" หรือไม่? · ลบแล้วเรียกคืนไม่ได้`)) return;
+            if (!confirm(`Delete draft "${name}"? This cannot be undone · ลบแล้วเรียกคืนไม่ได้`)) return;
             if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
             try {
                 await db.collection('disease_codex_drafts').doc(draftId).delete();
-                if (typeof showToast === 'function') showToast(`🗑️ ลบ draft "${name}" แล้ว`);
+                if (typeof showToast === 'function') showToast(`🗑️ Deleted draft "${name}" · ลบแล้ว`);
             } catch (err) {
                 console.error('[disease-codex intern] delete failed:', err);
-                alert('ลบไม่สำเร็จ: ' + (err && err.message ? err.message : 'unknown error'));
+                alert('Delete failed · ลบไม่สำเร็จ: ' + (err && err.message ? err.message : 'unknown error'));
                 if (btn) { btn.disabled = false; btn.textContent = '🗑️ Delete'; }
             }
         }
@@ -14421,16 +14421,16 @@
             if (dxSubmitState.mode !== 'edit-pending' || !dxSubmitState.editingId) return;
             const draft = dxMyDraftsState.drafts.find(d => d._id === dxSubmitState.editingId);
             const name = (draft && draft.diseaseName) || dxSubmitState.editingId;
-            if (!confirm(`ลบ draft "${name}" หรือไม่? · ลบแล้วเรียกคืนไม่ได้`)) return;
+            if (!confirm(`Delete draft "${name}"? This cannot be undone · ลบแล้วเรียกคืนไม่ได้`)) return;
             const delBtn = document.getElementById('dx-submit-delete-btn');
             if (delBtn) { delBtn.disabled = true; delBtn.textContent = '⏳'; }
             try {
                 await db.collection('disease_codex_drafts').doc(dxSubmitState.editingId).delete();
-                if (typeof showToast === 'function') showToast(`🗑️ ลบ draft "${name}" แล้ว`);
+                if (typeof showToast === 'function') showToast(`🗑️ Deleted draft "${name}" · ลบแล้ว`);
                 dxCloseSubmit();
             } catch (err) {
                 console.error('[disease-codex intern] delete (from form) failed:', err);
-                alert('ลบไม่สำเร็จ: ' + (err && err.message ? err.message : 'unknown error'));
+                alert('Delete failed · ลบไม่สำเร็จ: ' + (err && err.message ? err.message : 'unknown error'));
                 if (delBtn) { delBtn.disabled = false; delBtn.textContent = '🗑️ Delete'; }
             }
         }
@@ -15277,7 +15277,7 @@
                 const authUser = (typeof ensureFirebaseAuthReady === 'function')
                     ? await ensureFirebaseAuthReady(10000)
                     : (firebase.auth && firebase.auth().currentUser);
-                if (!authUser || !authUser.uid) throw new Error('ยังไม่ได้ sign-in');
+                if (!authUser || !authUser.uid) throw new Error('Not signed in · ยังไม่ได้ sign-in');
 
                 const nowTs = firebase.firestore.FieldValue.serverTimestamp();
 
@@ -15291,7 +15291,7 @@
                     // Preserve targetDrugId if it was set (suggest-edit draft).
                     if (dcSubmitState.targetDrugId) updateData.targetDrugId = dcSubmitState.targetDrugId;
                     await db.collection('drug_codex_drafts').doc(dcSubmitState.editingId).update(updateData);
-                    if (typeof showToast === 'function') showToast('💾 บันทึก draft แล้ว');
+                    if (typeof showToast === 'function') showToast('💾 Draft saved · บันทึก draft แล้ว');
                 } else {
                     // CREATE a new draft (new or suggest-edit). Required by rules:
                     // submittedBy, status='pending', genericName non-empty.
@@ -15332,14 +15332,14 @@
         async function dcDeleteMyDraft(draftId, btn) {
             const draft = dcMyDraftsState.drafts.find(d => d._id === draftId);
             const name = (draft && draft.genericName) || draftId;
-            if (!confirm(`ลบ draft "${name}" หรือไม่? · ลบแล้วเรียกคืนไม่ได้`)) return;
+            if (!confirm(`Delete draft "${name}"? This cannot be undone · ลบแล้วเรียกคืนไม่ได้`)) return;
             if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
             try {
                 await db.collection('drug_codex_drafts').doc(draftId).delete();
-                if (typeof showToast === 'function') showToast(`🗑️ ลบ draft "${name}" แล้ว`);
+                if (typeof showToast === 'function') showToast(`🗑️ Deleted draft "${name}" · ลบแล้ว`);
             } catch (err) {
                 console.error('[drug-codex intern] delete failed:', err);
-                alert('ลบไม่สำเร็จ: ' + (err && err.message ? err.message : 'unknown error'));
+                alert('Delete failed · ลบไม่สำเร็จ: ' + (err && err.message ? err.message : 'unknown error'));
                 if (btn) { btn.disabled = false; btn.textContent = '🗑️ Delete'; }
             }
         }
@@ -15348,16 +15348,16 @@
             if (dcSubmitState.mode !== 'edit-pending' || !dcSubmitState.editingId) return;
             const draft = dcMyDraftsState.drafts.find(d => d._id === dcSubmitState.editingId);
             const name = (draft && draft.genericName) || dcSubmitState.editingId;
-            if (!confirm(`ลบ draft "${name}" หรือไม่? · ลบแล้วเรียกคืนไม่ได้`)) return;
+            if (!confirm(`Delete draft "${name}"? This cannot be undone · ลบแล้วเรียกคืนไม่ได้`)) return;
             const delBtn = document.getElementById('dc-submit-delete-btn');
             if (delBtn) { delBtn.disabled = true; delBtn.textContent = '⏳'; }
             try {
                 await db.collection('drug_codex_drafts').doc(dcSubmitState.editingId).delete();
-                if (typeof showToast === 'function') showToast(`🗑️ ลบ draft "${name}" แล้ว`);
+                if (typeof showToast === 'function') showToast(`🗑️ Deleted draft "${name}" · ลบแล้ว`);
                 dcCloseSubmit();
             } catch (err) {
                 console.error('[drug-codex intern] delete (from form) failed:', err);
-                alert('ลบไม่สำเร็จ: ' + (err && err.message ? err.message : 'unknown error'));
+                alert('Delete failed · ลบไม่สำเร็จ: ' + (err && err.message ? err.message : 'unknown error'));
                 if (delBtn) { delBtn.disabled = false; delBtn.textContent = '🗑️ Delete'; }
             }
         }
@@ -15517,7 +15517,7 @@
                 console.error('[drug-codex discussion] send failed:', err);
                 // Restore the unsent text so the user doesn't lose what they typed.
                 input.value = originalText;
-                alert('ส่ง comment ไม่สำเร็จ: ' + (err && err.message ? err.message : 'unknown error'));
+                alert('Could not post the comment · ส่ง comment ไม่สำเร็จ: ' + (err && err.message ? err.message : 'unknown error'));
             } finally {
                 if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'ส่ง'; }
             }
@@ -15527,7 +15527,7 @@
             const drugId = dcDiscussionState.drugId;
             if (!drugId || !commentId) return;
             if (!isAdmin) return; // UI guard; rules enforce server-side too.
-            if (!confirm('ลบ comment นี้? (admin moderation — ลบแล้วเรียกคืนไม่ได้)')) return;
+            if (!confirm('Delete this comment? (admin moderation — cannot be undone)\nลบแล้วเรียกคืนไม่ได้')) return;
             if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
             try {
                 await window.db.collection('drug_codex').doc(drugId)
@@ -15535,7 +15535,7 @@
                 // onSnapshot will refresh the list. No manual remove needed.
             } catch (err) {
                 console.error('[drug-codex discussion] delete failed:', err);
-                alert('ลบไม่สำเร็จ: ' + (err && err.message ? err.message : 'unknown error'));
+                alert('Delete failed · ลบไม่สำเร็จ: ' + (err && err.message ? err.message : 'unknown error'));
                 if (btn) { btn.disabled = false; btn.textContent = '🗑️'; }
             }
         }
@@ -16126,8 +16126,8 @@
                     return f ? `${f.icon} ${f.title}` : id;
                 }).join(', ');
 
-                if (typeof showToast === 'function') showToast(`🏅 ปลดล็อก Badge ใหม่: ${names}`);
-                else alert(`🏅 ปลดล็อก Badge ใหม่: ${names}`);
+                if (typeof showToast === 'function') showToast(`🏅 New badge unlocked: ${names} · ปลดล็อก Badge ใหม่`);
+                else alert(`🏅 New badge unlocked: ${names} · ปลดล็อก Badge ใหม่`);
 
                 unseen.forEach(id => localStorage.setItem(keyPrefix + id, '1'));
             } catch (e) {
@@ -17506,8 +17506,8 @@
 
         async function claimReflectivePoints(logId) {
             const log = (window.myReflectiveLogsCache || []).find(l => l.id === logId);
-            if (!log) return alert("ไม่พบข้อมูล กรุณารีเฟรชหน้าแล้วลองใหม่ครับ");
-            if (log.pointsClaimed) return alert("รับ Points ไปแล้วครับ");
+            if (!log) return alert("Data not found — please refresh the page and try again · ไม่พบข้อมูล กรุณารีเฟรชแล้วลองใหม่");
+            if (log.pointsClaimed) return alert("Points already claimed · รับ Points ไปแล้ว");
             if (!log.adminBonus || log.adminBonus <= 0) return;
 
             const bonus = log.adminBonus;
@@ -17541,7 +17541,7 @@
 
                 await b.commit();
                 document.getElementById('reflectiveFeedbackModal').style.display = 'none';
-                alert(`✨ รับ +${bonus} คะแนนเรียบร้อยครับ!`);
+                alert(`✨ +${bonus} points claimed · รับคะแนนเรียบร้อย`);
             } catch (e) {
                 console.error(e);
                 alert("Error: " + e.message);
@@ -17703,7 +17703,7 @@
         async function subQ(qId, baseScore) {
             const ans = document.getElementById(`ans-${qId}`);
             const text = ans ? ans.value.trim() : "";
-            if (!text) { alert("กรุณาพิมพ์คำตอบก่อนส่งครับ"); return; }
+            if (!text) { alert("Please type an answer before submitting · กรุณาพิมพ์คำตอบก่อนส่ง"); return; }
 
             const btn = document.getElementById(`btn-sub-${qId}`);
             if (btn) { btn.disabled = true; btn.innerText = '🔄 กำลังส่ง...'; }
@@ -17715,7 +17715,7 @@
                     baseScore: baseScore || 0,
                     submittedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                alert("✅ ส่งคำตอบเรียบร้อย!");
+                alert("✅ Answer submitted · ส่งคำตอบเรียบร้อย");
             } catch (e) {
                 alert("Error: " + e.message);
                 if (btn) { btn.disabled = false; btn.innerText = 'ส่งคำตอบ (Submit)'; }
@@ -18228,7 +18228,7 @@ async function archiveDoneCard(cardId) {
                 event.preventDefault();
                 event.stopPropagation();
             }
-            if (!confirm(`ยืนยันลบประวัติ ${type} นี้?`)) return;
+            if (!confirm(`Delete this ${type} history entry? · ยืนยันลบประวัตินี้`)) return;
             try {
                 let col = "";
                 if (type === 'Quest') col = "quest_submissions";
@@ -18243,8 +18243,8 @@ async function archiveDoneCard(cardId) {
                         if (workContent) workContent.style.display = 'block';
                         if (workIcon) workIcon.style.transform = 'rotate(180deg)';
                     }
-                    if (typeof showToast === 'function') showToast("ลบสำเร็จ (Deleted successfully)");
-                    else alert("ลบสำเร็จ (Deleted successfully)");
+                    if (typeof showToast === 'function') showToast("Deleted successfully · ลบสำเร็จ");
+                    else alert("Deleted successfully · ลบสำเร็จ");
                 }
             } catch (e) {
                 alert("Delete Error: " + e.message);
@@ -19575,8 +19575,8 @@ async function archiveDoneCard(cardId) {
             const customer = document.getElementById('u-case-customer').value.trim();
             const systemKey = document.getElementById('u-case-system').value;
             const note = document.getElementById('u-case-note').value.trim();
-            if (!caseId) throw new Error('กรุณากรอก Case No.');
-            if (!systemKey) throw new Error('กรุณาเลือกระบบโรค');
+            if (!caseId) throw new Error('Case No. is required · กรุณากรอก Case No.');
+            if (!systemKey) throw new Error('Please pick a disease system · กรุณาเลือกระบบโรค');
             const systemLabels = {
                 respiratory: 'Respiratory / ระบบทางเดินหายใจ',
                 cardio: 'Cardiovascular / ระบบหัวใจ',
@@ -19607,8 +19607,8 @@ async function archiveDoneCard(cardId) {
         async function submitUnifiedWork() {
             const title = document.getElementById('u-work-title').value.trim();
             const link = document.getElementById('u-work-link').value.trim();
-            if (!title) throw new Error('กรุณากรอกหัวข้องาน');
-            if (!link) throw new Error('กรุณากรอกลิงก์');
+            if (!title) throw new Error('A title is required · กรุณากรอกหัวข้องาน');
+            if (!link) throw new Error('A link is required · กรุณากรอกลิงก์');
             document.getElementById('w-title').value = title;
             document.getElementById('w-link').value = link;
             await submitWork();
