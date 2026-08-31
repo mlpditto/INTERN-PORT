@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V96.86)</title>
+    <title>Internship Portfolio (V96.87)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -16380,7 +16380,7 @@
                 alert("Error: " + e.message);
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit';
+                updateJournalSubmitLabel(); // V96.87: keep the spans the label logic needs
             }
         }
 
@@ -16635,10 +16635,26 @@
                 btn.disabled = count >= LN_LIFETIME_CAP;
                 btn.style.opacity = count >= LN_LIFETIME_CAP ? '0.55' : '1';
                 btn.style.cursor = count >= LN_LIFETIME_CAP ? 'not-allowed' : 'pointer';
-                if (count >= LN_LIFETIME_CAP) {
-                    btn.innerHTML = '<i class="fa-solid fa-ban"></i> Reached 90-note limit';
-                } else {
-                    btn.innerHTML = '<i class="fa-solid fa-graduation-cap"></i> Save Note <span style="opacity:0.85; font-weight:500;">(awarded after review)</span>';
+                // V96.87: this targets the note FOLD now, not a standalone Save button.
+                // Writing the old button's markup here destroyed the fold's own label and
+                // chevron, so the toggle stopped being able to update itself.
+                // Close FIRST: toggleJournalNoteFields rewrites this label itself, so
+                // setting the cap text before closing would immediately be overwritten.
+                if (count >= LN_LIFETIME_CAP) toggleJournalNoteFields(false);
+                const foldLabel = document.getElementById('rl-note-fold-label');
+                if (foldLabel) {
+                    if (count >= LN_LIFETIME_CAP) {
+                        foldLabel.innerHTML = '<i class="fa-solid fa-ban"></i> Note limit reached '
+                            + '<span style="font-weight:500; color:#a78bfa;">— you can still write today’s reflection</span>';
+                    } else {
+                        // Back under the cap (an admin deleted a note) — restore the label
+                        // that matches the fold's CURRENT state, not a fixed string.
+                        const open = (document.getElementById('rl-note-fields') || {}).style
+                            && document.getElementById('rl-note-fields').style.display !== 'none';
+                        foldLabel.innerHTML = open
+                            ? 'Title and tags <span style="font-weight:500; color:#a78bfa;">— this saves as a Learning Note</span>'
+                            : '+ Add a title and tags <span style="font-weight:500; color:#a78bfa;">— makes it a Learning Note</span>';
+                    }
                 }
             }
         };
@@ -17086,7 +17102,11 @@
             const body = document.getElementById('rl-note-fields');
             const btn = document.getElementById('rl-note-fold-btn');
             if (!body) return;
-            const open = (forceOpen === true) ? true : body.style.display === 'none';
+            // V96.87: accept an explicit false as force-CLOSE. It used to fall through
+            // to the toggle branch, so the note cap closing the fold would have opened it.
+            const open = (forceOpen === true) ? true
+                       : (forceOpen === false) ? false
+                       : body.style.display === 'none';
             body.style.display = open ? 'block' : 'none';
             if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
             const chev = document.getElementById('rl-note-fold-chevron');
@@ -17099,16 +17119,21 @@
         }
         window.toggleJournalNoteFields = toggleJournalNoteFields;
 
-        // The button says what pressing it will actually do.
+        // The button says what pressing it will actually do. V96.87: REBUILDS the
+        // markup rather than patching the two spans, because every submit path wipes
+        // the button's innerHTML while it works ("Submitting…") — after that there are
+        // no spans left to patch, and the label would stay frozen on the busy text.
         function updateJournalSubmitLabel() {
             const btn = document.getElementById('rl-submit-btn');
             if (!btn) return;
             const title = (document.getElementById('lp-note-title')?.value || '').trim();
             const asNote = !!title || ((window._lpNoteTags || []).length > 0);
-            const lab = btn.querySelector('[data-reflect-i18n="drSubmitLabel"]');
-            const meta = btn.querySelector('[data-reflect-i18n="drSubmitMeta"]');
-            if (lab) lab.textContent = asNote ? 'Save note' : 'Submit';
-            if (meta) meta.textContent = asNote ? '(+0.1 pts · admin grades on top)' : '(+0.1 pts · once a day)';
+            btn.innerHTML =
+                '<i class="fa-solid fa-' + (asNote ? 'graduation-cap' : 'paper-plane') + '"></i> ' +
+                '<span data-reflect-i18n="drSubmitLabel">' + (asNote ? 'Save note' : 'Submit') + '</span> ' +
+                '<span data-reflect-i18n="drSubmitMeta" style="opacity:0.85; font-weight:500;">' +
+                (asNote ? '(+0.1 pts · admin grades on top)' : '(+0.1 pts · once a day)') +
+                '</span>';
         }
         window.updateJournalSubmitLabel = updateJournalSubmitLabel;
 
@@ -17195,7 +17220,9 @@
                 console.error(e);
                 alert('Error: ' + e.message);
             } finally {
-                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-graduation-cap"></i> Save Note <span style="opacity:0.85; font-weight:500;">(awarded after review)</span>'; }
+                // V96.87: the shared Submit button — rebuild it, do not paste the old
+                // standalone note-button markup over it.
+                if (btn) { btn.disabled = false; updateJournalSubmitLabel(); }
             }
         }
 
