@@ -2011,19 +2011,46 @@ exports.notifyPurgeDigest = onSchedule({
 // ============================================================
 const QUIZ_SUBMITTED_STATUSES = ['pending', 'completed', 'graded', 'approved'];
 
+// Why a target was rejected, in a form that never prints the id itself. A LINE
+// id that fails its prefix test is nearly always a copy-paste artefact — a
+// leading space or newline, or a value pasted into the wrong secret — so the
+// shape alone (length, first character, stray whitespace) separates those
+// cases. The value must stay out of Cloud Logging: see memory
+// feedback_firebase_secrets_access.
+// Note this only sees ids that fail the PREFIX test. A trailing newline still
+// starts with 'U'/'C', so it passes here and instead surfaces at push time as
+// PUSH_FAILED code=invalid status=400 — already loud, so it is left alone.
+function describeRejectedLineTarget(envName, raw, expected) {
+    if (raw === undefined || raw === null || raw === '') return `${envName} is not set`;
+    if (typeof raw !== 'string') return `${envName} is a ${typeof raw}, expected a string`;
+    const stray = raw.trim().length !== raw.length ? ', has surrounding whitespace' : '';
+    return `${envName} does not start with ${expected} (len=${raw.length}, first=${JSON.stringify(raw.charAt(0))}${stray})`;
+}
+
 // Push targets shared by both functions. Empty = nothing configured,
 // caller no-ops (so the deploy is safe before the group secret exists).
 function resolveLineTargets(tag) {
     const adminLineId = process.env.ADMIN_LINE_USER_ID;
     const adminGroupId = process.env.ADMIN_LINE_GROUP_ID;
     const targets = [];
+    // One warn per REJECTED target. This used to warn only when every target was
+    // rejected, so losing one of the two logged nothing at all — pushLineFlex
+    // only ever logs the targets it is handed, and a target dropped here never
+    // reaches it. That blind spot got worse when V98.09 made the digest
+    // group-only (see the .filter in runQuizDigest): ADMIN_LINE_GROUP_ID alone
+    // going bad now takes the entire digest down, and nothing else in the
+    // pipeline would say so.
     if (adminLineId && typeof adminLineId === 'string' && adminLineId.startsWith('U')) {
         targets.push({ to: adminLineId, label: 'admin-1on1', withScores: true });
+    } else {
+        console.warn(`[${tag}] admin-1on1 target unavailable — ${describeRejectedLineTarget('ADMIN_LINE_USER_ID', adminLineId, "'U'")}`);
     }
     if (adminGroupId && typeof adminGroupId === 'string' && /^[CR]/.test(adminGroupId)) {
         targets.push({ to: adminGroupId, label: 'group', withScores: false });
+    } else {
+        console.warn(`[${tag}] group target unavailable — ${describeRejectedLineTarget('ADMIN_LINE_GROUP_ID', adminGroupId, "'C' or 'R'")}`);
     }
-    if (!targets.length) console.warn(`[${tag}] no valid push target (ADMIN_LINE_USER_ID / ADMIN_LINE_GROUP_ID) — skipping`);
+    if (!targets.length) console.warn(`[${tag}] no valid push target — skipping`);
     return targets;
 }
 
@@ -2630,7 +2657,13 @@ async function runQuizDigest(kind, options) {
     // dashboard (Preview digest, kanban, review sections) and the 16:00 LINE
     // copy was ~30 pushes/month of the shared quota. The group copy stays.
     const targets = resolveLineTargets('notifyQuizDigest').filter(t => !t.withScores);
-    if (!targets.length) return { sent: false, reason: 'no-targets' };
+    if (!targets.length) {
+        // The digest's only remaining target is the group, so this return is the
+        // whole feature going dark. It used to be silent; the reason is in the
+        // resolveLineTargets warn immediately above this line.
+        console.warn('[notifyQuizDigest] no group target — digest not sent');
+        return { sent: false, reason: 'no-targets' };
+    }
 
     const db = admin.firestore();
     const now = admin.firestore.Timestamp.now();
