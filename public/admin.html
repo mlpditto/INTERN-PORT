@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.43</title>
+    <title>Nika V98.45</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -31583,6 +31583,7 @@ RULES:
 
             db.collection("users").orderBy("score", "desc").onSnapshot(s => {
                 usersData = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                if (typeof refreshHubHeaderIfOpen === 'function') refreshHubHeaderIfOpen(); // V98.45
                 renderUserGroupTabs();
                 renderBoardGroupTabs();
                 renderTable('users');
@@ -46090,6 +46091,18 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return '';
         }
 
+        // V98.44 — "Profile" action in the User Hub popup header. Opens the same
+        // User Hub modal (setUserGroup) the Users table row opens, so LINE ID /
+        // enrollment CODE / the profile form / the group rail are reachable from
+        // the drill-down popup too. groupSelectModal gets .force-show (z-index
+        // 99999) so it stacks above this popup (z-index 9998); closing it leaves
+        // the popup open underneath.
+        window.openHubProfile = function(uid) {
+            if (typeof setUserGroup !== 'function') return;
+            const u = (usersData || []).find(x => x.id === uid);
+            setUserGroup(uid, (u && u.group) || 'Public');
+        };
+
         // Training day indicator (V91.104) — computes Day X/Y · N days left from start/end dates
         window._hubTrainingDays = function(startStr, endStr) {
             if (!startStr || !endStr) return null;
@@ -46118,7 +46131,29 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return { label: `📍 D ${dayNum}/${totalDays} · ${daysLeft} d left`, color: '#475569' };
         };
 
+        // V98.45 — the header renders once at open time, so a Save in the profile
+        // modal (or a Score/Beri adjust, or a cert request) left it showing the
+        // values from when the popup opened. The users onSnapshot calls
+        // refreshHubHeaderIfOpen() after rebuilding usersData; this signature keeps
+        // it to a real change, so an unrelated user's write can't churn the DOM or
+        // close the open score-breakdown popover.
+        function hubHeaderSig(u) {
+            return [u.pictureUrl, u.displayName, u.score, u.beri, u.group,
+                    u.startDate, u.endDate, !!u.certRequested, !!u.certApproved].join('|');
+        }
+        window.refreshHubHeaderIfOpen = function() {
+            const modal = document.getElementById('lbChartModal');
+            const uid = window._currentPopupUser;
+            if (!uid || !modal || getComputedStyle(modal).display === 'none') return;
+            const u = (usersData || []).find(x => x.id === uid);
+            if (!u) return;
+            if (hubHeaderSig(u) === window._hubHeaderSig) return;
+            renderHubHeader(u);
+        };
+
         function renderHubHeader(u) {
+            window._hubHeaderSig = hubHeaderSig(u);
+            const hubGroup = u.group || 'Public';
             const crewRank = getCrewRankByScore(u.score || 0);
             const td = window._hubTrainingDays(u.startDate, u.endDate);
             // V92.18: dedupe — show training day indicator inline; date range moves to tooltip on the calendar icon
@@ -46133,6 +46168,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     <div style="font-size:1.4em; font-weight:900; color:#1e293b; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                         ${u.displayName}
                         <span style="font-size:11px; background:linear-gradient(135deg, #4361ee, #7209b7); color:white; padding:4px 12px; border-radius:30px; letter-spacing:1px; font-weight:900;">${crewRank}</span>
+                        <span title="Group" style="display:inline-flex; align-items:center; gap:5px; font-size:11px; background:${getGroupColor(hubGroup)}; color:white; padding:4px 12px; border-radius:30px; font-weight:800;"><i class="fa-solid ${getGroupIcon(hubGroup)}"></i>${escapeHtml(hubGroup)}</span>
                     </div>
                     <div style="font-size:0.85em; color:#64748b; margin-top:4px;">
                         ${trainingHtml}
@@ -46141,7 +46177,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             <i class="fa-solid fa-star" style="color:#f59e0b; margin-right:4px;"></i> Now: <b style="color:#4361ee; font-size:1.1em;">${(u.score || 0).toFixed(2)}</b>
                         </span>
                         <span style="margin:0 10px; color:#cbd5e1;">|</span>
-                        <span title="Beri balance" style="color:#c2410c; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:2px 8px; white-space:nowrap; font-weight:700;"><i class="fa-solid fa-coins" style="margin-right:4px; font-size:0.9em;"></i>${Math.round(u.beri || 0)}</span>${buildHubCertificateAction(u)}
+                        <span title="Beri balance" style="color:#c2410c; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:2px 8px; white-space:nowrap; font-weight:700;"><i class="fa-solid fa-coins" style="margin-right:4px; font-size:0.9em;"></i>${Math.round(u.beri || 0)}</span><button onclick="event.stopPropagation(); openHubProfile('${u.id}')" title="Open this user's profile / group settings" style="display:inline-flex; align-items:center; gap:6px; margin-left:10px; padding:5px 12px; border-radius:999px; font-size:0.78em; font-weight:900; white-space:nowrap; background:#eef2ff; color:#4361ee; border:1px solid #c7d2fe; cursor:pointer;"><i class="fa-solid fa-id-card"></i> Profile</button>${buildHubCertificateAction(u)}
                     </div>
                 </div>
                 <div id="hub-score-popover" style="display:none; position:absolute; z-index:100; top:90px; left:90px;"></div>
