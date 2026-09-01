@@ -265,7 +265,24 @@ service cloud.firestore {
     // refactor (out of scope for this hotfix).
     match /submissions/{docId} {
       allow read, create: if isSignedIn();
-      allow update, delete: if isAdmin();
+      allow update: if isAdmin();
+      // V96.93: an intern may withdraw their OWN Learning Note, but only while it
+      // is still untouched by review. Every clause matters:
+      //   - submissionType pins this to Learning Notes; Quest/Work/Case mirrors
+      //     stay admin-only.
+      //   - status 'pending' + pointsAwarded false means no score has reached
+      //     users.score yet, so there is nothing to revert. Once an admin reviews
+      //     it, only deleteLearningNote (which reverts points) may remove it.
+      //   - ownership is read off the STORED doc, not the request, so this cannot
+      //     be used to delete someone else's note.
+      allow delete: if isAdmin()
+        || (isSignedIn()
+            && resource.data.submissionType == 'learning_note'
+            && resource.data.status == 'pending'
+            && resource.data.get('pointsAwarded', false) == false
+            && (resource.data.authUid == request.auth.uid
+                || resource.data.userId == request.auth.uid
+                || hasAuthLinkToUserId(resource.data.userId)));
 
       // V91.75 γ.4a: Conversation thread between admin and student on a review.
       // Each message records its author so a student can never impersonate admin.
