@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V96.92)</title>
+    <title>Internship Portfolio (V96.93)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5496,6 +5496,11 @@
             <div id="ln-view-modal-meta" style="font-size:0.78em; color:#64748b; margin-bottom:10px;"></div>
             <div id="ln-view-modal-tags" style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:10px;"></div>
             <div id="ln-view-modal-content" class="md-render" style="background:#faf5ff; border:1px solid #e9d5ff; border-radius:12px; padding:14px 16px; max-height:50vh; overflow-y:auto; font-size:0.92em; line-height:1.6; color:#1f2937; word-break:break-word;"></div>
+            <!-- V96.93: withdraw control. lnInternViewNote shows it only while the
+                 note is still pending; the authoritative check runs in lnDeleteNote. -->
+            <div id="ln-view-modal-actions" style="display:none; margin-top:14px; text-align:right;">
+                <button type="button" id="ln-view-modal-delete" style="width:auto; min-height:0; padding:8px 16px; border:1px solid #fecaca; background:#fff1f2; color:#b91c1c; border-radius:10px; font-weight:800; font-size:0.85em; cursor:pointer;">🗑️ Delete note ลบบันทึก</button>
+            </div>
         </div>
     </div>
 
@@ -16882,6 +16887,14 @@
                 const scoreHtml = score > 0
                     ? `<span style="background:#ecfdf5; color:#059669; padding:2px 8px; border-radius:999px; font-size:0.7em; font-weight:800;">+${score.toFixed(2)}</span>`
                     : `<span style="background:#f1f5f9; color:#64748b; padding:2px 8px; border-radius:999px; font-size:0.7em; font-weight:700;">pending</span>`;
+                // V96.93: withdraw button, shown only while the note still reads
+                // "pending" here. The authoritative check is in lnDeleteNote, which
+                // re-reads the submissions mirror — this card only knows adminBonus,
+                // and an admin can approve a note with no bonus, which still looks
+                // pending from here.
+                const deleteBtnHtml = score > 0
+                    ? ''
+                    : `<button onclick="event.stopPropagation(); lnDeleteNote('${e.id}')" title="Delete this note" data-th-title="ลบบันทึกนี้" aria-label="Delete this note" style="width:auto; min-height:0; background:none; border:none; padding:2px 4px; font-size:0.85em; line-height:1; cursor:pointer; opacity:0.55;">🗑️</button>`;
                 // V94.33: Show admin-edit badge so intern knows their entry was modified by an admin
                 // V97.02: badge click must not also fire the new card-level view-note handler below.
                 const editCount = Array.isArray(e.editHistory) ? e.editHistory.length : 0;
@@ -16894,7 +16907,7 @@
                 return `<div onclick="lnInternViewNote('${e.id}')" title="Tap to view the full note" style="padding:10px 12px; border:1px solid #f1f5f9; border-radius:10px; background:white; cursor:pointer;">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:6px; flex-wrap:wrap;">
                         <div style="flex:1; min-width:0; font-weight:800; color:#1e293b; font-size:0.9em;">🎓 ${escapeHtml(e.title || 'Untitled')}</div>
-                        ${scoreHtml}
+                        <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">${scoreHtml}${deleteBtnHtml}</div>
                     </div>
                     ${editedBadgeHtml ? `<div style="margin-bottom:6px;">${editedBadgeHtml}</div>` : ''}
                     ${tagsHtml ? `<div style="display:flex; gap:4px; flex-wrap:wrap; margin-bottom:6px;">${tagsHtml}</div>` : ''}
@@ -16955,8 +16968,72 @@
                 }).join('');
             }
             if (contentEl) contentEl.innerHTML = window.renderMd(entry.contentMarkdown || '') || '<span style="color:#94a3b8;">(no content)</span>';
+            // V96.93: wire the withdraw control to THIS entry, and only offer it
+            // while the note still reads pending (adminBonus not yet awarded).
+            const actions = document.getElementById('ln-view-modal-actions');
+            const delBtn = document.getElementById('ln-view-modal-delete');
+            const bonus = typeof entry.adminBonus === 'number' ? entry.adminBonus : 0;
+            if (actions && delBtn) {
+                if (bonus > 0) {
+                    actions.style.display = 'none';
+                } else {
+                    actions.style.display = 'block';
+                    delBtn.onclick = () => lnDeleteNote(entryId);
+                }
+            }
             const modal = document.getElementById('lnNoteViewModal');
             if (modal) modal.style.display = 'flex';
+        };
+
+        // V96.93: let an intern withdraw their own Learning Note while it is still
+        // pending. Deliberately NOT a plain delete of the entry: submitting a note
+        // dual-writes learning_path_entries + a submissions mirror linked by
+        // metadata.sourceId, so removing only the entry would leave the mirror row
+        // showing in Work History with its source gone — the exact orphan the admin
+        // scanOrphanMirrors tool exists to clean up.
+        //
+        // No score is reverted here, and that is the reason for the pending gate:
+        // the +0.1 lands on users.score at admin review, not at submit. Once a note
+        // is reviewed only admin deleteLearningNote may remove it, because that path
+        // knows how to revert the points.
+        window._lnDeleteInFlight = window._lnDeleteInFlight || {};
+        window.lnDeleteNote = async function(entryId) {
+            const cache = window.myLpEntriesCache || [];
+            const entry = cache.find(x => x.id === entryId);
+            if (!entry) { alert('Entry not found in your history.'); return; }
+            // Guard a second tap: deleting an already-deleted doc makes the rules
+            // evaluate resource.data on null, which surfaces as PERMISSION_DENIED —
+            // i.e. "Delete failed" on a delete that actually succeeded.
+            if (window._lnDeleteInFlight[entryId]) return;
+            const title = entry.title || 'Untitled';
+            if (!confirm(`Delete "${title}"?\nThis cannot be undone.\nลบแล้วเรียกคืนไม่ได้`)) return;
+            const say = (m) => { if (typeof showToast === 'function') showToast(m); else alert(m); };
+            window._lnDeleteInFlight[entryId] = true;
+            try {
+                // Re-read the mirror: the card only knows adminBonus, which stays 0
+                // when an admin approves a note without a bonus.
+                const mirrorSnap = await db.collection('submissions')
+                    .where('metadata.sourceId', '==', entryId).limit(1).get();
+                const mirror = mirrorSnap.empty ? null : mirrorSnap.docs[0];
+                if (mirror) {
+                    const m = mirror.data() || {};
+                    if (m.status !== 'pending' || m.pointsAwarded === true) {
+                        say('This note has already been reviewed — ask an admin to remove it ตรวจแล้ว ลบเองไม่ได้');
+                        return;
+                    }
+                }
+                const batch = db.batch();
+                if (mirror) batch.delete(mirror.ref);
+                batch.delete(db.collection('learning_path_entries').doc(entryId));
+                await batch.commit();
+                const modal = document.getElementById('lnNoteViewModal');
+                if (modal) modal.style.display = 'none';
+                say('🗑️ Note deleted ลบบันทึกแล้ว');
+            } catch (err) {
+                say('Delete failed · ลบไม่สำเร็จ: ' + ((err && err.message) || 'unknown error'));
+            } finally {
+                delete window._lnDeleteInFlight[entryId];
+            }
         };
 
         window.lnInternOpenHistory = function(entryId) {
