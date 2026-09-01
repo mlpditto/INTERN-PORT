@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V96.95)</title>
+    <title>Internship Portfolio (V96.96)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3755,6 +3755,21 @@
 
                             <div id="b5-result" style="display:none;"></div>
                         </div>
+
+                        <!-- V96.96 — the bridge into the Journal. Shown only once
+                             there is something to reflect on. Outside both panes
+                             because it applies to whichever result exists. -->
+                        <div id="pers-journal-cta" style="display:none; margin-top:16px; padding-top:14px; border-top:1px dashed #e9dcff;">
+                            <button type="button" onclick="openJournalWithPersonalityPrompt()"
+                                style="width:auto; min-height:0; display:inline-flex; align-items:center; gap:8px; padding:9px 16px; border-radius:10px; border:1px solid #ddd6fe; background:#f5f3ff; color:#6d28d9; font-weight:800; font-size:0.83em; cursor:pointer;">
+                                <i class="fa-solid fa-feather-pointed"></i> Reflect on this in your Journal
+                                เขียนสะท้อนใน Journal
+                            </button>
+                            <div style="font-size:0.72em; color:#94a3b8; margin-top:6px; line-height:1.6;">
+                                A result only becomes useful once you check it against how you actually worked.
+                                ผลจะมีประโยชน์ก็ต่อเมื่อได้ลองทบทวนกับการทำงานจริง
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -3910,6 +3925,24 @@
                                                 title="Pull in today's activity (Quiz / Case / Note) to help you start writing" data-th-title="ดึงกิจกรรมวันนี้มาช่วยเริ่มเขียน"
                                                 style="width:auto; min-height:0; padding:7px 14px; border:1px solid #ddd6fe; background:#f5f3ff; color:#6d28d9; font-weight:800; font-size:0.82em; border-radius:999px; cursor:pointer;">✨ Summarize today สรุปกิจกรรมวันนี้</button>
                                         </div>
+                                        <!-- V96.96: prompt seeded by the Know Yourself card. A HINT above the
+                                             box, never text inside it — a prefilled question would be counted as
+                                             the intern's own words by My Writing Profile. Dismissible, and the
+                                             entry itself goes through the ordinary submit path untouched. -->
+                                        <div id="rl-personality-prompt"
+                                            style="display:none; margin-top:12px; padding:11px 13px; background:#faf7ff; border:1px solid #e9dcff; border-left:3px solid #7c3aed; border-radius:10px;">
+                                            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+                                                <div>
+                                                    <div style="font-size:0.7em; font-weight:800; color:#7c3aed; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:5px;">
+                                                        <i class="fa-solid fa-compass"></i> From Know Yourself จากการ์ดรู้จักตัวเอง</div>
+                                                    <div id="rl-personality-prompt-text"
+                                                        style="font-size:0.83em; color:#334155; line-height:1.7;"></div>
+                                                </div>
+                                                <button type="button" onclick="dismissPersonalityPrompt()" aria-label="Dismiss"
+                                                    style="width:auto; min-height:0; flex-shrink:0; padding:2px 7px; border:none; background:transparent; color:#a78bfa; font-size:1em; cursor:pointer; line-height:1;">&times;</button>
+                                            </div>
+                                        </div>
+
                                         <!-- V94.01: Textarea + Submit (moved above Learning Tools) -->
                                         <div style="position:relative; margin-top:10px;">
                                             <textarea id="rl-content" rows="5"
@@ -7683,6 +7716,10 @@
             if (b5 && b5.scores && !quizOpen) {
                 renderBig5Result(b5.scores, b5.derived || big5ToLetters(b5.scores), b5.at);
             }
+
+            // V96.96: the Journal bridge appears once either result exists.
+            const cta = document.getElementById('pers-journal-cta');
+            if (cta) cta.style.display = (saved || (b5 && b5.scores)) ? 'block' : 'none';
         }
 
         // ============================================================
@@ -7945,6 +7982,112 @@
             document.getElementById('b5-quiz').style.display = 'none';
             document.getElementById('b5-intro').style.display = 'none';
             host.style.display = 'block';
+        }
+
+        // ============================================================
+        // V96.96 — Know Yourself → Journal.
+        //
+        // A test result is inert on its own; it earns its keep only when the
+        // intern checks it against a week they actually lived. This builds a
+        // question out of whatever result they have and drops them into the
+        // existing Journal box with it showing above.
+        //
+        // Deliberately NOT a new scoring path. The entry is written by the
+        // ordinary submitJournalEntry() router and earns the same +0.1 as any
+        // other day's writing — the card's promise is that the personality
+        // result never scores anything, and a bonus for reflecting ON it would
+        // be that promise bent sideways.
+        //
+        // The prompt is a hint ABOVE the textarea, never text inside it: My
+        // Writing Profile counts words per log, and prefilled text would be
+        // counted as the intern's own.
+        // ============================================================
+        // EN and Thai go in SEPARATE elements on purpose. lang-toggle's backward
+        // absorption runs inside one text node: with both halves in the same
+        // node, the English sentence's final "?" sits immediately before the
+        // Thai run, gets claimed by it, and disappears along with the Thai.
+        // An element boundary stops that.
+        function bilingual(en, th) {
+            return `<span>${en}</span><br><span>${th}</span>`;
+        }
+
+        function buildPersonalityPrompt(me) {
+            const p = (me && me.personality) || {};
+            const b5 = p.big5, neris = p.neris;
+
+            if (b5 && b5.scores) {
+                // The most informative trait is the one furthest from the
+                // midpoint. A profile that is flat everywhere has no standout,
+                // and saying "you scored 50% on X" would be noise.
+                let best = null, bestDist = -1;
+                B5_TRAITS.forEach(t => {
+                    const v = b5.scores[t.k];
+                    if (typeof v !== 'number') return;
+                    const d = Math.abs(v - 50);
+                    if (d > bestDist) { bestDist = d; best = { t, v }; }
+                });
+                if (best && bestDist >= 10) {
+                    const desc = best.v > 50 ? best.t.hi : best.t.lo;
+                    // The descriptor carries its own Thai, so it is spliced in
+                    // rather than translated twice.
+                    return bilingual(
+                        `Your Big Five put you at <b>${best.v}%</b> on ${best.t.en} — “${desc}”.`
+                        + ' Where did that show up in your work this week, and where did it not?',
+                        `ผลของคุณอยู่ที่ ${best.v}% ในด้าน${best.t.th}`
+                        + ' สัปดาห์นี้เห็นสิ่งนี้ในงานของคุณตรงไหนบ้าง และตรงไหนที่ไม่เป็นแบบนั้น');
+                }
+                return bilingual(
+                    'Your Big Five came out close to the middle on every trait, which is its own kind of answer.'
+                    + ' Does that match how you see yourself at work?',
+                    'ผลของคุณอยู่ใกล้กึ่งกลางทุกด้าน ซึ่งก็เป็นคำตอบแบบหนึ่ง ตรงกับที่คุณมองตัวเองตอนทำงานไหม');
+            }
+
+            if (neris && neris.type) {
+                const code = neris.variant ? `${neris.type}-${neris.variant}` : neris.type;
+                // The code stays OUT of the Thai half: a Latin run inside a Thai
+                // clause survives as an orphan when Thai is hidden.
+                return bilingual(
+                    `You reported <b>${escapeB5(code)}</b>.`
+                    + ' Which part of that description matched how you actually worked this week — and which part did not?',
+                    'ผลที่คุณบันทึกไว้ ส่วนไหนตรงกับการทำงานจริงของคุณสัปดาห์นี้ และส่วนไหนไม่ตรง');
+            }
+            return '';
+        }
+
+        function openJournalWithPersonalityPrompt() {
+            const me = (allUsersData || []).find(u => u.id === userId) || {};
+            const text = buildPersonalityPrompt(me);
+            const box = document.getElementById('rl-personality-prompt');
+            const textEl = document.getElementById('rl-personality-prompt-text');
+            if (!box || !textEl) return;
+            // The button only renders once a result exists, so an empty prompt
+            // means the user lookup missed — say so rather than doing nothing
+            // visible and leaving the intern tapping a dead button.
+            if (!text) {
+                showToast('Save a result first, then come back เก็บผลไว้ก่อน แล้วค่อยกลับมาเขียน');
+                return;
+            }
+            textEl.innerHTML = text;
+            box.style.display = 'block';
+
+            // Open the Mission card only if it is closed — toggleKanban() is a
+            // toggle, and calling it blind would shut an already-open card.
+            const kanban = document.getElementById('kanban-content');
+            if (kanban && kanban.style.display === 'none') toggleKanban();
+            switchMissionTab('reflection');
+
+            const content = document.getElementById('rl-content');
+            if (content) {
+                content.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // focus() on a smooth scroll fights it on iOS Safari, so it waits
+                // for the scroll to settle.
+                setTimeout(() => content.focus({ preventScroll: true }), 450);
+            }
+        }
+
+        function dismissPersonalityPrompt() {
+            const box = document.getElementById('rl-personality-prompt');
+            if (box) box.style.display = 'none';
         }
 
         function loadGroupSettings() {
