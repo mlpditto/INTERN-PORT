@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.44</title>
+    <title>Nika V98.45</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -31583,6 +31583,7 @@ RULES:
 
             db.collection("users").orderBy("score", "desc").onSnapshot(s => {
                 usersData = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                if (typeof refreshHubHeaderIfOpen === 'function') refreshHubHeaderIfOpen(); // V98.45
                 renderUserGroupTabs();
                 renderBoardGroupTabs();
                 renderTable('users');
@@ -46130,7 +46131,29 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return { label: `📍 D ${dayNum}/${totalDays} · ${daysLeft} d left`, color: '#475569' };
         };
 
+        // V98.45 — the header renders once at open time, so a Save in the profile
+        // modal (or a Score/Beri adjust, or a cert request) left it showing the
+        // values from when the popup opened. The users onSnapshot calls
+        // refreshHubHeaderIfOpen() after rebuilding usersData; this signature keeps
+        // it to a real change, so an unrelated user's write can't churn the DOM or
+        // close the open score-breakdown popover.
+        function hubHeaderSig(u) {
+            return [u.pictureUrl, u.displayName, u.score, u.beri, u.group,
+                    u.startDate, u.endDate, !!u.certRequested, !!u.certApproved].join('|');
+        }
+        window.refreshHubHeaderIfOpen = function() {
+            const modal = document.getElementById('lbChartModal');
+            const uid = window._currentPopupUser;
+            if (!uid || !modal || getComputedStyle(modal).display === 'none') return;
+            const u = (usersData || []).find(x => x.id === uid);
+            if (!u) return;
+            if (hubHeaderSig(u) === window._hubHeaderSig) return;
+            renderHubHeader(u);
+        };
+
         function renderHubHeader(u) {
+            window._hubHeaderSig = hubHeaderSig(u);
+            const hubGroup = u.group || 'Public';
             const crewRank = getCrewRankByScore(u.score || 0);
             const td = window._hubTrainingDays(u.startDate, u.endDate);
             // V92.18: dedupe — show training day indicator inline; date range moves to tooltip on the calendar icon
@@ -46145,6 +46168,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     <div style="font-size:1.4em; font-weight:900; color:#1e293b; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                         ${u.displayName}
                         <span style="font-size:11px; background:linear-gradient(135deg, #4361ee, #7209b7); color:white; padding:4px 12px; border-radius:30px; letter-spacing:1px; font-weight:900;">${crewRank}</span>
+                        <span title="Group" style="display:inline-flex; align-items:center; gap:5px; font-size:11px; background:${getGroupColor(hubGroup)}; color:white; padding:4px 12px; border-radius:30px; font-weight:800;"><i class="fa-solid ${getGroupIcon(hubGroup)}"></i>${escapeHtml(hubGroup)}</span>
                     </div>
                     <div style="font-size:0.85em; color:#64748b; margin-top:4px;">
                         ${trainingHtml}
