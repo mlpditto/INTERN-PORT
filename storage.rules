@@ -64,6 +64,25 @@ service firebase.storage {
       allow update, delete: if isAdmin();
     }
 
+    // "Know Yourself" NERIS result screenshots (V96.94). Content-addressed by
+    // SHA-256 like the paths above, but scoped under the uploader's own auth
+    // uid — NOT flat like product-images. A personality result can carry a name
+    // or an email if the intern crops carelessly (the card warns them not to),
+    // so one intern must not be able to fetch another's even knowing the hash,
+    // and the flat layout gave exactly that away to anyone signed in.
+    // {ownerUid} is the ANONYMOUS Firebase auth uid, not the LINE user id that
+    // keys users/{uid} — Storage rules cannot read Firestore, so the auth uid is
+    // the only identity available here. Admin reads by the stored path.
+    // 1 MB rather than product-images' 2 MB: this is a cropped screenshot, not a
+    // camera photo, and the client downscales before uploading.
+    match /personality-proofs/{ownerUid}/{fileName} {
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == ownerUid);
+      allow create, update: if isSignedIn() && request.auth.uid == ownerUid
+        && request.resource.size < 1 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+      allow delete: if isAdmin() || (isSignedIn() && request.auth.uid == ownerUid);
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }
