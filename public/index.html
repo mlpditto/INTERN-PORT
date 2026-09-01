@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V96.94)</title>
+    <title>Internship Portfolio (V96.95)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3649,6 +3649,18 @@
                             มีเพียงคุณและแอดมินที่เห็น และลบได้ทุกเมื่อ
                         </div>
 
+                        <!-- V96.95 — two instruments, one card. Chip rail rather
+                             than a dropdown, matching the rest of the app. -->
+                        <div id="pers-tab-rail" style="display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap;">
+                            <button type="button" class="pers-tab-chip" data-pane="neris" onclick="persSwitchPane('neris')"
+                                style="width:auto; min-height:0; padding:6px 13px; border-radius:999px; border:1.5px solid #7c3aed; background:#7c3aed; color:#fff; font-weight:800; font-size:0.76em; cursor:pointer; font-family:inherit;">
+                                16Personalities</button>
+                            <button type="button" class="pers-tab-chip" data-pane="big5" onclick="persSwitchPane('big5')"
+                                style="width:auto; min-height:0; padding:6px 13px; border-radius:999px; border:1.5px solid #e2e8f0; background:#fff; color:#475569; font-weight:800; font-size:0.76em; cursor:pointer; font-family:inherit;">
+                                Big Five</button>
+                        </div>
+
+                        <div id="pers-pane-neris">
                         <!-- Step 1 — hand off to 16Personalities -->
                         <div style="font-size:0.82em; font-weight:800; color:#475569; margin-bottom:6px;">
                             1 · Take the test ทำแบบทดสอบ</div>
@@ -3693,6 +3705,56 @@
                             </button>
                         </div>
                         <div id="pers-saved-note" style="font-size:0.75em; color:#64748b; margin-top:10px; line-height:1.6;"></div>
+                        </div><!-- /pers-pane-neris -->
+
+                        <!-- ================================================
+                             V96.95 — Big Five pane (Part B).
+                             Mini-IPIP (Donnellan et al., 2006), drawn from the
+                             International Personality Item Pool, which is in
+                             the public domain: "It is not necessary to contact
+                             the IPIP site author ... for permission to use IPIP
+                             materials." That is why this test CAN live inside
+                             the app, while the NERIS one in the pane above
+                             cannot. The Thai is our own translation of the
+                             public-domain English, not a lift of anyone's
+                             existing localisation.
+                             ================================================ -->
+                        <div id="pers-pane-big5" style="display:none;">
+                            <div style="font-size:0.78em; color:#475569; line-height:1.7; margin-bottom:12px;">
+                                20 statements, about 3 minutes. There are no right answers — rate how accurately each
+                                one describes you, in general.
+                                20 ข้อ ใช้เวลาราว 3 นาที ไม่มีคำตอบถูกผิด ให้ประเมินว่าแต่ละข้อตรงกับตัวคุณโดยทั่วไปแค่ไหน
+                            </div>
+
+                            <div id="b5-intro">
+                                <button type="button" onclick="startBig5()"
+                                    style="width:auto; min-height:0; display:inline-flex; align-items:center; gap:8px; padding:9px 16px; border-radius:10px; border:none; background:linear-gradient(135deg,#0284c7,#0ea5e9); color:#fff; font-weight:800; font-size:0.85em; cursor:pointer;">
+                                    <i class="fa-solid fa-play"></i> Start the test เริ่มทำแบบทดสอบ
+                                </button>
+                            </div>
+
+                            <div id="b5-quiz" style="display:none;">
+                                <div
+                                    style="position:sticky; top:0; z-index:2; background:#faf7ff; padding:8px 0 10px; border-bottom:1px solid #ede9fe; margin-bottom:12px;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75em; font-weight:800; color:#475569;">
+                                        <span id="b5-progress-label">0 / 20</span>
+                                        <span style="color:#94a3b8; font-weight:700;">1 = Very inaccurate ไม่ตรงเลย ·
+                                            5 = Very accurate ตรงมาก</span>
+                                    </div>
+                                    <div style="height:5px; background:#e2e8f0; border-radius:999px; margin-top:6px; overflow:hidden;">
+                                        <div id="b5-progress-bar"
+                                            style="height:100%; width:0%; background:linear-gradient(90deg,#0284c7,#0ea5e9); transition:width 0.25s;"></div>
+                                    </div>
+                                </div>
+                                <div id="b5-items"></div>
+                                <button type="button" id="b5-submit-btn" onclick="submitBig5()" disabled
+                                    style="width:auto; min-height:0; margin-top:14px; padding:10px 20px; border-radius:10px; border:none; background:#cbd5e1; color:#fff; font-weight:800; font-size:0.85em; cursor:not-allowed;">
+                                    <i class="fa-solid fa-check"></i> See my result ดูผลลัพธ์
+                                </button>
+                            </div>
+
+                            <div id="b5-result" style="display:none;"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -7589,6 +7651,7 @@
         // is seeded only when there is no draft yet.
         function renderPersonalityCard(me) {
             const saved = (me && me.personality && me.personality.neris) || null;
+            window._persSavedNeris = saved;   // V96.95: the Big Five comparison reads this
             const chip = document.getElementById('pers-head-chip');
             const clearBtn = document.getElementById('pers-clear-btn');
             const note = document.getElementById('pers-saved-note');
@@ -7611,6 +7674,277 @@
                 _persDraft.variant = saved.variant || null;
                 if (document.getElementById('pers-type-grid')?.dataset.built === '1') persPaintSelection();
             }
+
+            // V96.95: a returning intern should land on their Big Five result,
+            // not on the Start button. Skipped while the test is open so a
+            // snapshot mid-questionnaire cannot wipe half-entered answers.
+            const b5 = (me && me.personality && me.personality.big5) || null;
+            const quizOpen = document.getElementById('b5-quiz')?.style.display === 'block';
+            if (b5 && b5.scores && !quizOpen) {
+                renderBig5Result(b5.scores, b5.derived || big5ToLetters(b5.scores), b5.at);
+            }
+        }
+
+        // ============================================================
+        // V96.95 — Know Yourself, Part B: Mini-IPIP Big Five
+        //
+        // Items are the Mini-IPIP (Donnellan, Oswald, Baird & Lucas, 2006),
+        // taken from the International Personality Item Pool. IPIP is public
+        // domain — "It is not necessary to contact the IPIP site author (Lew
+        // Goldberg) or the IPIP Consultant (John A. Johnson) for permission to
+        // use IPIP materials" — which is exactly why this instrument can live
+        // inside the app while the NERIS one cannot. The English below is the
+        // verbatim IPIP wording (stem-less first person, as published); the
+        // Thai is our own translation of it.
+        //
+        // `r: true` marks a reverse-keyed item. Order is the published 1-20
+        // interleave (E, A, C, N, O repeating), which breaks up response sets —
+        // do not group by trait.
+        // ============================================================
+        const B5_INSTRUMENT = 'mini-ipip-20-v1';
+        const B5_ITEMS = [
+            { f: 'E', r: false, en: 'Am the life of the party.', th: 'เป็นคนที่ทำให้งานสังสรรค์สนุกขึ้น' },
+            { f: 'A', r: false, en: "Sympathize with others' feelings.", th: 'เห็นอกเห็นใจความรู้สึกของคนอื่น' },
+            { f: 'C', r: false, en: 'Get chores done right away.', th: 'ทำงานที่ต้องทำให้เสร็จทันที' },
+            { f: 'N', r: false, en: 'Have frequent mood swings.', th: 'อารมณ์ขึ้นลงบ่อย' },
+            { f: 'O', r: false, en: 'Have a vivid imagination.', th: 'มีจินตนาการชัดเจน' },
+            { f: 'E', r: true, en: "Don't talk a lot.", th: 'ไม่ค่อยพูด' },
+            { f: 'A', r: true, en: "Am not interested in other people's problems.", th: 'ไม่สนใจปัญหาของคนอื่น' },
+            { f: 'C', r: true, en: 'Often forget to put things back in their proper place.', th: 'มักลืมเก็บของเข้าที่' },
+            { f: 'N', r: true, en: 'Am relaxed most of the time.', th: 'ส่วนใหญ่รู้สึกผ่อนคลาย' },
+            { f: 'O', r: true, en: 'Am not interested in abstract ideas.', th: 'ไม่สนใจเรื่องที่เป็นนามธรรม' },
+            { f: 'E', r: false, en: 'Talk to a lot of different people at parties.', th: 'คุยกับคนหลากหลายในงานสังสรรค์' },
+            { f: 'A', r: false, en: "Feel others' emotions.", th: 'รับรู้อารมณ์ของคนรอบข้างได้' },
+            { f: 'C', r: false, en: 'Like order.', th: 'ชอบความเป็นระเบียบ' },
+            { f: 'N', r: false, en: 'Get upset easily.', th: 'หงุดหงิดง่าย' },
+            { f: 'O', r: true, en: 'Have difficulty understanding abstract ideas.', th: 'เข้าใจเรื่องนามธรรมได้ยาก' },
+            { f: 'E', r: true, en: 'Keep in the background.', th: 'มักอยู่เงียบๆ ไม่ออกหน้า' },
+            { f: 'A', r: true, en: 'Am not really interested in others.', th: 'ไม่ค่อยสนใจผู้อื่นจริงๆ' },
+            { f: 'C', r: true, en: 'Make a mess of things.', th: 'ทำอะไรมักออกมาไม่เรียบร้อย' },
+            { f: 'N', r: true, en: 'Seldom feel blue.', th: 'นานๆ ครั้งถึงจะรู้สึกหม่นหมอง' },
+            { f: 'O', r: true, en: 'Do not have a good imagination.', th: 'ไม่ค่อยมีจินตนาการ' }
+        ];
+        const B5_TRAITS = [
+            { k: 'O', en: 'Openness',          th: 'เปิดรับประสบการณ์', color: '#7c3aed', hi: 'curious, imaginative ช่างสงสัย มีจินตนาการ',      lo: 'practical, concrete ยึดสิ่งที่จับต้องได้',      mid: 'balanced between the two อยู่กึ่งกลางระหว่างสองด้าน' },
+            { k: 'C', en: 'Conscientiousness', th: 'ความมีระเบียบ',     color: '#0284c7', hi: 'organised, follows through เป็นระบบ ทำจนจบ',     lo: 'flexible, spontaneous ยืดหยุ่น ตามสถานการณ์',   mid: 'balanced between the two อยู่กึ่งกลางระหว่างสองด้าน' },
+            { k: 'E', en: 'Extraversion',      th: 'การแสดงตัว',        color: '#f59e0b', hi: 'outgoing, energised by people ชอบเข้าสังคม',     lo: 'reserved, recharges alone ชอบอยู่กับตัวเอง',    mid: 'balanced between the two อยู่กึ่งกลางระหว่างสองด้าน' },
+            { k: 'A', en: 'Agreeableness',     th: 'ความประนีประนอม',   color: '#16a34a', hi: 'warm, cooperative อบอุ่น ร่วมมือ',              lo: 'direct, questioning ตรงไปตรงมา ตั้งคำถาม',      mid: 'balanced between the two อยู่กึ่งกลางระหว่างสองด้าน' },
+            { k: 'N', en: 'Neuroticism',       th: 'ความไวต่ออารมณ์',   color: '#ef4444', hi: 'reacts strongly to stress ตอบสนองต่อความเครียดมาก', lo: 'steady under pressure นิ่งเมื่อกดดัน',       mid: 'balanced between the two อยู่กึ่งกลางระหว่างสองด้าน' }
+        ];
+        let _b5Answers = new Array(B5_ITEMS.length).fill(0);
+
+        function persSwitchPane(pane) {
+            document.querySelectorAll('#pers-tab-rail .pers-tab-chip').forEach(btn => {
+                const on = btn.dataset.pane === pane;
+                btn.style.background = on ? '#7c3aed' : '#fff';
+                btn.style.color = on ? '#fff' : '#475569';
+                btn.style.borderColor = on ? '#7c3aed' : '#e2e8f0';
+            });
+            const neris = document.getElementById('pers-pane-neris');
+            const big5 = document.getElementById('pers-pane-big5');
+            if (neris) neris.style.display = (pane === 'neris') ? 'block' : 'none';
+            if (big5) big5.style.display = (pane === 'big5') ? 'block' : 'none';
+        }
+
+        function startBig5() {
+            _b5Answers = new Array(B5_ITEMS.length).fill(0);
+            const host = document.getElementById('b5-items');
+            host.innerHTML = B5_ITEMS.map((it, i) => `
+                <div style="padding:10px 0; border-bottom:1px solid #f1f5f9;">
+                    <div style="font-size:0.82em; color:#1e293b; line-height:1.6; margin-bottom:8px;">
+                        <span style="color:#94a3b8; font-weight:800; margin-right:6px;">${i + 1}</span>${escapeB5(it.en)} ${escapeB5(it.th)}
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        ${[1, 2, 3, 4, 5].map(v => `
+                            <button type="button" class="b5-opt" data-i="${i}" data-v="${v}" onclick="answerBig5(${i}, ${v})"
+                                aria-label="${v} of 5"
+                                style="flex:1; width:auto; min-height:0; padding:8px 0; border-radius:8px; border:1.5px solid #e2e8f0; background:#fff; color:#64748b; font-weight:800; font-size:0.8em; cursor:pointer; font-family:inherit;">${v}</button>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+            document.getElementById('b5-intro').style.display = 'none';
+            document.getElementById('b5-result').style.display = 'none';
+            document.getElementById('b5-quiz').style.display = 'block';
+            updateBig5Progress();
+        }
+
+        // The items are ours to render, but they still go through an escaper —
+        // this is the same discipline the AI-output renderers use, and it costs
+        // nothing to keep the habit.
+        function escapeB5(s) {
+            return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        function answerBig5(i, v) {
+            _b5Answers[i] = v;
+            document.querySelectorAll(`#b5-items .b5-opt[data-i="${i}"]`).forEach(btn => {
+                const on = Number(btn.dataset.v) === v;
+                btn.style.background = on ? '#0284c7' : '#fff';
+                btn.style.color = on ? '#fff' : '#64748b';
+                btn.style.borderColor = on ? '#0284c7' : '#e2e8f0';
+            });
+            updateBig5Progress();
+        }
+
+        function updateBig5Progress() {
+            const done = _b5Answers.filter(Boolean).length;
+            const total = B5_ITEMS.length;
+            document.getElementById('b5-progress-label').textContent = `${done} / ${total}`;
+            document.getElementById('b5-progress-bar').style.width = `${(done / total) * 100}%`;
+            const btn = document.getElementById('b5-submit-btn');
+            const ready = done === total;
+            btn.disabled = !ready;
+            btn.style.background = ready ? '#0284c7' : '#cbd5e1';
+            btn.style.cursor = ready ? 'pointer' : 'not-allowed';
+        }
+
+        // Reverse-keyed items flip on a 5-point scale (6 - x). Each trait is the
+        // sum of its 4 items, so raw runs 4-20 and the percentage is
+        // (sum - 4) / 16. That is a percentage OF THE SCALE, not a percentile
+        // against any norm group — the result screen says so, because reading it
+        // as "I am in the 80th percentile" would be wrong.
+        function scoreBig5(answers) {
+            const sums = { O: 0, C: 0, E: 0, A: 0, N: 0 };
+            B5_ITEMS.forEach((it, i) => {
+                const raw = answers[i];
+                sums[it.f] += it.r ? (6 - raw) : raw;
+            });
+            const pct = {};
+            Object.keys(sums).forEach(k => { pct[k] = Math.round(((sums[k] - 4) / 16) * 100); });
+            return pct;
+        }
+
+        // A rough correspondence, not a conversion. 16Personalities builds its
+        // letters on Big Five traits, so the four axes line up in direction —
+        // but a 51% and a 99% both become the same letter, which is exactly the
+        // information a four-letter code throws away. The result screen frames
+        // this as "what your Big Five would suggest", never as your type.
+        //
+        // 50% is the exact midpoint of the scale, not a lean, and it is a real
+        // outcome: the 4-item raw sum of 12 lands there. A `>= 50` test would
+        // have handed a perfectly flat profile a confident "ENFJ-T", so the
+        // midpoint gets its own marker and is never counted as agreeing with
+        // anything.
+        const B5_NO_LEAN = '–';
+        function big5ToLetters(pct) {
+            const ax = (v, hi, lo) => v === 50 ? B5_NO_LEAN : (v > 50 ? hi : lo);
+            return {
+                letters: ax(pct.E, 'E', 'I') + ax(pct.O, 'N', 'S') + ax(pct.A, 'F', 'T') + ax(pct.C, 'J', 'P'),
+                variant: ax(pct.N, 'T', 'A')
+            };
+        }
+
+        // Scores, renders, THEN saves. Someone who has just answered 20 items
+        // must see their result whatever the network or the auth state is
+        // doing — a failed write is worth a toast, not twenty lost answers.
+        async function submitBig5() {
+            if (_b5Answers.some(v => !v)) return;
+            const btn = document.getElementById('b5-submit-btn');
+            const label = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
+            const at = new Date().toISOString();
+            const scores = scoreBig5(_b5Answers);
+            const derived = big5ToLetters(scores);
+            renderBig5Result(scores, derived, at);
+            try {
+                if (!userId) throw new Error('not signed in');
+                await db.collection('users').doc(userId).set({
+                    personality: {
+                        consentAt: at,
+                        big5: { instrument: B5_INSTRUMENT, answers: _b5Answers.slice(), scores, derived, at }
+                    }
+                }, { merge: true });
+                showToast('Saved บันทึกแล้ว');
+            } catch (e) {
+                console.error('submitBig5 save failed:', e);
+                showToast('Could not save — your result is shown below บันทึกไม่สำเร็จ แต่แสดงผลไว้ด้านล่างแล้ว');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = label;
+            }
+        }
+
+        function renderBig5Result(scores, derived, at) {
+            const host = document.getElementById('b5-result');
+            if (!host) return;
+            const bars = B5_TRAITS.map(t => {
+                const v = Math.max(0, Math.min(100, scores[t.k]));
+                return `
+                    <div style="margin-bottom:12px;">
+                        <div style="display:flex; justify-content:space-between; font-size:0.76em; font-weight:800; color:#334155; margin-bottom:4px;">
+                            <span>${t.en} ${t.th}</span><span style="color:${t.color};">${v}%</span>
+                        </div>
+                        <div style="height:8px; background:#f1f5f9; border-radius:999px; overflow:hidden;">
+                            <div style="height:100%; width:${v}%; background:${t.color}; border-radius:999px;"></div>
+                        </div>
+                        <div style="font-size:0.68em; color:#94a3b8; margin-top:3px; line-height:1.5;">${v === 50 ? t.mid : (v > 50 ? t.hi : t.lo)}</div>
+                    </div>`;
+            }).join('');
+
+            // The suggested code always shows; the letter-by-letter comparison
+            // only appears once there is a self-reported NERIS type to compare
+            // against. A B5_NO_LEAN letter is a midpoint score and never counts
+            // as agreement — it is the absence of a lean, not a match.
+            const sugg = derived.letters;
+            const suggCode = sugg + (derived.variant === B5_NO_LEAN ? '' : `-${derived.variant}`);
+            const saved = window._persSavedNeris;
+            let compare = '';
+            if (saved && saved.type) {
+                const mine = saved.type.toUpperCase();
+                const cells = [0, 1, 2, 3].map(i => {
+                    const flat = sugg[i] === B5_NO_LEAN;
+                    const same = !flat && mine[i] === sugg[i];
+                    const bg = flat ? '#f8fafc' : (same ? '#f0fdf4' : '#fffbeb');
+                    const fg = flat ? '#94a3b8' : (same ? '#16a34a' : '#b45309');
+                    return `<td style="padding:4px 8px; text-align:center; font-weight:900; color:${fg}; background:${bg}; border-radius:6px;">${sugg[i]}${same ? '' : ` <span style="font-weight:700; font-size:0.85em;">(${mine[i]})</span>`}</td>`;
+                }).join('');
+                const agree = [0, 1, 2, 3].filter(i => sugg[i] !== B5_NO_LEAN && mine[i] === sugg[i]).length;
+                const flatCount = [0, 1, 2, 3].filter(i => sugg[i] === B5_NO_LEAN).length;
+                compare = `
+                    <div style="margin-top:16px; padding:12px; background:#fbfaff; border:1px solid #ede9fe; border-radius:10px;">
+                        <div style="font-size:0.78em; font-weight:800; color:#475569; margin-bottom:8px;">
+                            Against your 16Personalities type เทียบกับผลที่คุณกรอกไว้</div>
+                        <table style="width:100%; border-spacing:4px;"><tr>${cells}</tr></table>
+                        <div style="font-size:0.72em; color:#64748b; margin-top:8px; line-height:1.7;">
+                            ${agree} of 4 letters agree with <b>${escapeB5(mine)}</b>. ตรงกัน ${agree} จาก 4 ตัวอักษร<br>
+                            ${flatCount ? `${flatCount} landed exactly mid-scale, which is no lean either way.
+                            มี ${flatCount} แกนที่ได้คะแนนกึ่งกลางพอดี คือไม่เอนไปทางใด<br>` : ''}
+                            This is a rough correspondence, not a conversion — the two tests were built
+                            differently, and a score of 51% and one of 99% become the same letter.
+                            นี่เป็นการเทียบอย่างหยาบ ไม่ใช่การแปลงผล เพราะแบบทดสอบสองชุดสร้างคนละแบบ
+                            และคะแนน 51% กับ 99% ให้ตัวอักษรเดียวกัน
+                        </div>
+                    </div>`;
+            }
+            const suggLine = `
+                <div style="margin-top:14px; font-size:0.78em; color:#475569; line-height:1.7;">
+                    On the four-letter scheme your Big Five would suggest
+                    ตามเกณฑ์สี่ตัวอักษร ผลของคุณชี้ไปที่
+                    <b style="color:#7c3aed; letter-spacing:0.05em;">${escapeB5(suggCode)}</b>
+                </div>`;
+
+            host.innerHTML = `
+                <div style="font-size:0.82em; font-weight:800; color:#475569; margin-bottom:10px;">
+                    Your Big Five ผลของคุณ
+                    <span style="font-weight:600; color:#94a3b8;">· ${new Date(at).toLocaleDateString()}</span>
+                </div>
+                ${bars}
+                <div style="font-size:0.68em; color:#94a3b8; line-height:1.7; margin-top:4px;">
+                    Percentages are of the scale itself, not a percentile against other people.
+                    เปอร์เซ็นต์คิดจากช่วงคะแนนของแบบทดสอบ ไม่ใช่การเทียบอันดับกับคนอื่น<br>
+                    Mini-IPIP (Donnellan et al., 2006), from the public-domain International Personality Item Pool.
+                </div>
+                ${suggLine}
+                ${compare}
+                <button type="button" onclick="startBig5()"
+                    style="width:auto; min-height:0; margin-top:14px; padding:8px 16px; border-radius:10px; border:1px solid #cbd5e1; background:#fff; color:#475569; font-weight:800; font-size:0.8em; cursor:pointer;">
+                    <i class="fa-solid fa-rotate-right"></i> Take it again ทำใหม่
+                </button>`;
+            document.getElementById('b5-quiz').style.display = 'none';
+            document.getElementById('b5-intro').style.display = 'none';
+            host.style.display = 'block';
         }
 
         function loadGroupSettings() {
