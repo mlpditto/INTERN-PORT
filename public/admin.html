@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.50</title>
+    <title>Nika V98.51</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -51745,32 +51745,75 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             renderPreRegList();
         }
 
+        // V98.51 lean, phases 1+2. This modal exists to make a code and hand it
+        // over, but pre_users is loaded whole and a claimed code never leaves — so
+        // the codes still waiting to be given out were sinking under an archive
+        // that only grows. Split them, and collapse the archive.
+        //
+        // The two status pills are GONE rather than inverted: once the rows are
+        // partitioned, the section heading already says which state you are
+        // looking at, so a pill on every row said nothing (same finding as the
+        // "✓ active" pill on every User Hub row, V98.10 #944). Claimed rows keep a
+        // faint ✓ so an expanded list still reads on its own.
         function renderPreRegList() {
             const container = document.getElementById('prereg-list');
             if (preRegData.length === 0) {
                 container.innerHTML = '<div style="text-align:center; color:#999; padding:20px; font-size:0.9em;">No pre-registration items yet.</div>';
                 return;
             }
-            container.innerHTML = preRegData.map(p => {
-                const claimed = p.claimed ? `<span class="badge" style="background:#28a745; font-size:0.7em;">✅ Claimed</span>` : `<span class="badge" style="background:#ffc107; color:black; font-size:0.7em;">⏳ Waiting</span>`;
-                const claimedBy = p.claimedByName ? `<br><span style="font-size:0.7em; color:#666;">→ ${p.claimedByName}</span>` : '';
-                const groupColor = getGroupColor(p.group || 'Public');
-                return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid #eee; border-radius:10px; background:#fff; margin-bottom:6px;">
-                    <div style="flex:1; min-width:0;">
-                        <div style="font-weight:bold; font-size:0.9em;">${p.fullName || p.fullNameEn || '-'} <span style="font-size:0.85em; font-weight:normal; color:#666;">${p.nickname ? `(${p.nickname})` : ''}</span></div>
-                        ${p.fullNameEn && p.fullName ? `<div style="font-size:0.75em; color:var(--primary); font-style:italic;">${p.fullNameEn}</div>` : ''}
-                        <div style="font-size:0.75em; color:#666;">
-                            <span style="background:${groupColor}; color:white; padding:1px 8px; border-radius:10px; font-size:0.85em;">${p.group || 'Public'}</span>
-                            ${p.startDate ? `${p.startDate} ~ ${p.endDate || ''}` : ''}
-                        </div>
+            const waiting = preRegData.filter(p => !p.claimed);
+            const claimed = preRegData.filter(p => p.claimed);
+            const head = t => `<div style="font-size:0.68em; color:#94a3b8; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; margin:0 0 6px 2px;">${t}</div>`;
+            container.innerHTML =
+                head(`To hand out · ${waiting.length}`) +
+                (waiting.length
+                    ? waiting.map(preRegWaitingRow).join('')
+                    : `<div style="color:#94a3b8; font-size:0.82em; padding:6px 2px 2px;">No unused codes — generate one above.</div>`) +
+                (claimed.length ? `
+                    <div style="margin-top:14px; padding-top:10px; border-top:1px solid #eee;">
+                        <button onclick="togglePreRegClaimed(this)" style="width:auto; min-height:0; padding:5px 12px; border-radius:20px; border:1px solid #e2e8f0; background:#fff; color:#64748b; font-size:0.78em; font-weight:700; cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-chevron-down"></i> ${claimed.length} claimed</button>
                     </div>
-                    <div style="text-align:center; min-width:80px;">
-                        <div onclick="copyCode('${p.code}')" style="font-family:monospace; font-weight:bold; font-size:1.1em; color:#6f42c1; cursor:pointer; background:#f3f0ff; padding:4px 10px; border-radius:8px; border:1px dashed #6f42c1;" title="Click to copy">${p.code}</div>
-                        <div style="margin-top:3px;">${claimed}${claimedBy}</div>
+                    <div id="prereg-claimed-list" style="display:none; margin-top:8px;">${claimed.map(preRegClaimedRow).join('')}</div>` : '');
+        }
+        function togglePreRegClaimed(btn) {
+            const list = document.getElementById('prereg-claimed-list');
+            if (!list) return;
+            const open = list.style.display !== 'none';
+            list.style.display = open ? 'none' : 'block';
+            btn.innerHTML = open
+                ? `<i class="fa-solid fa-chevron-down"></i> ${list.children.length} claimed`
+                : `<i class="fa-solid fa-chevron-up"></i> Hide claimed`;
+        }
+        // "→ someone" only when the person who used the code is NOT the person it
+        // was made for. When they match it just printed the row's own name back.
+        function preRegClaimedByTrail(p) {
+            const who = (p.claimedByName || '').trim();
+            if (!who) return '';
+            const mine = [p.fullName, p.fullNameEn].some(n => (n || '').trim().toLowerCase() === who.toLowerCase());
+            return mine ? '' : ` <span style="color:#94a3b8;">→ ${escapeHtml(who)}</span>`;
+        }
+        function preRegWaitingRow(p) {
+            const groupColor = getGroupColor(p.group || 'Public');
+            const dates = p.startDate ? `${p.startDate} ~ ${p.endDate || ''}` : '';
+            return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid #eee; border-left:3px solid #f59e0b; border-radius:10px; background:#fff; margin-bottom:6px;">
+                <div style="flex:1; min-width:0;">
+                    <div style="font-weight:bold; font-size:0.9em;">${escapeHtml(p.fullName || p.fullNameEn || '-')} <span style="font-size:0.85em; font-weight:normal; color:#666;">${p.nickname ? `(${escapeHtml(p.nickname)})` : ''}</span></div>
+                    ${p.fullNameEn && p.fullName ? `<div style="font-size:0.75em; color:var(--primary); font-style:italic;">${escapeHtml(p.fullNameEn)}</div>` : ''}
+                    <div style="font-size:0.75em; color:#666;">
+                        <span style="background:${groupColor}; color:white; padding:1px 8px; border-radius:10px; font-size:0.85em;">${escapeHtml(p.group || 'Public')}</span>
+                        ${dates}
                     </div>
-                    ${!p.claimed ? `<button class="btn-sm btn-danger" onclick="deletePreReg('${p.id}')" style="padding:4px 8px; font-size:0.7em;">✕</button>` : ''}
-                </div>`;
-            }).join('');
+                </div>
+                <div onclick="copyCode('${p.code}')" style="font-family:monospace; font-weight:bold; font-size:1.1em; color:#6f42c1; cursor:pointer; background:#f3f0ff; padding:4px 10px; border-radius:8px; border:1px dashed #6f42c1;" title="Click to copy">${p.code}</div>
+                <button class="btn-sm btn-danger" onclick="deletePreReg('${p.id}')" style="padding:4px 8px; font-size:0.7em;">✕</button>
+            </div>`;
+        }
+        function preRegClaimedRow(p) {
+            return `<div style="display:flex; align-items:center; gap:10px; padding:6px 4px; border-bottom:1px solid #f1f5f9; font-size:0.82em;">
+                <i class="fa-solid fa-check" style="color:#22c55e; font-size:0.9em;"></i>
+                <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(p.fullName || p.fullNameEn || '-')}${preRegClaimedByTrail(p)}</span>
+                <span onclick="copyCode('${p.code}')" style="font-family:monospace; color:#94a3b8; cursor:pointer;" title="Click to copy">${p.code}</span>
+            </div>`;
         }
 
         function copyCode(code) {
