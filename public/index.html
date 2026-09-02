@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V96.99)</title>
+    <title>Internship Portfolio (V97.00)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -6937,7 +6937,24 @@
             return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
         }
 
+        // V97.00: the modal used to open ONLY inside the .then() of this read, with
+        // no .catch() — so a rejected read (rules, offline, a tap before sign-in
+        // finished) left the button completely dead, feedback-free, with an
+        // unhandled rejection in the console.
+        //
+        // On failure it still must NOT open: savePersonalInfo() writes every field
+        // unconditionally, so a form opened blank because the load failed would let
+        // Save blank out a real name, phone, email and address. A toast and a
+        // closed modal is the safe half of this fix, not a shortcut.
+        //
+        // The userId guard is separate on purpose: .doc(undefined) throws
+        // SYNCHRONOUSLY in the Firebase v8 SDK, so a .catch() on the promise never
+        // sees it — and "tapped before sign-in finished" is the likeliest way in.
         function openPersonalInfoModal() {
+            if (!userId) {
+                showToast('Still signing you in — try again in a moment กำลังเข้าสู่ระบบ ลองใหม่อีกครั้ง');
+                return;
+            }
             populateBirthdaySelects(); // V94.76: fill day/month/year options before load
             // Load current data
             db.collection("users").doc(userId).get().then(doc => {
@@ -6956,6 +6973,9 @@
                     document.getElementById('pi-address').value = d.address || "";
                 }
                 document.getElementById('personalInfoModal').style.display = 'flex';
+            }).catch(e => {
+                console.error('openPersonalInfoModal: could not load users/' + userId, e);
+                showToast('Could not load your info — try again โหลดข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง');
             });
         }
 
