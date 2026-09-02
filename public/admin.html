@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.53</title>
+    <title>Nika V98.54</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -55438,21 +55438,32 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 // Update user document
                 await db.collection("users").doc(userId).update(updateData);
                 
-                // Log the adjustment if reason provided
-                if (reason) {
-                    await db.collection("admin_logs").add({
-                        userId: userId,
-                        action: enabled ? 'period_enabled' : 'period_disabled',
-                        details: enabled ? {
-                            startDate: updateData.startDate,
-                            endDate: updateData.endDate
-                        } : 'period_removed',
-                        reason: reason,
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                        adminId: 'current_admin' // You might want to track which admin made the change
-                    });
-                }
-                
+                // V98.54 — this block had three faults at once, and they covered
+                // for each other:
+                // 1. admin_logs had no firestore.rules entry, so this write was
+                //    ALWAYS denied and the trail has been empty since V90.49.
+                // 2. It was awaited inside the main try, so the denial threw AFTER
+                //    the user doc had already been updated — the admin saw
+                //    "Could not adjust Period", the modal stayed open, and the
+                //    change had in fact been saved. Typing a reason made a
+                //    successful action look failed.
+                // 3. It only ran `if (reason)`. Between 2 and 3, the only path
+                //    that appeared to work was the one that logged nothing — which
+                //    is how an intern's dates got cleared with no trace at all.
+                // Now: log every time, reason or not, and never let the log take
+                // the operation down with it. A failed audit write is worth a
+                // console line, not a rolled-back-looking UI.
+                const editor = (auth && auth.currentUser) || {};
+                db.collection("admin_logs").add({
+                    userId: userId,
+                    action: enabled ? 'period_enabled' : 'period_disabled',
+                    details: enabled ? { startDate: updateData.startDate, endDate: updateData.endDate } : 'period_removed',
+                    reason: reason || '',
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdByUid: editor.uid || 'unknown',
+                    createdByEmail: editor.email || ALLOWED_EMAIL
+                }).catch(e => console.error('admin_logs write failed (period adjustment still saved):', e));
+
                 // Close modal and refresh table
                 closePeriodAdjustmentModal();
                 renderTable('users');

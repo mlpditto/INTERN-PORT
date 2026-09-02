@@ -560,5 +560,18 @@ service cloud.firestore {
       allow create, read: if isSignedIn();
       allow update, delete: if isAdmin();
     }
+
+    // 39. Admin Logs — append-only audit trail of admin actions on a user
+    // (savePeriodAdjustment is the first writer). This collection had NO rule
+    // at all, and there is no catch-all, so Firestore default-denied every
+    // write: the trail has been empty since the feature shipped in V90.49
+    // (2026-04-16), and reads 'permission-denied' even for the admin account.
+    // Append-only on purpose — an audit log nobody can rewrite or delete is
+    // the only kind worth keeping, so update and delete stay closed to
+    // everyone including admins.
+    match /admin_logs/{logId} {
+      allow read, create: if isAdmin();
+      allow update, delete: if false;
+    }
   }
 }
