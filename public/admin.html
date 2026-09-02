@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.47</title>
+    <title>Nika V98.48</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -46138,8 +46138,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // it to a real change, so an unrelated user's write can't churn the DOM or
         // close the open score-breakdown popover.
         function hubHeaderSig(u) {
+            const p = u.personality || {};
+            const n = p.neris || {}, b = p.big5 || {};
             return [u.pictureUrl, u.displayName, u.score, u.beri, u.group,
-                    u.startDate, u.endDate, !!u.certRequested, !!u.certApproved].join('|');
+                    u.startDate, u.endDate, !!u.certRequested, !!u.certApproved,
+                    n.type, n.variant, n.at, b.at].join('|');
         }
         window.refreshHubHeaderIfOpen = function() {
             const modal = document.getElementById('lbChartModal');
@@ -46150,6 +46153,116 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (hubHeaderSig(u) === window._hubHeaderSig) return;
             renderHubHeader(u);
         };
+
+        // V98.48 — "Know Yourself" surfacing. The intern writes
+        // users/{uid}.personality from index.html (NERIS self-report + Mini-IPIP
+        // Big Five); it rides along on the existing users onSnapshot, so this
+        // costs no extra reads. The intern card promises the result is NEVER used
+        // to score, rank or evaluate — so this is read-only, carries that line in
+        // the popover, and nothing here may ever feed score/Beri/a leaderboard.
+        const HUB_NERIS_GROUP = {
+            INTJ: 'NT', INTP: 'NT', ENTJ: 'NT', ENTP: 'NT',
+            INFJ: 'NF', INFP: 'NF', ENFJ: 'NF', ENFP: 'NF',
+            ISTJ: 'SJ', ISFJ: 'SJ', ESTJ: 'SJ', ESFJ: 'SJ',
+            ISTP: 'SP', ISFP: 'SP', ESTP: 'SP', ESFP: 'SP'
+        };
+        const HUB_NERIS_COLOR = { NT: '#7c3aed', NF: '#16a34a', SJ: '#0284c7', SP: '#d97706' };
+        const HUB_NERIS_GROUP_NAME = { NT: 'Analyst', NF: 'Diplomat', SJ: 'Sentinel', SP: 'Explorer' };
+        const HUB_B5_TRAITS = [
+            { k: 'O', en: 'Openness',          color: '#7c3aed' },
+            { k: 'C', en: 'Conscientiousness', color: '#0284c7' },
+            { k: 'E', en: 'Extraversion',      color: '#f59e0b' },
+            { k: 'A', en: 'Agreeableness',     color: '#16a34a' },
+            { k: 'N', en: 'Neuroticism',       color: '#ef4444' }
+        ];
+        function hubPersonalityLabel(u) {
+            const p = u.personality || {};
+            const type = p.neris && p.neris.type;
+            if (type) return type + (p.neris.variant ? `-${p.neris.variant}` : '');
+            if (p.big5 && p.big5.scores) return 'Big Five';
+            return '';
+        }
+        function buildHubPersonalityChip(u) {
+            const label = hubPersonalityLabel(u);
+            if (!label) return '';
+            const g = HUB_NERIS_GROUP[(u.personality.neris || {}).type] || null;
+            const color = g ? HUB_NERIS_COLOR[g] : '#64748b';
+            return `<button id="hub-pers-trigger" onclick="event.stopPropagation(); toggleHubPersonalityDetail(event)" title="Self-reported personality — click for detail" style="display:inline-flex; align-items:center; gap:5px; width:auto; min-height:0; font-size:11px; background:#fff; color:${color}; border:1.5px solid ${color}; padding:3px 11px; border-radius:30px; font-weight:900; letter-spacing:0.04em; cursor:pointer; font-family:inherit;"><i class="fa-solid fa-compass"></i>${escapeHtml(label)}</button>`;
+        }
+        // A short date, tolerant of the ISO strings index.html writes.
+        function hubPersDate(iso) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            return isNaN(d) ? '' : d.toISOString().slice(0, 10);
+        }
+        window.toggleHubPersonalityDetail = function(event) {
+            const popover = document.getElementById('hub-pers-popover');
+            if (!popover) return;
+            if (popover.style.display === 'block') { popover.style.display = 'none'; return; }
+            const score = document.getElementById('hub-score-popover');
+            if (score) score.style.display = 'none';
+            const u = (usersData || []).find(x => x.id === window._currentPopupUser);
+            const p = (u && u.personality) || {};
+            const n = p.neris || {}, b = p.big5 || {};
+            let body = '';
+            if (n.type) {
+                const g = HUB_NERIS_GROUP[n.type];
+                const color = g ? HUB_NERIS_COLOR[g] : '#64748b';
+                const proof = n.proofUrl
+                    ? `<a href="${escapeHtml(n.proofUrl)}" target="_blank" rel="noopener" style="color:#4361ee; font-weight:700;">screenshot</a>`
+                    : '<span style="color:#cbd5e1;">no screenshot</span>';
+                body += `
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="font-size:1.15em; font-weight:900; letter-spacing:0.06em; color:${color};">${escapeHtml(n.type)}${n.variant ? `-${escapeHtml(n.variant)}` : ''}</span>
+                        <span style="color:#64748b;">${g ? HUB_NERIS_GROUP_NAME[g] : ''}</span>
+                    </div>
+                    <div style="color:#94a3b8; margin-top:3px;">16Personalities · self-reported${hubPersDate(n.at) ? ` · ${hubPersDate(n.at)}` : ''} · ${proof}</div>`;
+            }
+            if (b.scores) {
+                const bars = HUB_B5_TRAITS.map(t => {
+                    const v = Math.max(0, Math.min(100, Number(b.scores[t.k]) || 0));
+                    return `<div style="display:contents;">
+                        <span style="color:#475569;">${t.en}</span>
+                        <span style="background:#f1f5f9; border-radius:999px; height:7px; align-self:center; position:relative; overflow:hidden;"><span style="position:absolute; inset:0 auto 0 0; width:${v}%; background:${t.color}; border-radius:999px;"></span></span>
+                        <b style="color:${t.color}; text-align:right;">${v}%</b>
+                    </div>`;
+                }).join('');
+                const der = b.derived || {};
+                body += `
+                    <div style="margin-top:${n.type ? '10px' : '0'}; padding-top:${n.type ? '9px' : '0'}; ${n.type ? 'border-top:1px dashed #e2e8f0;' : ''}">
+                        <div style="font-size:0.9em; color:#94a3b8; font-weight:800; margin-bottom:6px;">Big Five (Mini-IPIP)${hubPersDate(b.at) ? ` · ${hubPersDate(b.at)}` : ''}</div>
+                        <div style="display:grid; grid-template-columns:auto 90px auto; gap:5px 10px; align-items:center;">${bars}</div>
+                        ${der.letters ? `<div style="margin-top:7px; color:#94a3b8;">Would suggest <b style="color:#475569;">${escapeHtml(der.letters)}${der.variant ? `-${escapeHtml(der.variant)}` : ''}</b> — % of the scale, not a percentile.</div>` : ''}
+                    </div>`;
+            }
+            if (!body) body = '<div style="color:#94a3b8;">Nothing self-reported yet.</div>';
+            popover.innerHTML = `
+                <div style="background:white; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px; box-shadow:0 8px 24px rgba(15,23,42,0.18); min-width:290px; max-width:340px; font-size:0.85em;">
+                    <div style="font-size:0.7em; color:#94a3b8; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">Know Yourself</div>
+                    ${body}
+                    <div style="margin-top:10px; padding-top:8px; border-top:1px dashed #e2e8f0; font-size:0.8em; color:#94a3b8;">Self-reported by the intern. Never used to score, rank or evaluate.</div>
+                </div>`;
+            const trigger = document.getElementById('hub-pers-trigger');
+            const parent = document.getElementById('lb-popup-header');
+            if (trigger && parent) {
+                const tRect = trigger.getBoundingClientRect();
+                const pRect = parent.getBoundingClientRect();
+                popover.style.top = `${tRect.bottom - pRect.top + 6}px`;
+                popover.style.left = `${tRect.left - pRect.left}px`;
+            }
+            popover.style.display = 'block';
+            setTimeout(() => {
+                document.addEventListener('click', closeHubPersonalityOnce, { once: true });
+            }, 0);
+        };
+        function closeHubPersonalityOnce(e) {
+            const popover = document.getElementById('hub-pers-popover');
+            if (popover && !popover.contains(e.target)) {
+                popover.style.display = 'none';
+            } else {
+                document.addEventListener('click', closeHubPersonalityOnce, { once: true });
+            }
+        }
 
         function renderHubHeader(u) {
             window._hubHeaderSig = hubHeaderSig(u);
@@ -46169,6 +46282,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         ${u.displayName}
                         <span style="font-size:11px; background:linear-gradient(135deg, #4361ee, #7209b7); color:white; padding:4px 12px; border-radius:30px; letter-spacing:1px; font-weight:900;">${crewRank}</span>
                         <span title="Group" style="display:inline-flex; align-items:center; gap:5px; font-size:11px; background:${getGroupColor(hubGroup)}; color:white; padding:4px 12px; border-radius:30px; font-weight:800;"><i class="fa-solid ${getGroupIcon(hubGroup)}"></i>${escapeHtml(hubGroup)}</span>
+                        ${buildHubPersonalityChip(u)}
                     </div>
                     <div style="font-size:0.85em; color:#64748b; margin-top:4px;">
                         ${trainingHtml}
@@ -46181,6 +46295,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     </div>
                 </div>
                 <div id="hub-score-popover" style="display:none; position:absolute; z-index:100; top:90px; left:90px;"></div>
+                <div id="hub-pers-popover" style="display:none; position:absolute; z-index:100; top:90px; left:90px;"></div>
             `;
             // Ensure parent has position:relative so absolute popover anchors correctly
             const parent = document.getElementById('lb-popup-header');
@@ -46193,6 +46308,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (!popover) return;
             const isOpen = popover.style.display === 'block';
             if (isOpen) { popover.style.display = 'none'; return; }
+            const pers = document.getElementById('hub-pers-popover'); // V98.48: one at a time
+            if (pers) pers.style.display = 'none';
             const userId = window._currentPopupUser;
             const cache = (window._hubUserCache && userId) ? window._hubUserCache[userId] : null;
             const dash = cache && cache.dash;
