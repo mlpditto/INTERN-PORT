@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.51</title>
+    <title>Nika V98.52</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -51792,20 +51792,38 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const mine = [p.fullName, p.fullNameEn].some(n => (n || '').trim().toLowerCase() === who.toLowerCase());
             return mine ? '' : ` <span style="color:#94a3b8;">→ ${escapeHtml(who)}</span>`;
         }
+        // V98.52 lean, phase 3. Two changes, one idea: a row's weight should match
+        // how much of it you still need.
+        // 1. Three stacked lines -> one. Name, nickname, group and dates all fit on
+        //    a single line at this modal's width; the English name folds behind the
+        //    same toggleRowDetail() chevron the User Hub rows use (V98.16 #952).
+        // 2. The code is the thing you came here to copy, so it gets the size — and
+        //    the dashed border comes off, because a dashed box reads as a
+        //    placeholder rather than as the live value it actually is. (A spent
+        //    code already went muted-mono in V98.51.)
+        //
+        // ⚠️ The chevron MUST be a direct child of the same element the .row-detail
+        // is a sibling of: toggleRowDetail resolves the detail as
+        // btn.parentElement.nextElementSibling. Nesting it one level deeper (inside
+        // the name block, say) makes that lookup miss and the fallback
+        // querySelector find nothing — a chevron that silently does nothing.
         function preRegWaitingRow(p) {
             const groupColor = getGroupColor(p.group || 'Public');
             const dates = p.startDate ? `${p.startDate} ~ ${p.endDate || ''}` : '';
-            return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid #eee; border-left:3px solid #f59e0b; border-radius:10px; background:#fff; margin-bottom:6px;">
-                <div style="flex:1; min-width:0;">
-                    <div style="font-weight:bold; font-size:0.9em;">${escapeHtml(p.fullName || p.fullNameEn || '-')} <span style="font-size:0.85em; font-weight:normal; color:#666;">${p.nickname ? `(${escapeHtml(p.nickname)})` : ''}</span></div>
-                    ${p.fullNameEn && p.fullName ? `<div style="font-size:0.75em; color:var(--primary); font-style:italic;">${escapeHtml(p.fullNameEn)}</div>` : ''}
-                    <div style="font-size:0.75em; color:#666;">
-                        <span style="background:${groupColor}; color:white; padding:1px 8px; border-radius:10px; font-size:0.85em;">${escapeHtml(p.group || 'Public')}</span>
-                        ${dates}
+            const hasMore = !!(p.fullNameEn && p.fullName);
+            return `<div style="padding:9px 12px; border:1px solid #eee; border-left:3px solid #f59e0b; border-radius:10px; background:#fff; margin-bottom:6px;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="flex:1; min-width:0; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                        <span style="font-weight:bold; font-size:0.9em;">${escapeHtml(p.fullName || p.fullNameEn || '-')}</span>
+                        ${p.nickname ? `<span style="font-size:0.78em; color:#666;">(${escapeHtml(p.nickname)})</span>` : ''}
+                        <span style="background:${groupColor}; color:white; padding:1px 8px; border-radius:10px; font-size:0.68em; font-weight:700;">${escapeHtml(p.group || 'Public')}</span>
+                        ${dates ? `<span style="font-size:0.75em; color:#94a3b8; font-family:monospace;">${dates}</span>` : ''}
                     </div>
+                    ${hasMore ? `<button type="button" onclick="toggleRowDetail(this)" style="width:auto; min-height:0; border:none; background:transparent; color:#94a3b8; cursor:pointer; font-size:0.8em; padding:0 2px; line-height:1;" title="English name"><i class="fa-solid fa-chevron-down"></i></button>` : ''}
+                    <div onclick="copyCode('${p.code}')" style="font-family:monospace; font-weight:bold; font-size:1.25em; letter-spacing:0.03em; color:#6f42c1; cursor:pointer; background:#f3f0ff; padding:5px 12px; border-radius:8px; display:flex; align-items:center; gap:7px;" title="Click to copy">${p.code}<i class="fa-regular fa-copy" style="font-size:0.62em; opacity:0.65;"></i></div>
+                    <button class="btn-sm btn-danger" onclick="deletePreReg('${p.id}')" style="padding:4px 8px; font-size:0.7em;">✕</button>
                 </div>
-                <div onclick="copyCode('${p.code}')" style="font-family:monospace; font-weight:bold; font-size:1.1em; color:#6f42c1; cursor:pointer; background:#f3f0ff; padding:4px 10px; border-radius:8px; border:1px dashed #6f42c1;" title="Click to copy">${p.code}</div>
-                <button class="btn-sm btn-danger" onclick="deletePreReg('${p.id}')" style="padding:4px 8px; font-size:0.7em;">✕</button>
+                ${hasMore ? `<div class="row-detail" style="display:none; margin-top:4px; font-size:0.75em; color:var(--primary); font-style:italic;">${escapeHtml(p.fullNameEn)}</div>` : ''}
             </div>`;
         }
         function preRegClaimedRow(p) {
