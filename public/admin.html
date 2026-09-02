@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.52</title>
+    <title>Nika V98.53</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -51845,6 +51845,27 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return code;
         }
 
+        // Returns a message when the pair is unusable, or '' when it is fine.
+        // Deliberately narrow: it catches an internship that ends before it starts
+        // and a year far enough out that it can only be a typo. It does NOT reject
+        // a start date in the past — pre-registering someone mid-rotation is
+        // ordinary — and it does not require either date.
+        function preRegDateProblem(startDate, endDate) {
+            const PLAUSIBLE_YEARS_AHEAD = 5;
+            const maxYear = new Date().getFullYear() + PLAUSIBLE_YEARS_AHEAD;
+            for (const [label, v] of [['Start', startDate], ['End', endDate]]) {
+                if (!v) continue;
+                const y = Number(String(v).slice(0, 4));
+                if (!Number.isFinite(y) || y > maxYear) {
+                    return `${label} date is ${v} — check the year (anything after ${maxYear} looks like a typo).`;
+                }
+            }
+            if (startDate && endDate && endDate < startDate) {
+                return `End date (${endDate}) is before the start date (${startDate}).`;
+            }
+            return '';
+        }
+
         async function addPreRegUser() {
             // V98.47: fullName is the THAI name (users.fullName), fullNameEn the
             // English one. Either alone is enough to create a code.
@@ -51856,6 +51877,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const endDate = document.getElementById('prereg-end').value;
 
             if (!fullName && !fullNameEn) return alert("Please specify a full name (Thai or English).");
+
+            // V98.53: dates were written with no sanity check at all. Production
+            // currently holds "2026-06-04 ~ 3026-06-04" — a mistyped leading digit
+            // that nothing caught, and which the claim flow copies straight onto
+            // the user, where every "days remaining" pill downstream reads from it.
+            // Both dates stay OPTIONAL (codes made by regenPreRegCode often have
+            // none); these only fire when a date is actually present.
+            const dateErr = preRegDateProblem(startDate, endDate);
+            if (dateErr) return alert(dateErr);
 
             // Generate unique code (check collision)
             let code = generateCode();
