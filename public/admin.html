@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.48</title>
+    <title>Nika V98.49</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -7161,6 +7161,13 @@
             <div id="user-group-tabs"
                 style="display:flex; gap:8px; overflow-x:auto; padding-bottom:10px; margin-bottom:15px; border-bottom:2px solid #f0f0f0;"></div>
             <div id="leaderboardList" style="margin-bottom:25px; overflow-x:auto;"></div>
+            <!-- V98.49: "Know Yourself" filter for the table below. Rendered by
+                 renderUserPersFilter() from the group-filtered rows and hidden
+                 entirely while nobody in view has self-reported anything — the
+                 table lean track (#944-#952) took columns OUT, so this stays a
+                 rail and never becomes a ninth column. -->
+            <div id="user-pers-filter" class="lang-no-toggle"
+                style="display:none; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px;"></div>
             <div style="overflow-x:auto;">
                 <table id="usersTable" class="lang-no-toggle">
                     <thead>
@@ -43752,7 +43759,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         data = data.filter(u => (u.group || 'Public') === activeUserGroup);
                     }
                 }
-                
+
+                // V98.49 — Know Yourself rail. Built from the rows the group/search
+                // filters left, then applied. Read-only slice of a self-report: it
+                // reorders nothing and feeds no score.
+                renderUserPersFilter(data);
+                if (window._userPersFilter && window._userPersFilter !== 'all') {
+                    data = data.filter(u => userPersBucket(u) === window._userPersFilter);
+                }
+
                 // 🔥 Period Calculation & Sorting ([Version: V86.96])
                 if (hasRange) {
                     const start = startStr ? new Date(startStr) : new Date(0);
@@ -46175,6 +46190,62 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             { k: 'A', en: 'Agreeableness',     color: '#16a34a' },
             { k: 'N', en: 'Neuroticism',       color: '#ef4444' }
         ];
+        // V98.49 — which bucket a row falls in for the table filter rail. A NERIS
+        // type wins over Big Five because it is the coarser, more recognisable
+        // label; someone who did Part B only lands in 'b5'.
+        function userPersBucket(u) {
+            const p = u.personality || {};
+            const t = p.neris && p.neris.type;
+            if (t && HUB_NERIS_GROUP[t]) return HUB_NERIS_GROUP[t];
+            if (p.big5 && p.big5.scores) return 'b5';
+            return 'none';
+        }
+        window._userPersFilter = 'all';
+        window.setUserPersFilter = function(k) {
+            window._userPersFilter = k;
+            renderTable('users');
+        };
+        // Counts come from the rows the group/search filters already left in view,
+        // so the rail describes the table it sits above, not the whole roster.
+        function renderUserPersFilter(rows) {
+            const el = document.getElementById('user-pers-filter');
+            if (!el) return;
+            const counts = { NT: 0, NF: 0, SJ: 0, SP: 0, b5: 0, none: 0 };
+            rows.forEach(u => { counts[userPersBucket(u)]++; });
+            const withData = counts.NT + counts.NF + counts.SJ + counts.SP + counts.b5;
+            if (!withData) {
+                // Nothing to filter — hide the rail AND drop any active filter, or
+                // switching to a group where nobody answered would empty the table
+                // with no visible control to undo it.
+                window._userPersFilter = 'all';
+                el.style.display = 'none';
+                el.innerHTML = '';
+                return;
+            }
+            const opts = [
+                { k: 'all',  label: 'All',           color: '#333',                icon: 'fa-users',        count: rows.length },
+                { k: 'NT',   label: 'Analyst',       color: HUB_NERIS_COLOR.NT,    icon: 'fa-compass',      count: counts.NT },
+                { k: 'NF',   label: 'Diplomat',      color: HUB_NERIS_COLOR.NF,    icon: 'fa-compass',      count: counts.NF },
+                { k: 'SJ',   label: 'Sentinel',      color: HUB_NERIS_COLOR.SJ,    icon: 'fa-compass',      count: counts.SJ },
+                { k: 'SP',   label: 'Explorer',      color: HUB_NERIS_COLOR.SP,    icon: 'fa-compass',      count: counts.SP },
+                { k: 'b5',   label: 'Big Five only', color: '#64748b',             icon: 'fa-chart-simple', count: counts.b5 },
+                { k: 'none', label: 'No result',     color: '#94a3b8',             icon: 'fa-circle-minus', count: counts.none }
+            ].filter(o => o.k === 'all' || o.count > 0);
+            if (!opts.some(o => o.k === window._userPersFilter)) window._userPersFilter = 'all';
+            el.style.display = 'flex';
+            el.innerHTML = `<span style="font-size:0.72em; color:#94a3b8; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; margin-right:2px;">Know Yourself</span>` +
+                opts.map(o => {
+                    const on = o.k === window._userPersFilter;
+                    return `<button onclick="setUserPersFilter('${o.k}')" style="
+                        width:auto; min-height:0; padding:5px 13px; border-radius:20px;
+                        border:2px solid ${on ? o.color : '#ddd'};
+                        background:${on ? o.color : '#fff'}; color:${on ? '#fff' : o.color};
+                        font-size:0.78em; font-weight:bold; cursor:pointer; white-space:nowrap;
+                        display:flex; align-items:center; gap:5px; font-family:inherit; transition:all 0.2s;
+                    "><i class="fa-solid ${o.icon}"></i> ${o.label} <span style="background:${on ? 'rgba(255,255,255,0.3)' : '#eee'}; padding:1px 7px; border-radius:10px; font-size:0.85em;">${o.count}</span></button>`;
+                }).join('');
+        }
+
         function hubPersonalityLabel(u) {
             const p = u.personality || {};
             const type = p.neris && p.neris.type;
