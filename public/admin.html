@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.46</title>
+    <title>Nika V98.47</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -51483,7 +51483,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const groupColor = getGroupColor(p.group || 'Public');
                 return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid #eee; border-radius:10px; background:#fff; margin-bottom:6px;">
                     <div style="flex:1; min-width:0;">
-                        <div style="font-weight:bold; font-size:0.9em;">${p.fullName || '-'} <span style="font-size:0.85em; font-weight:normal; color:#666;">${p.nickname ? `(${p.nickname})` : ''}</span></div>
+                        <div style="font-weight:bold; font-size:0.9em;">${p.fullName || p.fullNameEn || '-'} <span style="font-size:0.85em; font-weight:normal; color:#666;">${p.nickname ? `(${p.nickname})` : ''}</span></div>
+                        ${p.fullNameEn && p.fullName ? `<div style="font-size:0.75em; color:var(--primary); font-style:italic;">${p.fullNameEn}</div>` : ''}
                         <div style="font-size:0.75em; color:#666;">
                             <span style="background:${groupColor}; color:white; padding:1px 8px; border-radius:10px; font-size:0.85em;">${p.group || 'Public'}</span>
                             ${p.startDate ? `${p.startDate} ~ ${p.endDate || ''}` : ''}
@@ -51510,13 +51511,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         async function addPreRegUser() {
-            const fullName = document.getElementById('prereg-name').value.trim();
+            // V98.47: fullName is the THAI name (users.fullName), fullNameEn the
+            // English one. Either alone is enough to create a code.
+            const fullName = document.getElementById('prereg-name-th').value.trim();
+            const fullNameEn = document.getElementById('prereg-name').value.trim();
             const nickname = document.getElementById('prereg-nick').value.trim();
             const group = document.getElementById('prereg-group').value.trim() || 'Junior';
             const startDate = document.getElementById('prereg-start').value;
             const endDate = document.getElementById('prereg-end').value;
 
-            if (!fullName) return alert("Please specify full name.");
+            if (!fullName && !fullNameEn) return alert("Please specify a full name (Thai or English).");
 
             // Generate unique code (check collision)
             let code = generateCode();
@@ -51525,11 +51529,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
             try {
                 await db.collection("pre_users").add({
-                    fullName, nickname, group, startDate, endDate, code,
+                    fullName, fullNameEn, nickname, group, startDate, endDate, code,
                     claimed: false,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                showToast(`✅ Pre-registered: ${nickname ? nickname : fullName} → Code: ${code}`);
+                showToast(`✅ Pre-registered: ${nickname || fullName || fullNameEn} → Code: ${code}`);
+                document.getElementById('prereg-name-th').value = '';
                 document.getElementById('prereg-name').value = '';
                 document.getElementById('prereg-nick').value = '';
             } catch (e) {
@@ -51557,6 +51562,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             try {
                 await db.collection("pre_users").add({
                     fullName: user.fullName || user.displayName,
+                    fullNameEn: user.fullNameEn || "", // V98.47: carry the cert name too
                     nickname: user.nickname || "",
                     group: user.group || "Public",
                     startDate: user.startDate || "",
@@ -58831,12 +58837,22 @@ Reply ONLY with raw JSON, no markdown:
 
             <div
                 style="background:#f8f9fa; padding:15px; border-radius:12px; margin-bottom:15px; border:1px solid #eee;">
-                <div style="display:flex; gap:8px; margin-bottom:8px;">
-                    <input type="text" id="prereg-name" placeholder="Full Name (English)" style="flex:2; margin:0;"
+                <!-- V98.47: two name boxes, matching the users schema the rest of the
+                     app already assumes — users.fullName is the THAI name (the profile
+                     modal binds it to #gs-fullname-th) and users.fullNameEn is the
+                     English one the certificate prints. regenPreRegCode has always
+                     copied user.fullName into pre_users.fullName, so the Thai box is
+                     the one that feeds it; the English box now lands in fullNameEn
+                     instead of overwriting the Thai slot. -->
+                <div style="display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
+                    <input type="text" id="prereg-name-th" placeholder="Full name (Thai)"
+                        data-th-placeholder="ชื่อ-นามสกุล ภาษาไทย" style="flex:2; min-width:180px; margin:0;"
+                        title="Thai full name — shown across the admin and the LIFF profile">
+                    <input type="text" id="prereg-name" placeholder="Full Name (English)" style="flex:2; min-width:180px; margin:0;"
                         title="English Full Name for Certificate">
-                    <input type="text" id="prereg-nick" placeholder="Nickname/AKA" style="flex:1; margin:0;"
+                    <input type="text" id="prereg-nick" placeholder="Nickname/AKA" style="flex:1; min-width:120px; margin:0;"
                         title="Nickname/AKA">
-                    <select id="prereg-group" style="flex:1; margin:0;">
+                    <select id="prereg-group" style="flex:1; min-width:120px; margin:0;">
                         <option value="Junior">Junior</option>
                         <option value="INTERN">INTERN</option>
                         <option value="EXTERN">EXTERN</option>
