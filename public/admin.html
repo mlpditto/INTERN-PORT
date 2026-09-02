@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.49</title>
+    <title>Nika V98.50</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -15415,6 +15415,24 @@
             <div id="quiz-compare-summary" style="font-size:0.85em; color:#475569; margin-bottom:10px;"></div>
             <div id="quiz-compare-ai-result" style="margin-bottom:14px;"></div>
             <div id="quiz-compare-body" style="display:flex; flex-direction:column; gap:16px; max-height:60vh; overflow-y:auto;"></div>
+        </div>
+    </div>
+
+    <!-- V98.50: Know Yourself composition. lang-no-toggle because group names are
+         admin-authored and can be Thai — see the Pre-register list (V98.46). -->
+    <div id="persCompositionModal" class="modal lang-no-toggle" style="z-index:4100;">
+        <div class="modal-content" style="max-width:760px; text-align:left;">
+            <span class="close-modal"
+                onclick="document.getElementById('persCompositionModal').style.display='none'">&times;</span>
+            <h3 style="margin-top:0;">🧭 Know Yourself — group composition</h3>
+            <p style="font-size:0.85em; color:#666; margin-bottom:14px;">
+                How each group splits across the four NERIS role groups, and its mean Big Five.
+                Groups are listed by name, never ordered by any of this.</p>
+            <div id="pers-composition-body" style="max-height:60vh; overflow-y:auto;"></div>
+            <p style="font-size:0.76em; color:#94a3b8; margin:14px 0 0;">
+                Self-reported by the interns, and never used to score, rank or evaluate — a group
+                with a low <b>reported</b> count is a group that has not filled it in, nothing more.
+                A mean over a small <b>n</b> says very little; check the n before reading anything into it.</p>
         </div>
     </div>
 
@@ -46243,8 +46261,76 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         font-size:0.78em; font-weight:bold; cursor:pointer; white-space:nowrap;
                         display:flex; align-items:center; gap:5px; font-family:inherit; transition:all 0.2s;
                     "><i class="fa-solid ${o.icon}"></i> ${o.label} <span style="background:${on ? 'rgba(255,255,255,0.3)' : '#eee'}; padding:1px 7px; border-radius:10px; font-size:0.85em;">${o.count}</span></button>`;
-                }).join('');
+                }).join('') +
+                `<button onclick="openPersCompositionModal()" title="How the groups are made up" style="
+                    width:auto; min-height:0; padding:5px 13px; border-radius:20px; margin-left:4px;
+                    border:1px dashed #cbd5e1; background:#fff; color:#64748b;
+                    font-size:0.78em; font-weight:bold; cursor:pointer; white-space:nowrap;
+                    display:flex; align-items:center; gap:5px; font-family:inherit;
+                "><i class="fa-solid fa-chart-pie"></i> Composition</button>`;
         }
+
+        // V98.50 — per-group composition. Aggregate only: how many people in each
+        // group reported anything, how the four NERIS role groups split, and the
+        // mean Big Five. Groups are listed in name order and NEVER ordered by any
+        // personality metric — the intern card promises the result is not used to
+        // rank or evaluate, and ranking the GROUPS would break that promise just
+        // as surely as ranking the people.
+        function persGroupStats(users) {
+            const s = { total: users.length, NT: 0, NF: 0, SJ: 0, SP: 0, typed: 0, anyData: 0, b5n: 0, b5sum: { O: 0, C: 0, E: 0, A: 0, N: 0 } };
+            users.forEach(u => {
+                const b = userPersBucket(u);
+                if (b !== 'none') s.anyData++;
+                if (b !== 'none' && b !== 'b5') { s[b]++; s.typed++; }
+                const sc = u.personality && u.personality.big5 && u.personality.big5.scores;
+                if (sc) {
+                    s.b5n++;
+                    Object.keys(s.b5sum).forEach(k => { s.b5sum[k] += Number(sc[k]) || 0; });
+                }
+            });
+            s.b5avg = {};
+            Object.keys(s.b5sum).forEach(k => { s.b5avg[k] = s.b5n ? Math.round(s.b5sum[k] / s.b5n) : null; });
+            return s;
+        }
+        function persCompositionRow(label, color, users) {
+            const s = persGroupStats(users);
+            const roleBar = s.typed
+                ? ['NT', 'NF', 'SJ', 'SP'].filter(k => s[k]).map(k =>
+                    `<span title="${HUB_NERIS_GROUP_NAME[k]}: ${s[k]}" style="width:${(s[k] / s.typed) * 100}%; background:${HUB_NERIS_COLOR[k]};"></span>`).join('')
+                : '';
+            const roleLegend = s.typed
+                ? ['NT', 'NF', 'SJ', 'SP'].filter(k => s[k]).map(k =>
+                    `<span style="color:${HUB_NERIS_COLOR[k]}; font-weight:800;">${HUB_NERIS_GROUP_NAME[k]} ${s[k]}</span>`).join('<span style="color:#e2e8f0;"> · </span>')
+                : '<span style="color:#cbd5e1;">no type reported</span>';
+            const b5 = s.b5n
+                ? HUB_B5_TRAITS.map(t => `
+                    <div style="display:contents;">
+                        <span style="color:#64748b;">${t.k}</span>
+                        <span style="background:#f1f5f9; border-radius:999px; height:6px; align-self:center; position:relative; overflow:hidden;"><span style="position:absolute; inset:0 auto 0 0; width:${s.b5avg[t.k]}%; background:${t.color}; border-radius:999px;"></span></span>
+                        <b style="color:${t.color}; text-align:right;">${s.b5avg[t.k]}%</b>
+                    </div>`).join('')
+                : '';
+            return `
+                <div style="padding:11px 0; border-bottom:1px solid #f1f5f9;">
+                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
+                        <span style="background:${color}; color:#fff; padding:2px 11px; border-radius:20px; font-size:0.78em; font-weight:800;">${escapeHtml(label)}</span>
+                        <span style="font-size:0.78em; color:#94a3b8; font-weight:700;">${s.anyData}/${s.total} reported</span>
+                        <span style="font-size:0.76em; margin-left:auto;">${roleLegend}</span>
+                    </div>
+                    ${s.typed ? `<div style="display:flex; height:8px; border-radius:999px; overflow:hidden; background:#f1f5f9;">${roleBar}</div>` : ''}
+                    ${b5 ? `<div style="margin-top:8px; display:grid; grid-template-columns:auto 1fr auto; gap:4px 9px; align-items:center; font-size:0.76em; max-width:420px;">
+                        <div style="grid-column:1/-1; color:#94a3b8; font-weight:800;">Mean Big Five · n=${s.b5n}</div>${b5}
+                    </div>` : ''}
+                </div>`;
+        }
+        window.openPersCompositionModal = function() {
+            const body = document.getElementById('pers-composition-body');
+            const all = (usersData || []);
+            const groups = [...new Set(all.map(u => u.group || 'Public'))].sort();
+            body.innerHTML = persCompositionRow('All', '#334155', all) +
+                groups.map(g => persCompositionRow(g, getGroupColor(g), all.filter(u => (u.group || 'Public') === g))).join('');
+            document.getElementById('persCompositionModal').style.display = 'block';
+        };
 
         function hubPersonalityLabel(u) {
             const p = u.personality || {};
