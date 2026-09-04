@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.03)</title>
+    <title>Internship Portfolio (V97.04)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3399,6 +3399,29 @@
                 #dd-type-tabs .dd-type-tab[data-ddtype="disease"].active {
                     color: #0f766e; border-bottom-color: #0f766e;
                 }
+                /* V97.04: Schedule pane switch (🗓 Agenda / 🔥 Activity).
+                   Its own class, NOT .dc-view-tab — dcSwitchView/dxSwitchView do
+                   an UNSCOPED querySelectorAll('.dc-view-tab') and would strip
+                   .active here, exactly the trap the DD Codex switch documents
+                   above. schSwitchPane() likewise only queries '#sch-tabs .sch-tab'.
+                   width/min-height negate the global `button` rule (line 361). */
+                #sch-tabs {
+                    display: flex; gap: 4px; padding: 10px 12px 0;
+                    border-bottom: 1px solid #e2e8f0;
+                }
+                #sch-tabs .sch-tab {
+                    width: auto; min-height: 0;
+                    padding: 8px 14px; border: none; background: transparent;
+                    color: #64748b; font-weight: 700; font-size: 0.85em;
+                    cursor: pointer; border-bottom: 2px solid transparent;
+                    border-radius: 8px 8px 0 0;
+                    display: inline-flex; align-items: center; gap: 6px;
+                    font-family: inherit;
+                }
+                #sch-tabs .sch-tab:hover { color: #6d28d9; background: #f5f3ff; }
+                #sch-tabs .sch-tab.active {
+                    color: #7c3aed; background: #fff; border-bottom-color: #7c3aed;
+                }
                 .dc-view-tab-badge {
                     font-size: 0.72em; background: #1d4ed8; color: #fff;
                     padding: 1px 7px; border-radius: 999px;
@@ -4110,11 +4133,20 @@
                         </h4>
                         <i id="schedule-section-icon" class="fa-solid fa-chevron-down" style="color:#7c3aed; transition:0.3s; font-size:0.9em;"></i>
                     </div>
-                    <div id="schedule-section-content" style="display:none; border-top:1px solid #f0f0f0; background:#fff; padding:14px 16px 18px;">
-                        <div id="sch-summary" style="font-size:0.82em; color:#475569; font-weight:700; margin-bottom:10px;"></div>
-                        <div id="sch-heatmap"></div>
-                        <div id="sch-legend" style="display:flex; align-items:center; gap:5px; margin-top:10px; font-size:0.68em; color:#94a3b8;"></div>
-                        <div id="sch-day-detail" style="display:none; margin-top:12px; padding-top:10px; border-top:1px solid #f1f5f9;"></div>
+                    <div id="schedule-section-content" style="display:none; border-top:1px solid #f0f0f0; background:#fff;">
+                        <div id="sch-tabs">
+                            <button type="button" class="sch-tab active" data-schpane="agenda" onclick="schSwitchPane('agenda')">🗓 Agenda</button>
+                            <button type="button" class="sch-tab" data-schpane="activity" onclick="schSwitchPane('activity')">🔥 Activity</button>
+                        </div>
+                        <div id="sch-pane-agenda" style="padding:14px 16px 18px;">
+                            <div id="sch-agenda"></div>
+                        </div>
+                        <div id="sch-pane-activity" style="display:none; padding:14px 16px 18px;">
+                            <div id="sch-summary" style="font-size:0.82em; color:#475569; font-weight:700; margin-bottom:10px;"></div>
+                            <div id="sch-heatmap"></div>
+                            <div id="sch-legend" style="display:flex; align-items:center; gap:5px; margin-top:10px; font-size:0.68em; color:#94a3b8;"></div>
+                            <div id="sch-day-detail" style="display:none; margin-top:12px; padding-top:10px; border-top:1px solid #f1f5f9;"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -13112,6 +13144,165 @@
             return ({ case: '🩺', work: '📤', quiz: '📝', quest: '🎯', reflective: '📓', explore_link: '🔗' })[t] || '•';
         }
 
+        // ---- V97.04: Schedule — Agenda pane --------------------------------
+        // Everything dated the intern still owes, in one chronological list.
+        // Like the heatmap this reads only caches the page already holds
+        // (questsCache / quizzesCache / quizAttemptsCache / mySubmissionsCache),
+        // and it reuses renderAssignments' own visibility predicates so the
+        // Agenda can never advertise something the Mission list would hide.
+        // ⚠️ loadAllQuests() caps questsCache at 20 docs, so a quest older than
+        // the 20 most recent will not appear here either.
+        const SCH_BUCKETS = [
+            ['missed', 'Missed พลาดแล้ว', '#991b1b', '#fef2f2', '#fecaca'],
+            ['today', 'Today วันนี้', '#9a3412', '#fff7ed', '#fed7aa'],
+            ['week', 'This week สัปดาห์นี้', '#1d4ed8', '#eff6ff', '#bfdbfe'],
+            ['later', 'Later ถัดไป', '#475569', '#f8fafc', '#e2e8f0']
+        ];
+
+        function schRel(ms) {
+            const mins = Math.floor(ms / 60000);
+            if (mins < 60) return Math.max(1, mins) + 'm';
+            const hrs = Math.floor(mins / 60);
+            if (hrs < 24) return hrs + 'h ' + (mins % 60) + 'm';
+            return Math.floor(hrs / 24) + 'd';
+        }
+
+        function schAgendaItems() {
+            const now = new Date();
+            const out = [];
+            const asDate = v => v ? ((typeof v.toDate === 'function') ? v.toDate() : new Date(v)) : null;
+
+            // Daily obligations reuse the very predicates the streak card uses, so
+            // the two surfaces can never disagree about what "done today" means.
+            const todayKey = getBangkokDateTimeParts().dateKey;
+            if ((typeof myCheckin !== 'undefined' ? (myCheckin || {}) : {}).lastDate !== todayKey) {
+                out.push({ bucket: 'today', icon: '✅', title: 'Daily check-in เช็คอินประจำวัน', act: 'tryDailyCheckin()' });
+            }
+            if (typeof _activityDoneToday === 'function' && !_activityDoneToday(_combinedLogCache())) {
+                out.push({ bucket: 'today', icon: '📝', title: 'Journal entry บันทึกประจำวัน', tag: '+0.1', act: 'gotoLog()' });
+            }
+            if (typeof _activityDoneToday === 'function' && !_activityDoneToday(window.myCasesCache)) {
+                out.push({ bucket: 'today', icon: '🩺', title: 'Case log บันทึกเคส', act: 'gotoCaseSubmit()' });
+            }
+
+            const openMission = "openJourneySection('section-kanban','toggleKanban')";
+
+            (typeof questsCache !== 'undefined' ? (questsCache || []) : []).forEach(q => {
+                if (typeof audienceIncludesMe === 'function' && !audienceIncludesMe(q.targetGroup)) return;
+                const mine = (typeof mySubmissionsCache !== 'undefined' ? (mySubmissionsCache || {}) : {})[q.id] || {};
+                if (mine.status === 'submitted') return;
+                const due = asDate(q.deadline), opens = asDate(q.startTime);
+                if (!due && !(opens && opens > now)) return;   // undated: the Mission list already carries it
+                out.push({ icon: '🎯', title: q.title || 'Quest ภารกิจ', due: due, opens: opens, act: openMission });
+            });
+
+            (typeof quizzesCache !== 'undefined' ? (quizzesCache || []) : []).forEach(q => {
+                if (q.isActive !== true) return;
+                if (typeof audienceIncludesMe === 'function' && !audienceIncludesMe(q.targetGroup)) return;
+                if (q.isHomework && Array.isArray(q.assignedUsers) && q.assignedUsers.length
+                    && !q.assignedUsers.includes(userId)) return;
+                const att = (typeof quizAttemptsCache !== 'undefined' ? (quizAttemptsCache || {}) : {})[q.id];
+                if (att && (att.status === 'pending' || att.status === 'approved')) return;   // already taken
+                const due = asDate(q.deadline), opens = asDate(q.startTime);
+                if (!due && !(opens && opens > now)) return;
+                out.push({ icon: '📝', title: q.title || 'Quiz แบบทดสอบ', due: due, opens: opens, act: openMission });
+            });
+
+            const me = (typeof allUsersData !== 'undefined' && allUsersData)
+                ? (allUsersData.find(u => u.id === userId) || {}) : {};
+            const endD = schParseDay(me.endDate);
+            if (endD && endD >= new Date(now.getFullYear(), now.getMonth(), now.getDate())) {
+                out.push({ icon: '🎓', title: 'Internship ends วันสุดท้ายของการฝึกงาน', due: endD });
+            }
+            return out;
+        }
+
+        function schBucketOf(it, now) {
+            if (it.bucket) return it.bucket;
+            const WEEK = 7 * 86400000;
+            const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+            if (it.opens && it.opens > now) return (it.opens - now <= WEEK) ? 'week' : 'later';
+            if (!it.due) return 'later';
+            if (it.due < now) return 'missed';
+            if (it.due <= todayEnd) return 'today';
+            return (it.due - now <= WEEK) ? 'week' : 'later';
+        }
+
+        function schWhen(it, now) {
+            if (it.opens && it.opens > now) return 'opens in ' + schRel(it.opens - now);
+            if (!it.due) return '';
+            const diff = it.due - now;
+            return diff < 0 ? (schRel(-diff) + ' ago') : (schRel(diff) + ' left');
+        }
+
+        function schRenderAgenda() {
+            const box = document.getElementById('sch-agenda');
+            if (!box) return;
+            const now = new Date();
+            const items = schAgendaItems();
+
+            if (!items.length) {
+                box.innerHTML = '<div style="text-align:center; color:#94a3b8; font-size:0.8em; padding:22px 0;">Nothing scheduled ไม่มีรายการที่มีกำหนดเวลา</div>';
+                return;
+            }
+
+            const grouped = {};
+            items.forEach(it => { (grouped[schBucketOf(it, now)] = grouped[schBucketOf(it, now)] || []).push(it); });
+
+            let html = '';
+            SCH_BUCKETS.forEach(([key, label, color, bg, border]) => {
+                const list = grouped[key];
+                if (!list || !list.length) return;
+                // Sort on the SAME clock the bucket and the countdown use: an item
+                // that has not opened yet is ordered by when it becomes actionable,
+                // not by its far-off deadline.
+                const sortKey = it => (it.opens && it.opens > now) ? it.opens : (it.due || it.opens || 0);
+                list.sort((a, b) => sortKey(a) - sortKey(b));
+                html += '<div style="display:flex; align-items:center; gap:6px; margin:12px 0 6px;">'
+                    + '<span style="font-size:0.66em; font-weight:800; letter-spacing:0.04em; text-transform:uppercase; color:' + color + ';">'
+                    + label + '</span>'
+                    + '<span style="font-size:0.62em; font-weight:800; color:' + color + '; background:' + bg
+                    + '; border:1px solid ' + border + '; border-radius:999px; padding:1px 7px;">' + list.length + '</span>'
+                    + '</div>';
+                list.forEach(it => {
+                    const when = schWhen(it, now);
+                    const click = it.act ? (' onclick="' + it.act + '"') : '';
+                    html += '<div' + click + ' style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:'
+                        + bg + '; border:1px solid ' + border + '; border-radius:9px; margin-bottom:6px; font-size:0.78em;'
+                        + (it.act ? ' cursor:pointer;' : '') + '">'
+                        + '<span style="flex:0 0 auto;">' + it.icon + '</span>'
+                        + '<span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700; color:#1e293b;">'
+                        + escapeHtml(it.title) + '</span>'
+                        + (it.tag ? '<span style="flex:0 0 auto; font-size:0.82em; font-weight:800; color:' + color + ';">' + it.tag + '</span>' : '')
+                        + (when ? '<span style="flex:0 0 auto; font-size:0.82em; color:#64748b; white-space:nowrap;">' + when + '</span>' : '')
+                        + '</div>';
+                });
+            });
+            box.innerHTML = html;
+        }
+
+        function schSwitchPane(pane) {
+            const isAgenda = pane !== 'activity';
+            window._schPane = isAgenda ? 'agenda' : 'activity';
+            const paneA = document.getElementById('sch-pane-agenda');
+            const paneB = document.getElementById('sch-pane-activity');
+            if (paneA) paneA.style.display = isAgenda ? 'block' : 'none';
+            if (paneB) paneB.style.display = isAgenda ? 'none' : 'block';
+            // Scoped to #sch-tabs on purpose — see the CSS note about the unscoped
+            // .dc-view-tab query that strips .active off unrelated rails.
+            document.querySelectorAll('#sch-tabs .sch-tab').forEach(t => {
+                t.classList.toggle('active', (t.getAttribute('data-schpane') === 'agenda') === isAgenda);
+            });
+            if (isAgenda) schRenderAgenda(); else schRenderHeatmap();
+        }
+
+        function schRefreshOpenPane() {
+            const pane = document.getElementById('schedule-section-content');
+            if (!pane || pane.style.display === 'none') return;
+            if ((window._schPane || 'agenda') === 'agenda') schRenderAgenda();
+            else schRenderHeatmap();
+        }
+
         function toggleSchedule() {
             const content = document.getElementById('schedule-section-content');
             const icon = document.getElementById('schedule-section-icon');
@@ -13120,7 +13311,7 @@
                 closeOtherGrandLineSections('schedule-section-content');
                 content.style.display = 'block';
                 if (icon) icon.style.transform = 'rotate(180deg)';
-                schRenderHeatmap();
+                schSwitchPane(window._schPane || 'agenda');
             } else {
                 content.style.display = 'none';
                 if (icon) icon.style.transform = 'rotate(0deg)';
@@ -16970,6 +17161,11 @@
                     <div style="flex:1; min-width:120px; font-size:0.72em; font-weight:800; color:#9a3412; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Daily Streak <span style="color:#c2410c; font-weight:700;">· ${hint}</span></div>
                     <div style="display:flex; gap:6px; flex-wrap:wrap; flex-shrink:0; align-items:center;">${chipCheck}${chipLog}${chipCase}</div>
                 </div>`;
+
+            // V97.04: the Agenda's "Today" bucket is built from the SAME three
+            // predicates as the chips above, so refresh it on the same trigger —
+            // otherwise checking in leaves a stale "Daily check-in" row behind.
+            if (typeof schRefreshOpenPane === 'function') schRefreshOpenPane();
         }
 
         // V96.41: `source` is 'manual' when the ✅ chip is tapped, 'activity' when a
@@ -20202,12 +20398,9 @@ async function archiveDoneCard(cardId) {
             if (stats) stats.style.display = isEmpty ? 'none' : '';
             if (searchWrap) searchWrap.style.display = isEmpty ? 'none' : '';
             if (filtersWrap) filtersWrap.style.display = isEmpty ? 'none' : '';
-            // V97.03: the Schedule heatmap reads the same corpus, so refresh it
-            // here rather than leaving it stale until the section is reopened.
-            const schPane = document.getElementById('schedule-section-content');
-            if (schPane && schPane.style.display !== 'none' && typeof schRenderHeatmap === 'function') {
-                schRenderHeatmap();
-            }
+            // V97.03: the Schedule panes read the same corpus, so refresh here
+            // rather than leaving them stale until the section is reopened.
+            if (typeof schRefreshOpenPane === 'function') schRefreshOpenPane();
         }
 
         // 🔥 [V91.62] Count submissions per type (for pill badges)
