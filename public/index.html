@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.10)</title>
+    <title>Internship Portfolio (V97.11)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4652,41 +4652,23 @@
                         style="display: none; border-top: 1px solid #f0f0f0; background: #fff;">
                         <!-- Tab bar -->
                         <div class="work-tabs-bar">
-                            <button class="work-tab-btn active" id="wtab-submit" onclick="switchWorkTab('submit')">
-                                <i class="fa-solid fa-upload"></i>
-                                Submit
+                            <!-- V97.11: the Submit tab is gone — Submit New (the + button)
+                                 already carries the Work form, and two doors to the same
+                                 form is one more than anyone needs. Analytics takes the
+                                 first slot it left behind. -->
+                            <button class="work-tab-btn active" id="wtab-analytics" onclick="switchWorkTab('analytics')">
+                                <i class="fa-solid fa-chart-line"></i>
+                                Analytics
                             </button>
                             <button class="work-tab-btn" id="wtab-history" onclick="switchWorkTab('history')">
                                 <i class="fa-solid fa-clock-rotate-left"></i>
                                 History
                             </button>
-                            <button class="work-tab-btn" id="wtab-analytics" onclick="switchWorkTab('analytics')">
-                                <i class="fa-solid fa-chart-line"></i>
-                                Analytics
-                            </button>
                         </div>
 
-                        <!-- Submit pane -->
-                        <div id="work-pane-submit" class="work-tab-pane active">
-                            <div class="work-pane-shell">
-                                <div style="margin-bottom:12px;">
-                                    <label
-                                        style="font-size:0.8em; font-weight:700; color:#28a745; display:block; margin-bottom:5px;">📌
-                                        Work Title*</label>
-                                    <input type="text" id="w-title" placeholder="Work Title..." style="margin:0;">
-                                </div>
-                                <div style="margin-bottom:16px;">
-                                    <label
-                                        style="font-size:0.8em; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">🔗
-                                        Work Link</label>
-                                    <input type="url" id="w-link" placeholder="https://..." style="margin:0;">
-                                </div>
-                                <button class="btn-success" onclick="submitWork()"
-                                    style="width:100%; font-weight:bold; border-radius:12px; height:48px;">
-                                    🚀 Submit Work
-                                </button>
-                            </div>
-                        </div>
+                        <!-- V97.11: the Submit pane lived here. Removed — Submit New (the +
+                             button) already carries the Work form. submitWork() now takes
+                             (title, link) instead of reading this pane’s inputs. -->
 
                         <!-- History pane - Unified Timeline -->
                         <div id="work-pane-history" class="work-tab-pane">
@@ -4763,7 +4745,7 @@
                         </div>
 
                         <!-- Analytics pane (V94.16: moved from Mission tab) -->
-                        <div id="work-pane-analytics" class="work-tab-pane">
+                        <div id="work-pane-analytics" class="work-tab-pane active">
                             <div class="work-pane-shell">
                                 <div id="learning-analytics-container">
                                     <div style="text-align:center; padding:20px; color:#999;">Select this tab to load analytics</div>
@@ -14660,6 +14642,13 @@
                 content.style.display = 'block';
                 icon.style.transform = 'rotate(180deg)';
                 renderHistory();
+                // V97.11: Analytics is the default pane now, and its content is only
+                // fetched by switchWorkTab — which opening the section never calls.
+                // Load it here so the section does not open on an empty chart.
+                const anaPane = document.getElementById('work-pane-analytics');
+                if (anaPane && anaPane.classList.contains('active') && typeof loadLearningAnalytics === 'function') {
+                    loadLearningAnalytics();
+                }
             } else {
                 content.style.display = 'none';
                 icon.style.transform = 'rotate(0deg)';
@@ -19560,7 +19549,10 @@ async function archiveDoneCard(cardId) {
 
         // --- Work Submission (Notify Fix) ---
         function switchWorkTab(tab) {
-            ['submit', 'history', 'analytics'].forEach(t => {
+            // V97.11: 'submit' is gone. Anything still asking for it lands on
+            // analytics, the new first tab, rather than on a blank section.
+            if (tab === 'submit') tab = 'analytics';
+            ['history', 'analytics'].forEach(t => {
                 document.getElementById(`wtab-${t}`)?.classList.toggle('active', t === tab);
                 document.getElementById(`work-pane-${t}`)?.classList.toggle('active', t === tab);
             });
@@ -19617,9 +19609,16 @@ async function archiveDoneCard(cardId) {
             }, 400);
         }
 
-        async function submitWork() {
-            const t = document.getElementById('w-title').value.trim();
-            const l = document.getElementById('w-link').value.trim();
+        // V97.11: takes its values as arguments. The Work tab's inline Submit pane is
+        // gone (Submit New already covers it), and submitUnifiedWork() used to reach
+        // that pane's hidden inputs to hand data over — so the modal's Work path
+        // depended on a form the user could no longer see. The DOM fallback stays for
+        // any caller still passing nothing.
+        async function submitWork(titleArg, linkArg) {
+            const titleEl = document.getElementById('w-title');
+            const linkEl = document.getElementById('w-link');
+            const t = (titleArg !== undefined ? titleArg : (titleEl ? titleEl.value : '')).trim();
+            const l = (linkArg !== undefined ? linkArg : (linkEl ? linkEl.value : '')).trim();
             if (!t || !l) return alert("Please fill in all fields");
 
             const btn = document.querySelector('button[onclick="submitWork()"]');
@@ -19688,8 +19687,8 @@ async function archiveDoneCard(cardId) {
                     }
                 }
 
-                document.getElementById('w-title').value = "";
-                document.getElementById('w-link').value = "";
+                if (titleEl) titleEl.value = "";
+                if (linkEl) linkEl.value = "";
                 switchWorkTab('history'); // Switch to History tab after submit
             } catch (e) {
                 alert("Error: " + e.message);
@@ -21139,9 +21138,10 @@ async function archiveDoneCard(cardId) {
             const link = document.getElementById('u-work-link').value.trim();
             if (!title) throw new Error('A title is required · กรุณากรอกหัวข้องาน');
             if (!link) throw new Error('A link is required · กรุณากรอกลิงก์');
-            document.getElementById('w-title').value = title;
-            document.getElementById('w-link').value = link;
-            await submitWork();
+            // V97.11: hand the values straight over. This used to write them into the
+            // Work tab's inline inputs first, which stopped existing when that pane
+            // was removed.
+            await submitWork(title, link);
             document.getElementById('u-work-title').value = '';
             document.getElementById('u-work-link').value = '';
         }
