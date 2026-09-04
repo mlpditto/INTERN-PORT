@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.13)</title>
+    <title>Internship Portfolio (V97.14)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -13347,10 +13347,35 @@
             return Math.floor(hrs / 24) + 'd';
         }
 
+        // V97.14: the day this intern's clock started. Everything that closed before
+        // it was never theirs to miss.
+        //   startDate  — what they actually said their internship is
+        //   createdAt  — when they claimed an enrol code, written at enrolment
+        //   (null)     — brand new account; nothing is filtered out
+        // Measured on production 2026-09-04: 66 of 161 active quizzes were already
+        // past their deadline, and ~17 of those closed 90-197 days ago — before this
+        // intern's first recorded activity. Only 2 of the 66 ever set a `startTime`,
+        // so they were open from creation until the deadline and anyone who arrived
+        // later never had a window at all.
+        function schEnrolmentAnchor() {
+            const me = (typeof myOwnRow === 'function') ? myOwnRow() : {};
+            const fromStart = schParseDay(me.startDate);
+            if (fromStart) return fromStart;
+            const created = me.createdAt;
+            const d = created ? ((typeof created.toDate === 'function') ? created.toDate() : new Date(created)) : null;
+            if (d && !isNaN(d.getTime())) return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+            return null;
+        }
+
         function schAgendaItems() {
             const now = new Date();
             const out = [];
             const asDate = v => v ? ((typeof v.toDate === 'function') ? v.toDate() : new Date(v)) : null;
+            const anchor = schEnrolmentAnchor();
+            // A deadline that fell before the anchor is not a miss — the intern was
+            // not here. Only ever filters items that would land in Missed; anything
+            // still open is untouched.
+            const closedBeforeMe = due => !!(anchor && due && due < anchor);
 
             // Daily obligations reuse the very predicates the streak card uses, so
             // the two surfaces can never disagree about what "done today" means.
@@ -13373,6 +13398,7 @@
                 if (mine.status === 'submitted') return;
                 const due = asDate(q.deadline), opens = asDate(q.startTime);
                 if (!due && !(opens && opens > now)) return;   // undated: the Mission list already carries it
+                if (closedBeforeMe(due)) return;               // closed before this intern arrived
                 out.push({ icon: '🎯', title: q.title || 'Quest ภารกิจ', due: due, opens: opens, act: openMission });
             });
 
@@ -13385,6 +13411,7 @@
                 if (att && (att.status === 'pending' || att.status === 'approved')) return;   // already taken
                 const due = asDate(q.deadline), opens = asDate(q.startTime);
                 if (!due && !(opens && opens > now)) return;
+                if (closedBeforeMe(due)) return;               // closed before this intern arrived
                 out.push({ icon: '📝', title: q.title || 'Quiz แบบทดสอบ', due: due, opens: opens, act: openMission });
             });
 
