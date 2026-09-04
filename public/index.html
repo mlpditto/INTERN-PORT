@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.05)</title>
+    <title>Internship Portfolio (V97.06)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -13193,7 +13193,7 @@
                 + head + ' · ' + items.length + ' entries</div>'
                 + items.map(it => '<div style="display:flex; align-items:center; gap:7px; padding:5px 8px; background:#faf5ff; border:1px solid #f3e8ff; border-radius:7px; margin-bottom:5px; font-size:0.75em;">'
                     + '<span style="flex:0 0 auto;">' + schTypeIcon(it.submissionType) + '</span>'
-                    + '<span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">'
+                    + '<span class="lang-no-toggle" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">'
                     + escapeHtml(it.title || 'Untitled ไม่มีชื่อ') + '</span></div>').join('');
             box.style.display = 'block';
         }
@@ -13210,6 +13210,7 @@
         // Agenda can never advertise something the Mission list would hide.
         // ⚠️ loadAllQuests() caps questsCache at 20 docs, so a quest older than
         // the 20 most recent will not appear here either.
+        const SCH_MISSED_VISIBLE = 5;   // V97.06: the live page had 63 missed rows, oldest 199 days
         const SCH_BUCKETS = [
             ['missed', 'Missed พลาดแล้ว', '#991b1b', '#fef2f2', '#fecaca'],
             ['today', 'Today วันนี้', '#9a3412', '#fff7ed', '#fed7aa'],
@@ -13309,34 +13310,69 @@
 
             let html = '';
             SCH_BUCKETS.forEach(([key, label, color, bg, border]) => {
-                const list = grouped[key];
+                let list = grouped[key];
                 if (!list || !list.length) return;
                 // Sort on the SAME clock the bucket and the countdown use: an item
                 // that has not opened yet is ordered by when it becomes actionable,
                 // not by its far-off deadline.
                 const sortKey = it => (it.opens && it.opens > now) ? it.opens : (it.due || it.opens || 0);
                 list.sort((a, b) => sortKey(a) - sortKey(b));
+
+                // V97.06: Missed reads newest-first and is capped. The first live run
+                // produced 63 rows going back 199 days — every quiz whose deadline had
+                // ever passed — which buried Today and This week under a wall no one
+                // can act on. The badge still counts them all; the list shows the most
+                // recent few and hides the rest behind a tap.
+                let hidden = 0;
+                if (key === 'missed') {
+                    list = list.slice().reverse();
+                    if (!window._schMissedExpanded && list.length > SCH_MISSED_VISIBLE) {
+                        hidden = list.length - SCH_MISSED_VISIBLE;
+                        list = list.slice(0, SCH_MISSED_VISIBLE);
+                    }
+                }
+                const badgeCount = (grouped[key] || list).length;
                 html += '<div style="display:flex; align-items:center; gap:6px; margin:12px 0 6px;">'
                     + '<span style="font-size:0.66em; font-weight:800; letter-spacing:0.04em; text-transform:uppercase; color:' + color + ';">'
                     + label + '</span>'
                     + '<span style="font-size:0.62em; font-weight:800; color:' + color + '; background:' + bg
-                    + '; border:1px solid ' + border + '; border-radius:999px; padding:1px 7px;">' + list.length + '</span>'
+                    + '; border:1px solid ' + border + '; border-radius:999px; padding:1px 7px;">' + badgeCount + '</span>'
                     + '</div>';
                 list.forEach(it => {
                     const when = schWhen(it, now);
                     const click = it.act ? (' onclick="' + it.act + '"') : '';
+                    // V97.06: the title span is SHIELDED. It renders admin-authored
+                    // quiz/quest titles, which are often pure Thai — unshielded, the
+                    // walker wrapped and hid them, so those rows rendered as a bare
+                    // icon and a countdown on the live page. A mixed title like
+                    // "ยา NSAIDs และการใช้" was worse: only the orphan "NSAIDs" showed.
+                    // The shield is on the title alone so the labels around it still
+                    // follow the TH toggle. Same call as #explore-links-list.
                     html += '<div' + click + ' style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:'
                         + bg + '; border:1px solid ' + border + '; border-radius:9px; margin-bottom:6px; font-size:0.78em;'
                         + (it.act ? ' cursor:pointer;' : '') + '">'
                         + '<span style="flex:0 0 auto;">' + it.icon + '</span>'
-                        + '<span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700; color:#1e293b;">'
+                        + '<span class="lang-no-toggle" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700; color:#1e293b;">'
                         + escapeHtml(it.title) + '</span>'
                         + (it.tag ? '<span style="flex:0 0 auto; font-size:0.82em; font-weight:800; color:' + color + ';">' + it.tag + '</span>' : '')
                         + (when ? '<span style="flex:0 0 auto; font-size:0.82em; color:#64748b; white-space:nowrap;">' + when + '</span>' : '')
                         + '</div>';
                 });
+                if (hidden) {
+                    html += '<div onclick="schToggleMissed()" style="text-align:center; font-size:0.7em; font-weight:800; color:'
+                        + color + '; padding:4px 0 2px; cursor:pointer; opacity:0.85;">'
+                        + 'Show ' + hidden + ' older ดูที่พลาดไปก่อนหน้า ›</div>';
+                } else if (key === 'missed' && window._schMissedExpanded && (grouped[key] || []).length > SCH_MISSED_VISIBLE) {
+                    html += '<div onclick="schToggleMissed()" style="text-align:center; font-size:0.7em; font-weight:800; color:'
+                        + color + '; padding:4px 0 2px; cursor:pointer; opacity:0.85;">Show less ย่อกลับ ›</div>';
+                }
             });
             box.innerHTML = html;
+        }
+
+        function schToggleMissed() {
+            window._schMissedExpanded = !window._schMissedExpanded;
+            schRenderAgenda();
         }
 
         function schSwitchPane(pane) {
