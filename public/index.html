@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.09)</title>
+    <title>Internship Portfolio (V97.10)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -6866,6 +6866,33 @@
         // deny for every non-admin, so anything that only wants YOUR fields must
         // prefer window.myUserDoc (set by the single-doc profile listener below).
         // The allUsersData branch is kept so admins and the preview path still work.
+        // V97.10: leaderboard rows via the getLeaderboard callable. The projection
+        // carries no identity at all, so your own name and avatar are merged back in
+        // from your own doc — that is the only row allowed to show a real person,
+        // which is exactly what "Blind Logic V77.17" already renders.
+        async function loadLeaderboard() {
+            if (!firebase || !firebase.functions) return;
+            try {
+                const res = await firebase.functions().httpsCallable('getLeaderboard')({});
+                const rows = (res && res.data && res.data.rows) || [];
+                const mine = myOwnRow();
+                allUsersData = rows.map(r => (r.id === userId)
+                    ? Object.assign({}, r, {
+                        displayName: mine.displayName || (userProfile && userProfile.displayName) || '',
+                        pictureUrl: mine.pictureUrl || (userProfile && userProfile.pictureUrl) || ''
+                    })
+                    : r);
+                if (typeof renderReflectiveMiniLeaderboard === 'function') renderReflectiveMiniLeaderboard();
+                if (typeof renderProfileLeaderboard === 'function') renderProfileLeaderboard();
+                const lb = document.getElementById('lb-list');
+                if (lb && lb.innerHTML && typeof renderLeaderboard === 'function') renderLeaderboard();
+            } catch (e) {
+                // Best-effort: an empty board is better than a broken page, and the
+                // rest of the profile card no longer depends on this data (V97.08).
+                console.warn('[leaderboard] getLeaderboard failed:', e && e.message);
+            }
+        }
+
         function myOwnRow() {
             if (window.myUserDoc) return window.myUserDoc;
             return (typeof allUsersData !== 'undefined' && allUsersData)
@@ -7651,23 +7678,14 @@
                     updateDivisionAndVisibility();
                 }
             }, e => handleFirestoreListenerError('division config listener', e));
-            // Also load all users for leaderboard.
-            // ⚠️ V97.08: this query is CURRENTLY DENIED for every non-admin and has
-            // been since c713c77 (2026-04-23). `users` reads are scoped to your own
-            // doc, and Firestore rules are not filters — an unbounded collection
-            // query is rejected outright unless the rule provably holds for every
-            // matched document. Only the two leaderboard renderers are left here, so
-            // the failure is now contained to the leaderboard instead of taking the
-            // profile card, the badges and the timeline bar down with it.
-            // The real fix is a display-safe projection (a `leaderboard` collection
-            // or a callable returning displayName/pictureUrl/score/group only) —
-            // loosening the `users` read rule would expose fullName and the
-            // personality results to every signed-in intern.
-            db.collection("users").orderBy("score", "desc").onSnapshot(s => {
-                allUsersData = s.docs.map(d => ({ id: d.id, ...d.data() }));
-                renderReflectiveMiniLeaderboard();
-                renderProfileLeaderboard();
-            }, e => handleFirestoreListenerError('users leaderboard listener', e));
+            // V97.10: the leaderboard now comes from the getLeaderboard callable.
+            // The old client-side `users` collection query was permission-denied for
+            // every non-admin (rules are not filters — see V97.08), and it could not
+            // be fixed by loosening the rule: `users` docs carry fullName and the
+            // personality results. The callable returns score/group/reflective counts
+            // and nothing else. Fetch-on-load rather than onSnapshot — a leaderboard
+            // does not need to be realtime, and a callable cannot be.
+            loadLeaderboard();
         }
 
         // ============================================================
@@ -8258,7 +8276,9 @@
         }
 
         function openJournalWithPersonalityPrompt() {
-            const me = (allUsersData || []).find(u => u.id === userId) || {};
+            // V97.10: needs `personality`, an own-doc field the leaderboard
+            // projection deliberately does not carry.
+            const me = myOwnRow();
             const text = buildPersonalityPrompt(me);
             const box = document.getElementById('rl-personality-prompt');
             const textEl = document.getElementById('rl-personality-prompt-text');
@@ -13543,7 +13563,10 @@
             const container = document.getElementById('profile-leaderboard-container');
             if (!container) return;
 
-            const myData = allUsersData.find(u => u.id === userId) || {};
+            // V97.10: own-doc fields (startDate / endDate / badges) — the leaderboard
+            // projection deliberately does not carry them, so read the own doc.
+            // divUsers below still needs every row and stays on allUsersData.
+            const myData = myOwnRow();
 
             // Rank position in division
             const myDiv = getMyDivision();
@@ -17532,7 +17555,7 @@
                 return `<div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-radius:10px; margin-bottom:5px; background:${bg}; border:1px solid ${isMe ? '#dbeafe' : 'transparent'};">
                     <div style="display:flex; align-items:center; gap:10px;">
                         <div style="width:24px; text-align:center; font-weight:900; color:${idx < 3 ? '#b45309' : '#94a3b8'}; font-size:0.9em;">${medal || (idx + 1)}</div>
-                        <img src="${u.pictureUrl || 'https://via.placeholder.com/30'}" style="width:28px; height:28px; border-radius:50%; border:2px solid #fff; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
+                        <img src="${isMe ? (u.pictureUrl || 'https://via.placeholder.com/30') : 'https://via.placeholder.com/30'}" style="width:28px; height:28px; border-radius:50%; border:2px solid #fff; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
                         <span style="font-weight:600; font-size:0.9em; color:${isMe ? '#1e40af' : '#4b5563'};">${name}${isMe ? ' <span style="font-size:0.8em;">(You)</span>' : ''}</span>
                     </div>
                     <div style="text-align:right;">
