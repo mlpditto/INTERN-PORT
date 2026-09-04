@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.11)</title>
+    <title>Internship Portfolio (V97.12)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -13118,6 +13118,45 @@
             return out;
         }
 
+        // V97.12: days the intern checked in. Until now the heatmap counted only
+        // submissions, so a day someone showed up and checked in but filed nothing
+        // rendered blank — the grid answered "what did I hand in" when the whole
+        // point was "did I show up". This is the one Firestore read the Schedule
+        // section makes; `checkin_logs` is `allow read: if true`, so a userId query
+        // is authorized for the whole collection (unlike `users` — see
+        // feedback_firestore_rules_not_filters).
+        let schCheckinDays = null;      // Set of 'YYYY-MM-DD', null until loaded
+        let schCheckinLoading = null;   // in-flight promise, so concurrent opens share one read
+
+        function schLoadCheckinDays() {
+            if (schCheckinDays) return Promise.resolve(schCheckinDays);
+            if (schCheckinLoading) return schCheckinLoading;
+            if (!userId || typeof db === 'undefined') return Promise.resolve(new Set());
+            // userId equality only — a single-field query needs no composite index.
+            // The collection also holds streak/score/bonus logs, so the type filter
+            // runs here rather than as a second where() clause.
+            schCheckinLoading = db.collection('checkin_logs')
+                .where('userId', '==', userId)
+                .limit(500)
+                .get()
+                .then(snap => {
+                    const days = new Set();
+                    snap.forEach(doc => {
+                        const d = doc.data() || {};
+                        if (d.type === 'daily_checkin' && d.dateKey) days.add(d.dateKey);
+                    });
+                    schCheckinDays = days;
+                    return days;
+                })
+                .catch(err => {
+                    console.warn('[schedule] check-in days unavailable:', err && err.message);
+                    schCheckinDays = new Set();   // cache the empty result; do not retry on every render
+                    return schCheckinDays;
+                })
+                .finally(() => { schCheckinLoading = null; });
+            return schCheckinLoading;
+        }
+
         function schBuildDayMap() {
             const map = {};
             const items = (typeof getUnifiedAllItems === 'function') ? getUnifiedAllItems() : [];
@@ -13127,6 +13166,17 @@
                 const k = schDateKey(d);
                 (map[k] = map[k] || []).push(it);
             });
+            // A check-in on a day that already has a submission adds nothing new —
+            // the day is already lit, and the detail strip would just repeat itself.
+            (schCheckinDays || []).forEach(key => {
+                if (map[key]) return;
+                map[key] = [{
+                    id: 'checkin-' + key,
+                    submissionType: 'checkin',
+                    title: 'Daily check-in เช็คอินประจำวัน',
+                    status: 'done'
+                }];
+            });
             return map;
         }
 
@@ -13135,6 +13185,13 @@
             const summaryEl = document.getElementById('sch-summary');
             const legendEl = document.getElementById('sch-legend');
             if (!grid) return;
+
+            // V97.12: first render paints submissions only, then repaints once the
+            // check-in days arrive. Fetching before the first paint would leave the
+            // pane blank on a slow connection for no gain.
+            if (schCheckinDays === null) {
+                schLoadCheckinDays().then(() => schRenderHeatmap());
+            }
 
             const dayMap = schBuildDayMap();
             const dayKeys = Object.keys(dayMap).sort();
@@ -13238,7 +13295,7 @@
         }
 
         function schTypeIcon(t) {
-            return ({ case: '🩺', work: '📤', quiz: '📝', quest: '🎯', reflective: '📓', explore_link: '🔗' })[t] || '•';
+            return ({ case: '🩺', work: '📤', quiz: '📝', quest: '🎯', reflective: '📓', explore_link: '🔗', checkin: '✅' })[t] || '•';
         }
 
         // ---- V97.04: Schedule — Agenda pane --------------------------------
@@ -13456,6 +13513,13 @@
 
         function schRefreshOpenPane() {
             schUpdateHeaderBadge();
+            // V97.12: checking in should light today's cell without a refetch. The
+            // streak card already knows the date, so fold it into the cache here —
+            // this runs from renderDailyCheckinCard(), the same trigger that flips
+            // the chip.
+            if (schCheckinDays && typeof myCheckin !== 'undefined' && myCheckin && myCheckin.lastDate) {
+                schCheckinDays.add(myCheckin.lastDate);
+            }
             if (!schModalOpen()) return;
             if ((window._schPane || 'agenda') === 'agenda') schRenderAgenda();
             else schRenderHeatmap();
