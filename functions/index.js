@@ -201,6 +201,41 @@ exports.generatePreviewToken = onCall(async (request) => {
     return { token };
 });
 
+// === V97.10: intern leaderboard projection ===
+// The intern page used to run `db.collection("users").orderBy("score","desc")`
+// straight from the client. Since the `users` read rule was scoped to your own
+// doc (c713c77, 2026-04-23) that query has been permission-denied for every
+// non-admin — Firestore rules are not filters, so a collection query is refused
+// unless the rule provably holds for every matched document.
+//
+// This returns ONLY what the leaderboard actually renders. No displayName, no
+// pictureUrl, no fullName, no personality: the board is anonymous by design
+// ("Blind Logic V77.17" — everyone except you shows as "Intern #N"), and your
+// own name and avatar already come from your own doc on the client. That is why
+// this is a projection rather than a loosened read rule: `users` docs carry real
+// names and Big Five results, and no intern should be able to read another's.
+exports.getLeaderboard = onCall(async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'Login required');
+    }
+    const db = admin.firestore();
+    const snap = await db.collection('users')
+        .orderBy('score', 'desc')
+        .limit(500)   // bounds cost; the board only ever shows a division's top rows
+        .get();
+    const rows = snap.docs.map((d) => {
+        const u = d.data() || {};
+        return {
+            id: d.id,
+            score: Number(u.score) || 0,
+            group: u.group || 'Public',
+            reflectiveTotalLogs: Number(u.reflectiveTotalLogs) || 0,
+            reflectiveBestStreak: Number(u.reflectiveBestStreak) || 0
+        };
+    });
+    return { rows, count: rows.length };
+});
+
 // === V94.68: server-side quiz deadline auto-shrink (capped at 50%) ===
 // Each non-practice quiz submission pulls the quiz `deadline` in by 10% of the
 // time still remaining — but never past 50% of the original window. This used
