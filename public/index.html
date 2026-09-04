@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.12)</title>
+    <title>Internship Portfolio (V97.13)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -7478,6 +7478,15 @@
         // The date inputs are transparent overlays on their chips, so the picker is
         // opened by poking the input itself. showPicker() is not in every LINE
         // WebView, hence the click() fallback.
+        // V97.13: the date inputs live in the header, underneath the Schedule modal —
+        // opening the picker without closing the modal first puts it behind an overlay.
+        function schPromptForDates() {
+            if (typeof closeScheduleModal === 'function') closeScheduleModal();
+            // Let the modal actually come down before the picker is asked to open;
+            // showPicker() on an obscured input is unreliable in the LINE WebView.
+            setTimeout(() => schFocusStartDate(), 120);
+        }
+
         function schFocusStartDate() {
             const el = document.getElementById('u-start-date');
             if (!el) return;
@@ -13199,13 +13208,29 @@
             const todayKey = schDateKey(today);
 
             const me = myOwnRow();
-            let start = schParseDay(me.startDate);
-            let end = schParseDay(me.endDate);
+            const start = schParseDay(me.startDate);
+            const end = schParseDay(me.endDate);
             const hasWindow = !!(start && end && end > start);
 
+            // V97.13: the heatmap now requires the internship dates. A grid measured
+            // from "your first entry" was a different, weaker claim than one measured
+            // against the internship itself, and it let the dates stay unset forever.
+            // This is a DOORWAY, not a hidden pane — hiding it outright would repeat
+            // exactly what updateTimelineBar() used to do, which is why that bar never
+            // rendered for anyone who had not filled the dates in.
             if (!hasWindow) {
-                start = dayKeys.length ? schParseDay(dayKeys[0]) : new Date(today.getTime() - 27 * 86400000);
-                end = today;
+                grid.innerHTML =
+                    '<div style="text-align:center; padding:18px 6px;">'
+                    + '<div style="font-size:1.6em; line-height:1;">🗓</div>'
+                    + '<div style="font-size:0.82em; font-weight:800; color:#475569; margin-top:8px;">'
+                    + 'Set your internship dates to see your activity map ตั้งวันเริ่มและวันจบก่อน</div>'
+                    + '<div onclick="schPromptForDates()" style="margin-top:12px; display:inline-block; cursor:pointer; '
+                    + 'font-size:0.78em; font-weight:800; color:#7c3aed; background:#f5f3ff; border:1px solid #ddd6fe; '
+                    + 'border-radius:999px; padding:7px 16px;">Set dates กรอกวันที่ ›</div>'
+                    + '</div>';
+                if (summaryEl) summaryEl.textContent = '';
+                if (legendEl) legendEl.innerHTML = '';
+                return;
             }
 
             if (!dayKeys.length) {
@@ -13258,16 +13283,16 @@
 
             // Summary. Every number is followed by a Latin word before any Thai
             // run, or the digits get absorbed into the Thai and hide with it.
+            // V97.13: the no-dates branch that used to live here is gone — the
+            // function returns at the doorway above, so hasWindow is always true by
+            // now and the summary always measures the real internship. The active-day
+            // count rides along: it is the number the grid is actually made of.
             if (summaryEl) {
-                if (hasWindow) {
-                    const total = Math.max(1, Math.ceil((end - start) / 86400000));
-                    const passed = Math.min(total, Math.max(0, Math.ceil((today - start) / 86400000)));
-                    const left = Math.max(0, Math.ceil((end - today) / 86400000));
-                    summaryEl.textContent = 'Day ' + passed + ' of ' + total + ' · ' + left + ' days left เหลืออีกกี่วัน';
-                } else {
-                    summaryEl.textContent = 'Since your first entry · ' + dayKeys.length
-                        + ' active days ยังไม่ได้กรอกวันฝึกงาน';
-                }
+                const total = Math.max(1, Math.ceil((end - start) / 86400000));
+                const passed = Math.min(total, Math.max(0, Math.ceil((today - start) / 86400000)));
+                const left = Math.max(0, Math.ceil((end - today) / 86400000));
+                summaryEl.textContent = 'Day ' + passed + ' of ' + total + ' · ' + left
+                    + ' days left · ' + dayKeys.length + ' active days เหลืออีกกี่วัน';
             }
 
             if (legendEl) {
