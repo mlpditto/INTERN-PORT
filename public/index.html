@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.04)</title>
+    <title>Internship Portfolio (V97.05)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -2150,18 +2150,40 @@
                                     <input type="date" id="u-end-date" onchange="saveMyDates()"
                                         style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
                                 </div>
-                                <div id="date-alert"
-                                    style="display:none; color:#e09f3e; font-size:0.95em; font-weight:bold; align-self:center; margin-left:2px;">
-                                    <i class="fa-solid fa-circle-exclamation"></i> Please complete internship dates กรุณาระบุวันฝึกงานให้ครบ</div>
-                            </div>
-                            <!-- V94.04: Internship Timeline Bar -->
-                            <div id="u-timeline-bar" style="display:none; margin-top:4px;">
-                                <div style="display:flex; justify-content:space-between; font-size:0.68em; color:#94a3b8; margin-bottom:3px;">
-                                    <span id="u-tl-label">Day 0 of 0</span>
-                                    <span id="u-tl-remaining">⏳ 0 days left</span>
+                                <!-- V97.05: Schedule entry point, sitting with the dates
+                                     because that is where "time" already lives on this card.
+                                     STATIC markup on purpose — updateTimelineBar() runs from
+                                     the `users` listener, which can fail with
+                                     permission-denied, so anything rendered only by that
+                                     listener is not a reliable doorway. -->
+                                <div onclick="schOpenFromHeader()" id="u-schedule-chip"
+                                    style="display:inline-flex; align-items:center; gap:3px; background:#f5f3ff; padding:2px 7px; border-radius:5px; border:1px solid #ddd6fe; cursor:pointer;"
+                                    title="Open Schedule" data-th-title="เปิดตารางฝึกงาน">
+                                    <i class="fa-solid fa-calendar-days" style="color:#7c3aed; font-size:0.8em;"></i>
+                                    <span style="color:#7c3aed; font-weight:700;">Schedule ตาราง</span>
                                 </div>
-                                <div style="height:5px; background:#e2e8f0; border-radius:999px; overflow:hidden;">
-                                    <div id="u-tl-bar" style="height:100%; width:0%; background:linear-gradient(90deg,#4361ee,#7c3aed); border-radius:999px; transition:width 0.4s ease;"></div>
+                                <div id="date-alert" onclick="schFocusStartDate()"
+                                    style="display:none; color:#e09f3e; font-size:0.95em; font-weight:bold; align-self:center; margin-left:2px; cursor:pointer;">
+                                    <i class="fa-solid fa-circle-exclamation"></i> Please complete internship dates กรุณาระบุวันฝึกงานให้ครบ <span style="opacity:0.7;">›</span></div>
+                            </div>
+                            <!-- V94.04: Internship Timeline Bar.
+                                 V97.05: the wrap no longer hides itself when the dates are
+                                 missing — that hid the nudge from precisely the interns who
+                                 had not filled them in, and it hid the Schedule row too.
+                                 Only #u-tl-progress depends on the dates now. -->
+                            <div id="u-timeline-bar" style="margin-top:4px;">
+                                <div id="u-tl-progress" style="display:none;">
+                                    <div style="display:flex; justify-content:space-between; font-size:0.68em; color:#94a3b8; margin-bottom:3px;">
+                                        <span id="u-tl-label">Day 0 of 0</span>
+                                        <span id="u-tl-remaining">⏳ 0 days left</span>
+                                    </div>
+                                    <div style="height:5px; background:#e2e8f0; border-radius:999px; overflow:hidden;">
+                                        <div id="u-tl-bar" style="height:100%; width:0%; background:linear-gradient(90deg,#4361ee,#7c3aed); border-radius:999px; transition:width 0.4s ease;"></div>
+                                    </div>
+                                </div>
+                                <div id="u-tl-open" onclick="schOpenFromHeader()"
+                                    style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; font-size:0.68em; font-weight:800; color:#7c3aed; cursor:pointer;">
+                                    <span>🗓 Open Schedule ดูตารางฝึกงาน</span><span style="opacity:0.7;">›</span>
                                 </div>
                             </div>
                             <!-- 🔥 Unified Metrics Bar (V91.38) - Combines KPI + Voyage Metrics -->
@@ -7374,9 +7396,20 @@
         function updateTimelineBar(startVal, endVal) {
             const wrap = document.getElementById('u-timeline-bar');
             if (!wrap) return;
-            const start = startVal ? new Date(startVal) : null;
-            const end   = endVal   ? new Date(endVal)   : null;
-            if (!start || !end || end <= start) { wrap.style.display = 'none'; return; }
+            const prog = document.getElementById('u-tl-progress');
+            // V97.05: parse as LOCAL midnight — `new Date('YYYY-MM-DD')` is UTC
+            // midnight, i.e. 07:00 Bangkok, which shifted every day count by one.
+            // Same fix as schParseDay() in the Schedule section.
+            const start = (typeof schParseDay === 'function') ? schParseDay(startVal) : (startVal ? new Date(startVal) : null);
+            const end   = (typeof schParseDay === 'function') ? schParseDay(endVal)   : (endVal   ? new Date(endVal)   : null);
+            // The wrap itself stays visible so the "Open Schedule" row is always
+            // reachable; only the progress half needs the dates.
+            wrap.style.display = 'block';
+            if (!start || !end || end <= start) {
+                if (prog) prog.style.display = 'none';
+                return;
+            }
+            if (prog) prog.style.display = 'block';
             const now        = new Date();
             const totalDays  = Math.ceil((end - start) / 86400000);
             const daysPassed = Math.min(totalDays, Math.max(0, Math.ceil((now - start) / 86400000)));
@@ -7387,7 +7420,32 @@
             document.getElementById('u-tl-remaining').textContent  = pct >= 100 ? '🎓 Completed' : `⏳ ${daysLeft} days left`;
             document.getElementById('u-tl-bar').style.width        = pct + '%';
             document.getElementById('u-tl-bar').style.background   = `linear-gradient(90deg,${barColor},${barColor}cc)`;
-            wrap.style.display = 'block';
+        }
+
+        // V97.05: header entry points for the Schedule section.
+        function schOpenFromHeader() {
+            if (typeof openJourneySection === 'function') {
+                openJourneySection('section-schedule', 'toggleSchedule');
+                return;
+            }
+            const content = document.getElementById('schedule-section-content');
+            if (content && content.style.display === 'none' && typeof toggleSchedule === 'function') toggleSchedule();
+            const section = document.getElementById('section-schedule');
+            if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        // The date inputs are transparent overlays on their chips, so the picker is
+        // opened by poking the input itself. showPicker() is not in every LINE
+        // WebView, hence the click() fallback.
+        function schFocusStartDate() {
+            const el = document.getElementById('u-start-date');
+            if (!el) return;
+            try {
+                if (typeof el.showPicker === 'function') el.showPicker();
+                else el.click();
+            } catch (e) {
+                el.click();
+            }
         }
 
         // V94.04: Earned badges as metrics bar row 3
@@ -13352,6 +13410,7 @@
             let contentId = '';
             if (sectionId === 'section-assignments') contentId = 'assignments-content';
             else if (sectionId === 'section-kanban') contentId = 'kanban-content';
+            else if (sectionId === 'section-schedule') contentId = 'schedule-section-content';   // V97.05
             else if (sectionId === 'section-cases') contentId = 'case-section-content';
             else if (sectionId === 'section-general-work') contentId = 'work-section-content';
 
