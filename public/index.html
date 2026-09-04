@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.07)</title>
+    <title>Internship Portfolio (V97.08)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -6402,7 +6402,12 @@
         }
 
         function notifyMissingFirebaseAuth(contextLabel) {
-            const msg = `Auth required for ${contextLabel}. Check that Firebase Anonymous provider is enabled ตรวจสอบว่าเปิด Firebase Anonymous provider แล้ว`;
+            // V97.08: the old copy blamed the Anonymous provider outright, which sent
+            // a four-month investigation down the wrong path — the actual cause of the
+            // `users leaderboard listener` failure is a rules/query mismatch, not
+            // sign-in. permission-denied means EITHER not signed in OR the rules deny
+            // this particular read, so say both.
+            const msg = `Read denied for ${contextLabel} — check sign-in and the Firestore rule for this query อ่านข้อมูลไม่ได้`;
             console.warn(msg);
             if (typeof showToast === 'function') showToast(msg);
         }
@@ -6855,6 +6860,17 @@
             return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
         }
 
+        // V97.08: the intern's own row, from whichever source actually holds data.
+        // `allUsersData` comes from the `users` collection query, which the rules
+        // deny for every non-admin, so anything that only wants YOUR fields must
+        // prefer window.myUserDoc (set by the single-doc profile listener below).
+        // The allUsersData branch is kept so admins and the preview path still work.
+        function myOwnRow() {
+            if (window.myUserDoc) return window.myUserDoc;
+            return (typeof allUsersData !== 'undefined' && allUsersData)
+                ? (allUsersData.find(u => u.id === userId) || {}) : {};
+        }
+
         function checkUser() {
             const r = db.collection("users").doc(userId);
 
@@ -6944,6 +6960,27 @@
                     } else {
                         document.getElementById('date-alert').style.display = 'none';
                     }
+
+                    // V97.08: these four used to hang off the `users` LEADERBOARD
+                    // listener, which is a collection query (`.orderBy("score")` over
+                    // every user). Firestore rules are not filters, so since the read
+                    // rule was tightened in c713c77 (2026-04-23) that query has been
+                    // permission-denied for every non-admin — and everything inside
+                    // its callback died with it, including the timeline bar that is
+                    // supposed to nag interns into filling their dates in.
+                    // None of them ever needed more than the intern's OWN doc, which
+                    // this single-doc listener already has. Moved here; the leaderboard
+                    // query keeps only the leaderboard.
+                    renderPersonalityCard(da);
+                    renderReflectiveBadgeCollection(da.reflectiveBadges || []);
+                    updateEarnedBadgesBar(da.reflectiveBadges || da.reflectiveUnlockedBadgeIds || []);
+                    updateTimelineBar(da.startDate, da.endDate);
+
+                    // V97.08: anything that wants the intern's own fields should read
+                    // this, not allUsersData — that array is populated by the denied
+                    // leaderboard query and stays empty for non-admins.
+                    window.myUserDoc = Object.assign({ id: userId }, da);
+                    if (typeof schRefreshOpenPane === 'function') schRefreshOpenPane();
 
                     // Render Special Awards (Support multiple V78.91)
                     const awardEl = document.getElementById('u-award-badge');
@@ -7619,16 +7656,22 @@
                     updateDivisionAndVisibility();
                 }
             }, e => handleFirestoreListenerError('division config listener', e));
-            // Also load all users for leaderboard
+            // Also load all users for leaderboard.
+            // ⚠️ V97.08: this query is CURRENTLY DENIED for every non-admin and has
+            // been since c713c77 (2026-04-23). `users` reads are scoped to your own
+            // doc, and Firestore rules are not filters — an unbounded collection
+            // query is rejected outright unless the rule provably holds for every
+            // matched document. Only the two leaderboard renderers are left here, so
+            // the failure is now contained to the leaderboard instead of taking the
+            // profile card, the badges and the timeline bar down with it.
+            // The real fix is a display-safe projection (a `leaderboard` collection
+            // or a callable returning displayName/pictureUrl/score/group only) —
+            // loosening the `users` read rule would expose fullName and the
+            // personality results to every signed-in intern.
             db.collection("users").orderBy("score", "desc").onSnapshot(s => {
                 allUsersData = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderReflectiveMiniLeaderboard();
                 renderProfileLeaderboard();
-                const me = allUsersData.find(u => u.id === userId) || {};
-                renderPersonalityCard(me);   // V96.94
-                renderReflectiveBadgeCollection(me.reflectiveBadges || []);
-                updateTimelineBar(me.startDate, me.endDate);
-                updateEarnedBadgesBar(me.reflectiveBadges || me.reflectiveUnlockedBadgeIds || []);
             }, e => handleFirestoreListenerError('users leaderboard listener', e));
         }
 
@@ -13101,8 +13144,7 @@
             const today = new Date();
             const todayKey = schDateKey(today);
 
-            const me = (typeof allUsersData !== 'undefined' && allUsersData)
-                ? (allUsersData.find(u => u.id === userId) || {}) : {};
+            const me = myOwnRow();
             let start = schParseDay(me.startDate);
             let end = schParseDay(me.endDate);
             const hasWindow = !!(start && end && end > start);
@@ -13267,8 +13309,7 @@
                 out.push({ icon: '📝', title: q.title || 'Quiz แบบทดสอบ', due: due, opens: opens, act: openMission });
             });
 
-            const me = (typeof allUsersData !== 'undefined' && allUsersData)
-                ? (allUsersData.find(u => u.id === userId) || {}) : {};
+            const me = myOwnRow();
             const endD = schParseDay(me.endDate);
             if (endD && endD >= new Date(now.getFullYear(), now.getMonth(), now.getDate())) {
                 out.push({ icon: '🎓', title: 'Internship ends วันสุดท้ายของการฝึกงาน', due: endD });
@@ -13534,7 +13575,7 @@
             if (!container) return;
 
             // Get unlocked badges from user data
-            const myData = allUsersData.find(u => u.id === userId);
+            const myData = myOwnRow();
             const unlockedBadgeIds = myData ? (myData.reflectiveUnlockedBadgeIds || []) : [];
             
             // Reuse the existing badge catalog logic
@@ -13739,7 +13780,7 @@
             if (tab === 'leaderboard') {
                 renderReflectiveMiniLeaderboard();
             } else if (tab === 'badges') {
-                const me = allUsersData.find(u => u.id === userId) || {};
+                const me = myOwnRow();
                 renderReflectiveBadgeCollection(me.reflectiveBadges || []);
             } else if (tab === 'quiz') {
                 // V95.61: no on-demand load — quiz cards render from the
@@ -17421,7 +17462,7 @@
             const list = document.getElementById('rl-badge-modal-list');
             if (!list) return;
 
-            const me = allUsersData.find(u => u.id === userId) || {};
+            const me = myOwnRow();
             const unlocked = new Set(Array.isArray(me.reflectiveBadges) ? me.reflectiveBadges : []);
             list.innerHTML = reflectiveBadgeCatalog.map(b => {
                 const got = unlocked.has(b.id);
@@ -17616,7 +17657,7 @@
                 headerCountEl.innerText = `📝 ${totalCount}/${totalDays}`;
                 headerCountEl.style.display = totalCount > 0 ? 'inline-block' : 'none';
             }
-            const currentUserRow = allUsersData.find(u => u.id === userId) || {};
+            const currentUserRow = myOwnRow();
             const existingBadgeIds = Array.isArray(currentUserRow.reflectiveBadges) ? currentUserRow.reflectiveBadges : [];
             const unlockedBadgeIds = getReflectiveUnlockedBadges(metrics, existingBadgeIds);
 
