@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.17)</title>
+    <title>Internship Portfolio (V97.18)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -13085,6 +13085,9 @@
         // falls back to "first activity → today", because an intern who never
         // filled the dates in still has a history worth showing.
         const SCH_MAX_WEEKS = 16;   // 16 rows is the most that stays legible on a LIFF viewport
+        // V97.18: 26 weeks — double the ~12-week ceiling a real intern/extern/junior
+        // placement runs to, so it only ever catches a mistyped year.
+        const SCH_MAX_SPAN_DAYS = 182;
         const SCH_RAMP = ['#f1f5f9', '#dcfce7', '#86efac', '#34d399', '#15803d'];
 
         function schDateKey(d) {
@@ -13290,7 +13293,7 @@
                 + '</div>'
                 + '<div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; align-items:center;">'
                 + '<span style="font-size:0.7em; color:#94a3b8; font-weight:700;">Length ระยะฝึก</span>'
-                + [4, 6, 8, 16].map(w => '<button type="button" onclick="schPresetWeeks(' + w + ')" style="' + chip + '">'
+                + [4, 6, 8, 12].map(w => '<button type="button" onclick="schPresetWeeks(' + w + ')" style="' + chip + '">'
                     + w + ' weeks</button>').join('')
                 + '</div>'
                 + '<div id="sch-date-msg" style="font-size:0.72em; color:#ef4444; font-weight:700; margin-top:9px; min-height:1em;"></div>'
@@ -13322,6 +13325,17 @@
             const sd = schParseDay(sv), ed = schParseDay(ev);
             if (!sd || !ed || ed <= sd) {
                 if (msg) msg.textContent = 'End date must be after the start date วันจบต้องอยู่หลังวันเริ่ม';
+                return;
+            }
+            // V97.18: an upper bound. `ed > sd` alone accepted 1988-11-08 → 2088-11-08
+            // and the summary dutifully read "Day 13816 of 36525 · 22710 days left" —
+            // the arithmetic was right, nothing was there to say the span is absurd.
+            // Intern / extern / junior placements run to about 12 weeks; 26 is double
+            // that, so a real rotation always passes and a mistyped year never does.
+            const spanDays = Math.round((ed - sd) / 86400000);
+            if (spanDays > SCH_MAX_SPAN_DAYS) {
+                if (msg) msg.textContent = 'That is ' + spanDays + ' days — the limit is '
+                    + SCH_MAX_SPAN_DAYS + ' ช่วงฝึกงานยาวเกินไป ตรวจปีที่กรอกอีกครั้ง';
                 return;
             }
             if (msg) { msg.style.color = '#64748b'; msg.textContent = 'Saving กำลังบันทึก'; }
@@ -13395,9 +13409,13 @@
             let firstMon = schMonday(start);
             const lastMon = schMonday(lastDay);
             const weeks = Math.floor((lastMon - firstMon) / (7 * 86400000)) + 1;
-            if (weeks > SCH_MAX_WEEKS) {
+            const truncated = weeks > SCH_MAX_WEEKS;
+            if (truncated) {
                 firstMon = new Date(lastMon.getTime() - (SCH_MAX_WEEKS - 1) * 7 * 86400000);
             }
+            // V97.18: when the grid is truncated the rows are the LAST 16 weeks, not
+            // weeks 1-16 — the labels used to restart at W1 and say so wrongly.
+            const wkOffset = Math.round((firstMon - schMonday(start)) / (7 * 86400000));
 
             const DOW = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
             // max-width matters: the cells are aspect-ratio:1, so on a wide
@@ -13408,7 +13426,7 @@
                 html += '<span style="font-size:0.6em; color:#cbd5e1; text-align:center; font-weight:700;">' + d + '</span>';
             });
 
-            let wk = 0;
+            let wk = wkOffset;
             for (let mon = new Date(firstMon); mon <= lastMon; mon.setDate(mon.getDate() + 7)) {
                 wk++;
                 html += '<span style="font-size:0.58em; color:#cbd5e1; font-weight:700;">W' + wk + '</span>';
@@ -13429,6 +13447,11 @@
                 }
             }
             html += '</div>';
+            if (truncated) {
+                html += '<div style="font-size:0.65em; color:#94a3b8; margin-top:7px; text-align:center;">'
+                    + 'Showing the last ' + SCH_MAX_WEEKS + ' weeks of ' + weeks
+                    + ' แสดงเฉพาะสัปดาห์ล่าสุด</div>';
+            }
             grid.innerHTML = html;
 
             // Summary. Every number is followed by a Latin word before any Thai
