@@ -121,6 +121,17 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Applicant documents (CV/résumé attached to a pre-registration), V98.58.
+    // A SEPARATE collection on purpose: pre_users above is `read: if true` so the
+    // public claim flow can look a code up, and a Storage download URL is a bearer
+    // token — putting the file list on that doc would publish the applicant's CV to
+    // anyone who asked. Nothing here is readable without isAdmin(). Storage side is
+    // `applicant-docs/{preUserId}/{sha256}.ext`, admin-only to match.
+    match /applicant_docs/{docId} {
+      allow read, create, delete: if isAdmin();
+      allow update: if false;
+    }
+
     // 12. Quiz Feedback
     match /quiz_feedback/{docId} {
       allow read, create: if true;

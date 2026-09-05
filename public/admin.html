@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.57)</title>
+    <title>Nika Admin (V98.58)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -32266,6 +32266,19 @@ RULES:
                 renderTable('users');
             });
 
+            // V98.58: applicant CVs. Admin-only collection, so this listener simply
+            // fails closed for anyone else — the 📎 badge just never appears.
+            db.collection("applicant_docs").onSnapshot(s => {
+                const byUser = {};
+                s.docs.forEach(d => {
+                    const v = { id: d.id, ...d.data() };
+                    (byUser[v.preUserId] = byUser[v.preUserId] || []).push(v);
+                });
+                applicantDocsCache = byUser;
+                renderTable('users');
+                if (document.getElementById('applicantDocsModal').style.display === 'flex') renderApplicantDocs();
+            }, e => console.error("🔥 [Firestore Error] applicant_docs:", e));
+
             // 🔥 Access Request Listener ([Version: V84.3])
             db.collection("reports").where("type", "==", "access_request").where("status", "==", "รอตรวจ")
                 .onSnapshot(s => {
@@ -43930,6 +43943,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             <td>
                                 <div style="display:flex; gap:5px;">
                                     <button class="btn-sm" onclick="openMergeModal('${d.id}')" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; border-radius:5px; padding:4px 8px;" title="Link Data"><i class="fa-solid fa-link"></i></button>
+                                    <button class="btn-sm" onclick="openApplicantDocs('${d.id}')" style="background:#0ea5e9; color:white;" title="Applicant documents (CV)">📎${applicantDocCount(d.id) ? ' ' + applicantDocCount(d.id) : ''}</button>
                                     <button class="btn-sm btn-danger" onclick="deletePreReg('${d.id}')">Del</button>
                                 </div>
                             </td>
@@ -50311,6 +50325,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 // 6. Delete PreReg entry if it was a raw pre-reg source
                 if (source.isPreReg) {
                      currentBatch.delete(db.collection("pre_users").doc(mergeSourceId));
+                     // V98.58: the second place a pre_users row disappears. Storage
+                     // objects cannot go in a Firestore batch, so purge them here —
+                     // otherwise the applicant's CV outlives every record of it.
+                     await purgeApplicantDocs(mergeSourceId);
                 }
 
                 await currentBatch.commit();
@@ -52026,9 +52044,124 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
         }
 
-        async function deletePreReg(id) {
-            if (!confirm("Delete this pre-registration item?")) return;
+        // ---- V98.58: applicant documents (CV/résumé on a pre-registration) ----------
+        // Kept in `applicant_docs`, NOT on the pre_users doc: that one is
+        // `read: if true` so the public claim flow can look a code up, and a Storage
+        // download URL is a bearer token — the CV would have been world-readable.
+        let applicantDocsCache = {};   // preUserId -> [{id, name, path, size}]
+        let apdTargetId = null;
+
+        const _APPLICANT_EXT = {
+            'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp'
+        };
+
+        function applicantDocCount(preUserId) {
+            return (applicantDocsCache[preUserId] || []).length;
+        }
+
+        function openApplicantDocs(preUserId) {
+            apdTargetId = preUserId;
+            const u = (usersData || []).find(x => x.id === preUserId) || {};
+            document.getElementById('apd-who').textContent = 'For ' + (u.displayName || preUserId);
+            document.getElementById('apd-msg').textContent = '';
+            renderApplicantDocs();
+            document.getElementById('applicantDocsModal').style.display = 'flex';
+        }
+
+        function renderApplicantDocs() {
+            const box = document.getElementById('apd-list');
+            if (!box) return;
+            const docs = applicantDocsCache[apdTargetId] || [];
+            if (!docs.length) { box.innerHTML = '<div style="color:#94a3b8; font-size:0.85em;">No documents yet.</div>'; return; }
+            box.innerHTML = docs.map(d => `
+                <div style="display:flex; align-items:center; gap:8px; padding:7px 9px; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:6px;">
+                    <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:0.85em;">${escapeHtml(d.name)}</span>
+                    <span style="font-size:0.72em; color:#94a3b8;">${Math.round((d.size || 0) / 1024)} KB</span>
+                    <button class="btn-sm" style="background:#0ea5e9; color:#fff; padding:3px 9px; font-size:0.72em;" onclick="openApplicantDoc('${d.id}')">Open</button>
+                    <button class="btn-sm btn-danger" style="padding:3px 9px; font-size:0.72em;" onclick="deleteApplicantDoc('${d.id}')">Del</button>
+                </div>`).join('');
+        }
+
+        // The download URL is fetched on demand and never stored — a stored URL is a
+        // bearer token that outlives whatever rule was meant to protect the file.
+        async function openApplicantDoc(docId) {
+            const d = (applicantDocsCache[apdTargetId] || []).find(x => x.id === docId);
+            if (!d) return;
             try {
+                const url = await adminApp.storage().ref(d.path).getDownloadURL();
+                window.open(url, '_blank', 'noopener');
+            } catch (e) { alert('Could not open: ' + e.message); }
+        }
+
+        async function uploadApplicantDoc(input) {
+            const file = input.files && input.files[0];
+            input.value = '';
+            const msg = document.getElementById('apd-msg');
+            if (!file || !apdTargetId) return;
+            const ext = _APPLICANT_EXT[file.type];
+            if (!ext) { msg.style.color = '#ef4444'; msg.textContent = 'PDF, JPG, PNG or WEBP only.'; return; }
+            if (file.size >= 4 * 1024 * 1024) { msg.style.color = '#ef4444'; msg.textContent = 'The file must be under 4 MB.'; return; }
+            msg.style.color = '#64748b';
+            msg.textContent = 'Uploading…';
+            try {
+                const hash = await _sha256Hex(file);
+                const path = `applicant-docs/${apdTargetId}/${hash}.${ext}`;
+                await adminApp.storage().ref(path).put(file, { contentType: file.type });
+                const editor = (auth && auth.currentUser) || {};
+                await db.collection('applicant_docs').add({
+                    preUserId: apdTargetId,
+                    name: file.name,
+                    path,
+                    size: file.size,
+                    contentType: file.type,
+                    uploadedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    byEmail: editor.email || ALLOWED_EMAIL
+                });
+                msg.textContent = '';
+            } catch (e) {
+                msg.style.color = '#ef4444';
+                msg.textContent = 'Upload failed: ' + e.message;
+            }
+        }
+
+        async function deleteApplicantDoc(docId) {
+            const d = (applicantDocsCache[apdTargetId] || []).find(x => x.id === docId);
+            if (!d || !confirm('Delete "' + d.name + '"? This removes the file itself.')) return;
+            try {
+                try {
+                    await adminApp.storage().ref(d.path).delete();
+                } catch (e) {
+                    if (e.code !== 'storage/object-not-found') throw e;   // already gone is fine
+                }
+                await db.collection('applicant_docs').doc(docId).delete();
+            } catch (e) { alert('Could not delete: ' + e.message); }
+        }
+
+        // Personal data must not outlive the record it belongs to. `pre_users` rows are
+        // removed from TWO places — deletePreReg() below and the user-merge path — so
+        // both call this, or a rejected applicant's CV sits in Storage forever with
+        // nothing left in Firestore to say it is there.
+        async function purgeApplicantDocs(preUserId) {
+            const snap = await db.collection('applicant_docs').where('preUserId', '==', preUserId).get();
+            for (const doc of snap.docs) {
+                const path = doc.data().path;
+                try {
+                    await adminApp.storage().ref(path).delete();
+                } catch (e) {
+                    if (e.code !== 'storage/object-not-found') console.error('applicant doc file delete failed:', path, e);
+                }
+                await doc.ref.delete();
+            }
+            return snap.size;
+        }
+
+        async function deletePreReg(id) {
+            const n = applicantDocCount(id);
+            if (!confirm(n
+                ? `Delete this pre-registration item AND its ${n} attached document(s)? The files are removed too.`
+                : "Delete this pre-registration item?")) return;
+            try {
+                await purgeApplicantDocs(id);
                 await db.collection("pre_users").doc(id).delete();
                 showToast("Deleted");
             } catch (e) { alert(e.message); }
@@ -59376,6 +59509,24 @@ Reply ONLY with raw JSON, no markdown:
         </div>
     </div>
     <!-- 🔥 User Merger Modal ([Version: V89.46]) -->
+    <!-- V98.58: applicant documents. The list lives in `applicant_docs` (admin-only),
+         never on the pre_users doc — that one is world-readable for the public claim
+         flow, and a Storage download URL is a bearer token. -->
+    <div id="applicantDocsModal" class="modal" style="display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);">
+        <div class="modal-content" style="max-width:480px; width:90%; border-radius:20px; border:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <h3 style="margin:0; color:#0ea5e9;">📎 Applicant documents</h3>
+                <span onclick="document.getElementById('applicantDocsModal').style.display='none'" style="cursor:pointer; font-size:24px; color:#94a3b8;">&times;</span>
+            </div>
+            <p id="apd-who" style="margin:0 0 12px; font-size:0.85em; color:#64748b;"></p>
+            <div id="apd-list" style="margin-bottom:12px;"></div>
+            <div id="apd-msg" style="font-size:0.78em; font-weight:700; min-height:1em; margin-bottom:8px;"></div>
+            <input type="file" id="apd-file" accept="application/pdf,image/jpeg,image/png,image/webp" style="display:none;" onchange="uploadApplicantDoc(this)">
+            <button class="btn-primary" style="width:100%;" onclick="document.getElementById('apd-file').click()">Attach a file — PDF or image, under 4 MB</button>
+            <p style="margin:10px 0 0; font-size:0.72em; color:#94a3b8;">Visible to admins only. <b>Deleting the applicant deletes these files too</b> — a CV is personal data and must not outlive the record it belongs to.</p>
+        </div>
+    </div>
+
     <!-- V98.57: log a Work submission on behalf of a user. Work handed in outside the
          app (LINE, in person) previously had no way in at all — an admin could review
          submissions but never create one, so the only options were to ask the intern to
