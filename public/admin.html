@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.56</title>
+    <title>Nika Admin (V98.57)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -43982,10 +43982,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const delBtn = `<button class="btn-sm btn-danger" onclick="delUser('${d.id}')" style="font-size:0.75em; padding:4px 8px; border-radius:4px;" title="Delete User"><i class="fa-solid fa-trash-can"></i></button>`;
 
                     const mergeBtn = `<button class="btn-sm" onclick="openMergeModal('${d.id}')" style="font-size:0.75em; padding:4px 8px; border-radius:4px; background:#4361ee; color:white;" title="Merge/Transfer Data"><i class="fa-solid fa-link"></i></button>`;
+                    // V98.57: log a Work submission ON BEHALF of this user — for work
+                    // handed in outside the app (LINE, in person). Writes the same pair
+                    // submitWork() does, so it lands in the normal review queue.
+                    const logWorkBtn = `<button class="btn-sm" onclick="openAdminLogWorkModal('${d.id}')" style="font-size:0.75em; padding:4px 8px; border-radius:4px; background:#0ea5e9; color:white;" title="Log work for this user"><i class="fa-solid fa-upload"></i></button>`;
                     const actionsGroup = `
                         <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-start;">
                             <div style="display:flex; gap:4px; background:rgba(241, 245, 249, 0.5); padding:4px; border-radius:10px; border:1px solid #e2e8f0; width:fit-content;">
-                                ${certBtn}${historyBtn}${mergeBtn}${keyBtn}${delBtn}
+                                ${certBtn}${historyBtn}${logWorkBtn}${mergeBtn}${keyBtn}${delBtn}
                             </div>
                             <div style="display:flex; align-items:center; gap:4px; background:rgba(236, 253, 245, 0.75); border:1px solid #bbf7d0; border-radius:8px; padding:4px;">
                                 <input type="number" step="0.1" id="adj-${d.id}" placeholder="0.0" style="width:62px; margin:0; height:24px; font-size:0.75em;" onkeypress="if(event.key==='Enter')adjDec('${d.id}')">
@@ -44058,6 +44062,86 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
         function toggleWorkArchive() { hideCompletedWorks = !hideCompletedWorks; document.getElementById('btn-toggle-work-archive').classList.toggle('active'); renderTable('works'); }
         async function adjDec(id) { try { const valInput = document.getElementById(`adj-${id}`); let v = valInput.value; if (!v) return alert("Please specify score."); v = v.replace(',', '.'); const scoreVal = parseFloat(v); if (isNaN(scoreVal)) return alert("Invalid score value."); const n = prompt("Reason (Note):"); if (!n) return; const editor = (auth && auth.currentUser) || {}; await db.collection("users").doc(id).update({ score: firebase.firestore.FieldValue.increment(scoreVal) }); await db.collection("checkin_logs").add({ userId: id, type: 'manual_adjust', amount: scoreVal, note: n, timestamp: firebase.firestore.FieldValue.serverTimestamp(), createdByUid: editor.uid || 'unknown', createdByEmail: editor.email || ALLOWED_EMAIL }); showToast("Saved!"); valInput.value = ""; valInput.blur(); } catch (e) { alert("Error saving score: " + e.message); } }
+
+        // V98.57: log a Work submission on behalf of a user.
+        let alwTargetId = null;
+
+        function openAdminLogWorkModal(uid) {
+            const u = (usersData || []).find(x => x.id === uid) || {};
+            alwTargetId = uid;
+            document.getElementById('alw-who').textContent =
+                'For ' + (u.displayName || uid) + (u.group ? ' · ' + u.group : '');
+            document.getElementById('alw-title').value = '';
+            document.getElementById('alw-link').value = '';
+            document.getElementById('alw-msg').textContent = '';
+            document.getElementById('adminLogWorkModal').style.display = 'flex';
+        }
+
+        async function adminSubmitWorkFor() {
+            const msg = document.getElementById('alw-msg');
+            const title = document.getElementById('alw-title').value.trim();
+            const link = document.getElementById('alw-link').value.trim();
+            if (!alwTargetId) return;
+            if (!title || !link) { msg.textContent = 'Both a title and a link are required.'; return; }
+            if (!/^https?:\/\//i.test(link)) { msg.textContent = 'The link must start with http:// or https://'; return; }
+
+            const u = (usersData || []).find(x => x.id === alwTargetId) || {};
+            const editor = (auth && auth.currentUser) || {};
+            const by = { uid: editor.uid || 'unknown', email: editor.email || ALLOWED_EMAIL };
+            msg.style.color = '#64748b';
+            msg.textContent = 'Saving…';
+            try {
+                // Mirrors submitWork() in index.html — BOTH collections. `works` is what
+                // the review queue and the intern's own history actually read;
+                // `submissions` is the unified mirror. Writing one and not the other
+                // leaves the two views disagreeing about the same piece of work.
+                // authUid is deliberately null: the intern never signed in for this, and
+                // borrowing an id would make an admin action look like theirs.
+                const workData = {
+                    authUid: null,
+                    userId: alwTargetId,
+                    displayName: u.displayName || '',
+                    pictureUrl: u.pictureUrl || '',
+                    title, link,
+                    status: 'รอตรวจ',
+                    score: 0,
+                    submittedByAdmin: by,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                const legacyRef = await db.collection('works').add(workData);
+                await db.collection('submissions').add({
+                    submissionType: 'work',
+                    authUid: null,
+                    userId: alwTargetId,
+                    displayName: u.displayName || '',
+                    pictureUrl: u.pictureUrl || '',
+                    title,
+                    description: link,
+                    status: 'pending',
+                    score: 0,
+                    adminComment: '',
+                    adminBonus: 0,
+                    submittedByAdmin: by,
+                    metadata: { link, sourceType: 'works', sourceId: legacyRef.id },
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                db.collection('admin_logs').add({
+                    userId: alwTargetId,
+                    action: 'work_logged_on_behalf',
+                    details: { title, link, workId: legacyRef.id },
+                    reason: '',
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdByUid: by.uid,
+                    createdByEmail: by.email
+                }).catch(e => console.error('admin_logs write failed (work still saved):', e));
+
+                document.getElementById('adminLogWorkModal').style.display = 'none';
+                showToast('Logged — it is in the review queue now.');
+            } catch (e) {
+                msg.style.color = '#ef4444';
+                msg.textContent = 'Could not save: ' + e.message;
+            }
+        }
 
         // V96.52: manual Beri adjust — e.g. crediting Beri for a real-world/offline
         // purchase. Same flow as adjDec (signed number + required reason prompt),
@@ -59292,6 +59376,28 @@ Reply ONLY with raw JSON, no markdown:
         </div>
     </div>
     <!-- 🔥 User Merger Modal ([Version: V89.46]) -->
+    <!-- V98.57: log a Work submission on behalf of a user. Work handed in outside the
+         app (LINE, in person) previously had no way in at all — an admin could review
+         submissions but never create one, so the only options were to ask the intern to
+         re-submit or to fudge the score with Adj, which leaves no record of the work. -->
+    <div id="adminLogWorkModal" class="modal" style="display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);">
+        <div class="modal-content" style="max-width:460px; width:90%; border-radius:20px; border:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <h3 style="margin:0; color:#0ea5e9;"><i class="fa-solid fa-upload"></i> Log work for user</h3>
+                <span onclick="document.getElementById('adminLogWorkModal').style.display='none'" style="cursor:pointer; font-size:24px; color:#94a3b8;">&times;</span>
+            </div>
+            <p id="alw-who" style="margin:0 0 14px; font-size:0.85em; color:#64748b;"></p>
+            <label style="font-size:0.78em; font-weight:bold; color:#555; display:block; margin-bottom:4px;">Title ชื่องาน</label>
+            <input type="text" id="alw-title" placeholder="e.g. Case report — DM type 2" style="width:100%; padding:9px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; margin-bottom:10px;">
+            <label style="font-size:0.78em; font-weight:bold; color:#555; display:block; margin-bottom:4px;">Link ลิงก์งาน</label>
+            <input type="url" id="alw-link" placeholder="https://…" style="width:100%; padding:9px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; margin-bottom:4px;">
+            <p style="margin:0 0 12px; font-size:0.72em; color:#94a3b8;">Work is a link in this system — upload the file to Drive first, then paste the share link.</p>
+            <div id="alw-msg" style="font-size:0.78em; font-weight:700; color:#ef4444; min-height:1em; margin-bottom:8px;"></div>
+            <button class="btn-primary" style="width:100%;" onclick="adminSubmitWorkFor()">Save — goes to the review queue</button>
+            <p style="margin:10px 0 0; font-size:0.72em; color:#94a3b8;">The intern sees this marked <b>logged by admin</b>, and it is written to <code>admin_logs</code>. It earns no points until you review it like any other submission.</p>
+        </div>
+    </div>
+
     <div id="mergeModal" class="modal" style="display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);">
         <div class="modal-content" style="max-width:500px; width:90%; border-radius:20px; border:none; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
