@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.15)</title>
+    <title>Internship Portfolio (V97.16)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -7478,15 +7478,9 @@
         // The date inputs are transparent overlays on their chips, so the picker is
         // opened by poking the input itself. showPicker() is not in every LINE
         // WebView, hence the click() fallback.
-        // V97.13: the date inputs live in the header, underneath the Schedule modal —
-        // opening the picker without closing the modal first puts it behind an overlay.
-        function schPromptForDates() {
-            if (typeof closeScheduleModal === 'function') closeScheduleModal();
-            // Let the modal actually come down before the picker is asked to open;
-            // showPicker() on an obscured input is unreliable in the LINE WebView.
-            setTimeout(() => schFocusStartDate(), 120);
-        }
-
+        // V97.16: schPromptForDates() is gone with the doorway that called it — the
+        // Activity pane now sets the dates in place, so nothing needs to close the
+        // modal to reach these inputs. #date-alert still opens the picker directly.
         function schFocusStartDate() {
             const el = document.getElementById('u-start-date');
             if (!el) return;
@@ -13189,6 +13183,109 @@
             return map;
         }
 
+        // ---- V97.16: Schedule — set the internship dates from the Activity pane --
+        // The dates gate the whole pane (V97.13) but could only be typed into the
+        // header inputs, which sit UNDER this modal — so the doorway had to close
+        // it. The nudge that was supposed to catch this earlier lives in
+        // updateTimelineBar(), which is only reached from a listener that is
+        // permission-denied for every non-admin, so in practice nothing asked.
+        // Guess from the intern's own first activity; they confirm rather than type.
+        function schDateGuess(dayKeys) {
+            const first = (dayKeys && dayKeys.length) ? dayKeys[0] : schDateKey(new Date());
+            const start = schParseDay(first) || new Date();
+            const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 56);
+            return { start: schDateKey(start), end: schDateKey(end) };
+        }
+
+        function schRenderDateSetup(grid, summaryEl, legendEl, dayKeys) {
+            const g = schDateGuess(dayKeys);
+            // A ghost grid: the doorway should show what the dates buy, not just
+            // say it. pointer-events:none — it is a picture, not a control.
+            const shape = [0, 1, 2, 0, 3, 0, 0, 1, 2, 4, 3, 1, 0, 0, 0, 3, 2, 4, 2, 1, 0, 2, 1, 3, 0, 4, 0, 0];
+            let ghost = '<div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:3px; '
+                + 'max-width:196px; margin:0 auto; opacity:0.35; pointer-events:none;">';
+            shape.forEach(n => {
+                ghost += '<div style="aspect-ratio:1; border-radius:3px; border:1px solid #e2e8f0; background:'
+                    + SCH_RAMP[n] + ';"></div>';
+            });
+            ghost += '</div>';
+
+            // Both buttons below have to negate `button { width:100%; min-height:48px }`
+            // from index.html:361 explicitly, the same way .sch-tab does.
+            const chip = 'width:auto; min-height:0; cursor:pointer; font-size:0.72em; font-weight:800; '
+                + 'color:#7c3aed; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:999px; padding:5px 11px;';
+            const field = 'width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; '
+                + 'box-sizing:border-box; font-size:0.85em;';
+
+            grid.innerHTML = ghost
+                + '<div style="text-align:center; margin-top:14px;">'
+                + '<div style="font-size:0.82em; font-weight:800; color:#475569;">'
+                + 'Set your internship dates to see your activity map ตั้งวันเริ่มและวันจบก่อน</div></div>'
+                + '<div style="display:flex; gap:8px; margin-top:12px;">'
+                + '<div style="flex:1;"><label style="font-size:0.72em; font-weight:700; color:#64748b; display:block; margin-bottom:4px;">'
+                + 'Start วันเริ่ม</label><input type="date" id="sch-start-date" value="' + g.start + '" style="' + field + '"></div>'
+                + '<div style="flex:1;"><label style="font-size:0.72em; font-weight:700; color:#64748b; display:block; margin-bottom:4px;">'
+                + 'End วันจบ</label><input type="date" id="sch-end-date" value="' + g.end + '" style="' + field + '"></div>'
+                + '</div>'
+                + '<div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; align-items:center;">'
+                + '<span style="font-size:0.7em; color:#94a3b8; font-weight:700;">Length ระยะฝึก</span>'
+                + [4, 6, 8, 16].map(w => '<button type="button" onclick="schPresetWeeks(' + w + ')" style="' + chip + '">'
+                    + w + ' weeks</button>').join('')
+                + '</div>'
+                + '<div id="sch-date-msg" style="font-size:0.72em; color:#ef4444; font-weight:700; margin-top:9px; min-height:1em;"></div>'
+                + '<button type="button" onclick="schSaveDatesInline()" style="width:100%; min-height:42px; margin-top:4px; '
+                + 'cursor:pointer; font-size:0.82em; font-weight:800; color:#fff; background:#7c3aed; border:none; '
+                + 'border-radius:9px; padding:10px;">Save dates บันทึกวันที่</button>';
+
+            if (summaryEl) summaryEl.textContent = '';
+            if (legendEl) legendEl.innerHTML = '';
+        }
+
+        function schPresetWeeks(w) {
+            const s = document.getElementById('sch-start-date');
+            const e = document.getElementById('sch-end-date');
+            if (!s || !e) return;
+            const start = schParseDay(s.value) || new Date();
+            if (!s.value) s.value = schDateKey(start);
+            e.value = schDateKey(new Date(start.getFullYear(), start.getMonth(), start.getDate() + w * 7));
+        }
+
+        async function schSaveDatesInline() {
+            const s = document.getElementById('sch-start-date');
+            const e = document.getElementById('sch-end-date');
+            const msg = document.getElementById('sch-date-msg');
+            if (!s || !e) return;
+            const sv = s.value, ev = e.value;
+            // schParseDay, not new Date() — a date-only string parses as UTC
+            // midnight, which is 07:00 Bangkok and shifts every comparison by a day.
+            const sd = schParseDay(sv), ed = schParseDay(ev);
+            if (!sd || !ed || ed <= sd) {
+                if (msg) msg.textContent = 'End date must be after the start date วันจบต้องอยู่หลังวันเริ่ม';
+                return;
+            }
+            if (msg) { msg.style.color = '#64748b'; msg.textContent = 'Saving กำลังบันทึก'; }
+            // Write through the header inputs so saveMyDates() stays the only writer
+            // and the timeline bar under them refreshes with us.
+            const hs = document.getElementById('u-start-date');
+            const he = document.getElementById('u-end-date');
+            if (hs) hs.value = sv;
+            if (he) he.value = ev;
+            try {
+                await saveMyDates();
+            } catch (err) {
+                if (msg) { msg.style.color = '#ef4444'; msg.textContent = 'Could not save บันทึกไม่สำเร็จ'; }
+                console.error('schSaveDatesInline', err);
+                return;
+            }
+            // myOwnRow() reads window.myUserDoc. The profile listener will refresh it,
+            // but the grid has to be drawable on this tap, not on the next snapshot.
+            if (window.myUserDoc) {
+                window.myUserDoc.startDate = sv;
+                window.myUserDoc.endDate = ev;
+            }
+            schRenderHeatmap();
+        }
+
         function schRenderHeatmap() {
             const grid = document.getElementById('sch-heatmap');
             const summaryEl = document.getElementById('sch-summary');
@@ -13218,18 +13315,10 @@
             // This is a DOORWAY, not a hidden pane — hiding it outright would repeat
             // exactly what updateTimelineBar() used to do, which is why that bar never
             // rendered for anyone who had not filled the dates in.
+            // V97.16: the doorway now fills the dates in place instead of sending the
+            // intern to the header input, which closed the modal to do it.
             if (!hasWindow) {
-                grid.innerHTML =
-                    '<div style="text-align:center; padding:18px 6px;">'
-                    + '<div style="font-size:1.6em; line-height:1;">🗓</div>'
-                    + '<div style="font-size:0.82em; font-weight:800; color:#475569; margin-top:8px;">'
-                    + 'Set your internship dates to see your activity map ตั้งวันเริ่มและวันจบก่อน</div>'
-                    + '<div onclick="schPromptForDates()" style="margin-top:12px; display:inline-block; cursor:pointer; '
-                    + 'font-size:0.78em; font-weight:800; color:#7c3aed; background:#f5f3ff; border:1px solid #ddd6fe; '
-                    + 'border-radius:999px; padding:7px 16px;">Set dates กรอกวันที่ ›</div>'
-                    + '</div>';
-                if (summaryEl) summaryEl.textContent = '';
-                if (legendEl) legendEl.innerHTML = '';
+                schRenderDateSetup(grid, summaryEl, legendEl, dayKeys);
                 return;
             }
 
