@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.55</title>
+    <title>Nika V98.56</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -22226,8 +22226,26 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 let opts = [];
                 let correct = 0;
 
-                if (qType === 'choice') {
+                // The options UI is shown for choice, ordering, flashcard AND
+                // short_answer (see the .q-type handler), and flashcard even
+                // auto-fills True/False rows — but only 'choice' was ever read
+                // back, so everything typed under the other three was dropped on
+                // save. Ordering was the visible casualty: the intern renderer
+                // maps over question.options, so an ordering question authored
+                // here reached the intern with nothing to order, and its grader
+                // (target.length > 0) scored it 0 every time.
+                if (qType === 'choice' || qType === 'ordering' || qType === 'flashcard' || qType === 'short_answer') {
                     opts = [...item.querySelectorAll('.q-opt')].map(i => i.value);
+                }
+                // Flashcard shares the correct-checkbox UI with choice, but
+                // 'correct' was only read for choice, so every flashcard saved as
+                // correct = 0 = True: an intern answering False on a False card
+                // was marked wrong, and re-saving an existing quiz clobbered a
+                // correct value that had been right before the edit.
+                // Ordering is deliberately NOT included — its grader reads a
+                // falsy correct as "the authored option order", which is what we
+                // want, and writing [0] here would break that fallback.
+                if (qType === 'choice' || qType === 'flashcard') {
                     correct = [...item.querySelectorAll('.q-correct-check:checked')].map(c => parseInt(c.value));
                     if (correct.length === 0) correct = [0]; // Fallback
                 }
