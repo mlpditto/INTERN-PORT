@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.63)</title>
+    <title>Nika Admin (V98.64)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -11694,7 +11694,7 @@
                 <textarea id="ev-desc" rows="2" oninput="saveEventDraft()" placeholder="Details (optional)" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.85em; resize:vertical;"></textarea>
                 <div id="ev-groups" style="display:flex; flex-wrap:wrap; gap:5px; margin:8px 0;"></div>
                 <div id="ev-msg" style="font-size:0.74em; font-weight:700; min-height:1em; margin-bottom:6px;"></div>
-                <button onclick="createEvent()" style="width:auto; min-height:0; padding:7px 16px; border:none; border-radius:8px; background:#7c3aed; color:#fff; font-weight:700; font-size:0.8em; cursor:pointer;">Post event</button>
+                <button onclick="postEventNow()" style="width:auto; min-height:0; padding:7px 16px; border:none; border-radius:8px; background:#7c3aed; color:#fff; font-weight:700; font-size:0.8em; cursor:pointer;">Post event</button>
                 <span id="ev-draft-state" style="font-size:0.68em; color:#cbd5e1; margin-left:8px;"></span>
             </div>
                     <div id="ev-list" style="margin-top:12px;"></div>
@@ -52368,7 +52368,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // own — switchModalTab() owns what is on screen, so this only prepares the form.
         }
 
-        async function createEvent() {
+        // V98.64: NOT `createEvent`. An inline on* handler resolves names against
+        // element -> form -> document -> window, and `document.createEvent()` is a real
+        // DOM method — so onclick="createEvent()" called THAT, threw "1 argument
+        // required, but only 0 present", and this function never ran once. Nothing
+        // appeared on screen because the failure happened before its first line.
+        // Proven in a real browser, not reasoned about. Check any new inline-handler
+        // name with `name in document` before shipping it.
+        async function postEventNow() {
             const msg = document.getElementById('ev-msg');
             const title = document.getElementById('ev-title').value.trim();
             const date = document.getElementById('ev-date').value;
@@ -52396,7 +52403,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             } catch (e) {
                 msg.style.color = '#ef4444';
                 msg.textContent = 'Could not post: ' + (e && (e.code || '')) + ' ' + (e && e.message || e);
-                console.error('createEvent failed:', e);
+                console.error('postEventNow failed:', e);
             }
         }
 
