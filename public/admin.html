@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.59)</title>
+    <title>Nika Admin (V98.60)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -50244,7 +50244,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         startDate: preRegDoc.startDate,
                         endDate: preRegDoc.endDate,
                         isIntern: preRegDoc.group === 'INTERN',
-                        status: 'active'
+                        status: 'active',
+                        // V98.60: carry the applicant record forward. The CV files stay
+                        // where they are (keyed by pre_users id) and `applicant_docs` is
+                        // admin-only, so the intern gets the COUNT on their own user doc
+                        // — enough to be told their résumé arrived, without exposing the
+                        // file list or its Storage paths to them.
+                        preUserId: preRegId,
+                        resumeDocCount: (typeof applicantDocCount === 'function') ? applicantDocCount(preRegId) : 0
                     };
                     // V97.01: was preRegDoc.nickName (wrong casing — pre_users stores
                     // `nickname`, always undefined) writing to users.nickName (also wrong
@@ -52127,6 +52134,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     uploadedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     byEmail: editor.email || ALLOWED_EMAIL
                 });
+                await syncResumeFlag(apdTargetId);
                 msg.textContent = '';
             } catch (e) {
                 msg.style.color = '#ef4444';
@@ -52144,6 +52152,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     if (e.code !== 'storage/object-not-found') throw e;   // already gone is fine
                 }
                 await db.collection('applicant_docs').doc(docId).delete();
+                await syncResumeFlag(apdTargetId);
             } catch (e) { alert('Could not delete: ' + e.message); }
         }
 
@@ -52237,6 +52246,21 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 }
             }));
             apdRenderReview(results);
+        }
+
+        // V98.60: keep users.resumeDocCount in step. Documents can be attached or removed
+        // AFTER the code is claimed, and `applicant_docs` is admin-only — the intern can
+        // only ever learn about their CV through their own user doc, so if this drifts
+        // they are told something untrue about their own paperwork.
+        async function syncResumeFlag(preUserId) {
+            try {
+                // Counted from Firestore, not from applicantDocsCache — the cache is
+                // refreshed by a listener, so reading it right after a write can be a
+                // beat behind and would store a number that was never true.
+                const n = (await db.collection('applicant_docs').where('preUserId', '==', preUserId).get()).size;
+                const snap = await db.collection('users').where('preUserId', '==', preUserId).get();
+                await Promise.all(snap.docs.map(d => d.ref.update({ resumeDocCount: n })));
+            } catch (e) { console.error('resumeDocCount sync failed:', e); }
         }
 
         // Personal data must not outlive the record it belongs to. `pre_users` rows are

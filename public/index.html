@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.20)</title>
+    <title>Internship Portfolio (V97.21)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -20229,6 +20229,31 @@ async function archiveDoneCard(cardId) {
                     adminComment: w.adminComment
                 });
             });
+
+            // 3b. V97.21: the CV handed in with the application, shown as a Day 1 entry.
+            // The admin attaches it before the intern even has an account, so without
+            // this the intern has no way to know their paperwork arrived. They get the
+            // FACT only — `applicant_docs` is admin-only and the file list and its
+            // Storage paths never reach this page; `users.resumeDocCount` is the whole
+            // channel. Dated at startDate so it lands on day 1 rather than at the top of
+            // the list pretending to be today's work. Deliberately NOT a submission:
+            // status 'ตรวจแล้ว', score 0, nothing to review, no points.
+            {
+                const me = (typeof myOwnRow === 'function') ? myOwnRow() : {};
+                const d0 = me && me.startDate && typeof schParseDay === 'function' ? schParseDay(me.startDate) : null;
+                if (d0 && Number(me.resumeDocCount) > 0) {
+                    items.push({
+                        id: 'resume-day1',
+                        title: 'Resume received ส่งเรซูเม่แล้ว',
+                        type: 'Doc',
+                        timestamp: { toDate: () => d0 },
+                        status: 'ตรวจแล้ว',
+                        score: 0,
+                        icon: 'fa-file-arrow-up',
+                        color: '#0ea5e9'
+                    });
+                }
+            }
 
             // 4. Reflective Logs (Daily Logs)
             if (window.myReflectiveLogsCache) {
