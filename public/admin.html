@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.61)</title>
+    <title>Nika Admin (V98.62)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -32283,7 +32283,15 @@ RULES:
             db.collection("events").orderBy("eventDate", "desc").onSnapshot(s => {
                 eventsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderEventsList();
-            }, e => console.error("🔥 [Firestore Error] events:", e));
+            }, e => {
+                // V98.62: a denied or failed listener used to leave "No events yet." on
+                // screen — indistinguishable from a working empty list, which is exactly
+                // what made "I pressed Post and nothing happened" impossible to read.
+                console.error("🔥 [Firestore Error] events:", e);
+                const box = document.getElementById('ev-list');
+                if (box) box.innerHTML = '<div style="font-size:0.8em; color:#b91c1c; font-weight:700;">Could not load events: '
+                    + (e && (e.code || e.message || e)) + '</div>';
+            });
 
             db.collection("event_interests").onSnapshot(s => {
                 const byEvent = {};
@@ -52291,12 +52299,53 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function toggleEventGroup(g) {
             if (evSelectedGroups.has(g)) evSelectedGroups.delete(g); else evSelectedGroups.add(g);
             renderEventGroupChips();
+            saveEventDraft();
+        }
+
+        // V98.62: the form is a long thing to retype — a webinar URL especially — so it is
+        // kept as a draft while you type and restored on reopen. localStorage, not
+        // Firestore: an unposted draft is nobody else's business, and it has to survive a
+        // reload that never reached the network in the first place.
+        const EV_DRAFT_KEY = 'nika_event_draft_v1';
+        const EV_FIELDS = ['ev-title', 'ev-date', 'ev-time', 'ev-join', 'ev-desc'];
+
+        function saveEventDraft() {
+            try {
+                const d = {};
+                EV_FIELDS.forEach(id => { const e = document.getElementById(id); if (e) d[id] = e.value; });
+                d.groups = [...evSelectedGroups];
+                localStorage.setItem(EV_DRAFT_KEY, JSON.stringify(d));
+                const s = document.getElementById('ev-draft-state');
+                if (s) s.textContent = 'Draft saved';
+            } catch (e) { /* private mode or quota — a lost draft must never block posting */ }
+        }
+
+        function loadEventDraft() {
+            try {
+                const d = JSON.parse(localStorage.getItem(EV_DRAFT_KEY) || '{}');
+                let any = false;
+                EV_FIELDS.forEach(id => {
+                    const e = document.getElementById(id);
+                    if (e && d[id]) { e.value = d[id]; any = true; }
+                });
+                if (Array.isArray(d.groups) && d.groups.length) evSelectedGroups = new Set(d.groups);
+                const s = document.getElementById('ev-draft-state');
+                if (s) s.textContent = any ? 'Draft restored' : '';
+                return any;
+            } catch (e) { return false; }
+        }
+
+        function clearEventDraft() {
+            try { localStorage.removeItem(EV_DRAFT_KEY); } catch (e) {}
+            const s = document.getElementById('ev-draft-state');
+            if (s) s.textContent = '';
         }
 
         function openEventsModal() {
             evSelectedGroups = new Set(EVENT_GROUPS);
-            ['ev-title', 'ev-date', 'ev-time', 'ev-join', 'ev-desc'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+            EV_FIELDS.forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
             document.getElementById('ev-msg').textContent = '';
+            loadEventDraft();          // after the reset, so a saved draft wins over the blank form
             renderEventGroupChips();
             renderEventsList();
             document.getElementById('eventsModal').style.display = 'flex';
@@ -52314,16 +52363,24 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const editor = (auth && auth.currentUser) || {};
             msg.style.color = '#64748b'; msg.textContent = 'Posting…';
             try {
-                await db.collection('events').add({
+                const ref = await db.collection('events').add({
                     title, eventDate: date, timeText: time, joinVia: join, description: desc,
                     targetGroups: [...evSelectedGroups],
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     createdByEmail: editor.email || ALLOWED_EMAIL
                 });
                 ['ev-title', 'ev-time', 'ev-join', 'ev-desc'].forEach(id => document.getElementById(id).value = '');
-                msg.textContent = '';
+                clearEventDraft();
+                // V98.62: say it in the modal, not only in a toast that can be missed —
+                // "did that work?" was a real question a moment ago.
+                msg.style.color = '#15803d';
+                msg.textContent = 'Posted ✓  (id ' + ref.id + ')';
                 showToast('Event posted');
-            } catch (e) { msg.style.color = '#ef4444'; msg.textContent = 'Could not post: ' + e.message; }
+            } catch (e) {
+                msg.style.color = '#ef4444';
+                msg.textContent = 'Could not post: ' + (e && (e.code || '')) + ' ' + (e && e.message || e);
+                console.error('createEvent failed:', e);
+            }
         }
 
         async function deleteEvent(id) {
@@ -59767,16 +59824,17 @@ Reply ONLY with raw JSON, no markdown:
             </div>
 
             <div style="border:1px solid #eef2f7; border-radius:10px; padding:10px; margin-top:10px;">
-                <input type="text" id="ev-title" placeholder="Title — e.g. MPS Science webinar" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.85em; margin-bottom:6px;">
+                <input type="text" id="ev-title" oninput="saveEventDraft()" placeholder="Title — e.g. MPS Science webinar" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.85em; margin-bottom:6px;">
                 <div style="display:flex; gap:6px; margin-bottom:6px;">
-                    <input type="date" id="ev-date" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:8px; font-size:0.85em;">
-                    <input type="text" id="ev-time" placeholder="14:00 - 15:00" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:8px; font-size:0.85em;">
+                    <input type="date" id="ev-date" oninput="saveEventDraft()" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:8px; font-size:0.85em;">
+                    <input type="text" id="ev-time" oninput="saveEventDraft()" placeholder="14:00 - 15:00" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:8px; font-size:0.85em;">
                 </div>
-                <input type="text" id="ev-join" placeholder="How to join — link, ON24, room…" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.85em; margin-bottom:6px;">
-                <textarea id="ev-desc" rows="2" placeholder="Details (optional)" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.85em; resize:vertical;"></textarea>
+                <input type="text" id="ev-join" oninput="saveEventDraft()" placeholder="How to join — link, ON24, room…" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.85em; margin-bottom:6px;">
+                <textarea id="ev-desc" rows="2" oninput="saveEventDraft()" placeholder="Details (optional)" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.85em; resize:vertical;"></textarea>
                 <div id="ev-groups" style="display:flex; flex-wrap:wrap; gap:5px; margin:8px 0;"></div>
                 <div id="ev-msg" style="font-size:0.74em; font-weight:700; min-height:1em; margin-bottom:6px;"></div>
                 <button onclick="createEvent()" style="width:auto; min-height:0; padding:7px 16px; border:none; border-radius:8px; background:#7c3aed; color:#fff; font-weight:700; font-size:0.8em; cursor:pointer;">Post event</button>
+                <span id="ev-draft-state" style="font-size:0.68em; color:#cbd5e1; margin-left:8px;"></span>
             </div>
 
             <div id="ev-list" style="margin-top:12px;"></div>
