@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V98.54</title>
+    <title>Nika V98.55</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -17976,11 +17976,28 @@ RULES:
             // Specific date DD/MM/YYYY or YYYY-MM-DD
             if (/\b\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}\b/.test(s)) hits.push('date');
             if (/\b20\d{2}[\/\-]\d{1,2}[\/\-]\d{1,2}\b/.test(s)) hits.push('iso-date');
+            // Names. The prompt asks the model to redact them; until this sweep,
+            // nothing checked whether it did — a leaked patient or attending name
+            // passed silently in every language. Honorific/label-anchored on
+            // purpose: a bare name is indistinguishable from a drug or a place
+            // without a dictionary, and a sweep that fires on prose is a sweep
+            // admins learn to ignore.
+            if (/(?:^|[\s"'(\[\/,;:–—-])(?:นาย(?!กรัฐมนตรี|จ้าง|ทะเบียน|หน้า)|นาง|นางสาว|น\.ส\.|ด\.ช\.|ด\.ญ\.)\s*[ก-๙]{2,}/.test(s)) hits.push('thai-name');
+            if (/\b(?:Mr|Mrs|Ms|Miss|Dr|Prof)\.?\s+[A-Z][a-zA-Z'-]{1,}/.test(s)) hits.push('title-name');
+            if (/(?:ชื่อ-?สกุล|ชื่อผู้ป่วย|ผู้ป่วยชื่อ|patient\s+name|ชื่อ)\s*[:：]/i.test(s)) hits.push('name-label');
+            // Labelled record numbers the bare-digit rules miss: "HN: 123" is
+            // only 3 digits, but the label makes it an identifier regardless.
+            if (/\b(?:HN|AN|VN)\s*[:：.\-]?\s*\d/i.test(s)) hits.push('id-label');
             return hits;
         }
         function piiPostSweep(result) {
             const allHits = new Set();
             const scan = (txt) => piiSweepText(txt).forEach(h => allHits.add(h));
+            // A missing redactedCaseContent IS the finding: the caller falls back
+            // to the RAW note, and scanning an empty string returns no hits, so
+            // the unredacted case would otherwise be filled into the form with
+            // nothing flagged at all.
+            if (!String(result.redactedCaseContent || '').trim()) allHits.add('redaction-missing');
             scan(result.redactedCaseContent);
             (result.questions || []).forEach(q => {
                 scan(q.q);
