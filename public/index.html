@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.21)</title>
+    <title>Internship Portfolio (V97.22)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -13169,6 +13169,80 @@
             return schCheckinLoading;
         }
 
+        // ---- V97.22: events posted by an admin (admin V98.61) ----------------------
+        // Loaded lazily on the first Schedule open, the same way check-ins are, so the
+        // page boot order is untouched.
+        // Deliberately NOT folded into schBuildDayMap(): that map feeds the heat ramp,
+        // the streak and "N active days". An event is something an ADMIN posted, not
+        // work the intern did — counting it would inflate their own activity numbers.
+        let schEventsCache = null;          // null until loaded
+        let schMyEventInterests = {};       // eventId -> interest doc id
+        let schEventsUnsub = null;
+
+        function schLoadEvents() {
+            if (schEventsUnsub) return;
+            schEventsCache = schEventsCache || [];
+            schEventsUnsub = db.collection('events')
+                .where('targetGroups', 'array-contains', myGroup)
+                .onSnapshot(s => {
+                    schEventsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                    schRefreshOpenPane();
+                }, e => handleFirestoreListenerError('events listener', e));
+            db.collection('event_interests').where('userId', '==', userId)
+                .onSnapshot(s => {
+                    const m = {};
+                    s.docs.forEach(d => { m[d.data().eventId] = d.id; });
+                    schMyEventInterests = m;
+                    schRefreshOpenPane();
+                }, e => handleFirestoreListenerError('event interests listener', e));
+        }
+
+        function schEventsOn(dateKey) {
+            return (schEventsCache || []).filter(e => e.eventDate === dateKey);
+        }
+
+        async function schJoinEvent(eventId) {
+            const ev = (schEventsCache || []).find(e => e.id === eventId);
+            if (!ev) return;
+            try {
+                const authUser = await ensureFirebaseAuthReady(10000);
+                if (!authUser) throw new Error('Firebase auth is required');
+                await db.collection('event_interests').add({
+                    eventId,
+                    authUid: authUser.uid,   // the rule lets the owner withdraw on this
+                    userId,
+                    displayName: (typeof userProfile !== 'undefined' && userProfile.displayName) || '',
+                    group: myGroup,
+                    eventTitle: ev.title || '',
+                    eventDate: ev.eventDate || '',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            } catch (e) { alert('Could not send the request: ' + e.message); }
+        }
+
+        async function schLeaveEvent(eventId) {
+            const id = schMyEventInterests[eventId];
+            if (!id || !confirm('Withdraw your request to join? ยกเลิกคำขอเข้าร่วม')) return;
+            try {
+                await db.collection('event_interests').doc(id).delete();
+            } catch (e) { alert('Could not withdraw: ' + e.message); }
+        }
+
+        function schEventRowHtml(e) {
+            const joined = !!schMyEventInterests[e.id];
+            const btn = joined
+                ? `<button type="button" onclick="schLeaveEvent('${e.id}')" style="width:auto; min-height:0; padding:3px 10px; font-size:0.68em; font-weight:700; border:1px solid #bbf7d0; background:#f0fdf4; color:#15803d; border-radius:999px; cursor:pointer;">✓ Requested</button>`
+                : `<button type="button" onclick="schJoinEvent('${e.id}')" style="width:auto; min-height:0; padding:3px 10px; font-size:0.68em; font-weight:700; border:none; background:#7c3aed; color:#fff; border-radius:999px; cursor:pointer;">Join</button>`;
+            return `<div style="padding:7px 9px; background:#faf5ff; border:1px solid #f3e8ff; border-radius:8px; margin-bottom:5px;">
+                <div style="display:flex; align-items:center; gap:7px;">
+                    <span style="flex:1; min-width:0; font-size:0.76em; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">📣 ${escapeHtml(e.title || '')}</span>
+                    ${btn}
+                </div>
+                <div style="font-size:0.68em; color:#94a3b8; margin-top:3px;">${escapeHtml(e.eventDate || '')}${e.timeText ? ' · ' + escapeHtml(e.timeText) : ''}${e.joinVia ? ' · ' + escapeHtml(e.joinVia) : ''}</div>
+                ${e.description ? `<div style="font-size:0.7em; color:#475569; margin-top:3px;">${escapeHtml(e.description)}</div>` : ''}
+            </div>`;
+        }
+
         function schBuildDayMap() {
             const map = {};
             const items = (typeof getUnifiedAllItems === 'function') ? getUnifiedAllItems() : [];
@@ -13277,10 +13351,16 @@
             for (let day = 1; day <= daysInMonth; day++) {
                 const key = ym + '-' + String(day).padStart(2, '0');
                 const n = (dayMap[key] || []).length;
+                // V97.22: an event makes the day worth opening even with no activity —
+                // this is the surface where a FUTURE date can be tapped, which the
+                // heatmap can never be (it is retrospective by design).
+                const evs = schEventsOn(key).length;
                 const bg = SCH_RAMP[Math.min(n, SCH_RAMP.length - 1)];
-                const border = (key === todayKey) ? '2px solid #7c3aed' : '1px solid #e2e8f0';
-                const click = n ? ' onclick="schShowDay(\'' + key + '\')"' : '';
-                html += '<div' + click + ' title="' + key + (n ? ' — ' + n + ' entries' : '') + '"'
+                const border = (key === todayKey) ? '2px solid #7c3aed'
+                    : (evs ? '1px solid #a78bfa' : '1px solid #e2e8f0');
+                const click = (n || evs) ? ' onclick="schShowDay(\'' + key + '\')"' : '';
+                html += '<div' + click + ' title="' + key + (n ? ' — ' + n + ' entries' : '')
+                    + (evs ? ' — ' + evs + ' event' : '') + '"'
                     + ' style="aspect-ratio:1; border-radius:3px; display:flex; align-items:center; justify-content:center;'
                     + ' font-size:0.55em; font-weight:700; color:' + (n > 2 ? '#fff' : '#94a3b8') + ';'
                     + ' background:' + bg + '; border:' + border + '; cursor:' + (n ? 'pointer' : 'default') + ';">'
@@ -13542,11 +13622,15 @@
             const box = document.getElementById('sch-day-detail');
             if (!box) return;
             const items = schBuildDayMap()[key] || [];
-            if (!items.length) { box.style.display = 'none'; return; }
+            // V97.22: a day can now be worth opening for an event alone — a date with an
+            // announcement and no activity of the intern's own must still be clickable.
+            const events = schEventsOn(key);
+            if (!items.length && !events.length) { box.style.display = 'none'; return; }
             const d = schParseDay(key) || new Date(key);
             const head = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
             box.innerHTML = '<div style="font-size:0.78em; font-weight:800; color:#7c3aed; margin-bottom:7px;">'
                 + head + ' · ' + items.length + ' entries</div>'
+                + events.map(schEventRowHtml).join('')
                 + items.map(it => '<div style="display:flex; align-items:center; gap:7px; padding:5px 8px; background:#faf5ff; border:1px solid #f3e8ff; border-radius:7px; margin-bottom:5px; font-size:0.75em;">'
                     + '<span style="flex:0 0 auto;">' + schTypeIcon(it.submissionType) + '</span>'
                     + '<span class="lang-no-toggle" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">'
@@ -13648,6 +13732,23 @@
                 if (!due && !(opens && opens > now)) return;
                 if (closedBeforeMe(due)) return;               // closed before this intern arrived
                 out.push({ icon: '📝', title: q.title || 'Quiz แบบทดสอบ', due: due, opens: opens, act: openMission });
+            });
+
+            // V97.22: announced events. The Agenda is where UPCOMING things live, and it
+            // is the only place a future event can be reached — the heatmap never draws
+            // future weeks. `due` is the end of the event's day, so it stays in Today for
+            // the whole day rather than falling into Missed at 00:01.
+            (schEventsCache || []).forEach(ev => {
+                const d0 = schParseDay(ev.eventDate);
+                if (!d0) return;
+                const due = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate(), 23, 59, 59, 999);
+                if (due < now) return;                          // finished; it lives in the calendar now
+                out.push({
+                    icon: '📣',
+                    title: (ev.title || 'Event') + (schMyEventInterests[ev.id] ? ' · ✓ requested' : ''),
+                    due: due,
+                    act: () => schShowDay(ev.eventDate)
+                });
             });
 
             const me = myOwnRow();
@@ -13824,6 +13925,7 @@
             schCalMonth = null;   // V97.17: else the doorway reopens on whatever month was paged to
             schWeekPage = null;   // V97.19: same for the week pager, and for edit mode
             schEditingDates = false;
+            schLoadEvents();      // V97.22: lazy, once — no-op after the first open
             const det = document.getElementById('sch-day-detail');
             if (det) { det.style.display = 'none'; det.innerHTML = ''; }
             m.style.display = 'flex';
