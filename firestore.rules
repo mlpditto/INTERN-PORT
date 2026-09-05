@@ -121,6 +121,24 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Announcements with a date — a webinar, a training day (V98.61). Read by any
+    // signed-in user; the client filters by targetGroups, which is presentation, not
+    // security: an event is an invitation, not a secret.
+    match /events/{eventId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // "I want to join" against an event. Create is open to any signed-in user the same
+    // way `submissions` is; a user may withdraw their OWN request (matched on the
+    // STORED authUid, so it cannot be used to cancel someone else's), and only an admin
+    // may edit one — the roster is what the admin acts on.
+    match /event_interests/{docId} {
+      allow read, create: if isSignedIn();
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.authUid == request.auth.uid);
+      allow update: if isAdmin();
+    }
+
     // Applicant documents (CV/résumé attached to a pre-registration), V98.58.
     // A SEPARATE collection on purpose: pre_users above is `read: if true` so the
     // public claim flow can look a code up, and a Storage download URL is a bearer
