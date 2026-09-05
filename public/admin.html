@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.60)</title>
+    <title>Nika Admin (V98.61)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6475,6 +6475,14 @@
                                 <i class="fa-solid fa-eye"></i> Preview digest
                             </button>
                             <span id="line-digest-now-status" style="font-size:0.74em; color:#64748b;"></span>
+                            <!-- V98.61: events sit next to the LINE panel because both are
+                                 "things you announce" — the digest pushes them out, this
+                                 one posts them inside the app. -->
+                            <button onclick="openEventsModal()"
+                                style="padding:7px 14px; border:1px solid #7c3aed; border-radius:10px; background:#7c3aed; color:#fff; font-size:0.78em; font-weight:700; cursor:pointer; width:auto; min-height:0;">
+                                <i class="fa-solid fa-bullhorn"></i> Events
+                            </button>
+                            <span id="events-count-hint" style="font-size:0.74em; color:#64748b;"></span>
                         </div>
                         <div id="line-digest-preview-box" class="lang-no-toggle" style="display:none; margin-top:10px; border:1px solid #d8dee7; border-radius:10px; background:#f8fafc; padding:10px 12px;">
                             <div id="line-digest-preview-meta" style="font-size:0.72em; color:#64748b; margin-bottom:8px;"></div>
@@ -32270,6 +32278,23 @@ RULES:
                 renderTable('users');
             });
 
+            // V98.61: events + who asked to join. Sorted by date descending so the next
+            // thing happening is at the top of the list.
+            db.collection("events").orderBy("eventDate", "desc").onSnapshot(s => {
+                eventsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderEventsList();
+            }, e => console.error("🔥 [Firestore Error] events:", e));
+
+            db.collection("event_interests").onSnapshot(s => {
+                const byEvent = {};
+                s.docs.forEach(d => {
+                    const v = { id: d.id, ...d.data() };
+                    (byEvent[v.eventId] = byEvent[v.eventId] || []).push(v);
+                });
+                eventInterestsCache = byEvent;
+                renderEventsList();
+            }, e => console.error("🔥 [Firestore Error] event_interests:", e));
+
             // V98.58: applicant CVs. Admin-only collection, so this listener simply
             // fails closed for anyone else — the 📎 badge just never appears.
             db.collection("applicant_docs").onSnapshot(s => {
@@ -52248,6 +52273,101 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             apdRenderReview(results);
         }
 
+        // ---- V98.61: events -------------------------------------------------------
+        const EVENT_GROUPS = ['EXTERN', 'INTERN', 'Junior', 'Pharmacists', 'Public'];
+        let eventsCache = [], eventInterestsCache = {};   // eventId -> [interest]
+        let evSelectedGroups = new Set(EVENT_GROUPS);
+
+        function renderEventGroupChips() {
+            const box = document.getElementById('ev-groups');
+            if (!box) return;
+            box.innerHTML = '<span style="font-size:0.72em; color:#94a3b8; font-weight:700; align-self:center;">Who sees it</span>'
+                + EVENT_GROUPS.map(g => {
+                    const on = evSelectedGroups.has(g);
+                    return `<button type="button" onclick="toggleEventGroup('${g}')" style="width:auto; min-height:0; padding:3px 10px; font-size:0.72em; font-weight:700; cursor:pointer; border-radius:999px; border:1px solid ${on ? '#ddd6fe' : '#e2e8f0'}; background:${on ? '#f5f3ff' : '#fff'}; color:${on ? '#7c3aed' : '#cbd5e1'};">${g}</button>`;
+                }).join('');
+        }
+
+        function toggleEventGroup(g) {
+            if (evSelectedGroups.has(g)) evSelectedGroups.delete(g); else evSelectedGroups.add(g);
+            renderEventGroupChips();
+        }
+
+        function openEventsModal() {
+            evSelectedGroups = new Set(EVENT_GROUPS);
+            ['ev-title', 'ev-date', 'ev-time', 'ev-join', 'ev-desc'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+            document.getElementById('ev-msg').textContent = '';
+            renderEventGroupChips();
+            renderEventsList();
+            document.getElementById('eventsModal').style.display = 'flex';
+        }
+
+        async function createEvent() {
+            const msg = document.getElementById('ev-msg');
+            const title = document.getElementById('ev-title').value.trim();
+            const date = document.getElementById('ev-date').value;
+            const time = document.getElementById('ev-time').value.trim();
+            const join = document.getElementById('ev-join').value.trim();
+            const desc = document.getElementById('ev-desc').value.trim();
+            if (!title || !date) { msg.style.color = '#ef4444'; msg.textContent = 'A title and a date are required.'; return; }
+            if (!evSelectedGroups.size) { msg.style.color = '#ef4444'; msg.textContent = 'Pick at least one group, or nobody will see it.'; return; }
+            const editor = (auth && auth.currentUser) || {};
+            msg.style.color = '#64748b'; msg.textContent = 'Posting…';
+            try {
+                await db.collection('events').add({
+                    title, eventDate: date, timeText: time, joinVia: join, description: desc,
+                    targetGroups: [...evSelectedGroups],
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdByEmail: editor.email || ALLOWED_EMAIL
+                });
+                ['ev-title', 'ev-time', 'ev-join', 'ev-desc'].forEach(id => document.getElementById(id).value = '');
+                msg.textContent = '';
+                showToast('Event posted');
+            } catch (e) { msg.style.color = '#ef4444'; msg.textContent = 'Could not post: ' + e.message; }
+        }
+
+        async function deleteEvent(id) {
+            const n = (eventInterestsCache[id] || []).length;
+            if (!confirm(n ? `Delete this event and its ${n} join request(s)?` : 'Delete this event?')) return;
+            try {
+                // The requests are meaningless without the event, and they carry names —
+                // leaving them behind is the same orphan problem as the applicant CVs.
+                const snap = await db.collection('event_interests').where('eventId', '==', id).get();
+                await Promise.all(snap.docs.map(d => d.ref.delete()));
+                await db.collection('events').doc(id).delete();
+            } catch (e) { alert('Could not delete: ' + e.message); }
+        }
+
+        function renderEventsList() {
+            const box = document.getElementById('ev-list');
+            if (!box) return;
+            if (!eventsCache.length) { box.innerHTML = '<div style="font-size:0.82em; color:#94a3b8;">No events yet.</div>'; return; }
+            const today = schAdminTodayKey();
+            box.innerHTML = eventsCache.map(e => {
+                const people = eventInterestsCache[e.id] || [];
+                const past = e.eventDate < today;
+                return `<div style="border:1px solid #eef2f7; border-radius:10px; padding:8px 10px; margin-bottom:6px; ${past ? 'opacity:0.6;' : ''}">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="flex:1; min-width:0; font-size:0.85em; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(e.title)}</span>
+                        <span style="font-size:0.72em; color:#64748b; white-space:nowrap;">${escapeHtml(e.eventDate)}${e.timeText ? ' · ' + escapeHtml(e.timeText) : ''}</span>
+                        <button onclick="deleteEvent('${e.id}')" style="width:auto; min-height:0; padding:2px 8px; font-size:0.68em; border:none; border-radius:6px; background:#fee2e2; color:#b91c1c; cursor:pointer;">Del</button>
+                    </div>
+                    <div style="font-size:0.7em; color:#94a3b8; margin-top:3px;">${(e.targetGroups || []).join(' · ')}${e.joinVia ? ' — ' + escapeHtml(e.joinVia) : ''}</div>
+                    <div style="font-size:0.74em; color:#334155; margin-top:4px;">
+                        <b>${people.length}</b> want to join${people.length ? ': ' + people.map(p => escapeHtml(p.displayName || p.userId)).join(', ') : ''}
+                    </div>
+                </div>`;
+            }).join('');
+            const hint = document.getElementById('events-count-hint');
+            const upcoming = eventsCache.filter(e => e.eventDate >= today).length;
+            if (hint) hint.textContent = upcoming ? upcoming + ' upcoming' : '';
+        }
+
+        function schAdminTodayKey() {
+            const d = new Date();
+            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        }
+
         // V98.60: keep users.resumeDocCount in step. Documents can be attached or removed
         // AFTER the code is claimed, and `applicant_docs` is admin-only — the intern can
         // only ever learn about their CV through their own user doc, so if this drifts
@@ -59635,6 +59755,34 @@ Reply ONLY with raw JSON, no markdown:
         </div>
     </div>
     <!-- 🔥 User Merger Modal ([Version: V89.46]) -->
+    <!-- V98.61: announcements with a date. Deliberately NOT a quest: quests expect a
+         submission and award points, so reusing them would drag the whole review and
+         scoring machinery into "there is a webinar on Tuesday" and put it in the Mission
+         list. An event asks for one thing — do you want to come. -->
+    <div id="eventsModal" class="modal" style="display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);">
+        <div class="modal-content" style="max-width:560px; width:94%; margin:auto; padding:16px; border-radius:16px; border:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0; font-size:1.05em; color:#7c3aed;"><i class="fa-solid fa-bullhorn"></i> Events</h3>
+                <span onclick="document.getElementById('eventsModal').style.display='none'" style="cursor:pointer; font-size:22px; color:#cbd5e1;">&times;</span>
+            </div>
+
+            <div style="border:1px solid #eef2f7; border-radius:10px; padding:10px; margin-top:10px;">
+                <input type="text" id="ev-title" placeholder="Title — e.g. MPS Science webinar" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.85em; margin-bottom:6px;">
+                <div style="display:flex; gap:6px; margin-bottom:6px;">
+                    <input type="date" id="ev-date" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:8px; font-size:0.85em;">
+                    <input type="text" id="ev-time" placeholder="14:00 - 15:00" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:8px; font-size:0.85em;">
+                </div>
+                <input type="text" id="ev-join" placeholder="How to join — link, ON24, room…" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.85em; margin-bottom:6px;">
+                <textarea id="ev-desc" rows="2" placeholder="Details (optional)" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.85em; resize:vertical;"></textarea>
+                <div id="ev-groups" style="display:flex; flex-wrap:wrap; gap:5px; margin:8px 0;"></div>
+                <div id="ev-msg" style="font-size:0.74em; font-weight:700; min-height:1em; margin-bottom:6px;"></div>
+                <button onclick="createEvent()" style="width:auto; min-height:0; padding:7px 16px; border:none; border-radius:8px; background:#7c3aed; color:#fff; font-weight:700; font-size:0.8em; cursor:pointer;">Post event</button>
+            </div>
+
+            <div id="ev-list" style="margin-top:12px;"></div>
+        </div>
+    </div>
+
     <!-- V98.58: applicant documents. The list lives in `applicant_docs` (admin-only),
          never on the pre_users doc — that one is world-readable for the public claim
          flow, and a Storage download URL is a bearer token. -->
