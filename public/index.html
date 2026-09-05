@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.24)</title>
+    <title>Internship Portfolio (V97.25)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -7507,7 +7507,11 @@
 
         function checkGraduation(data) {
             if (!data.startDate || !data.endDate) return;
-            const e = new Date(data.endDate), now = new Date();
+            // V97.25: parse as LOCAL midnight. `new Date('YYYY-MM-DD')` is UTC midnight —
+            // 07:00 in Bangkok — which is exactly why this function's countdown disagreed
+            // by one with updateTimelineBar()'s. Same fix as V97.05 made there.
+            const e = (typeof schParseDay === 'function') ? schParseDay(data.endDate) : new Date(data.endDate);
+            const now = new Date();
             const btn = document.getElementById('grad-action');
             const certBtnContainer = document.getElementById('cert-request-btn-container');
 
@@ -7516,11 +7520,17 @@
 
             // Logic: now >= end_date (Inclusive)
             if (now >= e) {
+                btn.style.display = '';
                 if (data.certRequested) btn.innerHTML = `<span style="color:#28a745;">✅ Certificate request sent ส่งคำร้องแล้ว</span>`;
                 else btn.innerHTML = `<button onclick="requestCert()" class="btn-warning" style="width:100%"><i class="fa-solid fa-certificate"></i> Request Cert ขอใบรับรองจบ</button>`;
             } else {
-                const left = Math.ceil((e - now) / 86400000);
-                btn.innerHTML = `<span style="color:#17a2b8; display:inline-block; background:#e0f7fa; padding:3px 8px; border-radius:6px; font-weight:600;"><i class="fa-solid fa-hourglass-half"></i> ${left} day(s) of internship left เหลือเวลาฝึกงาน</span>`;
+                // V97.25: a countdown chip used to sit here — and it said the same thing as
+                // the "⏳ N days left" already on the timeline bar directly above it, with a
+                // DIFFERENT number (22710 vs 22709), so the two contradicted each other.
+                // One countdown, on the bar. This slot is now only for the graduation action,
+                // and stays out of the layout entirely while the internship is still running.
+                btn.innerHTML = '';
+                btn.style.display = 'none';
             }
         }
 
