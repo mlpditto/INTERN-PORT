@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.16)</title>
+    <title>Internship Portfolio (V97.17)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -13197,18 +13197,77 @@
             return { start: schDateKey(start), end: schDateKey(end) };
         }
 
+        // V97.17: the month the calendar in the doorway is showing, as 'YYYY-MM'.
+        // Null = not chosen yet; openScheduleModal() resets it so a month the intern
+        // paged to last time does not survive a close (static-modal state leak).
+        let schCalMonth = null;
+
+        // Current month, unless it has no activity at all — then the newest month
+        // that does, so the doorway never opens on an empty grid.
+        function schCalDefaultMonth(dayMap) {
+            const now = schDateKey(new Date()).slice(0, 7);
+            if (Object.keys(dayMap).some(k => k.slice(0, 7) === now)) return now;
+            const months = Object.keys(dayMap).map(k => k.slice(0, 7)).sort();
+            return months.length ? months[months.length - 1] : now;
+        }
+
+        function schCalShift(delta) {
+            const [y, m] = (schCalMonth || schCalDefaultMonth(schBuildDayMap())).split('-').map(Number);
+            const d = new Date(y, m - 1 + delta, 1);
+            schCalMonth = schDateKey(d).slice(0, 7);
+            schRenderHeatmap();
+        }
+
+        // V97.17: a REAL month calendar, not the V97.16 ghost grid. Before the dates
+        // are set the pane used to show fabricated cells; the intern's own activity
+        // is right there in the same cache the heatmap reads, so show that instead.
+        // Trade-off accepted knowingly: V97.13 removed the "since your first entry"
+        // fallback as deliberate pressure to fill the dates in. That pressure is
+        // weaker now — but the date form sits directly under this calendar, so
+        // filling them in no longer costs a trip out of the modal.
+        function schRenderMiniCalendar(dayMap) {
+            const ym = schCalMonth || (schCalMonth = schCalDefaultMonth(dayMap));
+            const [y, m] = ym.split('-').map(Number);
+            const first = new Date(y, m - 1, 1);
+            const daysInMonth = new Date(y, m, 0).getDate();
+            const lead = (first.getDay() + 6) % 7;   // Monday-start, matching schMonday()
+            const todayKey = schDateKey(new Date());
+            const label = first.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+            const nav = 'width:auto; min-height:0; cursor:pointer; border:1px solid #e2e8f0; background:#fff; '
+                + 'color:#7c3aed; border-radius:8px; padding:2px 9px; font-weight:800; font-size:0.8em;';
+
+            let html = '<div style="display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:8px;">'
+                + '<button type="button" onclick="schCalShift(-1)" style="' + nav + '">‹</button>'
+                + '<span style="font-size:0.78em; font-weight:800; color:#475569; min-width:118px; text-align:center;">'
+                + label + '</span>'
+                + '<button type="button" onclick="schCalShift(1)" style="' + nav + '">›</button></div>';
+
+            // max-width or the aspect-ratio:1 cells blow up on a wide viewport —
+            // the same trap the main heatmap grid carries.
+            html += '<div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:3px; max-width:266px; margin:0 auto;">';
+            ['M', 'T', 'W', 'T', 'F', 'S', 'S'].forEach(d => {
+                html += '<span style="font-size:0.58em; color:#cbd5e1; text-align:center; font-weight:700;">' + d + '</span>';
+            });
+            for (let i = 0; i < lead; i++) html += '<span></span>';
+            for (let day = 1; day <= daysInMonth; day++) {
+                const key = ym + '-' + String(day).padStart(2, '0');
+                const n = (dayMap[key] || []).length;
+                const bg = SCH_RAMP[Math.min(n, SCH_RAMP.length - 1)];
+                const border = (key === todayKey) ? '2px solid #7c3aed' : '1px solid #e2e8f0';
+                const click = n ? ' onclick="schShowDay(\'' + key + '\')"' : '';
+                html += '<div' + click + ' title="' + key + (n ? ' — ' + n + ' entries' : '') + '"'
+                    + ' style="aspect-ratio:1; border-radius:3px; display:flex; align-items:center; justify-content:center;'
+                    + ' font-size:0.55em; font-weight:700; color:' + (n > 2 ? '#fff' : '#94a3b8') + ';'
+                    + ' background:' + bg + '; border:' + border + '; cursor:' + (n ? 'pointer' : 'default') + ';">'
+                    + day + '</div>';
+            }
+            html += '</div>';
+            return html;
+        }
+
         function schRenderDateSetup(grid, summaryEl, legendEl, dayKeys) {
             const g = schDateGuess(dayKeys);
-            // A ghost grid: the doorway should show what the dates buy, not just
-            // say it. pointer-events:none — it is a picture, not a control.
-            const shape = [0, 1, 2, 0, 3, 0, 0, 1, 2, 4, 3, 1, 0, 0, 0, 3, 2, 4, 2, 1, 0, 2, 1, 3, 0, 4, 0, 0];
-            let ghost = '<div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:3px; '
-                + 'max-width:196px; margin:0 auto; opacity:0.35; pointer-events:none;">';
-            shape.forEach(n => {
-                ghost += '<div style="aspect-ratio:1; border-radius:3px; border:1px solid #e2e8f0; background:'
-                    + SCH_RAMP[n] + ';"></div>';
-            });
-            ghost += '</div>';
+            const ghost = schRenderMiniCalendar(schBuildDayMap());
 
             // Both buttons below have to negate `button { width:100%; min-height:48px }`
             // from index.html:361 explicitly, the same way .sch-tab does.
@@ -13220,7 +13279,9 @@
             grid.innerHTML = ghost
                 + '<div style="text-align:center; margin-top:14px;">'
                 + '<div style="font-size:0.82em; font-weight:800; color:#475569;">'
-                + 'Set your internship dates to see your activity map ตั้งวันเริ่มและวันจบก่อน</div></div>'
+                + 'Set your internship dates to see the whole run ตั้งวันเริ่มและวันจบเพื่อดูทั้งช่วง</div>'
+                + '<div style="font-size:0.7em; color:#94a3b8; margin-top:4px;">'
+                + 'This calendar shows one month at a time ปฏิทินนี้แสดงทีละเดือน</div></div>'
                 + '<div style="display:flex; gap:8px; margin-top:12px;">'
                 + '<div style="flex:1;"><label style="font-size:0.72em; font-weight:700; color:#64748b; display:block; margin-bottom:4px;">'
                 + 'Start วันเริ่ม</label><input type="date" id="sch-start-date" value="' + g.start + '" style="' + field + '"></div>'
@@ -13675,6 +13736,7 @@
             // or with a stale day-detail strip from a cell tapped days ago.
             window._schPane = 'agenda';
             window._schMissedExpanded = false;
+            schCalMonth = null;   // V97.17: else the doorway reopens on whatever month was paged to
             const det = document.getElementById('sch-day-detail');
             if (det) { det.style.display = 'none'; det.innerHTML = ''; }
             m.style.display = 'flex';
