@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.65)</title>
+    <title>Nika Admin (V98.66)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -11686,10 +11686,24 @@
                     <h2 style="margin-top:0;">📣 New Event</h2>
                     <div style="border:1px solid #eef2f7; border-radius:10px; padding:10px; margin-top:10px;">
                 <input type="text" id="ev-title" oninput="saveEventDraft()" placeholder="Title — e.g. MPS Science webinar" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.85em; margin-bottom:6px;">
-                <div style="display:flex; gap:6px; margin-bottom:6px;">
-                    <input type="date" id="ev-date" oninput="saveEventDraft()" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:8px; font-size:0.85em;">
-                    <input type="text" id="ev-time" oninput="saveEventDraft()" placeholder="14:00 - 15:00" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:8px; font-size:0.85em;">
+                <!-- V98.66: DATE and TIME get real labels, the date shows the weekday and
+                     an abbreviated month under it, and TIME is two 24h fields instead of a
+                     free-text box. The bare "09 / 08 / 2026" was read as 9 Aug by a Thai
+                     reader when 8 Sep was meant — the written-out preview is the guard that
+                     does not depend on the browser's locale. lang="en-GB" nudges Chrome to
+                     DD/MM and to a 24h clock, but it is a nudge, not the guarantee. -->
+                <label style="display:block; font-size:0.68em; font-weight:800; color:#94a3b8; letter-spacing:0.04em; margin:8px 0 3px;">DATE</label>
+                <input type="date" id="ev-date" lang="en-GB" oninput="saveEventDraft(); renderEventWhen();" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; font-size:0.85em; box-sizing:border-box;">
+                <div id="ev-when" style="font-size:0.74em; font-weight:700; color:#7c3aed; min-height:1.1em; margin-top:4px;"></div>
+                <label style="display:block; font-size:0.68em; font-weight:800; color:#94a3b8; letter-spacing:0.04em; margin:8px 0 3px;">TIME</label>
+                <div style="display:flex; gap:6px; align-items:center;">
+                    <input type="time" id="ev-start" lang="en-GB" step="300" oninput="saveEventDraft(); renderEventWhen();" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:8px; font-size:0.85em; box-sizing:border-box;">
+                    <span style="color:#cbd5e1; font-size:0.8em;">to</span>
+                    <input type="time" id="ev-end" lang="en-GB" step="300" oninput="saveEventDraft(); renderEventWhen();" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:8px; font-size:0.85em; box-sizing:border-box;">
                 </div>
+                <label style="display:block; font-size:0.68em; font-weight:800; color:#94a3b8; letter-spacing:0.04em; margin:8px 0 3px;">LOCATION <span style="font-weight:600; color:#cbd5e1;">optional</span></label>
+                <input type="text" id="ev-location" oninput="saveEventDraft()" placeholder="📍 e.g. Manarom hospital / online" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; font-size:0.85em; box-sizing:border-box;">
+                <label style="display:block; font-size:0.68em; font-weight:800; color:#94a3b8; letter-spacing:0.04em; margin:8px 0 3px;">HOW TO JOIN</label>
                 <input type="text" id="ev-join" oninput="saveEventDraft()" placeholder="How to join — link, ON24, room…" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.85em; margin-bottom:6px;">
                 <textarea id="ev-desc" rows="2" oninput="saveEventDraft()" placeholder="Details (optional)" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.85em; resize:vertical;"></textarea>
                 <div id="ev-groups" style="display:flex; flex-wrap:wrap; gap:5px; margin:8px 0;"></div>
@@ -52327,7 +52341,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // Firestore: an unposted draft is nobody else's business, and it has to survive a
         // reload that never reached the network in the first place.
         const EV_DRAFT_KEY = 'nika_event_draft_v1';
-        const EV_FIELDS = ['ev-title', 'ev-date', 'ev-time', 'ev-join', 'ev-desc'];
+        const EV_FIELDS = ['ev-title', 'ev-date', 'ev-start', 'ev-end', 'ev-location', 'ev-join', 'ev-desc'];
 
         function saveEventDraft() {
             try {
@@ -52361,11 +52375,38 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (s) s.textContent = '';
         }
 
+        // V98.66: the guard against "09 / 08 / 2026". A date input renders in whatever
+        // format the browser feels like; this line spells the day out — weekday first,
+        // then an abbreviated month — so a wrong date is obvious before it is posted.
+        function evComposedTime() {
+            const st = (document.getElementById('ev-start') || {}).value || '';
+            const en = (document.getElementById('ev-end') || {}).value || '';
+            if (st && en) return st + ' - ' + en;
+            return st || en || '';
+        }
+
+        function renderEventWhen() {
+            const box = document.getElementById('ev-when');
+            if (!box) return;
+            const v = (document.getElementById('ev-date') || {}).value || '';
+            const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+            if (!m) { box.textContent = ''; return; }
+            const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));   // local, never UTC
+            const t = evComposedTime();
+            let out = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+            if (t) out += ' · ' + t;
+            const st = (document.getElementById('ev-start') || {}).value;
+            const en = (document.getElementById('ev-end') || {}).value;
+            if (st && en && en < st) out += '   ⚠ ends before it starts';
+            box.textContent = out;
+        }
+
         function openEventsModal() {
             evSelectedGroups = new Set(EVENT_GROUPS);
             EV_FIELDS.forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
             document.getElementById('ev-msg').textContent = '';
             loadEventDraft();          // after the reset, so a saved draft wins over the blank form
+            renderEventWhen();
             renderEventGroupChips();
             renderEventsList();
             // V98.63: this is a TAB inside the global Create modal now, not a modal of its
@@ -52383,7 +52424,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const msg = document.getElementById('ev-msg');
             const title = document.getElementById('ev-title').value.trim();
             const date = document.getElementById('ev-date').value;
-            const time = document.getElementById('ev-time').value.trim();
+            const time = evComposedTime();
+            const location = document.getElementById('ev-location').value.trim();
             const join = document.getElementById('ev-join').value.trim();
             const desc = document.getElementById('ev-desc').value.trim();
             if (!title || !date) { msg.style.color = '#ef4444'; msg.textContent = 'A title and a date are required.'; return; }
@@ -52393,11 +52435,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             try {
                 const ref = await db.collection('events').add({
                     title, eventDate: date, timeText: time, joinVia: join, description: desc,
+                    // startTime/endTime are kept alongside timeText: timeText is what every
+                    // existing reader renders, the two fields are what a future reminder or
+                    // sort would need. Writing only the composed string would throw that away.
+                    startTime: (document.getElementById('ev-start') || {}).value || '',
+                    endTime: (document.getElementById('ev-end') || {}).value || '',
+                    location,
                     targetGroups: [...evSelectedGroups],
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     createdByEmail: editor.email || ALLOWED_EMAIL
                 });
-                ['ev-title', 'ev-time', 'ev-join', 'ev-desc'].forEach(id => document.getElementById(id).value = '');
+                ['ev-title', 'ev-start', 'ev-end', 'ev-location', 'ev-join', 'ev-desc']
+                    .forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+                renderEventWhen();
                 clearEventDraft();
                 // V98.62: say it in the modal, not only in a toast that can be missed —
                 // "did that work?" was a real question a moment ago.
@@ -52437,7 +52487,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         <span style="font-size:0.72em; color:#64748b; white-space:nowrap;">${escapeHtml(e.eventDate)}${e.timeText ? ' · ' + escapeHtml(e.timeText) : ''}</span>
                         <button onclick="deleteEvent('${e.id}')" style="width:auto; min-height:0; padding:2px 8px; font-size:0.68em; border:none; border-radius:6px; background:#fee2e2; color:#b91c1c; cursor:pointer;">Del</button>
                     </div>
-                    <div style="font-size:0.7em; color:#94a3b8; margin-top:3px;">${(e.targetGroups || []).join(' · ')}${e.joinVia ? ' — ' + escapeHtml(e.joinVia) : ''}</div>
+                    <div style="font-size:0.7em; color:#94a3b8; margin-top:3px;">${(e.targetGroups || []).join(' · ')}${e.location ? ' · 📍 ' + escapeHtml(e.location) : ''}${e.joinVia ? ' — ' + escapeHtml(e.joinVia) : ''}</div>
                     <div style="font-size:0.74em; color:#334155; margin-top:4px;">
                         <b>${people.length}</b> want to join${people.length ? ': ' + people.map(p => escapeHtml(p.displayName || p.userId)).join(', ') : ''}
                     </div>
