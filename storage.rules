@@ -83,6 +83,21 @@ service firebase.storage {
       allow delete: if isAdmin() || (isSignedIn() && request.auth.uid == ownerUid);
     }
 
+    // Applicant documents (a CV/résumé handed in with a pre-registration), keyed by the
+    // pre_users doc id and content-addressed by SHA-256 like every path above.
+    // ADMIN ONLY, both directions: at this stage the applicant has no account at all —
+    // they hold an enrolment code, not an identity — so there is nobody else who could
+    // be granted access. 4 MB covers a scanned multi-page CV; PDF or image only.
+    // NOTE: the file LIST lives in Firestore `applicant_docs`, which is admin-only, and
+    // deliberately NOT on the pre_users doc — that one is `read: if true` for the public
+    // claim flow, and a Storage download URL is a bearer token.
+    match /applicant-docs/{preUserId}/{fileName} {
+      allow read, delete: if isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.size < 4 * 1024 * 1024
+        && request.resource.contentType.matches('application/pdf|image/(jpeg|png|webp)');
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }
