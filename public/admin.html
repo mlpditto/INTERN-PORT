@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.58)</title>
+    <title>Nika Admin (V98.59)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -4304,6 +4304,10 @@
         rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- V98.59: pdf.js READS pdfs — jspdf above only writes them. Used to pull the text
+         layer out of an applicant's CV for AI review. UMD build on purpose (global
+         `pdfjsLib`); the .mjs build would need a module script. -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <!-- V96.83: vendored QR encoder (MIT, kazuhikoarase/qrcode-generator) for certificate verify QR -->
     <script src="libs/qrcode-generator.js?v=1.5.0"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -52061,9 +52065,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
         function openApplicantDocs(preUserId) {
             apdTargetId = preUserId;
-            const u = (usersData || []).find(x => x.id === preUserId) || {};
-            document.getElementById('apd-who').textContent = 'For ' + (u.displayName || preUserId);
+            // V98.59: pending rows come from `preRegData`, NOT `usersData` — renderTable
+            // maps them in with isPreReg:true. Looking in the wrong array made the
+            // heading read the raw doc id ("For 1HckMT56eFo1WWbB73Kv").
+            const u = (typeof preRegData !== 'undefined' ? preRegData : []).find(x => x.id === preUserId)
+                || (usersData || []).find(x => x.id === preUserId) || {};
+            document.getElementById('apd-who').textContent = u.fullName || u.displayName || preUserId;
             document.getElementById('apd-msg').textContent = '';
+            document.getElementById('apd-ai').innerHTML = '';
             renderApplicantDocs();
             document.getElementById('applicantDocsModal').style.display = 'flex';
         }
@@ -52074,11 +52083,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const docs = applicantDocsCache[apdTargetId] || [];
             if (!docs.length) { box.innerHTML = '<div style="color:#94a3b8; font-size:0.85em;">No documents yet.</div>'; return; }
             box.innerHTML = docs.map(d => `
-                <div style="display:flex; align-items:center; gap:8px; padding:7px 9px; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:6px;">
-                    <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:0.85em;">${escapeHtml(d.name)}</span>
-                    <span style="font-size:0.72em; color:#94a3b8;">${Math.round((d.size || 0) / 1024)} KB</span>
-                    <button class="btn-sm" style="background:#0ea5e9; color:#fff; padding:3px 9px; font-size:0.72em;" onclick="openApplicantDoc('${d.id}')">Open</button>
-                    <button class="btn-sm btn-danger" style="padding:3px 9px; font-size:0.72em;" onclick="deleteApplicantDoc('${d.id}')">Del</button>
+                <div style="display:flex; align-items:center; gap:6px; padding:5px 8px; border:1px solid #eef2f7; border-radius:8px; margin-bottom:4px;">
+                    <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:0.78em;">${escapeHtml(d.name)}</span>
+                    <span style="font-size:0.66em; color:#cbd5e1; white-space:nowrap;">${Math.round((d.size || 0) / 1024)} KB</span>
+                    ${d.contentType === 'application/pdf' ? `<button class="btn-sm" style="width:auto; min-height:0; background:#ede9fe; color:#7c3aed; padding:2px 8px; font-size:0.68em; border:none; border-radius:6px; cursor:pointer;" onclick="aiReviewApplicantDoc('${d.id}')" title="AI review — two models">🤖</button>` : ''}
+                    <button class="btn-sm" style="width:auto; min-height:0; background:#e0f2fe; color:#0369a1; padding:2px 8px; font-size:0.68em; border:none; border-radius:6px; cursor:pointer;" onclick="openApplicantDoc('${d.id}')">Open</button>
+                    <button class="btn-sm" style="width:auto; min-height:0; background:#fee2e2; color:#b91c1c; padding:2px 8px; font-size:0.68em; border:none; border-radius:6px; cursor:pointer;" onclick="deleteApplicantDoc('${d.id}')">Del</button>
                 </div>`).join('');
         }
 
@@ -52135,6 +52145,98 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 }
                 await db.collection('applicant_docs').doc(docId).delete();
             } catch (e) { alert('Could not delete: ' + e.message); }
+        }
+
+        // ---- V98.59: AI review of an applicant's CV, two models ---------------------
+        // Two on purpose: one model's opinion of a person is not evidence. Where they
+        // agree is worth acting on; where they disagree is exactly what a human should
+        // look at, so the disagreement is shown rather than averaged away.
+        const APD_REVIEW_MODELS = ['claude-4-sonnet-latest', 'gpt-5.4'];
+
+        async function apdExtractPdfText(url) {
+            if (!window.pdfjsLib) throw new Error('pdf.js did not load');
+            pdfjsLib.GlobalWorkerOptions.workerSrc =
+                'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            const buf = await (await fetch(url)).arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+            let out = '';
+            for (let p = 1; p <= Math.min(pdf.numPages, 8); p++) {
+                const page = await pdf.getPage(p);
+                const content = await page.getTextContent();
+                out += content.items.map(i => i.str).join(' ') + '\n';
+            }
+            return out.trim();
+        }
+
+        function apdReviewPrompt(text) {
+            return 'คุณคือเภสัชกรพี่เลี้ยงที่คัดเลือกนักศึกษาฝึกงานร้านยา '
+                + 'อ่านเรซูเม่ต่อไปนี้แล้วตอบเป็น JSON เท่านั้น ตามรูปแบบ '
+                + '{"summary":"สรุป 1-2 ประโยค","strengths":["..."],"gaps":["..."],'
+                + '"questions":["คำถามที่ควรถามตอนสัมภาษณ์"],"suggestions":["สิ่งที่ผู้สมัครควรปรับในเรซูเม่"]}'
+                + ' ตอบเป็นภาษาไทย สั้น กระชับ ข้อละไม่เกิน 1 บรรทัด อย่างละไม่เกิน 4 ข้อ '
+                + 'ห้ามเดาข้อมูลที่ไม่มีในเอกสาร ถ้าข้อมูลไม่พอให้บอกตรง ๆ ใน gaps\n\n--- เรซูเม่ ---\n'
+                + text.slice(0, 12000);
+        }
+
+        function apdRenderReview(results) {
+            const box = document.getElementById('apd-ai');
+            const li = (arr) => (arr && arr.length)
+                ? arr.map(x => '<li>' + escapeHtml(String(x)) + '</li>').join('')
+                : '<li style="color:#cbd5e1;">—</li>';
+            box.innerHTML = results.map(r => {
+                if (r.error) {
+                    return `<div style="border:1px solid #fee2e2; background:#fef2f2; border-radius:8px; padding:8px; margin-bottom:6px;">
+                        <div style="font-size:0.7em; font-weight:800; color:#b91c1c;">${escapeHtml(r.model)}</div>
+                        <div style="font-size:0.72em; color:#b91c1c;">${escapeHtml(r.error)}</div></div>`;
+                }
+                const d = r.data || {};
+                return `<div style="border:1px solid #eef2f7; border-radius:8px; padding:8px; margin-bottom:6px;">
+                    <div style="font-size:0.7em; font-weight:800; color:#7c3aed; margin-bottom:3px;">${escapeHtml(r.model)}</div>
+                    <div style="font-size:0.74em; color:#334155; margin-bottom:5px;">${escapeHtml(d.summary || '')}</div>
+                    <div style="font-size:0.7em; color:#475569;">
+                        <b>จุดแข็ง</b><ul style="margin:2px 0 5px 16px; padding:0;">${li(d.strengths)}</ul>
+                        <b>จุดที่ขาด</b><ul style="margin:2px 0 5px 16px; padding:0;">${li(d.gaps)}</ul>
+                        <b>ควรถามตอนสัมภาษณ์</b><ul style="margin:2px 0 5px 16px; padding:0;">${li(d.questions)}</ul>
+                        <b>ผู้สมัครควรปรับ</b><ul style="margin:2px 0 0 16px; padding:0;">${li(d.suggestions)}</ul>
+                    </div></div>`;
+            }).join('')
+            + '<p style="font-size:0.64em; color:#cbd5e1; margin:4px 0 0;">Two models, shown separately on purpose — where they disagree is what a human should look at. Not a hiring decision.</p>';
+        }
+
+        async function aiReviewApplicantDoc(docId) {
+            const d = (applicantDocsCache[apdTargetId] || []).find(x => x.id === docId);
+            const box = document.getElementById('apd-ai');
+            if (!d) return;
+            box.innerHTML = '<div style="font-size:0.74em; color:#64748b;">Reading the PDF…</div>';
+            let text;
+            try {
+                const url = await adminApp.storage().ref(d.path).getDownloadURL();
+                text = await apdExtractPdfText(url);
+            } catch (e) {
+                box.innerHTML = '<div style="font-size:0.74em; color:#b91c1c;">Could not read the PDF: ' + escapeHtml(e.message) + '</div>';
+                return;
+            }
+            // A scanned CV has no text layer at all. Say that plainly instead of sending
+            // an empty prompt and presenting whatever the models invent from nothing.
+            if (text.length < 200) {
+                box.innerHTML = '<div style="font-size:0.74em; color:#b45309;">This PDF has almost no text layer ('
+                    + text.length + ' chars) — it is probably a scan. AI review needs a text PDF.</div>';
+                return;
+            }
+            box.innerHTML = '<div style="font-size:0.74em; color:#64748b;">Asking ' + APD_REVIEW_MODELS.length + ' models…</div>';
+            const prompt = apdReviewPrompt(text);
+            const results = await Promise.all(APD_REVIEW_MODELS.map(async model => {
+                try {
+                    const res = await window.callUniversalAI(model, prompt, true, null, '', { feature: 'resume_review' });
+                    const raw = (res && res.text) || '';
+                    const m = raw.match(/\{[\s\S]*\}/);      // models like to wrap JSON in prose
+                    if (!m) throw new Error('no JSON in the reply: ' + raw.slice(0, 120));
+                    return { model, data: JSON.parse(m[0]) };
+                } catch (e) {
+                    return { model, error: e.message };
+                }
+            }));
+            apdRenderReview(results);
         }
 
         // Personal data must not outlive the record it belongs to. `pre_users` rows are
@@ -59513,17 +59615,19 @@ Reply ONLY with raw JSON, no markdown:
          never on the pre_users doc — that one is world-readable for the public claim
          flow, and a Storage download URL is a bearer token. -->
     <div id="applicantDocsModal" class="modal" style="display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);">
-        <div class="modal-content" style="max-width:480px; width:90%; border-radius:20px; border:none;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                <h3 style="margin:0; color:#0ea5e9;">📎 Applicant documents</h3>
-                <span onclick="document.getElementById('applicantDocsModal').style.display='none'" style="cursor:pointer; font-size:24px; color:#94a3b8;">&times;</span>
+        <div class="modal-content" style="max-width:420px; width:92%; margin:auto; padding:14px 16px; border-radius:16px; border:none;">
+            <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;">
+                <h3 style="margin:0; font-size:1em; color:#0ea5e9;">📎 Documents</h3>
+                <span id="apd-who" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:0.78em; color:#94a3b8;"></span>
+                <span onclick="document.getElementById('applicantDocsModal').style.display='none'" style="cursor:pointer; font-size:20px; line-height:1; color:#cbd5e1;">&times;</span>
             </div>
-            <p id="apd-who" style="margin:0 0 12px; font-size:0.85em; color:#64748b;"></p>
-            <div id="apd-list" style="margin-bottom:12px;"></div>
-            <div id="apd-msg" style="font-size:0.78em; font-weight:700; min-height:1em; margin-bottom:8px;"></div>
+            <div id="apd-list" style="margin:10px 0 8px;"></div>
+            <div id="apd-msg" style="font-size:0.75em; font-weight:700; margin-bottom:6px;"></div>
             <input type="file" id="apd-file" accept="application/pdf,image/jpeg,image/png,image/webp" style="display:none;" onchange="uploadApplicantDoc(this)">
-            <button class="btn-primary" style="width:100%;" onclick="document.getElementById('apd-file').click()">Attach a file — PDF or image, under 4 MB</button>
-            <p style="margin:10px 0 0; font-size:0.72em; color:#94a3b8;">Visible to admins only. <b>Deleting the applicant deletes these files too</b> — a CV is personal data and must not outlive the record it belongs to.</p>
+            <button class="btn-sm" onclick="document.getElementById('apd-file').click()" style="width:auto; min-height:0; padding:5px 12px; font-size:0.75em; font-weight:700; background:#f5f3ff; color:#7c3aed; border:1px solid #ddd6fe; border-radius:999px; cursor:pointer;">+ Attach</button>
+            <span style="font-size:0.68em; color:#cbd5e1; margin-left:6px;">PDF or image, under 4 MB</span>
+            <div id="apd-ai" style="margin-top:10px;"></div>
+            <p style="margin:10px 0 0; font-size:0.66em; color:#cbd5e1; line-height:1.45;">Admins only · deleting the applicant deletes these files too · AI review sends the CV text to the model providers</p>
         </div>
     </div>
 
