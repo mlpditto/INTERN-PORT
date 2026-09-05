@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.18)</title>
+    <title>Internship Portfolio (V97.19)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -13084,7 +13084,13 @@
         // Range = the internship window when both dates are set; otherwise it
         // falls back to "first activity → today", because an intern who never
         // filled the dates in still has a history worth showing.
-        const SCH_MAX_WEEKS = 16;   // 16 rows is the most that stays legible on a LIFF viewport
+        // V97.19: replaces SCH_MAX_WEEKS (16). That was a truncation cap — the grid drew
+        // the newest 16 weeks and the rest was unreachable. This is a PAGE size: 12 weeks
+        // per page, the length an intern/extern/junior placement actually runs to, with
+        // `‹ ›` to walk the rest. 12 rows also stay legible on a LIFF viewport.
+        const SCH_PAGE_WEEKS = 12;
+        let schWeekPage = null;      // page index; null = open on the most recent
+        let schEditingDates = false; // true while the date form is open over an existing window
         // V97.18: 26 weeks — double the ~12-week ceiling a real intern/extern/junior
         // placement runs to, so it only ever catches a mistyped year.
         const SCH_MAX_SPAN_DAYS = 182;
@@ -13200,6 +13206,22 @@
             return { start: schDateKey(start), end: schDateKey(end) };
         }
 
+        // V97.19: the two controls under the grid.
+        function schWeekPageShift(delta) {
+            schWeekPage = Math.max(0, (schWeekPage || 0) + delta);
+            schRenderHeatmap();
+        }
+
+        function schEditDates() {
+            schEditingDates = true;
+            schRenderHeatmap();
+        }
+
+        function schCancelEditDates() {
+            schEditingDates = false;
+            schRenderHeatmap();
+        }
+
         // V97.17: the month the calendar in the doorway is showing, as 'YYYY-MM'.
         // Null = not chosen yet; openScheduleModal() resets it so a month the intern
         // paged to last time does not survive a close (static-modal state leak).
@@ -13268,8 +13290,13 @@
             return html;
         }
 
-        function schRenderDateSetup(grid, summaryEl, legendEl, dayKeys) {
-            const g = schDateGuess(dayKeys);
+        // `existing` is the user row when a window is already stored (V97.19 edit mode) —
+        // then the fields carry what is saved, not a guess, or "edit" would silently
+        // propose different dates than the ones on screen a second ago.
+        function schRenderDateSetup(grid, summaryEl, legendEl, dayKeys, existing) {
+            const g = existing
+                ? { start: existing.startDate || '', end: existing.endDate || '' }
+                : schDateGuess(dayKeys);
             const ghost = schRenderMiniCalendar(schBuildDayMap());
 
             // Both buttons below have to negate `button { width:100%; min-height:48px }`
@@ -13299,7 +13326,12 @@
                 + '<div id="sch-date-msg" style="font-size:0.72em; color:#ef4444; font-weight:700; margin-top:9px; min-height:1em;"></div>'
                 + '<button type="button" onclick="schSaveDatesInline()" style="width:100%; min-height:42px; margin-top:4px; '
                 + 'cursor:pointer; font-size:0.82em; font-weight:800; color:#fff; background:#7c3aed; border:none; '
-                + 'border-radius:9px; padding:10px;">Save dates บันทึกวันที่</button>';
+                + 'border-radius:9px; padding:10px;">Save dates บันทึกวันที่</button>'
+                + (existing
+                    ? '<div style="text-align:center; margin-top:8px;"><button type="button" onclick="schCancelEditDates()"'
+                      + ' style="width:auto; min-height:0; cursor:pointer; font-size:0.72em; font-weight:700; color:#64748b;'
+                      + ' background:none; border:none; text-decoration:underline;">Cancel ยกเลิก</button></div>'
+                    : '');
 
             if (summaryEl) summaryEl.textContent = '';
             if (legendEl) legendEl.innerHTML = '';
@@ -13358,6 +13390,10 @@
                 window.myUserDoc.startDate = sv;
                 window.myUserDoc.endDate = ev;
             }
+            // V97.19: leave edit mode and drop the page index — the window just changed,
+            // so a page number from the old one means nothing.
+            schEditingDates = false;
+            schWeekPage = null;
             schRenderHeatmap();
         }
 
@@ -13392,8 +13428,12 @@
             // rendered for anyone who had not filled the dates in.
             // V97.16: the doorway now fills the dates in place instead of sending the
             // intern to the header input, which closed the modal to do it.
-            if (!hasWindow) {
-                schRenderDateSetup(grid, summaryEl, legendEl, dayKeys);
+            // V97.19: `schEditingDates` reaches the same form. Before this the form was
+            // ONLY the empty state, so once any window was stored — including a wrong one
+            // — there was no way to change it from this pane at all, which is exactly the
+            // trip back out to the header inputs that V97.16 set out to remove.
+            if (!hasWindow || schEditingDates) {
+                schRenderDateSetup(grid, summaryEl, legendEl, dayKeys, hasWindow ? me : null);
                 return;
             }
 
@@ -13409,13 +13449,17 @@
             let firstMon = schMonday(start);
             const lastMon = schMonday(lastDay);
             const weeks = Math.floor((lastMon - firstMon) / (7 * 86400000)) + 1;
-            const truncated = weeks > SCH_MAX_WEEKS;
-            if (truncated) {
-                firstMon = new Date(lastMon.getTime() - (SCH_MAX_WEEKS - 1) * 7 * 86400000);
-            }
-            // V97.18: when the grid is truncated the rows are the LAST 16 weeks, not
-            // weeks 1-16 — the labels used to restart at W1 and say so wrongly.
-            const wkOffset = Math.round((firstMon - schMonday(start)) / (7 * 86400000));
+            // V97.19: page the grid instead of truncating it. V97.18 drew the LAST 16
+            // weeks and admitted so in a note — but every earlier week was still hidden
+            // with no way to reach it. `‹ ›` now walk 12-week pages (the length a real
+            // placement runs to), and nothing is out of reach.
+            // V97.18's wkOffset stays: the W labels carry their true index either way.
+            const pages = Math.max(1, Math.ceil(weeks / SCH_PAGE_WEEKS));
+            if (schWeekPage === null || schWeekPage > pages - 1) schWeekPage = pages - 1;
+            const wkOffset = schWeekPage * SCH_PAGE_WEEKS;
+            firstMon = new Date(schMonday(start).getTime() + wkOffset * 7 * 86400000);
+            const pageLastMon = new Date(Math.min(
+                lastMon.getTime(), firstMon.getTime() + (SCH_PAGE_WEEKS - 1) * 7 * 86400000));
 
             const DOW = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
             // max-width matters: the cells are aspect-ratio:1, so on a wide
@@ -13427,7 +13471,7 @@
             });
 
             let wk = wkOffset;
-            for (let mon = new Date(firstMon); mon <= lastMon; mon.setDate(mon.getDate() + 7)) {
+            for (let mon = new Date(firstMon); mon <= pageLastMon; mon.setDate(mon.getDate() + 7)) {
                 wk++;
                 html += '<span style="font-size:0.58em; color:#cbd5e1; font-weight:700;">W' + wk + '</span>';
                 for (let i = 0; i < 7; i++) {
@@ -13447,11 +13491,29 @@
                 }
             }
             html += '</div>';
-            if (truncated) {
-                html += '<div style="font-size:0.65em; color:#94a3b8; margin-top:7px; text-align:center;">'
-                    + 'Showing the last ' + SCH_MAX_WEEKS + ' weeks of ' + weeks
-                    + ' แสดงเฉพาะสัปดาห์ล่าสุด</div>';
+
+            // Pager + the way back to the date form. Both label strings stay English —
+            // a bare number immediately before a Thai run gets absorbed into it and
+            // hides with it (V97.18 shipped exactly that bug: "…weeks of" with no
+            // number). The rule is spelled out under the summary below.
+            const nav = 'width:auto; min-height:0; cursor:pointer; border:1px solid #e2e8f0; background:#fff; '
+                + 'color:#7c3aed; border-radius:8px; padding:2px 9px; font-weight:800; font-size:0.8em;';
+            const navOff = nav + ' color:#e2e8f0; cursor:default;';
+            if (pages > 1) {
+                const from = wkOffset + 1;
+                const to = Math.min(weeks, wkOffset + SCH_PAGE_WEEKS);
+                html += '<div style="display:flex; align-items:center; justify-content:center; gap:10px; margin-top:9px;">'
+                    + '<button type="button"' + (schWeekPage > 0 ? ' onclick="schWeekPageShift(-1)"' : '')
+                    + ' style="' + (schWeekPage > 0 ? nav : navOff) + '">‹</button>'
+                    + '<span style="font-size:0.7em; font-weight:800; color:#64748b;">Weeks '
+                    + from + '-' + to + ' of ' + weeks + '</span>'
+                    + '<button type="button"' + (schWeekPage < pages - 1 ? ' onclick="schWeekPageShift(1)"' : '')
+                    + ' style="' + (schWeekPage < pages - 1 ? nav : navOff) + '">›</button></div>';
             }
+            html += '<div style="text-align:center; margin-top:9px;">'
+                + '<button type="button" onclick="schEditDates()" style="width:auto; min-height:0; cursor:pointer; '
+                + 'font-size:0.7em; font-weight:800; color:#7c3aed; background:#f5f3ff; border:1px solid #ddd6fe; '
+                + 'border-radius:999px; padding:4px 12px;">Edit dates แก้วันที่</button></div>';
             grid.innerHTML = html;
 
             // Summary. Every number is followed by a Latin word before any Thai
@@ -13760,6 +13822,8 @@
             window._schPane = 'agenda';
             window._schMissedExpanded = false;
             schCalMonth = null;   // V97.17: else the doorway reopens on whatever month was paged to
+            schWeekPage = null;   // V97.19: same for the week pager, and for edit mode
+            schEditingDates = false;
             const det = document.getElementById('sch-day-detail');
             if (det) { det.style.display = 'none'; det.innerHTML = ''; }
             m.style.display = 'flex';
