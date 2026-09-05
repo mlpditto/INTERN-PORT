@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.66)</title>
+    <title>Nika Admin (V98.67)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -32317,6 +32317,7 @@ RULES:
             db.collection("events").orderBy("eventDate", "desc").onSnapshot(s => {
                 eventsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderEventsList();
+                purgePastEvents();   // V98.67 — finished events clean themselves up
             }, e => {
                 // V98.62: a denied or failed listener used to leave "No events yet." on
                 // screen — indistinguishable from a working empty list, which is exactly
@@ -52473,6 +52474,62 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             } catch (e) { alert('Could not delete: ' + e.message); }
         }
 
+        // V98.67: an event whose day is over deletes itself, together with its join
+        // requests. This lives on the admin side because it has to: `events` is
+        // admin-delete by rule, so an intern's page could not do it even if asked.
+        //
+        // "Finished" = eventDate strictly BEFORE today. An event earlier today is left
+        // alone — the time fields are optional, so a same-day event may still be the
+        // thing people are looking for, and there is no honest way to know it has ended.
+        //
+        // The delete cannot be undone and it takes the roster of who asked to join with
+        // it, so the names go into `admin_logs` FIRST. The row disappears; the record
+        // that the event happened, and who wanted in, does not.
+        let evPurgeRunning = false, evPurgeDone = false;
+        async function purgePastEvents() {
+            if (evPurgeRunning || evPurgeDone) return;
+            // Only the admin account may delete these. Anyone else reaching this page
+            // would just generate permission-denied noise.
+            const by = auth.currentUser;
+            if (!by || (by.email || '').trim().toLowerCase() !== (ALLOWED_EMAIL || '').trim().toLowerCase()) return;
+            const today = schAdminTodayKey();
+            const finished = eventsCache.filter(e => e.eventDate && e.eventDate < today);
+            if (!finished.length) return;
+            evPurgeRunning = true;
+            let done = 0;
+            try {
+                for (const e of finished) {
+                    const snap = await db.collection('event_interests').where('eventId', '==', e.id).get();
+                    const people = snap.docs.map(d => (d.data() || {})).map(v => v.displayName || v.userId || '?');
+                    await db.collection('admin_logs').add({
+                        userId: '',
+                        action: 'event_auto_deleted',
+                        details: {
+                            eventId: e.id, title: e.title || '', eventDate: e.eventDate || '',
+                            timeText: e.timeText || '', location: e.location || '',
+                            targetGroups: e.targetGroups || [], interested: people
+                        },
+                        reason: 'event date has passed',
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        createdByUid: by.uid || null,
+                        createdByEmail: by.email || ''
+                    }).catch(err => console.error('admin_logs write failed (event still removed):', err));
+                    await Promise.all(snap.docs.map(d => d.ref.delete()));
+                    await db.collection('events').doc(e.id).delete();
+                    done++;
+                }
+                evPurgeDone = true;
+                // Not silent. Data disappearing with no word is how you stop trusting a tool.
+                if (done && typeof showToast === 'function') {
+                    showToast('Cleared ' + done + ' finished event' + (done > 1 ? 's' : '') + '.');
+                }
+            } catch (err) {
+                console.error('event auto-cleanup failed:', err);
+            } finally {
+                evPurgeRunning = false;
+            }
+        }
+
         function renderEventsList() {
             const box = document.getElementById('ev-list');
             if (!box) return;
@@ -52485,7 +52542,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span style="flex:1; min-width:0; font-size:0.85em; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(e.title)}</span>
                         <span style="font-size:0.72em; color:#64748b; white-space:nowrap;">${escapeHtml(e.eventDate)}${e.timeText ? ' · ' + escapeHtml(e.timeText) : ''}</span>
-                        <button onclick="deleteEvent('${e.id}')" style="width:auto; min-height:0; padding:2px 8px; font-size:0.68em; border:none; border-radius:6px; background:#fee2e2; color:#b91c1c; cursor:pointer;">Del</button>
+                        <button onclick="deleteEvent('${e.id}')" title="Delete this event" aria-label="Delete this event" style="width:auto; min-height:0; flex:0 0 auto; padding:0; font-size:0.95em; line-height:1; border:none; border-radius:6px; background:transparent; color:#b91c1c; cursor:pointer;">🗑️</button>
                     </div>
                     <div style="font-size:0.7em; color:#94a3b8; margin-top:3px;">${(e.targetGroups || []).join(' · ')}${e.location ? ' · 📍 ' + escapeHtml(e.location) : ''}${e.joinVia ? ' — ' + escapeHtml(e.joinVia) : ''}</div>
                     <div style="font-size:0.74em; color:#334155; margin-top:4px;">
