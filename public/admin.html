@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.61)</title>
+    <title>Nika Admin (V98.63)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6475,14 +6475,6 @@
                                 <i class="fa-solid fa-eye"></i> Preview digest
                             </button>
                             <span id="line-digest-now-status" style="font-size:0.74em; color:#64748b;"></span>
-                            <!-- V98.61: events sit next to the LINE panel because both are
-                                 "things you announce" — the digest pushes them out, this
-                                 one posts them inside the app. -->
-                            <button onclick="openEventsModal()"
-                                style="padding:7px 14px; border:1px solid #7c3aed; border-radius:10px; background:#7c3aed; color:#fff; font-size:0.78em; font-weight:700; cursor:pointer; width:auto; min-height:0;">
-                                <i class="fa-solid fa-bullhorn"></i> Events
-                            </button>
-                            <span id="events-count-hint" style="font-size:0.74em; color:#64748b;"></span>
                         </div>
                         <div id="line-digest-preview-box" class="lang-no-toggle" style="display:none; margin-top:10px; border:1px solid #d8dee7; border-radius:10px; background:#f8fafc; padding:10px 12px;">
                             <div id="line-digest-preview-meta" style="font-size:0.72em; color:#64748b; margin-bottom:8px;"></div>
@@ -11682,6 +11674,30 @@
                     <button id="modal-tab-quest" onclick="switchModalTab('quest')" style="flex:1; border:0; background:transparent; color:#666; padding:8px; border-radius:25px; font-weight:bold; cursor:pointer; transition:0.3s;">
                         <i class="fa-solid fa-scroll"></i> Daily Quest
                     </button>
+                    <button id="modal-tab-event" onclick="switchModalTab('event')" style="flex:1; border:0; background:transparent; color:#666; padding:8px; border-radius:25px; font-weight:700; cursor:pointer;">
+                        <i class="fa-solid fa-bullhorn"></i> Event
+                    </button>
+                </div>
+
+                <!-- V98.63: Events moved out of the Dashboard LINE panel into the
+                     global Create modal — everything an admin CREATES now starts in
+                     one place. -->
+                <div id="form-event-container" style="display:none;">
+                    <h2 style="margin-top:0;">📣 New Event</h2>
+                    <div style="border:1px solid #eef2f7; border-radius:10px; padding:10px; margin-top:10px;">
+                <input type="text" id="ev-title" oninput="saveEventDraft()" placeholder="Title — e.g. MPS Science webinar" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.85em; margin-bottom:6px;">
+                <div style="display:flex; gap:6px; margin-bottom:6px;">
+                    <input type="date" id="ev-date" oninput="saveEventDraft()" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:8px; font-size:0.85em;">
+                    <input type="text" id="ev-time" oninput="saveEventDraft()" placeholder="14:00 - 15:00" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:8px; font-size:0.85em;">
+                </div>
+                <input type="text" id="ev-join" oninput="saveEventDraft()" placeholder="How to join — link, ON24, room…" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.85em; margin-bottom:6px;">
+                <textarea id="ev-desc" rows="2" oninput="saveEventDraft()" placeholder="Details (optional)" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.85em; resize:vertical;"></textarea>
+                <div id="ev-groups" style="display:flex; flex-wrap:wrap; gap:5px; margin:8px 0;"></div>
+                <div id="ev-msg" style="font-size:0.74em; font-weight:700; min-height:1em; margin-bottom:6px;"></div>
+                <button onclick="createEvent()" style="width:auto; min-height:0; padding:7px 16px; border:none; border-radius:8px; background:#7c3aed; color:#fff; font-weight:700; font-size:0.8em; cursor:pointer;">Post event</button>
+                <span id="ev-draft-state" style="font-size:0.68em; color:#cbd5e1; margin-left:8px;"></span>
+            </div>
+                    <div id="ev-list" style="margin-top:12px;"></div>
                 </div>
 
                 <!-- 1. Kanban Task Form -->
@@ -32283,7 +32299,15 @@ RULES:
             db.collection("events").orderBy("eventDate", "desc").onSnapshot(s => {
                 eventsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderEventsList();
-            }, e => console.error("🔥 [Firestore Error] events:", e));
+            }, e => {
+                // V98.62: a denied or failed listener used to leave "No events yet." on
+                // screen — indistinguishable from a working empty list, which is exactly
+                // what made "I pressed Post and nothing happened" impossible to read.
+                console.error("🔥 [Firestore Error] events:", e);
+                const box = document.getElementById('ev-list');
+                if (box) box.innerHTML = '<div style="font-size:0.8em; color:#b91c1c; font-weight:700;">Could not load events: '
+                    + (e && (e.code || e.message || e)) + '</div>';
+            });
 
             db.collection("event_interests").onSnapshot(s => {
                 const byEvent = {};
@@ -49352,10 +49376,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         };
 
         function switchModalTab(type) {
+            // V98.63: three tabs now (Event joined Task and Quest), so the old
+            // two-way if/else is a table — adding a fourth must not mean another branch.
+            const TABS = {
+                task:  { form: 'form-task-container',  btn: 'modal-tab-task',  color: 'var(--primary)' },
+                quest: { form: 'form-quest-container', btn: 'modal-tab-quest', color: '#d35400' },
+                event: { form: 'form-event-container', btn: 'modal-tab-event', color: '#7c3aed' },
+            };
             const taskForm = document.getElementById('form-task-container');
             const questForm = document.getElementById('form-quest-container');
-            const btnTask = document.getElementById('modal-tab-task');
-            const btnQuest = document.getElementById('modal-tab-quest');
 
             // V92.33 — warn when leaving a dirty Daily Quest draft for the Kanban Task tab.
             // Tab switch does not actually drop the value (form stays in DOM), but this surfaces
@@ -49367,25 +49396,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 }
             }
 
-            if (type === 'task') {
-                taskForm.style.display = 'block';
-                questForm.style.display = 'none';
-                btnTask.style.background = 'white';
-                btnTask.style.color = 'var(--primary)';
-                btnTask.style.boxShadow = '0 2px 5px rgba(0,0,0,0.05)';
-                btnQuest.style.background = 'transparent';
-                btnQuest.style.color = '#666';
-                btnQuest.style.boxShadow = 'none';
-            } else {
-                taskForm.style.display = 'none';
-                questForm.style.display = 'block';
-                btnQuest.style.background = 'white';
-                btnQuest.style.color = '#d35400';
-                btnQuest.style.boxShadow = '0 2px 5px rgba(0,0,0,0.05)';
-                btnTask.style.background = 'transparent';
-                btnTask.style.color = '#666';
-                btnTask.style.boxShadow = 'none';
-                // Render card pickers
+            if (!TABS[type]) type = 'task';
+            Object.entries(TABS).forEach(([k, t]) => {
+                const form = document.getElementById(t.form);
+                const btn = document.getElementById(t.btn);
+                const on = (k === type);
+                if (form) form.style.display = on ? 'block' : 'none';
+                if (btn) {
+                    btn.style.background = on ? 'white' : 'transparent';
+                    btn.style.color = on ? t.color : '#666';
+                    btn.style.boxShadow = on ? '0 2px 5px rgba(0,0,0,0.05)' : 'none';
+                }
+            });
+            if (type === 'quest') {
                 renderDQGroupCards();
                 renderDQTagCards();
                 // V92.33: refresh Schedule button gating when entering quest tab
@@ -49393,6 +49416,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 // V93.82: wire + render the intern-facing live preview
                 if (typeof wireDailyQuestPreviewInputs === 'function') wireDailyQuestPreviewInputs();
             }
+            if (type === 'event') openEventsModal();   // prepares the form + restores the draft
         }
         async function saveSideQuest() { const id = document.getElementById('edit-id').value; const t = document.getElementById('sq-title').value; if (!t) return alert("Title?"); const d = { title: t, description: document.getElementById('sq-desc').value, priority: document.getElementById('sq-priority').value, dueDate: document.getElementById('sq-due').value, isProject: document.getElementById('sq-isProject').checked, assigneeIds: [...document.querySelectorAll('.sq-user-check:checked')].map(c => c.value), assignees: [...document.querySelectorAll('.sq-user-check:checked')].map(c => ({ uid: c.value, name: c.dataset.name, pic: c.dataset.pic })) }; if (id) { await db.collection("side_quests").doc(id).update(d); showToast("Updated"); } else { d.status = "Backlog"; d.createdAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection("side_quests").add(d); showToast("Created"); } document.getElementById('taskModal').style.display = 'none'; }
         let chatUnsub; 
@@ -52291,15 +52315,57 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function toggleEventGroup(g) {
             if (evSelectedGroups.has(g)) evSelectedGroups.delete(g); else evSelectedGroups.add(g);
             renderEventGroupChips();
+            saveEventDraft();
+        }
+
+        // V98.62: the form is a long thing to retype — a webinar URL especially — so it is
+        // kept as a draft while you type and restored on reopen. localStorage, not
+        // Firestore: an unposted draft is nobody else's business, and it has to survive a
+        // reload that never reached the network in the first place.
+        const EV_DRAFT_KEY = 'nika_event_draft_v1';
+        const EV_FIELDS = ['ev-title', 'ev-date', 'ev-time', 'ev-join', 'ev-desc'];
+
+        function saveEventDraft() {
+            try {
+                const d = {};
+                EV_FIELDS.forEach(id => { const e = document.getElementById(id); if (e) d[id] = e.value; });
+                d.groups = [...evSelectedGroups];
+                localStorage.setItem(EV_DRAFT_KEY, JSON.stringify(d));
+                const s = document.getElementById('ev-draft-state');
+                if (s) s.textContent = 'Draft saved';
+            } catch (e) { /* private mode or quota — a lost draft must never block posting */ }
+        }
+
+        function loadEventDraft() {
+            try {
+                const d = JSON.parse(localStorage.getItem(EV_DRAFT_KEY) || '{}');
+                let any = false;
+                EV_FIELDS.forEach(id => {
+                    const e = document.getElementById(id);
+                    if (e && d[id]) { e.value = d[id]; any = true; }
+                });
+                if (Array.isArray(d.groups) && d.groups.length) evSelectedGroups = new Set(d.groups);
+                const s = document.getElementById('ev-draft-state');
+                if (s) s.textContent = any ? 'Draft restored' : '';
+                return any;
+            } catch (e) { return false; }
+        }
+
+        function clearEventDraft() {
+            try { localStorage.removeItem(EV_DRAFT_KEY); } catch (e) {}
+            const s = document.getElementById('ev-draft-state');
+            if (s) s.textContent = '';
         }
 
         function openEventsModal() {
             evSelectedGroups = new Set(EVENT_GROUPS);
-            ['ev-title', 'ev-date', 'ev-time', 'ev-join', 'ev-desc'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+            EV_FIELDS.forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
             document.getElementById('ev-msg').textContent = '';
+            loadEventDraft();          // after the reset, so a saved draft wins over the blank form
             renderEventGroupChips();
             renderEventsList();
-            document.getElementById('eventsModal').style.display = 'flex';
+            // V98.63: this is a TAB inside the global Create modal now, not a modal of its
+            // own — switchModalTab() owns what is on screen, so this only prepares the form.
         }
 
         async function createEvent() {
@@ -52314,16 +52380,24 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const editor = (auth && auth.currentUser) || {};
             msg.style.color = '#64748b'; msg.textContent = 'Posting…';
             try {
-                await db.collection('events').add({
+                const ref = await db.collection('events').add({
                     title, eventDate: date, timeText: time, joinVia: join, description: desc,
                     targetGroups: [...evSelectedGroups],
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     createdByEmail: editor.email || ALLOWED_EMAIL
                 });
                 ['ev-title', 'ev-time', 'ev-join', 'ev-desc'].forEach(id => document.getElementById(id).value = '');
-                msg.textContent = '';
+                clearEventDraft();
+                // V98.62: say it in the modal, not only in a toast that can be missed —
+                // "did that work?" was a real question a moment ago.
+                msg.style.color = '#15803d';
+                msg.textContent = 'Posted ✓  (id ' + ref.id + ')';
                 showToast('Event posted');
-            } catch (e) { msg.style.color = '#ef4444'; msg.textContent = 'Could not post: ' + e.message; }
+            } catch (e) {
+                msg.style.color = '#ef4444';
+                msg.textContent = 'Could not post: ' + (e && (e.code || '')) + ' ' + (e && e.message || e);
+                console.error('createEvent failed:', e);
+            }
         }
 
         async function deleteEvent(id) {
@@ -59755,34 +59829,6 @@ Reply ONLY with raw JSON, no markdown:
         </div>
     </div>
     <!-- 🔥 User Merger Modal ([Version: V89.46]) -->
-    <!-- V98.61: announcements with a date. Deliberately NOT a quest: quests expect a
-         submission and award points, so reusing them would drag the whole review and
-         scoring machinery into "there is a webinar on Tuesday" and put it in the Mission
-         list. An event asks for one thing — do you want to come. -->
-    <div id="eventsModal" class="modal" style="display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);">
-        <div class="modal-content" style="max-width:560px; width:94%; margin:auto; padding:16px; border-radius:16px; border:none;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h3 style="margin:0; font-size:1.05em; color:#7c3aed;"><i class="fa-solid fa-bullhorn"></i> Events</h3>
-                <span onclick="document.getElementById('eventsModal').style.display='none'" style="cursor:pointer; font-size:22px; color:#cbd5e1;">&times;</span>
-            </div>
-
-            <div style="border:1px solid #eef2f7; border-radius:10px; padding:10px; margin-top:10px;">
-                <input type="text" id="ev-title" placeholder="Title — e.g. MPS Science webinar" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.85em; margin-bottom:6px;">
-                <div style="display:flex; gap:6px; margin-bottom:6px;">
-                    <input type="date" id="ev-date" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:8px; font-size:0.85em;">
-                    <input type="text" id="ev-time" placeholder="14:00 - 15:00" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:8px; font-size:0.85em;">
-                </div>
-                <input type="text" id="ev-join" placeholder="How to join — link, ON24, room…" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.85em; margin-bottom:6px;">
-                <textarea id="ev-desc" rows="2" placeholder="Details (optional)" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.85em; resize:vertical;"></textarea>
-                <div id="ev-groups" style="display:flex; flex-wrap:wrap; gap:5px; margin:8px 0;"></div>
-                <div id="ev-msg" style="font-size:0.74em; font-weight:700; min-height:1em; margin-bottom:6px;"></div>
-                <button onclick="createEvent()" style="width:auto; min-height:0; padding:7px 16px; border:none; border-radius:8px; background:#7c3aed; color:#fff; font-weight:700; font-size:0.8em; cursor:pointer;">Post event</button>
-            </div>
-
-            <div id="ev-list" style="margin-top:12px;"></div>
-        </div>
-    </div>
-
     <!-- V98.58: applicant documents. The list lives in `applicant_docs` (admin-only),
          never on the pre_users doc — that one is world-readable for the public claim
          flow, and a Storage download URL is a bearer token. -->
