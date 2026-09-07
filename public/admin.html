@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.69)</title>
+    <title>Nika Admin (V98.70)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -33210,6 +33210,19 @@ RULES:
 
         // Removed redundant activeUserGroup definition
 
+        // V98.70: a group name is DATA the admin typed, not UI copy, so it must never be
+        // language-toggled. admin.html defaults to EN-only, and lang-toggle.js wraps every
+        // Thai run in <span class="lang-th"> which `.lang-th { display:none }` then hides —
+        // a Thai group name rendered here as an icon and a count with NOTHING between them.
+        // Hence `lang-no-toggle` around the name: the walker checks ancestors and bails the
+        // moment it sees that class.
+        //
+        // Six places print a group name and ALL of them need the wrapper — a seventh must
+        // too. As of V98.70: here, renderBoardGroupTabs, the Users-table Group badge
+        // (Pending Req. row) and Group button (normal row), the User Hub header chip, and
+        // renderDQGroupCards. `<option>` text is the exception that hides the bug: browsers
+        // render an option's text and ignore markup inside it, so display:none never
+        // applies and Thai keeps showing there while these chips go blank.
         function renderUserGroupTabs() {
             const container = document.getElementById('user-group-tabs');
             if (!container) return;
@@ -33240,7 +33253,7 @@ RULES:
                     background:${isActive ? color : '#fff'}; color:${isActive ? '#fff' : color};
                     font-size:0.82em; font-weight:bold; cursor:pointer; white-space:nowrap;
                     display:flex; align-items:center; gap:5px; transition:all 0.2s;
-                "><i class="fa-solid ${icon}"></i> ${g} <span style="background:${isActive ? 'rgba(255,255,255,0.3)' : '#eee'}; padding:1px 7px; border-radius:10px; font-size:0.85em;">${count}</span></button>`;
+                "><i class="fa-solid ${icon}"></i> <span class="lang-no-toggle">${g}</span> <span style="background:${isActive ? 'rgba(255,255,255,0.3)' : '#eee'}; padding:1px 7px; border-radius:10px; font-size:0.85em;">${count}</span></button>`;
             }).join('');
         }
 
@@ -33260,7 +33273,7 @@ RULES:
                     background:${isActive ? color : '#fff'}; color:${isActive ? '#fff' : color};
                     font-size:0.78em; font-weight:bold; cursor:pointer; white-space:nowrap;
                     display:flex; align-items:center; gap:5px; transition:all 0.2s;
-                "><i class="fa-solid ${icon}"></i> ${g} <span style="background:${isActive ? 'rgba(255,255,255,0.3)' : '#eee'}; padding:1px 7px; border-radius:10px; font-size:0.8em;">${count}</span></button>`;
+                "><i class="fa-solid ${icon}"></i> <span class="lang-no-toggle">${g}</span> <span style="background:${isActive ? 'rgba(255,255,255,0.3)' : '#eee'}; padding:1px 7px; border-radius:10px; font-size:0.8em;">${count}</span></button>`;
             }).join('');
         }
 
@@ -44007,7 +44020,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         tbody.innerHTML += `<tr style="background:#fcfcfc;">
                             <td style="text-align:center;">-</td>
                             <td><img src="${d.pictureUrl}" class="user-pic"> <span style="font-weight:bold; color:#777;">⏳ ${d.displayName}</span><div style="font-size:0.75em; color:var(--primary); margin-top:3px; padding-left:40px;">Code: <b style="background:#f3f0ff; padding:2px 8px; border-radius:10px; border:1px dashed var(--primary); font-family:monospace;">${d.code}</b></div></td>
-                            <td><span class="badge" style="background:${getGroupColor(d.group)}; color:white; font-size:0.8em;"><i class="fa-solid ${getGroupIcon(d.group)}"></i> ${d.group}</span></td>
+                            <td><span class="badge" style="background:${getGroupColor(d.group)}; color:white; font-size:0.8em;"><i class="fa-solid ${getGroupIcon(d.group)}"></i> <span class="lang-no-toggle">${d.group}</span></span></td>
                             <td><span class="badge" style="background:#ffc107; color:black;"><i class="fa-solid fa-hourglass-half"></i> Pending Req.</span></td>
                             <td>-</td>
                             <td>-</td>
@@ -44104,7 +44117,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                  control while the table shows every group (filter = All).
                                  With a group tab active the pill just repeats the tab, so
                                  the cell goes empty. -->
-                            <td>${activeUserGroup === 'All' ? `<button class="btn-sm" style="font-size:0.75em; padding:2px 8px; background:${getGroupColor(group)}; color:white; border:none; display:flex; align-items:center; gap:5px;" onclick="setUserGroup('${d.id}', '${group}')"><i class="fa-solid ${getGroupIcon(group)}"></i> ${group}</button>` : ''}</td>
+                            <td>${activeUserGroup === 'All' ? `<button class="btn-sm" style="font-size:0.75em; padding:2px 8px; background:${getGroupColor(group)}; color:white; border:none; display:flex; align-items:center; gap:5px;" onclick="setUserGroup('${d.id}', '${group}')"><i class="fa-solid ${getGroupIcon(group)}"></i> <span class="lang-no-toggle">${group}</span></button>` : ''}</td>
                             <!-- V98.10 lean: "active" is the default — a bright green pill on
                                  every row was noise. Active rows get a faint icon-only toggle
                                  (still the way to ignore someone); "ignored" keeps its pill. -->
@@ -46667,7 +46680,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     <div style="font-size:1.4em; font-weight:900; color:#1e293b; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                         ${u.displayName}
                         <span style="font-size:11px; background:linear-gradient(135deg, #4361ee, #7209b7); color:white; padding:4px 12px; border-radius:30px; letter-spacing:1px; font-weight:900;">${crewRank}</span>
-                        <span title="Group" style="display:inline-flex; align-items:center; gap:5px; font-size:11px; background:${getGroupColor(hubGroup)}; color:white; padding:4px 12px; border-radius:30px; font-weight:800;"><i class="fa-solid ${getGroupIcon(hubGroup)}"></i>${escapeHtml(hubGroup)}</span>
+                        <span title="Group" style="display:inline-flex; align-items:center; gap:5px; font-size:11px; background:${getGroupColor(hubGroup)}; color:white; padding:4px 12px; border-radius:30px; font-weight:800;"><i class="fa-solid ${getGroupIcon(hubGroup)}"></i><span class="lang-no-toggle">${escapeHtml(hubGroup)}</span></span>
                         ${buildHubPersonalityChip(u)}
                     </div>
                     <div style="font-size:0.85em; color:#64748b; margin-top:4px;">
@@ -50625,7 +50638,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                            border-radius:12px; padding:8px 14px; font-size:0.8em; font-weight:800;
                            cursor:pointer; display:inline-flex; align-items:center; gap:6px;
                            transition:all 0.15s; white-space:nowrap;">
-                    <i class="fa-solid ${icon}" style="font-size:0.9em;"></i> ${g}${countBadge}
+                    <i class="fa-solid ${icon}" style="font-size:0.9em;"></i> <span class="lang-no-toggle">${g}</span>${countBadge}
                 </button>`;
             }).join('');
         }
