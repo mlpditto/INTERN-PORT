@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.68)</title>
+    <title>Nika Admin (V98.69)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -50430,6 +50430,21 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     if (opCount >= 450) { /* Actually rare to have >500 pre-regs for one user */ }
                 });
 
+                // V98.69: the pre-registration follows the account, so the link on the
+                // account has to follow too — otherwise the merge silently strands the
+                // applicant's CV (users.preUserId still points at the deleted source, or
+                // at nothing). Only when there is exactly one: a target holding several
+                // pre-registrations is the ambiguous case the backfill scan reports and
+                // refuses to guess at, and guessing here would be no better.
+                if (preSnap.size === 1) {
+                    const onlyPreId = preSnap.docs[0].id;
+                    currentBatch.update(db.collection("users").doc(targetId), {
+                        preUserId: onlyPreId,
+                        resumeDocCount: (applicantDocsCache[onlyPreId] || []).length
+                    });
+                    opCount++;
+                }
+
                 // 5. Delete Source Account
                 currentBatch.delete(db.collection("users").doc(mergeSourceId));
                 
@@ -52606,6 +52621,118 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 await Promise.all(snap.docs.map(d => d.ref.update({ resumeDocCount: n })));
             } catch (e) { console.error('resumeDocCount sync failed:', e); }
         }
+
+        // V98.69: backfill users.preUserId / users.resumeDocCount for accounts that were
+        // linked to a pre-registration before V98.60 wrote those fields — and, more to
+        // the point, for everyone who enrols themselves with a code, which is the common
+        // path and never wrote them at all (index.html linkEnrollmentCode; fixed in
+        // V97.26, but every account claimed before that fix is still missing the link).
+        //
+        // Without the link the intern's "Resume received" row (V97.21) and the admin's
+        // History entry (V98.68) both stay invisible even though the CV is sitting right
+        // there in applicant_docs.
+        //
+        // The authority for who owns which pre-registration is pre_users.claimedBy — both
+        // claim paths have always written it — with sourceUserId as the fallback the
+        // merge flow leaves behind. Nothing is inferred from names or dates.
+        //
+        // Scans every claimed row rather than trying to detect "pre-V98.60": the write is
+        // idempotent (rows already correct are skipped), so a narrower filter would only
+        // add a way to be wrong.
+        function _scanPreUserLinks() {
+            const rows = [];
+            const conflicts = [];
+            const byUser = {};
+
+            (preRegData || []).filter(p => p.claimed).forEach(p => {
+                const uid = p.claimedBy || p.sourceUserId;
+                if (!uid) return;
+                (byUser[uid] = byUser[uid] || []).push(p);
+            });
+
+            Object.entries(byUser).forEach(([uid, pres]) => {
+                const u = (usersData || []).find(x => x.id === uid);
+                if (!u) return;   // pre-registration points at an account that is gone
+
+                // A merge can leave one account holding several pre-registrations. Which
+                // one is "the" applicant record is not ours to guess, so report it and
+                // write nothing for that user.
+                if (pres.length > 1) {
+                    conflicts.push({ uid, name: u.displayName || u.fullName || uid, ids: pres.map(p => p.id) });
+                    return;
+                }
+
+                const preId = pres[0].id;
+                // Counted from the applicant_docs listener cache: this is a scan the admin
+                // triggered, not a read straight after a write, so the beat-behind hazard
+                // syncResumeFlag guards against does not apply — and it saves one query
+                // per pre-registration.
+                const n = (applicantDocsCache[preId] || []).length;
+                if (u.preUserId === preId && (Number(u.resumeDocCount) || 0) === n) return;
+
+                rows.push({
+                    uid,
+                    preId,
+                    n,
+                    name: u.displayName || u.fullName || uid,
+                    was: u.preUserId ? 'relink' : 'new'
+                });
+            });
+
+            return { rows, conflicts };
+        }
+
+        window.backfillPreUserLinks = async function() {
+            const btn = document.getElementById('prereg-backfill-btn');
+            const orig = btn ? btn.innerHTML : '';
+            try {
+                const { rows, conflicts } = _scanPreUserLinks();
+                const conflictNote = conflicts.length
+                    ? `\n\n⚠️ ${conflicts.length} account(s) hold more than one pre-registration and were SKIPPED — link those by hand:\n`
+                      + conflicts.slice(0, 5).map(c => `• ${c.name} → ${c.ids.join(', ')}`).join('\n')
+                    : '';
+
+                if (!rows.length) {
+                    alert(`✅ Every claimed pre-registration is already linked — nothing to backfill.${conflictNote}`);
+                    return;
+                }
+
+                const fresh = rows.filter(r => r.was === 'new').length;
+                const withCv = rows.filter(r => r.n > 0).length;
+                const sample = rows.slice(0, 10).map(r => `• ${r.name} → ${r.preId}${r.n ? ` (${r.n} document${r.n > 1 ? 's' : ''})` : ''}`).join('\n');
+                const more = rows.length > 10 ? `\n… and ${rows.length - 10} more` : '';
+
+                if (!confirm(
+                    `Backfill ${rows.length} user record(s)?\n\n`
+                    + `${fresh} newly linked · ${rows.length - fresh} corrected · ${withCv} have a CV attached\n\n`
+                    + `This writes preUserId and resumeDocCount onto the users docs below. `
+                    + `It adds no points and touches nothing else.\n\n${sample}${more}${conflictNote}`
+                )) return;
+
+                if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> writing…'; }
+
+                // Chunked well under the 500-op batch ceiling, same as scanOrphanMirrors.
+                let written = 0;
+                for (let i = 0; i < rows.length; i += 400) {
+                    const batch = db.batch();
+                    rows.slice(i, i + 400).forEach(r => {
+                        batch.update(db.collection('users').doc(r.uid), {
+                            preUserId: r.preId,
+                            resumeDocCount: r.n
+                        });
+                    });
+                    await batch.commit();
+                    written += Math.min(400, rows.length - i);
+                }
+
+                if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+                showToast(`🔗 Linked ${written} user record(s) to their pre-registration`, 'success');
+            } catch (e) {
+                if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+                console.error('backfillPreUserLinks failed:', e);
+                alert('Backfill failed: ' + e.message);
+            }
+        };
 
         // Personal data must not outlive the record it belongs to. `pre_users` rows are
         // removed from TWO places — deletePreReg() below and the user-merge path — so
@@ -59930,7 +60057,13 @@ Reply ONLY with raw JSON, no markdown:
         <div class="modal-content" style="max-width:900px;">
             <span class="close-modal"
                 onclick="document.getElementById('preRegModal').style.display='none'">&times;</span>
-            <h2 style="margin-bottom:5px;">📋 Pre-register Users</h2>
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:5px;">
+                <h2 style="margin:0;">📋 Pre-register Users</h2>
+                <!-- V98.69: scan first, write only on confirm — see backfillPreUserLinks(). -->
+                <button type="button" id="prereg-backfill-btn" onclick="backfillPreUserLinks()"
+                    title="Link claimed pre-registrations back onto their user doc (preUserId + resumeDocCount). Scans first and shows what it would write."
+                    style="width:auto; min-height:0; margin:0; padding:4px 11px; font-size:0.72em; font-weight:800; color:#0369a1; background:#fff; border:1px solid #bae6fd; border-radius:999px; cursor:pointer;">🔗 Backfill links</button>
+            </div>
             <p style="font-size:0.8em; color:#666; margin-top:0;">Create pre-registration codes — Users enter this code in LIFF to receive group/internship dates automatically.</p>
 
             <div
