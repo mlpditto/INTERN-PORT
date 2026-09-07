@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.71)</title>
+    <title>Nika Admin (V98.72)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -47021,7 +47021,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     : (isQuizApproval
                         ? ` onclick="openQuizAttemptFromHubLog(event, ${e.t.getTime()})" `
                         : (isDoc
-                            ? ` onclick="openApplicantDocs('${e.preUserId}')" `
+                            // V98.72: straight to the document itself, not to the list it
+                            // sits in — the row already names the one file. The viewer's
+                            // "All documents" button is the way back to attach/delete/AI.
+                            ? ` onclick="openApplicantDoc('${e.docId}', '${e.preUserId}')" `
                             : (isClickable ? ` onclick="showHubItemDetails(${JSON.stringify(e).replace(/"/g, '&quot;')})" ` : '')));
 
                 // V91.102/V91.106: per-entry word count + content preview for reflective_log + learning_note
@@ -52261,13 +52264,62 @@ Save it anyway?`;
 
         // The download URL is fetched on demand and never stored — a stored URL is a
         // bearer token that outlives whatever rule was meant to protect the file.
-        async function openApplicantDoc(docId) {
-            const d = (applicantDocsCache[apdTargetId] || []).find(x => x.id === docId);
+        //
+        // V98.72: opens in-app instead of throwing the admin into a new tab. PDFs go into
+        // an <iframe>, which hands the browser's own PDF viewer the job — zoom, page
+        // navigation, search and print, none of which is worth reimplementing on a canvas.
+        // (pdf.js IS already loaded here for apdExtractPdfText, so a canvas renderer was
+        // available; the native viewer is simply better and a quarter of the code.) The
+        // upload sets contentType, so the object is served as application/pdf and renders
+        // inline rather than downloading. Images skip the iframe entirely.
+        //
+        // `preUserId` is explicit so the History row (V98.68) can open one document
+        // directly without going through the list modal and its apdTargetId.
+        async function openApplicantDoc(docId, preUserId) {
+            const owner = preUserId || apdTargetId;
+            const d = (applicantDocsCache[owner] || []).find(x => x.id === docId);
             if (!d) return;
             try {
                 const url = await adminApp.storage().ref(d.path).getDownloadURL();
-                window.open(url, '_blank', 'noopener');
+                apvOwner = owner;
+                document.getElementById('apv-name').textContent = d.name || 'document';
+                document.getElementById('apv-tab').href = url;
+                const body = document.getElementById('apv-body');
+                body.innerHTML = '';
+                if (d.contentType === 'application/pdf') {
+                    const f = document.createElement('iframe');
+                    f.src = url;
+                    f.style.cssText = 'width:100%; height:100%; border:0; background:#fff;';
+                    body.appendChild(f);
+                } else {
+                    const img = document.createElement('img');
+                    img.src = url;
+                    img.style.cssText = 'max-width:100%; max-height:100%; object-fit:contain;';
+                    body.appendChild(img);
+                }
+                document.getElementById('applicantDocViewer').style.display = 'flex';
             } catch (e) { alert('Could not open: ' + e.message); }
+        }
+
+        let apvOwner = null;   // which applicant the open document belongs to
+
+        // Emptying the body is not cosmetic: it drops the download URL out of the DOM.
+        // That URL is a bearer token, and the whole point of resolving it per click is
+        // that it does not sit around afterwards.
+        function closeApplicantDocViewer() {
+            const box = document.getElementById('applicantDocViewer');
+            if (!box) return;
+            box.style.display = 'none';
+            document.getElementById('apv-body').innerHTML = '';
+            document.getElementById('apv-tab').href = '#';
+        }
+
+        // From the viewer back to the full list (attach / delete / AI review), which is
+        // the only place those actions live.
+        function apvOpenList() {
+            const owner = apvOwner;
+            closeApplicantDocViewer();
+            if (owner) openApplicantDocs(owner);
         }
 
         async function uploadApplicantDoc(input) {
@@ -60180,6 +60232,27 @@ Reply ONLY with raw JSON, no markdown:
             <span style="font-size:0.68em; color:#cbd5e1; margin-left:6px;">PDF or image, under 4 MB</span>
             <div id="apd-ai" style="margin-top:10px;"></div>
             <p style="margin:10px 0 0; font-size:0.66em; color:#cbd5e1; line-height:1.45;">Admins only · deleting the applicant deletes these files too · AI review sends the CV text to the model providers</p>
+        </div>
+    </div>
+
+    <!-- V98.72: in-app viewer for an applicant document. Deliberately NOT class="modal":
+         `.modal[style*="flex"]` forces `z-index:9999 !important`, which this has to sit
+         ABOVE (applicantDocsModal is already at 9999), and forceShowModal() — the other way
+         to outrank it — hides every sibling overlay, so closing the viewer would take the
+         document list down with it. A plain fixed div with its own z-index is the same
+         shape lbChartModal already uses, and it stacks without touching shared behaviour. -->
+    <div id="applicantDocViewer"
+        style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.75); backdrop-filter:blur(4px); z-index:100001; align-items:center; justify-content:center;"
+        onclick="if (event.target === this) closeApplicantDocViewer();">
+        <div style="background:#fff; border-radius:16px; width:94%; max-width:1000px; height:92vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 30px 80px rgba(0,0,0,0.45);">
+            <div style="display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid #eef2f7; flex-shrink:0;">
+                <span style="font-size:1em;">📎</span>
+                <span id="apv-name" class="lang-no-toggle" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:0.86em; font-weight:800; color:#334155;"></span>
+                <button type="button" id="apv-all-btn" onclick="apvOpenList()" style="width:auto; min-height:0; padding:4px 11px; font-size:0.72em; font-weight:800; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:999px; cursor:pointer;">All documents</button>
+                <a id="apv-tab" href="#" target="_blank" rel="noopener" style="padding:4px 11px; font-size:0.72em; font-weight:800; color:#0369a1; background:#f0f9ff; border:1px solid #bae6fd; border-radius:999px; text-decoration:none;">New tab ↗</a>
+                <span onclick="closeApplicantDocViewer()" style="cursor:pointer; font-size:22px; line-height:1; color:#cbd5e1; padding:0 4px;">&times;</span>
+            </div>
+            <div id="apv-body" style="flex:1; min-height:0; background:#f1f5f9; display:flex; align-items:center; justify-content:center;"></div>
         </div>
     </div>
 
