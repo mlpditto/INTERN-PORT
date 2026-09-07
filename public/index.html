@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.26)</title>
+    <title>Internship Portfolio (V97.27)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -7445,6 +7445,25 @@
         async function saveMyDates() {
             const s = document.getElementById('u-start-date').value;
             const e = document.getElementById('u-end-date').value;
+            // V97.27: the two header inputs write straight through here on `onchange`, and
+            // NOTHING checked them — that is the path that put 1988-11-08 -> 2088-11-08 on a
+            // live profile, where the header dutifully read "Day 13818 of 36525 - 22708 days
+            // left". schSaveDatesInline has had the span rule since V97.18, but it guards the
+            // Schedule popup only; the rule has to live in the single WRITER, not in one of
+            // its two callers. These dates feed the timeline bar, the graduation countdown,
+            // checkGraduation() and the Schedule grid, so a wrong pair is not cosmetic.
+            const problem = internshipDatesProblem(s, e);
+            if (problem) {
+                if (typeof showToast === 'function') showToast('❌ ' + problem);
+                // Put the inputs back to what is actually STORED. Leaving the rejected value
+                // on screen would show a period the database does not have, which is worse
+                // than the typo — the intern would believe it saved.
+                const me = (typeof myOwnRow === 'function') ? myOwnRow() : {};
+                document.getElementById('u-start-date').value = me.startDate || '';
+                document.getElementById('u-end-date').value = me.endDate || '';
+                updateTimelineBar(me.startDate || '', me.endDate || '');
+                return;
+            }
             if (s || e) await db.collection("users").doc(userId).update({ startDate: s, endDate: e });
             updateTimelineBar(s, e);
         }
@@ -13116,6 +13135,27 @@
         const SCH_MAX_SPAN_DAYS = 182;
         const SCH_RAMP = ['#f1f5f9', '#dcfce7', '#86efac', '#34d399', '#15803d'];
 
+        // V97.27: the single definition of what a usable internship period is. Both dates
+        // are OPTIONAL here — saveMyDates() runs from each header input's `onchange`, so it
+        // legitimately sees a half-filled pair while someone is still picking the second
+        // one, and nagging then would be wrong.
+        function internshipDatesProblem(startVal, endVal) {
+            // schParseDay, not new Date() — a date-only string parses as UTC midnight,
+            // which is 07:00 Bangkok and shifts every comparison by a day.
+            const sd = startVal ? schParseDay(startVal) : null;
+            const ed = endVal ? schParseDay(endVal) : null;
+            if (startVal && !sd) return 'Start date is not a real date วันเริ่มไม่ถูกต้อง';
+            if (endVal && !ed) return 'End date is not a real date วันจบไม่ถูกต้อง';
+            if (!sd || !ed) return '';
+            if (ed <= sd) return 'End date must be after the start date วันจบต้องอยู่หลังวันเริ่ม';
+            const spanDays = Math.round((ed - sd) / 86400000);
+            if (spanDays > SCH_MAX_SPAN_DAYS) {
+                return 'That is ' + spanDays + ' days — the limit is ' + SCH_MAX_SPAN_DAYS
+                    + ' ช่วงฝึกงานยาวเกินไป ตรวจปีที่กรอกอีกครั้ง';
+            }
+            return '';
+        }
+
         function schDateKey(d) {
             return d.getFullYear() + '-' +
                 String(d.getMonth() + 1).padStart(2, '0') + '-' +
@@ -13457,20 +13497,22 @@
             const sv = s.value, ev = e.value;
             // schParseDay, not new Date() — a date-only string parses as UTC
             // midnight, which is 07:00 Bangkok and shifts every comparison by a day.
+            // Both dates are required HERE (this form saves a pair), which is stricter
+            // than internshipDatesProblem() — that one tolerates a half-filled pair
+            // because saveMyDates() fires per input. Keep the check, delegate the rules.
             const sd = schParseDay(sv), ed = schParseDay(ev);
-            if (!sd || !ed || ed <= sd) {
+            if (!sd || !ed) {
                 if (msg) msg.textContent = 'End date must be after the start date วันจบต้องอยู่หลังวันเริ่ม';
                 return;
             }
-            // V97.18: an upper bound. `ed > sd` alone accepted 1988-11-08 → 2088-11-08
-            // and the summary dutifully read "Day 13816 of 36525 · 22710 days left" —
-            // the arithmetic was right, nothing was there to say the span is absurd.
-            // Intern / extern / junior placements run to about 12 weeks; 26 is double
-            // that, so a real rotation always passes and a mistyped year never does.
-            const spanDays = Math.round((ed - sd) / 86400000);
-            if (spanDays > SCH_MAX_SPAN_DAYS) {
-                if (msg) msg.textContent = 'That is ' + spanDays + ' days — the limit is '
-                    + SCH_MAX_SPAN_DAYS + ' ช่วงฝึกงานยาวเกินไป ตรวจปีที่กรอกอีกครั้ง';
+            // V97.27: the ed<=sd and span rules moved into internshipDatesProblem() so this
+            // form and saveMyDates() cannot drift apart. The V97.18 reasoning still holds:
+            // `ed > sd` alone accepted 1988-11-08 → 2088-11-08 and the summary dutifully
+            // read "Day 13816 of 36525 · 22710 days left" — the arithmetic was right,
+            // nothing was there to say the span is absurd.
+            const problem = internshipDatesProblem(sv, ev);
+            if (problem) {
+                if (msg) msg.textContent = problem;
                 return;
             }
             if (msg) { msg.style.color = '#64748b'; msg.textContent = 'Saving กำลังบันทึก'; }

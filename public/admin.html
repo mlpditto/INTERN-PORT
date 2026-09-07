@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.70)</title>
+    <title>Nika Admin (V98.71)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -44462,6 +44462,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const awardCheckboxes = document.querySelectorAll('input[name="cert-award"]:checked');
             const awards = Array.from(awardCheckboxes).map(cb => cb.value);
 
+            // V98.71: this modal wrote start/end with NO check of any kind, and it is one
+            // of the four places a user's period is set. Same rules as everywhere else.
+            const dateErr = preRegDateProblem(s, e);
+            if (dateErr) return alert(dateErr);
+            const spanWarn = internshipSpanWarning(s, e);
+            if (spanWarn && !confirm(spanWarn)) return;
+
             const updateData = {
                 startDate: s,
                 endDate: e,
@@ -52142,6 +52149,27 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return '';
         }
 
+        // V98.71: the span rule, kept SEPARATE from preRegDateProblem above because it is a
+        // heuristic, not an impossibility. 182 days = 26 weeks, the same number index.html
+        // has used since V97.18: double the ~12-week ceiling a real intern/extern/junior
+        // placement runs to, so a real rotation always passes and a mistyped year never
+        // does. Admin call sites CONFIRM on this rather than blocking — an admin may have a
+        // genuine long placement and being unable to record it would be the worse failure.
+        // The intern side blocks outright: they have no override and no reason to need one.
+        const ADMIN_MAX_SPAN_DAYS = 182;
+        function internshipSpanWarning(startDate, endDate) {
+            if (!startDate || !endDate) return '';
+            const sd = new Date(startDate), ed = new Date(endDate);
+            if (isNaN(sd) || isNaN(ed)) return '';
+            const spanDays = Math.round((ed - sd) / 86400000);
+            if (spanDays <= ADMIN_MAX_SPAN_DAYS) return '';
+            return `That period is ${spanDays} days (${startDate} to ${endDate}) — about `
+                 + `${(spanDays / 365).toFixed(1)} years. A placement is normally under `
+                 + `${ADMIN_MAX_SPAN_DAYS} days, so check the year.
+
+Save it anyway?`;
+        }
+
         async function addPreRegUser() {
             // V98.47: fullName is the THAI name (users.fullName), fullNameEn the
             // English one. Either alone is enough to create a code.
@@ -52162,6 +52190,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // none); these only fire when a date is actually present.
             const dateErr = preRegDateProblem(startDate, endDate);
             if (dateErr) return alert(dateErr);
+            // V98.71: the impossible cases are refused above; an absurd-but-possible SPAN
+            // is only ever a warning, because the admin may know something we do not.
+            const spanWarn = internshipSpanWarning(startDate, endDate);
+            if (spanWarn && !confirm(spanWarn)) return;
 
             // Generate unique code (check collision)
             let code = generateCode();
@@ -56280,10 +56312,16 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                         return;
                     }
                     
-                    if (new Date(startDate) > new Date(endDate)) {
-                        showToast("❌ Start date must not be after end date", "error");
+                    // V98.71: was start>end only, which accepted 1988 -> 2088. Same shared
+                    // rules as the other three writers: refuse the impossible, confirm the
+                    // merely implausible.
+                    const dateErr = preRegDateProblem(startDate, endDate);
+                    if (dateErr) {
+                        showToast("❌ " + dateErr, "error");
                         return;
                     }
+                    const spanWarn = internshipSpanWarning(startDate, endDate);
+                    if (spanWarn && !confirm(spanWarn)) return;
                     
                     updateData = {
                         startDate: startDate,
