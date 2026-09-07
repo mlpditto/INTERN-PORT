@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.72)</title>
+    <title>Nika Admin (V98.73)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -44085,10 +44085,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     // handed in outside the app (LINE, in person). Writes the same pair
                     // submitWork() does, so it lands in the normal review queue.
                     const logWorkBtn = `<button class="btn-sm" onclick="openAdminLogWorkModal('${d.id}')" style="font-size:0.75em; padding:4px 8px; border-radius:4px; background:#0ea5e9; color:white;" title="Log work for this user"><i class="fa-solid fa-upload"></i></button>`;
+                    // V98.73: the same 📎 the Pending Req. row has, now reachable after the
+                    // code is claimed. Hidden when the applicant record cannot be resolved
+                    // unambiguously — a button that would attach to the wrong person is
+                    // worse than no button.
+                    const apdOwner = applicantOwnerFor(d);
+                    const apdCount = apdOwner ? applicantDocCount(apdOwner) : 0;
+                    const docsBtn = apdOwner
+                        ? `<button class="btn-sm" onclick="openApplicantDocs('${apdOwner}')" style="font-size:0.75em; padding:4px 8px; border-radius:4px; background:#0369a1; color:white;" title="Applicant documents (CV)">📎${apdCount ? ' ' + apdCount : ''}</button>`
+                        : '';
                     const actionsGroup = `
                         <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-start;">
                             <div style="display:flex; gap:4px; background:rgba(241, 245, 249, 0.5); padding:4px; border-radius:10px; border:1px solid #e2e8f0; width:fit-content;">
-                                ${certBtn}${historyBtn}${logWorkBtn}${mergeBtn}${keyBtn}${delBtn}
+                                ${certBtn}${historyBtn}${logWorkBtn}${docsBtn}${mergeBtn}${keyBtn}${delBtn}
                             </div>
                             <div style="display:flex; align-items:center; gap:4px; background:rgba(236, 253, 245, 0.75); border:1px solid #bbf7d0; border-radius:8px; padding:4px;">
                                 <input type="number" step="0.1" id="adj-${d.id}" placeholder="0.0" style="width:62px; margin:0; height:24px; font-size:0.75em;" onkeypress="if(event.key==='Enter')adjDec('${d.id}')">
@@ -46347,6 +46356,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return 'LV.1 Rookie Navigator';
         }
 
+        // V98.73: reach the applicant's CV from the person you are already looking at.
+        // Same resolver and the same silence-when-ambiguous rule as the Users-table 📎.
+        function buildHubDocsAction(u) {
+            const owner = applicantOwnerFor(u);
+            if (!owner) return '';
+            const n = applicantDocCount(owner);
+            return `<button onclick="event.stopPropagation(); openApplicantDocs('${owner}')" title="Applicant documents (CV)" style="display:inline-flex; align-items:center; gap:6px; margin-left:10px; padding:5px 12px; border-radius:999px; font-size:0.78em; font-weight:900; white-space:nowrap; background:#f0f9ff; color:#0369a1; border:1px solid #bae6fd; cursor:pointer;">📎 Documents${n ? ' ' + n : ''}</button>`;
+        }
+
         function buildHubCertificateAction(u) {
             const score = parseFloat(u.score || 0);
             const certRequested = !!u.certRequested;
@@ -46697,7 +46715,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             <i class="fa-solid fa-star" style="color:#f59e0b; margin-right:4px;"></i> Now: <b style="color:#4361ee; font-size:1.1em;">${(u.score || 0).toFixed(2)}</b>
                         </span>
                         <span style="margin:0 10px; color:#cbd5e1;">|</span>
-                        <span title="Beri balance" style="color:#c2410c; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:2px 8px; white-space:nowrap; font-weight:700;"><i class="fa-solid fa-coins" style="margin-right:4px; font-size:0.9em;"></i>${Math.round(u.beri || 0)}</span><button onclick="event.stopPropagation(); openHubProfile('${u.id}')" title="Open this user's profile / group settings" style="display:inline-flex; align-items:center; gap:6px; margin-left:10px; padding:5px 12px; border-radius:999px; font-size:0.78em; font-weight:900; white-space:nowrap; background:#eef2ff; color:#4361ee; border:1px solid #c7d2fe; cursor:pointer;"><i class="fa-solid fa-id-card"></i> Profile</button>${buildHubCertificateAction(u)}
+                        <span title="Beri balance" style="color:#c2410c; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:2px 8px; white-space:nowrap; font-weight:700;"><i class="fa-solid fa-coins" style="margin-right:4px; font-size:0.9em;"></i>${Math.round(u.beri || 0)}</span><button onclick="event.stopPropagation(); openHubProfile('${u.id}')" title="Open this user's profile / group settings" style="display:inline-flex; align-items:center; gap:6px; margin-left:10px; padding:5px 12px; border-radius:999px; font-size:0.78em; font-weight:900; white-space:nowrap; background:#eef2ff; color:#4361ee; border:1px solid #c7d2fe; cursor:pointer;"><i class="fa-solid fa-id-card"></i> Profile</button>${buildHubDocsAction(u)}${buildHubCertificateAction(u)}
                     </div>
                 </div>
                 <div id="hub-score-popover" style="display:none; position:absolute; z-index:100; top:90px; left:90px;"></div>
@@ -52231,6 +52249,28 @@ Save it anyway?`;
 
         function applicantDocCount(preUserId) {
             return (applicantDocsCache[preUserId] || []).length;
+        }
+
+        // V98.73: which pre-registration a CLAIMED user's documents live under.
+        //
+        // Until now 📎 existed only on `Pending Req.` rows — and those come from
+        // `preRegData.filter(p => !p.claimed)`, so the moment an intern typed their code
+        // the row and its button vanished. There was then NO way to attach, replace or
+        // delete their CV: the History row (V98.68) can only appear once a file already
+        // exists, which is the chicken and the egg.
+        //
+        // `preUserId` wins when it is set — something deliberately decided it. Otherwise
+        // fall back to the claim link, the same authority the Backfill button uses, so
+        // this works for accounts claimed before V98.60 WITHOUT waiting for a backfill.
+        // Several pre-registrations on one account (possible after a merge) is ambiguous:
+        // return null and show no button, rather than upload someone's CV onto the wrong
+        // applicant record — the same refusal _scanPreUserLinks() makes.
+        function applicantOwnerFor(u) {
+            if (!u || !u.id) return null;
+            if (u.preUserId) return u.preUserId;
+            const hits = (preRegData || []).filter(p =>
+                p.claimed && (p.claimedBy === u.id || p.sourceUserId === u.id));
+            return hits.length === 1 ? hits[0].id : null;
         }
 
         function openApplicantDocs(preUserId) {
