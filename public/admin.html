@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.67)</title>
+    <title>Nika Admin (V98.68)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -46264,6 +46264,30 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     });
                 });
 
+                // V98.68: the CV handed in with the application, shown in History.
+                // The intern already sees a "Resume received" row on their own Unified
+                // History (V97.21, from users.resumeDocCount); the admin reviewing that
+                // same person here saw no trace of it and had to go hunting for the 📎
+                // badge in the Users table. Admin-side we hold the real rows, so it is
+                // one entry per file at its actual upload time, click-through to the
+                // Documents modal. Read from `applicant_docs` and NOT from
+                // users.resumeDocCount: purgeApplicantDocs() deletes the files without
+                // syncing that counter, so the counter can outlive the documents.
+                // Carries no `score` (like Beri rows) — nothing here is a submission and
+                // it earns no points, so it must stay out of dash and every score total.
+                // Label is EN-only: #hub-history-list is not `lang-no-toggle`, so a Thai
+                // run in here is what lang-toggle.js hides when the page is in English.
+                (applicantDocsCache[u.preUserId] || []).forEach(apd => {
+                    allLogs.push({
+                        t: toHubDate(apd.uploadedAt),
+                        type: 'doc',
+                        text: `📎 Resume received · ${escapeHtml(apd.name || 'document')}`,
+                        isDoc: true,
+                        preUserId: u.preUserId,
+                        docId: apd.id
+                    });
+                });
+
                 allLogs.forEach(item => {
                     if (item.type === 'work' && item.docId && hubCaseReviewLogTextByDocId[item.docId]) {
                         item.text = hubCaseReviewLogTextByDocId[item.docId];
@@ -46955,22 +46979,30 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 // V98.26: Beri rows carry beriAmount (integer, a separate currency),
                 // not score — render a coin, keep them un-clickable/informational.
                 const isBeri = e.type === 'beri';
+                // V98.68: an applicant document is a fact, not a submission — leave the
+                // score column empty rather than print a green "+0.00" that reads as if
+                // handing in a CV had been graded.
+                const isDoc = e.type === 'doc';
                 const amtVal = isBeri ? (Number(e.beriAmount) || 0) : (Number(e.score) || 0);
                 const amtColor = amtVal >= 0 ? '#10b981' : '#ef4444';
-                const amtText = isBeri
-                    ? `🪙 ${amtVal >= 0 ? '+' : ''}${Math.round(amtVal)}`
-                    : `${amtVal >= 0 ? '+' : ''}${amtVal.toFixed(2)}`;
+                const amtText = isDoc
+                    ? `<span style="color:#cbd5e1;">—</span>`
+                    : (isBeri
+                        ? `🪙 ${amtVal >= 0 ? '+' : ''}${Math.round(amtVal)}`
+                        : `${amtVal >= 0 ? '+' : ''}${amtVal.toFixed(2)}`);
                 let delBtn = (e.source === 'checkin_logs' && e.docId) ? `<button class="btn-sm" style="background:none; color:#ef4444; border:none; padding:0; margin-left:8px; cursor:pointer;" onclick="deleteHubHistoryLog('${e.docId}', ${e.score})"><i class="fa-solid fa-trash-can"></i></button>` : "";
                 const isManualAdjust = e.type === 'manual' && !!e.docId;
                 // V92.50: quiz approval entries are now clickable — opens reviewQuiz overlay (read-only
                 // since att.status === 'approved' disables the approve buttons over there).
                 const isQuizApproval = e.type === 'quiz' && e.t instanceof Date;
-                const isClickable = e.type === 'work' || e.isReflective || e.isLearningNote || isManualAdjust || isQuizApproval;
+                const isClickable = e.type === 'work' || e.isReflective || e.isLearningNote || isManualAdjust || isQuizApproval || (isDoc && !!e.preUserId);
                 const onClickAttr = isManualAdjust
                     ? ` onclick="openManualAdjustEditModal('${e.docId}')" `
                     : (isQuizApproval
                         ? ` onclick="openQuizAttemptFromHubLog(event, ${e.t.getTime()})" `
-                        : (isClickable ? ` onclick="showHubItemDetails(${JSON.stringify(e).replace(/"/g, '&quot;')})" ` : ''));
+                        : (isDoc
+                            ? ` onclick="openApplicantDocs('${e.preUserId}')" `
+                            : (isClickable ? ` onclick="showHubItemDetails(${JSON.stringify(e).replace(/"/g, '&quot;')})" ` : '')));
 
                 // V91.102/V91.106: per-entry word count + content preview for reflective_log + learning_note
                 let wordsBadge = '';
