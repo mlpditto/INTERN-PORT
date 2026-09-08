@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.36)</title>
+    <title>Internship Portfolio (V97.37)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -9251,21 +9251,23 @@
             { re: /skin|dermat|cortico|eczema|psoriasis|topical|cutaneous|acne|rash|antifungal|fungal|candida|clotrimazole|bifonazole|fluconazole|ketoconazole|miconazole|sunscreen|melasma|ผิวหนัง|ผื่น|เชื้อรา|กันแดด|ฝ้า/i, system: 'skin' },
             { re: /\bneuro\b|seizure|epilep|parkin|alzheim|migraine|headache|ประสาท|ชัก|สมอง/i, system: 'neuro' },
 
-            // Non-system topics (FA icon)
+            // Non-system topics (FA icon). `generic: true` marks them as topic-neutral:
+            // they describe the KIND of material, not a body system, so they are the
+            // sensible landing place for a quiz that spans several systems at once.
             { re: /preceptor|mentor|training|coaching|education|teaching|พี่เลี้ยง|สอน|ฝึก/i,
-              icon: 'fa-chalkboard-user', bg: 'linear-gradient(135deg, #3949ab, #283593)' },
+              icon: 'fa-chalkboard-user', bg: 'linear-gradient(135deg, #3949ab, #283593)', generic: true },
             { re: /guideline|protocol|\bsop\b|standard care|แนวทาง|แนวปฏิบัติ|มาตรฐาน/i,
-              icon: 'fa-book-medical', bg: 'linear-gradient(135deg, #00acc1, #00838f)' },
+              icon: 'fa-book-medical', bg: 'linear-gradient(135deg, #00acc1, #00838f)', generic: true },
             { re: /wound|gauze|bandage|dressing|ulcer|แผล/i,
-              icon: 'fa-bandage', bg: 'linear-gradient(135deg, #ef5350, #e53935)' },
+              icon: 'fa-bandage', bg: 'linear-gradient(135deg, #ef5350, #e53935)', generic: true },
             { re: /vaccin|immuniz|วัคซีน|ภูมิคุ้มกัน/i,
-              icon: 'fa-shield-heart', bg: 'linear-gradient(135deg, #26a69a, #00796b)' },
+              icon: 'fa-shield-heart', bg: 'linear-gradient(135deg, #26a69a, #00796b)', generic: true },
             { re: /antibiotic|\babx\b|amoxicillin|penicillin|infection|sepsis|\btb\b|ติดเชื้อ|ยาฆ่าเชื้อ/i,
-              icon: 'fa-virus', bg: 'linear-gradient(135deg, #5e35b1, #4527a0)' },
+              icon: 'fa-virus', bg: 'linear-gradient(135deg, #5e35b1, #4527a0)', generic: true },
             { re: /\bcase\b|patient|เคส|ผู้ป่วย/i,
-              icon: 'fa-stethoscope', bg: 'linear-gradient(135deg, #43a047, #2e7d32)' },
+              icon: 'fa-stethoscope', bg: 'linear-gradient(135deg, #43a047, #2e7d32)', generic: true },
             { re: /\bdrug\b|\bmed\b|pill|tablet|capsule|pharmaco|pharmacy|ประเมินยา|\bยา\b/i,
-              icon: 'fa-pills', bg: 'linear-gradient(135deg, #1e88e5, #1565c0)' },
+              icon: 'fa-pills', bg: 'linear-gradient(135deg, #1e88e5, #1565c0)', generic: true },
         ];
 
         function getQuizIconStyle(q) {
@@ -9280,7 +9282,21 @@
             // V96.25: q.tags folded in — admin's own category chips (e.g. "Women's Health")
             // are free-text tags, and titles alone don't always carry the matching keyword.
             const haystack = `${String(q.title || '')} ${String(q.shortTitle || '')} ${String(q.description || '')} ${String(q.tags || '')}`;
-            for (const rule of QUIZ_ICON_RESOLUTION) {
+
+            // V97.37: a quiz matching THREE OR MORE body-system rules is not "about"
+            // any one of them, and picking the first match just returns whichever rule
+            // happens to sit highest in the table. PRETEST-1.2 carries 8 tags — Vaginal
+            // Candidiasis, Pediatric Dosing, Headache among them — and got the ♀ icon
+            // purely because women's health is index 0. Two matches are usually one
+            // subject seen twice ("Cervical cancer" = women + cancer), so the line is
+            // drawn at 3: a mixed quiz falls through to the topic-neutral rules below
+            // (💊 pharmacotherapy, 🩺 case, …) and to the brain default if none fit.
+            const topicHits = QUIZ_ICON_RESOLUTION.filter(r => !r.generic && r.re.test(haystack));
+            const pool = topicHits.length >= 3
+                ? QUIZ_ICON_RESOLUTION.filter(r => r.generic)
+                : QUIZ_ICON_RESOLUTION;
+
+            for (const rule of pool) {
                 if (!rule.re.test(haystack)) continue;
                 if (rule.system) {
                     const sys = (window.CASE_SYSTEMS || []).find(s => s.key === rule.system);
