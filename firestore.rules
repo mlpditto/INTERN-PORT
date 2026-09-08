@@ -124,9 +124,41 @@ service cloud.firestore {
     // Announcements with a date — a webinar, a training day (V98.61). Read by any
     // signed-in user; the client filters by targetGroups, which is presentation, not
     // security: an event is an invitation, not a secret.
+    // V98.81: two kinds of event, and the difference is enforced HERE, not in the UI.
+    //   kind 'official' — an announcement from the programme. ADMIN ONLY, unchanged.
+    //   kind 'social'   — "come to dinner after work". Any signed-in user may create one,
+    //                     and may edit or delete only their OWN.
+    // Notes on the conditions below:
+    //   - `createdByUid` must be the caller's uid at CREATE, so an event can never be
+    //     posted in someone else's name.
+    //   - an owner's update must keep kind == 'social' AND keep the same createdByUid,
+    //     so nobody can promote their own event to official or hand it to someone else.
+    //     Promotion to official stays an admin action.
+    //   - documents written before this rule have NO `kind` field, so
+    //     `resource.data.kind == 'social'` is false for them: every pre-existing event
+    //     remains admin-only, which is what it was created under.
+    //   - interns sign in ANONYMOUSLY, so request.auth.uid is the anonymous uid. That is
+    //     the id `createdByUid` must hold; the LINE id and display name are stored
+    //     alongside for showing who is inviting, exactly as event_interests does.
     match /events/{eventId} {
       allow read: if isSignedIn();
-      allow create, update, delete: if isAdmin();
+
+      allow create: if isAdmin()
+        || (isSignedIn()
+            && request.resource.data.kind == 'social'
+            && request.resource.data.createdByUid == request.auth.uid);
+
+      allow update: if isAdmin()
+        || (isSignedIn()
+            && resource.data.kind == 'social'
+            && resource.data.createdByUid == request.auth.uid
+            && request.resource.data.kind == 'social'
+            && request.resource.data.createdByUid == resource.data.createdByUid);
+
+      allow delete: if isAdmin()
+        || (isSignedIn()
+            && resource.data.kind == 'social'
+            && resource.data.createdByUid == request.auth.uid);
     }
 
     // "I want to join" against an event. Create is open to any signed-in user the same
