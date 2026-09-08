@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.32)</title>
+    <title>Internship Portfolio (V97.33)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5600,8 +5600,9 @@
                 <button type="button" class="sch-tab" data-schpane="activity" onclick="schSwitchPane('activity')">🔥 Activity</button>
             </div>
             <div id="sch-pane-agenda" style="padding:14px 16px 18px;">
-                <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
-                    <button type="button" onclick="schToggleNewEvent(true)" style="width:auto; min-height:0; padding:5px 12px; font-size:0.72em; font-weight:800; border:1px solid #ddd6fe; background:#f5f3ff; color:#6d28d9; border-radius:999px; cursor:pointer;">+ Invite people ชวนเพื่อน</button>
+                <div style="display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-bottom:8px;">
+                    <span id="sch-invite-why" class="lang-no-toggle" style="display:none; font-size:0.68em; color:#94a3b8; text-align:right;"></span>
+                    <button type="button" id="sch-invite-btn" onclick="schToggleNewEvent(true)" style="width:auto; min-height:0; padding:5px 12px; font-size:0.72em; font-weight:800; border:1px solid #ddd6fe; background:#f5f3ff; color:#6d28d9; border-radius:999px; cursor:pointer;">+ Invite people ชวนเพื่อน</button>
                 </div>
         <!-- V97.32: interns can propose a SOCIAL event — "come to dinner after work".
              Official announcements stay admin-only; firestore.rules enforces that split,
@@ -14032,9 +14033,60 @@
             return diff < 0 ? (schRel(-diff) + ' ago') : (schRel(diff) + ' left');
         }
 
+        // V97.33: who is offered the invite button. Step 1 of the gate discussed with the
+        // user: the criterion lives in the UI ONLY for now — firestore.rules still allows
+        // any signed-in user to post, deliberately. This is a nudge, not a control, and it
+        // is worth being honest about that: the point is to see whether the criterion is
+        // the right one before it is locked down, not to enforce it yet.
+        //
+        // The criterion is "today is inside the internship period", NOT users.status.
+        // status is written once at account creation and never transitions — it is only
+        // ever 'active', so it says nothing about whether someone is still here. The
+        // period expires on its own, which is exactly the property a gate needs.
+        //
+        // schParseDay, never new Date('YYYY-MM-DD') — the latter is UTC midnight, i.e.
+        // 07:00 Bangkok, and would close the button 7 hours early on the last day.
+        //
+        // Fails OPEN on purpose:
+        //   - no dates recorded  -> nothing has ended, so nothing to withhold
+        //   - notAnInternship    -> the period is not a rotation at all
+        function schInvitePermission() {
+            const me = (typeof myOwnRow === 'function') ? myOwnRow() : {};
+            if (!me || me.notAnInternship === true) return { ok: true, why: '' };
+            const s = me.startDate ? schParseDay(me.startDate) : null;
+            const e = me.endDate ? schParseDay(me.endDate) : null;
+            if (!s || !e) return { ok: true, why: '' };
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (today < s) {
+                return { ok: false, why: 'You can post invites once your programme starts on ' + me.startDate };
+            }
+            if (today > e) {
+                return { ok: false, why: 'Your programme ended on ' + me.endDate + ' — ask an admin to post an invite' };
+            }
+            return { ok: true, why: '' };
+        }
+
+        function schApplyInvitePermission() {
+            const btn = document.getElementById('sch-invite-btn');
+            const why = document.getElementById('sch-invite-why');
+            if (!btn || !why) return;
+            const p = schInvitePermission();
+            btn.style.display = p.ok ? '' : 'none';
+            why.style.display = p.ok ? 'none' : 'inline';
+            why.textContent = p.ok ? '' : p.why;
+            // Close the form too, or someone who had it open when their last day rolled
+            // over keeps a form they can no longer be offered.
+            if (!p.ok) {
+                const box = document.getElementById('sch-new-event');
+                if (box) box.style.display = 'none';
+            }
+        }
+
         function schRenderAgenda() {
             const box = document.getElementById('sch-agenda');
             if (!box) return;
+            schApplyInvitePermission();
             const now = new Date();
             const items = schAgendaItems();
 
