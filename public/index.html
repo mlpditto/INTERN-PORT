@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.37)</title>
+    <title>Internship Portfolio (V97.38)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -2267,26 +2267,10 @@
                     </div>
                 </div>
 
-                <!-- V94.02: Merged Ranks + Badges — single pane -->
-                <div class="profile-tab-content">
-                    <!-- Merged pane: Leaderboard + Badge strip on Me row -->
-                    <div id="pane-profile-ranks" class="profile-tab-pane active">
-                        <div id="profile-leaderboard-container" style="padding: 6px 0;">
-                            <div style="text-align:center; padding:8px; color:#999;">
-                                <i class="fa-solid fa-spinner fa-spin"></i> Loading rankings...
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Hidden: kept for compatibility, no longer shown as tab -->
-                    <div id="pane-profile-badges" class="profile-tab-pane">
-                        <div id="profile-badges-container" style="padding: 10px 0;">
-                            <div style="text-align:center; padding:15px; color:#999;">
-                                <i class="fa-solid fa-spinner fa-spin"></i> Loading badges...
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <!-- V97.38: the Ranks/Badges pane shell is gone. Its only remaining
+                     occupant was the On track / Catch up chip, now folded into the
+                     timeline bar above; the badges pane had been unreachable ever
+                     since the tab buttons were removed. -->
 
                 <!-- V95.43: Daily Check-in card — กดรับคะแนนรายวัน + streak ต่อเนื่อง -->
                 <div id="daily-checkin-card" class="lang-no-toggle"></div>
@@ -2485,59 +2469,6 @@
 
                 .voyage-trend i {
                     font-size: 0.9em;
-                }
-
-                /* 🔥 Profile Tabs (V91.47) */
-                .profile-tabs-bar {
-                    display: flex;
-                    gap: 0;
-                    margin-top: 12px;
-                    border-bottom: 2px solid #e2e8f0;
-                    padding: 0;
-                }
-
-                .profile-tab-btn {
-                    flex: 1;
-                    padding: 8px 12px;
-                    background: none;
-                    border: none;
-                    border-bottom: 3px solid transparent;
-                    cursor: pointer;
-                    font-size: 0.82em;
-                    font-weight: 700;
-                    color: #64748b;
-                    transition: all 0.2s;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 4px;
-                }
-
-                .profile-tab-btn:hover {
-                    color: #475569;
-                    background: #f8fafc;
-                }
-
-                .profile-tab-btn.active {
-                    color: #e67e22;
-                    border-bottom-color: #e67e22;
-                    background: #fff7ed;
-                }
-
-                .profile-tab-btn i {
-                    font-size: 0.95em;
-                }
-
-                .profile-tab-content {
-                    margin-top: 0;
-                }
-
-                .profile-tab-pane {
-                    display: none;
-                }
-
-                .profile-tab-pane.active {
-                    display: block;
                 }
 
                 .grandline-summary-dot {
@@ -7046,7 +6977,7 @@
                     renderPersonalityCard(da);
                     renderReflectiveBadgeCollection(da.reflectiveBadges || []);
                     updateEarnedBadgesBar(da.reflectiveBadges || da.reflectiveUnlockedBadgeIds || []);
-                    updateTimelineBar(da.startDate, da.endDate);
+                    updateTimelineBar(da.startDate, da.endDate, da.score);
 
                     // V97.08: anything that wants the intern's own fields should read
                     // this, not allUsersData — that array is populated by the denied
@@ -7572,8 +7503,15 @@
             updateTimelineBar(s, e);
         }
 
-        // V94.04: Timeline bar under Start/End Date
-        function updateTimelineBar(startVal, endVal) {
+        // V94.04: Timeline bar under Start/End Date.
+        // V97.38: this row also carries the points pace. It used to be a separate
+        // "On track / Catch up" chip on its own full-width row (rendered by
+        // renderProfileLeaderboard), which spent a row to say one word, hid the
+        // number it was judging, and duplicated the graduation state this bar
+        // already shows. Now: on pace prints nothing, behind prints how far behind.
+        // `scoreVal` is passed by the own-doc listener because window.myUserDoc is
+        // not assigned until after this call.
+        function updateTimelineBar(startVal, endVal, scoreVal) {
             const wrap = document.getElementById('u-timeline-bar');
             if (!wrap) return;
             const prog = document.getElementById('u-tl-progress');
@@ -7596,7 +7534,22 @@
             const daysLeft   = Math.max(0, Math.ceil((end - now) / 86400000));
             const pct        = Math.min(100, Math.round((daysPassed / totalDays) * 100));
             const barColor   = pct >= 100 ? '#10b981' : pct >= 60 ? '#4361ee' : '#f59e0b';
-            document.getElementById('u-tl-label').textContent     = `Day ${daysPassed} of ${totalDays}`;
+            // V97.38: pace uses the same test the old chip used (0.08 x % elapsed),
+            // so nobody's status changes -- only how it is told. Shown ONLY when
+            // behind: "you are fine" is not news, and this bar's colour is already
+            // spoken for by elapsed time, so the gap rides the label instead.
+            // NOTE: 0.08 puts the finish line at 8 pts whether the internship runs
+            // 4 weeks or 182 days, and the certificate needs 30 (see
+            // updateUnifiedMetricsBar). Left alone on purpose -- changing WHO gets
+            // warned is a separate decision from where the warning lives.
+            const score      = (scoreVal !== undefined && scoreVal !== null)
+                ? (Number(scoreVal) || 0)
+                : (Number(((typeof myOwnRow === 'function') ? myOwnRow() : {}).score) || 0);
+            const behind     = (pct * 0.08) - score;
+            const paceHtml   = (pct < 100 && behind > 0)
+                ? ` <span style="color:#c2410c; font-weight:700;" title="Behind the expected points pace for how far into the internship you are" data-th-title="ตามหลังเป้าคะแนนเทียบกับเวลาที่ผ่านไป">· behind ${behind.toFixed(2)} pts</span>`
+                : '';
+            document.getElementById('u-tl-label').innerHTML        = `Day ${daysPassed} of ${totalDays}${paceHtml}`;
             document.getElementById('u-tl-remaining').textContent  = pct >= 100 ? '🎓 Completed' : `⏳ ${daysLeft} days left`;
             document.getElementById('u-tl-bar').style.width        = pct + '%';
             document.getElementById('u-tl-bar').style.background   = `linear-gradient(90deg,${barColor},${barColor}cc)`;
@@ -14321,31 +14274,12 @@
             updateGrandLineDashboard();
         }
 
-        // 🔥 Profile Tab Switching (V91.47)
-        function switchProfileTab(tab) {
-            // Update buttons
-            document.querySelectorAll('.profile-tab-btn').forEach(btn => btn.classList.remove('active'));
-            document.getElementById('ptab-' + tab).classList.add('active');
-
-            // Update panes
-            document.querySelectorAll('.profile-tab-pane').forEach(pane => pane.classList.remove('active'));
-            document.getElementById('pane-profile-' + tab).classList.add('active');
-
-            // Load data if needed
-            if (tab === 'ranks') renderProfileLeaderboard();
-            else if (tab === 'badges') renderProfileBadges();
-        }
 
         // V94.04: Profile Summary — Rank + Status only (Timeline→date row, Badges→metrics row 3)
+        // V97.38: Status moved onto the timeline bar (updateTimelineBar), so this
+        // function now exists only for the floating division badge in the points
+        // column. It renders no container of its own any more.
         function renderProfileLeaderboard() {
-            const container = document.getElementById('profile-leaderboard-container');
-            if (!container) return;
-
-            // V97.10: own-doc fields (startDate / endDate / badges) — the leaderboard
-            // projection deliberately does not carry them, so read the own doc.
-            // divUsers below still needs every row and stays on allUsersData.
-            const myData = myOwnRow();
-
             // Rank position in division
             const myDiv = getMyDivision();
             const relevantGroups = divisionConfig[myDiv] || [myGroup];
@@ -14355,10 +14289,6 @@
                 .filter(u => (u.reflectiveTotalLogs || 0) > 0 || u.id === userId)
                 .sort((a, b) => (b.reflectiveTotalLogs || 0) - (a.reflectiveTotalLogs || 0));
             const myRank   = divUsers.findIndex(u => u.id === userId) + 1;
-            const rankHtml = myRank > 0
-                ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:0.75em;font-weight:700;background:#fff7ed;border:1px solid #fdba74;border-radius:20px;padding:4px 10px;color:#c2410c;">🏆 #${myRank} in division</span>`
-                : '';
-
             // Floating division rank badge in points section (Approach D)
             const floatingBadge = document.getElementById('u-division-rank-badge');
             if (floatingBadge) {
@@ -14369,56 +14299,6 @@
                     floatingBadge.style.display = 'none';
                 }
             }
-
-            // Status vs time progress
-            const start = myData.startDate ? new Date(myData.startDate) : null;
-            const end   = myData.endDate   ? new Date(myData.endDate)   : null;
-            const now   = new Date();
-            let statusHtml = '';
-            if (start && end && end > start) {
-                const pct   = Math.min(100, Math.round(((now - start) / (end - start)) * 100));
-                const score = myData.score || 0;
-                if (now >= end) {
-                    statusHtml = `<span style="display:inline-flex;align-items:center;gap:4px;font-size:0.75em;font-weight:700;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:20px;padding:4px 10px;color:#065f46;">🎓 Completed</span>`;
-                } else if (score >= pct * 0.08) {
-                    statusHtml = `<span style="display:inline-flex;align-items:center;gap:4px;font-size:0.75em;font-weight:700;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:20px;padding:4px 10px;color:#065f46;">✅ On track</span>`;
-                } else {
-                    statusHtml = `<span style="display:inline-flex;align-items:center;gap:4px;font-size:0.75em;font-weight:700;background:#fff7ed;border:1px solid #fdba74;border-radius:20px;padding:4px 10px;color:#c2410c;">⚠️ Catch up</span>`;
-                }
-            }
-
-            if (!statusHtml) { container.innerHTML = ''; return; }
-            container.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 0;">${statusHtml}</div>`;
-        }
-
-        // 🔥 Render Badges in Profile Tab
-        function renderProfileBadges() {
-            const container = document.getElementById('profile-badges-container');
-            if (!container) return;
-
-            // Get unlocked badges from user data
-            const myData = myOwnRow();
-            const unlockedBadgeIds = myData ? (myData.reflectiveUnlockedBadgeIds || []) : [];
-            
-            // Reuse the existing badge catalog logic
-            const unlocked = new Set(unlockedBadgeIds || []);
-            const preview = [...reflectiveBadgeCatalog].sort((a, b) => {
-                const aUnlocked = unlocked.has(a.id) ? 1 : 0;
-                const bUnlocked = unlocked.has(b.id) ? 1 : 0;
-                return bUnlocked - aUnlocked;
-            });
-
-            if (!preview.length) {
-                container.innerHTML = '<div style="font-size:0.78em; color:#999; text-align:center; padding:20px;">No badges available yet</div>';
-                return;
-            }
-
-            container.innerHTML = '<div style="display:flex; flex-wrap:wrap; gap:6px;">' + preview.map(b => {
-                const isUnlocked = unlocked.has(b.id);
-                return `<div class="badge-chip ${isUnlocked ? 'unlocked' : 'locked'}" style="display:inline-flex; align-items:center; gap:6px; font-size:0.75em; border-radius:12px; padding:6px 12px; border:1px solid ${isUnlocked ? '#f0c36d' : '#e0e0e0'}; background:${isUnlocked ? 'linear-gradient(135deg, #fffcf5 0%, #fff7e6 100%)' : '#f9f9f9'}; color:${isUnlocked ? '#915f16' : '#999'}; box-shadow: ${isUnlocked ? '0 2px 5px rgba(230, 126, 34, 0.1)' : 'none'};">
-                    <span style="font-size:1.2em;">${b.icon}</span><span style="font-weight:600;">${b.title}</span>
-                </div>`;
-            }).join('') + '</div>';
         }
 
         function loadLearningAnalytics() {
