@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.33)</title>
+    <title>Internship Portfolio (V97.34)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -2082,6 +2082,10 @@
                             <button type="button" class="profile-more-menu-item" onclick="closeProfileMoreMenus(); openEnrollmentCodeMatcher();">
                                 <i class="fa-solid fa-key" style="color:#6f42c1;"></i> Match with Enrollment Key
                             </button>
+                            <!-- V97.34: the certificate lives here now, and is ABSENT — not
+                                 greyed out — until it is actually available. Filled in by
+                                 updateCertificateButton(). -->
+                            <button type="button" id="cert-menu-item" class="profile-more-menu-item" style="display:none;"></button>
                         </div>
                     </details>
                     <!-- V96.99: Personal Info promoted back OUT of the ⋯ menu. V94.84 put it
@@ -2287,13 +2291,12 @@
                 <!-- V95.43: Daily Check-in card — กดรับคะแนนรายวัน + streak ต่อเนื่อง -->
                 <div id="daily-checkin-card" class="lang-no-toggle"></div>
 
-                <!-- Certificate Request Section -->
-                <div id="certificate-request-section"
-                    style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #f0f0f0;">
-                    <div id="cert-request-btn-container" style="text-align: center;">
-                        <!-- Certificate button will be injected here -->
-                    </div>
-                </div>
+                <!-- V97.34: the full-width "🔒 Request Certificate (Score: 14.0)" bar used to
+                     sit here. It was the largest element on the card and, below 30 points,
+                     it was permanently disabled — a big grey rectangle whose only job was to
+                     announce that it did nothing, and to publish the score a second time
+                     right under the score. It now lives in the ⋯ menu and appears only when
+                     there is something to do. See updateCertificateButton(). -->
 
                 <!-- Internship Status Row is now integrated compactly into Profile Info Row -->
                 <div id="status-row" style="display: none;"></div>
@@ -7643,7 +7646,6 @@
             const e = (typeof schParseDay === 'function') ? schParseDay(data.endDate) : new Date(data.endDate);
             const now = new Date();
             const btn = document.getElementById('grad-action');
-            const certBtnContainer = document.getElementById('cert-request-btn-container');
 
             // Update certificate request button
             updateCertificateButton(data);
@@ -7665,8 +7667,12 @@
         }
 
         function updateCertificateButton(userData) {
-            const container = document.getElementById('cert-request-btn-container');
-            if (!container) return;
+            // V97.34: renders the ⋯ menu entry, not a bar on the card. Below the threshold
+            // the entry is HIDDEN rather than disabled — nothing is gained by showing a
+            // control that cannot be used, and the locked state was repeating the score
+            // that is already displayed directly above it.
+            const item = document.getElementById('cert-menu-item');
+            if (!item) return;
 
             // V95.55: certificate requires 30 pts (matches the progress bar + status gate
             // in updateGrandLineDashboard). Was `> 0`, which let sub-30 users (e.g. score
@@ -7676,30 +7682,28 @@
             const certApproved = userData.certApproved || false;
             const score = userData.score || 0;
 
+            const show = (html, onclick, disabled) => {
+                item.style.display = '';
+                item.innerHTML = html;
+                item.disabled = !!disabled;
+                item.style.opacity = disabled ? '0.75' : '';
+                item.style.cursor = disabled ? 'default' : '';
+                item.onclick = disabled ? null : onclick;
+            };
+
             if (certApproved) {
-                container.innerHTML = `
-                    <button class="btn-sm btn-success" disabled style="width:100%; background:#28a745; border:none; border-radius:25px; padding:10px 15px; font-weight:600;">
-                        <i class="fa-solid fa-certificate"></i> Certificate Approved
-                    </button>
-                `;
+                show('<i class="fa-solid fa-certificate" style="color:#28a745;"></i> Certificate approved', null, true);
             } else if (certRequested) {
-                container.innerHTML = `
-                    <button class="btn-sm btn-warning" disabled style="width:100%; background:#f39c12; border:none; border-radius:25px; padding:10px 15px; font-weight:600;">
-                        <i class="fa-solid fa-clock"></i> Request Pending
-                    </button>
-                `;
+                show('<i class="fa-solid fa-clock" style="color:#f39c12;"></i> Certificate request pending', null, true);
             } else if (hasCert) {
-                container.innerHTML = `
-                    <button onclick="requestCertificateFromLIFF()" class="btn-sm btn-primary" style="width:100%; background:linear-gradient(135deg, #667eea, #764ba2); border:none; border-radius:25px; padding:10px 15px; font-weight:600; color:white;">
-                        <i class="fa-solid fa-certificate"></i> Request Certificate
-                    </button>
-                `;
+                show('<i class="fa-solid fa-certificate" style="color:#667eea;"></i> Request Certificate',
+                     () => { closeProfileMoreMenus(); requestCertificateFromLIFF(); }, false);
             } else {
-                container.innerHTML = `
-                    <button class="btn-sm" disabled style="width:100%; background:#e0e0e0; border:none; border-radius:25px; padding:10px 15px; font-weight:600; color:#999;" title="Complete more tasks to unlock certificate">
-                        <i class="fa-solid fa-lock"></i> Request Certificate (Score: ${score.toFixed(1)})
-                    </button>
-                `;
+                // Not yet available: show NOTHING. `score` is deliberately unused here — the
+                // old locked state printed it, duplicating the number already on the card.
+                item.style.display = 'none';
+                item.innerHTML = '';
+                item.onclick = null;
             }
         }
 
