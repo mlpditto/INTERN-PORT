@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.75)</title>
+    <title>Nika Admin (V98.76)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -47068,7 +47068,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         ? `🪙 ${amtVal >= 0 ? '+' : ''}${Math.round(amtVal)}`
                         : `${amtVal >= 0 ? '+' : ''}${amtVal.toFixed(2)}`);
                 let delBtn = (e.source === 'checkin_logs' && e.docId) ? `<button class="btn-sm" style="background:none; color:#ef4444; border:none; padding:0; margin-left:8px; cursor:pointer;" onclick="deleteHubHistoryLog('${e.docId}', ${e.score})"><i class="fa-solid fa-trash-can"></i></button>` : "";
-                const isManualAdjust = e.type === 'manual' && !!e.docId;
+                // V98.76: `manual_adjust` too, not just `manual`. adjDec() — the button
+                // that creates almost all of these — writes 'manual_adjust' (6 write sites
+                // use it against 3 for 'manual'), and this line was the ONLY place that
+                // accepted just one of the two: the dash bucket, the M filter chip and
+                // openManualAdjustEditModal itself all handle both. So the audited edit
+                // modal, with its edit history and revert, was unreachable for the common
+                // case — the row simply did nothing when clicked, with no error to notice.
+                const isManualAdjust = (e.type === 'manual' || e.type === 'manual_adjust') && !!e.docId;
                 // V92.50: quiz approval entries are now clickable — opens reviewQuiz overlay (read-only
                 // since att.status === 'approved' disables the approve buttons over there).
                 const isQuizApproval = e.type === 'quiz' && e.t instanceof Date;
