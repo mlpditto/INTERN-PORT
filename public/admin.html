@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.79)</title>
+    <title>Nika Admin (V98.80)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13488,6 +13488,22 @@
                     <label style="font-size:0.75em; color:#888; font-weight:bold;">📍 Address ที่อยู่</label>
                     <input type="text" id="gs-address" placeholder="Address..." data-th-placeholder="ที่อยู่..." style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
                 </div>
+                <!-- V98.80: same `socials` map the intern edits in Personal Info. DOT-PATH
+                     writes on both sides — a whole-map replace from either form would wipe
+                     whatever the other form does not carry. -->
+                <div>
+                    <label style="font-size:0.75em; color:#888; font-weight:bold;">🔗 Social</label>
+                    <div style="display:flex; gap:8px; margin-top:3px;">
+                        <input type="text" id="gs-social-facebook" placeholder="Facebook" style="flex:1; min-width:0; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                        <input type="text" id="gs-social-line" placeholder="LINE ID" style="flex:1; min-width:0; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                    </div>
+                    <div style="display:flex; gap:8px; margin-top:6px;">
+                        <input type="text" id="gs-social-instagram" placeholder="Instagram" style="flex:1; min-width:0; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                        <input type="text" id="gs-social-tiktok" placeholder="TikTok" style="flex:1; min-width:0; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                    </div>
+                    <div id="gs-social-links" class="lang-no-toggle" style="margin-top:6px; display:flex; gap:8px; flex-wrap:wrap;"></div>
+                </div>
+
 
                 <!-- Certificate Info (English) -->
                 <!-- V98.22 lean: the combined line (gs-cert-fullname) is what prints
@@ -33045,6 +33061,12 @@ RULES:
             document.getElementById('gs-institute').value = user?.institute || '';
             document.getElementById('gs-tel').value = user?.phone || user?.tel || '';
             document.getElementById('gs-email').value = user?.email || '';
+            const _gsSoc = (user && user.socials) || {};
+            ['facebook', 'line', 'instagram', 'tiktok'].forEach(k => {
+                const el = document.getElementById('gs-social-' + k);
+                if (el) el.value = _gsSoc[k] || '';
+            });
+            renderGsSocialLinks(_gsSoc);
             document.getElementById('gs-birthday').value = user?.birthday || '';
             document.getElementById('gs-address').value = user?.address || '';
 
@@ -33197,7 +33219,12 @@ RULES:
                     phone: tel,
                     email: email,
                     birthday: birthday,
-                    address: address
+                    address: address,
+                    // V98.80: dot paths — see the note by the inputs.
+                    'socials.facebook': (document.getElementById('gs-social-facebook') || {}).value?.trim() || '',
+                    'socials.line': (document.getElementById('gs-social-line') || {}).value?.trim() || '',
+                    'socials.instagram': (document.getElementById('gs-social-instagram') || {}).value?.trim() || '',
+                    'socials.tiktok': (document.getElementById('gs-social-tiktok') || {}).value?.trim() || ''
                 });
                 showToast("User updated successfully!");
                 forceHideModal('groupSelectModal');
@@ -46381,6 +46408,40 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 document.getElementById('lb-popup-header').innerHTML = `<div style="padding:20px; color:#ef4444;">Error loading user data.</div>`;
             }
         };
+
+        // V98.80: turn a stored social value into something clickable, WITHOUT inventing a
+        // URL that might not exist. A value that is already a link is used as-is. A bare
+        // handle becomes a profile URL only for the three services whose handle -> URL rule
+        // is unambiguous; LINE has no such rule (personal ids and @official ids resolve
+        // differently) so a LINE value is never turned into a link, only shown.
+        // A value containing a space is a name, not a handle — left as text.
+        function socialHref(kind, value) {
+            const v = String(value || '').trim();
+            if (!v) return '';
+            if (/^https?:\/\//i.test(v)) return v;
+            if (kind === 'line' || /\s/.test(v)) return '';
+            const handle = v.replace(/^@/, '');
+            if (kind === 'facebook') return 'https://facebook.com/' + encodeURIComponent(handle);
+            if (kind === 'instagram') return 'https://instagram.com/' + encodeURIComponent(handle);
+            if (kind === 'tiktok') return 'https://tiktok.com/@' + encodeURIComponent(handle);
+            return '';
+        }
+
+        function renderGsSocialLinks(socials) {
+            const box = document.getElementById('gs-social-links');
+            if (!box) return;
+            const icons = { facebook: '\U0001f4d8 Facebook', line: '\U0001f4ac LINE', instagram: '\U0001f4f7 Instagram', tiktok: '\U0001f3b5 TikTok' };
+            const parts = Object.keys(icons).map(k => {
+                const raw = (socials || {})[k];
+                if (!raw) return '';
+                const href = socialHref(k, raw);
+                const label = icons[k] + ': ' + escapeHtml(String(raw));
+                return href
+                    ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener" style="font-size:0.72em; font-weight:700; color:#0369a1; background:#f0f9ff; border:1px solid #bae6fd; border-radius:999px; padding:2px 9px; text-decoration:none;">${label} \u2197</a>`
+                    : `<span title="No reliable profile URL for this value \u2014 shown as text" style="font-size:0.72em; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:999px; padding:2px 9px;">${label}</span>`;
+            }).filter(Boolean);
+            box.innerHTML = parts.join('');
+        }
 
         function getCrewRankByScore(score) {
             if (score >= 90) return 'LV.10 Captain';
