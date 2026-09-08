@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.76)</title>
+    <title>Nika Admin (V98.77)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -46218,7 +46218,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     }
                     const hubType = d.type === 'case_review_bonus' ? 'work' : (d.type || 'log');
                     const hubText = d.type === 'case_review_bonus' ? `📁 ${d.note || 'Alabasta Case Review'}` : (d.note || '-');
-                    addP(d.timestamp, s, hubType, hubText, { docId: doc.id, source: 'checkin_logs' });
+                    addP(d.timestamp, s, hubType, hubText, { docId: doc.id, source: 'checkin_logs', timeText: d.timeText || '' });
                     if (d.type === 'streak') { dash.bonus += s; dash.bc++; }
                     else if (d.type === 'manual' || d.type === 'manual_adjust') { dash.manual += s; dash.mc++; }
                     else if (d.type === 'case_review_bonus') { dash.works += s; dash.wc++; }
@@ -46754,7 +46754,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             <i class="fa-solid fa-star" style="color:#f59e0b; margin-right:4px;"></i> Now: <b style="color:#4361ee; font-size:1.1em;">${(u.score || 0).toFixed(2)}</b>
                         </span>
                         <span style="margin:0 10px; color:#cbd5e1;">|</span>
-                        <span title="Beri balance" style="color:#c2410c; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:2px 8px; white-space:nowrap; font-weight:700;"><i class="fa-solid fa-coins" style="margin-right:4px; font-size:0.9em;"></i>${Math.round(u.beri || 0)}</span><button onclick="event.stopPropagation(); openHubProfile('${u.id}')" title="Open this user's profile / group settings" style="display:inline-flex; align-items:center; gap:6px; margin-left:10px; padding:5px 12px; border-radius:999px; font-size:0.78em; font-weight:900; white-space:nowrap; background:#eef2ff; color:#4361ee; border:1px solid #c7d2fe; cursor:pointer;"><i class="fa-solid fa-id-card"></i> Profile</button>${buildHubDocsAction(u)}${buildHubCertificateAction(u)}
+                        <span title="Beri balance" style="color:#c2410c; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:2px 8px; white-space:nowrap; font-weight:700;"><i class="fa-solid fa-coins" style="margin-right:4px; font-size:0.9em;"></i>${Math.round(u.beri || 0)}</span><button onclick="event.stopPropagation(); openHubProfile('${u.id}')" title="Open this user's profile / group settings" style="display:inline-flex; align-items:center; gap:6px; margin-left:10px; padding:5px 12px; border-radius:999px; font-size:0.78em; font-weight:900; white-space:nowrap; background:#eef2ff; color:#4361ee; border:1px solid #c7d2fe; cursor:pointer;"><i class="fa-solid fa-id-card"></i> Profile</button><button onclick="event.stopPropagation(); openHubAddPoints('${u.id}')" title="Award or deduct points for this user" style="display:inline-flex; align-items:center; gap:6px; margin-left:10px; padding:5px 12px; border-radius:999px; font-size:0.78em; font-weight:900; white-space:nowrap; background:#ecfdf5; color:#059669; border:1px solid #a7f3d0; cursor:pointer;">⭐ Points</button>${buildHubDocsAction(u)}${buildHubCertificateAction(u)}
                     </div>
                 </div>
                 <div id="hub-score-popover" style="display:none; position:absolute; z-index:100; top:90px; left:90px;"></div>
@@ -47121,6 +47121,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const typeLabel = e.isQuest ? 'quest' : e.type;
                 const typeColor = e.type === 'quiz' ? '#4361ee' : (e.isQuest ? '#f59e0b' : '#64748b');
                 const typeBadge = hasIconPrefix ? '' : ` <span style="margin-left:5px; color:#e2e8f0;">|</span> <span style="margin-left:5px; text-transform:uppercase; font-weight:900; color:${typeColor}">${typeLabel}</span>`;
+                // V98.77: the optional time range recorded with a manual award. Documentation
+                // only — it never touched the amount — so it renders beside the date, not as
+                // anything that could read as a calculation.
+                const timeBadge = e.timeText
+                    ? ` <span style="margin-left:5px; color:#e2e8f0;">|</span> <span style="margin-left:5px; font-weight:800; color:#64748b;">🕘 ${String(e.timeText).replace(/[<>&]/g, '')}</span>`
+                    : '';
 
                 l.innerHTML += `
                     <div style="padding:12px 15px; border-radius:12px; border:1px solid #f1f5f9; margin-bottom:10px; background:white; display:flex; justify-content:space-between; align-items:flex-start; gap:10px; transition:0.2s; ${isClickable ? 'cursor:pointer;' : ''}" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='#f1f5f9'" ${onClickAttr}>
@@ -47129,7 +47135,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 <span style="background:#f1f5f9; color:#94a3b8; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:900;">#${seqNum}</span>
                                 ${e.text}${isClickable ? ' <i class="fa-solid fa-arrow-up-right" style="font-size:0.7em; color:#94a3b8; margin-left:4px;"></i>' : ''} ${delBtn}
                             </div>
-                            <div style="font-size:0.75em; color:#94a3b8; margin-top:4px;">${d}${typeBadge}${wordsBadge}</div>
+                            <div style="font-size:0.75em; color:#94a3b8; margin-top:4px;">${d}${typeBadge}${timeBadge}${wordsBadge}</div>
                             ${previewBlock}
                         </div>
                         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0;">
@@ -52391,6 +52397,104 @@ Save it anyway?`;
                 document.getElementById('applicantDocViewer').style.display = 'flex';
             } catch (e) { alert('Could not open: ' + e.message); }
         }
+
+        // ---- V98.77: award points from the User Hub popup -------------------------
+        // Writes the SAME checkin_logs shape adjDec() produces, so the row lands in
+        // History and openManualAdjustEditModal can already edit it, with its own edit
+        // trail and revert. Deliberately not a second kind of record.
+        let hapTargetId = null;
+
+        window.openHubAddPoints = function(uid) {
+            hapTargetId = uid;
+            const u = (usersData || []).find(x => x.id === uid) || {};
+            document.getElementById('hap-who').textContent = 'For ' + (u.displayName || uid) + (u.group ? ' \u00b7 ' + u.group : '');
+            // Local today, NOT toISOString() — that is UTC and hands back yesterday for
+            // most of the Bangkok evening. Same trap schParseDay guards on the intern side.
+            const n = new Date();
+            document.getElementById('hap-date').value =
+                n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
+            document.getElementById('hap-start').value = '';
+            document.getElementById('hap-end').value = '';
+            document.getElementById('hap-amount').value = '';
+            document.getElementById('hap-note').value = '';
+            document.getElementById('hap-msg').textContent = '';
+            document.getElementById('hap-save').disabled = false;
+            document.getElementById('hubAddPointsModal').style.display = 'flex';
+        };
+
+        window.closeHubAddPoints = function() {
+            const m = document.getElementById('hubAddPointsModal');
+            if (m) m.style.display = 'none';
+        };
+
+        // The instant the entry counts for, built from LOCAL parts — new Date('YYYY-MM-DD')
+        // is UTC midnight, i.e. 07:00 Bangkok, which lands the row on the wrong day.
+        // With no start time it is local NOON, far enough from either midnight that no
+        // timezone reading of it can slide into an adjacent day.
+        function hapInstant(dateStr, startStr) {
+            const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateStr || ''));
+            if (!m) return null;
+            let hh = 12, mm = 0;
+            const t = /^(\d{2}):(\d{2})$/.exec(String(startStr || ''));
+            if (t) { hh = Number(t[1]); mm = Number(t[2]); }
+            return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), hh, mm, 0, 0);
+        }
+
+        window.saveHubAddPoints = async function() {
+            const msg = document.getElementById('hap-msg');
+            const btn = document.getElementById('hap-save');
+            const uid = hapTargetId;
+            if (!uid) return;
+            const dateStr = document.getElementById('hap-date').value;
+            const startStr = document.getElementById('hap-start').value;
+            const endStr = document.getElementById('hap-end').value;
+            // The comma swap mirrors adjDec(). It is belt-and-braces here: <input type=number>
+            // already refuses a comma and hands back '', which the empty check below catches.
+            const raw = String(document.getElementById('hap-amount').value || '').replace(',', '.');
+            const note = document.getElementById('hap-note').value.trim();
+
+            const when = hapInstant(dateStr, startStr);
+            if (!when) { msg.style.color = '#ef4444'; msg.textContent = 'Pick a date.'; return; }
+            const amount = parseFloat(raw);
+            // Not `!amount` — that would also reject a deliberate 0.
+            if (raw === '' || !Number.isFinite(amount)) { msg.style.color = '#ef4444'; msg.textContent = 'Enter the points.'; return; }
+            if (!note) { msg.style.color = '#ef4444'; msg.textContent = 'A reason is required — this is an audit record.'; return; }
+            if (startStr && endStr && endStr < startStr) { msg.style.color = '#ef4444'; msg.textContent = 'The end time is before the start time.'; return; }
+
+            const timeText = (startStr && endStr) ? (startStr + '\u2013' + endStr) : (startStr || endStr || '');
+            const editor = (auth && auth.currentUser) || {};
+            msg.style.color = '#64748b';
+            msg.textContent = 'Saving\u2026';
+            btn.disabled = true;
+            try {
+                await db.collection('users').doc(uid).update({
+                    score: firebase.firestore.FieldValue.increment(amount)
+                });
+                await db.collection('checkin_logs').add({
+                    userId: uid,
+                    type: 'manual_adjust',
+                    amount: amount,
+                    note: note,
+                    // `timestamp` is the day it COUNTS for; `createdAt` is when the admin
+                    // actually entered it. One field cannot tell those apart, and on a
+                    // backdated entry the audit trail would then say something untrue.
+                    timestamp: firebase.firestore.Timestamp.fromDate(when),
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    startTime: startStr || '',
+                    endTime: endStr || '',
+                    timeText: timeText,
+                    createdByUid: editor.uid || 'unknown',
+                    createdByEmail: editor.email || ALLOWED_EMAIL
+                });
+                closeHubAddPoints();
+                showToast('\u2b50 ' + (amount >= 0 ? '+' : '') + amount.toFixed(2) + ' points saved');
+                if (typeof openUserHub === 'function') openUserHub(uid, 'history');
+            } catch (e) {
+                msg.style.color = '#ef4444';
+                msg.textContent = 'Could not save: ' + (e.message || e);
+                btn.disabled = false;
+            }
+        };
 
         let apvOwner = null;   // which applicant the open document belongs to
 
@@ -60340,6 +60444,43 @@ Reply ONLY with raw JSON, no markdown:
          to outrank it — hides every sibling overlay, so closing the viewer would take the
          document list down with it. A plain fixed div with its own z-index is the same
          shape lbChartModal already uses, and it stacks without touching shared behaviour. -->
+
+    <!-- V98.77: award points from the User Hub popup. Not class="modal" for the same
+         reason as applicantDocViewer: `.modal[style*="flex"]` pins z-index at 9999 and
+         forceShowModal() hides sibling overlays, which would close the popup underneath. -->
+    <div id="hubAddPointsModal"
+        style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.72); backdrop-filter:blur(4px); z-index:100002; align-items:center; justify-content:center;"
+        onclick="if (event.target === this) closeHubAddPoints();">
+        <div class="lang-no-toggle" style="background:#fff; border-radius:16px; width:94%; max-width:440px; max-height:92vh; overflow:auto; padding:18px 20px; box-shadow:0 30px 80px rgba(0,0,0,0.45);">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:2px;">
+                <h3 style="margin:0; font-size:1.05em; color:#059669; flex:1;">⭐ Add points</h3>
+                <span onclick="closeHubAddPoints()" style="cursor:pointer; font-size:22px; line-height:1; color:#cbd5e1;">&times;</span>
+            </div>
+            <p id="hap-who" style="margin:0 0 14px; font-size:0.82em; color:#94a3b8;"></p>
+
+            <label style="font-size:0.78em; font-weight:800; color:#475569; display:block; margin-bottom:4px;">Date — the day this counts for</label>
+            <input type="date" id="hap-date" style="width:100%; padding:9px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; margin-bottom:10px;">
+
+            <label style="font-size:0.78em; font-weight:800; color:#475569; display:block; margin-bottom:4px;">Time (optional) — recorded as a note, it does not change the points</label>
+            <div style="display:flex; gap:6px; align-items:center; margin-bottom:10px;">
+                <input type="time" id="hap-start" style="flex:1; min-width:0; padding:9px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box;">
+                <span style="color:#94a3b8;">–</span>
+                <input type="time" id="hap-end" style="flex:1; min-width:0; padding:9px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box;">
+            </div>
+
+            <label style="font-size:0.78em; font-weight:800; color:#475569; display:block; margin-bottom:4px;">Points</label>
+            <input type="number" id="hap-amount" step="0.01" placeholder="e.g. 0.50 — negative deducts"
+                style="width:100%; padding:9px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; margin-bottom:10px;">
+
+            <label style="font-size:0.78em; font-weight:800; color:#475569; display:block; margin-bottom:4px;">Reason (required)</label>
+            <textarea id="hap-note" rows="3" placeholder="Why these points are being awarded"
+                style="width:100%; padding:9px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; resize:vertical; font-size:0.9em;"></textarea>
+
+            <div id="hap-msg" style="font-size:0.78em; font-weight:700; color:#ef4444; min-height:1.2em; margin:6px 0;"></div>
+            <button class="btn-primary" id="hap-save" style="width:100%; background:#059669;" onclick="saveHubAddPoints()">Save</button>
+            <p style="margin:10px 0 0; font-size:0.72em; color:#94a3b8; line-height:1.45;">Written to <code>checkin_logs</code> as a manual adjustment, so it appears in History and stays editable there with its own edit trail. Backdating moves the Activity chart and Active Days for that day.</p>
+        </div>
+    </div>
     <div id="applicantDocViewer"
         style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.75); backdrop-filter:blur(4px); z-index:100001; align-items:center; justify-content:center;"
         onclick="if (event.target === this) closeApplicantDocViewer();">
