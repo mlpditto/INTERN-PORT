@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.73)</title>
+    <title>Nika Admin (V98.74)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -21786,9 +21786,24 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                     <button type="button" class="qdraft-discard" style="background:transparent; color:#92400e; border:1px solid #f59e0b; border-radius:8px; padding:5px 10px; font-weight:700; font-size:0.85em; cursor:pointer;">Discard</button>
                 </div>`;
             banner.querySelector('.qdraft-restore').onclick = () => {
-                try { fillQuizForm(JSON.parse(draftJson)); }
-                catch (e) { console.warn('[V93.98] quiz draft restore failed:', e); }
-                banner.remove();
+                // V98.74: `banner.remove()` used to sit OUTSIDE the try, so a failed restore
+                // still cleared the banner: the draft was left half-applied (title in, no
+                // questions), the only report was a console.warn nobody had open, and there
+                // was no way back to the draft without reopening the editor. That is the
+                // whole reported symptom — "Restore does nothing".
+                try {
+                    fillQuizForm(JSON.parse(draftJson));
+                    banner.remove();
+                } catch (e) {
+                    console.warn('[V93.98] quiz draft restore failed:', e);
+                    // Keep the banner AND the draft, and say so on screen. Discard is still
+                    // right there if the admin would rather drop it.
+                    const label = banner.querySelector('span');
+                    if (label) {
+                        label.textContent = '⚠️ Could not fully restore the draft: ' + (e && e.message ? e.message : e)
+                            + ' — the draft is still saved. Try again, or Discard.';
+                    }
+                }
             };
             banner.querySelector('.qdraft-discard').onclick = () => {
                 localStorage.removeItem('quiz_draft');
@@ -22460,7 +22475,16 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const container = document.getElementById('quiz-questions-container');
             const qId = Date.now() + Math.floor(Math.random() * 1000);
             const qType = data ? data.type : 'choice';
-            const options = data ? data.options : ["Option 1", "Option 2"];
+            // V98.74: `data.options` can be ABSENT, not just empty. Until V98.56 (#1032)
+            // getQuizFormData() only collected options for type 'choice', so every draft
+            // autosaved from an ordering/flashcard question carries questions with no
+            // `options` key at all — and those drafts are still sitting in people's
+            // localStorage. `data.options` was then undefined here and line ~22537's
+            // `options.map` threw, which is what made Restore look dead.
+            // The lost options cannot be recovered; falling back to the same placeholders a
+            // NEW question gets lets the rest of the draft — every other question, the text,
+            // the explanations — come back, and the admin can see what needs refilling.
+            const options = (data && Array.isArray(data.options)) ? data.options : ["Option 1", "Option 2"];
             const correct = data ? (Array.isArray(data.correct) ? data.correct : [data.correct]) : [];
             // V92.28: per-question tags (Phase B)
             const initialTags = (data && data.tags) ? String(data.tags).trim() : '';
