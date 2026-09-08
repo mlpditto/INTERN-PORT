@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.38)</title>
+    <title>Internship Portfolio (V97.39)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -7503,6 +7503,52 @@
             updateTimelineBar(s, e);
         }
 
+        // ── Certificate requirement ──────────────────────────────────────────
+        // V97.39: the requirement now scales with the length of the internship.
+        // It used to be a flat 30 everywhere, while the timeline's pace target was
+        // a flat 8 (0.08 x % elapsed) — two finish lines that never agreed, and
+        // neither of which moved with the rotation length. Against the real earn
+        // rates (check-in 0.01 + journal 0.10 a day, +0.05 per 7-day streak =
+        // 0.1171/day at best) the flat pair failed in OPPOSITE directions:
+        //   under ~68 days  a perfect intern read "behind" on every single day;
+        //   over  ~68 days  journalling alone read "on track" every single day,
+        //                   and still finished under 30, unable to request a cert.
+        // 0.25/day is that best-case habit rate plus roughly the same again from
+        // quizzes. The floor keeps a 4-week rotation worth finishing; the ceiling
+        // keeps the original 30 for anything from ~4 months up, so nothing changes
+        // for a full-length internship.
+        //   28d->8   40d->10   60d->15   90d->23   120d+->30
+        // DUPLICATED in admin.html (buildHubCertificateAction) on purpose — the two
+        // pages share no script. Keep the two copies in step.
+        const CERT_POINTS_PER_DAY = 0.25;
+        const CERT_POINTS_MIN = 8;
+        const CERT_POINTS_MAX = 30;
+        // Points arrive in lumps (a quiz is worth 1.00) while the target rises
+        // smoothly, so a perfectly compliant intern is fractionally "behind" for
+        // most of the gap between quizzes. Measured over the whole range, a grace
+        // of one quiz is exactly the line that separates the two populations:
+        // someone keeping the required cadence is never flagged at any length
+        // (0/28, 0/40, 0/60, 0/90, 0/120, 0/182 days), while someone doing the
+        // daily habits and no quizzes still is (23/28 ... 162/182). Anything
+        // smaller nags the compliant intern; anything larger only delays the
+        // warning for the one who has stopped.
+        const CERT_PACE_GRACE = 1.00;
+
+        function certRequiredForDays(totalDays) {
+            if (!(totalDays > 0)) return CERT_POINTS_MAX;
+            return Math.min(CERT_POINTS_MAX,
+                   Math.max(CERT_POINTS_MIN, Math.round(totalDays * CERT_POINTS_PER_DAY)));
+        }
+
+        // Same day arithmetic as updateTimelineBar so the pace target and the gate
+        // can never disagree about how long the internship is.
+        function certRequiredPoints(startVal, endVal) {
+            const st = (typeof schParseDay === 'function') ? schParseDay(startVal) : null;
+            const en = (typeof schParseDay === 'function') ? schParseDay(endVal)   : null;
+            if (!st || !en || en <= st) return CERT_POINTS_MAX;
+            return certRequiredForDays(Math.ceil((en - st) / 86400000));
+        }
+
         // V94.04: Timeline bar under Start/End Date.
         // V97.38: this row also carries the points pace. It used to be a separate
         // "On track / Catch up" chip on its own full-width row (rendered by
@@ -7538,15 +7584,15 @@
             // so nobody's status changes -- only how it is told. Shown ONLY when
             // behind: "you are fine" is not news, and this bar's colour is already
             // spoken for by elapsed time, so the gap rides the label instead.
-            // NOTE: 0.08 puts the finish line at 8 pts whether the internship runs
-            // 4 weeks or 182 days, and the certificate needs 30 (see
-            // updateUnifiedMetricsBar). Left alone on purpose -- changing WHO gets
-            // warned is a separate decision from where the warning lives.
+            // V97.39: the target is the certificate requirement for THIS rotation,
+            // walked linearly across the dates — so "on track" now means on track to
+            // actually graduate, not on track to reach a number nothing used.
             const score      = (scoreVal !== undefined && scoreVal !== null)
                 ? (Number(scoreVal) || 0)
                 : (Number(((typeof myOwnRow === 'function') ? myOwnRow() : {}).score) || 0);
-            const behind     = (pct * 0.08) - score;
-            const paceHtml   = (pct < 100 && behind > 0)
+            const certNeed   = certRequiredForDays(totalDays);
+            const behind     = ((pct / 100) * certNeed) - score;
+            const paceHtml   = (pct < 100 && behind > CERT_PACE_GRACE)
                 ? ` <span style="color:#c2410c; font-weight:700;" title="Behind the expected points pace for how far into the internship you are" data-th-title="ตามหลังเป้าคะแนนเทียบกับเวลาที่ผ่านไป">· behind ${behind.toFixed(2)} pts</span>`
                 : '';
             document.getElementById('u-tl-label').innerHTML        = `Day ${daysPassed} of ${totalDays}${paceHtml}`;
@@ -7627,10 +7673,12 @@
             const item = document.getElementById('cert-menu-item');
             if (!item) return;
 
-            // V95.55: certificate requires 30 pts (matches the progress bar + status gate
-            // in updateGrandLineDashboard). Was `> 0`, which let sub-30 users (e.g. score
-            // 2.12) submit a request — fixed to `>= 30`.
-            const hasCert = userData.startDate && userData.endDate && (userData.score || 0) >= 30;
+            // V95.55: certificate requires the point gate (matches the progress bar +
+            // status gate in updateGrandLineDashboard). Was `> 0`, which let under-gate
+            // users (e.g. score 2.12) submit a request — fixed to `>=`.
+            // V97.39: the gate is no longer a flat 30 — it scales with the rotation.
+            const certNeed = certRequiredPoints(userData.startDate, userData.endDate);
+            const hasCert = userData.startDate && userData.endDate && (userData.score || 0) >= certNeed;
             const certRequested = userData.certRequested || false;
             const certApproved = userData.certApproved || false;
             const score = userData.score || 0;
@@ -7663,10 +7711,14 @@
         async function requestCertificateFromLIFF() {
             try {
                 // V95.55: re-check eligibility against fresh data before writing — guards
-                // against a stale active button or a direct call submitting below the 30-pt gate.
+                // against a stale active button or a direct call submitting below the gate.
+                // V97.39: the gate scales with the rotation length, and the message now
+                // prints the number instead of a constant the intern cannot look up.
                 const _certDoc = await db.collection("users").doc(userId).get();
-                if (((_certDoc.data() || {}).score || 0) < 30) {
-                    showToast("⚠️ You need 30 points before you can request a certificate · ต้องมีคะแนนถึง 30 ก่อน");
+                const _certData = _certDoc.data() || {};
+                const _certNeed = certRequiredPoints(_certData.startDate, _certData.endDate);
+                if ((_certData.score || 0) < _certNeed) {
+                    showToast(`⚠️ You need ${_certNeed} points before you can request a certificate · ต้องมีคะแนนถึง ${_certNeed} ก่อน`);
                     checkUser();
                     return;
                 }
@@ -12909,9 +12961,14 @@
                 rankBar.style.width = `${rankPct.toFixed(1)}%`;
             }
             
-            // Certificate progress (30 pts required)
+            // Certificate progress. V97.39: the requirement scales with the
+            // internship length (certRequiredPoints), so this bar and the timeline
+            // pace and the request gate all read from one number.
             if (certBar) {
-                const certPct = Math.max(0, Math.min(100, (currentScore / 30) * 100));
+                const _certMe = (typeof myOwnRow === 'function') ? myOwnRow() : {};
+                const certNeed = certRequiredPoints(_certMe.startDate, _certMe.endDate);
+                certBar.parentElement && certBar.parentElement.setAttribute('title', `${currentScore.toFixed(2)} / ${certNeed} points toward the certificate`);
+                const certPct = Math.max(0, Math.min(100, (currentScore / certNeed) * 100));
                 certBar.style.width = `${certPct.toFixed(1)}%`;
             }
             

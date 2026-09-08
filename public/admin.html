@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.85)</title>
+    <title>Nika Admin (V98.86)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -46594,11 +46594,44 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return `<button onclick="event.stopPropagation(); openApplicantDocs('${owner}')" title="Applicant documents (CV)" style="display:inline-flex; align-items:center; gap:6px; margin-left:10px; padding:5px 12px; border-radius:999px; font-size:0.78em; font-weight:900; white-space:nowrap; background:#f0f9ff; color:#0369a1; border:1px solid #bae6fd; cursor:pointer;">📎 Documents${n ? ' ' + n : ''}</button>`;
         }
 
+        // V98.86: the certificate requirement scales with the length of the
+        // internship instead of being a flat 30. A 4-week rotation and a 6-month
+        // one used to face the same bar, which — at the real earn rates — made 30
+        // unreachable for the short ones and trivial for the long ones.
+        // This is a VERBATIM copy of the block in index.html (search
+        // CERT_POINTS_PER_DAY there); admin.html and index.html are separate pages
+        // with no shared script, so the two copies must be changed together.
+        // admin.html has no schParseDay(), hence the local parse here — it must stay
+        // LOCAL midnight, because `new Date('YYYY-MM-DD')` is UTC midnight, i.e.
+        // 07:00 Bangkok, and would shift the day count by one.
+        //   28d->8   40d->10   60d->15   90d->23   120d+->30
+        const CERT_POINTS_PER_DAY = 0.25;
+        const CERT_POINTS_MIN = 8;
+        const CERT_POINTS_MAX = 30;
+
+        function certParseDay(v) {
+            const m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+            return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
+        }
+
+        function certRequiredPoints(startVal, endVal) {
+            const st = certParseDay(startVal), en = certParseDay(endVal);
+            if (!st || !en || en <= st) return CERT_POINTS_MAX;
+            const days = Math.ceil((en - st) / 86400000);
+            if (!(days > 0)) return CERT_POINTS_MAX;
+            return Math.min(CERT_POINTS_MAX,
+                   Math.max(CERT_POINTS_MIN, Math.round(days * CERT_POINTS_PER_DAY)));
+        }
+
         function buildHubCertificateAction(u) {
             const score = parseFloat(u.score || 0);
             const certRequested = !!u.certRequested;
             const certApproved = !!u.certApproved;
-            const canRequest = score > 30;
+            const certNeed = certRequiredPoints(u.startDate, u.endDate);
+            // V98.86: `>=`, not `>`. It was `> 30` here while index.html gated on
+            // `>= 30`, so at exactly 30.00 the intern could send a request that the
+            // admin side had no button to originate.
+            const canRequest = score >= certNeed;
             const baseStyle = 'display:inline-flex; align-items:center; gap:6px; margin-left:10px; padding:5px 12px; border-radius:999px; font-size:0.78em; font-weight:900; border:none; white-space:nowrap;';
 
             if (certApproved) {
@@ -46607,8 +46640,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
             if (certRequested) {
                 // V91.104: warn if pending request was made when score later dropped below threshold
-                if (score < 30) {
-                    return `<button onclick="openCertModal('${u.id}')" style="${baseStyle} background:#fef2f2; color:#b91c1c; border:1px solid #fca5a5; cursor:pointer;" title="Score ${score.toFixed(2)} below 30 threshold — request may need review"><i class="fa-solid fa-triangle-exclamation"></i> Pending (< 30)</button>`;
+                if (score < certNeed) {
+                    return `<button onclick="openCertModal('${u.id}')" style="${baseStyle} background:#fef2f2; color:#b91c1c; border:1px solid #fca5a5; cursor:pointer;" title="Score ${score.toFixed(2)} below the ${certNeed}-point threshold for this internship length — request may need review"><i class="fa-solid fa-triangle-exclamation"></i> Pending (&lt; ${certNeed})</button>`;
                 }
                 return `<button onclick="openCertModal('${u.id}')" style="${baseStyle} background:#fff7ed; color:#c2410c; border:1px solid #fdba74; cursor:pointer;" title="Open certificate issuer"><i class="fa-solid fa-clock"></i> Request Pending</button>`;
             }
