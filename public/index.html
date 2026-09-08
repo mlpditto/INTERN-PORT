@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.28)</title>
+    <title>Internship Portfolio (V97.29)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -13191,6 +13191,15 @@
             if (endVal && !ed) return 'End date is not a real date วันจบไม่ถูกต้อง';
             if (!sd || !ed) return '';
             if (ed <= sd) return 'End date must be after the start date วันจบต้องอยู่หลังวันเริ่ม';
+            // V97.29: users.notAnInternship — set by an ADMIN in the Period modal, never
+            // here. The span rule assumes the period is a rotation; some accounts hold a
+            // long-range personal timeline instead, and #1050 had locked those out of being
+            // edited at all. Read-only from this page on purpose: an intern who could tick
+            // this for themselves would be protected by nothing.
+            // End-before-start above still applies to everyone — that is incoherent, not
+            // merely unusual.
+            const _me = (typeof myOwnRow === 'function') ? myOwnRow() : {};
+            if (_me && _me.notAnInternship === true) return '';
             const spanDays = Math.round((ed - sd) / 86400000);
             if (spanDays > SCH_MAX_SPAN_DAYS) {
                 return 'That is ' + spanDays + ' days — the limit is ' + SCH_MAX_SPAN_DAYS
