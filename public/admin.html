@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.81)</title>
+    <title>Nika Admin (V98.82)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -12764,6 +12764,11 @@
                         <div style="display:flex; align-items:center; gap:4px;">
                             <button class="btn-sm" onclick="toolbarCopyQ(this)" title="Copy Question" style="width:30px; height:30px; border-radius:10px; background:#1e293b; border:1px solid #475569; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:0.95em; color:#94a3b8; transition:0.2s;" onmouseover="this.style.background='#334155'; this.style.color='#f1f5f9';" onmouseout="this.style.background='#1e293b'; this.style.color='#94a3b8';"><i class="fa-solid fa-copy"></i></button>
                             <button class="btn-sm" onclick="toolbarCloneQ(this)" title="Clone Question" style="width:30px; height:30px; border-radius:10px; background:#1e293b; border:1px solid #475569; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:0.95em; color:#94a3b8; transition:0.2s;" onmouseover="this.style.background='#334155'; this.style.color='#f1f5f9';" onmouseout="this.style.background='#1e293b'; this.style.color='#94a3b8';"><span style="font-size:0.9em; line-height:1;">🐑</span></button>
+                            <!-- V98.82: multi-select. The number rail is already how you think
+                                 about "which question is which", so selection lives there rather
+                                 than in a new list. -->
+                            <button class="btn-sm" id="quiz-select-toggle" onclick="toggleQuizSelectMode()" title="Select several questions" style="width:auto; min-height:0; padding:0 10px; height:30px; border-radius:10px; background:#1e293b; border:1px solid #475569; cursor:pointer; font-size:0.72em; font-weight:800; color:#cbd5e1; transition:0.2s;">Select</button>
+                            <button class="btn-sm" id="quiz-select-delete" onclick="deleteSelectedQuestions()" title="Delete the selected questions" style="display:none; width:auto; min-height:0; padding:0 10px; height:30px; border-radius:10px; background:#451a1a; border:1px solid #ef4444; cursor:pointer; font-size:0.72em; font-weight:800; color:#ef4444;">Delete 0</button>
                             <button class="btn-sm" onclick="toolbarDeleteQ()" title="Delete Current" style="width:30px; height:30px; border-radius:10px; background:#451a1a; border:1px solid #ef4444; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:0.95em; color:#ef4444; transition:0.2s;" onmouseover="this.style.background='#ef4444'; this.style.color='white';" onmouseout="this.style.background='#451a1a'; this.style.color='#ef4444';"><i class="fa-solid fa-trash-can"></i></button>
                         </div>
                     </div>
@@ -21783,6 +21788,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 qmModal.dataset.audienceSummaryDelegated = '1';
             }
 
+            quizSelectExit();   // V98.82: a selection belongs to the quiz that was open
             if (id) {
                 const q = quizzesData.find(x => x.id === id);
                 fillQuizForm(q);
@@ -22410,6 +22416,84 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             return 10;
         }
 
+        // ---- V98.82: delete several questions at once -----------------------------
+        // Deleting used to be one question at a time behind its own confirm(), so clearing
+        // ten out of twenty-five meant twenty interactions — and the numbering shifted after
+        // every single one, so you had to re-find your place each time. Selection is
+        // collected first and applied in one go, which is also why the numbers stay still
+        // while you choose.
+        //
+        // Nothing here writes to Firestore. Like toolbarDeleteQ, this only removes DOM
+        // nodes; the quiz is unchanged until Save Quiz, so closing the editor undoes it.
+        let quizSelectMode = false;
+        let quizSelected = new Set();     // 0-based question indexes
+        let quizSelectAnchor = null;      // for shift-click ranges
+
+        window.toggleQuizSelectMode = function() {
+            quizSelectMode = !quizSelectMode;
+            quizSelected.clear();
+            quizSelectAnchor = null;
+            updateQuizPagination();
+        };
+
+        function quizSelectExit() {
+            quizSelectMode = false;
+            quizSelected.clear();
+            quizSelectAnchor = null;
+        }
+
+        // Renders the toggle + the count, and keeps the Delete button out of the way
+        // entirely when nothing is selected — a "Delete 0" you can press is a trap.
+        function refreshQuizSelectUI() {
+            const toggle = document.getElementById('quiz-select-toggle');
+            const del = document.getElementById('quiz-select-delete');
+            if (!toggle || !del) return;
+            toggle.textContent = quizSelectMode ? 'Done' : 'Select';
+            toggle.style.background = quizSelectMode ? '#4361ee' : '#1e293b';
+            toggle.style.color = quizSelectMode ? '#fff' : '#cbd5e1';
+            toggle.style.borderColor = quizSelectMode ? '#4361ee' : '#475569';
+            const n = quizSelected.size;
+            del.style.display = (quizSelectMode && n > 0) ? '' : 'none';
+            del.textContent = 'Delete ' + n;
+        }
+
+        // "3, 5, 8-11" rather than "3, 5, 8, 9, 10, 11" — the confirm has to be readable at
+        // a glance or it is not really a confirmation.
+        function quizRangeSummary(sortedNums) {
+            const parts = [];
+            let i = 0;
+            while (i < sortedNums.length) {
+                let j = i;
+                while (j + 1 < sortedNums.length && sortedNums[j + 1] === sortedNums[j] + 1) j++;
+                parts.push(j - i >= 2 ? (sortedNums[i] + '-' + sortedNums[j]) : sortedNums.slice(i, j + 1).join(', '));
+                i = j + 1;
+            }
+            return parts.join(', ');
+        }
+
+        window.deleteSelectedQuestions = function() {
+            const items = document.querySelectorAll('.quiz-q-item');
+            const idxs = [...quizSelected].filter(i => i < items.length).sort((a, b) => a - b);
+            if (!idxs.length) return;
+            if (idxs.length >= items.length) {
+                alert('That would delete every question. Keep at least one, or close the editor without saving.');
+                return;
+            }
+            const nums = idxs.map(i => i + 1);
+            if (!confirm('Delete ' + idxs.length + ' question' + (idxs.length > 1 ? 's' : '') + ': '
+                + quizRangeSummary(nums) + '?\n\nNothing is saved until you press Save Quiz.')) return;
+
+            // Remove from the END so the earlier indexes stay valid while removing.
+            idxs.slice().reverse().forEach(i => items[i].remove());
+
+            // Land on the question that took the place of the first one removed, so the
+            // editor stays near where you were working.
+            quizQPageIndex = Math.max(0, Math.min(idxs[0], document.querySelectorAll('.quiz-q-item').length - 1));
+            quizSelectExit();
+            updateQuizPagination();
+            if (typeof showToast === 'function') showToast('🗑️ Deleted ' + idxs.length + ' question' + (idxs.length > 1 ? 's' : ''));
+        };
+
         function updateQuizPagination() {
             updatePollUI();
             const items = document.querySelectorAll('.quiz-q-item');
@@ -22484,10 +22568,42 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                     if (hasMissingAnswer) btn.classList.add('has-missing-answer');
                     btn.innerHTML = `<span>${i + 1}</span>${hasMissingAnswer ? '<span class="q-nav-missing-indicator" title="Missing Answer Key"></span>' : ''}`;
                     btn.title = hasMissingAnswer ? `Q${i + 1}: Missing Answer Key` : `Q${i + 1}`;
-                    btn.onclick = (e) => { e.preventDefault(); quizQPageIndex = i; updateQuizPagination(); };
+                    // V98.82: in select mode the rail picks questions instead of navigating.
+                    // Shift-click extends from the last plain click, the way a file list
+                    // behaves — it works without select mode too, for anyone who reaches for
+                    // it, and turns select mode on so the result is visible.
+                    if (quizSelectMode && quizSelected.has(i)) {
+                        btn.style.outline = '2px solid #ef4444';
+                        btn.style.outlineOffset = '1px';
+                        btn.style.background = 'rgba(239,68,68,0.18)';
+                    }
+                    btn.onclick = (e) => {
+                        e.preventDefault();
+                        if (e.shiftKey && quizSelectAnchor !== null) {
+                            quizSelectMode = true;
+                            const [lo, hi] = [Math.min(quizSelectAnchor, i), Math.max(quizSelectAnchor, i)];
+                            for (let k = lo; k <= hi; k++) quizSelected.add(k);
+                            updateQuizPagination();
+                            return;
+                        }
+                        if (quizSelectMode) {
+                            if (quizSelected.has(i)) quizSelected.delete(i); else quizSelected.add(i);
+                            quizSelectAnchor = i;
+                            updateQuizPagination();
+                            return;
+                        }
+                        quizSelectAnchor = i;
+                        quizQPageIndex = i;
+                        updateQuizPagination();
+                    };
                     nav.appendChild(btn);
                 });
             }
+
+            // V98.82: selection indexes only mean anything against the CURRENT list, so
+            // drop any that no longer exist (a delete elsewhere, a fresh quiz loaded).
+            [...quizSelected].forEach(i => { if (i >= total) quizSelected.delete(i); });
+            refreshQuizSelectUI();
 
             const missingSummary = document.getElementById('quiz-missing-answer-summary');
             if (missingSummary) {
