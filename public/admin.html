@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.86)</title>
+    <title>Nika Admin (V98.87)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -52611,6 +52611,14 @@ Save it anyway?`;
                 document.getElementById('apv-tab').href = url;
                 const body = document.getElementById('apv-body');
                 body.innerHTML = '';
+                // V98.87: the modal is shown BEFORE the render, not after. apvRenderPdf
+                // sizes every page from wrap.clientWidth, and inside a display:none modal
+                // that reads 0 — so `Math.max(240, Math.min(0 - 24, 900))` pinned every
+                // PDF at the 240px floor and a CV arrived as an unreadable thumbnail. The
+                // floor was written as a guard against exactly this and instead hid it.
+                // Showing first also means the "Rendering…" line is actually visible, so a
+                // slow PDF no longer looks like a dead button.
+                document.getElementById('applicantDocViewer').style.display = 'flex';
                 if (d.contentType === 'application/pdf') {
                     // V98.79: rendered by pdf.js, NOT an <iframe>. The iframe handed the job to
                     // whatever PDF handler the browser happens to have, and in Firefox that
@@ -52620,7 +52628,10 @@ Save it anyway?`;
                     // loaded here (apdExtractPdfText uses it) and renders identically
                     // everywhere, so the viewer stops depending on browser configuration.
                     // "New tab" stays as the escape hatch and still uses the native viewer.
-                    body.innerHTML = '<div style="color:#64748b; font-size:0.85em;">Rendering the PDF…</div>';
+                    // The body centres its child, which is right for an image and wrong
+                    // for a full-height scroller, so each branch states what it needs.
+                    body.style.alignItems = 'stretch';
+                    body.innerHTML = '<div style="color:#64748b; font-size:0.85em; margin:auto;">Rendering the PDF…</div>';
                     try {
                         await apvRenderPdf(url, body);
                     } catch (err) {
@@ -52630,12 +52641,12 @@ Save it anyway?`;
                             + '<br><span style="color:#64748b;">Use <b>New tab \u2197</b> above to open it directly.</span></div>';
                     }
                 } else {
+                    body.style.alignItems = 'center';
                     const img = document.createElement('img');
                     img.src = url;
                     img.style.cssText = 'max-width:100%; max-height:100%; object-fit:contain;';
                     body.appendChild(img);
                 }
-                document.getElementById('applicantDocViewer').style.display = 'flex';
             } catch (e) { alert('Could not open: ' + e.message); }
         }
 
@@ -52752,12 +52763,17 @@ Save it anyway?`;
             wrap.style.cssText = 'width:100%; height:100%; overflow:auto; padding:12px; box-sizing:border-box;';
             container.appendChild(wrap);
 
-            // Width is measured AFTER the wrap is in the DOM, or clientWidth is 0 and every
-            // page renders one pixel wide.
-            const targetW = Math.max(240, Math.min(wrap.clientWidth - 24, 900));
+            // Width is measured AFTER the wrap is in the DOM. V98.87: the caller now
+            // shows the modal first, so this is a real number; when it is not (a caller
+            // that forgets, a detached node) fall back to a readable 900 rather than the
+            // old 240 floor, which silently produced a thumbnail instead of a page.
+            const avail = wrap.clientWidth - 24;
+            const targetW = avail > 0 ? Math.min(avail, 1400) : 900;
             // Render at device pixel density, display at CSS width — otherwise the text is
             // visibly soft on a HiDPI screen, which matters when the point is reading a CV.
-            const dpr = window.devicePixelRatio || 1;
+            // Capped at 2: past that the canvas grows faster than the sharpness does, and a
+            // multi-page CV would hold several very large bitmaps at once.
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
             for (let p = 1; p <= pdf.numPages; p++) {
                 const page = await pdf.getPage(p);
@@ -60768,7 +60784,10 @@ Reply ONLY with raw JSON, no markdown:
     <div id="applicantDocViewer"
         style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.75); backdrop-filter:blur(4px); z-index:100001; align-items:center; justify-content:center;"
         onclick="if (event.target === this) closeApplicantDocViewer();">
-        <div style="background:#fff; border-radius:16px; width:94%; max-width:1000px; height:92vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 30px 80px rgba(0,0,0,0.45);">
+        <!-- V98.87: 1200 rather than 1000 — this pane holds a CV that has to be read,
+             and the extra width goes straight into rendered detail. 94% still keeps it
+             off the edges on a small screen. -->
+        <div style="background:#fff; border-radius:16px; width:94%; max-width:1200px; height:92vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 30px 80px rgba(0,0,0,0.45);">
             <div style="display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid #eef2f7; flex-shrink:0;">
                 <span style="font-size:1em;">📎</span>
                 <span id="apv-name" class="lang-no-toggle" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:0.86em; font-weight:800; color:#334155;"></span>
