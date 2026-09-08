@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.27)</title>
+    <title>Internship Portfolio (V97.28)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5692,6 +5692,27 @@
                 </div>
             </div>
 
+            <!-- V97.28: internship period. It was only ever editable from the two
+                 header inputs and the Schedule popup, neither of which reads as "your
+                 details" — so people filled everything here and left the period alone,
+                 or worse, typed a birthdate into the header field.
+                 Native <input type="date"> here, NOT the 3-select treatment Date of Birth
+                 gets above: that exists because picking a birth YEAR from a native picker
+                 is painful (V94.76), and these two dates are near-present. The header and
+                 the Schedule popup already use native date inputs for exactly these two
+                 fields, so this matches them rather than inventing a third style. -->
+            <div style="margin-bottom:10px;">
+                <label style="font-size:0.78em; font-weight:bold; display:block; margin-bottom:4px; color:#555;">📅 Internship Period ช่วงฝึกงาน</label>
+                <div style="display:flex; gap:6px; align-items:center;">
+                    <input type="date" id="pi-start-date"
+                        style="flex:1; min-width:0; padding:9px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.9em; background:white;">
+                    <span style="color:#94a3b8; font-size:0.9em;">–</span>
+                    <input type="date" id="pi-end-date"
+                        style="flex:1; min-width:0; padding:9px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.9em; background:white;">
+                </div>
+                <p id="pi-date-msg" style="margin:4px 0 0; font-size:0.72em; color:#ef4444; min-height:1em;"></p>
+            </div>
+
             <!-- ที่อยู่ -->
             <div style="margin-bottom:14px;">
                 <label style="font-size:0.78em; font-weight:bold; display:block; margin-bottom:4px; color:#555;">📍 Address ที่อยู่</label>
@@ -7097,6 +7118,9 @@
                     document.getElementById('pi-phone').value = d.phone || "";
                     document.getElementById('pi-email').value = d.email || "";
                     setBirthdaySelects(d.birthday || "");
+                    document.getElementById('pi-start-date').value = d.startDate || "";
+                    document.getElementById('pi-end-date').value = d.endDate || "";
+                    document.getElementById('pi-date-msg').textContent = '';
                     document.getElementById('pi-address').value = d.address || "";
                 }
                 document.getElementById('personalInfoModal').style.display = 'flex';
@@ -7174,6 +7198,15 @@
                 const _dt = new Date(_by, _bm - 1, _bd);
                 if (_dt.getMonth() !== _bm - 1 || _dt.getDate() !== _bd) return alert("Date of Birth is not a valid date / วันเกิดไม่ถูกต้อง");
             }
+            // V97.28: the SAME rule the header inputs and the Schedule popup use — see
+            // internshipDatesProblem(). Checked here, before anything is written, so a bad
+            // period never leaves the profile half-saved.
+            const piStart = document.getElementById('pi-start-date').value;
+            const piEnd = document.getElementById('pi-end-date').value;
+            const piDateMsg = document.getElementById('pi-date-msg');
+            const dateProblem = internshipDatesProblem(piStart, piEnd);
+            piDateMsg.textContent = dateProblem || '';
+            if (dateProblem) return;
 
             try {
                 const fullNameEn = mnameEn ? `${fnameEn} ${mnameEn} ${lnameEn}` : `${fnameEn} ${lnameEn}`;
@@ -7192,6 +7225,16 @@
                     fullName: `${fname} ${lname}`, // Thai full name
                     fullNameEn: fullNameEn // English full name for certs
                 });
+                // V97.28: the period goes through saveMyDates(), NEVER written directly
+                // here. #1050 made that function the single writer so the validation and
+                // the timeline bar cannot drift; a fourth independent writer is exactly
+                // what caused 1988 -> 2088 to reach a live profile. Same trick
+                // schSaveDatesInline uses: set the header inputs, then let it save.
+                if (piStart || piEnd) {
+                    document.getElementById('u-start-date').value = piStart;
+                    document.getElementById('u-end-date').value = piEnd;
+                    await saveMyDates();
+                }
                 alert("Personal info saved");
                 document.getElementById('personalInfoModal').style.display = 'none';
             } catch (e) {
