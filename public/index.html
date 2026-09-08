@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.31)</title>
+    <title>Internship Portfolio (V97.32)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5600,6 +5600,30 @@
                 <button type="button" class="sch-tab" data-schpane="activity" onclick="schSwitchPane('activity')">🔥 Activity</button>
             </div>
             <div id="sch-pane-agenda" style="padding:14px 16px 18px;">
+                <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
+                    <button type="button" onclick="schToggleNewEvent(true)" style="width:auto; min-height:0; padding:5px 12px; font-size:0.72em; font-weight:800; border:1px solid #ddd6fe; background:#f5f3ff; color:#6d28d9; border-radius:999px; cursor:pointer;">+ Invite people ชวนเพื่อน</button>
+                </div>
+        <!-- V97.32: interns can propose a SOCIAL event — "come to dinner after work".
+             Official announcements stay admin-only; firestore.rules enforces that split,
+             this form can only ever write kind 'social'. lang-no-toggle because everything
+             typed in here is the user's own text and is usually Thai. -->
+        <div id="sch-new-event" class="lang-no-toggle" style="display:none; margin-top:8px; padding:9px; background:#f5f3ff; border:1px solid #ede9fe; border-radius:10px;">
+            <input type="text" id="sne-title" maxlength="80" placeholder="What are you inviting people to? ชวนไปทำอะไร"
+                style="width:100%; padding:7px; border:1px solid #ddd6fe; border-radius:7px; box-sizing:border-box; font-size:0.76em; margin-bottom:5px;">
+            <div style="display:flex; gap:5px; margin-bottom:5px;">
+                <input type="date" id="sne-date" style="flex:1.2; min-width:0; padding:7px; border:1px solid #ddd6fe; border-radius:7px; box-sizing:border-box; font-size:0.74em;">
+                <input type="time" id="sne-start" style="flex:1; min-width:0; padding:7px; border:1px solid #ddd6fe; border-radius:7px; box-sizing:border-box; font-size:0.74em;">
+                <input type="time" id="sne-end" style="flex:1; min-width:0; padding:7px; border:1px solid #ddd6fe; border-radius:7px; box-sizing:border-box; font-size:0.74em;">
+            </div>
+            <input type="text" id="sne-location" maxlength="80" placeholder="Where? ที่ไหน"
+                style="width:100%; padding:7px; border:1px solid #ddd6fe; border-radius:7px; box-sizing:border-box; font-size:0.76em; margin-bottom:5px;">
+            <div id="sne-msg" style="font-size:0.68em; font-weight:700; color:#ef4444; min-height:1em; margin-bottom:4px;"></div>
+            <div style="display:flex; gap:5px;">
+                <button type="button" onclick="schCreateSocialEvent()" style="flex:1; width:auto; min-height:0; padding:6px; font-size:0.72em; font-weight:800; border:none; background:#7c3aed; color:#fff; border-radius:7px; cursor:pointer;">Post the invite</button>
+                <button type="button" onclick="schToggleNewEvent(false)" style="width:auto; min-height:0; padding:6px 12px; font-size:0.72em; font-weight:700; border:1px solid #ddd6fe; background:#fff; color:#6d28d9; border-radius:7px; cursor:pointer;">Cancel</button>
+            </div>
+            <p style="margin:5px 0 0; font-size:0.64em; color:#a78bfa; line-height:1.4;">Your name is shown on the invite, and only you (or an admin) can delete it. ชื่อคุณจะแสดงบนกิจกรรม</p>
+        </div>
                 <div id="sch-agenda"></div>
             </div>
             <div id="sch-pane-activity" style="display:none; padding:14px 16px 18px;">
@@ -13373,8 +13397,87 @@
             } catch (e) { alert('Could not withdraw: ' + e.message); }
         }
 
+
+        // ---- V97.32: intern-created SOCIAL events ---------------------------------
+        window.schToggleNewEvent = function(show) {
+            const box = document.getElementById('sch-new-event');
+            if (!box) return;
+            if (show) {
+                const n = new Date();
+                // Local parts, not toISOString() — that is UTC and offers yesterday for
+                // most of the Bangkok evening.
+                document.getElementById('sne-date').value =
+                    n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
+                document.getElementById('sne-title').value = '';
+                document.getElementById('sne-start').value = '';
+                document.getElementById('sne-end').value = '';
+                document.getElementById('sne-location').value = '';
+                document.getElementById('sne-msg').textContent = '';
+            }
+            box.style.display = show ? 'block' : 'none';
+        };
+
+        window.schCreateSocialEvent = async function() {
+            const msg = document.getElementById('sne-msg');
+            const title = document.getElementById('sne-title').value.trim();
+            const date = document.getElementById('sne-date').value;
+            const start = document.getElementById('sne-start').value;
+            const end = document.getElementById('sne-end').value;
+            const location = document.getElementById('sne-location').value.trim();
+            if (!title) { msg.textContent = 'Give it a name ใส่ชื่อกิจกรรมด้วย'; return; }
+            if (!date) { msg.textContent = 'Pick a date เลือกวันที่'; return; }
+            if (start && end && end < start) { msg.textContent = 'The end time is before the start ครบเวลาจบก่อนเริ่ม'; return; }
+            const authUser = firebase.auth().currentUser;
+            if (!authUser) { msg.textContent = 'Still signing you in — try again กำลังเข้าสู่ระบบ'; return; }
+
+            msg.style.color = '#64748b';
+            msg.textContent = 'Posting…';
+            try {
+                await db.collection('events').add({
+                    // The rule reads BOTH of these. kind must be 'social' and createdByUid
+                    // must be this caller, so an invite can never be posted in someone
+                    // else's name or slipped in as an official announcement.
+                    kind: 'social',
+                    createdByUid: authUser.uid,
+                    userId: userId,
+                    createdByName: (typeof userProfile !== 'undefined' && userProfile.displayName) || '',
+                    title,
+                    eventDate: date,
+                    startTime: start || '',
+                    endTime: end || '',
+                    // timeText is what every existing reader renders; the two fields above
+                    // are what a future reminder or sort needs. Same pairing as V98.65.
+                    timeText: (start && end) ? (start + '–' + end) : (start || ''),
+                    location,
+                    joinVia: '',
+                    description: '',
+                    // Only the creator's own group, so an invite lands with the people they
+                    // actually share a rotation with rather than on everyone's calendar.
+                    targetGroups: [myGroup],
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                schToggleNewEvent(false);
+                if (typeof showToast === 'function') showToast('📣 Invite posted โพสต์แล้ว');
+            } catch (e) {
+                msg.style.color = '#ef4444';
+                msg.textContent = 'Could not post: ' + (e.message || e);
+            }
+        };
+
+        window.schDeleteMyEvent = async function(id) {
+            if (!confirm('Delete this invite? ลบกิจกรรมนี้?')) return;
+            try { await db.collection('events').doc(id).delete(); }
+            catch (e) { alert('Could not delete: ' + (e.message || e)); }
+        };
+
         function schEventRowHtml(e) {
             const joined = !!schMyEventInterests[e.id];
+            // V97.32: an intern-created invite is the user's own only when the STORED
+            // createdByUid matches this session's anonymous auth uid — the same identity
+            // firestore.rules checks, so the button never appears where the delete would
+            // be refused.
+            const _au = firebase.auth().currentUser;
+            const mine = e.kind === 'social' && _au && e.createdByUid === _au.uid;
             const btn = joined
                 ? `<button type="button" onclick="schLeaveEvent('${e.id}')" style="width:auto; min-height:0; padding:3px 10px; font-size:0.68em; font-weight:700; border:1px solid #bbf7d0; background:#f0fdf4; color:#15803d; border-radius:999px; cursor:pointer;">✓ Requested</button>`
                 : `<button type="button" onclick="schJoinEvent('${e.id}')" style="width:auto; min-height:0; padding:3px 10px; font-size:0.68em; font-weight:700; border:none; background:#7c3aed; color:#fff; border-radius:999px; cursor:pointer;">Join</button>`;
@@ -13383,10 +13486,12 @@
             // run in .lang-th and the EN-default page hides it, leaving only the Latin half.
             return `<div class="lang-no-toggle" style="padding:7px 9px; background:#faf5ff; border:1px solid #f3e8ff; border-radius:8px; margin-bottom:5px;">
                 <div style="display:flex; align-items:center; gap:7px;">
-                    <span style="flex:1; min-width:0; font-size:0.76em; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">📣 ${escapeHtml(e.title || '')}</span>
+                    <span style="flex:1; min-width:0; font-size:0.76em; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${e.kind === 'social' ? '🧑\u200d🤝\u200d🧑' : '📣'} ${escapeHtml(e.title || '')}</span>
+                    ${mine ? `<button type="button" onclick="schDeleteMyEvent('${e.id}')" title="Delete your invite" style="width:auto; min-height:0; padding:3px 8px; font-size:0.68em; font-weight:700; border:1px solid #fecaca; background:#fff; color:#b91c1c; border-radius:999px; cursor:pointer;">Delete</button>` : ''}
                     ${btn}
                 </div>
                 <div style="font-size:0.68em; color:#94a3b8; margin-top:3px;">${escapeHtml(e.eventDate || '')}${e.timeText ? ' · ' + escapeHtml(e.timeText) : ''}${e.location ? ' · 📍 ' + escapeHtml(e.location) : ''}${e.joinVia ? ' · ' + escapeHtml(e.joinVia) : ''}</div>
+                ${e.kind === 'social' ? `<div style="font-size:0.66em; color:#7c3aed; margin-top:3px; font-weight:700;">invited by ${escapeHtml(e.createdByName || 'a colleague')}</div>` : ''}
                 ${e.description ? `<div style="font-size:0.7em; color:#475569; margin-top:3px;">${escapeHtml(e.description)}</div>` : ''}
             </div>`;
         }
