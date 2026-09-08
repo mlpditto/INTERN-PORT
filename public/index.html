@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.34)</title>
+    <title>Internship Portfolio (V97.35)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -23477,7 +23477,21 @@ async function archiveDoneCard(cardId) {
             }
             function showBanner(remoteVersion) {
                 if (suppressed()) return;
-                if (document.getElementById('upd-banner')) return;
+                // V98.83: was `return` — once the banner existed, every later poll bailed
+                // out here, so it kept advertising whatever version was live the FIRST time
+                // it fired. Leave a tab open across a few deploys and it sits there naming a
+                // version that has already been superseded, which is worse than no banner:
+                // it looks like the check is working. The fetch was never the problem — it
+                // already sends `?t=` with `cache: 'no-store'`, and <title> is 156 bytes in,
+                // well inside the 500-byte Range. Refresh the text instead of returning.
+                // The span here carries the ellipsis/flex layout, so only its CONTENT is
+                // replaced — rebuilding the element would drop those styles.
+                const existing = document.getElementById('upd-banner');
+                if (existing) {
+                    const label = existing.querySelector('span');
+                    if (label) label.innerHTML = '\u{1F504} New version <strong>' + remoteVersion + '</strong> available \u00b7 current ' + localVersion;
+                    return;
+                }
                 const bar = document.createElement('div');
                 bar.id = 'upd-banner';
                 // V95.25: single-line layout. flex-wrap:wrap previously dropped the

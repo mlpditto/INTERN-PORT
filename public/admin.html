@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.82)</title>
+    <title>Nika Admin (V98.83)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -60810,7 +60810,19 @@ Reply ONLY with raw JSON, no markdown:
             }
             function showBanner(remoteVersion) {
                 if (suppressed()) return;
-                if (document.getElementById('upd-banner')) return;
+                // V98.83: was `return` — once the banner existed, every later poll bailed
+                // out here, so it kept advertising whatever version was live the FIRST time
+                // it fired. Leave a tab open across a few deploys and it sits there naming a
+                // version that has already been superseded, which is worse than no banner:
+                // it looks like the check is working. The fetch was never the problem — it
+                // already sends `?t=` with `cache: 'no-store'`, and <title> is 156 bytes in,
+                // well inside the 500-byte Range. Refresh the text instead of returning.
+                const existing = document.getElementById('upd-banner');
+                if (existing) {
+                    const label = existing.querySelector('span');
+                    if (label) label.innerHTML = '\u{1F504} New version <strong>' + remoteVersion + '</strong> available \u00b7 current ' + localVersion;
+                    return;
+                }
                 const bar = document.createElement('div');
                 bar.id = 'upd-banner';
                 bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:linear-gradient(135deg,#fde68a,#fbbf24);color:#7c2d12;padding:10px 16px;display:flex;align-items:center;justify-content:center;gap:12px;font-weight:700;font-size:0.9em;box-shadow:0 2px 8px rgba(0,0,0,0.12);flex-wrap:wrap;';
