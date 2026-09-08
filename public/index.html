@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.35)</title>
+    <title>Internship Portfolio (V97.36)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -9204,11 +9204,16 @@
 
         const QUIZ_ICON_RESOLUTION = [
             // Demographic / cross-cutting (run before disease systems)
-            { re: /women|female|gyne|obs|ob[-\s]?gyn|\bvvc\b|\bbv\b|vaginal|cervical|breast|contracept|birth[-\s]?control|\bocp\b|ผู้หญิง|สตรี|มดลูก|เต้านม|คุมกำเนิด|ช่องคลอด/i,
+            // V97.36: `obs` was a bare substring — it matched "observation", "jobs" and
+            //          "obstructive", so a PRETEST whose text mentioned observation got the
+            //          ♀ icon. Anchored to the word plus "obstetric", which is what it was
+            //          meant to catch. `cervical` likewise excludes the MSK sense.
+            { re: /women|female|gyne|\bobs\b|obstetric|ob[-\s]?gyn|\bvvc\b|\bbv\b|vaginal|cervical(?!\s*(spine|vertebr|radiculo))|breast|contracept|birth[-\s]?control|\bocp\b|ผู้หญิง|สตรี|มดลูก|เต้านม|คุมกำเนิด|ช่องคลอด/i,
               icon: 'fa-venus', bg: 'linear-gradient(135deg, #ec407a, #d81b60)' },
             { re: /pediatric|child|baby|infant|neonatal|ทารก|เด็ก|กุมาร/i,
               icon: 'fa-baby', bg: 'linear-gradient(135deg, #42a5f5, #1976d2)' },
-            { re: /geriatric|elderly|aged|ผู้สูงอายุ|สูงวัย/i,
+            // V97.36: `aged` anchored — it was matching "managed", "packaged", "damaged".
+            { re: /geriatric|elderly|\baged\b|ผู้สูงอายุ|สูงวัย/i,
               icon: 'fa-person-cane', bg: 'linear-gradient(135deg, #795548, #5d4037)' },
             { re: /cancer|onco|tumor|chemo|มะเร็ง/i,
               icon: 'fa-ribbon', bg: 'linear-gradient(135deg, #d81b60, #ad1457)' },
@@ -9229,12 +9234,20 @@
             { re: /anxio|sedat|sleep|insomnia|depress|psych|ssri|benzo|bipolar|schizo|panic|วิตก|นอน|ซึมเศร้า|จิต/i, system: 'mental' },
             { re: /stem[-\s]?cell|car[-\s]?t|gene therapy|leukemia|lymphoma|anemia|coagul|thrombo|hematology|สเต็มเซลล์|เซลล์บำบัด|เลือด/i, system: 'heme' },
             { re: /kidney|renal|dialysis|nephro|\buti\b|urinary|bladder|ไต|ปัสสาวะ/i, system: 'renal' },
-            { re: /bone|ortho|fracture|osteo|joint|arthritis|กระดูก|ข้อ/i, system: 'msk' },
+            // V97.36: `ortho` matched "orthostatic" (a cardio/geriatric topic) and the bare
+            //          Thai `ข้อ` matched "ข้อสอบ" / "ข้อมูล" / "ข้อควรระวัง" — words that appear
+            //          in almost every Thai quiz description, so Thai quizzes were landing on
+            //          the bone icon at random. Narrowed to real joint terms; `spine` added
+            //          because the neck/back cases used to arrive here via `ข้อ`.
+            { re: /bone|orthop|fracture|osteo|joint|arthritis|spine|spinal|กระดูก|ข้อเข่า|ข้อสะโพก|ข้อต่อ|ข้ออักเสบ|ข้อเสื่อม|ปวดข้อ/i, system: 'msk' },
             // V96.28: "ตา" (eye) excludes the "ตามอง(เห็น)" idiom ("visible" light) —
             // a sunscreen/melasma quiz mentioning "แสงที่ตามองเห็น" (visible light)
             // was matching here as an eye topic before ever reaching the skin rule below.
-            { re: /\beye\b|ophth|glaucoma|cataract|retina|hearing|\bear\b|sinus|nasal|throat|ตา(?!มอง)|หู|จมูก|คอ/i, system: 'ent' },
-            { re: /\bgi\b|gastro|stomach|nausea|vomit|diarrhea|constipat|hepat|liver|abdomin|กระเพาะ|ตับ|ลำไส้|ท้องเสีย/i, system: 'gi' },
+            // V97.36: bare `คอ` matched "คอเลสเตอรอล" (cholesterol) — narrowed the same way
+            //          `ตา` already was, to the throat senses that were actually intended.
+            { re: /\beye\b|ophth|glaucoma|cataract|retina|hearing|\bear\b|sinus|nasal|throat|ตา(?!มอง)|หู|จมูก|เจ็บคอ|คออักเสบ|ต่อมทอนซิล/i, system: 'ent' },
+            // V97.36: `liver` anchored — it was matching "delivery" ("drug delivery system").
+            { re: /\bgi\b|gastro|stomach|nausea|vomit|diarrhea|constipat|hepat|\bliver\b|abdomin|กระเพาะ|ตับ|ลำไส้|ท้องเสีย/i, system: 'gi' },
             { re: /skin|dermat|cortico|eczema|psoriasis|topical|cutaneous|acne|rash|antifungal|fungal|candida|clotrimazole|bifonazole|fluconazole|ketoconazole|miconazole|sunscreen|melasma|ผิวหนัง|ผื่น|เชื้อรา|กันแดด|ฝ้า/i, system: 'skin' },
             { re: /\bneuro\b|seizure|epilep|parkin|alzheim|migraine|headache|ประสาท|ชัก|สมอง/i, system: 'neuro' },
 
