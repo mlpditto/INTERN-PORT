@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.74)</title>
+    <title>Nika Admin (V98.75)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13017,6 +13017,19 @@
                         <label style="display:block; font-size:0.85em; font-weight:bold; color:#555; margin-bottom:5px;">📅 End วันสิ้นสุด:</label>
                         <input type="date" id="period-end-date"
                             style="width:100%; padding:10px; border:1.5px solid #6c757d; border-radius:8px; font-weight:bold;">
+                    </div>
+
+                    <!-- V98.75: the length guard added in #1050 assumes this period IS an
+                         internship rotation. Some accounts are not — a long-range personal
+                         timeline / life journal is a real use, and the guard locked it out of
+                         being edited at all. This flag says the premise does not apply.
+                         ADMIN-ONLY on purpose: if an intern could tick it for themselves the
+                         guard would protect nobody. -->
+                    <div style="margin-bottom:20px; padding:10px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;">
+                        <label style="display:block; font-size:0.85em; font-weight:bold; color:#555;">
+                            <input type="checkbox" id="period-not-internship" style="width:16px; height:16px; margin:0 4px 0 0; padding:0; vertical-align:middle;"> Not an internship period
+                        </label>
+                        <div style="font-size:0.75em; color:#999; margin-top:3px;">Lifts the 182-day and year-range checks for this user — for long-range personal timelines, not rotations.</div>
                     </div>
                 </div>
 
@@ -44497,9 +44510,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
             // V98.71: this modal wrote start/end with NO check of any kind, and it is one
             // of the four places a user's period is set. Same rules as everywhere else.
-            const dateErr = preRegDateProblem(s, e);
+            // V98.75: honour users.notAnInternship like the Period modal does.
+            const certExempt = ((usersData || []).find(x => x.id === certUser.uid) || {}).notAnInternship === true;
+            const dateErr = preRegDateProblem(s, e, certExempt);
             if (dateErr) return alert(dateErr);
-            const spanWarn = internshipSpanWarning(s, e);
+            const spanWarn = internshipSpanWarning(s, e, certExempt);
             if (spanWarn && !confirm(spanWarn)) return;
 
             const updateData = {
@@ -52178,7 +52193,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // and a year far enough out that it can only be a typo. It does NOT reject
         // a start date in the past — pre-registering someone mid-rotation is
         // ordinary — and it does not require either date.
-        function preRegDateProblem(startDate, endDate) {
+        // V98.75: `exempt` = users.notAnInternship. End-before-start stays refused for
+        // everyone — that is incoherent, not merely unusual — but the YEAR ceiling is only
+        // a typo heuristic and a long-range personal timeline is allowed to break it.
+        function preRegDateProblem(startDate, endDate, exempt) {
+            if (startDate && endDate && endDate < startDate) {
+                return `End date (${endDate}) is before the start date (${startDate}).`;
+            }
+            if (exempt) return '';
             const PLAUSIBLE_YEARS_AHEAD = 5;
             const maxYear = new Date().getFullYear() + PLAUSIBLE_YEARS_AHEAD;
             for (const [label, v] of [['Start', startDate], ['End', endDate]]) {
@@ -52187,9 +52209,6 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 if (!Number.isFinite(y) || y > maxYear) {
                     return `${label} date is ${v} — check the year (anything after ${maxYear} looks like a typo).`;
                 }
-            }
-            if (startDate && endDate && endDate < startDate) {
-                return `End date (${endDate}) is before the start date (${startDate}).`;
             }
             return '';
         }
@@ -52202,7 +52221,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // genuine long placement and being unable to record it would be the worse failure.
         // The intern side blocks outright: they have no override and no reason to need one.
         const ADMIN_MAX_SPAN_DAYS = 182;
-        function internshipSpanWarning(startDate, endDate) {
+        function internshipSpanWarning(startDate, endDate, exempt) {
+            if (exempt) return '';   // V98.75: this account's period is not a rotation
             if (!startDate || !endDate) return '';
             const sd = new Date(startDate), ed = new Date(endDate);
             if (isNaN(sd) || isNaN(ed)) return '';
@@ -56396,6 +56416,11 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 endDateInput.value = nextMonth.toISOString().split('T')[0];
             }
             
+            // V98.75: read from usersData rather than a 5th positional argument, so every
+            // existing openPeriodModal(...) call site keeps working untouched.
+            const _pu = (usersData || []).find(x => x.id === userId) || {};
+            document.getElementById('period-not-internship').checked = _pu.notAnInternship === true;
+
             togglePeriodFields();
             forceShowModal('periodAdjustmentModal');
         }
@@ -56430,18 +56455,21 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     
                     // V98.71: was start>end only, which accepted 1988 -> 2088. Same shared
                     // rules as the other three writers: refuse the impossible, confirm the
-                    // merely implausible.
-                    const dateErr = preRegDateProblem(startDate, endDate);
+                    // merely implausible. V98.75: unless this account is flagged as not
+                    // being an internship at all.
+                    const notIntern = document.getElementById('period-not-internship').checked;
+                    const dateErr = preRegDateProblem(startDate, endDate, notIntern);
                     if (dateErr) {
                         showToast("❌ " + dateErr, "error");
                         return;
                     }
-                    const spanWarn = internshipSpanWarning(startDate, endDate);
+                    const spanWarn = internshipSpanWarning(startDate, endDate, notIntern);
                     if (spanWarn && !confirm(spanWarn)) return;
                     
                     updateData = {
                         startDate: startDate,
-                        endDate: endDate
+                        endDate: endDate,
+                        notAnInternship: notIntern
                     };
                 } else {
                     // Clear period dates
