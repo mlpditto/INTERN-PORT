@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.42)</title>
+    <title>Internship Portfolio (V97.43)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -19187,7 +19187,26 @@
                 if (mirror) {
                     const m = mirror.data() || {};
                     if (m.status !== 'pending' || m.pointsAwarded === true) {
-                        say('This note has already been reviewed — ask an admin to remove it ตรวจแล้ว ลบเองไม่ได้');
+                        // V97.43: reviewed notes still cannot be withdrawn here — the +0.1
+                        // has already reached users.score and only admin deleteLearningNote
+                        // reverts it. But "ask an admin" was a dead end with no way to ask,
+                        // so raise a flag on the mirror instead; the admin's note card shows
+                        // it next to the Delete button they already have.
+                        if (m.deleteRequestedAt) {
+                            say('🕓 Delete already requested — waiting for an admin ขอลบไปแล้ว รออยู่');
+                            return;
+                        }
+                        if (!confirm('This note has already been reviewed, so you cannot remove it yourself.\nSend a delete request to an admin?\nตรวจแล้วลบเองไม่ได้ — ส่งคำขอให้แอดมินลบแทนไหม')) {
+                            say('This note has already been reviewed — ask an admin to remove it ตรวจแล้ว ลบเองไม่ได้');
+                            return;
+                        }
+                        const reason = String(prompt('Reason (optional) เหตุผล:') || '').trim().slice(0, 300);
+                        await mirror.ref.update({
+                            deleteRequestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            deleteRequestedBy: (firebase.auth().currentUser || {}).uid || '',
+                            deleteRequestReason: reason
+                        });
+                        say('📨 Delete request sent — waiting for an admin ส่งคำขอลบแล้ว รอแอดมิน');
                         return;
                     }
                 }
