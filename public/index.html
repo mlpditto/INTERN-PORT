@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.46)</title>
+    <title>Internship Portfolio (V97.47)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5545,12 +5545,26 @@
         <div id="sch-new-event" class="lang-no-toggle" style="display:none; margin-top:8px; padding:9px; background:#f5f3ff; border:1px solid #ede9fe; border-radius:10px;">
             <input type="text" id="sne-title" maxlength="80" placeholder="What are you inviting people to? ชวนไปทำอะไร"
                 style="width:100%; padding:7px; border:1px solid #ddd6fe; border-radius:7px; box-sizing:border-box; font-size:0.76em; margin-bottom:5px;">
+            <!-- V97.47: same shape the admin event form settled on in V98.66. `lang="en-GB"`
+                 is a nudge and nothing more — measured on this browser it changes nothing,
+                 because Chrome formats date/time inputs from the BROWSER locale and no
+                 attribute overrides it, so an en-US device still paints "02:00 PM". The
+                 written-out line under the fields is the actual guarantee: it prints the
+                 weekday, an abbreviated month and a 24h range regardless of locale, so
+                 "09/10/2026 02:00 PM" can no longer be read as 10 Sep at an unclear hour. -->
             <div style="display:flex; gap:5px; margin-bottom:5px;">
-                <input type="date" id="sne-date" style="flex:1.2; min-width:0; padding:7px; border:1px solid #ddd6fe; border-radius:7px; box-sizing:border-box; font-size:0.74em;">
-                <input type="time" id="sne-start" style="flex:1; min-width:0; padding:7px; border:1px solid #ddd6fe; border-radius:7px; box-sizing:border-box; font-size:0.74em;">
-                <input type="time" id="sne-end" style="flex:1; min-width:0; padding:7px; border:1px solid #ddd6fe; border-radius:7px; box-sizing:border-box; font-size:0.74em;">
+                <input type="date" id="sne-date" lang="en-GB" oninput="schRenderInviteWhen()" style="flex:1.2; min-width:0; padding:7px; border:1px solid #ddd6fe; border-radius:7px; box-sizing:border-box; font-size:0.74em;">
+                <input type="time" id="sne-start" lang="en-GB" step="300" oninput="schRenderInviteWhen()" style="flex:1; min-width:0; padding:7px; border:1px solid #ddd6fe; border-radius:7px; box-sizing:border-box; font-size:0.74em;">
+                <input type="time" id="sne-end" lang="en-GB" step="300" oninput="schRenderInviteWhen()" style="flex:1; min-width:0; padding:7px; border:1px solid #ddd6fe; border-radius:7px; box-sizing:border-box; font-size:0.74em;">
             </div>
+            <div id="sne-when" style="font-size:0.7em; font-weight:700; color:#7c3aed; min-height:1.1em; margin-bottom:5px;"></div>
             <input type="text" id="sne-location" maxlength="80" placeholder="Where? ที่ไหน"
+                style="width:100%; padding:7px; border:1px solid #ddd6fe; border-radius:7px; box-sizing:border-box; font-size:0.76em; margin-bottom:5px;">
+            <!-- V97.47: `joinVia` already existed on the event doc — the admin form has
+                 written it since the Events track shipped, and this one hardcoded ''. So
+                 interns pasted the Zoom URL into "Where?", which is meant for a place. No
+                 schema or rules change: the key was already in the payload. -->
+            <input type="text" id="sne-join" maxlength="300" placeholder="How to join — paste a link วิธีเข้าร่วม เช่น ลิงก์ Zoom"
                 style="width:100%; padding:7px; border:1px solid #ddd6fe; border-radius:7px; box-sizing:border-box; font-size:0.76em; margin-bottom:5px;">
             <div id="sne-msg" style="font-size:0.68em; font-weight:700; color:#ef4444; min-height:1em; margin-bottom:4px;"></div>
             <div style="display:flex; gap:5px;">
@@ -13456,9 +13470,33 @@
                 document.getElementById('sne-start').value = '';
                 document.getElementById('sne-end').value = '';
                 document.getElementById('sne-location').value = '';
+                document.getElementById('sne-join').value = '';
                 document.getElementById('sne-msg').textContent = '';
+                schRenderInviteWhen();
             }
             box.style.display = show ? 'block' : 'none';
+        };
+
+        // V97.47: the locale-proof half of the DATE/TIME pair. Mirrors admin's
+        // renderEventWhen(): spells the weekday and month out, and always prints the
+        // range on a 24h clock, so what the native picker paints as "02:00 PM" reads
+        // here as 14:00 whatever the device is set to.
+        window.schRenderInviteWhen = function() {
+            const box = document.getElementById('sne-when');
+            if (!box) return;
+            const v = (document.getElementById('sne-date') || {}).value || '';
+            const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+            if (!m) { box.textContent = ''; return; }
+            // Local parts, never new Date(string) — that parses as UTC midnight and
+            // lands on the previous day for Bangkok.
+            const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+            const st = (document.getElementById('sne-start') || {}).value || '';
+            const en = (document.getElementById('sne-end') || {}).value || '';
+            let out = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+            const t = (st && en) ? (st + '–' + en) : (st || en || '');
+            if (t) out += ' · ' + t;
+            if (st && en && en < st) out += '   ⚠ ends before it starts';
+            box.textContent = out;
         };
 
         window.schCreateSocialEvent = async function() {
@@ -13468,6 +13506,7 @@
             const start = document.getElementById('sne-start').value;
             const end = document.getElementById('sne-end').value;
             const location = document.getElementById('sne-location').value.trim();
+            const joinVia = document.getElementById('sne-join').value.trim();
             if (!title) { msg.textContent = 'Give it a name ใส่ชื่อกิจกรรมด้วย'; return; }
             if (!date) { msg.textContent = 'Pick a date เลือกวันที่'; return; }
             if (start && end && end < start) { msg.textContent = 'The end time is before the start ครบเวลาจบก่อนเริ่ม'; return; }
@@ -13493,7 +13532,7 @@
                     // are what a future reminder or sort needs. Same pairing as V98.65.
                     timeText: (start && end) ? (start + '–' + end) : (start || ''),
                     location,
-                    joinVia: '',
+                    joinVia,
                     description: '',
                     // Only the creator's own group, so an invite lands with the people they
                     // actually share a rotation with rather than on everyone's calendar.
