@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V99.00)</title>
+    <title>Internship Portfolio (V99.01)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -2210,6 +2210,7 @@
                                  had not filled them in, and it hid the Schedule row too.
                                  Only #u-tl-progress depends on the dates now. -->
                             <div id="u-timeline-bar" style="margin-top:4px;">
+                                <div id="u-period-status" style="display:none; font-size:0.75em; color:#64748b;"></div>
                                 <div id="u-tl-progress" style="display:none;">
                                     <div style="display:flex; justify-content:space-between; font-size:0.68em; color:#94a3b8; margin-bottom:3px;">
                                         <span id="u-tl-label">Day 0 of 0</span>
@@ -2285,6 +2286,7 @@
                         </span>
                         <span class="metric-badge badge-cert" id="badge-cert">
                             <i class="fa-solid fa-certificate"></i>
+                            <span id="badge-cert-text">คะแนนสะสมเพื่อใบรับรอง</span>
                             <span class="badge-progress-mini"><span id="badge-cert-bar" style="width:0%"></span></span>
                         </span>
                         <!-- V97.52: the two lifetime counters used to be a second row of
@@ -2294,9 +2296,9 @@
                              end of the rail as one muted pair. Both ids are unchanged, so
                              their writers are untouched.
                              V96.18/19/20: the per-activity counters live on their own tabs. -->
-                        <span id="u-lifetime-counts" title="Submissions · check-ins (all time)" data-th-title="งานที่ส่ง · เช็คอิน (ทั้งหมด)"
-                            style="font-size:0.66em; font-weight:700; color:#94a3b8; white-space:nowrap; margin-left:auto;">
-                            <span id="unified-total">0</span> · <span id="unified-checkin">0</span>
+                        <span id="u-lifetime-counts" title="Scored quizzes, logs and cases · all check-ins" data-th-title="Quiz, Log และ Case ที่ได้คะแนน · เช็กอินทั้งหมด"
+                            style="font-size:0.66em; font-weight:700; color:#64748b; white-space:normal; margin-left:auto;">
+                            กิจกรรมที่ได้คะแนน <span id="unified-total">0</span> · เช็กอินทั้งหมด <span id="unified-checkin">0</span>
                         </span>
                     </div>
 
@@ -2401,7 +2403,9 @@
                     border-radius: 8px;
                     font-size: 0.68em;
                     font-weight: 700;
-                    white-space: nowrap;
+                    white-space: normal;
+                    max-width: 100%;
+                    box-sizing: border-box;
                 }
 
                 .badge-today {
@@ -6978,7 +6982,7 @@
                     renderPersonalityCard(da);
                     renderReflectiveBadgeCollection(da.reflectiveBadges || []);
                     updateEarnedBadgesBar(da.reflectiveBadges || da.reflectiveUnlockedBadgeIds || []);
-                    updateTimelineBar(da.startDate, da.endDate, da.score);
+                    updateTimelineBar(da.startDate, da.endDate, da.score, da);
 
                     // V97.08: anything that wants the intern's own fields should read
                     // this, not allUsersData — that array is populated by the denied
@@ -7558,7 +7562,7 @@
         // already shows. Now: on pace prints nothing, behind prints how far behind.
         // `scoreVal` is passed by the own-doc listener because window.myUserDoc is
         // not assigned until after this call.
-        function updateTimelineBar(startVal, endVal, scoreVal) {
+        function updateTimelineBar(startVal, endVal, scoreVal, profile) {
             const wrap = document.getElementById('u-timeline-bar');
             if (!wrap) return;
             const prog = document.getElementById('u-tl-progress');
@@ -7570,7 +7574,18 @@
             // The wrap itself stays visible so the "Open Schedule" row is always
             // reachable; only the progress half needs the dates.
             wrap.style.display = 'block';
-            if (!start || !end || end <= start) {
+            const me = profile || ((typeof myOwnRow === 'function') ? myOwnRow() : {});
+            const status = document.getElementById('u-period-status');
+            const personal = me && me.notAnInternship === true;
+            const invalid = !start || !end || !Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start;
+            const tooLong = !invalid && !personal && Math.round((end - start) / 86400000) > SCH_MAX_SPAN_DAYS;
+            if (status) {
+                status.textContent = personal ? 'ช่วงเวลาส่วนตัว · ไม่ได้อยู่ในรอบฝึกงาน'
+                    : tooLong ? 'ตรวจสอบช่วงฝึกงาน · ระยะเวลาเกิน 182 วัน'
+                    : invalid ? 'ยังไม่มีช่วงฝึกงานที่ใช้คำนวณได้ · ตรวจสอบวันเริ่มและวันจบ' : '';
+                status.style.display = status.textContent ? 'block' : 'none';
+            }
+            if (personal || invalid || tooLong) {
                 if (prog) prog.style.display = 'none';
                 return;
             }
@@ -12946,7 +12961,7 @@
             const rankBar = document.getElementById('badge-rank-bar');
             const certBar = document.getElementById('badge-cert-bar');
             
-            if (todayBadge) todayBadge.innerHTML = `<i class="fa-solid fa-coins"></i> +${todayPoints.toFixed(2)}`;
+            if (todayBadge) todayBadge.innerHTML = `<i class="fa-solid fa-coins"></i> วันนี้ +${todayPoints.toFixed(2)} คะแนน`;
             // V97.52: #badge-streak is written by renderDailyCheckinCard() alone. It used to
             // be written here too, from reflectiveMetrics.currentStreak — the reflective-log
             // streak, not the check-in/log/case one the card counts — but the element was
@@ -12955,7 +12970,7 @@
             // V95.50: show only the points still needed to rank up (not the next-rank name),
             // e.g. "→ 4.62 pts". The progress bar already conveys "toward next rank"; the rank
             // name was redundant with the current-LV badge and read as contradicting it.
-            if (rankText) rankText.textContent = nextRank.required > 0 ? `→ ${nextRank.required.toFixed(2)} pts` : 'Max';
+            if (rankText) rankText.textContent = nextRank.required > 0 ? `อีก ${nextRank.required.toFixed(2)} คะแนนถึงระดับถัดไป` : 'ระดับสูงสุด';
             if (rankBadge) rankBadge.title = nextRank.required > 0 ? `${nextRank.required.toFixed(2)} points to next rank` : 'Max level reached';
             if (rankBar) {
                 const rankPct = nextRank.required > 0
@@ -12971,6 +12986,8 @@
                 const _certMe = (typeof myOwnRow === 'function') ? myOwnRow() : {};
                 const certNeed = certRequiredPoints(_certMe.startDate, _certMe.endDate);
                 certBar.parentElement && certBar.parentElement.setAttribute('title', `${currentScore.toFixed(2)} / ${certNeed} points toward the certificate`);
+                const certText = document.getElementById('badge-cert-text');
+                if (certText) certText.textContent = `คะแนนใบรับรอง ${currentScore.toFixed(2)} / ${certNeed}`;
                 const certPct = Math.max(0, Math.min(100, (currentScore / certNeed) * 100));
                 certBar.style.width = `${certPct.toFixed(1)}%`;
             }
@@ -18258,7 +18275,7 @@
             // reflectiveMetrics.currentStreak in that slot — a different streak — so having
             // two writers was never an option.
             const fireChip = document.getElementById('badge-streak');
-            if (fireChip) fireChip.innerHTML = `<i class="fa-solid fa-fire"></i> ${streak}`;
+            if (fireChip) fireChip.innerHTML = `<i class="fa-solid fa-fire"></i> กิจกรรมต่อเนื่อง ${streak} วัน`;
 
             // V97.52: no shell and no "Daily Streak" caption — this is the second row of the
             // metrics bar, and the 🔥 chip on the row above already names the subject. What is
