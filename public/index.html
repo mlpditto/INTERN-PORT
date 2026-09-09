@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V99.02)</title>
+    <title>Internship Portfolio (V99.03)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -648,6 +648,11 @@
         }
         #daily-checkin-card button { min-height: 44px; }
 
+        .submit-type-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+        .submit-type-grid .type-btn { min-width:0; }
+        @media (max-width:480px) { .submit-type-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+        #event-form-section label { display:block; margin:12px 0 5px; font-weight:700; color:#6d28d9; }
+        #event-form-section input { width:100%; box-sizing:border-box; }
         /* Grid-optimized card styling */
         #assignments-container .assignment-card {
             margin-bottom: 0; /* Remove individual margin, use grid gap instead */
@@ -4701,7 +4706,7 @@
                             <label style="font-size:0.85em; font-weight:700; color:#64748b; display:block; margin-bottom:10px;">
                                 Select Type / 유형 / เลือกรูปแบบ
                             </label>
-                            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
+                            <div class="submit-type-grid">
                                 <button class="type-btn active" data-type="case" onclick="selectSubmissionType('case')"
                                         style="padding:20px; background:linear-gradient(135deg, #4361ee, #3a56d4); border:2px solid #4361ee; border-radius:14px; cursor:pointer; transition:all 0.3s ease; display:flex; flex-direction:column; align-items:center; gap:8px; font-weight:700; color:white; box-shadow:0 8px 20px rgba(67,97,238,0.3);">
                                     <i class="fa-solid fa-notes-medical" style="font-size:2em;"></i>
@@ -4728,6 +4733,11 @@
                                     <i class="fa-solid fa-link" style="font-size:2em;"></i>
                                     <div>Explore</div>
                                     <div style="font-size:0.75em; opacity:0.7;">탐색</div>
+                                </button>
+                                <button type="button" class="type-btn" data-type="event" onclick="selectSubmissionType('event')"
+                                    style="padding:20px; background:#f8f9fa; border:2px solid #e2e8f0; border-radius:14px; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:8px; font-weight:700; color:#64748b;">
+                                    <i class="fa-solid fa-calendar-days" style="font-size:2em;"></i><div>Event</div>
+                                    <div style="font-size:0.75em; opacity:0.7;">이벤트</div>
                                 </button>
                             </div>
 
@@ -4856,6 +4866,21 @@
                                 <input type="hidden" id="sl-type" value="line_man">
                                 <div id="sl-type-chips" style="display:flex; gap:6px;"></div>
                             </div>
+                        </div>
+                        <div id="event-form-section" class="form-section lang-no-toggle" style="display:none;">
+                            <p>สร้างกิจกรรมชวนเพื่อน · กลุ่มที่เห็น: <strong id="ue-group"></strong></p>
+                            <label for="ue-title">ชื่อกิจกรรม *</label>
+                            <input id="ue-title" type="text" maxlength="80" placeholder="ชวนไปทำอะไร">
+                            <label for="ue-date">วันที่ *</label>
+                            <input id="ue-date" type="date" oninput="schRenderInviteWhen('ue')">
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                                <div><label for="ue-start">เวลาเริ่ม</label><input id="ue-start" type="time" step="300" oninput="schRenderInviteWhen('ue')"></div>
+                                <div><label for="ue-end">เวลาจบ</label><input id="ue-end" type="time" step="300" oninput="schRenderInviteWhen('ue')"></div>
+                            </div>
+                            <div id="ue-when" aria-live="polite" style="color:#6d28d9; margin-top:6px;"></div>
+                            <label for="ue-location">สถานที่</label><input id="ue-location" type="text" maxlength="300">
+                            <label for="ue-join">ลิงก์เข้าร่วม</label><input id="ue-join" type="text" maxlength="300" placeholder="https://…">
+                            <p>ชื่อคุณจะแสดงบนกิจกรรม เหมือนการสร้างจาก Schedule</p>
                         </div>
                     </div>
 
@@ -13449,17 +13474,17 @@
         // renderEventWhen(): spells the weekday and month out, and always prints the
         // range on a 24h clock, so what the native picker paints as "02:00 PM" reads
         // here as 14:00 whatever the device is set to.
-        window.schRenderInviteWhen = function() {
-            const box = document.getElementById('sne-when');
+        window.schRenderInviteWhen = function(prefix = 'sne') {
+            const box = document.getElementById(prefix + '-when');
             if (!box) return;
-            const v = (document.getElementById('sne-date') || {}).value || '';
+            const v = (document.getElementById(prefix + '-date') || {}).value || '';
             const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
             if (!m) { box.textContent = ''; return; }
             // Local parts, never new Date(string) — that parses as UTC midnight and
             // lands on the previous day for Bangkok.
             const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-            const st = (document.getElementById('sne-start') || {}).value || '';
-            const en = (document.getElementById('sne-end') || {}).value || '';
+            const st = (document.getElementById(prefix + '-start') || {}).value || '';
+            const en = (document.getElementById(prefix + '-end') || {}).value || '';
             let out = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
             const t = (st && en) ? (st + '–' + en) : (st || en || '');
             if (t) out += ' · ' + t;
@@ -13467,28 +13492,24 @@
             box.textContent = out;
         };
 
-        window.schCreateSocialEvent = async function() {
-            const msg = document.getElementById('sne-msg');
-            const title = document.getElementById('sne-title').value.trim();
-            const date = document.getElementById('sne-date').value;
-            const start = document.getElementById('sne-start').value;
-            const end = document.getElementById('sne-end').value;
-            let location = document.getElementById('sne-location').value.trim();
-            let joinVia = document.getElementById('sne-join').value.trim();
+        async function createSocialEventFromForm(prefix) {
+            const title = document.getElementById(prefix + '-title').value.trim();
+            const date = document.getElementById(prefix + '-date').value;
+            const start = document.getElementById(prefix + '-start').value;
+            const end = document.getElementById(prefix + '-end').value;
+            let location = document.getElementById(prefix + '-location').value.trim();
+            let joinVia = document.getElementById(prefix + '-join').value.trim();
             // V97.50: a link pasted into "Where?" is a join link that landed in the wrong
             // field — move it rather than store it somewhere nothing can open it. The
             // 80-char cap on that input silently truncated long meeting URLs, so this
             // also stops the next one from being saved already broken.
             if (!joinVia && evIsUrl(location)) { joinVia = location; location = ''; }
-            if (!title) { msg.textContent = 'Give it a name ใส่ชื่อกิจกรรมด้วย'; return; }
-            if (!date) { msg.textContent = 'Pick a date เลือกวันที่'; return; }
-            if (start && end && end < start) { msg.textContent = 'The end time is before the start ครบเวลาจบก่อนเริ่ม'; return; }
+            if (!title) { throw new Error('Give it a name ใส่ชื่อกิจกรรมด้วย'); }
+            if (!date) { throw new Error('Pick a date เลือกวันที่'); }
+            if (start && end && end < start) { throw new Error('The end time is before the start ครบเวลาจบก่อนเริ่ม'); }
             const authUser = firebase.auth().currentUser;
-            if (!authUser) { msg.textContent = 'Still signing you in — try again กำลังเข้าสู่ระบบ'; return; }
+            if (!authUser) { throw new Error('Still signing you in — try again กำลังเข้าสู่ระบบ'); }
 
-            msg.style.color = '#64748b';
-            msg.textContent = 'Posting…';
-            try {
                 await db.collection('events').add({
                     // The rule reads BOTH of these. kind must be 'social' and createdByUid
                     // must be this caller, so an invite can never be posted in someone
@@ -13516,6 +13537,14 @@
                     targetGroups: [myGroup],
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
+        }
+
+        window.schCreateSocialEvent = async function() {
+            const msg = document.getElementById('sne-msg');
+            msg.style.color = '#64748b';
+            msg.textContent = 'Posting…';
+            try {
+                await createSocialEventFromForm('sne');
                 schToggleNewEvent(false);
                 if (typeof showToast === 'function') showToast('📣 Invite posted โพสต์แล้ว');
             } catch (e) {
@@ -22048,7 +22077,15 @@ async function archiveDoneCard(cardId) {
         let selectedSymptoms = [];
 
         function selectSubmissionType(type) {
+            if (document.getElementById('u-submit-btn').disabled) return;
             currentSubmissionType = type;
+            document.getElementById('event-form-section').style.display = type === 'event' ? 'block' : 'none';
+            document.getElementById('u-submit-btn').textContent = type === 'event' ? '📅 สร้างกิจกรรม' : '🚀 Submit ส่งงาน';
+            if (type === 'event') {
+                document.getElementById('ue-group').textContent = myGroup || '';
+                if (!document.getElementById('ue-date').value) document.getElementById('ue-date').value = getBangkokDateTimeParts().dateKey;
+                schRenderInviteWhen('ue');
+            }
             document.querySelectorAll('.type-btn').forEach(btn => {
                 const isActive = btn.dataset.type === type;
                 btn.classList.toggle('active', isActive);
@@ -22123,6 +22160,7 @@ async function archiveDoneCard(cardId) {
 
         async function submitUnified() {
             const submitBtn = document.getElementById('u-submit-btn');
+            if (submitBtn.disabled) return;
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังส่ง...';
             try {
@@ -22132,19 +22170,22 @@ async function archiveDoneCard(cardId) {
                     await submitUnifiedWork();
                 } else if (currentSubmissionType === 'explore_link') {
                     await submitLinkSuggestion();
+                } else if (currentSubmissionType === 'event') {
+                    await createSocialEventFromForm('ue');
+                    ['title','date','start','end','location','join'].forEach(key => document.getElementById('ue-' + key).value = '');
                 }
                 submitBtn.innerHTML = '✅ Success สำเร็จ!';
                 submitBtn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
                 setTimeout(() => {
                     closeUnifiedModal();
                     submitBtn.disabled = false;
-                    submitBtn.innerHTML = '🚀 Submit ส่งงาน';
+                    submitBtn.textContent = currentSubmissionType === 'event' ? '📅 สร้างกิจกรรม' : '🚀 Submit ส่งงาน';
                     submitBtn.style.background = '';
                 }, 2000);
             } catch (error) {
                 alert('Error: ' + error.message);
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = '🚀 Submit ส่งงาน';
+                submitBtn.textContent = currentSubmissionType === 'event' ? '📅 สร้างกิจกรรม' : '🚀 Submit ส่งงาน';
             }
         }
 
