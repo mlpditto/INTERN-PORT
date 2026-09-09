@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.89)</title>
+    <title>Nika Admin (V98.90)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -4490,6 +4490,10 @@
                     <div id="hub-filter-logs" onclick="setHubHistoryFilter('logs')" title="Show Logs only (📓 Daily Reflection + 🎓 Learning Note)" style="cursor:pointer; border-radius:999px; padding:4px 10px; font-size:0.78em; font-weight:800; transition:all 0.2s; display:inline-flex; align-items:center; gap:5px;"><span style="color:#94a3b8; text-transform:uppercase; font-size:0.85em;">L</span><b id="hub-dash-logs" style="color:#f43f5e;">0</b><small id="hub-dash-logs-count" style="font-size:0.85em; color:#94a3b8;">(0)</small><span id="hub-dash-logs-breakdown" style="font-size:0.78em; color:#94a3b8; font-weight:700; padding-left:4px; border-left:1px solid #e2e8f0; margin-left:2px;">📓 0 · 🎓 0</span></div>
                     <div id="hub-filter-bonus" onclick="setHubHistoryFilter('bonus')" title="Show Bonus only" style="cursor:pointer; border-radius:999px; padding:4px 10px; font-size:0.78em; font-weight:800; transition:all 0.2s; display:inline-flex; align-items:center; gap:5px;"><span style="color:#94a3b8; text-transform:uppercase; font-size:0.85em;">B</span><b id="hub-dash-bonus" style="color:#f59e0b;">0</b><small id="hub-dash-bonus-count" style="font-size:0.85em; color:#94a3b8;">(0)</small></div>
                     <div id="hub-filter-manual" onclick="setHubHistoryFilter('manual')" title="Show Manual only" style="cursor:pointer; border-radius:999px; padding:4px 10px; font-size:0.78em; font-weight:800; transition:all 0.2s; display:inline-flex; align-items:center; gap:5px;"><span style="color:#94a3b8; text-transform:uppercase; font-size:0.85em;">M</span><b id="hub-dash-manual" style="color:#8b5cf6;">0</b><small id="hub-dash-manual-count" style="font-size:0.85em; color:#94a3b8;">(0)</small></div>
+                    <!-- V98.90: daily_checkin rows add to the score but `dash` never counted
+                         them and no chip matched them, so they were reachable only under "All".
+                         Hidden when the user has none, same as the Beri chip. -->
+                    <div id="hub-filter-checkin" onclick="setHubHistoryFilter('checkin')" title="Show daily check-ins only" style="display:none; cursor:pointer; border-radius:999px; padding:4px 10px; font-size:0.78em; font-weight:800; transition:all 0.2s; align-items:center; gap:5px;"><span style="font-size:0.9em;">📍</span><b id="hub-dash-checkin" style="color:#0ea5e9;">0</b><small id="hub-dash-checkin-count" style="font-size:0.85em; color:#94a3b8;">(0)</small></div>
                     <!-- V98.26: Beri ledger — separate currency, kept out of the score total -->
                     <div id="hub-filter-beri" onclick="setHubHistoryFilter('beri')" title="Show Beri movements only" style="cursor:pointer; border-radius:999px; padding:4px 10px; font-size:0.78em; font-weight:800; transition:all 0.2s; display:inline-flex; align-items:center; gap:5px;"><span style="font-size:0.9em;">🪙</span><b id="hub-dash-beri" style="color:#c2410c;">0</b><small id="hub-dash-beri-count" style="font-size:0.85em; color:#94a3b8;">(0)</small></div>
                 </div>
@@ -47081,12 +47085,32 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             document.getElementById('hub-dash-logs-count').innerText = `(${dash.lc})`;
             const logsBreakdownEl = document.getElementById('hub-dash-logs-breakdown');
             if (logsBreakdownEl) logsBreakdownEl.innerText = `📓 ${(dash.logsDR || 0).toFixed(2)}/${dash.lcDR || 0} · 🎓 ${(dash.logsLN || 0).toFixed(2)}/${dash.lcLN || 0}`;
-            document.getElementById('hub-dash-bonus').innerText = dash.bonus.toFixed(2);
-            document.getElementById('hub-dash-bonus-count').innerText = `(${dash.bc})`;
+            // V98.90: B is derived from historyCache, not from `dash`. dash.bonus only ever
+            // took `+= 0.1` per quest receive and then had exactly that sum subtracted back
+            // out (`dash.bonus = Math.max(0, dash.bonus - questReceiveScore)`), plus a branch
+            // for `type === 'streak'` that no current writer emits — so it read 0.00 for
+            // everyone while real bonus rows (streak_bonus, case/product submit + review
+            // bonuses) sat in the list underneath it. Q/W/L/M still come from `dash`, which
+            // also feeds the score-breakdown popover.
+            const bonusRows = historyCache.filter(e => window.hubBucketOf(e) === 'bonus');
+            const bonusSum = bonusRows.reduce((s, e) => s + (Number(e.score) || 0), 0);
+            document.getElementById('hub-dash-bonus').innerText = bonusSum.toFixed(2);
+            document.getElementById('hub-dash-bonus-count').innerText = `(${bonusRows.length})`;
             document.getElementById('hub-dash-manual').innerText = dash.manual.toFixed(2);
             document.getElementById('hub-dash-manual-count').innerText = `(${dash.mc})`;
             // V98.26: Beri chip — net movement + count, computed from historyCache
             // (a separate currency, deliberately never folded into `dash`).
+            // V98.90: Check-in chip — same pattern as Beri (computed here, hidden when
+            // empty) because `dash` carries no counter for daily_checkin at all, even
+            // though those rows DO add to the score via addP.
+            const ciRows = historyCache.filter(e => window.hubBucketOf(e) === 'checkin');
+            const ciSum = ciRows.reduce((s, e) => s + (Number(e.score) || 0), 0);
+            const ciEl = document.getElementById('hub-dash-checkin');
+            const ciCntEl = document.getElementById('hub-dash-checkin-count');
+            const ciChip = document.getElementById('hub-filter-checkin');
+            if (ciEl) ciEl.innerText = ciSum.toFixed(2);
+            if (ciCntEl) ciCntEl.innerText = `(${ciRows.length})`;
+            if (ciChip) ciChip.style.display = ciRows.length ? 'inline-flex' : 'none';
             const beriRows = historyCache.filter(e => e.type === 'beri');
             const beriNet = beriRows.reduce((s, e) => s + (Number(e.beriAmount) || 0), 0);
             const beriEl = document.getElementById('hub-dash-beri');
@@ -47109,16 +47133,43 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             renderHubHistoryPage();
         };
 
+        // V98.90: ONE place that decides which chip a history row belongs to.
+        //
+        // The filter used to test `e.type` inline per chip, and the loader hands it the
+        // RAW `checkin_logs.type` (`const hubType = d.type === 'case_review_bonus' ? 'work'
+        // : (d.type || 'log')`), so every type the intern page or a Cloud Function writes
+        // that admin.html never named fell through all six chips and was reachable only
+        // under "All": daily_checkin, daily_decay, streak_bonus, morning_quiz_first_bonus,
+        // case_submit_bonus, product_submit_bonus, product_review_bonus, and the two
+        // *_review_revert types. The `bonus` chip in particular tested for `'streak'`,
+        // which no writer emits any more — the intern page writes `streak_bonus` — so B
+        // could only ever read 0.00.
+        //
+        // The `_bonus`/`_revert` suffix rules at the end are deliberate: they give any
+        // future type from either page a home instead of letting it disappear again.
+        window.hubBucketOf = function(e) {
+            const t = String((e && e.type) || '');
+            if (t === 'quiz') return 'quizzes';
+            if (t === 'work' || (e && e.isQuest) || t === 'quest') return 'works';
+            if (t === 'reflective_log' || t === 'reflective_bonus' || t === 'learning_note') return 'logs';
+            // daily_decay is a negative check-in adjustment; `dash` already counts it
+            // under manual, so the chip and the rows now agree.
+            if (t === 'manual' || t === 'manual_adjust' || t === 'daily_decay') return 'manual';
+            if (t === 'beri') return 'beri';
+            if (t === 'daily_checkin') return 'checkin';
+            if (t === 'doc') return 'other';
+            // Quest rows already left via `works` above (they carry isQuest). Any leftover
+            // "Quest Bonus" text row stays out of B so a quest is not counted twice — the
+            // same exclusion the old inline `bonus` filter made.
+            if (t === 'bonus') return String((e && e.text) || '').includes('Quest Bonus') ? 'other' : 'bonus';
+            if (t === 'streak' || /_bonus$|_revert$/.test(t)) return 'bonus';
+            return 'other';
+        };
+
         function getHubFilteredHistory() {
             const mode = window._hubHistoryFilter || 'all';
             if (mode === 'all') return historyCache;
-            if (mode === 'quizzes') return historyCache.filter(e => e.type === 'quiz');
-            if (mode === 'works') return historyCache.filter(e => e.type === 'work' || e.isQuest);
-            if (mode === 'logs') return historyCache.filter(e => e.type === 'reflective_log' || e.type === 'reflective_bonus' || e.type === 'learning_note');
-            if (mode === 'bonus') return historyCache.filter(e => (e.type === 'bonus' && !e.isQuest && !String(e.text || '').includes('Quest Bonus')) || e.type === 'streak');
-            if (mode === 'manual') return historyCache.filter(e => e.type === 'manual' || e.type === 'manual_adjust');
-            if (mode === 'beri') return historyCache.filter(e => e.type === 'beri');
-            return historyCache;
+            return historyCache.filter(e => window.hubBucketOf(e) === mode);
         }
 
         function applyHubHistoryFilterUI() {
@@ -47129,6 +47180,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 logs: 'hub-filter-logs',
                 bonus: 'hub-filter-bonus',
                 manual: 'hub-filter-manual',
+                checkin: 'hub-filter-checkin',
                 beri: 'hub-filter-beri'
             };
             Object.entries(map).forEach(([key, elId]) => {
