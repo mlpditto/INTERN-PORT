@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.48)</title>
+    <title>Internship Portfolio (V97.49)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -13737,7 +13737,7 @@
                     + (evs ? ' — ' + evs + ' event' : '') + '"'
                     + ' style="aspect-ratio:1; border-radius:3px; display:flex; align-items:center; justify-content:center;'
                     + ' font-size:0.55em; font-weight:700; color:' + (n > 2 ? '#fff' : '#94a3b8') + ';'
-                    + ' background:' + bg + '; border:' + border + '; cursor:' + (n ? 'pointer' : 'default') + ';">'
+                    + ' background:' + bg + '; border:' + border + '; cursor:' + ((n || evs) ? 'pointer' : 'default') + ';">'
                     + day + '</div>';
             }
             html += '</div>';
@@ -14129,7 +14129,11 @@
                     icon: '📣',
                     title: (ev.title || 'Event') + (schMyEventInterests[ev.id] ? ' · ✓ requested' : ''),
                     due: due,
-                    act: () => schShowDay(ev.eventDate)
+                    // V97.49: the row expands the event's own card in place. It used to
+                    // call schShowDay, which draws into the Activity pane's
+                    // #sch-day-detail — invisible while the Agenda pane is the open one.
+                    eventId: ev.id,
+                    act: () => schToggleAgendaEvent(ev.id)
                 });
             });
 
@@ -14225,6 +14229,9 @@
             items.forEach(it => { (grouped[schBucketOf(it, now)] = grouped[schBucketOf(it, now)] || []).push(it); });
 
             let html = '';
+            // V97.49: handlers that are functions rather than strings of JS, bound after
+            // innerHTML below. Index into this is what data-schact carries.
+            const acts = [];
             SCH_BUCKETS.forEach(([key, label, color, bg, border]) => {
                 let list = grouped[key];
                 if (!list || !list.length) return;
@@ -14256,7 +14263,17 @@
                     + '</div>';
                 list.forEach(it => {
                     const when = schWhen(it, now);
-                    const click = it.act ? (' onclick="' + it.act + '"') : '';
+                    // V97.49: an act is either a string of JS (the original form, e.g.
+                    // 'gotoLog()') or a function. Concatenating a function into the
+                    // attribute yielded onclick="() => schShowDay(ev.eventDate)" — valid
+                    // JS that BUILDS an arrow and discards it, so every event row was
+                    // inert since V97.22 without a single console error to show for it.
+                    // Functions are bound as listeners now, so the two forms cannot
+                    // diverge silently again.
+                    const click = !it.act ? ''
+                        : (typeof it.act === 'function')
+                            ? (' data-schact="' + (acts.push(it.act) - 1) + '"')
+                            : (' onclick="' + it.act + '"');
                     // V97.06: the title span is SHIELDED. It renders admin-authored
                     // quiz/quest titles, which are often pure Thai — unshielded, the
                     // walker wrapped and hid them, so those rows rendered as a bare
@@ -14272,7 +14289,17 @@
                         + escapeHtml(it.title) + '</span>'
                         + (it.tag ? '<span style="flex:0 0 auto; font-size:0.82em; font-weight:800; color:' + color + ';">' + it.tag + '</span>' : '')
                         + (when ? '<span style="flex:0 0 auto; font-size:0.82em; color:#64748b; white-space:nowrap;">' + when + '</span>' : '')
+                        + (it.eventId ? '<span style="flex:0 0 auto; font-size:0.8em; color:#a78bfa;">'
+                            + (window._schOpenEventId === it.eventId ? '▴' : '▾') + '</span>' : '')
                         + '</div>';
+                    // The event's own card, opened under its row. Reuses schEventRowHtml
+                    // so Join / ✓ Requested / the join link have one renderer, and the
+                    // event_interests listener already re-renders this pane — joining
+                    // updates the open card with no extra wiring.
+                    if (it.eventId && window._schOpenEventId === it.eventId) {
+                        const ev = (schEventsCache || []).find(e => e.id === it.eventId);
+                        if (ev) html += '<div style="margin:-2px 0 8px;">' + schEventRowHtml(ev) + '</div>';
+                    }
                 });
                 if (hidden) {
                     html += '<div onclick="schToggleMissed()" style="text-align:center; font-size:0.7em; font-weight:800; color:'
@@ -14284,10 +14311,21 @@
                 }
             });
             box.innerHTML = html;
+            // An inline onclick can only name a global; a closure over `ev` is not one.
+            box.querySelectorAll('[data-schact]').forEach(el => {
+                const fn = acts[Number(el.getAttribute('data-schact'))];
+                if (fn) el.addEventListener('click', fn);
+            });
         }
 
         function schToggleMissed() {
             window._schMissedExpanded = !window._schMissedExpanded;
+            schRenderAgenda();
+        }
+
+        // V97.49: one open event at a time — the Agenda is a list, not a stack of cards.
+        function schToggleAgendaEvent(id) {
+            window._schOpenEventId = (window._schOpenEventId === id) ? null : id;
             schRenderAgenda();
         }
 
