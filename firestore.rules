@@ -326,7 +326,22 @@ service cloud.firestore {
     // refactor (out of scope for this hotfix).
     match /submissions/{docId} {
       allow read, create: if isSignedIn();
-      allow update: if isAdmin();
+      // V97.43: an intern may ASK for a reviewed Learning Note to be removed. They
+      // still cannot delete it (that is the rule below, gated on pending) because
+      // the +0.1 has already reached users.score and only admin deleteLearningNote
+      // knows how to revert it. This clause only lets them raise the flag:
+      //   - hasOnly() pins the write to the three request fields, so status, score,
+      //     pointsAwarded and adminComment stay admin-only.
+      //   - submissionType pins it to Learning Notes; other mirrors stay admin-only.
+      //   - ownership is read off the STORED doc, so this cannot flag someone else's.
+      allow update: if isAdmin()
+        || (isSignedIn()
+            && resource.data.submissionType == 'learning_note'
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['deleteRequestedAt', 'deleteRequestedBy', 'deleteRequestReason'])
+            && (resource.data.authUid == request.auth.uid
+                || resource.data.userId == request.auth.uid
+                || hasAuthLinkToUserId(resource.data.userId)));
       // V96.93: an intern may withdraw their OWN Learning Note, but only while it
       // is still untouched by review. Every clause matters:
       //   - submissionType pins this to Learning Notes; Quest/Work/Case mirrors
