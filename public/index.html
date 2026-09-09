@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V99.01)</title>
+    <title>Internship Portfolio (V99.02)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -631,21 +631,22 @@
         .profile-more-menu-item:hover { background: #f1f5f9; }
         .profile-more-menu-item i { width: 18px; text-align: center; }
 
-        /* V94.86: bump touch-target size in the profile-card Quick Actions
-           row from 28px to 40px on coarse-pointer devices (touch screens).
-           28px is well below WCAG AA (44px) and Apple HIG (44pt) minimums —
-           40px hits WCAG AAA and stays compact enough that the row still fits
-           on iPhone 17 Pro without forcing a 3rd wrap line. Mouse/trackpad
-           viewports keep the original 28px since pointer precision is fine.
-           Inline-style sizes need !important to override. */
+        /* Use 44px toolbar targets on touch devices; preserve compact mouse controls. */
         @media (pointer: coarse) {
             #profile-quick-actions .btn-sm,
             #profile-quick-actions .profile-more-menu > summary {
-                width: 40px !important;
-                height: 40px !important;
+                width: 44px !important;
+                height: 44px !important;
                 font-size: 0.95em !important;
             }
         }
+
+        #section-profile-combined button:focus-visible,
+        #section-profile-combined summary:focus-visible {
+            outline: 3px solid #1d4ed8;
+            outline-offset: 3px;
+        }
+        #daily-checkin-card button { min-height: 44px; }
 
         /* Grid-optimized card styling */
         #assignments-container .assignment-card {
@@ -2187,7 +2188,7 @@
                                      the `users` listener, which can fail with
                                      permission-denied, so anything rendered only by that
                                      listener is not a reliable doorway. -->
-                                <div onclick="schOpenFromHeader()" id="u-schedule-chip"
+                                <button type="button" onclick="schOpenFromHeader()" id="u-schedule-chip"
                                     style="display:inline-flex; align-items:center; gap:4px; background:#f5f3ff; padding:2px 7px; border-radius:5px; border:1px solid #ddd6fe; cursor:pointer;"
                                     title="Open Schedule" data-th-title="เปิดตารางฝึกงาน">
                                     <i class="fa-solid fa-calendar-days" style="color:#7c3aed; font-size:0.8em;"></i>
@@ -2199,7 +2200,7 @@
                                          can act on. -->
                                     <span id="u-schedule-badge"
                                         style="display:none; background:#7c3aed; color:#fff; font-size:0.82em; font-weight:800; border-radius:999px; padding:0 6px;"></span>
-                                </div>
+                                </button>
                                 <div id="date-alert" onclick="schFocusStartDate()"
                                     style="display:none; color:#e09f3e; font-size:0.95em; font-weight:bold; align-self:center; margin-left:2px; cursor:pointer;">
                                     <i class="fa-solid fa-circle-exclamation"></i> Please complete internship dates กรุณาระบุวันฝึกงานให้ครบ <span style="opacity:0.7;">›</span></div>
@@ -18242,12 +18243,12 @@
                 const rem = streak % CHECKIN_STREAK_BONUS_EVERY;
                 const left = CHECKIN_STREAK_BONUS_EVERY - rem;
                 hint = (rem === 0 && streak > 0)
-                    ? `🎁 ${streak}-day bonus ${bonus} earned!`
-                    : `${left} day${left === 1 ? '' : 's'} to your ${bonus} bonus`;
+                    ? `🎁 ทำกิจกรรมครบ ${streak} วัน ได้โบนัส ${bonus} คะแนนแล้ว`
+                    : `อีก ${left} วันถึงโบนัส ${bonus} คะแนน`;
             } else {
                 const projected = streak + 1;
-                if (projected % CHECKIN_STREAK_BONUS_EVERY === 0) hint = `🎁 Act today for a ${projected}-day bonus ${bonus}!`;
-                else hint = streak > 0 ? 'Do any activity to keep your streak' : 'Check in or log to start your streak';
+                if (projected % CHECKIN_STREAK_BONUS_EVERY === 0) hint = `🎁 ทำกิจกรรมวันนี้ให้ครบ ${projected} วัน เพื่อรับโบนัส ${bonus} คะแนน`;
+                else hint = streak > 0 ? 'ทำกิจกรรมวันนี้เพื่อรักษาความต่อเนื่อง' : 'เช็กอินหรือเขียน Log เพื่อเริ่มกิจกรรมต่อเนื่อง';
             }
 
             const checkDone = (myCheckin || {}).lastDate === todayKey;
@@ -18257,13 +18258,13 @@
             // V95.75: lean single-row card — time moved inline into the chip (was a
             // stacked caption row), 🔥+streak on one line, title+hint on one line,
             // tighter padding. ~63px → ~43px tall. `sub` = "last submitted" caption.
-            const doneChip = (icon, label, sub) => `<span title="${label} done today${sub ? ` · last ${sub}` : ''}" style="display:inline-flex; align-items:center; gap:4px; padding:5px 9px; border-radius:9px; background:#dcfce7; color:#15803d; font-weight:800; font-size:0.72em; white-space:nowrap;">${icon} ${label} ✓${sub ? `<span style="opacity:.65; margin-left:1px;">${sub}</span>` : ''}</span>`;
+            const doneChip = (icon, label, sub) => `<span title="${label}" style="display:inline-flex; align-items:center; gap:4px; padding:5px 9px; border-radius:9px; background:#dcfce7; color:#15803d; font-weight:800; font-size:0.72em; white-space:nowrap;">${icon} ${label} ✓${sub ? `<span style="opacity:.65; margin-left:1px;">${sub}</span>` : ''}</span>`;
             const actChip = (icon, label, fn, primary, id, sub) => `<button ${id ? `id="${id}" ` : ''}onclick="${fn}" title="${label}${sub ? ` · last ${sub}` : ''}" style="display:inline-flex; align-items:center; gap:4px; width:auto; padding:5px 10px; border-radius:9px; background:${primary ? 'linear-gradient(135deg,#f97316,#ea580c)' : '#fff7ed'}; color:${primary ? '#fff' : '#c2410c'}; border:${primary ? 'none' : '1px solid #fed7aa'}; font-weight:800; font-size:0.72em; cursor:pointer; white-space:nowrap;">${icon} ${label}${sub ? `<span style="opacity:.7; font-weight:700; margin-left:1px;">· ${sub}</span>` : ''}</button>`;
 
             const logCap = _activityChipCaption(_combinedLogCache(), [profileActivityState.logs, profileActivityState.notes]);
             const caseCap = _activityChipCaption(window.myCasesCache, [profileActivityState.cases]);
-            const chipCheck = checkDone ? doneChip('✅', 'Check in') : actChip('✅', 'Check in', 'tryDailyCheckin()', true, 'daily-checkin-btn');
-            const activityChip = (icon, label, action, fn, done, caption) => `<button type="button" onclick="${fn}" style="display:flex; flex-direction:column; align-items:flex-start; gap:3px; max-width:100%; padding:8px 10px; border-radius:9px; background:${done ? '#f0fdf4' : '#f8fafc'}; color:${done ? '#166534' : '#334155'}; border:1px solid ${done ? '#bbf7d0' : '#e2e8f0'}; cursor:pointer; text-align:left; white-space:normal;">
+            const chipCheck = checkDone ? doneChip('✅', 'เช็กอินแล้ววันนี้') : actChip('✅', 'เช็กอิน', 'tryDailyCheckin()', true, 'daily-checkin-btn');
+            const activityChip = (icon, label, action, fn, done, caption) => `<button aria-label="${action}${done ? ' เพิ่มเติม · ส่งแล้ววันนี้' : ''} · ${caption}" type="button" onclick="${fn}" style="display:flex; flex-direction:column; align-items:flex-start; gap:3px; max-width:100%; padding:8px 10px; border-radius:9px; background:${done ? '#f0fdf4' : '#f8fafc'}; color:${done ? '#166534' : '#334155'}; border:1px solid ${done ? '#bbf7d0' : '#e2e8f0'}; cursor:pointer; text-align:left; white-space:normal;">
                 <span style="font-weight:800; font-size:0.85em;">${icon} ${done ? label + ' · ส่งแล้ววันนี้ ✓' : action} ›</span>
                 <span style="font-size:0.72em;">${caption}</span>
             </button>`;
@@ -18283,7 +18284,7 @@
             // do it with.
             el.innerHTML = `
                 <div style="border-top:1px solid #e2e8f0; padding-top:6px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                    <div style="flex:1; min-width:110px; font-size:0.72em; font-weight:800; color:#9a3412; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${hint}</div>
+                    <div style="flex:1; min-width:110px; font-size:0.72em; font-weight:800; color:#9a3412; white-space:normal; overflow-wrap:anywhere;">${hint}</div>
                     <div style="display:flex; gap:6px; flex-wrap:wrap; min-width:0; max-width:100%; align-items:center;">${chipCheck}${chipLog}${chipCase}</div>
                 </div>`;
 
