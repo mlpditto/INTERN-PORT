@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.47)</title>
+    <title>Internship Portfolio (V97.48)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -13573,10 +13573,48 @@
                     ${mine ? `<button type="button" onclick="schDeleteMyEvent('${e.id}')" title="Delete your invite" style="width:auto; min-height:0; padding:3px 8px; font-size:0.68em; font-weight:700; border:1px solid #fecaca; background:#fff; color:#b91c1c; border-radius:999px; cursor:pointer;">Delete</button>` : ''}
                     ${btn}
                 </div>
-                <div style="font-size:0.68em; color:#94a3b8; margin-top:3px;">${escapeHtml(e.eventDate || '')}${e.timeText ? ' · ' + escapeHtml(e.timeText) : ''}${e.location ? ' · 📍 ' + escapeHtml(e.location) : ''}${e.joinVia ? ' · ' + escapeHtml(e.joinVia) : ''}</div>
+                <div style="font-size:0.68em; color:#94a3b8; margin-top:3px;">${escapeHtml(e.eventDate || '')}${e.timeText ? ' · ' + escapeHtml(e.timeText) : ''}${e.location ? ' · 📍 ' + escapeHtml(e.location) : ''}</div>
+                    ${evJoinHtml(e.joinVia, '#7c3aed')}
                 ${e.kind === 'social' ? `<div style="font-size:0.66em; color:#7c3aed; margin-top:3px; font-weight:700;">invited by ${escapeHtml(e.createdByName || 'a colleague')}</div>` : ''}
                 ${e.description ? `<div style="font-size:0.7em; color:#475569; margin-top:3px;">${escapeHtml(e.description)}</div>` : ''}
             </div>`;
+        }
+
+        // V97.48: a join value is usually a pasted meeting URL, and both pages rendered it
+        // as plain escaped text — so "click it easily" meant selecting and copying it.
+        // Render a real button when it is one, and name the platform from the host so
+        // nothing extra has to be typed or stored. DERIVED at render, not a new field: no
+        // schema or rules change, and it works retroactively on every event already
+        // posted, admin-created ones included.
+        function evJoinPlatform(host) {
+            host = String(host || '').toLowerCase();
+            if (host.indexOf('zoom.us') >= 0) return '\u{1F3A5} Zoom';
+            if (host.indexOf('teams.microsoft.com') >= 0 || host.indexOf('teams.live.com') >= 0) return '\u{1F4BC} Teams';
+            if (host.indexOf('meet.google.com') >= 0) return '\u{1F4F9} Meet';
+            if (host.indexOf('line.me') >= 0) return '\u{1F49A} LINE';
+            if (host.indexOf('webex.com') >= 0) return '\u{1F4E1} Webex';
+            if (host.indexOf('youtube.com') >= 0 || host.indexOf('youtu.be') >= 0) return '\u25B6\uFE0F YouTube';
+            return '\u{1F517} Join';
+        }
+
+        // A button for an http(s) link, otherwise the text as-is ("ON24", "room 3").
+        // ONLY http/https ever becomes an anchor — a javascript: value stays inert text.
+        function evJoinHtml(joinVia, accent) {
+            var raw = String(joinVia || '').trim();
+            if (!raw) return '';
+            var url = null;
+            try { var u = new URL(raw); if (u.protocol === 'http:' || u.protocol === 'https:') url = u; } catch (e) { url = null; }
+            // Sits outside the small meta line now, so it carries its own size.
+            if (!url) return '<span style="display:inline-block; margin-top:3px; font-size:0.68em; color:#64748b;">\u00b7 '
+                + escapeHtml(raw) + '</span>';
+            // Deliberately a SECONDARY chip: the card already carries a solid "Join"
+            // button, and that one means "I want to come" — a second solid pill next to
+            // it would read as the same action. Tinted, so it reads as the link it is.
+            return '<a href="' + escapeHtml(url.href) + '" target="_blank" rel="noopener noreferrer"'
+                + ' onclick="event.stopPropagation();"'
+                + ' style="display:inline-flex; align-items:center; gap:4px; margin-top:4px; padding:3px 10px; border-radius:999px;'
+                + ' background:#f5f3ff; border:1px solid #ddd6fe; color:' + accent + '; font-size:0.7em; font-weight:800; text-decoration:none;">'
+                + evJoinPlatform(url.hostname) + '</a>';
         }
 
         function schBuildDayMap() {

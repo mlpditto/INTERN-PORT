@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V98.96)</title>
+    <title>Nika Admin (V98.97)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -53280,6 +53280,41 @@ Save it anyway?`;
             }
         }
 
+        // V98.97: mirror of the intern page's helper (index.html) — the two files are
+        // SEPARATE documents, so this is a deliberate copy, not an import. A join value is
+        // usually a pasted meeting URL and was rendered as plain escaped text on both
+        // sides. DERIVED at render, not a new field: no schema or rules change, and it
+        // works retroactively on every event already posted.
+        function evJoinPlatform(host) {
+            host = String(host || '').toLowerCase();
+            if (host.indexOf('zoom.us') >= 0) return '\u{1F3A5} Zoom';
+            if (host.indexOf('teams.microsoft.com') >= 0 || host.indexOf('teams.live.com') >= 0) return '\u{1F4BC} Teams';
+            if (host.indexOf('meet.google.com') >= 0) return '\u{1F4F9} Meet';
+            if (host.indexOf('line.me') >= 0) return '\u{1F49A} LINE';
+            if (host.indexOf('webex.com') >= 0) return '\u{1F4E1} Webex';
+            if (host.indexOf('youtube.com') >= 0 || host.indexOf('youtu.be') >= 0) return '\u25B6\uFE0F YouTube';
+            return '\u{1F517} Join';
+        }
+
+        // ONLY http/https ever becomes an anchor — a javascript: value stays inert text.
+        function evJoinHtml(joinVia, accent) {
+            var raw = String(joinVia || '').trim();
+            if (!raw) return '';
+            var url = null;
+            try { var u = new URL(raw); if (u.protocol === 'http:' || u.protocol === 'https:') url = u; } catch (e) { url = null; }
+            // Sits outside the small meta line now, so it carries its own size.
+            if (!url) return '<span style="display:inline-block; margin-top:3px; font-size:0.7em; color:#64748b;">\u2014 '
+                + escapeHtml(raw) + '</span>';
+            // Deliberately a SECONDARY chip: the card already carries a solid "Join"
+            // button, and that one means "I want to come" — a second solid pill next to
+            // it would read as the same action. Tinted, so it reads as the link it is.
+            return '<a href="' + escapeHtml(url.href) + '" target="_blank" rel="noopener noreferrer"'
+                + ' onclick="event.stopPropagation();"'
+                + ' style="display:inline-flex; align-items:center; gap:4px; margin-top:4px; padding:3px 10px; border-radius:999px;'
+                + ' background:#f5f3ff; border:1px solid #ddd6fe; color:' + accent + '; font-size:0.72em; font-weight:800; text-decoration:none;">'
+                + evJoinPlatform(url.hostname) + '</a>';
+        }
+
         function renderEventsList() {
             const box = document.getElementById('ev-list');
             if (!box) return;
@@ -53294,7 +53329,8 @@ Save it anyway?`;
                         <span style="font-size:0.72em; color:#64748b; white-space:nowrap;">${escapeHtml(e.eventDate)}${e.timeText ? ' · ' + escapeHtml(e.timeText) : ''}</span>
                         <button onclick="deleteEvent('${e.id}')" title="Delete this event" aria-label="Delete this event" style="width:auto; min-height:0; flex:0 0 auto; padding:0; font-size:0.95em; line-height:1; border:none; border-radius:6px; background:transparent; color:#b91c1c; cursor:pointer;">🗑️</button>
                     </div>
-                    <div style="font-size:0.7em; color:#94a3b8; margin-top:3px;">${(e.targetGroups || []).join(' · ')}${e.location ? ' · 📍 ' + escapeHtml(e.location) : ''}${e.joinVia ? ' — ' + escapeHtml(e.joinVia) : ''}</div>
+                    <div style="font-size:0.7em; color:#94a3b8; margin-top:3px;">${(e.targetGroups || []).join(' · ')}${e.location ? ' · 📍 ' + escapeHtml(e.location) : ''}</div>
+                        <div>${evJoinHtml(e.joinVia, '#7c3aed')}</div>
                     <div style="font-size:0.74em; color:#334155; margin-top:4px;">
                         <b>${people.length}</b> want to join${people.length ? ': ' + people.map(p => escapeHtml(p.displayName || p.userId)).join(', ') : ''}
                     </div>
