@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.41)</title>
+    <title>Internship Portfolio (V97.42)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -13938,7 +13938,7 @@
         }
 
         function schTypeIcon(t) {
-            return ({ case: '🩺', work: '📤', quiz: '📝', quest: '🎯', reflective: '📓', explore_link: '🔗', checkin: '✅' })[t] || '•';
+            return ({ case: '🩺', work: '📤', quiz: '📝', quest: '🎯', reflective: '📓', learning_note: '🎓', product: '🛒', explore_link: '🔗', checkin: '✅' })[t] || '•';
         }
 
         // ---- V97.04: Schedule — Agenda pane --------------------------------
@@ -21346,7 +21346,12 @@ async function archiveDoneCard(cardId) {
 
         // 🔥 [V91.62] Count submissions per type (for pill badges)
         function getUnifiedTypeCounts() {
-            const counts = { all: 0, case: 0, work: 0, quiz: 0, quest: 0, reflective: 0, explore_link: 0 };
+            // V97.42: learning_note and product were missing here. Both are written to
+            // `submissions` (a Journal note dual-writes one; the Product tab writes the
+            // other), so they DO reach the timeline — but `counts[s.submissionType]` was
+            // undefined for them, the guard below skipped them, and getFilteredUnifiedItems
+            // dropped them under every pill. They were reachable only under "All".
+            const counts = { all: 0, case: 0, work: 0, quiz: 0, quest: 0, reflective: 0, learning_note: 0, product: 0, explore_link: 0 };
             getUnifiedAllItems().forEach(s => {
                 counts.all++;
                 if (counts[s.submissionType] !== undefined) counts[s.submissionType]++;
@@ -21401,6 +21406,8 @@ async function archiveDoneCard(cardId) {
                 { key: 'quiz',       emoji: '🧠', label: 'Quiz / 퀴즈' },
                 { key: 'quest',      emoji: '⭐', label: 'Quest / 퀘스트' },
                 { key: 'reflective', emoji: '😊', label: 'Log / 로그' },
+                { key: 'learning_note', emoji: '🎓', label: 'Note / 노트' },
+                { key: 'product', emoji: '🛒', label: 'Product / 상품' },
                 { key: 'explore_link', emoji: '🔗', label: 'Link / 링크' }
             ];
             wrap.innerHTML = meta.map(m => {
@@ -21468,7 +21475,9 @@ async function archiveDoneCard(cardId) {
             if (filtered.length === 0) {
                 const typeLabels = {
                     case: '🏥 case', work: '📝 work', quiz: '🧠 quiz',
-                    quest: '⭐ quest', reflective: '😊 reflective log', explore_link: '🔗 explore link'
+                    quest: '⭐ quest', reflective: '😊 reflective log',
+                    learning_note: '🎓 learning note', product: '🛒 product',
+                    explore_link: '🔗 explore link'
                 };
                 let emptyTitle, emptyHint;
                 if (unifiedSearchQuery) {
@@ -21564,6 +21573,33 @@ async function archiveDoneCard(cardId) {
                             color: '#f39c12',
                             link: null,
                             detail: sub.metadata?.learningTools?.length > 0 ? `Tools: ${sub.metadata.learningTools.join(', ')}` : 'Daily reflection'
+                        };
+
+                    // V97.42: both used to fall through to `default`, which prints the raw
+                    // submissionType as the row's type text — so the new chips would have
+                    // filtered to rows labelled "learning_note" / "product".
+                    case 'learning_note':
+                        return {
+                            ...baseItem,
+                            title: `🎓 ${sub.title || 'Untitled Note'}`,
+                            type: 'Note 노트 / โน้ต',
+                            icon: 'fa-graduation-cap',
+                            color: '#7c3aed',
+                            link: null,
+                            detail: Array.isArray(sub.metadata?.tags) && sub.metadata.tags.length
+                                ? `Tags: ${sub.metadata.tags.join(', ')}`
+                                : 'Learning note'
+                        };
+
+                    case 'product':
+                        return {
+                            ...baseItem,
+                            title: `🛒 ${sub.title || 'Untitled Product'}`,
+                            type: 'Product 상품 / สินค้า',
+                            icon: 'fa-cart-shopping',
+                            color: '#16a34a',
+                            link: sub.metadata?.url || null,
+                            detail: 'Product listing'
                         };
 
                     case 'explore_link':
