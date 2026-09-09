@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V98.99)</title>
+    <title>Internship Portfolio (V99.00)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -18111,24 +18111,19 @@
             return latest;
         }
 
-        // V95.49: compact "last submitted" caption for the Log / Case chips.
-        function _lastActivityCaption(cache) {
-            const key = _lastActivityDateKey(cache);
-            if (!key) return 'never';
-            const todayKey = getBangkokDateTimeParts().dateKey;
-            if (key === todayKey) return 'today';
-            const days = Math.round(
-                (new Date(todayKey + 'T12:00:00Z') - new Date(key + 'T12:00:00Z')) / 86400000);
-            return days <= 1 ? '1d ago' : `${days}d ago`;
-        }
-
-        // V95.81: Daily Streak chip caption — total count + compact recency,
-        // e.g. "3 · 1d" (3 submissions, last 1 day ago). "0" when none yet.
-        function _activityChipCaption(cache) {
+        // Counts describe submitted activity, not a review queue.
+        const profileActivityState = { logs: 'loading', notes: 'loading', cases: 'loading' };
+        function _activityChipCaption(cache, states) {
+            if (states.includes('error')) return 'โหลดประวัติไม่สำเร็จ';
+            if (states.includes('loading')) return 'กำลังโหลดประวัติ…';
             const n = (cache || []).length;
-            if (n === 0) return '0';
-            const time = _lastActivityCaption(cache).replace(' ago', '');
-            return n + ' · ' + time;
+            if (n === 0) return 'ยังไม่เคยส่ง';
+            const key = _lastActivityDateKey(cache);
+            if (!key) return `ส่งแล้ว ${n} รายการ · ไม่ทราบวันที่ล่าสุด`;
+            const todayKey = getBangkokDateTimeParts().dateKey;
+            const days = Math.round((new Date(todayKey + 'T12:00:00Z') - new Date(key + 'T12:00:00Z')) / 86400000);
+            const last = days === 0 ? 'วันนี้' : days > 0 ? `${days} วันก่อน` : key;
+            return `ส่งแล้ว ${n} รายการ · ล่าสุด ${last}`;
         }
 
         // V95.88: the "📝 Log" activity = Daily Reflection + Learning Note. LN entries
@@ -18245,14 +18240,18 @@
             // V95.75: lean single-row card — time moved inline into the chip (was a
             // stacked caption row), 🔥+streak on one line, title+hint on one line,
             // tighter padding. ~63px → ~43px tall. `sub` = "last submitted" caption.
-            const doneChip = (icon, label, sub) => `<span title="${label} done today${sub ? ` · last ${sub}` : ''}" style="display:inline-flex; align-items:center; gap:4px; padding:5px 9px; border-radius:9px; background:#dcfce7; color:#15803d; font-weight:800; font-size:0.72em; white-space:nowrap;">${icon} ✓${sub ? `<span style="opacity:.65; margin-left:1px;">${sub}</span>` : ''}</span>`;
+            const doneChip = (icon, label, sub) => `<span title="${label} done today${sub ? ` · last ${sub}` : ''}" style="display:inline-flex; align-items:center; gap:4px; padding:5px 9px; border-radius:9px; background:#dcfce7; color:#15803d; font-weight:800; font-size:0.72em; white-space:nowrap;">${icon} ${label} ✓${sub ? `<span style="opacity:.65; margin-left:1px;">${sub}</span>` : ''}</span>`;
             const actChip = (icon, label, fn, primary, id, sub) => `<button ${id ? `id="${id}" ` : ''}onclick="${fn}" title="${label}${sub ? ` · last ${sub}` : ''}" style="display:inline-flex; align-items:center; gap:4px; width:auto; padding:5px 10px; border-radius:9px; background:${primary ? 'linear-gradient(135deg,#f97316,#ea580c)' : '#fff7ed'}; color:${primary ? '#fff' : '#c2410c'}; border:${primary ? 'none' : '1px solid #fed7aa'}; font-weight:800; font-size:0.72em; cursor:pointer; white-space:nowrap;">${icon} ${label}${sub ? `<span style="opacity:.7; font-weight:700; margin-left:1px;">· ${sub}</span>` : ''}</button>`;
 
-            const logCap = _activityChipCaption(_combinedLogCache()); // V95.88: Daily Reflection + Learning Note
-            const caseCap = _activityChipCaption(window.myCasesCache);
+            const logCap = _activityChipCaption(_combinedLogCache(), [profileActivityState.logs, profileActivityState.notes]);
+            const caseCap = _activityChipCaption(window.myCasesCache, [profileActivityState.cases]);
             const chipCheck = checkDone ? doneChip('✅', 'Check in') : actChip('✅', 'Check in', 'tryDailyCheckin()', true, 'daily-checkin-btn');
-            const chipLog = logDone ? doneChip('📝', 'Log', logCap) : actChip('📝', 'Log', 'gotoLog()', false, null, logCap);
-            const chipCase = caseDone ? doneChip('🩺', 'Case', caseCap) : actChip('🩺', 'Case', 'gotoCaseSubmit()', false, null, caseCap);
+            const activityChip = (icon, label, action, fn, done, caption) => `<button type="button" onclick="${fn}" style="display:flex; flex-direction:column; align-items:flex-start; gap:3px; max-width:100%; padding:8px 10px; border-radius:9px; background:${done ? '#f0fdf4' : '#f8fafc'}; color:${done ? '#166534' : '#334155'}; border:1px solid ${done ? '#bbf7d0' : '#e2e8f0'}; cursor:pointer; text-align:left; white-space:normal;">
+                <span style="font-weight:800; font-size:0.85em;">${icon} ${done ? label + ' · ส่งแล้ววันนี้ ✓' : action} ›</span>
+                <span style="font-size:0.72em;">${caption}</span>
+            </button>`;
+            const chipLog = activityChip('📝', 'Log', 'เขียน Log', 'gotoLog()', logDone, logCap);
+            const chipCase = activityChip('🩺', 'Case', 'ส่ง Case', 'gotoCaseSubmit()', caseDone, caseCap);
 
             // V97.52: the 🔥 count is the metrics rail's chip now, written from HERE because
             // this function owns computeEngagementStreak(). The rail used to print
@@ -18268,7 +18267,7 @@
             el.innerHTML = `
                 <div style="border-top:1px solid #e2e8f0; padding-top:6px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                     <div style="flex:1; min-width:110px; font-size:0.72em; font-weight:800; color:#9a3412; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${hint}</div>
-                    <div style="display:flex; gap:6px; flex-wrap:wrap; flex-shrink:0; align-items:center;">${chipCheck}${chipLog}${chipCase}</div>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; min-width:0; max-width:100%; align-items:center;">${chipCheck}${chipLog}${chipCase}</div>
                 </div>`;
 
             // V97.04: the Agenda's "Today" bucket is built from the SAME three
@@ -20679,6 +20678,7 @@ async function archiveDoneCard(cardId) {
                     myReflectiveLogsUnsub = null;
                 }
                 myReflectiveLogsUnsub = db.collection("reflective_logs").where("userId", "==", userId).onSnapshot(s => {
+                    profileActivityState.logs = 'ready';
                     window.myReflectiveLogsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                     renderHistory();
                     updateGrandLineDashboard();
@@ -20688,6 +20688,8 @@ async function archiveDoneCard(cardId) {
                     renderDailyCheckinCard(); // V95.45: log dates feed the unified streak
                 }, e => {
                     console.error("Error loading my reflective logs:", e);
+                    profileActivityState.logs = 'error';
+                    renderDailyCheckinCard();
                     if (e && e.code === 'permission-denied') notifyMissingFirebaseAuth('my reflective logs');
                 });
 
@@ -20695,6 +20697,7 @@ async function archiveDoneCard(cardId) {
                 if (myLpEntriesUnsub) { myLpEntriesUnsub(); myLpEntriesUnsub = null; }
                 myLpEntriesUnsub = db.collection('learning_path_entries').where('userId', '==', userId).onSnapshot(s => {
                     // V92.16: hide soft-deleted entries from the intern's view
+                    profileActivityState.notes = 'ready';
                     window.myLpEntriesCache = s.docs.map(d => ({ id: d.id, ...d.data() })).filter(e => !e.deleted);
                     if (typeof renderLnCounter === 'function') renderLnCounter();
                     if (typeof renderLnHistory === 'function') renderLnHistory();
@@ -20705,6 +20708,8 @@ async function archiveDoneCard(cardId) {
                     if (typeof updateMissionDoneBadge === 'function') updateMissionDoneBadge();
                 }, e => {
                     console.warn('Error loading my LN entries:', e);
+                    profileActivityState.notes = 'error';
+                    renderDailyCheckinCard();
                 });
             });
         }
@@ -23416,6 +23421,7 @@ async function archiveDoneCard(cardId) {
                     const bTs = b.timestamp && typeof b.timestamp.toMillis === 'function' ? b.timestamp.toMillis() : 0;
                     return bTs - aTs;
                 });
+                profileActivityState.cases = 'ready';
                 window.myCasesCache = cases;
                 renderCaseGrouped(cases);
                 renderCaseSystemCards(); // V94.79: refresh the per-system counters on the Log Case cards
@@ -23423,7 +23429,9 @@ async function archiveDoneCard(cardId) {
                 renderDailyCheckinCard(); // V95.45: case dates feed the unified streak
             }).catch(err => {
                 console.error("Failed to load cases:", err);
+                profileActivityState.cases = 'error';
                 window.myCasesCache = [];
+                renderDailyCheckinCard();
                 renderCaseGrouped([]);
             });
         }
