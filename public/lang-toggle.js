@@ -34,9 +34,19 @@
         return 'other';
     }
 
+    // V97.41: a closing bracket is never part of the run being hidden — it closes
+    // something the VISIBLE half opened. The backward expansion below stopped only
+    // at a letter, so `Activity (6 mo) · 활동 추이` rendered as `Activity (6 mo`,
+    // `time(s) ส่ง…` as `time(s`, and `Social (optional) ช่องทาง…` as
+    // `Social (optional`. Stopping here fixes the whole class instead of one call
+    // site at a time. Separators (space, ·, /, |, ,, -) still get absorbed, which
+    // is the behaviour this expansion exists for.
+    var BLOCK_ABSORB = ')]}';
+
     // Split text into chunks { lang, text }. KR/TH runs absorb preceding
-    // 'other' chars (whitespace, punctuation) up to the nearest alpha char,
-    // so when the span is hidden, no separator is left dangling.
+    // 'other' chars (whitespace, punctuation) up to the nearest alpha char
+    // or closing bracket, so when the span is hidden, no separator is left
+    // dangling and nothing belonging to the visible half goes with it.
     function splitByLang(text) {
         var n = text.length;
         if (!n) return [];
@@ -54,7 +64,8 @@
             if (marks[i] === 'kr' || marks[i] === 'th') {
                 var target = marks[i];
                 var j = i - 1;
-                while (j >= 0 && langs[j] === 'other' && marks[j] === null) {
+                while (j >= 0 && langs[j] === 'other' && marks[j] === null
+                       && BLOCK_ABSORB.indexOf(text[j]) === -1) {
                     marks[j] = target;
                     j--;
                 }
