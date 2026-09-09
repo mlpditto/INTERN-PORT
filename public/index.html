@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V99.05)</title>
+    <title>Internship Portfolio (V99.06)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -645,6 +645,26 @@
         #section-profile-combined summary:focus-visible {
             outline: 3px solid #1d4ed8;
             outline-offset: 3px;
+        }
+
+        .unified-metrics-bar.lean-activity { display:flex; flex-direction:row; flex-wrap:wrap; align-items:center; gap:8px; padding:6px 10px; }
+        .lean-activity #daily-checkin-card { flex:1; min-width:0; }
+        .activity-row, .activity-actions { display:flex; align-items:center; gap:6px; }
+        .activity-actions { margin-left:auto; }
+        .activity-row button, .activity-more { width:auto; min-height:44px; padding:6px 10px; margin:0; border:1px solid #e2e8f0; border-radius:8px; background:#fff; color:#334155; font-family:inherit; font-size:0.75em; white-space:nowrap; cursor:pointer; }
+        .activity-checked { color:#15803d; font-size:0.75em; white-space:nowrap; }
+        .activity-hint { color:#9a3412; font-size:0.72em; }
+        .activity-more { min-width:44px; background:transparent; }
+        .activity-mobile { display:none; }
+        #activity-details { flex-basis:100%; min-width:0; border-top:1px solid #e2e8f0; padding-top:8px; }
+        #activity-details[hidden] { display:none; }
+        #activity-history { font-size:0.75em; overflow-wrap:anywhere; }
+        #activity-history p { margin:0 0 6px; }
+        @media(max-width:700px) {
+            .activity-desktop { display:none !important; }
+            .activity-mobile { display:inline; }
+            .activity-row button { padding:6px 8px; }
+            .lean-activity { gap:4px !important; }
         }
         #daily-checkin-card button { width:auto; min-height:44px; font-family:inherit; }
         #u-schedule-chip { width:auto; min-height:30px; font-family:inherit; font-size:inherit; }
@@ -2275,7 +2295,16 @@
                      the first place. Measured on the real markup: 172px → 340px wide,
                      204px → 141px tall for the pair. -->
                 <!-- 🔥 Unified Metrics Bar (V91.38) - Combines KPI + Voyage Metrics -->
-                <div class="unified-metrics-bar">
+                <div class="unified-metrics-bar lean-activity">
+                    <div id="daily-checkin-card" class="lang-no-toggle"></div>
+                    <button type="button" class="activity-more" aria-label="รายละเอียดกิจกรรม" aria-expanded="false" aria-controls="activity-details" onclick="const panel=document.getElementById('activity-details'); panel.hidden=!panel.hidden; this.setAttribute('aria-expanded', String(!panel.hidden));">⋯</button>
+                    <div id="activity-details" hidden>
+                    <div id="activity-history" class="lang-no-toggle"></div>
+                    <span class="metric-badge badge-cert" id="badge-cert">
+                            <i class="fa-solid fa-certificate"></i>
+                            <span id="badge-cert-text">คะแนนสะสมเพื่อใบรับรอง</span>
+                            <span class="badge-progress-mini"><span id="badge-cert-bar" style="width:0%"></span></span>
+                    </span>
                     <!-- Left: Compact Badges -->
                     <div class="metrics-badges">
                         <!-- V97.52: 🔥 comes back to the rail. V95.45 had moved it down into
@@ -2300,11 +2329,7 @@
                             <span id="badge-rank-text">Lv.1</span>
                             <span class="badge-progress-mini"><span id="badge-rank-bar" style="width:0%"></span></span>
                         </span>
-                        <span class="metric-badge badge-cert" id="badge-cert">
-                            <i class="fa-solid fa-certificate"></i>
-                            <span id="badge-cert-text">คะแนนสะสมเพื่อใบรับรอง</span>
-                            <span class="badge-progress-mini"><span id="badge-cert-bar" style="width:0%"></span></span>
-                        </span>
+
                         <!-- V97.52: the two lifetime counters used to be a second row of
                              their own, with icons and a divider, beside a "— Today" chip
                              that said what 💰 +0.00 next to it already said. They are
@@ -2327,7 +2352,7 @@
                          bar's second row now; renderDailyCheckinCard() fills it and no
                          longer draws a shell or repeats the words "Daily Streak" (the 🔥
                          chip above says it). -->
-                    <div id="daily-checkin-card" class="lang-no-toggle"></div>
+                    </div>
                 </div>
 
                 <!-- V97.34: the full-width "🔒 Request Certificate (Score: 14.0)" bar used to
@@ -18297,19 +18322,10 @@
             const logDone = _activityDoneToday(_combinedLogCache()); // V95.88: Daily Reflection OR Learning Note
             const caseDone = _activityDoneToday(window.myCasesCache);
 
-            // V95.75: lean single-row card — time moved inline into the chip (was a
-            // stacked caption row), 🔥+streak on one line, title+hint on one line,
-            // tighter padding. ~63px → ~43px tall. `sub` = "last submitted" caption.
-            const doneChip = (icon, label, sub) => `<span title="${label}" style="display:inline-flex; align-items:center; gap:4px; padding:5px 9px; border-radius:9px; background:#dcfce7; color:#15803d; font-weight:800; font-size:0.72em; white-space:nowrap;">${icon} ${label} ✓${sub ? `<span style="opacity:.65; margin-left:1px;">${sub}</span>` : ''}</span>`;
-            const actChip = (icon, label, fn, primary, id, sub) => `<button ${id ? `id="${id}" ` : ''}onclick="${fn}" title="${label}${sub ? ` · last ${sub}` : ''}" style="display:inline-flex; align-items:center; gap:4px; width:auto; padding:5px 10px; border-radius:9px; background:${primary ? 'linear-gradient(135deg,#f97316,#ea580c)' : '#fff7ed'}; color:${primary ? '#fff' : '#c2410c'}; border:${primary ? 'none' : '1px solid #fed7aa'}; font-weight:800; font-size:0.72em; cursor:pointer; white-space:nowrap;">${icon} ${label}${sub ? `<span style="opacity:.7; font-weight:700; margin-left:1px;">· ${sub}</span>` : ''}</button>`;
-
             const logCap = _activityChipCaption(_combinedLogCache(), [profileActivityState.logs, profileActivityState.notes]);
             const caseCap = _activityChipCaption(window.myCasesCache, [profileActivityState.cases]);
-            const chipCheck = checkDone ? doneChip('✅', 'เช็กอินแล้ววันนี้') : actChip('✅', 'เช็กอิน', 'tryDailyCheckin()', true, 'daily-checkin-btn');
-            const activityChip = (icon, label, action, fn, done, caption) => `<button aria-label="${action}${done ? ' เพิ่มเติม · ส่งแล้ววันนี้' : ''} · ${caption}" type="button" onclick="${fn}" style="display:flex; flex-direction:column; align-items:flex-start; gap:3px; width:auto; max-width:100%; padding:6px 10px; border-radius:9px; background:${done ? '#f0fdf4' : '#f8fafc'}; color:${done ? '#166534' : '#334155'}; border:1px solid ${done ? '#bbf7d0' : '#e2e8f0'}; cursor:pointer; text-align:left; white-space:normal;">
-                <span style="font-weight:800; font-size:0.85em;">${icon} ${done ? label + ' · ส่งแล้ววันนี้ ✓' : action} ›</span>
-                <span style="font-size:0.72em;">${caption}</span>
-            </button>`;
+            const chipCheck = checkDone ? '<span class="activity-checked">✓ <span class="activity-desktop">เช็กอินแล้ว</span><span class="activity-mobile">วันนี้</span></span>' : '<button type="button" id="daily-checkin-btn" onclick="tryDailyCheckin()">เช็กอิน</button>';
+            const activityChip = (icon, label, action, fn, done, caption) => `<button aria-label="${action}${done ? ' เพิ่มเติม · ส่งแล้ววันนี้' : ''} · ${caption}" type="button" onclick="${fn}"><span class="activity-desktop">${icon} ${action}</span><span class="activity-mobile">${label}</span>${done ? ' ✓' : ''}</button>`;
             const chipLog = activityChip('📝', 'Log', 'เขียน Log', 'gotoLog()', logDone, logCap);
             const chipCase = activityChip('🩺', 'Case', 'ส่ง Case', 'gotoCaseSubmit()', caseDone, caseCap);
 
@@ -18320,15 +18336,9 @@
             const fireChip = document.getElementById('badge-streak');
             if (fireChip) fireChip.innerHTML = `<i class="fa-solid fa-fire"></i> กิจกรรมต่อเนื่อง ${streak} วัน`;
 
-            // V97.52: no shell and no "Daily Streak" caption — this is the second row of the
-            // metrics bar, and the 🔥 chip on the row above already names the subject. What is
-            // left is the pair that earns its space: what happens next, and the three chips to
-            // do it with.
-            el.innerHTML = `
-                <div style="border-top:1px solid #e2e8f0; padding-top:6px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                    <div style="flex:1; min-width:110px; font-size:0.72em; font-weight:800; color:#9a3412; white-space:normal; overflow-wrap:anywhere;">${hint}</div>
-                    <div style="display:flex; gap:6px; flex-wrap:wrap; min-width:0; max-width:100%; align-items:center;">${chipCheck}${chipLog}${chipCase}</div>
-                </div>`;
+            el.innerHTML = `<div class="activity-row">${chipCheck}<span class="activity-hint activity-desktop">${hint}</span><div class="activity-actions">${chipLog}${chipCase}</div></div>`;
+            const history = document.getElementById('activity-history');
+            if (history) history.innerHTML = `<p>${hint}</p><p>Log: ${logCap}${logDone ? ' · ส่งแล้ววันนี้ ✓' : ''}</p><p>Case: ${caseCap}${caseDone ? ' · ส่งแล้ววันนี้ ✓' : ''}</p>`;
 
             // V97.04: the Agenda's "Today" bucket is built from the SAME three
             // predicates as the chips above, so refresh it on the same trigger —
