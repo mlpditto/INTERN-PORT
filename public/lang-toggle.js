@@ -43,6 +43,22 @@
     // is the behaviour this expansion exists for.
     var BLOCK_ABSORB = ')]}';
 
+    // V97.44: a full stop that closes a Latin word closes the VISIBLE sentence, so it
+    // must not go with the run being hidden — `…describes you, in general. 20 ข้อ…`
+    // was losing its period, `HN / Case No. 환자번호` its `No.`, `Saving... 가는 중`
+    // its ellipsis. Returns true when text[i] is such a stop.
+    //
+    // Deliberately keyed on a LETTER, not on any character: `0.5 คะแนน` has its dot
+    // between two digits and belongs to the hidden Thai phrase, so a decimal point is
+    // still absorbed exactly as before. Consecutive dots are walked as one unit so an
+    // ellipsis survives whole rather than losing two of its three dots.
+    function isSentenceStop(text, langs, i) {
+        if (text[i] !== '.') return false;
+        var k = i;
+        while (k >= 0 && text[k] === '.') k--;
+        return k >= 0 && langs[k] === 'alpha';
+    }
+
     // Split text into chunks { lang, text }. KR/TH runs absorb preceding
     // 'other' chars (whitespace, punctuation) up to the nearest alpha char
     // or closing bracket, so when the span is hidden, no separator is left
@@ -65,9 +81,29 @@
                 var target = marks[i];
                 var j = i - 1;
                 while (j >= 0 && langs[j] === 'other' && marks[j] === null
-                       && BLOCK_ABSORB.indexOf(text[j]) === -1) {
+                       && BLOCK_ABSORB.indexOf(text[j]) === -1
+                       && !isSentenceStop(text, langs, j)) {
                     marks[j] = target;
                     j--;
+                }
+            }
+        }
+
+        // V97.44: forward expand — claim a SINGLE trailing full stop, the one that closes
+        // the run's own sentence. The expansion above only ever ran backward, so
+        // `…prompt. · 안전 … 합니다.` left the Korean sentence's period behind. That was
+        // invisible while the English period was being eaten (the leftover stood in for
+        // it); the moment isSentenceStop kept the English one, the two showed up together
+        // as `prompt..`.
+        //
+        // Exactly one dot, never an ellipsis: in `🚀 Logging in กำลังเข้าสู่ระบบ...` the
+        // `...` is a progress marker the ENGLISH half wants too, and swallowing it left
+        // a bare `🚀 Logging in`. A lone '.' terminates one sentence; '...' is shared.
+        for (i = 0; i < n; i++) {
+            if (marks[i] === 'kr' || marks[i] === 'th') {
+                var f = i + 1;
+                if (f < n && text[f] === '.' && marks[f] === null && text[f + 1] !== '.') {
+                    marks[f] = marks[i];
                 }
             }
         }
