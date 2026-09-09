@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.45)</title>
+    <title>Internship Portfolio (V97.46)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -13949,12 +13949,18 @@
         // Agenda can never advertise something the Mission list would hide.
         // ⚠️ loadAllQuests() caps questsCache at 20 docs, so a quest older than
         // the 20 most recent will not appear here either.
-        const SCH_MISSED_VISIBLE = 5;   // V97.06: the live page had 63 missed rows, oldest 199 days
+        // V97.46: Missed reads LAST and starts collapsed. V97.06 capped it to 5 rows for
+        // exactly this reason ("buried Today and This week under a wall no one can act
+        // on") but left it first, which still cost a header + 5 rows + the expander
+        // before Today — on a list that only ever grows, since `it.due < now` has no
+        // floor beyond the enrolment anchor. The agenda now reads forward in time and
+        // keeps the backward-looking section as an appendix; the count badge is
+        // unchanged, so nothing is hidden, and a tap still opens the full list.
         const SCH_BUCKETS = [
-            ['missed', 'Missed พลาดแล้ว', '#991b1b', '#fef2f2', '#fecaca'],
             ['today', 'Today วันนี้', '#9a3412', '#fff7ed', '#fed7aa'],
             ['week', 'This week สัปดาห์นี้', '#1d4ed8', '#eff6ff', '#bfdbfe'],
-            ['later', 'Later ถัดไป', '#475569', '#f8fafc', '#e2e8f0']
+            ['later', 'Later ถัดไป', '#475569', '#f8fafc', '#e2e8f0'],
+            ['missed', 'Missed พลาดแล้ว', '#991b1b', '#fef2f2', '#fecaca']
         ];
 
         function schRel(ms) {
@@ -14151,17 +14157,17 @@
                 const sortKey = it => (it.opens && it.opens > now) ? it.opens : (it.due || it.opens || 0);
                 list.sort((a, b) => sortKey(a) - sortKey(b));
 
-                // V97.06: Missed reads newest-first and is capped. The first live run
-                // produced 63 rows going back 199 days — every quiz whose deadline had
-                // ever passed — which buried Today and This week under a wall no one
-                // can act on. The badge still counts them all; the list shows the most
-                // recent few and hides the rest behind a tap.
+                // V97.46: Missed reads newest-first and is collapsed to its header until
+                // tapped. The first live run produced 63 rows going back 199 days — every
+                // quiz whose deadline had ever passed. Expanding shows all of them rather
+                // than the old first-five-then-more, since the section now sits last and
+                // buries nothing.
                 let hidden = 0;
                 if (key === 'missed') {
                     list = list.slice().reverse();
-                    if (!window._schMissedExpanded && list.length > SCH_MISSED_VISIBLE) {
-                        hidden = list.length - SCH_MISSED_VISIBLE;
-                        list = list.slice(0, SCH_MISSED_VISIBLE);
+                    if (!window._schMissedExpanded) {
+                        hidden = list.length;
+                        list = [];
                     }
                 }
                 const badgeCount = (grouped[key] || list).length;
@@ -14194,8 +14200,8 @@
                 if (hidden) {
                     html += '<div onclick="schToggleMissed()" style="text-align:center; font-size:0.7em; font-weight:800; color:'
                         + color + '; padding:4px 0 2px; cursor:pointer; opacity:0.85;">'
-                        + 'Show ' + hidden + ' older ดูที่พลาดไปก่อนหน้า ›</div>';
-                } else if (key === 'missed' && window._schMissedExpanded && (grouped[key] || []).length > SCH_MISSED_VISIBLE) {
+                        + 'Show ' + hidden + ' missed ดูรายการที่พลาด ›</div>';
+                } else if (key === 'missed' && window._schMissedExpanded && (grouped[key] || []).length) {
                     html += '<div onclick="schToggleMissed()" style="text-align:center; font-size:0.7em; font-weight:800; color:'
                         + color + '; padding:4px 0 2px; cursor:pointer; opacity:0.85;">Show less ย่อกลับ ›</div>';
                 }
