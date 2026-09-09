@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.50)</title>
+    <title>Internship Portfolio (V97.51)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -14224,7 +14224,15 @@
                 const due = asDate(q.deadline), opens = asDate(q.startTime);
                 if (!due && !(opens && opens > now)) return;
                 if (closedBeforeMe(due)) return;               // closed before this intern arrived
-                out.push({ icon: '📝', title: q.title || 'Quiz แบบทดสอบ', due: due, opens: opens, act: openMission });
+                // V97.51: the row itself still opens the Kanban board — `quizId` adds a ▶
+                // that starts THIS quiz, which is what the row was already naming. Not set
+                // for a quiz that has not opened yet: runQuiz() refuses one anyway
+                // (an alert at its startTime gate), but a button that can only say no is
+                // worse than no button.
+                out.push({
+                    icon: '📝', title: q.title || 'Quiz แบบทดสอบ', due: due, opens: opens, act: openMission,
+                    quizId: (opens && opens > now) ? '' : q.id
+                });
             });
 
             // V97.22: announced events. The Agenda is where UPCOMING things live, and it
@@ -14402,6 +14410,18 @@
                         + (when ? '<span style="flex:0 0 auto; font-size:0.82em; color:#64748b; white-space:nowrap;">' + when + '</span>' : '')
                         + (it.eventId ? '<span style="flex:0 0 auto; font-size:0.8em; color:#a78bfa;">'
                             + (window._schOpenEventId === it.eventId ? '▴' : '▾') + '</span>' : '')
+                        // V97.51: start the quiz the row is naming. confirmRunQuiz is the
+                        // same entry the Browse modal uses, and every rule lives BELOW it
+                        // in runQuiz() — the 09:00-21:00 window and its ×0.95, the
+                        // unlockScore gate, "not opened yet", and the resume/abandoned
+                        // branch — so this shortcut cannot skip one. stopPropagation keeps
+                        // the row's own click (which opens the board) from firing too.
+                        // width/min-height are pinned against the global button rule.
+                        + (it.quizId ? '<button type="button" onclick="event.stopPropagation(); confirmRunQuiz(\''
+                            + it.quizId + '\')" title="Start this quiz" data-th-title="เริ่มทำข้อสอบนี้"'
+                            + ' aria-label="Start this quiz" data-th-aria-label="เริ่มทำข้อสอบนี้"'
+                            + ' style="flex:0 0 auto; width:auto; min-height:0; padding:3px 9px; border:none; border-radius:999px;'
+                            + ' background:#4361ee; color:#fff; font-size:0.8em; line-height:1.3; cursor:pointer;">▶</button>' : '')
                         + '</div>';
                     // The event's own card, opened under its row. Reuses schEventRowHtml
                     // so Join / ✓ Requested / the join link have one renderer, and the
