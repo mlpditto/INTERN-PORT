@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V97.49)</title>
+    <title>Internship Portfolio (V97.50)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5558,7 +5558,10 @@
                 <input type="time" id="sne-end" lang="en-GB" step="300" oninput="schRenderInviteWhen()" style="flex:1; min-width:0; padding:7px; border:1px solid #ddd6fe; border-radius:7px; box-sizing:border-box; font-size:0.74em;">
             </div>
             <div id="sne-when" style="font-size:0.7em; font-weight:700; color:#7c3aed; min-height:1.1em; margin-bottom:5px;"></div>
-            <input type="text" id="sne-location" maxlength="80" placeholder="Where? ที่ไหน"
+            <!-- V97.50: 80 chars was a place name's worth, and a pasted Zoom URL is longer
+                 than that — it was cut mid-query-string and stored already dead. Matched to
+                 the join field's 300 so a misplaced link survives to be moved there. -->
+            <input type="text" id="sne-location" maxlength="300" placeholder="Where? ที่ไหน"
                 style="width:100%; padding:7px; border:1px solid #ddd6fe; border-radius:7px; box-sizing:border-box; font-size:0.76em; margin-bottom:5px;">
             <!-- V97.47: `joinVia` already existed on the event doc — the admin form has
                  written it since the Events track shipped, and this one hardcoded ''. So
@@ -13505,8 +13508,13 @@
             const date = document.getElementById('sne-date').value;
             const start = document.getElementById('sne-start').value;
             const end = document.getElementById('sne-end').value;
-            const location = document.getElementById('sne-location').value.trim();
-            const joinVia = document.getElementById('sne-join').value.trim();
+            let location = document.getElementById('sne-location').value.trim();
+            let joinVia = document.getElementById('sne-join').value.trim();
+            // V97.50: a link pasted into "Where?" is a join link that landed in the wrong
+            // field — move it rather than store it somewhere nothing can open it. The
+            // 80-char cap on that input silently truncated long meeting URLs, so this
+            // also stops the next one from being saved already broken.
+            if (!joinVia && evIsUrl(location)) { joinVia = location; location = ''; }
             if (!title) { msg.textContent = 'Give it a name ใส่ชื่อกิจกรรมด้วย'; return; }
             if (!date) { msg.textContent = 'Pick a date เลือกวันที่'; return; }
             if (start && end && end < start) { msg.textContent = 'The end time is before the start ครบเวลาจบก่อนเริ่ม'; return; }
@@ -13524,6 +13532,10 @@
                     createdByUid: authUser.uid,
                     userId: userId,
                     createdByName: (typeof userProfile !== 'undefined' && userProfile.displayName) || '',
+                    // V97.50: the LINE avatar, denormalized for the same reason the name
+                    // is — nobody reading this card can open the poster's users/ doc.
+                    // The rules pin `kind` and `createdByUid` only, so no rules change.
+                    createdByPicture: (typeof userProfile !== 'undefined' && userProfile.pictureUrl) || '',
                     title,
                     eventDate: date,
                     startTime: start || '',
@@ -13553,7 +13565,30 @@
             catch (e) { alert('Could not delete: ' + (e.message || e)); }
         };
 
-        function schEventRowHtml(e) {
+        // V97.50: the poster's face instead of a line that spells their name. The picture
+        // has to travel ON the event doc: an intern cannot read another intern's users/
+        // doc (the rules deny the whole collection — see myOwnRow), so there is nothing
+        // here to look a URL up in. Invites posted before V97.50 carry no picture, which
+        // is what the initial-letter circle is for. https only, so a stored value can
+        // never turn into a javascript: or data: src.
+        function schEventAvatarHtml(e) {
+            const name = String(e.createdByName || '').trim();
+            const pic = String(e.createdByPicture || '').trim();
+            const t = ' title="' + escapeHtml(name || 'a colleague') + '"';
+            if (/^https:\/\//i.test(pic)) {
+                return '<img src="' + escapeHtml(pic) + '" alt="' + escapeHtml(name) + '"' + t
+                    + ' style="flex:0 0 auto; width:22px; height:22px; border-radius:50%; object-fit:cover; background:#ede9fe;">';
+            }
+            return '<span' + t + ' style="flex:0 0 auto; width:22px; height:22px; border-radius:50%; background:#ede9fe;'
+                + ' color:#5b21b6; font-size:0.6em; font-weight:800; display:flex; align-items:center; justify-content:center;">'
+                + escapeHtml(name ? name.charAt(0).toUpperCase() : '?') + '</span>';
+        }
+
+        // opts.hideTitle: the Agenda gags the title because the row this card opens under
+        // already prints it (V97.49) — the two sat one line apart. The day popup passes
+        // nothing and keeps its title, since there is no row above it there.
+        function schEventRowHtml(e, opts) {
+            opts = opts || {};
             const joined = !!schMyEventInterests[e.id];
             // V97.32: an intern-created invite is the user's own only when the STORED
             // createdByUid matches this session's anonymous auth uid — the same identity
@@ -13561,21 +13596,38 @@
             // be refused.
             const _au = firebase.auth().currentUser;
             const mine = e.kind === 'social' && _au && e.createdByUid === _au.uid;
-            const btn = joined
-                ? `<button type="button" onclick="schLeaveEvent('${e.id}')" style="width:auto; min-height:0; padding:3px 10px; font-size:0.68em; font-weight:700; border:1px solid #bbf7d0; background:#f0fdf4; color:#15803d; border-radius:999px; cursor:pointer;">✓ Requested</button>`
-                : `<button type="button" onclick="schJoinEvent('${e.id}')" style="width:auto; min-height:0; padding:3px 10px; font-size:0.68em; font-weight:700; border:none; background:#7c3aed; color:#fff; border-radius:999px; cursor:pointer;">Join</button>`;
+            // V97.50: the person who posted it is already going — a Join button on your
+            // own invite asks you to request a seat at your own table.
+            const btn = mine
+                ? `<span style="flex:0 0 auto; font-size:0.62em; font-weight:800; color:#7c3aed;">yours</span>`
+                : joined
+                    ? `<button type="button" onclick="schLeaveEvent('${e.id}')" style="width:auto; min-height:0; padding:3px 10px; font-size:0.68em; font-weight:700; border:1px solid #bbf7d0; background:#f0fdf4; color:#15803d; border-radius:999px; cursor:pointer;">✓ Requested</button>`
+                    : `<button type="button" onclick="schJoinEvent('${e.id}')" style="width:auto; min-height:0; padding:3px 10px; font-size:0.68em; font-weight:700; border:none; background:#7c3aed; color:#fff; border-radius:999px; cursor:pointer;">Join</button>`;
+            // V97.50: an icon — the word "Delete" took as much room as the title beside
+            // it. schDeleteMyEvent still asks confirm() before anything is removed.
+            const del = mine
+                ? `<button type="button" onclick="schDeleteMyEvent('${e.id}')" title="Delete your invite" data-th-title="ลบกิจกรรมของคุณ" aria-label="Delete your invite" data-th-aria-label="ลบกิจกรรมของคุณ" style="width:auto; min-height:0; padding:3px 7px; font-size:0.74em; line-height:1; border:1px solid #fecaca; background:#fff; color:#b91c1c; border-radius:999px; cursor:pointer;">🗑</button>`
+                : '';
+            // A location that is really a pasted URL is dropped from this line and shown
+            // as a chip below instead (evEventLinksHtml).
+            const when = escapeHtml(e.eventDate || '')
+                + (e.timeText ? ' · ' + escapeHtml(e.timeText) : '')
+                + ((e.location && !evIsUrl(e.location)) ? ' · 📍 ' + escapeHtml(e.location) : '');
+            const lead = opts.hideTitle
+                ? `<span style="flex:1; min-width:0; font-size:0.68em; color:#64748b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${when}</span>`
+                : `<span style="flex:1; min-width:0; font-size:0.76em; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(e.title || '')}</span>`;
             // V97.23: lang-no-toggle — the title, join channel and description are typed
             // by an admin and are usually Thai. Unshielded, lang-toggle.js wraps each Thai
             // run in .lang-th and the EN-default page hides it, leaving only the Latin half.
             return `<div class="lang-no-toggle" style="padding:7px 9px; background:#faf5ff; border:1px solid #f3e8ff; border-radius:8px; margin-bottom:5px;">
                 <div style="display:flex; align-items:center; gap:7px;">
-                    <span style="flex:1; min-width:0; font-size:0.76em; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${e.kind === 'social' ? '🧑\u200d🤝\u200d🧑' : '📣'} ${escapeHtml(e.title || '')}</span>
-                    ${mine ? `<button type="button" onclick="schDeleteMyEvent('${e.id}')" title="Delete your invite" style="width:auto; min-height:0; padding:3px 8px; font-size:0.68em; font-weight:700; border:1px solid #fecaca; background:#fff; color:#b91c1c; border-radius:999px; cursor:pointer;">Delete</button>` : ''}
+                    ${e.kind === 'social' ? schEventAvatarHtml(e) : '<span style="flex:0 0 auto;">📣</span>'}
+                    ${lead}
+                    ${del}
                     ${btn}
                 </div>
-                <div style="font-size:0.68em; color:#94a3b8; margin-top:3px;">${escapeHtml(e.eventDate || '')}${e.timeText ? ' · ' + escapeHtml(e.timeText) : ''}${e.location ? ' · 📍 ' + escapeHtml(e.location) : ''}</div>
-                    ${evJoinHtml(e.joinVia, '#7c3aed')}
-                ${e.kind === 'social' ? `<div style="font-size:0.66em; color:#7c3aed; margin-top:3px; font-weight:700;">invited by ${escapeHtml(e.createdByName || 'a colleague')}</div>` : ''}
+                ${opts.hideTitle ? '' : `<div style="font-size:0.68em; color:#94a3b8; margin-top:3px;">${when}</div>`}
+                ${evEventLinksHtml(e, '#7c3aed')}
                 ${e.description ? `<div style="font-size:0.7em; color:#475569; margin-top:3px;">${escapeHtml(e.description)}</div>` : ''}
             </div>`;
         }
@@ -13610,11 +13662,70 @@
             // Deliberately a SECONDARY chip: the card already carries a solid "Join"
             // button, and that one means "I want to come" — a second solid pill next to
             // it would read as the same action. Tinted, so it reads as the link it is.
+            // V97.50: the copy button carries the URL through encodeURIComponent — a raw
+            // href in an onclick attribute breaks on the first apostrophe in a query
+            // string, and a meeting link is all query string.
+            var arg = encodeURIComponent(url.href).replace(/'/g, '%27');
             return '<a href="' + escapeHtml(url.href) + '" target="_blank" rel="noopener noreferrer"'
                 + ' onclick="event.stopPropagation();"'
                 + ' style="display:inline-flex; align-items:center; gap:4px; margin-top:4px; padding:3px 10px; border-radius:999px;'
                 + ' background:#f5f3ff; border:1px solid #ddd6fe; color:' + accent + '; font-size:0.7em; font-weight:800; text-decoration:none;">'
-                + evJoinPlatform(url.hostname) + '</a>';
+                + evJoinPlatform(url.hostname) + '</a>'
+                + '<button type="button" onclick="event.stopPropagation(); evCopyLink(decodeURIComponent(\'' + arg + '\'))"'
+                + ' title="Copy the link" data-th-title="คัดลอกลิงก์" aria-label="Copy the link" data-th-aria-label="คัดลอกลิงก์"'
+                + ' style="width:auto; min-height:0; margin-top:4px; padding:3px 8px; border-radius:999px;'
+                + ' background:#f5f3ff; border:1px solid #ddd6fe; color:' + accent + '; font-size:0.7em; line-height:1.4; cursor:pointer;">\u{1F4CB}</button>';
+        }
+
+        function evIsUrl(v) {
+            try {
+                var u = new URL(String(v || '').trim());
+                return u.protocol === 'http:' || u.protocol === 'https:';
+            } catch (e) { return false; }
+        }
+
+        // V97.50: the meeting URL lands in "Where?" as often as in "How to join" — the
+        // form only stopped inviting that mistake in V97.47, and every invite posted
+        // before it still holds the link in `location`, where it rendered as plain
+        // unclickable text. Whichever field holds a URL becomes a chip; the two are
+        // de-duped when they hold the same one.
+        function evEventLinksHtml(e, accent) {
+            var join = String((e && e.joinVia) || '').trim();
+            var loc = String((e && e.location) || '').trim();
+            var html = evJoinHtml(join, accent);
+            if (loc && loc !== join && evIsUrl(loc)) html += evJoinHtml(loc, accent);
+            if (!html) return '';
+            return '<div style="display:flex; align-items:center; flex-wrap:wrap; gap:5px;">' + html + '</div>';
+        }
+
+        // V97.50: opening a link is not the same as having it — a Zoom URL usually has to
+        // be pasted into a desktop client or a calendar. The chip opens, this copies.
+        // execCommand is the fallback: navigator.clipboard is missing in some LINE
+        // WebView builds even though the page is served over https.
+        window.evCopyLink = function(url) {
+            var done = function() {
+                if (typeof showToast === 'function') showToast('\u{1F517} Link copied คัดลอกลิงก์แล้ว');
+            };
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(url).then(done, function() { evCopyFallback(url, done); });
+                    return;
+                }
+            } catch (e) { /* fall through */ }
+            evCopyFallback(url, done);
+        };
+
+        function evCopyFallback(url, done) {
+            var ta = document.createElement('textarea');
+            ta.value = url;
+            ta.setAttribute('readonly', '');
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); done(); }
+            catch (e) { prompt('Copy this link คัดลอกลิงก์นี้', url); }
+            document.body.removeChild(ta);
         }
 
         function schBuildDayMap() {
@@ -14006,7 +14117,7 @@
             const head = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
             box.innerHTML = '<div style="font-size:0.78em; font-weight:800; color:#7c3aed; margin-bottom:7px;">'
                 + head + ' · ' + items.length + ' entries</div>'
-                + events.map(schEventRowHtml).join('')
+                + events.map(function (ev) { return schEventRowHtml(ev); }).join('')
                 + items.map(it => '<div style="display:flex; align-items:center; gap:7px; padding:5px 8px; background:#faf5ff; border:1px solid #f3e8ff; border-radius:7px; margin-bottom:5px; font-size:0.75em;">'
                     + '<span style="flex:0 0 auto;">' + schTypeIcon(it.submissionType) + '</span>'
                     + '<span class="lang-no-toggle" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">'
@@ -14298,7 +14409,8 @@
                     // updates the open card with no extra wiring.
                     if (it.eventId && window._schOpenEventId === it.eventId) {
                         const ev = (schEventsCache || []).find(e => e.id === it.eventId);
-                        if (ev) html += '<div style="margin:-2px 0 8px;">' + schEventRowHtml(ev) + '</div>';
+                        // hideTitle: the row directly above already printed the title.
+                        if (ev) html += '<div style="margin:-2px 0 8px;">' + schEventRowHtml(ev, { hideTitle: true }) + '</div>';
                     }
                 });
                 if (hidden) {
