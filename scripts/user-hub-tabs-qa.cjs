@@ -1,0 +1,15 @@
+const fs = require('node:fs');
+const vm = require('node:vm');
+const assert = require('node:assert/strict');
+const html = fs.readFileSync('public/admin.html', 'utf8');
+const nodes = {};
+const context = { document: { getElementById: id => nodes[id] ||= { hidden: false, value: 'unsaved', setAttribute(k, v) { this[k] = v; } } } };
+vm.createContext(context);
+vm.runInContext(html.slice(html.indexOf('        function switchGsTab('), html.indexOf('        function setUserGroup(')), context);
+context.switchGsTab('profile');
+assert.equal(nodes['gs-pane-group'].hidden, true);
+assert.equal(nodes['gs-tab-profile']['aria-selected'], 'true');
+context.switchGsTab('group');
+assert.equal(nodes['gs-pane-profile'].hidden, true);
+assert.equal(nodes['gs-pane-profile'].value, 'unsaved');
+console.log('PASS: User Hub tabs switch without resetting panel state');
