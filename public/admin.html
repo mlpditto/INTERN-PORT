@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.17)</title>
+    <title>Nika Admin (V99.18)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -14963,6 +14963,44 @@
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:18px; flex-wrap:wrap;">
                 <button type="button" class="btn-sm" onclick="closeCaseReviewScoreModal(false)" style="min-width:96px; background:#e5e7eb; color:#374151; border:none; border-radius:12px; padding:10px 16px; font-weight:800;">Cancel</button>
                 <button type="button" class="btn-sm" onclick="closeCaseReviewScoreModal(true)" style="min-width:110px; background:linear-gradient(135deg,#f59e0b,#ea580c); color:#fff; border:none; border-radius:12px; padding:10px 18px; font-weight:900;">Save Score</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- V99.18: admin photo editor for Product listings (Alabasta → 🛒 Product). Opened by
+         tapping a row's photo; logic under the "admin photo editor" banner in the JS. -->
+    <div id="productPhotoModal" class="modal" style="z-index:4304;">
+        <div class="modal-content" style="max-width:460px;">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
+                <div style="font-size:1.05em; color:#92400e; font-weight:900;">Product photo · 상품 사진
+                    <div id="pp-product-name" class="lang-no-toggle" style="color:#78716c; font-weight:700; font-size:0.82em;"></div>
+                </div>
+                <button type="button" onclick="closeProductPhotoEditor()" aria-label="Close" style="width:auto; min-height:0; border:none; background:transparent; color:#475569; font-size:1.45em; line-height:1; cursor:pointer;">&times;</button>
+            </div>
+            <div style="margin-top:12px; border:1px solid #e2e8f0; border-radius:12px; background:#f8fafc; min-height:180px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+                <img id="pp-preview-img" alt="Product photo preview" style="max-width:100%; max-height:280px; display:none;">
+                <div id="pp-preview-empty" style="color:#94a3b8; font-size:0.85em;">🚫 No photo</div>
+            </div>
+            <div style="display:flex; justify-content:space-between; gap:8px; margin-top:6px; font-size:0.75em; color:#64748b;">
+                <span id="pp-meta" class="lang-no-toggle"></span>
+                <a id="pp-open-full" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">Open full size ↗</a>
+            </div>
+            <input type="file" id="pp-file-input" accept="image/*" style="display:none;" onchange="onProductPhotoFilePicked(event)">
+            <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+                <button type="button" class="btn-sm" onclick="document.getElementById('pp-file-input').click()" style="width:auto; min-height:0; background:#fff7ed; color:#9a3412; border:1px solid #fed7aa; border-radius:10px; padding:8px 14px; font-weight:800;">📤 Upload file</button>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:8px;">
+                <input type="url" id="pp-url-input" placeholder="https://… image link" style="margin:0; flex:1; min-width:0; border-radius:10px;" onkeydown="if(event.key==='Enter'){event.preventDefault();loadProductPhotoFromUrl();}">
+                <button type="button" class="btn-sm" onclick="loadProductPhotoFromUrl()" style="width:auto; min-height:0; background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; border-radius:10px; padding:8px 14px; font-weight:800;">🔗 Load</button>
+            </div>
+            <div id="pp-note" style="display:none; margin-top:8px; padding:8px 12px; border:1px solid; border-radius:10px; font-size:0.78em; line-height:1.5;"></div>
+            <button type="button" id="pp-aslink-btn" class="btn-sm" onclick="useProductPhotoLinkAsIs()" style="display:none; width:auto; min-height:0; margin-top:6px; background:#fff; color:#92400e; border:1px dashed #fcd34d; border-radius:10px; padding:6px 12px; font-weight:800;">Use the link as-is</button>
+            <div style="display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; align-items:center;">
+                <button type="button" id="pp-remove-btn" class="btn-sm" onclick="markProductPhotoRemove()" style="width:auto; min-height:0; background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; border-radius:10px; padding:8px 12px; font-weight:800;">🗑️ Remove photo</button>
+                <button type="button" id="pp-revert-btn" class="btn-sm" onclick="markProductPhotoRevert()" style="display:none; width:auto; min-height:0; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; border-radius:10px; padding:8px 12px; font-weight:800;">↩️ Intern's original</button>
+                <span style="flex:1;"></span>
+                <button type="button" class="btn-sm" onclick="closeProductPhotoEditor()" style="width:auto; min-height:0; background:#e5e7eb; color:#374151; border:none; border-radius:12px; padding:10px 16px; font-weight:800;">Cancel</button>
+                <button type="button" id="pp-save-btn" class="btn-sm" onclick="saveProductPhotoEdit()" style="width:auto; min-height:0; background:linear-gradient(135deg,#f59e0b,#ea580c); color:#fff; border:none; border-radius:12px; padding:10px 18px; font-weight:900;">Save</button>
             </div>
         </div>
     </div>
@@ -34174,9 +34212,15 @@ RULES:
                                 <div style="font-weight:700;">${safe(p.displayName || p.userId || '-')}</div>
                             </div>
                         </td>
-                        <td style="text-align:center;">${p.photoUrl
-                            ? `<a href="${safe(p.photoUrl)}" target="_blank" rel="noopener noreferrer" title="Open full size · 원본 열기"><img src="${safe(p.photoUrl)}" alt="" style="width:52px; height:52px; object-fit:cover; border-radius:8px; border:1px solid #e2e8f0; display:block;" loading="lazy"></a>`
-                            : `<span style="color:#cbd5e1; font-size:1.2em;" title="No photo · 사진 없음">🚫</span>`}</td>
+                        <td style="text-align:center;">
+                            <button type="button" onclick="openProductPhotoEditor('${safe(p.id)}')" title="Change photo · 사진 변경"
+                                style="position:relative; width:auto; min-height:0; padding:0; border:none; background:none; cursor:pointer;">${p.photoUrl
+                                ? `<img src="${safe(p.photoUrl)}" alt="" style="width:52px; height:52px; object-fit:cover; border-radius:8px; border:1px solid #e2e8f0; display:block;" loading="lazy">`
+                                : `<span style="display:flex; align-items:center; justify-content:center; width:52px; height:52px; border:1px dashed #cbd5e1; border-radius:8px; color:#94a3b8; font-size:0.72em; font-weight:800;">＋ Photo</span>`}
+                                <span style="position:absolute; right:-6px; bottom:-6px; background:#fff; border:1px solid #e2e8f0; border-radius:999px; font-size:0.62em; padding:1px 4px;">✏️</span>
+                            </button>
+                            ${p.photoEditedAt ? `<div style="font-size:0.62em; color:#b45309; font-weight:800; margin-top:4px;">edited</div>` : ''}
+                        </td>
                         <td class="lang-no-toggle">
                             <div style="font-weight:700;">${safe(p.name || '-')}</div>
                             ${p.packSize ? `<div style="font-size:0.78em; color:#64748b;">${safe(p.packSize)}</div>` : ''}
@@ -34193,6 +34237,268 @@ RULES:
                 `;
             }).join('');
         }
+
+        // ─── V99.18: admin photo editor ─────────────────────────────────────
+        // Replace / remove / revert an intern's product photo. New photos are copied
+        // into our own Storage (product-images/<sha256>.jpg, the path the intern upload
+        // uses) so the URL the CSV hands LINE MAN never dies. The old file is NOT
+        // deleted: paths are content-addressed, so another listing may share it.
+        const ADMIN_PRODUCT_PHOTO_MAX_DIM = 1280;
+        const ADMIN_PRODUCT_PHOTO_MAX_UPLOAD = 2 * 1024 * 1024;   // storage.rules cap
+        window.productPhotoEdit = null;
+
+        // Pure: the product_listings update + the log's from/to for one edit. The
+        // intern's ORIGINAL photo is captured on the first edit only, so a second
+        // replace can still revert to what the intern actually sent.
+        function buildProductPhotoUpdate(item, action, next) {
+            const cur = { url: item.photoUrl || '', path: item.photoPath || '' };
+            const hasOriginal = Object.prototype.hasOwnProperty.call(item, 'photoUrlOriginal');
+            const original = hasOriginal ? { url: item.photoUrlOriginal || '', path: item.photoPathOriginal || '' } : cur;
+            let to;
+            if (action === 'remove') to = { url: '', path: '' };
+            else if (action === 'revert') to = original;
+            else to = { url: (next && next.url) || '', path: (next && next.path) || '' };
+            const update = { photoUrl: to.url, photoPath: to.path };
+            if (!hasOriginal) {
+                update.photoUrlOriginal = cur.url;
+                update.photoPathOriginal = cur.path;
+            }
+            return { update, from: cur.url, to: to.url, changed: cur.url !== to.url };
+        }
+
+        // Same resize the intern form does: <=1280px JPEG keeps us under the 2 MB rule.
+        function resizeAdminProductPhoto(blob) {
+            return new Promise((resolve, reject) => {
+                const url = URL.createObjectURL(blob);
+                const img = new Image();
+                img.onload = () => {
+                    URL.revokeObjectURL(url);
+                    const scale = Math.min(1, ADMIN_PRODUCT_PHOTO_MAX_DIM / Math.max(img.width, img.height));
+                    const w = Math.max(1, Math.round(img.width * scale));
+                    const h = Math.max(1, Math.round(img.height * scale));
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w;
+                    canvas.height = h;
+                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                    canvas.toBlob(out => out ? resolve({ blob: out, width: w, height: h }) : reject(new Error('Canvas encode failed')), 'image/jpeg', 0.82);
+                };
+                img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Not a readable image')); };
+                img.src = url;
+            });
+        }
+
+        async function uploadAdminProductPhoto(blob) {
+            const hash = await window._sha256Hex(blob);
+            const path = `product-images/${hash}.jpg`;
+            const app = window.adminApp || firebase.app('admin');
+            const ref = app.storage().ref(path);
+            try {
+                return { url: await ref.getDownloadURL(), path };       // dedup hit — skip upload
+            } catch (probeErr) {
+                if (probeErr && probeErr.code !== 'storage/object-not-found') throw probeErr;
+                const snap = await ref.put(blob, { contentType: 'image/jpeg' });
+                return { url: await snap.ref.getDownloadURL(), path };
+            }
+        }
+
+        function ppSetNote(msg, kind) {
+            const el = document.getElementById('pp-note');
+            if (!el) return;
+            if (!msg) { el.style.display = 'none'; el.textContent = ''; return; }
+            const palette = {
+                warn: { bg: '#fffbeb', border: '#fcd34d', color: '#92400e' },
+                error: { bg: '#fef2f2', border: '#fecaca', color: '#b91c1c' }
+            }[kind] || { bg: '#eff6ff', border: '#bfdbfe', color: '#1e40af' };
+            el.style.display = 'block';
+            el.style.background = palette.bg;
+            el.style.borderColor = palette.border;
+            el.style.color = palette.color;
+            el.textContent = msg;
+        }
+
+        function ppClearObjectUrl() {
+            const s = window.productPhotoEdit;
+            if (s && s.objectUrl) { URL.revokeObjectURL(s.objectUrl); s.objectUrl = ''; }
+        }
+
+        function ppRender() {
+            const s = window.productPhotoEdit;
+            if (!s) return;
+            const img = document.getElementById('pp-preview-img');
+            if (s.previewUrl) img.src = s.previewUrl; else img.removeAttribute('src');
+            img.style.display = s.previewUrl ? 'block' : 'none';
+            document.getElementById('pp-preview-empty').style.display = s.previewUrl ? 'none' : 'block';
+            document.getElementById('pp-meta').textContent = s.meta || '';
+            const full = document.getElementById('pp-open-full');
+            const isHosted = /^https:\/\//.test(s.previewUrl || '');
+            full.style.display = isHosted ? '' : 'none';
+            if (isHosted) full.href = s.previewUrl;
+            const item = s.item;
+            const hasOriginal = Object.prototype.hasOwnProperty.call(item, 'photoUrlOriginal');
+            document.getElementById('pp-revert-btn').style.display =
+                (hasOriginal && (item.photoUrlOriginal || '') !== (item.photoUrl || '') && s.action !== 'revert') ? '' : 'none';
+            document.getElementById('pp-remove-btn').style.display = s.previewUrl ? '' : 'none';
+            document.getElementById('pp-aslink-btn').style.display = s.linkCandidate ? '' : 'none';
+            const save = document.getElementById('pp-save-btn');
+            save.disabled = !s.action;
+            save.style.opacity = s.action ? '1' : '0.5';
+            save.style.cursor = s.action ? 'pointer' : 'not-allowed';
+        }
+
+        function openProductPhotoEditor(productDocId) {
+            const item = (productListingsData || []).find(p => p.id === productDocId);
+            if (!item) { alert('Product not found'); return; }
+            ppClearObjectUrl();
+            window.productPhotoEdit = {
+                item, action: null, blob: null, next: null, objectUrl: '', linkCandidate: '',
+                previewUrl: item.photoUrl || '',
+                meta: item.photoUrl ? (item.photoEditedAt ? 'Current photo (edited by admin)' : "Current photo (intern's)") : 'No photo yet'
+            };
+            document.getElementById('pp-product-name').textContent = item.name || productDocId;
+            document.getElementById('pp-url-input').value = '';
+            document.getElementById('pp-save-btn').textContent = 'Save';
+            ppSetNote('', '');
+            ppRender();
+            forceShowModal('productPhotoModal');
+        }
+
+        function closeProductPhotoEditor() {
+            ppClearObjectUrl();
+            window.productPhotoEdit = null;
+            forceHideModal('productPhotoModal');
+        }
+
+        async function ppTakeImage(source, label) {
+            const s = window.productPhotoEdit;
+            if (!s) return;
+            if (!/^image\//.test(source.type || '')) throw new Error('That is not an image');
+            const { blob, width, height } = await resizeAdminProductPhoto(source);
+            if (blob.size > ADMIN_PRODUCT_PHOTO_MAX_UPLOAD) throw new Error('Still over 2 MB after resizing');
+            ppClearObjectUrl();
+            s.objectUrl = URL.createObjectURL(blob);
+            Object.assign(s, {
+                action: 'replace', blob, next: null, linkCandidate: '', previewUrl: s.objectUrl,
+                meta: `${label} · ${width}×${height} · ${(blob.size / 1024).toFixed(0)} KB`
+            });
+            ppRender();
+        }
+
+        async function onProductPhotoFilePicked(ev) {
+            const file = ev.target.files && ev.target.files[0];
+            ev.target.value = '';   // so re-picking the same file still fires change
+            if (!file) return;
+            if (file.size > 12 * 1024 * 1024) { ppSetNote('That file is too large to process.', 'error'); return; }
+            ppSetNote('', '');
+            try { await ppTakeImage(file, 'New upload'); }
+            catch (e) { ppSetNote('Could not use that file: ' + e.message, 'error'); }
+        }
+
+        async function loadProductPhotoFromUrl() {
+            const s = window.productPhotoEdit;
+            if (!s) return;
+            const url = (document.getElementById('pp-url-input').value || '').trim();
+            if (!/^https:\/\//i.test(url)) { ppSetNote('Paste a link that starts with https://', 'error'); return; }
+            ppSetNote('Loading…', 'info');
+            let fetched;
+            try {
+                const res = await fetch(url, { mode: 'cors' });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                fetched = await res.blob();
+            } catch (e) {
+                // Most shop and CDN sites block cross-site reads; an <img> can still show it.
+                s.linkCandidate = url;
+                ppSetNote('This site does not let us copy the image. Save it to your device and use Upload file, or use the link as-is (it breaks if that site removes the image).', 'warn');
+                ppRender();
+                return;
+            }
+            try {
+                await ppTakeImage(fetched, 'From link');
+                ppSetNote('Copied into our storage on Save, so the photo keeps working even if the link goes away.', 'info');
+            } catch (e) {
+                ppSetNote('That link did not give us an image: ' + e.message, 'error');
+            }
+        }
+
+        function useProductPhotoLinkAsIs() {
+            const s = window.productPhotoEdit;
+            if (!s || !s.linkCandidate) return;
+            ppClearObjectUrl();
+            Object.assign(s, {
+                action: 'replace', blob: null, next: { url: s.linkCandidate, path: '' },
+                previewUrl: s.linkCandidate, linkCandidate: '', meta: 'External link (not copied)'
+            });
+            ppSetNote('', '');
+            ppRender();
+        }
+
+        function markProductPhotoRemove() {
+            const s = window.productPhotoEdit;
+            if (!s) return;
+            ppClearObjectUrl();
+            Object.assign(s, { action: 'remove', blob: null, next: null, linkCandidate: '', previewUrl: '', meta: 'Photo will be removed on Save' });
+            ppSetNote('', '');
+            ppRender();
+        }
+
+        function markProductPhotoRevert() {
+            const s = window.productPhotoEdit;
+            if (!s) return;
+            ppClearObjectUrl();
+            Object.assign(s, {
+                action: 'revert', blob: null, next: null, linkCandidate: '',
+                previewUrl: s.item.photoUrlOriginal || '', meta: "Intern's original photo"
+            });
+            ppSetNote('', '');
+            ppRender();
+        }
+
+        async function saveProductPhotoEdit() {
+            const s = window.productPhotoEdit;
+            if (!s || !s.action) return;
+            const btn = document.getElementById('pp-save-btn');
+            btn.disabled = true;
+            btn.textContent = 'Saving…';
+            try {
+                let next = s.next;
+                if (s.action === 'replace' && s.blob) next = await uploadAdminProductPhoto(s.blob);
+                const { update, from, to, changed } = buildProductPhotoUpdate(s.item, s.action, next);
+                if (!changed) {
+                    closeProductPhotoEditor();
+                    if (typeof showToast === 'function') showToast('No change to the photo', 'info');
+                    return;
+                }
+                const editor = (typeof auth !== 'undefined' && auth.currentUser) || {};
+                const batch = db.batch();
+                batch.update(db.collection('product_listings').doc(s.item.id), {
+                    ...update,
+                    photoEditedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    photoEditedBy: editor.email || ALLOWED_EMAIL || 'admin'
+                });
+                // Keep the intern's Work History twin pointing at the same photo.
+                await stageSubmissionMirror(batch, s.item.id, { 'metadata.photoUrl': update.photoUrl, 'metadata.photoPath': update.photoPath });
+                await batch.commit();
+
+                const verb = s.action === 'remove' ? 'removed' : (s.action === 'revert' ? 'reverted' : 'replaced');
+                db.collection('admin_logs').add({
+                    userId: s.item.userId || '',
+                    action: 'product_photo_' + verb,
+                    details: { productDocId: s.item.id, name: s.item.name || '', from, to },
+                    reason: '',
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdByUid: editor.uid || null,
+                    createdByEmail: editor.email || ''
+                }).catch(e => console.error('admin_logs write failed (photo still saved):', e));
+
+                closeProductPhotoEditor();
+                if (typeof showToast === 'function') showToast(`Photo ${verb} · 사진 변경됨`, 'success');
+            } catch (e) {
+                console.error('saveProductPhotoEdit failed:', e);
+                ppSetNote('Save failed: ' + e.message, 'error');
+                btn.disabled = false;
+                btn.textContent = 'Save';
+            }
+        }
+        // ────────────────────────────────────────────────────────────────────
 
         // ─── CSV export (V97.59 Phase 3) ────────────────────────────────────
         // Placeholder column set: LINE MAN Mart's real bulk-upload template
