@@ -42,9 +42,9 @@ assert.match(elements['daily-checkin-card'].innerHTML, /กำลังโหล
 vm.runInContext("Object.keys(profileActivityState).forEach(k => profileActivityState[k] = 'ready')", ctx);
 ctx.renderDailyCheckinCard();
 assert.match(elements['daily-checkin-card'].innerHTML, /ยังไม่เคยส่ง/);
-assert.match(elements['daily-checkin-card'].innerHTML, /อีก 4 วันถึงโบนัส/);
+assert.match(elements['daily-checkin-card'].innerHTML, /Bonus \+0.05 · 4d/);
 logToday = true; ctx.renderDailyCheckinCard();
-assert.match(elements['daily-checkin-card'].innerHTML, /เขียน Log เพิ่มเติม · ส่งแล้ววันนี้/);
+assert.match(elements['daily-checkin-card'].innerHTML, /Log เพิ่มเติม · ส่งแล้ววันนี้/);
 const timeline = ctx.updateTimelineBar;
 for (const [start,end,profile,word] of [
     ['1988-11-08','2088-11-08',{notAnInternship:true},'ส่วนตัว'],
