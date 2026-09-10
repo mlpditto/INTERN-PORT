@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.13)</title>
+    <title>Nika Admin (V99.14)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -29243,6 +29243,7 @@ ${JSON.stringify(sourceObj)}`;
                     b.set(db.collection("checkin_logs").doc(), {
                         userId: att.userId,
                         type: 'quiz',
+                        quizId: att.quizId,
                         amount: pointsToAdd,
                         note: `Quiz Approved (All Correct): ${quiz.shortTitle || quiz.title || quiz.id}`,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
@@ -29321,6 +29322,7 @@ ${JSON.stringify(sourceObj)}`;
                     b.set(db.collection("checkin_logs").doc(), {
                         userId: att.userId,
                         type: 'quiz',
+                        quizId: att.quizId,
                         amount: pointsToAdd,
                         note: `Quiz Approved (Actual): ${curCorrect}/${totalQ} - ${quiz.shortTitle || quiz.title || quiz.id}`,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
@@ -46427,7 +46429,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     }
                     const hubType = d.type === 'case_review_bonus' ? 'work' : (d.type || 'log');
                     const hubText = d.type === 'case_review_bonus' ? `📁 ${d.note || 'Alabasta Case Review'}` : (d.note || '-');
-                    addP(d.timestamp, s, hubType, hubText, { docId: doc.id, source: 'checkin_logs', timeText: d.timeText || '' });
+                    addP(d.timestamp, s, hubType, hubText, { docId: doc.id, source: 'checkin_logs', taskKey: d.type === 'quiz' && d.quizId ? `quiz:${d.quizId}_${userId}` : '', timeText: d.timeText || '' });
                     if (d.type === 'streak') { dash.bonus += s; dash.bc++; }
                     else if (d.type === 'manual' || d.type === 'manual_adjust') { dash.manual += s; dash.mc++; }
                     else if (d.type === 'case_review_bonus') { dash.works += s; dash.wc++; }
@@ -46536,6 +46538,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         text: x.note || BERI_LEDGER_SOURCE_LABEL[x.source] || 'Beri',
                         beriAmount: Number(x.amount) || 0,
                         beriSource: x.source || '',
+                        taskKey: ['quiz_early_bird', 'quiz_deadline_buffer'].includes(x.source) && x.refId ? `quiz:${x.refId}` : '',
                         isBeri: true,
                         docId: doc.id
                     });
@@ -47368,6 +47371,22 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
         };
 
+        function groupHubHistoryEvents(logs) {
+            const groups = [], keyed = new Map();
+            logs.forEach(event => {
+                let group = event.taskKey && keyed.get(event.taskKey);
+                if (!group) {
+                    group = { events: [], points: 0, beri: 0 };
+                    groups.push(group);
+                    if (event.taskKey) keyed.set(event.taskKey, group);
+                }
+                group.events.push(event);
+                if (event.type === 'beri') group.beri += Number(event.beriAmount) || 0;
+                else if (event.type !== 'doc') group.points += Number(event.score) || 0;
+            });
+            return groups;
+        }
+
         window.renderHubHistoryPage = function() {
             const l = document.getElementById("hub-history-list");
             const pNav = document.getElementById("hub-history-pagination");
@@ -47385,15 +47404,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             
             const logsPerPage = 10; // V91.102: 10/page + no inner scroll for compact modal
             const s = (historyPage - 1) * logsPerPage;
-            const p = filteredLogs.slice(s, s + logsPerPage);
-            const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
+            const groups = groupHubHistoryEvents(filteredLogs);
+            const totalPages = Math.ceil(groups.length / logsPerPage);
+            historyPage = Math.max(1, Math.min(historyPage, totalPages || 1));
+            const p = groups.slice((historyPage - 1) * logsPerPage, historyPage * logsPerPage);
 
             if (filteredLogs.length === 0) {
                 l.innerHTML = `<div style="padding:14px; border:1px dashed #cbd5e1; border-radius:10px; color:#64748b; text-align:center; background:#f8fafc; font-weight:700;">No logs in this category.</div>`;
                 return;
             }
             
-            p.forEach((e, idx) => {
+            p.forEach((group, idx) => {
+                let groupHtml = '';
+                group.events.forEach(e => {
                 const globalIdx = s + idx;
                 const seqNum = filteredLogs.length - globalIdx;
                 const d = window._fmtDate(e.t);
@@ -47481,7 +47504,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     ? ` <span style="margin-left:5px; color:#e2e8f0;">|</span> <span style="margin-left:5px; font-weight:800; color:#64748b;">🕘 ${String(e.timeText).replace(/[<>&]/g, '')}</span>`
                     : '';
 
-                l.innerHTML += `
+                groupHtml += `
                     <div style="padding:12px 15px 12px 18px; border-radius:12px; border:1px solid #f1f5f9; margin-bottom:10px; background:${rowTint}; box-shadow:inset 4px 0 0 ${rowAccent}; display:flex; justify-content:space-between; align-items:flex-start; gap:10px; transition:0.2s; ${isClickable ? 'cursor:pointer;' : ''}" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='#f1f5f9'" ${onClickAttr}>
                         <div style="flex:1; min-width:0;">
                             <div style="font-size:0.9em; font-weight:800; color:#1e293b; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
@@ -47497,7 +47520,18 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         </div>
                     </div>
                 `;
+                });
+                if (group.events.length > 1) {
+                    const first = group.events[0];
+                    const quiz = (quizzesData || []).find(q => first.taskKey === `quiz:${q.id}_${window._currentPopupUser}`);
+                    const title = escapeHtml(String(quiz ? (quiz.shortTitle || quiz.title || 'Quiz') : 'Quiz activity'));
+                    const pts = `${group.points >= 0 ? '+' : ''}${group.points.toFixed(2)} pts`;
+                    const beri = `🪙 ${group.beri >= 0 ? '+' : ''}${group.beri}`;
+                    l.innerHTML += `<details style="border:1px solid #e2e8f0; border-radius:10px; padding:10px; margin-bottom:10px;"><summary style="cursor:pointer; overflow-wrap:anywhere;"><strong>${title}</strong> <span style="font-size:12px;">· ${group.events.length} events · ${pts} · ${beri}</span></summary><div style="margin-top:10px;">${groupHtml}</div></details>`;
+                } else l.innerHTML += groupHtml;
             });
+
+
 
             // 🔥 Turbo Navigation UI
             if (totalPages > 1) {
