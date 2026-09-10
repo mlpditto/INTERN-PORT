@@ -1,0 +1,12 @@
+const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
+const html = fs.readFileSync('public/index.html','utf8');
+const nodes = {};
+const ctx = {document:{getElementById:id=>nodes[id] ||= {style:{},hidden:true,setAttribute(k,v){this[k]=v;}}},myBeri:499,myEverUnlockedBeriShop:false,myRedemptionsCache:[],beriRewardsCache:[],BERI_SHOP_UNLOCK_THRESHOLD:500,BERI_REDEMPTION_STATUS_LABEL:{requesting:{}},escapeHtml:s=>s};
+vm.createContext(ctx);
+vm.runInContext(html.slice(html.indexOf('        function toggleBeriShopPanel('),html.indexOf('        // Reads server-truth balance')),ctx);
+ctx.renderBeriShop(); assert.equal(nodes['beri-shop-section'].hidden,true);
+ctx.myBeri=500;ctx.renderBeriShop();assert.equal(nodes['beri-shop-section'].hidden,false);assert.equal(nodes['beri-rewards-toggle'].hidden,false);
+ctx.myBeri=0;ctx.myEverUnlockedBeriShop=true;ctx.renderBeriShop();assert.equal(nodes['beri-shop-section'].hidden,false);
+ctx.myEverUnlockedBeriShop=false;ctx.myRedemptionsCache=[{}];ctx.renderBeriShop();assert.equal(nodes['beri-shop-section'].hidden,false);assert.equal(nodes['beri-rewards-toggle'].hidden,true);
+ctx.toggleBeriShopPanel('requests');assert.equal(nodes['beri-requests-panel'].hidden,false);
+console.log('PASS: 499/500 boundary, permanent unlock, old requests, disclosure');

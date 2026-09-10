@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V99.14)</title>
+    <title>Internship Portfolio (V99.15)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4048,32 +4048,24 @@
                                      ancestors on both static AND innerHTML-inserted text (same fix
                                      as the links-list block above, which shipped without it and
                                      had to be hotfixed live — see PR #913). -->
-                                <div class="lang-no-toggle" style="margin-top:22px; padding-top:16px; border-top:1px solid #f1f5f9;">
-                                    <div style="font-size:0.9em; font-weight:800; color:#475569; margin-bottom:10px;">
-                                        🏪 Murthehelp
+                                <div id="beri-shop-section" class="lang-no-toggle" hidden style="margin-top:14px;">
+                                    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                                        <strong id="beri-shop-title">🏪 Murthehelp</strong>
+                                        <div style="display:flex; gap:8px;">
+                                            <button type="button" id="beri-rewards-toggle" aria-expanded="false" aria-controls="beri-rewards-panel" onclick="toggleBeriShopPanel('rewards')" style="width:auto; min-height:44px; padding:8px 12px;">🎁 Rewards</button>
+                                            <button type="button" id="beri-requests-toggle" aria-expanded="false" aria-controls="beri-requests-panel" onclick="toggleBeriShopPanel('requests')" style="width:auto; min-height:44px; padding:8px 12px;">📋 My requests</button>
+                                        </div>
                                     </div>
-                                    <!-- V96.5x: locked until myBeri > BERI_SHOP_UNLOCK_THRESHOLD (500)
-                                         — same "explain why + how to unlock" convention as the quiz
-                                         unlockScore gate (renderAssignments' 🔒 message), rather than
-                                         just hiding the section outright. V98.04: once unlocked, stays
-                                         unlocked forever (myEverUnlockedBeriShop, persisted to
-                                         users/{uid}.beriShopUnlocked) even if Beri later drops back
-                                         under the threshold from spending — this banner then only
-                                         shows for someone who has genuinely never crossed it. Message
-                                         now leads with how much MORE Beri is needed, not the current
-                                         balance. -->
-                                    <div id="beri-shop-locked" style="display:none; padding:16px; text-align:center; background:#fafaf9; border:1px dashed #d6d3d1; border-radius:12px; color:#78716c; font-size:0.84em; line-height:1.6;">
-                                        🔒 <span id="beri-shop-locked-remaining-en">500</span> more Beri needed to unlock
-                                    </div>
+                                    <div id="beri-rewards-panel" hidden style="margin-top:10px;">
                                     <div id="beri-shop-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px;"></div>
                                     <div id="beri-shop-empty" style="display:none; padding:20px; text-align:center; color:#94a3b8; font-size:0.86em;">
                                         ยังไม่มีของรางวัล · No rewards yet
                                     </div>
 
-                                    <details style="margin-top:14px;">
-                                        <summary style="cursor:pointer; font-size:0.82em; font-weight:700; color:#78716c; outline:none; user-select:none;">📋 My redemption requests คำขอแลกของของฉัน</summary>
-                                        <div id="beri-redemptions-history" style="display:flex; flex-direction:column; gap:6px; margin-top:8px;"></div>
-                                    </details>
+                                    </div>
+                                    <div id="beri-requests-panel" hidden style="margin-top:10px;">
+                                        <div id="beri-redemptions-history" style="display:flex; flex-direction:column; gap:6px;"></div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -6966,7 +6958,7 @@
                     // !da.beriShopUnlocked so this only fires once — the resulting write
                     // re-triggers this same onSnapshot with the flag already true.
                     myEverUnlockedBeriShop = !!da.beriShopUnlocked;
-                    if (!myEverUnlockedBeriShop && myBeri > BERI_SHOP_UNLOCK_THRESHOLD) {
+                    if (!myEverUnlockedBeriShop && myBeri >= BERI_SHOP_UNLOCK_THRESHOLD) {
                         myEverUnlockedBeriShop = true;
                         db.collection('users').doc(userId).update({ beriShopUnlocked: true }).catch(() => {});
                     }
@@ -9111,27 +9103,33 @@
             denied: { text: 'Denied — Beri refunded · ปฏิเสธและคืนแต้มแล้ว', color: '#991b1b', bg: '#fee2e2' }
         };
 
+        function toggleBeriShopPanel(name) {
+            const panel = document.getElementById('beri-' + name + '-panel');
+            panel.hidden = !panel.hidden;
+            document.getElementById('beri-' + name + '-toggle').setAttribute('aria-expanded', String(!panel.hidden));
+        }
+
         function renderBeriShop() {
             const grid = document.getElementById('beri-shop-grid');
             const empty = document.getElementById('beri-shop-empty');
-            const locked = document.getElementById('beri-shop-locked');
+
             if (!grid) return; // tab not in DOM yet
 
-            // V96.5x: shop locked until myBeri > BERI_SHOP_UNLOCK_THRESHOLD. Redemption
+            // V96.5x: shop locked until myBeri >= BERI_SHOP_UNLOCK_THRESHOLD. Redemption
             // history stays visible regardless — it's about past requests, not access.
             // V98.04: myEverUnlockedBeriShop short-circuits this to permanently-unlocked
             // once crossed once, regardless of current myBeri (see the onSnapshot sync above).
-            const isLocked = !myEverUnlockedBeriShop && myBeri <= BERI_SHOP_UNLOCK_THRESHOLD;
-            if (locked) {
-                locked.style.display = isLocked ? 'block' : 'none';
-                if (isLocked) {
-                    // V98.04: lead with how many MORE Beri are needed, not the raw balance.
-                    // V96.68: one EN line only — the Thai line and the "(need more than N)"
-                    // parenthetical were trimmed.
-                    const remaining = Math.max(1, BERI_SHOP_UNLOCK_THRESHOLD - myBeri + 1);
-                    const el = document.getElementById('beri-shop-locked-remaining-en');
-                    if (el) el.textContent = remaining;
-                }
+            const isLocked = !myEverUnlockedBeriShop && myBeri < BERI_SHOP_UNLOCK_THRESHOLD;
+            const section = document.getElementById('beri-shop-section');
+            if (section) section.hidden = isLocked && !myRedemptionsCache.length;
+            const rewardsToggle = document.getElementById('beri-rewards-toggle');
+            if (rewardsToggle) rewardsToggle.hidden = isLocked;
+            const title = document.getElementById('beri-shop-title');
+            if (title) title.hidden = isLocked;
+            if (isLocked) {
+                const panel = document.getElementById('beri-rewards-panel');
+                if (panel) panel.hidden = true;
+                if (rewardsToggle) rewardsToggle.setAttribute('aria-expanded', 'false');
             }
             if (isLocked) {
                 grid.innerHTML = '';
@@ -9170,7 +9168,7 @@
                             <div style="font-size:0.82em; font-weight:700; color:#334155;">${escapeHtml(r.rewardName || '')} <span style="color:#b45309;">🪙 ${r.beriCost || 0}</span></div>
                             <span style="font-size:0.72em; font-weight:800; color:${st.color}; background:${st.bg}; padding:2px 9px; border-radius:999px;">${st.text}</span>
                         </div>`;
-                }).join('');
+                }).join('') || '<div style="font-size:13px; color:#64748b;">No requests yet</div>';
             }
         }
 
@@ -9182,7 +9180,7 @@
             // locked, but this guards a direct console call too (same posture as the quiz
             // unlockScore gate: client-side only, no rules-level enforcement). V98.04:
             // myEverUnlockedBeriShop bypasses this the same way renderBeriShop does.
-            if (!myEverUnlockedBeriShop && myBeri <= BERI_SHOP_UNLOCK_THRESHOLD) {
+            if (!myEverUnlockedBeriShop && myBeri < BERI_SHOP_UNLOCK_THRESHOLD) {
                 alert(`🔒 Shop is locked — you need more than ${BERI_SHOP_UNLOCK_THRESHOLD} Beri\nร้านนี้ยังล็อกอยู่ ต้องมี Beri เกิน ${BERI_SHOP_UNLOCK_THRESHOLD}`);
                 return;
             }
