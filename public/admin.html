@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.18)</title>
+    <title>Nika Admin (V99.19)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -14992,6 +14992,11 @@
             <div style="display:flex; gap:8px; margin-top:8px;">
                 <input type="url" id="pp-url-input" placeholder="https://… image link" style="margin:0; flex:1; min-width:0; border-radius:10px;" onkeydown="if(event.key==='Enter'){event.preventDefault();loadProductPhotoFromUrl();}">
                 <button type="button" class="btn-sm" onclick="loadProductPhotoFromUrl()" style="width:auto; min-height:0; background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; border-radius:10px; padding:8px 14px; font-weight:800;">🔗 Load</button>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:8px; align-items:center; flex-wrap:wrap;">
+                <button type="button" id="pp-ai-btn" class="btn-sm" onclick="cleanupProductPhotoWithAI()" title="Nano Banana: white background, square, same pack and text" style="width:auto; min-height:0; background:#faf5ff; color:#6b21a8; border:1px solid #e9d5ff; border-radius:10px; padding:8px 14px; font-weight:800;">✨ AI clean-up</button>
+                <button type="button" id="pp-undo-ai-btn" class="btn-sm" onclick="undoProductPhotoAI()" style="display:none; width:auto; min-height:0; background:#fff; color:#6b21a8; border:1px dashed #e9d5ff; border-radius:10px; padding:6px 12px; font-weight:800;">↶ Undo AI</button>
+                <span style="font-size:0.72em; color:#94a3b8;">White background · square · 🍌 Nano Banana</span>
             </div>
             <div id="pp-note" style="display:none; margin-top:8px; padding:8px 12px; border:1px solid; border-radius:10px; font-size:0.78em; line-height:1.5;"></div>
             <button type="button" id="pp-aslink-btn" class="btn-sm" onclick="useProductPhotoLinkAsIs()" style="display:none; width:auto; min-height:0; margin-top:6px; background:#fff; color:#92400e; border:1px dashed #fcd34d; border-radius:10px; padding:6px 12px; font-weight:800;">Use the link as-is</button>
@@ -34219,7 +34224,7 @@ RULES:
                                 : `<span style="display:flex; align-items:center; justify-content:center; width:52px; height:52px; border:1px dashed #cbd5e1; border-radius:8px; color:#94a3b8; font-size:0.72em; font-weight:800;">＋ Photo</span>`}
                                 <span style="position:absolute; right:-6px; bottom:-6px; background:#fff; border:1px solid #e2e8f0; border-radius:999px; font-size:0.62em; padding:1px 4px;">✏️</span>
                             </button>
-                            ${p.photoEditedAt ? `<div style="font-size:0.62em; color:#b45309; font-weight:800; margin-top:4px;">edited</div>` : ''}
+                            ${p.photoEditedAt ? `<div style="font-size:0.62em; color:#b45309; font-weight:800; margin-top:4px;">edited${p.photoAiModel ? ' · AI' : ''}</div>` : ''}
                         </td>
                         <td class="lang-no-toggle">
                             <div style="font-weight:700;">${safe(p.name || '-')}</div>
@@ -34339,10 +34344,15 @@ RULES:
                 (hasOriginal && (item.photoUrlOriginal || '') !== (item.photoUrl || '') && s.action !== 'revert') ? '' : 'none';
             document.getElementById('pp-remove-btn').style.display = s.previewUrl ? '' : 'none';
             document.getElementById('pp-aslink-btn').style.display = s.linkCandidate ? '' : 'none';
+            const aiBtn = document.getElementById('pp-ai-btn');
+            aiBtn.disabled = !!s.aiBusy || !s.previewUrl;
+            aiBtn.style.opacity = aiBtn.disabled ? '0.5' : '1';
+            document.getElementById('pp-undo-ai-btn').style.display = (s.beforeAi && !s.aiBusy) ? '' : 'none';
             const save = document.getElementById('pp-save-btn');
-            save.disabled = !s.action;
-            save.style.opacity = s.action ? '1' : '0.5';
-            save.style.cursor = s.action ? 'pointer' : 'not-allowed';
+            const ready = !!s.action && !s.aiBusy;
+            save.disabled = !ready;
+            save.style.opacity = ready ? '1' : '0.5';
+            save.style.cursor = ready ? 'pointer' : 'not-allowed';
         }
 
         function openProductPhotoEditor(productDocId) {
@@ -34351,12 +34361,14 @@ RULES:
             ppClearObjectUrl();
             window.productPhotoEdit = {
                 item, action: null, blob: null, next: null, objectUrl: '', linkCandidate: '',
+                aiBusy: false, beforeAi: null, aiModel: null,
                 previewUrl: item.photoUrl || '',
                 meta: item.photoUrl ? (item.photoEditedAt ? 'Current photo (edited by admin)' : "Current photo (intern's)") : 'No photo yet'
             };
             document.getElementById('pp-product-name').textContent = item.name || productDocId;
             document.getElementById('pp-url-input').value = '';
             document.getElementById('pp-save-btn').textContent = 'Save';
+            document.getElementById('pp-ai-btn').textContent = '✨ AI clean-up';
             ppSetNote('', '');
             ppRender();
             forceShowModal('productPhotoModal');
@@ -34377,7 +34389,7 @@ RULES:
             ppClearObjectUrl();
             s.objectUrl = URL.createObjectURL(blob);
             Object.assign(s, {
-                action: 'replace', blob, next: null, linkCandidate: '', previewUrl: s.objectUrl,
+                action: 'replace', blob, next: null, linkCandidate: '', previewUrl: s.objectUrl, beforeAi: null, aiModel: null,
                 meta: `${label} · ${width}×${height} · ${(blob.size / 1024).toFixed(0)} KB`
             });
             ppRender();
@@ -34424,7 +34436,7 @@ RULES:
             if (!s || !s.linkCandidate) return;
             ppClearObjectUrl();
             Object.assign(s, {
-                action: 'replace', blob: null, next: { url: s.linkCandidate, path: '' },
+                action: 'replace', blob: null, next: { url: s.linkCandidate, path: '' }, beforeAi: null, aiModel: null,
                 previewUrl: s.linkCandidate, linkCandidate: '', meta: 'External link (not copied)'
             });
             ppSetNote('', '');
@@ -34435,7 +34447,7 @@ RULES:
             const s = window.productPhotoEdit;
             if (!s) return;
             ppClearObjectUrl();
-            Object.assign(s, { action: 'remove', blob: null, next: null, linkCandidate: '', previewUrl: '', meta: 'Photo will be removed on Save' });
+            Object.assign(s, { action: 'remove', blob: null, next: null, linkCandidate: '', previewUrl: '', meta: 'Photo will be removed on Save', beforeAi: null, aiModel: null });
             ppSetNote('', '');
             ppRender();
         }
@@ -34445,7 +34457,7 @@ RULES:
             if (!s) return;
             ppClearObjectUrl();
             Object.assign(s, {
-                action: 'revert', blob: null, next: null, linkCandidate: '',
+                action: 'revert', blob: null, next: null, linkCandidate: '', beforeAi: null, aiModel: null,
                 previewUrl: s.item.photoUrlOriginal || '', meta: "Intern's original photo"
             });
             ppSetNote('', '');
@@ -34472,7 +34484,8 @@ RULES:
                 batch.update(db.collection('product_listings').doc(s.item.id), {
                     ...update,
                     photoEditedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    photoEditedBy: editor.email || ALLOWED_EMAIL || 'admin'
+                    photoEditedBy: editor.email || ALLOWED_EMAIL || 'admin',
+                    photoAiModel: s.aiModel || null
                 });
                 // Keep the intern's Work History twin pointing at the same photo.
                 await stageSubmissionMirror(batch, s.item.id, { 'metadata.photoUrl': update.photoUrl, 'metadata.photoPath': update.photoPath });
@@ -34482,7 +34495,7 @@ RULES:
                 db.collection('admin_logs').add({
                     userId: s.item.userId || '',
                     action: 'product_photo_' + verb,
-                    details: { productDocId: s.item.id, name: s.item.name || '', from, to },
+                    details: { productDocId: s.item.id, name: s.item.name || '', from, to, ai: s.aiModel || null },
                     reason: '',
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                     createdByUid: editor.uid || null,
@@ -34497,6 +34510,121 @@ RULES:
                 btn.disabled = false;
                 btn.textContent = 'Save';
             }
+        }
+        // ─── V99.19: AI clean-up (white background, square) ─────────────────
+        // 🍌 Nano Banana through callAIProxy's gemini-aistudio branch, which EDITS the
+        // supplied image when visionData carries one (functions/index.js, V96.01). The
+        // result goes through the same resize + Save path as an upload, so nothing
+        // reaches Firestore or Storage until the admin presses Save.
+        const PRODUCT_PHOTO_AI_MODEL = 'as/gemini-3.1-flash-image-preview';
+
+        // A pharmacy listing: the pack must stay truthful, so the rules forbid the
+        // model from touching any printed text, the classic image-model failure.
+        function buildProductPhotoCleanupPrompt() {
+            return [
+                'Edit the supplied product photo into a clean e-commerce listing image.',
+                'Output: a square 1:1 image. The product centred, filling about 80% of the frame, on a pure white (#FFFFFF) seamless background with a soft natural shadow beneath it. Even, bright studio lighting.',
+                'Hard rules. This is a pharmacy listing and the packaging must stay truthful:',
+                '- Keep the product exactly as photographed: same shape, colours, logo, and every word, number and symbol printed on the pack.',
+                '- Do not add, remove, translate, retype or invent any text. Do not turn blurry letters into different letters.',
+                '- Do not add props, hands, extra products, badges, prices, watermarks, borders or captions.',
+                '- If part of the pack is cut off in the photo, leave it cut off. Do not invent the missing part.',
+                '- Only remove the background clutter and fix the lighting and framing.',
+                'Return only the edited image.'
+            ].join('\n');
+        }
+
+        // Pure: the image in a callUniversalAI response, or '' when the model answered
+        // with text (a refusal or an explanation) instead of an image.
+        function pickAiImageFromResponse(resp) {
+            if (!resp) return '';
+            const raw = resp.raw || {};
+            const first = raw.data && raw.data[0];
+            const candidates = [
+                resp.imageDataUrl, resp.dataUrl, raw.imageDataUrl, raw.dataUrl,
+                first && first.url, first && first.b64_json ? 'data:image/png;base64,' + first.b64_json : '',
+                resp.text
+            ];
+            for (const c of candidates) {
+                const v = String(c || '').trim();
+                if (v.startsWith('data:image/') || /^https:\/\/\S+$/.test(v)) return v;
+            }
+            return '';
+        }
+
+        async function ppBlobToVision(blob) {
+            const dataUrl = await new Promise((res, rej) => {
+                const fr = new FileReader();
+                fr.onload = () => res(String(fr.result));
+                fr.onerror = () => rej(new Error('Could not read the image'));
+                fr.readAsDataURL(blob);
+            });
+            const comma = dataUrl.indexOf(',');
+            return { image_base64: dataUrl.slice(comma + 1), image_mimetype: blob.type || 'image/jpeg' };
+        }
+
+        async function ppCurrentPhotoBlob(s) {
+            if (s.blob) return s.blob;
+            if (!/^https:\/\//.test(s.previewUrl || '')) throw new Error('No photo to clean up yet');
+            let res;
+            try { res = await fetch(s.previewUrl); }
+            catch (e) { throw new Error('Could not read this photo from its site. Upload the file first.'); }
+            if (!res.ok) throw new Error('Could not load the photo (HTTP ' + res.status + ')');
+            return res.blob();
+        }
+
+        async function cleanupProductPhotoWithAI() {
+            const s = window.productPhotoEdit;
+            if (!s || s.aiBusy) return;
+            const btn = document.getElementById('pp-ai-btn');
+            const started = Date.now();
+            const tick = () => { if (btn) btn.textContent = `⏳ Cleaning up · ${Math.round((Date.now() - started) / 1000)}s`; };
+            s.aiBusy = true;
+            ppRender();
+            tick();
+            const timer = setInterval(tick, 1000);
+            ppSetNote('Nano Banana is editing the photo. This usually takes 10-30s.', 'info');
+            try {
+                const before = { action: s.action, blob: s.blob, next: s.next, previewUrl: s.blob ? '' : s.previewUrl, meta: s.meta };
+                const source = await ppCurrentPhotoBlob(s);
+                const { blob: small } = await resizeAdminProductPhoto(source);
+                const resp = await window.callUniversalAI(
+                    PRODUCT_PHOTO_AI_MODEL, buildProductPhotoCleanupPrompt(), false,
+                    await ppBlobToVision(small), '', { feature: 'product_photo_cleanup' }
+                );
+                const out = pickAiImageFromResponse(resp);
+                if (!out) throw new Error('The model answered without an image' + (resp && resp.text ? ': ' + String(resp.text).slice(0, 120) : ''));
+                const aiRes = await fetch(out);
+                if (!aiRes.ok) throw new Error('Could not load the AI image (HTTP ' + aiRes.status + ')');
+                const aiBlob = await aiRes.blob();
+                if (window.productPhotoEdit !== s) return;   // editor closed meanwhile
+                await ppTakeImage(aiBlob, 'AI clean-up');
+                s.beforeAi = before;
+                s.aiModel = PRODUCT_PHOTO_AI_MODEL.replace(/^as\//, '');
+                ppSetNote('Check every word on the pack against the original before saving. Undo AI brings the previous photo back.', 'warn');
+            } catch (e) {
+                console.error('cleanupProductPhotoWithAI failed:', e);
+                if (window.productPhotoEdit === s) ppSetNote('AI clean-up failed: ' + e.message, 'error');
+            } finally {
+                clearInterval(timer);
+                s.aiBusy = false;
+                if (btn) btn.textContent = '✨ AI clean-up';
+                if (window.productPhotoEdit === s) ppRender();
+            }
+        }
+
+        function undoProductPhotoAI() {
+            const s = window.productPhotoEdit;
+            if (!s || !s.beforeAi) return;
+            const b = s.beforeAi;
+            ppClearObjectUrl();
+            if (b.blob) s.objectUrl = URL.createObjectURL(b.blob);
+            Object.assign(s, {
+                action: b.action, blob: b.blob, next: b.next, linkCandidate: '',
+                previewUrl: b.blob ? s.objectUrl : b.previewUrl, meta: b.meta, beforeAi: null, aiModel: null
+            });
+            ppSetNote('', '');
+            ppRender();
         }
         // ────────────────────────────────────────────────────────────────────
 
