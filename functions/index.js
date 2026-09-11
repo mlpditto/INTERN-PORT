@@ -610,7 +610,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
         }
 
         // --- 🟣 Google Vertex AI (Gemini Multimodal / Vision) ---
-        if (provider === "gemini") {
+        if (provider === "gemini" && model !== "gemini-3.8-flash") {
             const auth = new GoogleAuth({ scopes: "https://www.googleapis.com/auth/cloud-platform" });
             const client = await auth.getClient();
             const token = await client.getAccessToken();
@@ -854,7 +854,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
         // --- 🟡 Google AI Studio (Gemini Generative Language API — image gen via Nano Banana) ---
         // V92.70: New default for Case Card + Goldenweek after OpenRouter started returning 500.
         // Uses GEMINI_API_KEY from https://aistudio.google.com/api-keys (project-bound to intern-port-edfa7).
-        if (provider === "gemini-aistudio") {
+        if (provider === "gemini-aistudio" || (provider === "gemini" && model === "gemini-3.8-flash")) {
             const apiKey = process.env.GEMINI_API_KEY;
             if (!apiKey) return res.status(500).json({ error: "GEMINI_API_KEY is not configured on server." });
 
@@ -878,10 +878,16 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                     }
                 });
             }
+            const textConfig = {
+                ...(isJson ? { responseMimeType: "application/json" } : {}),
+                maxOutputTokens: Math.min(32768, Math.max(1, Number(generationOptions?.maxOutputTokens) || 8192)),
+                ...(asModel === "gemini-3.8-flash" ? { thinkingConfig: { thinkingLevel: "low" } } : {})
+            };
             const body = {
                 contents: [{ parts: asParts }],
-                ...(isImageRequest ? { generationConfig: { responseModalities: ["IMAGE", "TEXT"] } } : {})
+                generationConfig: isImageRequest ? { responseModalities: ["IMAGE", "TEXT"] } : textConfig
             };
+            const startedAt = Date.now();
 
             const response = await postWithRetry(endpoint, body, {
                 headers: { "Content-Type": "application/json" }
@@ -905,12 +911,34 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 });
             }
 
-            const textOut = response.data?.candidates?.[0]?.content?.parts?.find(p => p?.text)?.text || "";
-            return res.json({
-                text: textOut,
-                tokens: response.data?.usageMetadata?.totalTokenCount || 0,
-                model: asModel
-            });
+            const candidate = response.data?.candidates?.[0];
+            const textOut = (candidate?.content?.parts || []).filter(p => p?.text && !p.thought).map(p => p.text).join("");
+            const finishReason = candidate?.finishReason || null;
+            const usage = response.data?.usageMetadata || {};
+            let jsonValid = null;
+            if (isJson) {
+                try { JSON.parse(textOut); jsonValid = true; } catch (_) { jsonValid = false; }
+            }
+            const metrics = {
+                model: response.data?.modelVersion || asModel,
+                tokens: usage.totalTokenCount ?? null,
+                usage: {
+                    inputTokens: usage.promptTokenCount ?? null,
+                    outputTokens: usage.candidatesTokenCount ?? null,
+                    thinkingTokens: usage.thoughtsTokenCount ?? null,
+                    totalTokens: usage.totalTokenCount ?? null
+                },
+                latencyMs: Date.now() - startedAt,
+                finishReason,
+                jsonValid
+            };
+            if (!textOut || (finishReason && finishReason !== "STOP") || jsonValid === false) {
+                return res.status(502).json({
+                    error: `AI Studio response incomplete or invalid (${finishReason || "no output"}).`,
+                    ...metrics
+                });
+            }
+            return res.json({ text: textOut, ...metrics });
         }
 
         // --- 🟢 OpenRouter (multi-model aggregator) ---
