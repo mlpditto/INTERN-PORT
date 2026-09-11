@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.38)</title>
+    <title>Nika Admin (V99.39)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6361,6 +6361,7 @@
     <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <!-- V93.08: cache-bust on taxonomy.js for the LP Firestore overlay rollout -->
+    <script src="ai-model-registry.js?v=V99.39"></script>
     <script src="taxonomy.js?v=V94.55"></script>
     <!-- V91.84: cache-busting on case-taxonomy.js so browser refetches when shim changes (script URL is otherwise constant) -->
     <script src="case-taxonomy.js?v=V94.53"></script>
@@ -16145,7 +16146,7 @@
             let usage = JSON.parse(localStorage.getItem('aiDetailedUsage') || '{}');
             if (usage.date !== today) usage = { date: today, totals: {}, count: 0 };
             usage.count = (usage.count || 0) + 1;
-            const key = provider.toLowerCase().includes('gemini') ? 'Gemini' : (provider.toLowerCase().includes('gpt') ? 'OpenAI' : 'Typhoon');
+            const key = /gemini/i.test(provider) ? 'Gemini' : /gpt|openai/i.test(provider) ? 'OpenAI' : /claude|anthropic/i.test(provider) ? 'Claude' : provider;
             usage.totals[key] = (usage.totals[key] || 0) + tokens;
             localStorage.setItem('aiDetailedUsage', JSON.stringify(usage));
             if (typeof initAIUsageDisplay === 'function') initAIUsageDisplay();
@@ -16232,18 +16233,23 @@
                 updateAIUsage('gemini-aistudio', data.tokens || 0);
                 return { text: data.text || '', tokens: data.tokens || 0, model: data.model || modelName, raw: data };
             }
-            if (proxyProvider === 'openai' && modelName === 'gpt-5.6-terra') {
+            if (/^(gpt-5\.6-|gpt-6-|claude-(sonnet|opus|fable)-5)/.test(modelName) && !window.AI_MODEL_REGISTRY) {
+                throw new Error('Model registry failed to load. Refresh before running AI.');
+            }
+            const modernModel = window.AI_MODEL_REGISTRY?.models.find(m => m.id === modelName && ['responses', 'messages'].includes(m.adapter));
+            if (modernModel && proxyProvider === modernModel.provider) {
                 const response = await fetch(PROXY_URL, {
                     method: 'POST', headers: await window._aiAuthHeaders(),
-                    body: JSON.stringify({ provider: 'openai', model: modelName, prompt, isJson,
+                    body: JSON.stringify({ provider: modernModel.provider, model: modelName, prompt, isJson, visionData,
                         generationOptions: generationOptions || undefined, feature: aiFeature || undefined })
                 });
                 const data = await response.json();
-                if (!response.ok || data.error) throw new Error(data.error || `Terra request failed (${response.status}).`);
-                if (!data.usage || data.finishReason !== 'completed' || (isJson && data.jsonValid !== true)) {
-                    throw new Error('Terra server response is not ready. Update callAIProxy before using the trial.');
+                if (!response.ok || data.error) throw new Error(data.error || `AI request failed (${response.status}).`);
+                const expectedFinish = modernModel.adapter === 'responses' ? 'completed' : 'end_turn';
+                if (!data.usage || data.finishReason !== expectedFinish || (isJson && data.jsonValid !== true)) {
+                    throw new Error('AI server returned incomplete output.');
                 }
-                updateAIUsage('openai', data.tokens || 0);
+                updateAIUsage(modernModel.provider, data.tokens || 0);
                 return { text: data.text || '', tokens: data.tokens || 0, model: data.model || modelName, raw: data };
             }
             // V92.70: AI Studio image models also need proxy-only path so failed proxy doesn't fall through to text-only OpenAI fallback
@@ -17759,16 +17765,16 @@
             return `<div class="lang-no-toggle" style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; color:#334155;">
                 <label for="quality-audit-model">โมเดลสำหรับตรวจใหม่</label>
                 <select id="quality-audit-model" style="padding:8px; min-height:44px; max-width:100%; border:1px solid #cbd5e1; border-radius:8px; background:white; color:#334155;">
-                    <option value="gemini-3.8-flash">Gemini 3.8</option>
-                    <option value="gpt-5.6-terra">GPT-5.6 Terra</option>
+                    ${(window.AI_MODEL_REGISTRY?.models || []).filter(m => m.selectable).map(m => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.label)}</option>`).join('')}
                 </select>
                 <button onclick="runSelectedQualityAudit(this)" style="padding:8px 12px; min-height:44px; border:0; border-radius:8px; background:#0891b2; color:white; cursor:pointer;">${hasResult ? 'ตรวจใหม่' : 'เริ่มตรวจ'}</button>
             </div>`;
         };
 
         window.runSelectedQualityAudit = function(btn) {
-            const terra = document.getElementById('quality-audit-model').value === 'gpt-5.6-terra';
-            return auditQuizAI(btn, { forceNew: true, trial38: !terra, trialTerra: terra });
+            const model = document.getElementById('quality-audit-model').value;
+            if (!window.AI_MODEL_REGISTRY?.models.some(m => m.id === model && m.selectable)) return;
+            return auditQuizAI(btn, { forceNew: true, model });
         };
 
         window.renderAuditStart = function() {
@@ -17871,7 +17877,7 @@
                     }, 350);
                 }
 
-                const selectedModel = opts.trialTerra ? 'gpt-5.6-terra' : opts.trial38 ? 'gemini-3.8-flash' : (document.getElementById('ai-analyzer-model-val').value || 'gemini-3.8-flash');
+                const selectedModel = opts.model || (opts.trialTerra ? 'gpt-5.6-terra' : opts.trial38 ? 'gemini-3.8-flash' : (document.getElementById('ai-analyzer-model-val').value || 'gemini-3.8-flash'));
                 let resultRaw = '', aiTokens = 0, aiModel = '', result = null;
 
                 // V97.41: "🕑" next to Audit reopens a previously-saved audit (Firestore

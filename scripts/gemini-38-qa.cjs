@@ -8,6 +8,7 @@ const handlerSource = backend.slice(start, backend.indexOf('\n});', start) + 4);
 let request, authenticated = true, admin = true;
 let providerData;
 const ctx = {
+    ...{ aiModelRegistry: require('../functions/modern-ai').registry, runModernAI: require('../functions/modern-ai').runModernAI },
     exports: {}, onRequest: (_, fn) => fn, process: { env: { GEMINI_API_KEY: 'test-only', OPENAI_API_KEY: 'test-only' } },
     verifyIdTokenFromHeader: async (_, res) => authenticated ? {} : (res.status(401).json({error:'Unauthorized'}), null),
     isAdminToken: () => admin, recordAiUsage() {},
@@ -59,13 +60,15 @@ function valid() { providerData = {modelVersion:'gemini-3.8-flash-001',candidate
     const a=html.indexOf('        window.callUniversalAI = async');
     const source=html.slice(a,html.indexOf('\n        };',a)+11);
     let calls=0, status=200, failNetwork=false, sent;
-    const front={window:{location:{hostname:'mlpditto.github.io'},_aiAuthHeaders:async()=>({Authorization:'Bearer test'})},updateAIUsage(){},fetch:async (url,opts)=>{calls++;sent=JSON.parse(opts.body);if(failNetwork)throw Error('network');return {ok:status===200,status,json:async()=>status===200?{text:'{}',model:'gemini-3.8-flash-001',tokens:25,usage:{totalTokens:25},jsonValid:true,finishReason:'STOP'}:{error:'Request rejected'}};}};
+    const front={window:{AI_MODEL_REGISTRY:require('../functions/ai-model-registry.json'),location:{hostname:'mlpditto.github.io'},_aiAuthHeaders:async()=>({Authorization:'Bearer test'})},updateAIUsage(){},fetch:async (url,opts)=>{calls++;sent=JSON.parse(opts.body);if(failNetwork)throw Error('network');return {ok:status===200,status,json:async()=>status===200?{text:'{}',model:'gemini-3.8-flash-001',tokens:25,usage:{totalTokens:25},jsonValid:true,finishReason:'STOP'}:{error:'Request rejected'}};}};
     vm.createContext(front);vm.runInContext(source,front);
     const invoke=()=>front.window.callUniversalAI('gemini-3.8-flash','synthetic',true,null,'',{maxOutputTokens:32768,feature:'quiz_audit'});
     r=await invoke();assert.equal(r.raw.usage.totalTokens,25);assert.equal(sent.provider,'gemini-aistudio');assert.equal(sent.feature,'quiz_audit');assert.equal(sent.generationOptions.feature,undefined);
     for (status of [401,403,429,502]) {calls=0;await assert.rejects(invoke);assert.equal(calls,1,'no duplicate request or browser fallback');}
     failNetwork=true;calls=0;await assert.rejects(invoke);assert.equal(calls,1);
-    calls=0; await assert.rejects(()=>front.window.callUniversalAI('gpt-5.6-terra','JSON synthetic',true)); assert.equal(calls,1,'Terra does not fall back to browser keys');
+    for (const model of front.window.AI_MODEL_REGISTRY.models.filter(m => m.adapter !== 'gemini-content')) {
+        calls=0; await assert.rejects(()=>front.window.callUniversalAI(model.id,'JSON synthetic',true)); assert.equal(calls,1,'Modern models do not fall back to browser keys');
+    }
     const audit=html.slice(html.indexOf('        window.auditQuizAI = async'),html.indexOf('        function renderAuditScorecard'));
     assert.ok(audit.includes('result.gemini38Metrics ='));
     const analyze=html.slice(html.indexOf('        window.analyzeQuizAI = async'),html.indexOf('        window.auditQuizAI = async'));

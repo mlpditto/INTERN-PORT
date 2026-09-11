@@ -1,5 +1,6 @@
 
 const admin = require("firebase-admin");
+const { registry: aiModelRegistry, runModernAI } = require("./modern-ai");
 admin.initializeApp();
 
 // Import migration function (wrapped in try-catch to prevent timeout)
@@ -536,6 +537,13 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             return _sendJson(payload);
         };
 
+        const registeredModel = aiModelRegistry.models.find(m => m.id === model);
+        if (registeredModel && ['responses', 'messages'].includes(registeredModel.adapter)) {
+            if (provider !== registeredModel.provider) return res.status(400).json({ error: 'Model/provider mismatch' });
+            const result = await runModernAI({ model, prompt, isJson, visionData, generationOptions }, postWithRetry, process.env);
+            return res.status(result.error ? 502 : 200).json(result);
+        }
+
         // --- Google Cloud Text-to-Speech (Gemini TTS) ---
         if (provider === "cloud_tts") {
             const auth = new GoogleAuth({
@@ -569,29 +577,6 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             const apiKey = process.env.OPENAI_API_KEY;
             if (!apiKey) {
                 return res.status(500).json({ error: "OPENAI_API_KEY is not configured on server." });
-            }
-
-            if (model === 'gpt-5.6-terra') {
-                const started = Date.now();
-                const response = await postWithRetry('https://api.openai.com/v1/responses', {
-                    model, input: prompt, store: false,
-                    reasoning: { effort: 'low' },
-                    text: { format: { type: isJson ? 'json_object' : 'text' } },
-                    max_output_tokens: Math.min(Math.max(Number(generationOptions && generationOptions.maxOutputTokens) || 8192, 1024), 32768)
-                }, { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' } });
-                const data = response.data;
-                const text = (data.output || []).flatMap(item => item.content || [])
-                    .filter(item => item.type === 'output_text').map(item => item.text || '').join('');
-                let jsonValid = false;
-                try { JSON.parse(text); jsonValid = true; } catch (_) {}
-                if (data.status !== 'completed' || !text.trim() || (isJson && !jsonValid)) {
-                    return res.status(502).json({ error: 'Terra returned incomplete or invalid output.', jsonValid });
-                }
-                const usage = data.usage || {};
-                return res.json({ text, model: data.model || model, tokens: usage.total_tokens || 0,
-                    usage: { inputTokens: usage.input_tokens ?? null, outputTokens: usage.output_tokens ?? null,
-                        thinkingTokens: usage.output_tokens_details?.reasoning_tokens ?? null, totalTokens: usage.total_tokens ?? null },
-                    latencyMs: Date.now() - started, finishReason: data.status, jsonValid });
             }
 
             const actualModel = model.includes('gpt-5') ? model : (model.includes('gpt-4') ? 'gpt-5.4-mini' : model);
@@ -629,7 +614,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" }
             });
 
-            return res.json({ text: response.data.choices[0].message.content, tokens: response.data.usage.total_tokens });
+            return res.json({ text: response.data.choices[0].message.content, tokens: response.data.usage.total_tokens, model: response.data.model || actualModel, requestedModel: model });
         }
 
         // --- 🟣 Google Vertex AI (Gemini Multimodal / Vision) ---
