@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.29)</title>
+    <title>Nika Admin (V99.30)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6503,6 +6503,7 @@
                             <!-- γ.4d: opens the Escalated Learning Notes review queue. Hidden by
                                  refreshEscalatedNotesCount() until at least one note is escalated. -->
                             <button type="button" id="escalated-notes-btn" onclick="openEscalatedNotesView()" title="Learning notes you flagged with 🚀 Escalate — focused review queue" style="display:none; margin:0; padding:5px 14px; font-size:0.85em; border-radius:30px; border:1.5px solid #fecaca; background:#fff5f5; color:#b91c1c; font-weight:800; cursor:pointer; white-space:nowrap;">🚀 Escalated <span id="escalated-notes-count">0</span></button>
+                            <button type="button" id="note-delete-requests-btn" onclick="openNoteDeleteRequests()" title="User requests to delete learning notes, including archived notes" style="display:none; margin:0; padding:5px 14px; font-size:0.85em; border-radius:30px; border:1.5px solid #fecaca; background:#fff5f5; color:#b91c1c; font-weight:800; cursor:pointer; white-space:nowrap;">🗑️ Delete requests <span id="note-delete-requests-count">0</span></button>
                         </div>
                     </div>
 
@@ -15223,6 +15224,15 @@
             </div>
             <div style="font-size:0.82em; color:#94a3b8; margin-bottom:14px;">Notes you flagged with 🚀 Escalate — your queue of standout reflections to turn into teaching material or follow up on.</div>
             <div class="lang-no-toggle" id="escalated-notes-list" style="max-height:60vh; overflow-y:auto;"></div>
+        </div>
+    </div>
+
+    <div id="noteDeleteRequestsModal" class="modal" style="z-index:4302;">
+        <div class="modal-content" style="max-width:680px;">
+            <button type="button" onclick="forceHideModal('noteDeleteRequestsModal')" style="float:right; width:auto;" aria-label="Close delete requests">×</button>
+            <h2 style="color:#b91c1c;">🗑️ Learning Note Delete Requests</h2>
+            <p>Requests from users, including archived notes. Open a note to inspect it before deciding.</p>
+            <div id="note-delete-requests-list" class="lang-no-toggle" style="max-height:60vh; overflow-y:auto;"></div>
         </div>
     </div>
 
@@ -54234,6 +54244,7 @@ Save it anyway?`;
                     learningNotesCache = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
                     learningNotesCache.sort((a, b) => (b.timestamp?.toMillis?.() || 0) - (a.timestamp?.toMillis?.() || 0));
                     drawKanban();
+                    refreshNoteDeleteRequests();
                     refreshEscalatedNotesCount(); // γ.4d: keep the Escalated queue button + count fresh
                 }, e => console.error("🔥 [Firestore Error] learning_note submissions:", e));
         }
@@ -56303,6 +56314,45 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         // collection and NO patient-case doc (the original "create a cases doc" plan was
         // rejected because it would pollute the real patient-case table). escalatedAt is
         // stamped in _lnrCommitReview.
+        function getNoteDeleteRequests() {
+            return (learningNotesCache || []).filter(note => note && note.deleteRequestedAt)
+                .sort((a, b) => (b.deleteRequestedAt?.toMillis?.() || 0) - (a.deleteRequestedAt?.toMillis?.() || 0));
+        }
+
+        function refreshNoteDeleteRequests() {
+            const notes = getNoteDeleteRequests();
+            const count = document.getElementById('note-delete-requests-count');
+            const btn = document.getElementById('note-delete-requests-btn');
+            if (count) count.textContent = notes.length;
+            if (btn) btn.style.display = '';
+            const list = document.getElementById('note-delete-requests-list');
+            if (!list) return;
+            list.replaceChildren();
+            if (!notes.length) { list.textContent = 'No pending delete requests · ไม่มีคำขอลบค้างอยู่'; return; }
+            notes.forEach(note => {
+                const row = document.createElement('div');
+                row.style.cssText = 'padding:12px; margin-bottom:10px; border:1px solid #fecaca; border-radius:10px;';
+                const title = document.createElement('strong');
+                title.textContent = note.title || 'Untitled';
+                const detail = document.createElement('p');
+                const when = note.deleteRequestedAt?.toDate?.().toLocaleString('th-TH') || '—';
+                detail.textContent = `${note.displayName || note.userId || 'Unknown'} · ${when}${note.isArchived ? ' · Archived' : ''}`;
+                const reason = document.createElement('p');
+                reason.textContent = `Reason: ${note.deleteRequestReason || 'Not provided'}`;
+                const open = document.createElement('button');
+                open.type = 'button'; open.textContent = 'Open note';
+                open.onclick = () => { forceHideModal('noteDeleteRequestsModal'); reviewLearningNote(note.id); };
+                row.append(title, detail, reason, open);
+                list.appendChild(row);
+            });
+        }
+
+        function openNoteDeleteRequests() {
+            refreshNoteDeleteRequests();
+            const modal = document.getElementById('noteDeleteRequestsModal');
+            if (modal) { modal.style.display = 'block'; modal.classList.add('force-show'); }
+        }
+
         function escGetEscalatedNotes() {
             const ms = (n) => (n.escalatedAt && n.escalatedAt.toMillis) ? n.escalatedAt.toMillis()
                 : (n.timestamp && n.timestamp.toMillis ? n.timestamp.toMillis() : 0);
