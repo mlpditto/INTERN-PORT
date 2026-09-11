@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.30)</title>
+    <title>Nika Admin (V99.31)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -4344,6 +4344,21 @@
             #reflectiveReviewModal .reflective-review-quill .ql-editor { min-height:160px; }
             #reflectiveReviewModal .reflective-focus-pill, #reflectiveReviewModal .reflective-review-lang-chip, #reflectiveReviewModal .reflective-bonus-chip { min-height:40px; }
             #reflectiveReviewModal .reflective-review-reading .reflective-review-label-row > div { flex-wrap:wrap; }
+        }
+        #learningNoteReviewModal .lnr-dialog { width:calc(100% - 32px); max-height:92vh; display:flex; flex-direction:column; overflow:hidden; padding:22px; }
+        #learningNoteReviewModal .lnr-layout { display:grid; grid-template-columns:minmax(0,1.55fr) minmax(300px,1fr); gap:22px; min-height:0; overflow:hidden; }
+        #learningNoteReviewModal .lnr-reading, #learningNoteReviewModal .lnr-controls { min-width:0; overflow-y:auto; overscroll-behavior:contain; }
+        #learningNoteReviewModal .lnr-controls { border-left:1px solid #e9d5ff; padding-left:20px; }
+        #learningNoteReviewModal .lnr-footer { flex-shrink:0; padding-top:12px; border-top:1px solid #e9d5ff; }
+        #learningNoteReviewModal .lnr-conversation { margin-top:16px; }
+        #learningNoteReviewModal .lnr-conversation summary { cursor:pointer; font-weight:700; color:#6b21a8; }
+        #learningNoteReviewModal #lnr-tag-suggested { max-height:220px; overflow-y:auto; }
+        @media(max-width:760px) {
+            #learningNoteReviewModal .lnr-dialog { padding:14px; width:calc(100% - 16px); }
+            #learningNoteReviewModal .lnr-layout { display:block; overflow-y:auto; }
+            #learningNoteReviewModal .lnr-reading, #learningNoteReviewModal .lnr-controls { overflow:visible; }
+            #learningNoteReviewModal .lnr-controls { border-left:0; padding:16px 0 0; }
+            #learningNoteReviewModal .lnr-footer button { flex:1 1 40%; min-width:0!important; }
         }
     </style>
 
@@ -15064,7 +15079,7 @@
              lang-toggle.js hid every Thai-language span by default (per feedback_lang_toggle_thai_blank
              in memory), leaving only the intern's English loanwords ("Telepharmacy", "case discussion")
              visible and squished together. Same root cause + fix as the V97.02 Reject Case popup. -->
-        <div class="modal-content lang-no-toggle" style="max-width:920px;">
+        <div class="modal-content lang-no-toggle lnr-dialog" style="max-width:1180px;">
             <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:14px;">
                 <div style="flex:1; min-width:0;">
                     <span style="display:inline-block; background:linear-gradient(135deg,#6c5ce7,#a29bfe); color:white; padding:4px 12px; border-radius:8px; font-size:0.7em; font-weight:800; letter-spacing:0.5px;">🎓 LEARNING NOTE</span>
@@ -15074,6 +15089,38 @@
                 <button type="button" onclick="closeLearningNoteReviewModal()" style="border:none; background:transparent; color:#475569; font-size:1.45em; line-height:1; cursor:pointer; padding:4px 10px;">&times;</button>
             </div>
 
+            <div id="lnr-delete-request" role="status" style="display:none; padding:12px; margin-bottom:12px; background:#fff1f2; border:1px solid #fecaca; border-radius:12px; color:#991b1b;">
+                <strong>🗑️ User requested deletion</strong>
+                <p id="lnr-delete-reason" style="margin:6px 0;"></p>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button type="button" onclick="lnrResolveDeleteRequest(false)" style="width:auto;">Keep note / Decline request</button>
+                    <button type="button" onclick="lnrResolveDeleteRequest(true)" style="width:auto; background:#b91c1c; color:white;">Approve deletion</button>
+                </div>
+            </div>
+            <div class="lnr-layout">
+                <section class="lnr-reading" aria-label="Note and conversation">
+            <div style="background:#faf5ff; border:1px solid #e9d5ff; border-radius:12px; padding:14px 16px;  line-height:1.6; color:#1f2937;">
+                <div id="lnr-content" style="font-size:0.95em; word-break:break-word;"></div>
+            </div>
+
+            <!-- V91.75 γ.4a: Conversation thread between admin and student -->
+            <details class="lnr-conversation"><summary>💬 Conversation</summary><div style="margin-top:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
+                    <label style="font-weight:800; color:#374151; font-size:0.9em;">💬 Conversation 대화</label>
+                    <span id="lnr-thread-count" style="font-size:0.7em; color:#94a3b8;"></span>
+                </div>
+                <div id="lnr-thread" style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:12px; padding:12px; max-height:200px; overflow-y:auto; min-height:80px; font-size:0.85em;">
+                    <div style="color:#94a3b8; font-style:italic; font-size:0.85em; text-align:center; padding:20px 0;">No messages yet — start the conversation below</div>
+                </div>
+                <div style="display:flex; gap:6px; margin-top:8px;">
+                    <textarea id="lnr-thread-input" rows="2" placeholder="Reply to student... (Ctrl+Enter to send)" style="flex:1; min-width:0; padding:8px 12px; border:1px solid #d8b4fe; border-radius:10px; font-size:0.85em; margin:0; resize:vertical; box-sizing:border-box;" onkeydown="lnrThreadInputKeydown(event)"></textarea>
+                    <button type="button" onclick="lnrSendMessage()" style="width:auto; min-width:90px; padding:8px 16px; background:#6c5ce7; border:none; border-radius:10px; color:white; font-size:0.85em; cursor:pointer; flex-shrink:0; white-space:nowrap; align-self:flex-end; min-height:auto; font-weight:700;">📨 Send</button>
+                </div>
+            </div>
+
+</details>
+                </section>
+                <aside class="lnr-controls" aria-label="Review and tags">
             <!-- γ.2: Tag editor — admin can add/remove tags + suggest from Phase A taxonomy -->
             <div style="margin-bottom:14px;">
                 <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
@@ -15098,36 +15145,11 @@
                     <span style="font-size:0.68em; color:#94a3b8; margin-left:8px;">on-device · first run downloads ~21 MB</span>
                     <div id="lnr-drug-hits" style="display:none; margin-top:8px; padding:8px 12px; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:8px; font-size:0.78em; color:#065f46;"></div>
                 </div>
-                <!-- V98.06: open by default. Live-verified 2026-08-25 (3 real notes,
-                     authed admin console) that this panel was never actually broken —
-                     it always rendered 97 real taxonomy chips correctly. The "blank box"
-                     reports were this <details> sitting collapsed by default: a working
-                     panel and a broken one look identical until expanded, which the
-                     V96.97 count-badge-in-summary fix apparently didn't make obvious
-                     enough on its own. Removing the need to click at all closes the gap. -->
-                <details open style="margin-top:8px; background:#faf5ff; border:1px solid #d8b4fe; border-radius:10px; padding:8px 12px;">
+                <details class="lnr-taxonomy" style="margin-top:8px; background:#faf5ff; border:1px solid #d8b4fe; border-radius:10px; padding:8px 12px;">
                     <summary style="cursor:pointer; font-size:0.8em; font-weight:600; color:#6b21a8; outline:none; user-select:none;">💡 Suggested taxonomy 추천 분류</summary>
+                    <input id="lnr-taxonomy-search" aria-label="Search suggested tags" placeholder="Search suggested tags…" oninput="lnrFilterTaxonomy()" style="margin:10px 0 0; width:100%;">
                     <div id="lnr-tag-suggested" style="padding-top:10px;"></div>
                 </details>
-            </div>
-
-            <div style="background:#faf5ff; border:1px solid #e9d5ff; border-radius:12px; padding:14px 16px; max-height:340px; overflow-y:auto; line-height:1.6; color:#1f2937;">
-                <div id="lnr-content" style="font-size:0.95em; word-break:break-word;"></div>
-            </div>
-
-            <!-- V91.75 γ.4a: Conversation thread between admin and student -->
-            <div style="margin-top:16px;">
-                <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
-                    <label style="font-weight:800; color:#374151; font-size:0.9em;">💬 Conversation 대화</label>
-                    <span id="lnr-thread-count" style="font-size:0.7em; color:#94a3b8;"></span>
-                </div>
-                <div id="lnr-thread" style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:12px; padding:12px; max-height:200px; overflow-y:auto; min-height:80px; font-size:0.85em;">
-                    <div style="color:#94a3b8; font-style:italic; font-size:0.85em; text-align:center; padding:20px 0;">No messages yet — start the conversation below</div>
-                </div>
-                <div style="display:flex; gap:6px; margin-top:8px;">
-                    <textarea id="lnr-thread-input" rows="2" placeholder="Reply to student... (Ctrl+Enter to send)" style="flex:1; min-width:0; padding:8px 12px; border:1px solid #d8b4fe; border-radius:10px; font-size:0.85em; margin:0; resize:vertical; box-sizing:border-box;" onkeydown="lnrThreadInputKeydown(event)"></textarea>
-                    <button type="button" onclick="lnrSendMessage()" style="width:auto; min-width:90px; padding:8px 16px; background:#6c5ce7; border:none; border-radius:10px; color:white; font-size:0.85em; cursor:pointer; flex-shrink:0; white-space:nowrap; align-self:flex-end; min-height:auto; font-weight:700;">📨 Send</button>
-                </div>
             </div>
 
             <div style="margin-top:16px;">
@@ -15202,8 +15224,10 @@
                 </button>
             </div>
 
+                </aside>
+            </div>
             <!-- γ.3: 4 outcome buttons replace single Save & Award -->
-            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:18px; flex-wrap:wrap;">
+            <div class="lnr-footer" style="display:flex; justify-content:flex-end; gap:8px; margin-top:18px; flex-wrap:wrap;">
                 <button type="button" class="btn-sm" onclick="closeLearningNoteReviewModal()" style="width:auto; min-width:88px; background:#e5e7eb; color:#374151; border:none; border-radius:12px; padding:10px 14px; font-weight:800; min-height:auto;">Cancel</button>
                 <button type="button" class="btn-sm" onclick="requestLearningNoteRevision()" title="Send back to student for edits — no points awarded" style="width:auto; min-width:140px; background:#fff; color:#92400e; border:1.5px solid #fcd34d; border-radius:12px; padding:10px 14px; font-weight:800; min-height:auto;">🔄 Request Revision</button>
                 <button type="button" class="btn-sm" onclick="approveLearningNoteNoScore()" title="Mark reviewed without awarding points" style="width:auto; min-width:130px; background:#fff; color:#475569; border:1.5px solid #cbd5e1; border-radius:12px; padding:10px 14px; font-weight:800; min-height:auto;">Approve no pts</button>
@@ -54245,6 +54269,7 @@ Save it anyway?`;
                     learningNotesCache.sort((a, b) => (b.timestamp?.toMillis?.() || 0) - (a.timestamp?.toMillis?.() || 0));
                     drawKanban();
                     refreshNoteDeleteRequests();
+                    if (window._lnrCurrent) lnrRenderDeleteRequest(learningNotesCache.find(note => note.id === window._lnrCurrent.id));
                     refreshEscalatedNotesCount(); // γ.4d: keep the Escalated queue button + count fresh
                 }, e => console.error("🔥 [Firestore Error] learning_note submissions:", e));
         }
@@ -56425,6 +56450,10 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 return;
             }
             window._lnrCurrent = note;
+            lnrRenderDeleteRequest(note);
+            document.querySelectorAll('#learningNoteReviewModal details').forEach(el => el.open = false);
+            const taxonomySearch = document.getElementById('lnr-taxonomy-search');
+            if (taxonomySearch) taxonomySearch.value = '';
             window._lnrTags = (note.metadata && Array.isArray(note.metadata.tags))
                 ? [...note.metadata.tags] : [];
             window._lnrTagsOriginal = [...window._lnrTags];
@@ -56583,6 +56612,39 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         // on inspection, so this now (a) never fails silently (try/catch + loud visible error
         // instead of an empty div), and (b) logs enough state to console.debug to diagnose the
         // next occurrence instantly instead of guessing again.
+        function lnrFilterTaxonomy() {
+            const query = (document.getElementById('lnr-taxonomy-search')?.value || '').trim().toLowerCase();
+            document.querySelectorAll('#lnr-tag-suggested button').forEach(button => {
+                button.hidden = !button.textContent.toLowerCase().includes(query);
+            });
+        }
+
+        function lnrRenderDeleteRequest(note) {
+            const panel = document.getElementById('lnr-delete-request');
+            if (!panel) return;
+            panel.style.display = note?.deleteRequestedAt ? '' : 'none';
+            document.getElementById('lnr-delete-reason').textContent = note?.deleteRequestedAt
+                ? `${note.displayName || note.userId || 'User'} · ${note.deleteRequestedAt.toDate?.().toLocaleString('th-TH') || '—'} · ${note.deleteRequestReason || 'No reason provided'}` : '';
+        }
+
+        async function lnrResolveDeleteRequest(approve) {
+            const note = window._lnrCurrent;
+            if (!note?.deleteRequestedAt) return;
+            if (approve) return deleteLearningNote(note.id);
+            if (!confirm('Decline this delete request and keep the note?')) return;
+            try {
+                await db.collection('submissions').doc(note.id).update({
+                    deleteRequestedAt: firebase.firestore.FieldValue.delete(),
+                    deleteRequestedBy: firebase.firestore.FieldValue.delete(),
+                    deleteRequestReason: firebase.firestore.FieldValue.delete(),
+                    deleteRequestResolution: 'declined',
+                    deleteRequestResolvedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                closeLearningNoteReviewModal();
+                showToast('Delete request declined. Note kept.');
+            } catch (error) { alert('Unable to resolve request: ' + error.message); }
+        }
+
         function lnrRenderSuggestedTaxonomy() {
             const container = document.getElementById('lnr-tag-suggested');
             if (!container) return;
@@ -57078,42 +57140,45 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         // Mirrors deleteReflectiveLog: also reverts the +0.1 autoScore granted at submit time
         // and any adminBonus already awarded. Hard-deletes the submission doc.
         async function deleteLearningNote(id) {
-            if (!confirm('Delete this Learning Note submission? Any awarded scores (autoScore + adminBonus) will be removed automatically.')) return;
+            if (!confirm('Delete this Learning Note from both admin and user history? Recorded awarded points will be reverted. This cannot be undone.')) return;
             try {
-                const ref = db.collection("submissions").doc(id);
-                const snap = await ref.get();
-                if (!snap.exists) {
-                    showToast('Submission not found (already deleted)');
-                    return;
-                }
-                const note = snap.data() || {};
-                const uid = note.userId || '';
-                const autoScore = Number.isFinite(parseFloat(note.score)) ? parseFloat(note.score) : 0.1;
-                const claimedBonus = note.adminAcknowledged === true ? (parseFloat(note.adminBonus) || 0) : 0;
-                const totalRevert = autoScore + claimedBonus;
-
-                const batch = db.batch();
-                if (uid && totalRevert > 0) {
-                    batch.update(db.collection("users").doc(uid), {
-                        score: firebase.firestore.FieldValue.increment(-totalRevert)
-                    });
-                    batch.set(db.collection("checkin_logs").doc(), {
-                        userId: uid,
-                        type: 'learning_note_delete_revert',
-                        amount: -totalRevert,
-                        note: `Admin deleted Learning Note: ${note.title || id}`,
-                        relatedSubmissionId: id,
-                        autoRevert: autoScore,
-                        bonusRevert: claimedBonus,
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                }
-                batch.delete(ref);
-                await batch.commit();
-                showToast(`Deleted Learning Note${totalRevert > 0 ? ` and reverted ${totalRevert.toFixed(2)} pts` : ''}`);
-            } catch (e) {
-                alert('Delete failed: ' + e.message);
-            }
+                const ref = db.collection('submissions').doc(id);
+                const before = await ref.get();
+                if (!before.exists) { showToast('Note already deleted'); return; }
+                const original = before.data();
+                const logs = await db.collection('checkin_logs').where('relatedSubmissionId', '==', id).get();
+                const creditedTypes = ['learning_note_bonus', 'learning_note_featured', 'learning_note_escalated'];
+                const awarded = logs.docs.filter(doc => creditedTypes.includes(doc.data().type));
+                const totalRevert = awarded.reduce((sum, doc) => sum + Math.max(0, Number(doc.data().amount) || 0), 0);
+                // Legacy scored records without their award ledger cannot be safely inferred from score/pointsAmount.
+                if (!awarded.length && Number(original.adminBonus) > 0) throw new Error('Award history missing. Verify points before deleting this legacy note.');
+                const logRef = db.collection('checkin_logs').doc();
+                const removed = await db.runTransaction(async transaction => {
+                    const current = await transaction.get(ref);
+                    if (!current.exists) return false;
+                    const note = current.data();
+                    if (note.submissionType !== 'learning_note') throw new Error('Not a Learning Note.');
+                    if (JSON.stringify(note) !== JSON.stringify(original)) throw new Error('Note changed while checking points. Reopen and try again.');
+                    const sourceId = note.metadata?.sourceId;
+                    const sourceRef = note.metadata?.sourceType === 'learning_path_entries' && sourceId
+                        ? db.collection('learning_path_entries').doc(sourceId) : null;
+                    if (sourceRef) {
+                        const source = await transaction.get(sourceRef);
+                        if (source.exists && source.data().userId !== note.userId) throw new Error('Source note owner does not match.');
+                    }
+                    if (note.userId && totalRevert > 0) {
+                        transaction.update(db.collection('users').doc(note.userId), { score: firebase.firestore.FieldValue.increment(-totalRevert) });
+                    }
+                    transaction.set(logRef, { userId: note.userId || '', type: 'learning_note_delete_revert', amount: -totalRevert,
+                        relatedSubmissionId: id, relatedEntryId: sourceId || '', note: 'Admin deleted Learning Note: ' + (note.title || id),
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+                    if (sourceRef) transaction.delete(sourceRef);
+                    transaction.delete(ref);
+                    return true;
+                });
+                if (window._lnrCurrent?.id === id) closeLearningNoteReviewModal();
+                showToast(removed ? `Deleted note and reverted ${totalRevert.toFixed(2)} pts` : 'Note already deleted');
+            } catch (error) { alert('Delete failed: ' + error.message); }
         }
 
         // V97.26: the delete itself, minus the confirm and the toast, so the bulk
