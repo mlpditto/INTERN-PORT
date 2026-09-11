@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.35)</title>
+    <title>Nika Admin (V99.36)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -4365,7 +4365,14 @@
         #dashboard-summary #qcov-grid { grid-template-columns:minmax(0,1fr)!important; }
         #dashboard-summary #quiz-coverage-panel { margin-top:0!important; }
         #dashboard-summary #line-usage-breakdown { margin-left:0!important; overflow-wrap:anywhere; }
-        #dashboard-work #board-group-tabs { flex-wrap:wrap; overflow-x:visible!important; }
+        #dashboard-work #board-group-tabs { flex-wrap:wrap; align-items:center; overflow-x:visible!important; }
+        #board-group-tabs label { font-weight:700; }
+        #board-group-select { max-width:100%; min-height:44px; padding:8px 12px; border:1px solid #cbd5e1; border-radius:10px; background:var(--card-bg, #fff); color:inherit; font:inherit; }
+        #board-group-status { flex:1 1 240px; border-left:3px solid #6366f1; padding:6px 12px; }
+        #board-group-status strong, #board-group-status small { display:block; }
+        #board-group-status small { margin-top:3px; color:var(--text-muted, #64748b); }
+        #board-group-tabs button { min-height:44px; padding:8px 14px; border:1px solid #c7d2fe; border-radius:10px; background:#eef2ff; color:#4338ca; cursor:pointer; }
+        #board-group-select:focus-visible, #board-group-tabs button:focus-visible { outline:2px solid #6366f1; outline-offset:2px; }
         #dashboard-work .kanban-board { grid-template-columns:repeat(2,minmax(0,1fr)); min-height:0!important; }
         #dashboard-work .kanban-board.cols-1 { grid-template-columns:minmax(0,1fr); }
         #dashboard-summary .qcov-extra { display:none!important; }
@@ -33713,18 +33720,45 @@ RULES:
             const groups = [...new Set(usersData.map(u => u.group || 'Public'))].sort();
             const allGroups = ['All', ...groups];
 
-            container.innerHTML = allGroups.map(g => {
-                const isActive = g === activeBoardGroup;
+            container.replaceChildren();
+            const label = document.createElement('label');
+            label.htmlFor = 'board-group-select';
+            label.textContent = 'กลุ่มผู้ใช้';
+            const select = document.createElement('select');
+            select.id = 'board-group-select';
+            select.setAttribute('aria-describedby', 'board-group-status');
+            allGroups.forEach(g => {
                 const count = g === 'All' ? usersData.length : usersData.filter(u => (u.group || 'Public') === g).length;
-                const color = g === 'All' ? '#333' : getGroupColor(g);
-                const icon = g === 'All' ? 'fa-users' : getGroupIcon(g);
-                return `<button onclick="setBoardGroupFilter('${g}')" style="
-                    padding:5px 14px; border-radius:20px; border:2px solid ${isActive ? color : '#ddd'};
-                    background:${isActive ? color : '#fff'}; color:${isActive ? '#fff' : color};
-                    font-size:0.78em; font-weight:bold; cursor:pointer; white-space:nowrap;
-                    display:flex; align-items:center; gap:5px; transition:all 0.2s;
-                "><i class="fa-solid ${icon}"></i> <span class="lang-no-toggle">${g}</span> <span style="background:${isActive ? 'rgba(255,255,255,0.3)' : '#eee'}; padding:1px 7px; border-radius:10px; font-size:0.8em;">${count}</span></button>`;
-            }).join('');
+                const option = document.createElement('option');
+                option.value = g;
+                option.textContent = `${g === 'All' ? 'ทั้งหมด' : g} · ${count} คน`;
+                option.selected = g === activeBoardGroup;
+                select.append(option);
+            });
+            select.onchange = () => {
+                setBoardGroupFilter(select.value);
+                document.getElementById('board-group-select')?.focus();
+            };
+            const status = document.createElement('div');
+            status.id = 'board-group-status';
+            status.setAttribute('role', 'status');
+            const summary = document.createElement('strong');
+            summary.textContent = activeBoardGroup === 'All' ? 'แสดงงานทุกกลุ่ม' : `แสดงงานเฉพาะ ${activeBoardGroup}`;
+            const hint = document.createElement('small');
+            hint.textContent = 'ตัวเลขคือจำนวนคนในกลุ่ม ไม่ใช่จำนวนงานค้าง';
+            status.append(summary, hint);
+            container.classList.add('lang-no-toggle');
+            container.append(label, select, status);
+            if (activeBoardGroup !== 'All') {
+                const reset = document.createElement('button');
+                reset.type = 'button';
+                reset.textContent = 'ดูทุกกลุ่ม';
+                reset.onclick = () => {
+                    setBoardGroupFilter('All');
+                    document.getElementById('board-group-select')?.focus();
+                };
+                container.append(reset);
+            }
         }
 
         function setBoardGroupFilter(group) {
