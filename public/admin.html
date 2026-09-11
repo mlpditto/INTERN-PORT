@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.32)</title>
+    <title>Nika Admin (V99.33)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -15255,7 +15255,7 @@
         <div class="modal-content" style="max-width:680px;">
             <button type="button" onclick="forceHideModal('noteDeleteRequestsModal')" style="float:right; width:auto;" aria-label="Close delete requests">×</button>
             <h2 style="color:#b91c1c;">🗑️ Learning Note Delete Requests</h2>
-            <p>Requests from users, including archived notes. Open a note to inspect it before deciding.</p>
+            <p>Requests from users, including archived notes. Open a note to inspect it, or approve deletion here.</p>
             <div id="note-delete-requests-list" class="lang-no-toggle" style="max-height:60vh; overflow-y:auto;"></div>
         </div>
     </div>
@@ -56367,7 +56367,19 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 const open = document.createElement('button');
                 open.type = 'button'; open.textContent = 'Open note';
                 open.onclick = () => { forceHideModal('noteDeleteRequestsModal'); reviewLearningNote(note.id); };
-                row.append(title, detail, reason, open);
+                open.style.cssText = 'width:auto; padding:8px 14px; border:1px solid #d8b4fe; border-radius:9px; background:#faf5ff; color:#6b21a8; cursor:pointer;';
+                const remove = document.createElement('button');
+                remove.type = 'button'; remove.textContent = 'Approve deletion';
+                remove.style.cssText = 'width:auto; padding:8px 14px; border:1px solid #b91c1c; border-radius:9px; background:#b91c1c; color:white; cursor:pointer;';
+                remove.onclick = async () => {
+                    remove.disabled = true;
+                    try { await deleteLearningNote(note.id); }
+                    finally { remove.disabled = false; }
+                };
+                const actions = document.createElement('div');
+                actions.style.cssText = 'display:flex; gap:8px; flex-wrap:wrap;';
+                actions.append(open, remove);
+                row.append(title, detail, reason, actions);
                 list.appendChild(row);
             });
         }
