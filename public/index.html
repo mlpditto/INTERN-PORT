@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V99.48)</title>
+    <title>Internship Portfolio (V99.49)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3608,6 +3608,23 @@
                 }
                 .dc-submit-back:hover { background: #eff6ff; }
                 .dc-submit-back span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                /* V99.49: DD Codex Phase 3 — "⇄ Disease / ⇄ Drug" swap chip, only for a
+                   fresh entry opened from ＋ Submit New (toggled in dc/dxSetBackLabel). */
+                .dc-submit-swap {
+                    width: auto; min-height: 0; margin: 0 0 0 8px; /* global button trap */
+                    display: inline-flex; align-items: center; gap: 4px;
+                    padding: 2px 9px; border-radius: 999px; border: 1px dashed currentColor;
+                    font-size: 0.72em; font-weight: 800; font-family: inherit;
+                    cursor: pointer; vertical-align: 1px; white-space: nowrap;
+                }
+                .dc-submit-swap[hidden] { display: none; }
+                /* V99.49: the × here had no width/min-height override, so the global
+                   button rule made it 181px × 48px and squeezed the title block to 130px
+                   at 390px — that is what wrapped the title. Scoped to the submit head. */
+                .dc-submit-head > div { flex: 1; min-width: 0; text-align: left; }
+                .dc-submit-head .dc-detail-close { width: auto; min-height: 0; flex: none; }
+                .dc-submit-swap-to-disease { color: #0f766e; background: #f0fdfa; }
+                .dc-submit-swap-to-drug { color: #1d4ed8; background: #eff6ff; }
 
                 /* "Suggest edit" inline button inside detail modal.
                    V96.10: emoji-only compact chip — width:auto + min-height:0
@@ -5113,8 +5130,9 @@
             <div class="dc-submit-head">
                 <div>
                     <button type="button" id="dx-submit-back" class="dc-submit-back lang-no-toggle" onclick="dxSubmitBack()"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i><span id="dx-submit-back-label">Back</span></button>
-                    <span class="dc-submit-title">📥 Submit Disease</span>
+                    <span class="dc-submit-title">🩺 Disease</span>
                     <span id="dx-submit-mode-pill" class="dc-submit-mode-pill">New entry</span>
+                    <button type="button" id="dx-submit-swap" class="dc-submit-swap dc-submit-swap-to-drug" onclick="dxSwapToDrug()" aria-label="Switch to the Drug form" hidden>⇄ Drug</button>
                 </div>
                 <button type="button" class="dc-detail-close" onclick="dxRequestCloseSubmit()" aria-label="Close">×</button>
             </div>
@@ -5188,8 +5206,9 @@
             <div class="dc-submit-head">
                 <div>
                     <button type="button" id="dc-submit-back" class="dc-submit-back lang-no-toggle" onclick="dcSubmitBack()"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i><span id="dc-submit-back-label">Back</span></button>
-                    <span class="dc-submit-title">📥 Submit Drug</span>
+                    <span class="dc-submit-title">💊 Drug</span>
                     <span id="dc-submit-mode-pill" class="dc-submit-mode-pill">New entry</span>
+                    <button type="button" id="dc-submit-swap" class="dc-submit-swap dc-submit-swap-to-disease" onclick="dcSwapToDisease()" aria-label="Switch to the Disease form" hidden>⇄ Disease</button>
                 </div>
                 <button type="button" class="dc-detail-close" onclick="dcRequestCloseSubmit()" aria-label="Close">×</button>
             </div>
@@ -16903,6 +16922,16 @@
         }
         function dxSetBackLabel() {
             ddApplyBackLabel('dx-submit-back', 'dx-submit-back-label', ddBackLabel(dxSubmitState.from, dxSubmitState.targetDiseaseName));
+            // V99.49: the ⇄ swap chip is only for a fresh entry from ＋ Submit New.
+            const swap = document.getElementById('dx-submit-swap');
+            if (swap) swap.hidden = !(dxSubmitState.mode === 'new' && dxSubmitState.from === 'submit-new');
+        }
+        // V99.49 — DD Codex Phase 3: tapped Disease but meant Drug. Goes through the
+        // discard check (the two forms have different fields, so nothing carries
+        // over), then opens the other form with the same origin, so its Back still
+        // returns to ＋ Submit New.
+        function dxSwapToDrug() {
+            dxRequestCloseSubmit(() => dcOpenSubmit('new', { from: 'submit-new' }));
         }
         function dxSubmitBack() {
             // Read these before the close resets dxSubmitState.
@@ -17857,6 +17886,13 @@
         // V99.48 — Back button; see dxSubmitBack().
         function dcSetBackLabel() {
             ddApplyBackLabel('dc-submit-back', 'dc-submit-back-label', ddBackLabel(dcSubmitState.from, dcSubmitState.targetDrugName));
+            // V99.49: ⇄ swap chip — see dxSetBackLabel().
+            const swap = document.getElementById('dc-submit-swap');
+            if (swap) swap.hidden = !(dcSubmitState.mode === 'new' && dcSubmitState.from === 'submit-new');
+        }
+        // V99.49 — tapped Drug but meant Disease; see dxSwapToDrug().
+        function dcSwapToDisease() {
+            dcRequestCloseSubmit(() => dxOpenSubmit('new', { from: 'submit-new' }));
         }
         function dcSubmitBack() {
             const from = dcSubmitState.from, targetId = dcSubmitState.targetDrugId;
