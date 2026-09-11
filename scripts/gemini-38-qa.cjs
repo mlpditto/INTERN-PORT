@@ -56,13 +56,13 @@ function valid() { providerData = {modelVersion:'gemini-3.8-flash-001',candidate
     assert.ok(html.includes('id="ai-analyzer-model-val" value="gemini-3.8-flash"'));
     const start=html.indexOf('const syncChipRailToHidden =');
     const end=html.indexOf('\n            };',start)+15;
-    for (const stored of [null, 'gemini-3.6-flash', 'gpt-5.4']) {
+    for (const stored of [null, 'gemini-3.6-flash', 'gpt-5.4', 'or/xiaomi/mimo-v2.5', 'or/xiaomi/mimo-v2.5-pro']) {
         const hidden={value:'gemini-3.8-flash'};
         const active=[];
         const rail={querySelectorAll:()=>['gemini-3.8-flash','gemini-3.6-flash','gpt-5.4'].map(value=>({dataset:{value},classList:{toggle:(name,on)=>{if(on)active.push(value);}}}))};
-        const ctx={localStorage:{getItem:()=>stored},document:{getElementById:()=>hidden},rail};
+        const ctx={localStorage:{getItem:()=>stored,setItem:(key,value)=>{assert.equal(key,'ai_default_analyzer_model');assert.equal(value,'gemini-3.8-flash');}},document:{getElementById:()=>hidden},rail};
         vm.runInNewContext(html.slice(start,end)+";syncChipRailToHidden(rail,'ai-analyzer-model-val');",ctx);
-        assert.equal(hidden.value,stored || 'gemini-3.8-flash');
+        assert.equal(hidden.value,stored && !stored.startsWith('or/xiaomi/mimo') ? stored : 'gemini-3.8-flash');
         assert.deepEqual(active,[hidden.value]);
     }
     console.log('PASS: Gemini 3.8 auth, routing, config, usage, JSON, truncation, missing output, image regression, server-only failures, Audit isolation');
