@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.33)</title>
+    <title>Nika Admin (V99.34)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -4360,6 +4360,20 @@
             #learningNoteReviewModal .lnr-controls { border-left:0; padding:16px 0 0; }
             #learningNoteReviewModal .lnr-footer button { flex:1 1 40%; min-width:0!important; }
         }
+        #dashboard-workspace { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:20px; align-items:start; }
+        #dashboard-work, #dashboard-summary { min-width:0; }
+        #dashboard-summary #qcov-grid { grid-template-columns:minmax(0,1fr)!important; }
+        #dashboard-summary #quiz-coverage-panel { margin-top:0!important; }
+        #dashboard-summary #line-usage-breakdown { margin-left:0!important; overflow-wrap:anywhere; }
+        #dashboard-work #board-group-tabs { flex-wrap:wrap; overflow-x:visible!important; }
+        #dashboard-work .kanban-board { grid-template-columns:repeat(2,minmax(0,1fr)); min-height:0!important; }
+        #dashboard-work .kanban-board.cols-1 { grid-template-columns:minmax(0,1fr); }
+        #dashboard-summary .qcov-extra { display:none!important; }
+        #dashboard-summary.qcov-expanded .qcov-extra { display:flex!important; }
+        @media(max-width:900px) {
+            #dashboard-workspace { grid-template-columns:minmax(0,1fr); }
+            #dashboard-work .kanban-board { grid-template-columns:minmax(0,1fr); }
+        }
     </style>
 
     <script>
@@ -6512,7 +6526,7 @@
             <div style="margin-bottom:20px;">
                 <div style="display:flex; flex-direction:column; gap:10px; flex:1;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <div style="display:flex; gap:10px; align-items:center;">
+                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                             <h4 style="margin:0; color:var(--primary);"><i class="fa-solid fa-layer-group"></i> Kanban Board</h4>
                             <input type="text" id="board-search" placeholder="🔍 Search tasks..." onkeyup="filterBoard()" style="margin:0; width:180px; padding:5px 12px; font-size:0.85em; border-radius:30px;">
                             <!-- γ.4d: opens the Escalated Learning Notes review queue. Hidden by
@@ -6522,87 +6536,10 @@
                         </div>
                     </div>
 
-                    <!-- V95.22: Quiz coverage by disease system (CASE_SYSTEMS). Display-only —
-                         counts quizzesData tags matched against the 12 systems + Uncategorized,
-                         and highlights coverage gaps (systems with 0 quizzes). lang-no-toggle so
-                         the Thai gap labels survive admin's EN-default lang toggle. -->
-                    <details id="quiz-coverage-panel" class="lang-no-toggle" open style="margin-top:10px; border:1px solid #e2e8f0; border-radius:12px; background:#fff;">
-                        <summary style="padding:10px 14px; cursor:pointer; font-weight:700; color:var(--primary); list-style:none; display:flex; align-items:center; gap:8px;">
-                            <i class="fa-solid fa-notes-medical"></i> Quiz Coverage by System
-                            <span id="qcov-summary" style="font-size:0.78em; font-weight:600; color:#64748b; margin-left:auto;"></span>
-                        </summary>
-                        <div id="qcov-grid" style="padding:12px 14px; border-top:1px solid #eef2ff; display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:8px;"></div>
-                    </details>
-
-                    <!-- V97.53: LINE push quota for the current Bangkok month, read from
-                         line_usage/{YYYY-MM} (written by pushLineFlex via the Admin SDK).
-                         The OA free plan carries 300 pushes/month shared by the quiz digest,
-                         milestone announcements and case notifications — milestone mode exists
-                         to protect that cap, so the cap belongs on the dashboard next to it.
-                         Hidden entirely until the first push of the month is recorded.
-                         V97.57: lang-no-toggle REMOVED. It was here so Thai labels would
-                         survive admin's EN-default toggle, but the panel renders only fixed
-                         labels and numbers — no user or AI content — so once the labels lead
-                         in English the shield has nothing left to protect, and dropping it
-                         lets the TH button actually work here. Thai in this panel must stay
-                         free of Latin characters and must never sit after a digit run: a
-                         Thai run backward-absorbs preceding 'other' chars, and digits count
-                         as 'other', so trailing Thai would swallow the counts. -->
-                    <div id="line-usage-panel" style="display:none; margin-top:10px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; padding:12px 14px;">
-                        <!-- V97.64 / V98.98: preview-then-send. The panel offers only Preview; the
-                             Send button lives inside the preview box and is unreachable until a
-                             preview has rendered. A digest push is irreversible (it lands in the
-                             intern group), spends one push PER TARGET off a 300/month plan, and is
-                             assembled server-side from live data, so there is no way to know what it
-                             says without building it. V98.98 moved it from its own row under the bar
-                             into this row's right corner: the cost of the click used to be the number
-                             directly above it and is now the number directly to its left, and the card
-                             drops a whole row. Labels are English-only for the reason the panel comment
-                             above gives: Thai here must carry no Latin characters and must never
-                             follow a digit run. -->
-                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                            <span style="font-weight:700; color:var(--primary);"><i class="fa-solid fa-paper-plane"></i> LINE pushes this month เดือนนี้</span>
-                            <span id="line-usage-count" style="font-weight:800; font-size:0.95em;"></span>
-                            <span id="line-usage-breakdown" style="font-size:0.78em; color:#64748b; margin-left:auto;"></span>
-                            <button id="line-digest-preview-btn" onclick="previewDigest()"
-                                style="padding:6px 12px; border:1px solid #0f766e; border-radius:10px; background:#0f766e; color:#fff; font-size:0.78em; font-weight:700; cursor:pointer; white-space:nowrap;">
-                                <i class="fa-solid fa-eye"></i> Preview digest
-                            </button>
-                        </div>
-                        <!-- V98.08: name the OA this quota belongs to. The project wires
-                             several LINE channels; the notify pipeline uses this one. Latin
-                             + emoji only, so the no-Thai-after-digits rule above is moot. -->
-                        <div style="margin-top:3px; font-size:0.72em; color:#94a3b8;">🦉 MLP INTERN PORT Noti</div>
-                        <div style="margin-top:8px; height:8px; background:#eef2f7; border-radius:999px; overflow:hidden;">
-                            <div id="line-usage-bar" style="height:100%; width:0%; border-radius:999px; background:#22c55e; transition:width 0.3s;"></div>
-                        </div>
-                        <!-- V98.98: the quota note and the send/copy status share one row. Both are
-                             grey micro-text and the note is short, so the status no longer needs a
-                             row of its own now that the Preview button has left the card body. -->
-                        <div style="margin-top:6px; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;">
-                            <span id="line-usage-note" style="font-size:0.72em; color:#94a3b8;"></span>
-                            <span id="line-digest-now-status" style="font-size:0.74em; color:#64748b; margin-left:auto; text-align:right;"></span>
-                        </div>
-                        <div id="line-digest-preview-box" class="lang-no-toggle" style="display:none; margin-top:10px; border:1px solid #d8dee7; border-radius:10px; background:#f8fafc; padding:10px 12px;">
-                            <div id="line-digest-preview-meta" style="font-size:0.72em; color:#64748b; margin-bottom:8px;"></div>
-                            <div id="line-digest-preview-copies" style="display:flex; gap:12px; flex-wrap:wrap;"></div>
-                            <div style="margin-top:10px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                                <button id="line-digest-now-btn" onclick="sendDigestNow()"
-                                    style="padding:7px 14px; border:1px solid #b45309; border-radius:10px; background:#b45309; color:#fff; font-size:0.78em; font-weight:700; cursor:pointer;">
-                                    <i class="fa-solid fa-paper-plane"></i> Send this now
-                                </button>
-                                <button onclick="copyDigestText()" title="Copy the digest as plain text — paste it into the group yourself, 0 pushes"
-                                    style="padding:7px 12px; border:1px solid #0f766e; border-radius:10px; background:#fff; color:#0f766e; font-size:0.78em; font-weight:700; cursor:pointer;">
-                                    <i class="fa-solid fa-clipboard"></i> Copy text
-                                </button>
-                                <button onclick="closeDigestPreview()"
-                                    style="padding:7px 12px; border:1px solid #cbd5e1; border-radius:10px; background:#fff; color:#475569; font-size:0.78em; font-weight:600; cursor:pointer;">
-                                    Close
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
+                </div>
+            </div>
+            <div id="dashboard-workspace">
+                <div id="dashboard-work">
                     <!-- 🔥 Relocated Review Sections inside Dashboard Kanban area -->
                     <div id="review-sections-container" style="margin-top:10px;">
                         <!-- 🔥 Reflective Log Review Section -->
@@ -6709,8 +6646,6 @@
                     <div id="board-group-tabs" style="display:flex; gap:8px; overflow-x:auto; padding-bottom:10px; border-bottom:1px solid #eee; margin-top:5px;">
                         <!-- Groups injected here -->
                     </div>
-                </div>
-            </div>
             <div class="kanban-board" style="min-height: 450px;">
                 <div class="kanban-col" id="col-Backlog">
                     <div style="font-weight:bold; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
@@ -6743,6 +6678,92 @@
                     </div>
                     <div id="Done"></div>
                 </div>
+            </div>
+                </div>
+                <aside id="dashboard-summary" aria-label="Quiz coverage and LINE usage">
+                    <!-- V95.22: Quiz coverage by disease system (CASE_SYSTEMS). Display-only —
+                         counts quizzesData tags matched against the 12 systems + Uncategorized,
+                         and highlights coverage gaps (systems with 0 quizzes). lang-no-toggle so
+                         the Thai gap labels survive admin's EN-default lang toggle. -->
+                    <details id="quiz-coverage-panel" class="lang-no-toggle" open style="margin-top:10px; border:1px solid #e2e8f0; border-radius:12px; background:#fff;">
+                        <summary style="padding:10px 14px; cursor:pointer; font-weight:700; color:var(--primary); list-style:none; display:flex; align-items:center; gap:8px;">
+                            <i class="fa-solid fa-notes-medical"></i> Quiz Coverage by System
+                            <span id="qcov-summary" style="font-size:0.78em; font-weight:600; color:#64748b; margin-left:auto;"></span>
+                        </summary>
+                        <button type="button" id="qcov-expand" onclick="toggleQuizCoverageSummary()" aria-expanded="false" style="margin:8px 14px; width:auto; padding:6px 10px;">Show all systems</button>
+                        <div id="qcov-grid" style="padding:12px 14px; border-top:1px solid #eef2ff; display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:8px;"></div>
+                    </details>
+
+                    <!-- V97.53: LINE push quota for the current Bangkok month, read from
+                         line_usage/{YYYY-MM} (written by pushLineFlex via the Admin SDK).
+                         The OA free plan carries 300 pushes/month shared by the quiz digest,
+                         milestone announcements and case notifications — milestone mode exists
+                         to protect that cap, so the cap belongs on the dashboard next to it.
+                         Hidden entirely until the first push of the month is recorded.
+                         V97.57: lang-no-toggle REMOVED. It was here so Thai labels would
+                         survive admin's EN-default toggle, but the panel renders only fixed
+                         labels and numbers — no user or AI content — so once the labels lead
+                         in English the shield has nothing left to protect, and dropping it
+                         lets the TH button actually work here. Thai in this panel must stay
+                         free of Latin characters and must never sit after a digit run: a
+                         Thai run backward-absorbs preceding 'other' chars, and digits count
+                         as 'other', so trailing Thai would swallow the counts. -->
+                    <div id="line-usage-panel" style="display:none; margin-top:10px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; padding:12px 14px;">
+                        <!-- V97.64 / V98.98: preview-then-send. The panel offers only Preview; the
+                             Send button lives inside the preview box and is unreachable until a
+                             preview has rendered. A digest push is irreversible (it lands in the
+                             intern group), spends one push PER TARGET off a 300/month plan, and is
+                             assembled server-side from live data, so there is no way to know what it
+                             says without building it. V98.98 moved it from its own row under the bar
+                             into this row's right corner: the cost of the click used to be the number
+                             directly above it and is now the number directly to its left, and the card
+                             drops a whole row. Labels are English-only for the reason the panel comment
+                             above gives: Thai here must carry no Latin characters and must never
+                             follow a digit run. -->
+                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                            <span style="font-weight:700; color:var(--primary);"><i class="fa-solid fa-paper-plane"></i> LINE pushes this month เดือนนี้</span>
+                            <span id="line-usage-count" style="font-weight:800; font-size:0.95em;"></span>
+                            <span id="line-usage-breakdown" style="font-size:0.78em; color:#64748b; margin-left:auto;"></span>
+                            <button id="line-digest-preview-btn" onclick="previewDigest()"
+                                style="padding:6px 12px; border:1px solid #0f766e; border-radius:10px; background:#0f766e; color:#fff; font-size:0.78em; font-weight:700; cursor:pointer; white-space:nowrap;">
+                                <i class="fa-solid fa-eye"></i> Preview digest
+                            </button>
+                        </div>
+                        <!-- V98.08: name the OA this quota belongs to. The project wires
+                             several LINE channels; the notify pipeline uses this one. Latin
+                             + emoji only, so the no-Thai-after-digits rule above is moot. -->
+                        <div style="margin-top:3px; font-size:0.72em; color:#94a3b8;">🦉 MLP INTERN PORT Noti</div>
+                        <div style="margin-top:8px; height:8px; background:#eef2f7; border-radius:999px; overflow:hidden;">
+                            <div id="line-usage-bar" style="height:100%; width:0%; border-radius:999px; background:#22c55e; transition:width 0.3s;"></div>
+                        </div>
+                        <!-- V98.98: the quota note and the send/copy status share one row. Both are
+                             grey micro-text and the note is short, so the status no longer needs a
+                             row of its own now that the Preview button has left the card body. -->
+                        <div style="margin-top:6px; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;">
+                            <span id="line-usage-note" style="font-size:0.72em; color:#94a3b8;"></span>
+                            <span id="line-digest-now-status" style="font-size:0.74em; color:#64748b; margin-left:auto; text-align:right;"></span>
+                        </div>
+                        <div id="line-digest-preview-box" class="lang-no-toggle" style="display:none; margin-top:10px; border:1px solid #d8dee7; border-radius:10px; background:#f8fafc; padding:10px 12px;">
+                            <div id="line-digest-preview-meta" style="font-size:0.72em; color:#64748b; margin-bottom:8px;"></div>
+                            <div id="line-digest-preview-copies" style="display:flex; gap:12px; flex-wrap:wrap;"></div>
+                            <div style="margin-top:10px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                                <button id="line-digest-now-btn" onclick="sendDigestNow()"
+                                    style="padding:7px 14px; border:1px solid #b45309; border-radius:10px; background:#b45309; color:#fff; font-size:0.78em; font-weight:700; cursor:pointer;">
+                                    <i class="fa-solid fa-paper-plane"></i> Send this now
+                                </button>
+                                <button onclick="copyDigestText()" title="Copy the digest as plain text — paste it into the group yourself, 0 pushes"
+                                    style="padding:7px 12px; border:1px solid #0f766e; border-radius:10px; background:#fff; color:#0f766e; font-size:0.78em; font-weight:700; cursor:pointer;">
+                                    <i class="fa-solid fa-clipboard"></i> Copy text
+                                </button>
+                                <button onclick="closeDigestPreview()"
+                                    style="padding:7px 12px; border:1px solid #cbd5e1; border-radius:10px; background:#fff; color:#475569; font-size:0.78em; font-weight:600; cursor:pointer;">
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                </aside>
             </div>
 
         </div>
@@ -32507,6 +32528,14 @@ RULES:
                 }
             };
 
+            window.toggleQuizCoverageSummary = function () {
+                const panel = document.getElementById('dashboard-summary');
+                const expanded = panel.classList.toggle('qcov-expanded');
+                const button = document.getElementById('qcov-expand');
+                button.setAttribute('aria-expanded', String(expanded));
+                button.textContent = expanded ? 'Show fewer systems' : 'Show all systems';
+            };
+
             window.renderQuizCoverage = function () {
                 const grid = document.getElementById('qcov-grid');
                 if (!grid) return;
@@ -32517,11 +32546,11 @@ RULES:
                 const uncategorized = buckets.__uncat.length;
 
                 const covered = systems.filter(s => counts[s.key] > 0).length;
-                let html = systems.map(s => {
+                let html = [...systems].sort((a, b) => counts[a.key] - counts[b.key]).map((s, index) => {
                     const n = counts[s.key];
                     const isGap = n === 0;
                     const clickable = n > 0;
-                    return `<div ${clickable ? `onclick="window.openQuizCoverageList('${s.key}')"` : ''} style="display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid ${isGap ? '#fecaca' : '#e2e8f0'}; border-radius:10px; background:${isGap ? '#fef2f2' : '#f8fafc'}; ${clickable ? 'cursor:pointer;' : ''}" ${clickable ? `onmouseover="this.style.background='#eef2ff'" onmouseout="this.style.background='#f8fafc'"` : ''}>
+                    return `<div class="${index >= 3 ? 'qcov-extra' : ''}" ${clickable ? `onclick="window.openQuizCoverageList('${s.key}')"` : ''} style="display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid ${isGap ? '#fecaca' : '#e2e8f0'}; border-radius:10px; background:${isGap ? '#fef2f2' : '#f8fafc'}; ${clickable ? 'cursor:pointer;' : ''}" ${clickable ? `onmouseover="this.style.background='#eef2ff'" onmouseout="this.style.background='#f8fafc'"` : ''}>
                         <span style="font-size:1.1em;">${s.emoji}</span>
                         <div style="flex:1; min-width:0;">
                             <div style="font-size:0.8em; font-weight:700; color:#334155; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(s.label.en)}</div>
