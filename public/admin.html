@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.36)</title>
+    <title>Nika Admin (V99.37)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6243,6 +6243,21 @@
                 opacity: 1;
                 transform: translateY(0) scale(1);
             }
+        }
+
+        /* Compact Quiz Editor: keep question navigation and review actions visible. */
+        #quizManageModal .quiz-editor-fold { margin-bottom:8px; border:1px solid #334155; border-radius:10px; background:#182335; min-width:0; }
+        #quizManageModal .quiz-editor-fold > summary { padding:10px 12px; color:#c4b5fd; cursor:pointer; font-weight:700; }
+        #quiz-editor-summary { color:#cbd5e1; font-weight:400; overflow-wrap:anywhere; }
+        #quizManageModal .quiz-editor-fold-body { padding:12px; }
+        #quiz-editor-ai > #quiz-ai-tools-row { margin:8px; }
+        #quiz-editor-tools > div { flex-wrap:wrap; white-space:normal!important; overflow-x:visible!important; }
+        #quiz-editor-tools > div > div { flex-wrap:wrap; }
+        @media(max-width:600px) {
+            #quizManageModal .quiz-editor-fold-body > div[style*="display:grid"] { grid-template-columns:minmax(0,1fr)!important; }
+            #quizManageModal .quiz-editor-fold-body div { min-width:0; }
+            #quizManageModal .quiz-editor-fold > summary { min-height:44px; }
+            #quiz-editor-review-actions button { min-height:44px!important; }
         }
 
         /* Quiz Editor — Markdown split layout (Phase 1, V91.35) */
@@ -12526,9 +12541,12 @@
                 </div>
                 
                 <!-- Content Area -->
-                <div class="mobile-no-margin mobile-p-10 mobile-no-radius" style="position: relative; z-index: 1; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-radius: 20px; padding: 20px; margin: 0 15px 15px 15px; min-height: 350px; border: 1px solid rgba(255,255,255,0.05); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);">
+                <div class="mobile-no-margin mobile-p-10 mobile-no-radius" style="position: relative; z-index: 1; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-radius: 20px; padding: 20px; margin: 0 15px 15px 15px; min-height: 0; border: 1px solid rgba(255,255,255,0.05); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);">
                     <input type="hidden" id="edit-quiz-id">
                     
+                    <details id="quiz-editor-settings" class="quiz-editor-fold" oninput="updateQuizEditorSummary()" onchange="updateQuizEditorSummary()">
+                        <summary class="lang-no-toggle">ตั้งค่า Quiz <span id="quiz-editor-summary"></span></summary>
+                        <div class="quiz-editor-fold-body">
                     <!-- Main Form Grid -->
                     <!-- Row 1: Title + Short Title + Points -->
                     <div style="display:grid; grid-template-columns:2fr 1fr 100px; gap:8px; margin-bottom:8px;">
@@ -12777,6 +12795,9 @@
                     </div>
                 </div>
 
+                        </div>
+                    </details>
+
                 <div style="background:#1e293b; border:1.5px solid #334155; border-radius:14px; padding:10px 14px; margin-bottom:8px; display:flex; flex-direction:column; gap:8px; box-shadow:0 4px 12px rgba(0,0,0,0.2);">
                     <!-- ROW 1: Quiz Mode + Question Type + Nav + Actions ([Version: V88.71]) -->
                     <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
@@ -12814,6 +12835,13 @@
                         <span id="auto-save-status" style="font-size:0.6em; font-weight:bold; color:#fb7185; display:none; margin-left:8px;">Saving...</span>
                         </div>
 
+                    <div id="quiz-editor-review-actions" style="display:flex; flex-wrap:wrap; gap:6px;">
+<button class="btn-sm" onclick="openQuizReview(this)" title="Score every question, then switch to rewrites in the same popup — opens saved results for free when they exist" style="background:linear-gradient(135deg,#7c3aed,#0891b2); color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-clipboard-check"></i> Review</button>
+<button class="btn-sm" id="quiz-audit-trial-btn" onclick="auditQuizAI(this, { forceNew: true, trial38: true })" title="Run a Gemini 3.8 Flash audit directly; replaces any saved scorecard" style="background:#ecfeff; color:#0e7490; border:1px solid #a5f3fc; padding:4px 10px; border-radius:10px; font-weight:700; font-size:0.68em; min-height:32px;">🧪 Audit 3.8</button>
+<button class="btn-sm" id="quiz-audit-terra-btn" onclick="auditQuizAI(this, { forceNew: true, trialTerra: true })" title="Run a GPT-5.6 Terra audit directly; replaces any saved scorecard" style="background:#ecfeff; color:#0e7490; border:1px solid #a5f3fc; padding:4px 10px; border-radius:10px; font-weight:700; font-size:0.68em; min-height:32px;">🧪 Audit Terra</button>
+                    </div>
+                    <details id="quiz-editor-ai" class="quiz-editor-fold">
+                        <summary>AI / Translate / PDF / Expand</summary>
                     <!-- ROW 2: AI Tools (Split: Analyze | Translate) [Version: V88.69] -->
                     <div id="quiz-ai-tools-row" style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
                         <!-- LEFT: Quiz Analysis (V93.28 PR #13 follow-up: visual styling parity with TRANSLATE panel — container shadow, label uppercase, chip rail sizing, button heights aligned. Purple identity preserved.) -->
@@ -12833,9 +12861,6 @@
                                      button. It opens the 🧪 Scorecard; the chip rail in that
                                      popup's header switches to 🪄 Rewrites, loading it only if
                                      asked. Saved results still open free (V97.39 / V97.41). -->
-                                <button class="btn-sm" onclick="openQuizReview(this)" title="Score every question, then switch to rewrites in the same popup — opens saved results for free when they exist" style="background:linear-gradient(135deg,#7c3aed,#0891b2); color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-clipboard-check"></i> Review</button>
-                                <button class="btn-sm" id="quiz-audit-trial-btn" onclick="auditQuizAI(this, { forceNew: true, trial38: true })" title="Run a Gemini 3.8 Flash audit directly; replaces any saved scorecard" style="background:#ecfeff; color:#0e7490; border:1px solid #a5f3fc; padding:4px 10px; border-radius:10px; font-weight:700; font-size:0.68em; min-height:32px;">🧪 Audit 3.8</button>
-                                <button class="btn-sm" id="quiz-audit-terra-btn" onclick="auditQuizAI(this, { forceNew: true, trialTerra: true })" title="Run a GPT-5.6 Terra audit directly; replaces any saved scorecard" style="background:#ecfeff; color:#0e7490; border:1px solid #a5f3fc; padding:4px 10px; border-radius:10px; font-weight:700; font-size:0.68em; min-height:32px;">🧪 Audit Terra</button>
                                 <button class="btn-sm" onclick="openPdfToQuizModal()" title="Import PDF" style="background:#0ea5e9; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-file-pdf"></i> PDF</button>
                                 <button class="btn-sm" onclick="openSuggestMoreModal()" title="Expand" style="background:#f59e0b; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-sparkles"></i> Expand</button>
                             </div>
@@ -12865,8 +12890,11 @@
                                 <button class="btn-sm" onclick="aiEnhanceCurrentQuestion(this)" title="AI Enhance Current Question" style="background:linear-gradient(135deg,#10b981,#059669); color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:900; font-size:0.8em; height:32px; box-shadow:0 4px 12px rgba(16,185,129,0.3); transition:all 0.2s; display:flex; align-items:center; gap:6px;" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 15px rgba(16,185,129,0.4)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 12px rgba(16,185,129,0.3)';"><i class="fa-solid fa-wand-magic-sparkles"></i> Magic</button>
                             </div>
                         </div>
+                    </details>
                     </div>
 
+                    <details id="quiz-editor-tools" class="quiz-editor-fold">
+                        <summary class="lang-no-toggle">เครื่องมือเพิ่มเติม · Timer / Import / Export / Bulk</summary>
                     <!-- ROW 3: Consolidated Management Toolbar ([Version: V90.28] One-Line Layout) -->
                     <div style="display:flex; align-items:center; gap:8px; padding:6px 12px; background:linear-gradient(135deg, rgba(2,132,199,0.12), rgba(245,158,11,0.12)); border-radius:14px; border:1px solid rgba(245,158,11,0.35); box-shadow:0 8px 20px rgba(2,132,199,0.08); white-space:nowrap; overflow-x:auto; margin-bottom:8px;">
                         
@@ -12908,6 +12936,7 @@
                             <button class="btn-sm" onclick="toolbarDeleteQ()" title="Delete Current" style="width:30px; height:30px; border-radius:10px; background:#451a1a; border:1px solid #ef4444; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:0.95em; color:#ef4444; transition:0.2s;" onmouseover="this.style.background='#ef4444'; this.style.color='white';" onmouseout="this.style.background='#451a1a'; this.style.color='#ef4444';"><i class="fa-solid fa-trash-can"></i></button>
                         </div>
                     </div>
+                    </details>
                 </div>
 
                 <div id="quiz-questions-container" style="min-height: 350px; text-align: left; padding: 12px; border: 1px solid #334155; border-radius: 12px; margin-bottom: 8px; background:#0f172a;">
@@ -21936,7 +21965,17 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             el.textContent = parts.join(' · ');
         };
 
+        function updateQuizEditorSummary() {
+            const title = document.getElementById('quiz-title').value.trim() || 'Untitled';
+            const group = document.getElementById('quiz-target-group').selectedOptions[0]?.textContent || 'Public';
+            const points = document.getElementById('quiz-total-points').value;
+            document.getElementById('quiz-editor-summary').textContent = ` · ${title} · ${group} · ${points} pt`;
+        }
+
         async function openQuizModal(id = null) {
+            document.getElementById('quiz-editor-settings').open = !id;
+            document.getElementById('quiz-editor-ai').open = false;
+            document.getElementById('quiz-editor-tools').open = false;
             forceShowModal('quizManageModal');
             const container = document.getElementById('quiz-questions-container');
             container.innerHTML = "";
@@ -22187,6 +22226,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             quizQPageIndex = 0;
             updateQuizPagination();
             window.updateAudienceSummaryPreview && window.updateAudienceSummaryPreview();
+            updateQuizEditorSummary();
         }
 
         function resetQuizForm() {
@@ -22238,6 +22278,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             document.getElementById('quiz-questions-container').innerHTML = "";
             quizQPageIndex = 0;
             window.updateAudienceSummaryPreview && window.updateAudienceSummaryPreview();
+            updateQuizEditorSummary();
         }
 
         // 🔥 [Version: V78.2] Homework User Picker
