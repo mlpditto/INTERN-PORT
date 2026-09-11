@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V99.46)</title>
+    <title>Internship Portfolio (V99.47)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3567,6 +3567,34 @@
                     font-family: inherit;
                 }
                 .dc-submit-delete-btn:hover { background: #fef2f2; }
+                /* V99.47: DD Codex discard check — a bottom sheet above the submit
+                   modal (.modal is z-index 9999). Full-width buttons on purpose. */
+                .dd-discard-overlay {
+                    display: none; position: fixed; inset: 0; z-index: 10000;
+                    background: rgba(15, 23, 42, 0.45);
+                    align-items: flex-end; justify-content: center;
+                }
+                .dd-discard-sheet {
+                    width: 100%; max-width: 480px; background: #fff;
+                    border-radius: 18px 18px 0 0;
+                    padding: 12px 18px calc(18px + env(safe-area-inset-bottom));
+                    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.25);
+                    display: flex; flex-direction: column; gap: 8px; text-align: left;
+                }
+                .dd-discard-grab {
+                    width: 36px; height: 4px; border-radius: 2px; background: #cbd5e1;
+                    align-self: center; margin-bottom: 4px;
+                }
+                .dd-discard-title { font-size: 1.05em; font-weight: 900; color: #1e293b; }
+                .dd-discard-body { font-size: 0.88em; color: #64748b; margin-bottom: 6px; }
+                .dd-discard-keep, .dd-discard-toss {
+                    width: 100%; min-height: 44px; margin: 0; padding: 10px 14px;
+                    border-radius: 12px; font-weight: 800; font-size: 0.95em;
+                    font-family: inherit; cursor: pointer;
+                    display: flex; align-items: center; justify-content: center;
+                }
+                .dd-discard-keep { border: none; color: #fff; background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+                .dd-discard-toss { border: 1px solid #fecaca; background: #fff; color: #b91c1c; }
 
                 /* "Suggest edit" inline button inside detail modal.
                    V96.10: emoji-only compact chip — width:auto + min-height:0
@@ -5074,7 +5102,7 @@
                     <span class="dc-submit-title">📥 Submit Disease</span>
                     <span id="dx-submit-mode-pill" class="dc-submit-mode-pill">New entry</span>
                 </div>
-                <button type="button" class="dc-detail-close" onclick="dxCloseSubmit()" aria-label="Close">×</button>
+                <button type="button" class="dc-detail-close" onclick="dxRequestCloseSubmit()" aria-label="Close">×</button>
             </div>
             <div class="dc-submit-body">
                 <div id="dx-submit-target-banner" class="dc-submit-target-banner" style="display:none;">
@@ -5124,7 +5152,7 @@
                     <button type="button" id="dx-submit-delete-btn" class="dc-submit-delete-btn" onclick="dxDeleteCurrentDraft()" style="display:none;">🗑️ Delete</button>
                 </div>
                 <div class="dc-submit-footer-right">
-                    <button type="button" class="dc-submit-cancel-btn" onclick="dxCloseSubmit()">Cancel</button>
+                    <button type="button" class="dc-submit-cancel-btn" onclick="dxRequestCloseSubmit()">Cancel</button>
                     <button type="button" id="dx-submit-save-btn" class="dc-submit-save-btn" onclick="dxSubmitForm()">📥 Submit</button>
                 </div>
             </div>
@@ -5148,7 +5176,7 @@
                     <span class="dc-submit-title">📥 Submit Drug</span>
                     <span id="dc-submit-mode-pill" class="dc-submit-mode-pill">New entry</span>
                 </div>
-                <button type="button" class="dc-detail-close" onclick="dcCloseSubmit()" aria-label="Close">×</button>
+                <button type="button" class="dc-detail-close" onclick="dcRequestCloseSubmit()" aria-label="Close">×</button>
             </div>
             <div class="dc-submit-body">
                 <div id="dc-submit-target-banner" class="dc-submit-target-banner" style="display:none;">
@@ -5199,7 +5227,7 @@
                     <button type="button" id="dc-submit-delete-btn" class="dc-submit-delete-btn" onclick="dcDeleteCurrentDraft()" style="display:none;">🗑️ Delete</button>
                 </div>
                 <div class="dc-submit-footer-right">
-                    <button type="button" class="dc-submit-cancel-btn" onclick="dcCloseSubmit()">Cancel</button>
+                    <button type="button" class="dc-submit-cancel-btn" onclick="dcRequestCloseSubmit()">Cancel</button>
                     <button type="button" id="dc-submit-save-btn" class="dc-submit-save-btn" onclick="dcSubmitForm()">📥 Submit</button>
                 </div>
             </div>
@@ -16747,6 +16775,7 @@
                     internNotes: ''
                 });
             }
+            dxMarkSubmitClean();
             const modal = document.getElementById('diseaseCodexSubmitModal');
             if (modal) modal.style.display = 'flex';
             // If opened from Suggest-edit while detail modal is up, close detail
@@ -16766,6 +16795,72 @@
             dxSubmitState.editingId = null;
             dxSubmitState.targetDiseaseId = null;
             dxSubmitState.targetDiseaseName = '';
+            dxSubmitState.snapshot = null;
+        }
+
+        // V99.47 — DD Codex Phase 1: × and Cancel used to close the submit form at
+        // once and silently drop whatever was typed. They now call
+        // dx/dcRequestCloseSubmit(), which compares the form against a snapshot taken
+        // when it opened (after any pre-fill, so a Suggest-edit or draft that nobody
+        // touched closes without asking). dx/dcCloseSubmit() stay the raw close — the
+        // submit success path calls them directly and must not ask.
+        function ddNormField(v) {
+            return Array.isArray(v) ? v.join('\n') : (v == null ? '' : String(v));
+        }
+        function ddCountChanged(snapshot, current) {
+            const snap = snapshot || {};
+            return Object.keys(current).filter(k => ddNormField(current[k]) !== ddNormField(snap[k])).length;
+        }
+        function ddIsBlank(snapshot) {
+            return Object.values(snapshot || {}).every(v => ddNormField(v) === '');
+        }
+        function ddCloseDiscard() {
+            const ov = document.getElementById('dd-discard-sheet');
+            if (!ov) return;
+            ov.style.display = 'none';
+            ov._onDiscard = null;
+        }
+        // One bottom sheet shared by the Drug and Disease forms. English only, so
+        // lang-toggle has nothing to hide; lang-no-toggle anyway, like the modals.
+        function ddConfirmDiscard(changed, wasBlank, onDiscard) {
+            let ov = document.getElementById('dd-discard-sheet');
+            if (!ov) {
+                ov = document.createElement('div');
+                ov.id = 'dd-discard-sheet';
+                ov.className = 'dd-discard-overlay lang-no-toggle';
+                ov.innerHTML = '<div class="dd-discard-sheet" role="alertdialog" aria-modal="true" aria-labelledby="dd-discard-title" aria-describedby="dd-discard-body">'
+                    + '<div class="dd-discard-grab" aria-hidden="true"></div>'
+                    + '<div id="dd-discard-title" class="dd-discard-title">Discard this draft?</div>'
+                    + '<div id="dd-discard-body" class="dd-discard-body"></div>'
+                    + '<button type="button" class="dd-discard-keep">Keep editing</button>'
+                    + '<button type="button" class="dd-discard-toss">Discard</button>'
+                    + '</div>';
+                document.body.appendChild(ov);
+                ov.addEventListener('click', e => { if (e.target === ov) ddCloseDiscard(); });
+                ov.querySelector('.dd-discard-keep').addEventListener('click', ddCloseDiscard);
+                ov.querySelector('.dd-discard-toss').addEventListener('click', () => {
+                    const fn = ov._onDiscard;
+                    ddCloseDiscard();
+                    if (fn) fn();
+                });
+                document.addEventListener('keydown', e => {
+                    if (e.key === 'Escape' && ov.style.display === 'flex') ddCloseDiscard();
+                });
+            }
+            const noun = changed === 1 ? 'field' : 'fields';
+            ov.querySelector('.dd-discard-body').textContent = wasBlank
+                ? `You've filled in ${changed} ${noun}. If you leave now, what you typed will be lost.`
+                : `You've changed ${changed} ${noun}. If you leave now, your changes will be lost.`;
+            ov._onDiscard = onDiscard;
+            ov.style.display = 'flex';
+            ov.querySelector('.dd-discard-keep').focus();
+        }
+        function dxMarkSubmitClean() { dxSubmitState.snapshot = dxCollectSubmitForm(); }
+        function dxRequestCloseSubmit() {
+            const snap = dxSubmitState.snapshot;
+            const changed = ddCountChanged(snap, dxCollectSubmitForm());
+            if (!changed) { dxCloseSubmit(); return; }
+            ddConfirmDiscard(changed, ddIsBlank(snap), dxCloseSubmit);
         }
 
         async function dxSubmitForm() {
@@ -16887,6 +16982,7 @@
             // status != 'pending'. The rejected draft stays as a record.
             dxOpenSubmit('new');
             dxFillSubmitForm(draft);
+            dxMarkSubmitClean();  // V99.47: the pre-fill is the starting point, not an edit
             const errEl = document.getElementById('dx-submit-error');
             if (errEl) {
                 errEl.style.display = 'block';
@@ -17672,6 +17768,7 @@
                     internNotes: ''
                 });
             }
+            dcMarkSubmitClean();
             const modal = document.getElementById('drugCodexSubmitModal');
             // V94.97: 'flex' instead of 'block' so the .modal centering rules fire.
             if (modal) modal.style.display = 'flex';
@@ -17693,6 +17790,15 @@
             dcSubmitState.editingId = null;
             dcSubmitState.targetDrugId = null;
             dcSubmitState.targetDrugName = '';
+            dcSubmitState.snapshot = null;
+        }
+        // V99.47 — discard check for × / Cancel; see dxRequestCloseSubmit().
+        function dcMarkSubmitClean() { dcSubmitState.snapshot = dcCollectSubmitForm(); }
+        function dcRequestCloseSubmit() {
+            const snap = dcSubmitState.snapshot;
+            const changed = ddCountChanged(snap, dcCollectSubmitForm());
+            if (!changed) { dcCloseSubmit(); return; }
+            ddConfirmDiscard(changed, ddIsBlank(snap), dcCloseSubmit);
         }
 
         async function dcSubmitForm() {
@@ -17814,6 +17920,7 @@
             // status != 'pending'. The rejected draft stays as a record.
             dcOpenSubmit('new');
             dcFillSubmitForm(draft);
+            dcMarkSubmitClean();  // V99.47: the pre-fill is the starting point, not an edit
             const errEl = document.getElementById('dc-submit-error');
             if (errEl) {
                 errEl.style.display = 'block';
