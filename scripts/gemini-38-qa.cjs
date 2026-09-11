@@ -53,6 +53,17 @@ function valid() { providerData = {modelVersion:'gemini-3.8-flash-001',candidate
     assert.ok(audit.includes('result.gemini38Metrics ='));
     const analyze=html.slice(html.indexOf('        window.analyzeQuizAI = async'),html.indexOf('        window.auditQuizAI = async'));
     assert.ok(!analyze.includes('opts.trial38'),'trial does not change shared analysis');
-    assert.ok(!html.slice(html.indexOf('id="ai-analyze-model-toggle"'),html.indexOf('id="ai-analyzer-model-val"')).includes('3.8'));
+    assert.ok(html.includes('id="ai-analyzer-model-val" value="gemini-3.8-flash"'));
+    const start=html.indexOf('const syncChipRailToHidden =');
+    const end=html.indexOf('\n            };',start)+15;
+    for (const stored of [null, 'gemini-3.6-flash', 'gpt-5.4']) {
+        const hidden={value:'gemini-3.8-flash'};
+        const active=[];
+        const rail={querySelectorAll:()=>['gemini-3.8-flash','gemini-3.6-flash','gpt-5.4'].map(value=>({dataset:{value},classList:{toggle:(name,on)=>{if(on)active.push(value);}}}))};
+        const ctx={localStorage:{getItem:()=>stored},document:{getElementById:()=>hidden},rail};
+        vm.runInNewContext(html.slice(start,end)+";syncChipRailToHidden(rail,'ai-analyzer-model-val');",ctx);
+        assert.equal(hidden.value,stored || 'gemini-3.8-flash');
+        assert.deepEqual(active,[hidden.value]);
+    }
     console.log('PASS: Gemini 3.8 auth, routing, config, usage, JSON, truncation, missing output, image regression, server-only failures, Audit isolation');
 })().catch(e=>{console.error(e);process.exitCode=1;});
