@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.55)</title>
+    <title>Nika Admin (V99.56)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -3812,6 +3812,17 @@
         #groupSelectModal .gs-language button[aria-pressed="true"] { background:var(--primary); color:white; }
         #groupSelectModal .gs-profile-card h3 { width:auto; flex:1; margin:0; }
         #groupSelectModal .gs-copy-card, #groupSelectModal .gs-edit-card { width:44px; padding:6px; font-size:18px; flex-shrink:0; }
+        .hub-log-category { border:1px solid var(--border-color, #e2e8f0); border-radius:14px; margin-bottom:12px; overflow:hidden; }
+        .hub-log-category > summary { display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:14px; min-height:48px; cursor:pointer; background:color-mix(in srgb, var(--log-accent) 12%, var(--bg-card, white)); border-left:4px solid var(--log-accent); }
+        .hub-log-category > summary::before { content:'▸'; }
+        .hub-log-category[open] > summary::before { content:'▾'; }
+        .hub-log-category > summary strong { flex:1; min-width:140px; }
+        .hub-log-category > summary span { color:var(--text-sub); font-size:12px; }
+        .hub-log-category > summary b { font-size:14px; font-variant-numeric:tabular-nums; }
+        .hub-log-category-body { padding:10px; }
+        .hub-log-overview { margin-bottom:12px; }
+        .hub-log-overview > summary, .hub-log-tools > summary { cursor:pointer; min-height:44px; padding:10px; color:var(--text-sub); }
+        @media(max-width:600px) { .hub-log-category-body { padding:6px; } .hub-log-category > summary { padding:12px; } }
         #groupSelectModal .gs-identity { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
         #groupSelectModal .gs-save-row { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; border-top:1px solid #e2e8f0; padding-top:12px; }
         #groupSelectModal .gs-save-row span { font-size:12px; color:#64748b; }
@@ -4620,9 +4631,10 @@
             <div id="insight-history-view" style="display:none;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                     <div id="hub-history-summary" style="font-weight:800; color:#334155;">-</div>
-                    <button class="btn-sm btn-warning" onclick="recalculateUserScore(window._currentPopupUser)" style="font-size:0.75em; border-radius:8px; padding:5px 12px; font-weight:800;">Recalculate Score</button>
+                    <details class="hub-log-tools"><summary>Tools</summary><button class="btn-sm btn-warning" onclick="recalculateUserScore(window._currentPopupUser)" style="font-size:0.75em; border-radius:8px; padding:5px 12px; font-weight:800;">Recalculate Score</button></details>
                 </div>
                 
+                <details class="hub-log-overview"><summary>Overview · Score breakdown & writing profile</summary>
                 <!-- V92.18: pill bar (was 5 stacked cards) — same IDs preserved -->
                 <div id="hub-dash-box" style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:10px; background:#fcfdff; padding:6px 10px; border-radius:12px; border:1px solid #eef2f7;">
                     <div id="hub-filter-quizzes" onclick="setHubHistoryFilter('quizzes')" title="Show Quizzes only" style="cursor:pointer; border-radius:999px; padding:4px 10px; font-size:0.78em; font-weight:800; transition:all 0.2s; display:inline-flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:#4361ee; flex-shrink:0;"></span><span style="color:#94a3b8; text-transform:uppercase; font-size:0.85em;">Q</span><b id="hub-dash-quizzes" style="color:#4361ee;">0</b><small id="hub-dash-quizzes-count" style="font-size:0.85em; color:#94a3b8;">(0)</small></div>
@@ -4653,6 +4665,7 @@
                     </div>
                 </div>
 
+                </details>
                 <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
                     <button id="hub-filter-all" class="btn-sm" onclick="setHubHistoryFilter('all')" style="border:1px solid #dbe3ef; background:#f8fafc; color:#475569; border-radius:999px; padding:4px 12px; font-size:0.72em; font-weight:800;">All</button>
                 </div>
@@ -48144,6 +48157,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return groups;
         }
 
+        function groupHubHistoryCategories(logs) {
+            const buckets = new Map();
+            logs.forEach(event => {
+                const key = window.hubBucketOf(event);
+                if (!buckets.has(key)) buckets.set(key, { key, events: [], points: 0, beri: 0 });
+                const group = buckets.get(key);
+                group.events.push(event);
+                if (event.type === 'beri') group.beri += Number(event.beriAmount) || 0;
+                else if (event.type !== 'doc') group.points += Number(event.score) || 0;
+            });
+            return Array.from(buckets.values());
+        }
+
         window.renderHubHistoryPage = function() {
             const l = document.getElementById("hub-history-list");
             const pNav = document.getElementById("hub-history-pagination");
@@ -48161,7 +48187,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             
             const logsPerPage = 10; // V91.102: 10/page + no inner scroll for compact modal
             const s = (historyPage - 1) * logsPerPage;
-            const groups = groupHubHistoryEvents(filteredLogs);
+            const groups = groupHubHistoryCategories(filteredLogs);
             const totalPages = Math.ceil(groups.length / logsPerPage);
             historyPage = Math.max(1, Math.min(historyPage, totalPages || 1));
             const p = groups.slice((historyPage - 1) * logsPerPage, historyPage * logsPerPage);
@@ -48175,7 +48201,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 let groupHtml = '';
                 group.events.forEach(e => {
                 const globalIdx = s + idx;
-                const seqNum = filteredLogs.length - globalIdx;
+                const seqNum = historyCache.length - historyCache.indexOf(e);
                 const d = window._fmtDate(e.t);
                 // V98.26: Beri rows carry beriAmount (integer, a separate currency),
                 // not score — render a coin, keep them un-clickable/informational.
@@ -48278,14 +48304,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     </div>
                 `;
                 });
-                if (group.events.length > 1) {
-                    const first = group.events[0];
-                    const quiz = (quizzesData || []).find(q => first.taskKey === `quiz:${q.id}_${window._currentPopupUser}`);
-                    const title = escapeHtml(String(quiz ? (quiz.shortTitle || quiz.title || 'Quiz') : 'Quiz activity'));
-                    const pts = `${group.points >= 0 ? '+' : ''}${group.points.toFixed(2)} pts`;
-                    const beri = `🪙 ${group.beri >= 0 ? '+' : ''}${group.beri}`;
-                    l.innerHTML += `<details style="border:1px solid #e2e8f0; border-radius:10px; padding:10px; margin-bottom:10px;"><summary style="cursor:pointer; overflow-wrap:anywhere;"><strong>${title}</strong> <span style="font-size:12px;">· ${group.events.length} events · ${pts} · ${beri}</span></summary><div style="margin-top:10px;">${groupHtml}</div></details>`;
-                } else l.innerHTML += groupHtml;
+                const names = { quizzes: 'Quizzes', works: 'Works & quests', logs: 'Reflections & learning notes', bonus: 'Bonus', manual: 'Adjustments', checkin: 'Daily check-ins', beri: 'Coins', other: 'Other activity' };
+                const style = HUB_LOG_STYLE[group.key] || HUB_LOG_STYLE.other;
+                const amount = group.key === 'beri'
+                    ? `${group.beri >= 0 ? '+' : ''}${group.beri} coins`
+                    : `${group.points >= 0 ? '+' : ''}${group.points.toFixed(2)} pts`;
+                l.innerHTML += `<details class="hub-log-category" style="--log-accent:${style.accent};" ${idx === 0 ? 'open' : ''}><summary><strong>${names[group.key] || names.other}</strong><span>${group.events.length} events</span><b>${amount}</b></summary><div class="hub-log-category-body">${groupHtml}</div></details>`;
             });
 
 
