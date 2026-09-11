@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.34)</title>
+    <title>Nika Admin (V99.35)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -57184,9 +57184,19 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             if (!confirm('Delete this Learning Note from both admin and user history? Recorded awarded points will be reverted. This cannot be undone.')) return;
             try {
                 const ref = db.collection('submissions').doc(id);
-                const before = await ref.get();
+                const before = await ref.get({ source: 'server' });
                 if (!before.exists) { showToast('Note already deleted'); return; }
                 const original = before.data();
+                // Firestore maps have no field order. Compare values, including SDK value types.
+                const sameValue = (a, b) => {
+                    if (Object.is(a, b)) return true;
+                    if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+                    if (typeof a.isEqual === 'function') return a.isEqual(b);
+                    if (Array.isArray(a) !== Array.isArray(b)) return false;
+                    const keys = Object.keys(a);
+                    return keys.length === Object.keys(b).length
+                        && keys.every(key => Object.prototype.hasOwnProperty.call(b, key) && sameValue(a[key], b[key]));
+                };
                 const logs = await db.collection('checkin_logs').where('relatedSubmissionId', '==', id).get();
                 const creditedTypes = ['learning_note_bonus', 'learning_note_featured', 'learning_note_escalated'];
                 const awarded = logs.docs.filter(doc => creditedTypes.includes(doc.data().type));
@@ -57199,7 +57209,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     if (!current.exists) return false;
                     const note = current.data();
                     if (note.submissionType !== 'learning_note') throw new Error('Not a Learning Note.');
-                    if (JSON.stringify(note) !== JSON.stringify(original)) throw new Error('Note changed while checking points. Reopen and try again.');
+                    if (!sameValue(note, original)) throw new Error('Note changed while checking points. Reopen and try again.');
                     const sourceId = note.metadata?.sourceId;
                     const sourceRef = note.metadata?.sourceType === 'learning_path_entries' && sourceId
                         ? db.collection('learning_path_entries').doc(sourceId) : null;
