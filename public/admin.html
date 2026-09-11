@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.39)</title>
+    <title>Nika Admin (V99.40)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -134,6 +134,7 @@
         window.syncModelDefault = function(targetId, value) {
             const hidden = document.getElementById(targetId);
             if (hidden) hidden.value = value;
+            window.syncRegistryModelSelect?.(targetId);
             // Sync glass-toggle pills that target this input
             document.querySelectorAll(`[onclick*="'${targetId}'"]`).forEach(el => {
                 el.classList.toggle('active', el.dataset.value === value);
@@ -146,7 +147,7 @@
                 // V95.46: keep the dropdown trigger label in sync on programmatic restore.
                 const lbl = document.getElementById('rr-model-label');
                 const activeChip = document.querySelector('.reflective-review-model-chip.active');
-                if (lbl && activeChip) lbl.textContent = activeChip.textContent.trim();
+                if (lbl) lbl.textContent = window.AI_MODEL_REGISTRY?.models.find(m => m.id === value)?.label || activeChip?.textContent.trim() || value;
             }
             // Persist
             const keyMap = {
@@ -6361,7 +6362,9 @@
     <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <!-- V93.08: cache-bust on taxonomy.js for the LP Firestore overlay rollout -->
-    <script src="ai-model-registry.js?v=V99.39"></script>
+    <script src="ai-model-registry.js?v=V99.40"></script>
+    <script src="ai-model-ui.js?v=V99.40"></script>
+    <script src="quiz-generation-rules.js?v=V99.40"></script>
     <script src="taxonomy.js?v=V94.55"></script>
     <!-- V91.84: cache-busting on case-taxonomy.js so browser refetches when shim changes (script URL is otherwise constant) -->
     <script src="case-taxonomy.js?v=V94.53"></script>
@@ -16182,6 +16185,10 @@
                 generationOptions = Object.keys(restGenOpts).length ? restGenOpts : null;
             }
 
+            if (['case_to_quiz', 'kb_to_quiz', 'quiz_suggestion', 'quiz_regen_suggestion', 'quiz_image_generate'].includes(aiFeature)) {
+                if (!window.QUIZ_GENERATION_RULES) throw new Error('Question rules failed to load. Refresh before generating.');
+                prompt += '\n' + window.QUIZ_GENERATION_RULES;
+            }
             // V94.60: prefix checks moved to TOP of the chain. Before this
             // fix, models like `as/gemini-2.5-flash-image-preview` hit the
             // `includes('gemini')` branch first → routed to provider='gemini'
@@ -17768,6 +17775,7 @@
                     ${(window.AI_MODEL_REGISTRY?.models || []).filter(m => m.selectable).map(m => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.label)}</option>`).join('')}
                 </select>
                 <button onclick="runSelectedQualityAudit(this)" style="padding:8px 12px; min-height:44px; border:0; border-radius:8px; background:#0891b2; color:white; cursor:pointer;">${hasResult ? 'ตรวจใหม่' : 'เริ่มตรวจ'}</button>
+                <small style="flex-basis:100%;">ตรวจคำตอบซ้ำและเฉลยกำกวมด้วยตนเองด้วย · ผล AI อาจพลาดได้</small>
             </div>`;
         };
 
@@ -22056,11 +22064,13 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 const resolved = retiredAnalyzer ? 'gemini-3.8-flash' : (stored || hidden.value);
                 if (retiredAnalyzer) localStorage.setItem('ai_default_analyzer_model', resolved);
                 hidden.value = resolved;
+                window.syncRegistryModelSelect?.(hiddenId);
                 containerEl.querySelectorAll('.glass-toggle-item').forEach(item => {
                     item.classList.toggle('active', item.dataset.value === resolved);
                 });
             };
 
+            window.initRegistryModelSelectors?.();
             // 🔥 Init AI Model Toggles
             const aiAnalyzeToggle = document.getElementById('ai-analyze-model-toggle');
             if (aiAnalyzeToggle) {
