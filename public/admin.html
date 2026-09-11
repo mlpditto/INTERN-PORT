@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.43)</title>
+    <title>Nika Admin (V99.44)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -5656,6 +5656,9 @@
         .u-row-menu button.danger { color: #dc2626; }
         .u-row-menu-ic { width: 16px; text-align: center; flex-shrink: 0; }
         .u-row-menu-sep { height: 1px; background: var(--border-color); margin: 4px 2px; }
+        /* V99.44: Elite Board Phase 3 — denser Users-table rows */
+        #usersTable td { padding: 8px 10px; vertical-align: middle; }
+        #usersTable .user-pic { width: 30px; height: 30px; }
 
         .quest-deadline {
             font-weight: bold;
@@ -45063,7 +45066,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         const _total = Math.max(1, Math.round((_end - _start) / 86400000) + 1);
                         const _rem = Math.max(0, Math.round((_end - _now) / 86400000));
                         const _remColor = _rem === 0 ? '#ef4444' : _rem <= 7 ? '#f97316' : '#16a34a';
-                        daysRemainingHtml = `<span style="font-size:0.78em; background:#f0fdf4; color:${_remColor}; border:1px solid #bbf7d0; border-radius:5px; padding:1px 6px; white-space:nowrap; font-weight:700;" title="${_rem} days remaining / ${_total} days total">⏳${_rem}/${_total}d</span>`;
+                        // V99.44 — Elite Board Phase 3: a bar of the share already served
+                        // replaces the ⏳rem/total pill; same thresholds and colours.
+                        const _pct = Math.min(100, Math.max(0, Math.round((_total - _rem) / _total * 100)));
+                        daysRemainingHtml = `<span style="display:inline-flex; flex-direction:column; gap:3px; min-width:96px;" title="${_rem} days remaining / ${_total} days total"><span style="display:block; height:5px; border-radius:3px; background:var(--border-color); overflow:hidden;"><span style="display:block; height:100%; width:${_pct}%; background:${_remColor};"></span></span><span style="font-size:0.8em; color:var(--text-sub); white-space:nowrap; font-weight:600;"><b style="color:${_remColor};">${_rem}d</b> left · ${_total}d</span></span>`;
                     }
 
                     const userCode = d.enrollmentCode || preRegData.find(p => p.claimedBy === d.id)?.code || preRegData.find(p => p.sourceUserId === d.id)?.code || '';
@@ -45075,10 +45081,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const _instShort = d.institute || '';
                     const _certSummary = `${d.fullName || '-'}${_instShort ? ` · ${_instShort}` : ''}`;
                     const _certHasMore = d.fullNameEn || codeDisplay || (d.nickname && d.nickname !== '-');
+                    // V99.44 — Elite Board Phase 3: no dashed box; the summary is one grey
+                    // line under the display name (still click-to-edit via setUserGroup).
                     const certNameDisplay = `
-                        <div style="cursor:pointer; margin-left: 35px; margin-top: 5px; background: #f8f9fa; padding: 4px 8px; border-radius: 6px; border: 1px dashed #ddd; display: inline-block; max-width:230px;" onclick="setUserGroup('${d.id}', '${group}')">
+                        <div style="margin-top:1px; max-width:240px;">
                             <div style="display:flex; align-items:center; gap:4px;">
-                                <span style="font-size:0.8em; font-weight:bold; color:#444; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:160px;" title="${_certSummary.replace(/"/g, '&quot;')}">${_certSummary} <i class="fa-solid fa-pen" style="font-size:0.8em; color:#ccc;"></i></span>
+                                <span onclick="setUserGroup('${d.id}', '${group}')" style="cursor:pointer; font-size:0.78em; color:var(--text-sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;" title="${_certSummary.replace(/"/g, '&quot;')}">${_certSummary} <i class="fa-solid fa-pen" style="font-size:0.8em; color:#cbd5e1;"></i></span>
                                 ${_certHasMore ? `<button type="button" onclick="event.stopPropagation(); toggleRowDetail(this)" style="border:none; background:transparent; color:#94a3b8; cursor:pointer; font-size:0.8em; padding:0 2px; line-height:1;" title="More"><i class="fa-solid fa-chevron-down"></i></button>` : ''}
                             </div>
                             <div class="row-detail" style="display:none; margin-top:3px;">
@@ -45092,14 +45100,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     // V99.43 — Elite Board Phase 2: the seven per-row buttons (🎓 📜 log-work
                     // 📎 merge key delete) live in one shared ⋯ menu, openUserRowMenu().
                     // Adj and Beri stay inline — they are the controls used most.
+                    // V99.44 (Phase 3): Adj · Beri · ⋯ on one line instead of two stacked rows.
                     const actionsGroup = `
-                        <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-start;">
-                            <div style="display:flex; align-items:center; gap:4px;">
-                                <div style="display:flex; align-items:center; gap:4px; background:rgba(236, 253, 245, 0.75); border:1px solid #bbf7d0; border-radius:8px; padding:4px;">
-                                    <input type="number" step="0.1" id="adj-${d.id}" placeholder="0.0" style="width:62px; margin:0; height:24px; font-size:0.75em;" onkeypress="if(event.key==='Enter')adjDec('${d.id}')">
-                                    <button class="btn-sm btn-success" style="height:24px; min-height:auto; padding:0 8px; font-size:0.72em;" onclick="adjDec('${d.id}')">Adj</button>
-                                </div>
-                                <button type="button" class="u-row-kebab" onclick="openUserRowMenu(event, '${d.id}')" aria-haspopup="menu" aria-expanded="false" aria-label="More actions" title="More actions"><i class="fa-solid fa-ellipsis"></i></button>
+                        <div style="display:flex; align-items:center; gap:4px; flex-wrap:nowrap;">
+                            <div style="display:flex; align-items:center; gap:4px; background:rgba(236, 253, 245, 0.75); border:1px solid #bbf7d0; border-radius:8px; padding:4px;">
+                                <input type="number" step="0.1" id="adj-${d.id}" placeholder="0.0" style="width:62px; margin:0; height:24px; font-size:0.75em;" onkeypress="if(event.key==='Enter')adjDec('${d.id}')">
+                                <button class="btn-sm btn-success" style="height:24px; min-height:auto; padding:0 8px; font-size:0.72em;" onclick="adjDec('${d.id}')">Adj</button>
                             </div>
                             <!-- V96.52: manual Beri adjust — e.g. crediting an offline/real-world
                                  purchase. Mirrors the score Adj control above exactly (same
@@ -45112,19 +45118,26 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 <input type="number" step="1" id="beri-adj-${d.id}" placeholder="🪙 0" style="width:62px; margin:0; height:24px; font-size:0.75em;" onkeypress="if(event.key==='Enter')adjBeri('${d.id}')">
                                 <button class="btn-sm" style="height:24px; min-height:auto; padding:0 8px; font-size:0.72em; background:#ea580c; color:white;" onclick="adjBeri('${d.id}')" title="Adjust Beri (e.g. offline purchase credit)">Beri</button>
                             </div>
+                            <button type="button" class="u-row-kebab" onclick="openUserRowMenu(event, '${d.id}')" aria-haspopup="menu" aria-expanded="false" aria-label="More actions" title="More actions"><i class="fa-solid fa-ellipsis"></i></button>
                         </div>`;
 
                     tbody.innerHTML += `<tr class="${ignored ? 'u-ignored' : ''}">
                             <td style="text-align:center;">${rankDisplay}</td>
                             <td>
-                                <div><img src="${d.pictureUrl}" class="user-pic" style="vertical-align: middle;"> <span style="font-weight:bold;">${d.displayName}</span></div>
-                                ${certNameDisplay}
+                                <div style="display:flex; align-items:center; gap:10px;">
+                                    <img src="${d.pictureUrl}" class="user-pic" style="flex-shrink:0;">
+                                    <div style="min-width:0;">
+                                        <div style="font-weight:bold; line-height:1.25;">${d.displayName}</div>
+                                        ${certNameDisplay}
+                                    </div>
+                                </div>
                             </td>
                             <!-- V98.10 lean: the Group cell only carries the change-group
                                  control while the table shows every group (filter = All).
                                  With a group tab active the pill just repeats the tab, so
-                                 the cell goes empty. -->
-                            <td>${activeUserGroup === 'All' ? `<button class="btn-sm" style="font-size:0.75em; padding:2px 8px; background:${getGroupColor(group)}; color:white; border:none; display:flex; align-items:center; gap:5px;" onclick="setUserGroup('${d.id}', '${group}')"><i class="fa-solid ${getGroupIcon(group)}"></i> <span class="lang-no-toggle">${group}</span></button>` : ''}</td>
+                                 the cell goes empty. V99.44: soft tint instead of a solid
+                                 fill; text mixed with --text-main so it reads in dark mode. -->
+                            <td>${activeUserGroup === 'All' ? `<button class="btn-sm" style="font-size:0.75em; padding:2px 8px; background:color-mix(in srgb, ${getGroupColor(group)} 14%, transparent); color:color-mix(in srgb, ${getGroupColor(group)} 80%, var(--text-main)); border:1px solid color-mix(in srgb, ${getGroupColor(group)} 35%, transparent); display:flex; align-items:center; gap:5px; font-weight:700;" onclick="setUserGroup('${d.id}', '${group}')"><i class="fa-solid ${getGroupIcon(group)}"></i> <span class="lang-no-toggle">${group}</span></button>` : ''}</td>
                             <!-- V98.10 lean: "active" is the default — a bright green pill on
                                  every row was noise. Active rows get a faint icon-only toggle
                                  (still the way to ignore someone); "ignored" keeps its pill. -->
@@ -45143,22 +45156,20 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 </span>
                             </td>
                             <td style="font-size:0.84em;">
-                                <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-start;">
+                                <div>
                                     <!-- V98.16 lean: the full YYYY-MM-DD ~ YYYY-MM-DD string
-                                         folds behind a chevron; the ⏳rem/total pill (which
-                                         encodes the same window) stays, and so does the
-                                         Set / LIFF-visibility control row below. -->
-                                    <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
-                                        <i class="fa-solid fa-calendar-day" style="color:#64748b; font-size:0.92em; flex-shrink:0;"></i>
+                                         folds behind a chevron. V99.44 (Phase 3): the days-left
+                                         bar and the Set / LIFF-visibility controls share one
+                                         line; the .row-detail stays the chevron line's next
+                                         sibling, which is what toggleRowDetail() looks for. -->
+                                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:nowrap;">
                                         ${daysRemainingHtml || `<span style="${d.hidePeriod ? 'text-decoration:line-through; color:#94a3b8;' : 'font-weight:700; color:#475569;'} font-family:monospace; font-size:0.92em;">${dateStr}</span>`}
                                         ${daysRemainingHtml ? `<button type="button" onclick="toggleRowDetail(this)" style="border:none; background:transparent; color:#94a3b8; cursor:pointer; font-size:0.8em; padding:0 2px; line-height:1;" title="Show dates"><i class="fa-solid fa-chevron-down"></i></button>` : ''}
-                                    </div>
-                                    ${daysRemainingHtml ? `<div class="row-detail" style="display:none; margin-left:16px;"><span style="${d.hidePeriod ? 'text-decoration:line-through; color:#94a3b8;' : 'font-weight:700; color:#475569;'} font-family:monospace; font-size:0.92em;">${dateStr}</span></div>` : ''}
-                                    <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap; margin-left:16px;">
                                         ${certStatus}
                                         <button class="btn-sm" onclick="openPeriodModal('${d.id}', '${d.displayName}', '${d.startDate || ''}', '${d.endDate || ''}')" style="font-size:0.68em; height:20px; padding:0 6px; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; border-radius:5px; display:flex; align-items:center; gap:3px; flex-shrink:0;" title="Adjust Period"><i class="fa-solid fa-calendar-plus"></i> Set</button>
                                         <button class="btn-sm" onclick="toggleHidePeriod('${d.id}', ${d.hidePeriod === true})" style="width:22px; height:20px; background:${d.hidePeriod ? '#fee2e2' : '#f0fdf4'}; color:${d.hidePeriod ? '#ef4444' : '#22c55e'}; border:1px solid ${d.hidePeriod ? '#fecaca' : '#dcfce7'}; border-radius:5px; display:flex; align-items:center; justify-content:center; flex-shrink:0;" title="${d.hidePeriod ? 'Hidden in LIFF' : 'Visible in LIFF'}"><i class="fa-solid ${d.hidePeriod ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
                                     </div>
+                                    ${daysRemainingHtml ? `<div class="row-detail" style="display:none; margin-top:3px;"><span style="${d.hidePeriod ? 'text-decoration:line-through; color:#94a3b8;' : 'font-weight:700; color:#475569;'} font-family:monospace; font-size:0.92em;">${dateStr}</span></div>` : ''}
                                 </div>
                             </td>
                             <td>${actionsGroup}</td>
