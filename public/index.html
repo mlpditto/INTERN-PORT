@@ -15,7 +15,7 @@
     <meta property="og:description" content="เปิดแอปเพื่อทำ quiz · ส่งงาน · เก็บ Beri">
     <meta property="og:image" content="https://mlpditto.github.io/INTERN-PORT/assets/medlife-logo.png">
     <meta property="og:url" content="https://liff.line.me/2008959998-yjcNpaGt">
-    <title>Internship Portfolio (V99.47)</title>
+    <title>Internship Portfolio (V99.48)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3595,6 +3595,19 @@
                 }
                 .dd-discard-keep { border: none; color: #fff; background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
                 .dd-discard-toss { border: 1px solid #fecaca; background: #fff; color: #b91c1c; }
+                /* V99.48: DD Codex Phase 2 — "← <where you came from>" in the submit header */
+                /* Own line above the title (a mobile back link) — inline, it pushed the
+                   title onto a third line at 390px. */
+                .dc-submit-back {
+                    width: fit-content; min-height: 0; margin: 0 0 6px; /* global button trap */
+                    display: flex; align-items: center; gap: 5px;
+                    max-width: 200px; padding: 4px 11px 4px 8px;
+                    border: 1px solid #bfdbfe; border-radius: 999px; background: #fff;
+                    color: #1d4ed8; font-size: 0.78em; font-weight: 800; font-family: inherit;
+                    cursor: pointer;
+                }
+                .dc-submit-back:hover { background: #eff6ff; }
+                .dc-submit-back span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
                 /* "Suggest edit" inline button inside detail modal.
                    V96.10: emoji-only compact chip — width:auto + min-height:0
@@ -4782,13 +4795,13 @@
                                 Open the full form
                             </div>
                             <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
-                                <button type="button" onclick="closeUnifiedModal(); dcOpenSubmit('new');"
+                                <button type="button" onclick="closeUnifiedModal(); dcOpenSubmit('new', { from: 'submit-new' });"
                                         style="padding:16px; background:#f8f9fa; border:2px solid #e2e8f0; border-radius:14px; cursor:pointer; transition:all 0.3s ease; display:flex; flex-direction:column; align-items:center; gap:6px; font-weight:700; color:#64748b;">
                                     <span style="font-size:1.7em; line-height:1;">💊</span>
                                     <div>Drug</div>
                                     <div style="font-size:0.72em; opacity:0.7;">DD Codex</div>
                                 </button>
-                                <button type="button" onclick="closeUnifiedModal(); dxOpenSubmit('new');"
+                                <button type="button" onclick="closeUnifiedModal(); dxOpenSubmit('new', { from: 'submit-new' });"
                                         style="padding:16px; background:#f8f9fa; border:2px solid #e2e8f0; border-radius:14px; cursor:pointer; transition:all 0.3s ease; display:flex; flex-direction:column; align-items:center; gap:6px; font-weight:700; color:#64748b;">
                                     <span style="font-size:1.7em; line-height:1;">🩺</span>
                                     <div>Disease</div>
@@ -5099,6 +5112,7 @@
         <div class="modal-content dc-submit-shell">
             <div class="dc-submit-head">
                 <div>
+                    <button type="button" id="dx-submit-back" class="dc-submit-back lang-no-toggle" onclick="dxSubmitBack()"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i><span id="dx-submit-back-label">Back</span></button>
                     <span class="dc-submit-title">📥 Submit Disease</span>
                     <span id="dx-submit-mode-pill" class="dc-submit-mode-pill">New entry</span>
                 </div>
@@ -5173,6 +5187,7 @@
         <div class="modal-content dc-submit-shell">
             <div class="dc-submit-head">
                 <div>
+                    <button type="button" id="dc-submit-back" class="dc-submit-back lang-no-toggle" onclick="dcSubmitBack()"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i><span id="dc-submit-back-label">Back</span></button>
                     <span class="dc-submit-title">📥 Submit Drug</span>
                     <span id="dc-submit-mode-pill" class="dc-submit-mode-pill">New entry</span>
                 </div>
@@ -16621,7 +16636,7 @@
                     + '<div style="font-weight:700; color:#475569; margin-bottom:14px;">No drafts yet</div>'
                     + '<div style="display:flex; gap:10px;">'
                     + '<button type="button" onclick="dxSwitchView(\'browse\')" style="flex:1; width:auto; min-height:0; background:#f0fdfa; color:#0f766e; border:1px solid #99f6e4; border-radius:8px; padding:7px 12px; font-weight:700; font-size:0.85em; cursor:pointer;">📚 Open Browse</button>'
-                    + '<button type="button" onclick="dxOpenSubmit(\'new\')" style="flex:1; width:auto; min-height:0; background:#0f766e; color:#fff; border:1px solid #0f766e; border-radius:8px; padding:7px 12px; font-weight:700; font-size:0.85em; cursor:pointer;">📥 Submit</button>'
+                    + '<button type="button" onclick="dxOpenSubmit(\'new\', { from: \'drafts\' })" style="flex:1; width:auto; min-height:0; background:#0f766e; color:#fff; border:1px solid #0f766e; border-radius:8px; padding:7px 12px; font-weight:700; font-size:0.85em; cursor:pointer;">📥 Submit</button>'
                     + '</div>'
                     + '</div>';
                 return;
@@ -16711,6 +16726,9 @@
             dxSubmitState.editingId = null;
             dxSubmitState.targetDiseaseId = null;
             dxSubmitState.targetDiseaseName = '';
+            // V99.48: where Back returns to. Suggest-edit always comes from the detail
+            // view and edit-pending from My drafts; 'new' callers pass ctx.from.
+            dxSubmitState.from = (ctx && ctx.from) || (mode === 'suggest-edit' ? 'detail' : mode === 'edit-pending' ? 'drafts' : '');
 
             const titleEl = document.getElementById('dx-submit-mode-pill');
             const banner = document.getElementById('dx-submit-target-banner');
@@ -16775,6 +16793,7 @@
                     internNotes: ''
                 });
             }
+            dxSetBackLabel();
             dxMarkSubmitClean();
             const modal = document.getElementById('diseaseCodexSubmitModal');
             if (modal) modal.style.display = 'flex';
@@ -16856,11 +16875,42 @@
             ov.querySelector('.dd-discard-keep').focus();
         }
         function dxMarkSubmitClean() { dxSubmitState.snapshot = dxCollectSubmitForm(); }
-        function dxRequestCloseSubmit() {
+        // afterClose runs only once the form has really closed (V99.48: Back uses it
+        // to reopen where the intern came from). × / Cancel pass nothing.
+        function dxRequestCloseSubmit(afterClose) {
             const snap = dxSubmitState.snapshot;
             const changed = ddCountChanged(snap, dxCollectSubmitForm());
-            if (!changed) { dxCloseSubmit(); return; }
-            ddConfirmDiscard(changed, ddIsBlank(snap), dxCloseSubmit);
+            const close = () => { dxCloseSubmit(); if (typeof afterClose === 'function') afterClose(); };
+            if (!changed) { close(); return; }
+            ddConfirmDiscard(changed, ddIsBlank(snap), close);
+        }
+
+        // V99.48 — DD Codex Phase 2: "← <origin>" in the submit header. The form can
+        // open from ＋ Submit New, My drafts (Edit / Resubmit / empty-state Submit)
+        // or a detail view (Suggest edit); Back returns there, through the discard
+        // check above. Unknown origin → plain "Back" that just closes.
+        function ddBackLabel(from, targetName) {
+            if (from === 'submit-new') return 'Submit New';
+            if (from === 'drafts') return 'My drafts';
+            if (from === 'detail' && targetName) return targetName;
+            return 'Back';
+        }
+        function ddApplyBackLabel(btnId, labelId, label) {
+            const el = document.getElementById(labelId);
+            if (el) el.textContent = label;
+            const btn = document.getElementById(btnId);
+            if (btn) btn.setAttribute('aria-label', label === 'Back' ? 'Back' : 'Back to ' + label);
+        }
+        function dxSetBackLabel() {
+            ddApplyBackLabel('dx-submit-back', 'dx-submit-back-label', ddBackLabel(dxSubmitState.from, dxSubmitState.targetDiseaseName));
+        }
+        function dxSubmitBack() {
+            // Read these before the close resets dxSubmitState.
+            const from = dxSubmitState.from, targetId = dxSubmitState.targetDiseaseId;
+            dxRequestCloseSubmit(() => {
+                if (from === 'submit-new') openUnifiedModal();
+                else if (from === 'detail' && targetId) dxOpenDetail(targetId);
+            });
         }
 
         async function dxSubmitForm() {
@@ -16980,7 +17030,7 @@
             // Open a fresh "new" draft pre-filled from the rejected one. We
             // don't reuse the rejected doc because rules lock it to admin once
             // status != 'pending'. The rejected draft stays as a record.
-            dxOpenSubmit('new');
+            dxOpenSubmit('new', { from: 'drafts' });
             dxFillSubmitForm(draft);
             dxMarkSubmitClean();  // V99.47: the pre-fill is the starting point, not an edit
             const errEl = document.getElementById('dx-submit-error');
@@ -17614,7 +17664,7 @@
                     + '<div style="font-weight:700; color:#475569; margin-bottom:14px;">No drafts yet</div>'
                     + '<div style="display:flex; gap:10px;">'
                     + '<button type="button" onclick="dcSwitchView(\'browse\')" style="flex:1; width:auto; min-height:0; background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; border-radius:8px; padding:7px 12px; font-weight:700; font-size:0.85em; cursor:pointer;">📚 Open Browse</button>'
-                    + '<button type="button" onclick="dcOpenSubmit(\'new\')" style="flex:1; width:auto; min-height:0; background:#2563eb; color:#fff; border:1px solid #2563eb; border-radius:8px; padding:7px 12px; font-weight:700; font-size:0.85em; cursor:pointer;">📥 Submit</button>'
+                    + '<button type="button" onclick="dcOpenSubmit(\'new\', { from: \'drafts\' })" style="flex:1; width:auto; min-height:0; background:#2563eb; color:#fff; border:1px solid #2563eb; border-radius:8px; padding:7px 12px; font-weight:700; font-size:0.85em; cursor:pointer;">📥 Submit</button>'
                     + '</div>'
                     + '</div>';
                 return;
@@ -17704,6 +17754,8 @@
             dcSubmitState.editingId = null;
             dcSubmitState.targetDrugId = null;
             dcSubmitState.targetDrugName = '';
+            // V99.48: where Back returns to — see dxOpenSubmit().
+            dcSubmitState.from = (ctx && ctx.from) || (mode === 'suggest-edit' ? 'detail' : mode === 'edit-pending' ? 'drafts' : '');
 
             const titleEl = document.getElementById('dc-submit-mode-pill');
             const banner = document.getElementById('dc-submit-target-banner');
@@ -17768,6 +17820,7 @@
                     internNotes: ''
                 });
             }
+            dcSetBackLabel();
             dcMarkSubmitClean();
             const modal = document.getElementById('drugCodexSubmitModal');
             // V94.97: 'flex' instead of 'block' so the .modal centering rules fire.
@@ -17794,11 +17847,29 @@
         }
         // V99.47 — discard check for × / Cancel; see dxRequestCloseSubmit().
         function dcMarkSubmitClean() { dcSubmitState.snapshot = dcCollectSubmitForm(); }
-        function dcRequestCloseSubmit() {
+        function dcRequestCloseSubmit(afterClose) {
             const snap = dcSubmitState.snapshot;
             const changed = ddCountChanged(snap, dcCollectSubmitForm());
-            if (!changed) { dcCloseSubmit(); return; }
-            ddConfirmDiscard(changed, ddIsBlank(snap), dcCloseSubmit);
+            const close = () => { dcCloseSubmit(); if (typeof afterClose === 'function') afterClose(); };
+            if (!changed) { close(); return; }
+            ddConfirmDiscard(changed, ddIsBlank(snap), close);
+        }
+        // V99.48 — Back button; see dxSubmitBack().
+        function dcSetBackLabel() {
+            ddApplyBackLabel('dc-submit-back', 'dc-submit-back-label', ddBackLabel(dcSubmitState.from, dcSubmitState.targetDrugName));
+        }
+        function dcSubmitBack() {
+            const from = dcSubmitState.from, targetId = dcSubmitState.targetDrugId;
+            dcRequestCloseSubmit(() => {
+                if (from === 'submit-new') openUnifiedModal();
+                else if (from === 'detail' && targetId) {
+                    // Suggest-edit only hid the detail modal, so a discussion listener
+                    // wired before it may still be live with wired=true — reset it so
+                    // the re-rendered thread wires fresh when opened.
+                    dcDiscussionTeardown();
+                    dcOpenDetail(targetId);
+                }
+            });
         }
 
         async function dcSubmitForm() {
@@ -17918,7 +17989,7 @@
             // Open a fresh "new" draft pre-filled from the rejected one. We
             // don't reuse the rejected doc because rules lock it to admin once
             // status != 'pending'. The rejected draft stays as a record.
-            dcOpenSubmit('new');
+            dcOpenSubmit('new', { from: 'drafts' });
             dcFillSubmitForm(draft);
             dcMarkSubmitClean();  // V99.47: the pre-fill is the starting point, not an edit
             const errEl = document.getElementById('dc-submit-error');
