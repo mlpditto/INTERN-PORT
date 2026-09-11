@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.37)</title>
+    <title>Nika Admin (V99.38)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -12836,9 +12836,9 @@
                         </div>
 
                     <div id="quiz-editor-review-actions" style="display:flex; flex-wrap:wrap; gap:6px;">
-<button class="btn-sm" onclick="openQuizReview(this)" title="Score every question, then switch to rewrites in the same popup — opens saved results for free when they exist" style="background:linear-gradient(135deg,#7c3aed,#0891b2); color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-clipboard-check"></i> Review</button>
-<button class="btn-sm" id="quiz-audit-trial-btn" onclick="auditQuizAI(this, { forceNew: true, trial38: true })" title="Run a Gemini 3.8 Flash audit directly; replaces any saved scorecard" style="background:#ecfeff; color:#0e7490; border:1px solid #a5f3fc; padding:4px 10px; border-radius:10px; font-weight:700; font-size:0.68em; min-height:32px;">🧪 Audit 3.8</button>
-<button class="btn-sm" id="quiz-audit-terra-btn" onclick="auditQuizAI(this, { forceNew: true, trialTerra: true })" title="Run a GPT-5.6 Terra audit directly; replaces any saved scorecard" style="background:#ecfeff; color:#0e7490; border:1px solid #a5f3fc; padding:4px 10px; border-radius:10px; font-weight:700; font-size:0.68em; min-height:32px;">🧪 Audit Terra</button>
+<button class="btn-sm lang-no-toggle" onclick="openQuizReview(this)" title="Score every question, then switch to rewrites in the same popup — opens saved results for free when they exist" style="background:linear-gradient(135deg,#7c3aed,#0891b2); color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-clipboard-check"></i> ตรวจคุณภาพ</button>
+
+
                     </div>
                     <details id="quiz-editor-ai" class="quiz-editor-fold">
                         <summary>AI / Translate / PDF / Expand</summary>
@@ -17755,6 +17755,33 @@
             result.overallScore = Math.round(rows.reduce((sum, row) => sum + row.averageScore, 0) / rows.length * 10) / 10;
         };
 
+        window.auditModelControlsHtml = function(hasResult) {
+            return `<div class="lang-no-toggle" style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; color:#334155;">
+                <label for="quality-audit-model">โมเดลสำหรับตรวจใหม่</label>
+                <select id="quality-audit-model" style="padding:8px; min-height:44px; max-width:100%; border:1px solid #cbd5e1; border-radius:8px; background:white; color:#334155;">
+                    <option value="gemini-3.8-flash">Gemini 3.8</option>
+                    <option value="gpt-5.6-terra">GPT-5.6 Terra</option>
+                </select>
+                <button onclick="runSelectedQualityAudit(this)" style="padding:8px 12px; min-height:44px; border:0; border-radius:8px; background:#0891b2; color:white; cursor:pointer;">${hasResult ? 'ตรวจใหม่' : 'เริ่มตรวจ'}</button>
+            </div>`;
+        };
+
+        window.runSelectedQualityAudit = function(btn) {
+            const terra = document.getElementById('quality-audit-model').value === 'gpt-5.6-terra';
+            return auditQuizAI(btn, { forceNew: true, trial38: !terra, trialTerra: terra });
+        };
+
+        window.renderAuditStart = function() {
+            document.getElementById('ai-audit-popup-regen')?.remove();
+            const modal = document.createElement('div');
+            modal.id = 'ai-audit-popup';
+            modal.className = 'lang-no-toggle';
+            modal.style = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:92%; max-width:780px; max-height:85vh; overflow-y:auto; background:white; color:#334155; padding:24px; border-radius:20px; box-shadow:0 20px 60px rgba(0,0,0,.3); z-index:10001;';
+            modal.innerHTML = `<div style="display:flex; justify-content:space-between; gap:8px;">${window.reviewTabsHtml('audit')}<button onclick="closeQuizReview()" aria-label="Close the review">✕</button></div>
+                <p>ยังไม่มีผลตรวจคุณภาพ เลือกโมเดลแล้วกดเริ่มตรวจ</p>${window.auditModelControlsHtml(false)}`;
+            document.body.appendChild(modal);
+        };
+
         window.auditQuizAI = async function(clickedBtn, opts = {}) {
             const formData = getQuizFormData();
             if (!formData.questions || formData.questions.length < 1) return alert('Add at least 1 question to audit.');
@@ -17807,15 +17834,20 @@
                                 cachedResult: saved.result,
                                 cachedModel: saved.model,
                                 cachedTokens: saved.tokens,
-                                cachedSavedAtLabel: savedAtLabel
+                                cachedSavedAtLabel: savedAtLabel,
+                                cachedStale: window.quizAuditIsStale({ ...formData, lastAiAudit: saved })
                             });
                         }
                     } catch (e) {
-                        console.warn('Could not check for a saved audit, running fresh:', e);
+                        console.warn('Could not load saved audit:', e);
+                        regenHost?.remove();
+                        return alert('โหลดผลตรวจเดิมไม่สำเร็จ กรุณาลองอีกครั้ง');
                     } finally {
                         if (preBtn) { preBtn.innerHTML = preOldHtml; preBtn.disabled = false; }
                     }
                 }
+                window.renderAuditStart();
+                return;
             }
 
             const btn = clickedBtn || (event && event.target ? event.target.closest('button') : null);
@@ -17970,7 +18002,13 @@ RULES:
                 // duplication depends on the live question set, not on whether the audit
                 // scores themselves were just generated or reopened from a saved run.
                 const dupMap = window.computeQuizSetDuplicatesAll(formData.questions);
-                renderAuditScorecard(result, aiModel, aiTokens, bp, formData.questions, (opts && opts.cachedSavedAtLabel) || null, dupMap);
+                renderAuditScorecard(result, aiModel, aiTokens, bp, formData.questions, (opts && opts.cachedResult) ? (opts.cachedSavedAtLabel || '') : null, dupMap);
+                if (opts.cachedStale) {
+                    const notice = document.createElement('p');
+                    notice.textContent = 'คำถามมีการแก้ไข ควรตรวจใหม่ — ผลด้านล่างเป็นผลตรวจเดิม';
+                    notice.style = 'color:#92400e; background:#fffbeb; padding:12px; border-radius:8px;';
+                    document.getElementById('ai-audit-popup').prepend(notice);
+                }
 
             } catch (e) {
                 console.error('Audit error:', e);
@@ -18161,7 +18199,7 @@ RULES:
             // AI call — mirrors analyzeQuizAI's savedBannerHtml (V97.39).
             const savedBannerHtml = savedAtLabel !== null && savedAtLabel !== undefined ? `
                 <div style="background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; padding:10px 16px; border-radius:12px; margin-bottom:16px; font-size:0.85em; display:flex; align-items:center; gap:8px;">
-                    <i class="fa-solid fa-clock-rotate-left"></i> Showing a saved audit${savedAtLabel ? ` from ${savedAtLabel}` : ''} — no tokens spent. Hit 🔄 Regenerate for a fresh run.
+                    <i class="fa-solid fa-clock-rotate-left"></i> Showing a saved audit${savedAtLabel ? ` from ${savedAtLabel}` : ''} — no tokens spent. เลือกโมเดลแล้วกดตรวจใหม่เมื่อต้องการรันอีกครั้ง.
                 </div>
             ` : '';
 
@@ -18169,8 +18207,7 @@ RULES:
                 <div style="display:flex; flex-wrap:wrap; gap:8px; justify-content:space-between; align-items:center; border-bottom:2px solid #f1f5f9; padding-bottom:14px; margin-bottom:18px;">
                     ${window.reviewTabsHtml('audit')}
                     <div style="display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px;">
-                        <button onclick="auditQuizAI(this, { forceNew: true, trial38: true })" title="Run a new Gemini 3.8 Flash audit with low thinking; replaces the saved scorecard" style="border:1px solid #a5f3fc; background:#ecfeff; color:#0e7490; padding:6px 10px; min-height:34px; border-radius:10px; cursor:pointer; font-size:0.78em; font-weight:700;">🧪 Gemini 3.8 · Trial</button>
-                        <button onclick="auditQuizAI(null, { forceNew: true })" title="Run a fresh Audit (spends tokens) — the 🧪 Scorecard tab itself opens a saved audit for free when one exists" style="border:1px solid #e2e8f0; background:#f8fafc; color:#475569; padding:0 12px; height:34px; border-radius:10px; cursor:pointer; font-size:0.78em; font-weight:700; display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-arrows-rotate"></i> Regenerate</button>
+                        ${window.auditModelControlsHtml(true)}
                         <button onclick="closeQuizReview()" title="Close the review" style="border:none; background:#f1f5f9; color:#64748b; width:34px; height:34px; border-radius:50%; cursor:pointer; font-size:1.1em;">✕</button>
                     </div>
                 </div>
