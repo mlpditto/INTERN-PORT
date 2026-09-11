@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.23)</title>
+    <title>Nika Admin (V99.24)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -16120,6 +16120,22 @@
             } else if (modelName.includes('glm-5.1') || modelName.includes('ollama')) {
                 proxyProvider = "ollama";
             }
+            // V99.24: the Audit trial uses one authenticated server request, with no local-key fallback.
+            if (modelName === 'gemini-3.8-flash' && (proxyProvider === 'gemini' || proxyProvider === 'gemini-aistudio')) {
+                const response = await fetch(PROXY_URL, {
+                    method: 'POST',
+                    headers: await window._aiAuthHeaders(),
+                    body: JSON.stringify({ provider: 'gemini-aistudio', model: modelName, prompt, isJson, visionData,
+                        generationOptions: generationOptions || undefined, feature: aiFeature || undefined })
+                });
+                const data = await response.json();
+                if (!response.ok || data.error) throw new Error(data.error || `Gemini 3.8 request failed (${response.status}).`);
+                if (!data.usage || (isJson && data.jsonValid !== true) || data.finishReason !== 'STOP') {
+                    throw new Error('Gemini 3.8 server response is not ready. Update callAIProxy before using the trial.');
+                }
+                updateAIUsage('gemini-aistudio', data.tokens || 0);
+                return { text: data.text || '', tokens: data.tokens || 0, model: data.model || modelName, raw: data };
+            }
             // V92.70: AI Studio image models also need proxy-only path so failed proxy doesn't fall through to text-only OpenAI fallback
             const isProxyOnlyImageModel = (proxyProvider === 'gemini-aistudio' && /image/i.test(modelName))
                 || (proxyProvider === 'openrouter' && /image/i.test(modelName));
@@ -17700,7 +17716,7 @@
                     }, 350);
                 }
 
-                const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-3.6-flash';
+                const selectedModel = opts.trial38 ? 'gemini-3.8-flash' : (document.getElementById('ai-analyzer-model-val').value || 'gemini-3.6-flash');
                 let resultRaw = '', aiTokens = 0, aiModel = '', result = null;
 
                 // V97.41: "🕑" next to Audit reopens a previously-saved audit (Firestore
@@ -17764,6 +17780,7 @@ RULES:
                         aiTokens = aiResp.tokens;
                         aiModel = aiResp.model;
                         result = safeJsonParse(resultRaw);
+                        if (result && opts.trial38) result.gemini38Metrics = { usage: aiResp.raw.usage, latencyMs: aiResp.raw.latencyMs, finishReason: aiResp.raw.finishReason, jsonValid: aiResp.raw.jsonValid };
                         if (result) break;
                         if (attempt === 1) console.warn('[auditQuizAI] attempt 1 non-JSON, retrying. Snippet:', String(resultRaw || '').slice(0, 200));
                     }
@@ -18023,9 +18040,10 @@ RULES:
             ` : '';
 
             modal.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #f1f5f9; padding-bottom:14px; margin-bottom:18px;">
+                <div style="display:flex; flex-wrap:wrap; gap:8px; justify-content:space-between; align-items:center; border-bottom:2px solid #f1f5f9; padding-bottom:14px; margin-bottom:18px;">
                     ${window.reviewTabsHtml('audit')}
-                    <div style="display:flex; align-items:center; gap:8px;">
+                    <div style="display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px;">
+                        <button onclick="auditQuizAI(this, { forceNew: true, trial38: true })" title="Run a new Gemini 3.8 Flash audit with low thinking; replaces the saved scorecard" style="border:1px solid #a5f3fc; background:#ecfeff; color:#0e7490; padding:6px 10px; min-height:34px; border-radius:10px; cursor:pointer; font-size:0.78em; font-weight:700;">🧪 Gemini 3.8 · Trial</button>
                         <button onclick="auditQuizAI(null, { forceNew: true })" title="Run a fresh Audit (spends tokens) — the 🧪 Scorecard tab itself opens a saved audit for free when one exists" style="border:1px solid #e2e8f0; background:#f8fafc; color:#475569; padding:0 12px; height:34px; border-radius:10px; cursor:pointer; font-size:0.78em; font-weight:700; display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-arrows-rotate"></i> Regenerate</button>
                         <button onclick="closeQuizReview()" title="Close the review" style="border:none; background:#f1f5f9; color:#64748b; width:34px; height:34px; border-radius:50%; cursor:pointer; font-size:1.1em;">✕</button>
                     </div>
@@ -18037,6 +18055,7 @@ RULES:
                     <div style="font-size:0.75em; color:${overallColor}; opacity:0.8; margin-top:4px;">${result.perQuestionAudit.length} question${result.perQuestionAudit.length === 1 ? '' : 's'} audited${blueprintBloom ? ` · blueprint Bloom = ${escapeHtml(blueprintBloom)}` : ''}</div>
                 </div>
                 ${perQHtml}
+                ${result.gemini38Metrics ? `<div style="font-size:0.75em; color:#64748b; margin:10px 0;">Gemini 3.8 · Thinking: low · Input: ${escapeHtml(String(result.gemini38Metrics.usage?.inputTokens ?? '—'))} · Output: ${escapeHtml(String(result.gemini38Metrics.usage?.outputTokens ?? '—'))} · Thinking tokens: ${escapeHtml(String(result.gemini38Metrics.usage?.thinkingTokens ?? '—'))} · ${escapeHtml(String(result.gemini38Metrics.latencyMs ?? '—'))} ms · ${escapeHtml(result.gemini38Metrics.finishReason || '—')} · JSON: ${result.gemini38Metrics.jsonValid === true ? 'valid' : '—'}</div>` : ''}
                 <div style="margin-top:14px; padding-top:12px; border-top:1px solid #e2e8f0; font-size:0.7em; color:#94a3b8; display:flex; justify-content:space-between;">
                     <span>🚀 Model: <b>${escapeHtml(aiModel || '')}</b> · 💡 Tokens: <b>${aiTokens.toLocaleString()}</b></span>
                     <span style="opacity:0.7;">V93.88 Q3 · 1-pass</span>
@@ -57920,6 +57939,7 @@ ${steerBlock}
             // matched it first and mislabeled every Pro-generated result as "Flash", even
             // though the admin picked Pro. startsWith (not ===) so a version-suffixed id
             // the proxy might echo back (e.g. gemini-3.6-flash-002) still matches.
+            if (m.startsWith('gemini-3.8')) return { label: 'Gemini 3.8 Flash', emoji: '⚡', color: '#0891b2' };
             if (m.startsWith('gemini-3.6')) return { label: 'Pro', emoji: '🧠', color: '#6366f1' };
             if (m.startsWith('gemini-3.5')) return { label: 'Flash', emoji: '⚡', color: '#fbbf24' };
             if (m.includes('flash')) return { label: 'Flash', emoji: '⚡', color: '#fbbf24' };
