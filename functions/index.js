@@ -571,6 +571,29 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 return res.status(500).json({ error: "OPENAI_API_KEY is not configured on server." });
             }
 
+            if (model === 'gpt-5.6-terra') {
+                const started = Date.now();
+                const response = await postWithRetry('https://api.openai.com/v1/responses', {
+                    model, input: prompt, store: false,
+                    reasoning: { effort: 'low' },
+                    text: { format: { type: isJson ? 'json_object' : 'text' } },
+                    max_output_tokens: Math.min(Math.max(Number(generationOptions && generationOptions.maxOutputTokens) || 8192, 1024), 32768)
+                }, { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' } });
+                const data = response.data;
+                const text = (data.output || []).flatMap(item => item.content || [])
+                    .filter(item => item.type === 'output_text').map(item => item.text || '').join('');
+                let jsonValid = false;
+                try { JSON.parse(text); jsonValid = true; } catch (_) {}
+                if (data.status !== 'completed' || !text.trim() || (isJson && !jsonValid)) {
+                    return res.status(502).json({ error: 'Terra returned incomplete or invalid output.', jsonValid });
+                }
+                const usage = data.usage || {};
+                return res.json({ text, model: data.model || model, tokens: usage.total_tokens || 0,
+                    usage: { inputTokens: usage.input_tokens ?? null, outputTokens: usage.output_tokens ?? null,
+                        thinkingTokens: usage.output_tokens_details?.reasoning_tokens ?? null, totalTokens: usage.total_tokens ?? null },
+                    latencyMs: Date.now() - started, finishReason: data.status, jsonValid });
+            }
+
             const actualModel = model.includes('gpt-5') ? model : (model.includes('gpt-4') ? 'gpt-5.4-mini' : model);
 
             // Ensure 'json' is in prompt for OpenAI if isJson is true (V89.15)

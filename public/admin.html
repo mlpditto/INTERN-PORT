@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.28)</title>
+    <title>Nika Admin (V99.29)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -12791,6 +12791,7 @@
                                      asked. Saved results still open free (V97.39 / V97.41). -->
                                 <button class="btn-sm" onclick="openQuizReview(this)" title="Score every question, then switch to rewrites in the same popup — opens saved results for free when they exist" style="background:linear-gradient(135deg,#7c3aed,#0891b2); color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-clipboard-check"></i> Review</button>
                                 <button class="btn-sm" id="quiz-audit-trial-btn" onclick="auditQuizAI(this, { forceNew: true, trial38: true })" title="Run a Gemini 3.8 Flash audit directly; replaces any saved scorecard" style="background:#ecfeff; color:#0e7490; border:1px solid #a5f3fc; padding:4px 10px; border-radius:10px; font-weight:700; font-size:0.68em; min-height:32px;">🧪 Audit 3.8</button>
+                                <button class="btn-sm" id="quiz-audit-terra-btn" onclick="auditQuizAI(this, { forceNew: true, trialTerra: true })" title="Run a GPT-5.6 Terra audit directly; replaces any saved scorecard" style="background:#ecfeff; color:#0e7490; border:1px solid #a5f3fc; padding:4px 10px; border-radius:10px; font-weight:700; font-size:0.68em; min-height:32px;">🧪 Audit Terra</button>
                                 <button class="btn-sm" onclick="openPdfToQuizModal()" title="Import PDF" style="background:#0ea5e9; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-file-pdf"></i> PDF</button>
                                 <button class="btn-sm" onclick="openSuggestMoreModal()" title="Expand" style="background:#f59e0b; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-sparkles"></i> Expand</button>
                             </div>
@@ -16140,6 +16141,20 @@
                 updateAIUsage('gemini-aistudio', data.tokens || 0);
                 return { text: data.text || '', tokens: data.tokens || 0, model: data.model || modelName, raw: data };
             }
+            if (proxyProvider === 'openai' && modelName === 'gpt-5.6-terra') {
+                const response = await fetch(PROXY_URL, {
+                    method: 'POST', headers: await window._aiAuthHeaders(),
+                    body: JSON.stringify({ provider: 'openai', model: modelName, prompt, isJson,
+                        generationOptions: generationOptions || undefined, feature: aiFeature || undefined })
+                });
+                const data = await response.json();
+                if (!response.ok || data.error) throw new Error(data.error || `Terra request failed (${response.status}).`);
+                if (!data.usage || data.finishReason !== 'completed' || (isJson && data.jsonValid !== true)) {
+                    throw new Error('Terra server response is not ready. Update callAIProxy before using the trial.');
+                }
+                updateAIUsage('openai', data.tokens || 0);
+                return { text: data.text || '', tokens: data.tokens || 0, model: data.model || modelName, raw: data };
+            }
             // V92.70: AI Studio image models also need proxy-only path so failed proxy doesn't fall through to text-only OpenAI fallback
             const isProxyOnlyImageModel = (proxyProvider === 'gemini-aistudio' && /image/i.test(modelName))
                 || (proxyProvider === 'openrouter' && /image/i.test(modelName));
@@ -17636,6 +17651,19 @@
         // but conceptually different — Specialist proposes rewrites, Audit judges each question on a
         // fixed rubric and surfaces raw scores so admin can prioritise fixes. 1-pass for now;
         // self-confirmation bias monitored, 2nd critic pass deferred.
+        window.normalizeAuditScores = function(result, questionCount) {
+            const rows = result && result.perQuestionAudit;
+            const dims = window.AUDIT_DIMS.map(d => d.key);
+            if (!Array.isArray(rows) || rows.length !== questionCount || !rows.length) throw new Error('Audit must include every question.');
+            rows.forEach((row, index) => {
+                if (row.qNumber !== index + 1 || !row.scores || dims.some(key => !Number.isInteger(row.scores[key]) || row.scores[key] < 1 || row.scores[key] > 5)) {
+                    throw new Error('Audit contains missing or invalid question scores.');
+                }
+                row.averageScore = Math.round(dims.reduce((sum, key) => sum + row.scores[key], 0) / dims.length * 10) / 10;
+            });
+            result.overallScore = Math.round(rows.reduce((sum, row) => sum + row.averageScore, 0) / rows.length * 10) / 10;
+        };
+
         window.auditQuizAI = async function(clickedBtn, opts = {}) {
             const formData = getQuizFormData();
             if (!formData.questions || formData.questions.length < 1) return alert('Add at least 1 question to audit.');
@@ -17720,7 +17748,7 @@
                     }, 350);
                 }
 
-                const selectedModel = opts.trial38 ? 'gemini-3.8-flash' : (document.getElementById('ai-analyzer-model-val').value || 'gemini-3.8-flash');
+                const selectedModel = opts.trialTerra ? 'gpt-5.6-terra' : opts.trial38 ? 'gemini-3.8-flash' : (document.getElementById('ai-analyzer-model-val').value || 'gemini-3.8-flash');
                 let resultRaw = '', aiTokens = 0, aiModel = '', result = null;
 
                 // V97.41: "🕑" next to Audit reopens a previously-saved audit (Firestore
@@ -17785,6 +17813,7 @@ RULES:
                         aiModel = aiResp.model;
                         result = safeJsonParse(resultRaw);
                         if (result && selectedModel === 'gemini-3.8-flash') result.gemini38Metrics = { usage: aiResp.raw.usage, latencyMs: aiResp.raw.latencyMs, finishReason: aiResp.raw.finishReason, jsonValid: aiResp.raw.jsonValid };
+                        if (result && selectedModel === 'gpt-5.6-terra') result.terraMetrics = { usage: aiResp.raw.usage, latencyMs: aiResp.raw.latencyMs, finishReason: aiResp.raw.finishReason, jsonValid: aiResp.raw.jsonValid };
                         if (result) break;
                         if (attempt === 1) console.warn('[auditQuizAI] attempt 1 non-JSON, retrying. Snippet:', String(resultRaw || '').slice(0, 200));
                     }
@@ -17792,6 +17821,8 @@ RULES:
                         throw new Error('AI returned invalid JSON after 2 attempts. First 300 chars:\n\n' + String(resultRaw || '').slice(0, 300));
                     }
                 }
+
+                if (!opts.cachedResult) window.normalizeAuditScores(result, formData.questions.length);
 
                 // V96.49 Phase 2-full: stash per-Q findings (Thai rationale + weakest
                 // dimension) keyed by qNumber so "Suggest fix" can feed them into the
@@ -18060,6 +18091,7 @@ RULES:
                 </div>
                 ${perQHtml}
                 ${result.gemini38Metrics ? `<div style="font-size:0.75em; color:#64748b; margin:10px 0;">Gemini 3.8 · Thinking: low · Input: ${escapeHtml(String(result.gemini38Metrics.usage?.inputTokens ?? '—'))} · Output: ${escapeHtml(String(result.gemini38Metrics.usage?.outputTokens ?? '—'))} · Thinking tokens: ${escapeHtml(String(result.gemini38Metrics.usage?.thinkingTokens ?? '—'))} · ${escapeHtml(String(result.gemini38Metrics.latencyMs ?? '—'))} ms · ${escapeHtml(result.gemini38Metrics.finishReason || '—')} · JSON: ${result.gemini38Metrics.jsonValid === true ? 'valid' : '—'}</div>` : ''}
+                ${result.terraMetrics ? `<div style="font-size:0.75em; color:#64748b; margin:10px 0;">GPT-5.6 Terra · Thinking: low · Input: ${escapeHtml(String(result.terraMetrics.usage?.inputTokens ?? '—'))} · Output: ${escapeHtml(String(result.terraMetrics.usage?.outputTokens ?? '—'))} · Thinking tokens: ${escapeHtml(String(result.terraMetrics.usage?.thinkingTokens ?? '—'))} · ${escapeHtml(String(result.terraMetrics.latencyMs ?? '—'))} ms · ${escapeHtml(result.terraMetrics.finishReason || '—')} · JSON: ${result.terraMetrics.jsonValid === true ? 'valid' : '—'}</div>` : ''}
                 <div style="margin-top:14px; padding-top:12px; border-top:1px solid #e2e8f0; font-size:0.7em; color:#94a3b8; display:flex; justify-content:space-between;">
                     <span>🚀 Model: <b>${escapeHtml(aiModel || '')}</b> · 💡 Tokens: <b>${aiTokens.toLocaleString()}</b></span>
                     <span style="opacity:0.7;">V93.88 Q3 · 1-pass</span>

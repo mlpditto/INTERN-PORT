@@ -8,7 +8,7 @@ const handlerSource = backend.slice(start, backend.indexOf('\n});', start) + 4);
 let request, authenticated = true, admin = true;
 let providerData;
 const ctx = {
-    exports: {}, onRequest: (_, fn) => fn, process: { env: { GEMINI_API_KEY: 'test-only' } },
+    exports: {}, onRequest: (_, fn) => fn, process: { env: { GEMINI_API_KEY: 'test-only', OPENAI_API_KEY: 'test-only' } },
     verifyIdTokenFromHeader: async (_, res) => authenticated ? {} : (res.status(401).json({error:'Unauthorized'}), null),
     isAdminToken: () => admin, recordAiUsage() {},
     postWithRetry: async (url, body) => { request = {url, body}; return {data: providerData}; },
@@ -40,6 +40,22 @@ function valid() { providerData = {modelVersion:'gemini-3.8-flash-001',candidate
     providerData={candidates:[{content:{parts:[{inlineData:{data:'abc',mimeType:'image/png'}}]}}]};
     r=await call({model:'gemini-3.1-flash-image-preview'}); assert.equal(r.data.imageDataUrl,'data:image/png;base64,abc');
     assert.equal(JSON.stringify(request.body.generationConfig),'{"responseModalities":["IMAGE","TEXT"]}');
+    const terraData = () => ({status:'completed',model:'gpt-5.6-terra',output:[{content:[{type:'output_text',text:'{"ok":true}'}]}],usage:{input_tokens:12,output_tokens:8,total_tokens:20,output_tokens_details:{reasoning_tokens:3}}});
+    providerData=terraData(); r=await call({provider:'openai',model:'gpt-5.6-terra'});
+    assert.equal(r.code,200); assert.equal(r.data.finishReason,'completed'); assert.equal(r.data.usage.thinkingTokens,3);
+    assert.equal(request.url,'https://api.openai.com/v1/responses'); assert.equal(request.body.store,false); assert.equal(request.body.reasoning.effort,'low');
+    assert.equal(request.body.max_output_tokens,32768); assert.equal(request.body.text.format.type,'json_object');
+    providerData.status='incomplete'; assert.equal((await call({provider:'openai',model:'gpt-5.6-terra'})).code,502);
+    providerData=terraData(); providerData.output[0].content[0].text='invalid'; assert.equal((await call({provider:'openai',model:'gpt-5.6-terra'})).code,502);
+    providerData=terraData(); providerData.output=[]; assert.equal((await call({provider:'openai',model:'gpt-5.6-terra'})).code,502);
+    const normStart=html.indexOf('        window.normalizeAuditScores =');
+    const normEnd=html.indexOf('\n        };',normStart)+11;
+    const scoreCtx={window:{AUDIT_DIMS:[{key:'a'},{key:'b'}]}};
+    vm.runInNewContext(html.slice(normStart,normEnd),scoreCtx);
+    const scoreResult={overallScore:5,perQuestionAudit:[{qNumber:1,scores:{a:1,b:2},averageScore:5},{qNumber:2,scores:{a:4,b:4},averageScore:1}]};
+    scoreCtx.window.normalizeAuditScores(scoreResult,2); assert.equal(scoreResult.overallScore,2.8); assert.equal(scoreResult.perQuestionAudit[0].averageScore,1.5);
+    assert.throws(()=>scoreCtx.window.normalizeAuditScores(scoreResult,3));
+    scoreResult.perQuestionAudit[0].scores.a=6; assert.throws(()=>scoreCtx.window.normalizeAuditScores(scoreResult,2));
     const a=html.indexOf('        window.callUniversalAI = async');
     const source=html.slice(a,html.indexOf('\n        };',a)+11);
     let calls=0, status=200, failNetwork=false, sent;
@@ -49,6 +65,7 @@ function valid() { providerData = {modelVersion:'gemini-3.8-flash-001',candidate
     r=await invoke();assert.equal(r.raw.usage.totalTokens,25);assert.equal(sent.provider,'gemini-aistudio');assert.equal(sent.feature,'quiz_audit');assert.equal(sent.generationOptions.feature,undefined);
     for (status of [401,403,429,502]) {calls=0;await assert.rejects(invoke);assert.equal(calls,1,'no duplicate request or browser fallback');}
     failNetwork=true;calls=0;await assert.rejects(invoke);assert.equal(calls,1);
+    calls=0; await assert.rejects(()=>front.window.callUniversalAI('gpt-5.6-terra','JSON synthetic',true)); assert.equal(calls,1,'Terra does not fall back to browser keys');
     const audit=html.slice(html.indexOf('        window.auditQuizAI = async'),html.indexOf('        function renderAuditScorecard'));
     assert.ok(audit.includes('result.gemini38Metrics ='));
     const analyze=html.slice(html.indexOf('        window.analyzeQuizAI = async'),html.indexOf('        window.auditQuizAI = async'));
