@@ -64,6 +64,12 @@ function valid() { providerData = {modelVersion:'gemini-3.8-flash-001',candidate
     vm.createContext(front);vm.runInContext(source,front);
     const invoke=()=>front.window.callUniversalAI('gemini-3.8-flash','synthetic',true,null,'',{maxOutputTokens:32768,feature:'quiz_audit'});
     r=await invoke();assert.equal(r.raw.usage.totalTokens,25);assert.equal(sent.provider,'gemini-aistudio');assert.equal(sent.feature,'quiz_audit');assert.equal(sent.generationOptions.feature,undefined);
+    vm.runInContext(fs.readFileSync('public/quiz-generation-rules.js','utf8'),front);
+    for (const feature of ['case_to_quiz','kb_to_quiz','quiz_suggestion','quiz_regen_suggestion','quiz_image_generate']) {
+        await front.window.callUniversalAI('gemini-3.8-flash','source',true,null,'',{feature});
+        assert(sent.prompt.includes('Each question must stand alone')); assert.equal(sent.feature,feature);
+    }
+    await invoke(); assert.equal(sent.prompt,'synthetic','audit prompt remains unchanged');
     for (status of [401,403,429,502]) {calls=0;await assert.rejects(invoke);assert.equal(calls,1,'no duplicate request or browser fallback');}
     failNetwork=true;calls=0;await assert.rejects(invoke);assert.equal(calls,1);
     for (const model of front.window.AI_MODEL_REGISTRY.models.filter(m => m.adapter !== 'gemini-content')) {
@@ -80,7 +86,7 @@ function valid() { providerData = {modelVersion:'gemini-3.8-flash-001',candidate
         const hidden={value:'gemini-3.8-flash'};
         const active=[];
         const rail={querySelectorAll:()=>['gemini-3.8-flash','gemini-3.6-flash','gpt-5.4'].map(value=>({dataset:{value},classList:{toggle:(name,on)=>{if(on)active.push(value);}}}))};
-        const ctx={localStorage:{getItem:()=>stored,setItem:(key,value)=>{assert.equal(key,'ai_default_analyzer_model');assert.equal(value,'gemini-3.8-flash');}},document:{getElementById:()=>hidden},rail};
+        const ctx={window:{},localStorage:{getItem:()=>stored,setItem:(key,value)=>{assert.equal(key,'ai_default_analyzer_model');assert.equal(value,'gemini-3.8-flash');}},document:{getElementById:()=>hidden},rail};
         vm.runInNewContext(html.slice(start,end)+";syncChipRailToHidden(rail,'ai-analyzer-model-val');",ctx);
         assert.equal(hidden.value,stored && !stored.startsWith('or/xiaomi/mimo') ? stored : 'gemini-3.8-flash');
         assert.deepEqual(active,[hidden.value]);
