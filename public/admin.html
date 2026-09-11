@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.41)</title>
+    <title>Nika Admin (V99.42)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -44849,6 +44849,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function renderTable(type) {
             const tbody = document.querySelector(`#${type}Table tbody`);
             let data = (type === 'works') ? [...worksData] : [...usersData];
+            let usersRank = null, usersHeads = null, usersIgnOpen = false;
             if (type === 'works') {
                 if (!hideCompletedWorks) {
                     data = [...data, ...quizApprovedData, ...(window.pollData || [])];
@@ -44921,6 +44922,28 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
                 const countLabel = document.getElementById('user-count-label');
                 if (countLabel) countLabel.innerText = `${data.length} users`;
+
+                // V99.42 — Elite Board Phase 1: the table is three sections, not one
+                // ranked list. Pending pre-registrations are work waiting on the admin,
+                // so they go first. Ignored rows fold away at the bottom and get no
+                // rank — the leaderboard already leaves them out, so the two now agree.
+                // filter() is stable: each section keeps the score/period order above.
+                const secPend = data.filter(u => u.isPreReg);
+                const secAct = data.filter(u => !u.isPreReg && !u.isIgnored);
+                const secIgn = data.filter(u => !u.isPreReg && u.isIgnored);
+                data = [...secPend, ...secAct, ...secIgn];
+                usersRank = new Map(secAct.map((u, i) => [u, i + 1]));
+                // A search that only matches an ignored user must still show them.
+                usersIgnOpen = !!window._userIgnOpen || !!t;
+                const secHead = html => `<tr class="u-sec-row"><td colspan="8" style="padding:0; background:var(--bg-body); border-top:1px solid var(--border-color);">${html}</td></tr>`;
+                const secLabel = (label, n, color) => `<span style="display:inline-flex; align-items:center; gap:6px; padding:7px 12px; font-size:0.78em; font-weight:800; color:${color};">${label} <span style="background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-sub); padding:0 8px; border-radius:10px; font-size:0.92em;">${n}</span></span>`;
+                usersHeads = new Map();
+                if (secPend.length) usersHeads.set(secPend[0], secHead(secLabel('<i class="fa-solid fa-hourglass-half"></i> Pending requests', secPend.length, '#b45309')));
+                if (secAct.length) usersHeads.set(secAct[0], secHead(secLabel('<i class="fa-solid fa-circle-check"></i> Active · ranked', secAct.length, 'var(--text-main)')));
+                if (secIgn.length) {
+                    const ignHint = t ? 'not ranked · shown while searching' : `not ranked · click to ${usersIgnOpen ? 'hide' : 'show'}`;
+                    usersHeads.set(secIgn[0], secHead(`<button type="button" onclick="toggleUserIgnoredSection()" aria-expanded="${usersIgnOpen}" style="width:100%; min-height:0; margin:0; padding:0; display:flex; align-items:center; gap:4px; background:transparent; border:none; cursor:pointer; text-align:left; font-family:inherit;">${secLabel(`<i class="fa-solid fa-chevron-${usersIgnOpen ? 'down' : 'right'}"></i> Hidden (ignored)`, secIgn.length, 'var(--text-sub)')}<span style="font-size:0.72em; color:var(--text-sub);">${ignHint}</span></button>`));
+                }
             }
 
             // 🔥 Stat Chip: General Work Count (Pending only)
@@ -44986,8 +45009,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     }
                 }
                 else {
-                    const rank = data.indexOf(d) + 1;
-                    let rankDisplay = `<span style="color:#aaa; font-weight:bold;">${rank}</span>`;
+                    const secHeadHtml = usersHeads.get(d);
+                    if (secHeadHtml) tbody.innerHTML += secHeadHtml;
+                    if (d.isIgnored && !d.isPreReg && !usersIgnOpen) return;
+                    const rank = usersRank.get(d);
+                    let rankDisplay = rank ? `<span style="color:#aaa; font-weight:bold;">${rank}</span>` : '<span style="color:#cbd5e1; font-weight:bold;">–</span>';
                     if (rank === 1) rankDisplay = '<span style="font-size:1.4em;">🥇</span>';
                     else if (rank === 2) rankDisplay = '<span style="font-size:1.4em;">🥈</span>';
                     else if (rank === 3) rankDisplay = '<span style="font-size:1.4em;">🥉</span>';
@@ -45146,6 +45172,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             });
         }
         function toggleWorkArchive() { hideCompletedWorks = !hideCompletedWorks; document.getElementById('btn-toggle-work-archive').classList.toggle('active'); renderTable('works'); }
+        // V99.42: open/close the folded "Hidden (ignored)" section of the Users table.
+        // A window flag, not DOM state — every users onSnapshot re-renders the table.
+        function toggleUserIgnoredSection() { window._userIgnOpen = !window._userIgnOpen; renderTable('users'); }
         async function adjDec(id) { try { const valInput = document.getElementById(`adj-${id}`); let v = valInput.value; if (!v) return alert("Please specify score."); v = v.replace(',', '.'); const scoreVal = parseFloat(v); if (isNaN(scoreVal)) return alert("Invalid score value."); const n = prompt("Reason (Note):"); if (!n) return; const editor = (auth && auth.currentUser) || {}; await db.collection("users").doc(id).update({ score: firebase.firestore.FieldValue.increment(scoreVal) }); await db.collection("checkin_logs").add({ userId: id, type: 'manual_adjust', amount: scoreVal, note: n, timestamp: firebase.firestore.FieldValue.serverTimestamp(), createdByUid: editor.uid || 'unknown', createdByEmail: editor.email || ALLOWED_EMAIL }); showToast("Saved!"); valInput.value = ""; valInput.blur(); } catch (e) { alert("Error saving score: " + e.message); } }
 
         // V98.57: log a Work submission on behalf of a user.
