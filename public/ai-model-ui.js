@@ -1,5 +1,17 @@
 // Registry-backed choices; saved legacy IDs remain explicit and are never remapped here.
 (function () {
+    const intelligenceIds = ['gemini-3.8-flash', 'gpt-6-astra', 'gpt-5.6-terra', 'gpt-5.6-luna', 'claude-fable-5-1', 'claude-sonnet-5'];
+    function intelligenceModels(select) {
+        select.replaceChildren();
+        intelligenceIds.forEach(id => {
+            const model = window.AI_MODEL_REGISTRY?.models.find(m => m.id === id && m.selectable);
+            if (!model) return;
+            const option = document.createElement('option');
+            option.value = id;
+            option.textContent = model.label;
+            select.appendChild(option);
+        });
+    }
     const targets = {
         'ai-analyze-model-toggle': ['ai-analyzer-model-val', 'AI / PDF / Expand model'],
         'ai-translate-model-toggle': ['toolbar-ai-translate-model', 'Translation model']
@@ -20,6 +32,16 @@
         const hidden = document.getElementById(hiddenId);
         const select = document.getElementById(hiddenId + '-registry');
         if (!hidden || !select) return;
+        if (hiddenId === 'ai-analyzer-model-val') {
+            if (!Array.from(select.options).some(o => o.value === hidden.value)) {
+                hidden.value = select.options[0]?.value || '';
+                localStorage.setItem('ai_default_analyzer_model', hidden.value);
+            }
+            select.value = hidden.value;
+            const preference = document.getElementById('default-analyzer-model');
+            if (preference) preference.value = hidden.value;
+            return;
+        }
         if (!Array.from(select.options).some(o => o.value === hidden.value)) {
             const option = document.createElement('option');
             option.value = hidden.value;
@@ -47,6 +69,7 @@
                 legacy.appendChild(option);
             });
             select.appendChild(legacy);
+            if (hiddenId === 'ai-analyzer-model-val') intelligenceModels(select);
             select.onchange = () => { document.getElementById(hiddenId).value = select.value; };
             container.replaceChildren(select);
             container.style.cssText = 'margin:0;display:block;min-width:0;width:100%;max-width:360px;height:auto;';
@@ -56,6 +79,13 @@
             const select = document.getElementById(id);
             if (!select || select.dataset.registryReady) return;
             const value = select.value;
+            if (id === 'default-analyzer-model') {
+                intelligenceModels(select);
+                select.value = intelligenceIds.includes(value) && Array.from(select.options).some(o => o.value === value) ? value : select.options[0]?.value || '';
+                select.dataset.registryReady = 'true';
+                window.syncRegistryModelSelect('ai-analyzer-model-val');
+                return;
+            }
             Array.from(select.options).forEach(o => {
                 const model = window.AI_MODEL_REGISTRY?.models.find(m => m.id === o.value);
                 o.textContent = model ? model.label : o.value + ' · existing route';

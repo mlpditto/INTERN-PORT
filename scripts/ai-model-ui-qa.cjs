@@ -9,6 +9,8 @@ const { chromium } = require('playwright');
         const start = html.indexOf('<div class="glass-toggle-container" id="ai-analyze-model-toggle"');
         const end = html.indexOf('<div style="display:flex; flex-wrap:wrap; gap:4px;">',start);
         const pref = html.match(/<select id="default-analyzer-model"[\s\S]*?<\/select>/)[0];
+        await page.route('http://localhost/', route => route.fulfill({body:'<html></html>', contentType:'text/html'}));
+        await page.goto('http://localhost/');
         await page.setContent('<main style="width:100%;box-sizing:border-box;padding:12px">'+html.slice(start,end)+pref+'</main>');
         await page.addScriptTag({path:'public/ai-model-registry.js'});
         await page.addScriptTag({path:'public/ai-model-ui.js'});
@@ -21,7 +23,9 @@ const { chromium } = require('playwright');
         }
         assert.equal(await select.locator('option[value="claude-opus-5"]').count(),0);
         await page.evaluate(()=>{document.getElementById('ai-analyzer-model-val').value='gpt-5.4';window.syncRegistryModelSelect('ai-analyzer-model-val');});
-        assert.equal(await select.inputValue(),'gpt-5.4');
+        assert.equal(await select.inputValue(),'gemini-3.8-flash');
+        assert.equal(await select.locator('option').count(),6);
+        assert.equal(await select.locator('option[value="gpt-5.4"]').count(),0);
         const count=await select.locator('option').count();
         await page.evaluate(()=>window.initRegistryModelSelectors());
         assert.equal(await select.locator('option').count(),count);
@@ -29,6 +33,6 @@ const { chromium } = require('playwright');
         assert.equal(await page.locator('#default-analyzer-model option[value="gpt-5.6-luna"]').count(),1);
         const box=await select.boundingBox(); assert(box.x>=0 && box.x+box.width<=390);
         await select.focus(); assert.equal(await select.evaluate(e=>e===document.activeElement),true);
-        console.log('PASS: real admin markup, exact selectable IDs, hidden-value routing, legacy restore, unchanged default, idempotent init, mobile fit and keyboard focus');
+        console.log('PASS: real admin markup, exact selectable IDs, hidden-value routing, legacy migration, unchanged default, idempotent init, mobile fit and keyboard focus');
     } finally { await browser.close(); }
 })().catch(e=>{console.error(e);process.exitCode=1;});
