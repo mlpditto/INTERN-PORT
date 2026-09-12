@@ -4,7 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.86)</title>
+    <title>Nika Admin (V99.87)</title>
+    <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -40440,14 +40441,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             panel.innerHTML = '<div style="display:flex; flex-wrap:wrap; gap:6px; padding:10px;">'
                 + interns.map(u => {
                     const name = u.displayName || u.id;
+                    const inactive = u.status === 'inactive' || !!u.isIgnored || !!u.isPreReg;
                     const avatar = u.pictureUrl
                         ? `<img src="${dcaEscapeHtml(u.pictureUrl)}" alt="" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid #99f6e4;" onerror="this.outerHTML='<span style=\\'font-size:32px;line-height:44px;\\'>🤝</span>'">`
                         : '<span style="font-size:32px;line-height:44px;">🤝</span>';
-                    return `<button type="button" onclick="dcaAddHelper('${dcaEscapeHtml(u.id)}')" title="Add ${dcaEscapeHtml(name)} (${Number(u.score || 0)} pts) as a contributor"`
+                    return `<button type="button" class="${inactive ? 'dca-helper-inactive' : ''}" onclick="dcaAddHelper('${dcaEscapeHtml(u.id)}')" title="Add ${dcaEscapeHtml(name)} (${Number(u.score || 0)} pts) as a contributor"`
                         + ` style="width:74px; min-height:0; display:flex; flex-direction:column; align-items:center; gap:3px; background:none; border:none; cursor:pointer; padding:3px;">`
-                        + avatar
+                        + `<span class="dca-helper-avatar">${avatar}</span>`
                         + `<span style="font-size:0.7em; color:#334155; max-width:70px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${dcaEscapeHtml(name)}</span>`
-                        + `</button>`;
+                        + (inactive ? '<small>Inactive</small>' : '') + `</button>`;
                 }).join('')
                 + '</div>';
         }
@@ -41111,11 +41113,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
 
             // Reuse Phase 3 saved chip silently.
-            let selectedModel = DCA_AI_FALLBACK_MODEL;
-            try {
-                const saved = localStorage.getItem(DCA_AI_LS_KEY);
-                if (saved) selectedModel = saved;
-            } catch (_) { /* ignore */ }
+            const selectedModel = window.dcaSelectedToolbarModel?.() || DCA_AI_FALLBACK_MODEL;
 
             if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
             if (btn) { btn.disabled = true; btn.textContent = '⏳ Filling ' + emptyKeys.length + ' field' + (emptyKeys.length === 1 ? '' : 's') + '…'; }
@@ -41330,8 +41328,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 internContext = String(banner.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 500);
             }
 
-            let selectedModel = DCA_AI_FALLBACK_MODEL;
-            try { const saved = localStorage.getItem(DCA_AI_LS_KEY); if (saved) selectedModel = saved; } catch (_) { /* ignore */ }
+            const selectedModel = window.dcaSelectedToolbarModel?.() || DCA_AI_FALLBACK_MODEL;
 
             if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
             if (btn) { btn.disabled = true; btn.textContent = '⏳ Reviewing…'; }
@@ -62260,6 +62257,7 @@ Reply ONLY with raw JSON, no markdown:
     })();
     </script>
 <script src="history-review.js?v=V99.81"></script>
+<script src="drug-toolbar.js?v=V99.87"></script>
 <script src="journal-feedback-admin.js?v=V99.86"></script>
 <script src="delete-requests.js?v=V99.84"></script>
 </body>
