@@ -573,6 +573,22 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             });
         }
 
+        // Image models use the Images API, never the chat completion fallback.
+        if (provider === "openai" && /^gpt-image-/.test(model)) {
+            if (!['gpt-image-2.5-flare', 'gpt-image-2.5-sunburst'].includes(model)) {
+                return res.status(400).json({ error: 'Unsupported image model' });
+            }
+            if (!process.env.OPENAI_API_KEY) return res.status(500).json({ error: 'OpenAI key unavailable' });
+            if (visionData) return res.status(400).json({ error: 'This image route supports generation only' });
+            const response = await axios.post('https://api.openai.com/v1/images/generations', {
+                model, prompt, n: 1, size: '1024x1024', quality: 'medium'
+            }, { headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' }, timeout: 240000 });
+            const image = response.data.data?.[0]?.b64_json;
+            if (!image) return res.status(502).json({ error: 'No image returned' });
+            return res.json({ imageDataUrl: `data:image/png;base64,${image}`, model,
+                usage: response.data.usage || null, tokens: response.data.usage?.total_tokens || 0 });
+        }
+
         if (provider === "openai") {
             const apiKey = process.env.OPENAI_API_KEY;
             if (!apiKey) {
