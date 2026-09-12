@@ -13,8 +13,30 @@ document.addEventListener('DOMContentLoaded', () => {
         root.replaceChildren();
         const header = document.createElement('header');
         const heading = document.createElement('strong'); heading.textContent = prefix === 'ue' ? '📅 New Event' : '📅 Agenda'; header.append(heading);
-        if (prefix === 'ue') header.append(group);
+        if (prefix === 'ue') { group.hidden = true; header.append(group); }
+        const audience = new Set();
+        const toggle = document.createElement('button'); toggle.type = 'button';
+        toggle.textContent = '🌐 Public ▾'; toggle.setAttribute('aria-expanded', 'false');
+        const picker = document.createElement('div'); picker.className = 'invite-audience'; picker.hidden = true;
+        picker.id = prefix + '-audience'; toggle.setAttribute('aria-controls', picker.id);
+        const renderAudience = () => {
+            picker.replaceChildren();
+            const add = (name, key) => {
+                const label = document.createElement('label'), input = document.createElement('input');
+                input.type = 'checkbox'; input.checked = key === '__public__' ? !audience.size : audience.has(key);
+                input.onchange = () => { if (key === '__public__') audience.clear(); else if (input.checked) audience.add(key); else audience.delete(key); renderAudience(); };
+                label.append(input, document.createTextNode(name)); picker.append(label);
+            };
+            add('🌐 Public · All groups', '__public__');
+            (window.getInviteGroupOptions?.() || []).forEach(name => add(name, name));
+            toggle.textContent = !audience.size ? '🌐 Public ▾' : audience.size === 1 ? '👥 ' + [...audience][0] + ' ▾' : '👥 ' + audience.size + ' groups ▾';
+        };
+        toggle.onclick = () => { renderAudience(); picker.hidden = !picker.hidden; toggle.setAttribute('aria-expanded', String(!picker.hidden)); };
+        header.append(toggle);
+        root._inviteAudience = audience;
+        root._resetInviteAudience = () => { audience.clear(); picker.hidden = true; toggle.setAttribute('aria-expanded','false'); renderAudience(); };
         root.append(header);
+        root.append(picker);
         nodes.title.placeholder = 'What are you planning?'; nodes.title.setAttribute('aria-label', 'Event name'); nodes.title.required = true; root.append(nodes.title);
         const row = document.createElement('div'); row.className = 'invite-when';
         const wrap = (text, input) => { const label = document.createElement('label'); label.append(document.createTextNode(text), input); return label; };
@@ -40,6 +62,10 @@ document.addEventListener('DOMContentLoaded', () => {
         root._syncInviteDate = sync; sync();
     });
     const original = window.schRenderInviteWhen;
+    window.getInviteAudience = prefix => {
+        const selected = document.getElementById(prefix === 'ue' ? 'event-form-section' : 'sch-new-event')._inviteAudience;
+        return selected?.size ? [...selected] : ['__public__'];
+    };
     window.schRenderInviteWhen = function(prefix = 'sne') {
         original(prefix);
         const root = document.getElementById(prefix === 'ue' ? 'event-form-section' : 'sch-new-event');

@@ -2,7 +2,7 @@
 <html lang="th">
 
 <head>
-    <title>Internship Portfolio (V99.73)</title>
+    <title>Internship Portfolio (V99.74)</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
@@ -2140,8 +2140,8 @@
 <script src="personal-profile-tabs.js?v=V99.70"></script>
 <link rel="stylesheet" href="submit-system-grid.css?v=V99.72">
 <script defer src="submit-system-grid.js?v=V99.71"></script>
-<link rel="stylesheet" href="invite-ticket.css?v=V99.73">
-<script defer src="invite-ticket.js?v=V99.73"></script>
+<link rel="stylesheet" href="invite-ticket.css?v=V99.74">
+<script defer src="invite-ticket.js?v=V99.74"></script>
 </head>
 
 <body>
@@ -5626,7 +5626,7 @@
                 <div class="sch-header-actions">
                     <button type="button" id="sch-invite-btn" class="lang-no-toggle" onclick="schSwitchPane('agenda'); schToggleNewEvent(true)"
                         style="width:auto; padding:5px 10px; font-size:0.72em; font-weight:800; border:1px solid #ddd6fe; background:#f5f3ff; color:#6d28d9; border-radius:999px; cursor:pointer; white-space:nowrap;"
-                        aria-label="Invite people ชวนเพื่อน">+ Invite<span class="sch-invite-long"> people</span></button>
+                        aria-label="Create event" title="Create event">📅＋</button>
                     <button type="button" onclick="closeScheduleModal()" aria-label="Close Schedule"
                         style="width:40px; height:40px; padding:0; background:transparent; border:none; font-size:24px; cursor:pointer; color:#64748b;">&times;</button>
                 </div>
@@ -13511,11 +13511,13 @@
         let schMyEventInterests = {};       // eventId -> interest doc id
         let schEventsUnsub = null;
 
+        window.getInviteGroupOptions = () => [...new Set([...Object.values(divisionConfig).flat().filter(g => typeof g === 'string'), ...Object.keys(groupSettings), myGroup])].filter(Boolean).sort();
+
         function schLoadEvents() {
             if (schEventsUnsub) return;
             schEventsCache = schEventsCache || [];
             schEventsUnsub = db.collection('events')
-                .where('targetGroups', 'array-contains', myGroup)
+                .where('targetGroups', 'array-contains-any', [...new Set([myGroup, '__public__'])])
                 .onSnapshot(s => {
                     schEventsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                     schRefreshOpenPane();
@@ -13572,6 +13574,7 @@
                 document.getElementById('sne-date').value =
                     n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
                 document.getElementById('sne-title').value = '';
+                box._resetInviteAudience?.();
                 document.getElementById('sne-start').value = '';
                 document.getElementById('sne-end').value = '';
                 document.getElementById('sne-location').value = '';
@@ -13644,9 +13647,8 @@
                     location,
                     joinVia,
                     description: '',
-                    // Only the creator's own group, so an invite lands with the people they
-                    // actually share a rotation with rather than on everyone's calendar.
-                    targetGroups: [myGroup],
+                    // __public__ is all audiences, distinct from the named Public user group.
+                    targetGroups: window.getInviteAudience(prefix),
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
         }
@@ -22498,6 +22500,7 @@ async function archiveDoneCard(cardId) {
         }
 
         function openUnifiedModal() {
+            document.getElementById('event-form-section')._resetInviteAudience?.();
             document.getElementById('unified-submit-modal').style.display = 'flex';
             window.renderSubmitSystemGrid?.();
             selectSubmissionType('case');
