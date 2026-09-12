@@ -20,6 +20,30 @@ window.updatePersonalBirthday = function() {
     const age = now.getFullYear() - year - (now.getMonth() < month - 1 || (now.getMonth() === month - 1 && now.getDate() < day) ? 1 : 0);
     result.textContent = age + ' years · Born on ' + ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][birth.getDay()];
 };
+window.updatePersonalPeriod = function(now = new Date()) {
+    const start = Date.parse(document.getElementById('pi-start-date').value);
+    const end = Date.parse(document.getElementById('pi-end-date').value);
+    const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+    const label = document.getElementById('pi-period-elapsed');
+    const fill = document.getElementById('pi-period-fill');
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+        label.textContent = '—'; fill.style.width = '0%'; return;
+    }
+    const percent = Math.max(0, Math.min(100, (today - start) / (end - start) * 100));
+    fill.style.width = percent + '%';
+    if (today < start) { label.textContent = 'Not started (0%)'; return; }
+    const first = new Date(start), current = new Date(today);
+    let months = (current.getUTCFullYear() - first.getUTCFullYear()) * 12 + current.getUTCMonth() - first.getUTCMonth();
+    const anniversary = n => {
+        const date = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + n, 1));
+        const last = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
+        date.setUTCDate(Math.min(first.getUTCDate(), last)); return date.getTime();
+    };
+    if (anniversary(months) > today) months--;
+    const days = Math.round((today - anniversary(months)) / 86400000);
+    label.textContent = Math.floor(months / 12) + 'y ' + months % 12 + 'mo ' + days + 'd (' + percent.toFixed(1) + '%)';
+    label.title = 'Elapsed since Start · Percentage of Start–End';
+};
 window.validatePersonalCards = function() {
     const required = ['pi-firstname-en', 'pi-lastname-en', 'pi-institute'];
     let missing = required.find(id => !document.getElementById(id).value.trim());
@@ -45,6 +69,7 @@ window.copyPersonalSocial = async function(key) {
     if (confirm('Copied · คัดลอกแล้ว\nOpen in a new window? · ต้องการเปิดหน้าต่างใหม่หรือไม่?\n' + url.href)) window.open(url.href, '_blank', 'noopener,noreferrer');
 };
 document.addEventListener('DOMContentLoaded', () => {
+    ['pi-start-date','pi-end-date'].forEach(id => document.getElementById(id)?.addEventListener('input', () => updatePersonalPeriod()));
     ['day','month','year'].forEach(k => document.getElementById('pi-bday-' + k)?.addEventListener('change', updatePersonalBirthday));
     const tabs = document.querySelector('#personalInfoModal .pi-tabs');
     tabs?.addEventListener('keydown', event => {
