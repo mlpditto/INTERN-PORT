@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.57)</title>
+    <title>Nika Admin (V99.59)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -3842,6 +3842,18 @@
         .quiz-insight-tags span { padding:4px 7px; background:var(--bg-body, #f1f5f9); border-radius:6px; font-size:12px; overflow-wrap:anywhere; }
         .quiz-insight-card button { min-height:44px; width:auto; margin-top:12px; padding:8px 12px; font-size:13px; border-radius:8px; }
         @media(max-width:600px) { .quiz-insight-cards { grid-template-columns:minmax(0,1fr); } }
+        #imageQuizModal .modal-content { height:auto !important; min-height:0 !important; max-height:90dvh; overflow-y:auto; flex:none !important; }
+        #imageQuizModal .iq-workspace { display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
+        #imageQuizModal .iq-image-panel { min-width:0; padding:16px; border-radius:16px; background:color-mix(in srgb, #f59e0b 10%, var(--bg-card, white)); }
+        #imageQuizModal .iq-settings-panel { min-width:0; padding:16px; border-radius:16px; background:color-mix(in srgb, #6366f1 6%, var(--bg-card, white)); }
+        #imageQuizModal h4 { margin:0 0 12px; font-size:15px; }
+        #imageQuizModal #img-quiz-file-status { overflow-wrap:anywhere; }
+        #imageQuizModal #img-quiz-thumbnails { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+        #imageQuizModal #img-quiz-thumbnails img { width:100%; height:100px; object-fit:contain; border-radius:8px; background:var(--bg-card, white); }
+        #imageQuizModal .iq-build-footer { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:18px; padding-top:16px; border-top:1px solid #e2e8f0; }
+        #imageQuizModal #img-quiz-output-count { font-size:13px; color:var(--text-sub); }
+        #imageQuizModal #img-quiz-model-rail button, #imageQuizModal #img-quiz-selfcontained-chip, #imageQuizModal summary { min-height:44px !important; }
+        @media(max-width:600px) { #imageQuizModal .iq-workspace { grid-template-columns:minmax(0,1fr); } #imageQuizModal .iq-build-footer button { width:100%; } #imageQuizModal .modal-content { padding:18px !important; } }
         #groupSelectModal .gs-identity { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
         #groupSelectModal .gs-save-row { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; border-top:1px solid #e2e8f0; padding-top:12px; }
         #groupSelectModal .gs-save-row span { font-size:12px; color:#64748b; }
@@ -28357,6 +28369,18 @@ ${JSON.stringify(sourceObj)}`;
             }).join('');
         }
 
+        function imageQuizUpdateCount() {
+            const count = window._imgQuizFiles.length;
+            const models = window._imgQuizModels.length;
+            document.getElementById('img-quiz-output-count').textContent = count ? `${count} images × ${models} models = ${count * models} questions` : 'Choose images to begin';
+        }
+
+        function imageQuizClearThumbnails() {
+            (window._imgQuizPreviewUrls || []).forEach(url => URL.revokeObjectURL(url));
+            window._imgQuizPreviewUrls = [];
+            document.getElementById('img-quiz-thumbnails').replaceChildren();
+        }
+
         function imageQuizToggleModel(id) {
             const cur = window._imgQuizModels;
             const at = cur.indexOf(id);
@@ -28364,6 +28388,7 @@ ${JSON.stringify(sourceObj)}`;
             if (at >= 0) { if (cur.length === 1) { showToast('Select at least one model', 'error'); return; } cur.splice(at, 1); }
             else cur.push(id);
             imageQuizRenderModelRail();
+            imageQuizUpdateCount();
         }
 
         // V97.24: when ON, the stem must carry every fact needed to answer, so the
@@ -28395,6 +28420,8 @@ ${JSON.stringify(sourceObj)}`;
 
         function openImageQuizModal() {
             window._imgQuizFiles = [];
+            imageQuizClearThumbnails();
+            imageQuizUpdateCount();
             document.getElementById('img-quiz-file-input').value = '';
             document.getElementById('img-quiz-file-status').textContent = 'ยังไม่ได้เลือกรูป';
             document.getElementById('img-quiz-progress').textContent = '';
@@ -28407,7 +28434,16 @@ ${JSON.stringify(sourceObj)}`;
         }
 
         function imageQuizFilesChosen(input) {
+            imageQuizClearThumbnails();
             window._imgQuizFiles = Array.from(input.files || []);
+            window._imgQuizFiles.forEach(file => {
+                const url = URL.createObjectURL(file);
+                window._imgQuizPreviewUrls.push(url);
+                const image = document.createElement('img');
+                image.src = url; image.alt = file.name;
+                document.getElementById('img-quiz-thumbnails').appendChild(image);
+            });
+            imageQuizUpdateCount();
             const n = window._imgQuizFiles.length;
             document.getElementById('img-quiz-file-status').textContent = n
                 ? `เลือกแล้ว ${n} รูป: ` + window._imgQuizFiles.map(f => f.name).join(', ')
@@ -32810,6 +32846,7 @@ RULES:
                 applicantDocsCache = byUser;
                 renderTable('users');
                 if (document.getElementById('applicantDocsModal').style.display === 'flex') renderApplicantDocs();
+                refreshHubDocuments();
             }, e => console.error("🔥 [Firestore Error] applicant_docs:", e));
 
             // 🔥 Access Request Listener ([Version: V84.3])
@@ -47352,13 +47389,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 // it earns no points, so it must stay out of dash and every score total.
                 // V98.85: the row prints a real filename, which is often Thai; it survives
                 // because #hub-history-list now carries `lang-no-toggle`.
-                (applicantDocsCache[u.preUserId] || []).forEach(apd => {
+                getHubDocuments(u).forEach(apd => {
                     allLogs.push({
                         t: toHubDate(apd.uploadedAt),
                         type: 'doc',
-                        text: `📎 Resume received · ${escapeHtml(apd.name || 'document')}`,
+                        text: `📎 Document received · ${escapeHtml(apd.name || 'document')}`,
                         isDoc: true,
-                        preUserId: u.preUserId,
+                        preUserId: apd.preUserId,
                         docId: apd.id
                     });
                 });
@@ -48166,6 +48203,32 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return groups;
         }
 
+        function getHubDocuments(user) {
+            const owners = new Set([applicantOwnerFor(user), user.id].filter(Boolean));
+            return Array.from(owners).flatMap(owner => applicantDocsCache[owner] || []);
+        }
+
+        function openHubUploadDocuments() {
+            const user = (usersData || []).find(u => u.id === window._currentPopupUser);
+            if (!user) return;
+            openApplicantDocs(applicantOwnerFor(user) || user.id);
+            document.getElementById('apd-who').textContent = user.fullName || user.displayName || user.id;
+        }
+
+        function refreshHubDocuments() {
+            const uid = window._currentPopupUser;
+            const cache = window._hubUserCache && window._hubUserCache[uid];
+            if (!cache) return;
+            const docs = getHubDocuments(cache.user).map(d => ({
+                t: d.uploadedAt && d.uploadedAt.toDate ? d.uploadedAt.toDate() : new Date(),
+                type: 'doc', isDoc: true, preUserId: d.preUserId, docId: d.id,
+                text: `📎 Document received · ${escapeHtml(d.name || 'document')}`
+            }));
+            cache.allLogs = cache.allLogs.filter(e => e.type !== 'doc').concat(docs).sort((a,b) => (b.t || 0) - (a.t || 0));
+            historyCache = cache.allLogs;
+            renderHubHistoryPage();
+        }
+
         function groupHubHistoryCategories(logs) {
             const buckets = new Map();
             logs.forEach(event => {
@@ -48197,11 +48260,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const logsPerPage = 10; // V91.102: 10/page + no inner scroll for compact modal
             const s = (historyPage - 1) * logsPerPage;
             const groups = groupHubHistoryCategories(filteredLogs);
+            if ((window._hubHistoryFilter || 'all') === 'all' && !groups.some(g => g.key === 'other')) groups.push({ key: 'other', events: [], points: 0, beri: 0 });
             const totalPages = Math.ceil(groups.length / logsPerPage);
             historyPage = Math.max(1, Math.min(historyPage, totalPages || 1));
             const p = groups.slice((historyPage - 1) * logsPerPage, historyPage * logsPerPage);
 
-            if (filteredLogs.length === 0) {
+            if (filteredLogs.length === 0 && (window._hubHistoryFilter || 'all') !== 'all') {
                 l.innerHTML = `<div style="padding:14px; border:1px dashed #cbd5e1; border-radius:10px; color:#64748b; text-align:center; background:#f8fafc; font-weight:700;">No logs in this category.</div>`;
                 return;
             }
@@ -48318,7 +48382,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const amount = group.key === 'beri'
                     ? `${group.beri >= 0 ? '+' : ''}${group.beri} coins`
                     : `${group.points >= 0 ? '+' : ''}${group.points.toFixed(2)} pts`;
-                l.innerHTML += `<details class="hub-log-category" style="--log-accent:${style.accent};" ${idx === 0 ? 'open' : ''}><summary><strong>${names[group.key] || names.other}</strong><span>${group.events.length} events</span><b>${amount}</b></summary><div class="hub-log-category-body">${groupHtml}</div></details>`;
+                l.innerHTML += `<details class="hub-log-category" style="--log-accent:${style.accent};" ${idx === 0 ? 'open' : ''}><summary><strong>${names[group.key] || names.other}</strong><span>${group.events.length} events</span><b>${amount}</b></summary><div class="hub-log-category-body">${group.key === 'other' ? '<button type="button" class="btn-sm" style="min-height:44px; margin-bottom:12px;" onclick="openHubUploadDocuments()">📎 Upload file for user</button><div style="font-size:12px; color:var(--text-sub); margin-bottom:10px;">PDF, JPG, PNG, WEBP · Under 4 MB · No points</div>' : ''}${groupHtml}</div></details>`;
             });
 
 
@@ -53730,19 +53794,22 @@ Save it anyway?`;
             const file = input.files && input.files[0];
             input.value = '';
             const msg = document.getElementById('apd-msg');
-            if (!file || !apdTargetId) return;
+            if (!file || !apdTargetId || input.dataset.uploading === 'true') return;
+            const ownerId = apdTargetId;
             const ext = _APPLICANT_EXT[file.type];
             if (!ext) { msg.style.color = '#ef4444'; msg.textContent = 'PDF, JPG, PNG or WEBP only.'; return; }
             if (file.size >= 4 * 1024 * 1024) { msg.style.color = '#ef4444'; msg.textContent = 'The file must be under 4 MB.'; return; }
             msg.style.color = '#64748b';
             msg.textContent = 'Uploading…';
+            input.dataset.uploading = 'true';
+            input.disabled = true;
             try {
                 const hash = await _sha256Hex(file);
-                const path = `applicant-docs/${apdTargetId}/${hash}.${ext}`;
+                const path = `applicant-docs/${ownerId}/${hash}.${ext}`;
                 await adminApp.storage().ref(path).put(file, { contentType: file.type });
                 const editor = (auth && auth.currentUser) || {};
                 await db.collection('applicant_docs').add({
-                    preUserId: apdTargetId,
+                    preUserId: ownerId,
                     name: file.name,
                     path,
                     size: file.size,
@@ -53750,12 +53817,12 @@ Save it anyway?`;
                     uploadedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     byEmail: editor.email || ALLOWED_EMAIL
                 });
-                await syncResumeFlag(apdTargetId);
-                msg.textContent = '';
+                await syncResumeFlag(ownerId);
+                msg.textContent = 'Uploaded successfully.';
             } catch (e) {
                 msg.style.color = '#ef4444';
                 msg.textContent = 'Upload failed: ' + e.message;
-            }
+            } finally { input.disabled = false; delete input.dataset.uploading; }
         }
 
         async function deleteApplicantDoc(docId) {
@@ -61660,22 +61727,24 @@ Reply ONLY with raw JSON, no markdown:
          extracts an already-formatted Q+options. Feeds results into the Bulk Paste
          preview stage above so review/edit/select is one consistent flow either way. -->
     <div id="imageQuizModal" class="modal" style="z-index:5200;">
-        <div class="modal-content lang-no-toggle" style="max-width:600px; padding:28px; border-radius:24px;">
+        <div class="modal-content lang-no-toggle" style="max-width:900px; padding:28px; border-radius:24px;">
             <span class="close-modal" onclick="document.getElementById('imageQuizModal').style.display='none'">&times;</span>
             <div style="display:flex; align-items:center; gap:14px; margin-bottom:16px; border-bottom:1px solid #eee; padding-bottom:14px;">
                 <div style="width:48px; height:48px; background:#fef3c7; border-radius:14px; display:flex; align-items:center; justify-content:center; color:#b45309; font-size:1.4em;">🧩</div>
                 <div>
-                    <h3 style="margin:0;">Build questions from an image</h3>
-                    <p style="margin:2px 0 0 0; font-size:0.85em; color:#666;">For images that do not already carry their own options (a puzzle, or a story scenario). The AI solves what is in the image first, then writes one multiple-choice question per image and re-checks the answer key before showing you the result.</p>
+                    <h3 style="margin:0;">Build questions from images</h3>
+                    <p style="margin:2px 0 0 0; font-size:0.85em; color:#666;">Turn a puzzle or scenario into multiple-choice questions.</p>
                 </div>
             </div>
 
+            <div class="iq-workspace"><section class="iq-image-panel"><h4>1 · Choose images</h4>
             <input type="file" id="img-quiz-file-input" accept="image/*" multiple style="display:none;" onchange="imageQuizFilesChosen(this)">
             <button class="magic-btn" onclick="document.getElementById('img-quiz-file-input').click()" style="width:100%; background:linear-gradient(135deg,#f59e0b,#d97706); padding:12px; border-radius:12px; font-size:0.9em; margin-bottom:10px;">
-                <i class="fa-solid fa-image"></i> Choose images (several allowed)
+                <i class="fa-solid fa-image"></i> Choose images
             </button>
             <div id="img-quiz-file-status" style="font-size:0.82em; color:#94a3b8; margin-bottom:14px;">No image chosen yet</div>
 
+            <div id="img-quiz-thumbnails"></div></section><section class="iq-settings-panel"><h4>2 · Settings</h4>
             <!-- V97.22: vision-model rail. Multi-select = compare mode (each picked
                  model produces its own candidate row per image, badged in the preview
                  so the admin keeps the better one and unticks the rest). -->
@@ -61684,7 +61753,7 @@ Reply ONLY with raw JSON, no markdown:
                     AI model <span style="font-weight:400; color:#94a3b8;">· pick several to compare — one question per image per model</span>
                 </div>
                 <div id="img-quiz-model-rail" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
-                <div style="font-size:0.72em; color:#94a3b8; margin-top:6px; font-style:italic;">* Only models that can actually read images through the AI proxy are listed. GPT / Claude / OpenRouter still accept text only, so they are left out.</div>
+                <div style="font-size:0.72em; color:#94a3b8; margin-top:6px; font-style:italic;">Choose one model, or select several to compare.</div>
             </div>
 
             <!-- V97.24: self-contained toggle. ON = lift every fact the question needs
@@ -61698,6 +61767,7 @@ Reply ONLY with raw JSON, no markdown:
                 <div id="img-quiz-selfcontained-hint" style="font-size:0.72em; color:#94a3b8; margin-top:6px; font-style:italic;"></div>
             </div>
 
+            <details><summary>How it works</summary><p style="font-size:12px;">AI solves the image, drafts a question, then checks the answer key. Review results before use.</p></details></section></div>
             <div id="img-quiz-progress-wrap" style="display:none; margin:14px 0;">
                 <div style="height:8px; background:#f1f5f9; border-radius:4px; overflow:hidden;">
                     <div id="img-quiz-progress-bar" style="height:100%; width:0%; background:linear-gradient(90deg,#f59e0b,#d97706); border-radius:4px; transition:width 0.25s;"></div>
@@ -61705,7 +61775,7 @@ Reply ONLY with raw JSON, no markdown:
                 <div id="img-quiz-progress" style="font-size:0.78em; color:#b45309; font-weight:700; margin-top:6px;"></div>
             </div>
 
-            <div style="margin-top:6px; display:flex; justify-content:flex-end; align-items:center; gap:10px;">
+            <div class="iq-build-footer"><span id="img-quiz-output-count" role="status">Choose images to begin</span>
                 <button class="magic-btn" id="img-quiz-generate-btn" onclick="imageQuizGenerate()" disabled style="padding:10px 26px;">🪄 Build questions</button>
             </div>
         </div>
