@@ -117,11 +117,11 @@
         section.innerHTML = '<summary>📈 Learning review requests</summary><div class="lr-admin-list"></div><p role="status" class="lr-admin-message"></p>';
         host.prepend(section);
         const list = section.querySelector('.lr-admin-list'), message = section.querySelector('.lr-admin-message');
-        let loaded = false;
-        section.addEventListener('toggle', async () => {
-            if (!section.open || loaded) return;
-            loaded = true;
-            db.collection('learning_reviews').onSnapshot(snap => {
+        let unsubscribe;
+        function listen() {
+            if (unsubscribe || !db.app.auth().currentUser) return;
+            unsubscribe = db.collection('learning_reviews').onSnapshot(snap => {
+                section.classList.toggle('queue-empty', !snap.docs.some(doc => ['pending', 'reviewing'].includes(doc.data().status)));
                 // Preserve an in-progress admin draft during live status updates.
                 const drafts = new Map([...list.querySelectorAll('textarea')].map(e => [e.dataset.id, e.value]));
                 const openIds = new Set([...list.querySelectorAll('details[open]')].map(e => e.dataset.id));
@@ -145,7 +145,13 @@
                     list.append(card);
                 });
                 if (!rows.length) list.textContent = 'No requests yet. Earlier requests remain in Backlog.';
-            }, () => { loaded = false; message.textContent = 'Could not load requests. Close and reopen to retry.'; });
+            }, () => { section.classList.remove('queue-empty'); unsubscribe = null; message.textContent = 'Could not load requests. Close and reopen to retry.'; });
+        }
+        section.addEventListener('toggle', () => { if (section.open) listen(); });
+        db.app.auth().onAuthStateChanged(user => {
+            unsubscribe?.(); unsubscribe = null;
+            section.classList.remove('queue-empty');
+            if (user) listen();
         });
     }
     document.addEventListener('DOMContentLoaded', () => { userUI(); adminUI(); });

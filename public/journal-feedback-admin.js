@@ -7,10 +7,10 @@ document.addEventListener('DOMContentLoaded', () => {
     host.prepend(section);
     const list = section.querySelector('div'), status = section.querySelector('p');
     let unsubscribe;
-    section.addEventListener('toggle', () => {
-        if (!section.open) { unsubscribe?.(); unsubscribe = null; return; }
-        if (unsubscribe) return;
+    function listen() {
+        if (unsubscribe || !db.app.auth().currentUser) return;
         unsubscribe = db.collection('admin_notifications').where('type', '==', 'journal_feedback').onSnapshot(snap => {
+            section.classList.toggle('queue-empty', !snap.docs.some(doc => !doc.data().read));
             const open = new Set([...list.querySelectorAll('details[open]')].map(d => d.dataset.id));
             list.replaceChildren();
             snap.docs.sort((a, b) => (b.data().timestamp?.toMillis?.() || 0) - (a.data().timestamp?.toMillis?.() || 0)).forEach(doc => {
@@ -39,6 +39,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 list.append(row);
             });
             if (!snap.size) list.textContent = 'No journal feedback yet.';
-        }, () => { unsubscribe = null; status.textContent = 'Could not load. Close and reopen to retry.'; });
+        }, () => { section.classList.remove('queue-empty'); unsubscribe = null; status.textContent = 'Could not load. Close and reopen to retry.'; });
+    }
+    section.addEventListener('toggle', () => { if (section.open) listen(); });
+    db.app.auth().onAuthStateChanged(user => {
+        unsubscribe?.(); unsubscribe = null;
+        section.classList.remove('queue-empty');
+        if (user) listen();
     });
 });
