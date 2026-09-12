@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.62)</title>
+    <title>Nika Admin (V99.63)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6362,9 +6362,10 @@
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <!-- V93.08: cache-bust on taxonomy.js for the LP Firestore overlay rollout -->
     <script src="ai-model-registry.js?v=V99.40"></script>
-    <script src="ai-model-ui.js?v=V99.62"></script>
-    <link rel="stylesheet" href="quiz-resource-cards.css?v=V99.62">
-    <script src="quiz-resource-cards.js?v=V99.62"></script>
+    <script src="ai-model-ui.js?v=V99.63"></script>
+    <link rel="stylesheet" href="quiz-resource-cards.css?v=V99.63">
+    <link rel="stylesheet" href="case-split-studio.css?v=V99.63">
+    <script src="quiz-resource-cards.js?v=V99.63"></script>
     <script src="quiz-generation-rules.js?v=V99.40"></script>
     <script src="quiz-compact-toolbar.js?v=V99.41"></script>
     <link rel="stylesheet" href="quiz-compact-toolbar.css?v=V99.41">
@@ -15358,7 +15359,7 @@
             <span class="close-modal" onclick="closeAlabastaCaseCardModal()" style="top:14px; right:16px;">&times;</span>
             <div class="alabasta-casecard-header">
                 <div>
-                    <h3 class="alabasta-casecard-title"><i class="fa-solid fa-image"></i> Generate Case Card · 케이스 카드 생성</h3>
+                    <h3 class="alabasta-casecard-title"><i class="fa-solid fa-image"></i> Case Card Studio</h3>
                     <div class="alabasta-casecard-subtitle">Generate a patient-safe image card from this case. The summary is auto-anonymized, translated to English, then sent to your chosen AI image generator.<span class="lang-kr"><br>이 케이스에서 환자 안전 이미지 카드를 생성합니다. 요약은 자동으로 익명화되고 영어로 번역된 후 선택한 AI 이미지 생성기로 전송됩니다.</span></div>
                 </div>
                 <span class="alabasta-casecard-badge" title="The summary text was screened for patient identifiers before this modal opened. · 모달이 열리기 전에 환자 식별 정보를 확인했습니다.">Privacy Checked · 개인정보 확인됨</span>
@@ -15386,6 +15387,7 @@
 
             <input type="hidden" id="alabasta-case-card-id">
 
+            <div class="case-studio-grid"><div class="case-studio-inputs">
             <div class="alabasta-visual-card" id="alabasta-case-card-step-1" style="margin-bottom:12px; scroll-margin-top:80px;">
                 <label class="alabasta-visual-label" for="alabasta-case-card-safe-summary">① Anonymized Summary · 익명 요약</label>
                 <textarea id="alabasta-case-card-safe-summary" onblur="rebuildAlabastaCaseCardPromptFromInputs()" class="alabasta-casecard-textarea" style="min-height:120px; max-height:240px;"></textarea>
@@ -15399,11 +15401,23 @@
             <!-- V91.89: GenMage Prompt pulled out of Advanced Draft Details so admins can preview/edit
                  the final prompt text BEFORE clicking GenMage (used to be hidden inside a collapsed
                  accordion — admins were burning AI tokens without seeing what they were sending). -->
-            <div class="alabasta-visual-card" id="alabasta-case-card-step-2" style="margin-bottom:12px; scroll-margin-top:80px;">
-                <label class="alabasta-visual-label" for="alabasta-case-card-prompt">② Final Prompt Preview · 최종 프롬프트 미리보기</label>
+<section class="alabasta-visual-card case-studio-settings"><h4>② Image settings</h4>                            <div class="alabasta-genmage-quick-rail" id="alabasta-case-card-mode-rail" aria-label="Choose composite mode">
+                                <span class="alabasta-genmage-quick-label">Mode:</span>
+                                <button type="button" class="alabasta-genmage-quick-chip active" data-value="ai" onclick="selectCaseCardCompositeMode('ai')" title="AI generates the entire image including text. Faster, but titles may garble on small text.">🖼️ AI image</button>
+                                <button type="button" class="alabasta-genmage-quick-chip" data-value="html-overlay" onclick="selectCaseCardCompositeMode('html-overlay')" title="AI generates illustration only (no text in image). Disease/system/tags are overlaid as real HTML text and composited via html2canvas → never garbles.">🎨 Illustration + HTML</button>
+                            </div>                            <div class="alabasta-genmage-quick-rail" id="alabasta-case-card-quick-rail" aria-label="Switch image model">
+                                <span class="alabasta-genmage-quick-label">Model:</span>
+                                <button type="button" class="alabasta-genmage-quick-chip active" data-value="as/gemini-3.1-flash-image" onclick="switchAndRegenerateAlabastaCaseCard('as/gemini-3.1-flash-image', false)" title="as/gemini-3.1-flash-image">Nano Banana 2</button>
+                                <button type="button" class="alabasta-genmage-quick-chip" data-value="as/gemini-3.1-flash-lite-image" onclick="switchAndRegenerateAlabastaCaseCard('as/gemini-3.1-flash-lite-image', false)" title="as/gemini-3.1-flash-lite-image">Nano Banana 2 Lite</button>
+                                <button type="button" class="alabasta-genmage-quick-chip" data-value="as/gemini-3-pro-image" onclick="switchAndRegenerateAlabastaCaseCard('as/gemini-3-pro-image', false)" title="as/gemini-3-pro-image">Nano Banana Pro</button>
+                                <button type="button" class="alabasta-genmage-quick-chip" data-value="gpt-image-2.5-flare" onclick="switchAndRegenerateAlabastaCaseCard('gpt-image-2.5-flare', false)" title="gpt-image-2.5-flare">GPT Image 2.5 Flare</button>
+                                <button type="button" class="alabasta-genmage-quick-chip" data-value="gpt-image-2.5-sunburst" onclick="switchAndRegenerateAlabastaCaseCard('gpt-image-2.5-sunburst', false)" title="gpt-image-2.5-sunburst">GPT Image 2.5 Sunburst</button>
+                            </div></section>
+            <details class="alabasta-visual-card case-studio-prompt" id="alabasta-case-card-step-2" style="margin-bottom:12px; scroll-margin-top:80px;">
+                <summary>Prompt preview & edit</summary>
                 <textarea id="alabasta-case-card-prompt" class="alabasta-casecard-textarea" style="min-height:120px; max-height:220px;"></textarea>
                 <div class="alabasta-casecard-note">Edit before sending if needed. Optimized for clearer English copy and better infographic readability. · 필요하면 전송 전에 편집하세요. 명확한 영어와 인포그래픽 가독성에 최적화되어 있습니다.</div>
-            </div>
+            </details>
 
             <details class="alabasta-casecard-details">
                 <summary class="alabasta-casecard-details-summary">
@@ -15435,6 +15449,7 @@
             <!-- V92.57 Phase 3-A: ③ GenMage AI Model section removed (mirrors V92.56 Goldenweek 2-model pattern). The 2 OpenRouter chips now live exclusively on the under-image quick rail; the hidden input below preserves the existing read site `document.getElementById('alabasta-case-card-model').value`. -->
             <input type="hidden" id="alabasta-case-card-model" value="as/gemini-3.1-flash-image">
 
+            </div><div class="case-studio-preview"><div class="case-studio-empty"><span>🖼️</span><h4>Your case card preview</h4><p>Review the summary, choose a model, then generate.</p></div>
             <div id="alabasta-case-card-image-wrap" class="alabasta-visual-card" style="margin-bottom:12px; display:none; scroll-margin-top:80px;">
                 <label class="alabasta-visual-label">Generated Image · 생성된 이미지</label>
                 <div class="alabasta-genmage-gallery">
@@ -15467,28 +15482,18 @@
                                 <i class="fa-solid fa-rotate"></i> Regenerate · 다시 생성
                             </button>
                             <!-- V94.32 Phase 3 escalation: choose between AI image (Mode A, AI handles everything — text inside the image, may garble) vs Illustration + HTML overlay (Mode B, AI draws illustration only, real text composited via html2canvas). -->
-                            <div class="alabasta-genmage-quick-rail" id="alabasta-case-card-mode-rail" aria-label="Choose composite mode">
-                                <span class="alabasta-genmage-quick-label">Mode:</span>
-                                <button type="button" class="alabasta-genmage-quick-chip active" data-value="ai" onclick="selectCaseCardCompositeMode('ai')" title="AI generates the entire image including text. Faster, but titles may garble on small text.">🖼️ AI image</button>
-                                <button type="button" class="alabasta-genmage-quick-chip" data-value="html-overlay" onclick="selectCaseCardCompositeMode('html-overlay')" title="AI generates illustration only (no text in image). Disease/system/tags are overlaid as real HTML text and composited via html2canvas → never garbles.">🎨 Illustration + HTML</button>
-                            </div>
+
                             <!-- V96.39: Nano Banana Pro (Gemini 3 Pro Image) added as the FIRST/recommended chip —
                                  measured ~5× faster + cheaper + higher quality than GPT-5.4 Image 2 (live smoke 2026-06-24).
                                  Default active stays AI Studio Nano Banana (separate GEMINI key → no OpenRouter-credit dependency). -->
-                            <div class="alabasta-genmage-quick-rail" id="alabasta-case-card-quick-rail" aria-label="Switch image model">
-                                <span class="alabasta-genmage-quick-label">Switch:</span>
-                                <button type="button" class="alabasta-genmage-quick-chip active" data-value="as/gemini-3.1-flash-image" onclick="switchAndRegenerateAlabastaCaseCard('as/gemini-3.1-flash-image')" title="as/gemini-3.1-flash-image">Nano Banana 2</button>
-                                <button type="button" class="alabasta-genmage-quick-chip" data-value="as/gemini-3.1-flash-lite-image" onclick="switchAndRegenerateAlabastaCaseCard('as/gemini-3.1-flash-lite-image')" title="as/gemini-3.1-flash-lite-image">Nano Banana 2 Lite</button>
-                                <button type="button" class="alabasta-genmage-quick-chip" data-value="as/gemini-3-pro-image" onclick="switchAndRegenerateAlabastaCaseCard('as/gemini-3-pro-image')" title="as/gemini-3-pro-image">Nano Banana Pro</button>
-                                <button type="button" class="alabasta-genmage-quick-chip" data-value="gpt-image-2.5-flare" onclick="switchAndRegenerateAlabastaCaseCard('gpt-image-2.5-flare')" title="gpt-image-2.5-flare">GPT Image 2.5 Flare</button>
-                                <button type="button" class="alabasta-genmage-quick-chip" data-value="gpt-image-2.5-sunburst" onclick="switchAndRegenerateAlabastaCaseCard('gpt-image-2.5-sunburst')" title="gpt-image-2.5-sunburst">GPT Image 2.5 Sunburst</button>
-                            </div>
+
                             <a id="alabasta-case-card-image-download" href="#" download="alabasta-case-card.png" class="btn-sm alabasta-casecard-btn utility" style="text-decoration:none;" title="Download image as PNG · 이미지를 PNG로 저장"><i class="fa-solid fa-download"></i> PNG</a>
                         </div>
                     </div>
                 </div>
             </div>
 
+            </div></div>
             <div class="alabasta-casecard-footer">
                 <div id="alabasta-case-card-meta" class="alabasta-casecard-meta">No identifiers should appear in the safe summary or image prompt. · 안전 요약이나 이미지 프롬프트에 식별 정보가 나타나지 않아야 합니다.</div>
                 <div class="alabasta-casecard-actions">
@@ -15534,7 +15539,7 @@
                     <div class="alabasta-casecard-action-group final" aria-label="Final actions">
                         <button type="button" class="btn-sm alabasta-casecard-btn muted" onclick="closeAlabastaCaseCardModal()">Close · 닫기</button>
                         <button type="button" class="btn-sm alabasta-casecard-btn secondary" onclick="saveAlabastaCaseCardScaffold()" id="alabasta-case-card-save-btn"><i class="fa-solid fa-floppy-disk"></i> Save · 저장</button>
-                        <button type="button" class="btn-sm alabasta-casecard-btn primary" onclick="generateAlabastaCaseCardImage()" id="alabasta-case-card-generate-btn"><i class="fa-solid fa-image"></i> GenMage · 생성</button>
+                        <button type="button" class="btn-sm alabasta-casecard-btn primary" onclick="generateAlabastaCaseCardImage()" id="alabasta-case-card-generate-btn"><i class="fa-solid fa-image"></i> Generate image</button>
                     </div>
                 </div>
             </div>
@@ -35830,13 +35835,13 @@ RULES:
         // V92.57 Phase 3-A: ③ sidebar rail removed, so this is now the primary path. Writes to
         // the hidden state input + syncs inline rail visual + persists to localStorage, then
         // triggers a regenerate.
-        window.switchAndRegenerateAlabastaCaseCard = function(modelValue) {
+        window.switchAndRegenerateAlabastaCaseCard = function(modelValue, regenerate = true) {
             if (!modelValue) return;
             const hiddenInput = document.getElementById('alabasta-case-card-model');
             if (hiddenInput) hiddenInput.value = modelValue;
             if (typeof syncAlabastaCaseCardQuickRail === 'function') syncAlabastaCaseCardQuickRail(modelValue);
             try { localStorage.setItem(window.ALABASTA_CASECARD_MODEL_PREF_KEY, modelValue); } catch (e) {}
-            if (typeof generateAlabastaCaseCardImage === 'function') {
+            if (regenerate && typeof generateAlabastaCaseCardImage === 'function') {
                 generateAlabastaCaseCardImage();
             }
         };
