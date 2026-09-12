@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.57)</title>
+    <title>Nika Admin (V99.58)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -32810,6 +32810,7 @@ RULES:
                 applicantDocsCache = byUser;
                 renderTable('users');
                 if (document.getElementById('applicantDocsModal').style.display === 'flex') renderApplicantDocs();
+                refreshHubDocuments();
             }, e => console.error("🔥 [Firestore Error] applicant_docs:", e));
 
             // 🔥 Access Request Listener ([Version: V84.3])
@@ -47352,13 +47353,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 // it earns no points, so it must stay out of dash and every score total.
                 // V98.85: the row prints a real filename, which is often Thai; it survives
                 // because #hub-history-list now carries `lang-no-toggle`.
-                (applicantDocsCache[u.preUserId] || []).forEach(apd => {
+                getHubDocuments(u).forEach(apd => {
                     allLogs.push({
                         t: toHubDate(apd.uploadedAt),
                         type: 'doc',
-                        text: `📎 Resume received · ${escapeHtml(apd.name || 'document')}`,
+                        text: `📎 Document received · ${escapeHtml(apd.name || 'document')}`,
                         isDoc: true,
-                        preUserId: u.preUserId,
+                        preUserId: apd.preUserId,
                         docId: apd.id
                     });
                 });
@@ -48166,6 +48167,32 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return groups;
         }
 
+        function getHubDocuments(user) {
+            const owners = new Set([applicantOwnerFor(user), user.id].filter(Boolean));
+            return Array.from(owners).flatMap(owner => applicantDocsCache[owner] || []);
+        }
+
+        function openHubUploadDocuments() {
+            const user = (usersData || []).find(u => u.id === window._currentPopupUser);
+            if (!user) return;
+            openApplicantDocs(applicantOwnerFor(user) || user.id);
+            document.getElementById('apd-who').textContent = user.fullName || user.displayName || user.id;
+        }
+
+        function refreshHubDocuments() {
+            const uid = window._currentPopupUser;
+            const cache = window._hubUserCache && window._hubUserCache[uid];
+            if (!cache) return;
+            const docs = getHubDocuments(cache.user).map(d => ({
+                t: d.uploadedAt && d.uploadedAt.toDate ? d.uploadedAt.toDate() : new Date(),
+                type: 'doc', isDoc: true, preUserId: d.preUserId, docId: d.id,
+                text: `📎 Document received · ${escapeHtml(d.name || 'document')}`
+            }));
+            cache.allLogs = cache.allLogs.filter(e => e.type !== 'doc').concat(docs).sort((a,b) => (b.t || 0) - (a.t || 0));
+            historyCache = cache.allLogs;
+            renderHubHistoryPage();
+        }
+
         function groupHubHistoryCategories(logs) {
             const buckets = new Map();
             logs.forEach(event => {
@@ -48197,11 +48224,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const logsPerPage = 10; // V91.102: 10/page + no inner scroll for compact modal
             const s = (historyPage - 1) * logsPerPage;
             const groups = groupHubHistoryCategories(filteredLogs);
+            if ((window._hubHistoryFilter || 'all') === 'all' && !groups.some(g => g.key === 'other')) groups.push({ key: 'other', events: [], points: 0, beri: 0 });
             const totalPages = Math.ceil(groups.length / logsPerPage);
             historyPage = Math.max(1, Math.min(historyPage, totalPages || 1));
             const p = groups.slice((historyPage - 1) * logsPerPage, historyPage * logsPerPage);
 
-            if (filteredLogs.length === 0) {
+            if (filteredLogs.length === 0 && (window._hubHistoryFilter || 'all') !== 'all') {
                 l.innerHTML = `<div style="padding:14px; border:1px dashed #cbd5e1; border-radius:10px; color:#64748b; text-align:center; background:#f8fafc; font-weight:700;">No logs in this category.</div>`;
                 return;
             }
@@ -48318,7 +48346,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const amount = group.key === 'beri'
                     ? `${group.beri >= 0 ? '+' : ''}${group.beri} coins`
                     : `${group.points >= 0 ? '+' : ''}${group.points.toFixed(2)} pts`;
-                l.innerHTML += `<details class="hub-log-category" style="--log-accent:${style.accent};" ${idx === 0 ? 'open' : ''}><summary><strong>${names[group.key] || names.other}</strong><span>${group.events.length} events</span><b>${amount}</b></summary><div class="hub-log-category-body">${groupHtml}</div></details>`;
+                l.innerHTML += `<details class="hub-log-category" style="--log-accent:${style.accent};" ${idx === 0 ? 'open' : ''}><summary><strong>${names[group.key] || names.other}</strong><span>${group.events.length} events</span><b>${amount}</b></summary><div class="hub-log-category-body">${group.key === 'other' ? '<button type="button" class="btn-sm" style="min-height:44px; margin-bottom:12px;" onclick="openHubUploadDocuments()">📎 Upload file for user</button><div style="font-size:12px; color:var(--text-sub); margin-bottom:10px;">PDF, JPG, PNG, WEBP · Under 4 MB · No points</div>' : ''}${groupHtml}</div></details>`;
             });
 
 
@@ -53730,19 +53758,22 @@ Save it anyway?`;
             const file = input.files && input.files[0];
             input.value = '';
             const msg = document.getElementById('apd-msg');
-            if (!file || !apdTargetId) return;
+            if (!file || !apdTargetId || input.dataset.uploading === 'true') return;
+            const ownerId = apdTargetId;
             const ext = _APPLICANT_EXT[file.type];
             if (!ext) { msg.style.color = '#ef4444'; msg.textContent = 'PDF, JPG, PNG or WEBP only.'; return; }
             if (file.size >= 4 * 1024 * 1024) { msg.style.color = '#ef4444'; msg.textContent = 'The file must be under 4 MB.'; return; }
             msg.style.color = '#64748b';
             msg.textContent = 'Uploading…';
+            input.dataset.uploading = 'true';
+            input.disabled = true;
             try {
                 const hash = await _sha256Hex(file);
-                const path = `applicant-docs/${apdTargetId}/${hash}.${ext}`;
+                const path = `applicant-docs/${ownerId}/${hash}.${ext}`;
                 await adminApp.storage().ref(path).put(file, { contentType: file.type });
                 const editor = (auth && auth.currentUser) || {};
                 await db.collection('applicant_docs').add({
-                    preUserId: apdTargetId,
+                    preUserId: ownerId,
                     name: file.name,
                     path,
                     size: file.size,
@@ -53750,12 +53781,12 @@ Save it anyway?`;
                     uploadedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     byEmail: editor.email || ALLOWED_EMAIL
                 });
-                await syncResumeFlag(apdTargetId);
-                msg.textContent = '';
+                await syncResumeFlag(ownerId);
+                msg.textContent = 'Uploaded successfully.';
             } catch (e) {
                 msg.style.color = '#ef4444';
                 msg.textContent = 'Upload failed: ' + e.message;
-            }
+            } finally { input.disabled = false; delete input.dataset.uploading; }
         }
 
         async function deleteApplicantDoc(docId) {
