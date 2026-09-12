@@ -82,7 +82,7 @@
             if (!current.exists) return;
             if (source.exists || !unscoredPending(current.data()) || current.data().metadata?.sourceId !== sourceId) throw Error('The item changed. Reload and review it again.');
             tx.set(audit, { action:'remove_orphan_case_history', userId:r.userId, submissionId:r.itemId, sourceId,
-                previousData:current.data(), adminUid:firebase.auth().currentUser.uid, timestamp:stamp() });
+                previousData:current.data(), adminUid:db.app.auth().currentUser.uid, timestamp:stamp() });
             tx.delete(mirror.ref);
         });
         return true;
@@ -128,12 +128,12 @@
                         b.disabled=true;const status=box.querySelector('p[role]');
                         try {
                             const fresh=await doc.ref.get(); if(fresh.data()?.status!=='pending') throw Error('Request is no longer pending.');
-                            if(b.dataset.act==='reject'){await doc.ref.update({status:'rejected',updatedAt:stamp(),resolvedBy:firebase.auth().currentUser.uid});}
+                            if(b.dataset.act==='reject'){await doc.ref.update({status:'rejected',updatedAt:stamp(),resolvedBy:db.app.auth().currentUser.uid});}
                             else {
                                 const collection=r.itemType==='quiz'?'quiz_attempts':r.itemType==='explore_link'?'review_link_suggestions':'submissions';
                                 const gone=b.dataset.act==='delete'?await deleteSource(r):!(await db.collection(collection).doc(r.itemId).get()).exists;
                                 if(!gone) throw Error('Item still exists. Request remains pending.');
-                                await doc.ref.update({status:'deleted',updatedAt:stamp(),resolvedBy:firebase.auth().currentUser.uid});
+                                await doc.ref.update({status:'deleted',updatedAt:stamp(),resolvedBy:db.app.auth().currentUser.uid});
                             }
                             status.textContent='Saved';
                         }catch(e){status.textContent=e.message;}finally{b.disabled=false;}
