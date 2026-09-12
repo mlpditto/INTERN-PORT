@@ -11,16 +11,14 @@ window.switchPersonalTab = function(tab) {
     }
 };
 window.updatePersonalBirthday = function() {
-    const card = document.querySelector('.pi-card-personal');
-    let result = document.getElementById('pi-age');
-    if (!result) { result = document.createElement('p'); result.id = 'pi-age'; result.setAttribute('aria-live', 'polite'); card.append(result); }
+    const result = document.getElementById('pi-age');
     const [day, month, year] = ['day', 'month', 'year'].map(k => Number(document.getElementById('pi-bday-' + k).value));
     const birth = new Date(year, month - 1, day), now = new Date();
     result.textContent = '';
     if (!day || !month || !year) return;
     if (birth.getFullYear() !== year || birth.getMonth() !== month - 1 || birth.getDate() !== day || birth > now) { result.textContent = 'Please check your date of birth · กรุณาตรวจสอบวันเกิด'; return; }
     const age = now.getFullYear() - year - (now.getMonth() < month - 1 || (now.getMonth() === month - 1 && now.getDate() < day) ? 1 : 0);
-    result.textContent = '🎂 ' + age + ' years · Born on ' + ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][birth.getDay()];
+    result.textContent = age + ' years · Born on ' + ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][birth.getDay()];
 };
 window.validatePersonalCards = function() {
     const required = ['pi-firstname-en', 'pi-lastname-en', 'pi-institute'];
