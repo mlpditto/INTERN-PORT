@@ -79,6 +79,41 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // Learning reviews are private; only admins publish results or change status.
+    match /learning_reviews/{reviewId} {
+      allow read: if isAdmin() || isOwnerByAuthUid();
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(['authUid', 'userId', 'userName', 'analysisType', 'scope', 'note', 'status', 'result', 'createdAt', 'updatedAt'])
+        && request.resource.data.authUid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.result == ''
+        && request.resource.data.analysisType in ['behavior', 'quiz', 'time', 'improvement', 'recommendation']
+        && request.resource.data.note is string && request.resource.data.note.size() <= 4000
+        && request.resource.data.scope is map
+        && request.resource.data.scope.keys().hasOnly(['category', 'status', 'query', 'start', 'end'])
+        && request.resource.data.scope.category is string
+        && request.resource.data.scope.status is string
+        && request.resource.data.scope.query is string && request.resource.data.scope.query.size() <= 4000
+        && request.resource.data.scope.start is string && request.resource.data.scope.end is string
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'result', 'updatedAt'])
+        && request.resource.data.status in ['reviewing', 'ready']
+        && request.resource.data.result is string && request.resource.data.result.size() <= 12000
+        && (request.resource.data.status != 'ready' || request.resource.data.result.matches('[\\s\\S]*\\S[\\s\\S]*'))
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isAdmin();
+    }
+    match /learning_review_locks/{lockId} {
+      allow read: if isSignedIn() && (lockId.matches(request.auth.uid + '_.*'));
+      allow create, update: if isSignedIn()
+        && lockId.matches(request.auth.uid + '_.*')
+        && request.resource.data.keys().hasOnly(['authUid', 'requestId'])
+        && request.resource.data.authUid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/learning_reviews/$(request.resource.data.requestId)).data.authUid == request.auth.uid;
+    }
+
     // 6. Side Quests
     match /side_quests/{taskId} {
       allow read: if true;
