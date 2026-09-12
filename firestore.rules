@@ -79,6 +79,30 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    match /deletion_requests/{id} {
+      allow read: if isAdmin() || isOwnerByAuthUid()
+        || (isSignedIn() && id.matches(request.auth.uid + '_.*'));
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(['authUid','userId','itemId','itemType','reason','status','createdAt','updatedAt'])
+        && request.resource.data.authUid == request.auth.uid
+        && (request.resource.data.userId == request.auth.uid || hasAuthLinkToUserId(request.resource.data.userId))
+        && request.resource.data.status == 'pending'
+        && request.resource.data.itemId is string && request.resource.data.itemId.size() > 0
+        && request.resource.data.itemType in ['case','work','quiz','quest','reflective','learning_note','product','explore_link']
+        && request.resource.data.reason is string && request.resource.data.reason.size() > 0 && request.resource.data.reason.size() <= 240
+        && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time;
+      allow update: if request.resource.data.updatedAt == request.time && (
+        (isAdmin() && resource.data.status == 'pending'
+          && request.resource.data.status in ['rejected','deleted']
+          && request.resource.data.resolvedBy == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt','resolvedBy']))
+        || (isOwnerByAuthUid()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reason','updatedAt'])
+          && request.resource.data.reason is string && request.resource.data.reason.size() > 0 && request.resource.data.reason.size() <= 240
+          && ((resource.data.status == 'pending' && request.resource.data.status == 'cancelled')
+            || (resource.data.status in ['cancelled','rejected'] && request.resource.data.status == 'pending'))));
+    }
+
     // Learning reviews are private; only admins publish results or change status.
     match /learning_reviews/{reviewId} {
       allow read: if isAdmin() || isOwnerByAuthUid();
