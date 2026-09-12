@@ -2,7 +2,7 @@
 <html lang="th">
 
 <head>
-    <title>Internship Portfolio (V99.77)</title>
+    <title>Internship Portfolio (V99.78)</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
@@ -2142,6 +2142,7 @@
 <script defer src="submit-system-grid.js?v=V99.71"></script>
 <link rel="stylesheet" href="invite-ticket.css?v=V99.74">
 <script defer src="invite-ticket.js?v=V99.74"></script>
+<link rel="stylesheet" href="learning-review.css?v=V99.78">
 </head>
 
 <body>
@@ -14754,49 +14755,30 @@
 
         function loadLearningAnalytics() {
             const container = document.getElementById('learning-analytics-container');
+            const topics = [['behavior', '✨ Overview'], ['quiz', '🎯 Quiz'], ['time', '⏱ Time'], ['improvement', '🌱 Improve'], ['recommendation', '📚 Content']];
             container.innerHTML = `
-                <div style="text-align:center; padding:15px;">
-                    <div style="color:#6f42c1; font-weight:bold; margin-bottom:10px; font-size:1.1em;">
-                        <i class="fa-solid fa-chart-line"></i> Learning Analytics
+                <section class="learning-review" aria-label="Learning Review">
+                    <div class="learning-review-row">
+                        <h3>📈 Learning Review</h3><span class="learning-review-meta">Admin review</span>
                     </div>
-                    <div style="font-size:0.85em; color:#666; margin-bottom:15px;">
-                        AI-powered insights to optimize your learning journey
+                    <input type="hidden" id="analytics-type-select" value="behavior">
+                    <div class="learning-review-topics" role="group" aria-label="Analysis topic">
+                        ${topics.map(([value, label]) => `<button type="button" data-topic="${value}" aria-pressed="${value === 'behavior'}">${label}</button>`).join('')}
                     </div>
-                    
-                    <div style="background:#f8f9fa; padding:12px; border-radius:8px; margin-bottom:15px; text-align:left;">
-                        <div style="font-weight:bold; margin-bottom:8px; color:#333; font-size:0.9em;">📊 Analysis Includes:</div>
-                        <div style="font-size:0.82em; color:#666; line-height:1.6;">
-                            • Peak learning hours & patterns<br>
-                            • Score trends & progress<br>
-                            • Weak areas identification<br>
-                            • Response speed analysis<br>
-                            • Personalized recommendations
-                        </div>
+                    <div class="learning-review-row learning-review-actions">
+                        <details><summary>✏️ Add note</summary>
+                            <textarea id="analytics-note-text" rows="2" aria-label="Analysis note" placeholder="What should we focus on?"></textarea>
+                        </details>
+                        <button type="button" class="learning-review-send" onclick="requestLearningAnalytics()">Send request ↗</button>
                     </div>
-                    
-                    <div style="margin-bottom:12px;">
-                        <select id="analytics-type-select" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; font-size:0.85em;">
-                            <option value="">-- Select Analysis Type --</option>
-                            <option value="behavior">Full Learning Behavior</option>
-                            <option value="quiz">Quiz Performance</option>
-                            <option value="time">Time Analysis</option>
-                            <option value="improvement">Improvement Strategy</option>
-                            <option value="recommendation">Content Recommendations</option>
-                        </select>
-                    </div>
-                    
-                    <div style="margin-bottom:12px;">
-                        <textarea id="analytics-note-text" rows="2" placeholder="Additional notes (optional)..." 
-                            style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; resize:none; font-size:0.85em;"></textarea>
-                    </div>
-                    
-                    <button onclick="requestLearningAnalytics()" class="btn-sm btn-primary" style="width:100%; background:#6f42c1; border:none; padding:10px; border-radius:6px; font-weight:bold; font-size:0.9em;">
-                        <i class="fa-solid fa-chart-line"></i> Request Analysis
-                    </button>
-                    
-                    <div id="analytics-request-status" style="margin-top:12px;"></div>
-                </div>
-            `;
+                    <div id="analytics-request-status" role="status" aria-live="polite"></div>
+                </section>`;
+            container.querySelectorAll('[data-topic]').forEach(button => {
+                button.addEventListener('click', () => {
+                    document.getElementById('analytics-type-select').value = button.dataset.topic;
+                    container.querySelectorAll('[data-topic]').forEach(chip => chip.setAttribute('aria-pressed', String(chip === button)));
+                });
+            });
         }
 
         async function requestLearningAnalytics() {
@@ -14809,9 +14791,10 @@
                 return;
             }
 
+            const button = document.querySelector('.learning-review-send');
+            if (button.disabled) return;
             try {
                 // Disable button
-                const button = event.target;
                 button.disabled = true;
                 button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังส่งคำขอ...';
 
@@ -14860,7 +14843,8 @@
                 `;
 
                 // Reset form
-                document.getElementById('analytics-type-select').value = '';
+                document.getElementById('analytics-type-select').value = 'behavior';
+                document.querySelectorAll('#learning-analytics-container [data-topic]').forEach(chip => chip.setAttribute('aria-pressed', String(chip.dataset.topic === 'behavior')));
                 document.getElementById('analytics-note-text').value = '';
 
                 // Show success in main UI
@@ -14874,7 +14858,7 @@
                 const button = document.querySelector('button[onclick="requestLearningAnalytics()"]');
                 if (button) {
                     button.disabled = false;
-                    button.innerHTML = '<i class="fa-solid fa-chart-line"></i> ขอให้ Admin วิเคราะห์';
+                    button.textContent = 'Send request ↗';
                 }
             }
         }
