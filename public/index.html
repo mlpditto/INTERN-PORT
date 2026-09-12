@@ -2,8 +2,8 @@
 <html lang="th">
 
 <head>
-    <title>Internship Portfolio (V99.85)</title>
-    <link rel="stylesheet" href="daily-canvas.css?v=V99.85">
+    <title>Internship Portfolio (V99.86)</title>
+    <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
@@ -8565,6 +8565,7 @@
         }
 
         function openJournalWithPersonalityPrompt() {
+            window.selectJournalTab?.('day');
             // V97.10: needs `personality`, an own-doc field the leaderboard
             // projection deliberately does not carry.
             const me = myOwnRow();
@@ -18912,7 +18913,7 @@
         function renderReflectiveLogs() {
             const list = document.getElementById('rl-history-list');
             const status = document.getElementById('rl-today-status');
-            const formArea = document.getElementById('rl-form-area');
+            const formArea = document.getElementById('dc-day') || document.getElementById('rl-form-area');
             const streakBadge = document.getElementById('rl-streak-badge');
 
             if (!list) return;
@@ -19062,7 +19063,7 @@
         }
 
         async function submitReflectiveLog() {
-            let content = document.getElementById('rl-content').value.trim();
+            const content = document.getElementById('rl-content').value.trim();
             const mood = document.getElementById('rl-mood').value;
             const btn = document.getElementById('rl-submit-btn');
 
@@ -19078,7 +19079,6 @@
             }
 
             // Flush pending custom-tool input so it isn't dropped on submit
-            content = window.dailyCanvasContent ? window.dailyCanvasContent(content) : content;
             if (document.getElementById('rl-custom-tool')?.value?.trim()) {
                 addCustomTool();
             }
@@ -19176,7 +19176,6 @@
                 awardEngagementBonusIfDue();
 
                 document.getElementById('rl-content').value = "";
-                window.resetDailyCanvasFeedback?.();
                 updateCharCount();
                 window.rlSelectedTools = new Set();
                 renderSelectedTools();
@@ -20000,6 +19999,7 @@
         // same writing box, and either way the first entry of the day earns the +0.1
         // (V96.85). Kept as a router so both original paths stay intact and testable.
         async function submitJournalEntry() {
+            if (document.getElementById('dc-day')) return submitReflectiveLog();
             const title = (document.getElementById('lp-note-title')?.value || '').trim();
             const hasTags = ((window._lpNoteTags || []).length > 0);
             if (title || hasTags) return submitLpNoteOnly();
@@ -20009,6 +20009,10 @@
 
         // Fold the note-only fields away. Closed is the common case: write and submit.
         function toggleJournalNoteFields(forceOpen) {
+            if (document.getElementById('dc-note')) {
+                if (forceOpen !== false) window.selectJournalTab?.('note');
+                return;
+            }
             const body = document.getElementById('rl-note-fields');
             const btn = document.getElementById('rl-note-fold-btn');
             if (!body) return;
@@ -20034,6 +20038,11 @@
         // the button's innerHTML while it works ("Submitting…") — after that there are
         // no spans left to patch, and the label would stay frozen on the busy text.
         function updateJournalSubmitLabel() {
+            if (document.getElementById('dc-note-submit')) {
+                document.getElementById('dc-note-submit').textContent = '🎓 Save note';
+                renderDRStatus();
+                return;
+            }
             const btn = document.getElementById('rl-submit-btn');
             if (!btn) return;
             const title = (document.getElementById('lp-note-title')?.value || '').trim();
@@ -20049,8 +20058,8 @@
 
         async function submitLpNoteOnly() {
             const title = (document.getElementById('lp-note-title').value || '').trim();
-            // V96.86: one writing box for both kinds of entry.
-            let content = (document.getElementById('rl-content').value || '').trim();
+            const noteInput = document.getElementById('dc-note-content') || document.getElementById('rl-content');
+            const content = (noteInput.value || '').trim();
             if (!content) return alert('Please write Learning Note content first.');
 
             // V94.31: enforce 90-lifetime cap (Model α — admin grades later, no immediate score)
@@ -20062,8 +20071,8 @@
                 return;
             }
 
-            content = window.dailyCanvasContent ? window.dailyCanvasContent(content) : content;
-            const btn = document.getElementById('rl-submit-btn');
+            const btn = document.getElementById('dc-note-submit') || document.getElementById('rl-submit-btn');
+            if (btn?.disabled) return;
             if (btn) { btn.disabled = true; btn.innerText = 'Saving...'; }
             try {
                 const authUser = await ensureFirebaseAuthReady(10000);
@@ -20118,8 +20127,7 @@
 
                 // Reset form
                 document.getElementById('lp-note-title').value = '';
-                document.getElementById('rl-content').value = '';
-                window.resetDailyCanvasFeedback?.();
+                noteInput.value = '';
                 window._lpNoteTags = [];
                 renderLpTags('note');
 
@@ -24114,7 +24122,7 @@ async function archiveDoneCard(cardId) {
          Same reason admin.html shields its toast (V96.89). -->
     <div id="toast" class="lang-no-toggle"></div>
 <script src="history-review.js?v=V99.81"></script>
-<script src="daily-canvas.js?v=V99.85"></script>
+<script src="daily-canvas.js?v=V99.86"></script>
 <script src="history-compact.js?v=V99.81"></script><script src="delete-requests.js?v=V99.84"></script>
 </body>
 
