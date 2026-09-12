@@ -57,6 +57,36 @@
             };
         });
     };
+    async function removeOrphanCase(r, mirror, sourceId) {
+        const data = mirror.data();
+        const unscoredPending = d => d.userId === r.userId && d.submissionType === 'case'
+            && ['pending', 'รอตรวจ'].includes(d.status)
+            && Number(d.score || 0) === 0 && Number(d.adminBonus || 0) === 0;
+        if (!unscoredPending(data)) throw Error('Source missing: this item is reviewed or has points. Admin must reconcile the score before removing it.');
+        const [cases, logs] = await Promise.all([
+            db.collection('cases').where('userId', '==', r.userId).get(),
+            db.collection('checkin_logs').where('userId', '==', r.userId).get()
+        ]);
+        const caseId = data.metadata?.caseId;
+        if (caseId && cases.docs.some(d => d.data().caseId === caseId)) throw Error('A case with the same reference still exists. Review its History link before deleting.');
+        const linked = logs.docs.some(doc => {
+            const log = doc.data();
+            return log.sourceCaseDocId === sourceId || log.relatedSubmissionId === r.itemId
+                || (caseId && (log.sourceCaseRef === caseId || log.note === `Alabasta reviewed: ${caseId}`));
+        });
+        if (linked) throw Error('Linked score records exist. Admin must reconcile them before removing this History entry.');
+        if (!confirm('The original case is missing. Remove this pending, zero-point History entry? No points will be changed.')) return false;
+        const sourceRef = db.collection('cases').doc(sourceId), audit = db.collection('admin_logs').doc();
+        await db.runTransaction(async tx => {
+            const [current, source] = await Promise.all([tx.get(mirror.ref), tx.get(sourceRef)]);
+            if (!current.exists) return;
+            if (source.exists || !unscoredPending(current.data()) || current.data().metadata?.sourceId !== sourceId) throw Error('The item changed. Reload and review it again.');
+            tx.set(audit, { action:'remove_orphan_case_history', userId:r.userId, submissionId:r.itemId, sourceId,
+                previousData:current.data(), adminUid:firebase.auth().currentUser.uid, timestamp:stamp() });
+            tx.delete(mirror.ref);
+        });
+        return true;
+    }
     async function deleteSource(r) {
         const collection = r.itemType === 'quiz' ? 'quiz_attempts' : r.itemType === 'explore_link' ? 'review_link_suggestions' : 'submissions';
         const mirror = await db.collection(collection).doc(r.itemId).get();
@@ -67,7 +97,10 @@
         const mapping = {case:['cases',deleteCaseSubmission],product:['product_listings',deleteProductListing],work:['works',delWork],reflective:['reflective_logs',deleteReflectiveLog]};
         if (mapping[r.itemType] && sourceId) {
             const [name, handler] = mapping[r.itemType], source = await db.collection(name).doc(sourceId).get();
-            if (!source.exists) throw Error('Source is missing. Inspect the history mirror manually.');
+            if (!source.exists) {
+                if (r.itemType === 'case') return removeOrphanCase(r, mirror, sourceId);
+                throw Error('Source is missing. Inspect the history mirror manually.');
+            }
             if (source.data().userId !== r.userId) throw Error('Source owner mismatch.');
             if (r.itemType === 'case') { casesData = casesData.filter(c=>c.id!==sourceId); casesData.push({id:sourceId,...source.data()}); }
             if (r.itemType === 'product') { productListingsData = productListingsData.filter(c=>c.id!==sourceId); productListingsData.push({id:sourceId,...source.data()}); }
