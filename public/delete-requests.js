@@ -116,10 +116,11 @@
         const host = document.getElementById('dashboard-work'); if (!host) return;
         const box = document.createElement('details'); box.className='dr-admin';
         box.innerHTML='<summary>🗑 Delete requests</summary><div></div><p role="status"></p>';host.prepend(box);
-        let loaded=false;
-        box.addEventListener('toggle',()=>{
-            if (!box.open || loaded) return; loaded=true;
-            db.collection('deletion_requests').where('status','==','pending').onSnapshot(snap=>{
+        let unsubscribe;
+        function listen() {
+            if (unsubscribe || !db.app.auth().currentUser) return;
+            unsubscribe = db.collection('deletion_requests').where('status','==','pending').onSnapshot(snap=>{
+                box.classList.toggle('queue-empty', snap.empty);
                 const list=box.querySelector('div'); list.replaceChildren();
                 snap.forEach(doc=>{
                     const r=doc.data(), row=document.createElement('div');row.className='dr-row';
@@ -139,7 +140,13 @@
                         }catch(e){status.textContent=e.message;}finally{b.disabled=false;}
                     });list.append(row);
                 });if(snap.empty)list.textContent='No pending requests';
-            },()=>{loaded=false;box.querySelector('p[role]').textContent='Could not load requests. Reopen to retry.';});
+            },()=>{ box.classList.remove('queue-empty');unsubscribe=null;box.querySelector('p[role]').textContent='Could not load requests. Reopen to retry.';});
+        }
+        box.addEventListener('toggle', () => { if (box.open) listen(); });
+        db.app.auth().onAuthStateChanged(user => {
+            unsubscribe?.(); unsubscribe = null;
+            box.classList.remove('queue-empty');
+            if (user) listen();
         });
     }
     document.addEventListener('DOMContentLoaded',()=>{

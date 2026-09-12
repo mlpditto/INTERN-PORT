@@ -2,7 +2,7 @@
 <html lang="th">
 
 <head>
-    <title>Internship Portfolio (V99.87)</title>
+    <title>Internship Portfolio (V99.88)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -2145,6 +2145,7 @@
 <script defer src="invite-ticket.js?v=V99.74"></script>
 <link rel="stylesheet" href="learning-review.css?v=V99.81">
 <link rel="stylesheet" href="history-compact.css?v=V99.81"><link rel="stylesheet" href="delete-requests.css?v=V99.82">
+<link rel="stylesheet" href="case-compact.css?v=V99.88">
 </head>
 
 <body>
@@ -4274,7 +4275,7 @@
                                  V96.82: "Logbook" said where the work goes, not what to do
                                  with it. Naming both jobs outright is the point of the
                                  section: log a case, or list a product for the marketplace. -->
-                            Case &amp; Product List 케이스 · 상품<!-- V96.20: bonused-cases counter moved here from the metrics bar's 🩺 item
+                            Cases 케이스<!-- V96.20: bonused-cases counter moved here from the metrics bar's 🩺 item
                             --><span id="case-section-count" class="lang-no-toggle" title="Cases that already got an admin bonus" data-th-title="Case ที่ได้โบนัสจาก admin แล้ว" style="display:none; font-size:0.62em; font-weight:800; color:#0369a1; background:#e0f2fe; border:1px solid #bae6fd; padding:1px 8px; border-radius:999px; margin-left:8px; vertical-align:middle;">0</span></h4>
                         <i id="case-section-icon" class="fa-solid fa-chevron-down"
                             style="color: #4361ee; transition: 0.3s; font-size: 0.9em;"></i>
@@ -4355,7 +4356,7 @@
                                 <div class="cs-step">
                                     <div class="cs-step-head">
                                         <span class="cs-num">2</span>
-                                        <span class="cs-label">Disease System 질병 계통</span>
+                                        <span class="cs-label">Disease System * 질병 계통</span>
                                         <span class="cs-badge req">Required 필수</span>
                                     </div>
                                     <!-- hidden select kept for submitCase() backward compat -->
@@ -4394,12 +4395,8 @@
                                 </div>
 
                                 <!-- STEP 4: Note (Optional) -->
-                                <div class="cs-step">
-                                    <div class="cs-step-head">
-                                        <span class="cs-num opt">4</span>
-                                        <span class="cs-label">Additional Note 추가 메모</span>
-                                        <span class="cs-badge opt">Optional 선택</span>
-                                    </div>
+                                <details class="cs-step" id="case-note-details">
+                                    <summary>✏️ Note</summary>
                                     <textarea id="c-note" rows="3"
                                         placeholder="Interesting details, drug counseling, follow-up notes... 자세한 내용, 복약 상담, 후속 메모..."
                                         style="margin:0;" maxlength="500"></textarea>
@@ -4407,7 +4404,7 @@
                                     <div id="note-char-counter" style="text-align: right; font-size: 0.75em; color: #64748b; margin-top: 4px; transition: color 0.2s ease;">
                                         <span id="note-char-count" style="font-weight: 600;">0</span>/500 characters 글자
                                     </div>
-                                </div>
+                                </details>
 
                                 <!-- V94.17: Clear (left) + Submit (right) side-by-side, 50/50 · V94.19: id added for show/hide -->
                                 <div id="case-cta-row" class="cs-cta-row" style="display:flex; gap:8px; margin-top:4px;">
@@ -22500,6 +22497,7 @@ async function archiveDoneCard(cardId) {
             document.getElementById('c-customer').value = customer;
             document.getElementById('c-disease').value = systemLabels[systemKey] || systemKey;
             document.getElementById('c-note').value = note;
+            document.getElementById('case-note-details').open = !!note;
             const diseaseSystemSelect = document.getElementById('c-disease-system');
             if (diseaseSystemSelect) diseaseSystemSelect.value = systemKey;
             window.caseComposerState = { selectedSymptoms: [...selectedSymptoms] };
@@ -22705,6 +22703,7 @@ async function archiveDoneCard(cardId) {
             if (customerEl) customerEl.value = draft.customer || '';
             if (telEl) telEl.value = draft.customerTel || '';
             if (noteEl) noteEl.value = draft.note || '';
+            document.getElementById('case-note-details').open = !!draft.note;
 
             // Trigger HN validation listener so the submit button updates
             if (idEl) idEl.dispatchEvent(new Event('input'));
@@ -22751,10 +22750,11 @@ async function archiveDoneCard(cardId) {
             if (telEl) telEl.value = '';
             if (diseaseEl) diseaseEl.value = '';
             if (noteEl) noteEl.value = '';
+            document.getElementById('case-note-details').open = false;
 
             const ds = document.getElementById('c-disease-system');
             if (ds) ds.value = '';
-            document.querySelectorAll('.cs-sys-card').forEach(c => c.classList.remove('selected'));
+            document.querySelectorAll('.cs-sys-card').forEach(c => { c.classList.remove('selected'); c.setAttribute('aria-pressed', 'false'); });
 
             const symptomStep = document.getElementById('case-symptom-step');
             if (symptomStep) symptomStep.style.display = 'none';
@@ -22897,13 +22897,13 @@ async function archiveDoneCard(cardId) {
             container.innerHTML = caseTaxonomyCatalog.map(item => {
                 const n = countByKey[item.key] || 0;
                 return `
-                <div class="cs-sys-card${item.key === currentKey ? ' selected' : ''}"
+                <button type="button" aria-pressed="${item.key === currentKey}" class="cs-sys-card${item.key === currentKey ? ' selected' : ''}"
                      data-key="${item.key}"
                      onclick="selectCaseSystem('${item.key}')">
                     ${n > 0 ? `<span class="cs-sys-count" title="${n} case${n > 1 ? 's' : ''} logged">${n}</span>` : ''}
                     <div class="cs-sys-emoji">${CASE_SYSTEM_EMOJI[item.key] || '🏥'}</div>
                     <div class="cs-sys-name">${item.label}</div>
-                </div>`;
+                </button>`;
             }).join('');
         }
 
@@ -22914,6 +22914,7 @@ async function archiveDoneCard(cardId) {
             // Update card highlight
             document.querySelectorAll('.cs-sys-card').forEach(c => {
                 c.classList.toggle('selected', c.dataset.key === key);
+                c.setAttribute('aria-pressed', String(c.dataset.key === key));
             });
 
             // Show symptom step when a system is picked
@@ -23056,6 +23057,7 @@ async function archiveDoneCard(cardId) {
             if (telEl) telEl.value = '';
             document.getElementById('c-disease').value = '';
             document.getElementById('c-note').value = '';
+            document.getElementById('case-note-details').open = false;
             
             // Reset disease system selection
             const diseaseSystemSelect = document.getElementById('c-disease-system');
@@ -23516,7 +23518,7 @@ async function archiveDoneCard(cardId) {
             if (customInput) customInput.value = '';
             window.caseComposerState = { selectedSymptoms: [] };
             // Clear card selection and hide symptom step
-            document.querySelectorAll('.cs-sys-card').forEach(c => c.classList.remove('selected'));
+            document.querySelectorAll('.cs-sys-card').forEach(c => { c.classList.remove('selected'); c.setAttribute('aria-pressed', 'false'); });
             const symptomStep = document.getElementById('case-symptom-step');
             if (symptomStep) symptomStep.style.display = 'none';
             renderCaseTaxonomyComposer();
