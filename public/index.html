@@ -2,7 +2,7 @@
 <html lang="th">
 
 <head>
-    <title>Internship Portfolio (V99.74)</title>
+    <title>Internship Portfolio (V99.75)</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
@@ -10220,7 +10220,7 @@
             });
         }
 
-        function confirmRunQuiz(quizId) {
+        async function confirmRunQuiz(quizId) {
             const q = quizzesCache.find(x => x.id === quizId);
             if (!q) return;
 
@@ -10248,14 +10248,12 @@
 
                 if (confirm(practiceMsg)) {
                     isPracticeMode = true;
-                    runQuiz(quizId);
+                    return await runQuiz(quizId);
                 }
             } else {
                 // Normal quiz or Allowed re-take — styled confirmation modal.
                 isPracticeMode = false;
-                quizStartConfirm(q.title).then(function (ok) {
-                    if (ok) runQuiz(quizId);
-                });
+                if (await quizStartConfirm(q.title)) return await runQuiz(quizId);
             }
         }
 
@@ -14338,7 +14336,7 @@
                 // (an alert at its startTime gate), but a button that can only say no is
                 // worse than no button.
                 out.push({
-                    icon: '📝', title: q.title || 'Quiz แบบทดสอบ', due: due, opens: opens, act: openMission,
+                    icon: '📝', title: q.title || 'Quiz แบบทดสอบ', due: due, opens: opens, act: 'schLaunchQuiz(' + JSON.stringify(q.id) + ')',
                     quizId: (opens && opens > now) ? '' : q.id
                 });
             });
@@ -14500,7 +14498,7 @@
                     const click = !it.act ? ''
                         : (typeof it.act === 'function')
                             ? (' data-schact="' + (acts.push(it.act) - 1) + '"')
-                            : (' onclick="' + it.act + '"');
+                            : (' onclick="' + escapeHtml(it.act) + '"');
                     // V97.06: the title span is SHIELDED. It renders admin-authored
                     // quiz/quest titles, which are often pure Thai — unshielded, the
                     // walker wrapped and hid them, so those rows rendered as a bare
@@ -14525,7 +14523,7 @@
                         // branch — so this shortcut cannot skip one. stopPropagation keeps
                         // the row's own click (which opens the board) from firing too.
                         // width/min-height are pinned against the global button rule.
-                        + (it.quizId ? '<button type="button" onclick="event.stopPropagation(); confirmRunQuiz(\''
+                        + (it.quizId ? '<button type="button" onclick="event.stopPropagation(); schLaunchQuiz(\''
                             + it.quizId + '\')" title="Start this quiz" data-th-title="เริ่มทำข้อสอบนี้"'
                             + ' aria-label="Start this quiz" data-th-aria-label="เริ่มทำข้อสอบนี้"'
                             + ' style="flex:0 0 auto; width:auto; min-height:0; padding:3px 9px; border:none; border-radius:999px;'
@@ -14641,6 +14639,26 @@
             if (det) { det.style.display = 'none'; det.innerHTML = ''; }
             m.style.display = 'flex';
             schSwitchPane('agenda');
+        }
+
+        async function schLaunchQuiz(quizId) {
+            const schedule = document.getElementById('scheduleModal');
+            const quiz = document.getElementById('quizModal');
+            const previousDisplay = schedule.style.display;
+            const scrolls = [schedule, ...schedule.querySelectorAll('*')].filter(el => el.scrollTop).map(el => [el, el.scrollTop]);
+            closeScheduleModal();
+            const restore = () => {
+                schedule.style.display = previousDisplay;
+                scrolls.forEach(([el, top]) => { el.scrollTop = top; });
+            };
+            try {
+                await confirmRunQuiz(quizId);
+                if (quiz.style.display === 'none' || !quiz.style.display) { restore(); return; }
+                const observer = new MutationObserver(() => {
+                    if (quiz.style.display === 'none') { observer.disconnect(); restore(); }
+                });
+                observer.observe(quiz, { attributes: true, attributeFilter: ['style'] });
+            } catch (error) { restore(); console.error('Schedule quiz launch failed', error); }
         }
 
         function closeScheduleModal() {
