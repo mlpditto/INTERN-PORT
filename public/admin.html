@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.76)</title>
+    <title>Nika Admin (V99.77)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6378,6 +6378,7 @@
     <script src="case-taxonomy.js?v=V94.53"></script>
     <!-- V91.98 fix: walker skips user-content subtrees (q-text-preview / md-render / lang-no-toggle) -->
     <script src="lang-toggle.js?v=V97.44"></script>
+<link rel="stylesheet" href="audit-toolbar.css?v=V99.77">
 </head>
 
 <body>
@@ -17698,14 +17699,12 @@
         };
 
         window.auditModelControlsHtml = function(hasResult) {
-            return `<div class="lang-no-toggle" style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; color:#334155;">
-                <label for="quality-audit-model">โมเดลสำหรับตรวจใหม่</label>
-                <select id="quality-audit-model" style="padding:8px; min-height:44px; max-width:100%; border:1px solid #cbd5e1; border-radius:8px; background:white; color:#334155;">
-                    ${(window.AI_MODEL_REGISTRY?.models || []).filter(m => m.selectable).map(m => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.label)}</option>`).join('')}
-                </select>
-                <button onclick="runSelectedQualityAudit(this)" style="padding:8px 12px; min-height:44px; border:0; border-radius:8px; background:#0891b2; color:white; cursor:pointer;">${hasResult ? 'ตรวจใหม่' : 'เริ่มตรวจ'}</button>
-                <small style="flex-basis:100%;">ตรวจคำตอบซ้ำและเฉลยกำกวมด้วยตนเองด้วย · ผล AI อาจพลาดได้</small>
-            </div>`;
+            return `<select id="quality-audit-model" aria-label="Review model">
+                ${(window.AI_MODEL_REGISTRY?.models || []).filter(m => m.selectable).map(m => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.label)}</option>`).join('')}
+                </select><button class="audit-run" onclick="runSelectedQualityAudit(this)" aria-label="${hasResult ? 'Review again' : 'Start review'}" title="${hasResult ? 'Review again' : 'Start review'}">↻</button>`;
+        };
+        window.auditToolbarHtml = function(hasResult) {
+            return `<div class="audit-toolbar lang-no-toggle">${window.reviewTabsHtml('audit')}${window.auditModelControlsHtml(hasResult)}<button class="audit-close" onclick="closeQuizReview()" aria-label="Close review">×</button></div><p class="audit-toolbar-note lang-no-toggle">ⓘ AI may err · Check duplicate answers and ambiguous keys.</p>`;
         };
 
         window.runSelectedQualityAudit = function(btn) {
@@ -17720,8 +17719,7 @@
             modal.id = 'ai-audit-popup';
             modal.className = 'lang-no-toggle';
             modal.style = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:92%; max-width:780px; max-height:85vh; overflow-y:auto; background:white; color:#334155; padding:24px; border-radius:20px; box-shadow:0 20px 60px rgba(0,0,0,.3); z-index:10001;';
-            modal.innerHTML = `<div style="display:flex; justify-content:space-between; gap:8px;">${window.reviewTabsHtml('audit')}<button onclick="closeQuizReview()" aria-label="Close the review">✕</button></div>
-                <p>ยังไม่มีผลตรวจคุณภาพ เลือกโมเดลแล้วกดเริ่มตรวจ</p>${window.auditModelControlsHtml(false)}`;
+            modal.innerHTML = `${window.auditToolbarHtml(false)}<p>No review yet.</p>`;
             document.body.appendChild(modal);
         };
 
@@ -18147,13 +18145,7 @@ RULES:
             ` : '';
 
             modal.innerHTML = `
-                <div style="display:flex; flex-wrap:wrap; gap:8px; justify-content:space-between; align-items:center; border-bottom:2px solid #f1f5f9; padding-bottom:14px; margin-bottom:18px;">
-                    ${window.reviewTabsHtml('audit')}
-                    <div style="display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px;">
-                        ${window.auditModelControlsHtml(true)}
-                        <button onclick="closeQuizReview()" title="Close the review" style="border:none; background:#f1f5f9; color:#64748b; width:34px; height:34px; border-radius:50%; cursor:pointer; font-size:1.1em;">✕</button>
-                    </div>
-                </div>
+                ${window.auditToolbarHtml(true)}
                 ${savedBannerHtml}
                 <div style="background:${overallBg}; padding:18px; border-radius:14px; margin-bottom:18px; text-align:center;">
                     <div style="font-size:0.75em; color:${overallColor}; font-weight:800; letter-spacing:0.8px; text-transform:uppercase; margin-bottom:6px;">Overall Quality</div>
