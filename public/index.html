@@ -2,7 +2,7 @@
 <html lang="th">
 
 <head>
-    <title>Internship Portfolio (V99.75)</title>
+    <title>Internship Portfolio (V99.76)</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
@@ -12545,6 +12545,7 @@
                 if (btn) btn.disabled = false;
                 if (btnPrev) btnPrev.disabled = false;
                 if (btnNext) btnNext.disabled = false;
+                document.getElementById('quizModal').dataset.followup = isPracticeMode ? 'quizResultModal' : ((currentQuiz.quizType === 'standard' || !currentQuiz.quizType) ? 'quizFeedbackModal' : '');
                 document.getElementById('quizModal').style.display = 'none';
                 isSubmittingQuiz = false;
                 morningBonusPromise.then(result => {
@@ -14646,6 +14647,7 @@
             const quiz = document.getElementById('quizModal');
             const previousDisplay = schedule.style.display;
             const scrolls = [schedule, ...schedule.querySelectorAll('*')].filter(el => el.scrollTop).map(el => [el, el.scrollTop]);
+            delete quiz.dataset.followup;
             closeScheduleModal();
             const restore = () => {
                 schedule.style.display = previousDisplay;
@@ -14655,7 +14657,19 @@
                 await confirmRunQuiz(quizId);
                 if (quiz.style.display === 'none' || !quiz.style.display) { restore(); return; }
                 const observer = new MutationObserver(() => {
-                    if (quiz.style.display === 'none') { observer.disconnect(); restore(); }
+                    if (quiz.style.display !== 'none') return;
+                    observer.disconnect();
+                    const followup = document.getElementById(quiz.dataset.followup || '');
+                    delete quiz.dataset.followup;
+                    if (!followup) { restore(); return; }
+                    // Submission opens Feedback/Practice Result after a delay. Wait for
+                    // that modal to open AND close before returning to Schedule.
+                    let opened = followup.style.display === 'flex' || followup.style.display === 'block';
+                    const followupObserver = new MutationObserver(() => {
+                        if (followup.style.display !== 'none' && followup.style.display) opened = true;
+                        else if (opened) { followupObserver.disconnect(); restore(); }
+                    });
+                    followupObserver.observe(followup, { attributes: true, attributeFilter: ['style'] });
                 });
                 observer.observe(quiz, { attributes: true, attributeFilter: ['style'] });
             } catch (error) { restore(); console.error('Schedule quiz launch failed', error); }
