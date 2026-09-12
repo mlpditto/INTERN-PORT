@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.60)</title>
+    <title>Nika Admin (V99.61)</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6362,7 +6362,9 @@
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <!-- V93.08: cache-bust on taxonomy.js for the LP Firestore overlay rollout -->
     <script src="ai-model-registry.js?v=V99.40"></script>
-    <script src="ai-model-ui.js?v=V99.60"></script>
+    <script src="ai-model-ui.js?v=V99.61"></script>
+    <link rel="stylesheet" href="quiz-resource-cards.css?v=V99.61">
+    <script src="quiz-resource-cards.js?v=V99.61"></script>
     <script src="quiz-generation-rules.js?v=V99.40"></script>
     <script src="quiz-compact-toolbar.js?v=V99.41"></script>
     <link rel="stylesheet" href="quiz-compact-toolbar.css?v=V99.41">
@@ -12617,6 +12619,12 @@
                         <textarea id="quiz-description" placeholder="Describe your quiz..." style="width:100%; padding:6px 10px; border:1px solid #334155; border-radius:8px; font-size:0.85em; background:#0f172a; color:#f1f5f9; min-height:45px; max-height:80px; resize:vertical;"></textarea>
                     </div>
 
+                    <section class="quiz-resources" aria-label="Quiz materials">
+                        <header><div><strong>📚 Materials <span id="quiz-resource-count">0</span></strong><p>Links for learners · Add as many resources as this quiz needs.</p></div><button type="button" onclick="quizResourceCards.add()">＋ Add link</button></header>
+                        <div id="quiz-resource-grid" class="lang-no-toggle"></div>
+                        <p>Changes are saved with the quiz.</p>
+                    </section>
+
                     <!-- Details: Audience & Categorization ([Version: V89.27] Refactored) -->
                     <!-- V95.39 lean Phase 3: collapsed by default; the summary chip mirrors the
                          current values (kept live by updateAudienceSummaryPreview) so the admin
@@ -12658,15 +12666,6 @@
                                     <button onclick="const inp=document.getElementById('quiz-tag-input'); manualAddTag(inp.value); inp.value='';" style="background:#334155; color:white; border:none; border-radius:10px; padding:0 15px; cursor:pointer;"><i class="fa-solid fa-plus"></i></button>
                                 </div>
                                 <input type="hidden" id="quiz-tags" value="">
-                            </div>
-
-                            <!-- V95.12: optional downloadable materials. One per line:
-                                 "Name | https://..." (or just the URL). Stored as
-                                 materials:[{name,url}] on the quiz; interns get 📎 links.
-                                 V96.17: optional 3rd segment "Name | URL | Description". -->
-                            <div style="margin-bottom:8px;">
-                                <label style="font-size:0.7em; color:#94a3b8; font-weight:600; display:block; margin-bottom:2px;"><i class="fa-solid fa-paperclip"></i> Materials (optional) <span class="lang-th">— บรรทัดละ 1 ไฟล์: ชื่อ | URL | คำอธิบาย (ใส่หลายลิงก์ได้ บรรทัดละลิงก์; คำอธิบายไม่ใส่ก็ได้)</span></label>
-                                <textarea id="quiz-materials" rows="3" placeholder="สไลด์เลคเชอร์ | https://drive.google.com/... | อ่านก่อนทำข้อสอบ&#10;ใบงาน PDF | https://example.com/handout.pdf&#10;https://example.com/อ้างอิง.pdf" style="width:100%; padding:8px 12px; border:1px solid #334155; border-radius:8px; font-size:0.82em; background:#0f172a; color:#f1f5f9; resize:vertical; font-family:inherit;"></textarea>
                             </div>
 
                             <!-- V95.17: lean Audience row — Unlock-at-score + Target Group
@@ -21942,7 +21941,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const target = (tgSel && tgSel.selectedIndex >= 0) ? tgSel.options[tgSel.selectedIndex].text : 'Public';
             const unlock = Number(document.getElementById('quiz-unlock-score')?.value || 0);
             const tagCount = (document.getElementById('quiz-tags')?.value || '').split(',').filter(t => t.trim()).length;
-            const matCount = (document.getElementById('quiz-materials')?.value || '').split('\n').filter(l => l.trim()).length;
+            const matCount = quizResourceCards.count();
             const modes = [];
             if (document.getElementById('quiz-is-poll')?.checked) modes.push('Poll');
             if (document.getElementById('quiz-one-time')?.checked) modes.push('1×');
@@ -22146,7 +22145,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             if (document.getElementById('quiz-db-beri')) document.getElementById('quiz-db-beri').value = (typeof q.deadlineBeriMax === 'number') ? q.deadlineBeriMax : '';
             document.getElementById('quiz-description').value = q.description || "";
             document.getElementById('quiz-tags').value = q.tags || "";
-            if (document.getElementById('quiz-materials')) document.getElementById('quiz-materials').value = serializeQuizMaterials(q.materials);
+            quizResourceCards.load(q.materials);
             refreshTagChips();
             document.getElementById('quiz-is-poll').checked = q.isPoll || false;
             document.getElementById('quiz-one-time').checked = q.oneTimeMode || false;
@@ -22236,7 +22235,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             if (document.getElementById('quiz-db-beri')) document.getElementById('quiz-db-beri').value = '';
             document.getElementById('quiz-description').value = "";
             document.getElementById('quiz-tags').value = "";
-            if (document.getElementById('quiz-materials')) document.getElementById('quiz-materials').value = "";
+            quizResourceCards.load([]);
             refreshTagChips();
             document.getElementById('quiz-is-poll').checked = false;
             document.getElementById('quiz-one-time').checked = false;
@@ -22589,7 +22588,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const feedbackLimit = parseInt(document.getElementById('quiz-feedback-limit').value) || 280;
             const caseContent = document.getElementById('quiz-case-content').value;
             const tags = document.getElementById('quiz-tags').value.trim();
-            const materials = parseQuizMaterials((document.getElementById('quiz-materials') || {}).value);
+            const materials = quizResourceCards.read();
 
             // V93.87 Quiz Quality Q1: read blueprint, build only if any field set.
             // Keeps Firestore noise out of quizzes that never touched the panel.
