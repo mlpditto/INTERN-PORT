@@ -16,7 +16,7 @@ const { chromium } = require('playwright');
         await page.addScriptTag({ path: 'public/ai-model-ui.js' });
         for (const [start, end] of [
             ['        window.syncModelDefault =', '\n        };'],
-            ['        window.auditModelControlsHtml =', '        window.renderAuditStart ='],
+            ['        window.auditFixModel =', '        window.renderAuditStart ='],
             ['        window.REVIEW_TABS =', '        // The rail is rendered'],
             ['        window.reviewTabsHtml =', '\n        };'],
             ['        window.showReviewTab =', '\n        };']
@@ -67,6 +67,28 @@ const { chromium } = require('playwright');
         await page.screenshot({ path:'graphite-toolbar-qa.png' });
         await page.locator('#ai-audit-popup .audit-close').click();
         assert.equal(await page.evaluate(() => closeRequested), true);
+        const bridgeStart = html.indexOf('        window.auditSuggestFix =');
+        await page.addScriptTag({ content: html.slice(bridgeStart, html.indexOf('\n        };', bridgeStart) + 11) });
+        await page.evaluate(() => {
+            document.getElementById('ai-audit-popup').style.display = 'block';
+            document.getElementById('ai-audit-popup').insertAdjacentHTML('beforeend', auditFixButtonHtml(1));
+            window.showToast = () => {};
+            window.analyzeQuizAI = async (button, options) => window.fixRequest = options;
+            window._aiAnalysisItems = [];
+            syncAuditFixHints();
+        });
+        for (const [value, label] of [['gpt-6-astra', 'GPT 6 Astra'], ['gemini-3.8-flash', 'Gemini 3.8 Flash']]) {
+            await page.locator('#ai-audit-popup [data-value="' + value + '"]').click();
+            const fix = page.locator('.audit-fix-control button');
+            assert((await fix.getAttribute('title')).includes(label));
+            assert.equal(await page.locator('.audit-fix-model').innerText(), label);
+            await fix.focus();
+            assert(await page.locator('.audit-fix-tooltip').isVisible());
+            await page.evaluate(() => auditSuggestFix(1, document.querySelector('.audit-fix-control button')));
+            assert.equal(await page.evaluate(() => fixRequest.model), value);
+            await page.evaluate(() => document.getElementById('ai-audit-popup').style.display = 'block');
+        }
+        assert(html.includes("const selectedModel = opts?.model ? normalizeTextAIModel(opts.model) : textAIModel('ai-analyzer-model-val');"));
         assert.deepEqual(errors, []);
         console.log('PASS: actual popup CSS, Sakura tabs, nine compact chips, no overlap at 320–1024px, audit/rewrite model routing, tabs, Export and Close');
     } finally { await browser.close(); }
