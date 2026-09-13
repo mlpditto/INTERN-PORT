@@ -1,110 +1,123 @@
-// Registry-backed choices; saved legacy IDs remain explicit and are never remapped here.
+// Shared catalog for text tasks, Settings and saved preferences.
 (function () {
-    const intelligenceIds = ['gemini-3.8-flash', 'gpt-6-astra', 'gpt-5.6-terra', 'gpt-5.6-luna', 'claude-fable-5-1', 'claude-sonnet-5'];
-    function intelligenceModels(select) {
-        select.replaceChildren();
-        intelligenceIds.forEach(id => {
-            const model = window.AI_MODEL_REGISTRY?.models.find(m => m.id === id && m.selectable);
-            if (!model) return;
-            const option = document.createElement('option');
-            option.value = id;
-            option.textContent = model.label;
-            select.appendChild(option);
+    const models = window.TEXT_AI_MODELS = [
+        { id: 'as/gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', hint: 'Gemini รุ่นประหยัด สำหรับงานสั้น' },
+        { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', hint: 'Gemini สำหรับวิเคราะห์และสรุปข้อมูล' },
+        { id: 'gpt-5.6-luna', label: 'GPT 5.6 Luna', hint: 'GPT รุ่นประหยัด ค่าเริ่มต้นสำหรับงานทั่วไป' },
+        { id: 'gpt-5.6-terra', label: 'GPT 5.6 Terra', hint: 'GPT สำหรับงานวิเคราะห์ที่ซับซ้อนขึ้น' },
+        { id: 'gpt-5.6-sol', label: 'GPT 5.6 Sol', hint: 'GPT สำหรับงานที่ต้องการรายละเอียดมากขึ้น' },
+        { id: 'gpt-6-astra', label: 'GPT 6 Astra', hint: 'GPT รุ่นใหญ่ ใช้เมื่อต้องการความสามารถสูง' },
+        { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', hint: 'Claude รุ่นประหยัด สำหรับงานสั้น' },
+        { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', hint: 'Claude สำหรับงานเขียนและวิเคราะห์' },
+        { id: 'claude-fable-5-1', label: 'Claude Fable 5.1', hint: 'Claude สำหรับงานที่ต้องการรายละเอียดมากขึ้น' }
+    ];
+    window.normalizeTextAIModel = value => models.some(m => m.id === value) ? value : 'gpt-5.6-luna';
+    window.textAIModel = id => window.normalizeTextAIModel(document.getElementById(id)?.value);
+    window.selectStoredTextAIModel = (button, key) => {
+        localStorage.setItem(key, button.dataset.value);
+        button.parentElement.querySelectorAll('button').forEach(b => {
+            b.classList.toggle('active', b === button);
+            b.setAttribute('aria-pressed', String(b === button));
         });
-    }
-    const targets = {
-        'ai-analyze-model-toggle': ['ai-analyzer-model-val', 'AI / PDF / Expand model'],
-        'ai-translate-model-toggle': ['toolbar-ai-translate-model', 'Translation model']
     };
-    function addModels(select) {
-        const group = document.createElement('optgroup');
-        group.label = 'Verified models · manual selection';
-        (window.AI_MODEL_REGISTRY?.models || []).filter(m => m.selectable).forEach(m => {
-            if (Array.from(select.options).some(o => o.value === m.id)) return;
-            const option = document.createElement('option');
-            option.value = m.id;
-            option.textContent = m.label + (m.id === 'claude-sonnet-5' ? ' · trial: JSON failures observed' : '');
-            group.appendChild(option);
+    const bindings = new Map();
+    const preferences = {
+        'toolbar-ai-translate-model': ['default-translate-model', 'ai_default_translate_model'],
+        'ai-analyzer-model-val': ['default-analyzer-model', 'ai_default_analyzer_model'],
+        'ai-model-review': ['default-review-model', 'ai_default_review_model'],
+        'ai-model-selector': ['default-qfp-model', 'ai_default_qfp_model']
+    };
+    function options(select) {
+        const value = window.normalizeTextAIModel(select.value);
+        select.replaceChildren(...models.map(m => new Option(m.label, m.id)));
+        select.value = value;
+    }
+    window.textAIChipsHtml = (id, value, action) => `<div class="text-ai-chips lang-no-toggle" role="group" aria-label="AI model"${id ? ` id="${id}"` : ''}>${models.map(m => `<button type="button" class="glass-toggle-item${m.id === value ? ' active' : ''}" data-value="${m.id}" aria-pressed="${m.id === value}" title="${m.hint}" onclick="${action}">${m.label}</button>`).join('')}</div>`;
+    window.syncRegistryModelSelect = function (id) {
+        const input = document.getElementById(id);
+        if (!input) return;
+        input.value = window.normalizeTextAIModel(input.value);
+        const binding = bindings.get(id);
+        binding?.rail.querySelectorAll('[data-value]').forEach(b => {
+            const on = b.dataset.value === input.value;
+            b.classList.toggle('active', on);
+            b.setAttribute('aria-pressed', String(on));
         });
-        select.appendChild(group);
-    }
-    window.syncRegistryModelSelect = function (hiddenId) {
-        const hidden = document.getElementById(hiddenId);
-        const select = document.getElementById(hiddenId + '-registry');
-        if (!hidden || !select) return;
-        if (hiddenId === 'ai-analyzer-model-val') {
-            if (!Array.from(select.options).some(o => o.value === hidden.value)) {
-                hidden.value = select.options[0]?.value || '';
-                localStorage.setItem('ai_default_analyzer_model', hidden.value);
-            }
-            select.value = hidden.value;
-            const preference = document.getElementById('default-analyzer-model');
-            if (preference) preference.value = hidden.value;
-            return;
+        const pref = preferences[id];
+        if (pref) {
+            const select = document.getElementById(pref[0]);
+            if (select) select.value = input.value;
+            bindings.get(pref[0])?.rail.querySelectorAll('[data-value]').forEach(b => {
+                b.classList.toggle('active', b.dataset.value === input.value);
+                b.setAttribute('aria-pressed', String(b.dataset.value === input.value));
+            });
+            localStorage.setItem(pref[1], input.value);
         }
-        if (!Array.from(select.options).some(o => o.value === hidden.value)) {
-            const option = document.createElement('option');
-            option.value = hidden.value;
-            option.textContent = hidden.value + ' · saved selection';
-            select.appendChild(option);
-        }
-        select.value = hidden.value;
+        if (binding?.key) localStorage.setItem(binding.key, input.value);
     };
+    function bind(id, host, key) {
+        const input = document.getElementById(id);
+        if (!input || bindings.has(id)) return;
+        if (input.tagName === 'SELECT') options(input);
+        if (!host) { host = document.createElement('div'); input.after(host); }
+        const pref = preferences[id];
+        key = key || pref?.[1];
+        input.value = window.normalizeTextAIModel((key && localStorage.getItem(key)) || input.value);
+        host.className = 'text-ai-chips lang-no-toggle';
+        host.removeAttribute('style');
+        host.setAttribute('role', 'group');
+        host.setAttribute('aria-label', 'AI model');
+        host.dataset.modelInput = id;
+        host.parentElement.classList.add('text-ai-row');
+        host.parentElement.parentElement?.classList.add('text-ai-row');
+        if (id === 'tts-polish-model' && input.previousElementSibling?.matches('i.fa-robot')) input.previousElementSibling.hidden = true;
+        host.innerHTML = models.map(m => `<button type="button" class="glass-toggle-item" data-value="${m.id}" title="${m.hint}">${m.label}</button>`).join('');
+        host.querySelectorAll('button').forEach(button => {
+            button.onclick = () => {
+                input.value = button.dataset.value;
+                if (pref) window.syncModelDefault(id, input.value);
+                window.syncRegistryModelSelect(id);
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+                if (id === 'laughtale-ai-model' || id === 'storyteller-model-select') {
+                    ['laughtale-ai-model', 'storyteller-model-select'].forEach(window.syncRegistryModelSelect);
+                }
+            };
+        });
+        if (input.tagName === 'SELECT') input.style.display = 'none';
+        bindings.set(id, { rail: host, key });
+        input.addEventListener('change', () => window.syncRegistryModelSelect(id));
+        window.syncRegistryModelSelect(id);
+    }
     window.initRegistryModelSelectors = function () {
-        Object.entries(targets).forEach(([containerId, [hiddenId, label]]) => {
-            const container = document.getElementById(containerId);
-            if (!container || document.getElementById(hiddenId + '-registry')) return;
-            const select = document.createElement('select');
-            select.id = hiddenId + '-registry';
-            select.setAttribute('aria-label', label);
-            select.style.cssText = 'width:100%;min-width:0;min-height:36px;border-radius:8px;background:#182235;color:#e2e8f0;border:1px solid #475569;padding:4px 8px;font-size:13px;';
-            addModels(select);
-            const legacy = document.createElement('optgroup');
-            legacy.label = 'Existing routes (legacy IDs / specialist models)';
-            container.querySelectorAll('[data-value]').forEach(chip => {
-                if (Array.from(select.options).some(o => o.value === chip.dataset.value)) return;
-                const option = document.createElement('option');
-                option.value = chip.dataset.value;
-                option.textContent = chip.dataset.value;
-                legacy.appendChild(option);
-            });
-            select.appendChild(legacy);
-            if (hiddenId === 'ai-analyzer-model-val') intelligenceModels(select);
-            select.onchange = () => { document.getElementById(hiddenId).value = select.value; };
-            container.replaceChildren(select);
-            container.style.cssText = 'margin:0;display:block;min-width:0;width:100%;max-width:360px;height:auto;';
-            window.syncRegistryModelSelect(hiddenId);
-        });
-        ['default-translate-model', 'default-analyzer-model', 'default-review-model', 'default-qfp-model', 'ai-model-review'].forEach(id => {
+        Object.values(preferences).forEach(([id]) => {
             const select = document.getElementById(id);
-            if (!select || select.dataset.registryReady) return;
-            const value = select.value;
-            if (id === 'default-qfp-model') {
-                select.replaceChildren(...Array.from(document.querySelectorAll('#qfp-model-pills button'), chip => {
-                    const option = document.createElement('option');
-                    option.value = chip.dataset.model;
-                    option.textContent = chip.textContent.trim();
-                    return option;
-                }));
-                select.dataset.registryReady = 'true';
-                window.syncModelDefault('ai-model-selector', localStorage.getItem('ai_default_qfp_model') || 'gpt-5.6-luna');
-                return;
-            }
-            if (id === 'default-analyzer-model') {
-                intelligenceModels(select);
-                select.value = intelligenceIds.includes(value) && Array.from(select.options).some(o => o.value === value) ? value : select.options[0]?.value || '';
-                select.dataset.registryReady = 'true';
-                window.syncRegistryModelSelect('ai-analyzer-model-val');
-                return;
-            }
-            Array.from(select.options).forEach(o => {
-                const model = window.AI_MODEL_REGISTRY?.models.find(m => m.id === o.value);
-                o.textContent = model ? model.label : o.value + ' · existing route';
-            });
-            addModels(select);
-            select.value = value;
-            select.dataset.registryReady = 'true';
+            if (select) options(select);
         });
+        const controls = [
+            ['ai-analyzer-model-val', '#ai-analyze-model-toggle'],
+            ['toolbar-ai-translate-model', '#ai-translate-model-toggle'],
+            ['ai-tagging-model-val', '#unused-tag-rail', 'ai_default_tagging_model'],
+            ['ai-model-design-enhancer', '[aria-label="Step 1 enhancer model"]', 'ai_default_design_enhancer_model'],
+            ['ai-model-grammar', '.reflective-grammar-model-chip', 'ai_default_grammar_model'],
+            ['dxa-ai-model-val', '#dxa-ai-chip-rail', 'ai_default_disease_codex_model'],
+            ['alabasta-case-card-refine-model', '.alabasta-casecard-tools-chip-rail', 'ai_default_casecard_refine_model']
+        ];
+        controls.forEach(([id, selector, key]) => {
+            let host = document.querySelector(selector) || document.querySelector(`[onclick*="'${id}'"][data-value]`)?.parentElement;
+            if (host?.matches('button')) host = host.parentElement;
+            bind(id, host, key);
+        });
+        const review = document.querySelector('.reflective-model-dd');
+        if (review && !bindings.has('ai-model-review')) {
+            const host = document.createElement('div'); review.replaceWith(host);
+            bind('ai-model-review', host);
+        }
+        ['research-model-select', 'tts-polish-model', 'laughtale-ai-model', 'storyteller-model-select', 'lp-ai-model', 'apd-model-a', 'apd-model-b', 'case-note-ai-model'].forEach(id => bind(id, null, 'ai_text_' + id));
+        const qfp = document.getElementById('ai-model-selector');
+        if (qfp) window.syncModelDefault('ai-model-selector', localStorage.getItem('ai_default_qfp_model') || qfp.value);
+        Object.values(preferences).forEach(([id, key]) => bind(id, null, key));
+        const description = document.getElementById('model-desc-box');
+        if (description) description.hidden = true;
     };
     document.addEventListener('DOMContentLoaded', window.initRegistryModelSelectors);
 })();
