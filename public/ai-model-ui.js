@@ -79,6 +79,17 @@
             const select = document.getElementById(id);
             if (!select || select.dataset.registryReady) return;
             const value = select.value;
+            if (id === 'default-qfp-model') {
+                select.replaceChildren(...Array.from(document.querySelectorAll('#qfp-model-pills button'), chip => {
+                    const option = document.createElement('option');
+                    option.value = chip.dataset.model;
+                    option.textContent = chip.textContent.trim();
+                    return option;
+                }));
+                select.dataset.registryReady = 'true';
+                window.syncModelDefault('ai-model-selector', localStorage.getItem('ai_default_qfp_model') || 'gpt-5.6-luna');
+                return;
+            }
             if (id === 'default-analyzer-model') {
                 intelligenceModels(select);
                 select.value = intelligenceIds.includes(value) && Array.from(select.options).some(o => o.value === value) ? value : select.options[0]?.value || '';

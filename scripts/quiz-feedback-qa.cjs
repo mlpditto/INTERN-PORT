@@ -16,9 +16,12 @@ const modalEnd = html.indexOf('        <!-- V92.95: Score Audit Modal',modalStar
     const browser=await chromium.launch({headless:true});
     try {
         const page=await browser.newPage();
+        await page.route('http://feedback.test/', r=>r.fulfill({body:'<html></html>',contentType:'text/html'}));
+        await page.goto('http://feedback.test/');
         const errors=[]; page.on('pageerror', e=>errors.push(e.message));
         const styles = Array.from(html.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/gi), m=>m[0]).join('\n');
-        await page.setContent(styles+'<style>*{box-sizing:border-box}body{margin:0}</style>'+html.slice(modalStart,modalEnd));
+        const preference = html.match(/<select id="default-qfp-model"[\s\S]*?<\/select>/)[0];
+        await page.setContent(styles+'<style>*{box-sizing:border-box}body{margin:0}</style>'+html.slice(modalStart,modalEnd)+'<div hidden>'+preference+'</div>');
         await page.addStyleTag({path:'public/quiz-feedback.css'});
         await page.evaluate(()=>{
             window.quizzesData=[{id:'test',title:'Emerging infections'}]; window.usersData=[]; window.fixture=[];
@@ -26,8 +29,22 @@ const modalEnd = html.indexOf('        <!-- V92.95: Score Audit Modal',modalStar
             window.callUniversalAI=async()=>({text:'Summary'});
         });
         await page.addScriptTag({content:html.slice(start,end)});
+        const syncStart=html.indexOf('        window.syncModelDefault =');
+        await page.addScriptTag({content:html.slice(syncStart,html.indexOf('\n        };',syncStart)+11)});
+        await page.addScriptTag({path:'public/ai-model-registry.js'});
+        await page.addScriptTag({path:'public/ai-model-ui.js'});
+        await page.evaluate(()=>initRegistryModelSelectors());
         await page.evaluate(async()=>{fixture=[{id:'f1',userId:'u1',displayName:'Bua',rating:7,comment:'',pointsEarned:1,timeUsedSeconds:353}];await showQuizFeedbackPanel('test');});
-        assert.equal(await page.locator('#qfp-model-pills button').count(),7);
+        assert.equal(await page.locator('#qfp-model-pills button').count(),9);
+        const ids = await page.locator('#qfp-model-pills button').evaluateAll(es=>es.map(e=>e.dataset.model));
+        assert.deepEqual(await page.locator('#default-qfp-model option').evaluateAll(es=>es.map(e=>e.value)),ids);
+        for (const saved of ['', 'gpt-4o-mini', 'unknown-model', 'gpt-6-astra', 'claude-fable-5-1']) {
+            await page.evaluate(saved=>{localStorage.setItem('ai_default_qfp_model',saved);delete document.getElementById('default-qfp-model').dataset.registryReady;initRegistryModelSelectors();},saved);
+            const expected=ids.includes(saved)?saved:'gpt-5.6-luna';
+            assert.equal(await page.locator('#default-qfp-model').inputValue(),expected);
+            assert.equal(await page.locator('#ai-model-selector').inputValue(),expected);
+            assert.equal(await page.evaluate(()=>localStorage.getItem('ai_default_qfp_model')),expected);
+        }
         assert.equal(await page.locator('#qfp-ai-btn').isDisabled(),true);
         assert.equal(await page.locator('#qfp-comments details').getAttribute('open'),null);
         assert.match(await page.locator('#qfp-comments').innerText(),/No comment provided/);
@@ -35,7 +52,11 @@ const modalEnd = html.indexOf('        <!-- V92.95: Score Audit Modal',modalStar
         for (const chip of await page.locator('#qfp-model-pills button').all()) {
             await chip.click(); assert.equal(await page.locator('#ai-model-selector').inputValue(),await chip.getAttribute('data-model'));
             assert.equal(await page.locator('#qfp-model-pills [aria-pressed=true]').count(),1);
+            assert.equal(await page.locator('#default-qfp-model').inputValue(),await chip.getAttribute('data-model'));
+            assert.equal(await page.evaluate(()=>localStorage.getItem('ai_default_qfp_model')),await chip.getAttribute('data-model'));
         }
+        await page.evaluate(()=>syncModelDefault('ai-model-selector','gpt-6-astra'));
+        assert.equal(await page.locator('#qfp-model-pills [aria-pressed=true]').getAttribute('data-model'),'gpt-6-astra');
         for (const width of [320,390,736]) {
             await page.setViewportSize({width,height:900});
             assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`overflow at ${width}`);
@@ -49,6 +70,6 @@ const modalEnd = html.indexOf('        <!-- V92.95: Score Audit Modal',modalStar
         await page.waitForFunction(()=>document.getElementById('qfp-ai-result').textContent==='Summary');
         await page.screenshot({path:'feedback-qa.png',fullPage:true});
         assert.deepEqual(errors,[]);
-        console.log('PASS: both pages parse; seven model chips; empty/comment states; safe rendering; summary generation; mobile layout');
+        console.log('PASS: nine chips match Settings; legacy defaults migrate; premium selections persist; two-way sync; empty/comment states; generation; mobile layout');
     } finally {await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});
