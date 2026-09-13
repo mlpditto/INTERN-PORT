@@ -9,7 +9,7 @@ const { chromium } = require('playwright');
         const errors = []; page.on('pageerror', e => errors.push(e.message));
         const html = fs.readFileSync('public/admin.html', 'utf8');
         assert(html.includes('onclick="openQuizCurate()"'));
-        assert(html.includes('src="quiz-curate.js?v=V99.95"'));
+        assert(html.includes('src="quiz-curate.js?v=V99.96"'));
         await page.setContent([...html.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/gi)].map(m => m[0]).join('\n') + '<input id="edit-quiz-id" value="source-quiz"><input id="ai-analyzer-model-val" value="gpt-5.6-luna">');
         await page.addStyleTag({ path: 'public/quiz-curate.css' });
         await page.addScriptTag({ path: 'public/ai-model-ui.js' });
@@ -37,9 +37,9 @@ const { chromium } = require('playwright');
             window.calls = []; window.writes = []; window.docCount = 0; window.writeFail = false;
             window.callUniversalAI = (...args) => { calls.push(args); return new Promise((resolve, reject) => { window.aiResolve = resolve; window.aiReject = reject; }); };
             window.firebase = { firestore: { FieldValue: { serverTimestamp: () => 'SERVER_TIMESTAMP' } } };
-            window.db = { collection: name => { if (name !== 'quizzes') throw Error('Unexpected collection'); return { doc: () => {
-                const id = 'copy-' + ++docCount;
-                return { set: async data => { writes.push({ id, data: structuredClone(data) }); if (writeFail) throw Error('Simulated uncertain write'); } };
+            window.db = { collection: name => { if (name !== 'quizzes') throw Error('Unexpected collection'); return { doc: requestedId => {
+                const id = requestedId || 'copy-' + ++docCount;
+                return { id, get: async () => ({ exists: true, data: () => structuredClone(fixture) }), set: async data => { writes.push({ id, data: structuredClone(data) }); if (writeFail) throw Error('Simulated uncertain write'); } };
             } }; } };
         });
         await page.addScriptTag({ path: 'public/quiz-curate.js' });
@@ -199,6 +199,61 @@ const { chromium } = require('playwright');
         await page.keyboard.press('Escape');
         assert.equal(await page.locator('#quiz-curate-dialog').isVisible(), false);
         assert.equal(await page.evaluate(() => window.editorClosed), undefined, 'Escape preserves the editor');
+        // Apply uses an atomic backup/update and refuses live or historical quizzes.
+        await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+        await page.evaluate(() => {
+            fixture = structuredClone(original); authOK = true; window.authEdit = false;
+            window.convertDate = value => value || null;
+            firebase.firestore.FieldValue.delete = () => '__DELETE__';
+            window.stored = { ...structuredClone(fixture), isActive: false, lastAiAnalysis: { old: true }, lastAiAudit: { old: true }, translations: { en: ['old'] } };
+            window.records = { 'source-quiz': structuredClone(stored) }; window.atomicWrites = 0;
+            window.hasAttempts = false; window.hasSessions = false; window.txFail = false; window.txUncertain = false;
+            const doc = id => ({ id: id || 'backup-' + ++docCount, get: async function () {
+                const data = structuredClone(records[this.id]); return { exists: !!data, data: () => data };
+            } });
+            window.db = {
+                collection: name => name === 'quizzes' ? { doc } : { where: (field, op, value) => {
+                    if (value !== 'source-quiz' || field !== (name === 'quiz_attempts' ? 'quizId' : 'examId')) throw Error('Wrong history query');
+                    return { limit: () => ({ get: async () => ({ empty: !(name === 'quiz_attempts' ? hasAttempts : hasSessions) }) }) };
+                } },
+                runTransaction: async callback => {
+                    const pending = [];
+                    await callback({ get: ref => ref.get(), set: (ref, value) => pending.push([ref.id, value]), update: (ref, value) => pending.push([ref.id, { ...records[ref.id], ...value }]) });
+                    if (txFail) throw Error('Atomic write failed');
+                    for (const [id, value] of pending) { records[id] = structuredClone(value); for (const key of Object.keys(records[id])) if (records[id][key] === '__DELETE__') delete records[id][key]; }
+                    atomicWrites += pending.length;
+                    if (txUncertain) throw Error('Write response lost');
+                }
+            };
+        });
+        const apply = async () => { assert.equal(await page.locator('#curate-apply').isDisabled(), false, await feedback()); await page.locator('#curate-apply').click(); };
+        for (const flag of ['active', 'attempts', 'sessions']) {
+            await page.evaluate(flag => { records['source-quiz'] = structuredClone(stored); records['source-quiz'].isActive = flag === 'active'; hasAttempts = flag === 'attempts'; hasSessions = flag === 'sessions'; }, flag);
+            await open(); await suggest(result()); await apply();
+            assert.match(await feedback(), flag === 'active' ? /quiz is active/ : /attempts or exam sessions/);
+            assert.equal(await page.evaluate(() => atomicWrites), 0); await close();
+        }
+        await page.evaluate(() => { records['source-quiz'] = structuredClone(stored); hasAttempts = false; hasSessions = false; });
+        await open(); await suggest(result());
+        await page.evaluate(() => records['source-quiz'].title = 'Concurrent edit'); await apply();
+        assert.match(await feedback(), /stored quiz changed/); await close();
+        await page.evaluate(() => records['source-quiz'] = structuredClone(stored));
+        await open(); await suggest(result());
+        page.once('dialog', d => { assert.match(d.message(), /Q11, Q12, Q13, Q14/); d.dismiss(); });
+        await apply(); assert.match(await feedback(), /cancelled/); assert.equal(await page.evaluate(() => atomicWrites), 0);
+        await page.evaluate(() => txFail = true); page.once('dialog', d => d.accept()); await apply();
+        assert.match(await feedback(), /Atomic write failed/); assert.equal(await page.evaluate(() => Object.keys(records).length), 1);
+        await page.evaluate(() => { txFail = false; txUncertain = true; }); page.once('dialog', d => d.accept()); await apply();
+        assert.match(await feedback(), /Write response lost/);
+        await page.evaluate(() => txUncertain = false); await apply();
+        assert.match(await feedback(), /Applied 10 questions/);
+        const applied = await page.evaluate(() => records);
+        const current = applied['source-quiz'], backup = applied[current.curation.backupQuizId];
+        assert.equal(current.questions.length, 10); assert.equal(current.isActive, false);
+        assert.deepEqual(backup.questions, original.questions); assert.equal(backup.isActive, false);
+        assert.equal(backup.curationBackup.sourceQuizId, 'source-quiz');
+        assert.equal(current.lastAiAnalysis, undefined); assert.equal(current.lastAiAudit, undefined); assert.equal(current.translations, undefined);
+        assert.equal(await page.evaluate(() => atomicWrites), 2, 'retry cannot duplicate backup or update');
         assert.deepEqual(errors, []);
         console.log('PASS: Curate responsive 320–1024px, model routing, ID/count/pin validation, manual review, safe text rendering, inactive copy with original answers/settings, auth/stale guards, duplicate-write retry and async session isolation');
     } finally { await browser.close(); }
