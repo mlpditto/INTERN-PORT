@@ -9,7 +9,7 @@ const { chromium } = require('playwright');
         const errors = []; page.on('pageerror', e => errors.push(e.message));
         const html = fs.readFileSync('public/admin.html', 'utf8');
         assert(html.includes('onclick="openQuizCurate()"'));
-        assert(html.includes('src="quiz-curate.js?v=V99.94"'));
+        assert(html.includes('src="quiz-curate.js?v=V99.95"'));
         await page.setContent([...html.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/gi)].map(m => m[0]).join('\n') + '<input id="edit-quiz-id" value="source-quiz"><input id="ai-analyzer-model-val" value="gpt-5.6-luna">');
         await page.addStyleTag({ path: 'public/quiz-curate.css' });
         await page.addScriptTag({ path: 'public/ai-model-ui.js' });
@@ -25,6 +25,7 @@ const { chromium } = require('playwright');
                     options: ['Option A', 'Option B'], correct: i === 2 ? 0 : [1], timer: 60, tags: 'Objective ' + i, explanation: 'Original explanation ' + i
                 }))
             };
+            fixture.questions[9].q += ' ผู้เรียนต้องวิเคราะห์สถานการณ์และเลือกคำตอบที่เหมาะสม โดยพิจารณาข้อมูลทั้งหมดในโจทย์และเปรียบเทียบเหตุผลของแต่ละตัวเลือก ก่อนสรุปคำตอบจากหลักฐานที่กำหนดไว้ในกรณีศึกษา';
             window.original = structuredClone(fixture);
             for (let i = 0; i < 14; i++) { const el = document.createElement('div'); el.className = 'quiz-q-item'; el.dataset.id = i + 1; document.body.append(el); }
             window.getQuizFormData = () => structuredClone(fixture);
@@ -46,7 +47,7 @@ const { chromium } = require('playwright');
         const saveDisabled = () => page.locator('#curate-save').isDisabled();
         const open = () => page.evaluate(() => openQuizCurate());
         const close = async () => { await page.locator('.curate-close').click(); await page.waitForFunction(() => !document.querySelector('#quiz-curate-dialog').open); await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))); };
-        const result = (keep = Array.from({ length: 10 }, (_, i) => i + 1)) => ({ questions: Array.from({ length: 14 }, (_, i) => ({ id: i + 1, keep: keep.includes(i + 1), topic: i === 13 ? 'Unique topic' : 'Core', reason: 'Reason for Q' + (i + 1), reasonTh: 'เหตุผลสำหรับข้อ ' + (i + 1) })) });
+        const result = (keep = Array.from({ length: 10 }, (_, i) => i + 1)) => ({ questions: Array.from({ length: 14 }, (_, i) => ({ id: i + 1, keep: keep.includes(i + 1), topic: i === 13 ? 'Unique topic' : 'Core', reason: 'Reason for Q' + (i + 1), reasonTh: 'เหตุผลสำหรับข้อ ' + (i + 1), detail: 'Detailed source evidence', detailTh: 'รายละเอียดจากต้นฉบับ', impact: 'Coverage remains', impactTh: 'ยังครอบคลุมหัวข้อ', reasonType: 'quality', related: [] })) });
         const resolve = async data => { await page.evaluate(data => aiResolve({ text: JSON.stringify(data) }), data); await page.waitForFunction(() => document.querySelector('#quiz-curate-dialog').getAttribute('aria-busy') === 'false'); };
         const suggest = async data => { await page.locator('#curate-suggest').click(); await resolve(data); };
         const row = id => page.locator('.curate-question').filter({ has: page.locator('.curate-number', { hasText: new RegExp('^Q' + id + '$') }) });
@@ -93,18 +94,51 @@ const { chromium } = require('playwright');
         const good = result([1,2,3,4,5,6,7,8,9,14]);
         good.questions[9].reason = '<img src=x onerror="window.injected=true">';
         good.questions[0].q = 'AI attempted rewrite';
+        good.questions[9].related = [{ id: 14, shared: 'Shared objective', sharedTh: 'วัตถุประสงค์เดียวกัน', difference: 'Different wording', differenceTh: 'ถ้อยคำต่างกัน', preference: 'Prefer Q14 for clarity', preferenceTh: 'เก็บ Q14 เพราะชัดเจนกว่า', evidence: [{ id: 10, quote: 'Clinical question 10' }, { id: 14, quote: 'Option B' }] }];
+        for (const mutate of [
+            d => { d.questions[9].related[0].id = 10; },
+            d => { d.questions[9].related[0].id = 99; },
+            d => { d.questions[9].related[0].evidence[0].quote = 'Invented source'; },
+            d => { d.questions[9].related[0].evidence.pop(); },
+            d => { d.questions[9].related[0].preferenceTh = ''; },
+            d => { delete d.questions[9].impactTh; }
+        ]) { const bad = structuredClone(good); mutate(bad); await suggest(bad); assert.match(await feedback(), /Could not suggest/); assert(await saveDisabled()); }
+
         await suggest(good);
         assert.equal(await saveDisabled(), false);
         assert.equal(await page.locator('.curate-question').count(), 4);
         assert.match(await page.locator('#curate-coverage').innerText(), /2\/2 topics/);
         assert.equal(await page.locator('#curate-rows img').count(), 0);
-        assert.match(await row(10).locator('[lang=th]').innerText(), /เหตุผลสำหรับข้อ 10/);
-        assert.match(await row(10).locator('[lang=en]').innerText(), /<img/);
+        assert.match(await row(10).locator('[lang=th]').first().innerText(), /เหตุผลสำหรับข้อ 10/);
+        assert.match(await row(10).locator('[lang=en]').first().innerText(), /<img/);
         assert.equal(await page.evaluate(() => window.injected), undefined);
+        assert.equal(await row(10).locator('.curate-stem').count(), 1);
+        await row(10).locator('.curate-expand').click();
+        assert.equal(await row(10).locator('.curate-expand').getAttribute('aria-expanded'), 'true');
+        assert.equal(await row(10).locator('.curate-stem').innerText(), await page.evaluate(() => fixture.questions[9].q));
+        assert.equal(await row(11).locator('.curate-compare').count(), 0);
+        await row(10).locator('.curate-compare').click();
+        assert.equal(await page.locator('.curate-compare-card').count(), 2);
+        assert.equal(await page.locator('.curate-compare-card mark').count(), 2);
+        assert.equal(await page.locator('.curate-compare-card .curate-key').count(), 2);
+        assert(await page.getByRole('button', { name: 'Keep Q10', exact: true }).isDisabled(), 'cannot remove pinned Q14');
+        for (const width of [320, 390, 736, 1024]) {
+            await page.setViewportSize({ width, height: 900 });
+            assert(await page.locator('#quiz-curate-dialog').evaluate(d => d.scrollWidth <= d.clientWidth + 1), 'comparison overflow at ' + width);
+            const cols = await page.locator('.curate-compare-card').evaluateAll(cs => cs.map(c => {const r=c.getBoundingClientRect();return {x:r.x,y:r.y};}));
+            assert(width <= 700 ? cols[0].y < cols[1].y : cols[0].x < cols[1].x);
+        }
+        await page.getByRole('button', { name: 'Keep both', exact: true }).click(); assert(await saveDisabled());
+        assert.match(await feedback(), /11 selected/);
+        await page.getByRole('button', { name: 'Keep Q14', exact: true }).click(); assert.equal(await saveDisabled(), false);
+        await page.screenshot({path:'quiz-curate-compare-qa.png'});
+        await page.keyboard.press('Escape');
+        assert(await page.locator('#quiz-curate-dialog').isVisible());
+        assert.equal(await page.locator('#curate-comparison').isVisible(), false);
         await row(10).locator('.curate-move').click(); assert(await saveDisabled());
         await page.locator('[data-view="keep"]').click();
-        assert.match(await row(14).locator('[lang=th]').innerText(), /เหตุผลสำหรับข้อ 14/);
-        assert.match(await row(14).locator('[lang=en]').innerText(), /Reason for Q14/);
+        assert.match(await row(14).locator('[lang=th]').first().innerText(), /เหตุผลสำหรับข้อ 14/);
+        assert.match(await row(14).locator('[lang=en]').first().innerText(), /Reason for Q14/);
         await row(1).locator('.curate-move').click(); assert.equal(await saveDisabled(), false);
         for (const width of [320, 390, 736, 1024]) {
             await page.setViewportSize({ width, height: 850 });
