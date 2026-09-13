@@ -9,7 +9,7 @@ const { chromium } = require('playwright');
         const errors = []; page.on('pageerror', e => errors.push(e.message));
         const html = fs.readFileSync('public/admin.html', 'utf8');
         assert(html.includes('onclick="openQuizCurate()"'));
-        assert(html.includes('src="quiz-curate.js?v=V99.93"'));
+        assert(html.includes('src="quiz-curate.js?v=V99.94"'));
         await page.setContent([...html.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/gi)].map(m => m[0]).join('\n') + '<input id="edit-quiz-id" value="source-quiz"><input id="ai-analyzer-model-val" value="gpt-5.6-luna">');
         await page.addStyleTag({ path: 'public/quiz-curate.css' });
         await page.addScriptTag({ path: 'public/ai-model-ui.js' });
@@ -46,7 +46,7 @@ const { chromium } = require('playwright');
         const saveDisabled = () => page.locator('#curate-save').isDisabled();
         const open = () => page.evaluate(() => openQuizCurate());
         const close = async () => { await page.locator('.curate-close').click(); await page.waitForFunction(() => !document.querySelector('#quiz-curate-dialog').open); await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))); };
-        const result = (keep = Array.from({ length: 10 }, (_, i) => i + 1)) => ({ questions: Array.from({ length: 14 }, (_, i) => ({ id: i + 1, keep: keep.includes(i + 1), topic: i === 13 ? 'Unique topic' : 'Core', reason: 'Reason for Q' + (i + 1) })) });
+        const result = (keep = Array.from({ length: 10 }, (_, i) => i + 1)) => ({ questions: Array.from({ length: 14 }, (_, i) => ({ id: i + 1, keep: keep.includes(i + 1), topic: i === 13 ? 'Unique topic' : 'Core', reason: 'Reason for Q' + (i + 1), reasonTh: 'เหตุผลสำหรับข้อ ' + (i + 1) })) });
         const resolve = async data => { await page.evaluate(data => aiResolve({ text: JSON.stringify(data) }), data); await page.waitForFunction(() => document.querySelector('#quiz-curate-dialog').getAttribute('aria-busy') === 'false'); };
         const suggest = async data => { await page.locator('#curate-suggest').click(); await resolve(data); };
         const row = id => page.locator('.curate-question').filter({ has: page.locator('.curate-number', { hasText: new RegExp('^Q' + id + '$') }) });
@@ -82,6 +82,8 @@ const { chromium } = require('playwright');
             d => { d.questions[1].id = 99; },
             d => { d.questions.pop(); },
             d => { d.questions[1].reason = ''; },
+            d => { delete d.questions[1].reasonTh; },
+            d => { d.questions[1].reasonTh = ' '; },
             d => { d.questions[1].keep = 'true'; },
             d => { d.questions[1].keep = false; }
         ]) {
@@ -96,9 +98,13 @@ const { chromium } = require('playwright');
         assert.equal(await page.locator('.curate-question').count(), 4);
         assert.match(await page.locator('#curate-coverage').innerText(), /2\/2 topics/);
         assert.equal(await page.locator('#curate-rows img').count(), 0);
+        assert.match(await row(10).locator('[lang=th]').innerText(), /เหตุผลสำหรับข้อ 10/);
+        assert.match(await row(10).locator('[lang=en]').innerText(), /<img/);
         assert.equal(await page.evaluate(() => window.injected), undefined);
         await row(10).locator('.curate-move').click(); assert(await saveDisabled());
         await page.locator('[data-view="keep"]').click();
+        assert.match(await row(14).locator('[lang=th]').innerText(), /เหตุผลสำหรับข้อ 14/);
+        assert.match(await row(14).locator('[lang=en]').innerText(), /Reason for Q14/);
         await row(1).locator('.curate-move').click(); assert.equal(await saveDisabled(), false);
         for (const width of [320, 390, 736, 1024]) {
             await page.setViewportSize({ width, height: 850 });
