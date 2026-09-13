@@ -32,7 +32,8 @@
         select.replaceChildren(...models.map(m => new Option(m.label, m.id)));
         select.value = value;
     }
-    window.textAIChipsHtml = (id, value, action) => `<div class="text-ai-chips lang-no-toggle" role="group" aria-label="AI model"${id ? ` id="${id}"` : ''}>${models.map(m => `<button type="button" class="glass-toggle-item${m.id === value ? ' active' : ''}" data-value="${m.id}" aria-pressed="${m.id === value}" title="${m.hint}" onclick="${action}">${m.label}</button>`).join('')}</div>`;
+    const shortLabels = ['Gemini 3.5 Lite', 'Gemini 3.8', 'GPT Luna', 'GPT Terra', 'GPT Sol', 'GPT Astra', 'Haiku 4.5', 'Sonnet 5', 'Fable 5.1'];
+    window.textAIChipsHtml = (id, value, action, compact = false) => `<div class="text-ai-chips lang-no-toggle" role="group" aria-label="AI model"${id ? ` id="${id}"` : ''}>${models.map((m, i) => `<button type="button" class="glass-toggle-item${m.id === value ? ' active' : ''}" data-value="${m.id}" aria-label="${m.label}" aria-pressed="${m.id === value}" title="${m.label} — ${m.hint}" onclick="${action}">${compact ? shortLabels[i] : m.label}</button>`).join('')}</div>`;
     window.syncRegistryModelSelect = function (id) {
         const input = document.getElementById(id);
         if (!input) return;
