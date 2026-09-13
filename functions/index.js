@@ -858,7 +858,10 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             const response = await postWithRetry('https://api.anthropic.com/v1/messages', {
                 model: actualModel,
                 max_tokens: anthropicMaxTokens,
-                messages: [{ role: "user", content: tailoredPrompt }],
+                messages: [{ role: "user", content: visionData ? [
+                    { type: 'text', text: tailoredPrompt },
+                    { type: 'image', source: { type: 'base64', media_type: visionData.image_mimetype || visionData.mimeType || 'image/png', data: (visionData.image_base64 || visionData.base64).replace(/^data:[^;]+;base64,/, '') } }
+                ] : tailoredPrompt }],
                 temperature: 0.7
             }, {
                 headers: { 

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.90)</title>
+    <title>Nika Admin (V99.91)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -133,6 +133,7 @@
         };
 
         window.syncModelDefault = function(targetId, value) {
+            value = window.normalizeTextAIModel ? window.normalizeTextAIModel(value) : value;
             if (targetId === 'ai-model-selector') {
                 const chips = Array.from(document.querySelectorAll('#qfp-model-pills button'));
                 const selected = chips.find(b => b.dataset.model === value) || chips.find(b => b.dataset.model === 'gpt-5.6-luna');
@@ -6371,7 +6372,8 @@
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <!-- V93.08: cache-bust on taxonomy.js for the LP Firestore overlay rollout -->
     <script src="ai-model-registry.js?v=V99.89"></script>
-    <script src="ai-model-ui.js?v=V99.90"></script>
+    <script src="ai-model-ui.js?v=V99.91"></script>
+    <link rel="stylesheet" href="text-ai-chips.css?v=V99.91">
     <link rel="stylesheet" href="quiz-resource-cards.css?v=V99.68">
     <link rel="stylesheet" href="case-split-studio.css?v=V99.68">
     <link rel="stylesheet" href="reflection-compact.css?v=V99.68">
@@ -11598,6 +11600,7 @@
                             </div>
                         </div>
                         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                            <input type="hidden" id="lp-ai-model" value="gpt-5.6-luna">
                             <button onclick="generateLearningPath()" id="lp-gen-btn" style="background:rgba(255,255,255,0.18); color:#fff; border:1px solid rgba(255,255,255,0.3); border-radius:10px; padding:8px 14px; font-size:0.84em; font-weight:700; cursor:pointer;">🤖 Generate My Path</button>
                             <button onclick="generateWeeklySummary()" style="background:rgba(255,255,255,0.12); color:#fff; border:1px solid rgba(255,255,255,0.25); border-radius:10px; padding:8px 14px; font-size:0.84em; font-weight:700; cursor:pointer;">📊 Weekly Summary</button>
                             <button onclick="lpTogglePathDetail()" id="lp-path-toggle-btn" style="background:transparent; color:rgba(255,255,255,0.7); border:none; font-size:1.1em; cursor:pointer; padding:4px 8px;">▼</button>
@@ -13903,6 +13906,7 @@
                 <label for="edit-case-note-text" style="display:block; font-weight:800; color:#374151;"><span data-ecn="en">Case Note</span><span data-ecn="sep"> · </span><span data-ecn="ko">케이스 메모</span><span data-ecn="sep2"> · </span><span data-ecn="th">บันทึกเคส</span></label>
                 <!-- V97.11: AI-translate the case note text (source stays Thai — this is a
                      read-only preview, not editable, so saving never overwrites the note). -->
+                <input type="hidden" id="case-note-ai-model" value="gpt-5.6-luna">
                 <button type="button" id="edit-case-note-translate-btn" onclick="translateEditCaseNote()" title="Translate to EN/KO" style="background:#fff; color:#1f2937; border:1px solid #cbd5e1; border-radius:999px; padding:5px 12px; font-size:0.76em; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
                     <i class="fa-solid fa-language"></i> Translate
                 </button>
@@ -15989,9 +15993,9 @@
 
             window.OLLAMA_API_KEY = localStorage.getItem('OLLAMA_API_KEY') || window.OLLAMA_API_KEY || '';
             window.OLLAMA_ENDPOINT = localStorage.getItem('OLLAMA_ENDPOINT') || 'https://api.ollama.com/v1';
-            window.DEFAULT_TRANSLATE_MODEL = localStorage.getItem('ai_default_translate_model') || 'gpt-4o';
+            window.DEFAULT_TRANSLATE_MODEL = normalizeTextAIModel(localStorage.getItem('ai_default_translate_model'));
             window.DEFAULT_ANALYZER_MODEL = localStorage.getItem('ai_default_analyzer_model') || 'gemini-3.8-flash';
-            window.DEFAULT_REVIEW_MODEL = localStorage.getItem('ai_default_review_model') || 'gpt-4o';
+            window.DEFAULT_REVIEW_MODEL = normalizeTextAIModel(localStorage.getItem('ai_default_review_model'));
             window.DEFAULT_QFP_MODEL = localStorage.getItem('ai_default_qfp_model') || 'gpt-5.6-luna';
         };
         window.loadAIKeys();
@@ -16246,6 +16250,7 @@
             }
 
             try {
+                if (visionData && proxyProvider === 'anthropic') throw new Error('Image analysis proxy unavailable. Please retry.');
                 // ThaiLLM is proxy-first. If proxy fails, fall back to an available local provider.
                 if (modelName.toLowerCase().includes('thaillm') || modelName.toLowerCase().includes('openthaigpt')) {
                     if (window.TYPHOON_API_KEY) {
@@ -16806,7 +16811,7 @@
                 document.getElementById('local-qwen-vd-model').value = localStorage.getItem('ai_qwen_voice_design_model') || '';
                 document.getElementById('local-qwen-speaker-catalog').value = localStorage.getItem('ai_qwen_speaker_catalog') || '';
                 // Model Defaults selects
-                const _mdef = { 'default-translate-model': localStorage.getItem('ai_default_translate_model') || 'gpt-4o', 'default-analyzer-model': localStorage.getItem('ai_default_analyzer_model') || 'gemini-3.8-flash', 'default-review-model': localStorage.getItem('ai_default_review_model') || 'gpt-4o', 'default-qfp-model': localStorage.getItem('ai_default_qfp_model') || 'gpt-5.6-luna' };
+                const _mdef = { 'default-translate-model': normalizeTextAIModel(localStorage.getItem('ai_default_translate_model')), 'default-analyzer-model': localStorage.getItem('ai_default_analyzer_model') || 'gemini-3.8-flash', 'default-review-model': normalizeTextAIModel(localStorage.getItem('ai_default_review_model')), 'default-qfp-model': localStorage.getItem('ai_default_qfp_model') || 'gpt-5.6-luna' };
                 Object.entries(_mdef).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.value = val; });
                 syncModelDefault('ai-model-selector', _mdef['default-qfp-model']);
 
@@ -17696,9 +17701,7 @@
         };
 
         window.auditModelControlsHtml = function(hasResult) {
-            return `<select id="quality-audit-model" aria-label="Review model">
-                ${(window.AI_MODEL_REGISTRY?.models || []).filter(m => m.selectable).map(m => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.label)}</option>`).join('')}
-                </select><button class="audit-run" onclick="runSelectedQualityAudit(this)" aria-label="${hasResult ? 'Review again' : 'Start review'}" title="${hasResult ? 'Review again' : 'Start review'}">↻</button>`;
+            return `<input type="hidden" id="quality-audit-model" value="gpt-5.6-luna">${textAIChipsHtml('', 'gpt-5.6-luna', "document.getElementById('quality-audit-model').value=this.dataset.value;this.parentElement.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b===this);b.setAttribute('aria-pressed',String(b===this))})")}<button class="audit-run" onclick="runSelectedQualityAudit(this)" aria-label="${hasResult ? 'Review again' : 'Start review'}" title="เริ่มตรวจคุณภาพด้วยโมเดลที่เลือก">↻</button>`;
         };
         window.auditToolbarHtml = function(hasResult) {
             return `<div class="audit-toolbar lang-no-toggle">${window.reviewTabsHtml('audit')}${window.auditModelControlsHtml(hasResult)}<button class="audit-close" onclick="closeQuizReview()" aria-label="Close review">×</button></div><p class="audit-toolbar-note lang-no-toggle">ⓘ AI may err · Check duplicate answers and ambiguous keys.</p>`;
@@ -17706,7 +17709,7 @@
 
         window.runSelectedQualityAudit = function(btn) {
             const model = document.getElementById('quality-audit-model').value;
-            if (!window.AI_MODEL_REGISTRY?.models.some(m => m.id === model && m.selectable)) return;
+            if (!window.TEXT_AI_MODELS.some(m => m.id === model)) return;
             return auditQuizAI(btn, { forceNew: true, model });
         };
 
@@ -18861,7 +18864,7 @@ RULES:
         // Plain text task (Thai→English prompt enhancement) — no JSON contract, so model choice
         // is low-risk. Falls back to default if a stale saved value is no longer in the rail.
         window.AI_DESIGN_ENHANCER_PREF_KEY = 'ai_default_design_enhancer_model';
-        window.AI_DESIGN_ENHANCER_VALID = ['gemini-3.5-flash', 'or/openai/gpt-4o-mini'];
+        window.AI_DESIGN_ENHANCER_VALID = window.TEXT_AI_MODELS.map(m => m.id);
 
         window.selectAIDesignEnhancerModel = function(btn) {
             if (!btn) return;
@@ -22904,7 +22907,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             div.className = 'quiz-q-item';
             div.innerHTML = `
                 <input type="hidden" class="q-type" value="${qType}">
-                <input type="hidden" class="ai-model-quiz" value="gemini-3.5-flash">
+                <input type="hidden" class="ai-model-quiz" value="${textAIModel('ai-analyzer-model-val')}">
                 <input type="hidden" class="ai-lang-quiz" value="Thai">
                 <div class="glass-toggle-container q-type-toggle" style="display:none;">
                     <div class="glass-toggle-item ${qType === 'choice' ? 'active' : ''}" data-value="choice"></div>
@@ -24045,7 +24048,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 const reader = new FileReader();
                 reader.onload = async () => {
                     const base64 = reader.result.split(',')[1];
-                    const aiModel = item.querySelector('.ai-model-quiz').value;
+                    const aiModel = textAIModel('ai-analyzer-model-val');
                     const aiLang = item.querySelector('.ai-lang-quiz').value;
 
                     const prompt = `Task: Extract quiz question and options from this image.
@@ -25119,7 +25122,7 @@ ${JSON.stringify(sourceObj)}`;
                 // V95.20: a big quiz (e.g. 29 questions × 4 options) translates to long
                 // JSON that overran Typhoon's default output cap and truncated mid-array,
                 // surfacing as "JSON parse failed". Request a larger budget (proxy caps it).
-                const response = await callUniversalAI('typhoon-v2.5-30b-a3b-instruct', prompt, true, null, '', { maxOutputTokens: 16384, feature: 'quiz_translation' });
+                const response = await callUniversalAI(textAIModel('toolbar-ai-translate-model'), prompt, true, null, '', { maxOutputTokens: 16384, feature: 'quiz_translation' });
                 if (!response || !response.text) { lastErr = 'Empty response'; continue; }
 
                 const parsed = (typeof safeJsonParse === 'function')
@@ -26776,6 +26779,8 @@ ${JSON.stringify(sourceObj)}`;
                             </div>
                         </div>
                         <div style="flex:1;overflow-y:auto;padding:20px;">
+                            <span class="lang-no-toggle">Short-answer AI model</span>
+                            ${textAIChipsHtml('', normalizeTextAIModel(localStorage.getItem('ai_short_answer_model')), "selectStoredTextAIModel(this, 'ai_short_answer_model')")}
                             ${cardsHtml}
                         </div>
                     </div>`;
@@ -28317,32 +28322,18 @@ ${JSON.stringify(sourceObj)}`;
         // ============================================================
         window._imgQuizFiles = [];
 
-        // V97.22: ONLY providers whose proxy branch actually forwards the image.
-        // Verified against functions/index.js: gemini builds an inlineData part
-        // (:585) and typhoon swaps to its vision model + image_url (:642), while
-        // openai (:508), anthropic (:731) and openrouter (:864) all send a plain
-        // text `content` — the image is dropped server-side with no error, which
-        // is the same silent-hallucination class as the V97.21 fix. Offering only
-        // the two that work removes the old blind "swap text-only chips to Gemini"
-        // heuristic, which swapped Typhoon (works) but NOT GPT/Claude (don't).
-        // `textId` is the id to use for the TEXT-only verify call. Typhoon needs the
-        // split: the proxy only swaps in the vision model when visionData is present
-        // (functions/index.js:643), so passing the vision id to a text call would
-        // forward `typhoon-v2.5-vision-instruct` as a plain chat model. Gemini ids
-        // serve both modes, so they need no override.
-        const IMG_QUIZ_VISION_MODELS = [
-            { id: 'gemini-3.5-flash', label: 'Gemini Flash' },
-            { id: 'gemini-3.6-flash', label: 'Gemini Pro' },
-            { id: 'typhoon-v2.5-vision-instruct', textId: 'typhoon-v2.5-30b-a3b-instruct', label: '🌀 Typhoon' }
-        ];
-        window._imgQuizModels = ['gemini-3.5-flash'];
+        // The nine text models also accept images through their server adapters.
+        // Image generation and speech synthesis retain their specialist models.
+        const IMG_QUIZ_VISION_MODELS = window.TEXT_AI_MODELS;
+        window._imgQuizModels = ['gpt-5.6-luna'];
 
         function imageQuizRenderModelRail() {
             const rail = document.getElementById('img-quiz-model-rail');
             if (!rail) return;
+            rail.classList.add('text-ai-chips', 'lang-no-toggle');
             rail.innerHTML = IMG_QUIZ_VISION_MODELS.map(m => {
                 const on = window._imgQuizModels.includes(m.id);
-                return '<button type="button" onclick="imageQuizToggleModel(\'' + m.id + '\')" style="width:auto; min-height:0; padding:5px 13px; border-radius:999px; cursor:pointer; font-size:0.78em; font-weight:800; border:1.5px solid ' + (on ? '#d97706' : '#e2e8f0') + '; background:' + (on ? 'linear-gradient(135deg,#f59e0b,#d97706)' : '#fff') + '; color:' + (on ? '#fff' : '#64748b') + ';">' + (on ? '✓ ' : '') + m.label + '</button>';
+                return `<button type="button" class="glass-toggle-item${on ? ' active' : ''}" aria-pressed="${on}" title="${m.hint}" onclick="imageQuizToggleModel('${m.id}')">${m.label}</button>`;
             }).join('');
         }
 
@@ -29302,7 +29293,7 @@ ${JSON.stringify(sourceObj)}`;
                   "confidence": 0-100
                 }`;
 
-                const { text: aiResponse } = await window.callUniversalAI("gemini-3.5-flash", prompt, true, null, '', { feature: 'short_answer_eval' });
+                const { text: aiResponse } = await window.callUniversalAI(normalizeTextAIModel(localStorage.getItem('ai_short_answer_model')), prompt, true, null, '', { feature: 'short_answer_eval' });
 
                 // V92.35: use shared safeJsonParse with bracket-extraction fallback
                 const result = safeJsonParse(aiResponse);
@@ -35359,7 +35350,7 @@ RULES:
                     '',
                     sourceText
                 ].join('\n');
-                const { text } = await window.callUniversalAI('gemini-3.6-flash', prompt, true, null, '', { feature: 'case_note_translate' });
+                const { text } = await window.callUniversalAI(textAIModel('case-note-ai-model'), prompt, true, null, '', { feature: 'case_note_translate' });
                 const result = (typeof safeJsonParse === 'function' ? safeJsonParse(text) : null) || {};
                 const enText = String(result.en || '').trim() || '(translation unavailable)';
                 const koText = String(result.ko || '').trim() || '(번역 없음)';
@@ -35829,7 +35820,7 @@ RULES:
                     '',
                     cleanSummary
                 ].filter(Boolean).join('\n');
-                const { text } = await window.callUniversalAI('gpt-4o-mini', prompt, false, null, '', { feature: 'casecard_translate' });
+                const { text } = await window.callUniversalAI(textAIModel('alabasta-case-card-refine-model'), prompt, false, null, '', { feature: 'casecard_translate' });
                 return String(text || '').trim() || cleanSummary;
             } catch (error) {
                 console.warn('Failed to translate anonymized summary to English:', error);
@@ -36458,7 +36449,7 @@ Required sections:
 Case Data:
 ${buildAlabastaCaseSnapshot(caseItem)}`;
 
-                const { text } = await window.callUniversalAI('gemini-3.5-flash', prompt, true, null, '', { feature: 'laboon_brief' });
+                const { text } = await window.callUniversalAI(textAIModel('tts-polish-model'), prompt, true, null, '', { feature: 'laboon_brief' });
                 outputEl.value = String(text || '').trim();
                 if (metaEl) metaEl.textContent = 'AI brief generated. You can edit it here or send it to Laboon studio.';
             } catch (e) {
@@ -53818,7 +53809,7 @@ Save it anyway?`;
         // Two on purpose: one model's opinion of a person is not evidence. Where they
         // agree is worth acting on; where they disagree is exactly what a human should
         // look at, so the disagreement is shown rather than averaged away.
-        const APD_REVIEW_MODELS = ['claude-4-sonnet-latest', 'gpt-5.4'];
+        const apdReviewModels = () => [...new Set([textAIModel('apd-model-a'), textAIModel('apd-model-b')])];
 
         async function apdExtractPdfText(url) {
             if (!window.pdfjsLib) throw new Error('pdf.js did not load');
@@ -53890,9 +53881,9 @@ Save it anyway?`;
                     + text.length + ' chars) — it is probably a scan. AI review needs a text PDF.</div>';
                 return;
             }
-            box.innerHTML = '<div style="font-size:0.74em; color:#64748b;">Asking ' + APD_REVIEW_MODELS.length + ' models…</div>';
+            box.innerHTML = '<div style="font-size:0.74em; color:#64748b;">Asking ' + apdReviewModels().length + ' models…</div>';
             const prompt = apdReviewPrompt(text);
-            const results = await Promise.all(APD_REVIEW_MODELS.map(async model => {
+            const results = await Promise.all(apdReviewModels().map(async model => {
                 try {
                     const res = await window.callUniversalAI(model, prompt, true, null, '', { feature: 'resume_review' });
                     const raw = (res && res.text) || '';
@@ -55289,7 +55280,7 @@ Reflective Logs (recent): ${JSON.stringify(logs.slice(0, 8))}
 
 Return a JSON object (no markdown, no code blocks):
 {"summary":"2-3 sentence overview","weeks":[{"week":1,"theme":"Theme","topics":["t1","t2","t3"],"goal":"weekly goal"},{"week":2,...},{"week":3,...},{"week":4,...}]}`;
-                const rawJson = await callUniversalAI(prompt, { maxTokens: 900 });
+                const { text: rawJson } = await callUniversalAI(textAIModel('lp-ai-model'), prompt, true, null, '', { maxOutputTokens: 900, feature: 'learning_path' });
                 let pathData;
                 try { pathData = JSON.parse(rawJson.trim()); } catch(e) { const m = rawJson.match(/\{[\s\S]*\}/); if (m) pathData = JSON.parse(m[0]); }
                 if (pathData) {
@@ -55325,7 +55316,7 @@ Return a JSON object (no markdown, no code blocks):
 
 Entries:
 ${weekEntries.map(e => `[${e.date}] ${e.title}: ${(e.contentMarkdown || '').slice(0, 300)}`).join('\n')}`;
-            const summary = await callUniversalAI(prompt, { maxTokens: 400 });
+            const { text: summary } = await callUniversalAI(textAIModel('lp-ai-model'), prompt, false, null, '', { maxOutputTokens: 400, feature: 'learning_summary' });
             if (output) output.value = summary;
         };
 
@@ -55346,7 +55337,7 @@ Knowledge Gaps:
 • ...
 
 Recommended Review: X days`;
-            const result = await callUniversalAI(prompt, { maxTokens: 400 });
+            const { text: result } = await callUniversalAI(textAIModel('lp-ai-model'), prompt, false, null, '', { maxOutputTokens: 400, feature: 'learning_entry' });
             if (output) output.value = result;
         };
 
@@ -57662,9 +57653,10 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 const hidden = document.getElementById('ai-preset-review');
                 if (hidden) hidden.value = 'encourage';
                 // V94.18: restore grammar model chip from localStorage (Flash default).
-                const grammarPref = localStorage.getItem('ai_default_grammar_model') || 'gemini-3.5-flash';
+                const grammarPref = normalizeTextAIModel(localStorage.getItem('ai_default_grammar_model'));
                 const grammarHidden = document.getElementById('ai-model-grammar');
                 if (grammarHidden) grammarHidden.value = grammarPref;
+                window.syncRegistryModelSelect('ai-model-grammar');
                 document.querySelectorAll('.reflective-grammar-model-chip').forEach(chip => {
                     chip.classList.toggle('active', chip.dataset.value === grammarPref);
                 });
@@ -58314,6 +58306,8 @@ ${steerBlock}
         };
 
         window._compareModelMeta = function(modelId) {
+            const current = window.TEXT_AI_MODELS.find(m => m.id === modelId);
+            if (current) return { label: current.label, emoji: '✦', color: '#d97706' };
             const m = String(modelId || '').toLowerCase();
             if (m.includes('mimo')) return { label: 'MiMo', emoji: '📱', color: '#f97316' };
             // V97.32: version-specific checks BEFORE the generic 'flash'/'gemini' checks
@@ -58335,32 +58329,17 @@ ${steerBlock}
         };
 
         window._compareModelB = function() {
-            const saved = localStorage.getItem('ai_default_2model_b') || 'claude-4-sonnet-latest';
-            // The GPT chip's id moved off the legacy gpt-4o on 2026-08-18. Anyone who
-            // had picked GPT before that has the old id in localStorage, which now
-            // matches no chip — it would render with nothing highlighted AND still
-            // route to the mini tier. Map it forward on read.
-            return saved === 'gpt-4o' ? 'gpt-5.4' : saved;
+            return normalizeTextAIModel(localStorage.getItem('ai_default_2model_b'));
         };
         window.setCompareModelB = function(chip) {
             localStorage.setItem('ai_default_2model_b', chip.dataset.value);
-            [...chip.parentElement.children].forEach(c => c.classList.toggle('active', c === chip));
+            chip.parentElement.querySelectorAll('button').forEach(c => {
+                c.classList.toggle('active', c === chip);
+                c.setAttribute('aria-pressed', String(c === chip));
+            });
         };
         window._compareModelBPickerHtml = function() {
-            const cur = window._compareModelB();
-            const chips = [
-                { v: 'gemini-3.6-flash', t: 'Pro' },
-                { v: 'gpt-5.4', t: 'GPT' },
-                { v: 'claude-4-sonnet-latest', t: 'Claude' },
-                { v: 'typhoon-v2.5-30b-a3b-instruct', t: '🌀' },
-                { v: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', t: '🦙' },
-                { v: 'or/xiaomi/mimo-v2.5', t: 'MiMo' }
-            ];
-            const items = chips.map(c => `<div class="glass-toggle-item${c.v === cur ? ' active' : ''}" data-value="${c.v}" onclick="window.setCompareModelB(this)" style="font-size:0.62em; font-weight:800; padding:2px 7px; border-radius:7px; color:#475569;">${c.t}</div>`).join('');
-            return `<div style="display:flex; align-items:center; gap:5px;">
-                <span style="font-size:0.62em; font-weight:900; color:#0891b2; letter-spacing:0.5px; text-transform:uppercase; white-space:nowrap;">Model B</span>
-                <div class="glass-toggle-container" style="margin:0; background:rgba(0,0,0,0.05); border:1px solid rgba(0,0,0,0.06); padding:2px; border-radius:9px; gap:1px;">${items}</div>
-            </div>`;
+            return '<span>Model B</span>' + textAIChipsHtml('', window._compareModelB(), 'window.setCompareModelB(this)');
         };
 
         window.generateAiProposalB = async function(qIdx, arrIdx, btn) {
@@ -61786,6 +61765,7 @@ Summarize in English in 3–5 concise lines:
             <input type="file" id="apd-file" accept="application/pdf,image/jpeg,image/png,image/webp" style="display:none;" onchange="uploadApplicantDoc(this)">
             <button class="btn-sm" onclick="document.getElementById('apd-file').click()" style="width:auto; min-height:0; padding:5px 12px; font-size:0.75em; font-weight:700; background:#f5f3ff; color:#7c3aed; border:1px solid #ddd6fe; border-radius:999px; cursor:pointer;">+ Attach</button>
             <span style="font-size:0.68em; color:#cbd5e1; margin-left:6px;">PDF or image, under 4 MB</span>
+            <div class="lang-no-toggle"><span>Review model A</span><input type="hidden" id="apd-model-a" value="gpt-5.6-luna"><span>Review model B</span><input type="hidden" id="apd-model-b" value="claude-haiku-4-5"></div>
             <div class="lang-no-toggle" id="apd-ai" style="margin-top:10px;"></div>
             <p style="margin:10px 0 0; font-size:0.66em; color:#cbd5e1; line-height:1.45;">Admins only · deleting the applicant deletes these files too · AI review sends the CV text to the model providers</p>
         </div>
@@ -62209,7 +62189,7 @@ Summarize in English in 3–5 concise lines:
     })();
     </script>
 <script src="history-review.js?v=V99.88"></script>
-<script src="drug-toolbar.js?v=V99.87"></script>
+<script src="drug-toolbar.js?v=V99.91"></script>
 <script src="journal-feedback-admin.js?v=V99.88"></script>
 <script src="delete-requests.js?v=V99.88"></script>
 </body>
