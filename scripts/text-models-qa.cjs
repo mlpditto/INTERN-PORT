@@ -24,6 +24,25 @@ const { chromium } = require('playwright');
         await page.addStyleTag({ path: 'public/text-ai-chips.css' });
         await page.addScriptTag({ path: 'public/drug-toolbar.js' });
         await page.evaluate(() => document.dispatchEvent(new Event('DOMContentLoaded')));
+        // Exercise the real editor-open initialization, which previously overwrote registry click handlers.
+        const editorStart = html.indexOf('            const syncChipRailToHidden =');
+        const editorEnd = html.indexOf('            // 🔥 Init AI Language Toggle', editorStart);
+        assert(editorStart > 0 && editorEnd > editorStart);
+        const editorInit = html.slice(editorStart, editorEnd);
+        for (let reopen = 0; reopen < 2; reopen++) {
+            await page.evaluate(code => { new Function(code)(); }, editorInit);
+            for (const id of ['ai-analyzer-model-val', 'toolbar-ai-translate-model']) {
+                const rail = page.locator(`[data-model-input="${id}"]`);
+                for (const value of ['as/gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gpt-5.6-luna']) {
+                    await rail.locator(`[data-value="${value}"]`).evaluate(b => b.click());
+                    assert.equal(await rail.locator('.active').count(), 1);
+                    assert.equal(await rail.locator('[aria-pressed="true"]').count(), 1);
+                    assert.equal(await rail.locator('[aria-pressed="true"]').getAttribute('data-value'), value);
+                    assert.equal(await page.locator('#' + id).inputValue(), value);
+                    assert.equal(await rail.locator('button').evaluateAll(bs => bs.filter(b => getComputedStyle(b).backgroundColor === 'rgb(245, 158, 11)').length), 1);
+                }
+            }
+        }
         const ids = await page.evaluate(() => TEXT_AI_MODELS.map(m => m.id));
         assert.equal(ids.length, 9);
         const controls = ['ai-analyzer-model-val', 'toolbar-ai-translate-model', 'ai-tagging-model-val', 'ai-model-design-enhancer', 'ai-model-grammar', 'dxa-ai-model-val', 'alabasta-case-card-refine-model', 'ai-model-review', 'research-model-select', 'tts-polish-model', 'laughtale-ai-model', 'storyteller-model-select', 'lp-ai-model', 'apd-model-a', 'apd-model-b', 'case-note-ai-model', 'default-translate-model', 'default-analyzer-model', 'default-review-model', 'default-qfp-model'];
