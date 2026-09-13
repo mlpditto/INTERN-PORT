@@ -166,6 +166,9 @@
         const apply = node('button', 'Apply to current quiz', 'curate-apply'); apply.type = 'button'; apply.id = 'curate-apply';
         apply.title = 'ตัดข้อออกจากชุดเดิมที่ปิดใช้งานและไม่มีประวัติ พร้อมสร้างสำเนาก่อนแก้ไข';
         byId('curate-save').after(apply);
+        const split = node('button', 'Split into two quizzes', 'curate-primary'); split.type = 'button'; split.id = 'curate-split';
+        split.title = 'ชุดเดิมเก็บ Keep ชุดใหม่รับ Remove พร้อมสำเนา Before Split'; apply.after(split);
+        split.onclick = () => save(true, true);
         dialog.querySelector('.curate-close').onclick = () => dialog.close();
         // Keep the editor's global Escape handler from closing the underlying modal.
         document.addEventListener('keydown', event => { if (dialog.open && event.key === 'Escape') event.stopPropagation(); }, true);
@@ -253,8 +256,10 @@
         byId('curate-save').disabled = s.busy || s.saving || s.saved || !!problem(s);
         byId('curate-save').textContent = s.saving ? 'Saving…' : s.saved ? 'Saved' : 'Save as new quiz';
         byId('curate-apply').disabled = s.busy || s.saving || s.saved || !s.source.sourceId || !!problem(s) || s.keep.size === count;
+        byId('curate-split').disabled = byId('curate-apply').disabled;
+        byId('curate-split').textContent = s.splitting ? 'Splitting…' : 'Split into two quizzes';
         byId('curate-apply').textContent = s.applying ? 'Applying…' : 'Remove ' + (count - s.keep.size) + ' from original';
-        dialog.querySelector('.curate-main > .curate-note').textContent = 'Save a new inactive copy, or apply to an inactive quiz with no attempts or exam sessions. Applying creates an inactive backup in the quiz list.';
+        dialog.querySelector('.curate-main > .curate-note').textContent = 'Save a new inactive copy, or apply to an inactive quiz with no attempts or exam sessions. Split keeps Keep in the original and moves Remove to a new inactive quiz. A backup is saved first.';
         byId('curate-suggest').textContent = s.busy ? 'Processing ' + (s.progress || 0) + '%' : s.progress === 100 ? '100% · Suggest again' : '✦ Suggest';
         byId('curate-suggest').title = s.busy ? 'ความคืบหน้าตามขั้นตอนงาน API ไม่รายงานเปอร์เซ็นต์ประมวลผลจริงของโมเดล' : 'ให้ AI เสนอข้อที่ควรเก็บและตัด';
         renderComparison(s);
@@ -343,12 +348,13 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
             if (state === s) { s.progress = 0; s.message = 'Could not suggest: ' + error.message; }
         } finally { if (state === s) { s.busy = false; render(); } }
     }
-    async function applyToCurrent(s, ids, timestamp) {
+    async function applyToCurrent(s, ids, timestamp, split = false) {
+        const operation = split ? (s.splitOperation ||= {}) : (s.applyOperation ||= {});
         const ref = db.collection('quizzes').doc(s.source.sourceId);
         const before = await ref.get({ source: 'server' });
         if (!before.exists) throw new Error('The original quiz no longer exists. Save as new quiz instead.');
         const original = before.data();
-        if (s.applyRef && original.curation?.applyOperationId === s.applyRef.id) return;
+        if (operation.backupRef && original.curation?.applyOperationId === operation.backupRef.id) return;
         const baseline = await s.serverBaseline;
         if (baseline?.error) throw new Error('Could not verify the original quiz. Close Curate and retry online.');
         if (!baseline?.exists || fingerprint(baseline.data) !== fingerprint(original)) throw new Error('The stored quiz changed since Curate opened. Close it and review the latest version.');
@@ -361,45 +367,56 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
         if (!attempts.empty || !sessions.empty) throw new Error('This quiz has attempts or exam sessions. Use Save as new quiz to preserve its history.');
         if (!unchanged(s)) throw new Error('The editor changed. Close Curate and reopen it.');
         const removed = s.source.form.questions.map((_, i) => i + 1).filter(id => !s.keep.has(id));
-        if (!confirm('Apply to current quiz: ' + s.source.form.title + '\n\nRemove: ' + removed.map(id => 'Q' + id).join(', ') + '\n' + s.source.form.questions.length + ' → ' + ids.length + ' questions.\n\nCurrent editor settings will also be saved. An inactive backup of the stored quiz will be created in the quiz list.\n\nยืนยันตัดข้อที่ระบุออกจากชุดเดิม พร้อมบันทึกการตั้งค่าปัจจุบันและสร้างสำเนาก่อนแก้ไข?')) return false;
-        if (!s.applyRef) s.applyRef = db.collection('quizzes').doc();
+        const confirmation = split
+            ? 'Split into two quizzes: ' + s.source.form.title + '\n\nOriginal keeps ' + ids.length + ': ' + ids.map(id => 'Q' + id).join(', ') + '\nNew inactive quiz receives ' + removed.length + ': ' + removed.map(id => 'Q' + id).join(', ') + '\n\nA Before Split backup will preserve all ' + s.source.form.questions.length + ' questions. Current editor settings will be saved; each resulting quiz retains the current total points.\n\nยืนยันแยก Keep ไว้ชุดเดิม และย้าย Remove ไปชุดใหม่ พร้อมสำเนาก่อนแยก?'
+            : 'Apply to current quiz: ' + s.source.form.title + '\n\nRemove: ' + removed.map(id => 'Q' + id).join(', ') + '\n' + s.source.form.questions.length + ' → ' + ids.length + ' questions.\n\nCurrent editor settings will also be saved. An inactive backup of the stored quiz will be created in the quiz list.\n\nยืนยันตัดข้อที่ระบุออกจากชุดเดิม พร้อมบันทึกการตั้งค่าปัจจุบันและสร้างสำเนาก่อนแก้ไข?';
+        if (!confirm(confirmation)) return false;
+        if (!operation.backupRef) operation.backupRef = db.collection('quizzes').doc();
+        if (split && !operation.newRef) operation.newRef = db.collection('quizzes').doc();
         await db.runTransaction(async tx => {
-            const current = await tx.get(ref), backup = await tx.get(s.applyRef);
-            if (current.exists && current.data().curation?.applyOperationId === s.applyRef.id) return;
+            const current = await tx.get(ref), backup = await tx.get(operation.backupRef);
+            const newQuiz = split ? await tx.get(operation.newRef) : null;
+            if (current.exists && current.data().curation?.applyOperationId === operation.backupRef.id) return;
             if (!current.exists || fingerprint(current.data()) !== fingerprint(original) || !unchanged(s)) throw new Error('The quiz changed before applying. Close Curate and review the latest version.');
-            if (backup.exists) throw new Error('Backup ID already exists. Close Curate and retry.');
-            tx.set(s.applyRef, { ...original, title: (original.title || 'Quiz') + ' (Before Curate)', isActive: false, isTemplate: true,
+            if (backup.exists || newQuiz?.exists) throw new Error('Backup ID already exists. Close Curate and retry.');
+            tx.set(operation.backupRef, { ...original, title: (original.title || 'Quiz') + (split ? ' (Before Split)' : ' (Before Curate)'), isActive: false, isTemplate: true,
                 startTime: null, deadline: null, createdAt: timestamp, updatedAt: timestamp,
                 curationBackup: { sourceQuizId: ref.id, originalStartTime: original.startTime || null, originalDeadline: original.deadline || null } });
+            if (split) tx.set(operation.newRef, { ...s.source.form, title: s.source.form.title + ' (Split ' + removed.length + ')',
+                questions: removed.map(id => s.source.form.questions[id - 1]), isActive: false, isTemplate: true,
+                startTime: null, deadline: null, createdAt: timestamp, updatedAt: timestamp,
+                curation: { sourceQuizId: ref.id, backupQuizId: operation.backupRef.id, originalCount: s.source.form.questions.length,
+                    originalQuestionNumbers: removed, model: s.model, strategy: s.mode, operation: 'split-removed' } });
             tx.update(ref, { ...s.source.form, questions: ids.map(id => s.source.form.questions[id - 1]),
                 startTime: convertDate(s.source.form.startTime), deadline: convertDate(s.source.form.deadline),
                 deadlineFloor: firebase.firestore.FieldValue.delete(), translations: firebase.firestore.FieldValue.delete(),
                 lastAiAnalysis: firebase.firestore.FieldValue.delete(), lastAiAudit: firebase.firestore.FieldValue.delete(),
-                updatedAt: timestamp, curation: { sourceQuizId: ref.id, backupQuizId: s.applyRef.id, applyOperationId: s.applyRef.id,
-                    originalCount: s.source.form.questions.length, originalQuestionNumbers: ids, model: s.model, strategy: s.mode } });
+                updatedAt: timestamp, curation: { sourceQuizId: ref.id, backupQuizId: operation.backupRef.id, applyOperationId: operation.backupRef.id,
+                    originalCount: s.source.form.questions.length, originalQuestionNumbers: ids, model: s.model, strategy: s.mode,
+                    ...(split ? { operation: 'split-kept', splitQuizId: operation.newRef.id } : {}) } });
         });
         return true;
     }
-    async function save(apply = false) {
+    async function save(apply = false, split = false) {
         const s = state; if (!s || s.busy || s.saving || s.saved) return;
         try {
             s.stale = !unchanged(s);
             if (problem(s)) { s.message = ''; render(); return; }
             const ids = selectedIds(s), form = s.source.form;
             if (!form.title.trim()) throw new Error('Add a quiz title in the editor, then reopen Curate.');
-            const invalid = ids.filter(id => {
+            const invalid = (split ? form.questions.map((_, i) => i + 1) : ids).filter(id => {
                 const q = form.questions[id - 1];
                 return !String(q.q || '').trim() || (q.type !== 'short_answer' && (!Array.isArray(q.options) || !q.options.length || q.options.some(o => !String(o).trim()))) || s.source.missingKeys.includes(id);
             });
             if (invalid.length) throw new Error('Complete the question and answer key for Q' + invalid.join(', Q') + ' in the editor, then reopen Curate.');
             if (apply && (!s.source.sourceId || ids.length === form.questions.length)) throw new Error('Select fewer questions from a saved quiz before applying.');
-            s.saving = true; s.applying = apply; s.message = apply ? 'Checking the original quiz and its history…' : 'Saving a new inactive quiz…'; render();
+            s.saving = true; s.applying = apply; s.splitting = split; s.message = apply ? 'Checking the original quiz and its history…' : 'Saving a new inactive quiz…'; render();
             if (!await ensureAuthForQuizWrite(6000)) throw new Error('Sign in with your admin account, then retry.');
             if (!unchanged(s)) { s.stale = true; throw new Error('The editor changed. Close Curate and reopen it.'); }
             const timestamp = firebase.firestore.FieldValue.serverTimestamp();
             if (apply) {
-                if (await applyToCurrent(s, ids, timestamp) === false) { s.message = 'Apply cancelled. No changes saved.'; return; }
-                s.saved = true; s.message = 'Applied ' + ids.length + ' questions. Backup: ' + (form.title || 'Quiz') + ' (Before Curate), in the quiz list.';
+                if (await applyToCurrent(s, ids, timestamp, split) === false) { s.message = 'Apply cancelled. No changes saved.'; return; }
+                s.saved = true; s.message = split ? 'Split complete: original keeps ' + ids.length + ', new inactive quiz contains ' + (form.questions.length - ids.length) + '. Before Split backup is in the quiz list.' : 'Applied ' + ids.length + ' questions. Backup: ' + (form.title || 'Quiz') + ' (Before Curate), in the quiz list.';
                 try { localStorage.removeItem('quiz_draft'); } catch (error) { console.warn('Curate saved; local draft cleanup unavailable:', error); }
                 if (document.getElementById('quizManageModal')) forceHideModal('quizManageModal');
                 showToast('Quiz updated. An inactive backup is available in the quiz list.'); return;
@@ -414,6 +431,6 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
             s.saved = true; s.message = 'Saved as a new inactive quiz. Original ' + form.questions.length + ' questions preserved.';
             showToast('Curated quiz saved. Find it in the quiz list.');
         } catch (error) { s.message = 'Could not save: ' + error.message; }
-        finally { if (state === s) { s.saving = false; s.applying = false; render(); } }
+        finally { if (state === s) { s.saving = false; s.applying = false; s.splitting = false; render(); } }
     }
 })();
