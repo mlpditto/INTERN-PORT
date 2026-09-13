@@ -68,6 +68,9 @@
         host.setAttribute('role', 'group');
         host.setAttribute('aria-label', 'AI model');
         host.dataset.modelInput = id;
+        host.parentElement.classList.add('text-ai-row');
+        host.parentElement.parentElement?.classList.add('text-ai-row');
+        if (id === 'tts-polish-model' && input.previousElementSibling?.matches('i.fa-robot')) input.previousElementSibling.hidden = true;
         host.innerHTML = models.map(m => `<button type="button" class="glass-toggle-item" data-value="${m.id}" title="${m.hint}">${m.label}</button>`).join('');
         host.querySelectorAll('button').forEach(button => {
             button.onclick = () => {
