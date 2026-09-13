@@ -1,6 +1,16 @@
 // AI proposes question IDs only. Saving copies the editor snapshot, never AI-authored questions.
 (function () {
-    let state = null, dialog;
+    let state = null, dialog, panelId = 0;
+    const stemObserver = new ResizeObserver(entries => entries.forEach(({ target }) => updateMore(target)));
+    function updateMore(stem) {
+        if (!stem.isConnected || !stem.clientWidth) return;
+        const more = stem.nextElementSibling;
+        if (!more?.classList.contains('curate-expand')) return;
+        const expanded = more.getAttribute('aria-expanded') === 'true';
+        stem.classList.add('clamped');
+        more.hidden = stem.scrollHeight <= stem.clientHeight + 1;
+        if (expanded) stem.classList.remove('clamped');
+    }
     const byId = id => document.getElementById(id);
     const strategies = {
         balanced: 'Preserve learning-objective and topic coverage, balance estimated difficulty, and reduce redundancy.',
@@ -50,10 +60,11 @@
     }
     function sourceView(host, q, expanded = false, evidence = [], missingKey = false) {
         const stem = node('div', undefined, 'curate-stem'); markedText(stem, q.q, evidence); host.append(stem);
-        if (!expanded && String(q.q).length > 150) {
-            stem.classList.add('clamped'); const more = node('button', 'Show more', 'curate-expand'); more.type = 'button';
+        if (!expanded) {
+            stem.classList.add('clamped'); const more = node('button', 'More ▾', 'curate-expand'); more.type = 'button'; more.hidden = true;
             more.title = 'ขยายโจทย์ในตำแหน่งเดิม'; more.setAttribute('aria-expanded', 'false');
-            more.onclick = () => { const clipped = stem.classList.toggle('clamped'); more.textContent = clipped ? 'Show more' : 'Show less'; more.setAttribute('aria-expanded', String(!clipped)); }; host.append(more);
+            more.onclick = () => { const clipped = stem.classList.toggle('clamped'); more.textContent = clipped ? 'More ▾' : 'Less ▴'; more.setAttribute('aria-expanded', String(!clipped)); }; host.append(more);
+            stemObserver.observe(stem);
         }
         if (q.content && q.content !== q.q) markedText(disclosure('Context', 'บริบทเพิ่มเติมของโจทย์', host, expanded), q.content, evidence);
         if (q.options?.length) {
@@ -68,6 +79,20 @@
             if (missingKey) choices.append(node('div', 'Answer key missing', 'curate-note'));
         }
         if (q.explanation) markedText(disclosure('Original explanation', 'คำอธิบายต้นฉบับ ไม่ใช่เหตุผลจาก AI', host, expanded), q.explanation, evidence);
+        if (!expanded) {
+            const sections = [...host.children].filter(el => el.tagName === 'DETAILS');
+            const controls = node('div', undefined, 'curate-source-controls'); host.append(controls);
+            for (const section of sections) {
+                const summary = section.querySelector('summary');
+                const label = summary.textContent === 'Original explanation' ? 'Explanation' : summary.textContent;
+                const button = node('button', label + ' ▾', 'curate-source-toggle'); button.type = 'button'; button.title = summary.title;
+                const panel = node('div', undefined, 'curate-source-panel'); panel.id = 'curate-panel-' + ++panelId; panel.hidden = true;
+                summary.remove(); panel.append(...section.childNodes); section.remove();
+                button.setAttribute('aria-controls', panel.id); button.setAttribute('aria-expanded', 'false');
+                button.onclick = () => { panel.hidden = !panel.hidden; button.setAttribute('aria-expanded', String(!panel.hidden)); button.textContent = label + (panel.hidden ? ' ▾' : ' ▴'); };
+                controls.append(button); host.append(panel);
+            }
+        }
     }
     function backToReview() {
         state.compare = null; render(); dialog.querySelector('[data-view="' + state.view + '"]').focus();
@@ -145,7 +170,7 @@
         // Keep the editor's global Escape handler from closing the underlying modal.
         document.addEventListener('keydown', event => { if (dialog.open && event.key === 'Escape') event.stopPropagation(); }, true);
         dialog.addEventListener('cancel', event => { if (state?.saving) event.preventDefault(); else if (state?.compare) { event.preventDefault(); backToReview(); } });
-        dialog.addEventListener('close', () => { state = null; });
+        dialog.addEventListener('close', () => { state = null; stemObserver.disconnect(); });
         dialog.querySelectorAll('[data-mode]').forEach(button => button.onclick = () => {
             state.mode = button.dataset.mode; state.needsSuggestion = true; state.progress = 0; state.message = ''; render();
         });
@@ -159,6 +184,7 @@
     }
     function render() {
         const s = state; if (!s) return;
+        stemObserver.disconnect();
         const focusedRow = document.activeElement?.closest('.curate-question');
         const focusedAction = focusedRow && { id: focusedRow.dataset.questionId, selector: document.activeElement.classList.contains('curate-pin') ? '.curate-pin' : '.curate-move' };
         const count = s.source.form.questions.length;
@@ -179,19 +205,20 @@
             const assessment = s.proposal?.find(item => item.id === id);
             const row = document.createElement('div'); row.className = 'curate-question' + (kept ? ' kept' : '');
             row.dataset.questionId = id;
-            row.innerHTML = `<span class="curate-number">Q${id}</span><div class="curate-body"><div class="curate-source"></div><div class="curate-reason"></div></div><div class="curate-actions"><button type="button" class="curate-pin" aria-pressed="${s.pins.has(id)}" title="ปักหมุดเพื่อเก็บข้อนี้ในการเสนอครั้งถัดไป">${s.pins.has(id) ? 'Pinned' : 'Pin'}</button><button type="button" class="curate-move" title="ปรับข้อเสนอด้วยตนเอง">${kept ? 'Remove' : 'Keep'}</button></div>`;
+            row.innerHTML = `<span class="curate-number">Q${id}</span><div class="curate-body"><div class="curate-source"></div><div class="curate-reason"></div></div><div class="curate-actions"><button type="button" class="curate-move" title="${kept ? 'ย้ายไปกลุ่มที่เสนอให้ตัด ยังไม่ลบต้นฉบับ' : 'เก็บข้อนี้ในรอบปัจจุบัน AI อาจเลือกใหม่เมื่อกด Suggest'}">${kept ? 'Remove' : 'Keep'}</button><button type="button" class="curate-pin" aria-pressed="${s.pins.has(id)}" title="บังคับเก็บข้อนี้แม้กด Suggest ใหม่ กดอีกครั้งเพื่อปลด">📌 Must keep</button></div>`;
             sourceView(row.querySelector('.curate-source'), q, false, [], s.source.missingKeys.includes(id));
             const reason = row.querySelector('.curate-reason');
-            const source = row.querySelector('.curate-source'); source.insertBefore(reason, source.querySelector('details'));
+            const source = row.querySelector('.curate-source'); source.insertBefore(reason, source.querySelector('.curate-source-controls'));
             if (s.pins.has(id) || (assessment && assessment.keep !== kept)) {
                 const note = document.createElement('div');
                 note.textContent = s.pins.has(id) ? 'Pinned to keep · ปักหมุดให้เก็บไว้' : 'Manual selection · AI suggested ' + (assessment.keep ? 'Keep' : 'Remove');
                 reason.append(note);
             }
             if (assessment) {
-                reason.append(node('strong', 'AI rationale · ' + (assessment.keep ? 'Keep suggested' : 'Remove suggested')));
+                reason.append(node('span', assessment.keep ? 'AI suggests keeping' : 'AI suggests removal', 'curate-badge'));
                 bilingual(reason, assessment.reason, assessment.reasonTh);
-                const details = disclosure('Reason details', 'รายละเอียดเหตุผลและผลกระทบหากตัดข้อนี้', reason);
+                const details = disclosure('Details', 'รายละเอียดเหตุผลและผลกระทบหากตัดข้อนี้', reason);
+                details.className = 'curate-reason-details';
                 bilingual(details, assessment.detail, assessment.detailTh);
                 details.append(node('strong', 'Impact if removed')); bilingual(details, assessment.impact, assessment.impactTh);
                 for (const related of assessment.related) {
