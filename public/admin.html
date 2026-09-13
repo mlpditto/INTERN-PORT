@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.01)</title>
+    <title>Nika Admin (V100.02)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6392,6 +6392,8 @@
 <link rel="stylesheet" href="audit-toolbar.css?v=V100.01">
 <link rel="stylesheet" href="quiz-curate.css?v=V100.00">
 <script src="quiz-curate.js?v=V100.00"></script>
+<script src="quiz-compare-cleanup.js?v=V100.02"></script>
+<link rel="stylesheet" href="quiz-compare-cleanup.css?v=V100.02">
 <link rel="stylesheet" href="learning-review.css?v=V99.88">
 <link rel="stylesheet" href="delete-requests.css?v=V99.82">
 <link rel="stylesheet" href="quiz-feedback.css?v=V99.89">
@@ -30828,6 +30830,19 @@ ${JSON.stringify(sourceObj)}`;
             const usable = picked.filter(q => (q.questions || []).length);
             if (usable.length < 2) return alert('Need at least 2 selected quizzes with questions to compare.');
 
+            quizCleanup.start(usable, outputs => {
+                outputs.forEach(({ sourceId, copy, quiz }) => {
+                    const index = quizzesData.findIndex(q => q.id === quiz.id);
+                    if (index >= 0) quizzesData[index] = quiz; else quizzesData.push(quiz);
+                    if (copy) { selectedQuizIds.delete(sourceId); selectedQuizIds.add(quiz.id); }
+                });
+                updateQuizBulkBar(); openQuizCompareModal();
+            });
+            document.getElementById('quiz-compare-ai-result').replaceChildren();
+            quizCompareOverlapData = [];
+            const compareAiButton = document.getElementById('quiz-compare-ai-btn');
+            compareAiButton.disabled = false; compareAiButton.textContent = '🤖 AI Deep Compare';
+
             // Flatten questions with a back-reference to their quiz (index into `usable`).
             const pool = [];
             usable.forEach((q, qi) => {
@@ -30877,8 +30892,8 @@ ${JSON.stringify(sourceObj)}`;
                         }).join('');
                         const rowBg = myMatches.length ? (myMatches[0].score >= 0.6 ? '#fef2f2' : '#fffbeb') : '#fff';
                         const rowBorder = myMatches.length ? '#fde68a' : '#f1f5f9';
-                        return `<div style="padding:8px 10px; border-radius:8px; background:${rowBg}; border:1px solid ${rowBorder};">
-                            <div style="font-size:0.85em; color:#1e293b;"><b>Q${i + 1}.</b> ${escapeHtml(stem)}${fullStem.length > 160 ? '…' : ''}</div>
+                        return `<div class="quiz-compare-question" style="padding:8px 10px; border-radius:8px; background:${rowBg}; border:1px solid ${rowBorder};">
+                            <div style="font-size:0.85em; color:#1e293b;"><b>Q${i + 1}.</b> ${quizCleanup.button(q, i + 1)} ${escapeHtml(stem)}${fullStem.length > 160 ? '…' : ''}</div>
                             ${badges ? `<div style="margin-top:4px;">${badges}</div>` : ''}
                         </div>`;
                     }).join('');
@@ -30908,9 +30923,8 @@ ${JSON.stringify(sourceObj)}`;
         // keeps cost flat regardless of question count) asks the model to name concept-level
         // overlaps. Opt-in / costs tokens, so it's a separate button, not automatic.
         async function quizCompareAiDeepCompare() {
-            const ids = [...selectedQuizIds];
-            const picked = ids.map(id => quizzesData.find(q => q.id === id)).filter(Boolean);
-            const usable = picked.filter(q => (q.questions || []).length);
+            const cleanupSession = quizCleanup.session();
+            const usable = quizCleanup.quizzes();
             if (usable.length < 2) return alert('Need at least 2 selected quizzes with questions to compare.');
 
             const btn = document.getElementById('quiz-compare-ai-btn');
@@ -30949,6 +30963,7 @@ RULES:
                 let resultRaw = '', result = null;
                 for (let attempt = 1; attempt <= 2; attempt++) {
                     const aiResp = await callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 8192, feature: 'quiz_compare_ai' });
+                    if (quizCleanup.session() !== cleanupSession) return;
                     resultRaw = aiResp.text;
                     result = safeJsonParse(resultRaw);
                     if (result) break;
@@ -30987,10 +31002,11 @@ RULES:
                     }
                 }
             } catch (e) {
+                if (quizCleanup.session() !== cleanupSession) return;
                 console.error('[quizCompareAiDeepCompare]', e);
                 if (resultEl) resultEl.innerHTML = '<div style="padding:10px 12px; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; color:#991b1b; font-size:0.85em;">⚠️ AI compare error: ' + escapeHtml(e && e.message ? e.message : 'unknown') + '</div>';
             } finally {
-                if (btn) { btn.disabled = false; btn.innerHTML = oldText; }
+                if (btn && quizCleanup.session() === cleanupSession) { btn.disabled = false; btn.innerHTML = oldText; }
             }
         }
 
@@ -31012,6 +31028,7 @@ RULES:
             // V97.17: Copy button lives in the card header now (next to the caret),
             // not injected here — saves the line it used to cost inside the panel.
             panel.innerHTML = quizCompareRenderQuestionBlock(item.qa, item.o.qA) + quizCompareRenderQuestionBlock(item.qb, item.o.qB);
+            quizCleanup.refresh();
             panel.style.display = 'block';
             if (caret) caret.textContent = '▴';
         }
@@ -31047,8 +31064,8 @@ RULES:
                 const isCorrect = correct.includes(i);
                 return `<div style="padding:4px 8px; margin:2px 0; border-radius:6px; background:${isCorrect ? '#dcfce7' : '#f8fafc'}; border:1px solid ${isCorrect ? '#86efac' : '#e2e8f0'}; font-size:0.85em; color:${isCorrect ? '#166534' : '#334155'}; font-weight:${isCorrect ? 800 : 400};">${i + 1}. ${escapeHtml(opt)}</div>`;
             }).join('');
-            return `<div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; margin-bottom:6px;">
-                <div style="font-weight:800; font-size:0.8em; color:#0891b2; margin-bottom:4px;">${escapeHtml(quiz.shortTitle || quiz.title || 'Quiz')} Q${qNum}</div>
+            return `<div class="quiz-compare-question" style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; margin-bottom:6px;">
+                <div style="font-weight:800; font-size:0.8em; color:#0891b2; margin-bottom:4px;">${escapeHtml(quiz.shortTitle || quiz.title || 'Quiz')} Q${qNum} ${quizCleanup.button(quiz, qNum)}</div>
                 <div style="font-size:0.85em; color:#1e293b; margin-bottom:6px; white-space:pre-wrap;">${escapeHtml(quizCompareStripMd(question.q))}</div>
                 ${opts}
             </div>`;
