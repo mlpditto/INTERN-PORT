@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.03)</title>
+    <title>Nika Admin (V100.04)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -18017,33 +18017,41 @@ RULES:
         // for the same answer twice (the mistake V97.16 was written to fix).
         window.showReviewTab = async function(tabId) {
             const tab = window.REVIEW_TABS.find(t => t.id === tabId);
-            if (!tab) return;
-            const others = window.REVIEW_TABS.filter(t => t.id !== tabId);
-            const setOthers = (display) => others.forEach(t => {
-                const el = document.getElementById(t.popupId);
-                if (el) el.style.display = display;
-            });
-
-            if (!document.getElementById(tab.popupId)) {
-                // Leave the current view up while the other one loads — each renderer shows
-                // its own spinner, and blanking the screen first (V96.44) removed the only
-                // sign anything was running. A detached button absorbs the renderer's
-                // spinner/disable handling so it never lands on a chip.
-                await tab.run(document.createElement('button'));
-                // A renderer can finish without a popup: a hard error alerts and returns, and
-                // the Specialist's prose-fallback path builds one only sometimes. Stay where
-                // we were rather than leaving the admin on a blank screen.
-                if (!document.getElementById(tab.popupId)) { setOthers('block'); return; }
+            if (!tab || window._reviewTabLoading) return;
+            const controls = [...document.querySelectorAll('.review-tab')];
+            const labels = controls.map(el => el.textContent);
+            window._reviewTabLoading = true;
+            try {
+                if (!document.getElementById(tab.popupId)) {
+                    controls.forEach(el => {
+                        el.disabled = true;
+                        if (el.dataset.reviewTab === tabId) el.textContent = 'Loading…';
+                    });
+                    await tab.run(document.createElement('button'));
+                }
+                const targets = [...document.querySelectorAll('[id="' + tab.popupId + '"]')];
+                if (!targets.length) return;
+                // Concurrent renders may leave duplicate IDs. Keep the latest result and
+                // hide every instance of the other view, including any stale overlay.
+                targets.slice(0, -1).forEach(el => el.remove());
+                window.REVIEW_TABS.forEach(t => {
+                    document.querySelectorAll('[id="' + t.popupId + '"]').forEach(el => {
+                        el.style.setProperty('display', t.id === tabId ? 'block' : 'none', 'important');
+                    });
+                });
+            } catch (e) {
+                console.error('Could not switch review tab:', e);
+                showToast('Could not open ' + tab.label + '. Please try again.');
+            } finally {
+                window._reviewTabLoading = false;
+                controls.forEach((el, i) => { el.disabled = false; el.textContent = labels[i]; });
             }
-            document.getElementById(tab.popupId).style.display = 'block';
-            setOthers('none');
         };
 
         // ✕ on either popup closes the whole surface — they are one thing to the admin now.
         window.closeQuizReview = function() {
             window.REVIEW_TABS.forEach(t => {
-                const el = document.getElementById(t.popupId);
-                if (el) el.remove();
+                document.querySelectorAll('[id="' + t.popupId + '"]').forEach(el => el.remove());
             });
         };
 

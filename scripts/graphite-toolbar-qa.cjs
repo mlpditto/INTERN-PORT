@@ -89,6 +89,38 @@ const { chromium } = require('playwright');
             await page.evaluate(() => document.getElementById('ai-audit-popup').style.display = 'block');
         }
         assert(html.includes("const selectedModel = opts?.model ? normalizeTextAIModel(opts.model) : textAIModel('ai-analyzer-model-val');"));
+        // Reproduce overlapping rerenders: switching must hide all Rewrites instances.
+        await page.evaluate(() => {
+            const rewrite = document.getElementById('ai-analysis-popup');
+            rewrite.style.display = 'block';
+            document.body.append(rewrite.cloneNode(true));
+        });
+        await page.locator('[id="ai-analysis-popup"]').last().locator('[data-review-tab="audit"]').click();
+        assert.equal(await page.locator('[id="ai-analysis-popup"]:visible').count(), 0);
+        assert(await page.locator('#ai-audit-popup').isVisible());
+        await page.locator('#ai-audit-popup [data-review-tab="specialist"]').click();
+        assert.equal(await page.locator('[id="ai-analysis-popup"]').count(), 1);
+        await page.evaluate(() => {
+            document.getElementById('ai-audit-popup').remove();
+            window.auditLoads = 0;
+            window.auditQuizAI = () => { auditLoads++; return new Promise(resolve => window.finishAudit = resolve); };
+        });
+        await page.locator('#ai-analysis-popup [data-review-tab="audit"]').click();
+        assert.equal(await page.locator('#ai-analysis-popup [data-review-tab="audit"]').innerText(), 'Loading…');
+        await page.evaluate(() => showReviewTab('audit'));
+        assert.equal(await page.evaluate(() => auditLoads), 1);
+        await page.evaluate(() => {
+            const target = document.createElement('div'); target.id = 'ai-audit-popup';
+            target.innerHTML = auditToolbarHtml(true); document.body.append(target); finishAudit();
+        });
+        await page.waitForFunction(() => !window._reviewTabLoading);
+        assert(await page.locator('#ai-audit-popup').isVisible());
+        assert.equal(await page.locator('#ai-analysis-popup').isVisible(), false);
+        // A renderer returning without a result leaves the current view usable.
+        await page.evaluate(() => { document.getElementById('ai-analysis-popup').remove(); window.analyzeQuizAI = async () => {}; });
+        await page.locator('#ai-audit-popup [data-review-tab="specialist"]').click();
+        assert(await page.locator('#ai-audit-popup').isVisible());
+        assert.equal(await page.locator('#ai-audit-popup [data-review-tab="specialist"]').isEnabled(), true);
         assert.deepEqual(errors, []);
         console.log('PASS: actual popup CSS, Sakura tabs, nine compact chips, no overlap at 320–1024px, audit/rewrite model routing, tabs, Export and Close');
     } finally { await browser.close(); }
