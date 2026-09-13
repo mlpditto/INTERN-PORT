@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.00)</title>
+    <title>Nika Admin (V100.01)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6389,7 +6389,7 @@
     <script src="case-taxonomy.js?v=V94.53"></script>
     <!-- V91.98 fix: walker skips user-content subtrees (q-text-preview / md-render / lang-no-toggle) -->
     <script src="lang-toggle.js?v=V97.44"></script>
-<link rel="stylesheet" href="audit-toolbar.css?v=V99.92">
+<link rel="stylesheet" href="audit-toolbar.css?v=V100.01">
 <link rel="stylesheet" href="quiz-curate.css?v=V100.00">
 <script src="quiz-curate.js?v=V100.00"></script>
 <link rel="stylesheet" href="learning-review.css?v=V99.88">
@@ -17322,7 +17322,7 @@
                     }, 350);
                 }
                 
-                const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-3.8-flash';
+                const selectedModel = opts?.model ? normalizeTextAIModel(opts.model) : textAIModel('ai-analyzer-model-val');
                 let resultRaw = '', aiTokens = 0, aiModel = '', result = null;
 
                 // V97.39: "🕑 Last" reopens a previously-saved analysis (Firestore
@@ -17693,11 +17693,25 @@
             result.overallScore = Math.round(rows.reduce((sum, row) => sum + row.averageScore, 0) / rows.length * 10) / 10;
         };
 
+        window.auditFixModel = () => textAIModel('quality-audit-model');
+        window.syncAuditFixHints = function() {
+            const model = TEXT_AI_MODELS.find(m => m.id === auditFixModel());
+            document.querySelectorAll('.audit-fix-control').forEach(host => {
+                host.querySelector('.audit-fix-model').textContent = model.label;
+                const hint = 'ใช้ ' + model.label + ' เสนอแก้ไขข้อนี้ · เปลี่ยนโมเดลได้จากแถว chips ด้านบน';
+                host.querySelector('.audit-fix-tooltip').textContent = hint;
+                host.querySelector('button').title = hint;
+            });
+        };
+        window.auditFixButtonHtml = function(qNumber) {
+            return `<span class="audit-fix-control lang-no-toggle"><span class="audit-fix-model"></span><button type="button" onclick="auditSuggestFix(${qNumber}, this)" onpointerenter="syncAuditFixHints()" onfocus="syncAuditFixHints()" aria-describedby="audit-fix-tip-${qNumber}">✦ Suggest fix</button><span id="audit-fix-tip-${qNumber}" class="audit-fix-tooltip" role="tooltip"></span></span>`;
+        };
+
         window.auditModelControlsHtml = function(hasResult, mode = 'audit') {
             const isAudit = mode === 'audit';
             const inputId = isAudit ? 'quality-audit-model' : 'rewrite-ai-model';
             const selected = isAudit ? 'gpt-5.6-luna' : textAIModel('ai-analyzer-model-val');
-            const action = `document.getElementById('${inputId}').value=this.dataset.value;this.parentElement.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b===this);b.setAttribute('aria-pressed',String(b===this))})` + (isAudit ? '' : ";syncModelDefault('ai-analyzer-model-val',this.dataset.value)");
+            const action = `document.getElementById('${inputId}').value=this.dataset.value;this.parentElement.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b===this);b.setAttribute('aria-pressed',String(b===this))})` + (isAudit ? ';syncAuditFixHints()' : ";syncModelDefault('ai-analyzer-model-val',this.dataset.value)");
             const run = isAudit ? 'runSelectedQualityAudit(this)' : 'analyzeQuizAI(this, { forceNew: true })';
             return `<input type="hidden" id="${inputId}" value="${selected}">${textAIChipsHtml('', selected, action, true)}<button type="button" class="audit-run" onclick="${run}" title="${isAudit ? 'ตรวจคุณภาพซ้ำด้วยโมเดลที่เลือก' : 'เสนอการปรับปรุงใหม่ด้วยโมเดลที่เลือก'}">↻ ${isAudit ? 'Review' : 'Rewrite'}</button>`;
         };
@@ -18125,7 +18139,7 @@ RULES:
                     ${dimRows}
                     ${q.rationale ? `<div class="lang-no-toggle" style="margin-top:10px; padding:8px 12px; background:#f8fafc; border-left:3px solid #0891b2; border-radius:6px; font-size:0.85em; color:#334155; line-height:1.55;"><i class="fa-solid fa-message" style="color:#0891b2; margin-right:6px;"></i>${escapeHtml(q.rationale)}</div>` : ''}
                     ${Number(q.averageScore) < 4 ? `<div style="margin-top:10px; text-align:right;">
-                        <button onclick="auditSuggestFix(${Number(q.qNumber) || 0}, this)" title="Hand this question to the Specialist (Analyze) for a concrete rewrite" style="background:#6366f1; color:white; border:none; padding:6px 14px; border-radius:9px; font-weight:700; font-size:0.72em; cursor:pointer; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Suggest fix</button>
+                        ${auditFixButtonHtml(Number(q.qNumber) || 0)}
                     </div>` : ''}
                 </div>`;
             }).join('');
@@ -18159,6 +18173,7 @@ RULES:
                 </div>
             `;
             document.body.appendChild(modal);
+            syncAuditFixHints();
         }
 
         // V97.33: expand/collapse a card's "Preview" block (the actual question + options,
@@ -18257,7 +18272,8 @@ RULES:
             // spinner lands on it. It used to resolve the button off window.event.target,
             // which only holds while the click is still dispatching — it happened to work,
             // but nothing here guaranteed it.
-            await window.analyzeQuizAI(clickedBtn || null, { onlyQNumber: qNumber, auditNote: auditNote });
+            const model = auditFixModel();
+            await window.analyzeQuizAI(clickedBtn || null, { onlyQNumber: qNumber, auditNote: auditNote, model });
 
             // analyzeQuizAI shows its own banner on prose-fallback / error — bail quietly then,
             // leaving the admin on the scorecard they started from rather than a blank screen.
