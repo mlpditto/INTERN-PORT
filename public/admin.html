@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.89)</title>
+    <title>Nika Admin (V99.90)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -133,6 +133,14 @@
         };
 
         window.syncModelDefault = function(targetId, value) {
+            if (targetId === 'ai-model-selector') {
+                const chips = Array.from(document.querySelectorAll('#qfp-model-pills button'));
+                const selected = chips.find(b => b.dataset.model === value) || chips.find(b => b.dataset.model === 'gpt-5.6-luna');
+                value = selected.dataset.model;
+                chips.forEach(b => b.setAttribute('aria-pressed', String(b === selected)));
+                const preference = document.getElementById('default-qfp-model');
+                if (preference) preference.value = value;
+            }
             const hidden = document.getElementById(targetId);
             if (hidden) hidden.value = value;
             window.syncRegistryModelSelect?.(targetId);
@@ -6363,7 +6371,7 @@
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <!-- V93.08: cache-bust on taxonomy.js for the LP Firestore overlay rollout -->
     <script src="ai-model-registry.js?v=V99.89"></script>
-    <script src="ai-model-ui.js?v=V99.68"></script>
+    <script src="ai-model-ui.js?v=V99.90"></script>
     <link rel="stylesheet" href="quiz-resource-cards.css?v=V99.68">
     <link rel="stylesheet" href="case-split-studio.css?v=V99.68">
     <link rel="stylesheet" href="reflection-compact.css?v=V99.68">
@@ -13308,8 +13316,10 @@
 <button type="button" onclick="selectQfpModel(this,'gpt-5.6-luna')" data-model="gpt-5.6-luna" aria-pressed="true" title="ราคาโทเคนต่ำสุดในชุดนี้">GPT 5.6 Luna</button>
 <button type="button" onclick="selectQfpModel(this,'gpt-5.6-terra')" data-model="gpt-5.6-terra" aria-pressed="false" title="สมดุลความสามารถและค่าใช้จ่าย">GPT 5.6 Terra</button>
 <button type="button" onclick="selectQfpModel(this,'gpt-5.6-sol')" data-model="gpt-5.6-sol" aria-pressed="false" title="สำหรับงานที่ซับซ้อนขึ้น">GPT 5.6 Sol</button>
+<button type="button" onclick="selectQfpModel(this,'gpt-6-astra')" data-model="gpt-6-astra" aria-pressed="false" title="รุ่นเรือธงสำหรับงานซับซ้อน มีค่าโทเคนสูงกว่ารุ่นประหยัด">GPT 6 Astra</button>
 <button type="button" onclick="selectQfpModel(this,'claude-haiku-4-5')" data-model="claude-haiku-4-5" aria-pressed="false" title="รุ่นประหยัดของ Claude">Claude Haiku 4.5</button>
-<button type="button" onclick="selectQfpModel(this,'claude-sonnet-5')" data-model="claude-sonnet-5" aria-pressed="false" title="สำหรับข้อความซับซ้อนขึ้น">Claude Sonnet 5</button></div>
+<button type="button" onclick="selectQfpModel(this,'claude-sonnet-5')" data-model="claude-sonnet-5" aria-pressed="false" title="สำหรับข้อความซับซ้อนขึ้น">Claude Sonnet 5</button>
+<button type="button" onclick="selectQfpModel(this,'claude-fable-5-1')" data-model="claude-fable-5-1" aria-pressed="false" title="รุ่นเรือธงสำหรับการวิเคราะห์เชิงลึก มีค่าโทเคนสูงกว่ารุ่นประหยัด">Claude Fable 5.1</button></div>
                     <input type="hidden" id="ai-model-selector" value="gpt-5.6-luna">
                     <div id="qfp-ai-result" title="ผลสรุปจาก AI"></div>
                 </section>
@@ -15838,10 +15848,12 @@
                                 <option value="gpt-5.6-luna">GPT 5.6 Luna</option>
                                 <option value="gpt-5.6-terra">GPT 5.6 Terra</option>
                                 <option value="gpt-5.6-sol">GPT 5.6 Sol</option>
+                                <option value="gpt-6-astra">GPT 6 Astra</option>
                                 <option value="as/gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite</option>
                                 <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
                                 <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
                                 <option value="claude-sonnet-5">Claude Sonnet 5</option>
+                                <option value="claude-fable-5-1">Claude Fable 5.1</option>
                             </select>
                         </div>
                     </div>
@@ -15980,7 +15992,7 @@
             window.DEFAULT_TRANSLATE_MODEL = localStorage.getItem('ai_default_translate_model') || 'gpt-4o';
             window.DEFAULT_ANALYZER_MODEL = localStorage.getItem('ai_default_analyzer_model') || 'gemini-3.8-flash';
             window.DEFAULT_REVIEW_MODEL = localStorage.getItem('ai_default_review_model') || 'gpt-4o';
-            window.DEFAULT_QFP_MODEL = localStorage.getItem('ai_default_qfp_model') || 'gpt-4o-mini';
+            window.DEFAULT_QFP_MODEL = localStorage.getItem('ai_default_qfp_model') || 'gpt-5.6-luna';
         };
         window.loadAIKeys();
 
@@ -16794,8 +16806,9 @@
                 document.getElementById('local-qwen-vd-model').value = localStorage.getItem('ai_qwen_voice_design_model') || '';
                 document.getElementById('local-qwen-speaker-catalog').value = localStorage.getItem('ai_qwen_speaker_catalog') || '';
                 // Model Defaults selects
-                const _mdef = { 'default-translate-model': localStorage.getItem('ai_default_translate_model') || 'gpt-4o', 'default-analyzer-model': localStorage.getItem('ai_default_analyzer_model') || 'gemini-3.8-flash', 'default-review-model': localStorage.getItem('ai_default_review_model') || 'gpt-4o', 'default-qfp-model': localStorage.getItem('ai_default_qfp_model') || 'gpt-4o-mini' };
+                const _mdef = { 'default-translate-model': localStorage.getItem('ai_default_translate_model') || 'gpt-4o', 'default-analyzer-model': localStorage.getItem('ai_default_analyzer_model') || 'gemini-3.8-flash', 'default-review-model': localStorage.getItem('ai_default_review_model') || 'gpt-4o', 'default-qfp-model': localStorage.getItem('ai_default_qfp_model') || 'gpt-5.6-luna' };
                 Object.entries(_mdef).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.value = val; });
+                syncModelDefault('ai-model-selector', _mdef['default-qfp-model']);
 
                 document.getElementById('local-gcp-mode').value = window.GCP_MODE || "auto";
                 document.getElementById('local-gcp-project').value = window.GCP_PROJECT_ID || "intern-port-edfa7";
@@ -60251,7 +60264,7 @@ RULES:
                 reviewEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Scoring...';
             }
 
-            const model = document.getElementById('ai-model-selector') ? document.getElementById('ai-model-selector').value : 'gpt-4o-mini';
+            const model = document.getElementById('ai-model-selector') ? document.getElementById('ai-model-selector').value : 'gpt-5.6-luna';
             const prompt = `You are an admin assistant evaluating the quality of a learner's quiz feedback.
 Score the feedback strictly from 0-10 based on 4 criteria:
 1) Clarity and specificity
@@ -60658,8 +60671,7 @@ Reply ONLY with raw JSON, no markdown:
         }
 
         window.selectQfpModel = function(btn, model) {
-            document.getElementById('ai-model-selector').value = model;
-            document.querySelectorAll('#qfp-model-pills button').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+            syncModelDefault('ai-model-selector', model);
         };
 
         // V95.57: light markdown renderer for the AI Insight result. The model
