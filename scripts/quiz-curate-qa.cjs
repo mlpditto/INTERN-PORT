@@ -9,7 +9,7 @@ const { chromium } = require('playwright');
         const errors = []; page.on('pageerror', e => errors.push(e.message));
         const html = fs.readFileSync('public/admin.html', 'utf8');
         assert(html.includes('onclick="openQuizCurate()"'));
-        assert(html.includes('src="quiz-curate.js?v=V99.96"'));
+        assert(html.includes('src="quiz-curate.js?v=V99.97"'));
         await page.setContent([...html.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/gi)].map(m => m[0]).join('\n') + '<input id="edit-quiz-id" value="source-quiz"><input id="ai-analyzer-model-val" value="gpt-5.6-luna">');
         await page.addStyleTag({ path: 'public/quiz-curate.css' });
         await page.addScriptTag({ path: 'public/ai-model-ui.js' });
@@ -56,6 +56,9 @@ const { chromium } = require('playwright');
         assert.equal(await page.locator('#curate-target').inputValue(), '10');
         assert.equal(await page.locator('.curate-question').count(), 14);
         assert(await saveDisabled());
+        assert.equal(await page.locator('#curate-models button').count(), 9);
+        await page.locator('[data-model="claude-haiku-4-5"]').click();
+        assert.match(await page.locator('#curate-model').innerText(), /Claude Haiku/);
         for (const value of ['0', '15', '2.5', '']) {
             await page.locator('#curate-target').fill(value); await page.locator('#curate-suggest').click();
             assert.equal(await page.evaluate(() => calls.length), 0); assert(await saveDisabled());
@@ -72,7 +75,10 @@ const { chromium } = require('playwright');
         await page.evaluate(() => document.getElementById('curate-suggest').onclick());
         assert.equal(await page.evaluate(() => calls.length), 1, 'duplicate generation blocked');
         const request = await page.evaluate(() => calls[0]);
-        assert.equal(request[0], 'gpt-5.6-luna');
+        assert.equal(request[0], 'claude-haiku-4-5');
+        assert.match(await page.locator('#curate-suggest').innerText(), /Processing 50%/);
+        assert.equal(await page.locator('#curate-progress').getAttribute('value'), '50');
+        assert(await page.locator('#curate-models button').first().isDisabled());
         assert(request[1].includes('Mandatory keep IDs: [14]'));
         assert(request[1].includes('Keep key objectives.'));
         assert.equal(request[5].feature, 'quiz_curate');
@@ -143,13 +149,18 @@ const { chromium } = require('playwright');
         for (const width of [320, 390, 736, 1024]) {
             await page.setViewportSize({ width, height: 850 });
             assert(await page.locator('#quiz-curate-dialog').evaluate(d => d.scrollWidth <= d.clientWidth + 1), 'horizontal overflow at ' + width);
-            assert(await page.locator('#quiz-curate-dialog button').evaluateAll(bs => bs.every(b => {
+            assert(await page.locator('#quiz-curate-dialog button:not([data-model])').evaluateAll(bs => bs.every(b => {
                 const r = b.getBoundingClientRect(), d = b.closest('dialog').getBoundingClientRect();
                 return r.left >= d.left && r.right <= d.right + 1;
             })), 'button outside dialog at ' + width);
         }
         await page.setViewportSize({ width: 1000, height: 900 });
         await page.locator('[data-view="remove"]').click();
+        assert.match(await page.locator('#curate-apply').innerText(), /Remove 4 from original/);
+        assert(await page.locator('#curate-apply').evaluate(b => {
+            const r = b.getBoundingClientRect(), d = b.closest('dialog').getBoundingClientRect();
+            return r.top >= d.top && r.bottom <= d.bottom;
+        }), 'original action remains visible while reviewing');
         await page.screenshot({ path: 'quiz-curate-qa.png' });
         await page.locator('#curate-save').click();
         await page.waitForFunction(() => document.getElementById('curate-save').textContent === 'Saved');
@@ -167,6 +178,14 @@ const { chromium } = require('playwright');
         assert.deepEqual(copy.materials, original.materials); assert.deepEqual(copy.blueprint, original.blueprint);
         assert.equal(copy.caseContent, original.caseContent);
         assert.deepEqual(await page.evaluate(() => fixture), original, 'editor is unchanged');
+        await close();
+
+        await open(); await suggest(result());
+        await page.locator('[data-model="gpt-5.6-terra"]').click();
+        assert(await saveDisabled(), 'changing model requires a fresh proposal');
+        assert.equal(await page.locator('#curate-suggest').innerText(), '✦ Suggest');
+        await suggest(result());
+        assert.equal(await page.evaluate(() => calls.at(-1)[0]), 'gpt-5.6-terra');
         await close();
 
         // API error, missing key, auth failure, uncertain writes, and idempotent retry.
