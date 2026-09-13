@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V99.88)</title>
+    <title>Nika Admin (V99.89)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6362,7 +6362,7 @@
     <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <!-- V93.08: cache-bust on taxonomy.js for the LP Firestore overlay rollout -->
-    <script src="ai-model-registry.js?v=V99.40"></script>
+    <script src="ai-model-registry.js?v=V99.89"></script>
     <script src="ai-model-ui.js?v=V99.68"></script>
     <link rel="stylesheet" href="quiz-resource-cards.css?v=V99.68">
     <link rel="stylesheet" href="case-split-studio.css?v=V99.68">
@@ -6382,6 +6382,7 @@
 <link rel="stylesheet" href="audit-toolbar.css?v=V99.77">
 <link rel="stylesheet" href="learning-review.css?v=V99.88">
 <link rel="stylesheet" href="delete-requests.css?v=V99.82">
+<link rel="stylesheet" href="quiz-feedback.css?v=V99.89">
 </head>
 
 <body>
@@ -13293,50 +13294,30 @@
             </div>
         </div>
 
-        <!-- Quiz Feedback Panel Modal ([Version: V90.36]) -->
-        <div id="quizFeedbackPanelModal" class="modal" style="z-index: 2501;">
-            <div class="modal-content" style="max-width:700px; border-top:5px solid #f59e0b; border-radius:18px;">
-                <span class="close-modal" onclick="document.getElementById('quizFeedbackPanelModal').style.display='none'">&times;</span>
-                <h3 style="margin:0 0 4px 0; display:flex; align-items:center; gap:10px; color:#b45309;">
-                    <i class="fa-solid fa-star-half-stroke"></i> Quiz Feedback Panel
-                </h3>
-                <div id="qfp-quiz-title" class="lang-no-toggle" style="font-size:0.85em; color:#64748b; margin-bottom:18px;"></div>
-
-                <!-- Summary Row -->
-                <div id="qfp-summary" style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:18px;"></div>
-
-                <!-- AI Insight Section -->
-                <div style="background:#fefce8; border:1px solid #fde68a; border-radius:12px; padding:14px; margin-bottom:18px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
-                        <span style="font-weight:800; font-size:0.9em; color:#78350f;"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Insight</span>
-                        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                            <div id="qfp-model-pills" style="display:flex; gap:4px; flex-wrap:wrap;">
-                                <button onclick="selectQfpModel(this,'gpt-4o-mini')" data-model="gpt-4o-mini" style="padding:3px 10px; border-radius:20px; border:1.5px solid #f59e0b; background:#f59e0b; color:white; font-size:0.72em; font-weight:800; cursor:pointer; transition:0.2s;">GPT-4o mini</button>
-                                <button onclick="selectQfpModel(this,'gpt-4o')" data-model="gpt-4o" style="padding:3px 10px; border-radius:20px; border:1.5px solid #fde68a; background:transparent; color:#92400e; font-size:0.72em; font-weight:800; cursor:pointer; transition:0.2s;">GPT-4o</button>
-                                <button onclick="selectQfpModel(this,'typhoon-v2.5-30b-a3b-instruct')" data-model="typhoon-v2.5-30b-a3b-instruct" style="padding:3px 10px; border-radius:20px; border:1.5px solid #fde68a; background:transparent; color:#92400e; font-size:0.72em; font-weight:800; cursor:pointer; transition:0.2s;">🌀 Typhoon</button>
-                                <button onclick="selectQfpModel(this,'claude-4-sonnet-latest')" data-model="claude-4-sonnet-latest" style="padding:3px 10px; border-radius:20px; border:1.5px solid #fde68a; background:transparent; color:#92400e; font-size:0.72em; font-weight:800; cursor:pointer; transition:0.2s;">Claude</button>
-                                <button onclick="selectQfpModel(this,'meta-llama/Llama-3.3-70B-Instruct-Turbo')" data-model="meta-llama/Llama-3.3-70B-Instruct-Turbo" style="padding:3px 10px; border-radius:20px; border:1.5px solid #fde68a; background:transparent; color:#92400e; font-size:0.72em; font-weight:800; cursor:pointer; transition:0.2s;">Llama 70B</button>
-                            </div>
-                            <input type="hidden" id="ai-model-selector" value="gpt-4o-mini">
-                            <button id="qfp-ai-btn" onclick="generateAIFeedbackInsight()" style="background:linear-gradient(135deg,#f59e0b,#d97706); color:white; border:none; border-radius:10px; padding:6px 16px; font-weight:800; font-size:0.8em; cursor:pointer;">✨ Generate</button>
-                        </div>
-                    </div>
-                    <div class="lang-no-toggle" id="qfp-ai-result" style="font-size:0.88em; color:#78350f; line-height:1.6; white-space:pre-wrap;"></div>
-                </div>
-
-                <!-- Comments Feed -->
-                <div style="font-weight:800; font-size:0.88em; color:#475569; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
-                    <i class="fa-solid fa-comments"></i> Individual Feedback
-                </div>
-                <!-- V95.60: filter/sort rail — populated by qfpRenderFilterRail() only when there are >3 responses -->
-                <div id="qfp-comments-controls" style="margin-bottom:10px;"></div>
-                <div id="qfp-comments" style="display:flex; flex-direction:column; gap:10px;">
-                    <p style="text-align:center; color:#94a3b8; padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</p>
-                </div>
-
-                <div style="text-align:right; margin-top:16px;">
-                    <button class="btn-sm" onclick="document.getElementById('quizFeedbackPanelModal').style.display='none'" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; border-radius:10px; padding:8px 20px; font-weight:700;">Close</button>
-                </div>
+        <!-- Quiz feedback: Warm Focus -->
+        <div id="quizFeedbackPanelModal" class="modal lang-no-toggle" style="z-index:2501;">
+            <div class="modal-content qfp-panel">
+                <button type="button" class="close-modal" aria-label="Close feedback" title="ปิดผลตอบรับ" onclick="document.getElementById('quizFeedbackPanelModal').style.display='none'">&times;</button>
+                <h3 title="ภาพรวมผลตอบรับแบบทดสอบ">Quiz Feedback</h3>
+                <div id="qfp-quiz-title" title="ชื่อชุดแบบทดสอบ"></div>
+                <div id="qfp-summary"></div>
+                <section class="qfp-insight">
+                    <div class="qfp-insight-heading"><strong title="สรุปความคิดเห็นด้วย AI">AI Insight</strong><button id="qfp-ai-btn" onclick="generateAIFeedbackInsight()" title="สรุปข้อความแสดงความคิดเห็นด้วยโมเดลที่เลือก">Generate</button></div>
+                    <div id="qfp-model-pills" role="group" aria-label="Choose one AI model"><button type="button" onclick="selectQfpModel(this,'as/gemini-3.5-flash-lite')" data-model="as/gemini-3.5-flash-lite" aria-pressed="false" title="รุ่นประหยัดของ Gemini">Gemini 3.5 Flash-Lite</button>
+<button type="button" onclick="selectQfpModel(this,'gemini-3.8-flash')" data-model="gemini-3.8-flash" aria-pressed="false" title="รุ่น Flash ล่าสุด">Gemini 3.8 Flash</button>
+<button type="button" onclick="selectQfpModel(this,'gpt-5.6-luna')" data-model="gpt-5.6-luna" aria-pressed="true" title="ราคาโทเคนต่ำสุดในชุดนี้">GPT 5.6 Luna</button>
+<button type="button" onclick="selectQfpModel(this,'gpt-5.6-terra')" data-model="gpt-5.6-terra" aria-pressed="false" title="สมดุลความสามารถและค่าใช้จ่าย">GPT 5.6 Terra</button>
+<button type="button" onclick="selectQfpModel(this,'gpt-5.6-sol')" data-model="gpt-5.6-sol" aria-pressed="false" title="สำหรับงานที่ซับซ้อนขึ้น">GPT 5.6 Sol</button>
+<button type="button" onclick="selectQfpModel(this,'claude-haiku-4-5')" data-model="claude-haiku-4-5" aria-pressed="false" title="รุ่นประหยัดของ Claude">Claude Haiku 4.5</button>
+<button type="button" onclick="selectQfpModel(this,'claude-sonnet-5')" data-model="claude-sonnet-5" aria-pressed="false" title="สำหรับข้อความซับซ้อนขึ้น">Claude Sonnet 5</button></div>
+                    <input type="hidden" id="ai-model-selector" value="gpt-5.6-luna">
+                    <div id="qfp-ai-result" title="ผลสรุปจาก AI"></div>
+                </section>
+                <section class="qfp-feedback">
+                    <h4 title="ผลตอบรับรายบุคคล">Individual Feedback</h4>
+                    <div id="qfp-comments-controls"></div>
+                    <div id="qfp-comments"></div>
+                </section>
             </div>
         </div>
 
@@ -15854,13 +15835,13 @@
                         <div style="background:white; border:1px solid #e2e8f0; border-radius:8px; padding:10px;">
                             <div style="font-size:0.72em; font-weight:700; color:#0369a1; margin-bottom:6px;">🗡️ Quiz Feedback</div>
                             <select id="default-qfp-model" onchange="syncModelDefault('ai-model-selector',this.value)" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:6px; font-size:0.8em; box-sizing:border-box;">
-                                <option value="gpt-4o-mini">GPT-4o mini</option>
-                                <option value="gpt-4o">GPT-4o</option>
-                                <option value="claude-3-5-haiku-20241022">Claude Haiku</option>
-                                <option value="claude-4-sonnet-latest">Claude Sonnet</option>
-                                <option value="gemini-3.5-flash">Gemini Flash</option>
-                                <option value="typhoon-v2.5-30b-a3b-instruct">Typhoon 🌀</option>
-                                <option value="meta-llama/Llama-3.3-70B-Instruct-Turbo">Llama 70B</option>
+                                <option value="gpt-5.6-luna">GPT 5.6 Luna</option>
+                                <option value="gpt-5.6-terra">GPT 5.6 Terra</option>
+                                <option value="gpt-5.6-sol">GPT 5.6 Sol</option>
+                                <option value="as/gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite</option>
+                                <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
+                                <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
+                                <option value="claude-sonnet-5">Claude Sonnet 5</option>
                             </select>
                         </div>
                     </div>
@@ -59919,10 +59900,7 @@ RULES:
             return /[\p{L}\p{N}\p{S}\p{P}]/u.test(cleaned) ? cleaned : '';
         }
 
-        // V95.58: absolute dd/mm/yyyy (พ.ศ.) + 24h, ASCII-only — mirrors
-        // dcaFormatAbsolute/dxaFormatAbsolute (V94.81). Replaces the panel's
-        // toLocaleString('th-TH', dateStyle:'short') form whose 2-digit Buddhist
-        // year ("12/6/69 22:11") was ambiguous.
+        // English UI uses an unambiguous Gregorian date with 24-hour time.
         function qfpFormatAbsolute(ts) {
             if (!ts) return '—';
             let d;
@@ -59931,7 +59909,7 @@ RULES:
             } catch (_) { return '—'; }
             if (!d || isNaN(d.getTime())) return '—';
             const pad = n => String(n).padStart(2, '0');
-            return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear() + 543} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
         }
 
         async function qfpCallAI(model, prompt) {
@@ -59943,6 +59921,10 @@ RULES:
         }
 
         async function showQuizFeedbackPanel(quizId, highlightUserId) {
+            const modelInput = document.getElementById('ai-model-selector');
+            const modelChips = Array.from(document.querySelectorAll('#qfp-model-pills button'));
+            const selectedChip = modelChips.find(b => b.dataset.model === modelInput.value) || modelChips.find(b => b.dataset.model === 'gpt-5.6-luna');
+            selectQfpModel(selectedChip, selectedChip.dataset.model);
             // V95.60: preserve filter/sort + scroll across in-place re-renders
             // (delete/score/clear-topic reopen the panel for the SAME quiz). A fresh
             // open of a different quiz — or any highlight jump — resets the filter and
@@ -59955,7 +59937,8 @@ RULES:
             _qfpFeedbacks = [];
             document.getElementById('qfp-comments-controls').innerHTML = '';
             // V95.57: muted placeholder instead of a blank yellow box before Generate
-            document.getElementById('qfp-ai-result').innerHTML = '<span style="color:#b08968;font-style:italic;">เลือกโมเดล แล้วกด ✨ Generate เพื่อให้ AI สรุปภาพรวม feedback ของชุดข้อสอบนี้</span>';
+            document.getElementById('qfp-ai-result').textContent = 'Loading feedback…';
+            document.getElementById('qfp-ai-btn').disabled = true;
             document.getElementById('qfp-summary').innerHTML = '';
             document.getElementById('qfp-comments').innerHTML = `<p style="text-align:center;color:#94a3b8;padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</p>`;
 
@@ -60004,60 +59987,21 @@ RULES:
             const allEntries = _qfpFeedbacks.map(f => ({ id: f.id, topic: qfpNormalizeTopic(f.nextTopic) }));
             const topicEntries = allEntries.filter(e => e.topic.length > 0);
             const topics = topicEntries.map(e => e.topic);
-            const blankTopicCount = allEntries.length - topicEntries.length;
             window._qfpVisibleTopicEntries = topicEntries;
             const avgTime = _qfpFeedbacks.reduce((a, f) => a + (f.timeUsedSeconds || 0), 0) / _qfpFeedbacks.length;
             // V95.58: single mm:ss value instead of "6 min" + "373s avg" (same value twice)
             const avgTimeR = Math.round(avgTime);
             const avgTimeMMSS = `${Math.floor(avgTimeR / 60)}:${String(avgTimeR % 60).padStart(2, '0')}`;
-            // V97.21: surface who's currently fastest right in the Avg Time card —
-            // requires a real (>0) recorded time so a missing/zeroed value never wins.
-            const timedFeedbacks = _qfpFeedbacks.filter(f => typeof f.timeUsedSeconds === 'number' && f.timeUsedSeconds > 0);
-            const fastest = timedFeedbacks.length
-                ? timedFeedbacks.reduce((a, b) => (b.timeUsedSeconds < a.timeUsedSeconds ? b : a))
-                : null;
-            let fastestHtml = '';
-            if (fastest) {
-                const fu = usersData.find(x => x.id === fastest.userId);
-                const fPic = (fu && fu.pictureUrl) || fastest.pictureUrl || '';
-                const fName = (fu && fu.displayName) || fastest.displayName || 'Anonymous';
-                const fMin = Math.floor(fastest.timeUsedSeconds / 60);
-                const fSec = fastest.timeUsedSeconds % 60;
-                fastestHtml = `<div style="display:flex;align-items:center;gap:5px;margin-top:6px;">
-                    ${fPic ? `<img src="${qfpEscapeHtml(fPic)}" alt="" style="width:20px;height:20px;border-radius:50%;object-fit:cover;border:1.5px solid #93c5fd;flex-shrink:0;" onerror="this.style.display='none'">` : ''}
-                    <span style="font-size:0.72em;color:#1e40af;font-weight:700;" title="Fastest recorded time">🏆 ${qfpEscapeHtml(fName)} · ${fMin}:${String(fSec).padStart(2, '0')}</span>
-                </div>`;
-            }
-
-            const starFill = avgRating !== null ? Math.round(avgRating / 10 * 5) : null;
-            const starsHtml = starFill !== null ? '★'.repeat(starFill) + '☆'.repeat(5 - starFill) : '—';
             document.getElementById('qfp-summary').innerHTML = `
-                <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:12px 18px;flex:1;min-width:140px;">
-                    <div style="font-size:0.75em;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:0.5px;">Avg Rating</div>
-                    <div style="font-size:2em;font-weight:900;color:#b45309;">${avgRating !== null ? avgRating.toFixed(1) : '—'}<span style="font-size:0.5em;color:#d97706;">/10</span></div>
-                    <div style="color:#f59e0b;font-size:1.1em;">${starsHtml}</div>
-                </div>
-                <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:12px 18px;flex:1;min-width:140px;">
-                    <div style="font-size:0.75em;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:0.5px;">Responses</div>
-                    <div style="font-size:2em;font-weight:900;color:#15803d;">${_qfpFeedbacks.length}</div>
-                    <div style="font-size:0.75em;color:#4ade80;">users</div>
-                </div>
-                <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:12px 18px;flex:1;min-width:140px;">
-                    <div style="font-size:0.75em;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:0.5px;">Avg Time</div>
-                    <div style="font-size:2em;font-weight:900;color:#1d4ed8;">${avgTimeMMSS}<span style="font-size:0.5em;color:#3b82f6;"> min</span></div>
-                    <div style="font-size:0.75em;color:#60a5fa;">เฉลี่ยต่อคน</div>
-                    ${fastestHtml}
-                </div>
-                ${(topics.length || blankTopicCount > 0) ? `<div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:12px;padding:12px 18px;flex:2;min-width:200px;">
-                    <div style="font-size:0.75em;font-weight:700;color:#6b21a8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">🎯 Next Topics Requested</div>
-                    <div style="display:flex;flex-wrap:wrap;gap:5px;">${topicEntries.slice(0, 8).map((e, i) => `<span class="lang-no-toggle" style="background:white;border:1px solid #d8b4fe;border-radius:8px;padding:3px 4px 3px 9px;font-size:0.8em;color:#7c3aed;font-weight:600;display:inline-flex;align-items:center;gap:4px;" title="Requested next topic">${qfpEscapeHtml(e.topic)}<button onclick="qfpClearTopicChip(${i})" title="Clear this entry's nextTopic (keeps rating + comment)" style="border:none;background:transparent;color:#c4b5fd;font-size:1.05em;line-height:1;cursor:pointer;padding:0 3px;border-radius:4px;transition:0.2s;" onmouseover="this.style.color='#dc2626';this.style.background='#fee2e2';" onmouseout="this.style.color='#c4b5fd';this.style.background='transparent';">&times;</button></span>`).join('')}${blankTopicCount > 0 ? `<span onclick="qfpClearBlankTopics()" style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:3px 9px;font-size:0.8em;color:#64748b;font-weight:600;cursor:pointer;transition:0.2s;" onmouseover="this.style.background='#fee2e2';this.style.borderColor='#fca5a5';this.style.color='#dc2626';" onmouseout="this.style.background='#f1f5f9';this.style.borderColor='#cbd5e1';this.style.color='#64748b';" title="Click to clear ${blankTopicCount} blank nextTopic field${blankTopicCount === 1 ? '' : 's'} (V92.90 — keeps rating + comment, removes empty nextTopic only)">🗑 +${blankTopicCount} blank</span>` : ''}</div>
-                </div>` : ''}
-                ${(() => { const n = _qfpFeedbacks.filter(qfpIsEmptyFeedback).length; return n > 0 ? `<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:12px;padding:12px 18px;flex:1;min-width:150px;">
-                    <div style="font-size:0.75em;font-weight:700;color:#991b1b;text-transform:uppercase;letter-spacing:0.5px;">Empty Feedback</div>
-                    <div style="font-size:2em;font-weight:900;color:#dc2626;">${n}</div>
-                    <button class="btn-sm" onclick="qfpCleanEmptyFeedback()" title="Delete every entry with no rating, no comment, and no next topic (one confirm, reverts feedback rewards + writes audit rows)" style="background:#dc2626;color:white;border:none;border-radius:8px;padding:4px 10px;font-size:0.78em;font-weight:700;cursor:pointer;">🧹 Clean empty</button>
-                </div>` : ''; })()}
+                <span title="คะแนนความพึงพอใจเฉลี่ย">Avg. rating <strong>${avgRating !== null ? avgRating.toFixed(1) : '—'}/10</strong></span>
+                <span title="จำนวนผู้ตอบ">Responses <strong>${_qfpFeedbacks.length}</strong></span>
+                <span title="เวลาที่ใช้เฉลี่ย">Avg. time <strong>${avgTimeMMSS} min</strong></span>
+                ${topics.length ? `<div class="qfp-topics" title="หัวข้อที่ผู้เรียนอยากทำต่อ">Next topics: ${topicEntries.slice(0,8).map((e,i)=>`<span>${qfpEscapeHtml(e.topic)} <button onclick="qfpClearTopicChip(${i})" title="ลบเฉพาะหัวข้อที่เสนอ">×</button></span>`).join(' ')}</div>` : ''}
+                ${_qfpFeedbacks.some(qfpIsEmptyFeedback) ? `<button onclick="qfpCleanEmptyFeedback()" title="ลบรายการที่ไม่มีคะแนน ข้อความ และหัวข้อ โดยจะขอยืนยัน">Clean empty</button>` : ''}
             `;
+            const hasComments = _qfpFeedbacks.some(f => qfpNormalizeTopic(f.comment));
+            document.getElementById('qfp-ai-btn').disabled = !hasComments;
+            document.getElementById('qfp-ai-result').textContent = hasComments ? 'Choose a model to summarize comments.' : 'No comments to summarize';
 
             // Update badge in quiz table
             const badge = document.getElementById(`fb-badge-${quizId}`);
@@ -60091,7 +60035,6 @@ RULES:
         // module-level state (_qfpAttempts) and global qfp* helpers.
         function qfpCardHtml(f) {
                 const dateStr = qfpFormatAbsolute(f.timestamp);
-                const stars = typeof f.rating === 'number' ? ('★'.repeat(Math.round(f.rating / 10 * 5)) + '☆'.repeat(5 - Math.round(f.rating / 10 * 5))) : '';
                 const mins = Math.floor((f.timeUsedSeconds || 0) / 60);
                 const secs = (f.timeUsedSeconds || 0) % 60;
                 // V92.88: route comment through qfpNormalizeTopic so invisible-only
@@ -60125,42 +60068,43 @@ RULES:
                     ].filter(Boolean).join(' · ');
                     quizResultHtml = `<div style="margin-bottom:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                         <span style="font-size:0.75em; font-weight:700; color:#475569; white-space:nowrap;">📊 Quiz Result</span>
-                        <span id="qfp-res-${f.id}" onclick="this.style.filter='none'; this.nextElementSibling.style.display='none';" style="filter:blur(5px); cursor:pointer; font-size:0.82em; font-weight:800; color:#1e293b; background:#f1f5f9; padding:2px 10px; border-radius:6px; user-select:none; transition:filter 0.3s;" title="Click to reveal">${resultText}</span>
+                        <span id="qfp-res-${f.id}" onclick="this.style.filter='none'; this.nextElementSibling.style.display='none';" style="filter:blur(5px); cursor:pointer; font-size:0.82em; font-weight:800; color:#1e293b; background:#f1f5f9; padding:2px 10px; border-radius:6px; user-select:none; transition:filter 0.3s;" title="คลิกเพื่อแสดงผลสอบ">${resultText}</span>
                         <span onclick="document.getElementById('qfp-res-${f.id}').style.filter='none'; this.style.display='none';" style="font-size:0.7em; color:#94a3b8; cursor:pointer; white-space:nowrap;">🔒 reveal</span>
+                        </details>
                     </div>`;
                 }
-                // V92.87: tint Individual Feedback card red when no comment — same
-                // palette as V92.83 LAUGH TALE empty-comment cards so admins recognize
-                // the cleanup target consistently across both surfaces.
-                const cardBg = rawComment ? 'white' : '#fef2f2';
-                const cardBorder = rawComment ? '1px solid #e2e8f0' : '1px solid #fca5a5';
+                // Sakura surface; empty comments have an explicit text state.
+                const cardBg = '#fff0f5';
+                const cardBorder = '1px solid #edcad8';
                 return `
                     <div data-fb-user="${f.userId || ''}" style="background:${cardBg};border:${cardBorder};border-radius:12px;padding:14px 16px;">
                         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
                             <div>
-                                <span style="font-weight:800;font-size:0.9em;color:#1e293b;">${f.displayName || 'Anonymous'}</span>
-                                <span style="color:#f59e0b;margin-left:8px;font-size:0.9em;">${stars}</span>
-                                <span style="margin-left:6px;font-size:0.8em;font-weight:700;color:#64748b;">${typeof f.rating === 'number' ? f.rating + '/10' : ''}</span>
-                                ${typeof f.pointsEarned === 'number' && f.pointsEarned > 0 ? `<span style="margin-left:8px;font-size:0.72em;font-weight:800;color:#065f46;background:#d1fae5;border:1px solid #6ee7b7;border-radius:999px;padding:2px 8px;" title="Feedback reward earned — this is what Delete would revert from the user's total score">🎁 +${f.pointsEarned.toFixed(1)} PTS</span>` : ''}
-                                ${f.userId && f.userId !== 'anon' ? `<button onclick="showUserScoreAudit('${f.userId}', ${JSON.stringify(f.displayName || '')})" title="Open score audit for this user — breakdown of total score by source" style="margin-left:6px;background:#ecfdf5;border:1px solid #6ee7b7;color:#065f46;border-radius:8px;padding:2px 8px;font-size:0.72em;font-weight:700;cursor:pointer;">📊 Audit</button>` : ''}
+                                <span style="font-weight:800;font-size:0.9em;color:#1e293b;">${qfpEscapeHtml(f.displayName || 'Anonymous')}</span>
+                                <span style="margin-left:6px;font-size:0.8em;font-weight:700;color:#64748b;">${typeof f.rating === 'number' ? 'Rating ' + f.rating + '/10' : ''}</span>
+                                ${typeof f.pointsEarned === 'number' && f.pointsEarned > 0 ? `<span style="margin-left:8px;font-size:0.72em;font-weight:800;color:#065f46;background:#d1fae5;border:1px solid #6ee7b7;border-radius:999px;padding:2px 8px;" title="คะแนนรางวัลที่ได้รับ การลบจะคืนคะแนนส่วนนี้">Bonus +${f.pointsEarned.toFixed(1)}</span>` : ''}
                             </div>
                             <div style="font-size:0.75em;color:#94a3b8;">${dateStr} · ⏱ ${mins}:${String(secs).padStart(2,'0')}</div>
                         </div>
+                        ${rawComment ? '' : '<p title="ผู้ตอบไม่ได้กรอกความคิดเห็น" style="color:#80566a;margin:4px 0;">No comment provided</p>'}
+                        ${rawComment ? `<div class="lang-no-toggle" style="font-size:0.85em;color:#475569;background:#f8fafc;padding:8px 12px;border-radius:8px;border-left:3px solid #cbd5e1; white-space:pre-wrap;">${safeComment}</div>` : ''}
+                        <details class="qfp-manage"><summary title="ดูข้อมูลและคำสั่งจัดการ">Details / Manage</summary>
+
+                                ${f.userId && f.userId !== 'anon' ? `<button onclick="showUserScoreAudit('${f.userId}', ${qfpEscapeHtml(JSON.stringify(f.displayName || ''))})" title="ดูประวัติและที่มาของคะแนน" style="margin-left:6px;background:#ecfdf5;border:1px solid #6ee7b7;color:#065f46;border-radius:8px;padding:2px 8px;font-size:0.72em;font-weight:700;cursor:pointer;">📊 Audit</button>` : ''}
                         ${quizResultHtml}
                         ${(() => { const nt = qfpNormalizeTopic(f.nextTopic); return nt ? `<div style="margin-bottom:6px;"><span style="font-size:0.75em;font-weight:700;color:#7c3aed;">🎯 Next Topic:</span> <span class="lang-no-toggle" style="font-size:0.82em;color:#6d28d9;">${qfpEscapeHtml(nt)}</span></div>` : ''; })()}
-                        ${rawComment ? `<div class="lang-no-toggle" style="font-size:0.85em;color:#475569;background:#f8fafc;padding:8px 12px;border-radius:8px;border-left:3px solid #cbd5e1; white-space:pre-wrap;">${safeComment}</div>` : ''}
                         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:8px; flex-wrap:wrap;">
                             <span style="font-size:0.76em; font-weight:700; color:${meetsMin ? '#166534' : '#b45309'}; background:${meetsMin ? '#dcfce7' : '#ffedd5'}; border:1px solid ${meetsMin ? '#86efac' : '#fdba74'}; border-radius:999px; padding:3px 10px;">
-                                Feedback Length: ${commentLength} chars · ${meetsMin ? 'Meets minimum' : 'Below 100'}
+                                Length: ${commentLength} chars · ${meetsMin ? 'Meets minimum' : 'Below 100'}
                             </span>
                             <div style="display:flex; gap:6px; align-items:center;">
-                                <button id="qfp-bonus-btn-${f.id}" class="btn-sm" onclick="qfpToggleBonus('${f.id}')" title="Show/hide Bonus Score by Admin (retroactive)" style="background:#f0fdfa; color:#0f766e; border:1px solid #99f6e4; border-radius:8px; padding:5px 10px;">
+                                <button id="qfp-bonus-btn-${f.id}" class="btn-sm" onclick="qfpToggleBonus('${f.id}')" title="เปิดหรือปิดการให้โบนัสย้อนหลัง" style="background:#f0fdfa; color:#0f766e; border:1px solid #99f6e4; border-radius:8px; padding:5px 10px;">
                                     🎁 Bonus${adminScoreValue !== '' ? ' ' + adminScoreValue : ''}
                                 </button>
-                                <button id="qfp-ai-btn-${f.id}" class="btn-sm" onclick="runAIFeedbackScoring('${f.id}')" ${!rawComment ? 'disabled title="No feedback text to score"' : ''} style="background:${rawComment ? '#1d4ed8' : '#94a3b8'}; color:white; border:none; border-radius:8px; padding:5px 10px; ${!rawComment ? 'cursor:not-allowed; opacity:0.6;' : ''}">
+                                <button id="qfp-ai-btn-${f.id}" class="btn-sm" onclick="runAIFeedbackScoring('${f.id}')" ${!rawComment ? 'disabled title="ไม่มีข้อความให้ประเมิน"' : ''} style="background:${rawComment ? '#1d4ed8' : '#94a3b8'}; color:white; border:none; border-radius:8px; padding:5px 10px; ${!rawComment ? 'cursor:not-allowed; opacity:0.6;' : ''}">
                                     🗡️ Score
                                 </button>
-                                <button class="btn-sm" onclick="deleteQuizFeedbackItem('${f.id}')" title="Delete this feedback (asks to confirm)" style="margin-left:10px; background:transparent; color:#cbd5e1; border:1px solid #e2e8f0; border-radius:8px; padding:5px 9px; cursor:pointer; transition:0.2s;" onmouseover="this.style.color='#dc2626';this.style.borderColor='#fca5a5';this.style.background='#fef2f2';" onmouseout="this.style.color='#cbd5e1';this.style.borderColor='#e2e8f0';this.style.background='transparent';">
+                                <button class="btn-sm" onclick="deleteQuizFeedbackItem('${f.id}')" title="ลบผลตอบรับนี้ โดยจะขอยืนยัน" style="margin-left:10px; background:transparent; color:#cbd5e1; border:1px solid #e2e8f0; border-radius:8px; padding:5px 9px; cursor:pointer; transition:0.2s;" onmouseover="this.style.color='#dc2626';this.style.borderColor='#fca5a5';this.style.background='#fef2f2';" onmouseout="this.style.color='#cbd5e1';this.style.borderColor='#e2e8f0';this.style.background='transparent';">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>
                             </div>
@@ -60178,6 +60122,7 @@ RULES:
                                 <button class="btn-sm" onclick="saveAdminFeedbackScore('${f.id}')" style="background:#0f766e; color:white; border:none; border-radius:8px; padding:6px 12px;">Save Bonus</button>
                             </div>
                         </div>
+                        </details>
                     </div>`;
         }
 
@@ -60233,15 +60178,15 @@ RULES:
             };
             rail.innerHTML = `
                 <div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;">
-                    ${chip('all', 'ทั้งหมด', counts.all)}
-                    ${chip('unscored', 'ยังไม่ตรวจ', counts.unscored)}
-                    ${chip('short', 'สั้น<100', counts.short)}
-                    ${chip('low', 'คะแนนต่ำ', counts.low)}
+                    ${chip('all', 'All', counts.all)}
+                    ${chip('unscored', 'Unscored', counts.unscored)}
+                    ${chip('short', 'Short <100', counts.short)}
+                    ${chip('low', 'Low rating', counts.low)}
                     <span style="width:1px;height:18px;background:#e2e8f0;margin:0 3px;"></span>
-                    <span style="font-size:0.7em;color:#94a3b8;font-weight:700;">เรียง:</span>
-                    ${sortChip('recent', 'ใหม่สุด')}
-                    ${sortChip('rating', 'คะแนนน้อย→มาก')}
-                    ${counts.unscored > 0 ? `<button id="qfp-bulk-score-btn" onclick="qfpScoreAllUnscored()" title="ตรวจ feedback ที่ยังไม่ตรวจทั้งหมดด้วย AI (โมเดลที่เลือกด้านบน) ทีละรายการ" style="margin-left:auto;padding:3px 12px;border-radius:20px;font-size:0.72em;font-weight:800;cursor:pointer;transition:0.2s;border:1.5px solid #1d4ed8;background:#1d4ed8;color:white;">🗡️ ตรวจที่ยังไม่ตรวจ (${counts.unscored})</button>` : ''}
+                    <span style="font-size:0.7em;color:#94a3b8;font-weight:700;">Sort:</span>
+                    ${sortChip('recent', 'Recent')}
+                    ${sortChip('rating', 'Rating ↑')}
+                    ${counts.unscored > 0 ? `<button id="qfp-bulk-score-btn" onclick="qfpScoreAllUnscored()" title="ตรวจข้อความที่ยังไม่ได้ประเมินด้วยโมเดลที่เลือก ทีละรายการ" style="margin-left:auto;padding:3px 12px;border-radius:20px;font-size:0.72em;font-weight:800;cursor:pointer;transition:0.2s;border:1.5px solid #1d4ed8;background:#1d4ed8;color:white;">Score unreviewed (${counts.unscored})</button>` : ''}
                 </div>`;
         }
 
@@ -60714,12 +60659,7 @@ Reply ONLY with raw JSON, no markdown:
 
         window.selectQfpModel = function(btn, model) {
             document.getElementById('ai-model-selector').value = model;
-            document.querySelectorAll('#qfp-model-pills button').forEach(b => {
-                b.style.background = 'transparent';
-                b.style.color = '#92400e';
-            });
-            btn.style.background = '#f59e0b';
-            btn.style.color = 'white';
+            document.querySelectorAll('#qfp-model-pills button').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
         };
 
         // V95.57: light markdown renderer for the AI Insight result. The model
@@ -60748,13 +60688,13 @@ Reply ONLY with raw JSON, no markdown:
         }
 
         async function generateAIFeedbackInsight() {
-            if (!_qfpFeedbacks.length) return;
+            if (!_qfpFeedbacks.some(f => qfpNormalizeTopic(f.comment))) return;
             const btn = document.getElementById('qfp-ai-btn');
             const resultEl = document.getElementById('qfp-ai-result');
             const oldText = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-            resultEl.innerHTML = '<span style="color:#b08968;"><i class="fa-solid fa-spinner fa-spin"></i> กำลังวิเคราะห์ feedback...</span>';
+            resultEl.innerHTML = '<span style="color:#b08968;"><i class="fa-solid fa-spinner fa-spin"></i> Analyzing feedback…</span>';
 
             const quiz = quizzesData.find(x => x.id === _qfpCurrentId);
             const ratings = _qfpFeedbacks.map(f => f.rating).filter(r => typeof r === 'number');
@@ -60770,13 +60710,13 @@ Reply ONLY with raw JSON, no markdown:
 - ความคิดเห็น:
 - ${comments}
 
-ช่วยสรุปเป็นภาษาไทยสั้นๆ 3-5 บรรทัด ว่า:
+Summarize in English in 3–5 concise lines:
 1. ผู้เรียนรู้สึกอย่างไรกับชุดข้อสอบนี้
 2. จุดเด่น/จุดอ่อนที่ควรปรับปรุง
 3. ข้อเสนอแนะสำหรับการออกโจทย์ครั้งต่อไป`;
 
             try {
-                const model = document.getElementById('ai-model-selector') ? document.getElementById('ai-model-selector').value : 'gpt-4o-mini';
+                const model = document.getElementById('ai-model-selector') ? document.getElementById('ai-model-selector').value : 'gpt-5.6-luna';
                 const { text } = await window.callUniversalAI(model, prompt, false, null, '', { feature: 'quiz_feedback' });
                 resultEl.innerHTML = text ? qfpRenderInsightMarkdown(text) : '(No response)';
             } catch (e) {
