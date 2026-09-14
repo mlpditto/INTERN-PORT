@@ -9,9 +9,10 @@ const { chromium } = require('playwright');
         const errors = []; page.on('pageerror', e => errors.push(e.message));
         const html = fs.readFileSync('public/admin.html', 'utf8');
         assert(html.includes('onclick="openQuizCurate()"'));
-        assert(html.includes('src="quiz-curate.js?v=V100.00"'));
+        assert(html.includes('src="quiz-curate.js?v=V100.05"'));
         await page.setContent([...html.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/gi)].map(m => m[0]).join('\n') + '<input id="edit-quiz-id" value="source-quiz"><input id="ai-analyzer-model-val" value="gpt-5.6-luna">');
         await page.addStyleTag({ path: 'public/quiz-curate.css' });
+        await page.addStyleTag({ path: 'public/text-ai-chips.css' });
         await page.addScriptTag({ path: 'public/ai-model-ui.js' });
         await page.evaluate(() => {
             window.fixture = {
@@ -165,6 +166,7 @@ const { chromium } = require('playwright');
         await row(1).locator('.curate-move').click(); assert.equal(await saveDisabled(), false);
         for (const width of [320, 390, 736, 1024]) {
             await page.setViewportSize({ width, height: 850 });
+            await page.waitForTimeout(250);
             assert(await page.locator('#quiz-curate-dialog').evaluate(d => d.scrollWidth <= d.clientWidth + 1), 'horizontal overflow at ' + width);
             assert(await page.locator('#quiz-curate-dialog button:not([data-model]):visible').evaluateAll(bs => bs.every(b => {
                 const r = b.getBoundingClientRect(), d = b.closest('dialog').getBoundingClientRect();

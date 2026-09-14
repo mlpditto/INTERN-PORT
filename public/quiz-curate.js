@@ -149,13 +149,14 @@
             <div class="curate-footer"><div id="curate-feedback" role="status" aria-live="polite"></div><button type="button" id="curate-save" class="curate-primary" title="บันทึกเป็นชุดใหม่ที่ยังไม่เปิดใช้งาน โดยต้นฉบับยังอยู่ครบ">Save as new quiz</button></div><div class="curate-note">New quizzes are saved inactive. Original questions and attempts are preserved.</div></div>`;
         document.body.append(dialog);
         const models = node('div', undefined, 'curate-models'); models.id = 'curate-models'; models.setAttribute('role', 'group'); models.setAttribute('aria-label', 'AI model');
-        for (const model of window.TEXT_AI_MODELS) {
-            const chip = node('button', model.label); chip.type = 'button'; chip.dataset.model = model.id; chip.title = model.hint;
+        models.innerHTML = window.textAIChipContents(null);
+        models.querySelectorAll('button').forEach(chip => {
+            chip.dataset.model = chip.dataset.value;
             chip.onclick = () => {
                 if (!state || state.busy || state.saving || state.saved) return;
-                state.model = model.id; state.needsSuggestion = true; state.progress = 0; state.message = ''; render();
-            }; models.append(chip);
-        }
+                state.model = chip.dataset.model; state.needsSuggestion = true; state.progress = 0; state.message = ''; render();
+            };
+        });
         dialog.querySelector('.curate-controls').before(models);
         const progress = node('progress'); progress.id = 'curate-progress'; progress.max = 100;
         progress.setAttribute('aria-label', 'Workflow progress, not model processing progress');
