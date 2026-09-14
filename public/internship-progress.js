@@ -9,6 +9,7 @@
   return {start,end,key:kind+'-'+start.toISOString().slice(0,10)};
  }
  function editGoal(){
+  if(!period?.personal)return;
   const d=el('dialog');d.className='ip-share ip-goal-editor';d.setAttribute('aria-labelledby','ip-goal-title');
   d.innerHTML='<header><h3 id="ip-goal-title">🎯 SMART GOALS</h3><button class="cancel" aria-label="Close" title="ปิด">×</button></header><p class="ip-muted">Set your quiz learning goal</p><h4>1 · Choose a period</h4><div class="ip-periods" role="group" aria-label="Goal period"></div><p class="ip-range" title="ช่วงวันที่ตามปฏิทิน เวลาไทย"></p><h4>2 · Set your target</h4><div class="ip-target-box"><label for="ip-goal-number">Quiz target<small class="ip-unit"></small></label><div class="ip-stepper"><button class="minus" aria-label="Decrease target" title="ลดเป้าหมาย">−</button><input id="ip-goal-number" type="number" min="1" max="10000" step="1" title="จำนวน Quiz เป้าหมายในรอบที่เลือก"><button class="plus" aria-label="Increase target" title="เพิ่มเป้าหมาย">+</button></div></div><h4>3 · Preview your progress</h4><div class="ip-goal-preview" aria-live="polite"></div><details><summary title="ดูจำนวน Quiz สะสมและรอบก่อน">Past activity</summary><div class="ip-past"></div></details><p class="ip-muted" title="นับ Quiz ชุดเดิมครั้งเดียวต่อรอบ ไม่นับแบบฝึกหัด">ⓘ Repeat attempts count once per quiz.</p><p role="status"></p><footer><button class="cancel" title="ยกเลิก">Cancel</button><button class="save" title="บันทึกเป้าหมาย">Save goal</button></footer>';
   const input=d.querySelector('input');let kind=period.goal?.kind||'monthly';const drafts={monthly:period.monthlyTarget||30};if(period.goal)drafts[period.goal.kind]=period.goal.target;input.value=drafts[kind]||30;
@@ -49,7 +50,8 @@
  function render(){
   const host=document.getElementById('internship-quiz-progress');if(!host)return;host.replaceChildren();summary=calculate(period,attempts);
   host.classList.toggle('ip-empty',!summary);
-  if(!summary&&period?.personal){const set=el('button','🎯 SMART GOALS · Set a learning target');set.onclick=editGoal;host.append(set);return;}
+  const periodAction=document.getElementById('ip-period-action');if(periodAction)periodAction.hidden=!period?.personal;
+  if(!summary&&period?.personal)return;
   if(!summary){const hint=el('small','📅 SMART GOALS · Set internship dates');hint.title='กำหนดวันเริ่มและวันสิ้นสุดการฝึกงาน เพื่อคำนวณเป้าหมาย Quiz และเปอร์เซ็นต์ความคืบหน้า';host.append(hint);return;}
   if(attempts===null){host.append(el('p','Loading quiz progress…'));return;}
   const s=summary;const head=el('div');head.className='ip-head';head.append(el('strong','📚 '+s.label),el('span','Day '+s.elapsed+' / '+s.duration));host.append(head);
@@ -57,7 +59,7 @@
   const bar=el('progress');bar.max=s.total;bar.value=Math.min(s.done,s.total);bar.setAttribute('aria-label','Completed quiz goal');host.append(bar);
   host.append(el('p',s.remaining===0?'Goal completed ✓':s.remaining+' remaining · '+(s.done>=s.expected?'On pace':(s.expected-s.done)+' behind today’s target')));
   if(s.remaining&&s.daysLeft)host.append(el('small','Aim for '+Math.ceil(s.remaining/s.daysLeft)+' quizzes a day across the remaining '+s.daysLeft+' days.'));
-  const actions=el('div');actions.className='ip-actions';const find=el('button','▶ Find a quiz');find.onclick=()=>{window.closeScheduleModal();window.qbOpenBrowse();};const share=el('button','📷 Share progress');share.onclick=preview;actions.append(find,share);if(period.personal){const edit=el('button','🎯 Edit goal');edit.onclick=editGoal;actions.append(edit);}host.append(actions);
+  const actions=el('div');actions.className='ip-actions';const find=el('button','▶ Find a quiz');find.onclick=()=>{window.closeScheduleModal();window.qbOpenBrowse();};const share=el('button','📷 Share progress');share.onclick=preview;actions.append(find,share);host.append(actions);
   if(period.personal&&period.history){const history=el('details');history.append(el('summary','Goal history'));Object.entries(period.history).sort((a,b)=>b[0].localeCompare(a[0])).forEach(([key,g])=>{const result=calculate({...period,goal:g},attempts,new Date(key.slice(key.indexOf('-')+1)+'T12:00:00Z'));if(result)history.append(el('p',key+' · '+result.done+' / '+result.total+' · '+result.percent+'%'));});host.append(history);}
   const note=el('small',period.personal?'Calendar period · Unique submitted quizzes only':'Goal: 1 quiz per internship day · Unique submitted quizzes only');note.title='นับชุดที่ส่งสำเร็จในช่วงฝึกงาน ชุดเดิมนับครั้งเดียว ไม่ใช่คะแนนใบรับรอง';host.append(note);
  }
@@ -67,5 +69,5 @@
   function paint(){ctx.fillStyle='#eef2ff';ctx.fillRect(0,0,1080,1350);ctx.fillStyle='#fff';ctx.fillRect(60,60,960,1230);ctx.fillStyle='#334155';ctx.font='bold 48px sans-serif';ctx.fillText('My learning progress',110,170);ctx.font='32px sans-serif';if(!d.querySelector('input').checked)ctx.fillText(s.name,110,235,850);ctx.fillText(s.label+' · Day '+s.elapsed+' of '+s.duration,110,330);ctx.fillStyle='#4f46e5';ctx.font='bold 140px sans-serif';ctx.fillText(s.percent+'%',110,550);ctx.fillStyle='#334155';ctx.font='bold 52px sans-serif';ctx.fillText(s.done+' / '+s.total+' quizzes',110,670);ctx.fillStyle='#e2e8f0';ctx.fillRect(110,740,860,32);ctx.fillStyle='#6366f1';ctx.fillRect(110,740,860*s.percent/100,32);ctx.font='34px sans-serif';ctx.fillStyle='#334155';ctx.fillText('Keep learning. Every quiz counts.',110,940);ctx.font='26px sans-serif';ctx.fillText('Unique submitted quizzes · '+s.date,110,1170);}
   paint();d.querySelector('input').onchange=paint;d.querySelector('.ip-cancel').onclick=()=>d.close();d.addEventListener('close',()=>d.remove());d.querySelector('.ip-download').onclick=()=>canvas.toBlob(blob=>{if(!blob)return;const url=URL.createObjectURL(blob),a=el('a');a.href=url;a.download='internship-progress.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);},'image/png');
  }
- window.internshipProgress={calculate,cycle,setPeriod:p=>{period=p;render();if(p.personal&&p.goal&&p.saveGoal){const key=cycle(p.goal.kind).key;if(!p.history?.[key]&&!recording.has(key)){recording.add(key);p.saveGoal(p.goal,key).catch(()=>{}).finally(()=>recording.delete(key));}}},setAttempts:r=>{attempts=r;render();}};
+ window.internshipProgress={editGoal,calculate,cycle,setPeriod:p=>{period=p;render();if(p.personal&&p.goal&&p.saveGoal){const key=cycle(p.goal.kind).key;if(!p.history?.[key]&&!recording.has(key)){recording.add(key);p.saveGoal(p.goal,key).catch(()=>{}).finally(()=>recording.delete(key));}}},setAttempts:r=>{attempts=r;render();}};
 })();
