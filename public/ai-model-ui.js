@@ -32,8 +32,14 @@
         select.replaceChildren(...models.map(m => new Option(m.label, m.id)));
         select.value = value;
     }
-    const shortLabels = ['Gemini 3.5 Lite', 'Gemini 3.8', 'GPT Luna', 'GPT Terra', 'GPT Sol', 'GPT Astra', 'Haiku 4.5', 'Sonnet 5', 'Fable 5.1'];
-    window.textAIChipsHtml = (id, value, action, compact = false) => `<div class="text-ai-chips lang-no-toggle" role="group" aria-label="AI model"${id ? ` id="${id}"` : ''}>${models.map((m, i) => `<button type="button" class="glass-toggle-item${m.id === value ? ' active' : ''}" data-value="${m.id}" aria-label="${m.label}" aria-pressed="${m.id === value}" title="${m.label} — ${m.hint}" onclick="${action}">${compact ? shortLabels[i] : m.label}</button>`).join('')}</div>`;
+    window.textAIChipContents = (value, action = '') => models.map((m, i) => {
+        const provider = m.label.split(' ')[0];
+        const heading = i === 0 || models[i - 1].label.split(' ')[0] !== provider
+            ? `<span class="text-ai-provider" data-provider="${provider}">${provider}</span>` : '';
+        const label = m.label.slice(provider.length + 1).replace('Flash-Lite', 'Lite');
+        return `${heading}<button type="button" class="glass-toggle-item${m.id === value ? ' active' : ''}" data-value="${m.id}" aria-label="${m.label}" aria-pressed="${m.id === value}" title="${m.label} — ${m.hint}"${action ? ` onclick="${action}"` : ''}>${label}</button>`;
+    }).join('');
+    window.textAIChipsHtml = (id, value, action) => `<div class="text-ai-chips lang-no-toggle" role="group" aria-label="AI model"${id ? ` id="${id}"` : ''}>${window.textAIChipContents(value, action)}</div>`;
     window.syncRegistryModelSelect = function (id) {
         const input = document.getElementById(id);
         if (!input) return;
@@ -72,7 +78,7 @@
         host.parentElement.classList.add('text-ai-row');
         host.parentElement.parentElement?.classList.add('text-ai-row');
         if (id === 'tts-polish-model' && input.previousElementSibling?.matches('i.fa-robot')) input.previousElementSibling.hidden = true;
-        host.innerHTML = models.map(m => `<button type="button" class="glass-toggle-item" data-value="${m.id}" title="${m.hint}">${m.label}</button>`).join('');
+        host.innerHTML = window.textAIChipContents(input.value);
         host.querySelectorAll('button').forEach(button => {
             button.onclick = () => {
                 input.value = button.dataset.value;
