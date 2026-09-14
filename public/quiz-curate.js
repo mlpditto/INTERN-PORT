@@ -178,7 +178,12 @@
         [byId('curate-target'), byId('curate-instructions')].forEach(input => input.oninput = () => {
             state.needsSuggestion = true; state.done = false; state.message = ''; render();
         });
-        byId('curate-suggest').onclick = suggest;
+        const history = node('details'); history.id = 'curate-history';
+        history.innerHTML = '<summary title="ประวัติผล AI ล่าสุด สูงสุด 5 รอบ">History</summary><div id="curate-history-list"></div>';
+        dialog.querySelector('.curate-controls').after(history);
+        const status = node('div'); status.id = 'curate-history-status'; status.setAttribute('role', 'status');
+        history.before(status);
+        byId('curate-suggest').onclick = () => suggest();
         byId('curate-save').onclick = () => save(false);
         apply.onclick = () => save(true);
     }
@@ -256,7 +261,7 @@
         byId('curate-split').textContent = s.splitting ? 'Splitting…' : 'Split into two quizzes';
         byId('curate-apply').textContent = s.applying ? 'Applying…' : 'Remove ' + (count - s.keep.size) + ' from original';
         dialog.querySelector('.curate-main > .curate-note').textContent = 'Save a new inactive copy, or apply to an inactive quiz with no attempts or exam sessions. Split keeps Keep in the original and moves Remove to a new inactive quiz. A backup is saved first.';
-        byId('curate-suggest').textContent = s.busy ? 'Processing · ' + elapsed(s) : s.done ? 'Done · ' + elapsed(s) : '✦ Suggest';
+        byId('curate-suggest').textContent = s.busy ? 'Processing · ' + elapsed(s) : s.done ? 'Run again' : '✦ Suggest';
         byId('curate-suggest').title = s.busy ? 'ความคืบหน้าตามขั้นตอนงาน API ไม่รายงานเปอร์เซ็นต์ประมวลผลจริงของโมเดล' : 'ให้ AI เสนอข้อที่ควรเก็บและตัด';
         renderComparison(s);
         if (focusedAction && !s.compare && !s.busy && !s.saving) {
@@ -280,8 +285,47 @@
         byId('curate-target').max = source.form.questions.length;
         byId('curate-target').value = Math.min(10, source.form.questions.length - 1);
         byId('curate-instructions').value = ''; dialog.querySelector('.curate-instructions').open = false;
+        byId('curate-history').open = false; byId('curate-history-list').replaceChildren();
+        byId('curate-history-status').textContent = source.sourceId ? 'Checking saved results…' : 'Save this quiz first to enable history.';
         render(); dialog.showModal(); byId('curate-target').focus();
+        loadHistory(state);
     };
+    function requestSettings(s) {
+        return { version: 1, form: s.source.form, model: s.model, target: target(s), mode: s.mode,
+            pins: [...s.pins].sort((a, b) => a - b), instructions: byId('curate-instructions').value.trim() };
+    }
+    async function loadHistory(s) {
+        const initial = fingerprint(requestSettings(s));
+        try {
+            s.runs = await curateHistory.load(s.source.sourceId);
+            if (state !== s) return;
+            const key = await curateHistory.key(requestSettings(s));
+            if (state !== s || s.busy || s.proposal || fingerprint(requestSettings(s)) !== initial) return;
+            const match = s.runs.find(r => r.key === key);
+            if (match) {
+                s.proposal = validateProposal({ questions: match.proposal }, s, target(s));
+                s.keep = new Set(s.proposal.filter(q => q.keep).map(q => q.id)); s.needsSuggestion = false;
+                s.done = true; s.startedAt = 0; s.finishedAt = match.elapsedMs; s.view = 'remove';
+                byId('curate-history-status').textContent = 'Saved result · ' + match.model + ' · ' + new Date(match.createdAt).toLocaleString() + ' · No AI call';
+                render();
+            } else byId('curate-history-status').textContent = s.runs.length ? 'Previous results differ from these questions or settings. Select Suggest.' : 'No saved result yet.';
+            renderHistory(s);
+        } catch (error) { console.warn('Curate history:', error); if (state === s) byId('curate-history-status').textContent = 'Could not load history. You can still select Suggest.'; }
+    }
+    function renderHistory(s) {
+        const list = byId('curate-history-list'); list.replaceChildren();
+        for (const run of s.runs || []) {
+            const item = node('details');
+            item.append(node('summary', new Date(run.createdAt).toLocaleString() + ' · ' + run.model + ' · ' + run.count + ' → ' + run.target + ' · Suggested'));
+            item.append(node('p', 'Historical proposal · Original question numbers. Not a record of changes applied to the quiz.'));
+            item.append(node('p', 'Strategy: ' + run.mode + ' · Must keep: ' + (run.pins.join(', ') || 'None') + ' · Instructions: ' + (run.instructions || 'None')));
+            for (const q of run.proposal) {
+                item.append(node('strong', 'Q' + q.id + ' · ' + (q.keep ? 'Keep' : 'Remove')));
+                const reason = node('div'); bilingual(reason, q.reason, q.reasonTh); item.append(reason);
+            }
+            list.append(item);
+        }
+    }
     function validateProposal(data, s, n) {
         const count = s.source.form.questions.length;
         if (!Array.isArray(data?.questions) || data.questions.length !== count) throw new Error('AI must assess every original question. Try Suggest again.');
@@ -309,7 +353,7 @@
         }
         const kept = new Set(data.questions.filter(q => q.keep).map(q => q.id));
         if (kept.size !== n || [...s.pins].some(id => !kept.has(id))) throw new Error('AI did not respect the target or pinned questions. Try Suggest again.');
-        return data.questions.map(q => ({ id: q.id, keep: q.keep, reason: q.reason.trim(), reasonTh: q.reasonTh.trim(), topic: q.topic.trim(),
+        return data.questions.map(q => ({ id: q.id, keep: q.keep, reasonType: q.reasonType, reason: q.reason.trim(), reasonTh: q.reasonTh.trim(), topic: q.topic.trim(),
             detail: q.detail.trim(), detailTh: q.detailTh.trim(), impact: q.impact.trim(), impactTh: q.impactTh.trim(),
             related: q.related.map(r => ({ id: r.id, shared: r.shared, sharedTh: r.sharedTh, difference: r.difference, differenceTh: r.differenceTh,
                 preference: r.preference, preferenceTh: r.preferenceTh, evidence: r.evidence.map(e => ({ id: e.id, quote: e.quote })) })) }));
@@ -326,6 +370,8 @@
             if (!n || s.pins.size > n || s.stale) { s.message = ''; render(); return; }
             s.busy = true; s.done = false; s.startedAt = performance.now(); s.needsSuggestion = true; s.message = ''; render();
             s.timer = setInterval(() => { if (state === s) byId('curate-suggest').textContent = 'Processing · ' + elapsed(s); }, 1000);
+            const settings = requestSettings(s), requestKey = await curateHistory.key(settings);
+            if (state !== s) return;
             const form = s.source.form;
             const prompt = `You curate an existing assessment. Select exactly ${n} of ${form.questions.length} questions. Never rewrite questions or answer keys.
 Strategy: ${strategies[s.mode]}
@@ -345,6 +391,13 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
             const proposal = validateProposal(safeJsonParse(response.text), s, n);
             s.proposal = proposal; s.keep = new Set(proposal.filter(q => q.keep).map(q => q.id));
             s.needsSuggestion = false; s.done = true; s.view = s.keep.size < form.questions.length ? 'remove' : 'keep'; s.message = '';
+            const run = { id: crypto.randomUUID(), key: requestKey, model: s.model, createdAt: Date.now(), elapsedMs: performance.now() - s.startedAt, count: form.questions.length, target: n, mode: s.mode, pins: settings.pins, instructions: settings.instructions, proposal };
+            try {
+                await curateHistory.save(s.source.sourceId, run);
+                if (state !== s) return;
+                s.runs = [run, ...(s.runs || [])].slice(0, 5); renderHistory(s);
+                byId('curate-history-status').textContent = 'Done · ' + elapsed(s) + (s.source.sourceId ? ' · Result saved' : ' · History requires a saved quiz');
+            } catch (error) { if (state === s) byId('curate-history-status').textContent = 'Done · Result available, but history could not be saved. ' + error.message; }
         } catch (error) {
             if (state === s) { s.done = false; s.message = 'Could not suggest: ' + error.message; }
         } finally { clearInterval(s.timer); if (state === s) { s.finishedAt = performance.now(); s.busy = false; render(); } }
