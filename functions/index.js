@@ -339,7 +339,7 @@ function requireAdminCallable(request) {
 // ai_usage/{YYYY-MM-DD}; atomic FieldValue.increment makes each call a cheap merge
 // (no read), split by provider and caller role (admin / intern). Best-effort:
 // a usage-write failure must never affect the AI response. Tokens only (no $ cost).
-async function recordAiUsage(provider, model, tokens, isAdmin, feature) {
+async function recordAiUsage(provider, model, tokens, isAdmin, feature, usage = {}) {
     try {
         const day = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" }); // YYYY-MM-DD
         const inc = (n) => admin.firestore.FieldValue.increment(n);
@@ -355,6 +355,12 @@ async function recordAiUsage(provider, model, tokens, isAdmin, feature) {
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             totalTokens: inc(t),
             totalCount: inc(1),
+            models: { [Buffer.from(prov + ':' + (model || 'unknown')).toString('base64url')]: {
+                model: model || 'unknown', provider: prov, tokens: inc(t), count: inc(1),
+                ...(Number.isFinite(usage.inputTokens) && Number.isFinite(usage.outputTokens) ? {
+                    inputTokens: inc(usage.inputTokens), outputTokens: inc(usage.outputTokens), detailedCount: inc(1)
+                } : {})
+            } },
             providers: { [prov]: { tokens: inc(t), count: inc(1) } },
             roles: { [role]: { tokens: inc(t), count: inc(1) } },
             features: { [feat]: { tokens: inc(t), count: inc(1) } }
@@ -532,7 +538,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
         const _sendJson = res.json.bind(res);
         res.json = (payload) => {
             if (payload && !payload.error) {
-                recordAiUsage(provider, payload.model || model, payload.tokens, callerIsAdmin, feature);
+                recordAiUsage(provider, payload.model || model, payload.tokens, callerIsAdmin, feature, payload.usage || {});
             }
             return _sendJson(payload);
         };
