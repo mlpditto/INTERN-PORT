@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V100.19)</title>
+    <title>Internship Portfolio (V100.20)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -5303,13 +5303,14 @@
         <div class="modal-content" style="max-width:440px; width:92%; text-align:left;">
             <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
                 <span style="font-size:1.6em;">⚠️</span>
-                <span id="qsc-title" style="font-weight:900; font-size:1.1em; color:#1e293b;"></span>
+                <span id="qsc-title" style="flex:1; min-width:0; font-weight:900; font-size:1.1em; color:#1e293b;"></span>
+                <div id="qsc-lang-chips" style="flex:0 0 auto;"></div>
             </div>
             <div id="qsc-quizname" style="font-weight:800; color:#4338ca; background:#eef2ff; border-radius:8px; padding:6px 12px; margin-bottom:12px; font-size:0.92em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
             <div id="qsc-key" style="display:flex; gap:8px; align-items:flex-start; background:#fef2f2; border:1px solid #fecaca; border-radius:10px; padding:10px 12px; color:#991b1b; font-weight:700; font-size:0.9em; margin-bottom:10px;"></div>
             <ul id="qsc-rules" style="margin:0 0 12px 0; padding-left:18px; color:#334155; font-size:0.86em; line-height:1.6;"></ul>
             <!-- V95.56: tap a chip to repaint the whole confirmation in that language -->
-            <div id="qsc-lang-chips" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;"></div>
+
             <div style="display:flex; gap:10px; justify-content:flex-end;">
                 <button id="qsc-cancel" type="button" style="width:auto; flex-shrink:0; padding:9px 18px; border-radius:10px; border:1px solid #cbd5e1; background:#fff; color:#475569; font-weight:700; cursor:pointer;"></button>
                 <button id="qsc-confirm" type="button" style="width:auto; flex-shrink:0; padding:9px 22px; border-radius:10px; border:none; background:linear-gradient(135deg,#4361ee,#4895ef); color:#fff; font-weight:800; cursor:pointer; box-shadow:0 2px 8px rgba(67,97,238,0.3);"></button>
@@ -10171,10 +10172,10 @@
                   key: 'ออกจากหน้านี้ หรือรีเฟรช = ระบบยุติการทำทันที',
                   rules: ['เมื่อเริ่มแล้ว ห้ามออกจากหน้าจนกว่าจะส่งคำตอบ'],
                   confirm: 'เริ่มทำ', cancel: 'ยกเลิก' },
-            en: { flag: '🇺🇸', name: 'English', title: 'Confirm to start the quiz?',
-                  key: 'Leaving or refreshing this page ends the session immediately',
+            en: { flag: '🇺🇸', name: 'English', title: 'Confirm quiz start',
+                  key: 'Leaving or refreshing ends your attempt.',
                   rules: ['Once started, do not leave until you submit your answers'],
-                  confirm: 'Start', cancel: 'Cancel' },
+                  confirm: 'Start quiz', cancel: 'Cancel' },
             kr: { flag: '🇰🇷', name: '한국어', title: '퀴즈를 시작하시겠습니까?',
                   key: '화면을 나가거나 새로고침하면 즉시 종료됩니다',
                   rules: ['시작 후 제출할 때까지 화면을 나가지 마십시오'],
@@ -10187,8 +10188,7 @@
             return new Promise(function (resolve) {
                 const m = document.getElementById('quizStartConfirmModal');
                 if (!m) { resolve(window.confirm('Start quiz "' + (quizTitle || '') + '"?')); return; }
-                const stored = localStorage.getItem('quiz_start_lang');
-                let lang = QUIZ_START_I18N[stored] ? stored : 'th';
+                let lang = 'en';
                 const cBtn = document.getElementById('qsc-confirm'), xBtn = document.getElementById('qsc-cancel');
                 function paint() {
                     const p = QUIZ_START_I18N[lang];
@@ -10198,21 +10198,16 @@
                     document.getElementById('qsc-rules').innerHTML = p.rules.map(function (r) { return '<li>' + escapeHtml(r) + '</li>'; }).join('');
                     const chips = document.getElementById('qsc-lang-chips');
                     if (chips) {
-                        chips.innerHTML = ['th', 'en', 'kr'].map(function (l) {
-                            const o = QUIZ_START_I18N[l];
-                            const active = l === lang;
-                            return '<button type="button" data-lang="' + l + '" style="width:auto; min-height:auto; flex-shrink:0; padding:5px 12px; border-radius:999px; font-size:0.8em; font-weight:800; cursor:pointer; border:1.5px solid ' + (active ? '#4f46e5' : '#c7d2fe') + '; background:' + (active ? '#4f46e5' : '#fff') + '; color:' + (active ? '#fff' : '#4f46e5') + ';">' + o.flag + ' ' + escapeHtml(o.name) + '</button>';
-                        }).join('');
-                        chips.querySelectorAll('button[data-lang]').forEach(function (b) {
-                            b.onclick = function () {
-                                lang = this.dataset.lang;
-                                localStorage.setItem('quiz_start_lang', lang);
-                                paint();
-                            };
-                        });
+                        chips.innerHTML = '<button type="button" aria-label="Toggle Korean" aria-pressed="' + (lang === 'kr') + '" title="กดเพื่อสลับภาษาเกาหลี / อังกฤษ" style="width:40px; min-width:40px; padding:6px; border-radius:9px; border:1px solid '+(lang==='kr'?'#6366f1':'#cbd5e1')+'; background:'+(lang==='kr'?'#eef2ff':'white')+'; cursor:pointer;">🇰🇷</button>';
+                        chips.querySelector('button').onclick = function () { lang = lang === 'kr' ? 'en' : 'kr'; paint(); chips.querySelector('button').focus(); };
                     }
                     cBtn.textContent = '▶ ' + p.confirm;
                     xBtn.textContent = p.cancel;
+                    document.getElementById('qsc-title').title=QUIZ_START_I18N.th.title;
+                    document.getElementById('qsc-key').title=QUIZ_START_I18N.th.key;
+                    document.getElementById('qsc-rules').title=QUIZ_START_I18N.th.rules[0];
+                    document.getElementById('qsc-quizname').title=quizTitle || '';
+                    cBtn.title='ยืนยันเริ่มทำแบบทดสอบ';xBtn.title='ยกเลิกและกลับหน้าก่อนหน้า';
                 }
                 paint();
                 function done(val) { m.style.display = 'none'; cBtn.onclick = null; xBtn.onclick = null; resolve(val); }
@@ -14307,7 +14302,7 @@
                 out.push({ bucket: 'today', icon: '✅', title: 'Daily check-in เช็คอินประจำวัน', act: 'tryDailyCheckin()' });
             }
             if (typeof _activityDoneToday === 'function' && !_activityDoneToday(_combinedLogCache())) {
-                out.push({ bucket: 'today', icon: '📝', title: 'Journal entry บันทึกประจำวัน', tag: '+0.1', act: 'gotoLog()' });
+                out.push({ bucket: 'today', icon: '📝', title: 'Journal entry บันทึกประจำวัน →', hint: 'ปิดหน้าต่างนี้และไปเขียนบันทึกประจำวัน', tag: '+0.1', act: 'closeScheduleModal(); gotoLog()' });
             }
             if (typeof _activityDoneToday === 'function' && !_activityDoneToday(window.myCasesCache)) {
                 out.push({ bucket: 'today', icon: '🩺', title: 'Case log บันทึกเคส', act: 'gotoCaseSubmit()' });
@@ -14511,11 +14506,11 @@
                     // "ยา NSAIDs และการใช้" was worse: only the orphan "NSAIDs" showed.
                     // The shield is on the title alone so the labels around it still
                     // follow the TH toggle. Same call as #explore-links-list.
-                    html += '<div' + click + ' style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:'
+                    html += '<div' + click + (it.hint ? ' title="' + escapeHtml(it.hint) + '" role="link" tabindex="0" onkeydown="if(event.key===&quot;Enter&quot;||event.key===&quot; &quot;){event.preventDefault();this.click();}"' : '') + ' style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:'
                         + bg + '; border:1px solid ' + border + '; border-radius:9px; margin-bottom:6px; font-size:0.78em;'
                         + (it.act ? ' cursor:pointer;' : '') + '">'
                         + '<span style="flex:0 0 auto;">' + it.icon + '</span>'
-                        + '<span class="lang-no-toggle" title="' + escapeHtml(it.title || '') + '" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700; color:#1e293b;">'
+                        + '<span class="lang-no-toggle" title="' + escapeHtml(it.hint || it.title || '') + '" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700; color:#1e293b;">'
                         + escapeHtml(it.title) + '</span>'
                         + (it.tag ? '<span style="flex:0 0 auto; font-size:0.82em; font-weight:800; color:' + color + ';">' + it.tag + '</span>' : '')
                         + (when ? '<span style="flex:0 0 auto; font-size:0.82em; color:#64748b; white-space:nowrap;">' + when + '</span>' : '')
