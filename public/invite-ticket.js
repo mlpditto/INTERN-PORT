@@ -15,28 +15,27 @@ document.addEventListener('DOMContentLoaded', () => {
         const heading = document.createElement('strong'); heading.textContent = prefix === 'ue' ? '📅 New Event' : '📅 Agenda'; header.append(heading);
         if (prefix === 'ue') { group.hidden = true; header.append(group); }
         const audience = new Set();
-        const toggle = document.createElement('button'); toggle.type = 'button';
-        toggle.textContent = '🌐 Public ▾'; toggle.setAttribute('aria-expanded', 'false');
-        const picker = document.createElement('div'); picker.className = 'invite-audience'; picker.hidden = true;
-        picker.id = prefix + '-audience'; toggle.setAttribute('aria-controls', picker.id);
-        const renderAudience = () => {
-            picker.replaceChildren();
-            const add = (name, key) => {
-                const label = document.createElement('label'), input = document.createElement('input');
-                input.type = 'checkbox'; input.checked = key === '__public__' ? !audience.size : audience.has(key);
-                input.onchange = () => { if (key === '__public__') audience.clear(); else if (input.checked) audience.add(key); else audience.delete(key); renderAudience(); };
-                label.append(input, document.createTextNode(name)); picker.append(label);
-            };
-            add('🌐 Public · All groups', '__public__');
-            (window.getInviteGroupOptions?.() || []).forEach(name => add(name, name));
-            toggle.textContent = !audience.size ? '🌐 Public ▾' : audience.size === 1 ? '👥 ' + [...audience][0] + ' ▾' : '👥 ' + audience.size + ' groups ▾';
-        };
-        toggle.onclick = () => { renderAudience(); picker.hidden = !picker.hidden; toggle.setAttribute('aria-expanded', String(!picker.hidden)); };
-        header.append(toggle);
         root._inviteAudience = audience;
-        root._resetInviteAudience = () => { audience.clear(); picker.hidden = true; toggle.setAttribute('aria-expanded','false'); renderAudience(); };
-        root.append(header);
-        root.append(picker);
+        root._inviteAudienceMode = 'public';
+        const modes=document.createElement('div');modes.className='invite-modes';modes.setAttribute('role','group');modes.setAttribute('aria-label','Who can see this?');
+        const picker=document.createElement('div');picker.className='invite-audience';
+        const hint=document.createElement('p');hint.className='invite-audience-hint';
+        const buttons={};
+        const renderAudience=()=>{
+            const isPublic=root._inviteAudienceMode==='public';
+            Object.entries(buttons).forEach(([key,button])=>button.setAttribute('aria-pressed',String(root._inviteAudienceMode===key)));
+            picker.hidden=isPublic;picker.replaceChildren();
+            hint.textContent=isPublic?'Visible to all groups':audience.size+' selected · Only selected groups can view this agenda.';
+            hint.title=isPublic?'ทุกกลุ่มเห็นกิจกรรมนี้':'เฉพาะกลุ่มที่เลือกเห็นกิจกรรมนี้';
+            if(!isPublic){
+                const options=window.getInviteGroupOptions?.()||[];
+                if(!options.length)picker.textContent='No groups available.';
+                options.forEach(name=>{const button=document.createElement('button');button.type='button';button.textContent=(audience.has(name)?'✓ ':'')+name;button.setAttribute('aria-pressed',String(audience.has(name)));button.onclick=()=>{if(audience.has(name))audience.delete(name);else audience.add(name);renderAudience();};picker.append(button);});
+            }
+        };
+        [['public','🌐 Public','ทุกกลุ่มเห็นกิจกรรม'],['groups','👥 Groups','เลือกกลุ่มที่เห็นกิจกรรม']].forEach(([key,label,title])=>{const button=document.createElement('button');button.type='button';button.textContent=label;button.title=title;button.onclick=()=>{root._inviteAudienceMode=key;renderAudience();};buttons[key]=button;modes.append(button);});
+        root._resetInviteAudience=()=>{audience.clear();root._inviteAudienceMode='public';renderAudience();};
+        root.append(header,modes,picker,hint);renderAudience();
         nodes.title.placeholder = 'What are you planning?'; nodes.title.setAttribute('aria-label', 'Event name'); nodes.title.required = true; root.append(nodes.title);
         const row = document.createElement('div'); row.className = 'invite-when';
         const wrap = (text, input) => { const label = document.createElement('label'); label.append(document.createTextNode(text), input); return label; };
@@ -63,8 +62,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     const original = window.schRenderInviteWhen;
     window.getInviteAudience = prefix => {
-        const selected = document.getElementById(prefix === 'ue' ? 'event-form-section' : 'sch-new-event')._inviteAudience;
-        return selected?.size ? [...selected] : ['__public__'];
+        const root=document.getElementById(prefix === 'ue' ? 'event-form-section' : 'sch-new-event');
+        if(root._inviteAudienceMode!=='groups')return ['__public__'];
+        if(!root._inviteAudience.size)throw new Error('Select at least one group · กรุณาเลือกอย่างน้อยหนึ่งกลุ่ม');
+        return [...root._inviteAudience];
     };
     window.schRenderInviteWhen = function(prefix = 'sne') {
         original(prefix);
