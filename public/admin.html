@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.15)</title>
+    <title>Nika Admin (V100.16)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6393,6 +6393,7 @@
 <link rel="stylesheet" href="ai-usage-overview.css?v=V100.11">
 <script src="quiz-curate-history.js?v=V100.08"></script>
 <script src="quiz-curate.js?v=V100.09"></script>
+<script src="quiz-merge.js?v=V100.16"></script>
 <script src="quiz-compare-cleanup.js?v=V100.13"></script>
 <link rel="stylesheet" href="quiz-compare-cleanup.css?v=V100.02">
 <link rel="stylesheet" href="learning-review.css?v=V100.13">
@@ -6918,6 +6919,7 @@
                         <button onclick="bulkSetQuizActive(false)" style="padding:6px 14px; border:none; border-radius:8px; background:#64748b; color:#fff; font-size:0.78em; font-weight:800; cursor:pointer;">⏹️ Deactivate</button>
                         <button onclick="openBulkExportQuizPdfModal()" title="Export the selected quizzes as PDF — one combined file or one file each" style="padding:6px 14px; border:none; border-radius:8px; background:#0284c7; color:#fff; font-size:0.78em; font-weight:800; cursor:pointer;">📄 Export PDF</button>
                         <!-- V97.05: spot overlapping/duplicate questions across the selected quizzes before deciding to merge/retire any. -->
+                        <button onclick="openQuizMerge([...selectedQuizIds])" title="รวมชุดที่เลือกเป็น Quiz ใหม่" style="padding:6px 14px;border:0;border-radius:8px;background:#7c3aed;color:white;cursor:pointer;">Merge</button>
                         <button onclick="openQuizCompareModal()" title="Compare question stems across the selected quizzes — flags likely-duplicate questions" style="padding:6px 14px; border:none; border-radius:8px; background:#0891b2; color:#fff; font-size:0.78em; font-weight:800; cursor:pointer;">🔍 Compare</button>
                         <button onclick="bulkDeleteQuizzes()" style="padding:6px 14px; border:none; border-radius:8px; background:#ef4444; color:#fff; font-size:0.78em; font-weight:800; cursor:pointer;">🗑️ Delete</button>
                         <button onclick="clearQuizSelection()" style="padding:6px 12px; border:1px solid #c7d2fe; border-radius:8px; background:#fff; color:#3730a3; font-size:0.78em; font-weight:800; cursor:pointer;">Clear</button>
@@ -15661,6 +15663,7 @@
                 <h3 style="margin:0 0 4px; color:#0891b2; font-size:1.3em; display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-code-compare"></i> Compare Selected Quizzes</h3>
                 <button id="quiz-compare-ai-btn" type="button" onclick="quizCompareAiDeepCompare()" title="Ask AI to find questions testing the same concept in different words — the free text-similarity pass above only catches literal overlap. Costs tokens." style="padding:6px 14px; border:none; border-radius:8px; background:linear-gradient(135deg,#7c3aed,#a855f7); color:#fff; font-size:0.78em; font-weight:800; cursor:pointer; white-space:nowrap;">🤖 AI Deep Compare</button>
             </div>
+            <div id="quiz-compare-models" style="margin:10px 0;"></div>
             <div id="quiz-compare-summary" style="font-size:0.85em; color:#475569; margin-bottom:10px;"></div>
             <div id="quiz-compare-ai-result" style="margin-bottom:14px;"></div>
             <div id="quiz-compare-body" style="display:flex; flex-direction:column; gap:16px; max-height:60vh; overflow-y:auto;"></div>
@@ -30819,6 +30822,9 @@ ${JSON.stringify(sourceObj)}`;
             });
             document.getElementById('quiz-compare-ai-result').replaceChildren();
             quizCompareOverlapData = [];
+            const compareModel = normalizeTextAIModel(localStorage.getItem('quiz_compare_model') || textAIModel('ai-analyzer-model-val'));
+            document.getElementById('quiz-compare-models').innerHTML = textAIChipsHtml('', compareModel, "selectStoredTextAIModel(this,'quiz_compare_model');syncQuizCompareModelHint()");
+            syncQuizCompareModelHint();
             const compareAiButton = document.getElementById('quiz-compare-ai-btn');
             compareAiButton.disabled = false; compareAiButton.textContent = '🤖 AI Deep Compare';
 
@@ -30901,6 +30907,10 @@ ${JSON.stringify(sourceObj)}`;
         // across two quizzes). One AI call for the whole selection (not O(n²) pairwise —
         // keeps cost flat regardless of question count) asks the model to name concept-level
         // overlaps. Opt-in / costs tokens, so it's a separate button, not automatic.
+        function syncQuizCompareModelHint() {
+            const selected = document.querySelector('#quiz-compare-models [aria-pressed="true"]');
+            document.getElementById('quiz-compare-ai-btn').title = 'ใช้ ' + (selected?.getAttribute('aria-label') || '') + ' เปรียบเทียบเนื้อหาข้ามชุด · ใช้โทเคน';
+        }
         async function quizCompareAiDeepCompare() {
             const cleanupSession = quizCleanup.session();
             const usable = quizCleanup.quizzes();
@@ -30908,6 +30918,9 @@ ${JSON.stringify(sourceObj)}`;
 
             const btn = document.getElementById('quiz-compare-ai-btn');
             const resultEl = document.getElementById('quiz-compare-ai-result');
+            if (btn?.disabled) return;
+            const modelButtons = document.querySelectorAll('#quiz-compare-models button');
+            modelButtons.forEach(b => b.disabled = true);
             const oldText = btn ? btn.innerHTML : '';
             if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> AI กำลังเทียบ…'; }
             if (resultEl) resultEl.innerHTML = '';
@@ -30938,7 +30951,7 @@ RULES:
 - If no overlaps found, return {"overlaps": []}. An empty array is a valid, good answer.`;
 
             try {
-                const selectedModel = document.getElementById('ai-analyzer-model-val')?.value || 'gemini-3.8-flash';
+                const selectedModel = normalizeTextAIModel(document.querySelector('#quiz-compare-models [aria-pressed="true"]')?.dataset.value);
                 let resultRaw = '', result = null;
                 for (let attempt = 1; attempt <= 2; attempt++) {
                     const aiResp = await callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 8192, feature: 'quiz_compare_ai' });
@@ -30985,7 +30998,7 @@ RULES:
                 console.error('[quizCompareAiDeepCompare]', e);
                 if (resultEl) resultEl.innerHTML = '<div style="padding:10px 12px; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; color:#991b1b; font-size:0.85em;">⚠️ AI compare error: ' + escapeHtml(e && e.message ? e.message : 'unknown') + '</div>';
             } finally {
-                if (btn && quizCleanup.session() === cleanupSession) { btn.disabled = false; btn.innerHTML = oldText; }
+                if (btn && quizCleanup.session() === cleanupSession) { btn.disabled = false; btn.innerHTML = oldText; modelButtons.forEach(b => b.disabled = false); }
             }
         }
 
