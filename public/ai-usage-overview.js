@@ -32,6 +32,34 @@
         }).finally(()=>pending=null);
         return pending;
     }
+    let closeBubble;
+    function modelBubble(anchor, day, hour, data) {
+        closeBubble?.();
+        const bubble=node('div',undefined,'au-model-bubble');bubble.setAttribute('role','dialog');bubble.setAttribute('aria-label','Hourly model usage');
+        const close=node('button','×');close.type='button';close.setAttribute('aria-label','Close model usage');
+        const heading=node('div',undefined,'au-bubble-heading');heading.append(node('strong',day+' · '+hour+':00–'+hour+':59'),close);bubble.append(heading,node('small','Bangkok time'));
+        if(!data)bubble.append(node('p','No recorded usage for this hour.'));
+        else {
+            bubble.append(node('p',number(data.count)+' calls · '+number(data.tokens)+' tokens'),node('h4','Top models by tokens'));
+            const rows=Object.values(data.models||{}).sort((a,b)=>Number(b.tokens||0)-Number(a.tokens||0));
+            rows.slice(0,3).forEach((m,i)=>{
+                const row=node('div',undefined,'au-model-rank');const label=window.TEXT_AI_MODELS?.find(x=>x.id===m.model)?.label||m.model;
+                row.append(node('span',(i+1)+'. '+label),node('strong',number(m.tokens)+' tokens'));bubble.append(row);
+            });
+            if(!rows.length)bubble.append(node('p','Model breakdown unavailable.'));
+            const other=rows.slice(3).reduce((n,m)=>n+Number(m.tokens||0),0);
+            const unknown=Math.max(0,Number(data.tokens||0)-rows.reduce((n,m)=>n+Number(m.tokens||0),0));
+            if(other)bubble.append(node('small','Other models · '+number(other)+' tokens'));
+            if(unknown)bubble.append(node('small','Unattributed · '+number(unknown)+' tokens'));
+        }
+        document.body.append(bubble);anchor.setAttribute('aria-expanded','true');
+        const r=anchor.getBoundingClientRect();bubble.style.left=Math.max(8,Math.min(r.left,innerWidth-bubble.offsetWidth-8))+'px';bubble.style.top=Math.max(8,Math.min(r.bottom+8,innerHeight-bubble.offsetHeight-8))+'px';
+        const dismiss=e=>{if(!bubble.contains(e.target)&&e.target!==anchor)cleanup(false);};
+        const key=e=>{if(e.key==='Escape'){e.stopPropagation();cleanup(true);}};
+        const scroll=()=>cleanup(false);
+        function cleanup(focus){bubble.remove();anchor.setAttribute('aria-expanded','false');document.removeEventListener('pointerdown',dismiss,true);document.removeEventListener('keydown',key,true);window.removeEventListener('scroll',scroll,true);window.removeEventListener('resize',scroll);closeBubble=null;if(focus&&anchor.isConnected)anchor.focus();}
+        close.onclick=()=>cleanup(true);closeBubble=()=>cleanup(false);document.addEventListener('pointerdown',dismiss,true);document.addEventListener('keydown',key,true);window.addEventListener('scroll',scroll,true);window.addEventListener('resize',scroll);close.focus({preventScroll:true});
+    }
     function hourly(body, a, metric) {
         const scroll=node('div',undefined,'au-scroll'), table=node('table'), header=node('tr');
         header.append(node('th','Date'));
@@ -48,7 +76,7 @@
                 const label=day+' · '+hour+':00–'+hour+':59 · '+(v?number(v.count)+' calls · '+number(v.tokens)+' tokens':'No recorded data');
                 b.title=label;b.setAttribute('aria-label',label);
                 b.style.background=v?'rgba(99,102,241,'+(0.12+0.7*Number(v[metric]||0)/max)+')':'#edf0f5';
-                b.onclick=()=>{readout.textContent=label+(v?' · Models: '+Object.values(v.models||{}).map(m=>m.model+' '+number(m[metric])+' '+(metric==='count'?'calls':'tokens')).join(', ')+' · Features: '+Object.keys(v.features||{}).join(', '):'');};
+                b.setAttribute('aria-haspopup','dialog');b.setAttribute('aria-expanded','false');b.onclick=()=>{readout.textContent=label;modelBubble(b,day,hour,v);};
                 td.append(b);tr.append(td);
             }table.append(tr);
         }
@@ -60,7 +88,7 @@
     async function mount(host, compact=false, refresh=false) {
         if (typeof host === 'string') host = document.getElementById(host);
         if (!host) return;
-        host.classList.add('ai-usage-overview'); host.textContent='Loading usage…';
+        closeBubble?.();host.classList.add('ai-usage-overview'); host.textContent='Loading usage…';
         try {
             const docs=await load(refresh); host.replaceChildren();
             const controls=node('div',undefined,'au-controls'), range=node('select'), metric=node('select'), view=node('select'), refreshButton=node('button','Refresh');
@@ -71,7 +99,7 @@
             view.setAttribute('aria-label','Activity view');['Hourly','Daily'].forEach(v=>view.add(new Option(v,v)));controls.append(range,view,metric,refreshButton);host.append(controls);
             const body=node('div');host.append(body);
             function render(){
-                body.replaceChildren();const a=aggregate(docs,Number(range.value));
+                closeBubble?.();body.replaceChildren();const a=aggregate(docs,Number(range.value));
                 const stats=node('div',undefined,'au-stats');
                 for(const [label,value] of [['Calls',number(a.calls)],['Tokens',number(a.tokens)],['Est. cost','—']]){
                     const card=node('div');card.append(node('small',label),node('strong',value));stats.append(card);
