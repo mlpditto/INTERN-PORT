@@ -32,8 +32,8 @@
         if (!doc.exists) throw Error('A selected quiz no longer exists. Reopen Compare.');
         const data = doc.data();
         if (fp(data.questions) !== fp(group.q.questions)) throw Error('Questions changed since comparison. Reopen Compare before removing anything.');
-        if (group.removed.length >= data.questions.length) throw Error('Each quiz must retain at least one question. Undo a selection.');
-        return { ...group, ref, data, copy: data.isActive !== false || !attempts.empty || !sessions.empty };
+        const deleteWhole = group.removed.length === data.questions.length;
+        return { ...group, ref, data, deleteWhole, copy: !deleteWhole && (data.isActive !== false || !attempts.empty || !sessions.empty) };
     }
     function setupReview() {
         if (review) return;
@@ -62,11 +62,11 @@
                 p.backup = db.collection('quizzes').doc(); p.output = p.copy ? db.collection('quizzes').doc() : p.ref;
                 const section = el('section');
                 section.append(el('h4', (p.data.shortTitle || p.data.title || p.ref.id) + ' · ' + p.data.questions.length + ' → ' + (p.data.questions.length - p.removed.length)));
-                section.append(el('p', p.copy ? 'Save cleaned copy · Original preserved (active quiz or exam history)' : 'Remove from original · Before Cleanup backup'));
+                section.append(el('p', p.deleteWhole ? 'Delete entire quiz · Remove from the quiz list and deactivate. Questions and existing history remain stored.' : p.copy ? 'Save cleaned copy · Original preserved (active quiz or exam history)' : 'Remove from original · Before Cleanup backup'));
                 for (const index of p.removed) section.append(el('div', 'Q' + (index + 1) + ' · ' + p.data.questions[index].q));
                 document.getElementById('qc-plan').append(section);
             }
-            status.textContent = 'Review every question above. Backups and changes save together. Cleaned copies start inactive; total points stay unchanged.';
+            status.textContent = s.plan.some(p => p.deleteWhole) ? 'Confirm the entire quizzes marked for deletion above. They will be hidden and deactivated; stored questions and history are preserved.' : 'Review every question above. Backups and changes save together. Cleaned copies start inactive; total points stay unchanged.';
             confirm.textContent = s.plan.every(p => p.copy) ? 'Save cleaned copies' : 'Confirm removal'; confirm.disabled = false;
         } catch (e) { s.plan = null; status.textContent = e.message; }
         finally { s.busy = false; sync(); document.getElementById('qc-cancel').disabled = false; }
@@ -99,7 +99,11 @@
                         const { id, ...data } = p.data;
                         const backup = { ...data, title: (data.title || 'Quiz') + ' (Before Cleanup)', isActive: false, isTemplate: true, startTime: null, deadline: null, createdAt: timestamp, updatedAt: timestamp,
                             cleanupBackup: { sourceQuizId: p.ref.id, originalStartTime: data.startTime || null, originalDeadline: data.deadline || null } };
-                        tx.set(p.backup, backup);
+                        tx.set(p.backup, p.deleteWhole ? { ...backup, isHistoryRevision: true } : backup);
+                        if (p.deleteWhole) {
+                            tx.update(p.ref, { isActive: false, isHistoryRevision: true, deletedByCleanup: true, updatedAt: timestamp, cleanup: { backupQuizId: p.backup.id, deletedEntireQuiz: true } });
+                            return;
+                        }
                         const questions = data.questions.filter((_, i) => !p.removed.includes(i));
                         const cleanup = { sourceQuizId: p.ref.id, backupQuizId: p.backup.id, originalQuestionNumbersRemoved: p.removed.map(i => i + 1) };
                         if (p.copy) {
@@ -112,9 +116,9 @@
                     });
                 });
             }
-            const outputs = await Promise.all(s.plan.map(async p => ({ sourceId: p.ref.id, copy: p.copy, quiz: { ...(await p.output.get({ source: 'server' })).data(), id: p.output.id } })));
+            const outputs = await Promise.all(s.plan.map(async p => ({ sourceId: p.ref.id, copy: p.copy, deleted: p.deleteWhole, quiz: { ...(await p.output.get({ source: 'server' })).data(), id: p.output.id } })));
             review.close(); s.busy = false; s.pending = false; s.marks.clear(); s.onDone(outputs);
-            showToast('Cleanup saved. Before Cleanup backups are available in the quiz list.');
+            showToast('Cleanup saved. Deleted quizzes are hidden; their history is preserved.');
         } catch (e) { status.textContent = 'Could not finish: ' + e.message; }
         finally { s.busy = false; sync(); document.getElementById('qc-confirm').disabled = false; document.getElementById('qc-cancel').disabled = false; }
     }
