@@ -66,10 +66,17 @@
         const input = document.getElementById(id);
         if (!input || bindings.has(id)) return;
         if (input.tagName === 'SELECT') options(input);
-        if (!host) { host = document.createElement('div'); input.after(host); }
         const pref = preferences[id];
         key = key || pref?.[1];
         input.value = window.normalizeTextAIModel((key && localStorage.getItem(key)) || input.value);
+        // Compact controls keep the catalog and persisted preference without a chip rail.
+        if (input.hasAttribute('data-native-model')) {
+            bindings.set(id, { rail: input, key });
+            input.addEventListener('change', () => window.syncRegistryModelSelect(id));
+            window.syncRegistryModelSelect(id);
+            return;
+        }
+        if (!host) { host = document.createElement('div'); input.after(host); }
         host.className = 'text-ai-chips lang-no-toggle';
         host.removeAttribute('style');
         host.setAttribute('role', 'group');
