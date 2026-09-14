@@ -355,6 +355,11 @@ async function recordAiUsage(provider, model, tokens, isAdmin, feature, usage = 
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             totalTokens: inc(t),
             totalCount: inc(1),
+            hours: { [new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', hourCycle: 'h23' })]: {
+                tokens: inc(t), count: inc(1),
+                models: { [Buffer.from(prov + ':' + (model || 'unknown')).toString('base64url')]: { model: model || 'unknown', tokens: inc(t), count: inc(1) } },
+                features: { [feat]: { tokens: inc(t), count: inc(1) } }
+            } },
             models: { [Buffer.from(prov + ':' + (model || 'unknown')).toString('base64url')]: {
                 model: model || 'unknown', provider: prov, tokens: inc(t), count: inc(1),
                 ...(Number.isFinite(usage.inputTokens) && Number.isFinite(usage.outputTokens) ? {
