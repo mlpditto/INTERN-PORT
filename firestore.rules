@@ -208,7 +208,8 @@ service cloud.firestore {
     }
 
     // Announcements with a date — a webinar, a training day (V98.61). Read by any
-    // signed-in user; the client filters by targetGroups, which is presentation, not
+    // eligible audience; new social events start private to the creator and admin.
+    // Older audience rules described targetGroups as presentation, not
     // security: an event is an invitation, not a secret.
     // V98.81: two kinds of event, and the difference is enforced HERE, not in the UI.
     //   kind 'official' — an announcement from the programme. ADMIN ONLY, unchanged.
@@ -227,19 +228,26 @@ service cloud.firestore {
     //     the id `createdByUid` must hold; the LINE id and display name are stored
     //     alongside for showing who is inviting, exactly as event_interests does.
     match /events/{eventId} {
-      allow read: if isSignedIn();
-
-      allow create: if isAdmin()
-        || (isSignedIn()
-            && request.resource.data.kind == 'social'
-            && request.resource.data.createdByUid == request.auth.uid);
-
-      allow update: if isAdmin()
-        || (isSignedIn()
-            && resource.data.kind == 'social'
-            && resource.data.createdByUid == request.auth.uid
-            && request.resource.data.kind == 'social'
-            && request.resource.data.createdByUid == resource.data.createdByUid);
+      function audienceMatches(uid) {
+        return exists(/databases/$(database)/documents/users/$(uid)) &&
+          get(/databases/$(database)/documents/users/$(uid)).data.group in resource.data.targetGroups;
+      }
+      allow read: if isAdmin() || (isSignedIn() && (
+        ('createdByUid' in resource.data && resource.data.createdByUid == request.auth.uid) ||
+        '__public__' in resource.data.targetGroups ||
+        audienceMatches(request.auth.uid) ||
+        (exists(/databases/$(database)/documents/user_auth_links/$(request.auth.uid)) &&
+         audienceMatches(get(/databases/$(database)/documents/user_auth_links/$(request.auth.uid)).data.effectiveUserId))
+      ));
+      allow create: if isAdmin() || (isSignedIn()
+        && request.resource.data.kind == 'social'
+        && request.resource.data.createdByUid == request.auth.uid
+        && request.resource.data.targetGroups == []);
+      allow update: if isAdmin() || (isSignedIn()
+        && resource.data.kind == 'social' && resource.data.createdByUid == request.auth.uid
+        && request.resource.data.kind == 'social'
+        && request.resource.data.createdByUid == resource.data.createdByUid
+        && request.resource.data.targetGroups == resource.data.targetGroups);
 
       allow delete: if isAdmin()
         || (isSignedIn()
