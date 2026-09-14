@@ -9,7 +9,7 @@ const { chromium } = require('playwright');
         const errors = []; page.on('pageerror', e => errors.push(e.message));
         const html = fs.readFileSync('public/admin.html', 'utf8');
         assert(html.includes('onclick="openQuizCurate()"'));
-        assert(html.includes('src="quiz-curate.js?v=V100.06"'));
+        assert(html.includes('src="quiz-curate.js?v=V100.07"'));
         await page.setContent([...html.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/gi)].map(m => m[0]).join('\n') + '<input id="edit-quiz-id" value="source-quiz"><input id="ai-analyzer-model-val" value="gpt-5.6-luna">');
         await page.addStyleTag({ path: 'public/quiz-curate.css' });
         await page.addStyleTag({ path: 'public/text-ai-chips.css' });
@@ -258,7 +258,7 @@ const { chromium } = require('playwright');
             window.db = {
                 collection: name => name === 'quizzes' ? { doc } : { where: (field, op, value) => {
                     if (value !== 'source-quiz' || field !== (name === 'quiz_attempts' ? 'quizId' : 'examId')) throw Error('Wrong history query');
-                    return { limit: () => ({ get: async () => ({ empty: !(name === 'quiz_attempts' ? hasAttempts : hasSessions) }) }) };
+                    return { get: async () => { const present = name === 'quiz_attempts' ? hasAttempts : hasSessions; const id = name === 'quiz_attempts' ? 'old-attempt' : 'old-session'; return { empty: !present, docs: present ? [{ ref: doc(id), data: () => structuredClone(records[id] || {}) }] : [] }; } };
                 } },
                 runTransaction: async callback => {
                     const pending = [];
@@ -271,7 +271,7 @@ const { chromium } = require('playwright');
             };
         });
         const apply = async () => { assert.equal(await page.locator('#curate-apply').isDisabled(), false, await feedback()); await page.locator('#curate-apply').click(); };
-        for (const flag of ['active', 'attempts', 'sessions']) {
+        for (const flag of ['active']) {
             await page.evaluate(flag => { records['source-quiz'] = structuredClone(stored); records['source-quiz'].isActive = flag === 'active'; hasAttempts = flag === 'attempts'; hasSessions = flag === 'sessions'; }, flag);
             await open(); await suggest(result()); await apply();
             assert.match(await feedback(), flag === 'active' ? /quiz is active/ : /attempts or exam sessions/);
@@ -290,7 +290,8 @@ const { chromium } = require('playwright');
         await page.evaluate(() => { txFail = false; txUncertain = true; }); page.once('dialog', d => d.accept()); await apply();
         assert.match(await feedback(), /Write response lost/);
         await page.evaluate(() => txUncertain = false); await apply();
-        assert.match(await feedback(), /Applied 10 questions/);
+        await page.waitForFunction(() => !document.getElementById('quiz-curate-dialog').open);
+        assert.equal(await page.locator('#quiz-curate-dialog').isVisible(), false);
         const applied = await page.evaluate(() => records);
         const current = applied['source-quiz'], backup = applied[current.curation.backupQuizId];
         assert.equal(current.questions.length, 10); assert.equal(current.isActive, false);
@@ -298,8 +299,34 @@ const { chromium } = require('playwright');
         assert.equal(backup.curationBackup.sourceQuizId, 'source-quiz');
         assert.equal(current.lastAiAnalysis, undefined); assert.equal(current.lastAiAudit, undefined); assert.equal(current.translations, undefined);
         assert.equal(await page.evaluate(() => atomicWrites), 2, 'retry cannot duplicate backup or update');
-        await close();
         await page.evaluate(() => { records = { 'source-quiz': structuredClone(stored) }; atomicWrites = 0; });
+        await page.evaluate(() => {
+            records = { 'source-quiz': structuredClone(stored),
+                'old-attempt': { quizId: 'source-quiz', answers: [0,1], score: 7, status: 'approved' },
+                'old-session': { examId: 'source-quiz', state: 'done', finalAnswers: {0:1} } };
+            hasAttempts = hasSessions = true; atomicWrites = 0;
+        });
+        await open(); await suggest(result());
+        await page.evaluate(() => txFail = true);
+        page.once('dialog', d => d.accept()); await apply();
+        assert.equal(await page.evaluate(() => records['old-attempt'].quizRevisionId), undefined);
+        assert.equal(await page.evaluate(() => records['source-quiz'].questions.length), 14);
+        assert(await page.locator('#quiz-curate-dialog').isVisible());
+        await page.evaluate(() => txFail = false);
+        page.once('dialog', d => d.accept()); await apply();
+        await page.waitForFunction(() => !document.getElementById('quiz-curate-dialog').open);
+        const historical = await page.evaluate(() => records);
+        const revisionId = historical['source-quiz'].curation.backupQuizId;
+        assert.equal(historical['old-attempt'].quizRevisionId, revisionId);
+        assert.equal(historical['old-session'].quizRevisionId, revisionId);
+        assert.deepEqual(historical['old-attempt'].answers, [0,1]);
+        assert.equal(historical['old-attempt'].score, 7);
+        assert.equal(historical[revisionId].questions.length, 14);
+        assert.equal(historical['source-quiz'].questions.length, 10);
+        assert.deepEqual(historical['old-session'].finalAnswers, {0:1});
+        await page.addScriptTag({ path: 'public/quiz-revision.js' });
+        assert.equal(await page.evaluate(() => quizForAttempt(records['source-quiz'], records['old-attempt'], Object.entries(records).map(([id,q]) => ({...q,id}))).questions.length), 14);
+        await page.evaluate(() => { records = { 'source-quiz': structuredClone(stored) }; atomicWrites = 0; hasAttempts = hasSessions = false; });
         const split = () => page.locator('#curate-split').click();
         for (const flag of ['active', 'attempts', 'sessions']) {
             await page.evaluate(flag => { records['source-quiz'].isActive = flag === 'active'; hasAttempts = flag === 'attempts'; hasSessions = flag === 'sessions'; }, flag);

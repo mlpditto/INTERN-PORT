@@ -1615,7 +1615,7 @@
             }
             let quiz;
             try {
-                quiz = await loadQuizForSession(examId);
+                quiz = await loadQuizForSession(session.quizRevisionId || examId);
             } catch (e) {
                 showError('Could not load quiz', e.message || String(e));
                 return;
@@ -2025,6 +2025,7 @@
                 const attemptDoc = {
                     userId: myUid,
                     quizId: examId,
+                    ...(session.quizRevisionId ? { quizRevisionId: session.quizRevisionId } : {}),
                     correctCount: attempt.correctCount,
                     totalQuestions: attempt.totalQuestions,
                     answers: attempt.answers,
@@ -2175,7 +2176,7 @@
             let quiz = null;
             try {
                 if (session.examId) {
-                    quiz = await loadQuizForSession(session.examId);
+                    quiz = await loadQuizForSession(session.quizRevisionId || session.examId);
                     // Phase 4.a retry: writeMyAttempt may have bailed earlier if quiz wasn't cached.
                     if (!(session.attemptIds && session.attemptIds[myProfile.userId])) writeMyAttempt(session);
                     const total = Array.isArray(quiz.questions) ? quiz.questions.length : 0;
