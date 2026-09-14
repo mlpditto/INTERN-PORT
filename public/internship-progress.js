@@ -9,13 +9,29 @@
   return {start,end,key:kind+'-'+start.toISOString().slice(0,10)};
  }
  function editGoal(){
-  const d=el('dialog');d.className='ip-share';d.innerHTML='<h3>🎯 SMART GOALS</h3><label>Period<select><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option></select></label><label>Quiz target<input type="number" min="1" max="10000" step="1"></label><p class="ip-range"></p><p role="status"></p><button class="cancel">Cancel</button> <button class="save">Save goal</button>';
-  const select=d.querySelector('select'),input=d.querySelector('input');select.value=period.goal?.kind||'monthly';input.value=period.goal?.target||30;
-  const range=()=>{const c=cycle(select.value);d.querySelector('.ip-range').textContent=c.start.toLocaleDateString('en-GB',{timeZone:'Asia/Bangkok'})+' – '+new Date(+c.end-86400000).toLocaleDateString('en-GB',{timeZone:'Asia/Bangkok'});};range();select.onchange=range;
-  d.querySelector('.cancel').onclick=()=>d.close();d.addEventListener('close',()=>d.remove());d.querySelector('.save').onclick=async()=>{
-   const target=Number(input.value);if(!Number.isInteger(target)||target<1||target>10000){d.querySelector('[role=status]').textContent='Enter a whole number from 1 to 10,000.';return;}
-   const goal={kind:select.value,target},c=cycle(goal.kind);d.querySelector('.save').disabled=true;
-   try{await period.saveGoal(goal,c.key);period.goal=goal;d.close();render();}catch(e){d.querySelector('[role=status]').textContent='Could not save. Please retry.';d.querySelector('.save').disabled=false;}
+  const d=el('dialog');d.className='ip-share ip-goal-editor';d.setAttribute('aria-labelledby','ip-goal-title');
+  d.innerHTML='<header><h3 id="ip-goal-title">🎯 SMART GOALS</h3><button class="cancel" aria-label="Close" title="ปิด">×</button></header><p class="ip-muted">Set your quiz learning goal</p><h4>1 · Choose a period</h4><div class="ip-periods" role="group" aria-label="Goal period"></div><p class="ip-range" title="ช่วงวันที่ตามปฏิทิน เวลาไทย"></p><h4>2 · Set your target</h4><div class="ip-target-box"><label for="ip-goal-number">Quiz target<small class="ip-unit"></small></label><div class="ip-stepper"><button class="minus" aria-label="Decrease target" title="ลดเป้าหมาย">−</button><input id="ip-goal-number" type="number" min="1" max="10000" step="1" title="จำนวน Quiz เป้าหมายในรอบที่เลือก"><button class="plus" aria-label="Increase target" title="เพิ่มเป้าหมาย">+</button></div></div><h4>3 · Preview your progress</h4><div class="ip-goal-preview" aria-live="polite"></div><details><summary title="ดูจำนวน Quiz สะสมและรอบก่อน">Past activity</summary><div class="ip-past"></div></details><p class="ip-muted" title="นับ Quiz ชุดเดิมครั้งเดียวต่อรอบ ไม่นับแบบฝึกหัด">ⓘ Repeat attempts count once per quiz.</p><p role="status"></p><footer><button class="cancel" title="ยกเลิก">Cancel</button><button class="save" title="บันทึกเป้าหมาย">Save goal</button></footer>';
+  const input=d.querySelector('input');let kind=period.goal?.kind||'monthly';const drafts={monthly:period.monthlyTarget||30};if(period.goal)drafts[period.goal.kind]=period.goal.target;input.value=drafts[kind]||30;
+  function refresh(){
+   const c=cycle(kind),target=Number(input.value),valid=input.validity.valid&&Number.isInteger(target)&&target>0;
+   d.querySelectorAll('[data-kind]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.kind===kind)));
+   const result=calculate({personal:true,goal:{kind,target:valid?target:1}},attempts);
+   d.querySelector('.ip-range').textContent=c.start.toLocaleDateString('en-GB',{timeZone:'Asia/Bangkok'})+' – '+new Date(+c.end-86400000).toLocaleDateString('en-GB',{timeZone:'Asia/Bangkok'})+' · '+result.daysLeft+' days left';
+   d.querySelector('.ip-unit').textContent='Unique quizzes per '+({monthly:'month',quarterly:'quarter',yearly:'year'}[kind]);
+   const box=d.querySelector('.ip-goal-preview');box.replaceChildren();
+   if(attempts===null){box.append(el('p','Loading quiz progress…'));}else if(!valid){box.append(el('p','Enter a target from 1 to 10,000.'));}else{
+    const top=el('div');top.className='ip-head';top.append(el('strong','Completed this '+({monthly:'month',quarterly:'quarter',yearly:'year'}[kind])),el('strong',result.done+' / '+target));
+    const bar=el('progress');bar.max=target;bar.value=Math.min(result.done,target);bar.setAttribute('aria-label','Goal progress');box.append(top,bar,el('p',Math.round(result.done/target*100)+'% complete · '+(result.remaining?result.remaining+' quizzes to go':'Goal reached ✓')));
+   }
+   const previous=new Date(+c.start-86400000),old=calculate({personal:true,goal:{kind,target:1}},attempts,previous),all=new Set((attempts||[]).filter(r=>r.quizId&&['approved','pending','completed','graded'].includes(r.status)&&!r.isPractice).map(r=>r.quizId));
+   d.querySelector('.ip-past').textContent=attempts===null?'Data not loaded':all.size+' unique quizzes overall · Previous '+({monthly:'month',quarterly:'quarter',yearly:'year'}[kind])+': '+old.done;
+  }
+  ['monthly','quarterly','yearly'].forEach(k=>{const btn=el('button',k[0].toUpperCase()+k.slice(1));btn.dataset.kind=k;btn.title={monthly:'รายเดือน',quarterly:'รายไตรมาส',yearly:'รายปี'}[k];btn.onclick=()=>{drafts[kind]=input.value;kind=k;input.value=drafts[k]||30;refresh();};d.querySelector('.ip-periods').append(btn);});
+  input.oninput=refresh;d.querySelector('.minus').onclick=()=>{input.value=Math.max(1,(Number(input.value)||1)-1);refresh();};d.querySelector('.plus').onclick=()=>{input.value=Math.min(10000,(Number(input.value)||0)+1);refresh();};refresh();
+  d.querySelectorAll('.cancel').forEach(b=>b.onclick=()=>d.close());d.addEventListener('close',()=>d.remove());d.querySelector('.save').onclick=async()=>{
+   const target=Number(input.value);if(!input.validity.valid||!Number.isInteger(target)||target<1||target>10000){d.querySelector('[role=status]').textContent='Enter a whole number from 1 to 10,000.';input.focus();return;}
+   const goal={kind,target},c=cycle(kind);d.querySelector('.save').disabled=true;
+   try{await period.saveGoal(goal,c.key);period.goal=goal;if(kind==='monthly')period.monthlyTarget=target;d.close();render();}catch(e){d.querySelector('[role=status]').textContent='Could not save. Please retry.';d.querySelector('.save').disabled=false;}
   };document.body.append(d);d.showModal();
  }
  function calculate(p,rows,now=new Date()){
