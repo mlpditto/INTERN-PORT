@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V100.22)</title>
+    <title>Internship Portfolio (V100.24)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -2147,7 +2147,7 @@
 <link rel="stylesheet" href="learning-review.css?v=V99.81">
 <link rel="stylesheet" href="history-compact.css?v=V99.81"><link rel="stylesheet" href="delete-requests.css?v=V99.82">
 <link rel="stylesheet" href="case-compact.css?v=V99.88">
-<script src="internship-progress.js?v=V100.22"></script><link rel="stylesheet" href="internship-progress.css?v=V100.22">
+<script src="internship-progress.js?v=V100.24"></script><link rel="stylesheet" href="internship-progress.css?v=V100.22">
 </head>
 
 <body>
@@ -5624,9 +5624,10 @@
     <div id="scheduleModal" class="modal">
         <div class="modal-content" style="max-width: 440px; text-align: left; padding: 16px 0 0;">
             <div class="sch-modal-header">
-                <h3 style="margin:0; font-size:1.05em; color:#7c3aed; min-width:0;">
-                    <i class="fa-solid fa-calendar-days"></i> Schedule
-                </h3>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;">
+                    <h3 style="margin:0;font-size:1.05em;color:#7c3aed;">📅 Schedule</h3>
+                    <button id="sch-edit-dates-btn" class="lang-no-toggle" type="button" onclick="schEditDates()" title="แก้ไขวันเริ่มและวันสิ้นสุดการฝึกงาน" style="width:auto;margin:0;min-height:32px;padding:4px 10px;border:1px solid #ddd6fe;border-radius:999px;background:#f5f3ff;color:#7c3aed;font-size:12px;font-weight:700;cursor:pointer;">Edit dates</button>
+                </div>
                 <div class="sch-header-actions">
                     <button type="button" id="sch-invite-btn" class="lang-no-toggle" onclick="schSwitchPane('agenda'); schToggleNewEvent(true)"
                         style="width:auto; padding:5px 10px; font-size:0.72em; font-weight:800; border:1px solid #ddd6fe; background:#f5f3ff; color:#6d28d9; border-radius:999px; cursor:pointer; white-space:nowrap;"
@@ -7717,7 +7718,7 @@
             const me = profile || ((typeof myOwnRow === 'function') ? myOwnRow() : {});
             const status = document.getElementById('u-period-status');
             const personal = me && me.notAnInternship === true;
-            window.internshipProgress?.setPeriod({start:start,end:end,personal,name:me?.displayName||''});
+            window.internshipProgress?.setPeriod({start:start,end:end,personal,name:me?.displayName||'',goal:me?.learningGoal,history:me?.learningGoalHistory,saveGoal:async(goal,key)=>{await db.collection('users').doc(userId).update({learningGoal:goal,['learningGoalHistory.'+key]:goal});}});
             const invalid = !start || !end || !Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start;
             const tooLong = !invalid && !personal && Math.round((end - start) / 86400000) > SCH_MAX_SPAN_DAYS;
             if (status) {
@@ -14187,10 +14188,6 @@
                     + '<button type="button"' + (schWeekPage < pages - 1 ? ' onclick="schWeekPageShift(1)"' : '')
                     + ' style="' + (schWeekPage < pages - 1 ? nav : navOff) + '">›</button></div>';
             }
-            html += '<div style="text-align:center; margin-top:9px;">'
-                + '<button type="button" onclick="schEditDates()" style="width:auto; min-height:0; cursor:pointer; '
-                + 'font-size:0.7em; font-weight:800; color:#7c3aed; background:#f5f3ff; border:1px solid #ddd6fe; '
-                + 'border-radius:999px; padding:4px 12px;">Edit dates แก้วันที่</button></div>';
             grid.innerHTML = html;
 
             // Summary. Every number is followed by a Latin word before any Thai
