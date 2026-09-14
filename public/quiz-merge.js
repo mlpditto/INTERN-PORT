@@ -1,5 +1,11 @@
 (function () {
     const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
+    // Firestore maps have no significant key order; arrays (question order) do.
+    function canonical(value){
+        if(Array.isArray(value))return value.map(canonical);
+        if(value&&typeof value==='object')return Object.fromEntries(Object.keys(value).sort().map(k=>[k,canonical(value[k])]));
+        return value;
+    }
     window.openQuizMerge = function(ids) {
         if(ids.length<2)return showToast('Select at least two quizzes');
         if(ids.length>100)return showToast('Select at most 100 quizzes');
@@ -38,14 +44,16 @@
                 await db.runTransaction(async tx=>{
                     if((await tx.get(attempt.ref)).exists)return;
                     const docs=await Promise.all(attempt.sources.map(s=>tx.get(s.ref)));
-                    docs.forEach((d,i)=>{if(!d.exists||JSON.stringify(d.data())!==JSON.stringify(attempt.sources[i].data))throw Error('Source changed. Close and review again.');});
+                    docs.forEach((d,i)=>{if(!d.exists||JSON.stringify(canonical(d.data()))!==JSON.stringify(canonical(attempt.sources[i].data)))throw Object.assign(Error('Source changed. Reload sources and review before merging.'),{code:'source-changed'});});
                     const stamp=firebase.firestore.FieldValue.serverTimestamp();const data={...attempt.sources[0].data,title:attempt.title,shortTitle:attempt.title,totalPoints:attempt.points,questions:attempt.sources.flatMap(s=>s.data.questions),isActive:false,isTemplate:true,startTime:null,deadline:null,createdAt:stamp,updatedAt:stamp,mergeSources:attempt.sources.map(s=>s.ref.id)};
                     ['id','translations','lastAiAnalysis','lastAiAudit','cleanup','curation','lastLiveAt','deadlineFloor','isHistoryRevision','deletedByCleanup'].forEach(k=>delete data[k]);
                     tx.set(attempt.ref,data);
                     if(attempt.remove)attempt.sources.forEach(s=>tx.update(s.ref,{isActive:false,isHistoryRevision:true,mergedIntoQuizId:attempt.ref.id,updatedAt:stamp}));
                 });
                 dialog.close();showToast('Merged quiz created · Inactive');
-            }catch(e){status.textContent='Could not save: '+e.message+' · Retry uses the same merge.';save.disabled=false;dialog.querySelector('#qm-back').disabled=false;}
+            }catch(e){status.textContent='Could not save: '+e.message+(e.code==='source-changed'?'':' · Retry uses the same merge.');save.disabled=false;dialog.querySelector('#qm-back').disabled=false;
+                if(e.code==='source-changed'){save.textContent='↻ Reload sources';save.onclick=()=>{dialog.close();window.openQuizMerge(ids);};}
+            }
             finally{busy=false;}
         };
     };
