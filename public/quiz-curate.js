@@ -160,6 +160,9 @@
         dialog.querySelector('.curate-controls').before(models);
         const comparison = node('div'); comparison.id = 'curate-comparison'; comparison.hidden = true;
         dialog.querySelector('.curate-review').after(comparison);
+        const backupOption = node('label'); backupOption.className = 'curate-backup-option';
+        backupOption.innerHTML = '<input type="checkbox" id="curate-create-backup" checked> Create backup quiz <span title="ใช้กับ Remove เท่านั้น หากปิดจะไม่เพิ่มสำเนาในรายการ Quiz แต่ยังเก็บเวอร์ชันที่จำเป็นต่อประวัติคำตอบเดิม">ⓘ</span>';
+        dialog.querySelector('.curate-footer').before(backupOption);
         const apply = node('button', 'Apply to current quiz', 'curate-apply'); apply.type = 'button'; apply.id = 'curate-apply';
         apply.title = 'ตัดข้อออกจากชุดเดิมที่ปิดใช้งานและไม่มีประวัติ พร้อมสร้างสำเนาก่อนแก้ไข';
         byId('curate-save').after(apply);
@@ -256,11 +259,12 @@
         });
         byId('curate-save').disabled = s.busy || s.saving || s.saved || !!problem(s);
         byId('curate-save').textContent = s.saving ? 'Saving…' : s.saved ? 'Saved' : 'Save as new quiz';
+        byId('curate-create-backup').disabled = s.busy || s.saving || s.saved || !!s.applyOperation?.backupRef;
         byId('curate-apply').disabled = s.busy || s.saving || s.saved || !s.source.sourceId || !!problem(s) || s.keep.size === count;
         byId('curate-split').disabled = byId('curate-apply').disabled;
         byId('curate-split').textContent = s.splitting ? 'Splitting…' : 'Split into two quizzes';
         byId('curate-apply').textContent = s.applying ? 'Applying…' : 'Remove ' + (count - s.keep.size) + ' from original';
-        dialog.querySelector('.curate-main > .curate-note').textContent = 'Save a new inactive copy, or apply to an inactive quiz with no attempts or exam sessions. Split keeps Keep in the original and moves Remove to a new inactive quiz. A backup is saved first.';
+        dialog.querySelector('.curate-main > .curate-note').textContent = 'Remove updates the inactive original. Create backup quiz is optional; required history versions are preserved. Split creates a new quiz from removed questions.';
         byId('curate-suggest').textContent = s.busy ? 'Processing · ' + elapsed(s) : s.done ? 'Run again' : '✦ Suggest';
         byId('curate-suggest').title = s.busy ? 'ความคืบหน้าตามขั้นตอนงาน API ไม่รายงานเปอร์เซ็นต์ประมวลผลจริงของโมเดล' : 'ให้ AI เสนอข้อที่ควรเก็บและตัด';
         renderComparison(s);
@@ -285,6 +289,7 @@
         byId('curate-target').max = source.form.questions.length;
         byId('curate-target').value = Math.min(10, source.form.questions.length - 1);
         byId('curate-instructions').value = ''; dialog.querySelector('.curate-instructions').open = false;
+        byId('curate-create-backup').checked = true;
         byId('curate-history').open = false; byId('curate-history-list').replaceChildren();
         byId('curate-history-status').textContent = source.sourceId ? 'Checking saved results…' : 'Save this quiz first to enable history.';
         render(); dialog.showModal(); byId('curate-target').focus();
@@ -423,10 +428,14 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
         if (history.length > 450) throw new Error('This quiz has too many history records for one atomic removal. No changes saved.');
         if (!unchanged(s)) throw new Error('The editor changed. Close Curate and reopen it.');
         const removed = s.source.form.questions.map((_, i) => i + 1).filter(id => !s.keep.has(id));
+        const createBackup = split || (operation.createBackup ?? byId('curate-create-backup').checked);
+        const preserveVersion = createBackup || history.length > 0;
+        const backupMessage = createBackup ? 'Create an inactive backup quiz.' : history.length ? 'No backup quiz in the list. A hidden version preserves existing answers and scores.' : 'No backup will be created. Removed questions cannot be restored from a backup.';
         const confirmation = split
             ? 'Split into two quizzes: ' + s.source.form.title + '\n\nOriginal keeps ' + ids.length + ': ' + ids.map(id => 'Q' + id).join(', ') + '\nNew inactive quiz receives ' + removed.length + ': ' + removed.map(id => 'Q' + id).join(', ') + '\n\nA Before Split backup will preserve all ' + s.source.form.questions.length + ' questions. Current editor settings will be saved; each resulting quiz retains the current total points.\n\nยืนยันแยก Keep ไว้ชุดเดิม และย้าย Remove ไปชุดใหม่ พร้อมสำเนาก่อนแยก?'
-            : 'Apply to current quiz: ' + s.source.form.title + '\n\nRemove: ' + removed.map(id => 'Q' + id).join(', ') + '\n' + s.source.form.questions.length + ' → ' + ids.length + ' questions.\n\nCurrent editor settings will also be saved. An inactive backup of the stored quiz will be created. Existing answers and scores remain linked to that version.\n\nยืนยันตัดข้อที่ระบุออกจากชุดเดิม พร้อมบันทึกการตั้งค่าปัจจุบันและสร้างสำเนาก่อนแก้ไข?';
+            : 'Apply to current quiz: ' + s.source.form.title + '\n\nRemove: ' + removed.map(id => 'Q' + id).join(', ') + '\n' + s.source.form.questions.length + ' → ' + ids.length + ' questions.\n\nCurrent editor settings will also be saved. ' + backupMessage + '\n\nยืนยันตัดข้อที่ระบุออกจากชุดเดิม และบันทึกการตั้งค่าปัจจุบัน?';
         if (!confirm(confirmation)) return false;
+        operation.createBackup = createBackup;
         if (!operation.backupRef) operation.backupRef = db.collection('quizzes').doc();
         if (split && !operation.newRef) operation.newRef = db.collection('quizzes').doc();
         await db.runTransaction(async tx => {
@@ -437,7 +446,7 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
             if (!current.exists || fingerprint(current.data()) !== fingerprint(original) || !unchanged(s)) throw new Error('The quiz changed before applying. Close Curate and review the latest version.');
             historyNow.forEach((doc, i) => { if (!doc.exists || fingerprint(doc.data()) !== fingerprint(history[i].data())) throw new Error('Quiz history changed while reviewing. Retry Remove.'); });
             if (backup.exists || newQuiz?.exists) throw new Error('Backup ID already exists. Close Curate and retry.');
-            tx.set(operation.backupRef, { ...original, title: (original.title || 'Quiz') + (split ? ' (Before Split)' : ' (Before Curate)'), isActive: false, isTemplate: true,
+            if (preserveVersion) tx.set(operation.backupRef, { ...original, isHistoryRevision: !createBackup, title: (original.title || 'Quiz') + (split ? ' (Before Split)' : ' (Before Curate)'), isActive: false, isTemplate: true,
                 startTime: null, deadline: null, createdAt: timestamp, updatedAt: timestamp,
                 curationBackup: { sourceQuizId: ref.id, originalStartTime: original.startTime || null, originalDeadline: original.deadline || null } });
             history.forEach(doc => tx.update(doc.ref, { quizRevisionId: operation.backupRef.id }));
@@ -450,7 +459,7 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
                 startTime: convertDate(s.source.form.startTime), deadline: convertDate(s.source.form.deadline),
                 deadlineFloor: firebase.firestore.FieldValue.delete(), translations: firebase.firestore.FieldValue.delete(),
                 lastAiAnalysis: firebase.firestore.FieldValue.delete(), lastAiAudit: firebase.firestore.FieldValue.delete(),
-                updatedAt: timestamp, curation: { sourceQuizId: ref.id, backupQuizId: operation.backupRef.id, applyOperationId: operation.backupRef.id,
+                updatedAt: timestamp, curation: { sourceQuizId: ref.id, backupQuizId: preserveVersion ? operation.backupRef.id : null, applyOperationId: operation.backupRef.id,
                     originalCount: s.source.form.questions.length, originalQuestionNumbers: ids, model: s.model, strategy: s.mode,
                     ...(split ? { operation: 'split-kept', splitQuizId: operation.newRef.id } : {}) } });
         });
@@ -478,7 +487,7 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
                 s.saved = true; s.message = split ? 'Split complete: original keeps ' + ids.length + ', new inactive quiz contains ' + (form.questions.length - ids.length) + '. Before Split backup is in the quiz list.' : 'Applied ' + ids.length + ' questions. Backup: ' + (form.title || 'Quiz') + ' (Before Curate), in the quiz list.';
                 try { localStorage.removeItem('quiz_draft'); } catch (error) { console.warn('Curate saved; local draft cleanup unavailable:', error); }
                 if (document.getElementById('quizManageModal')) forceHideModal('quizManageModal');
-                showToast('Quiz updated. An inactive backup is available in the quiz list.');
+                showToast(split || s.applyOperation?.createBackup ? 'Quiz updated. An inactive backup is available in the quiz list.' : 'Quiz updated without a backup quiz. Existing history is preserved.');
                 if (!split) dialog.close();
                 return;
             }
