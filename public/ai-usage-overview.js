@@ -57,8 +57,8 @@
         const dismiss=e=>{if(!bubble.contains(e.target)&&e.target!==anchor)cleanup(false);};
         const key=e=>{if(e.key==='Escape'){e.stopPropagation();cleanup(true);}};
         const scroll=()=>cleanup(false);
-        function cleanup(focus){bubble.remove();anchor.setAttribute('aria-expanded','false');document.removeEventListener('pointerdown',dismiss,true);document.removeEventListener('keydown',key,true);window.removeEventListener('scroll',scroll,true);window.removeEventListener('resize',scroll);closeBubble=null;if(focus&&anchor.isConnected)anchor.focus();}
-        close.onclick=()=>cleanup(true);closeBubble=()=>cleanup(false);document.addEventListener('pointerdown',dismiss,true);document.addEventListener('keydown',key,true);window.addEventListener('scroll',scroll,true);window.addEventListener('resize',scroll);close.focus({preventScroll:true});
+        function cleanup(focus){bubble.remove();anchor.setAttribute('aria-expanded','false');document.removeEventListener('pointerdown',dismiss,true);document.removeEventListener('keydown',key,true);window.removeEventListener('resize',scroll);closeBubble=null;if(focus&&anchor.isConnected)anchor.focus();}
+        close.onclick=()=>cleanup(true);closeBubble=()=>cleanup(false);document.addEventListener('pointerdown',dismiss,true);document.addEventListener('keydown',key,true);window.addEventListener('resize',scroll);close.focus({preventScroll:true});
     }
     function hourly(body, a, metric) {
         const scroll=node('div',undefined,'au-scroll'), table=node('table'), header=node('tr');
