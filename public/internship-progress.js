@@ -12,7 +12,8 @@
  }
  function render(){
   const host=document.getElementById('internship-quiz-progress');if(!host)return;host.replaceChildren();summary=calculate(period,attempts);
-  if(!summary){host.append(el('p','Set your internship dates to see your quiz goal.'));return;}
+  host.classList.toggle('ip-empty',!summary);
+  if(!summary){const hint=el('small','📅 Quiz goal · Set internship dates');hint.title='กำหนดวันเริ่มและวันสิ้นสุดการฝึกงาน เพื่อคำนวณเป้าหมาย Quiz และเปอร์เซ็นต์ความคืบหน้า';host.append(hint);return;}
   if(attempts===null){host.append(el('p','Loading quiz progress…'));return;}
   const s=summary;const head=el('div');head.className='ip-head';head.append(el('strong','📚 Quiz progress'),el('span','Day '+s.elapsed+' / '+s.total));host.append(head);
   const count=el('h3',s.done+' / '+s.total+' quizzes · '+s.percent+'%');host.append(count);
