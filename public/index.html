@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V100.35)</title>
+    <title>Internship Portfolio (V100.36)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -2147,7 +2147,7 @@
 <link rel="stylesheet" href="learning-review.css?v=V99.81">
 <link rel="stylesheet" href="history-compact.css?v=V99.81"><link rel="stylesheet" href="delete-requests.css?v=V99.82">
 <link rel="stylesheet" href="case-compact.css?v=V99.88">
-<script src="internship-progress.js?v=V100.35"></script><link rel="stylesheet" href="internship-progress.css?v=V100.35">
+<script src="internship-progress.js?v=V100.35"></script><link rel="stylesheet" href="internship-progress.css?v=V100.36">
 <script src="monthly-progress.js?v=V100.34"></script><link rel="stylesheet" href="monthly-progress.css?v=V100.34">
 <script src="assigned-goals.js?v=V100.30"></script><link rel="stylesheet" href="assigned-goals.css?v=V100.30">
 </head>
@@ -2238,8 +2238,7 @@
                                     <span id="u-start-date-text"
                                         style="color:#444; font-weight:500; min-width:60px; text-align:center;">Start
                                         Date</span>
-                                    <input type="date" id="u-start-date" onchange="saveMyDates()"
-                                        style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
+                                    <input type="date" id="u-start-date" hidden><button type="button" onclick="schEditDates()" aria-label="Edit training dates" title="แก้ไขช่วงฝึกงาน" style="position:absolute;inset:0;width:100%;min-height:0;padding:0;opacity:0;cursor:pointer"></button>
                                 </div>
                                 <span style="color:#adb5bd; font-weight:bold; line-height:20px;">-</span>
                                 <div
@@ -2248,8 +2247,7 @@
                                     <span id="u-end-date-text"
                                         style="color:#444; font-weight:500; min-width:60px; text-align:center;">End
                                         Date</span>
-                                    <input type="date" id="u-end-date" onchange="saveMyDates()"
-                                        style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
+                                    <input type="date" id="u-end-date" hidden><button type="button" onclick="schEditDates()" aria-label="Edit training dates" title="แก้ไขช่วงฝึกงาน" style="position:absolute;inset:0;width:100%;min-height:0;padding:0;opacity:0;cursor:pointer"></button>
                                 </div>
                                 <!-- V97.05: Schedule entry point, sitting with the dates
                                      because that is where "time" already lives on this card.
@@ -5627,7 +5625,7 @@
             <div class="sch-modal-header">
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;">
                     <h3 style="margin:0;font-size:1.05em;color:#7c3aed;">📅 Schedule</h3>
-                    <button id="sch-edit-dates-btn" class="lang-no-toggle" type="button" onclick="schEditDates()" title="แก้ไขวันเริ่มและวันสิ้นสุดการฝึกงาน" style="width:auto;margin:0;min-height:32px;padding:4px 10px;border:1px solid #ddd6fe;border-radius:999px;background:#f5f3ff;color:#7c3aed;font-size:12px;font-weight:700;cursor:pointer;">Edit dates</button>
+                    <button id="sch-edit-dates-btn" class="lang-no-toggle" type="button" onclick="schEditDates()" title="แก้ไขวันเริ่มและวันสิ้นสุดการฝึกงาน" style="width:auto;margin:0;min-height:32px;padding:4px 10px;border:1px solid #ddd6fe;border-radius:999px;background:#f5f3ff;color:#7c3aed;font-size:12px;font-weight:700;cursor:pointer;" aria-label="Edit training dates">✎</button>
                     <button type="button" class="ip-help-button lang-no-toggle" onclick="internshipProgress.showHelp(this)" aria-label="วิธีใช้งาน Schedule และตั้งเป้าหมาย" title="วิธีใช้งาน Schedule และตั้งเป้าหมาย">ⓘ</button>
                 </div>
                 <div class="sch-header-actions">
@@ -13888,14 +13886,15 @@
         }
 
         function schEditDates() {
-            schEditingDates = true;
-            schRenderHeatmap();
+            if(document.getElementById('training-dates-dialog'))return;
+            const trigger=document.activeElement,me=myOwnRow(),d=document.createElement('dialog');d.id='training-dates-dialog';d.className='ip-share training-dates lang-no-toggle';d.setAttribute('aria-labelledby','training-dates-title');
+            d.innerHTML='<header><h3 id="training-dates-title">📅 Training dates</h3><button type="button" class="date-close" aria-label="Close">×</button></header><label>Start<input id="sch-start-date" type="date" required></label><label>End<input id="sch-end-date" type="date" required></label><div class="date-presets"></div><p id="training-date-length"></p><p id="sch-date-msg" role="status"></p><footer><button type="button" class="date-close">Cancel</button><button type="button" id="training-date-save">Save</button></footer>';
+            d.querySelector('#sch-start-date').value=me.startDate||'';d.querySelector('#sch-end-date').value=me.endDate||'';
+            [4,6,8,12].forEach(w=>{const b=document.createElement('button');b.type='button';b.textContent=w+'w';b.title=w+' สัปดาห์';b.onclick=()=>{schPresetWeeks(w);schDateLength();};d.querySelector('.date-presets').append(b);});
+            d.querySelectorAll('input').forEach(n=>n.oninput=schDateLength);d.querySelectorAll('.date-close').forEach(b=>b.onclick=()=>d.close());d.addEventListener('close',()=>{d.remove();trigger?.focus();});d.querySelector('#training-date-save').onclick=async()=>{const button=d.querySelector('#training-date-save');button.disabled=true;try{await schSaveDatesInline();}finally{button.disabled=false;}};document.body.append(d);d.showModal();schDateLength();
         }
-
-        function schCancelEditDates() {
-            schEditingDates = false;
-            schRenderHeatmap();
-        }
+        function schDateLength(){const a=schParseDay(document.getElementById('sch-start-date').value),b=schParseDay(document.getElementById('sch-end-date').value);const days=a&&b?Math.round((b-a)/86400000):0;document.getElementById('training-date-length').textContent=days>0?days+' days · '+(days/7).toFixed(1).replace(/\.0$/,'')+' weeks':'';}
+        function schCancelEditDates() { document.getElementById('training-dates-dialog')?.close(); }
 
         // V97.17: the month the calendar in the doorway is showing, as 'YYYY-MM'.
         // Null = not chosen yet; openScheduleModal() resets it so a month the intern
@@ -13975,47 +13974,9 @@
         // then the fields carry what is saved, not a guess, or "edit" would silently
         // propose different dates than the ones on screen a second ago.
         function schRenderDateSetup(grid, summaryEl, legendEl, dayKeys, existing) {
-            const g = existing
-                ? { start: existing.startDate || '', end: existing.endDate || '' }
-                : schDateGuess(dayKeys);
-            const ghost = schRenderMiniCalendar(schBuildDayMap());
-
-            // Both buttons below have to negate `button { width:100%; min-height:48px }`
-            // from index.html:361 explicitly, the same way .sch-tab does.
-            const chip = 'width:auto; min-height:0; cursor:pointer; font-size:0.72em; font-weight:800; '
-                + 'color:#7c3aed; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:999px; padding:5px 11px;';
-            const field = 'width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; '
-                + 'box-sizing:border-box; font-size:0.85em;';
-
-            grid.innerHTML = ghost
-                + '<div style="text-align:center; margin-top:14px;">'
-                + '<div style="font-size:0.82em; font-weight:800; color:#475569;">'
-                + 'Set your internship dates to see the whole run ตั้งวันเริ่มและวันจบเพื่อดูทั้งช่วง</div>'
-                + '<div style="font-size:0.7em; color:#94a3b8; margin-top:4px;">'
-                + 'This calendar shows one month at a time ปฏิทินนี้แสดงทีละเดือน</div></div>'
-                + '<div style="display:flex; gap:8px; margin-top:12px;">'
-                + '<div style="flex:1;"><label style="font-size:0.72em; font-weight:700; color:#64748b; display:block; margin-bottom:4px;">'
-                + 'Start วันเริ่ม</label><input type="date" id="sch-start-date" value="' + g.start + '" style="' + field + '"></div>'
-                + '<div style="flex:1;"><label style="font-size:0.72em; font-weight:700; color:#64748b; display:block; margin-bottom:4px;">'
-                + 'End วันจบ</label><input type="date" id="sch-end-date" value="' + g.end + '" style="' + field + '"></div>'
-                + '</div>'
-                + '<div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; align-items:center;">'
-                + '<span style="font-size:0.7em; color:#94a3b8; font-weight:700;">Length ระยะฝึก</span>'
-                + [4, 6, 8, 12].map(w => '<button type="button" onclick="schPresetWeeks(' + w + ')" style="' + chip + '">'
-                    + w + ' weeks</button>').join('')
-                + '</div>'
-                + '<div id="sch-date-msg" style="font-size:0.72em; color:#ef4444; font-weight:700; margin-top:9px; min-height:1em;"></div>'
-                + '<button type="button" onclick="schSaveDatesInline()" style="width:100%; min-height:42px; margin-top:4px; '
-                + 'cursor:pointer; font-size:0.82em; font-weight:800; color:#fff; background:#7c3aed; border:none; '
-                + 'border-radius:9px; padding:10px;">Save dates บันทึกวันที่</button>'
-                + (existing
-                    ? '<div style="text-align:center; margin-top:8px;"><button type="button" onclick="schCancelEditDates()"'
-                      + ' style="width:auto; min-height:0; cursor:pointer; font-size:0.72em; font-weight:700; color:#64748b;'
-                      + ' background:none; border:none; text-decoration:underline;">Cancel ยกเลิก</button></div>'
-                    : '');
-
-            if (summaryEl) summaryEl.textContent = '';
-            if (legendEl) legendEl.innerHTML = '';
+            grid.innerHTML=schRenderMiniCalendar(schBuildDayMap());
+            if(summaryEl)summaryEl.innerHTML='<button type="button" onclick="schEditDates()" title="กำหนดช่วงฝึกงาน" style="width:auto;padding:4px 10px">📅 Set dates</button>';
+            if(legendEl)legendEl.innerHTML='';
         }
 
         function schPresetWeeks(w) {
@@ -14077,6 +14038,7 @@
             // so a page number from the old one means nothing.
             schEditingDates = false;
             schWeekPage = null;
+            document.getElementById('training-dates-dialog')?.close();
             schRenderHeatmap();
         }
 
