@@ -362,27 +362,32 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
         if (fingerprint(original.questions) !== fingerprint(s.source.form.questions)) throw new Error('Save the editor questions first, then reopen Curate before applying to this quiz.');
         if (original.isActive !== false) throw new Error('This quiz is active. Save as new quiz, or deactivate it before applying.');
         const [attempts, sessions] = await Promise.all([
-            db.collection('quiz_attempts').where('quizId', '==', ref.id).limit(1).get({ source: 'server' }),
-            db.collection('exam_sessions').where('examId', '==', ref.id).limit(1).get({ source: 'server' })
+            db.collection('quiz_attempts').where('quizId', '==', ref.id).get({ source: 'server' }),
+            db.collection('exam_sessions').where('examId', '==', ref.id).get({ source: 'server' })
         ]);
-        if (!attempts.empty || !sessions.empty) throw new Error('This quiz has attempts or exam sessions. Use Save as new quiz to preserve its history.');
+        if (split && (!attempts.empty || !sessions.empty)) throw new Error('This quiz has attempts or exam sessions. Use Save as new quiz to preserve its history.');
+        const history = [...attempts.docs, ...sessions.docs].filter(doc => !doc.data().quizRevisionId);
+        if (history.length > 450) throw new Error('This quiz has too many history records for one atomic removal. No changes saved.');
         if (!unchanged(s)) throw new Error('The editor changed. Close Curate and reopen it.');
         const removed = s.source.form.questions.map((_, i) => i + 1).filter(id => !s.keep.has(id));
         const confirmation = split
             ? 'Split into two quizzes: ' + s.source.form.title + '\n\nOriginal keeps ' + ids.length + ': ' + ids.map(id => 'Q' + id).join(', ') + '\nNew inactive quiz receives ' + removed.length + ': ' + removed.map(id => 'Q' + id).join(', ') + '\n\nA Before Split backup will preserve all ' + s.source.form.questions.length + ' questions. Current editor settings will be saved; each resulting quiz retains the current total points.\n\nยืนยันแยก Keep ไว้ชุดเดิม และย้าย Remove ไปชุดใหม่ พร้อมสำเนาก่อนแยก?'
-            : 'Apply to current quiz: ' + s.source.form.title + '\n\nRemove: ' + removed.map(id => 'Q' + id).join(', ') + '\n' + s.source.form.questions.length + ' → ' + ids.length + ' questions.\n\nCurrent editor settings will also be saved. An inactive backup of the stored quiz will be created in the quiz list.\n\nยืนยันตัดข้อที่ระบุออกจากชุดเดิม พร้อมบันทึกการตั้งค่าปัจจุบันและสร้างสำเนาก่อนแก้ไข?';
+            : 'Apply to current quiz: ' + s.source.form.title + '\n\nRemove: ' + removed.map(id => 'Q' + id).join(', ') + '\n' + s.source.form.questions.length + ' → ' + ids.length + ' questions.\n\nCurrent editor settings will also be saved. An inactive backup of the stored quiz will be created. Existing answers and scores remain linked to that version.\n\nยืนยันตัดข้อที่ระบุออกจากชุดเดิม พร้อมบันทึกการตั้งค่าปัจจุบันและสร้างสำเนาก่อนแก้ไข?';
         if (!confirm(confirmation)) return false;
         if (!operation.backupRef) operation.backupRef = db.collection('quizzes').doc();
         if (split && !operation.newRef) operation.newRef = db.collection('quizzes').doc();
         await db.runTransaction(async tx => {
             const current = await tx.get(ref), backup = await tx.get(operation.backupRef);
             const newQuiz = split ? await tx.get(operation.newRef) : null;
+            const historyNow = await Promise.all(history.map(doc => tx.get(doc.ref)));
             if (current.exists && current.data().curation?.applyOperationId === operation.backupRef.id) return;
             if (!current.exists || fingerprint(current.data()) !== fingerprint(original) || !unchanged(s)) throw new Error('The quiz changed before applying. Close Curate and review the latest version.');
+            historyNow.forEach((doc, i) => { if (!doc.exists || fingerprint(doc.data()) !== fingerprint(history[i].data())) throw new Error('Quiz history changed while reviewing. Retry Remove.'); });
             if (backup.exists || newQuiz?.exists) throw new Error('Backup ID already exists. Close Curate and retry.');
             tx.set(operation.backupRef, { ...original, title: (original.title || 'Quiz') + (split ? ' (Before Split)' : ' (Before Curate)'), isActive: false, isTemplate: true,
                 startTime: null, deadline: null, createdAt: timestamp, updatedAt: timestamp,
                 curationBackup: { sourceQuizId: ref.id, originalStartTime: original.startTime || null, originalDeadline: original.deadline || null } });
+            history.forEach(doc => tx.update(doc.ref, { quizRevisionId: operation.backupRef.id }));
             if (split) tx.set(operation.newRef, { ...s.source.form, title: s.source.form.title + ' (Split ' + removed.length + ')',
                 questions: removed.map(id => s.source.form.questions[id - 1]), isActive: false, isTemplate: true,
                 startTime: null, deadline: null, createdAt: timestamp, updatedAt: timestamp,
@@ -420,7 +425,9 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
                 s.saved = true; s.message = split ? 'Split complete: original keeps ' + ids.length + ', new inactive quiz contains ' + (form.questions.length - ids.length) + '. Before Split backup is in the quiz list.' : 'Applied ' + ids.length + ' questions. Backup: ' + (form.title || 'Quiz') + ' (Before Curate), in the quiz list.';
                 try { localStorage.removeItem('quiz_draft'); } catch (error) { console.warn('Curate saved; local draft cleanup unavailable:', error); }
                 if (document.getElementById('quizManageModal')) forceHideModal('quizManageModal');
-                showToast('Quiz updated. An inactive backup is available in the quiz list.'); return;
+                showToast('Quiz updated. An inactive backup is available in the quiz list.');
+                if (!split) dialog.close();
+                return;
             }
             // Reuse the new document ID on retry to prevent duplicate copies after an uncertain write.
             if (!s.docRef) s.docRef = db.collection('quizzes').doc();

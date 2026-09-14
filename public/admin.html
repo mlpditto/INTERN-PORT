@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.06)</title>
+    <title>Nika Admin (V100.07)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6391,7 +6391,8 @@
     <script src="lang-toggle.js?v=V97.44"></script>
 <link rel="stylesheet" href="audit-toolbar.css?v=V100.05">
 <link rel="stylesheet" href="quiz-curate.css?v=V100.06">
-<script src="quiz-curate.js?v=V100.06"></script>
+<script src="quiz-revision.js?v=V100.07"></script>
+<script src="quiz-curate.js?v=V100.07"></script>
 <script src="quiz-compare-cleanup.js?v=V100.02"></script>
 <link rel="stylesheet" href="quiz-compare-cleanup.css?v=V100.02">
 <link rel="stylesheet" href="learning-review.css?v=V99.88">
@@ -25600,7 +25601,7 @@ ${JSON.stringify(sourceObj)}`;
             tbody.innerHTML = "";
             drawKanban(); // Redraw Kanban with new data
             data.forEach(att => {
-                const q = quizzesData.find(x => x.id === att.quizId) || {};
+                const q = quizForAttempt(quizzesData.find(x => x.id === att.quizId), att, quizzesData) || {};
                 const qTitle = q.shortTitle || q.title || "Unknown Quiz";
                 const isPoll = q.isPoll === true;
                 // V96.79: out-of-hours penalty. index.html stamps `scoreMultiplier` on the
@@ -26338,7 +26339,7 @@ ${JSON.stringify(sourceObj)}`;
                 const attemptDoc = await db.collection("quiz_attempts").doc(attemptId).get();
                 if (!attemptDoc.exists) return alert("Data not found");
                 const att = attemptDoc.data();
-                const quiz = quizzesData.find(x => x.id === att.quizId);
+                const quiz = quizForAttempt(quizzesData.find(x => x.id === att.quizId), att, quizzesData);
                 if (!quiz) return alert("Quiz Reference missing");
 
                 // V93.97: remember quiz + learner so the footer "User Feedback"
@@ -26941,7 +26942,7 @@ ${JSON.stringify(sourceObj)}`;
                 const attemptDoc = await db.collection("quiz_attempts").doc(attemptId).get();
                 if (!attemptDoc.exists) return alert("Data not found");
                 const att = attemptDoc.data();
-                const quiz = quizzesData.find(x => x.id === att.quizId);
+                const quiz = quizForAttempt(quizzesData.find(x => x.id === att.quizId), att, quizzesData);
                 if (!quiz) return alert("Quiz Reference missing");
 
                 const jsPdfCtor = window.jspdf && window.jspdf.jsPDF;
@@ -29197,7 +29198,7 @@ ${JSON.stringify(sourceObj)}`;
                 const docSnap = await docRef.get();
                 if (!docSnap.exists) return;
                 const att = docSnap.data();
-                const quiz = quizzesData.find(x => x.id === att.quizId);
+                const quiz = quizForAttempt(quizzesData.find(x => x.id === att.quizId), att, quizzesData);
                 if (!quiz) return;
 
                 // 1. Update Manual Correction Status
@@ -29234,7 +29235,7 @@ ${JSON.stringify(sourceObj)}`;
                 const docSnap = await docRef.get();
                 if (!docSnap.exists) return;
                 const att = docSnap.data();
-                const quiz = quizzesData.find(x => x.id === att.quizId);
+                const quiz = quizForAttempt(quizzesData.find(x => x.id === att.quizId), att, quizzesData);
                 if (!quiz) return;
 
                 const qCount = Math.max(1, (quiz.questions || []).length);
@@ -29277,7 +29278,7 @@ ${JSON.stringify(sourceObj)}`;
 
                 const attDoc = await db.collection("quiz_attempts").doc(attemptId).get();
                 const att = attDoc.data();
-                const quiz = quizzesData.find(x => x.id === att.quizId);
+                const quiz = quizForAttempt(quizzesData.find(x => x.id === att.quizId), att, quizzesData);
                 const q = quiz.questions[qIndex];
                 const studentAns = (att.answers || [])[qIndex];
                 const guideline = (q.options || [])[0] || 'No specific guideline provided. Use general medical/technical knowledge.';
@@ -29442,7 +29443,7 @@ ${JSON.stringify(sourceObj)}`;
                 const docSnap = await docRef.get();
                 if (!docSnap.exists) return alert("Attempt data not found");
                 const att = docSnap.data();
-                const quiz = quizzesData.find(x => x.id === att.quizId);
+                const quiz = quizForAttempt(quizzesData.find(x => x.id === att.quizId), att, quizzesData);
                 if (!quiz) return alert("Quiz data not found");
 
                 let gradedAnswers = att.gradedAnswers || {};
@@ -29510,7 +29511,7 @@ ${JSON.stringify(sourceObj)}`;
                 const docSnap = await docRef.get();
                 if (!docSnap.exists) return alert("Attempt data not found");
                 const att = docSnap.data();
-                const quiz = quizzesData.find(x => x.id === att.quizId);
+                const quiz = quizForAttempt(quizzesData.find(x => x.id === att.quizId), att, quizzesData);
                 if (!quiz) return alert("Quiz data not found");
 
                 const recalculated = typeof calculateAttemptScoring === 'function'
@@ -45639,7 +45640,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const qAz = await db.collection("quiz_attempts").where("userId", "==", uid).where("status", "==", "approved").get();
                 qAz.forEach(d => {
                     const att = d.data();
-                    const qData = quizzesData.find(x => x.id === att.quizId) || {};
+                    const qData = quizForAttempt(quizzesData.find(x => x.id === att.quizId), att, quizzesData) || {};
                     const qTitle = qData.shortTitle || qData.title || "Quiz";
                     const isPoll = qData.isPoll === true;
                     let finalScore = 0;
@@ -45748,7 +45749,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const quizSnap = await db.collection("quiz_attempts").where("userId", "==", uid).where("status", "==", "approved").get();
                 quizSnap.forEach(d => {
                     const att = d.data();
-                    const qData = quizzesData.find(x => x.id === att.quizId) || {};
+                    const qData = quizForAttempt(quizzesData.find(x => x.id === att.quizId), att, quizzesData) || {};
                     let points = 0;
 
                     // V93.12: parity with Shōjiki button. Previously used the raw formula
@@ -47259,7 +47260,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
                 qAzSnap.forEach(doc => {
                     const att = doc.data();
-                    const qData = quizzesData.find(x => x.id === att.quizId) || {};
+                    const qData = quizForAttempt(quizzesData.find(x => x.id === att.quizId), att, quizzesData) || {};
                     const qTitle = qData.shortTitle || qData.title || "Quiz";
                     const score = (att.correctCount / att.totalQuestions) * (qData.totalPoints || 1.0);
                     
@@ -48870,7 +48871,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const ms = att.timestamp && att.timestamp.toMillis ? att.timestamp.toMillis() : 0;
                     if (ms < cutoffMs) return;
                 }
-                const qData = quizzesData.find(x => x.id === att.quizId);
+                const qData = quizForAttempt(quizzesData.find(x => x.id === att.quizId), att, quizzesData);
                 if (!qData || !Array.isArray(qData.questions)) return;
                 const manualCorrect = att.manualCorrect || {};
                 const gradedAnswers = att.gradedAnswers || {};
@@ -48966,7 +48967,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const tagEntries = {}; // tag -> [{attemptIdx, isCorrect}, ...] in chronological order (V92.30 trend)
 
                 attempts.forEach((att, attIdx) => {
-                    const qData = quizzesData.find(x => x.id === att.quizId);
+                    const qData = quizForAttempt(quizzesData.find(x => x.id === att.quizId), att, quizzesData);
                     if (!qData || !Array.isArray(qData.questions)) return;
                     const manualCorrect = att.manualCorrect || {};
                     const gradedAnswers = att.gradedAnswers || {};
@@ -49303,7 +49304,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function computeWrongQuestionsForGroup(group, ctx) {
             const wrong = [];
             ctx.attempts.forEach(att => {
-                const qData = quizzesData.find(x => x.id === att.quizId);
+                const qData = quizForAttempt(quizzesData.find(x => x.id === att.quizId), att, quizzesData);
                 if (!qData || !Array.isArray(qData.questions)) return;
                 const manualCorrect = att.manualCorrect || {};
                 const gradedAnswers = att.gradedAnswers || {};

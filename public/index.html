@@ -2,7 +2,8 @@
 <html lang="th">
 
 <head>
-    <title>Internship Portfolio (V100.06)</title>
+    <script src="quiz-revision.js?v=V100.07"></script>
+    <title>Internship Portfolio (V100.07)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10292,7 +10293,7 @@
         let currentQuizMultiplier = 1;
 
         async function runQuiz(quizId) {
-            currentQuiz = quizzesCache.find(x => x.id === quizId);
+            currentQuiz = quizForAttempt(quizzesCache.find(x => x.id === quizId), quizAttemptsCache[quizId], quizzesCache);
             if (!currentQuiz) return;
 
             // V96.24: global quiz window — daily 09:00-21:00 (device local time)
@@ -10461,6 +10462,7 @@
                         userId,
                         displayName: userProfile.displayName,
                         pictureUrl: userProfile.pictureUrl || "",
+                        ...(currentQuiz.quizRevisionId ? { quizRevisionId: currentQuiz.quizRevisionId } : {}),
                         status: 'started',
                         isPractice: isPracticeMode,
                         ...(_oohStamp || {}),
@@ -12062,7 +12064,7 @@
 
         // --- View Answers Logic ---
         async function viewQuizAnswers(quizId) {
-            const q = quizzesCache.find(x => x.id === quizId);
+            const q = quizForAttempt(quizzesCache.find(x => x.id === quizId), quizAttemptsCache[quizId], quizzesCache);
             const attempt = quizAttemptsCache[quizId];
 
             if (!q || !attempt) return alert("Data not found");
@@ -12518,6 +12520,7 @@
 
                 // --- 3. Core Submission ---
                 const attemptRef = db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`);
+                if (currentQuiz.quizRevisionId) submissionData.quizRevisionId = currentQuiz.quizRevisionId;
                 const tasks = [attemptRef.set(submissionData, { merge: true })];
 
                 if (isPoll && !isPracticeMode) {
@@ -13213,7 +13216,7 @@
             let totalQuizScore = 0;
             Object.values(quizAttemptsCache || {}).forEach(att => {
                 if (att.status === 'approved' || att.status === 'pending' || att.status === 'completed') {
-                    const quiz = quizzesCache.find(q => q.id === att.quizId);
+                    const quiz = quizForAttempt(quizzesCache.find(q => q.id === att.quizId), att, quizzesCache);
                     let s = Number(att.score);
                     // Fallback to auto-calculated score if missing
                     if (!Number.isFinite(s) || s === 0) {
