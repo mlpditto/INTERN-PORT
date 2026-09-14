@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.10)</title>
+    <title>Nika Admin (V100.11)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6389,6 +6389,8 @@
 <link rel="stylesheet" href="audit-toolbar.css?v=V100.05">
 <link rel="stylesheet" href="quiz-curate.css?v=V100.09">
 <script src="quiz-revision.js?v=V100.07"></script>
+<script src="ai-usage-overview.js?v=V100.11"></script>
+<link rel="stylesheet" href="ai-usage-overview.css?v=V100.11">
 <script src="quiz-curate-history.js?v=V100.08"></script>
 <script src="quiz-curate.js?v=V100.09"></script>
 <script src="quiz-compare-cleanup.js?v=V100.02"></script>
@@ -6733,6 +6735,7 @@
             </div>
                 </div>
                 <aside id="dashboard-summary" aria-label="Quiz coverage and LINE usage">
+<details id="dashboard-ai-usage" class="lang-no-toggle"><summary title="สรุปการใช้ AI และ heatmap กดเพื่อเปิด">AI usage · Overview</summary><div id="dashboard-ai-usage-body"></div></details>
                     <!-- V95.22: Quiz coverage by disease system (CASE_SYSTEMS). Display-only —
                          counts quizzesData tags matched against the 12 systems + Uncategorized,
                          and highlights coverage gaps (systems with 0 quizzes). lang-no-toggle so
@@ -15922,7 +15925,7 @@
                         <div id="usage-list">Loading usage...</div>
                         <div style="border-top:1px solid #ddd; margin-top:10px; padding-top:10px;">
                             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
-                                <div style="font-weight:bold; color:#7c3aed;"><i class="fa-solid fa-server"></i> Last 7 days (all devices)</div>
+                                <div style="font-weight:bold; color:#7c3aed;"><i class="fa-solid fa-server"></i> AI Usage Overview (server)</div>
                                 <button type="button" onclick="loadAiUsage7d()" title="Refresh server usage" style="background:none; border:1px solid #d8b4fe; color:#7c3aed; font-size:0.85em; padding:3px 9px; border-radius:7px; cursor:pointer;"><i class="fa-solid fa-rotate"></i></button>
                             </div>
                             <div id="ai-usage-7d" style="font-size:0.9em; color:#555;">Open to load…</div>
@@ -16629,56 +16632,7 @@
         // V95.96: server-backed 7-day token usage (all devices + intern, unlike the
         // localStorage "today" badge above). Reads ai_usage/{date} docs written by
         // callAIProxy. Range filter + orderBy on the same `date` field → no index.
-        window.loadAiUsage7d = async function() {
-            const el = document.getElementById('ai-usage-7d');
-            if (!el) return;
-            el.innerHTML = '<span style="color:#999;">Loading…</span>';
-            try {
-                const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
-                const since = new Date(Date.now() - 6 * 86400000).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
-                const snap = await db.collection('ai_usage').where('date', '>=', since).orderBy('date', 'desc').get();
-                if (snap.empty) { el.innerHTML = '<span style="color:#999; font-style:italic;">No server usage recorded yet.</span>'; return; }
-                let grand = 0, html = '';
-                const feats = {}; // V96.14: aggregate per-feature tokens across the 7 days
-                snap.forEach(doc => {
-                    const d = doc.data();
-                    grand += d.totalTokens || 0;
-                    Object.entries(d.features || {}).forEach(([f, v]) => {
-                        feats[f] = (feats[f] || 0) + ((v || {}).tokens || 0);
-                    });
-                    const provs = Object.entries(d.providers || {})
-                        .sort((a, b) => ((b[1] || {}).tokens || 0) - ((a[1] || {}).tokens || 0))
-                        .map(([p, v]) => `${p} ${((v || {}).tokens || 0).toLocaleString()}`).join(' · ');
-                    const roles = d.roles || {};
-                    const roleStr = `admin ${((roles.admin || {}).tokens || 0).toLocaleString()} / intern ${((roles.intern || {}).tokens || 0).toLocaleString()}`;
-                    html += `<div style="border-bottom:1px solid #f1e9fb; padding:5px 0;">
-                        <div style="display:flex; justify-content:space-between; font-weight:800; color:#6d28d9;">
-                            <span>${d.date}${d.date === today ? ' · today' : ''}</span>
-                            <span>${(d.totalTokens || 0).toLocaleString()} tok · ${(d.totalCount || 0)} calls</span>
-                        </div>
-                        <div style="color:#7a6207; font-size:0.85em; margin-top:1px;">${provs || '—'}</div>
-                        <div style="color:#999; font-size:0.8em;">${roleStr}</div>
-                    </div>`;
-                });
-                // V96.14: "by feature" breakdown — which feature is actually burning
-                // tokens. Sorted desc; "untagged" surfaces how much is not yet tagged.
-                const featRows = Object.entries(feats).sort((a, b) => b[1] - a[1]);
-                if (featRows.length) {
-                    const featStr = featRows
-                        .map(([f, tok]) => `<span style="white-space:nowrap;">${f === 'untagged' ? '<span style="color:#b45309;">untagged</span>' : f} ${tok.toLocaleString()}</span>`)
-                        .join(' · ');
-                    html += `<div style="margin-top:8px; padding-top:6px; border-top:1px dashed #ddd6f5;">
-                        <div style="font-size:0.8em; font-weight:800; color:#6d28d9; margin-bottom:2px;">By feature</div>
-                        <div style="font-size:0.82em; color:#555; line-height:1.7;">${featStr}</div>
-                    </div>`;
-                }
-                html += `<div style="text-align:right; font-weight:900; color:#6d28d9; margin-top:6px;">7-day total: ${grand.toLocaleString()} tokens</div>`;
-                el.innerHTML = html;
-            } catch (e) {
-                el.innerHTML = `<span style="color:#c0392b;">Load failed: ${e.message}</span>`;
-                console.warn('loadAiUsage7d failed:', e);
-            }
-        };
+        window.loadAiUsage7d = () => window.aiUsageOverview.mount('ai-usage-7d');
 
         // V96.05 Evaluation pillar — record an AI quality signal. outcome is a free
         // string ('suggested' | 'applied' | 'dismissed' | 'generated' | 'kept' …).

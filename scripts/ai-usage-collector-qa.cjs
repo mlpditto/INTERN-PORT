@@ -1,0 +1,5 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync('functions/index.js','utf8');const a=source.indexOf('async function recordAiUsage('),b=source.indexOf('\n// V95.97',a);let record;
+const admin={firestore:Object.assign(()=>({collection:name=>({doc:day=>({set:async v=>record=v})})}),{FieldValue:{increment:n=>n,serverTimestamp:()=>1}})};
+const ctx={admin,Buffer,console};vm.createContext(ctx);vm.runInContext(source.slice(a,b),ctx);
+(async()=>{await ctx.recordAiUsage('openai','test.model',120,true,'quiz_curate',{inputTokens:100,outputTokens:20});const m=Object.values(record.models)[0];assert.equal(m.model,'test.model');assert.equal(m.inputTokens,100);assert.equal(m.outputTokens,20);assert.equal(record.totalTokens,120);await ctx.recordAiUsage('gemini','unknown',50,false,'translate');assert.equal(Object.values(record.models)[0].detailedCount,undefined);console.log('PASS: model aggregation and missing breakdown remain distinguishable');})().catch(e=>{console.error(e);process.exitCode=1});
