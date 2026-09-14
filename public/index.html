@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V100.24)</title>
+    <title>Internship Portfolio (V100.25)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -2147,7 +2147,8 @@
 <link rel="stylesheet" href="learning-review.css?v=V99.81">
 <link rel="stylesheet" href="history-compact.css?v=V99.81"><link rel="stylesheet" href="delete-requests.css?v=V99.82">
 <link rel="stylesheet" href="case-compact.css?v=V99.88">
-<script src="internship-progress.js?v=V100.24"></script><link rel="stylesheet" href="internship-progress.css?v=V100.22">
+<script src="internship-progress.js?v=V100.25"></script><link rel="stylesheet" href="internship-progress.css?v=V100.22">
+<script src="monthly-progress.js?v=V100.25"></script><link rel="stylesheet" href="monthly-progress.css?v=V100.25">
 </head>
 
 <body>
@@ -2324,12 +2325,12 @@
                      the first place. Measured on the real markup: 172px → 340px wide,
                      204px → 141px tall for the pair. -->
                 <!-- 🔥 Unified Metrics Bar (V91.38) - Combines KPI + Voyage Metrics -->
-                <div id="internship-quiz-progress" class="lang-no-toggle"></div>
                 <div class="unified-metrics-bar lean-activity">
                     <div id="daily-checkin-card" class="lang-no-toggle"></div>
                     <button type="button" class="activity-more" aria-label="รายละเอียดกิจกรรม" aria-expanded="false" aria-controls="activity-details" onclick="const panel=document.getElementById('activity-details'); panel.hidden=!panel.hidden; this.setAttribute('aria-expanded', String(!panel.hidden));">⋯</button>
                     <div id="activity-details" class="lang-no-toggle" hidden>
-                        <section aria-label="ประวัติการส่ง">
+                        <div id="monthly-progress" class="lang-no-toggle"></div>
+                        <section aria-label="ประวัติการส่ง" hidden>
                             <h4>ประวัติการส่ง</h4>
                             <div id="activity-history"></div>
                             <div id="u-lifetime-counts" class="activity-totals">กิจกรรมที่ได้คะแนน <span id="unified-total">0</span> · เช็กอินสะสม <span id="unified-checkin">0</span></div>
@@ -5639,6 +5640,7 @@
             <div id="sch-tabs">
                 <button type="button" class="sch-tab active" data-schpane="agenda" onclick="schSwitchPane('agenda')">🗓 Agenda</button>
                 <button type="button" class="sch-tab" data-schpane="activity" onclick="schSwitchPane('activity')">🔥 Activity</button>
+                <button type="button" class="sch-tab lang-no-toggle" data-schpane="goals" onclick="schSwitchPane('goals')" title="ตั้งเป้าหมายการเรียนรู้ ติดตามความคืบหน้า และแชร์ภาพ">🎯 SMART GOALS</button>
             </div>
             <div id="sch-pane-agenda" style="padding:14px 16px 18px;">
                 <p id="sch-invite-why" class="lang-no-toggle" style="display:none; margin:0 0 8px; font-size:0.72em; color:#64748b;"></p>
@@ -5682,6 +5684,7 @@
         </div>
                 <div id="sch-agenda"></div>
             </div>
+            <div id="sch-pane-goals" style="display:none; padding:14px 16px 18px;"><button type="button" onclick="monthlyProgress.edit()" class="lang-no-toggle" style="width:auto;">🎯 Monthly targets · Quiz / Log / Case</button><div id="internship-quiz-progress" class="lang-no-toggle"></div></div>
             <div id="sch-pane-activity" style="display:none; padding:14px 16px 18px;">
                 <div id="sch-summary" style="font-size:0.82em; color:#475569; font-weight:700; margin-bottom:10px;"></div>
                 <div id="sch-heatmap"></div>
@@ -8825,6 +8828,7 @@
             }, e => handleFirestoreListenerError('quizzes listener', e));
             db.collection("quiz_attempts").where("userId", "==", userId).onSnapshot(s => {
                 window.internshipProgress?.setAttempts(s.docs.map(d=>d.data()));
+                window.monthlyProgress?.setQuizzes(s.docs.map(d=>d.data()));
                 quizAttemptsCache = {};
                 s.forEach(d => quizAttemptsCache[d.data().quizId] = d.data());
                 renderAssignments();
@@ -14569,18 +14573,18 @@
         }
 
         function schSwitchPane(pane) {
-            const isAgenda = pane !== 'activity';
-            window._schPane = isAgenda ? 'agenda' : 'activity';
-            const paneA = document.getElementById('sch-pane-agenda');
-            const paneB = document.getElementById('sch-pane-activity');
-            if (paneA) paneA.style.display = isAgenda ? 'block' : 'none';
-            if (paneB) paneB.style.display = isAgenda ? 'none' : 'block';
-            // Scoped to #sch-tabs on purpose — see the CSS note about the unscoped
-            // .dc-view-tab query that strips .active off unrelated rails.
-            document.querySelectorAll('#sch-tabs .sch-tab').forEach(t => {
-                t.classList.toggle('active', (t.getAttribute('data-schpane') === 'agenda') === isAgenda);
+            const selected = ['agenda','activity','goals'].includes(pane) ? pane : 'agenda';
+            window._schPane = selected;
+            ['agenda','activity','goals'].forEach(key => {
+                const panel=document.getElementById('sch-pane-'+key);
+                if(panel)panel.style.display=key===selected?'block':'none';
             });
-            if (isAgenda) schRenderAgenda(); else schRenderHeatmap();
+            document.querySelectorAll('#sch-tabs .sch-tab').forEach(t => {
+                t.classList.toggle('active',t.dataset.schpane===selected);
+                t.setAttribute('aria-pressed',String(t.dataset.schpane===selected));
+            });
+            if(selected==='agenda')schRenderAgenda();
+            else if(selected==='activity')schRenderHeatmap();
         }
 
         function schModalOpen() {
@@ -18587,6 +18591,7 @@
             if (fireChip) fireChip.innerHTML = `<i class="fa-solid fa-fire"></i> กิจกรรมต่อเนื่อง ${streak} วัน`;
 
             el.innerHTML = `<div class="activity-row">${chipCheck}<span class="activity-hint activity-desktop">${hint}</span><div class="activity-actions">${chipLog}${chipCase}</div></div>`;
+            window.monthlyProgress?.update({logs:window.myReflectiveLogsCache ? _combinedLogCache() : null,cases:window.myCasesCache,targets:myOwnRow().monthlyTargets,save:t=>db.collection('users').doc(userId).update({monthlyTargets:t})});
             const history = document.getElementById('activity-history');
             if (history) history.innerHTML = `<p>Log: ${logCap}${logDone ? ' · ส่งแล้ววันนี้ ✓' : ''}</p><p>Case: ${caseCap}${caseDone ? ' · ส่งแล้ววันนี้ ✓' : ''}</p>`;
 
