@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.12)</title>
+    <title>Nika Admin (V100.13)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6393,9 +6393,9 @@
 <link rel="stylesheet" href="ai-usage-overview.css?v=V100.11">
 <script src="quiz-curate-history.js?v=V100.08"></script>
 <script src="quiz-curate.js?v=V100.09"></script>
-<script src="quiz-compare-cleanup.js?v=V100.02"></script>
+<script src="quiz-compare-cleanup.js?v=V100.13"></script>
 <link rel="stylesheet" href="quiz-compare-cleanup.css?v=V100.02">
-<link rel="stylesheet" href="learning-review.css?v=V99.88">
+<link rel="stylesheet" href="learning-review.css?v=V100.13">
 <link rel="stylesheet" href="delete-requests.css?v=V99.82">
 <link rel="stylesheet" href="quiz-feedback.css?v=V99.89">
 </head>
@@ -6586,7 +6586,7 @@
                             <!-- γ.4d: opens the Escalated Learning Notes review queue. Hidden by
                                  refreshEscalatedNotesCount() until at least one note is escalated. -->
                             <button type="button" id="escalated-notes-btn" onclick="openEscalatedNotesView()" title="Learning notes you flagged with 🚀 Escalate — focused review queue" style="display:none; margin:0; padding:5px 14px; font-size:0.85em; border-radius:30px; border:1.5px solid #fecaca; background:#fff5f5; color:#b91c1c; font-weight:800; cursor:pointer; white-space:nowrap;">🚀 Escalated <span id="escalated-notes-count">0</span></button>
-                            <button type="button" id="note-delete-requests-btn" onclick="openNoteDeleteRequests()" title="User requests to delete learning notes, including archived notes" style="display:none; margin:0; padding:5px 14px; font-size:0.85em; border-radius:30px; border:1.5px solid #fecaca; background:#fff5f5; color:#b91c1c; font-weight:800; cursor:pointer; white-space:nowrap;">🗑️ Delete requests <span id="note-delete-requests-count">0</span></button>
+                            <button type="button" id="note-delete-requests-btn" onclick="openNoteDeleteRequests()" title="User requests to delete learning notes, including archived notes" style="display:none; margin:0; padding:5px 14px; font-size:0.85em; border-radius:30px; border:1.5px solid #fecaca; background:#fff5f5; color:#b91c1c; font-weight:800; cursor:pointer; white-space:nowrap;">🗑️ Note deletion requests <span id="note-delete-requests-count">0</span></button>
                         </div>
                     </div>
 
@@ -29827,6 +29827,7 @@ ${JSON.stringify(sourceObj)}`;
             };
 
             quizzesData.forEach(q => {
+                if (q.isHistoryRevision) return;
                 const dead = getSafeDate(q.deadline);
                 const isActuallyActive = q.isActive && (!dead || now <= dead);
 
@@ -30805,12 +30806,16 @@ ${JSON.stringify(sourceObj)}`;
             if (usable.length < 2) return alert('Need at least 2 selected quizzes with questions to compare.');
 
             quizCleanup.start(usable, outputs => {
-                outputs.forEach(({ sourceId, copy, quiz }) => {
+                outputs.forEach(({ sourceId, copy, quiz, deleted }) => {
+                    if (deleted) selectedQuizIds.delete(sourceId);
                     const index = quizzesData.findIndex(q => q.id === quiz.id);
                     if (index >= 0) quizzesData[index] = quiz; else quizzesData.push(quiz);
                     if (copy) { selectedQuizIds.delete(sourceId); selectedQuizIds.add(quiz.id); }
                 });
-                updateQuizBulkBar(); openQuizCompareModal();
+                updateQuizBulkBar();
+                renderQuizzes();
+                if (selectedQuizIds.size >= 2) openQuizCompareModal();
+                else forceHideModal('quizCompareModal');
             });
             document.getElementById('quiz-compare-ai-result').replaceChildren();
             quizCompareOverlapData = [];
@@ -56528,7 +56533,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             const count = document.getElementById('note-delete-requests-count');
             const btn = document.getElementById('note-delete-requests-btn');
             if (count) count.textContent = notes.length;
-            if (btn) { btn.style.display = ''; btn.classList.toggle('queue-empty', notes.length === 0); }
+            if (btn) { btn.style.display = notes.length ? '' : 'none'; btn.classList.toggle('queue-empty', notes.length === 0); }
             const list = document.getElementById('note-delete-requests-list');
             if (!list) return;
             list.replaceChildren();
