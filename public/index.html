@@ -2142,8 +2142,8 @@
 <script src="personal-profile-tabs.js?v=V99.70"></script>
 <link rel="stylesheet" href="submit-system-grid.css?v=V99.72">
 <script defer src="submit-system-grid.js?v=V99.71"></script>
-<link rel="stylesheet" href="invite-ticket.css?v=V100.33">
-<script defer src="invite-ticket.js?v=V100.33"></script>
+<link rel="stylesheet" href="invite-ticket.css?v=V100.35">
+<script defer src="invite-ticket.js?v=V100.35"></script>
 <link rel="stylesheet" href="learning-review.css?v=V99.81">
 <link rel="stylesheet" href="history-compact.css?v=V99.81"><link rel="stylesheet" href="delete-requests.css?v=V99.82">
 <link rel="stylesheet" href="case-compact.css?v=V99.88">
@@ -13524,12 +13524,11 @@
         function schLoadEvents() {
             if (schEventsUnsub) return;
             schEventsCache = schEventsCache || [];
-            schEventsUnsub = db.collection('events')
-                .where('targetGroups', 'array-contains-any', [...new Set([myGroup, '__public__'])])
-                .onSnapshot(s => {
-                    schEventsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
-                    schRefreshOpenPane();
-                }, e => handleFirestoreListenerError('events listener', e));
+            const snapshots=new Map();
+            const receive=(key,s)=>{snapshots.set(key,s.docs.map(d=>({id:d.id,...d.data()})));schEventsCache=[...new Map([...snapshots.values()].flat().map(e=>[e.id,e])).values()];schRefreshOpenPane();};
+            const publicOff=db.collection('events').where('targetGroups','array-contains-any',[...new Set([myGroup,'__public__'])]).onSnapshot(s=>receive('audience',s),e=>handleFirestoreListenerError('events listener',e));
+            const ownOff=db.collection('events').where('createdByUid','==',firebase.auth().currentUser.uid).onSnapshot(s=>receive('own',s),e=>handleFirestoreListenerError('own events listener',e));
+            schEventsUnsub=()=>{publicOff();ownOff();};
             db.collection('event_interests').where('userId', '==', userId)
                 .onSnapshot(s => {
                     const m = {};
@@ -13630,6 +13629,7 @@
             if (!title) { throw new Error('Give it a name ใส่ชื่อกิจกรรมด้วย'); }
             if (!date) { throw new Error('Pick a date เลือกวันที่'); }
             if (start && end && end < start) { throw new Error('The end time is before the start ครบเวลาจบก่อนเริ่ม'); }
+            if ([start,end].some(t=>t&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(t)))throw new Error('Use 24-hour time HH:mm เช่น 18:30');
             const authUser = firebase.auth().currentUser;
             if (!authUser) { throw new Error('Still signing you in — try again กำลังเข้าสู่ระบบ'); }
 

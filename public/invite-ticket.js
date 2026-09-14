@@ -15,32 +15,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const heading = document.createElement('strong'); heading.textContent = prefix === 'ue' ? '📅 New Event' : '📅 Agenda'; header.append(heading);
         if (prefix === 'ue') { group.hidden = true; header.append(group); }
         const audience = new Set();
-        root._inviteAudience = audience;
-        root._inviteAudienceMode = 'public';
-        const modes=document.createElement('div');modes.className='invite-modes';modes.setAttribute('role','group');modes.setAttribute('aria-label','Who can see this?');
-        const picker=document.createElement('div');picker.className='invite-audience';
-        const hint=document.createElement('p');hint.className='invite-audience-hint';
-        const buttons={};
-        const renderAudience=()=>{
-            const isPublic=root._inviteAudienceMode==='public';
-            Object.entries(buttons).forEach(([key,button])=>button.setAttribute('aria-pressed',String(root._inviteAudienceMode===key)));
-            picker.hidden=isPublic;picker.replaceChildren();
-            hint.textContent=isPublic?'Visible to all groups':audience.size+' selected · Only selected groups can view this agenda.';
-            hint.title=isPublic?'ทุกกลุ่มเห็นกิจกรรมนี้':'เฉพาะกลุ่มที่เลือกเห็นกิจกรรมนี้';
-            if(!isPublic){
-                const options=window.getInviteGroupOptions?.()||[];
-                if(!options.length)picker.textContent='No groups available.';
-                options.forEach(name=>{const button=document.createElement('button');button.type='button';button.textContent=(audience.has(name)?'✓ ':'')+name;button.setAttribute('aria-pressed',String(audience.has(name)));button.onclick=()=>{if(audience.has(name))audience.delete(name);else audience.add(name);renderAudience();};picker.append(button);});
-            }
-        };
-        [['public','🌐 Public','ทุกกลุ่มเห็นกิจกรรม'],['groups','👥 Groups','เลือกกลุ่มที่เห็นกิจกรรม']].forEach(([key,label,title])=>{const button=document.createElement('button');button.type='button';button.textContent=label;button.title=title;button.onclick=()=>{root._inviteAudienceMode=key;renderAudience();};buttons[key]=button;modes.append(button);});
-        root._resetInviteAudience=()=>{audience.clear();root._inviteAudienceMode='public';renderAudience();};
-        root.append(header,modes,picker,hint);renderAudience();
+        root._resetInviteAudience=()=>{};
+        root.append(header);
+        const privacy=document.createElement('p');privacy.className='invite-audience-hint';privacy.textContent='🔒 Visible to you and Admin';privacy.title='ผู้สร้างและ Admin เห็นก่อน Admin จะเลือกกลุ่มผู้ชมภายหลัง';
         nodes.title.placeholder = 'What are you planning?'; nodes.title.setAttribute('aria-label', 'Event name'); nodes.title.required = true; root.append(nodes.title);
         const row = document.createElement('div'); row.className = 'invite-when';
         const wrap = (text, input) => { const label = document.createElement('label'); label.append(document.createTextNode(text), input); return label; };
         const display = document.createElement('input'); display.placeholder = 'DD/MM/YYYY'; display.inputMode = 'numeric'; display.maxLength = 10; display.setAttribute('aria-label', 'Date DD/MM/YYYY'); display.required = true;
-        const dateLabel = wrap('Date * ', display); nodes.when.className = 'invite-weekday'; dateLabel.insertBefore(nodes.when, display);
+        const dateLabel = wrap('Date * ', display); nodes.when.className = 'invite-weekday'; dateLabel.append(nodes.when);
         nodes.date.hidden = true; dateLabel.append(nodes.date);
         const sync = () => { const match = nodes.date.value.match(/^(\d{4})-(\d{2})-(\d{2})$/); display.value = match ? match[3] + '/' + match[2] + '/' + match[1] : ''; };
         display.addEventListener('input', () => {
@@ -52,21 +34,22 @@ document.addEventListener('DOMContentLoaded', () => {
             window.schRenderInviteWhen(prefix);
         });
         nodes.date.addEventListener('change', sync);
-        row.append(dateLabel, wrap('Start', nodes.start), wrap('End', nodes.end)); root.append(row);
+        [nodes.start,nodes.end].forEach(input=>{input.type='text';input.inputMode='numeric';input.placeholder='HH:mm';input.maxLength=5;input.pattern='([01][0-9]|2[0-3]):[0-5][0-9]';input.title='เวลา 24 ชั่วโมง เช่น 18:30';});
+        row.append(dateLabel, wrap('Start · 24h', nodes.start), wrap('End · 24h', nodes.end)); root.append(row);
+        const duration=document.createElement('p');duration.className='invite-audience-hint';root.append(duration);
+        const updateDuration=()=>{const valid=t=>/^([01]\d|2[0-3]):[0-5]\d$/.test(t);const minutes=t=>Number(t.slice(0,2))*60+Number(t.slice(3));const diff=minutes(nodes.end.value)-minutes(nodes.start.value);duration.textContent=valid(nodes.start.value)&&valid(nodes.end.value)?diff<0?'End must be after start': 'Duration · '+Math.floor(diff/60)+' hr '+diff%60+' min':'';};
+        nodes.start.addEventListener('input',updateDuration);nodes.end.addEventListener('input',updateDuration);
+
         const details = document.createElement('details'); const summary = document.createElement('summary'); summary.textContent = '📍 Location & 🔗 Join link'; details.append(summary);
         nodes.location.placeholder = 'Where?'; nodes.join.placeholder = 'https://';
         details.append(wrap('Location', nodes.location), wrap('Join link', nodes.join)); root.append(details);
+        root.append(privacy);
         if (nodes.msg) root.append(nodes.msg);
         if (actions) { actions.classList.add('invite-actions'); root.append(actions); }
         root._syncInviteDate = sync; sync();
     });
     const original = window.schRenderInviteWhen;
-    window.getInviteAudience = prefix => {
-        const root=document.getElementById(prefix === 'ue' ? 'event-form-section' : 'sch-new-event');
-        if(root._inviteAudienceMode!=='groups')return ['__public__'];
-        if(!root._inviteAudience.size)throw new Error('Select at least one group · กรุณาเลือกอย่างน้อยหนึ่งกลุ่ม');
-        return [...root._inviteAudience];
-    };
+    window.getInviteAudience = () => [];
     window.schRenderInviteWhen = function(prefix = 'sne') {
         original(prefix);
         const root = document.getElementById(prefix === 'ue' ? 'event-form-section' : 'sch-new-event');
@@ -75,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (box && root?.classList.contains('invite-ticket')) {
             const value = document.getElementById(prefix + '-date').value;
             const date = value ? new Date(value + 'T12:00:00') : null;
-            box.textContent = date ? date.toLocaleDateString('en-GB', {weekday:'short'}) : '';
+            box.textContent = date ? date.toLocaleDateString('en-GB', {weekday:'long',day:'numeric',month:'long',year:'numeric'}) : '';
         }
     };
 });

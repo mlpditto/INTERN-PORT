@@ -54152,6 +54152,16 @@ Save it anyway?`;
                 + evJoinPlatform(url.hostname) + '</a>';
         }
 
+        async function editEventAudience(id){
+            const event=eventsCache.find(e=>e.id===id);if(!event)return;
+            const d=document.createElement('dialog');d.className='ag-modal';d.innerHTML='<h3>👥 Agenda audience</h3><p class="aud-title"></p><div class="aud-options"></div><p role="status"></p><button class="aud-cancel">Cancel</button><button class="aud-save">Save audience</button>';
+            d.querySelector('.aud-title').textContent=event.title;
+            const selected=new Set(event.targetGroups||[]),options=[['__public__','🌐 Public · All groups'],...[...new Set(usersData.map(u=>u.group||'Public'))].sort().map(g=>[g,g])];
+            options.forEach(([value,label])=>{const l=document.createElement('label'),c=document.createElement('input');c.type='checkbox';c.value=value;c.checked=selected.has(value);c.style.width='auto';c.onchange=()=>{if(c.checked){if(value==='__public__')selected.clear();else selected.delete('__public__');selected.add(value);}else selected.delete(value);d.querySelectorAll('input').forEach(n=>n.checked=selected.has(n.value));};l.append(c,document.createTextNode(label));d.querySelector('.aud-options').append(l);});
+            const hint=document.createElement('p');hint.textContent='No selection: visible only to the creator and Admin.';d.querySelector('.aud-options').after(hint);
+            d.querySelector('.aud-cancel').onclick=()=>d.close();d.addEventListener('close',()=>d.remove());d.querySelector('.aud-save').onclick=async()=>{d.querySelector('.aud-save').disabled=true;try{await db.collection('events').doc(id).update({targetGroups:[...selected]});d.close();}catch(e){d.querySelector('[role=status]').textContent='Could not save. Please retry.';d.querySelector('.aud-save').disabled=false;}};document.body.append(d);d.showModal();
+        }
+
         function renderEventsList() {
             const box = document.getElementById('ev-list');
             if (!box) return;
@@ -54164,9 +54174,9 @@ Save it anyway?`;
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span style="flex:1; min-width:0; font-size:0.85em; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(e.title)}</span>
                         <span style="font-size:0.72em; color:#64748b; white-space:nowrap;">${escapeHtml(e.eventDate)}${e.timeText ? ' · ' + escapeHtml(e.timeText) : ''}</span>
-                        <button onclick="deleteEvent('${e.id}')" title="Delete this event" aria-label="Delete this event" style="width:auto; min-height:0; flex:0 0 auto; padding:0; font-size:0.95em; line-height:1; border:none; border-radius:6px; background:transparent; color:#b91c1c; cursor:pointer;">🗑️</button>
+                        <button onclick="editEventAudience('${e.id}')" title="เลือกกลุ่มที่เห็นกิจกรรม" style="width:auto;padding:4px 8px">👥 Audience</button><button onclick="deleteEvent('${e.id}')" title="Delete this event" aria-label="Delete this event" style="width:auto; min-height:0; flex:0 0 auto; padding:0; font-size:0.95em; line-height:1; border:none; border-radius:6px; background:transparent; color:#b91c1c; cursor:pointer;">🗑️</button>
                     </div>
-                    <div style="font-size:0.7em; color:#94a3b8; margin-top:3px;">${(e.targetGroups || []).join(' · ')}${e.location ? ' · 📍 ' + escapeHtml(e.location) : ''}</div>
+                    <div style="font-size:0.7em; color:#94a3b8; margin-top:3px;">${escapeHtml((e.targetGroups || []).join(' · ') || '🔒 Creator + Admin')}${e.location ? ' · 📍 ' + escapeHtml(e.location) : ''}</div>
                         <div>${evJoinHtml(e.joinVia, '#7c3aed')}</div>
                     <div style="font-size:0.74em; color:#334155; margin-top:4px;">
                         <b>${people.length}</b> want to join${people.length ? ': ' + people.map(p => escapeHtml(p.displayName || p.userId)).join(', ') : ''}
