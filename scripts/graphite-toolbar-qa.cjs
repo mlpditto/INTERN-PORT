@@ -36,20 +36,21 @@ const { chromium } = require('playwright');
         for (const id of ['ai-audit-popup', 'ai-analysis-popup']) {
             const popup = page.locator('#' + id);
             assert.equal(await popup.locator('.text-ai-chips button').count(), 9);
-            assert.deepEqual(await popup.locator('.text-ai-provider').allTextContents(), ['Gemini', 'GPT', 'Claude']);
-            assert.deepEqual(await popup.locator('.text-ai-provider').evaluateAll(ns => ns.map(n => getComputedStyle(n).color)), ['rgb(168, 180, 255)', 'rgb(125, 211, 176)', 'rgb(232, 180, 154)']);
-            assert.equal(await popup.locator('[data-value="gpt-6-astra"]').innerText(), '6 Astra');
+            assert.equal(await popup.locator('.text-ai-chips button:visible').count(), 4);
+            assert.deepEqual(await popup.locator('.audit-provider').allTextContents(), ['Gemini', 'GPT', 'Claude']);
+            assert.deepEqual(await popup.locator('.audit-provider').evaluateAll(ns => ns.map(n => getComputedStyle(n).color)), ['rgb(168, 180, 255)', 'rgb(125, 211, 176)', 'rgb(232, 180, 154)']);
+            assert.equal(await popup.locator('[data-value="gpt-6-astra"]').textContent(), '6 Astra');
             assert.equal(await popup.locator('[data-value="gpt-6-astra"]').getAttribute('aria-label'), 'GPT 6 Astra');
             assert.equal(await popup.locator('.text-ai-chips [aria-pressed="true"]').count(), 1);
             assert.equal(await popup.locator('.review-tab[aria-pressed="true"]').evaluate(b => getComputedStyle(b).backgroundColor), 'rgb(245, 184, 205)');
             assert.equal(await popup.locator('.review-tab[aria-pressed="false"]').evaluate(b => getComputedStyle(b).backgroundColor), 'rgb(255, 240, 245)');
             for (const width of [320, 390, 736, 1024]) {
                 await page.setViewportSize({ width, height: 800 });
-                assert(await popup.locator('button').evaluateAll(bs => bs.every(b => {
+                assert(await popup.locator('button:visible').evaluateAll(bs => bs.every(b => {
                     const r = b.getBoundingClientRect(), host = b.closest('.audit-toolbar').getBoundingClientRect();
                     return r.left >= host.left && r.right <= host.right + 1 && b.scrollWidth <= b.clientWidth;
                 })), id + ' overflows at ' + width);
-                const boxes = await popup.locator('button').evaluateAll(bs => bs.map(b => { const r = b.getBoundingClientRect(); return { l:r.left, r:r.right, t:r.top, b:r.bottom }; }));
+                const boxes = await popup.locator('button:visible').evaluateAll(bs => bs.map(b => { const r = b.getBoundingClientRect(); return { l:r.left, r:r.right, t:r.top, b:r.bottom }; }));
                 for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
                     const a=boxes[i], b=boxes[j]; assert(!(a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t), 'overlapping controls');
                 }
@@ -58,6 +59,9 @@ const { chromium } = require('playwright');
         await page.locator('#ai-audit-popup [data-value="gpt-5.6-sol"]').click();
         await page.locator('#ai-audit-popup .audit-run').click();
         assert.equal(await page.evaluate(() => auditRequest.model), 'gpt-5.6-sol');
+        await page.locator('#ai-analysis-popup [data-provider="Claude"]').click();
+        assert.equal(await page.locator('#ai-analysis-popup .text-ai-chips button:visible').count(), 3);
+        assert.equal(await page.locator('#rewrite-ai-model').inputValue(), 'gpt-5.6-luna');
         await page.locator('#ai-analysis-popup [data-value="claude-haiku-4-5"]').click();
         await page.locator('#ai-analysis-popup .audit-run').click();
         assert.equal(await page.evaluate(() => rewriteRequest), 'claude-haiku-4-5');
@@ -83,6 +87,7 @@ const { chromium } = require('playwright');
             syncAuditFixHints();
         });
         for (const [value, label] of [['gpt-6-astra', 'GPT 6 Astra'], ['gemini-3.8-flash', 'Gemini 3.8 Flash']]) {
+            await page.locator('#ai-audit-popup [data-provider="' + label.split(' ')[0] + '"]').click();
             await page.locator('#ai-audit-popup [data-value="' + value + '"]').click();
             const fix = page.locator('.audit-fix-control button');
             assert((await fix.getAttribute('title')).includes(label));

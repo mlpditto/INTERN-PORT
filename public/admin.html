@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.11)</title>
+    <title>Nika Admin (V100.12)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6386,7 +6386,7 @@
     <script src="case-taxonomy.js?v=V94.53"></script>
     <!-- V91.98 fix: walker skips user-content subtrees (q-text-preview / md-render / lang-no-toggle) -->
     <script src="lang-toggle.js?v=V97.44"></script>
-<link rel="stylesheet" href="audit-toolbar.css?v=V100.05">
+<link rel="stylesheet" href="audit-toolbar.css?v=V100.12">
 <link rel="stylesheet" href="quiz-curate.css?v=V100.09">
 <script src="quiz-revision.js?v=V100.07"></script>
 <script src="ai-usage-overview.js?v=V100.11"></script>
@@ -17662,16 +17662,28 @@
             return `<span class="audit-fix-control lang-no-toggle"><span class="audit-fix-model"></span><button type="button" onclick="auditSuggestFix(${qNumber}, this)" onpointerenter="syncAuditFixHints()" onfocus="syncAuditFixHints()" aria-describedby="audit-fix-tip-${qNumber}">✦ Suggest fix</button><span id="audit-fix-tip-${qNumber}" class="audit-fix-tooltip" role="tooltip"></span></span>`;
         };
 
+        window.browseAuditProvider = function(button) {
+            const row = button.closest('.audit-model-row');
+            row.querySelectorAll('.audit-provider').forEach(b => b.setAttribute('aria-pressed', String(b === button)));
+            row.querySelectorAll('.text-ai-chips > button').forEach(b => {
+                b.hidden = !b.getAttribute('aria-label').startsWith(button.dataset.provider + ' ');
+            });
+        };
         window.auditModelControlsHtml = function(hasResult, mode = 'audit') {
             const isAudit = mode === 'audit';
             const inputId = isAudit ? 'quality-audit-model' : 'rewrite-ai-model';
             const selected = isAudit ? 'gpt-5.6-luna' : textAIModel('ai-analyzer-model-val');
-            const action = `document.getElementById('${inputId}').value=this.dataset.value;this.parentElement.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b===this);b.setAttribute('aria-pressed',String(b===this))})` + (isAudit ? ';syncAuditFixHints()' : ";syncModelDefault('ai-analyzer-model-val',this.dataset.value)");
-            const run = isAudit ? 'runSelectedQualityAudit(this)' : 'analyzeQuizAI(this, { forceNew: true })';
-            return `<input type="hidden" id="${inputId}" value="${selected}">${textAIChipsHtml('', selected, action, true)}<button type="button" class="audit-run" onclick="${run}" title="${isAudit ? 'ตรวจคุณภาพซ้ำด้วยโมเดลที่เลือก' : 'เสนอการปรับปรุงใหม่ด้วยโมเดลที่เลือก'}">↻ ${isAudit ? 'Review' : 'Rewrite'}</button>`;
+            const provider = TEXT_AI_MODELS.find(m => m.id === selected).label.split(' ')[0];
+            const action = `document.getElementById('${inputId}').value=this.dataset.value;this.parentElement.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b===this);b.setAttribute('aria-pressed',String(b===this))});this.closest('.audit-toolbar').querySelector('.audit-run').title='ใช้ '+this.getAttribute('aria-label')+' ทำงานนี้'` + (isAudit ? ';syncAuditFixHints()' : ";syncModelDefault('ai-analyzer-model-val',this.dataset.value)");
+            const chips = textAIChipContents(selected, action).replace(/<span class="text-ai-provider"[^>]*>.*?<\/span>/g, '').replace(/<button /g, '<button hidden ' ).replace(new RegExp('hidden ([^>]*aria-label="' + provider + ' )', 'g'), '$1');
+            return `<div class="audit-model-row"><input type="hidden" id="${inputId}" value="${selected}"><div class="audit-providers" role="group" aria-label="Browse model providers">${['Gemini', 'GPT', 'Claude'].map(p => `<button type="button" class="audit-provider" data-provider="${p}" aria-pressed="${p === provider}" title="ดูรุ่นของ ${p} · กดเลือกรุ่นเพื่อเปลี่ยนโมเดล" onclick="browseAuditProvider(this)">${p}</button>`).join('')}</div><div class="text-ai-chips" role="group" aria-label="AI model">${chips}</div></div>`;
         };
         window.auditToolbarHtml = function(hasResult, mode = 'audit', allowExport = false) {
-            return `<div class="audit-toolbar lang-no-toggle">${window.reviewTabsHtml(mode)}${window.auditModelControlsHtml(hasResult, mode)}${allowExport ? '<button type="button" onclick="exportAiAnalysisMd()" title="ดาวน์โหลดผลการวิเคราะห์เป็น Markdown">Export</button>' : ''}<button type="button" class="audit-close" onclick="closeQuizReview()" aria-label="Close review" title="ปิดหน้าตรวจข้อสอบ">×</button></div>${mode === 'audit' ? '<p class="audit-toolbar-note lang-no-toggle">ⓘ AI may err · Check duplicate answers and ambiguous keys.</p>' : ''}`;
+            const isAudit = mode === 'audit';
+            const run = isAudit ? 'runSelectedQualityAudit(this)' : 'analyzeQuizAI(this, { forceNew: true })';
+            const selected = isAudit ? 'gpt-5.6-luna' : textAIModel('ai-analyzer-model-val');
+            const label = TEXT_AI_MODELS.find(m => m.id === selected).label;
+            return `<div class="audit-toolbar lang-no-toggle"><div class="audit-toolbar-top">${window.reviewTabsHtml(mode)}<div class="audit-actions"><button type="button" class="audit-run" onclick="${run}" title="ใช้ ${label} ทำงานนี้">↻ ${isAudit ? 'Review' : 'Rewrite'}</button>${allowExport ? '<button type="button" onclick="exportAiAnalysisMd()" title="ดาวน์โหลดผลการวิเคราะห์เป็น Markdown">Export</button>' : ''}<button type="button" class="audit-close" onclick="closeQuizReview()" aria-label="Close review" title="ปิดหน้าตรวจข้อสอบ">×</button></div></div>${window.auditModelControlsHtml(hasResult, mode)}</div>${isAudit ? '<p class="audit-toolbar-note lang-no-toggle">ⓘ AI may err · Check duplicate answers and ambiguous keys.</p>' : ''}`;
         };
 
         window.runSelectedQualityAudit = function(btn) {
