@@ -1,6 +1,6 @@
 const fs = require('node:fs');
 const assert = require('node:assert/strict');
-const { chromium } = require('playwright');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 (async () => {
     const browser = await chromium.launch();
     try {
@@ -89,6 +89,19 @@ const { chromium } = require('playwright');
         assert.equal(copy.isActive,false); assert.equal(copy.translations,undefined); assert.equal(copy.totalPoints,2);
         assert.deepEqual(result.records[result.records.a.cleanup.backupQuizId].questions,result.base.a.questions);
         assert.deepEqual(result.records[copy.cleanup.backupQuizId].questions,result.base.b.questions);
+        await page.evaluate(()=>{records=structuredClone(base);writes=0;begin();});
+        await mark('0:0'); await mark('1:1'); await prepare();
+        assert.equal(await page.locator('#qc-backup').isChecked(),true);
+        await page.locator('#qc-backup').uncheck();
+        assert.match(await page.locator('#qc-plan').innerText(),/No backup/);
+        await page.evaluate(()=>uncertain=true); await commit();
+        assert.equal(await page.locator('#qc-backup').isDisabled(),true);
+        await page.evaluate(()=>uncertain=false); await commit();
+        assert.equal(await page.evaluate(()=>writes),2);
+        assert.equal(await page.evaluate(()=>Object.values(records).filter(r=>r.cleanupBackup).length),0);
+        assert.equal(await page.evaluate(()=>records.a.cleanup.backupQuizId),null);
+        assert.equal(await page.evaluate(()=>records.a.questions.length),2);
+        assert.equal(await page.evaluate(()=>records.b.questions.length),3);
         assert.deepEqual(errors,[]);
         console.log('PASS: multi-quiz marking, duplicate occurrences, whole-quiz removal with retained questions, review, source safety, mixed original/copy atomic commit, backups and uncertain retry');
     } finally {await browser.close();}
