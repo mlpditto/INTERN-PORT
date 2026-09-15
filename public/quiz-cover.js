@@ -2,6 +2,47 @@
 const QuizCover = (() => {
     let revision = 0, busy = false;
     const safeUrl = value => { try { const u = new URL(value); return u.protocol === 'https:' ? u.href : ''; } catch (_) { return ''; } };
+    const quickUploads = new Set();
+    async function upload(file) {
+        if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) throw new Error('Use PNG, JPG or WebP up to 10 MB');
+        const bitmap = await createImageBitmap(file);
+        const scale = Math.min(1, 720 / Math.max(bitmap.width, bitmap.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(bitmap.width * scale)); canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+        canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close();
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', 0.85));
+        if (!blob) throw new Error('Could not process image');
+        const ref = adminApp.storage().ref(`editor-images/quiz-cover-${Date.now()}-${crypto.randomUUID()}.webp`);
+        await ref.put(blob, { contentType: 'image/webp' });
+        return ref.getDownloadURL();
+    }
+    function quickInsert(button) {
+        const id = button.dataset.quizId;
+        if (!id || quickUploads.has(id)) return;
+        const input = document.createElement('input');
+        input.type = 'file'; input.accept = 'image/png,image/jpeg,image/webp'; input.hidden = true;
+        document.body.append(input);
+        input.oncancel = () => input.remove();
+        input.onchange = async () => {
+            const file = input.files[0]; input.remove();
+            if (!file || quickUploads.has(id)) return;
+            quickUploads.add(id); button.disabled = true; button.setAttribute('aria-busy', 'true');
+            try {
+                const url = await upload(file);
+                await db.collection('quizzes').doc(id).update({ coverUrl: url });
+                button.innerHTML = adminThumbnail(url);
+                button.title = 'เปลี่ยนปก Quiz — เลือกภาพแล้วบันทึกทันที';
+                button.setAttribute('aria-label', 'Replace quiz cover');
+                if (typeof showToast === 'function') showToast('Cover saved ✓');
+            } catch (error) {
+                console.error('Quick quiz cover:', error);
+                alert('Cover not saved. ' + (error.message || 'Please retry.'));
+            } finally {
+                quickUploads.delete(id); button.disabled = false; button.removeAttribute('aria-busy');
+            }
+        };
+        input.click();
+    }
     function editor() {
         let el = document.getElementById('quiz-cover-editor');
         if (el) return el;
@@ -21,16 +62,7 @@ const QuizCover = (() => {
             const token = ++revision;
             busy = true; controls(true); el.querySelector('[role=status]').textContent = 'Uploading…';
             try {
-                const bitmap = await createImageBitmap(file);
-                const scale = Math.min(1, 720 / Math.max(bitmap.width, bitmap.height));
-                const canvas = document.createElement('canvas');
-                canvas.width = Math.max(1, Math.round(bitmap.width * scale)); canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-                canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close();
-                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', 0.85));
-                if (!blob) throw new Error('Could not process image');
-                const ref = adminApp.storage().ref(`editor-images/quiz-cover-${Date.now()}-${crypto.randomUUID()}.webp`);
-                await ref.put(blob, { contentType: 'image/webp' });
-                const url = await ref.getDownloadURL();
+                const url = await upload(file);
                 if (token === revision) { set(url); el.querySelector('[role=status]').textContent = 'Save Quiz to apply'; }
             } catch (error) {
                 if (token === revision) el.querySelector('[role=status]').textContent = 'Upload failed. Try again.';
@@ -80,11 +112,16 @@ const QuizCover = (() => {
             }
         }
     }
-    function adminThumbnail(value) {
+    function adminThumbnail(value, id) {
+        if (id) {
+            const encoded = String(id).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, '&#39;');
+            const hasCover = !!safeUrl(value);
+            return `<button type="button" class="quiz-quick-cover" data-quiz-id="${encoded}" onclick="event.stopPropagation();QuizCover.quickInsert(this)" aria-label="${hasCover ? 'Replace' : 'Insert'} quiz cover" title="${hasCover ? 'เปลี่ยน' : 'ใส่'}ปก Quiz — เลือกภาพแล้วบันทึกทันที">${adminThumbnail(value) || '🖼️'}</button>`;
+        }
         const url = safeUrl(value);
         if (!url) return '';
         const escaped = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, '&#39;');
         return `<span class="quiz-admin-cover" title="Quiz นี้มีปกแล้ว" data-th-title="Quiz นี้มีปกแล้ว"><img src="${escaped}" alt="Quiz cover" loading="lazy" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span hidden role="img" aria-label="Cover set; preview unavailable" title="มีปกแล้ว แต่โหลดภาพตัวอย่างไม่ได้">🖼️</span></span>`;
     }
-    return { set, decorate, adminThumbnail, isBusy: () => busy, value: () => editor().querySelector('[type=hidden]').value };
+    return { set, decorate, adminThumbnail, quickInsert, isBusy: () => busy, value: () => editor().querySelector('[type=hidden]').value };
 })();
