@@ -59,7 +59,7 @@ window.activityRewards = (() => {
         return names[r.source||r.type]||'Recorded adjustment';
     }
     function bind(tile,key){
-        tile.dataset.rewardKey=key;tile.setAttribute('aria-controls','mp-reward-detail');tile.title='ดูที่มาของ Points และ Beri ที่บันทึกแล้ว';tile.onclick=()=>show(key,document.getElementById('monthly-progress'));
+        tile.dataset.rewardKey=key;tile.setAttribute('aria-controls','mp-reward-detail');tile.title=(tile.querySelector('small')?.textContent||'')+' · ดูที่มาของ Points และ Beri ที่บันทึกแล้ว';tile.onclick=()=>show(key,document.getElementById('monthly-progress'));
         const reward=node('span',summary(key));reward.className='mp-reward';tile.append(reward);
     }
     function decorate(host, activities={}) {
@@ -69,22 +69,22 @@ window.activityRewards = (() => {
         const totals=node('small');totals.className='mp-reward-total';
         if(rewardReady()){
             const net=key=>(sources[key]||[]).filter(current).reduce((sum,r)=>sum+(Number.isFinite(Number(r.amount))?Number(r.amount):0),0);
-            totals.textContent=`Recorded net · ${net('points').toFixed(2)} Points · ${net('beri').toLocaleString()} Beri`;
+            totals.textContent=`${net('points').toFixed(2)} Points · ${net('beri').toLocaleString()} Beri`;
         }else totals.textContent=summary('other');
-        grid.before(totals);
+        host.querySelector('.mp-head').append(totals);
         [...grid.children].slice(0,3).forEach((tile,i)=>{const key=categories[i];bind(tile,key);pending(tile,activities[key]);});
         [['explore','credited opens'],['event','requests'],['drug','submitted'],['disease','submitted'],['product','submitted']].forEach(([key,unit])=>{
             const tile=node('button');tile.type='button';tile.className='mp-card';tile.append(node('strong',labels[key]));
             const rows=sources[key], count=rows?rows.filter(current).filter(r=>!['draft','rejected','unsuccessful'].includes(r.status)).length:null;
             const value=node('span',errors.has(key)?'—':count===null?'—':count.toLocaleString());value.className='mp-value';tile.append(value,node('small',errors.has(key)?'Unavailable':count===null?'Loading…':unit));bind(tile,key);pending(tile,rows);grid.append(tile);
         });
-        const footer=node('div');footer.className='mp-reward-footer';footer.append(node('small','Recorded rewards only · Net of reversals'));
-        const other=node('button','Other adjustments · '+summary('other'));other.type='button';other.dataset.rewardKey='other';other.title='คะแนนเช็กอิน การปรับยอด และรายการที่ไม่มีหมวดระบุ';other.onclick=()=>show('other',host);footer.append(other);host.append(footer);
+        const footer=node('div');footer.className='mp-reward-footer';footer.title='รางวัลที่บันทึกแล้ว รวมรายการย้อนคืน';
+        const other=node('button','Adjustments · '+summary('other'));other.type='button';other.dataset.rewardKey='other';other.title='คะแนนเช็กอิน การปรับยอด และรายการที่ไม่มีหมวดระบุ';other.onclick=()=>show('other',host);footer.append(other);host.append(footer);
         if(errors.size){const retry=node('button','Retry unavailable data');retry.type='button';retry.onclick=()=>{identity='';start();};host.append(retry);}
         paintDetail(host);
         if(!identity&&!observer){observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){observer.disconnect();observer=null;start();}});observer.observe(host);}
     }
-    function pending(tile,rows){const n=(rows||[]).filter(current).filter(r=>r.status==='pending').length;if(n)tile.append(node('small',`${n} pending review`));}
+    function pending(tile,rows){const n=(rows||[]).filter(current).filter(r=>r.status==='pending').length;if(n){const note=node('small',`${labels[tile.dataset.rewardKey]} · ${n} pending review`);note.className='mp-pending';document.getElementById('monthly-progress').append(note);}}
     function start() {
         const uid=typeof userId==='undefined'?'':userId, authUid=typeof firebase==='undefined'?'':firebase.auth().currentUser?.uid;
         if(!uid||!authUid)return;
