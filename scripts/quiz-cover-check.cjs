@@ -17,17 +17,19 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
             QuizCover.set('javascript:alert(1)'); if (QuizCover.value()) throw Error('Unsafe URL');
             for (const state of ['start', 'locked', 'collapsed']) {
                 const card = document.createElement('div'); card.id = state;
-                card.innerHTML = '<div class="assign-header"><div class="assign-icon">Quiz</div><div class="assign-info">Long quiz title</div></div><div class="assign-footer">' + (state === 'locked' ? 'Locked' : '<button class="btn-quiz-cta" onclick="confirmRunQuiz()">Start<span class="quiz-cta-countdown" data-dead="123">2h</span></button>') + '</div>';
+                card.innerHTML = '<div class="assign-header"><div class="assign-icon">Quiz</div><div class="assign-info">Long quiz title<div class="quiz-mission-meta">10 items · 1 pt</div></div></div><div class="assign-footer">' + (state === 'locked' ? 'Locked' : '<button class="btn-quiz-cta" onclick="confirmRunQuiz()">Start<span class="quiz-cta-countdown" data-dead="123">2h</span></button>') + '</div>';
                 QuizCover.decorate(card, {title: 'Quiz'}, state === 'collapsed'); document.getElementById('cards').append(card);
             }
         });
         assert.equal(await page.locator('#locked button.quiz-cover-thumb').count(), 0);
         assert.equal(await page.locator('#collapsed button.quiz-cover-thumb').count(), 0);
-        for (const width of [320, 390, 600]) {
+        for (const width of [320, 390, 600, 1100]) {
             await page.setViewportSize({width, height: 800});
             assert.equal(await page.locator('#start .assign-footer').isVisible(), false);
             assert.equal(await page.locator('#start .quiz-cover-deadline').isVisible(), true);
         }
+        assert.equal(await page.locator('#start .quiz-mission-meta .quiz-cover-deadline').count(), 1);
+        assert.equal(await page.locator('#start .quiz-cta-countdown').count(), 1);
         await page.locator('#start button.quiz-cover-thumb').focus(); await page.keyboard.press('Enter');
         assert.equal(await page.evaluate(() => calls), 1);
         await page.evaluate(() => {window.adminApp = {storage: () => ({ref: () => ({put: async () => {}, getDownloadURL: async () => 'https://example.com/new.webp'})})};});
