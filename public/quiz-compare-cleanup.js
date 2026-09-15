@@ -38,10 +38,11 @@
     function setupReview() {
         if (review) return;
         review = el('dialog'); review.id = 'qc-dialog'; review.className = 'lang-no-toggle'; review.setAttribute('aria-labelledby', 'qc-heading');
-        review.innerHTML = '<h3 id="qc-heading">Review changes</h3><div id="qc-plan"></div><p id="qc-status" role="status"></p><div class="qc-actions"><button id="qc-cancel" type="button">Back</button><button id="qc-confirm" type="button">Confirm removal</button></div>';
+        review.innerHTML = '<h3 id="qc-heading">Review changes</h3><label style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px"><input id="qc-backup" type="checkbox" checked style="width:auto" title="สร้างสำเนาก่อนแก้ไข ปิดได้หากไม่ต้องการสำรอง"><span>Create backup</span></label><div id="qc-plan"></div><p id="qc-status" role="status"></p><div class="qc-actions"><button id="qc-cancel" type="button">Back</button><button id="qc-confirm" type="button">Confirm removal</button></div>';
         document.body.append(review);
         document.getElementById('qc-cancel').onclick = () => review.close();
         document.getElementById('qc-confirm').onclick = commit;
+        document.getElementById('qc-backup').onchange = e => { if (current.busy || current.pending) return; current.backupEnabled = e.target.checked; reviewText(); };
         document.addEventListener('keydown', e => { if (review.open && e.key === 'Escape') e.stopPropagation(); }, true);
         review.addEventListener('cancel', e => { if (current?.busy) e.preventDefault(); });
     }
@@ -49,6 +50,7 @@
         const s = current; if (!s || s.busy || !s.marks.size) return;
         if (s.pending) { review.showModal(); return; }
         setupReview(); review.showModal(); s.busy = true; sync();
+        document.getElementById('qc-backup').checked = s.backupEnabled; document.getElementById('qc-backup').disabled = true;
         const status = document.getElementById('qc-status'), confirm = document.getElementById('qc-confirm');
         document.getElementById('qc-plan').replaceChildren(); confirm.disabled = true;
         document.getElementById('qc-cancel').disabled = true; status.textContent = 'Checking quiz history…';
@@ -62,26 +64,36 @@
                 p.backup = db.collection('quizzes').doc(); p.output = p.copy ? db.collection('quizzes').doc() : p.ref;
                 const section = el('section');
                 section.append(el('h4', (p.data.shortTitle || p.data.title || p.ref.id) + ' · ' + p.data.questions.length + ' → ' + (p.data.questions.length - p.removed.length)));
-                section.append(el('p', p.deleteWhole ? 'Delete entire quiz · Remove from the quiz list and deactivate. Questions and existing history remain stored.' : p.copy ? 'Save cleaned copy · Original preserved (active quiz or exam history)' : 'Remove from original · Before Cleanup backup'));
+                const description = el('p', p.deleteWhole ? 'Delete entire quiz · Remove from the quiz list and deactivate. Questions and existing history remain stored.' : p.copy ? 'Save cleaned copy · Original preserved (active quiz or exam history)' : 'Remove from original'); description.className = 'qc-plan-action'; section.append(description);
                 for (const index of p.removed) section.append(el('div', 'Q' + (index + 1) + ' · ' + p.data.questions[index].q));
                 document.getElementById('qc-plan').append(section);
             }
             status.textContent = s.plan.some(p => p.deleteWhole) ? 'Confirm the entire quizzes marked for deletion above. They will be hidden and deactivated; stored questions and history are preserved.' : 'Review every question above. Backups and changes save together. Cleaned copies start inactive; total points stay unchanged.';
+            reviewText();
             confirm.textContent = s.plan.every(p => p.copy) ? 'Save cleaned copies' : 'Confirm removal'; confirm.disabled = false;
         } catch (e) { s.plan = null; status.textContent = e.message; }
-        finally { s.busy = false; sync(); document.getElementById('qc-cancel').disabled = false; }
+        finally { s.busy = false; sync(); document.getElementById('qc-cancel').disabled = false; document.getElementById('qc-backup').disabled = !!s.pending; }
+    }
+    function reviewText() {
+        const s = current; if (!s?.plan) return;
+        document.querySelectorAll('#qc-plan .qc-plan-action').forEach((node,i) => {
+            const p=s.plan[i];
+            node.textContent=(p.deleteWhole ? 'Delete entire quiz · Hidden and deactivated; questions and history preserved' : p.copy ? 'Save cleaned copy · Original preserved' : 'Remove from original') + (s.backupEnabled ? ' · Before Cleanup backup' : ' · No backup');
+        });
+        document.getElementById('qc-status').textContent = (s.backupEnabled ? 'Backup copies and changes save together.' : 'No backup copy will be created. Changes to an inactive original cannot be restored from a cleanup backup.') + ' Active quizzes or quizzes with history still produce cleaned copies. Total points stay unchanged.';
     }
     async function commit() {
         const s = current; if (!s?.plan || s.busy) return;
         s.busy = true; sync();
-        const status = document.getElementById('qc-status'); status.textContent = 'Saving backups and changes…';
+        const status = document.getElementById('qc-status'); status.textContent = s.backupEnabled ? 'Saving backups and changes…' : 'Saving changes without backup…';
+        document.getElementById('qc-backup').disabled = true;
         document.getElementById('qc-confirm').disabled = document.getElementById('qc-cancel').disabled = true;
         try {
             if (!await ensureAuthForQuizWrite(6000)) throw Error('Sign in as an admin before saving.');
-            // A complete set of backup documents proves a prior uncertain transaction committed.
-            const backups = await Promise.all(s.plan.map(p => p.backup.get({ source: 'server' })));
+            // Operation markers on outputs prove a prior uncertain transaction committed, even without backups.
+            const backups = await Promise.all(s.plan.map(async p => { const doc = await p.output.get({ source: 'server' }); return { exists: doc.exists && doc.data().cleanup?.operationId === p.backup.id }; }));
             if (!backups.every(b => b.exists)) {
-                if (backups.some(b => b.exists)) throw Error('Backup state changed. Reopen Compare.');
+                if (backups.some(b => b.exists)) throw Error('Cleanup state changed. Reopen Compare.');
                 const checked = await Promise.all(s.plan.map(inspect));
                 checked.forEach((p, i) => { if (p.copy !== s.plan[i].copy || fp(p.data) !== fp(s.plan[i].data)) throw Error('Quiz status or content changed. Go Back and review again.'); });
                 const timestamp = firebase.firestore.FieldValue.serverTimestamp();
@@ -91,7 +103,7 @@
                     const existing = await Promise.all(s.plan.map(p => tx.get(p.backup)));
                     const outputs = await Promise.all(s.plan.map(p => tx.get(p.output)));
                     if (existing.every(d => d.exists)) return;
-                    if (existing.some(d => d.exists)) throw Error('Backup state changed. Reopen Compare.');
+                    if (existing.some(d => d.exists)) throw Error('Cleanup state changed. Reopen Compare.');
                     s.plan.forEach((p, i) => {
                         if (!originals[i].exists || fp(originals[i].data()) !== fp(p.data) || (p.copy && outputs[i].exists)) throw Error('Quiz changed before saving. Go Back and review again.');
                     });
@@ -99,13 +111,13 @@
                         const { id, ...data } = p.data;
                         const backup = { ...data, title: (data.title || 'Quiz') + ' (Before Cleanup)', isActive: false, isTemplate: true, startTime: null, deadline: null, createdAt: timestamp, updatedAt: timestamp,
                             cleanupBackup: { sourceQuizId: p.ref.id, originalStartTime: data.startTime || null, originalDeadline: data.deadline || null } };
-                        tx.set(p.backup, p.deleteWhole ? { ...backup, isHistoryRevision: true } : backup);
+                        if (s.backupEnabled) tx.set(p.backup, p.deleteWhole ? { ...backup, isHistoryRevision: true } : backup);
                         if (p.deleteWhole) {
-                            tx.update(p.ref, { isActive: false, isHistoryRevision: true, deletedByCleanup: true, updatedAt: timestamp, cleanup: { backupQuizId: p.backup.id, deletedEntireQuiz: true } });
+                            tx.update(p.ref, { isActive: false, isHistoryRevision: true, deletedByCleanup: true, updatedAt: timestamp, cleanup: { backupQuizId: s.backupEnabled ? p.backup.id : null, operationId: p.backup.id, deletedEntireQuiz: true } });
                             return;
                         }
                         const questions = data.questions.filter((_, i) => !p.removed.includes(i));
-                        const cleanup = { sourceQuizId: p.ref.id, backupQuizId: p.backup.id, originalQuestionNumbersRemoved: p.removed.map(i => i + 1) };
+                        const cleanup = { sourceQuizId: p.ref.id, backupQuizId: s.backupEnabled ? p.backup.id : null, operationId: p.backup.id, originalQuestionNumbersRemoved: p.removed.map(i => i + 1) };
                         if (p.copy) {
                             const copy = { ...data, title: (data.title || 'Quiz') + ' (Cleaned)', questions, cleanup, isActive: false, isTemplate: true, startTime: null, deadline: null, createdAt: timestamp, updatedAt: timestamp };
                             ['translations', 'lastAiAnalysis', 'lastAiAudit', 'deadlineFloor'].forEach(k => delete copy[k]); tx.set(p.output, copy);
@@ -124,7 +136,7 @@
     }
     window.quizCleanup = {
         start(quizzes, onDone) {
-            current = { quizzes: quizzes.map(q => ({ ...q, questions: structuredClone(q.questions) })), marks: new Set(), busy: false, onDone };
+            current = { quizzes: quizzes.map(q => ({ ...q, questions: structuredClone(q.questions) })), marks: new Set(), busy: false, backupEnabled: true, onDone };
             let footer = document.getElementById('qc-footer');
             if (!footer) {
                 footer = el('div'); footer.id = 'qc-footer'; footer.innerHTML = '<span id="qc-summary" role="status"></span><button id="qc-clear" type="button" title="ยกเลิกข้อที่เลือกตัดทั้งหมด">Clear selection</button><button id="qc-review" type="button" title="ตรวจชื่อชุดและข้อที่จะตัดก่อนบันทึก">Review changes</button>';
