@@ -64,6 +64,28 @@ flowchart TB
 | Firestore **rules / indexes** | `firebase deploy --only firestore:rules,firestore:indexes` | **manual, after merge** |
 | Cloud **Functions** | `FUNCTIONS_DISCOVERY_TIMEOUT=120 firebase deploy --only functions:…` | **manual** (run from the non-OneDrive clone) |
 | **Storage** rules | `firebase deploy --only storage` | **manual** |
+| **Storage** bucket CORS (`storage.cors.json`) | `gcloud storage buckets update gs://intern-port-edfa7.firebasestorage.app --cors-file=storage.cors.json` | **manual, from Cloud Shell** |
+
+**Storage rules and Storage CORS are two different things.** `firebase deploy --only
+storage` deploys the *rules* and does not touch CORS — there is no `firebase` command for
+CORS at all, which is why the row above uses `gcloud`. The symptom when CORS is missing is
+deceptive: `fetch()` of a download URL fails with a bare network error while **New tab** on
+the same URL opens the file fine, so it reads as a code bug rather than a bucket setting.
+That is what happened to the applicant-document PDF viewer on 2026-09-09.
+
+Running it: this repo's machines have no `gcloud`, so use **Google Cloud Shell** — and click
+**Open Terminal** first, because Cloud Shell now opens on the Editor with Gemini Code Assist,
+where a pasted command becomes a request to edit a file instead of a command to run. Verify
+with:
+
+```
+gcloud storage buckets describe gs://intern-port-edfa7.firebasestorage.app --format="default(cors_config)"
+```
+
+`storage.cors.json` is the source of truth for what *should* be on the bucket; nothing applies
+it automatically, so re-run the update after changing it — including whenever a new origin
+needs read access. Keep the origin list as short as it can be: every entry there is a site
+allowed to read applicant documents and other user uploads out of the browser.
 
 The version badge in each page auto-derives from `<title>` (`Nika V98.xx` / `Internship Portfolio (V96.xx)`). Bump it on every `public/` change; serial PRs collide on that line.
 
