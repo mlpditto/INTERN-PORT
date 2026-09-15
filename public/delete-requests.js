@@ -112,6 +112,28 @@
         }
         return !(await db.collection(collection).doc(r.itemId).get()).exists;
     }
+    async function describeRequest(r, read) {
+        const collection = r.itemType === 'quiz' ? 'quiz_attempts' : r.itemType === 'explore_link' ? 'review_link_suggestions' : 'submissions';
+        const [user, item] = await Promise.all([read('users', r.userId), read(collection, r.itemId)]);
+        const owned = item && item.userId === r.userId ? item : {};
+        const types = {quiz:'Quiz attempt',case:'Case submission',product:'Product listing',work:'Work submission',reflective:'Reflection',learning_note:'Learning note',explore_link:'Explore link suggestion'};
+        let title = owned.quizTitle || owned.title || owned.metadata?.title || '';
+        if (r.itemType === 'quiz') {
+            const suffix = '_' + r.userId;
+            const quizId = owned.quizId || (r.itemId.endsWith(suffix) ? r.itemId.slice(0, -suffix.length) : '');
+            const quiz = await read('quizzes', quizId);
+            title = quiz?.title || quiz?.shortTitle || title;
+        } else if (owned.metadata?.sourceId) {
+            const sources = {case:'cases',product:'product_listings',work:'works',reflective:'reflective_logs'};
+            if (sources[r.itemType]) {
+                const source = await read(sources[r.itemType], owned.metadata.sourceId);
+                if (source?.userId === r.userId) title = source.title || source.disease || source.productName || title;
+            }
+        }
+        return {name:user?.displayName || owned.displayName || 'User profile unavailable',
+            picture:user?.pictureUrl || owned.pictureUrl || '', type:types[r.itemType] || 'Submission',
+            title:title || (item === null ? 'Original item unavailable' : 'Untitled item')};
+    }
     function adminUI() {
         const host = document.getElementById('dashboard-work'); if (!host) return;
         const box = document.createElement('details'); box.className='dr-admin';
@@ -120,11 +142,33 @@
         function listen() {
             if (unsubscribe || !db.app.auth().currentUser) return;
             unsubscribe = db.collection('deletion_requests').where('status','==','pending').onSnapshot(snap=>{
+                // Share reads within this snapshot, without caching stale profiles indefinitely.
+                const reads = new Map();
+                const read = (collection, id) => {
+                    if (!id || typeof id !== 'string' || id.includes('/')) return Promise.resolve(null);
+                    const key = collection + '/' + id;
+                    if (!reads.has(key)) reads.set(key, db.collection(collection).doc(id).get()
+                        .then(doc => doc.exists ? doc.data() : null).catch(() => null));
+                    return reads.get(key);
+                };
                 box.classList.toggle('queue-empty', snap.empty);
                 const list=box.querySelector('div'); list.replaceChildren();
                 snap.forEach(doc=>{
                     const r=doc.data(), row=document.createElement('div');row.className='dr-row';
-                    row.innerHTML=`<strong>${esc(r.itemType)} · ${esc(r.userId)}</strong><p>${esc(r.itemId)} · ${esc(r.reason)}</p><button data-act="delete">🗑 Delete</button> <button data-act="verify">✓ Verify deleted</button> <button data-act="reject">↩ Decline</button>`;
+                    row.innerHTML=`<div class="dr-requester"><span class="dr-avatar" aria-hidden="true">?</span><div><strong class="dr-name">Loading requester…</strong><div class="dr-type">Deletion request</div></div></div><p class="dr-item">Loading item details…</p><p class="dr-reason"><strong>Reason:</strong> ${esc(r.reason || 'Not provided')}</p><details class="dr-reference"><summary title="รหัสสำหรับตรวจสอบทางเทคนิค">Reference details</summary><div>User ID: ${esc(r.userId)}</div><div>Item ID: ${esc(r.itemId)}</div><div>Type: ${esc(r.itemType)}</div></details><button data-act="delete" title="ลบรายการต้นฉบับ">🗑 Delete</button> <button data-act="verify" title="ตรวจยืนยันว่ารายการต้นฉบับถูกลบแล้ว">✓ Verify deleted</button> <button data-act="reject" title="ปฏิเสธคำขอลบ">↩ Decline</button>`;
+                    describeRequest(r, read).then(info => {
+                        if (!row.isConnected) return;
+                        row.querySelector('.dr-name').textContent = info.name;
+                        row.querySelector('.dr-type').textContent = info.type;
+                        row.querySelector('.dr-item').textContent = info.title;
+                        const avatar = row.querySelector('.dr-avatar');
+                        avatar.textContent = Array.from(info.name)[0] || '?';
+                        if (/^https:\/\//i.test(info.picture)) {
+                            const image = document.createElement('img');
+                            image.alt = ''; image.src = info.picture; image.referrerPolicy = 'no-referrer';
+                            image.onerror = () => image.remove(); avatar.append(image);
+                        }
+                    });
                     row.querySelectorAll('button').forEach(b=>b.onclick=async()=>{
                         b.disabled=true;const status=box.querySelector('p[role]');
                         try {
