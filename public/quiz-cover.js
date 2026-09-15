@@ -80,5 +80,11 @@ const QuizCover = (() => {
             }
         }
     }
-    return { set, decorate, isBusy: () => busy, value: () => editor().querySelector('[type=hidden]').value };
+    function adminThumbnail(value) {
+        const url = safeUrl(value);
+        if (!url) return '';
+        const escaped = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, '&#39;');
+        return `<span class="quiz-admin-cover" title="Quiz นี้มีปกแล้ว" data-th-title="Quiz นี้มีปกแล้ว"><img src="${escaped}" alt="Quiz cover" loading="lazy" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span hidden role="img" aria-label="Cover set; preview unavailable" title="มีปกแล้ว แต่โหลดภาพตัวอย่างไม่ได้">🖼️</span></span>`;
+    }
+    return { set, decorate, adminThumbnail, isBusy: () => busy, value: () => editor().querySelector('[type=hidden]').value };
 })();
