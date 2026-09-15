@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.40)</title>
+    <title>Nika Admin (V100.41)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6271,6 +6271,8 @@
 <link rel="stylesheet" href="quiz-feedback.css?v=V99.89">
 <script src="assigned-goals.js?v=V100.30"></script><link rel="stylesheet" href="assigned-goals.css?v=V100.30">
 <script src="hub-progress-menu.js?v=V100.31" defer></script><link rel="stylesheet" href="hub-progress-menu.css?v=V100.31">
+<link rel="stylesheet" href="quiz-cover.css?v=V100.41">
+<script src="quiz-cover.js?v=V100.41"></script>
 </head>
 
 <body>
@@ -21931,6 +21933,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         }
 
         function fillQuizForm(q) {
+            QuizCover.set(q.coverUrl);
             document.getElementById('quiz-title').value = q.title || "";
             document.getElementById('quiz-short-title').value = q.shortTitle || "";
             setQuizTargetGroupValue(q.targetGroup || "Public");
@@ -22021,6 +22024,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         }
 
         function resetQuizForm() {
+            QuizCover.set('');
             document.getElementById('edit-quiz-id').value = "";
             document.getElementById('quiz-title').value = "";
             document.getElementById('quiz-short-title').value = "";
@@ -22450,7 +22454,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
 
             return {
                 title, shortTitle, targetGroup, unlockScore, description, tags, materials, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, partialCredit, notifyGroup, quizType, feedbackLimit, caseContent, questions, blueprint,
-                earlyBirdBeriFirst, deadlineBeriMax,
+                earlyBirdBeriFirst, deadlineBeriMax, coverUrl: QuizCover.value(),
                 startTime: document.getElementById('quiz-start-time').value,
                 deadline: document.getElementById('quiz-deadline').value
             };
@@ -25170,6 +25174,7 @@ ${JSON.stringify(sourceObj)}`;
         };
 
         async function saveQuiz() {
+            if (QuizCover.isBusy()) return alert("Please wait for the cover upload to finish.");
             const id = document.getElementById('edit-quiz-id').value;
             const formData = getQuizFormData();
 
@@ -25209,6 +25214,7 @@ ${JSON.stringify(sourceObj)}`;
 
             const data = {
                 title: formData.title,
+                coverUrl: QuizCover.value(),
                 shortTitle: formData.shortTitle,
                 targetGroup: formData.targetGroup, // Add targetGroup
                 unlockScore: formData.unlockScore || 0, // V95.15: score gate (0 = no gate)
