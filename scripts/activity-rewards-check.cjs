@@ -5,7 +5,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
  const browser=await chromium.launch();
  try{
   const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.setContent('<div id="monthly-progress"></div>');
+  await page.setContent('<div id="monthly-progress"></div><div id="work-pane-history"><div class="lr-header"><h3>History</h3><span class="hc-summary">17 entries · 9.6 pts</span><button id="lr-toggle">Review</button></div></div>');
   await page.addStyleTag({content:fs.readFileSync('public/monthly-progress.css','utf8')+'\n'+fs.readFileSync('public/activity-rewards.css','utf8')});
   await page.evaluate(()=>{
    window.userId='u1';window.firebase={auth:()=>({currentUser:{uid:'auth1'}})};window.listeners={};window.stopped=0;
@@ -29,6 +29,11 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
   const quiz=page.locator('[data-reward-key=quiz]');assert.match(await quiz.innerText(),/0.80 pt · 5 Beri/);assert.equal(await quiz.locator('.mp-value').innerText(),'1 / 3');
   assert.match(await page.locator('[data-reward-key=drug]').innerText(),/0.50 pt/);
   assert.match(await page.locator('[data-reward-key=event]').textContent(),/requests/);
+  assert.equal(await page.locator('#monthly-progress [data-reward-key=other]').count(),0);
+  await page.locator('#history-adjustments').click();
+  assert.match(await page.locator('#history-adjustment-records').innerText(),/Manual adjustment/);
+  await page.locator('#history-adjustment-records').getByRole('button',{name:'Close',exact:true}).click();
+  assert.equal(await page.locator('#history-adjustments').getAttribute('aria-expanded'),'false');
   await quiz.click();assert.match(await page.locator('.mp-reward-detail').innerText(),/Quiz correction/);assert.match(await page.locator('.mp-reward-detail').innerText(),/-0.20 Points/);
   for(const width of [320,390,736,1100]){await page.setViewportSize({width,height:1400});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.equal(await page.locator('.mp-grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length),width<=700?2:4);}
   await page.evaluate(()=>listeners.beri_ledger.fail(new Error('denied')));assert.match(await page.locator('[data-reward-key=quiz]').innerText(),/unavailable/);

@@ -33,12 +33,17 @@ window.activityRewards = (() => {
         paintDetail(host);
     }
     function paintDetail(host) {
-        host.querySelectorAll('[data-reward-key]').forEach(b=>b.setAttribute('aria-expanded',String(b.dataset.rewardKey===selected)));
+        const history=document.getElementById('history-adjustment-detail');
+        if(history && (selected==='other' || host===history)) host=history;
+        const monthly=document.querySelector('#monthly-progress .mp-reward-detail');
+        if(monthly && selected==='other') monthly.hidden=true;
+        if(history && selected!=='other') {history.replaceChildren();document.getElementById('history-adjustments')?.setAttribute('aria-expanded','false');}
+        document.querySelectorAll('#monthly-progress [data-reward-key], #history-adjustments').forEach(b=>b.setAttribute('aria-expanded',String(b.dataset.rewardKey===selected)));
         let detail=host.querySelector('.mp-reward-detail');
-        if(!detail){detail=node('section');detail.className='mp-reward-detail';detail.id='mp-reward-detail';host.append(detail);}
+        if(!detail){detail=node('section');detail.className='mp-reward-detail';detail.id=host===history?'history-adjustment-records':'mp-reward-detail';host.append(detail);}
         detail.hidden=!selected; detail.replaceChildren(); if(!selected)return;
         const head=node('div');head.className='mp-reward-row';head.append(node('strong',labels[selected]+' · Reward sources'));
-        const close=node('button','Close');close.type='button';close.title='ย่อรายละเอียด';close.onclick=()=>{const key=selected;selected='';paintDetail(host);host.querySelector(`[data-reward-key="${key}"]`)?.focus();};head.append(close);detail.append(head);
+        const close=node('button','Close');close.type='button';close.title='ย่อรายละเอียด';close.onclick=()=>{const key=selected;selected='';paintDetail(host);document.querySelector(`[data-reward-key="${key}"]`)?.focus();};head.append(close);detail.append(head);
         detail.append(node('small','Posted this month · Includes reversals · Counts use submission dates'));
         if(!rewardReady()){detail.append(node('p',summary(selected)));return;}
         const rows=records(selected);
@@ -78,12 +83,21 @@ window.activityRewards = (() => {
             const rows=sources[key], count=rows?rows.filter(current).filter(r=>!['draft','rejected','unsuccessful'].includes(r.status)).length:null;
             const value=node('span',errors.has(key)?'—':count===null?'—':count.toLocaleString());value.className='mp-value';tile.append(value,node('small',errors.has(key)?'Unavailable':count===null?'Loading…':unit));bind(tile,key);pending(tile,rows);grid.append(tile);
         });
-        const footer=node('div');footer.className='mp-reward-footer';footer.title='รางวัลที่บันทึกแล้ว รวมรายการย้อนคืน';
-        const other=node('button','Adjustments · '+summary('other'));other.type='button';other.dataset.rewardKey='other';other.title='คะแนนเช็กอิน การปรับยอด และรายการที่ไม่มีหมวดระบุ';other.onclick=()=>show('other',host);footer.append(other);host.append(footer);
+        historyChip();
         if(errors.size){const retry=node('button','Retry unavailable data');retry.type='button';retry.onclick=()=>{identity='';start();};host.append(retry);}
         paintDetail(host);
-        if(!identity&&!observer){observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){observer.disconnect();observer=null;start();}});observer.observe(host);}
+        if(!identity&&!observer){observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){observer.disconnect();observer=null;start();}});observer.observe(host);const history=document.getElementById('work-pane-history');if(history)observer.observe(history);}
     }
+    function historyChip() {
+        const header=document.querySelector('#work-pane-history .lr-header');if(!header)return;
+        let chip=document.getElementById('history-adjustments');
+        if(!chip){chip=node('button');chip.id='history-adjustments';chip.type='button';chip.dataset.rewardKey='other';chip.setAttribute('aria-controls','history-adjustment-records');chip.title='รายการปรับยอดเดือนนี้ รวมคะแนนเช็กอินและรายการย้อนคืน แยกจากคะแนน History';header.querySelector('h3').after(chip);
+            const detail=node('div');detail.id='history-adjustment-detail';header.after(detail);
+            chip.onclick=()=>{start();show('other',detail);chip.setAttribute('aria-expanded',String(selected==='other'));};
+        }
+        chip.textContent='Adjustments · '+summary('other')+' ↗';chip.setAttribute('aria-expanded',String(selected==='other'));
+    }
+    document.addEventListener('DOMContentLoaded',historyChip);
     function pending(tile,rows){const n=(rows||[]).filter(current).filter(r=>r.status==='pending').length;if(n){const note=node('small',`${labels[tile.dataset.rewardKey]} · ${n} pending review`);note.className='mp-pending';document.getElementById('monthly-progress').append(note);}}
     function start() {
         const uid=typeof userId==='undefined'?'':userId, authUid=typeof firebase==='undefined'?'':firebase.auth().currentUser?.uid;
