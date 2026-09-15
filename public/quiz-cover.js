@@ -108,7 +108,15 @@ const QuizCover = (() => {
             if (footer.children.length === 1) {
                 card.classList.add('quiz-cover-startable');
                 const countdown = start.querySelector('.quiz-cta-countdown[data-dead]');
-                if (countdown) { const copy = countdown.cloneNode(true); copy.classList.add('quiz-cover-deadline'); header.querySelector('.assign-info').append(copy); }
+                const meta = header.querySelector('.quiz-mission-meta') || header.querySelector('.assign-info');
+                if (countdown) {
+                    countdown.classList.add('quiz-cover-deadline');
+                    countdown.title = 'เวลาที่เหลือก่อนถึงกำหนดส่ง';
+                    meta.append(countdown);
+                } else if (quiz.deadline?.toDate?.() < new Date()) {
+                    const late = document.createElement('span'); late.className = 'quiz-cover-deadline';
+                    late.textContent = '⏱ Late'; late.title = 'เลยกำหนดส่งแล้ว ยังเริ่มทำได้'; meta.append(late);
+                }
             }
         }
     }
