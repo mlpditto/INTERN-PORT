@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.49)</title>
+    <title>Nika Admin (V100.50)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6276,6 +6276,7 @@
 <link rel="stylesheet" href="quiz-toolbar.css?v=V100.43">
 <link rel="stylesheet" href="quiz-more-popover.css?v=V100.47">
 <script defer src="quiz-more-popover.js?v=V100.47"></script>
+<script src="certificate-files.js?v=V100.50"></script><link rel="stylesheet" href="certificate-files.css?v=V100.50">
 </head>
 
 <body>
@@ -52857,6 +52858,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const imgData = c.toDataURL('image/png');
                 if (i > 0) doc.addPage();
                 doc.addImage(imgData, 'PNG', 0, 0, 297, 210); // Fill A4
+                const single = new jsPDF('l', 'mm', 'a4');
+                single.addImage(imgData, 'PNG', 0, 0, 297, 210);
+                if (!await CertificateFiles.archive(certNos[i], single)) return;
             }
 
             doc.save(opts.group ? `Certificates_${opts.group}.pdf` : "Bulk_Certificates.pdf");
@@ -52875,6 +52879,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             loadCertRegistry();
         }
         async function loadCertRegistry() {
+            CertificateFiles.reset();
             const box = document.getElementById('cert-reg-list');
             box.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:24px;">Loading...</div>';
             try {
@@ -52898,7 +52903,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const tplIcon = r.template === 'bootcamp' ? '🧪' : '🎓';
                 const issued = (r.issuedAt && r.issuedAt.toDate) ? r.issuedAt.toDate().toLocaleDateString('en-GB') : '-';
                 return `
-                <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid ${revoked ? '#fecaca' : '#e2e8f0'}; border-radius:12px; margin-bottom:8px; background:${revoked ? '#fff5f5' : '#fff'};">
+                <div class="cert-reg-row" style="display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid ${revoked ? '#fecaca' : '#e2e8f0'}; border-radius:12px; margin-bottom:8px; background:${revoked ? '#fff5f5' : '#fff'};">
                     <div style="flex:1; min-width:0;">
                         <div style="font-family:Consolas,monospace; font-size:0.8em; font-weight:700; color:#334155;">${escapeHtml(r.no)}</div>
                         <div style="font-weight:800; font-size:0.9em; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${tplIcon} ${escapeHtml(r.name)}${r.nickname ? ` (${escapeHtml(r.nickname)})` : ''}</div>
@@ -52907,8 +52912,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     <span style="flex-shrink:0; font-size:0.72em; font-weight:800; padding:3px 10px; border-radius:999px; ${revoked ? 'background:#fee2e2; color:#b91c1c;' : 'background:#dcfce7; color:#15803d;'}">${revoked ? '🚫 REVOKED' : '✅ VALID'}</span>
                     <button class="btn-sm" title="คัดลอกลิงก์ verify" onclick="copyCertLink('${escapeHtml(r.no)}')" style="width:auto; min-height:0; padding:6px 10px; background:#eef2ff; color:#4361ee; border:none; border-radius:8px; cursor:pointer;">🔗</button>
                     <button class="btn-sm" title="${revoked ? 'Restore to VALID' : 'Revoke'}" onclick="toggleRevokeCert('${escapeHtml(r.no)}')" style="width:auto; min-height:0; padding:6px 10px; background:${revoked ? '#ecfdf5' : '#fef2f2'}; color:${revoked ? '#047857' : '#b91c1c'}; border:none; border-radius:8px; cursor:pointer;">${revoked ? '↩️' : '🚫'}</button>
+                    <div class="cert-reg-files"><button disabled data-cert-file="${escapeHtml(r.no)}">👁 View certificate</button><button disabled data-cert-file="${escapeHtml(r.no)}" data-download="true">⬇ PDF</button><small data-file-status>Loading PDF…</small></div>
                 </div>`;
             }).join('');
+            CertificateFiles.decorate();
         }
         function copyCertLink(no) {
             navigator.clipboard.writeText(CERT_VERIFY_BASE + no);
@@ -53020,7 +53027,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             for (let i = 0; i < names.length; i++) {
                 renderCertificateCanvas(c, [names[i], dateText, [], 1, 0, tpl, certLang, certNos[i]], CERT_EXPORT_SCALE);
                 if (i > 0) doc.addPage();
-                doc.addImage(c.toDataURL('image/png'), 'PNG', 0, 0, 297, 210);
+                const image = c.toDataURL('image/png');
+                doc.addImage(image, 'PNG', 0, 0, 297, 210);
+                const single = new jsPDF('l', 'mm', 'a4');
+                single.addImage(image, 'PNG', 0, 0, 297, 210);
+                if (!await CertificateFiles.archive(certNos[i], single)) return;
             }
             doc.save("Certificates_Pasted.pdf");
             showToast("Export Completed!");
@@ -53055,6 +53066,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             renderCertificateCanvas(exportCanvas, [...drawArgs, certNo], CERT_EXPORT_SCALE);
             const imgData = exportCanvas.toDataURL('image/png');
             doc.addImage(imgData, 'PNG', 0, 0, 297, 210);
+            if (!await CertificateFiles.archive(certNo, doc)) return;
             doc.save(`Certificate_${document.getElementById('cert-fullname').value || "User"}.pdf`);
         }
         async function delQuizAttempt(id, collection = 'quiz_attempts') {

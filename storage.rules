@@ -98,6 +98,14 @@ service firebase.storage {
         && request.resource.contentType.matches('application/pdf|image/(jpeg|png|webp)');
     }
 
+    // Immutable certificate PDF snapshots, private to admins.
+    match /certificate-files/{certNo}/{fileName} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.size < 20 * 1024 * 1024
+        && request.resource.contentType == 'application/pdf';
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }
