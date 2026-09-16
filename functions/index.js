@@ -404,7 +404,10 @@ async function postWithRetry(url, data, config = {}) {
             // the same generation from zero against the same deadline, so it burns
             // another full run of tokens and wall-clock to fail identically.
             const ownTimeout = err && (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT');
-            const retryable = !ownTimeout && (!status || status === 429 || (status >= 500 && status <= 599));
+            const providerError = err?.response?.data?.error;
+            const quotaExhausted = providerError?.type === 'insufficient_quota'
+                || ['insufficient_quota', 'credit_balance_exhausted'].includes(providerError?.code);
+            const retryable = !ownTimeout && !quotaExhausted && (!status || status === 429 || (status >= 500 && status <= 599));
             if (!retryable || attempt === retries) throw err;
             const retryAfter = Number(err && err.response && err.response.headers && err.response.headers["retry-after"]);
             const backoff = (retryAfter > 0 ? Math.min(retryAfter * 1000, 10000) : baseDelayMs * Math.pow(2, attempt)) + Math.floor(Math.random() * 250);

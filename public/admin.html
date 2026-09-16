@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.51)</title>
+    <title>Nika Admin (V100.52)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6237,7 +6237,7 @@
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <!-- V93.08: cache-bust on taxonomy.js for the LP Firestore overlay rollout -->
     <script src="ai-model-registry.js?v=V99.89"></script>
-    <script src="ai-model-ui.js?v=V100.37"></script>
+    <script src="ai-model-ui.js?v=V100.52"></script>
     <link rel="stylesheet" href="text-ai-chips.css?v=V100.05">
     <link rel="stylesheet" href="quiz-resource-cards.css?v=V99.68">
     <link rel="stylesheet" href="case-split-studio.css?v=V100.38">
@@ -27858,6 +27858,8 @@ ${JSON.stringify(sourceObj)}`;
             document.getElementById('bp-textarea').value = '';
             const findBtn = document.getElementById('bp-find-btn');
             if (findBtn) findBtn.disabled = false;
+            const modelSelect = document.getElementById('bp-ai-model');
+            if (modelSelect) modelSelect.disabled = false;
             document.getElementById('bp-input-stage').style.display = 'block';
             document.getElementById('bp-preview-stage').style.display = 'none';
             modal.style.display = 'block';
@@ -28020,11 +28022,13 @@ ${JSON.stringify(sourceObj)}`;
             if (typeof window._aiFindAnswerCore !== 'function' || typeof window.callUniversalAI !== 'function') {
                 showToast('AI engine not ready — reload and try again', 'error'); return;
             }
-            const modelEl = document.getElementById('ai-analyzer-model-val');
-            const model = modelEl && modelEl.value ? modelEl.value : 'gemini-3.5-flash';
+            const modelEl = document.getElementById('bp-ai-model');
+            const model = modelEl && modelEl.value ? modelEl.value : 'gemini-3.8-flash';
             const countEl = document.getElementById('bp-preview-count');
+            if (modelEl) modelEl.disabled = true;
             btn.disabled = true; const origLabel = btn.textContent;
-            let done = 0, failed = 0;
+            let done = 0, failed = 0, quotaExhausted = false;
+            let lastError = '';
             for (const r of rows) {
                 // V97.81: this overwrites the "พบ N ข้อ" line right beside the button
                 // while the sweep runs, so it has to carry the same name the button does.
@@ -28040,12 +28044,26 @@ ${JSON.stringify(sourceObj)}`;
                     r.correct = core.picks;
                     r.conf = core.conf;
                     r.rationale = core.rationale;
-                } catch (e) { failed++; console.warn('bulkPaste findAnswer failed:', e); }
+                } catch (e) {
+                    failed++;
+                    lastError = String(e.message || 'AI request failed').slice(0, 240);
+                    quotaExhausted = /credit_balance_exhausted|insufficient_quota|no credits remaining|exceeded your current quota/i.test(lastError);
+                    console.warn('bulkPaste findAnswer failed:', e);
+                }
                 done++;
                 renderBulkPastePreview();
+                if (quotaExhausted) break;
             }
             btn.disabled = false; btn.textContent = origLabel;
-            showToast('🎯 E.V.I.E. done ' + (done - failed) + '/' + rows.length + (failed ? ' (' + failed + ' failed)' : '') + ' — verify before saving', failed ? 'warning' : 'success');
+            if (modelEl) modelEl.disabled = false;
+            const skipped = rows.length - done;
+            const summary = '🎯 E.V.I.E. done ' + (done - failed) + '/' + rows.length
+                + (failed ? ' (' + failed + ' failed' + (skipped ? ', ' + skipped + ' skipped' : '') + ')' : '');
+            const reason = quotaExhausted
+                ? 'API credits/quota exhausted (' + model + ') — choose another provider above or add API credits.'
+                : lastError;
+            countEl.textContent = summary + (reason ? ' — ' + reason : '');
+            showToast(summary + (reason ? ' — ' + reason : ' — verify before saving'), failed ? 'warning' : 'success');
         }
 
         // ============================================================
@@ -61494,6 +61512,12 @@ Summarize in English in 3–5 concise lines:
                              improve-menu assistant keeps the name J.A.R.V.I.S. -->
                         <button class="btn-sm" id="bp-find-btn" onclick="bulkPasteFindAnswers()" title="E.V.I.E. suggests an answer for every selected question (advisory — verify before saving)" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed); color:white; border:none; padding:6px 14px; border-radius:10px; font-weight:800; font-size:0.8em; cursor:pointer;">🎯 E.V.I.E.</button>
                     </div>
+                </div>
+                <div style="display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+                    <label for="bp-ai-model" style="font-weight:700; font-size:0.85em; color:#6d28d9;">E.V.I.E. model</label>
+                    <select id="bp-ai-model" data-native-model style="flex:1; min-width:180px; max-width:100%; min-height:36px; padding:6px 10px; border:1px solid #ddd6fe; border-radius:10px; background:#faf5ff; color:#334155; font:inherit; font-size:0.85em;">
+                        <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
+                    </select>
                 </div>
                 <div id="bp-preview-list" style="max-height:44vh; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding:2px;"></div>
                 <div style="margin-top:16px; border-top:1px solid #eee; padding-top:14px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
