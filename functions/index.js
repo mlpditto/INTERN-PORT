@@ -525,7 +525,19 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
         if (!decoded) return; // 401 already sent
         const callerIsAdmin = isAdminToken(decoded);
 
-        const { provider, model, prompt, isJson, visionData, generationOptions = {}, feature } = req.body;
+        const { provider, prompt, isJson, visionData, generationOptions = {}, feature } = req.body;
+        let { model } = req.body;
+        // V100.51: accept stale clients without calling retired Google models.
+        if (provider === "gemini" || provider === "gemini-aistudio") {
+            const googleModelAliases = {
+                'gemini-2.5-flash': 'gemini-3.5-flash',
+                'gemini-2.5-flash-lite': 'gemini-3.5-flash',
+                'gemini-2.5-flash-image': 'gemini-3.1-flash-image',
+                'gemini-2.5-flash-image-preview': 'gemini-3.1-flash-image',
+                'gemini-3.1-flash-image-preview': 'gemini-3.1-flash-image'
+            };
+            model = googleModelAliases[model] || model;
+        }
         if (!provider || (provider !== "cloud_tts" && !prompt)) {
             return res.status(400).json({ error: "Missing provider or prompt" });
         }
@@ -896,7 +908,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             const apiKey = process.env.GEMINI_API_KEY;
             if (!apiKey) return res.status(500).json({ error: "GEMINI_API_KEY is not configured on server." });
 
-            const asModel = model || "gemini-2.5-flash-image";
+            const asModel = model || "gemini-3.1-flash-image";
             const isImageRequest = /image/i.test(asModel);
             const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${asModel}:generateContent?key=${apiKey}`;
 

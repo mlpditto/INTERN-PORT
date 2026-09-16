@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.50)</title>
+    <title>Nika Admin (V100.51)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -7515,11 +7515,11 @@
                                             <!-- V92.56: 2-model only — GPT-5.4 (default) + Nano Banana 2; both via OpenRouter.
                                                  Canonical state lives in the hidden #design-engine input below this rail. -->
                                             <div class="alabasta-genmage-quick-rail" role="radiogroup" aria-label="Engine quick switch">
-                                                <button type="button" class="alabasta-genmage-quick-chip active" data-value="as/gemini-2.5-flash-image" onclick="selectDesignEngine(this)" title="Google AI Studio — Gemini 2.5 Flash Image (Nano Banana) · 기본값.">🍌 Nano Banana · AI Studio</button>
+                                                <button type="button" class="alabasta-genmage-quick-chip active" data-value="as/gemini-3.1-flash-image" onclick="selectDesignEngine(this)" title="Google AI Studio — Gemini 3.1 Flash Image (Nano Banana) · 기본값.">🍌 Nano Banana · AI Studio</button>
                                                 <button type="button" class="alabasta-genmage-quick-chip" data-value="or/openai/gpt-5.4-image-2" onclick="selectDesignEngine(this)" title="OpenRouter — OpenAI GPT-5.4 Image 2 · 최신 GPT 이미지 모델.">🆕 GPT-5.4 Image 2</button>
                                                 <button type="button" class="alabasta-genmage-quick-chip" data-value="or/google/gemini-3.1-flash-image-preview" onclick="selectDesignEngine(this)" title="OpenRouter — Google Gemini 3.1 Flash Image (Nano Banana 2 via OpenRouter).">🍌 Nano Banana 2 · OR</button>
                                             </div>
-                                            <input type="hidden" id="design-engine" value="as/gemini-2.5-flash-image">
+                                            <input type="hidden" id="design-engine" value="as/gemini-3.1-flash-image">
                                         </div>
                                         <button class="magic-btn" id="btn-generate-design" style="border-radius:50px; padding:12px 35px; font-size:1em; background:linear-gradient(45deg, #4361ee, #4895ef); box-shadow:0 10px 20px rgba(67,97,238,0.25); border:none; color:white; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:10px; height:48px;" onclick="generateAIDesign()">
                                             <i class="fa-solid fa-wand-magic-sparkles"></i> Create Masterpiece
@@ -14739,7 +14739,7 @@
                      those OpenRouter model IDs do not exist on OpenRouter ("model not found",
                      verified 2026-06-23). AI Studio (gemini-aistudio provider) is the proven
                      image-gen path; re-add an or/ chip only if a real OpenRouter image model ships. -->
-                <button type="button" class="dca-pk-visual-chip active" data-value="as/gemini-3.1-flash-image-preview" onclick="dcaSelectPkVisualModel(this)" title="Google AI Studio · Gemini 3.1 Flash Image Preview (Nano Banana) — real image gen via callAIProxy gemini-aistudio provider (V92.70).">🍌 Nano Banana · AI Studio</button>
+                <button type="button" class="dca-pk-visual-chip active" data-value="as/gemini-3.1-flash-image" onclick="dcaSelectPkVisualModel(this)" title="Google AI Studio · Gemini 3.1 Flash Image (Nano Banana) — real image gen via callAIProxy gemini-aistudio provider (V92.70).">🍌 Nano Banana · AI Studio</button>
             </div>
             <div class="dca-pk-visual-section-label">Style</div>
             <div class="dca-pk-visual-chip-rail" id="dcaPkVisualStyleRail">
@@ -14828,7 +14828,7 @@
                      those OpenRouter model IDs do not exist on OpenRouter ("model not found",
                      verified 2026-06-23). AI Studio (gemini-aistudio provider) is the proven
                      image-gen path; re-add an or/ chip only if a real OpenRouter image model ships. -->
-                <button type="button" class="dca-pk-visual-chip active" data-value="as/gemini-3.1-flash-image-preview" onclick="dxaSelectPathoVisualModel(this)" title="Google AI Studio · Gemini 3.1 Flash Image Preview (Nano Banana) — real image gen via callAIProxy gemini-aistudio provider.">🍌 Nano Banana · AI Studio</button>
+                <button type="button" class="dca-pk-visual-chip active" data-value="as/gemini-3.1-flash-image" onclick="dxaSelectPathoVisualModel(this)" title="Google AI Studio · Gemini 3.1 Flash Image (Nano Banana) — real image gen via callAIProxy gemini-aistudio provider.">🍌 Nano Banana · AI Studio</button>
             </div>
             <div class="dca-pk-visual-section-label">Style</div>
             <div class="dca-pk-visual-chip-rail" id="dxaPathoVisualStyleRail">
@@ -15989,6 +15989,17 @@
             // prefix-routed model since V92.70 was silently misrouted, only
             // surfacing now because PK Visual V94.55+ exercised the AI Studio
             // path in earnest.
+            // V100.51: normalize retired Google model IDs, including saved preferences.
+            const googleModelAliases = {
+                'gemini-2.5-flash': 'gemini-3.5-flash',
+                'gemini-2.5-flash-lite': 'gemini-3.5-flash',
+                'gemini-2.5-flash-image': 'gemini-3.1-flash-image',
+                'gemini-2.5-flash-image-preview': 'gemini-3.1-flash-image',
+                'gemini-3.1-flash-image-preview': 'gemini-3.1-flash-image'
+            };
+            const googlePrefix = modelName.startsWith('as/') ? 'as/' : '';
+            const googleModel = googlePrefix ? modelName.slice(3) : modelName;
+            if (googleModelAliases[googleModel]) modelName = googlePrefix + googleModelAliases[googleModel];
             let proxyProvider = "";
             if (modelName.startsWith('or/')) {
                 proxyProvider = "openrouter";
@@ -18668,11 +18679,11 @@ RULES:
         // Canonical state lives in hidden input #design-engine; the rail syncs to it via data-value.
         window.DESIGN_ENGINE_PREF_KEY = 'design_engine_model_pref';
         // V92.70: AI Studio Nano Banana added as new default; OpenRouter chips kept as fallback options.
-        window.DESIGN_ENGINE_VALID = ['as/gemini-2.5-flash-image', 'or/openai/gpt-5.4-image-2', 'or/google/gemini-3.1-flash-image-preview'];
+        window.DESIGN_ENGINE_VALID = ['as/gemini-3.1-flash-image', 'or/openai/gpt-5.4-image-2', 'or/google/gemini-3.1-flash-image-preview'];
 
         window.selectDesignEngine = function(btn) {
             if (!btn) return;
-            const value = btn.dataset.value || 'as/gemini-2.5-flash-image';
+            const value = btn.dataset.value || 'as/gemini-3.1-flash-image';
             document.querySelectorAll('.alabasta-genmage-quick-rail[aria-label="Engine quick switch"] .alabasta-genmage-quick-chip').forEach(chip => {
                 chip.classList.toggle('active', chip.dataset.value === value);
             });
@@ -28073,7 +28084,7 @@ ${JSON.stringify(sourceObj)}`;
         async function bulkPasteGenIllustration(idx) {
             const r = window._bulkPasteParsed[idx];
             if (!r) return;
-            const engine = (document.getElementById('design-engine') || {}).value || 'as/gemini-2.5-flash-image';
+            const engine = (document.getElementById('design-engine') || {}).value || 'as/gemini-3.1-flash-image';
             const btn = document.getElementById('bp-illus-' + idx);
             if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
             try {
@@ -34649,7 +34660,7 @@ RULES:
         // supplied image when visionData carries one (functions/index.js, V96.01). The
         // result goes through the same resize + Save path as an upload, so nothing
         // reaches Firestore or Storage until the admin presses Save.
-        const PRODUCT_PHOTO_AI_MODEL = 'as/gemini-3.1-flash-image-preview';
+        const PRODUCT_PHOTO_AI_MODEL = 'as/gemini-3.1-flash-image';
 
         // A pharmacy listing: the pack must stay truthful, so the rules forbid the
         // model from touching any printed text, the classic image-model failure.
@@ -38484,7 +38495,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // V94.61: model bumped from `gemini-2.5-flash-image-preview`
             // (deprecated from v1beta endpoint) to `gemini-3.1-flash-image-preview`
             // (matching the OpenRouter chip's labeled current Nano Banana 2).
-            model: 'as/gemini-3.1-flash-image-preview',
+            model: 'as/gemini-3.1-flash-image',
             style: 'infographic',
             lastImageDataUrl: '',
             lastModelLabel: '',
@@ -38496,7 +38507,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             lastErrorModelLabel: ''
         };
         const DCA_PK_VISUAL_MODEL_LABELS = {
-            'as/gemini-3.1-flash-image-preview':        'Nano Banana · AI Studio'
+            'as/gemini-3.1-flash-image':        'Nano Banana · AI Studio'
         };
 
         // Open modal. Snapshots the current PK textareas via dcaCollectForm —
@@ -43238,7 +43249,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // logic touched; reuses adminApp.storage + the .dca-pk-visual-* CSS.
         // ===================================================================
         const dxaPathoVisualState = {
-            model: 'as/gemini-3.1-flash-image-preview',
+            model: 'as/gemini-3.1-flash-image',
             style: 'infographic',
             lastImageDataUrl: '',
             lastModelLabel: '',
@@ -43247,7 +43258,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             lastErrorModelLabel: ''
         };
         const DXA_PATHO_VISUAL_MODEL_LABELS = {
-            'as/gemini-3.1-flash-image-preview':        'Nano Banana · AI Studio'
+            'as/gemini-3.1-flash-image':        'Nano Banana · AI Studio'
         };
 
         // Open modal. Snapshots the current form via dxaCollectForm so unsaved
