@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V100.53)</title>
+    <title>Internship Portfolio (V100.54)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -2161,6 +2161,7 @@
 <script src="assigned-goals.js?v=V100.30"></script><link rel="stylesheet" href="assigned-goals.css?v=V100.30">
 <link rel="stylesheet" href="quiz-user-focus.css?v=V100.39">
 <link rel="stylesheet" href="quiz-cover.css?v=V100.46">
+<link rel="stylesheet" href="case-insight-rail.css?v=V100.54">
 <script src="quiz-cover.js?v=V100.46"></script>
 <script src="activity-rewards.js?v=V100.49"></script><link rel="stylesheet" href="activity-rewards.css?v=V100.49">
 </head>
@@ -4313,10 +4314,6 @@
                                 <i class="fa-solid fa-list-ul"></i>
                                 <span>My Cases</span>
                             </button>
-                            <button class="case-tab-btn" id="case-tab-stats" onclick="switchCaseTab('stats')">
-                                <i class="fa-solid fa-chart-bar"></i>
-                                <span>Stats</span>
-                            </button>
 
                         </div>
                         <div id="case-pane-submit" class="case-tab-pane active">
@@ -4462,18 +4459,16 @@
                             </div>
                         </div>
                         <div id="case-pane-systems" class="case-tab-pane">
-                            <div class="case-pane-shell" style="background: #fbfbff;">
+                            <div class="case-pane-shell case-insight-layout" style="background: #fbfbff;">
+                                <div class="case-insight-list">
                                 <div class="case-stats-toolbar">
                                     <div id="case-stats-summary" class="case-filter-pills"></div>
                                     <div id="case-summary-meta"
                                         style="font-size:0.78em; color:#64748b; font-weight:700;"></div>
                                 </div>
                                 <div id="case-list-grouped"></div>
-                            </div>
-                        </div>
-                        <div id="case-pane-stats" class="case-tab-pane">
-                            <div class="case-pane-shell">
-                                <div id="case-stats-pane-content"></div>
+                                </div>
+                                <aside id="case-stats-pane-content" aria-label="สถิติเคสของฉัน"></aside>
                             </div>
                         </div>
                         <!-- V96.78: Product Listing, formerly its own #section-products
@@ -23122,6 +23117,7 @@ async function archiveDoneCard(cardId) {
 
         function switchCaseTab(tabName) {
             if (tabName === 'product') { gotoProductSubmit(); return; }
+            if (tabName === 'stats') tabName = 'systems'; // Preserve existing links to Stats.
             window.caseActiveTab = tabName;
             ['submit', 'systems', 'stats'].forEach(t => {
                 const btn = document.getElementById(`case-tab-${t}`);
@@ -23129,7 +23125,6 @@ async function archiveDoneCard(cardId) {
                 if (btn) btn.classList.toggle('active', t === tabName);
                 if (pane) pane.classList.toggle('active', t === tabName);
             });
-            if (tabName === 'stats') renderCaseStats(window.myCasesCache || []);
             if (tabName === 'systems') renderCaseGrouped(window.myCasesCache || []);
             // V96.78: the lazy init toggleProductSection used to do on open. Guarded by
             // _productComposerReady inside, so calling it on every visit is free.
@@ -23158,31 +23153,6 @@ async function archiveDoneCard(cardId) {
             const container = document.getElementById('case-stats-pane-content');
             if (!container) return;
 
-            if (!allCases.length) {
-                // V95.38 — inviting empty state: hero + CTA + a "systems to cover"
-                // checklist (all dashed) so the intern sees what to work toward.
-                const realSystems = (caseTaxonomyCatalog || []).filter(s => s.key !== 'other');
-                const checklist = realSystems.length ? `
-                    <div style="margin-top:22px; text-align:left; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px 16px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                            <span style="font-size:0.85em; font-weight:700; color:#334155;">🗺️ Systems to cover · 계통 커버리지</span>
-                            <span style="font-size:0.8em; font-weight:800; color:#94a3b8;">0/${realSystems.length}</span>
-                        </div>
-                        <div style="display:flex; flex-wrap:wrap; gap:6px;">
-                            ${realSystems.map(s => `<span style="font-size:0.76em; background:#fff; border:1px dashed #cbd5e1; color:#94a3b8; padding:4px 10px; border-radius:99px;">${CASE_SYSTEM_EMOJI[s.key] || '📋'} ${s.label}</span>`).join('')}
-                        </div>
-                    </div>` : '';
-                container.innerHTML = `
-                    <div style="text-align:center; padding:24px 0 6px;">
-                        <div style="font-size:2.4em; margin-bottom:6px;">🩺</div>
-                        <div style="font-size:1em; font-weight:800; color:#334155;">No cases logged yet · 아직 케이스가 없습니다</div>
-                        <div style="font-size:0.82em; color:#94a3b8; margin-top:6px;">Log your first case to start tracking your stats.</div>
-                        <button type="button" onclick="switchCaseTab('submit')" style="margin-top:16px; border:none; cursor:pointer; background:linear-gradient(135deg,#4361ee,#7b93f8); color:#fff; font-size:0.85em; font-weight:700; padding:10px 22px; border-radius:99px;"><i class="fa-solid fa-plus" style="margin-right:6px;"></i>Log your first case · 케이스 기록</button>
-                    </div>
-                    ${checklist}`;
-                return;
-            }
-
             const tsOf = c => (c.timestamp && typeof c.timestamp.toMillis === 'function') ? c.timestamp.toMillis() : 0;
 
             // V95.37 Stats v3 — time-window filter. Windows the aggregate summary
@@ -23192,70 +23162,24 @@ async function archiveDoneCard(cardId) {
             const winDays = win === '7d' ? 7 : win === '30d' ? 30 : null;
             const cutoff = winDays ? Date.now() - winDays * 86400000 : 0;
             const cases = winDays ? allCases.filter(c => tsOf(c) >= cutoff) : allCases;
-            const pill = (val, label) => `<button type="button" onclick="setCaseStatsWindow('${val}')" style="min-height:0; border:none; cursor:pointer; font-size:0.76em; font-weight:700; padding:7px 13px; border-radius:99px; ${win === val ? 'background:#4361ee; color:#fff;' : 'background:#eef2ff; color:#4361ee;'}">${label}</button>`;
-            const pillsHtml = `<div style="display:flex; gap:7px; margin-bottom:14px;">${pill('7d', '7 days')}${pill('30d', '30 days')}${pill('all', 'All-time')}</div>`;
-
-            // --- Windowed aggregate summary ---
-            let summaryHtml;
-            if (!cases.length) {
-                summaryHtml = `<p style="text-align:center; color:#94a3b8; padding:18px 0;">No cases in this window · 이 기간에 케이스 없음</p>`;
-            } else {
-                const groups = {};
-                cases.forEach(c => {
-                    // submitCase writes `diseaseSystemKey`; older docs may carry `diseaseSystem`.
-                    const key = c.diseaseSystemKey || c.diseaseSystem || 'other';
-                    groups[key] = (groups[key] || 0) + 1;
+            const groups = {}, symCounts = {};
+            cases.forEach(c => {
+                const key = c.diseaseSystemKey || c.diseaseSystem || 'other';
+                groups[key] = (groups[key] || 0) + 1;
+                (Array.isArray(c.symptomTags) ? c.symptomTags : []).forEach(t => {
+                    const tag = String(t || '').trim();
+                    if (tag) symCounts[tag] = (symCounts[tag] || 0) + 1;
                 });
-                const total = cases.length;
-                const sorted = Object.entries(groups).sort((a, b) => b[1] - a[1]);
-                // V95.84: per-system breakdown as compact inline count chips instead
-                // of full-width progress bars (the bars carried little signal when most
-                // systems have 1 case). 3+ rows → one wrapping line.
-                const rows = `<div style="display:flex; flex-wrap:wrap; gap:8px;">` + sorted.map(([key, count]) => {
-                    const item = caseTaxonomyCatalog.find(x => x.key === key) || { label: key, key };
-                    const emoji = CASE_SYSTEM_EMOJI[key] || '📋';
-                    return `<span style="font-size:0.82em; background:#eef2ff; color:#334155; padding:5px 11px; border-radius:99px; font-weight:600; white-space:nowrap;">${emoji} ${item.label} <b style="color:#4361ee; margin-left:3px;">${count}</b></span>`;
-                }).join('') + `</div>`;
-
-                const casePoints = cases.reduce((sum, c) => sum + (parseFloat(c.adminBonus) || 0), 0);
-                const pointsText = casePoints > 0 ? ` · ${casePoints % 1 === 0 ? casePoints : casePoints.toFixed(2)} pts` : '';
-
-                const realSystems = (caseTaxonomyCatalog || []).filter(s => s.key !== 'other');
-                const missingList = realSystems.filter(s => !groups[s.key]);
-                const coverageHtml = realSystems.length ? `
-                    <div style="margin-bottom:14px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                            <span style="font-size:0.88em; font-weight:700; color:#334155;">🗺️ System Coverage · 계통 커버리지</span>
-                            <span style="font-size:0.82em; font-weight:800; color:#4361ee;">${realSystems.length - missingList.length}/${realSystems.length}</span>
-                        </div>
-                        ${missingList.length
-                            ? `<div style="font-size:0.78em; color:#94a3b8; line-height:1.7;">Not yet logged: ${missingList.map(s => `${CASE_SYSTEM_EMOJI[s.key] || '📋'} ${s.label}`).join(' · ')}</div>`
-                            : `<div style="font-size:0.78em; color:#16a34a; font-weight:700;">✅ All systems covered · 모든 계통 완료</div>`}
-                    </div>` : '';
-
-                const symCounts = {};
-                cases.forEach(c => (Array.isArray(c.symptomTags) ? c.symptomTags : []).forEach(t => {
-                    const v = String(t || '').trim();
-                    if (v) symCounts[v] = (symCounts[v] || 0) + 1;
-                }));
-                const topSyms = Object.entries(symCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
-                const symptomsHtml = topSyms.length ? `
-                    <div style="margin-top:16px;">
-                        <div style="font-size:0.88em; font-weight:700; color:#334155; margin-bottom:10px;">🔬 Top Symptoms · 자주 본 증상</div>
-                        <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                            ${topSyms.map(([tag, n]) => `<span style="font-size:0.8em; background:#eef2ff; color:#4361ee; padding:5px 11px; border-radius:99px; font-weight:600;">${SYMPTOM_EMOJI[tag] || '🔹'} ${tag} <b style="margin-left:3px;">${n}</b></span>`).join('')}
-                        </div>
-                    </div>` : '';
-
-                summaryHtml = `
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-                        <span style="font-size:1em; font-weight:800; color:#334155;"><i class="fa-solid fa-chart-bar" style="color:#4361ee; margin-right:6px;"></i>My Case Summary · 내 케이스 요약</span>
-                        <span style="font-size:0.82em; font-weight:700; background:#e8eeff; color:#4361ee; padding:4px 10px; border-radius:99px;">${total} total${pointsText}</span>
-                    </div>
-                    ${coverageHtml}
-                    ${rows}
-                    ${symptomsHtml}`;
-            }
+            });
+            const systems = (caseTaxonomyCatalog || []).filter(s => s.key !== 'other');
+            const missing = systems.filter(s => !groups[s.key]);
+            const points = cases.reduce((sum, c) => sum + (parseFloat(c.adminBonus) || 0), 0);
+            const groupHtml = Object.entries(groups).sort((a,b) => b[1]-a[1]).map(([key,n]) => {
+                const label = (caseTaxonomyCatalog.find(s => s.key === key) || {label:key}).label;
+                return `<span title="${escapeHtml(label)}">${CASE_SYSTEM_EMOJI[key] || '📋'} ${escapeHtml(label)} <b>${n}</b></span>`;
+            }).join('');
+            const symptomHtml = Object.entries(symCounts).sort((a,b) => b[1]-a[1]).slice(0,8)
+                .map(([tag,n]) => `<span>${escapeHtml(tag)} <b>${n}</b></span>`).join('');
 
             // --- V95.37 Streak (all-time, by ISO-week Monday) ---
             const MS_DAY = 86400000;
@@ -23275,15 +23199,6 @@ async function archiveDoneCard(cardId) {
             let curStreak = 0;
             const anchor = weekSet.has(thisMon) ? thisMon : (weekSet.has(thisMon - 7) ? thisMon - 7 : null);
             if (anchor !== null) { let w = anchor; while (weekSet.has(w)) { curStreak++; w -= 7; } }
-            // V95.84: streak as one compact row instead of two tall cards.
-            const streakHtml = `
-                <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:16px; padding:9px 14px; background:#fafbff; border:1px solid #eef2ff; border-radius:12px; font-size:0.82em; font-weight:700;">
-                    <span style="color:#9a3412;">🔥 <b style="color:#ea580c; font-size:1.2em;">${curStreak}</b> Current streak · 현재</span>
-                    <span style="color:#cbd5e1;">|</span>
-                    <span style="color:#3730a3;">🏆 <b style="color:#4361ee; font-size:1.2em;">${longest}</b> Best streak · 최고</span>
-                    <span style="color:#94a3b8; font-weight:600;">(weeks)</span>
-                </div>`;
-
             // --- V95.37 Activity trend (last 6 months, all-time data) ---
             const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
             const curDk = getBangkokDateTimeParts(new Date()).dateKey;
@@ -23296,29 +23211,27 @@ async function archiveDoneCard(cardId) {
             }
             const monthCount = {};
             allCases.forEach(c => { const ts = tsOf(c); if (!ts) return; const ym = getBangkokDateTimeParts(new Date(ts)).dateKey.slice(0, 7); monthCount[ym] = (monthCount[ym] || 0) + 1; });
-            const maxM = Math.max(1, ...months.map(m => monthCount[m.key] || 0));
-            const trendHtml = `
-                <div style="margin-top:16px;">
-                    <div style="font-size:0.88em; font-weight:700; color:#334155; margin-bottom:10px;"><span>📈 Activity (6 mo)</span> · 활동 추이</div>
-                    <div style="display:flex; align-items:flex-end; gap:8px; height:62px; padding:0 4px;">
-                        ${months.map(m => {
-                            const n = monthCount[m.key] || 0;
-                            const h = Math.round((n / maxM) * 46) + (n > 0 ? 5 : 2);
-                            return `<div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:4px;">
-                                <span style="font-size:0.7em; font-weight:800; color:${n > 0 ? '#4361ee' : '#cbd5e1'};">${n}</span>
-                                <div style="width:100%; height:${h}px; border-radius:6px 6px 0 0; background:${n > 0 ? 'linear-gradient(180deg,#4361ee,#7b93f8)' : '#eef2ff'};"></div>
-                                <span style="font-size:0.66em; color:#94a3b8;">${m.label}</span>
-                            </div>`;
-                        }).join('')}
-                    </div>
+            const expanded = container.classList.contains('is-expanded');
+            container.innerHTML = `
+                <div class="case-rail-tools">
+                    <button type="button" class="case-rail-mobile" aria-label="แสดงหรือซ่อนสถิติ" aria-expanded="${expanded}" aria-controls="case-rail-extra" title="แสดงหรือซ่อนสถิติ" onclick="this.parentElement.parentElement.classList.toggle('is-expanded'); this.setAttribute('aria-expanded', this.parentElement.parentElement.classList.contains('is-expanded'))">📊 ▾</button>
+                    <select aria-label="ช่วงเวลาสถิติ" title="ช่วงเวลาของสถิติ ไม่เปลี่ยนรายการเคส" onchange="setCaseStatsWindow(this.value)">
+                        ${[['all','All-time'],['30d','30 days'],['7d','7 days']].map(([v,label]) => `<option value="${v}" ${win === v ? 'selected' : ''}>${label}</option>`).join('')}
+                    </select>
+                    <button type="button" onclick="exportCaseStatsCsv()" aria-label="ส่งออก CSV" title="ส่งออกสถิติตามช่วงเวลาที่เลือกเป็น CSV">📥</button>
+                </div>
+                <div class="case-rail-metrics">
+                    <span title="จำนวนเคสในช่วงเวลาที่เลือก" aria-label="จำนวนเคส ${cases.length}">📁 <b>${cases.length}</b></span>
+                    <span title="คะแนนในช่วงเวลาที่เลือก" aria-label="คะแนน ${points.toFixed(2)}">⭐ <b>${points.toFixed(2)}</b></span>
+                    <span title="จำนวนระบบที่บันทึกแล้วในช่วงเวลาที่เลือก ไม่นับ Other" aria-label="ความครอบคลุม ${systems.length-missing.length} จาก ${systems.length} ระบบ">🗺️ <b>${systems.length-missing.length}/${systems.length}</b></span>
+                </div>
+                <div class="case-rail-extra" id="case-rail-extra">
+                    <div class="case-rail-row"><span title="จำนวนเคสแยกตามระบบ" aria-label="ระบบ">🩺</span><div class="case-rail-values">${groupHtml || 'No cases'}</div></div>
+                    <div class="case-rail-row"><span title="อาการที่พบบ่อย" aria-label="อาการที่พบบ่อย">🔬</span><div class="case-rail-values">${symptomHtml || '—'}</div></div>
+                    <div class="case-rail-row"><span title="จำนวนสัปดาห์ต่อเนื่องปัจจุบัน คำนวณจากทุกเคส">🔥 ${curStreak}w</span><span title="จำนวนสัปดาห์ต่อเนื่องสูงสุด คำนวณจากทุกเคส">🏆 ${longest}w</span></div>
+                    <div class="case-rail-row"><span title="จำนวนเคสย้อนหลัง 6 เดือน ไม่เปลี่ยนตามตัวกรองช่วงเวลา" aria-label="กิจกรรมย้อนหลัง 6 เดือน">📈</span><div class="case-rail-months">${months.map(m => `<span><b>${monthCount[m.key] || 0}</b>${m.label}</span>`).join('')}</div></div>
+                    <details><summary title="ระบบที่ยังไม่บันทึกในช่วงเวลาที่เลือก">🗺️ ${missing.length} not logged ▾</summary><div class="case-rail-missing">${missing.map(s => escapeHtml(s.label)).join(' · ') || 'All systems covered'}</div></details>
                 </div>`;
-
-            const exportHtml = `
-                <div style="margin-top:16px; text-align:center;">
-                    <button type="button" onclick="exportCaseStatsCsv()" style="border:1px solid #c7d2fe; background:#fff; color:#4361ee; cursor:pointer; font-size:0.8em; font-weight:700; padding:8px 18px; border-radius:99px;"><i class="fa-solid fa-download" style="margin-right:6px;"></i>Export CSV · 내보내기</button>
-                </div>`;
-
-            container.innerHTML = pillsHtml + summaryHtml + streakHtml + trendHtml + exportHtml;
         }
 
         // V95.37 Stats v3 — time-window pill handler (persisted) + CSV export.
@@ -23777,6 +23690,7 @@ async function archiveDoneCard(cardId) {
         }
 
         function renderCaseGrouped(cases) {
+            renderCaseStats(cases);
             const statsContainer = document.getElementById('case-stats-summary');
             const listContainer = document.getElementById('case-list-grouped');
             const summaryMeta = document.getElementById('case-summary-meta');
