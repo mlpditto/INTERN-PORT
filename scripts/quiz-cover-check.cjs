@@ -42,6 +42,74 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         });
         await page.waitForFunction(() => QuizCover.value() === 'https://example.com/new.webp');
         await page.locator('[data-remove]').click(); assert.equal(await page.evaluate(() => QuizCover.value()), '');
+        // AI generation stays a preview until accepted; no production API calls.
+        const admin = fs.readFileSync('public/admin.html', 'utf8');
+        const picker = admin.match(/        function pickAiImageFromResponse\(resp\) \{[\s\S]*?\n        \}/)[0];
+        await page.addScriptTag({content: picker});
+        await page.evaluate(() => {
+            window.aiCalls = 0; window.uploads = 0;
+            window.adminApp = {storage: () => ({ref: () => ({put: async () => { uploads++; }, getDownloadURL: async () => 'https://example.com/ai.webp'})})};
+            const canvas = document.createElement('canvas'); canvas.width = 30; canvas.height = 40;
+            window.aiImage = canvas.toDataURL('image/png');
+            window.callUniversalAI = async (...args) => { aiCalls++; window.aiArgs = args; return {raw: {imageDataUrl: aiImage}}; };
+        });
+        await page.locator('[data-generate]').click();
+        assert.equal(await page.evaluate(() => aiCalls), 0, 'Title required');
+        await page.locator('#quiz-title').fill('Cardiology');
+        await page.locator('[data-prompt]').fill('Blue pastel');
+        await page.locator('[data-generate]').click();
+        await page.waitForFunction(() => !QuizCover.isBusy());
+        assert.equal(await page.locator('.quiz-cover-ai-preview').isVisible(), true);
+        assert.equal(await page.evaluate(() => QuizCover.value()), '');
+        assert.equal(await page.evaluate(() => uploads), 0, 'Preview does not upload');
+        assert.match(await page.evaluate(() => aiArgs[1]), /Cardiology/);
+        assert.match(await page.evaluate(() => aiArgs[1]), /Blue pastel/);
+        assert.equal(await page.evaluate(() => aiArgs[5].feature), 'quiz_cover');
+        await page.locator('[data-apply]').click();
+        await page.waitForFunction(() => QuizCover.value() === 'https://example.com/ai.webp');
+        assert.equal(await page.evaluate(() => uploads), 1);
+        assert.equal(await page.locator('.quiz-cover-ai-preview').isVisible(), false);
+        await page.locator('[data-generate]').click();
+        await page.waitForFunction(() => !QuizCover.isBusy());
+        await page.locator('[data-discard]').click();
+        assert.equal(await page.evaluate(() => QuizCover.value()), 'https://example.com/ai.webp');
+        assert.equal(await page.locator('.quiz-cover-ai-preview').isVisible(), false);
+        await page.evaluate(() => { window.callUniversalAI = async () => ({text:'No image available'}); });
+        await page.locator('[data-generate]').click();
+        await page.waitForFunction(() => !QuizCover.isBusy());
+        assert.equal(await page.evaluate(() => QuizCover.value()), 'https://example.com/ai.webp');
+        assert.equal(await page.locator('.quiz-cover-ai-preview').isVisible(), false);
+        // Switching quiz invalidates an in-flight result, including its busy state.
+        await page.evaluate(() => {
+            window.callUniversalAI = () => new Promise(resolve => { window.finishOld = resolve; });
+        });
+        await page.locator('[data-generate]').click();
+        assert.equal(await page.evaluate(() => QuizCover.isBusy()), true);
+        await page.evaluate(() => { QuizCover.set('https://example.com/other.webp'); finishOld({imageDataUrl:aiImage}); });
+        await page.waitForFunction(() => !QuizCover.isBusy());
+        assert.equal(await page.evaluate(() => QuizCover.value()), 'https://example.com/other.webp');
+        assert.equal(await page.locator('.quiz-cover-ai-preview').isVisible(), false);
+        await page.evaluate(() => { window.callUniversalAI = async () => ({imageDataUrl:aiImage}); });
+        await page.locator('[data-generate]').click();
+        await page.waitForFunction(() => !QuizCover.isBusy());
+        for (const width of [320, 390, 1100]) {
+            await page.setViewportSize({width, height:800});
+            assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'No horizontal overflow');
+        }
+        // Failed uploads can be retried without regenerating or losing the old cover.
+        await page.evaluate(() => { window.adminApp.storage = () => ({ref: () => ({put: async () => {throw Error('offline');}})}); });
+        await page.locator('[data-apply]').click();
+        await page.waitForFunction(() => !QuizCover.isBusy());
+        assert.equal(await page.locator('.quiz-cover-ai-preview').isVisible(), true);
+        assert.equal(await page.evaluate(() => QuizCover.value()), 'https://example.com/other.webp');
+        await page.evaluate(() => { window.adminApp.storage = () => ({ref: () => ({put: () => new Promise(resolve => {window.finishUpload = resolve;}), getDownloadURL: async () => 'https://example.com/stale.webp'})}); });
+        await page.locator('[data-apply]').click();
+        await page.waitForFunction(() => typeof finishUpload === 'function');
+        await page.evaluate(() => { QuizCover.set('https://example.com/next.webp'); finishUpload(); });
+        await page.waitForFunction(() => !QuizCover.isBusy());
+        assert.equal(await page.evaluate(() => QuizCover.value()), 'https://example.com/next.webp');
+        assert.equal(await page.locator('.quiz-cover-ai-preview').isVisible(), false);
+        console.log('PASS: AI title validation, preview, accept, discard, invalid response, stale generation and responsive layout.');
         console.log('PASS: cover load/remove/upload with mocked storage, unsafe URL rejection, locked/collapsed protection, mobile deadline, keyboard start.');
     } finally { await browser.close(); }
 })();
