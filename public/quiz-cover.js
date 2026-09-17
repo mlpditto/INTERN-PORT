@@ -9,6 +9,56 @@ const QuizCover = (() => {
     const MODEL_PREF_KEY = 'quiz_cover_ai_model';
     const safeUrl = value => { try { const u = new URL(value); return u.protocol === 'https:' ? u.href : ''; } catch (_) { return ''; } };
     const quickUploads = new Set();
+    let hoverBubble = null;
+    function bubble() {
+        if (hoverBubble) return hoverBubble;
+        hoverBubble = document.createElement('div');
+        hoverBubble.id = 'quiz-cover-hover-preview';
+        hoverBubble.hidden = true;
+        hoverBubble.setAttribute('aria-hidden', 'true');
+        hoverBubble.innerHTML = '<img alt="">';
+        document.body.append(hoverBubble);
+        return hoverBubble;
+    }
+    function hoverImage(target) {
+        if (!target || !target.closest) return null;
+        const editorImage = target.closest('#quiz-cover-editor img');
+        if (editorImage && !editorImage.hidden) return editorImage;
+        const adminCover = target.closest('.quiz-quick-cover, .quiz-admin-cover');
+        const image = adminCover && adminCover.querySelector('.quiz-admin-cover img');
+        return image && !image.hidden ? image : null;
+    }
+    function positionBubble(source) {
+        if (!hoverBubble || hoverBubble.hidden || !source.isConnected) return;
+        const gap = 12, edge = 12, rect = source.getBoundingClientRect();
+        const width = Math.min(innerWidth < 520 ? 190 : 280, innerWidth - edge * 2);
+        const height = width * 4 / 3 + 16;
+        let left = rect.right + gap;
+        if (left + width > innerWidth - edge) left = rect.left - width - gap;
+        if (left < edge) left = Math.max(edge, (innerWidth - width) / 2);
+        const top = Math.max(edge, Math.min(rect.top, innerHeight - height - edge));
+        hoverBubble.style.width = width + 'px';
+        hoverBubble.style.left = left + 'px';
+        hoverBubble.style.top = top + 'px';
+    }
+    function showHoverPreview(source) {
+        const url = safeUrl(source.currentSrc || source.src);
+        if (!url) return;
+        const el = bubble();
+        el.querySelector('img').src = url;
+        el.hidden = false;
+        positionBubble(source);
+    }
+    function hideHoverPreview() { if (hoverBubble) hoverBubble.hidden = true; }
+    document.addEventListener('pointerover', event => { const image = hoverImage(event.target); if (image) showHoverPreview(image); });
+    document.addEventListener('pointerout', event => {
+        const owner = event.target.closest && event.target.closest('#quiz-cover-editor img, .quiz-quick-cover, .quiz-admin-cover');
+        if (owner && !owner.contains(event.relatedTarget)) hideHoverPreview();
+    });
+    document.addEventListener('focusin', event => { const image = hoverImage(event.target); if (image) showHoverPreview(image); });
+    document.addEventListener('focusout', event => { if (hoverImage(event.target)) hideHoverPreview(); });
+    document.addEventListener('scroll', hideHoverPreview, true);
+    window.addEventListener('resize', hideHoverPreview);
     async function upload(file) {
         if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) throw new Error('Use PNG, JPG or WebP up to 10 MB');
         const bitmap = await createImageBitmap(file);
@@ -57,6 +107,7 @@ const QuizCover = (() => {
         el.className = 'lang-no-toggle';
         el.innerHTML = `<img alt="Quiz cover preview" hidden><span>Cover <small>Optional</small></span><input type="hidden" id="quiz-cover-url"><input type="file" accept="image/png,image/jpeg,image/webp" hidden><button type="button" data-upload title="ใส่หรือเปลี่ยนภาพปก">Upload</button><button type="button" data-remove title="นำปกออก" hidden>Remove</button><button type="button" data-generate>✨ AI สร้างปก</button><span class="quiz-cover-style-lock">สไตล์เดิม · 3D pastel · แนวตั้ง 3:4</span><label class="quiz-cover-ai-model">โมเดล<select data-model>${AI_MODELS.map(model => `<option value="${model.id}">${model.label}</option>`).join('')}</select></label><label class="quiz-cover-ai-note">แนวภาพเพิ่มเติม (ไม่บังคับ)<input type="text" data-prompt maxlength="300" placeholder="เช่น โทนฟ้า มีหัวใจเป็นภาพหลัก"></label><div class="quiz-cover-ai-preview" hidden><img alt="ตัวอย่างปกจาก AI"><div><button type="button" data-apply>ใช้ปกนี้</button><button type="button" data-discard>ยกเลิกภาพนี้</button><small>เลือกใช้ภาพ แล้วกด Save Quiz เพื่อบันทึก</small></div></div><small role="status" aria-live="polite"></small>`;
         document.getElementById('quiz-title').parentElement.parentElement.after(el);
+        el.querySelectorAll('img').forEach(img => img.tabIndex = 0);
         const input = el.querySelector('[type=file]');
         const modelSelect = el.querySelector('[data-model]');
         try {

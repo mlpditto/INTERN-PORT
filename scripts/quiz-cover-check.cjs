@@ -32,6 +32,23 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.equal(await page.locator('#start .quiz-cta-countdown').count(), 1);
         await page.locator('#start button.quiz-cover-thumb').focus(); await page.keyboard.press('Enter');
         assert.equal(await page.evaluate(() => calls), 1);
+        await page.setViewportSize({width: 390, height: 800});
+        await page.evaluate(() => QuizCover.set('https://example.com/cover.webp'));
+        await page.locator('#quiz-cover-editor > img').hover();
+        assert.equal(await page.locator('#quiz-cover-hover-preview').isVisible(), true);
+        assert.equal(await page.locator('#quiz-cover-hover-preview img').getAttribute('src'), 'https://example.com/cover.webp');
+        const sourceBox = await page.locator('#quiz-cover-editor > img').boundingBox();
+        const bubbleBox = await page.locator('#quiz-cover-hover-preview').boundingBox();
+        assert.ok(bubbleBox.width > sourceBox.width * 3, 'Hover bubble enlarges the cover');
+        assert.ok(bubbleBox.x >= 0 && bubbleBox.x + bubbleBox.width <= 390, 'Hover bubble stays inside the viewport');
+        await page.locator('#quiz-title').hover();
+        assert.equal(await page.locator('#quiz-cover-hover-preview').isVisible(), false);
+        await page.evaluate(() => document.getElementById('cards').insertAdjacentHTML('beforeend', QuizCover.adminThumbnail('https://example.com/table.webp', 'quiz-1')));
+        await page.locator('.quiz-quick-cover').focus();
+        assert.equal(await page.locator('#quiz-cover-hover-preview').isVisible(), true);
+        assert.equal(await page.locator('#quiz-cover-hover-preview img').getAttribute('src'), 'https://example.com/table.webp');
+        await page.locator('.quiz-quick-cover').blur();
+        assert.equal(await page.locator('#quiz-cover-hover-preview').isVisible(), false);
         await page.evaluate(() => {window.adminApp = {storage: () => ({ref: () => ({put: async () => {}, getDownloadURL: async () => 'https://example.com/new.webp'})})};});
         // Test processing and upload with an actual canvas-generated valid image.
         await page.evaluate(async () => {
