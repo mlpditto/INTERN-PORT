@@ -6,6 +6,11 @@
         if(value&&typeof value==='object')return Object.fromEntries(Object.keys(value).sort().map(k=>[k,canonical(value[k])]));
         return value;
     }
+    // V100.71: shortTitle-first, matching how every other quiz list in admin.html
+    // resolves a display name. A quiz whose English `title` was never filled in
+    // (e.g. never run through EN-first translation) rendered as a blank row here —
+    // `title` alone, with no fallback, is what this file used before this fix.
+    const titleOf = s => s.data.shortTitle || s.data.title || '(untitled)';
     window.openQuizMerge = function(ids) {
         if(ids.length<2)return showToast('Select at least two quizzes');
         if(ids.length>100)return showToast('Select at most 100 quizzes');
@@ -24,7 +29,7 @@
         titleInput.addEventListener('input',syncTitle);
         function renderTitleOptions(){
             const host=dialog.querySelector('#qm-title-options');host.replaceChildren(el('small','Use a source title:'));
-            [...new Set(sources.map(s=>s.data.title).filter(Boolean))].forEach(title=>{
+            [...new Set(sources.map(titleOf).filter(Boolean))].forEach(title=>{
                 const b=el('button',title);b.type='button';b.dataset.title=title;b.title='ใช้ชื่อเดิม: '+title;
                 b.onclick=()=>{titleInput.value=title;syncTitle();};host.append(b);
             });syncTitle();
@@ -32,7 +37,7 @@
 
         dialog.querySelector('#qm-back').onclick=()=>{if(!busy)dialog.close();};
         dialog.addEventListener('cancel',e=>{if(busy)e.preventDefault();});dialog.addEventListener('close',()=>dialog.remove());
-        const render=()=>{const host=dialog.querySelector('#qm-sources');host.replaceChildren();sources.forEach((s,i)=>{const row=el('div');row.className='qm-source';const info=el('div');info.append(el('strong',(i+1)+'. '+s.data.title),el('small',s.data.questions.length+' questions · '+(s.data.totalPoints||0)+' pts/question'));row.append(info);for(const [label,delta] of [['↑',-1],['↓',1]]){const b=el('button',label);b.type='button';b.disabled=busy||i+delta<0||i+delta>=sources.length;b.title=delta<0?'เลื่อนชุดขึ้น':'เลื่อนชุดลง';b.setAttribute('aria-label',(delta<0?'Move up: ':'Move down: ')+s.data.title);b.onclick=()=>{[sources[i],sources[i+delta]]=[sources[i+delta],sources[i]];render();};row.append(b);}host.append(row);});status.textContent=sources.length+' quizzes → '+sources.reduce((n,s)=>n+s.data.questions.length,0)+' questions · New inactive quiz';};
+        const render=()=>{const host=dialog.querySelector('#qm-sources');host.replaceChildren();sources.forEach((s,i)=>{const row=el('div');row.className='qm-source';const info=el('div');info.append(el('strong',(i+1)+'. '+titleOf(s)),el('small',s.data.questions.length+' questions · '+(s.data.totalPoints||0)+' pts/question'));row.append(info);for(const [label,delta] of [['↑',-1],['↓',1]]){const b=el('button',label);b.type='button';b.disabled=busy||i+delta<0||i+delta>=sources.length;b.title=delta<0?'เลื่อนชุดขึ้น':'เลื่อนชุดลง';b.setAttribute('aria-label',(delta<0?'Move up: ':'Move down: ')+titleOf(s));b.onclick=()=>{[sources[i],sources[i+delta]]=[sources[i+delta],sources[i]];render();};row.append(b);}host.append(row);});status.textContent=sources.length+' quizzes → '+sources.reduce((n,s)=>n+s.data.questions.length,0)+' questions · New inactive quiz';};
         Promise.all(ids.map(async id=>{const ref=db.collection('quizzes').doc(id),doc=await ref.get({source:'server'});if(!doc.exists||!doc.data().questions?.length||doc.data().isHistoryRevision)throw Error('A source is unavailable. Reopen Merge.');return {ref,data:doc.data()};})).then(v=>{sources=v;renderTitleOptions();dialog.querySelector('#qm-score').value=sources[0].data.totalPoints||1;render();save.disabled=false;}).catch(e=>status.textContent=e.message);
         save.onclick=async()=>{
             const title=dialog.querySelector('#qm-title').value.trim(),points=Number(dialog.querySelector('#qm-score').value),remove=dialog.querySelector('#qm-remove').checked;
