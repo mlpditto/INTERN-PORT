@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V100.58)</title>
+    <title>Internship Portfolio (V100.59)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7800,7 +7800,11 @@
             updateCertificateButton(data);
 
             // Logic: now >= end_date (Inclusive)
-            if (now >= e) {
+            // V100.59: the button used to appear for anyone past endDate, whatever the
+            // score — a bypass of the gate the ⋯ menu enforces. Below the gate the slot
+            // stays hidden, same "secret mission" treatment as the ⋯ entry.
+            const certReady = (data.score || 0) >= certRequiredPoints(data.startDate, data.endDate);
+            if (now >= e && (data.certRequested || certReady)) {
                 btn.style.display = '';
                 if (data.certRequested) btn.innerHTML = `<span style="color:#28a745;">✅ Certificate request sent ส่งคำร้องแล้ว</span>`;
                 else btn.innerHTML = `<button onclick="requestCert()" class="btn-warning" style="width:100%"><i class="fa-solid fa-certificate"></i> Request Cert ขอใบรับรองจบ</button>`;
@@ -7940,6 +7944,15 @@
         }
 
         async function requestCert() {
+            // V100.59: same fresh-data gate as requestCertificateFromLIFF — a stale button
+            // (score decayed since render) must not submit below the threshold.
+            const _certData = (await db.collection("users").doc(userId).get()).data() || {};
+            const _certNeed = certRequiredPoints(_certData.startDate, _certData.endDate);
+            if ((_certData.score || 0) < _certNeed) {
+                showToast(`⚠️ You need ${_certNeed} points before you can request a certificate · ต้องมีคะแนนถึง ${_certNeed} ก่อน`);
+                checkUser();
+                return;
+            }
             if (!confirm("Confirm certificate request?")) return;
             await db.collection('reports').add({
                 userId,
