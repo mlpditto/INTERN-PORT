@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.62)</title>
+    <title>Nika Admin (V100.63)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -52469,14 +52469,31 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // V96.82: shrink-to-fit — the dual-calendar date string is long and must
             // stay inside its own column, clear of the signature line.
             ctx.fillStyle = "#222";
-            let datePx = 16;
+            const fitDate = (s, px, minPx) => {
+                ctx.font = `600 ${px}px Montserrat`;
+                while (ctx.measureText(s).width > 280 && px > minPx) {
+                    px -= 1;
+                    ctx.font = `600 ${px}px Montserrat`;
+                }
+                return px;
+            };
             const dateStr = dates || "Pending Registration";
-            ctx.font = `600 ${datePx}px Montserrat`;
-            while (ctx.measureText(dateStr).width > 280 && datePx > 11) {
-                datePx -= 1;
-                ctx.font = `600 ${datePx}px Montserrat`;
+            // V100.63: the 11px floor could not hold long months in both calendars
+            // ("1 สิงหาคม 2569 – 19 กันยายน 2569 (1 August … September 2026)") inside
+            // 280px, so it ran under the signature. Below 13px, break before the
+            // "(English)" half instead and fit each line on its own.
+            const dateSplit = dateStr.indexOf(' (');
+            if (fitDate(dateStr, 16, 13) >= 13 && ctx.measureText(dateStr).width <= 280) {
+                ctx.fillText(dateStr, 80, 530);
+            } else if (dateSplit > 0) {
+                fitDate(dateStr.slice(0, dateSplit), 15, 11);
+                ctx.fillText(dateStr.slice(0, dateSplit), 80, 521);
+                fitDate(dateStr.slice(dateSplit + 1), 15, 11);
+                ctx.fillText(dateStr.slice(dateSplit + 1), 80, 539);
+            } else {
+                fitDate(dateStr, 16, 11);
+                ctx.fillText(dateStr, 80, 530);
             }
-            ctx.fillText(dateStr, 80, 530);
 
             // V96.84: real signature sitting on the line
             if (CERT_SIGN.complete && CERT_SIGN.naturalWidth) {
