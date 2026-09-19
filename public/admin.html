@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.63)</title>
+    <title>Nika Admin (V100.64)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -53167,13 +53167,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const previewToken = result.data.token;
                 document.getElementById('liffPreviewModal').style.display = 'flex';
                 // Use current origin + index.html + preview mode
-                let url = window.location.href.replace('admin.html', 'index.html?mode=preview');
-                url += `&previewToken=${encodeURIComponent(previewToken)}`;
+                // V100.64: resolve index.html next to this page and build a fresh query.
+                // String-replacing the href carried admin's own ?v=… / #hash along, which
+                // produced "?mode=preview?v=…" and preview mode never engaged.
+                const url = new URL('index.html', window.location.href);
+                url.searchParams.set('mode', 'preview');
+                url.searchParams.set('previewToken', previewToken);
                 if (userId) {
-                    url += `&userId=${encodeURIComponent(userId)}`;
+                    url.searchParams.set('userId', userId);
                 }
-                url += `&ts=${Date.now()}`;
-                document.getElementById('liff-frame').src = url;
+                url.searchParams.set('ts', Date.now());
+                document.getElementById('liff-frame').src = url.toString();
             } catch (e) {
                 console.error('Failed to generate preview token:', e);
                 showToast('❌ Failed to generate preview token: ' + (e.message || 'Admin required'));
