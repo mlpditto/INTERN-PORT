@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.64)</title>
+    <title>Nika Admin (V100.65)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -12321,7 +12321,7 @@
                 </div>
                 <div id="cert-preview-container"
                     style="text-align:center; border:2px solid #ddd; padding:15px; margin-bottom:15px; background:#f9f9f9; border-radius:12px; overflow:hidden; display: flex; justify-content: center; align-items: center;">
-                    <canvas id="cert-canvas" width="800" height="600"
+                    <canvas id="cert-canvas" width="848" height="600"
                         style="max-width:100%; height:auto; border-radius:4px; box-shadow:0 4px 15px rgba(0,0,0,0.1);"></canvas>
                 </div>
                 <div style="display:flex; gap:10px; justify-content:flex-end;"><button class="btn-sm" style="background:#64748b; color:white;" onclick="updateCertPreview()">🔄 Redraw</button><button class="btn-sm btn-primary"
@@ -52274,7 +52274,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const GOLD = '#b08a1e', GOLD_DARK = '#8f6b14';
             // Handle both array (multiple) and string (legacy)
             const awardList = Array.isArray(awards) ? awards : (awards && awards !== 'none' ? [awards] : []);
-            const w = 800, h = 600;
+            // V100.65: A4 proportions (297:210 ≈ 848:600). At 800×600 the 4:3 image was
+            // stretched ~6% wide when placed on the A4 PDF page — seals became ovals.
+            const w = CERT_BASE_WIDTH, h = CERT_BASE_HEIGHT;
 
             // 1. Premium Background: Subtle Gradient & Texture
             ctx.fillStyle = "#f7f1e3"; // Obvious Sand Color
@@ -52769,9 +52771,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             });
         }
 
-        const CERT_BASE_WIDTH = 800;
+        const CERT_BASE_WIDTH = 848;  // V100.65: was 800 — see drawCertificate
         const CERT_BASE_HEIGHT = 600;
-        const CERT_EXPORT_SCALE = 4; // 800x600 -> 3200x2400
+        const CERT_EXPORT_SCALE = 4; // 848x600 -> 3392x2400
 
         function renderCertificateCanvas(canvas, drawArgs, scale = 1) {
             const ctx = canvas.getContext('2d');
@@ -52782,7 +52784,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
             if (scale === 1) {
                 canvas.style.width = `${CERT_BASE_WIDTH}px`;
-                canvas.style.height = `${CERT_BASE_HEIGHT}px`;
+                // V100.65: 'auto', not a fixed px height — the markup caps the width with
+                // max-width:100%, and a fixed height then squashed the preview in a
+                // narrow modal. auto keeps the drawing's own aspect ratio.
+                canvas.style.height = 'auto';
             }
 
             ctx.setTransform(1, 0, 0, 1, 0, 0);
