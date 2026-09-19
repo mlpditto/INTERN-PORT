@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.57)</title>
+    <title>Nika Admin (V100.58)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -52225,6 +52225,24 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return slots.map(s => s.no);
         }
 
+        // V100.58: nothing used to write certApproved, so a requester stayed "pending"
+        // forever after their certificate was issued. Called once the PDF is archived;
+        // only users who actually requested are marked, so a group export does not
+        // approve everyone in the cohort. Non-fatal — the paper already exists.
+        async function markCertApproved(uid, no, approved = true) {
+            const u = usersData.find(x => x.id === uid);
+            if (!u || !u.certRequested) return;
+            if (!approved && u.certNo !== no) return; // revoking another number leaves this one alone
+            try {
+                await db.collection('users').doc(uid).update(approved
+                    ? { certApproved: true, certApprovedAt: firebase.firestore.FieldValue.serverTimestamp(), certNo: no }
+                    : { certApproved: false });
+            } catch (e) {
+                console.error('Cert approve flag:', e);
+                showToast('⚠️ Certificate issued, but the approved status could not be saved');
+            }
+        }
+
         // V96.79: company logo on the certificate. Preloaded once; canvas drawing is
         // synchronous, so every generate/preview path awaits certLogoReady() first.
         const CERT_LOGO = new Image();
@@ -52890,6 +52908,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const single = new jsPDF('l', 'mm', 'a4');
                 single.addImage(imgData, 'PNG', 0, 0, 297, 210);
                 if (!await CertificateFiles.archive(certNos[i], single)) return;
+                await markCertApproved(u.id, certNos[i]);
             }
 
             doc.save(opts.group ? `Certificates_${opts.group}.pdf` : "Bulk_Certificates.pdf");
@@ -52962,6 +52981,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         revokedReason: reason || '',
                         revokedAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
+                    if (row.userId) await markCertApproved(row.userId, no, false);
                 } else {
                     if (!confirm(`Restore ${no} to VALID?`)) return;
                     await db.collection('certificates').doc(no).update({
@@ -52969,6 +52989,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         revokedReason: firebase.firestore.FieldValue.delete(),
                         revokedAt: firebase.firestore.FieldValue.delete()
                     });
+                    if (row.userId) await markCertApproved(row.userId, no);
                 }
                 showToast('Updated!');
                 loadCertRegistry();
@@ -53096,6 +53117,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const imgData = exportCanvas.toDataURL('image/png');
             doc.addImage(imgData, 'PNG', 0, 0, 297, 210);
             if (!await CertificateFiles.archive(certNo, doc)) return;
+            if (certUser) await markCertApproved(certUser.uid, certNo);
             doc.save(`Certificate_${document.getElementById('cert-fullname').value || "User"}.pdf`);
         }
         async function delQuizAttempt(id, collection = 'quiz_attempts') {
