@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.66)</title>
+    <title>Nika Admin (V100.67)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -12311,6 +12311,11 @@
                         </label>
                         <input type="text" id="cert-nickname" placeholder="Nickname..." onkeyup="updateCertPreview()">
                     </div>
+                </div>
+                <!-- V100.67: Thai name — main name on TH certificates, second line on TH+EN -->
+                <div style="margin:-5px 0 15px;">
+                    <label style="font-size:0.8em; color:#666;">Full Name (TH) — used by TH and TH+EN:</label>
+                    <input type="text" id="cert-fullname-th" placeholder="ชื่อ-นามสกุล ภาษาไทย" onkeyup="updateCertPreview()">
                 </div>
                 <div style="display:flex; gap:10px; margin-bottom:10px;">
                     <div style="flex:1"><label>Start:</label><input type="date" id="cert-start"
@@ -45366,6 +45371,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (!u) return;
             certUser = { uid: u.id, name: u.displayName, level: Math.floor((u.score || 0) / 10) + 1, score: parseFloat((u.score || 0).toFixed(2)) };
             document.getElementById('cert-fullname').value = u.fullNameEn || u.fullName || u.displayName || "";
+            // V100.67: users.fullName is the Thai name (fullNameEn is the English one).
+            // Set on every open so one recipient's value never leaks into the next.
+            const _thName = document.getElementById('cert-fullname-th');
+            if (_thName) _thName.value = u.fullName || "";
             if (document.getElementById('cert-nickname')) {
                 document.getElementById('cert-nickname').value = u.nickname || u.nickName || "";
             }
@@ -52177,7 +52186,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function _certDedupeKey(name, template, ds, de) {
             return `${String(name || '').trim().toLowerCase()}|${template}|${ds || ''}|${de || ''}`;
         }
-        // items: [{name, nickname, template, dateStart, dateEnd, dateText, lang, cal, userId}]
+        // items: [{name, nickname, nameTh, template, dateStart, dateEnd, dateText, lang, cal, userId}]
         // Returns array of numbers aligned with items. Throws on any Firestore failure
         // — callers must abort the export so no unregistered paper exists.
         async function issueCertNumbers(items) {
@@ -52208,6 +52217,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         dedupeKey: slot.key,
                         name: it.name || '',
                         nickname: it.nickname || '',
+                        // V100.67: only when the certificate prints it (TH / TH+EN)
+                        nameTh: (it.lang === 'th' || it.lang === 'both') ? (it.nameTh || '') : '',
                         template: it.template,
                         dateStart: it.dateStart || '',
                         dateEnd: it.dateEnd || '',
@@ -52266,9 +52277,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return Promise.all([_certImgReady(CERT_LOGO), _certImgReady(CERT_SIGN)]);
         }
 
-        function drawCertificate(ctx, name, dates, awards, level, score, template, lang, certNo) {
+        // V100.67: `names` = { th } — the Thai name, printed as the main name in TH and
+        // under the English one in TH+EN. `name` stays the English name ("EN|nickname").
+        function drawCertificate(ctx, name, dates, awards, level, score, template, lang, certNo, names) {
             const tpl = CERT_TEMPLATES[template] || CERT_TEMPLATES.internship;
             lang = (lang === 'th' || lang === 'en') ? lang : 'both';
+            names = names || {};
             // V96.82: one gold pair for every accent — subtitle, underline, ornament,
             // borders and seal previously each used a slightly different gold.
             const GOLD = '#b08a1e', GOLD_DARK = '#8f6b14';
@@ -52369,19 +52383,20 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             ctx.fillStyle = GOLD_DARK; // V96.82: was #c5a021 — too pale on white
             ctx.fillText(tpl.subtitle, 75, 185);
 
-            // 7. Introduction (V96.82: per-language variants)
+            // 7. Introduction (V96.82: per-language variants; V100.67: regular grey
+            // instead of bold dark, so the recipient's name is the loudest line)
             ctx.textAlign = "left";
             if (lang === 'th') {
-                ctx.fillStyle = "#444";
-                ctx.font = "bold 20px Montserrat, sans-serif";
+                ctx.fillStyle = "#6b7280";
+                ctx.font = "400 19px Montserrat, sans-serif";
                 ctx.fillText("เกียรติบัตรฉบับนี้ให้ไว้เพื่อแสดงว่า", 75, 250);
             } else if (lang === 'en') {
-                ctx.fillStyle = "#555";
-                ctx.font = "italic bold 18px Montserrat, sans-serif";
+                ctx.fillStyle = "#6b7280";
+                ctx.font = "italic 400 18px Montserrat, sans-serif";
                 ctx.fillText("This is to certify that", 75, 250);
             } else {
-                ctx.fillStyle = "#444";
-                ctx.font = "bold 19px Montserrat, sans-serif";
+                ctx.fillStyle = "#6b7280";
+                ctx.font = "400 17px Montserrat, sans-serif";
                 ctx.fillText("เกียรติบัตรฉบับนี้ให้ไว้เพื่อแสดงว่า", 75, 240);
                 ctx.font = "italic 13px Montserrat, sans-serif";
                 ctx.fillStyle = "#888";
@@ -52390,20 +52405,27 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
             // 8. Recipient Name (Dynamic Fitting & Bold Italic)
             const recipientNameArray = name ? name.split('|') : ["Student Name"];
-            const recipientName = recipientNameArray[0].trim();
+            const enName = recipientNameArray[0].trim();
             const recipientNickname = recipientNameArray.length > 1 ? recipientNameArray[1].trim() : "";
+            // V100.67: TH → the Thai name leads (English if none on file); TH+EN →
+            // English leads with the Thai name underneath; EN → English only.
+            const thMain = lang === 'th' && !!names.th;
+            const recipientName = thMain ? names.th : enName;
+            const subName = lang === 'both' ? (names.th || '') : '';
             ctx.textAlign = "center";
             ctx.fillStyle = "#222";
 
             // Dynamic Font Scaling Logic (V96.82: cap 72→58 + weight bold→600 — the
-            // old size read too heavy; centered on 0.40w to match the narrower band)
-            let fontSize = 58;
+            // old size read too heavy; centered on 0.40w to match the narrower band).
+            // Thai is set upright: a synthetic italic on Thai script reads as broken.
+            const nameStyle = thMain ? '600' : 'italic 600';
+            let fontSize = thMain ? 52 : 58;
             const maxWidth = w * 0.58;
 
-            ctx.font = 'italic 600 ' + fontSize + 'px Montserrat, sans-serif';
+            ctx.font = `${nameStyle} ${fontSize}px Montserrat, sans-serif`;
             while (ctx.measureText(recipientName).width > maxWidth && fontSize > 24) {
                 fontSize -= 2;
-                ctx.font = 'italic 600 ' + fontSize + 'px Montserrat, sans-serif';
+                ctx.font = `${nameStyle} ${fontSize}px Montserrat, sans-serif`;
             }
 
             // Add subtle shadow to name
@@ -52412,15 +52434,24 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             ctx.shadowOffsetX = 2;
             ctx.shadowOffsetY = 2;
 
+            // Both extra lines at once (Thai name + nickname) get a tighter stack, or the
+            // English description runs into the signature.
+            const both2 = !!(subName && recipientNickname);
+            ctx.fillText(recipientName, w * 0.40, both2 ? 338 : (recipientNickname || subName) ? 344 : 350);
+            ctx.shadowColor = "transparent"; // Reset shadow
+            // lineY = the gold underline; everything below is laid out from it.
+            let lineY = 380;
+            if (subName) {
+                ctx.font = "400 20px Montserrat, sans-serif";
+                ctx.fillStyle = "#4b5563";
+                ctx.fillText(subName, w * 0.40, both2 ? 368 : 378);
+                lineY = 398;
+            }
             if (recipientNickname) {
-                ctx.fillText(recipientName, w * 0.40, 340);
-                ctx.shadowColor = "transparent"; // Reset shadow
                 ctx.font = `italic 600 ${fontSize * 0.4}px 'Montserrat', sans-serif`;
                 ctx.fillStyle = "#444";
-                ctx.fillText(`( AKA : ${recipientNickname} )`, w * 0.40, 374);
-            } else {
-                ctx.fillText(recipientName, w * 0.40, 350);
-                ctx.shadowColor = "transparent"; // Reset shadow
+                ctx.fillText(`( AKA : ${recipientNickname} )`, w * 0.40, both2 ? 393 : 374);
+                lineY = both2 ? 406 : 400;
             }
 
 
@@ -52433,14 +52464,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             ctx.strokeStyle = grad;
             ctx.lineWidth = 4;
             ctx.beginPath();
-            ctx.moveTo(w * 0.12, recipientNickname ? 400 : 380);
-            ctx.lineTo(w * 0.68, recipientNickname ? 400 : 380);
+            ctx.moveTo(w * 0.12, lineY);
+            ctx.lineTo(w * 0.68, lineY);
             ctx.stroke();
 
             // 10. Course Description (V96.82: language variants, heavier Thai weight,
             // more air after the name; shrink-to-fit so long titles never clip)
             ctx.textAlign = "center";
-            const descY = recipientNickname ? 440 : 424;
+            const descY = lineY + (both2 ? 36 : recipientNickname ? 40 : 44);
             const fitLine = (text, y, px, weight, minPx) => {
                 ctx.font = `${weight} ${px}px Montserrat, sans-serif`;
                 while (ctx.measureText(text).width > w * 0.66 && px > minPx) {
@@ -52533,6 +52564,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // 12. Verify QR + Certificate No. (V96.83: replaces the old random serial
             // and placeholder box — certNo comes from the Firestore registry and is
             // only present on real exports, never on previews)
+            // V100.67: card raised 22px (h-112 → h-134) so the caption under it clears
+            // the inner frame line at y≈557. Preview placeholder uses the same box.
+            const cardX = w - 112, cardY = h - 134, cardS = 68, qrS = 56;
             if (certNo) {
                 ctx.textAlign = "left";
                 ctx.font = "bold 10px Montserrat";
@@ -52545,7 +52579,6 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         qr.make();
                         const n = qr.getModuleCount();
                         // White card gives the QR its quiet zone on the navy band
-                        const cardX = w - 112, cardY = h - 112, cardS = 68, qrS = 56;
                         ctx.fillStyle = "#fff";
                         ctx.beginPath();
                         if (ctx.roundRect) ctx.roundRect(cardX, cardY, cardS, cardS, 8); else ctx.rect(cardX, cardY, cardS, cardS);
@@ -52561,20 +52594,32 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 }
             } else {
                 ctx.fillStyle = "rgba(0,0,0,0.05)";
-                ctx.fillRect(w - 105, h - 105, 60, 60);
+                ctx.fillRect(cardX + 4, cardY + 4, 60, 60);
                 ctx.strokeStyle = "rgba(0,0,0,0.1)";
-                ctx.strokeRect(w - 105, h - 105, 60, 60);
+                ctx.strokeRect(cardX + 4, cardY + 4, 60, 60);
                 ctx.textAlign = "center";
                 ctx.font = "7px Montserrat";
                 ctx.fillStyle = "#888";
-                ctx.fillText("QR on export", w - 75, h - 72);
+                ctx.fillText("QR on export", cardX + cardS / 2, cardY + 37);
+            }
+            // V100.67: say what the QR is for, in the certificate's language (also on the
+            // preview, so the admin sees the real layout before exporting).
+            ctx.fillStyle = "#fff";
+            ctx.textAlign = "center";
+            if (lang !== 'th') {
+                ctx.font = "bold 7px Montserrat";
+                ctx.fillText("SCAN TO VERIFY", cardX + cardS / 2, cardY + cardS + 9);
+            }
+            if (lang !== 'en') {
+                ctx.font = "400 6.5px Montserrat, sans-serif";
+                ctx.fillText("สแกนเพื่อตรวจสอบ", cardX + cardS / 2, cardY + cardS + (lang === 'th' ? 10 : 17));
             }
 
             // 13. Main Seal: MEDLIFE+ EXCELLENCE AWARDS — removed V100.66. It printed on
             // every certificate regardless of awards, so it said nothing; a redesign is
-            // pending. Its spot (V96.83: 0.70h, clear of the verify QR card) is kept as
-            // the anchor for the special awards below.
-            const sealX = w * 0.85, sealY = h * 0.70;
+            // pending. Its spot is kept as the anchor for the special awards below
+            // (V100.67: 0.70h → 0.66h so the first badge clears the raised QR card).
+            const sealX = w * 0.85, sealY = h * 0.66;
 
             // 14. Optional Special Award Seals (Multi-stack)
             awardList.forEach((award, index) => {
@@ -52801,6 +52846,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const dateStr = s ? formatCertDateRange(s, e || s, certDateCal) : "";
             return [displayNameForCert, dateStr, awards, level, score, currentCertTemplate, certLang];
         }
+        // V100.67: the extra names drawCertificate takes after certNo.
+        function getCurrentCertificateNames() {
+            const th = document.getElementById('cert-fullname-th');
+            return { th: th ? th.value.trim() : '' };
+        }
 
         // V96.74: which wording the preview + PDF use. Chip rail, per house style.
         let currentCertTemplate = 'internship';
@@ -52836,7 +52886,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 if (!c) return;
                 await certLogoReady();
                 const drawArgs = getCurrentCertificateDrawArgs();
-                renderCertificateCanvas(c, drawArgs, 1);
+                renderCertificateCanvas(c, [...drawArgs, null, getCurrentCertificateNames()], 1);
             } catch(err) {
                 console.error("Cert Preview Error:", err);
             }
@@ -52870,6 +52920,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const items = users.map(u => ({
                 name: u.fullNameEn || u.fullName || u.displayName || '',
                 nickname: u.nickname || '',
+                nameTh: u.fullName || '',
                 template: tpl,
                 dateStart: (u.startDate && u.endDate) ? u.startDate : (opts.dateRange ? opts.dateRange.start : ''),
                 dateEnd: (u.startDate && u.endDate) ? u.endDate : (opts.dateRange ? opts.dateRange.end : ''),
@@ -52901,7 +52952,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
                 const lv = Math.floor((u.score || 0) / 10) + 1;
                 const sc = parseFloat((u.score || 0).toFixed(2));
-                renderCertificateCanvas(c, [displayNameForCert, items[i].dateText, finalAwards, lv, sc, tpl, certLang, certNos[i]], CERT_EXPORT_SCALE);
+                renderCertificateCanvas(c, [displayNameForCert, items[i].dateText, finalAwards, lv, sc, tpl, certLang, certNos[i], { th: u.fullName || '' }], CERT_EXPORT_SCALE);
 
                 const imgData = c.toDataURL('image/png');
                 if (i > 0) doc.addPage();
@@ -53105,7 +53156,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             let certNo;
             try {
                 [certNo] = await issueCertNumbers([{
-                    name: _fn, nickname: _nn, template: currentCertTemplate,
+                    name: _fn, nickname: _nn, nameTh: getCurrentCertificateNames().th, template: currentCertTemplate,
                     dateStart: _s, dateEnd: _e || _s, dateText: drawArgs[1],
                     lang: certLang, cal: certDateCal,
                     userId: certUser ? certUser.uid : null
@@ -53114,7 +53165,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 console.error('Cert registry error:', err);
                 return alert('Could not issue a certificate number, printing cancelled — ออกเลขทะเบียนไม่สำเร็จ ยกเลิกการพิมพ์: ' + (err.message || err));
             }
-            renderCertificateCanvas(exportCanvas, [...drawArgs, certNo], CERT_EXPORT_SCALE);
+            renderCertificateCanvas(exportCanvas, [...drawArgs, certNo, getCurrentCertificateNames()], CERT_EXPORT_SCALE);
             const imgData = exportCanvas.toDataURL('image/png');
             // V100.62: 'FAST' (lossless flate). Uncompressed, a 3200x2400 page is 29 MB — over
             // the 20 MB certificate-files Storage rule, so every archive (#1242) was denied.
