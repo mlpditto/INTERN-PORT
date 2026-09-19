@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.74)</title>
+    <title>Nika Admin (V100.75)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -52381,29 +52381,25 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // stretched ~6% wide when placed on the A4 PDF page — seals became ovals.
             const w = CERT_BASE_WIDTH, h = CERT_BASE_HEIGHT;
 
-            // 1. Premium Background: Subtle Gradient & Texture
-            ctx.fillStyle = "#f7f1e3"; // Obvious Sand Color
+            // 1. Ground — V100.75: full redesign, per the owner's reference (own
+            // construction inspired by its general style — thin gold linework, ivory
+            // ground, corner brackets, dotted arc, navy seal — not traced from that
+            // image). Plain warm ivory replaces the sand fill + radial tint; there is no
+            // navy band anywhere now, so this is the certificate's one appearance, not a
+            // print-friendly variant of it (that toggle, #1266, is retired — redundant
+            // once the default itself has no heavy fill to opt out of).
+            ctx.fillStyle = "#fdfbf3";
             ctx.fillRect(0, 0, w, h);
-            
-            // Verification Frame
             ctx.strokeStyle = "#eee";
             ctx.lineWidth = 1;
             ctx.strokeRect(0, 0, w, h);
 
-            // Subtle Radial Gradient for Depth
-            const bgGrad = ctx.createRadialGradient(w / 2, h / 2, 100, w / 2, h / 2, 600);
-            bgGrad.addColorStop(0, "rgba(255, 255, 255, 0.8)");
-            bgGrad.addColorStop(1, "rgba(227, 242, 253, 0.2)"); // Light Blue hint
-            ctx.fillStyle = bgGrad;
-            ctx.fillRect(0, 0, w, h);
-
-            // 2. Watermark — faint company logo (V96.82; falls back to the old
-            // OFFICIAL text if the logo asset is unavailable)
+            // 2. Watermark — unchanged from before this redesign.
             if (CERT_LOGO.complete && CERT_LOGO.naturalWidth) {
                 ctx.save();
                 ctx.globalAlpha = 0.035;
                 const wmW = w * 0.46, wmH = wmW * CERT_LOGO.naturalHeight / CERT_LOGO.naturalWidth;
-                ctx.drawImage(CERT_LOGO, w * 0.40 - wmW / 2, h / 2 - wmH / 2, wmW, wmH);
+                ctx.drawImage(CERT_LOGO, w * 0.5 - wmW / 2, h / 2 - wmH / 2, wmW, wmH);
                 ctx.restore();
             } else {
                 ctx.save();
@@ -52416,117 +52412,153 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 ctx.restore();
             }
 
-            // 3. Right Side Navy Decoration (V96.82: narrowed — starts at 78% instead
-            // of 72% so the content area gets the space back)
-            ctx.fillStyle = "#0a192f"; // Premium Deep Navy
+            // 3. Dotted swoosh arc + sparkle accents — the one deliberately decorative
+            // flourish, confined to the bottom-left corner. A full page-spanning sweep
+            // was tried first and rose through y≈150-190 exactly where the header sits,
+            // cutting across "OF ACHIEVEMENT" — this shorter one stays clear of it.
+            const sparkle = (x, y, s) => {
+                ctx.save(); ctx.translate(x, y); ctx.fillStyle = GOLD;
+                ctx.beginPath();
+                ctx.moveTo(0, -s); ctx.quadraticCurveTo(s * .15, -s * .15, s, 0);
+                ctx.quadraticCurveTo(s * .15, s * .15, 0, s);
+                ctx.quadraticCurveTo(-s * .15, s * .15, -s, 0);
+                ctx.quadraticCurveTo(-s * .15, -s * .15, 0, -s);
+                ctx.closePath(); ctx.fill(); ctx.restore();
+            };
+            ctx.save();
+            ctx.strokeStyle = 'rgba(176,138,30,0.5)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([1, 5]);
             ctx.beginPath();
-            ctx.moveTo(w * 0.78, 0);
-            ctx.bezierCurveTo(w * 0.88, h * 0.2, w * 0.68, h * 0.8, w * 0.88, h);
-            ctx.lineTo(w, h);
-            ctx.lineTo(w, 0);
-            ctx.fill();
-
-            // 4. Gold Ornament Curves
-            ctx.strokeStyle = GOLD;
-            ctx.lineWidth = 12;
-            ctx.beginPath();
-            ctx.moveTo(w * 0.76, 0);
-            ctx.bezierCurveTo(w * 0.86, h * 0.2, w * 0.66, h * 0.8, w * 0.86, h);
+            ctx.moveTo(50, 420);
+            ctx.bezierCurveTo(60, 320, 120, 260, 210, 250);
             ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.restore();
+            sparkle(50, 420, 6);
+            sparkle(210, 250, 4);
 
-            // Thin Silver Accent
-            ctx.strokeStyle = "#bdc3c7";
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(w * 0.74, 0);
-            ctx.bezierCurveTo(w * 0.84, h * 0.2, w * 0.64, h * 0.8, w * 0.84, h);
-            ctx.stroke();
-
-            // 5. Elegant Frame Borders (V96.82: thicker + rounded corners)
+            // 4. Thin single-line border + small corner brackets (own construction: an L
+            // each corner with a small rotated diamond at the bend) — replaces the old
+            // double frame now there is no navy band for a heavier frame to sit against.
             const frame = (x, y, fw, fh, r) => {
                 ctx.beginPath();
                 if (ctx.roundRect) ctx.roundRect(x, y, fw, fh, r); else ctx.rect(x, y, fw, fh);
                 ctx.stroke();
             };
-            ctx.strokeStyle = "rgba(176, 138, 30, 0.35)";
-            ctx.lineWidth = 2;
-            frame(30, 30, w - 60, h - 60, 18);
             ctx.strokeStyle = GOLD;
-            ctx.lineWidth = 4.5;
-            frame(40, 40, w - 80, h - 80, 14);
-
-            // V96.79: small company logo, top-left above the header (skipped if the
-            // asset failed to load — the certificate must still render without it)
-            if (CERT_LOGO.complete && CERT_LOGO.naturalWidth) {
-                const logoH = 52, logoW = logoH * CERT_LOGO.naturalWidth / CERT_LOGO.naturalHeight;
-                ctx.drawImage(CERT_LOGO, 58, 44, logoW, logoH);
-            }
-
-            // 5b. Company Seal (V100.70) — a fixed decorative mark, unrelated to awards.
-            // Placed high in the navy band, clear of the logo (top-left) and the QR card
-            // (bottom-right). Special-award badges stack UPWARD from 0.66h and can reach
-            // this high with 3+ of them (measured: 3 leaves ~6px, 4 overlaps outright) —
-            // skip the seal rather than collide; awards are the more important content.
-            if (awardList.length <= 2) (() => {
-                const cx = w * 0.90, cy = h * 0.13, r = 34;
+            ctx.lineWidth = 1;
+            frame(28, 28, w - 56, h - 56, 6);
+            const corner = (x, y, sx, sy) => {
                 ctx.save();
-                // 12 short ticks around the rim — a plain circle reads as a badge, not a seal.
                 ctx.strokeStyle = GOLD;
                 ctx.lineWidth = 1.5;
-                for (let i = 0; i < 12; i++) {
-                    const a = (Math.PI / 6) * i;
-                    ctx.beginPath();
-                    ctx.moveTo(cx + Math.cos(a) * (r + 3), cy + Math.sin(a) * (r + 3));
-                    ctx.lineTo(cx + Math.cos(a) * (r + 8), cy + Math.sin(a) * (r + 8));
-                    ctx.stroke();
-                }
-                const grd = ctx.createRadialGradient(cx, cy, 4, cx, cy, r);
-                grd.addColorStop(0, '#ffd700');
-                grd.addColorStop(1, GOLD_DARK);
-                ctx.fillStyle = grd;
+                ctx.beginPath();
+                ctx.moveTo(x, y + 22 * sy);
+                ctx.lineTo(x, y);
+                ctx.lineTo(x + 22 * sx, y);
+                ctx.stroke();
+                ctx.translate(x + 6 * sx, y + 6 * sy);
+                ctx.rotate(Math.PI / 4);
+                ctx.fillStyle = GOLD;
+                ctx.fillRect(-3, -3, 6, 6);
+                ctx.restore();
+            };
+            corner(16, 16, 1, 1);
+            corner(w - 16, 16, -1, 1);
+            corner(16, h - 16, 1, -1);
+            corner(w - 16, h - 16, -1, -1);
+
+            // 5. Thin decorative-only side margins — no tagline text (dropped per the
+            // owner's call), just a hairline + two small dots. The right one is
+            // shortened to stop above where the award medallions start (0.66h, section
+            // 14 below) — tried full-height first and it ran straight through every
+            // badge's center, since both sat at the same x.
+            const sideLine = (x, yTop, yBot) => {
+                ctx.strokeStyle = 'rgba(176,138,30,0.35)';
+                ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(x, yTop); ctx.lineTo(x, yBot); ctx.stroke();
+                ctx.fillStyle = GOLD;
+                ctx.beginPath(); ctx.arc(x, yTop, 2, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(x, yBot, 2, 0, Math.PI * 2); ctx.fill();
+            };
+            sideLine(50, 90, h - 90);
+            sideLine(w - 50, 90, 300);
+
+            // V96.79: small company logo, top-left above the header.
+            if (CERT_LOGO.complete && CERT_LOGO.naturalWidth) {
+                const logoH = 50, logoW = logoH * CERT_LOGO.naturalWidth / CERT_LOGO.naturalHeight;
+                ctx.drawImage(CERT_LOGO, 62, 46, logoW, logoH);
+            }
+
+            // 5b. Company Seal — navy instead of gold in this redesign (the ivory ground
+            // has no dark accent anywhere else; the reference's seal is the one place a
+            // deep navy mark grounds the page). Same position and the same
+            // awardList.length<=2 collision guard as before this redesign — that math
+            // (badges stack upward from 0.66h and can reach this high with 3+ of them)
+            // didn't depend on the seal's color, only its position and size.
+            if (awardList.length <= 2) (() => {
+                const cx = w - 92, cy = 90, r = 38;
+                ctx.save();
                 ctx.beginPath();
                 ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                ctx.fillStyle = '#0a192f';
                 ctx.fill();
-                ctx.strokeStyle = '#ffffff';
                 ctx.lineWidth = 2;
+                ctx.strokeStyle = GOLD;
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(cx, cy, r - 6, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(176,138,30,0.5)';
+                ctx.lineWidth = 1;
                 ctx.stroke();
                 ctx.textAlign = 'center';
                 ctx.fillStyle = '#fff';
-                ctx.font = "bold 9px Montserrat";
-                ctx.fillText('MEDLIFE PLUS', cx, cy - 3);
-                ctx.font = "700 6.5px Montserrat";
-                ctx.fillText('CERTIFIED', cx, cy + 8);
+                ctx.font = "700 10px Montserrat";
+                ctx.fillText('MEDLIFE PLUS', cx, cy - 2);
+                ctx.font = "500 7.5px Montserrat";
+                ctx.fillStyle = GOLD;
+                ctx.fillText('CERTIFIED', cx, cy + 10);
                 ctx.restore();
             })();
 
-            // 6. Header Typography
-            ctx.textAlign = "left";
+            // 6. Header Typography — V100.75: centered, matching the redesign's fully
+            // symmetric layout (was left-aligned at x=70, from when the navy band on the
+            // right made a centered header look off-balance). "OF ACHIEVEMENT" gets
+            // flanking rule lines instead of sitting bare underneath.
+            ctx.textAlign = "center";
             ctx.fillStyle = "#0a192f";
-            ctx.font = "bold 60px 'Cormorant Garamond', Georgia, serif";
-            ctx.fillText("CERTIFICATE", 70, 150);
+            ctx.font = "bold 52px 'Cormorant Garamond', Georgia, serif";
+            ctx.fillText("CERTIFICATE", w / 2, 148);
 
-            ctx.font = "italic 24px 'Cormorant Garamond', serif";
+            ctx.font = "italic 600 20px 'Cormorant Garamond', serif";
             ctx.fillStyle = GOLD_DARK; // V96.82: was #c5a021 — too pale on white
-            ctx.fillText(tpl.subtitle, 75, 185);
+            ctx.fillText(tpl.subtitle, w / 2, 182);
+            const subW = ctx.measureText(tpl.subtitle).width;
+            ctx.strokeStyle = GOLD;
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(w / 2 - subW / 2 - 60, 178); ctx.lineTo(w / 2 - subW / 2 - 14, 178); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(w / 2 + subW / 2 + 14, 178); ctx.lineTo(w / 2 + subW / 2 + 60, 178); ctx.stroke();
 
             // 7. Introduction (V96.82: per-language variants; V100.67: regular grey
-            // instead of bold dark, so the recipient's name is the loudest line)
-            ctx.textAlign = "left";
+            // instead of bold dark, so the recipient's name is the loudest line;
+            // V100.75: centered under the now-centered header)
+            ctx.textAlign = "center";
             if (lang === 'th') {
                 ctx.fillStyle = "#6b7280";
                 ctx.font = "400 19px Montserrat, sans-serif";
-                ctx.fillText("เกียรติบัตรฉบับนี้ให้ไว้เพื่อแสดงว่า", 75, 250);
+                ctx.fillText("เกียรติบัตรฉบับนี้ให้ไว้เพื่อแสดงว่า", w / 2, 250);
             } else if (lang === 'en') {
                 ctx.fillStyle = "#6b7280";
                 ctx.font = "italic 400 18px Montserrat, sans-serif";
-                ctx.fillText("This is to certify that", 75, 250);
+                ctx.fillText("This is to certify that", w / 2, 250);
             } else {
                 ctx.fillStyle = "#6b7280";
                 ctx.font = `400 17px ${FF}`;
-                ctx.fillText(lang === 'ko' ? CERT_KO.intro : "เกียรติบัตรฉบับนี้ให้ไว้เพื่อแสดงว่า", 75, 240);
+                ctx.fillText(lang === 'ko' ? CERT_KO.intro : "เกียรติบัตรฉบับนี้ให้ไว้เพื่อแสดงว่า", w / 2, 240);
                 ctx.font = "italic 13px Montserrat, sans-serif";
                 ctx.fillStyle = "#888";
-                ctx.fillText("This is to certify that", 75, 260);
+                ctx.fillText("This is to certify that", w / 2, 260);
             }
 
             // 8. Recipient Name (Dynamic Fitting & Bold Italic)
@@ -52546,7 +52578,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // Thai is set upright: a synthetic italic on Thai script reads as broken.
             const nameStyle = thMain ? '600' : 'italic 600';
             let fontSize = thMain ? 52 : 58;
-            const maxWidth = w * 0.58;
+            // V100.75: was a flat 0.58. Centering (was 0.40w) let text reach further right
+            // toward the badge column — caught in testing: with awards present, a long
+            // name/description could run under the MVP badge's own label. Full room with
+            // no awards to protect against; narrower, safely clear of sealX=0.85w, when
+            // there are any.
+            const maxWidth = w * (awardList.length > 0 ? 0.50 : 0.62);
 
             ctx.font = `${nameStyle} ${fontSize}px ${NAME_FF}`;
             while (ctx.measureText(recipientName).width > maxWidth && fontSize > 24) {
@@ -52563,35 +52600,35 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // Both extra lines at once (Thai name + nickname) get a tighter stack, or the
             // English description runs into the signature.
             const both2 = !!(subName && recipientNickname);
-            ctx.fillText(recipientName, w * 0.40, both2 ? 338 : (recipientNickname || subName) ? 344 : 350);
+            ctx.fillText(recipientName, w * 0.5, both2 ? 338 : (recipientNickname || subName) ? 344 : 350);
             ctx.shadowColor = "transparent"; // Reset shadow
             // lineY = the gold underline; everything below is laid out from it.
             let lineY = 380;
             if (subName) {
                 ctx.font = `400 20px ${FF}`;
                 ctx.fillStyle = "#4b5563";
-                ctx.fillText(subName, w * 0.40, both2 ? 368 : 378);
+                ctx.fillText(subName, w * 0.5, both2 ? 368 : 378);
                 lineY = 398;
             }
             if (recipientNickname) {
                 ctx.font = `italic 600 ${fontSize * 0.4}px 'Montserrat', sans-serif`;
                 ctx.fillStyle = "#444";
-                ctx.fillText(`( AKA : ${recipientNickname} )`, w * 0.40, both2 ? 393 : 374);
+                ctx.fillText(`( AKA : ${recipientNickname} )`, w * 0.5, both2 ? 393 : 374);
                 lineY = both2 ? 406 : 400;
             }
 
 
 
             // 9. Premium Underline
-            const grad = ctx.createLinearGradient(w * 0.12, 0, w * 0.68, 0);
+            const grad = ctx.createLinearGradient(w * 0.22, 0, w * 0.78, 0); // V100.75: recentered, same 0.56w span
             grad.addColorStop(0, "rgba(176, 138, 30, 0)");
             grad.addColorStop(0.5, "rgba(176, 138, 30, 1)");
             grad.addColorStop(1, "rgba(176, 138, 30, 0)");
             ctx.strokeStyle = grad;
             ctx.lineWidth = 4;
             ctx.beginPath();
-            ctx.moveTo(w * 0.12, lineY);
-            ctx.lineTo(w * 0.68, lineY);
+            ctx.moveTo(w * 0.22, lineY);
+            ctx.lineTo(w * 0.78, lineY);
             ctx.stroke();
 
             // 10. Course Description (V96.82: language variants, heavier Thai weight,
@@ -52600,11 +52637,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const descY = lineY + (both2 ? 36 : recipientNickname ? 40 : 44);
             const fitLine = (text, y, px, weight, minPx) => {
                 ctx.font = `${weight} ${px}px ${FF}`;
-                while (ctx.measureText(text).width > w * 0.66 && px > minPx) {
+                // V100.75: same collision as the name's maxWidth above — narrower when
+                // awards are present, so this text can't run under a badge's label.
+                while (ctx.measureText(text).width > w * (awardList.length > 0 ? 0.52 : 0.7) && px > minPx) {
                     px -= 1;
                     ctx.font = `${weight} ${px}px ${FF}`;
                 }
-                ctx.fillText(text, w * 0.40, y);
+                ctx.fillText(text, w * 0.5, y);
             };
             if (lang === 'th') {
                 ctx.fillStyle = "#333";
@@ -52705,6 +52744,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // only present on real exports, never on previews)
             // V100.67: card raised 22px (h-112 → h-134) so the caption under it clears
             // the inner frame line at y≈557. Preview placeholder uses the same box.
+            // V100.75: the white card behind the QR was there for a quiet zone against
+            // the navy band; on the ivory ground the dark modules already have plenty of
+            // contrast on their own, so the card is dropped (module math unchanged).
             const cardX = w - 112, cardY = h - 134, cardS = 68, qrS = 56;
             if (certNo) {
                 ctx.textAlign = "left";
@@ -52717,11 +52759,6 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         qr.addData(CERT_VERIFY_BASE + certNo);
                         qr.make();
                         const n = qr.getModuleCount();
-                        // White card gives the QR its quiet zone on the navy band
-                        ctx.fillStyle = "#fff";
-                        ctx.beginPath();
-                        if (ctx.roundRect) ctx.roundRect(cardX, cardY, cardS, cardS, 8); else ctx.rect(cardX, cardY, cardS, cardS);
-                        ctx.fill();
                         const cell = qrS / n;
                         ctx.fillStyle = "#0a192f";
                         for (let qr_r = 0; qr_r < n; qr_r++) {
@@ -52743,7 +52780,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
             // V100.67: say what the QR is for, in the certificate's language (also on the
             // preview, so the admin sees the real layout before exporting).
-            ctx.fillStyle = "#fff";
+            // V100.75: was white (meant for the navy band) — invisible on the ivory
+            // ground, so it switches to the same dark grey "Certificate No." already uses.
+            ctx.fillStyle = "#555";
             ctx.textAlign = "center";
             if (lang !== 'th') {
                 ctx.font = "bold 7px Montserrat";
