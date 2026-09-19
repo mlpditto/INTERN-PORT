@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.71)</title>
+    <title>Nika Admin (V100.72)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -52755,12 +52755,87 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const sealX = w * 0.85, sealY = h * 0.66;
 
             // 14. Optional Special Award Seals (Multi-stack)
+            // V100.72: badge redesign. Two structural problems, both from the same root
+            // cause — text/spacing used fixed numbers that assumed the badge shapes were
+            // wide everywhere, when several are polygons/stars that narrow sharply away
+            // from center:
+            //   1. Quiz Master's diamond is only `r - |dy|` wide at vertical offset dy, so
+            //      "KNOWLEDGE ACE" (drawn at dy=20) ran past the diamond's edge onto the
+            //      navy background — not literally clipped by canvas, just visibly
+            //      spilling off the shape.
+            //   2. Badges stack upward by a fixed 110px with a fixed r=50; at 4 badges the
+            //      top one crossed the inner gold frame (0.70h → 0.66h in V100.67 made this
+            //      worse, not better — verified in Phase 3 testing).
+            // Fix: `halfWidthAtDy` computes each shape's TRUE width at any vertical offset
+            // (exact for polygons/stars via their own vertices, exact for circles via the
+            // circle equation), used to (a) shrink-to-fit every text line so it can never
+            // spill past its badge, and (b) size/space the stack so it can never cross the
+            // frame — solving both with one shared geometric fact instead of two sets of
+            // hand-picked numbers. Below 5 simultaneous awards (the realistic range — there
+            // are 8 possible checkboxes, but these are individual honors) both radius and
+            // spacing are unchanged from before this fix.
+            const AWARD_R = 50, AWARD_MIN_R = 26, AWARD_SAFE_TOP = 48, AWARD_GAP = 4;
+            // r <= this keeps `n` badges, spaced no closer than 2r+AWARD_GAP, from crossing
+            // AWARD_SAFE_TOP — derived by solving spacing(r) >= 2r+AWARD_GAP for r (see PR).
+            const awardMaxR = n => (sealY - AWARD_SAFE_TOP - (n - 1) * AWARD_GAP) / (2 * n - 1);
+            const awardR = awardList.length > 1
+                ? Math.max(AWARD_MIN_R, Math.min(AWARD_R, awardMaxR(awardList.length)))
+                : AWARD_R;
+            const awardSpacing = awardList.length > 1
+                ? Math.min(110, (sealY - awardR - AWARD_SAFE_TOP) / (awardList.length - 1))
+                : 0;
+            // Regular-polygon vertices (n sides, circumradius r, start angle, alternating
+            // inner ratio for stars/gears) — the exact same construction each badge's own
+            // ctx.lineTo loop already uses; built again here, kept separate from that
+            // drawing code, purely to measure width. `sides` per shape, matched to each
+            // badge's own loop below: zero-to-one 32/0/(r-8)/r, beta-user hex 6/0, iron-will
+            // pentagon 5/-90°, quiz-master diamond 4/-90°, team-player octagon 8/-22.5°,
+            // rising-star 10/-90°/0.45.
+            const regularPolyHalfWidthAtDy = (n, r, startAngle, innerRatio, dy) => {
+                const verts = [];
+                for (let i = 0; i < n; i++) {
+                    const rad = (innerRatio !== undefined && i % 2 === 1) ? r * innerRatio : r;
+                    const a = startAngle + (2 * Math.PI / n) * i;
+                    verts.push({ x: Math.cos(a) * rad, y: Math.sin(a) * rad });
+                }
+                for (let i = 0; i < verts.length; i++) {
+                    const a = verts[i], b = verts[(i + 1) % verts.length];
+                    if ((a.y <= dy) !== (b.y <= dy)) { // edge straddles the scanline at y=dy
+                        const x = a.x + (dy - a.y) / (b.y - a.y) * (b.x - a.x);
+                        if (x > 0) return x; // convex + symmetric about x=0: first positive hit is it
+                    }
+                }
+                return 0;
+            };
+            const circleHalfWidthAtDy = (r, dy) => Math.abs(dy) >= r ? 0 : Math.sqrt(r * r - dy * dy);
+            const AWARD_SHAPES = {
+                'zero-to-one': (r, dy) => regularPolyHalfWidthAtDy(32, r, 0, (r - 8) / r, dy),
+                'good-reporter': circleHalfWidthAtDy,
+                'beta-user': (r, dy) => regularPolyHalfWidthAtDy(6, r, 0, undefined, dy),
+                'iron-will': (r, dy) => regularPolyHalfWidthAtDy(5, r, -Math.PI / 2, undefined, dy),
+                'quiz-master': (r, dy) => regularPolyHalfWidthAtDy(4, r, -Math.PI / 2, undefined, dy),
+                'team-player': (r, dy) => regularPolyHalfWidthAtDy(8, r, -Math.PI / 8, undefined, dy),
+                'rising-star': (r, dy) => regularPolyHalfWidthAtDy(10, r, -Math.PI / 2, 0.45, dy),
+                'mvp': circleHalfWidthAtDy,
+            };
             awardList.forEach((award, index) => {
                 const specX = sealX;
-                // V100.66: the first award takes the old seal's spot instead of stacking
-                // 140px above an empty space.
-                const specY = sealY - (index * 110); // Stack upwards
-                const r = 50;
+                const specY = sealY - (index * awardSpacing);
+                const r = awardR;
+                const shapeFn = AWARD_SHAPES[award];
+                // Shrink-to-fit one line against the badge's true width at this offset; a
+                // line that already fits (true for most badges at their original sizes)
+                // never shrinks, so output is unchanged from before this fix.
+                const fitLine = (text, dy, startPx, minPx, weight, family) => {
+                    const maxW = shapeFn ? 2 * shapeFn(r, dy) - 6 : Infinity;
+                    let px = startPx * (r / AWARD_R); // scale with the (rare) shrunk radius too
+                    ctx.font = `${weight} ${px}px ${family}`;
+                    while (ctx.measureText(text).width > maxW && px > minPx) {
+                        px -= 0.5;
+                        ctx.font = `${weight} ${px}px ${family}`;
+                    }
+                    ctx.fillText(text, specX, specY + dy);
+                };
 
                 if (award === 'zero-to-one') {
                     const grd = ctx.createRadialGradient(specX, specY, 5, specX, specY, r);
@@ -52780,12 +52855,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
                     ctx.textAlign = "center";
                     ctx.fillStyle = "#fff";
-                    ctx.font = "bold 24px Arial";
-                    ctx.fillText("🚀", specX, specY - 6);
-                    ctx.font = "bold 9px Montserrat";
-                    ctx.fillText("ZERO-TO-ONE", specX, specY + 12);
-                    ctx.font = "7px Montserrat";
-                    ctx.fillText("GAME CHANGER", specX, specY + 22);
+                    fitLine("🚀", -6, 24, 14, "bold", "Arial");
+                    fitLine("ZERO-TO-ONE", 12, 9, 5, "bold", "Montserrat");
+                    fitLine("GAME CHANGER", 22, 7, 4, "normal", "Montserrat");
                 } else if (award === 'good-reporter') {
                     const grd = ctx.createRadialGradient(specX, specY, 5, specX, specY, r);
                     grd.addColorStop(0, "#50c878");
@@ -52799,12 +52871,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
                     ctx.textAlign = "center";
                     ctx.fillStyle = "#fff";
-                    ctx.font = "bold 24px Arial";
-                    ctx.fillText("🎤", specX, specY - 6);
-                    ctx.font = "bold 9px Montserrat";
-                    ctx.fillText("GOOD REPORTER", specX, specY + 12);
-                    ctx.font = "7px Montserrat";
-                    ctx.fillText("INSIGHTFUL", specX, specY + 22);
+                    fitLine("🎤", -6, 24, 14, "bold", "Arial");
+                    fitLine("GOOD REPORTER", 12, 9, 5, "bold", "Montserrat");
+                    fitLine("INSIGHTFUL", 22, 7, 4, "normal", "Montserrat");
                 } else if (award === 'beta-user') {
                     const grd = ctx.createRadialGradient(specX, specY, 5, specX, specY, r);
                     grd.addColorStop(0, "#ff0080"); // Pink
@@ -52822,12 +52891,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
                     ctx.textAlign = "center";
                     ctx.fillStyle = "#fff";
-                    ctx.font = "bold 24px Arial";
-                    ctx.fillText("🧪", specX, specY - 6);
-                    ctx.font = "bold 10px Montserrat";
-                    ctx.fillText("BETA USER", specX, specY + 12);
-                    ctx.font = "7px Montserrat";
-                    ctx.fillText("EARLY ADOPTER", specX, specY + 22);
+                    fitLine("🧪", -6, 24, 14, "bold", "Arial");
+                    fitLine("BETA USER", 12, 10, 5, "bold", "Montserrat");
+                    fitLine("EARLY ADOPTER", 22, 7, 4, "normal", "Montserrat");
                 } else if (award === 'iron-will') {
                     // 🔥 Iron Will — Pentagon, Orange-Red gradient
                     const grd = ctx.createRadialGradient(specX, specY, 5, specX, specY, r);
@@ -52843,9 +52909,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     ctx.fill();
                     ctx.strokeStyle = "#fff"; ctx.lineWidth = 2.5; ctx.stroke();
                     ctx.textAlign = "center"; ctx.fillStyle = "#fff";
-                    ctx.font = "bold 24px Arial"; ctx.fillText("🔥", specX, specY - 6);
-                    ctx.font = "bold 9px Montserrat"; ctx.fillText("IRON WILL", specX, specY + 12);
-                    ctx.font = "7px Montserrat"; ctx.fillText("NEVER GIVE UP", specX, specY + 22);
+                    fitLine("🔥", -6, 24, 14, "bold", "Arial");
+                    fitLine("IRON WILL", 12, 9, 5, "bold", "Montserrat");
+                    fitLine("NEVER GIVE UP", 22, 7, 4, "normal", "Montserrat");
 
                 } else if (award === 'quiz-master') {
                     // 🧠 Quiz Master — Diamond (rotated square), Purple-Indigo gradient
@@ -52862,9 +52928,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     ctx.fill();
                     ctx.strokeStyle = "#e8eaf6"; ctx.lineWidth = 2.5; ctx.stroke();
                     ctx.textAlign = "center"; ctx.fillStyle = "#fff";
-                    ctx.font = "bold 22px Arial"; ctx.fillText("🧠", specX, specY - 8);
-                    ctx.font = "bold 9px Montserrat"; ctx.fillText("QUIZ MASTER", specX, specY + 10);
-                    ctx.font = "7px Montserrat"; ctx.fillText("KNOWLEDGE ACE", specX, specY + 20);
+                    fitLine("🧠", -8, 22, 12, "bold", "Arial");
+                    fitLine("QUIZ MASTER", 10, 9, 5, "bold", "Montserrat");
+                    fitLine("KNOWLEDGE ACE", 20, 7, 4, "normal", "Montserrat");
 
                 } else if (award === 'team-player') {
                     // 🤝 Team Player — Rounded Octagon, Teal gradient
@@ -52881,9 +52947,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     ctx.fill();
                     ctx.strokeStyle = "#b2dfdb"; ctx.lineWidth = 3; ctx.stroke();
                     ctx.textAlign = "center"; ctx.fillStyle = "#fff";
-                    ctx.font = "bold 22px Arial"; ctx.fillText("🤝", specX, specY - 6);
-                    ctx.font = "bold 9px Montserrat"; ctx.fillText("TEAM PLAYER", specX, specY + 12);
-                    ctx.font = "7px Montserrat"; ctx.fillText("COLLABORATIVE", specX, specY + 22);
+                    fitLine("🤝", -6, 22, 12, "bold", "Arial");
+                    fitLine("TEAM PLAYER", 12, 9, 5, "bold", "Montserrat");
+                    fitLine("COLLABORATIVE", 22, 7, 4, "normal", "Montserrat");
 
                 } else if (award === 'rising-star') {
                     // 🌟 Rising Star — 5-pointed star, Gold-Amber gradient
@@ -52901,10 +52967,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     ctx.fill();
                     ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
                     ctx.textAlign = "center"; ctx.fillStyle = "#5d4037";
-                    ctx.font = "bold 18px Arial"; ctx.fillText("🌟", specX, specY - 7);
-                    ctx.font = "bold 6.4px Montserrat"; ctx.fillText("RISING", specX, specY + 7);
-                    ctx.font = "bold 6.4px Montserrat"; ctx.fillText("STAR", specX, specY + 14);
-                    ctx.font = "5.4px Montserrat"; ctx.fillText("RAPID GROWTH", specX, specY + 21);
+                    fitLine("🌟", -7, 18, 10, "bold", "Arial");
+                    fitLine("RISING", 7, 6.4, 4, "bold", "Montserrat");
+                    fitLine("STAR", 14, 6.4, 4, "bold", "Montserrat");
+                    fitLine("RAPID GROWTH", 21, 5.4, 3.5, "normal", "Montserrat");
 
                 } else if (award === 'mvp') {
                     // 👑 MVP — Double-ring circle, Gold-Crimson gradient
@@ -52921,9 +52987,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     ctx.beginPath(); ctx.arc(specX, specY, r - 6, 0, Math.PI * 2);
                     ctx.strokeStyle = "#ffd700"; ctx.lineWidth = 1.5; ctx.stroke();
                     ctx.textAlign = "center"; ctx.fillStyle = "#fff";
-                    ctx.font = "bold 22px Arial"; ctx.fillText("👑", specX, specY - 8);
-                    ctx.font = "bold 11px Montserrat"; ctx.fillText("MVP", specX, specY + 10);
-                    ctx.font = "7px Montserrat"; ctx.fillText("MOST VALUABLE", specX, specY + 20);
+                    fitLine("👑", -8, 22, 12, "bold", "Arial");
+                    fitLine("MVP", 10, 11, 6, "bold", "Montserrat");
+                    fitLine("MOST VALUABLE", 20, 7, 4, "normal", "Montserrat");
                 }
             });
         }
