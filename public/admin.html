@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.61)</title>
+    <title>Nika Admin (V100.62)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -52904,9 +52904,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
                 const imgData = c.toDataURL('image/png');
                 if (i > 0) doc.addPage();
-                doc.addImage(imgData, 'PNG', 0, 0, 297, 210); // Fill A4
+                doc.addImage(imgData, 'PNG', 0, 0, 297, 210, undefined, 'FAST'); // Fill A4
                 const single = new jsPDF('l', 'mm', 'a4');
-                single.addImage(imgData, 'PNG', 0, 0, 297, 210);
+                single.addImage(imgData, 'PNG', 0, 0, 297, 210, undefined, 'FAST');
                 if (!await CertificateFiles.archive(certNos[i], single)) return;
                 await markCertApproved(u.id, certNos[i]);
             }
@@ -53078,9 +53078,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 renderCertificateCanvas(c, [names[i], dateText, [], 1, 0, tpl, certLang, certNos[i]], CERT_EXPORT_SCALE);
                 if (i > 0) doc.addPage();
                 const image = c.toDataURL('image/png');
-                doc.addImage(image, 'PNG', 0, 0, 297, 210);
+                doc.addImage(image, 'PNG', 0, 0, 297, 210, undefined, 'FAST');
                 const single = new jsPDF('l', 'mm', 'a4');
-                single.addImage(image, 'PNG', 0, 0, 297, 210);
+                single.addImage(image, 'PNG', 0, 0, 297, 210, undefined, 'FAST');
                 if (!await CertificateFiles.archive(certNos[i], single)) return;
             }
             doc.save("Certificates_Pasted.pdf");
@@ -53115,7 +53115,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
             renderCertificateCanvas(exportCanvas, [...drawArgs, certNo], CERT_EXPORT_SCALE);
             const imgData = exportCanvas.toDataURL('image/png');
-            doc.addImage(imgData, 'PNG', 0, 0, 297, 210);
+            // V100.62: 'FAST' (lossless flate). Uncompressed, a 3200x2400 page is 29 MB — over
+            // the 20 MB certificate-files Storage rule, so every archive (#1242) was denied.
+            doc.addImage(imgData, 'PNG', 0, 0, 297, 210, undefined, 'FAST');
             if (!await CertificateFiles.archive(certNo, doc)) return;
             if (certUser) await markCertApproved(certUser.uid, certNo);
             doc.save(`Certificate_${document.getElementById('cert-fullname').value || "User"}.pdf`);
