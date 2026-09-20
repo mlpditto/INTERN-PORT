@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.82)</title>
+    <title>Nika Admin (V100.83)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -21560,19 +21560,24 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             return `<div style="margin-top:5px; display:inline-flex; align-items:center; gap:4px; background:${color}15; border:1px solid ${color}40; color:${color}; padding:2px 8px; border-radius:12px; font-size:0.72em; font-weight:bold;" title="Detected: ${result.words.join(', ')}"><i class="fa-solid ${icon}"></i> ${label} (${result.words.length})</div>`;
         }
 
+        // V100.83: repicked so every group is a genuinely distinct hue — the old set
+        // had 3 near-collisions (Pharmacists #8338ec vs Extern #6610f2, both violet;
+        // Marketing #ff9f1c vs Audit #fd7e14, both orange; IT #20c997 vs Junior
+        // #17a2b8, both teal), reported as "can't tell Pharmacists from EXTERN apart"
+        // in the User Hub Group column. 11 colors spread around the wheel instead of
+        // clustered in 3 families.
         const groupColorMap = {
             'Public': '#4361ee',
-            'IT': '#20c997',
-            'Marketing': '#ff9f1c',
-            'MLP': '#ef233c',
-            // ... (rest of the code remains the same)
+            'IT': '#22c55e',
+            'Marketing': '#f97316',
+            'MLP': '#ef4444',
             'Pharmacists': '#8338ec',
-            'Dev': '#34495e',
-            'Design': '#e83e8c',
-            'Intern': '#00b4d8',
-            'Extern': '#6610f2',
-            'Audit': '#fd7e14',
-            'Junior': '#17a2b8'
+            'Dev': '#14b8a6',
+            'Design': '#d946ef',
+            'Intern': '#06b6d4',
+            'Extern': '#ec4899',
+            'Audit': '#78716c',
+            'Junior': '#eab308'
         };
 
         const groupIconMap = {
@@ -45038,7 +45043,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         tbody.innerHTML += `<tr style="background:#fcfcfc;">
                             <td style="text-align:center;">-</td>
                             <td><img src="${d.pictureUrl}" class="user-pic"> <span style="font-weight:bold; color:#777;">⏳ ${d.displayName}</span><div style="font-size:0.75em; color:var(--primary); margin-top:3px; padding-left:40px;">Code: <b style="background:#f3f0ff; padding:2px 8px; border-radius:10px; border:1px dashed var(--primary); font-family:monospace;">${d.code}</b></div></td>
-                            <td><span class="badge" style="background:${getGroupColor(d.group)}; color:white; font-size:0.8em;"><i class="fa-solid ${getGroupIcon(d.group)}"></i> <span class="lang-no-toggle">${d.group}</span></span></td>
+                            <!-- V100.83: Style 1+3 combined — tinted pill (colored bg/border) + neutral
+                                 text (always readable regardless of hue) + a precise color dot, replacing
+                                 the old solid-fill + white-text + icon treatment. -->
+                            <td><span class="badge" style="background:color-mix(in srgb, ${getGroupColor(d.group)} 10%, white); border:1.5px solid color-mix(in srgb, ${getGroupColor(d.group)} 32%, transparent); color:#334155; font-size:0.8em; display:inline-flex; align-items:center; gap:7px;"><span style="width:8px; height:8px; border-radius:50%; background:${getGroupColor(d.group)}; flex-shrink:0;"></span><span class="lang-no-toggle">${d.group}</span></span></td>
                             <td><span class="badge" style="background:#ffc107; color:black;"><i class="fa-solid fa-hourglass-half"></i> Pending Req.</span></td>
                             <td>-</td>
                             <td>-</td>
@@ -45138,7 +45146,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                  With a group tab active the pill just repeats the tab, so
                                  the cell goes empty. V99.44: soft tint instead of a solid
                                  fill; text mixed with --text-main so it reads in dark mode. -->
-                            <td>${activeUserGroup === 'All' ? `<button class="btn-sm" style="font-size:0.75em; padding:2px 8px; background:color-mix(in srgb, ${getGroupColor(group)} 14%, transparent); color:color-mix(in srgb, ${getGroupColor(group)} 80%, var(--text-main)); border:1px solid color-mix(in srgb, ${getGroupColor(group)} 35%, transparent); display:flex; align-items:center; gap:5px; font-weight:700;" onclick="setUserGroup('${d.id}', '${group}')"><i class="fa-solid ${getGroupIcon(group)}"></i> <span class="lang-no-toggle">${group}</span></button>` : ''}</td>
+                            <!-- V100.83: same Style 1+3 combined treatment as the PreReg row above —
+                                 tinted bg/border + neutral text + color dot instead of a colored-text
+                                 tint. Still the group-reassign button (onclick unchanged). -->
+                            <td>${activeUserGroup === 'All' ? `<button class="btn-sm" style="font-size:0.75em; padding:4px 10px; background:color-mix(in srgb, ${getGroupColor(group)} 10%, white); color:#334155; border:1.5px solid color-mix(in srgb, ${getGroupColor(group)} 32%, transparent); display:flex; align-items:center; gap:7px; font-weight:700;" onclick="setUserGroup('${d.id}', '${group}')"><span style="width:8px; height:8px; border-radius:50%; background:${getGroupColor(group)}; flex-shrink:0;"></span><span class="lang-no-toggle">${group}</span></button>` : ''}</td>
                             <!-- V98.10 lean: "active" is the default — a bright green pill on
                                  every row was noise. Active rows get a faint icon-only toggle
                                  (still the way to ignore someone); "ignored" keeps its pill. -->
