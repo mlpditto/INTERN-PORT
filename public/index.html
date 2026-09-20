@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V100.70)</title>
+    <title>Internship Portfolio (V100.71)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11637,10 +11637,28 @@
             const status = effectiveQuestion && effectiveQuestion._translationPending
                 ? '⏳ Translating…'
                 : (effectiveQuestion && effectiveQuestion._translationSource ? sourceMap[effectiveQuestion._translationSource] || '' : '');
-            return `<div class="qt-bar quiz-focus-language lang-no-toggle"><label for="quiz-focus-language">Language</label>
-                <select id="quiz-focus-language" aria-label="Question language" title="เลือกภาษาของโจทย์และคำตอบ" onchange="qtApplyTranslation(this.value)">
-                    ${QT_LANGS.map(l => `<option value="${l.code}" ${currentLang === l.code ? 'selected' : ''}>${l.code === 'orig' ? 'Original' : QT_LANG_NAMES[l.code]}</option>`).join('')}
-                </select><span id="qt-status" role="status">${status}</span></div>`;
+            // V100.71: dropdown → flag/icon chip rail (QT_LANGS already carried a flag
+            // emoji per language — it just wasn't used since the <select> only rendered
+            // QT_LANG_NAMES text). No <label for> element anymore, so this bar no longer
+            // contributes a stray <label> for renderQuizStepUIOnly's choice-option query
+            // to miscount (see V100.71 fix note there).
+            const chips = QT_LANGS.map(l => {
+                const on = currentLang === l.code;
+                const name = l.code === 'orig' ? 'Original' : QT_LANG_NAMES[l.code];
+                // #4361ee, not var(--primary): that custom property is never defined
+                // anywhere reachable by this page (checked index.html + every linked
+                // .css) — every existing var(--primary) use on this page is silently
+                // falling back to transparent/initial. #4361ee is the same blue those
+                // call sites clearly intended (e.g. the rgba(67,97,238,...) shadow paired
+                // with one of them), and matches the literal already used for the choice
+                // options' own selected-state highlight a few hundred lines down.
+                return `<button type="button" onclick="qtApplyTranslation('${l.code}')" title="${l.title}" aria-label="${name}"
+                    style="width:auto; min-height:0; padding:4px 9px; border-radius:999px; border:1.5px solid ${on ? '#4361ee' : '#cbd5e1'}; background:${on ? '#4361ee' : '#fff'}; color:${on ? '#fff' : '#475569'}; font-size:1.05em; line-height:1; cursor:pointer;">${l.label}</button>`;
+            }).join('');
+            return `<div class="qt-bar quiz-focus-language lang-no-toggle" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                <span style="font-size:0.8em; color:#666; font-weight:700;">Language</span>
+                <div role="group" aria-label="Question language" style="display:flex; gap:5px; flex-wrap:wrap;">${chips}</div>
+                <span id="qt-status" role="status">${status}</span></div>`;
         }
 
         function qtApplyTranslation(lang) {
@@ -11782,7 +11800,7 @@
                     const displayOrder = sMap || question.options.map((_, i) => i); // Fallback to original order
 
                     inputHtml = `
-                    <div style="display:flex; flex-direction:column; gap:10px;">
+                    <div class="qt-choice-list" style="display:flex; flex-direction:column; gap:10px;">
                         ${displayOrder.map((origIdx, displayIdx) => {
                         const opt = question.options[origIdx];
                         // userAnswers stores ORIGINAL indices
@@ -11930,7 +11948,16 @@
         }
 
         function renderQuizStepUIOnly() {
-            const labels = document.querySelectorAll('#quiz-run-container label');
+            // V100.71 fix: was querying every <label> under #quiz-run-container,
+            // which also picked up the Language bar's <label for="quiz-focus-language">
+            // rendered just above the choices (qtRenderBar(), V96.x+) — that extra label
+            // shifted every real option's displayIdx by one, so this function re-checked
+            // the WRONG radio/checkbox after every click (symptom: click option 4, option
+            // 3 lights up instead — the underlying answer recorded by handleChoiceChange
+            // was always correct, only this re-highlight was reading the wrong element).
+            // Scoped to .qt-choice-list (the choice options' own wrapper) so only real
+            // option <label>s are counted.
+            const labels = document.querySelectorAll('#quiz-run-container .qt-choice-list label');
             const qType = currentQuiz.questions[currentStep].type || 'choice';
 
             if (qType === 'ordering' || qType === 'flashcard') {
