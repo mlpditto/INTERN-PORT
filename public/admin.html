@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.78)</title>
+    <title>Nika Admin (V100.79)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -4390,6 +4390,12 @@
     <!-- V96.83: vendored QR encoder (MIT, kazuhikoarase/qrcode-generator) for certificate verify QR -->
     <script src="libs/qrcode-generator.js?v=1.5.0"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- V100.79: regional-indicator flag emoji (🇹🇭🇬🇧🇰🇷ในCerts modal) render as plain
+         "TH"/"GB"/"KR" letter pairs on Windows — its emoji font has no combined-flag
+         glyphs, even though every individual regional-indicator character exists.
+         Twemoji replaces emoji characters with real flag SVGs client-side so they look
+         the same on every OS. Only the elements passed to twemoji.parse() are touched. -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/twemoji-js/14.0.2/twemoji.min.js" crossorigin="anonymous"></script>
 
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <!-- SweetAlert2 for premium modals ([Version: V87.66]) -->
@@ -53233,6 +53239,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             document.getElementById('certMenuModal').style.display = 'none';
             action();
         }
+
+        // V100.79: the LANG/YR flag emoji (🇹🇭🇬🇧🇰🇷) render as plain "TH"/"GB"/"KR"
+        // letter pairs on Windows, which has no combined-flag glyphs even though the
+        // individual regional-indicator characters exist. Twemoji swaps them for real
+        // flag SVGs so they look the same everywhere. Runs once on load — the chips are
+        // static markup, never re-rendered — scoped to certMenuModal only.
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof twemoji === 'undefined') return;
+            const el = document.getElementById('certMenuModal');
+            if (el) twemoji.parse(el, { folder: 'svg', ext: '.svg' });
+        });
 
         // V96.77: paste-a-name-list certs — same renderer + PDF loop as generateBulkCert,
         // but the recipients come from a pasted textarea instead of usersData, so no
