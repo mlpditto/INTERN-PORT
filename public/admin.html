@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.79)</title>
+    <title>Nika Admin (V100.80)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -4288,6 +4288,9 @@
         #certMenuModal .cert-menu-row:hover {
             background: #fffaf0 !important;
         }
+        #createMenuModal .create-menu-row:hover {
+            background: #f8fafc !important;
+        }
 
         /* V99.23: side-by-side review on desktop; a single reading order on mobile. */
         #reflectiveReviewModal .reflective-liquid-modal { width:calc(100% - 32px); max-width:1120px; padding:24px; overflow:hidden; }
@@ -6373,7 +6376,7 @@
                 </div>
             </div>
             <div style="display:flex; gap:8px; align-items:center; flex-wrap: wrap; justify-content: flex-end;">
-                <button class="btn-sm" onclick="openTaskModal()" title="Create New Task" style="background:#4361ee; color:white; border:none; border-radius:12px; padding:6px 16px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s; box-shadow:0 4px 10px rgba(67,97,238,0.2);" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                <button class="btn-sm" onclick="openCreateMenu()" title="Create" style="background:#4361ee; color:white; border:none; border-radius:12px; padding:6px 16px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s; box-shadow:0 4px 10px rgba(67,97,238,0.2);" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
                     ➕ <span class="hide-mobile">Create</span>
                 </button>
                 <button class="btn-sm" onclick="openArchiveModal()" title="View Archive" style="background:#1e293b; color:white; border:none; border-radius:12px; padding:6px 16px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
@@ -6770,7 +6773,10 @@
                             <span onclick="document.getElementById('section-inactive-quizzes').scrollIntoView({behavior:'smooth', block:'start'})" title="Jump to Inactive / Templates" style="color:#d97706; font-weight:900; font-size:0.75em; display:flex; align-items:center; gap:4px; cursor:pointer;">📂 Templates: <span id="stat-template-count">0</span></span>
                         </div>
                         <button id="btn-translate-all-missing" class="magic-btn" onclick="event.stopPropagation(); qtAdminOpenBackfillSelect()" style="background:linear-gradient(135deg, #d97706, #b45309); padding:10px 18px; border-radius:14px; font-weight:900; font-size:0.85em;" title="Pick which quizzes to backfill translations for (Typhoon)">🌐 Translate Missing</button>
-                        <button class="magic-btn" onclick="event.stopPropagation(); openQuizModal()" style="background:linear-gradient(135deg, #1565c0, #0d47a1); padding:10px 25px; border-radius:14px; font-weight:900;">🧪 Create Quiz</button>
+                        <!-- V100.80: "Create Quiz" moved into the global ➕ Create menu
+                             (top toolbar) alongside Task/Quest/Event — one entry point for
+                             everything creatable, per the same intent V98.63 stated when
+                             Event was merged into that modal. -->
                     </div>
 
                 </div>
@@ -11742,6 +11748,62 @@
         </div>
 
         <!-- Certificates tab removed, merged into Users -->
+
+        <!-- V100.80: one entry point for everything creatable — the "+ Create" button in
+             the top toolbar now opens this chooser instead of taskModal directly. Task /
+             Quest / Event still route into taskModal's existing tabs via openTaskModal()
+             + switchModalTab(), the same pair other flows already use to jump to a
+             specific tab (e.g. the Daily Quest draft-recall flow a few thousand lines
+             down). Quiz opens its own larger builder (quizManageModal) directly — its
+             editor is much bigger than Task/Quest/Event's single-screen forms, so
+             embedding it as a taskModal tab the way Event was merged in (V98.63) isn't
+             practical at that size; this chooser unifies the ENTRY POINT without
+             requiring that. Replaces the standalone "🧪 Create Quiz" button that lived in
+             the Quiz Engine section header. -->
+        <div id="createMenuModal" class="modal">
+            <div class="modal-content" style="max-width:480px;"><span class="close-modal"
+                    onclick="document.getElementById('createMenuModal').style.display='none'">&times;</span>
+                <h2>➕ Create</h2>
+                <div style="display:flex; flex-direction:column;">
+                    <button type="button" onclick="createMenuPick(() => openTaskModal())" class="create-menu-row"
+                        style="min-height:0; width:100%; display:flex; align-items:center; gap:14px; text-align:left; padding:14px 6px; border:none; border-bottom:1px solid #eee; border-radius:0; background:transparent; cursor:pointer;">
+                        <span style="width:40px; height:40px; border-radius:50%; background:#eef2ff; color:#4361ee; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0;"><i class="fa-solid fa-layer-group"></i></span>
+                        <span style="flex-grow:1; min-width:0;">
+                            <span style="display:block; font-size:1em; font-weight:800; color:#1e293b;">Task</span>
+                            <small style="display:block; font-weight:500; color:#64748b; font-size:0.8em; line-height:1.4; margin-top:2px;">Kanban board task การ์ดงานทั่วไป</small>
+                        </span>
+                        <span style="font-size:1.3em; color:#cbd5e1; flex-shrink:0;">›</span>
+                    </button>
+                    <button type="button" onclick="createMenuPick(() => { openTaskModal(); switchModalTab('quest'); })" class="create-menu-row"
+                        style="min-height:0; width:100%; display:flex; align-items:center; gap:14px; text-align:left; padding:14px 6px; border:none; border-bottom:1px solid #eee; border-radius:0; background:transparent; cursor:pointer;">
+                        <span style="width:40px; height:40px; border-radius:50%; background:#fff7ed; color:#d35400; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0;"><i class="fa-solid fa-scroll"></i></span>
+                        <span style="flex-grow:1; min-width:0;">
+                            <span style="display:block; font-size:1em; font-weight:800; color:#1e293b;">Quest</span>
+                            <small style="display:block; font-weight:500; color:#64748b; font-size:0.8em; line-height:1.4; margin-top:2px;">Daily Quest เควสประจำวันให้ผู้ใช้ทำ</small>
+                        </span>
+                        <span style="font-size:1.3em; color:#cbd5e1; flex-shrink:0;">›</span>
+                    </button>
+                    <button type="button" onclick="createMenuPick(() => { openTaskModal(); switchModalTab('event'); })" class="create-menu-row"
+                        style="min-height:0; width:100%; display:flex; align-items:center; gap:14px; text-align:left; padding:14px 6px; border:none; border-bottom:1px solid #eee; border-radius:0; background:transparent; cursor:pointer;">
+                        <span style="width:40px; height:40px; border-radius:50%; background:#f5f3ff; color:#7c3aed; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0;"><i class="fa-solid fa-bullhorn"></i></span>
+                        <span style="flex-grow:1; min-width:0;">
+                            <span style="display:block; font-size:1em; font-weight:800; color:#1e293b;">Event</span>
+                            <small style="display:block; font-weight:500; color:#64748b; font-size:0.8em; line-height:1.4; margin-top:2px;">Announce a date นัดหมาย/ประกาศกิจกรรม</small>
+                        </span>
+                        <span style="font-size:1.3em; color:#cbd5e1; flex-shrink:0;">›</span>
+                    </button>
+                    <button type="button" onclick="createMenuPick(() => openQuizModal())" class="create-menu-row"
+                        style="min-height:0; width:100%; display:flex; align-items:center; gap:14px; text-align:left; padding:14px 6px; border:none; border-bottom:none; border-radius:0; background:transparent; cursor:pointer;">
+                        <span style="width:40px; height:40px; border-radius:50%; background:#e3f2fd; color:#1565c0; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0;"><i class="fa-solid fa-flask"></i></span>
+                        <span style="flex-grow:1; min-width:0;">
+                            <span style="display:block; font-size:1em; font-weight:800; color:#1e293b;">Quiz</span>
+                            <small style="display:block; font-weight:500; color:#64748b; font-size:0.8em; line-height:1.4; margin-top:2px;">Build a new quiz สร้างแบบทดสอบใหม่</small>
+                        </span>
+                        <span style="font-size:1.3em; color:#cbd5e1; flex-shrink:0;">›</span>
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <div id="taskModal" class="modal">
             <div class="modal-content" style="max-width:1000px; width: 95%;">
@@ -50593,6 +50655,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function updateRealtimeTimers() { const now = Date.now(); document.querySelectorAll('.timer-global').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if (diff <= 0) el.innerText = "⏳ Expired"; else { const h = Math.floor(diff / 3600000); const m = Math.floor((diff % 3600000) / 60000); el.innerText = `⏳ Ends: ${h}h ${m}m`; } }); document.querySelectorAll('.timer-active').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if (diff <= 0) { el.innerText = "⏱️ Time Up!"; const card = el.closest('.kanban-card'); if (card && card.parentElement.id === 'Doing') { db.collection("side_quests").doc(card.dataset.id).update({ status: 'Review' }); } } else { const m = Math.floor(diff / 60000); const s = Math.floor((diff % 60000) / 1000); el.innerText = `⏱️ ${m}m ${s}s`; } }); document.querySelectorAll('.timer-cooldown').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if (diff <= 0) el.innerText = "❄️ Ready"; else { const m = Math.floor(diff / 60000); const s = Math.floor((diff % 60000) / 1000); el.innerText = `❄️ Cool: ${m}m ${s}s`; } }); updateQuestTimers(); }
         function startDeleteCard(id) { deleteCardId = id; document.getElementById('delCardModal').style.display = 'block'; const btn = document.getElementById('btn-del-card-confirm'); btn.disabled = false; btn.style.background = '#ef233c'; let c = 5; btn.innerText = `Confirm (${c})`; if (deleteTimer) clearInterval(deleteTimer); deleteTimer = setInterval(() => { c--; btn.innerText = `Confirm (${c})`; if (c <= 0) { clearInterval(deleteTimer); document.getElementById('delCardModal').style.display = 'none'; showToast("Cancelled"); } }, 1000); btn.onclick = executeDeleteCard; }
         async function executeDeleteCard() { if (!deleteCardId) return; clearInterval(deleteTimer); document.getElementById('delCardModal').style.display = 'none'; const deduct = confirm("Deduct points from assignee?\nOK=Deduct, Cancel=No"); try { const q = sideQuestsCache[deleteCardId]; const b = db.batch(); if (deduct && q.assigneeIds) { const s = prompt("Points to deduct (e.g., 0.5):"); if (s) { q.assigneeIds.forEach(u => { b.update(db.collection("users").doc(u), { score: firebase.firestore.FieldValue.increment(-parseFloat(s)) }); b.set(db.collection("checkin_logs").doc(), { userId: u, type: 'manual_adjust', amount: -parseFloat(s), note: `Del: ${q.title}`, timestamp: firebase.firestore.FieldValue.serverTimestamp() }); }); } } b.delete(db.collection("side_quests").doc(deleteCardId)); await b.commit(); showToast("Deleted!"); } catch (e) { alert(e.message); } }
+        // V100.80: single entry point for everything creatable — see the markup comment
+        // above #createMenuModal for why Task/Quest/Event route into taskModal's
+        // existing tabs while Quiz opens its own builder directly.
+        function openCreateMenu() {
+            document.getElementById('createMenuModal').style.display = 'block';
+        }
+        function createMenuPick(action) {
+            document.getElementById('createMenuModal').style.display = 'none';
+            action();
+        }
         function openTaskModal(id = null) {
             document.getElementById('taskModal').style.display = 'block';
             switchModalTab('task'); // Default to Task tab
