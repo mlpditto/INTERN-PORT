@@ -14,7 +14,16 @@
     window.openQuizMerge = function(ids) {
         if(ids.length<2)return showToast('Select at least two quizzes');
         if(ids.length>100)return showToast('Select at most 100 quizzes');
-        const dialog=el('dialog');dialog.id='quiz-merge-dialog';dialog.style.cssText='width:min(640px,90vw);max-height:85vh;overflow:auto;border:1px solid #cbd5e1;border-radius:16px;padding:24px;color:#334155';
+        const dialog=el('dialog');dialog.id='quiz-merge-dialog';
+        // V100.81: lang-toggle.js auto-wraps any Thai run in this dialog's dynamically-
+        // built source rows (titleOf(s)) in <span class="lang-th">, hidden by default
+        // (admin.html:179 .lang-th{display:none}) until the TH toggle is on — a
+        // Thai-only quiz title rendered as a blank row here, same bug class as 30+
+        // other admin surfaces (see feedback_lang_toggle_thai_blank memory). This
+        // dialog is a fresh document.body.append() overlay, exactly the "runtime-built
+        // overlay lacking the class" pattern that keeps recurring — shield it.
+        dialog.classList.add('lang-no-toggle');
+        dialog.style.cssText='width:min(640px,90vw);max-height:85vh;overflow:auto;border:1px solid #cbd5e1;border-radius:16px;padding:24px;color:#334155';
         dialog.innerHTML=`<h3>🔀 Merge quizzes</h3>
         <section class="qm-step"><h4>1 · 📝 Name your quiz</h4><label for="qm-title">New quiz title</label><input id="qm-title" maxlength="200" value="Merged quiz" title="ตั้งชื่อชุดข้อสอบใหม่"><div id="qm-title-options" role="group" aria-label="Use a source quiz title"></div></section>
         <section class="qm-step"><h4>2 · 📚 Arrange sources</h4><p class="qm-hint" title="เรียงข้อสอบตามลำดับชุดด้านล่าง ใช้ลูกศรเพื่อเลื่อนชุด">Questions follow this order.</p><div id="qm-sources"></div></section>
