@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.88)</title>
+    <title>Nika Admin (V100.89)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -17400,6 +17400,16 @@
                 resultDiv.style = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:90%; max-width:850px; max-height:85vh; background:white; padding:30px; border-radius:30px; box-shadow:0 20px 60px rgba(0,0,0,0.3); z-index:10001; overflow-y:auto; font-family:'Inter', sans-serif; border: 1px solid #eee;";
                 
                 window._aiAnalysisItems = result.items || [];
+                // V100.89: the batch call has no per-item retry, so flag (don't drop) any
+                // item whose improvedQuestion is syntactically-valid-but-corrupt JSON (e.g.
+                // schema field names leaking into "options") — previewAiFix reads this flag
+                // to disable Apply/Add for just that item instead of the whole batch.
+                window._aiAnalysisItems.forEach(it => {
+                    if (it && it.improvedQuestion) {
+                        const shapeCheck = window._validateAiQuestionShape(it.improvedQuestion);
+                        it._shapeInvalid = shapeCheck.ok ? null : shapeCheck.error;
+                    }
+                });
                 window._aiAnalysisText = analysis;
                 window._aiOriginalQsJson = qDataJson;
                 // V93.30: persist model used so the Quality Improvement Comparison modal
@@ -17449,8 +17459,13 @@
                                         .replace(/\\/g, '\\\\')
                                         .replace(/'/g, "\\'")
                                         .replace(/"/g, '&quot;');
+                                    // V100.89: this card's Fix button applies improvedQuestion
+                                    // directly, bypassing the Compare modal entirely — flag it
+                                    // here too, not just there, so a malformed suggestion (schema
+                                    // leakage into "options") is visible before the click, not after.
+                                    const shapeInvalid = item._shapeInvalid;
                                     return `
-                                        <div id="ai-fix-card-${arrIdx}" style="background:#fcfdff; border:1.5px solid #edf2f7; border-radius:15px; padding:15px; border-left:5px solid #4361ee; transition: all 0.3s ease; width: 100%; box-sizing: border-box;">
+                                        <div id="ai-fix-card-${arrIdx}" style="background:#fcfdff; border:1.5px solid #edf2f7; border-radius:15px; padding:15px; border-left:5px solid ${shapeInvalid ? '#ef4444' : '#4361ee'}; transition: all 0.3s ease; width: 100%; box-sizing: border-box;">
                                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap: wrap; gap: 8px;">
                                                 <b style="color:#2d3748; font-size: 1.1em;">Question ${qIdx + 1} Improvement</b>
                                                 <div style="display:flex; gap:6px; align-items: center;">
@@ -17462,8 +17477,8 @@
                                                         onclick="previewAiFix(${qIdx}, ${arrIdx})">
                                                         <i class="fa-solid fa-code-compare"></i> Compare
                                                     </button>
-                                                    <button class="btn-sm" style="background:#22c55e; color:white; border:none; padding:6px 12px; border-radius:8px; font-weight:bold; font-size:0.75em; cursor: pointer;"
-                                                        onclick="applySingleAiFix(${qIdx}, '${improvedJson}', ${arrIdx})" id="btn-fix-ai-${arrIdx}">
+                                                    <button class="btn-sm" style="background:${shapeInvalid ? '#cbd5e1' : '#22c55e'}; color:${shapeInvalid ? '#64748b' : 'white'}; border:none; padding:6px 12px; border-radius:8px; font-weight:bold; font-size:0.75em; cursor: ${shapeInvalid ? 'not-allowed' : 'pointer'};"
+                                                        onclick="applySingleAiFix(${qIdx}, '${improvedJson}', ${arrIdx})" id="btn-fix-ai-${arrIdx}" ${shapeInvalid ? 'disabled title="Malformed — regenerate first"' : ''}>
                                                         Fix
                                                     </button>
                                                     <button class="btn-sm" style="background:rgba(239,68,68,0.12); color:#dc2626; border:none; padding:6px 10px; border-radius:8px; font-weight:bold; font-size:0.75em; cursor: pointer;"
@@ -17472,6 +17487,7 @@
                                                     </button>
                                                 </div>
                                             </div>
+                                            ${shapeInvalid ? `<div style="font-size:0.88em; color:#b91c1c; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.22); border-radius:10px; padding:8px 10px; margin-bottom:10px;"><i class="fa-solid fa-triangle-exclamation"></i> Malformed AI output: ${escapeHtml(shapeInvalid)}</div>` : ''}
                                             <div style="font-size:0.95em; color:#4a5568; margin-bottom:10px; line-height: 1.5;">
                                                 <b style="color: #ef4444;"><i class="fa-solid fa-circle-exclamation"></i> Issue:</b> ${item.issue}
                                             </div>
@@ -58730,6 +58746,40 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             return { diffs, hasMeaningfulDiff: diffs.length > 0 };
         };
 
+        // V100.89: shared shape guard for any AI-generated "improved question" object,
+        // called right after safeJsonParse succeeds at every AI-improve call site
+        // (regenerate / Model B / merge / full-quiz analyze). Introduced after a model
+        // returned syntactically-valid JSON whose "options" array had spilled over with
+        // literal schema-key fragments ("correct", "[1]", "timer", "60", "explanation")
+        // instead of stopping at the real answer choices — safeJsonParse alone can't
+        // catch this because the JSON parses fine, it's just semantically corrupt.
+        window._validateAiQuestionShape = function(q) {
+            if (!q || typeof q !== 'object') return { ok: false, error: 'AI response is not an object.' };
+            const type = q.type || 'choice';
+            if (type !== 'choice') return { ok: true };
+            const options = Array.isArray(q.options) ? q.options : null;
+            if (!options || options.length < 2) {
+                return { ok: false, error: 'Fewer than 2 options returned.' };
+            }
+            if (options.length > 8) {
+                return { ok: false, error: `Suspiciously many options (${options.length}) — likely schema leakage. First few: ${JSON.stringify(options.slice(0, 6))}` };
+            }
+            const RESERVED = new Set(['correct', 'timer', 'explanation', 'suggestion', 'options', 'type', 'tags', 'content']);
+            const leaked = options.find(opt => {
+                const t = String(opt == null ? '' : opt).trim().toLowerCase();
+                return RESERVED.has(t) || /^\[\s*\d+(\s*,\s*\d+)*\s*\]$/.test(t);
+            });
+            if (leaked !== undefined) {
+                return { ok: false, error: `An option literally matches a JSON field name ("${leaked}") — the AI likely broke out of the options array mid-generation.` };
+            }
+            const correct = (Array.isArray(q.correct) ? q.correct : (q.correct !== undefined && q.correct !== null ? [q.correct] : []))
+                .map(Number).filter(n => Number.isInteger(n));
+            if (!correct.length || correct.some(i => i < 0 || i >= options.length)) {
+                return { ok: false, error: `Answer key out of range (correct=${JSON.stringify(q.correct)} for ${options.length} options).` };
+            }
+            return { ok: true };
+        };
+
         // V96.36: resolve an _aiAnalysisItems entry's quiz-question index, mirroring the
         // same fallback chain the Individual Improvements list uses (qNumber-1 → index → 0),
         // clamped to the current form. Single source for the compare-modal Prev/Next nav.
@@ -58879,7 +58929,7 @@ ${steerBlock}
                 const instruction = window._compareInstruction(item);
                 item.compareInstruction = instruction;
                 const prompt = window._buildSingleQImprovePrompt(originalQ, item.issue, item.suggestion, instruction);
-                let parsed = null, actual = modelB, raw = '', lastError = null;
+                let parsed = null, actual = modelB, raw = '', lastError = null, shapeError = null;
                 for (let attempt = 1; attempt <= 2; attempt++) {
                     // callUniversalAI throws when the server itself flags the response
                     // (e.g. "Model returned incomplete or invalid output." — usually a
@@ -58890,8 +58940,15 @@ ${steerBlock}
                     try {
                         const r = await callUniversalAI(modelB, prompt, true, null, '', { feature: 'quiz_2model_compare', maxOutputTokens: 8192 });
                         raw = r.text; actual = r.model || modelB;
-                        parsed = safeJsonParse(raw);
-                        if (parsed) break;
+                        const candidate = safeJsonParse(raw);
+                        if (candidate) {
+                            // V100.89: valid JSON can still be a semantically corrupt question
+                            // (schema leakage into "options") — retry the same as a parse failure.
+                            const shapeCheck = window._validateAiQuestionShape(candidate);
+                            if (shapeCheck.ok) { parsed = candidate; break; }
+                            shapeError = shapeCheck.error;
+                            console.warn('[generateAiProposalB] attempt', attempt, 'malformed question shape:', shapeError);
+                        }
                     } catch (attemptErr) {
                         lastError = attemptErr;
                     }
@@ -58899,7 +58956,9 @@ ${steerBlock}
                 if (!parsed) {
                     throw (lastError && !raw)
                         ? lastError
-                        : new Error('Model B returned invalid JSON. First 200 chars: ' + String(raw || '').slice(0, 200));
+                        : new Error(shapeError
+                            ? ('Model B returned malformed question data: ' + shapeError)
+                            : ('Model B returned invalid JSON. First 200 chars: ' + String(raw || '').slice(0, 200)));
                 }
                 item.improvedQuestionB = parsed;
                 item.improvedQuestionBModel = actual;
@@ -58958,29 +59017,34 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
 {"q":"...","options":["..."],"correct":[0],"explanation":"...","suggestion":"..."}`;
 
                 const model = document.getElementById('ai-analyzer-model-val')?.value || window._aiAnalysisModel || 'gemini-3.8-flash';
-                let parsed = null, actual = model, raw = '';
+                let parsed = null, actual = model, raw = '', shapeError = null;
                 for (let attempt = 1; attempt <= 2; attempt++) {
                     const r = await callUniversalAI(model, prompt, true, null, '', { feature: 'quiz_merge_versions', maxOutputTokens: 8192 });
                     raw = r.text; actual = r.model || model;
-                    parsed = safeJsonParse(raw);
-                    if (parsed) break;
-                    if (attempt === 1) console.warn('[mergeAiVersions] attempt 1 non-JSON, retrying. Snippet:', String(raw || '').slice(0, 200));
+                    const candidate = safeJsonParse(raw);
+                    if (candidate) {
+                        // The answer key is the one thing a merge can silently corrupt — options
+                        // come from two different arrays, so an index copied from either input can
+                        // point at the wrong choice. Also catches schema leakage into "options"
+                        // (V100.89) — either way, reject rather than apply a broken question, and
+                        // retry the same as a parse failure.
+                        const shapeCheck = window._validateAiQuestionShape(candidate);
+                        if (shapeCheck.ok) { parsed = candidate; break; }
+                        shapeError = shapeCheck.error;
+                        console.warn('[mergeAiVersions] attempt', attempt, 'malformed question shape:', shapeError);
+                    } else if (attempt === 1) {
+                        console.warn('[mergeAiVersions] attempt 1 non-JSON, retrying. Snippet:', String(raw || '').slice(0, 200));
+                    }
                 }
-                if (!parsed) throw new Error('Merge returned invalid JSON. First 200 chars: ' + String(raw || '').slice(0, 200));
+                if (!parsed) {
+                    throw new Error(shapeError
+                        ? ('Merge returned malformed question data: ' + shapeError)
+                        : ('Merge returned invalid JSON. First 200 chars: ' + String(raw || '').slice(0, 200)));
+                }
 
-                // The answer key is the one thing a merge can silently corrupt — options come
-                // from two different arrays, so an index copied from either input can point
-                // at the wrong choice. Reject rather than apply a mis-keyed question.
                 const mergedOptions = Array.isArray(parsed.options) ? parsed.options.map(o => String(o == null ? '' : o)) : [];
                 const mergedCorrect = (Array.isArray(parsed.correct) ? parsed.correct : [parsed.correct])
                     .map(Number).filter(n => Number.isInteger(n));
-                const typeIsChoice = (parsed.type || originalQ.type || 'choice') === 'choice';
-                if (typeIsChoice) {
-                    if (mergedOptions.length < 2) throw new Error('Merge returned fewer than 2 options — regenerate.');
-                    if (!mergedCorrect.length || mergedCorrect.some(i => i < 0 || i >= mergedOptions.length)) {
-                        throw new Error(`Merge returned an out-of-range answer key (correct=${JSON.stringify(parsed.correct)} for ${mergedOptions.length} options) — regenerate.`);
-                    }
-                }
 
                 item.mergedQuestion = { ...parsed, options: mergedOptions, correct: mergedCorrect };
                 item.mergedQuestionModel = actual;
@@ -59852,7 +59916,13 @@ RULES:
 
                 const diffState = window.getAiImprovementDiffState(currentQ, improvedQ);
                 const diffs = diffState.diffs;
-                const canApplyImprovement = diffState.hasMeaningfulDiff;
+                // V100.89: the batch analyzer has no per-item retry, so a malformed
+                // improvedQuestion (schema leakage into "options" — see
+                // window._validateAiQuestionShape) can reach here still flagged via
+                // item._shapeInvalid. Re-check live too, so regenerate/Model B/merge
+                // results (already validated at generation) and batch items share one gate.
+                const shapeCheck = window._validateAiQuestionShape(improvedQ);
+                const canApplyImprovement = diffState.hasMeaningfulDiff && shapeCheck.ok;
                 // V97.28: free in-set duplication pass — runs on every open, zero tokens,
                 // silent when clean. Stored on window so the Add-as-New guard can read it.
                 const dupCandidates = [
@@ -59864,9 +59934,11 @@ RULES:
                 window._compareDupHits = window.scanQuizSetDup(index, dupCandidates);
                 const dupChipsHtml = window._quizSetDupChipsHtml(window._compareDupHits);
                 const diffHtml = diffs.map(d => `<span style="background:rgba(99,102,241,0.1); color:#4338ca; padding:4px 12px; border-radius:20px; font-size:0.75em; font-weight:800; border:1px solid rgba(99,102,241,0.2);">${d}</span>`).join('');
-                const statusHtml = canApplyImprovement
-                    ? diffHtml
-                    : '<span style="background:rgba(239,68,68,0.10); color:#b91c1c; padding:6px 12px; border-radius:20px; font-size:0.75em; font-weight:800; border:1px solid rgba(239,68,68,0.22);">No meaningful difference detected</span><span style="color:#64748b; font-size:0.75em;">Please regenerate before applying this fix.</span>';
+                const statusHtml = !shapeCheck.ok
+                    ? `<span style="background:rgba(239,68,68,0.10); color:#b91c1c; padding:6px 12px; border-radius:20px; font-size:0.75em; font-weight:800; border:1px solid rgba(239,68,68,0.22);">⚠️ Malformed AI output</span><span style="color:#64748b; font-size:0.75em;">${escapeHtml(shapeCheck.error)} — please regenerate.</span>`
+                    : canApplyImprovement
+                        ? diffHtml
+                        : '<span style="background:rgba(239,68,68,0.10); color:#b91c1c; padding:6px 12px; border-radius:20px; font-size:0.75em; font-weight:800; border:1px solid rgba(239,68,68,0.22);">No meaningful difference detected</span><span style="color:#64748b; font-size:0.75em;">Please regenerate before applying this fix.</span>';
                 // V93.30: chip showing which AI produced this comparison. Was its own
                 // pattern-matching copy of window._aiAnalysisModel → label/emoji/color;
                 // V97.32 folds it into the single canonical _compareModelMeta (used by
@@ -60121,6 +60193,14 @@ RULES:
         window.applySingleAiFix = function(index, improvedArg, arrIdx, modelLabel) {
             try {
                 const { improvedQ, allQs } = getImprovedQuestionPayload(index, improvedArg);
+                // V100.89: the write point itself, so every entry path (Compare modal's
+                // Apply, the analysis list's direct Fix button, 2-model B, Merge) is
+                // guarded the same way regardless of which one was used to get here.
+                const shapeCheck = window._validateAiQuestionShape(improvedQ);
+                if (!shapeCheck.ok) {
+                    alert('This AI suggestion is malformed and was not applied: ' + shapeCheck.error + '\n\nPlease regenerate.');
+                    return false;
+                }
                 const diffState = window.getAiImprovementDiffState(allQs[index], improvedQ);
                 if (!diffState.hasMeaningfulDiff) {
                     alert("This improved version is still too similar to the original. Please regenerate a different fix first.");
@@ -60178,6 +60258,12 @@ RULES:
         window.addSingleAiAsNewQuestion = async function(index, improvedArg) {
             try {
                 const { improvedQ, allQs } = getImprovedQuestionPayload(index, improvedArg);
+                // V100.89: same write-point guard as applySingleAiFix — this is a separate
+                // insert path (new question, not a replace), so it needs its own check.
+                const shapeCheck = window._validateAiQuestionShape(improvedQ);
+                if (!shapeCheck.ok) {
+                    return alert('This AI suggestion is malformed and was not added: ' + shapeCheck.error + '\n\nPlease regenerate.');
+                }
                 const diffState = window.getAiImprovementDiffState(allQs[index], improvedQ);
                 if (!diffState.hasMeaningfulDiff) {
                     return alert("This improved version is still too similar to the original. Please regenerate a different fix first.");
@@ -60360,6 +60446,10 @@ RULES:
                 // V92.35: use shared safeJsonParse with bracket-extraction fallback
                 const newSuggestion = safeJsonParse(resultJson);
                 if (!newSuggestion) throw new Error('AI returned invalid JSON. First 200 chars: ' + String(resultJson || '').slice(0, 200));
+                // V100.89: safeJsonParse can succeed on JSON that's syntactically valid but
+                // semantically corrupt (e.g. schema field names leaking into "options").
+                const shapeCheck = window._validateAiQuestionShape(newSuggestion);
+                if (!shapeCheck.ok) throw new Error('AI returned malformed question data: ' + shapeCheck.error);
                 const diffState = window.getAiImprovementDiffState(originalQ, newSuggestion);
                 if (!diffState.hasMeaningfulDiff) {
                     throw new Error("AI returned an almost identical version. Please regenerate again.");
