@@ -327,7 +327,8 @@
         .reflective-review-quill .ql-editor { min-height:84px; max-height:240px; overflow-y:auto; }
         /* --- [V91.41] AI Focus pills + Bonus quick chips --- */
         .reflective-focus-pills { display:flex; flex-wrap:wrap; gap:4px; padding:5px; border-radius:14px; background:linear-gradient(180deg, rgba(255,255,255,0.68) 0%, rgba(241,245,249,0.55) 100%); border:1px solid rgba(226,232,240,0.92); box-shadow:inset 0 1px 0 rgba(255,255,255,0.7); }
-        .reflective-focus-pill { border:0; background:transparent; color:#64748b; padding:4px 8px; border-radius:9px; font-size:0.68em; font-weight:800; letter-spacing:0.01em; cursor:pointer; transition:transform 0.15s ease, background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease; white-space:nowrap; flex:0 0 auto; }
+        .reflective-focus-pill { border:0; background:transparent; color:#64748b; padding:4px 8px; border-radius:9px; font-size:0.68em; font-weight:800; letter-spacing:0.01em; cursor:pointer; transition:transform 0.15s ease, background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease; white-space:nowrap; flex:0 0 auto; position:relative; }
+        .focus-pill-badge { position:absolute; top:-6px; right:-4px; min-width:15px; height:15px; padding:0 3px; border-radius:999px; background:#dc2626; color:#fff; font-size:0.62em; font-weight:900; line-height:15px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.25); pointer-events:none; }
         .reflective-focus-pill:hover { color:#1e293b; transform:translateY(-1px); background:rgba(255,255,255,0.55); }
         .reflective-focus-pill.active { background:linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,247,237,0.9) 100%); color:#9a3412; box-shadow:0 6px 14px rgba(245,158,11,0.18), inset 0 1px 0 rgba(255,255,255,0.85); }
         .reflective-bonus-chips { display:flex; gap:6px; margin-top:8px; }
@@ -19283,7 +19284,31 @@ RULES:
                 const label = useThai ? pill.dataset.th : pill.dataset.en;
                 if (label) pill.textContent = label;
             });
+            // pill.textContent above wipes out any badge <span> the count tally added --
+            // re-render it from the last computed counts so it survives a language toggle.
+            if (typeof window.updateFocusPillBadges === 'function') window.updateFocusPillBadges(window._reflectiveFocusPresetCounts || {});
             applyReflectiveRewriteChipsLanguage(lang);
+        };
+
+        // How many of the last 5 reflections (for the student currently open) used each AI
+        // Focus preset -- lets the admin see at a glance which focus is overused and pick a
+        // different one for variety. Counts come from renderReflectiveHistoryStrip.
+        window.updateFocusPillBadges = function(counts) {
+            window._reflectiveFocusPresetCounts = counts || {};
+            document.querySelectorAll('#reflective-focus-pills .reflective-focus-pill').forEach(pill => {
+                const n = window._reflectiveFocusPresetCounts[pill.dataset.value] || 0;
+                let badge = pill.querySelector('.focus-pill-badge');
+                if (n > 0) {
+                    if (!badge) {
+                        badge = document.createElement('span');
+                        badge.className = 'focus-pill-badge';
+                        pill.appendChild(badge);
+                    }
+                    badge.textContent = n;
+                } else if (badge) {
+                    badge.remove();
+                }
+            });
         };
 
         // --- [V91.42] Quick rewrite chips: handlers ---
@@ -19679,6 +19704,7 @@ RULES:
             if (!strip || !cards || !uid) return;
             if (!Array.isArray(window.reflectiveLogsCache) || reflectiveLogsCache.length === 0) {
                 strip.style.display = 'none';
+                if (typeof window.updateFocusPillBadges === 'function') window.updateFocusPillBadges({});
                 return;
             }
             const history = reflectiveLogsCache
@@ -19687,8 +19713,14 @@ RULES:
                 .slice(0, 5);
             if (history.length === 0) {
                 strip.style.display = 'none';
+                if (typeof window.updateFocusPillBadges === 'function') window.updateFocusPillBadges({});
                 return;
             }
+            // Tally how many of these 5 recent reviews used each AI Focus preset, so the
+            // chip rail can badge overused presets and nudge the admin toward variety.
+            const presetCounts = {};
+            history.forEach(l => { if (l.feedbackPreset) presetCounts[l.feedbackPreset] = (presetCounts[l.feedbackPreset] || 0) + 1; });
+            if (typeof window.updateFocusPillBadges === 'function') window.updateFocusPillBadges(presetCounts);
             const moodMap = { happy: '😊', normal: '😐', sad: '😔', tired: '😫' };
             const escapeHtml = (s) => String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
             countEl.textContent = `(${history.length})`;
@@ -58109,6 +58141,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     adminComment: comment,
                     adminCommentHtml: commentHtml || '',
                     adminBonus: bonus,
+                    feedbackPreset: document.getElementById('ai-preset-review')?.value || null,
                     reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     pointsClaimed: false // 🔥 User must claim the points
                 };
