@@ -18786,6 +18786,26 @@ RULES:
         };
 
         window.showAiSuggestionsPopup = function(suggestions) {
+            // safeJsonParse's fallback tries {...} extraction before [...] extraction
+            // (V92.35). When the model returns (or gets truncated down to) a single
+            // question instead of the requested array, that fallback happily parses
+            // one bare {...} object and never reaches the array branch — suggestions
+            // then arrives here as an object, not an array, and .map() below threw
+            // "suggestions.map is not a function". Normalize once, here, since both
+            // callers (suggestMoreQuestionsAI, regenerateSuggestions) share this popup.
+            if (!Array.isArray(suggestions)) {
+                if (suggestions && typeof suggestions === 'object') {
+                    const wrapped = suggestions.questions || suggestions.suggestions || suggestions.items;
+                    suggestions = Array.isArray(wrapped) ? wrapped : [suggestions];
+                } else {
+                    suggestions = [];
+                }
+            }
+            if (suggestions.length === 0) {
+                alert('Suggestion error: AI returned no usable questions.');
+                return;
+            }
+
             const resultDiv = document.createElement('div');
             resultDiv.id = "ai-suggestions-popup";
             // V96.92: AI-written stems/options/explanations are injected at runtime, so
