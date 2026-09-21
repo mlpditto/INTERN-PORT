@@ -33898,7 +33898,13 @@ RULES:
             container.append(label);
 
             allGroups.forEach(g => {
-                const count = g === 'All' ? usersData.length : usersData.filter(u => (u.group || 'Public') === g).length;
+                // "All" is the raw headcount; a specific group excludes isIgnored
+                // (camp cohorts kept out of leaderboards/stats, per V96.75) and
+                // isPreReg (not yet registered) users, matching the convention
+                // used by the leaderboard and the Target Group card picker.
+                const count = g === 'All'
+                    ? usersData.length
+                    : usersData.filter(u => (u.group || 'Public') === g && !u.isIgnored && !u.isPreReg).length;
                 const isActive = g === activeBoardGroup;
                 const color = g === 'All' ? '#64748b' : (groupColorMap[g] || '#64748b');
                 const chip = document.createElement('button');
@@ -33938,7 +33944,7 @@ RULES:
 
             const group = activeBoardGroup;
             const users = (usersData || [])
-                .filter(u => group === 'All' || (u.group || 'Public') === group)
+                .filter(u => group === 'All' || ((u.group || 'Public') === group && !u.isIgnored && !u.isPreReg))
                 .slice()
                 .sort((a, b) => (a.fullName || a.displayName || '').localeCompare(b.fullName || b.displayName || '', 'th'));
 
