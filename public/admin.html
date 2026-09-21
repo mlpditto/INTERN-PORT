@@ -4353,10 +4353,8 @@
         #dashboard-summary #quiz-coverage-panel { margin-top:0!important; }
         #dashboard-summary #line-usage-breakdown { margin-left:0!important; overflow-wrap:anywhere; }
         #board-group-tabs { flex-wrap:wrap; align-items:center; overflow-x:visible!important; }
-        #board-group-tabs label { flex:0 0 auto; font-size:13px; font-weight:600; margin:0; }
-        #board-group-select { width:auto; flex:0 1 auto; min-width:0; margin:0; max-width:calc(100% - 58px); min-height:44px; padding:8px 12px; border:1px solid #cbd5e1; border-radius:10px; background:var(--card-bg, #fff); color:inherit; font:inherit; }
         #board-group-tabs button { min-height:44px; padding:8px 14px; border:1px solid #c7d2fe; border-radius:10px; background:#eef2ff; color:#4338ca; cursor:pointer; }
-        #board-group-select:focus-visible, #board-group-tabs button:focus-visible { outline:2px solid #6366f1; outline-offset:2px; }
+        #board-group-tabs button:focus-visible { outline:2px solid #6366f1; outline-offset:2px; }
         #dashboard-work .kanban-board { grid-template-columns:repeat(2,minmax(0,1fr)); min-height:0!important; }
         #dashboard-work .kanban-board.cols-1 { grid-template-columns:minmax(0,1fr); }
         #dashboard-summary .qcov-extra { display:none!important; }
@@ -6618,6 +6616,19 @@
                         </div>
 
                         <!-- Quests management moved to bottom of Kanban -->
+                    </div>
+
+                    <!-- Per-user Quiz/Journal/Case status for the group selected via
+                         #board-group-tabs (shared with the Quest kanban below). Quiz
+                         Coverage and LINE usage in #dashboard-summary stay global —
+                         neither is linked to a user group in the data model, so they
+                         don't react to this filter. Populated by renderGroupUsersPanel(). -->
+                    <div id="group-users-panel" style="margin-top:14px; border:1px solid #eef2ff; border-radius:12px; background:#fff; padding:14px 16px;">
+                        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+                            <span id="group-users-title" class="lang-no-toggle" style="font-weight:700; color:#1f2937; font-size:0.92em;">Users</span>
+                            <span style="font-size:0.72em; color:#94a3b8;">Quiz · Journal · Case</span>
+                        </div>
+                        <div id="group-users-list" class="lang-no-toggle" style="margin-top:10px; display:flex; flex-direction:column; gap:2px; max-height:360px; overflow-y:auto;"></div>
                     </div>
 
 
@@ -32197,6 +32208,7 @@ RULES:
             db.collection("cases").orderBy("timestamp", "desc").limit(200).onSnapshot(s => {
                 casesData = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderAlabastaCases();
+                renderGroupUsersPanel();
             }, e => {
                 console.error("🔥 [Firestore Error] cases:", e);
                 if (e.code === 'permission-denied') {
@@ -32220,6 +32232,7 @@ RULES:
                 if (typeof refreshHubHeaderIfOpen === 'function') refreshHubHeaderIfOpen(); // V98.45
                 renderUserGroupTabs();
                 renderBoardGroupTabs();
+                renderGroupUsersPanel();
                 renderTable('users');
                 renderLeaderboard();
                 updateAssigneeList();
@@ -32818,6 +32831,7 @@ RULES:
                 // 3. Refresh UI
                 renderQuizzes();
                 if (!hideCompletedWorks) renderTable('works');
+                renderGroupUsersPanel();
             });
             // 🔥 Feature: Load Poll Responses for Works Table
             db.collection("poll_responses").orderBy("timestamp", "desc").limit(50).onSnapshot(s => {
@@ -33867,6 +33881,8 @@ RULES:
             }).join('');
         }
 
+        // Chip rail (house style — chips over dropdowns). Was a <select> + Reset
+        // button; the "All" chip now serves as the reset, so Reset is gone.
         function renderBoardGroupTabs() {
             const container = document.getElementById('board-group-tabs');
             if (!container) return;
@@ -33874,37 +33890,31 @@ RULES:
             const allGroups = ['All', ...groups];
 
             container.replaceChildren();
-            const label = document.createElement('label');
-            label.htmlFor = 'board-group-select';
+            container.classList.add('lang-no-toggle');
+
+            const label = document.createElement('span');
             label.textContent = 'Group:';
-            const select = document.createElement('select');
-            select.id = 'board-group-select';
-            select.title = 'กรองงานตามกลุ่มผู้ใช้ ตัวเลขคือจำนวนผู้ใช้ ไม่ใช่จำนวนงานค้าง';
+            label.style.cssText = 'font-size:0.78em; font-weight:700; color:#64748b; margin-right:2px;';
+            container.append(label);
+
             allGroups.forEach(g => {
                 const count = g === 'All' ? usersData.length : usersData.filter(u => (u.group || 'Public') === g).length;
-                const option = document.createElement('option');
-                option.value = g;
-                option.textContent = `${g} · ${count} users`;
-                option.selected = g === activeBoardGroup;
-                select.append(option);
-            });
-            select.onchange = () => {
-                setBoardGroupFilter(select.value);
-                document.getElementById('board-group-select')?.focus();
-            };
-            container.classList.add('lang-no-toggle');
-            container.append(label, select);
-            if (activeBoardGroup !== 'All') {
-                const reset = document.createElement('button');
-                reset.type = 'button';
-                reset.textContent = 'Reset';
-                reset.title = 'แสดงงานทุกกลุ่ม';
-                reset.onclick = () => {
-                    setBoardGroupFilter('All');
-                    document.getElementById('board-group-select')?.focus();
+                const isActive = g === activeBoardGroup;
+                const color = g === 'All' ? '#64748b' : (groupColorMap[g] || '#64748b');
+                const chip = document.createElement('button');
+                chip.type = 'button';
+                chip.setAttribute('aria-pressed', String(isActive));
+                chip.title = 'กรองตามกลุ่มผู้ใช้ ตัวเลขคือจำนวนผู้ใช้ ไม่ใช่จำนวนงานค้าง';
+                chip.textContent = `${g} · ${count}`;
+                chip.style.cssText = isActive
+                    ? `border:1px solid ${color}; border-radius:14px; padding:5px 12px; font-size:0.78em; font-weight:700; background:${color}; color:#fff; cursor:pointer; white-space:nowrap;`
+                    : `border:1px solid #e2e8f0; border-radius:14px; padding:5px 12px; font-size:0.78em; font-weight:600; background:#f8fafc; color:#475569; cursor:pointer; white-space:nowrap;`;
+                chip.onclick = () => {
+                    setBoardGroupFilter(g);
+                    chip.focus();
                 };
-                container.append(reset);
-            }
+                container.append(chip);
+            });
         }
 
         function setBoardGroupFilter(group) {
@@ -33912,6 +33922,68 @@ RULES:
             renderBoardGroupTabs();
             drawKanban();
             renderAlabastaCases();
+            renderGroupUsersPanel();
+        }
+
+        // Per-user Quiz/Journal/Case status for #board-group-tabs' active group,
+        // each row copyable as a plain-text summary (e.g. for pasting into a
+        // supervisor's LINE chat). Reads existing client caches only — no new
+        // Firestore queries. casesData is capped at the 200 most recent case
+        // docs (see its onSnapshot), so a user's Case count can undercount if
+        // they have older or very many cases.
+        function renderGroupUsersPanel() {
+            const list = document.getElementById('group-users-list');
+            const title = document.getElementById('group-users-title');
+            if (!list || !title) return;
+
+            const group = activeBoardGroup;
+            const users = (usersData || [])
+                .filter(u => group === 'All' || (u.group || 'Public') === group)
+                .slice()
+                .sort((a, b) => (a.fullName || a.displayName || '').localeCompare(b.fullName || b.displayName || '', 'th'));
+
+            title.textContent = group === 'All' ? `Users (${users.length})` : `Users · ${group} (${users.length})`;
+
+            if (users.length === 0) {
+                list.innerHTML = '<div style="padding:8px 4px; font-size:0.78em; color:#94a3b8;">No users in this group.</div>';
+                return;
+            }
+
+            const color = group === 'All' ? '#64748b' : (groupColorMap[group] || '#64748b');
+            list.innerHTML = '';
+            users.forEach(u => {
+                const name = u.fullName || u.displayName || u.id;
+                const quizCount = quizAttemptsAllCache.filter(a => a.userId === u.id && a.status === 'approved').length;
+                const journalCount = reflectiveLogsCache.filter(lg => lg.userId === u.id).length;
+                const caseCount = casesData.filter(c => c.userId === u.id).length;
+                const initials = name.trim().split(/\s+/).slice(0, 2).map(p => p[0] || '').join('');
+
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex; align-items:center; gap:10px; padding:7px 4px; border-radius:8px;';
+                row.innerHTML = `
+                    <div style="width:28px; height:28px; border-radius:50%; background:${color}22; color:${color}; display:flex; align-items:center; justify-content:center; font-size:0.68em; font-weight:700; flex-shrink:0;">${escapeHtml(initials)}</div>
+                    <div style="flex-grow:1; min-width:0;">
+                        <div style="font-size:0.8em; font-weight:600; color:#1f2937; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(name)}</div>
+                        <div style="display:flex; gap:10px; margin-top:1px;">
+                            <span style="font-size:0.7em; color:${quizCount > 0 ? '#16a34a' : '#94a3b8'};">Quiz ${quizCount}</span>
+                            <span style="font-size:0.7em; color:${journalCount > 0 ? '#16a34a' : '#94a3b8'};">Journal ${journalCount}</span>
+                            <span style="font-size:0.7em; color:${caseCount > 0 ? '#16a34a' : '#94a3b8'};">Case ${caseCount}</span>
+                        </div>
+                    </div>
+                `;
+                const copyBtn = document.createElement('button');
+                copyBtn.type = 'button';
+                copyBtn.textContent = 'Copy';
+                copyBtn.style.cssText = 'flex-shrink:0; padding:5px 12px; border-radius:14px; font-size:0.7em; font-weight:600; border:1px solid #e2e8f0; background:#f1f5f9; color:#475569; cursor:pointer;';
+                copyBtn.onclick = () => {
+                    const text = `${name} — Quiz ${quizCount} · Journal ${journalCount} · Case ${caseCount}`;
+                    navigator.clipboard.writeText(text)
+                        .then(() => showToast(`Copied: ${name}`))
+                        .catch(() => showToast('Copy failed'));
+                };
+                row.appendChild(copyBtn);
+                list.appendChild(row);
+            });
         }
 
         function setUserGroupFilter(group) {
@@ -54675,7 +54747,8 @@ Save it anyway?`;
                     reflectiveLogsCache = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
                     // Client-side sort to replace missing composite index constraint
                     reflectiveLogsCache.sort((a,b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0));
-                    
+                    renderGroupUsersPanel();
+
                     // 🔥 Refresh User Table if open to update Log counts [Version: V89.54]
                     if (activeTab === 'tab-users') renderTable('users');
                     
