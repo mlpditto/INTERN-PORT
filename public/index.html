@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V100.71)</title>
+    <title>Internship Portfolio (V100.72)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8986,15 +8986,24 @@
         // scrolls that card into view). navigator.share (OS sheet) when available,
         // else clipboard with the same execCommand fallback explCopyLink uses for
         // older LINE webviews. Quiz ids are Firestore auto-ids ([A-Za-z0-9]).
+        // V100.72: LINE's auto-unfurl of a bare liff.line.me URL is always the
+        // same static, non-quiz-specific card (see the V96.69 note in <head> —
+        // a per-quiz preview needs server-side rendering this static site
+        // doesn't have). Prefixing the quiz title as plain text is the cheap
+        // fix: it travels with the link (clipboard or navigator.share) as one
+        // string, so whoever it's pasted to sees the quiz name even though the
+        // auto-generated card below it still can't.
         function qzShareLink(quizId) {
+            const quiz = quizzesCache.find(x => x.id === quizId);
             const url = `https://liff.line.me/2008959998-yjcNpaGt?quiz=${encodeURIComponent(quizId)}`;
-            if (navigator.share) { navigator.share({ url }).catch(() => {}); return; }
+            const text = quiz && quiz.title ? `📝 ${quiz.title}\n${url}` : url;
+            if (navigator.share) { navigator.share({ text }).catch(() => {}); return; }
             const done = () => alert('Link copied · คัดลอกลิงก์แล้ว');
             const fail = () => alert('Copy failed · คัดลอกไม่สำเร็จ');
             if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(url).then(done).catch(() => explCopyLinkFallback(url, done, fail));
+                navigator.clipboard.writeText(text).then(done).catch(() => explCopyLinkFallback(text, done, fail));
             } else {
-                explCopyLinkFallback(url, done, fail);
+                explCopyLinkFallback(text, done, fail);
             }
         }
 
