@@ -521,14 +521,14 @@ exports.ndiBrandLookup = onRequest({ cors: true, timeoutSeconds: 60, memory: "25
  * 🤖 AI Proxy Function (V89.19)
  * Handles: Gemini, OpenAI, Anthropic, OpenRouter, AI Studio, ThaiLLM, Typhoon, Cloud TTS
  */
-exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY", "GEMINI_API_KEY", "TYPHOON_API_KEY", "THAILLM_API_KEY"], timeoutSeconds: 300, memory: "512MiB" }, async (req, res) => {
+exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY", "GEMINI_API_KEY", "TYPHOON_API_KEY", "THAILLM_API_KEY", "JEV_AI_API_KEY"], timeoutSeconds: 300, memory: "512MiB" }, async (req, res) => {
     try {
         // 1. Auth: Firebase ID token (replaces the public x-mlp-secret gate).
         const decoded = await verifyIdTokenFromHeader(req, res);
         if (!decoded) return; // 401 already sent
         const callerIsAdmin = isAdminToken(decoded);
 
-        const { provider, prompt, isJson, visionData, generationOptions = {}, feature } = req.body;
+        const { provider, prompt, isJson, visionData, generationOptions = {}, feature, state, questions } = req.body;
         let { model } = req.body;
         // V100.51: accept stale clients without calling retired Google models.
         if (provider === "gemini" || provider === "gemini-aistudio") {
@@ -541,7 +541,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             };
             model = googleModelAliases[model] || model;
         }
-        if (!provider || (provider !== "cloud_tts" && !prompt)) {
+        if (!provider || (provider !== "cloud_tts" && provider !== "jev" && !prompt)) {
             return res.status(400).json({ error: "Missing provider or prompt" });
         }
 
@@ -1068,6 +1068,33 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 text: response.data.choices[0].message.content,
                 tokens: response.data.usage?.total_tokens || 0,
                 model: orModel
+            });
+        }
+
+        // --- 🟢 Jev AI (TypeSafe System One) — structured guardrail/classifier checks ---
+        // Not a text-generation provider: takes `state` (text to classify) + `questions`
+        // (yes/no "noul" / choice / score) instead of `prompt`, returns calibrated
+        // probabilities instead of free text. First use: writing_analysis guardrail
+        // (prompt-injection check on intern-authored reflective log text).
+        if (provider === "jev") {
+            const apiKey = process.env.JEV_AI_API_KEY;
+            if (!apiKey) return res.status(500).json({ error: "JEV_AI_API_KEY is not configured on server. Set with `firebase functions:secrets:set JEV_AI_API_KEY` then redeploy callAIProxy." });
+            if (!state || !questions) {
+                return res.status(400).json({ error: "Missing state or questions for jev provider" });
+            }
+
+            const response = await postWithRetry("https://jev-ai.pro/api/v1/systemone", {
+                state,
+                model: model || "jev-latest",
+                questions
+            }, {
+                headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" }
+            });
+
+            return res.json({
+                answers: response.data.answers,
+                tokens: (response.data.usage?.input_tokens || 0) + (response.data.usage?.output_tokens || 0),
+                model: response.data.model || "jev-latest"
             });
         }
 
