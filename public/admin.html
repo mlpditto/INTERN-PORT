@@ -6609,6 +6609,14 @@
                             </div>
                         </div>
 
+                        <!-- Shown only when every review-card above (incl. general-work-review-section,
+                             outside this container) is hidden, so the dashboard doesn't render a blank
+                             canvas when there's nothing pending. Toggled by updateReviewQueueEmptyState(). -->
+                        <div id="review-queue-empty-state" class="lang-no-toggle" style="display:none; text-align:center; padding:40px 20px; color:#94a3b8;">
+                            <div style="font-size:2.2em;">✅</div>
+                            <div style="margin-top:8px; font-weight:700; color:#64748b;">All caught up — ไม่มีงานค้างตรวจตอนนี้</div>
+                        </div>
+
                         <!-- Quests management moved to bottom of Kanban -->
                     </div>
 
@@ -25597,11 +25605,13 @@ ${JSON.stringify(sourceObj)}`;
             if (!data || data.length === 0) {
                 section.style.display = "none";
                 document.getElementById('chip-quiz').style.display = "none";
+                updateReviewQueueEmptyState();
                 drawKanban(); // Refresh Kanban to remove cards
                 return;
             }
             section.style.display = "block";
             document.getElementById('chip-quiz').style.display = "flex";
+            updateReviewQueueEmptyState();
             const statEl = document.getElementById('stat-quiz-count');
             if (statEl) statEl.innerText = data.length;
             tbody.innerHTML = "";
@@ -32896,12 +32906,14 @@ RULES:
                 section.style.display = "none";
                 document.getElementById('stat-access-count').innerText = 0;
                 document.getElementById('chip-access').style.display = "none";
+                updateReviewQueueEmptyState();
                 drawKanban();
                 return;
             }
             section.style.display = "block";
             document.getElementById('stat-access-count').innerText = data.length;
             document.getElementById('chip-access').style.display = "flex";
+            updateReviewQueueEmptyState();
             tbody.innerHTML = "";
             drawKanban();
             
@@ -44973,6 +44985,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 countEl.innerText = pendingWorks;
                 document.getElementById('chip-work').style.display = pendingWorks > 0 ? "flex" : "none";
                 document.getElementById('general-work-review-section').style.display = pendingWorks > 0 ? "block" : "none";
+                updateReviewQueueEmptyState();
             }
 
             tbody.innerHTML = "";
@@ -49942,8 +49955,24 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             });
         }
 
+        // Shows #review-queue-empty-state when every review-card section on the
+        // Dashboard tab (general work, reflective logs, points claimed, access
+        // requests, pending quizzes) is hidden, i.e. there's nothing to review.
+        // Called from each section's own render function after it sets
+        // section.style.display.
+        function updateReviewQueueEmptyState() {
+            const ids = ['general-work-review-section', 'reflective-log-review-section',
+                'points-claimed-section', 'access-request-section', 'quiz-pending-section'];
+            const allHidden = ids.every(id => {
+                const el = document.getElementById(id);
+                return !el || el.style.display === 'none';
+            });
+            const empty = document.getElementById('review-queue-empty-state');
+            if (empty) empty.style.display = allHidden ? 'block' : 'none';
+        }
+
         function drawKanban() {
-            const cols = { 
+            const cols = {
                 "Backlog": document.getElementById("Backlog"), 
                 "Doing": document.getElementById("Doing"), 
                 "Review": document.getElementById("Review"), 
@@ -54678,6 +54707,7 @@ Save it anyway?`;
                     if (section && tbody) {
                         // Section is visible if there are pending logs OR if the admin is explicitly searching/viewing reviewed
                         section.style.display = (pendingCount > 0 || search || showReviewed) ? "block" : "none";
+                        updateReviewQueueEmptyState();
                         tbody.innerHTML = "";
                         
                         pendingLogs.forEach(log => {
@@ -58012,6 +58042,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                         section.style.display = "none";
                         countEl.innerText = 0;
                         document.getElementById('chip-claimed').style.display = "none";
+                        updateReviewQueueEmptyState();
                         drawKanban();
                         return;
                     }
@@ -58019,6 +58050,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     section.style.display = "block";
                     countEl.innerText = snapshot.size;
                     document.getElementById('chip-claimed').style.display = "flex";
+                    updateReviewQueueEmptyState();
                     tbody.innerHTML = "";
                     drawKanban();
 
