@@ -117,6 +117,17 @@
                 if (typeof showToast === 'function') showToast(`🤖 Model set to: ${el.innerText}`);
             }
         };
+        window.setAiConsoleMode = function(el, mode) {
+            const container = el.parentElement;
+            if (container) {
+                container.querySelectorAll('.glass-toggle-item').forEach(i => i.classList.remove('active'));
+                el.classList.add('active');
+            }
+            const genPanel = document.getElementById('ai-console-generate-panel');
+            const transPanel = document.getElementById('ai-console-translate-panel');
+            if (genPanel) genPanel.style.display = mode === 'generate' ? 'flex' : 'none';
+            if (transPanel) transPanel.style.display = mode === 'translate' ? 'flex' : 'none';
+        };
         window.switchHubMode = window.switchHubMode || function(mode) { console.warn('switchHubMode not yet fully loaded:', mode); };
 
         window.toggleAiAccordion = function(id) {
@@ -6154,9 +6165,9 @@
         #quizManageModal .quiz-editor-fold > summary { padding:10px 12px; color:#c4b5fd; cursor:pointer; font-weight:700; }
         #quiz-editor-summary { color:#cbd5e1; font-weight:400; overflow-wrap:anywhere; }
         #quizManageModal .quiz-editor-fold-body { padding:12px; }
-        #quiz-editor-ai > #quiz-ai-tools-row { margin:8px; }
-        #quiz-editor-tools > div { flex-wrap:wrap; white-space:normal!important; overflow-x:visible!important; }
-        #quiz-editor-tools > div > div { flex-wrap:wrap; }
+        #quiz-ai-tools-row { margin:8px; }
+        #quiz-editor-toolbar { flex-wrap:wrap; white-space:normal!important; overflow-x:visible!important; }
+        #quiz-editor-toolbar > div { flex-wrap:wrap; }
         @media(max-width:600px) {
             #quizManageModal .quiz-editor-fold-body > div[style*="display:grid"] { grid-template-columns:minmax(0,1fr)!important; }
             #quizManageModal .quiz-editor-fold-body div { min-width:0; }
@@ -12917,18 +12928,16 @@
                         <span id="auto-save-status" style="font-size:0.6em; font-weight:bold; color:#fb7185; display:none; margin-left:8px;">Saving...</span>
                         </div>
 
-                    <div id="quiz-editor-review-actions" style="display:flex; flex-wrap:wrap; gap:6px;">
-<button class="btn-sm lang-no-toggle" onclick="openQuizReview(this)" title="Score every question, then switch to rewrites in the same popup — opens saved results for free when they exist" style="background:linear-gradient(135deg,#7c3aed,#0891b2); color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-clipboard-check"></i> Quality review</button>
-
-
+                    <div id="quiz-editor-review-actions" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:6px 12px; background:rgba(255,255,255,0.03); border-radius:12px; border:1px solid rgba(255,255,255,0.08); box-shadow:0 4px 15px rgba(0,0,0,0.1);">
+                        <div class="glass-toggle-container" id="ai-console-mode-toggle" style="margin:0; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.05); padding:3px; height:32px; border-radius:10px; gap:2px;">
+                            <div class="glass-toggle-item active" data-mode="generate" onclick="window.setAiConsoleMode(this,'generate')" title="สร้างคำถามเพิ่มด้วย AI" data-th-title="สร้างคำถามเพิ่มด้วย AI" style="padding:4px 10px; border-radius:8px; font-size:1.05em; cursor:pointer;">🧠</div>
+                            <div class="glass-toggle-item" data-mode="translate" onclick="window.setAiConsoleMode(this,'translate')" title="แปลข้อสอบเป็นภาษาอื่น" data-th-title="แปลข้อสอบเป็นภาษาอื่น" style="padding:4px 10px; border-radius:8px; font-size:1.05em; cursor:pointer;">🌐</div>
+                        </div>
+                        <button class="btn-sm lang-no-toggle" onclick="openQuizReview(this)" title="ตรวจคุณภาพชุดข้อสอบ (ให้คะแนน + คำแนะนำแก้ไข)" data-th-title="ตรวจคุณภาพชุดข้อสอบ (ให้คะแนน + คำแนะนำแก้ไข)" aria-label="Quality review" style="background:linear-gradient(135deg,#7c3aed,#0891b2); color:white; border:none; width:32px; height:32px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer;"><i class="fa-solid fa-shield-halved"></i></button>
                     </div>
-                    <details id="quiz-editor-ai" class="quiz-editor-fold">
-                        <summary class="lang-no-toggle">AI tools</summary>
-                    <!-- ROW 2: AI Tools (Split: Analyze | Translate) [Version: V88.69] -->
-                    <div id="quiz-ai-tools-row" style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
-                        <!-- LEFT: Quiz Analysis (V93.28 PR #13 follow-up: visual styling parity with TRANSLATE panel — container shadow, label uppercase, chip rail sizing, button heights aligned. Purple identity preserved.) -->
-                        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:6px 12px; background:rgba(124,58,237,0.1); border-radius:12px; border:1px solid rgba(124,58,237,0.25); box-shadow:0 4px 15px rgba(0,0,0,0.1);">
-                            <span style="font-size:0.65em; font-weight:900; color:#a78bfa; letter-spacing:0.8px; white-space:nowrap; text-transform:uppercase; margin-right:4px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Intelligence</span>
+                    <!-- ROW 2: AI Console (Generate | Translate, tab-switched) — was "AI tools" <details> with two always-visible side-by-side panels; Quality review moved into the row above. -->
+                    <div id="quiz-ai-tools-row" style="display:flex; flex-direction:column; gap:6px;">
+                        <div id="ai-console-generate-panel" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:6px 12px; background:rgba(124,58,237,0.1); border-radius:12px; border:1px solid rgba(124,58,237,0.25); box-shadow:0 4px 15px rgba(0,0,0,0.1);">
                             <div class="glass-toggle-container" id="ai-analyze-model-toggle" style="margin:0; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.05); padding:3px; height:32px; border-radius:10px; gap:2px;">
                                 <div class="glass-toggle-item" data-value="gemini-3.5-flash" onclick="window.selectAiToolbarToggle(this,'ai-analyzer-model-val')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#fbbf24;">Flash</div>
                                 <div class="glass-toggle-item" data-value="gemini-3.6-flash" onclick="window.selectAiToolbarToggle(this,'ai-analyzer-model-val')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#94a3b8;">Pro</div>
@@ -12943,14 +12952,12 @@
                                      button. It opens the 🧪 Scorecard; the chip rail in that
                                      popup's header switches to 🪄 Rewrites, loading it only if
                                      asked. Saved results still open free (V97.39 / V97.41). -->
-                                <button class="btn-sm" onclick="openPdfToQuizModal()" title="Import PDF" style="background:#0ea5e9; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-file-pdf"></i> Import PDF</button>
-                                <button class="btn-sm" onclick="openSuggestMoreModal()" title="Expand" style="background:#f59e0b; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-sparkles"></i> Generate more</button>
-                                <button type="button" class="btn-sm" onclick="openQuizCurate()" title="ให้ AI คัดข้อสอบตามจำนวนที่ต้องการและบันทึกเป็นชุดใหม่" style="background:#242c37; color:#f1b55e; border:1px solid #655031; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; height:32px;">✦ AI Curate</button>
+                                <button class="btn-sm" onclick="openPdfToQuizModal()" title="นำเข้าโจทย์จากไฟล์ PDF" data-th-title="นำเข้าโจทย์จากไฟล์ PDF" aria-label="Import PDF" style="background:#0ea5e9; color:white; border:none; width:32px; height:32px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer;"><i class="fa-solid fa-file-pdf"></i></button>
+                                <button class="btn-sm" onclick="openSuggestMoreModal()" title="ให้ AI สร้างคำถามเพิ่ม" data-th-title="ให้ AI สร้างคำถามเพิ่ม" aria-label="Generate more" style="background:#f59e0b; color:white; border:none; width:32px; height:32px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer;"><i class="fa-solid fa-sparkles"></i></button>
+                                <button type="button" class="btn-sm" onclick="openQuizCurate()" title="ให้ AI คัดข้อสอบตามจำนวนที่ต้องการและบันทึกเป็นชุดใหม่" data-th-title="ให้ AI คัดข้อสอบตามจำนวนที่ต้องการและบันทึกเป็นชุดใหม่" aria-label="AI Curate" style="background:#242c37; color:#f1b55e; border:1px solid #655031; width:32px; height:32px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer;">✦</button>
                             </div>
                         </div>
-                            <!-- RIGHT: Translation -->
-                            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:6px 12px; background:rgba(22,163,74,0.1); border-radius:12px; border:1px solid rgba(22,163,74,0.25); box-shadow:0 4px 15px rgba(0,0,0,0.1);">
-                                <span style="font-size:0.65em; font-weight:900; color:#4ade80; letter-spacing:0.8px; white-space:nowrap; text-transform:uppercase; margin-right:4px;"><i class="fa-solid fa-language"></i> Translate</span>
+                            <div id="ai-console-translate-panel" style="display:none; align-items:center; gap:6px; flex-wrap:wrap; padding:6px 12px; background:rgba(22,163,74,0.1); border-radius:12px; border:1px solid rgba(22,163,74,0.25); box-shadow:0 4px 15px rgba(0,0,0,0.1);">
                                 <div class="glass-toggle-container" id="ai-translate-model-toggle" style="margin:0; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.05); padding:3px; height:32px; border-radius:10px; gap:2px;">
                                     <div class="glass-toggle-item" data-value="gemini-3.5-flash" onclick="window.selectAiToolbarToggle(this,'toolbar-ai-translate-model')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#94a3b8;">Flash</div>
                                     <div class="glass-toggle-item" data-value="glm-5.1:cloud" onclick="window.selectAiToolbarToggle(this,'toolbar-ai-translate-model')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#94a3b8;">GLM-5.1</div>
@@ -12970,15 +12977,12 @@
                                 </div>
                                 <input type="hidden" id="toolbar-ai-lang" value="Thai">
                                 
-                                <button class="btn-sm" onclick="aiEnhanceCurrentQuestion(this)" title="AI Enhance Current Question" style="background:linear-gradient(135deg,#10b981,#059669); color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:900; font-size:0.8em; height:32px; box-shadow:0 4px 12px rgba(16,185,129,0.3); transition:all 0.2s; display:flex; align-items:center; gap:6px;" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 15px rgba(16,185,129,0.4)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 12px rgba(16,185,129,0.3)';"><i class="fa-solid fa-wand-magic-sparkles"></i> Translate</button>
+                                <button class="btn-sm" onclick="aiEnhanceCurrentQuestion(this)" title="แปลข้อสอบข้อนี้ด้วย AI" data-th-title="แปลข้อสอบข้อนี้ด้วย AI" aria-label="Translate" style="background:linear-gradient(135deg,#10b981,#059669); color:white; border:none; width:32px; height:32px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 4px 12px rgba(16,185,129,0.3); transition:all 0.2s;" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 15px rgba(16,185,129,0.4)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 12px rgba(16,185,129,0.3)';"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
                             </div>
                         </div>
-                    </details>
                     </div>
 
-                    <details id="quiz-editor-tools" class="quiz-editor-fold">
-                        <summary class="lang-no-toggle">More tools</summary>
-                    <!-- ROW 3: Consolidated Management Toolbar ([Version: V90.28] One-Line Layout) -->
+                    <!-- ROW 3: Consolidated Management Toolbar ([Version: V90.28] One-Line Layout) — was behind "More tools" <details>, now always visible right under the AI console. -->
                     <div id="quiz-editor-toolbar" class="lang-no-toggle" style="display:flex; align-items:center; gap:8px; padding:6px 12px; background:linear-gradient(135deg, rgba(2,132,199,0.12), rgba(245,158,11,0.12)); border-radius:14px; border:1px solid rgba(245,158,11,0.35); box-shadow:0 8px 20px rgba(2,132,199,0.08); white-space:nowrap; overflow-x:auto; margin-bottom:8px;">
                         
                         <!-- Group 1: Timer Logic -->
@@ -13019,7 +13023,6 @@
                             <button class="btn-sm" onclick="toolbarDeleteQ()" style="width:30px; height:30px; border-radius:10px; background:#451a1a; border:1px solid #ef4444; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:0.95em; color:#ef4444; transition:0.2s;" onmouseover="this.style.background='#ef4444'; this.style.color='white';" onmouseout="this.style.background='#451a1a'; this.style.color='#ef4444';" type="button" aria-label="Delete current question" title="ลบข้อสอบปัจจุบัน" data-th-title="ลบข้อสอบปัจจุบัน">🗑️</button>
                         </div>
                     </div>
-                    </details>
                 </div>
 
                 <div id="quiz-questions-container" style="min-height: 350px; text-align: left; padding: 12px; border: 1px solid #334155; border-radius: 12px; margin-bottom: 8px; background:#0f172a;">
@@ -22007,8 +22010,6 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
 
         async function openQuizModal(id = null) {
             document.getElementById('quiz-editor-settings').open = !id;
-            document.getElementById('quiz-editor-ai').open = false;
-            document.getElementById('quiz-editor-tools').open = false;
             forceShowModal('quizManageModal');
             const container = document.getElementById('quiz-questions-container');
             container.innerHTML = "";
