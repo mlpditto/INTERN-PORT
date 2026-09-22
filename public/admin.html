@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.97)</title>
+    <title>Nika Admin (V100.98)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -28297,6 +28297,55 @@ ${JSON.stringify(sourceObj)}`;
             document.getElementById('bp-preview-stage').style.display = 'none';
         }
 
+        // V100.98: Import JSON → same preview rows parseBulkQuestions() produces
+        // ({q, options, correct, conf, rationale, include}) plus tags/source so
+        // bulkPasteInsert can hand them to addQuestionUI. Accepts the
+        // intern-port.quiz.v1 export ({questions:[...]}) or a bare array.
+        function bulkPasteRowsFromJson(json) {
+            const list = Array.isArray(json) ? json : (json && Array.isArray(json.questions) ? json.questions : null);
+            if (!list) throw new Error('Expected {"questions": [...]} or a JSON array of questions');
+            const rows = [];
+            list.forEach((item, i) => {
+                if (!item || typeof item !== 'object') return;
+                const q = String(item.q || item.question || item.stem || '').trim();
+                const options = (Array.isArray(item.options) ? item.options : [])
+                    .map(o => (o && typeof o === 'object') ? String(o.text || '') : String(o == null ? '' : o)).map(t => t.trim()).filter(Boolean);
+                if (!q || options.length < 2) return;
+                let correct = Array.isArray(item.correct) ? item.correct : (Number.isInteger(item.correct) ? [item.correct] : []);
+                correct = correct.map(Number).filter(n => Number.isInteger(n) && n >= 0 && n < options.length);
+                rows.push({
+                    q, options, correct, conf: null, include: true,
+                    rationale: String(item.explanation || item.rationale || '').trim(),
+                    tags: String(item.tags || '').trim(),
+                    source: item._source && item._source.ref ? String(item._source.ref) : ''
+                });
+            });
+            return rows;
+        }
+        function bulkPasteImportJson(event) {
+            const input = event && event.target;
+            const file = input && input.files && input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+                let rows;
+                try { rows = bulkPasteRowsFromJson(JSON.parse(reader.result)); }
+                catch (e) { showToast('❌ Could not read JSON: ' + (e.message || e), 'error'); input.value = ''; return; }
+                input.value = '';
+                if (rows.length === 0) { showToast('No usable questions in that file (each needs q + at least 2 options)', 'error'); return; }
+                window._bulkPasteParsed = rows;
+                document.getElementById('bp-input-stage').style.display = 'none';
+                document.getElementById('bp-preview-stage').style.display = 'block';
+                renderBulkPastePreview();
+                const keyed = rows.filter(r => r.correct.length).length;
+                showToast(`📂 ${rows.length} question(s) imported · ${keyed} with answer key · ${rows.length - keyed} to mark`, 'success');
+            };
+            reader.onerror = () => { showToast('❌ Could not read the file', 'error'); input.value = ''; };
+            reader.readAsText(file, 'utf-8');
+        }
+        window.bulkPasteImportJson = bulkPasteImportJson;
+        window.bulkPasteRowsFromJson = bulkPasteRowsFromJson;
+
         function bulkPasteParse() {
             const text = document.getElementById('bp-textarea').value;
             const parsed = parseBulkQuestions(text);
@@ -28584,7 +28633,8 @@ ${JSON.stringify(sourceObj)}`;
             rows.forEach(r => addQuestionUI({
                 q: (r.illustrationUrl ? '![ภาพประกอบ](' + r.illustrationUrl + ')\n\n' : '') + r.q,
                 type: 'choice', options: r.options, correct: r.correct, timer: 60,
-                explanation: (r.rationale || '').trim()
+                explanation: (r.rationale || '').trim(),
+                tags: (r.tags || '').trim()   // V100.98: JSON-imported rows carry per-question tags
             }));
             document.getElementById('bulkPasteModal').style.display = 'none';
             if (typeof triggerAutoSave === 'function') triggerAutoSave();
@@ -62389,7 +62439,13 @@ Summarize in English in 3–5 concise lines:
                 <textarea id="bp-textarea" placeholder="Paste your questions here...&#10;&#10;Which of the following is correct about ...&#10;    Option 1&#10;    Option 2&#10;    Option 3&#10;    Option 4&#10;&#10;Next question ...&#10;    ..." style="width:100%; height:220px; border:1.5px solid #ddd; border-radius:14px; padding:14px; font-size:0.9em; line-height:1.6; box-sizing:border-box; font-family:inherit; resize:vertical;"></textarea>
                 <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
                     <span style="font-size:0.75em; color:#999; font-style:italic;">The answer key does not have to be in the text — tick it yourself, or let AI find it on the next screen.</span>
-                    <button class="magic-btn" onclick="bulkPasteParse()" style="padding:10px 26px;">✂️ Parse questions</button>
+                    <div style="display:flex; gap:8px; align-items:center; flex:none;">
+                        <!-- V100.98: JSON import — an intern-port.quiz.v1 file ({questions:[{q, options, correct, tags, explanation}]}) or a bare
+                             array of those. Lands in the same preview stage as pasted text, so E.V.I.E. / tick-to-mark / Insert all apply. -->
+                        <input type="file" id="bp-json-file" accept=".json,application/json" style="display:none;" onchange="bulkPasteImportJson(event)">
+                        <button type="button" onclick="document.getElementById('bp-json-file').click()" title="Import questions from a JSON file (intern-port.quiz.v1 or an array of {q, options, correct})" style="padding:10px 16px; width:auto; margin:0; border:1px solid #ddd6fe; background:#f5f3ff; color:#6d28d9; border-radius:12px; font-weight:800; font-size:0.85em; cursor:pointer;">📂 Import JSON</button>
+                        <button class="magic-btn" onclick="bulkPasteParse()" style="padding:10px 26px;">✂️ Parse questions</button>
+                    </div>
                 </div>
             </div>
 
