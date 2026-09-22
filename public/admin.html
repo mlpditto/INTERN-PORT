@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.06)</title>
+    <title>Nika Admin (V101.07)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -12806,10 +12806,14 @@
                                 </div>
                                 
                                 <div style="display:flex; gap:8px;">
-                                    <input type="text" id="quiz-tag-input" placeholder="Type tag and press Enter... (e.g. Cardiology)" style="flex:1; padding:10px 14px; border:1px solid #334155; border-radius:12px; font-size:0.85em; background:#0f172a; color:#f1f5f9; outline:none; transition:0.2s; box-shadow:0 4px 6px rgba(0,0,0,0.1);" onfocus="this.style.borderColor='#4ade80'; this.style.boxShadow='0 0 0 3px rgba(74,222,128,0.1)';" onblur="this.style.borderColor='#334155'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.1)';" onkeydown="if(event.key==='Enter'){ event.preventDefault(); manualAddTag(this.value); this.value=''; }">
+                                    <input type="text" id="quiz-tag-input" list="quiz-tag-suggestions" placeholder="Type a tag or pick a suggestion, then Enter (e.g. Cardiology)" style="flex:1; padding:10px 14px; border:1px solid #334155; border-radius:12px; font-size:0.85em; background:#0f172a; color:#f1f5f9; outline:none; transition:0.2s; box-shadow:0 4px 6px rgba(0,0,0,0.1);" onfocus="this.style.borderColor='#4ade80'; this.style.boxShadow='0 0 0 3px rgba(74,222,128,0.1)';" onblur="this.style.borderColor='#334155'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.1)';" onkeydown="if(event.key==='Enter'){ event.preventDefault(); manualAddTag(this.value); this.value=''; }">
                                     <button onclick="const inp=document.getElementById('quiz-tag-input'); manualAddTag(inp.value); inp.value='';" style="background:#334155; color:white; border:none; border-radius:10px; padding:0 15px; cursor:pointer;"><i class="fa-solid fa-plus"></i></button>
                                 </div>
                                 <input type="hidden" id="quiz-tags" value="">
+                                <!-- V101.07: autocomplete behind #quiz-tag-input. Existing quiz tags
+                                     (most used first, canonical spelling), CASE_SYSTEMS labels +
+                                     symptoms, LP taxonomy tags. Filled by refreshQuizTagSuggestions(). -->
+                                <datalist id="quiz-tag-suggestions"></datalist>
                             </div>
 
                             <!-- V95.17: lean Audience row — Unlock-at-score + Target Group
@@ -22854,7 +22858,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const quizType = document.getElementById('quiz-type').value;
             const feedbackLimit = parseInt(document.getElementById('quiz-feedback-limit').value) || 280;
             const caseContent = document.getElementById('quiz-case-content').value;
-            const tags = document.getElementById('quiz-tags').value.trim();
+            const tags = window.normalizeQuizTagString(document.getElementById('quiz-tags').value); // V101.07
             const materials = quizResourceCards.read();
 
             // V93.87 Quiz Quality Q1: read blueprint, build only if any field set.
@@ -23440,7 +23444,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
 
         window.applyBulkTag = function() {
             const inputEl = document.getElementById('bulk-tag-input');
-            const tag = inputEl ? (inputEl.value || '').trim() : '';
+            const tag = inputEl ? (window.normalizeQuizTagList(inputEl.value)[0] || '') : ''; // V101.07
             if (!tag) { alert('Type a tag to apply.'); return; }
             const checks = [...document.querySelectorAll('.bulk-q-check:checked')];
             if (checks.length === 0) { alert('Select at least one question.'); return; }
@@ -23453,7 +23457,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 const ti = item.querySelector('.q-tags');
                 if (!ti) return;
                 const current = (ti.value || '').split(',').map(t => t.trim()).filter(Boolean);
-                if (!current.includes(tag)) {
+                if (!current.some(t => t.toLowerCase() === tag.toLowerCase())) { // V101.07
                     current.push(tag);
                     ti.value = current.join(', ');
                     added++;
@@ -60689,16 +60693,73 @@ RULES:
             }
         };
 
+        // V101.07: one normaliser for every quiz-tag write path (manual add, chip edit,
+        // AI Suggest, bulk per-question, save). Trims, collapses whitespace, drops
+        // empties, de-dupes case-insensitively and caps the list. Casing converges on
+        // the spelling already used most across quizzesData (computeQuizTagHygiene),
+        // so "headache" typed on a new quiz becomes "Headache" when that is the norm.
+        const QUIZ_TAG_MAX = 20;
+        window.quizTagCanonicalForms = function () {
+            const map = new Map();
+            if (typeof window.computeQuizTagHygiene !== 'function' || typeof quizzesData === 'undefined') return map;
+            window.computeQuizTagHygiene(quizzesData).entries.forEach(e => map.set(e.key, e.forms[0].raw));
+            return map;
+        };
+        window.normalizeQuizTagList = function (list, canonical) {
+            const forms = canonical || window.quizTagCanonicalForms();
+            const seen = new Set();
+            const out = [];
+            (Array.isArray(list) ? list : String(list || '').split(','))
+                .map(t => String(t || '').trim().replace(/\s+/g, ' '))
+                .filter(Boolean)
+                .forEach(raw => {
+                    const key = raw.toLowerCase();
+                    if (seen.has(key)) return;
+                    seen.add(key);
+                    out.push(forms.get(key) || raw);
+                });
+            return out.slice(0, QUIZ_TAG_MAX);
+        };
+        window.normalizeQuizTagString = str => window.normalizeQuizTagList(str).join(', ');
+
+        // V101.07: datalist behind #quiz-tag-input. Order: tags already used on quizzes
+        // (most used first, canonical spelling), then CASE_SYSTEMS English labels and
+        // symptoms, then LP taxonomy tags. Tags already on this quiz are left out.
+        window.refreshQuizTagSuggestions = function () {
+            const list = document.getElementById('quiz-tag-suggestions');
+            if (!list) return;
+            const current = new Set(window.normalizeQuizTagList(document.getElementById('quiz-tags')?.value).map(t => t.toLowerCase()));
+            const seen = new Set();
+            const out = [];
+            const push = (raw, hint) => {
+                const key = String(raw || '').trim().toLowerCase();
+                if (!key || seen.has(key) || current.has(key)) return;
+                seen.add(key);
+                out.push({ raw: String(raw).trim(), hint });
+            };
+            if (typeof window.computeQuizTagHygiene === 'function' && typeof quizzesData !== 'undefined') {
+                window.computeQuizTagHygiene(quizzesData).entries.filter(e => !/^ai_/.test(e.key)).forEach(e => push(e.forms[0].raw, `${e.count} quiz${e.count === 1 ? '' : 'zes'}`)); // machine markers (AI_VARIANT, AI_FROM_CASE) are never suggested
+            }
+            (window.CASE_SYSTEMS || []).forEach(sys => {
+                push(sys.label && sys.label.en, 'system');
+                (sys.symptoms || []).forEach(sym => push(sym, (sys.label && sys.label.en) || 'symptom'));
+            });
+            (window.LP_ALL_TAGS || []).forEach(t => push(t, 'LP taxonomy'));
+            list.innerHTML = out.map(o => `<option value="${escapeHtml(o.raw)}">${escapeHtml(o.hint)}</option>`).join('');
+        };
+
         window.manualAddTag = function(val) {
             if(!val || val.trim() === "") return;
             const hiddenInput = document.getElementById('quiz-tags');
-            let tagStr = (hiddenInput.value || "").trim();
-            let tags = tagStr ? tagStr.split(',').map(t => t.trim()) : [];
-            if(!tags.includes(val.trim())) {
-                tags.push(val.trim());
-                hiddenInput.value = tags.join(', ');
-                if (typeof refreshTagChips === 'function') refreshTagChips();
+            // V101.07: accepts a comma-separated paste; everything funnels through the normaliser.
+            const before = window.normalizeQuizTagList(hiddenInput.value);
+            const after = window.normalizeQuizTagList([...before, ...String(val).split(',')]);
+            if (after.length === before.length) {
+                if (typeof showToast === 'function') showToast(before.length >= QUIZ_TAG_MAX ? `Tag limit is ${QUIZ_TAG_MAX}` : 'Tag already present');
+                return;
             }
+            hiddenInput.value = after.join(', ');
+            if (typeof refreshTagChips === 'function') refreshTagChips();
         };
 
         window.removeTagChip = function(index) {
@@ -60733,6 +60794,8 @@ RULES:
             // V95.39: tag writes are programmatic (no input/change event) — sync the
             // collapsed Audience summary chip here, the single funnel for all tag edits.
             if (window.updateAudienceSummaryPreview) window.updateAudienceSummaryPreview();
+            // V101.07: same funnel refreshes the autocomplete (drops tags already on the quiz).
+            if (window.refreshQuizTagSuggestions) window.refreshQuizTagSuggestions();
         };
 
         window.editTagChip = function(index) {
@@ -60745,7 +60808,7 @@ RULES:
             
             if (newVal !== null && newVal.trim() !== "" && newVal !== oldVal) {
                 tags[index] = newVal.trim();
-                hiddenInput.value = tags.join(', ');
+                hiddenInput.value = window.normalizeQuizTagList(tags).join(', '); // V101.07
                 if (typeof refreshTagChips === 'function') refreshTagChips();
                 if (typeof showToast === 'function') showToast("Tag updated!");
             }
@@ -60783,11 +60846,14 @@ RULES:
                     const cleanTags = suggestedTags.replace(/```/g, "").replace(/tags:/gi, "").replace(/tag:/gi, "").trim();
                     const tagInput = document.getElementById('quiz-tags');
                     if (tagInput) {
-                        if (tagInput.value && !confirm("Replace existing tags?")) return;
-                        tagInput.value = cleanTags;
+                        // V101.07: merge into the existing list instead of replacing it;
+                        // the normaliser de-dupes case-insensitively and caps the list.
+                        const before = window.normalizeQuizTagList(tagInput.value);
+                        const after = window.normalizeQuizTagList([...before, ...cleanTags.split(/[,\n]/)]);
+                        tagInput.value = after.join(', ');
                         if (typeof refreshTagChips === 'function') refreshTagChips();
+                        if (typeof showToast === 'function') showToast(`✅ AI added ${after.length - before.length} new tag(s)`);
                     }
-                    if (typeof showToast === 'function') showToast("✅ AI suggestion applied!");
                 }
             } catch (e) {
                 alert("AI Tagging Error: " + e.message);
