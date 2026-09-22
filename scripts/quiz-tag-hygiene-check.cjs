@@ -5,7 +5,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'admin.html'), 'utf8');
+// Git checks admin.html out with CRLF on Windows (autocrlf); the markers below are LF.
+const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'admin.html'), 'utf8').replace(/\r\n/g, '\n');
 const start = html.indexOf('window.computeQuizTagHygiene = function');
 const end = html.indexOf('\n        };\n', start);
 if (start < 0 || end < 0) { console.error('computeQuizTagHygiene not found in admin.html'); process.exit(1); }

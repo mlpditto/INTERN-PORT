@@ -6,7 +6,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'admin.html'), 'utf8');
+// Git checks admin.html out with CRLF on Windows (autocrlf); the markers below are LF.
+const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'admin.html'), 'utf8').replace(/\r\n/g, '\n');
 function slice(startMarker, endMarker) {
     const a = html.indexOf(startMarker);
     const b = html.indexOf(endMarker, a);
