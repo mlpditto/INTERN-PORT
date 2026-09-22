@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.93)</title>
+    <title>Nika Admin (V100.94)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -4392,7 +4392,7 @@
     </script>
 
     <link
-        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Montserrat:wght@400;700&family=Noto+Sans+KR:wght@400;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Montserrat:wght@400;700&family=Noto+Sans+KR:wght@400;700&family=Rajdhani:wght@600;700&display=swap"
         rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -18825,9 +18825,16 @@ RULES:
                                 <button class="btn-sm" title="Copy question + options" onclick="copyAiSuggestedQuestion(${qJson})" style="background:#0891b2; color:#fff; border:none; width:34px; height:34px; border-radius:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.9em;">
                                     <i class="fa-solid fa-copy"></i>
                                 </button>
-                                <button class="btn-sm" style="background:#22c55e; color:white; border:none; padding:8px 16px; border-radius:12px; font-weight:800; font-size:0.85em; cursor:pointer; box-shadow:0 4px 12px rgba(34,197,94,0.3);"
-                                    onclick="addQuestionUI(${qJson}); this.disabled=true; this.style.background='#94a3b8'; this.innerHTML='<i class=&quot;fa-solid fa-check&quot;></i> Added'; showToast('Question added!');">
-                                    <i class="fa-solid fa-plus"></i> Add to Quiz
+                                <button class="btn-sm" title="Add to quiz"
+                                    onclick="addQuestionUI(${qJson}); markAiSuggestionAdded(this); showToast('Question added!');"
+                                    style="display:inline-flex; align-items:center; gap:10px; padding:8px 18px 8px 8px; border-radius:999px; border:none; cursor:pointer;
+                                        background:conic-gradient(from 200deg, #d98b7a, #c98fb0, #8b7bb8, #6f9fc0, #e0b468, #d98b7a);
+                                        box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.55), 0 4px 14px rgba(139,123,184,.35);
+                                        color:#fffaf2;">
+                                    <span class="enso-ring" style="width:22px; height:22px; border-radius:50%; border:1.5px solid rgba(255,255,255,.85); display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:0.7em;">
+                                        <i class="fa-solid fa-plus"></i>
+                                    </span>
+                                    <span class="enso-label" style="font-family:'Rajdhani',sans-serif; font-weight:600; font-size:0.82em; letter-spacing:.14em; text-transform:uppercase;">Add</span>
                                 </button>
                             </div>
                         </div>
@@ -18878,6 +18885,22 @@ RULES:
             navigator.clipboard.writeText(text)
                 .then(() => showToast('📋 Copied'))
                 .catch(() => alert('Copy failed — clipboard permission blocked?'));
+        };
+
+        // V100.94: "enso halo" Add button (AI Suggested Questions) swaps to an
+        // "Added" state on click. Done as DOM mutation, not a reassigned innerHTML
+        // string on the onclick attribute itself, since that button's markup nests
+        // quotes (style attrs on child spans) that would need multiple layers of
+        // HTML-entity escaping inline — easy to get wrong, easy to read wrong.
+        window.markAiSuggestionAdded = function(btn) {
+            btn.disabled = true;
+            btn.style.cursor = 'default';
+            btn.style.background = 'linear-gradient(135deg,#c7cad1,#a8acb5)';
+            btn.style.boxShadow = 'inset 0 0 0 1.5px rgba(255,255,255,.5)';
+            const ring = btn.querySelector('.enso-ring');
+            if (ring) ring.innerHTML = '<i class="fa-solid fa-check"></i>';
+            const label = btn.querySelector('.enso-label');
+            if (label) label.textContent = 'Added';
         };
 
 
