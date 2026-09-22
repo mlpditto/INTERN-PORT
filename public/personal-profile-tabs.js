@@ -1,14 +1,72 @@
+// V100.73: three tabs now (info / self / bucket) — was a hardcoded boolean
+// toggle between two panels, rewritten as a lookup so a tab is just an entry
+// in PI_TABS rather than a new branch through every call site.
+const PI_TABS = {
+    info: { panel: 'pi-info-panel', tab: 'pi-tab-info' },
+    self: { panel: 'section-personality', tab: 'pi-tab-self' },
+    bucket: { panel: 'pi-bucket-panel', tab: 'pi-tab-bucket' }
+};
 window.switchPersonalTab = function(tab) {
-    const self = tab === 'self';
-    document.getElementById('pi-info-panel').hidden = self;
-    document.getElementById('section-personality').hidden = !self;
-    document.getElementById('pi-tab-info').setAttribute('aria-selected', String(!self));
-    document.getElementById('pi-tab-self').setAttribute('aria-selected', String(self));
-    if (self) {
+    if (!PI_TABS[tab]) tab = 'info';
+    Object.keys(PI_TABS).forEach(key => {
+        const { panel, tab: tabId } = PI_TABS[key];
+        document.getElementById(panel).hidden = key !== tab;
+        document.getElementById(tabId).setAttribute('aria-selected', String(key === tab));
+    });
+    if (tab === 'self') {
         document.getElementById('pers-content').style.display = 'block';
         const icon = document.getElementById('pers-collapse-icon');
         if (icon) icon.style.transform = 'rotate(180deg)';
     }
+};
+
+// V100.73: personal bucket list (things you want to do — series to watch,
+// places to go). Whole-array read/write on users/{uid}.bucketList, same
+// pattern saveSettingsPref already uses for other small personal fields —
+// no subcollection needed for a list this size. window._bucketItems is
+// populated by openPersonalInfoModal (index.html) on modal open.
+window.renderBucketList = function() {
+    const items = window._bucketItems || [];
+    const list = document.getElementById('bucket-list');
+    const empty = document.getElementById('bucket-empty');
+    if (!list || !empty) return;
+    empty.style.display = items.length ? 'none' : 'block';
+    list.innerHTML = items.map(item => `
+        <div style="display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid #eee; border-radius:10px; background:#fff;">
+            <input type="checkbox" ${item.done ? 'checked' : ''} onchange="toggleBucketItem('${item.id}')" style="flex-shrink:0; width:auto;">
+            <span style="flex:1; font-size:0.88em; ${item.done ? 'text-decoration:line-through; color:#94a3b8;' : 'color:#333;'} word-break:break-word;">${escapeHtml(item.text)}</span>
+            <button type="button" onclick="deleteBucketItem('${item.id}')" aria-label="Delete" style="width:auto; min-height:0; flex-shrink:0; border:none; background:transparent; color:#cbd5e1; font-size:1em; cursor:pointer; padding:2px 4px;">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+    `).join('');
+};
+window.saveBucketList = function() {
+    if (!userId || !db) return;
+    db.collection('users').doc(userId).set({ bucketList: window._bucketItems || [] }, { merge: true })
+        .catch(e => console.warn('[bucket] save failed:', e.message));
+};
+window.addBucketItem = function() {
+    const input = document.getElementById('bucket-input');
+    const text = input.value.trim();
+    if (!text) { input.focus(); return; }
+    if (!window._bucketItems) window._bucketItems = [];
+    window._bucketItems.push({ id: Date.now() + '-' + Math.floor(Math.random() * 1000), text, done: false });
+    input.value = '';
+    renderBucketList();
+    saveBucketList();
+};
+window.toggleBucketItem = function(id) {
+    const item = (window._bucketItems || []).find(it => it.id === id);
+    if (!item) return;
+    item.done = !item.done;
+    renderBucketList();
+    saveBucketList();
+};
+window.deleteBucketItem = function(id) {
+    window._bucketItems = (window._bucketItems || []).filter(it => it.id !== id);
+    renderBucketList();
+    saveBucketList();
 };
 window.updatePersonalBirthday = function() {
     const result = document.getElementById('pi-age');
@@ -71,12 +129,23 @@ window.copyPersonalSocial = async function(key) {
 document.addEventListener('DOMContentLoaded', () => {
     ['pi-start-date','pi-end-date'].forEach(id => document.getElementById(id)?.addEventListener('input', () => updatePersonalPeriod()));
     ['day','month','year'].forEach(k => document.getElementById('pi-bday-' + k)?.addEventListener('change', updatePersonalBirthday));
+    document.getElementById('bucket-input')?.addEventListener('keydown', event => {
+        if (event.key === 'Enter') { event.preventDefault(); addBucketItem(); }
+    });
     const tabs = document.querySelector('#personalInfoModal .pi-tabs');
+    const tabOrder = Object.keys(PI_TABS);
     tabs?.addEventListener('keydown', event => {
         if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
         event.preventDefault();
-        const self = event.key === 'End' || (event.key !== 'Home' && document.activeElement.id === 'pi-tab-info');
-        switchPersonalTab(self ? 'self' : 'info');
-        document.getElementById(self ? 'pi-tab-self' : 'pi-tab-info').focus();
+        const current = tabOrder.find(key => document.activeElement.id === PI_TABS[key].tab) || 'info';
+        let next;
+        if (event.key === 'Home') next = tabOrder[0];
+        else if (event.key === 'End') next = tabOrder[tabOrder.length - 1];
+        else {
+            const delta = event.key === 'ArrowRight' ? 1 : -1;
+            next = tabOrder[(tabOrder.indexOf(current) + delta + tabOrder.length) % tabOrder.length];
+        }
+        switchPersonalTab(next);
+        document.getElementById(PI_TABS[next].tab).focus();
     });
 });
