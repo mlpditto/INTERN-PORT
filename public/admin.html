@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.05)</title>
+    <title>Nika Admin (V101.06)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -2329,6 +2329,26 @@
             background: #e2e8f0;
             margin: 4px 0;
         }
+
+        /* V101.06: Tag hygiene panel under the Quiz Engine toolbar. Counts come from
+           quizzesData via renderQuizTagHygiene(); chips reuse the tag-rail look. */
+        #quiz-tag-hygiene { margin-top:10px; border-top:1px solid #f1f5f9; padding-top:8px; }
+        #quiz-tag-hygiene > summary { cursor:pointer; font-size:0.72em; font-weight:800; color:#64748b; list-style:none; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+        #quiz-tag-hygiene > summary::-webkit-details-marker { display:none; }
+        #quiz-tag-hygiene > summary::before { content:'\25B8'; color:#94a3b8; }
+        #quiz-tag-hygiene[open] > summary::before { content:'\25BE'; }
+        .tag-hyg-stat { padding:4px 9px; border-radius:10px; background:#f8fafc; border:1px solid #e2e8f0; white-space:nowrap; }
+        .tag-hyg-stat.warn { background:#fef9c3; border-color:#fde68a; color:#a16207; }
+        .tag-hyg-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px; margin-top:10px; }
+        .tag-hyg-card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:10px 12px; font-size:0.78em; color:#475569; }
+        .tag-hyg-card h5 { margin:0 0 6px; font-size:0.85em; font-weight:800; color:#334155; text-transform:uppercase; letter-spacing:0.4px; }
+        .tag-hyg-card .tag-hyg-chips + h5 { margin-top:10px; }
+        .tag-hyg-card p { margin:0 0 6px; }
+        .tag-hyg-chips { display:flex; flex-wrap:wrap; gap:5px; }
+        .tag-hyg-chip { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:10px; border:1px solid #cbd5e1; background:#fff; color:#64748b; font-size:0.92em; font-weight:700; cursor:pointer; }
+        .tag-hyg-chip:hover { border-color:#6366f1; color:#6366f1; }
+        .tag-hyg-chip small, .tag-hyg-group small { font-weight:600; color:#94a3b8; }
+        .tag-hyg-group { display:inline-flex; flex-wrap:wrap; gap:4px; align-items:center; margin:0 8px 4px 0; padding:3px 8px; border:1px dashed #cbd5e1; border-radius:10px; background:#fff; }
 
         /* V93.27 PR #13 Phase 4B: filter pills for Quiz Engine global toolbar
            (All / GRADED / TEMPLATE / ONE-TIME). Indigo active state matches the
@@ -6892,6 +6912,13 @@
                             <!-- Tag chips injected by renderQuizzes -->
                         </div>
                     </div>
+                    <!-- V101.06: Tag hygiene: distinct / case variants / near-duplicates / singletons
+                         over every quiz-level tag. Summary is refreshed by every renderQuizzes;
+                         the body renders only while open (ontoggle). -->
+                    <details id="quiz-tag-hygiene" class="lang-no-toggle" ontoggle="renderQuizTagHygiene()">
+                        <summary id="quiz-tag-hygiene-summary" title="Distinct tags, spelling drift and one-off tags across every quiz">🏷️ Tag hygiene</summary>
+                        <div id="quiz-tag-hygiene-body"></div>
+                    </details>
                 </div>
 
                 <!-- V94.04: bulk quiz actions bar — hidden until ≥1 row checkbox is ticked -->
@@ -30190,6 +30217,94 @@ ${JSON.stringify(sourceObj)}`;
         // snapshot pair on load) into one render. Every existing caller, including the
         // inline onclick handlers, keeps calling renderQuizzes() and is debounced free.
         let _renderQuizzesTimer = null;
+        // V101.06: Tag hygiene. Quiz-level tags are one free-text CSV string with no
+        // normalisation on save, so one topic drifts into several spellings. Reads
+        // quizzesData (already in memory, no extra Firestore reads) and groups:
+        //   key  = lowercased, whitespace-collapsed form  -> case variants share a key
+        //   fold = key minus punctuation/spaces, trailing "s" stripped
+        //          -> "Drug Interaction" / "drug-interactions" share a fold
+        // Quiz-level tags only; per-question tags are counted separately, not merged.
+        // On window so the harness (scripts/quiz-tag-hygiene-check.cjs) runs the real code.
+        window.computeQuizTagHygiene = function (quizzes) {
+            const split = s => String(s || '').split(',').map(t => t.trim().replace(/\s+/g, ' ')).filter(Boolean);
+            const byKey = new Map(); // key -> { forms: Map<raw, count>, quizIds: Set }
+            const perQuestionKeys = new Set();
+            let considered = 0, tagged = 0, untagged = 0;
+            (quizzes || []).forEach(q => {
+                if (!q || q.isHistoryRevision) return;
+                considered++;
+                const tags = split(q.tags);
+                if (tags.length) tagged++; else untagged++;
+                const seen = new Set();
+                tags.forEach(raw => {
+                    const key = raw.toLowerCase();
+                    const e = byKey.get(key) || { forms: new Map(), quizIds: new Set() };
+                    e.forms.set(raw, (e.forms.get(raw) || 0) + 1);
+                    if (!seen.has(key)) { e.quizIds.add(q.id || considered); seen.add(key); }
+                    byKey.set(key, e);
+                });
+                (Array.isArray(q.questions) ? q.questions : []).forEach(qq => split(qq && qq.tags).forEach(raw => perQuestionKeys.add(raw.toLowerCase())));
+            });
+            const fold = key => { const f = key.replace(/[^a-z0-9\u0E00-\u0E7F]/g, ''); return f.length > 3 && f.endsWith('s') ? f.slice(0, -1) : f; };
+            const entries = [...byKey.entries()].map(([key, e]) => ({
+                key, count: e.quizIds.size,
+                forms: [...e.forms.entries()].sort((a, b) => b[1] - a[1]).map(([raw, n]) => ({ raw, n }))
+            })).sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
+            const byFold = new Map();
+            entries.forEach(e => { const f = fold(e.key); if (!byFold.has(f)) byFold.set(f, []); byFold.get(f).push(e); });
+            return {
+                considered, tagged, untagged, distinct: entries.length, entries,
+                caseVariants: entries.filter(e => e.forms.length > 1),
+                nearDuplicates: [...byFold.values()].filter(g => g.length > 1),
+                singletons: entries.filter(e => e.count === 1),
+                markers: entries.filter(e => /^ai_|pharmcamp/.test(e.key)),
+                perQuestionDistinct: perQuestionKeys.size,
+                perQuestionOnly: [...perQuestionKeys].filter(k => !byKey.has(k))
+            };
+        };
+
+        window.quizTagHygieneFilter = function (el) {
+            const input = document.getElementById('quiz-search-global');
+            if (!input) return;
+            input.value = el.dataset.tag || '';
+            renderQuizzes();
+        };
+
+        window.renderQuizTagHygiene = function () {
+            const details = document.getElementById('quiz-tag-hygiene');
+            const summary = document.getElementById('quiz-tag-hygiene-summary');
+            const body = document.getElementById('quiz-tag-hygiene-body');
+            if (!details || !summary || !body || typeof quizzesData === 'undefined') return;
+            const h = window.computeQuizTagHygiene(quizzesData);
+            const stat = (label, n, warn) => `<span class="tag-hyg-stat${warn && n ? ' warn' : ''}">${n} ${label}</span>`;
+            summary.innerHTML = `🏷️ Tag hygiene ${stat('distinct', h.distinct)}${stat('case variants', h.caseVariants.length, true)}${stat('near-duplicates', h.nearDuplicates.length, true)}${stat('singletons', h.singletons.length)}${stat('untagged quizzes', h.untagged, true)}`;
+            if (!details.open) { body.innerHTML = ''; return; }
+            const label = e => `${escapeHtml(e.forms[0].raw)} <small>×${e.count}</small>`;
+            const chip = e => `<span class="tag-hyg-chip" data-tag="${escapeHtml(e.forms[0].raw)}" onclick="quizTagHygieneFilter(this)" title="Filter the list by this tag">${label(e)}</span>`;
+            const chips = list => `<div class="tag-hyg-chips">${list.map(chip).join('')}</div>`;
+            const group = parts => `<span class="tag-hyg-group">${parts}</span>`;
+            const cap = (list, n) => list.length > n ? `<p><small>Showing ${n} of ${list.length}.</small></p>` : '';
+            const none = '<p>None.</p>';
+            body.innerHTML = `<div class="tag-hyg-grid">
+                <div class="tag-hyg-card"><h5>Overview</h5>
+                    <p>${h.considered} quizzes · ${h.tagged} tagged · ${h.untagged} without tags · ${h.distinct} distinct tags (case-insensitive).</p>
+                    <p>Per-question tags: ${h.perQuestionDistinct} distinct, ${h.perQuestionOnly.length} not present at quiz level.</p>
+                    <h5>Top tags</h5>${chips(h.entries.slice(0, 15))}</div>
+                <div class="tag-hyg-card"><h5>Case variants · ${h.caseVariants.length}</h5>
+                    <p>Same tag, different capitalisation. Save only de-duplicates exact strings.</p>
+                    ${h.caseVariants.length ? h.caseVariants.slice(0, 30).map(e => group(e.forms.map(f => `${escapeHtml(f.raw)} <small>×${f.n}</small>`).join(' · '))).join('') : none}${cap(h.caseVariants, 30)}</div>
+                <div class="tag-hyg-card"><h5>Near-duplicates · ${h.nearDuplicates.length}</h5>
+                    <p>Differ only by punctuation, spacing or a plural "s".</p>
+                    ${h.nearDuplicates.length ? h.nearDuplicates.slice(0, 30).map(g => group(g.map(label).join(' ≈ '))).join('') : none}${cap(h.nearDuplicates, 30)}</div>
+                <div class="tag-hyg-card"><h5>Singletons · ${h.singletons.length}</h5>
+                    <p>Used by exactly one quiz. Candidates to fold into a common tag.</p>
+                    ${h.singletons.length ? chips(h.singletons.slice(0, 60)) : none}${cap(h.singletons, 60)}</div>
+                <div class="tag-hyg-card"><h5>Machine markers · ${h.markers.length}</h5>
+                    <p>AI_VARIANT / AI_FROM_CASE / PharmCamp live inside the tag string and drive code paths.</p>
+                    ${h.markers.length ? chips(h.markers) : none}</div>
+            </div>`;
+        };
+
         function renderQuizzes() {
             clearTimeout(_renderQuizzesTimer);
             _renderQuizzesTimer = setTimeout(renderQuizzesNow, 120);
@@ -30305,6 +30420,9 @@ ${JSON.stringify(sourceObj)}`;
             } else if (chipContainer && searchVal) {
                 chipContainer.innerHTML = `<span class="badge" onclick="document.getElementById('quiz-search-global').value=''; renderQuizzes();" style="background:#fee2e2; color:#ef4444; font-size:0.75em; cursor:pointer; padding:6px 14px; border:1px solid #fecaca; border-radius:10px; font-weight:800; display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-circle-xmark"></i> Clear Search Filter</span>`;
             }
+
+            // V101.06: tag hygiene summary rides the same pass (counts over ALL of quizzesData).
+            if (typeof window.renderQuizTagHygiene === 'function') window.renderQuizTagHygiene();
 
             // V97.80: audit coverage, deliberately counted over ALL of quizzesData rather
             // than the filtered view — the number answers "how far through auditing am I",
