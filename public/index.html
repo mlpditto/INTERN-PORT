@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V100.81)</title>
+    <title>Internship Portfolio (V100.82)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -702,6 +702,9 @@
         #finModal .fin-btn.sm { width:auto; padding:6px 12px; font-size:0.78em; }
         #finModal .fin-item { display:flex; align-items:center; gap:8px; font-size:0.84em; padding:6px 2px; border-bottom:1px dashed #e2e8f0; }
         #finModal .fin-item:last-child { border-bottom:0; }
+        #finModal .fin-item.editing { flex-wrap:wrap; }
+        #finModal .fin-item.editing .fin-cats { flex-basis:100%; margin:6px 0 2px; }
+        #finModal .fin-item.editing .fin-time { width:6ch; text-align:center; }
         #finModal .fin-item .ic { width:26px; height:26px; border-radius:8px; background:#f1f5f9; display:grid; place-items:center; flex:0 0 auto; }
         #finModal .fin-item .n { flex:1; min-width:0; overflow-wrap:anywhere; cursor:pointer; } #finModal .fin-item .n small { display:block; color:#94a3b8; font-size:0.85em; }
         #finModal .fin-item .a { font-weight:900; white-space:nowrap; }
@@ -18705,7 +18708,7 @@
         //     expenses: [ { id, date: 'YYYY-MM-DD', amount, cat, note, ts } ] }
         // V100.80: + Drink, Subs (subscriptions). Category text is stored on each expense, so reordering is safe.
         const FIN_CATS = ['🍜 Food', '🥤 Drink', '☕ Coffee', '🚌 Travel', '🛒 Groceries', '📱 Subs', '🎉 Fun', '💊 Health', '📚 Study', '📦 Other'];
-        const finState = { tab: 'today', month: null, cat: FIN_CATS[0], selDay: null, editId: null };
+        const finState = { tab: 'today', month: null, cat: FIN_CATS[0], selDay: null, editId: null, editCat: null };
         function finKey() { return 'fin_v1_' + (userId || 'anon'); }
         function finLoad() {
             try { const d = JSON.parse(localStorage.getItem(finKey()) || 'null'); if (d && d.plans && Array.isArray(d.expenses)) return d; } catch (_) {}
@@ -18713,7 +18716,9 @@
         }
         function finSave(d) { try { localStorage.setItem(finKey(), JSON.stringify(d)); } catch (_) { showToast('Could not save (storage full or blocked)'); } }
         function finToday() { return getBangkokDateTimeParts().dateKey; }
-        function finFmt(n) { return '฿ ' + Math.round(n).toLocaleString('en-US'); }
+        // V100.82: amounts keep up to 2 decimals — whole numbers stay "฿ 67", fractions show "฿ 67.50".
+        function finFmt(n) { const v = Math.round((Number(n) || 0) * 100) / 100; return '฿ ' + v.toLocaleString('en-US', Number.isInteger(v) ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+        function finRound(v) { return Math.round(v * 100) / 100; }
         function finEsc(t) { return String(t || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
         function finMonthLabel(ym) { const [y, m] = ym.split('-').map(Number); return new Date(y, m - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' }); }
         function finDaysIn(ym) { const [y, m] = ym.split('-').map(Number); return new Date(y, m, 0).getDate(); }
@@ -18741,7 +18746,7 @@
         function finPickCat(btn) { finState.cat = btn.dataset.cat; document.querySelectorAll('#finModal .fin-cat').forEach(b => b.classList.toggle('on', b === btn)); }
         function finAdd() {
             const amtEl = document.getElementById('fin-amt'), noteEl = document.getElementById('fin-note');
-            const amount = parseFloat(amtEl && amtEl.value);
+            const amount = finRound(parseFloat(amtEl && amtEl.value));
             if (!(amount > 0)) { showToast('Enter an amount first'); return; }
             const data = finLoad();
             data.expenses.unshift({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), date: finToday(), amount, cat: finState.cat, note: (noteEl.value || '').trim().slice(0, 80), ts: Date.now() });
@@ -18751,21 +18756,31 @@
         // V100.79: tap an item's name to add / change its note after the fact.
         // V100.80: the same editor also takes the time (HH:MM) — the item keeps its
         // date, only the clock part of ts moves.
-        function finEditItem(id) { finState.editId = finState.editId === id ? null : id; finRender(); }
+        // V100.82: the editor also has a category chip rail (finState.editCat), and the
+        // time field is a plain HH:MM text box — <input type="time"> shows AM/PM in
+        // en-locale WebViews, and interns asked for 24 h.
+        function finEditItem(id) {
+            finState.editId = finState.editId === id ? null : id;
+            const e = finState.editId ? finLoad().expenses.find(x => x.id === id) : null;
+            finState.editCat = e ? e.cat : null;
+            finRender();
+        }
+        function finPickEditCat(btn) { finState.editCat = btn.dataset.cat; btn.closest('.fin-cats').querySelectorAll('.fin-cat').forEach(b => b.classList.toggle('on', b === btn)); }
         function finSaveItem(id) {
             const noteEl = document.getElementById('fin-edit-note'), timeEl = document.getElementById('fin-edit-time');
             if (!noteEl) return;
             const data = finLoad(); const e = data.expenses.find(x => x.id === id);
             if (e) {
                 e.note = (noteEl.value || '').trim().slice(0, 80);
-                const m = /^(\d{1,2}):(\d{2})$/.exec(timeEl && timeEl.value || '');
+                if (FIN_CATS.includes(finState.editCat)) e.cat = finState.editCat;
+                const m = /^(\d{1,2}):?(\d{2})$/.exec((timeEl && timeEl.value || '').trim());
                 if (m) { const [y, mo, d] = e.date.split('-').map(Number); e.ts = new Date(y, mo - 1, d, Math.min(23, Number(m[1])), Math.min(59, Number(m[2]))).getTime(); }
                 finSave(data);
             }
             finState.editId = null; finRender();
         }
         function finSetDefault() {
-            const v = parseFloat(document.getElementById('fin-default').value);
+            const v = finRound(parseFloat(document.getElementById('fin-default').value));
             const data = finLoad(); const plan = data.plans[finState.month] || (data.plans[finState.month] = { daily: 0, days: {} });
             plan.daily = v > 0 ? v : 0; finSave(data); finRender(); showToast(`Default ${finFmt(plan.daily)}/day for ${finMonthLabel(finState.month)}`);
         }
@@ -18775,11 +18790,11 @@
             const data = finLoad(); const plan = data.plans[finState.month] || (data.plans[finState.month] = { daily: 0, days: {} });
             plan.days = plan.days || {};
             if (clear) delete plan.days[dayKey];
-            else { const v = parseFloat(document.getElementById('fin-day-amt').value); if (!(v >= 0)) return; plan.days[dayKey] = v; }
+            else { const v = finRound(parseFloat(document.getElementById('fin-day-amt').value)); if (!(v >= 0)) return; plan.days[dayKey] = v; }
             finSave(data); finState.selDay = null; finRender();
         }
         function finSetToday() {
-            const v = parseFloat(document.getElementById('fin-today-amt').value); if (!(v >= 0)) return;
+            const v = finRound(parseFloat(document.getElementById('fin-today-amt').value)); if (!(v >= 0)) return;
             const data = finLoad(); const ym = finToday().slice(0, 7); const plan = data.plans[ym] || (data.plans[ym] = { daily: 0, days: {} });
             plan.days = plan.days || {}; plan.days[finToday()] = v; finSave(data); finRender();
         }
@@ -18808,13 +18823,13 @@
                         <div class="fin-sub">Spent ${finFmt(spent)}${budget <= 0 ? ' · no budget set for today — set one below or in Plan' : ''}</div>
                         <div class="fin-row" style="margin-top:8px;">
                             <span class="fin-muted">Today's budget</span>
-                            <input id="fin-today-amt" type="number" inputmode="decimal" min="0" step="1" value="${budget || ''}" placeholder="0">
+                            <input id="fin-today-amt" type="number" inputmode="decimal" min="0" step="0.01" value="${budget || ''}" placeholder="0">
                             <button type="button" class="fin-btn ghost sm" onclick="finSetToday()">Set</button>
                         </div>
                     </div>
                     <div class="fin-card">
                         <div class="fin-lbl" style="margin-bottom:6px;">Add expense · บันทึกรายจ่าย</div>
-                        <div class="fin-amt"><span>฿</span><input id="fin-amt" type="number" inputmode="decimal" min="0" step="1" placeholder="0"></div>
+                        <div class="fin-amt"><span>฿</span><input id="fin-amt" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0"></div>
                         <div class="fin-cats">${FIN_CATS.map(c => `<button type="button" class="fin-cat${c === finState.cat ? ' on' : ''}" data-cat="${c}" onclick="finPickCat(this)">${c}</button>`).join('')}</div>
                         <input id="fin-note" class="fin-note" maxlength="80" placeholder="Note (optional) · ข้าวเที่ยง, BTS...">
                         <button type="button" class="fin-btn" onclick="finAdd()">＋ Add</button>
@@ -18822,7 +18837,7 @@
                     <div class="fin-card">
                         <div class="fin-lbl" style="margin-bottom:4px;">Today's items</div>
                         ${items.length ? items.map(e => finState.editId === e.id
-                            ? `<div class="fin-item"><span class="ic">${e.cat.split(' ')[0]}</span><input id="fin-edit-time" class="fin-note fin-time" type="time" value="${new Date(e.ts).toTimeString().slice(0, 5)}" onkeydown="if(event.key==='Enter'){event.preventDefault();finSaveItem('${e.id}')}"><input id="fin-edit-note" class="fin-note" maxlength="80" value="${finEsc(e.note)}" placeholder="Note · ข้าวเที่ยง, BTS..." onkeydown="if(event.key==='Enter'){event.preventDefault();finSaveItem('${e.id}')}" style="margin:0; flex:1; min-width:0;"><button type="button" class="fin-btn sm" onclick="finSaveItem('${e.id}')">Save</button></div>`
+                            ? `<div class="fin-item editing"><span class="ic">${e.cat.split(' ')[0]}</span><input id="fin-edit-time" class="fin-note fin-time" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" title="24 h · e.g. 17:45" value="${new Date(e.ts).toTimeString().slice(0, 5)}" onkeydown="if(event.key==='Enter'){event.preventDefault();finSaveItem('${e.id}')}"><input id="fin-edit-note" class="fin-note" maxlength="80" value="${finEsc(e.note)}" placeholder="Note · ข้าวเที่ยง, BTS..." onkeydown="if(event.key==='Enter'){event.preventDefault();finSaveItem('${e.id}')}" style="margin:0; flex:1; min-width:0;"><button type="button" class="fin-btn sm" onclick="finSaveItem('${e.id}')">Save</button><div class="fin-cats">${FIN_CATS.map(c => `<button type="button" class="fin-cat${c === finState.editCat ? ' on' : ''}" data-cat="${c}" onclick="finPickEditCat(this)">${c}</button>`).join('')}</div></div>`
                             : `<div class="fin-item"><span class="ic">${e.cat.split(' ')[0]}</span><span class="n" role="button" tabindex="0" title="Tap to edit note / time" onclick="finEditItem('${e.id}')">${e.note ? finEsc(e.note) : `<span class="fin-muted">${finEsc(e.cat.slice(e.cat.indexOf(' ') + 1))} · ✎ add note</span>`}<small>${new Date(e.ts).toTimeString().slice(0, 5)} · ${finEsc(e.cat)}</small></span><span class="a">${finFmt(e.amount)}</span><button type="button" class="del" onclick="finDel('${e.id}')" aria-label="Delete">✕</button></div>`).join('') : '<div class="fin-muted">Nothing yet today.</div>'}
                     </div>`;
                 const editEl = document.getElementById('fin-edit-note'); if (editEl) editEl.focus();
@@ -18876,7 +18891,7 @@
                     <div class="fin-lbl" style="margin-bottom:6px;">Default daily budget · งบต่อวันของเดือนนี้</div>
                     <div class="fin-row">
                         <span class="fin-muted">฿ / day</span>
-                        <input id="fin-default" type="number" inputmode="decimal" min="0" step="1" value="${plan.daily || ''}" placeholder="300">
+                        <input id="fin-default" type="number" inputmode="decimal" min="0" step="0.01" value="${plan.daily || ''}" placeholder="300">
                         <button type="button" class="fin-btn ghost sm" onclick="finSetDefault()">Save</button>
                         <span class="fin-muted" style="margin-left:auto;">= ${finFmt((plan.daily || 0) * days)} / month</span>
                     </div>
@@ -18886,7 +18901,7 @@
                     <div class="fin-grid">${dayKeys.map((k, i) => { const o = plan.days && Number.isFinite(plan.days[k]); return `<button type="button" class="fin-day${o ? ' override' : ''}${k === today ? ' today' : ''}${k === sel ? ' sel' : ''}${k < today ? ' past' : ''}" onclick="finSelDay('${k}')"><b>${i + 1}</b><small>${finBudget(data, k) ? Math.round(finBudget(data, k)).toLocaleString('en-US') : '–'}</small></button>`; }).join('')}</div>
                     ${sel ? `<div class="fin-row" style="margin-top:8px;">
                         <span class="fin-muted">${finMonthLabel(ym).split(' ')[0]} ${Number(sel.slice(-2))}</span>
-                        <input id="fin-day-amt" type="number" inputmode="decimal" min="0" step="1" value="${plan.days && Number.isFinite(plan.days[sel]) ? plan.days[sel] : ''}" placeholder="${plan.daily || 0}">
+                        <input id="fin-day-amt" type="number" inputmode="decimal" min="0" step="0.01" value="${plan.days && Number.isFinite(plan.days[sel]) ? plan.days[sel] : ''}" placeholder="${plan.daily || 0}">
                         <button type="button" class="fin-btn sm" onclick="finSetDay(false)">Set</button>
                         ${plan.days && Number.isFinite(plan.days[sel]) ? '<button type="button" class="fin-btn ghost sm" onclick="finSetDay(true)">Clear</button>' : ''}
                     </div>` : '<div class="fin-muted" style="margin-top:6px;">Green = custom amount · outline = today.</div>'}
@@ -18896,7 +18911,7 @@
         window.finOpen = finOpen; window.finClose = finClose; window.finTab = finTab; window.finShiftMonth = finShiftMonth;
         window.finPickCat = finPickCat; window.finAdd = finAdd; window.finDel = finDel; window.finSetDefault = finSetDefault;
         window.finSelDay = finSelDay; window.finSetDay = finSetDay; window.finSetToday = finSetToday;
-        window.finEditItem = finEditItem; window.finSaveItem = finSaveItem;
+        window.finEditItem = finEditItem; window.finSaveItem = finSaveItem; window.finPickEditCat = finPickEditCat;
 
         // V96.41: `source` is 'manual' when the ✅ chip is tapped, 'activity' when a
         // submission auto-checks the intern in. Both paths stamp checkinLastDate, which
