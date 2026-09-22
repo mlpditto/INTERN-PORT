@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V100.79)</title>
+    <title>Internship Portfolio (V100.80)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -694,6 +694,7 @@
         #finModal .fin-cat { width:auto; margin:0; border:1px solid #e2e8f0; background:#fff; border-radius:999px; padding:4px 9px; font-size:0.74em; font-weight:800; color:#475569; cursor:pointer; min-height:32px; }
         #finModal .fin-cat.on { background:#ecfdf5; border-color:#6ee7b7; color:#065f46; }
         #finModal .fin-note { width:100%; border:1.5px solid #e2e8f0; border-radius:12px; padding:7px 10px; font-size:0.85em; margin:0 0 8px; }
+        #finModal .fin-time { width:auto; flex:0 0 auto; margin:0; padding:5px 6px; font-weight:800; font-variant-numeric:tabular-nums; }
         #finModal .fin-btn { width:100%; border:0; border-radius:12px; padding:10px; margin:0; font-weight:900; font-size:0.88em; cursor:pointer; background:linear-gradient(135deg,#10b981,#059669); color:#fff; }
         #finModal .fin-btn.ghost { background:#fff; color:#065f46; border:1px solid #a7f3d0; }
         #finModal .fin-btn.sm { width:auto; padding:6px 12px; font-size:0.78em; }
@@ -18700,7 +18701,8 @@
         // income. Data never leaves the device: fin_v1_<uid> in localStorage.
         //   { plans: { 'YYYY-MM': { daily: 300, days: { 'YYYY-MM-DD': 500 } } },
         //     expenses: [ { id, date: 'YYYY-MM-DD', amount, cat, note, ts } ] }
-        const FIN_CATS = ['🍜 Food', '🚌 Travel', '☕ Coffee', '🛒 Groceries', '🎉 Fun', '💊 Health', '📚 Study', '📦 Other'];
+        // V100.80: + Drink, Subs (subscriptions). Category text is stored on each expense, so reordering is safe.
+        const FIN_CATS = ['🍜 Food', '🥤 Drink', '☕ Coffee', '🚌 Travel', '🛒 Groceries', '📱 Subs', '🎉 Fun', '💊 Health', '📚 Study', '📦 Other'];
         const finState = { tab: 'today', month: null, cat: FIN_CATS[0], selDay: null, editId: null };
         function finKey() { return 'fin_v1_' + (userId || 'anon'); }
         function finLoad() {
@@ -18745,11 +18747,19 @@
         }
         function finDel(id) { const data = finLoad(); data.expenses = data.expenses.filter(e => e.id !== id); finSave(data); finRender(); }
         // V100.79: tap an item's name to add / change its note after the fact.
-        function finEditNote(id) { finState.editId = finState.editId === id ? null : id; finRender(); }
-        function finSaveNote(id) {
-            const el = document.getElementById('fin-edit-note'); if (!el) return;
+        // V100.80: the same editor also takes the time (HH:MM) — the item keeps its
+        // date, only the clock part of ts moves.
+        function finEditItem(id) { finState.editId = finState.editId === id ? null : id; finRender(); }
+        function finSaveItem(id) {
+            const noteEl = document.getElementById('fin-edit-note'), timeEl = document.getElementById('fin-edit-time');
+            if (!noteEl) return;
             const data = finLoad(); const e = data.expenses.find(x => x.id === id);
-            if (e) { e.note = (el.value || '').trim().slice(0, 80); finSave(data); }
+            if (e) {
+                e.note = (noteEl.value || '').trim().slice(0, 80);
+                const m = /^(\d{1,2}):(\d{2})$/.exec(timeEl && timeEl.value || '');
+                if (m) { const [y, mo, d] = e.date.split('-').map(Number); e.ts = new Date(y, mo - 1, d, Math.min(23, Number(m[1])), Math.min(59, Number(m[2]))).getTime(); }
+                finSave(data);
+            }
             finState.editId = null; finRender();
         }
         function finSetDefault() {
@@ -18810,8 +18820,8 @@
                     <div class="fin-card">
                         <div class="fin-lbl" style="margin-bottom:4px;">Today's items</div>
                         ${items.length ? items.map(e => finState.editId === e.id
-                            ? `<div class="fin-item"><span class="ic">${e.cat.split(' ')[0]}</span><input id="fin-edit-note" class="fin-note" maxlength="80" value="${finEsc(e.note)}" placeholder="Note · ข้าวเที่ยง, BTS..." onkeydown="if(event.key==='Enter'){event.preventDefault();finSaveNote('${e.id}')}" style="margin:0; flex:1; min-width:0;"><button type="button" class="fin-btn sm" onclick="finSaveNote('${e.id}')">Save</button></div>`
-                            : `<div class="fin-item"><span class="ic">${e.cat.split(' ')[0]}</span><span class="n" role="button" tabindex="0" title="Tap to add or edit note" onclick="finEditNote('${e.id}')">${e.note ? finEsc(e.note) : `<span class="fin-muted">${finEsc(e.cat.slice(e.cat.indexOf(' ') + 1))} · ✎ add note</span>`}<small>${new Date(e.ts).toTimeString().slice(0, 5)} · ${finEsc(e.cat)}</small></span><span class="a">${finFmt(e.amount)}</span><button type="button" class="del" onclick="finDel('${e.id}')" aria-label="Delete">✕</button></div>`).join('') : '<div class="fin-muted">Nothing yet today.</div>'}
+                            ? `<div class="fin-item"><span class="ic">${e.cat.split(' ')[0]}</span><input id="fin-edit-time" class="fin-note fin-time" type="time" value="${new Date(e.ts).toTimeString().slice(0, 5)}" onkeydown="if(event.key==='Enter'){event.preventDefault();finSaveItem('${e.id}')}"><input id="fin-edit-note" class="fin-note" maxlength="80" value="${finEsc(e.note)}" placeholder="Note · ข้าวเที่ยง, BTS..." onkeydown="if(event.key==='Enter'){event.preventDefault();finSaveItem('${e.id}')}" style="margin:0; flex:1; min-width:0;"><button type="button" class="fin-btn sm" onclick="finSaveItem('${e.id}')">Save</button></div>`
+                            : `<div class="fin-item"><span class="ic">${e.cat.split(' ')[0]}</span><span class="n" role="button" tabindex="0" title="Tap to edit note / time" onclick="finEditItem('${e.id}')">${e.note ? finEsc(e.note) : `<span class="fin-muted">${finEsc(e.cat.slice(e.cat.indexOf(' ') + 1))} · ✎ add note</span>`}<small>${new Date(e.ts).toTimeString().slice(0, 5)} · ${finEsc(e.cat)}</small></span><span class="a">${finFmt(e.amount)}</span><button type="button" class="del" onclick="finDel('${e.id}')" aria-label="Delete">✕</button></div>`).join('') : '<div class="fin-muted">Nothing yet today.</div>'}
                     </div>`;
                 const editEl = document.getElementById('fin-edit-note'); if (editEl) editEl.focus();
                 const amt = document.getElementById('fin-amt'); if (amt && items.length === 0 && !editEl) amt.focus();
@@ -18884,7 +18894,7 @@
         window.finOpen = finOpen; window.finClose = finClose; window.finTab = finTab; window.finShiftMonth = finShiftMonth;
         window.finPickCat = finPickCat; window.finAdd = finAdd; window.finDel = finDel; window.finSetDefault = finSetDefault;
         window.finSelDay = finSelDay; window.finSetDay = finSetDay; window.finSetToday = finSetToday;
-        window.finEditNote = finEditNote; window.finSaveNote = finSaveNote;
+        window.finEditItem = finEditItem; window.finSaveItem = finSaveItem;
 
         // V96.41: `source` is 'manual' when the ✅ chip is tapped, 'activity' when a
         // submission auto-checks the intern in. Both paths stamp checkinLastDate, which
