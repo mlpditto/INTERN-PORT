@@ -116,12 +116,22 @@
             const section = node('section', undefined, 'curate-reason'); section.append(node('strong', label)); bilingual(section, relation[key], relation[key + 'Th']); panel.append(section);
         }
         const actions = node('div', undefined, 'curate-compare-actions');
+        // V101.04: the button matching the current selection shows as pressed, and a click
+        // confirms the result in the feedback line — before, pressing an already-current
+        // choice (e.g. "Keep Q1" while Q1 was kept) changed nothing visible and looked broken.
+        const current = [a, b].filter(id => s.keep.has(id));
         for (const ids of [[a], [b], [a, b]]) {
-            const button = node('button', ids.length === 2 ? 'Keep both' : 'Keep Q' + ids[0]); button.type = 'button'; button.title = 'ปรับข้อที่เก็บ โดยยังคงข้อที่ปักหมุดไว้';
+            const button = node('button', ids.length === 2 ? 'Keep both' : 'Keep Q' + ids[0]); button.type = 'button';
+            const pressed = ids.length === current.length && ids.every(id => current.includes(id));
+            button.setAttribute('aria-pressed', String(pressed));
+            button.title = pressed ? 'ตัวเลือกปัจจุบัน' : 'ปรับข้อที่เก็บ โดยยังคงข้อที่ปักหมุดไว้';
             button.disabled = s.saved || s.busy || s.saving || [a, b].some(id => s.pins.has(id) && !ids.includes(id));
             button.onclick = () => {
                 if (s.saved || s.busy || s.saving || [a, b].some(id => s.pins.has(id) && !ids.includes(id))) return;
-                [a, b].forEach(id => ids.includes(id) ? s.keep.add(id) : s.keep.delete(id)); s.message = ''; render();
+                [a, b].forEach(id => ids.includes(id) ? s.keep.add(id) : s.keep.delete(id));
+                const removed = [a, b].filter(id => !ids.includes(id));
+                s.message = 'Keeping ' + ids.map(id => 'Q' + id).join(' and ') + (removed.length ? ' · removing ' + removed.map(id => 'Q' + id).join(', ') : '') + ' · ' + s.keep.size + ' selected · target ' + target(s);
+                render();
                 [...panel.querySelectorAll('.curate-compare-actions button')].find(b => b.textContent === button.textContent)?.focus();
                 byId('curate-feedback').scrollIntoView({ block: 'nearest' });
             }; actions.append(button);
