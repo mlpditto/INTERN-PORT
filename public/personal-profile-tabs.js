@@ -13,11 +13,18 @@ window.switchPersonalTab = function(tab) {
         document.getElementById(panel).hidden = key !== tab;
         document.getElementById(tabId).setAttribute('aria-selected', String(key === tab));
     });
-    if (tab === 'self') {
-        document.getElementById('pers-content').style.display = 'block';
-        const icon = document.getElementById('pers-collapse-icon');
-        if (icon) icon.style.transform = 'rotate(180deg)';
-    }
+    // V100.76: #pers-content has no collapse state anymore (the toggle that used
+    // to show/hide it was removed — see index.html), so the only thing 'self'
+    // still needs on arrival is the type grid, built once and cached via
+    // dataset.built inside renderPersonalityTypeGrid itself (index.html).
+    if (tab === 'self' && typeof renderPersonalityTypeGrid === 'function') renderPersonalityTypeGrid();
+    // V100.76: .modal-content scrolls internally (max-height:80vh; overflow-y:auto),
+    // so a scroll position from the previous tab would otherwise carry over —
+    // e.g. leaving Know Yourself mid-scroll after reading Personal Info's
+    // Contact card. Reset on every switch, not just 'self': this used to be a
+    // one-off scrollIntoView inside the now-removed collapse toggle.
+    const modalContent = document.querySelector('#personalInfoModal .modal-content');
+    if (modalContent) modalContent.scrollTop = 0;
 };
 
 // V100.73: personal bucket list (things you want to do — series to watch,
