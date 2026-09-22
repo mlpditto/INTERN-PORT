@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.90)</title>
+    <title>Nika Admin (V100.91)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -31103,13 +31103,16 @@ ${JSON.stringify(sourceObj)}`;
                             const pct = Math.round(m.score * 100);
                             // V97.06: "strong" tier bumped 50%→60% — containment runs
                             // structurally higher than the old Jaccard score did.
-                            return `<span title="${escapeHtml(otherStem.slice(0, 200))}" style="display:inline-block; margin:3px 4px 0 0; padding:2px 8px; border-radius:999px; font-size:0.72em; font-weight:700; background:${pct >= 60 ? '#fee2e2' : '#fef3c7'}; color:${pct >= 60 ? '#991b1b' : '#92400e'};">≈ ${pct}% · ${escapeHtml(otherQuiz.shortTitle || otherQuiz.title || 'Quiz')} Q${m.other.qIndex + 1}</span>`;
+                            // V100.91: clickable — expands both full questions inline via
+                            // toggleQuizCompareNgramDetail, same look as the AI overlap cards below.
+                            return `<span onclick="toggleQuizCompareNgramDetail(${qi}, ${i}, ${m.other.quizIdx}, ${m.other.qIndex})" title="${escapeHtml(otherStem.slice(0, 200))} — click to view both full questions" style="display:inline-flex; align-items:center; gap:4px; cursor:pointer; margin:3px 4px 0 0; padding:2px 8px; border-radius:999px; font-size:0.72em; font-weight:700; background:${pct >= 60 ? '#fee2e2' : '#fef3c7'}; color:${pct >= 60 ? '#991b1b' : '#92400e'};">≈ ${pct}% · ${escapeHtml(otherQuiz.shortTitle || otherQuiz.title || 'Quiz')} Q${m.other.qIndex + 1} <i class="fa-solid fa-eye" style="font-size:0.85em; opacity:0.7;"></i></span>`;
                         }).join('');
                         const rowBg = myMatches.length ? (myMatches[0].score >= 0.6 ? '#fef2f2' : '#fffbeb') : '#fff';
                         const rowBorder = myMatches.length ? '#fde68a' : '#f1f5f9';
                         return `<div class="quiz-compare-question" style="padding:8px 10px; border-radius:8px; background:${rowBg}; border:1px solid ${rowBorder};">
                             <div style="font-size:0.85em; color:#1e293b;"><b>Q${i + 1}.</b> ${quizCleanup.button(q, i + 1)} ${escapeHtml(stem)}${fullStem.length > 160 ? '…' : ''}</div>
                             ${badges ? `<div style="margin-top:4px;">${badges}</div>` : ''}
+                            ${myMatches.length ? `<div id="quiz-compare-ngram-detail-${qi}-${i}" style="display:none; margin-top:8px;" onclick="event.stopPropagation()"></div>` : ''}
                         </div>`;
                     }).join('');
                     return `<div>
@@ -31253,6 +31256,29 @@ RULES:
             quizCleanup.refresh();
             panel.style.display = 'block';
             if (caret) caret.textContent = '▴';
+        }
+
+        // V100.91: same idea as toggleQuizCompareOverlapDetail above, but for the
+        // always-on free n-gram similarity badges instead of the opt-in AI pass — a
+        // badge only shows a truncated hover preview of the OTHER question, with no
+        // way to see either question in full to actually judge the match. Reuses
+        // quizCleanup.quizzes() (not the closure's `usable`) since this can be clicked
+        // long after openQuizCompareModal's own closure ran.
+        function toggleQuizCompareNgramDetail(qi, i, otherQuizIdx, otherQIndex) {
+            const panel = document.getElementById(`quiz-compare-ngram-detail-${qi}-${i}`);
+            if (!panel) return;
+            const key = `${otherQuizIdx}-${otherQIndex}`;
+            if (panel.dataset.openKey === key && panel.style.display !== 'none') {
+                panel.style.display = 'none';
+                panel.innerHTML = '';
+                delete panel.dataset.openKey;
+                return;
+            }
+            const list = quizCleanup.quizzes();
+            panel.innerHTML = quizCompareRenderQuestionBlock(list[qi], i + 1) + quizCompareRenderQuestionBlock(list[otherQuizIdx], otherQIndex + 1);
+            quizCleanup.refresh();
+            panel.style.display = 'block';
+            panel.dataset.openKey = key;
         }
 
         // V97.08: plain-text export of a compared pair — stem + choices with the correct
