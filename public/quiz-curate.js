@@ -232,7 +232,7 @@
                     const compare = node('button', 'Compare Q' + id + ' ↔ Q' + related.id, 'curate-compare'); compare.type = 'button'; compare.title = 'เปรียบเทียบโจทย์ ตัวเลือก เฉลย และเหตุผลที่ AI เลือก';
                     compare.onclick = () => { s.compare = [id, related.id]; render(); byId('curate-comparison').querySelector('button').focus(); dialog.scrollTop = 0; }; reason.append(compare);
                 }
-            } else if (!s.pins.has(id)) reason.textContent = 'Select Suggest for an AI recommendation.';
+            } else if (!s.pins.has(id)) reason.remove(); // V101.02: no per-row placeholder — the proposal label above already says to select Suggest
             row.querySelector('.curate-pin').onclick = () => {
                 if (s.pins.has(id)) s.pins.delete(id); else { s.pins.add(id); s.keep.add(id); }
                 s.message = ''; render();
