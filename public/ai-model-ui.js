@@ -9,7 +9,11 @@
         { id: 'gpt-6-astra', label: 'GPT 6 Astra', hint: 'GPT รุ่นใหญ่ ใช้เมื่อต้องการความสามารถสูง' },
         { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', hint: 'Claude รุ่นประหยัด สำหรับงานสั้น' },
         { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', hint: 'Claude สำหรับงานเขียนและวิเคราะห์' },
-        { id: 'claude-fable-5-1', label: 'Claude Fable 5.1', hint: 'Claude สำหรับงานที่ต้องการรายละเอียดมากขึ้น' }
+        { id: 'claude-fable-5-1', label: 'Claude Fable 5.1', hint: 'Claude สำหรับงานที่ต้องการรายละเอียดมากขึ้น' },
+        { id: 'or/qwen/qwen3.8-flash', label: 'Qwen 3.8 Flash', hint: 'Qwen รุ่นประหยัด ภาษาไทยดี ผ่าน OpenRouter' },
+        { id: 'or/qwen/qwen3.8-max-0902', label: 'Qwen 3.8 Max', hint: 'Qwen รุ่นใหญ่ ภาษาไทยดี สำหรับคัดและเปรียบเทียบข้อสอบ ผ่าน OpenRouter' },
+        { id: 'or/deepseek/deepseek-v4.1-flash', label: 'DeepSeek V4.1 Flash', hint: 'DeepSeek รุ่นประหยัด ผ่าน OpenRouter' },
+        { id: 'or/deepseek/deepseek-v4-pro', label: 'DeepSeek V4 Pro', hint: 'DeepSeek รุ่นใหญ่ เหมาะกับงานวิเคราะห์ ผ่าน OpenRouter' }
     ];
     window.normalizeTextAIModel = value => models.some(m => m.id === value) ? value : 'gpt-5.6-luna';
     window.textAIModel = id => window.normalizeTextAIModel(document.getElementById(id)?.value);

@@ -1019,14 +1019,17 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             const isImageRequest = (requestedModalities && requestedModalities.includes("image"))
                 || /(^|\/|-)image(-|\d|$)/i.test(orModel);
 
-            // V96.47: honor generationOptions.maxOutputTokens (default 8192 / cap 16384),
+            // V96.47: honor generationOptions.maxOutputTokens (default 8192),
             // matching the Gemini + Anthropic branches. The old hard 4096 truncated large
             // JSON outputs (e.g. a whole-quiz Analyze/Audit) mid-object → the client
             // surfaced it as "prose instead of JSON". Applies to every OpenRouter model
             // (Llama, Xiaomi MiMo, …).
+            // V101.05: cap raised 16384 → 32768 to match the OpenAI/Gemini branches —
+            // AI Curate asks for 32768 (27 questions × bilingual reasons + evidence) and
+            // the old cap cut the JSON mid-object for the new Qwen/DeepSeek chips.
             const orMaxTokens = Math.min(
                 Math.max(Number(generationOptions && generationOptions.maxOutputTokens) || 8192, 1024),
-                16384
+                32768
             );
             const body = {
                 model: orModel,
