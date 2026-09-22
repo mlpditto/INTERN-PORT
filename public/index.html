@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V100.78)</title>
+    <title>Internship Portfolio (V100.79)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -700,7 +700,7 @@
         #finModal .fin-item { display:flex; align-items:center; gap:8px; font-size:0.84em; padding:6px 2px; border-bottom:1px dashed #e2e8f0; }
         #finModal .fin-item:last-child { border-bottom:0; }
         #finModal .fin-item .ic { width:26px; height:26px; border-radius:8px; background:#f1f5f9; display:grid; place-items:center; flex:0 0 auto; }
-        #finModal .fin-item .n { flex:1; min-width:0; overflow-wrap:anywhere; } #finModal .fin-item .n small { display:block; color:#94a3b8; font-size:0.85em; }
+        #finModal .fin-item .n { flex:1; min-width:0; overflow-wrap:anywhere; cursor:pointer; } #finModal .fin-item .n small { display:block; color:#94a3b8; font-size:0.85em; }
         #finModal .fin-item .a { font-weight:900; white-space:nowrap; }
         #finModal .fin-item .del { width:auto; min-height:0; margin:0; padding:2px 6px; border:0; background:transparent; color:#cbd5e1; cursor:pointer; font-size:1em; }
         #finModal .fin-kv { display:grid; grid-template-columns:1fr auto; gap:4px 10px; font-size:0.82em; }
@@ -18701,7 +18701,7 @@
         //   { plans: { 'YYYY-MM': { daily: 300, days: { 'YYYY-MM-DD': 500 } } },
         //     expenses: [ { id, date: 'YYYY-MM-DD', amount, cat, note, ts } ] }
         const FIN_CATS = ['🍜 Food', '🚌 Travel', '☕ Coffee', '🛒 Groceries', '🎉 Fun', '💊 Health', '📚 Study', '📦 Other'];
-        const finState = { tab: 'today', month: null, cat: FIN_CATS[0], selDay: null };
+        const finState = { tab: 'today', month: null, cat: FIN_CATS[0], selDay: null, editId: null };
         function finKey() { return 'fin_v1_' + (userId || 'anon'); }
         function finLoad() {
             try { const d = JSON.parse(localStorage.getItem(finKey()) || 'null'); if (d && d.plans && Array.isArray(d.expenses)) return d; } catch (_) {}
@@ -18722,12 +18722,12 @@
         function finSpent(data, pred) { return data.expenses.filter(pred).reduce((s, e) => s + (Number(e.amount) || 0), 0); }
 
         function finOpen() {
-            finState.tab = 'today'; finState.month = finToday().slice(0, 7); finState.selDay = null;
+            finState.tab = 'today'; finState.month = finToday().slice(0, 7); finState.selDay = null; finState.editId = null;
             finRender();
             document.getElementById('finModal').style.display = 'flex';
         }
         function finClose() { document.getElementById('finModal').style.display = 'none'; }
-        function finTab(t) { finState.tab = t; finState.selDay = null; finRender(); }
+        function finTab(t) { finState.tab = t; finState.selDay = null; finState.editId = null; finRender(); }
         function finShiftMonth(delta) {
             const [y, m] = finState.month.split('-').map(Number);
             const d = new Date(y, m - 1 + delta, 1);
@@ -18744,6 +18744,14 @@
             finSave(data); finRender();
         }
         function finDel(id) { const data = finLoad(); data.expenses = data.expenses.filter(e => e.id !== id); finSave(data); finRender(); }
+        // V100.79: tap an item's name to add / change its note after the fact.
+        function finEditNote(id) { finState.editId = finState.editId === id ? null : id; finRender(); }
+        function finSaveNote(id) {
+            const el = document.getElementById('fin-edit-note'); if (!el) return;
+            const data = finLoad(); const e = data.expenses.find(x => x.id === id);
+            if (e) { e.note = (el.value || '').trim().slice(0, 80); finSave(data); }
+            finState.editId = null; finRender();
+        }
         function finSetDefault() {
             const v = parseFloat(document.getElementById('fin-default').value);
             const data = finLoad(); const plan = data.plans[finState.month] || (data.plans[finState.month] = { daily: 0, days: {} });
@@ -18801,9 +18809,12 @@
                     </div>
                     <div class="fin-card">
                         <div class="fin-lbl" style="margin-bottom:4px;">Today's items</div>
-                        ${items.length ? items.map(e => `<div class="fin-item"><span class="ic">${e.cat.split(' ')[0]}</span><span class="n">${finEsc(e.note) || finEsc(e.cat.slice(e.cat.indexOf(' ') + 1))}<small>${new Date(e.ts).toTimeString().slice(0, 5)} · ${finEsc(e.cat)}</small></span><span class="a">${finFmt(e.amount)}</span><button type="button" class="del" onclick="finDel('${e.id}')" aria-label="Delete">✕</button></div>`).join('') : '<div class="fin-muted">Nothing yet today.</div>'}
+                        ${items.length ? items.map(e => finState.editId === e.id
+                            ? `<div class="fin-item"><span class="ic">${e.cat.split(' ')[0]}</span><input id="fin-edit-note" class="fin-note" maxlength="80" value="${finEsc(e.note)}" placeholder="Note · ข้าวเที่ยง, BTS..." onkeydown="if(event.key==='Enter'){event.preventDefault();finSaveNote('${e.id}')}" style="margin:0; flex:1; min-width:0;"><button type="button" class="fin-btn sm" onclick="finSaveNote('${e.id}')">Save</button></div>`
+                            : `<div class="fin-item"><span class="ic">${e.cat.split(' ')[0]}</span><span class="n" role="button" tabindex="0" title="Tap to add or edit note" onclick="finEditNote('${e.id}')">${e.note ? finEsc(e.note) : `<span class="fin-muted">${finEsc(e.cat.slice(e.cat.indexOf(' ') + 1))} · ✎ add note</span>`}<small>${new Date(e.ts).toTimeString().slice(0, 5)} · ${finEsc(e.cat)}</small></span><span class="a">${finFmt(e.amount)}</span><button type="button" class="del" onclick="finDel('${e.id}')" aria-label="Delete">✕</button></div>`).join('') : '<div class="fin-muted">Nothing yet today.</div>'}
                     </div>`;
-                const amt = document.getElementById('fin-amt'); if (amt && items.length === 0) amt.focus();
+                const editEl = document.getElementById('fin-edit-note'); if (editEl) editEl.focus();
+                const amt = document.getElementById('fin-amt'); if (amt && items.length === 0 && !editEl) amt.focus();
                 return;
             }
             const ym = finState.month, days = finDaysIn(ym), today = finToday(), isCur = today.slice(0, 7) === ym;
@@ -18873,6 +18884,7 @@
         window.finOpen = finOpen; window.finClose = finClose; window.finTab = finTab; window.finShiftMonth = finShiftMonth;
         window.finPickCat = finPickCat; window.finAdd = finAdd; window.finDel = finDel; window.finSetDefault = finSetDefault;
         window.finSelDay = finSelDay; window.finSetDay = finSetDay; window.finSetToday = finSetToday;
+        window.finEditNote = finEditNote; window.finSaveNote = finSaveNote;
 
         // V96.41: `source` is 'manual' when the ✅ chip is tapped, 'activity' when a
         // submission auto-checks the intern in. Both paths stamp checkinLastDate, which
