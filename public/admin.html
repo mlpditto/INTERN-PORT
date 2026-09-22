@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.94)</title>
+    <title>Nika Admin (V100.95)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -31047,10 +31047,40 @@ ${JSON.stringify(sourceObj)}`;
             for (let i = 0; i <= clean.length - QUIZ_COMPARE_NGRAM; i++) shingles.add(clean.slice(i, i + QUIZ_COMPARE_NGRAM));
             return shingles;
         }
-        function quizCompareSimilarity(a, b) {
+        // V100.95: shingles that are boilerplate for THIS pool. Containment divides by the
+        // SMALLER shingle set, which is right for a short direct question sitting inside a
+        // long vignette (the case it was chosen for) — but it also means a template stub
+        // like "ข้อใดถูกต้อง" is "contained" in anything that opens the same way and
+        // scores 1.00 against an unrelated question (dyspepsia ⇄ travel health, seen in
+        // the TypeSafe eval dry run), and two long English stems reach 0.6 on nothing
+        // but " of t" / "tion " / "the ". Data-driven rather than a stopword list, so it
+        // covers Thai particles and English function words alike and needs no upkeep:
+        // a 5-gram is boilerplate if it occurs in at least 4 stems AND 10% of the pool.
+        // The "4" floor is what keeps a genuine duplicate pair (or triplet) from
+        // suppressing its own shared content in a small set — and in a typical 2-quiz
+        // compare (~30 stems) it is the floor, not the 10%, that decides. The 10% was
+        // picked by sweeping 0.25→0.02 over the full 2,077-stem catalogue: it is the
+        // least aggressive value that drops the long-English-stem false positive below
+        // the 0.6 red tier (0.62→0.46) while leaving a verbatim dup and a short question
+        // inside a long vignette both at 1.00; lower only thins the amber tier.
+        function quizCompareBoilerplate(texts) {
+            const sets = (texts || []).map(quizCompareShingles).filter(s => s.size);
+            const df = new Map();
+            sets.forEach(s => s.forEach(g => df.set(g, (df.get(g) || 0) + 1)));
+            const floor = Math.max(4, Math.ceil(sets.length * 0.10));
+            const drop = new Set();
+            df.forEach((n, g) => { if (n >= floor) drop.add(g); });
+            return drop;
+        }
+        // After boilerplate is removed, the smaller side must still carry this much
+        // content to score at all — a stub reduced to a handful of grams can't claim a
+        // match. 12 five-grams ≈ 16 characters, well under any real question.
+        const QUIZ_COMPARE_MIN_CONTENT = 12;
+        function quizCompareSimilarity(a, b, drop) {
             const sa = quizCompareShingles(a);
             const sb = quizCompareShingles(b);
-            if (sa.size === 0 || sb.size === 0) return 0;
+            if (drop && drop.size) { drop.forEach(g => { sa.delete(g); sb.delete(g); }); }
+            if (Math.min(sa.size, sb.size) < QUIZ_COMPARE_MIN_CONTENT) return 0;
             let inter = 0;
             sa.forEach(s => { if (sb.has(s)) inter++; });
             return inter / Math.min(sa.size, sb.size); // containment, not Jaccard — see comment above
@@ -31097,10 +31127,11 @@ ${JSON.stringify(sourceObj)}`;
             // Pairwise similarity, skipping pairs from the SAME quiz (that's not the
             // question we're asking — we care about cross-quiz overlap).
             const matches = [];
+            const drop = quizCompareBoilerplate(pool.map(p => p.text));   // V100.95
             for (let i = 0; i < pool.length; i++) {
                 for (let j = i + 1; j < pool.length; j++) {
                     if (pool[i].quizIdx === pool[j].quizIdx) continue;
-                    const score = quizCompareSimilarity(pool[i].text, pool[j].text);
+                    const score = quizCompareSimilarity(pool[i].text, pool[j].text, drop);
                     if (score >= QUIZ_COMPARE_THRESHOLD) matches.push({ a: pool[i], b: pool[j], score });
                 }
             }
@@ -34609,11 +34640,12 @@ RULES:
                 if (!byId.has(a.id)) byId.set(a.id, []);
                 byId.get(a.id).push({ id: b.id, name: b.name, score });
             };
+            const drop = quizCompareBoilerplate(items.map(it => it.key));   // V100.95
             for (let i = 0; i < items.length; i++) {
                 if (!items[i].key) continue;
                 for (let j = i + 1; j < items.length; j++) {
                     if (!items[j].key) continue;
-                    const score = quizCompareSimilarity(items[i].key, items[j].key);
+                    const score = quizCompareSimilarity(items[i].key, items[j].key, drop);
                     if (score < PRODUCT_DUP_THRESHOLD) continue;
                     push(items[i], items[j], score);
                     push(items[j], items[i], score);
@@ -59473,9 +59505,11 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
         window.scanQuizSetDup = function(index, candidates) {
             const sides = (candidates || []).filter(c => c && c.text);
             const byPeer = new Map();
-            window.buildQuizSetPeerPool(index).forEach(peer => {
+            const peers = window.buildQuizSetPeerPool(index);
+            const drop = quizCompareBoilerplate([...peers.map(p => p.text), ...sides.map(s => s.text)]);   // V100.95
+            peers.forEach(peer => {
                 sides.forEach(side => {
-                    const score = quizCompareSimilarity(side.text, peer.text);
+                    const score = quizCompareSimilarity(side.text, peer.text, drop);
                     if (score < QUIZ_SET_DUP_THRESHOLD) return;
                     const hit = byPeer.get(peer.qIndex)
                         || { qIndex: peer.qIndex, text: peer.text, pending: peer.pending, score: 0, sides: [] };
@@ -59513,11 +59547,15 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
         window.computeQuizSetDuplicatesAll = function(questions) {
             const texts = (questions || []).map(q => quizCompareStripMd((q && q.q) || ''));
             const byIdx = new Map();
+            // V100.95: kept on window so _auditHighlightShared paints exactly the overlap
+            // that produced the score — every pair it renders comes from this same pass.
+            const drop = quizCompareBoilerplate(texts);
+            window._auditDupDrop = drop;
             for (let i = 0; i < texts.length; i++) {
                 if (!texts[i]) continue;
                 for (let j = i + 1; j < texts.length; j++) {
                     if (!texts[j]) continue;
-                    const score = quizCompareSimilarity(texts[i], texts[j]);
+                    const score = quizCompareSimilarity(texts[i], texts[j], drop);
                     if (score < QUIZ_SET_DUP_THRESHOLD) continue;
                     if (!byIdx.has(i)) byIdx.set(i, []);
                     if (!byIdx.has(j)) byIdx.set(j, []);
@@ -59571,8 +59609,11 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
             const N = 5;   // QUIZ_COMPARE_NGRAM
             const marked = new Array(clean.length).fill(false);
             if (clean.length >= N && peer.length >= N) {
+                // V100.95: same boilerplate set the scorer dropped, so a shared " of t" or
+                // "ข้อใด" is not painted as if it contributed to the percentage.
+                const drop = window._auditDupDrop || new Set();
                 const peerGrams = new Set();
-                for (let i = 0; i <= peer.length - N; i++) peerGrams.add(peer.slice(i, i + N));
+                for (let i = 0; i <= peer.length - N; i++) { const g = peer.slice(i, i + N); if (!drop.has(g)) peerGrams.add(g); }
                 for (let i = 0; i <= clean.length - N; i++) {
                     if (peerGrams.has(clean.slice(i, i + N))) {
                         for (let k = i; k < i + N; k++) marked[k] = true;
