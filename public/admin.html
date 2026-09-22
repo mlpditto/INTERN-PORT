@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.99)</title>
+    <title>Nika Admin (V101.00)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -24443,6 +24443,33 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const optionPrefixRegex = /^([A-I]|[1-9]|[ก-ฮ])[\.\)\-\:]+\s*(.*)/i;
             const bulletPrefixRegex = /^[\-•\*]\s*(.*)/;
 
+            // V101.00: PDF / exam-site copies often drop the separator after the
+            // letter column ("AErythromycin", "BLevofloxacin"), which the regex
+            // above cannot see. Accept a bare capital letter glued to the option
+            // text ONLY when the lines run A, B, C... in order (≥3), so stems
+            // starting with "BP 120/80" or "HR 100" are never mistaken for options.
+            const bareLetterRegex = /^([A-I])(?=[^\s\.\)\-\:])/;
+            const bareLetterLines = new Set();
+            {
+                let expected = 'A';
+                const found = [];
+                rawLines.forEach((l, i) => {
+                    const m = l.trim().match(bareLetterRegex);
+                    if (m && m[1] === expected) {
+                        found.push(i);
+                        expected = String.fromCharCode(expected.charCodeAt(0) + 1);
+                    }
+                });
+                if (found.length >= 3) found.forEach(i => bareLetterLines.add(i));
+            }
+            // Returns the option body for a prefixed line, or null.
+            const matchOptionPrefix = (trimmed, i) => {
+                const m = trimmed.match(optionPrefixRegex);
+                if (m) return m[2];
+                if (bareLetterLines.has(i)) return trimmed.slice(1);
+                return null;
+            };
+
             let questionText = "";
             let optionsData = [];
 
@@ -24454,7 +24481,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 // Skip empty lines between question and options
                 if (trimmed === "" || trimmed === "*" || trimmed.match(/^\d+\/\d+$/)) continue;
 
-                const hasPrefix = trimmed.match(optionPrefixRegex) || trimmed.match(bulletPrefixRegex);
+                const hasPrefix = matchOptionPrefix(trimmed, i) !== null || trimmed.match(bulletPrefixRegex);
                 const isIndented = i > 0 && (line.startsWith(' ') || line.startsWith('\t'));
 
                 if (hasPrefix || isIndented) {
@@ -24474,13 +24501,13 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                     const trimmed = line.trim();
                     if (trimmed === "") continue;
 
-                    const prefixMatch = trimmed.match(optionPrefixRegex);
+                    const prefixBody = matchOptionPrefix(trimmed, i);
                     const bulletMatch = trimmed.match(bulletPrefixRegex);
-                    const isNewOption = prefixMatch || bulletMatch || (i > firstOptionLineIdx && (line.startsWith(' ') || line.startsWith('\t')));
+                    const isNewOption = prefixBody !== null || bulletMatch || (i > firstOptionLineIdx && (line.startsWith(' ') || line.startsWith('\t')));
 
                     if (isNewOption) {
                         if (currentOptionText) optionsData.push(currentOptionText.trim());
-                        currentOptionText = prefixMatch ? prefixMatch[2] : (bulletMatch ? bulletMatch[1] : trimmed);
+                        currentOptionText = prefixBody !== null ? prefixBody : (bulletMatch ? bulletMatch[1] : trimmed);
                     } else {
                         // Continuation of the previous option
                         currentOptionText += (currentOptionText ? " " : "") + trimmed;
