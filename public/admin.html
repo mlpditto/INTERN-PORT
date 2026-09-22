@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V100.91)</title>
+    <title>Nika Admin (V100.92)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -17392,6 +17392,9 @@
                 }
 
                 const analysis = result.analysisText || "Analysis complete.";
+                // V100.92: shared by the collapsed one-line summary and the expanded
+                // detail in the lean analysis <details> below — computed once.
+                const analysisClean = analysis.replace(/### 🎯 Suggested Titles[\s\S]*?(?=###|$)/i, '');
                 const qDataJson = JSON.stringify(formData.questions);
 
                 const resultDiv = document.createElement('div');
@@ -17450,7 +17453,7 @@
                 if (result.items && result.items.length > 0) {
                     improvementsHtml = `
                         <div style="margin-top:25px; border-top:2px solid #f8f9fa; padding-top:20px;">
-                            <h4 style="color:var(--primary); margin-bottom:15px;"><i class="fa-solid fa-list-check"></i> Individual Improvements (${result.items.length})</h4>
+                            <h4 style="color:var(--primary); margin-bottom:15px; font-size:0.85em;"><i class="fa-solid fa-list-check"></i> Improvements (${result.items.length})</h4>
                             <div style="display:flex; flex-direction:column; gap:12px;">
                                 ${result.items.map((item, arrIdx) => {
                                     let qIdx = (item.qNumber !== undefined) ? item.qNumber - 1 : (item.index !== undefined ? item.index : 0);
@@ -17465,36 +17468,32 @@
                                     // leakage into "options") is visible before the click, not after.
                                     const shapeInvalid = item._shapeInvalid;
                                     return `
-                                        <div id="ai-fix-card-${arrIdx}" style="background:#fcfdff; border:1.5px solid #edf2f7; border-radius:15px; padding:15px; border-left:5px solid ${shapeInvalid ? '#ef4444' : '#4361ee'}; transition: all 0.3s ease; width: 100%; box-sizing: border-box;">
-                                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap: wrap; gap: 8px;">
-                                                <b style="color:#2d3748; font-size: 1.1em;">Question ${qIdx + 1} Improvement</b>
-                                                <div style="display:flex; gap:6px; align-items: center;">
-                                                    <button id="btn-regen-ai-${arrIdx}" class="btn-sm" style="background:#f8fafc; color:#64748b; border:1px solid #e2e8f0; padding:6px 12px; border-radius:8px; font-weight:bold; font-size:0.75em; cursor: pointer;"
+                                        <div id="ai-fix-card-${arrIdx}" style="background:#fcfdff; border:1px solid #edf2f7; border-radius:12px; padding:12px 14px; border-left:4px solid ${shapeInvalid ? '#ef4444' : '#4361ee'}; transition: all 0.3s ease; width: 100%; box-sizing: border-box;">
+                                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap: 8px;">
+                                                <b style="color:#2d3748; font-size: 0.95em;">Q${qIdx + 1}</b>
+                                                <div style="display:flex; gap:4px; align-items: center;">
+                                                    <button id="btn-regen-ai-${arrIdx}" class="btn-sm" style="width:26px; height:26px; background:#f8fafc; color:#64748b; border:1px solid #e2e8f0; border-radius:6px; font-size:0.72em; cursor: pointer;"
                                                         onclick="regenerateSingleAiSuggestion(${qIdx}, ${arrIdx})" title="Regenerate different suggestion">
                                                         <i class="fa-solid fa-arrows-rotate"></i>
                                                     </button>
-                                                    <button class="btn-sm" style="background:#6366f1; color:white; border:none; padding:6px 12px; border-radius:8px; font-weight:bold; font-size:0.75em; cursor: pointer;"
-                                                        onclick="previewAiFix(${qIdx}, ${arrIdx})">
-                                                        <i class="fa-solid fa-code-compare"></i> Compare
+                                                    <button class="btn-sm" style="width:26px; height:26px; background:#6366f1; color:white; border:none; border-radius:6px; font-size:0.72em; cursor: pointer;"
+                                                        onclick="previewAiFix(${qIdx}, ${arrIdx})" title="Compare original vs improved">
+                                                        <i class="fa-solid fa-code-compare"></i>
                                                     </button>
-                                                    <button class="btn-sm" style="background:${shapeInvalid ? '#cbd5e1' : '#22c55e'}; color:${shapeInvalid ? '#64748b' : 'white'}; border:none; padding:6px 12px; border-radius:8px; font-weight:bold; font-size:0.75em; cursor: ${shapeInvalid ? 'not-allowed' : 'pointer'};"
-                                                        onclick="applySingleAiFix(${qIdx}, '${improvedJson}', ${arrIdx})" id="btn-fix-ai-${arrIdx}" ${shapeInvalid ? 'disabled title="Malformed — regenerate first"' : ''}>
-                                                        Fix
+                                                    <button class="btn-sm" style="width:26px; height:26px; background:${shapeInvalid ? '#cbd5e1' : '#22c55e'}; color:${shapeInvalid ? '#64748b' : 'white'}; border:none; border-radius:6px; font-size:0.8em; cursor: ${shapeInvalid ? 'not-allowed' : 'pointer'};"
+                                                        onclick="applySingleAiFix(${qIdx}, '${improvedJson}', ${arrIdx})" id="btn-fix-ai-${arrIdx}" ${shapeInvalid ? 'disabled title="Malformed — regenerate first"' : 'title="Apply this fix"'}>
+                                                        <i class="fa-solid fa-check"></i>
                                                     </button>
-                                                    <button class="btn-sm" style="background:rgba(239,68,68,0.12); color:#dc2626; border:none; padding:6px 10px; border-radius:8px; font-weight:bold; font-size:0.75em; cursor: pointer;"
+                                                    <button class="btn-sm" style="width:26px; height:26px; background:rgba(239,68,68,0.12); color:#dc2626; border:none; border-radius:6px; font-size:0.72em; cursor: pointer;"
                                                         onclick="deleteAiImprovementQuestion(${qIdx}, ${arrIdx})" title="Delete this question from the form — for a word-for-word duplicate, deleting beats rewriting">
                                                         <i class="fa-solid fa-trash"></i>
                                                     </button>
                                                 </div>
                                             </div>
-                                            ${shapeInvalid ? `<div style="font-size:0.88em; color:#b91c1c; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.22); border-radius:10px; padding:8px 10px; margin-bottom:10px;"><i class="fa-solid fa-triangle-exclamation"></i> Malformed AI output: ${escapeHtml(shapeInvalid)}</div>` : ''}
-                                            <div style="font-size:0.95em; color:#4a5568; margin-bottom:10px; line-height: 1.5;">
-                                                <b style="color: #ef4444;"><i class="fa-solid fa-circle-exclamation"></i> Issue:</b> ${item.issue}
-                                            </div>
+                                            ${shapeInvalid ? `<div style="font-size:0.85em; color:#b91c1c; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.22); border-radius:8px; padding:6px 8px; margin-bottom:8px;"><i class="fa-solid fa-triangle-exclamation"></i> Malformed AI output: ${escapeHtml(shapeInvalid)}</div>` : ''}
+                                            <div style="font-size:0.88em; color:#4a5568; margin-bottom:6px; line-height: 1.5;">❗ ${item.issue}</div>
                                             ${window._aiIssuePeerChipsHtml(item.issue, qIdx + 1, formData.questions, arrIdx)}
-                                            <div id="ai-suggestion-text-${arrIdx}" style="font-size:0.95em; color:#4361ee; line-height: 1.5; background: rgba(67, 97, 238, 0.05); padding: 10px; border-radius: 10px;">
-                                                <b><i class="fa-solid fa-lightbulb"></i> Suggestion:</b> ${item.suggestion}
-                                            </div>
+                                            <div id="ai-suggestion-text-${arrIdx}" style="font-size:0.88em; color:#4361ee; line-height: 1.5; border-left:2px solid #c7d2fe; padding-left:8px;">💡 ${item.suggestion}</div>
                                         </div>
                                     `;
                                 }).join('')}
@@ -17503,21 +17502,14 @@
                     `;
                 }
                 const titleSection = result.suggestedTitles ? `
-                    <div style="background:#f5f3ff; border:1px solid #ddd6fe; border-radius:15px; padding:15px; margin-bottom:20px;">
-                        <h4 style="margin:0 0 10px 0; color:#5b21b6; font-size:0.92em; display:flex; justify-content:space-between; align-items:center;">
-                            <span><i class="fa-solid fa-tag"></i> Suggested Titles</span>
-                            <button onclick="analyzeQuizAI()" style="background:rgba(139,92,246,0.1); border:none; border-radius:8px; cursor:pointer; font-size:1.15em; padding:4px 8px; line-height:1; transition:all 0.2s;" onmouseover="this.style.background='rgba(139,92,246,0.2)'" onmouseout="this.style.background='rgba(139,92,246,0.1)'" title="Regenerate Titles & Analysis">🔄</button>
-                        </h4>
-                        <div style="display:flex; flex-direction:column; gap:8px;">
-                            <div style="display:flex; justify-content:space-between; align-items:center; background:white; padding:8px 12px; border-radius:10px; border:1px solid #ede9fe;">
-                                <span style="font-size:0.9em; color:#4c1d95; font-weight:600;">Full: ${result.suggestedTitles.full}</span>
-                                <button class="btn-sm" style="background:#8b5cf6; color:white; border:none; padding:3px 10px; border-radius:6px; font-size:0.7em;" onclick="document.getElementById('quiz-title').value='${result.suggestedTitles.full.replace(/'/g, "\\'")}'; showToast('Title Updated');">Apply</button>
-                            </div>
-                            <div style="display:flex; justify-content:space-between; align-items:center; background:white; padding:8px 12px; border-radius:10px; border:1px solid #ede9fe;">
-                                <span style="font-size:0.9em; color:#4c1d95; font-weight:600;">Short: ${result.suggestedTitles.short}</span>
-                                <button class="btn-sm" style="background:#8b5cf6; color:white; border:none; padding:3px 10px; border-radius:6px; font-size:0.7em;" onclick="document.getElementById('quiz-short-title').value='${result.suggestedTitles.short.replace(/'/g, "\\'")}'; showToast('Short Title Updated');">Apply</button>
-                            </div>
-                        </div>
+                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:9px 12px; background:#f5f3ff; border:1px solid #ede9fe; border-radius:10px; margin-bottom:16px; font-size:0.82em;">
+                        <span style="color:#7c3aed;">🏷️</span>
+                        <span style="color:#4c1d95;"><b>Full</b> ${result.suggestedTitles.full}</span>
+                        <button class="btn-sm" style="background:#8b5cf6; color:white; border:none; padding:2px 8px; border-radius:6px; font-size:0.85em;" onclick="document.getElementById('quiz-title').value='${result.suggestedTitles.full.replace(/'/g, "\\'")}'; showToast('Title Updated');">Apply</button>
+                        <span style="color:#ddd6fe; font-weight:800;">·</span>
+                        <span style="color:#4c1d95;"><b>Short</b> ${result.suggestedTitles.short}</span>
+                        <button class="btn-sm" style="background:#8b5cf6; color:white; border:none; padding:2px 8px; border-radius:6px; font-size:0.85em;" onclick="document.getElementById('quiz-short-title').value='${result.suggestedTitles.short.replace(/'/g, "\\'")}'; showToast('Short Title Updated');">Apply</button>
+                        <button onclick="analyzeQuizAI()" title="Regenerate Titles & Analysis" style="margin-left:auto; background:rgba(139,92,246,0.1); border:none; border-radius:6px; cursor:pointer; font-size:1em; padding:2px 6px; line-height:1;">🔄</button>
                     </div>
                 ` : '';
 
@@ -17536,28 +17528,23 @@
                     ${savedBannerHtml}
                     ${titleSection}
 
-                    <div style="white-space:pre-wrap; line-height:1.8; color:#333; font-size:1em; margin-bottom:20px; background:#fafafa; padding:20px; border-radius:20px; border:1px solid #f0f0f0;">${analysis.replace(/### 🎯 Suggested Titles[\s\S]*?(?=###|$)/i, '')}</div>
-                    
+                    <details style="margin-bottom:16px; background:#fafafa; border:1px solid #f0f0f0; border-radius:14px; padding:10px 16px;">
+                        <summary style="cursor:pointer; display:flex; align-items:center; gap:8px; font-size:0.85em; color:#475569; font-weight:700;">
+                            <span>📊</span>
+                            <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:400; color:#64748b;">${analysisClean}</span>
+                        </summary>
+                        <div style="white-space:pre-wrap; line-height:1.8; color:#333; font-size:0.95em; margin-top:10px; padding-top:10px; border-top:1px dashed #e2e8f0;">${analysisClean}</div>
+                    </details>
+
                     ${improvementsHtml}
 
-                    <div style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding:24px; border-radius:16px; margin-top:25px; margin-bottom:25px; box-shadow:0 10px 40px rgba(102,126,234,0.3);">
-                        <h4 style="margin:0 0 12px 0; color:#ffffff; display:flex; align-items:center; gap:10px; font-size:1.1em; text-shadow:0 2px 4px rgba(0,0,0,0.1);">
-                            <i class="fa-solid fa-wand-magic-sparkles" style="color:#ffe066;"></i> 
-                            <span>Bulk Auto-Improvement <span style="opacity:0.8; font-weight:500;">(All Questions)</span></span>
-                        </h4>
-                        <p style="font-size:0.9em; color:rgba(255,255,255,0.85); margin-bottom:18px; line-height:1.5;">
-                            The AI will magically rewrite and diversify all questions. 
-                            <span style="background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:4px; font-size:0.85em;">Note:</span> 
-                            This process is independent of the single fixes above and will regenerate the entire quiz.
-                        </p>
-                        <div style="display:flex; gap:12px; justify-content:flex-start;">
-                            <button id="btn-apply-ai-improve" style="padding:12px 28px; border-radius:12px; font-weight:700; background:linear-gradient(135deg, #ffe066 0%, #ffd43b 100%); color:#5a4a00; border:none; cursor:pointer; box-shadow:0 4px 15px rgba(255,224,102,0.4); transition:transform 0.2s, box-shadow 0.2s;" 
-                                onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(255,224,102,0.5)';"
-                                onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(255,224,102,0.4)';"
-                                onclick="applyQuizImprovements()">
-                                <i class="fa-solid fa-sparkles"></i> Magic Overhaul (All Items)
-                            </button>
-                        </div>
+                    <div style="display:flex; align-items:center; gap:10px; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius:12px; padding:10px 10px 10px 16px; margin-top:20px; margin-bottom:20px;">
+                        <span style="color:#fff; font-size:0.9em; font-weight:700; flex:1;">✨ Magic Overhaul — rewrite all questions</span>
+                        <button id="btn-apply-ai-improve" style="padding:8px 16px; border-radius:8px; font-weight:800; background:linear-gradient(135deg, #ffe066 0%, #ffd43b 100%); color:#5a4a00; border:none; cursor:pointer; font-size:0.85em; white-space:nowrap;"
+                            title="Independent of the fixes above — regenerates the entire quiz"
+                            onclick="applyQuizImprovements()">
+                            Run ✨
+                        </button>
                     </div>
 
                     <div style="text-align:right;">
@@ -60488,7 +60475,7 @@ RULES:
                     }
                     const suggestionText = document.getElementById(`ai-suggestion-text-${arrIdx}`);
                     if (suggestionText) {
-                        suggestionText.innerHTML = `<b>Suggestion:</b> ${window._aiAnalysisItems[arrIdx].suggestion}`;
+                        suggestionText.innerHTML = `💡 ${window._aiAnalysisItems[arrIdx].suggestion}`;
                     }
                     const fixBtn = document.getElementById(`btn-fix-ai-${arrIdx}`);
                     if (fixBtn) {
