@@ -45,6 +45,41 @@
         const details = node('details'); details.open = open;
         const summary = node('summary', label); summary.title = hint; details.append(summary); host.append(details); return details;
     }
+    // V101.12: plain text of one question for the clipboard — number, stem, extra
+    // context, numbered choices with the answer key marked. Explanation stays out.
+    // Pure (no DOM, no closures) so scripts/quiz-curate-copy-check.cjs can run it.
+    function questionPlainText(q, number, missingKey) {
+        const lines = [];
+        lines.push((number ? 'Q' + number + ' · ' : '') + String(q.q || '').trim());
+        if (q.content && q.content !== q.q) lines.push('', String(q.content).trim());
+        const options = Array.isArray(q.options) ? q.options : [];
+        if (options.length) {
+            lines.push('');
+            const keys = missingKey || !['choice', 'flashcard'].includes(q.type) ? [] : (Array.isArray(q.correct) ? q.correct : [q.correct]);
+            options.forEach((option, i) => lines.push((i + 1) + '. ' + String(option || '').trim() + (keys.includes(i) ? '  [Answer key]' : '')));
+            if (q.type === 'ordering') lines.push('(Answer key: this option order)');
+        }
+        return lines.join('\n');
+    }
+    async function copyText(text) {
+        try { await navigator.clipboard.writeText(text); return true; } catch (_) {}
+        try {
+            const area = document.createElement('textarea'); area.value = text; area.setAttribute('readonly', '');
+            area.style.position = 'fixed'; area.style.opacity = '0'; document.body.append(area); area.select();
+            const ok = document.execCommand('copy'); area.remove(); return ok;
+        } catch (_) { return false; }
+    }
+    function copyButton(q, number, missingKey) {
+        const button = node('button', 'Copy', 'curate-source-toggle curate-copy'); button.type = 'button';
+        button.title = 'คัดลอกโจทย์และตัวเลือกเป็นข้อความ';
+        button.onclick = async () => {
+            const ok = await copyText(questionPlainText(q, number, missingKey));
+            button.textContent = ok ? 'Copied ✓' : 'Copy failed';
+            if (typeof showToast === 'function') showToast(ok ? 'Copied question ' + (number ? 'Q' + number : '') : 'Could not copy — select the text and copy manually');
+            setTimeout(() => { button.textContent = 'Copy'; }, 1500);
+        };
+        return button;
+    }
     function markedText(host, value, evidence) {
         const text = String(value || '');
         const ranges = evidence.flatMap(e => {
@@ -58,7 +93,7 @@
         }
         host.append(document.createTextNode(text.slice(cursor)));
     }
-    function sourceView(host, q, expanded = false, evidence = [], missingKey = false) {
+    function sourceView(host, q, expanded = false, evidence = [], missingKey = false, number = 0) {
         const stem = node('div', undefined, 'curate-stem'); markedText(stem, q.q, evidence); host.append(stem);
         if (!expanded) {
             stem.classList.add('clamped'); const more = node('button', 'More ▾', 'curate-expand'); more.type = 'button'; more.hidden = true;
@@ -92,6 +127,9 @@
                 button.onclick = () => { panel.hidden = !panel.hidden; button.setAttribute('aria-expanded', String(!panel.hidden)); button.textContent = label + (panel.hidden ? ' ▾' : ' ▴'); };
                 controls.append(button); host.append(panel);
             }
+            controls.append(copyButton(q, number, missingKey)); // V101.12
+        } else {
+            const controls = node('div', undefined, 'curate-source-controls'); controls.append(copyButton(q, number, missingKey)); host.append(controls); // V101.12
         }
     }
     function backToReview() {
@@ -110,7 +148,7 @@
         for (const id of [a, b]) {
             const card = node('section', undefined, 'curate-compare-card');
             card.append(node('h4', 'Q' + id + ' · ' + (s.keep.has(id) ? 'Keep' : 'Remove') + (s.pins.has(id) ? ' · Pinned' : '')));
-            sourceView(card, s.source.form.questions[id - 1], true, relation.evidence.filter(e => e.id === id), s.source.missingKeys.includes(id)); grid.append(card);
+            sourceView(card, s.source.form.questions[id - 1], true, relation.evidence.filter(e => e.id === id), s.source.missingKeys.includes(id), id); grid.append(card);
         }
         for (const [key, label] of [['shared', 'Shared objective'], ['difference', 'Key differences'], ['preference', 'Why prefer this question']]) {
             const section = node('section', undefined, 'curate-reason'); section.append(node('strong', label)); bilingual(section, relation[key], relation[key + 'Th']); panel.append(section);
@@ -223,7 +261,7 @@
             const row = document.createElement('div'); row.className = 'curate-question' + (kept ? ' kept' : '');
             row.dataset.questionId = id;
             row.innerHTML = `<span class="curate-number">Q${id}</span><div class="curate-body"><div class="curate-source"></div><div class="curate-reason"></div></div><div class="curate-actions"><button type="button" class="curate-move" title="${kept ? 'ย้ายไปกลุ่มที่เสนอให้ตัด ยังไม่ลบต้นฉบับ' : 'เก็บข้อนี้ในรอบปัจจุบัน AI อาจเลือกใหม่เมื่อกด Suggest'}">${kept ? 'Remove' : 'Keep'}</button><button type="button" class="curate-pin" aria-pressed="${s.pins.has(id)}" title="บังคับเก็บข้อนี้แม้กด Suggest ใหม่ กดอีกครั้งเพื่อปลด">📌 Must keep</button></div>`;
-            sourceView(row.querySelector('.curate-source'), q, false, [], s.source.missingKeys.includes(id));
+            sourceView(row.querySelector('.curate-source'), q, false, [], s.source.missingKeys.includes(id), id);
             const reason = row.querySelector('.curate-reason');
             const source = row.querySelector('.curate-source'); source.insertBefore(reason, source.querySelector('.curate-source-controls'));
             if (s.pins.has(id) || (assessment && assessment.keep !== kept)) {
