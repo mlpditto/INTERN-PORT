@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V100.97)</title>
+    <title>Internship Portfolio (V100.98)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -683,7 +683,7 @@
         .activity-row button.activity-fin { border-color:#a7f3d0; background:#ecfdf5; color:#065f46; }
         /* V100.78: FIN money-plan popup */
         #finModal .modal-content { text-align:left; padding:14px 14px calc(18px + env(safe-area-inset-bottom)); max-width:430px; max-height:88vh; }
-        #finModal .fin-head { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+        #finModal .fin-head { display:flex; align-items:center; gap:6px; margin-bottom:8px; }
         #finModal .fin-head h3 { margin:0; font-size:1.05em; font-weight:900; color:#065f46; }
         #finModal .fin-x { margin-left:auto; width:30px; height:30px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; color:#475569; cursor:pointer; padding:0; }
         #finModal .fin-sync { width:auto; min-height:0; margin:0 0 0 auto; padding:3px 9px; border:1px solid #e2e8f0; border-radius:999px; background:#f8fafc; color:#64748b; font-size:0.68em; font-weight:800; cursor:pointer; white-space:nowrap; font-variant-numeric:tabular-nums; }
@@ -693,7 +693,15 @@
         #finModal .fin-tabs button.on { background:#fff; color:#065f46; box-shadow:0 1px 3px rgba(15,23,42,0.12); }
         #finModal .fin-nav { display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:8px; font-weight:800; font-size:0.9em; color:#0f172a; }
         /* Scoped to .fin-nav-arrow so it cannot squash the budget chip that also sits here. */
-        #finModal .fin-nav button.fin-nav-arrow { width:30px; height:30px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; color:#475569; cursor:pointer; padding:0; margin:0; }
+        /* Six items share this row on Month. The title must not shrink-and-wrap (at 360px it
+           broke "💰 FIN" onto two lines, which scrollWidth never reported), the arrows are a
+           size down to buy the room, and the label truncates rather than break the row on a
+           320px screen. Measured clear at 375 and 360. */
+        #finModal .fin-head h3 { white-space:nowrap; flex:0 0 auto; }
+        #finModal .fin-head-nav { display:flex; align-items:center; gap:6px; min-width:0; }
+        #finModal .fin-head-nav b { font-size:0.9em; font-weight:800; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        #finModal .fin-head-nav .fin-nav-arrow { width:26px; height:26px; flex:0 0 auto; }
+        #finModal button.fin-nav-arrow { width:30px; height:30px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; color:#475569; cursor:pointer; padding:0; margin:0; }
         #finModal #fin-nav-extra { margin-left:auto; }
         #finModal #fin-nav-label { white-space:nowrap; }
         #finModal .fin-plan-total { text-align:right; font-size:0.7em; color:#94a3b8; margin:-2px 0 8px; }
@@ -5215,6 +5223,12 @@
             <div class="fin-head">
                 <h3>💰 FIN</h3>
                 <span class="fin-muted" id="fin-head-sub"></span>
+                <!-- V100.98: on Month the month control rides this row instead of having its own. -->
+                <span class="fin-head-nav" id="fin-head-nav" style="display:none;">
+                    <button type="button" class="fin-nav-arrow" onclick="finShiftMonth(-1)" aria-label="Previous month">‹</button>
+                    <b id="fin-head-month"></b>
+                    <button type="button" class="fin-nav-arrow" onclick="finShiftMonth(1)" aria-label="Next month">›</button>
+                </span>
                 <button type="button" class="fin-sync" id="fin-sync" onclick="finSync()" style="display:none;"></button>
                 <button type="button" class="fin-x" onclick="finClose()" aria-label="Close">✕</button>
             </div>
@@ -19052,6 +19066,8 @@
         // category is written out beside it drops the emoji and keeps just the word.
         function finCatName(c) { return String(c || '').slice(String(c || '').indexOf(' ') + 1); }
         function finMonthLabel(ym) { const [y, m] = ym.split('-').map(Number); return new Date(y, m - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' }); }
+        // "Sep 2026" — used wherever the full name would not fit the row it sits in.
+        function finMonthShort(ym) { return finMonthLabel(ym).slice(0, 3) + ' ' + ym.slice(0, 4); }
         function finDaysIn(ym) { const [y, m] = ym.split('-').map(Number); return new Date(y, m, 0).getDate(); }
         function finDayKey(ym, d) { return ym + '-' + String(d).padStart(2, '0'); }
         function finBudget(data, dayKey) {
@@ -19394,13 +19410,21 @@
             const data = finLoad(), body = document.getElementById('fin-body');
             if (!body) return;
             document.querySelectorAll('#finModal .fin-tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === finState.tab));
+            // V100.98: Month's month-control moves onto the header row and its own row goes.
+            // Measured on the real modal at 375px: the header has 323px of room, "Sep 2026"
+            // in it needs 287 and "September 2026" needs 337 — hence the short label. Plan
+            // cannot follow: with the ฿/day chip the same row wants 374px, so Plan keeps its
+            // row, and switching Month↔Plan shifts the content by that row's 44px.
             const nav = document.getElementById('fin-nav');
-            nav.style.display = finState.tab === 'today' ? 'none' : 'flex';
+            const headNav = document.getElementById('fin-head-nav');
+            nav.style.display = finState.tab === 'plan' ? 'flex' : 'none';
+            headNav.style.display = finState.tab === 'month' ? 'flex' : 'none';
+            if (finState.tab === 'month') document.getElementById('fin-head-month').textContent = finMonthShort(finState.month);
             // The open budget editor is wider than the chip it replaces and pushed the month
             // name onto a second line at 375px — it shortens to "Sep 2026" while editing.
             const navEditing = finState.tab === 'plan' && finState.editDaily;
             document.getElementById('fin-nav-label').textContent = navEditing
-                ? finMonthLabel(finState.month).slice(0, 3) + ' ' + finState.month.slice(0, 4)
+                ? finMonthShort(finState.month)
                 : finMonthLabel(finState.month);
             // V100.93: on Plan, the month's default daily budget rides this row as a chip —
             // the card, its uppercase title, the "฿ / day" label and the Save button are gone.
