@@ -25,7 +25,11 @@ check('no number → bare stem', fn({ q: 'Explain', type: 'essay' }, 0, false), 
 check('explanation never copied', fn({ q: 'S', explanation: 'secret', type: 'choice', correct: 0, options: ['a'] }, 1, false).includes('secret'), false);
 
 check('button added to the collapsed-row controls', /controls\.append\(copyButton\(q, number, missingKey\)\); \/\/ V101\.12/.test(src), true);
-check('button added to expanded compare cards', /const controls = node\('div', undefined, 'curate-source-controls'\); controls\.append\(copyButton\(q, number, missingKey\)\); host\.append\(controls\);/.test(src), true);
+check('compare card: button rides the heading, no extra row', /heading\.append\(copyButton\(s\.source\.form\.questions\[id - 1\], id, s\.source\.missingKeys\.includes\(id\)\)\);/.test(src) && !/controls\.append\(copyButton\(q, number, missingKey\)\); host\.append\(controls\);/.test(src), true);
+check('button is icon-only with an aria-label', /button\.innerHTML = icon\('fa-copy'\);/.test(src) && /setAttribute\('aria-label', 'Copy question'/.test(src) && !/node\('button', 'Copy'/.test(src), true);
+check('success swaps to a check icon and reverts', /icon\(ok \? 'fa-check' : 'fa-xmark'\)/.test(src) && /button\.innerHTML = icon\('fa-copy'\); button\.classList\.remove\('done'\); \}, 1500\)/.test(src), true);
+const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'quiz-curate.css'), 'utf8');
+check('css: heading is a flex row, copy button is a 28px icon square', /\.curate-compare-card h4\{[^}]*display:flex;[^}]*justify-content:space-between/.test(css) && /\.curate-copy\{[^}]*width:28px;height:28px;min-height:0/.test(css), true);
 check('compare call site passes the number', /s\.source\.missingKeys\.includes\(id\), id\); grid\.append\(card\);/.test(src), true);
 check('list call site passes the number', /sourceView\(row\.querySelector\('\.curate-source'\), q, false, \[\], s\.source\.missingKeys\.includes\(id\), id\);/.test(src), true);
 check('clipboard API with execCommand fallback', /navigator\.clipboard\.writeText\(text\)[\s\S]*document\.execCommand\('copy'\)/.test(src), true);
