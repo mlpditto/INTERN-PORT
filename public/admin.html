@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.07)</title>
+    <title>Nika Admin (V101.08)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -12781,6 +12781,17 @@
                         </summary>
                         <div style="padding:10px 12px; border-top:1px solid #334155;">
                             
+                            <!-- V101.08: System override. One select writes both fields the resolvers
+                                 already honour: diseaseSystemKey (intern card icon, getQuizIconStyle in
+                                 index.html) and coverageSystem (dashboard Quiz Coverage bucket + list row
+                                 chips). Auto = both guessed from title/tags, as before. Options are
+                                 filled from CASE_SYSTEMS by populateQuizSystemSelect(). -->
+                            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #334155;">
+                                <label for="quiz-system-select" style="font-size:0.75em; color:#4ade80; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; white-space:nowrap;"><i class="fa-solid fa-lungs"></i> System</label>
+                                <select id="quiz-system-select" class="lang-no-toggle" title="Sets the card icon and the Quiz Coverage bucket. Auto guesses from title and tags." style="flex:1; padding:8px 12px; border:1px solid #334155; border-radius:12px; font-size:0.85em; background:#0f172a; color:#f1f5f9; outline:none;">
+                                    <option value="">Auto · guess from title & tags</option>
+                                </select>
+                            </div>
                             <div style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #334155;">
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                                     <label style="font-size:0.75em; color:#4ade80; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><i class="fa-solid fa-tags"></i> Tags</label>
@@ -22415,6 +22426,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             if (document.getElementById('quiz-db-beri')) document.getElementById('quiz-db-beri').value = (typeof q.deadlineBeriMax === 'number') ? q.deadlineBeriMax : '';
             document.getElementById('quiz-description').value = q.description || "";
             document.getElementById('quiz-tags').value = q.tags || "";
+            window.populateQuizSystemSelect(window.quizSystemValueFromDoc(q)); // V101.08
             quizResourceCards.load(q.materials);
             refreshTagChips();
             document.getElementById('quiz-is-poll').checked = q.isPoll || false;
@@ -22506,6 +22518,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             if (document.getElementById('quiz-db-beri')) document.getElementById('quiz-db-beri').value = '';
             document.getElementById('quiz-description').value = "";
             document.getElementById('quiz-tags').value = "";
+            window.populateQuizSystemSelect(''); // V101.08
             quizResourceCards.load([]);
             refreshTagChips();
             document.getElementById('quiz-is-poll').checked = false;
@@ -25760,12 +25773,14 @@ ${JSON.stringify(sourceObj)}`;
                             data.deadlineFloor = firebase.firestore.FieldValue.delete();
                         }
                     }
+                    Object.assign(data, window.quizSystemFieldsFromEditor(true)); // V101.08
                     await db.collection("quizzes").doc(id).update(data);
                     savedQuizId = id;
                     showToast("Quiz Updated!");
                 } else {
                     data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
                     data.isActive = true;
+                    Object.assign(data, window.quizSystemFieldsFromEditor(false)); // V101.08
                     const docRef = await db.collection("quizzes").add(data);
                     savedQuizId = docRef.id;
                     showToast("Quiz Saved!");
@@ -25824,11 +25839,13 @@ ${JSON.stringify(sourceObj)}`;
 
                 if (existing) {
                     // Update existing template
+                    Object.assign(data, window.quizSystemFieldsFromEditor(true)); // V101.08
                     await db.collection("quizzes").doc(existing.id).update(data);
                     showToast("Template Updated!");
                 } else {
                     // Create new template
                     data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                    Object.assign(data, window.quizSystemFieldsFromEditor(false)); // V101.08
                     await db.collection("quizzes").add(data);
                     showToast("Template Saved!");
                 }
@@ -25870,9 +25887,11 @@ ${JSON.stringify(sourceObj)}`;
 
             try {
                 if (id) {
+                    Object.assign(data, window.quizSystemFieldsFromEditor(true)); // V101.08
                     await db.collection("quizzes").doc(id).update(data);
                 } else {
                     data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                    Object.assign(data, window.quizSystemFieldsFromEditor(false)); // V101.08
                     await db.collection("quizzes").add(data);
                 }
                 showToast("Quiz is now LIVE!");
@@ -33285,10 +33304,13 @@ RULES:
             // and the open list optimistically (the quizzes snapshot reconciles after).
             window.setQuizCoverage = function (id, value) {
                 const q = (Array.isArray(quizzesData) ? quizzesData : []).find(x => x.id === id);
-                if (q) q.coverageSystem = value;
+                // V101.08: same pair as the editor's System select, so the intern card
+                // icon follows the bucket. '__auto' clears both fields.
+                const chosen = value === '__auto' ? '' : value;
+                if (q) { q.coverageSystem = chosen || undefined; q.diseaseSystemKey = (chosen && chosen !== '__none') ? chosen : undefined; }
                 if (window.renderQuizCoverage) window.renderQuizCoverage();
                 if (window._qcovOpenKey) window.openQuizCoverageList(window._qcovOpenKey);
-                db.collection('quizzes').doc(id).update({ coverageSystem: value })
+                db.collection('quizzes').doc(id).update(window.quizSystemFields(chosen, true))
                     .then(() => { if (typeof showToast === 'function') showToast('✅ Category moved'); })
                     .catch(e => { if (typeof showToast === 'function') showToast('❌ Could not move category: ' + e.message); });
             };
@@ -60698,6 +60720,48 @@ RULES:
         // empties, de-dupes case-insensitively and caps the list. Casing converges on
         // the spelling already used most across quizzesData (computeQuizTagHygiene),
         // so "headache" typed on a new quiz becomes "Headache" when that is the norm.
+        // V101.08: System override select in the editor. Values: '' = Auto, a
+        // CASE_SYSTEMS key, or '__none' (coverage: forced Uncategorized). Writes
+        // diseaseSystemKey + coverageSystem together so the card icon and the coverage
+        // bucket never disagree; the Quiz Coverage modal picker (setQuizCoverage)
+        // writes the same pair. Deliberately NOT part of getQuizFormData: saveAsTemplate
+        // and goLiveNow spread formData straight into the doc, and the raw select value
+        // must never land in Firestore. On window so scripts/quiz-system-select-check.cjs
+        // runs the real code.
+        window.populateQuizSystemSelect = function (value) {
+            const sel = document.getElementById('quiz-system-select');
+            if (!sel) return;
+            const systems = window._qcovSystems || window.CASE_SYSTEMS || [];
+            sel.innerHTML = '<option value="">Auto · guess from title & tags</option>'
+                + systems.map(sys => `<option value="${escapeHtml(sys.key)}">${sys.emoji || ''} ${escapeHtml((sys.label && sys.label.en) || sys.key)}</option>`).join('')
+                + '<option value="__none">🏷️ Uncategorized</option>';
+            const want = value || '';
+            sel.value = want;
+            if (sel.value !== want) sel.value = ''; // unknown key → Auto
+        };
+        // What the select shows for a stored quiz: coverageSystem wins (the dashboard
+        // picker already writes it), then diseaseSystemKey, else Auto.
+        window.quizSystemValueFromDoc = function (q) {
+            const cov = q && q.coverageSystem;
+            if (cov === '__none') return '__none';
+            if (cov && cov !== '__auto') return cov;
+            return (q && q.diseaseSystemKey) || '';
+        };
+        // Fields to merge into a save. Auto clears both overrides; Uncategorized
+        // forces the bucket and clears the icon override. On update() a cleared
+        // field is FieldValue.delete(); on add() it is simply left out.
+        window.quizSystemFields = function (value, forUpdate) {
+            const clear = forUpdate ? firebase.firestore.FieldValue.delete() : undefined;
+            const fields = {};
+            if (value === '__none') { fields.coverageSystem = '__none'; fields.diseaseSystemKey = clear; }
+            else if (value) { fields.coverageSystem = value; fields.diseaseSystemKey = value; }
+            else { fields.coverageSystem = clear; fields.diseaseSystemKey = clear; }
+            Object.keys(fields).forEach(k => { if (fields[k] === undefined) delete fields[k]; });
+            return fields;
+        };
+        window.quizSystemFieldsFromEditor = forUpdate =>
+            window.quizSystemFields(document.getElementById('quiz-system-select')?.value || '', forUpdate);
+
         const QUIZ_TAG_MAX = 20;
         window.quizTagCanonicalForms = function () {
             const map = new Map();
