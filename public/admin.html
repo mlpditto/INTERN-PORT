@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.20)</title>
+    <title>Nika Admin (V101.21)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6360,7 +6360,7 @@
     <script src="codex-vision.js?v=V101.20"></script>
     <!-- V91.98 fix: walker skips user-content subtrees (q-text-preview / md-render / lang-no-toggle) -->
     <script src="lang-toggle.js?v=V97.44"></script>
-<link rel="stylesheet" href="audit-toolbar.css?v=V100.12">
+<link rel="stylesheet" href="audit-toolbar.css?v=V101.21">
 <link rel="stylesheet" href="quiz-curate.css?v=V101.18">
 <script src="quiz-revision.js?v=V100.07"></script>
 <script src="ai-usage-overview.js?v=V100.19"></script>
@@ -17819,7 +17819,10 @@
             const provider = TEXT_AI_MODELS.find(m => m.id === selected).label.split(' ')[0];
             const action = `document.getElementById('${inputId}').value=this.dataset.value;this.parentElement.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b===this);b.setAttribute('aria-pressed',String(b===this))});this.closest('.audit-toolbar').querySelector('.audit-run').title='ใช้ '+this.getAttribute('aria-label')+' ทำงานนี้'` + (isAudit ? ';syncAuditFixHints()' : ";syncModelDefault('ai-analyzer-model-val',this.dataset.value)");
             const chips = textAIChipContents(selected, action).replace(/<span class="text-ai-provider"[^>]*>.*?<\/span>/g, '').replace(/<button /g, '<button hidden ' ).replace(new RegExp('hidden ([^>]*aria-label="' + provider + ' )', 'g'), '$1');
-            return `<div class="audit-model-row"><input type="hidden" id="${inputId}" value="${selected}"><div class="audit-providers" role="group" aria-label="Browse model providers">${['Gemini', 'GPT', 'Claude'].map(p => `<button type="button" class="audit-provider" data-provider="${p}" aria-pressed="${p === provider}" title="ดูรุ่นของ ${p} · กดเลือกรุ่นเพื่อเปลี่ยนโมเดล" onclick="browseAuditProvider(this)">${p}</button>`).join('')}</div><div class="text-ai-chips" role="group" aria-label="AI model">${chips}</div></div>`;
+            // V101.21: tabs follow TEXT_AI_MODELS (first word of each label, in order) — the
+            // hard-coded three left the Qwen / DeepSeek chips (V101.05) permanently hidden.
+            const providers = [...new Set(TEXT_AI_MODELS.map(m => m.label.split(' ')[0]))];
+            return `<div class="audit-model-row"><input type="hidden" id="${inputId}" value="${selected}"><div class="audit-providers" role="group" aria-label="Browse model providers">${providers.map(p => `<button type="button" class="audit-provider" data-provider="${p}" aria-pressed="${p === provider}" title="ดูรุ่นของ ${p} · กดเลือกรุ่นเพื่อเปลี่ยนโมเดล" onclick="browseAuditProvider(this)">${p}</button>`).join('')}</div><div class="text-ai-chips" role="group" aria-label="AI model">${chips}</div></div>`;
         };
         window.auditToolbarHtml = function(hasResult, mode = 'audit', allowExport = false) {
             const isAudit = mode === 'audit';
