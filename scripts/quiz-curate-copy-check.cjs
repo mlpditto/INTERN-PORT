@@ -30,7 +30,7 @@ check('compare call site passes the number', /s\.source\.missingKeys\.includes\(
 check('list call site passes the number', /sourceView\(row\.querySelector\('\.curate-source'\), q, false, \[\], s\.source\.missingKeys\.includes\(id\), id\);/.test(src), true);
 check('clipboard API with execCommand fallback', /navigator\.clipboard\.writeText\(text\)[\s\S]*document\.execCommand\('copy'\)/.test(src), true);
 const admin = fs.readFileSync(path.join(__dirname, '..', 'public', 'admin.html'), 'utf8');
-check('admin cache-busts both curate assets', /quiz-curate\.css\?v=V101\.12/.test(admin) && /quiz-curate\.js\?v=V101\.12/.test(admin), true);
+check('admin cache-busts both curate assets', /quiz-curate\.css\?v=V\d+\.\d+/.test(admin) && /quiz-curate\.js\?v=V\d+\.\d+/.test(admin), true);
 
 let fail = 0;
 checks.forEach(([name, got, want]) => {

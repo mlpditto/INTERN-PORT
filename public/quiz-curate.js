@@ -379,9 +379,45 @@
             list.append(item);
         }
     }
+    // V101.14: the evidence check used to be an exact `includes`, and ONE quote that
+    // differed from the source by a "**" marker, a curly quote, a run of spaces or
+    // its case threw the whole run away ("AI quoted text not found"). Now a quote
+    // is first matched exactly, then snapped to the source through a normalised
+    // view (markdown markers, quote characters, whitespace, case, edge punctuation)
+    // and replaced by the exact source substring so highlighting still works. A
+    // quote that cannot be snapped is dropped; a comparison left without evidence
+    // for both questions is dropped; an "overlap" left without comparisons becomes
+    // "other". The run survives and the status line reports what was adjusted.
+    function normalizeForMatch(text) {
+        const map = []; let norm = '';
+        const src = String(text || '');
+        for (let i = 0; i < src.length; i++) {
+            let ch = src[i];
+            if (ch === '*' || ch === '_' || ch === '`') continue;
+            if (ch === '\u2018' || ch === '\u2019') ch = "'";
+            else if (ch === '\u201C' || ch === '\u201D') ch = '"';
+            if (/\s/.test(ch)) { if (norm.endsWith(' ')) continue; ch = ' '; }
+            norm += ch.toLowerCase(); map.push(i);
+        }
+        return { norm, map };
+    }
+    function snapQuote(quote, text) {
+        if (typeof text !== 'string' || !text) return null;
+        const target = normalizeForMatch(quote).norm.trim().replace(/^[\s"'.,;:!?()\[\]\-\u2026\u2013\u2014]+|[\s"'.,;:!?()\[\]\-\u2026\u2013\u2014]+$/g, '');
+        if (target.length < 3) return null; // a 1-2 character "excerpt" proves nothing, even when it is an exact substring
+        if (text.includes(quote)) return quote;
+        const view = normalizeForMatch(text);
+        const at = view.norm.indexOf(target);
+        if (at < 0) return null;
+        let start = view.map[at], end = view.map[at + target.length - 1] + 1;
+        while (start > 0 && '*_`'.includes(text[start - 1])) start--; // keep adjacent markdown markers inside the span
+        while (end < text.length && '*_`'.includes(text[end])) end++;
+        return text.slice(start, end);
+    }
     function validateProposal(data, s, n) {
         const count = s.source.form.questions.length;
         if (!Array.isArray(data?.questions) || data.questions.length !== count) throw new Error('AI must assess every original question. Try Suggest again.');
+        const adjust = { snapped: 0, dropped: 0, relations: 0, downgraded: 0 };
         const seen = new Set();
         for (const q of data.questions) {
             if (!Number.isInteger(q.id) || q.id < 1 || q.id > count || seen.has(q.id) || typeof q.keep !== 'boolean' || typeof q.reason !== 'string' || !q.reason.trim() || typeof q.topic !== 'string' || !q.topic.trim()) throw new Error('AI returned invalid question IDs or missing reasons. Try Suggest again.');
@@ -391,21 +427,36 @@
             if (!Array.isArray(q.related) || q.related.length > 3) throw new Error('AI returned invalid comparisons. Try Suggest again.');
             if (!['overlap', 'quality', 'coverage', 'other'].includes(q.reasonType) || (q.reasonType === 'overlap' && !q.related.length)) throw new Error('AI must link overlapping questions for comparison. Try Suggest again.');
             const linked = new Set();
+            const keptRelated = [];
             for (const r of q.related) {
                 if (!r || !Number.isInteger(r.id) || r.id < 1 || r.id > count || r.id === q.id || linked.has(r.id)) throw new Error('AI returned an invalid comparison question. Try Suggest again.');
                 linked.add(r.id);
                 for (const key of ['shared', 'sharedTh', 'difference', 'differenceTh', 'preference', 'preferenceTh']) if (typeof r[key] !== 'string' || !r[key].trim()) throw new Error('AI must explain each comparison in both languages. Try Suggest again.');
                 if (!Array.isArray(r.evidence) || !r.evidence.length || r.evidence.length > 6) throw new Error('AI comparison evidence is missing. Try Suggest again.');
+                const verified = [];
                 for (const e of r.evidence) {
                     if (!e || ![q.id, r.id].includes(e.id) || typeof e.quote !== 'string' || !e.quote.trim()) throw new Error('AI returned invalid source evidence. Try Suggest again.');
                     const source = s.source.form.questions[e.id - 1];
-                    if (![source.q, source.content, ...(source.options || []), source.explanation].some(text => typeof text === 'string' && text.includes(e.quote))) throw new Error('AI quoted text not found in the original question. Try Suggest again.');
+                    let snapped = null;
+                    for (const text of [source.q, source.content, ...(source.options || []), source.explanation]) { snapped = snapQuote(e.quote, text); if (snapped) break; }
+                    if (snapped === null) { adjust.dropped++; continue; }
+                    if (snapped !== e.quote) adjust.snapped++;
+                    verified.push({ id: e.id, quote: snapped });
                 }
-                if (![q.id, r.id].every(id => r.evidence.some(e => e.id === id))) throw new Error('AI must cite both compared questions. Try Suggest again.');
+                if (![q.id, r.id].every(id => verified.some(e => e.id === id))) { adjust.relations++; continue; }
+                keptRelated.push({ ...r, evidence: verified });
             }
+            q.related = keptRelated;
+            if (q.reasonType === 'overlap' && !q.related.length) { q.reasonType = 'other'; adjust.downgraded++; }
         }
         const kept = new Set(data.questions.filter(q => q.keep).map(q => q.id));
         if (kept.size !== n || [...s.pins].some(id => !kept.has(id))) throw new Error('AI did not respect the target or pinned questions. Try Suggest again.');
+        const notes = [];
+        if (adjust.snapped) notes.push(adjust.snapped + ' excerpt' + (adjust.snapped === 1 ? '' : 's') + ' snapped to the source text');
+        if (adjust.dropped) notes.push(adjust.dropped + ' unverifiable excerpt' + (adjust.dropped === 1 ? '' : 's') + ' dropped');
+        if (adjust.relations) notes.push(adjust.relations + ' comparison' + (adjust.relations === 1 ? '' : 's') + ' dropped for lack of evidence');
+        if (adjust.downgraded) notes.push(adjust.downgraded + ' overlap reason' + (adjust.downgraded === 1 ? '' : 's') + ' downgraded to other');
+        s.evidenceNote = notes.join(' · ');
         return data.questions.map(q => ({ id: q.id, keep: q.keep, reasonType: q.reasonType, reason: q.reason.trim(), reasonTh: q.reasonTh.trim(), topic: q.topic.trim(),
             detail: q.detail.trim(), detailTh: q.detailTh.trim(), impact: q.impact.trim(), impactTh: q.impactTh.trim(),
             related: q.related.map(r => ({ id: r.id, shared: r.shared, sharedTh: r.sharedTh, difference: r.difference, differenceTh: r.differenceTh,
@@ -449,7 +500,7 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
                 await curateHistory.save(s.source.sourceId, run);
                 if (state !== s) return;
                 s.runs = [run, ...(s.runs || [])].slice(0, 5); renderHistory(s);
-                byId('curate-history-status').textContent = 'Done · ' + elapsed(s) + (s.source.sourceId ? ' · Result saved' : ' · History requires a saved quiz');
+                byId('curate-history-status').textContent = 'Done · ' + elapsed(s) + (s.source.sourceId ? ' · Result saved' : ' · History requires a saved quiz') + (s.evidenceNote ? ' · ' + s.evidenceNote : '');
             } catch (error) { if (state === s) byId('curate-history-status').textContent = 'Done · Result available, but history could not be saved. ' + error.message; }
         } catch (error) {
             if (state === s) { s.done = false; s.message = 'Could not suggest: ' + error.message; }
