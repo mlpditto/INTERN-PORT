@@ -218,12 +218,17 @@ fin.finState.month = '2026-09';   // finOpen() normally sets this; the mutators 
     check('10d. the award never blocks the entry (called after finSave/finRender)',
         /finSave\(data\); finRender\(\);\s*\n\s*finAwardBeri\(exp\);/.test(index), true);
     check('10e. the ledger row is the dedupe record, read inside the transaction',
-        /if \(\(await tx\.get\(bl\.ref\)\)\.exists\) return false;/.test(award), true);
+        /if \(\(await tx\.get\(bl\.ref\)\)\.exists\) return/.test(award), true);
     check('10f. deterministic refId so the other device cannot re-credit', /refId: `\$\{exp\.id\}_\$\{userId\}`/.test(award), true);
     check('10g. FIN caps on its own finAmount, leaving the Explore amount alone',
         /finAmount/.test(award) && !/\bamount:/.test(award.replace(/amount: 1,/, '')), true);
     check('10h. the Explore link cap still reads its own field', /REVIEW_LINK_DAILY_BERI_CAP/.test(index) && !/finAmount/.test(index.slice(index.indexOf('async function explOpenLink'), index.indexOf('// ==================================================================='))), true);
     check('10i. admin can label the new ledger source', /fin_expense: '💰 FIN entry'/.test(read('public/admin.html')), true);
+    // V100.97: three outcomes, so "capped" is distinguishable from "nothing happened".
+    check('10j. hitting the cap says so on the earning entry', /\+1 Beri · ครบ \$\{FIN_DAILY_BERI_CAP\}\/วันแล้ว/.test(award), true);
+    check('10k. entries past the cap say why they earned nothing', /ครบ \$\{FIN_DAILY_BERI_CAP\} Beri วันนี้แล้ว · พรุ่งนี้เริ่มใหม่/.test(award), true);
+    check('10l. an already-credited expense stays silent (it is a sync artifact)',
+        /\{ credited: false, atCap: false \}/.test(award), true);
 
     // ---- 11. wiring + rules (static) ----
     check('11a. rules grant fin/{id} to the owner only, no admin branch',
