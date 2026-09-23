@@ -299,10 +299,15 @@ fin.finState.month = '2026-09';   // finOpen() normally sets this; the mutators 
         /#finModal \.fin-head-nav b \{[^}]*text-overflow:ellipsis;/.test(index), true);
     // V100.99: the month group owns the middle and centres in it; that also leaves no slack,
     // so the pill's auto margin collapses and it parks against the ✕.
-    check('11ap. the month group takes the middle and centres itself',
-        /#finModal \.fin-head-nav \{ display:flex; flex:1; justify-content:center;/.test(index), true);
-    check('11aq. the pill keeps its auto margin for the tabs with no month group',
-        /#finModal \.fin-sync \{[^}]*margin:0 0 0 auto;/.test(index), true);
+    // V101.00: true centring — the two side groups flex equally around a content-sized middle.
+    check('11ap. the month group is content-sized, not the one absorbing the slack',
+        /#finModal \.fin-head-nav \{ display:flex; flex:0 0 auto; justify-content:center;/.test(index), true);
+    check('11aq. both sides flex equally, right-hand pair aligned to the end',
+        /#finModal \.fin-head-side \{ display:flex; flex:1 1 0;/.test(index)
+        && /#finModal \.fin-head-side\.right \{ justify-content:flex-end; \}/.test(index), true);
+    check('11as. the ✕ no longer pushes itself away from the pill', /#finModal \.fin-x \{ margin-left:auto;/.test(index), false);
+    check('11at. the header markup actually has the two side wrappers',
+        (index.match(/class="fin-head-side/g) || []).length, 2);
     check('11ar. below 345px the month keeps its own row rather than losing the year',
         /matchMedia\('\(max-width: 345px\)'\)\.matches/.test(index)
         && /nav\.style\.display = \(finState\.tab === 'plan' \|\| \(finState\.tab === 'month' && !monthInHeader\)\)/.test(index), true);
