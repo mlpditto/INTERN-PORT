@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V100.93)</title>
+    <title>Internship Portfolio (V100.94)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -697,9 +697,16 @@
         #finModal #fin-nav-extra { margin-left:auto; }
         #finModal #fin-nav-label { white-space:nowrap; }
         #finModal .fin-plan-total { text-align:right; font-size:0.7em; color:#94a3b8; margin:-2px 0 8px; }
+        /* V100.94: Month's sections, borderless like Today and Plan. */
+        #finModal .fin-verdict { font-size:0.75em; font-weight:800; color:#047857; white-space:nowrap; }
+        #finModal .fin-verdict.over { color:#b91c1c; }
+        #finModal .fin-sect { padding-bottom:11px; margin-bottom:10px; border-bottom:1px solid #e2e8f0; }
+        #finModal .fin-mini { font-size:0.75em; font-weight:700; color:#64748b; margin-bottom:7px; }
+        #finModal .fin-stats { display:flex; flex-wrap:wrap; gap:4px 12px; font-size:0.78em; color:#475569; }
+        #finModal .fin-stats b { font-weight:800; }
         #finModal .fin-card { border:1px solid #e2e8f0; border-radius:14px; padding:10px 12px; margin-bottom:8px; background:#fff; }
-        #finModal .fin-card.hero { background:linear-gradient(135deg,#ecfdf5,#f0fdfa); border-color:#a7f3d0; }
-        /* V100.91: Today's hero is a borderless two-row strip (the Month tab still uses .fin-card.hero). */
+        /* V100.91: Today's hero is a borderless two-row strip; V100.94 gave Month the same
+           shape, so the gradient .fin-card.hero and the .fin-kv grid it used are both gone. */
         #finModal .fin-hero { padding:2px 2px 10px; margin-bottom:8px; border-bottom:1px solid #e2e8f0; }
         #finModal .fin-hero-row { display:flex; align-items:baseline; gap:8px; }
         #finModal .fin-hero-row .fin-big { flex:1; min-width:0; }
@@ -743,8 +750,6 @@
         #finModal .fin-item .n { flex:1; min-width:0; overflow-wrap:anywhere; cursor:pointer; } #finModal .fin-item .n small { display:block; color:#94a3b8; font-size:0.85em; }
         #finModal .fin-item .a { font-weight:900; white-space:nowrap; }
         #finModal .fin-item .del { width:auto; min-height:0; margin:0; padding:2px 6px; border:0; background:transparent; color:#cbd5e1; cursor:pointer; font-size:1em; }
-        #finModal .fin-kv { display:grid; grid-template-columns:1fr auto; gap:4px 10px; font-size:0.82em; }
-        #finModal .fin-kv b { font-weight:800; }
         #finModal .fin-catbar { display:grid; grid-template-columns:auto 1fr auto; gap:6px 8px; align-items:center; font-size:0.8em; }
         #finModal .fin-catbar .b { height:7px; border-radius:999px; background:#e2e8f0; overflow:hidden; } #finModal .fin-catbar .b i { display:block; height:100%; background:#34d399; }
         #finModal .fin-row { display:flex; align-items:center; gap:8px; }
@@ -19378,24 +19383,36 @@
                 const byCat = {}; data.expenses.filter(inMonth).forEach(e => { byCat[e.cat] = (byCat[e.cat] || 0) + e.amount; });
                 const cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]); const maxCat = cats.length ? cats[0][1] : 1;
                 const pace = isCur && elapsedKeys.length ? Math.round(spent / elapsedKeys.length * days) : null;
+                // V100.94: same two-row strip as Today. The old sub line crammed four facts
+                // into one wrapping sentence — the day counter and % now ride the bar, the
+                // on-track verdict takes the headline's right slot (it is the one number that
+                // answers "am I OK"), and the pace projection moves into the bar's tooltip.
+                // With no plan at all there is nothing to be over or under, so the "of ฿X"
+                // and the % drop out and the bar stays empty rather than filling amber.
+                const noPlan = !(planTotal > 0);
+                const ahead = elapsedBudget - spent;
+                const verdict = elapsedBudget > 0
+                    ? `<span class="fin-verdict${ahead < 0 ? ' over' : ''}">${ahead >= 0 ? '🟢 ' + finFmt(ahead) + ' under' : '🔴 ' + finFmt(-ahead) + ' over'}</span>`
+                    : '';
                 body.innerHTML = `
-                    <div class="fin-card hero">
-                        <div class="fin-lbl">Spent this month · ใช้ไปแล้วเดือนนี้</div>
-                        <div class="fin-big${spent > planTotal && planTotal > 0 ? ' over' : ''}">${finFmt(spent)} <small>of ${finFmt(planTotal)} plan</small></div>
-                        ${bar(spent, planTotal)}
-                        <div class="fin-sub">${isCur ? `Day ${elapsedKeys.length} of ${days}` : `${days} days`}${elapsedBudget > 0 ? ` · budget so far ${finFmt(elapsedBudget)} · ${spent <= elapsedBudget ? '🟢 under by ' + finFmt(elapsedBudget - spent) : '🔴 over by ' + finFmt(spent - elapsedBudget)}` : ''}${pace !== null ? ` · on pace for ${finFmt(pace)}` : ''}</div>
+                    <div class="fin-hero">
+                        <div class="fin-hero-row">
+                            <div class="fin-big${!noPlan && spent > planTotal ? ' over' : ''}">${finFmt(spent)} <small>${noPlan ? 'spent · ใช้ไปแล้วเดือนนี้' : 'of ' + finFmt(planTotal)}</small></div>
+                            ${verdict}
+                        </div>
+                        <div class="fin-hero-row bar"${pace !== null ? ` title="On pace for ${finEsc(finFmt(pace))} this month"` : ''}>
+                            ${bar(noPlan ? 0 : spent, planTotal)}
+                            <span class="fin-sub">${isCur ? `Day ${elapsedKeys.length}/${days}` : `${days} days`}${noPlan ? '' : ` · ${Math.round(spent / planTotal * 100)}%`}</span>
+                        </div>
                     </div>
-                    <div class="fin-card">
-                        <div class="fin-lbl" style="margin-bottom:6px;">By category</div>
+                    <div class="fin-sect">
+                        <div class="fin-mini">By category</div>
                         ${cats.length ? `<div class="fin-catbar">${cats.map(([c, v]) => `<span>${finEsc(c)}</span><div class="b"><i style="width:${Math.round(v / maxCat * 100)}%"></i></div><b>${finFmt(v)}</b>`).join('')}</div>` : '<div class="fin-muted">No expenses this month.</div>'}
                     </div>
-                    <div class="fin-card">
-                        <div class="fin-lbl" style="margin-bottom:6px;">Days · วัน</div>
-                        <div class="fin-kv">
-                            <span>Days within budget</span><b>${under} / ${trackedKeys.length}</b>
-                            <span>Current streak</span><b>🔥 ${streak} ${streak === 1 ? 'day' : 'days'}</b>
-                            <span>Items logged</span><b>${data.expenses.filter(inMonth).length}</b>
-                        </div>
+                    <div class="fin-stats">
+                        <span><b>${under}/${trackedKeys.length}</b> days within budget</span>
+                        <span>🔥 <b>${streak} ${streak === 1 ? 'day' : 'days'}</b> streak</span>
+                        <span><b>${data.expenses.filter(inMonth).length}</b> items</span>
                     </div>`;
                 return;
             }

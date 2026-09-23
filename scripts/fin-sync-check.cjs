@@ -187,8 +187,8 @@ fin.finState.month = '2026-09';   // finOpen() normally sets this; the mutators 
     check('11i. finCatName strips the emoji', /function finCatName\(c\)/.test(index), true);
     // V100.91 hero: a two-row strip, no .fin-card.hero on Today, budget edited in place.
     const today = index.slice(index.indexOf("if (finState.tab === 'today')"), index.indexOf("if (finState.tab === 'month')"));
-    check('11j. Today no longer renders the gradient hero card', /fin-card hero/.test(today), false);
-    check('11k. Month still does', /fin-card hero/.test(index.slice(index.indexOf("if (finState.tab === 'month')"))), true);
+    // V100.91 dropped it from Today, V100.94 from Month — nothing renders it now.
+    check('11j. the gradient hero card is not rendered anywhere', /fin-card hero/.test(index), false);
     check('11l. budget chip toggles the inline editor', /onclick="finEditBudget\(\)"/.test(today) && /window\.finEditBudget = finEditBudget/.test(index), true);
     check('11m. no Set row left on Today', /finSetToday\(\)">Set</.test(index), false);
     check('11n. no-budget state does not render a negative "left"', /const noBudget = budget <= 0;/.test(today) && /noBudget \? finFmt\(spent\) : finFmt\(left\)/.test(today), true);
@@ -213,6 +213,17 @@ fin.finState.month = '2026-09';   // finOpen() normally sets this; the mutators 
     check('11ab. the month name shortens while the editor is open', /finMonthLabel\(finState\.month\)\.slice\(0, 3\)/.test(index), true);
     check('11ac. editDaily resets on tab and month change',
         (index.match(/finState\.editDaily = false/g) || []).length >= 4, true);
+    // V100.94: Month is the same two-row strip as Today; all three of its cards are gone.
+    const month = index.slice(index.indexOf("if (finState.tab === 'month')"), index.indexOf("// plan"));
+    check('11ad. Month renders the borderless hero, not a card', /<div class="fin-hero">/.test(month) && !/fin-card/.test(month), true);
+    check('11ae. the run-on sub line is gone', /budget so far/.test(index), false);
+    check('11af. with no plan there is no "of ฿0" and no %', /noPlan \? 'spent · ใช้ไปแล้วเดือนนี้' : 'of ' \+ finFmt\(planTotal\)/.test(month), true);
+    check('11ag. with no plan the bar stays empty instead of filling amber', /bar\(noPlan \? 0 : spent, planTotal\)/.test(month), true);
+    check('11ah. pace moved into the bar tooltip', /title="On pace for /.test(month), true);
+    check('11ai. the Days card is one stats line', /<div class="fin-stats">/.test(month) && !/fin-kv/.test(month), true);
+    // Both were only ever used by the cards this change removed.
+    check('11aj. the orphaned .fin-card.hero and .fin-kv CSS is gone',
+        /#finModal \.fin-card\.hero \{/.test(index) || /#finModal \.fin-kv \{/.test(index), false);
 
     let bad = 0;
     for (const [name, got, want] of checks) {
