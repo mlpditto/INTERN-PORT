@@ -33,21 +33,24 @@ new Function(...Object.keys(ctx), readerSrc + '\n' + backfillSrc)(...Object.valu
 const w = ctx.window;
 
 check('CSV: trim, collapse whitespace, drop empties', w.quizTagList(quizzesData[0]).join('|'), 'Headache|Drug Interaction');
-check('CSV wins over a stale array', w.quizTagList(quizzesData[2]).join('|'), 'Fever|Cough');
+check('stage 2: the array wins when present (even if the text differs)', w.quizTagList(quizzesData[2]).join('|'), 'Fever');
+check('stage 2: in-sync doc reads the same either way', w.quizTagList(quizzesData[1]).join('|'), 'Fever');
+check('stage 2: array entries are trimmed / whitespace-collapsed / empties dropped', w.quizTagList({ tags: 'x', tagList: [' A  B ', '', null, 'c'] }).join('|'), 'A B|c');
 check('array-only doc reads tagList', w.quizTagList(quizzesData[5]).join('|'), 'Array|Only');
-check('empty CSV with array → array (empty) not CSV', w.quizTagList({ tags: '', tagList: ['X'] }).join('|'), 'X');
+check('empty CSV with array → array', w.quizTagList({ tags: '', tagList: ['X'] }).join('|'), 'X');
+check('no array → CSV fallback', w.quizTagList({ tags: 'Only, Text' }).join('|'), 'Only|Text');
 check('null / missing → []', `${w.quizTagList(null).length}|${w.quizTagList({}).length}`, '0|0');
 check('quizTagsCsv joins with ", "', w.quizTagsCsv(quizzesData[0]), 'Headache, Drug Interaction');
 check('questionTagList parses per-question CSV', w.questionTagList({ tags: ' a ,b' }).join('|'), 'a|b');
 
-check('backfill todo = missing or stale mirrors, CSV docs only', w.quizTagListBackfillTodo().map(q => q.id).join(','), 'A,C,E');
+check('backfill todo = missing or stale mirrors, CSV docs only (stale still detected after the flip)', w.quizTagListBackfillTodo().map(q => q.id).join(','), 'A,C,E');
 w.backfillQuizTagList().then(() => {
     check('backfill writes ONLY tagList', writes.map(x => `${x.id}:${JSON.stringify(x.data)}`).join(' '), 'A:{"tagList":["Headache","Drug Interaction"]} C:{"tagList":["Fever","Cough"]} E:{"tagList":[]}');
 
     // --- intern reader (same semantics) ---
     const internSrc = index.slice(index.indexOf('        function quizTagList(q) {'), index.indexOf("        let qbTagFilter = '';"));
     const intern = new Function(internSrc + '\nreturn { quizTagList, quizTagsCsv };')();
-    check('intern reader: CSV wins, whitespace collapsed', intern.quizTagList(quizzesData[2]).join('|') + ' / ' + intern.quizTagList(quizzesData[0]).join('|'), 'Fever|Cough / Headache|Drug Interaction');
+    check('intern reader: array wins, CSV fallback with whitespace collapsed', intern.quizTagList(quizzesData[2]).join('|') + ' / ' + intern.quizTagList(quizzesData[0]).join('|'), 'Fever / Headache|Drug Interaction');
     check('intern reader: array-only doc', intern.quizTagsCsv(quizzesData[5]), 'Array, Only');
 
     // --- writers ---
@@ -72,7 +75,9 @@ w.backfillQuizTagList().then(() => {
         ['index q.tags in hay', index, /\[q\.title, q\.shortTitle, q\.tags,/g]
     ];
     stray.forEach(([name, src, re]) => check(`no stray parser: ${name}`, (src.match(re) || []).length, 0));
-    check('editor still loads the CSV into the hidden input', /getElementById\('quiz-tags'\)\.value = window\.quizTagsCsv\(q\);/.test(admin), true);
+    check('editor still loads through the reader', /getElementById\('quiz-tags'\)\.value = window\.quizTagsCsv\(q\);/.test(admin), true);
+    check('backfill derives the array from the CSV, not from the reader', /\{ tagList: splitTagCsv\(q\.tags\) \}/.test(admin) && !/\{ tagList: window\.quizTagList\(q\) \}/.test(admin), true);
+    check('backfill todo compares against the CSV', /!== JSON\.stringify\(splitTagCsv\(q\.tags\)\)/.test(admin), true);
 
     let fail = 0;
     checks.forEach(([name, got, want]) => {
