@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.10)</title>
+    <title>Nika Admin (V101.11)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -14263,7 +14263,7 @@
             <div id="lpt-editor-discover" style="display:none;">
                 <div class="lpt-editor-toolbar">
                     <div style="font-size:0.83em; color:#78716c; max-width:60%; line-height:1.4;">
-                        Find custom tags users have added to LP entries that aren't yet in your taxonomy. Promote popular ones to a system to surface them as Suggested chips.
+                        Find tags that are not yet in your taxonomy: custom tags interns added to LP entries, plus the tags on quizzes (quiz-level and per-question). Promote popular ones to a system to surface them as Suggested chips.
                     </div>
                     <button type="button" onclick="lptEditorScanCustomTags()" class="lpt-add-btn">🔍 Scan</button>
                 </div>
@@ -38039,7 +38039,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             document.getElementById('lpt-editor-list').style.display = 'none';
             document.getElementById('lpt-editor-form').style.display = 'none';
             document.getElementById('lpt-editor-discover').style.display = 'block';
-            document.getElementById('lpt-discover-status').innerHTML = '<span style="color:#78716c;">Click 🔍 Scan to find custom tags from LP entries.</span>';
+            document.getElementById('lpt-discover-status').innerHTML = '<span style="color:#78716c;">Click 🔍 Scan to find tags from LP entries and quizzes that are not in the taxonomy yet.</span>';
             document.getElementById('lpt-discover-rows').innerHTML = '';
         }
 
@@ -38057,36 +38057,56 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         async function lptEditorScanCustomTags() {
             const statusEl = document.getElementById('lpt-discover-status');
             const rowsEl = document.getElementById('lpt-discover-rows');
-            statusEl.innerHTML = '<span style="color:#64748b;">🔄 Scanning LP entries…</span>';
+            statusEl.innerHTML = '<span style="color:#64748b;">🔄 Scanning LP entries and quizzes…</span>';
             rowsEl.innerHTML = '';
             try {
                 // Cap at 3000 for performance — most-used tags surface even with sampling.
                 // Bump the limit if discovery starts missing popular tags in a large dataset.
                 const snap = await db.collection('learning_path_entries').limit(3000).get();
                 const known = lptEditorBuildKnownTagsSet();
-                const tagMap = new Map(); // tagLower -> { display, count, users:Set }
+                const tagMap = new Map(); // tagLower -> { display, count, users:Set, lp, quiz, quizIds:Set }
+                const bump = (raw, source, userId, quizId) => {
+                    raw = String(raw || '').trim();
+                    if (!raw) return;
+                    const lower = raw.toLowerCase();
+                    if (known.has(lower)) return;
+                    if (!tagMap.has(lower)) tagMap.set(lower, { display: raw, count: 0, users: new Set(), lp: 0, quiz: 0, quizIds: new Set() });
+                    const entry = tagMap.get(lower);
+                    entry.count++;
+                    entry[source]++;
+                    if (userId) entry.users.add(userId);
+                    if (quizId) entry.quizIds.add(quizId);
+                };
                 snap.forEach(doc => {
                     const data = doc.data() || {};
                     const tags = Array.isArray(data.tags) ? data.tags : [];
-                    const userId = data.userId || '';
-                    tags.forEach(t => {
-                        const raw = String(t || '').trim();
-                        if (!raw) return;
-                        const lower = raw.toLowerCase();
-                        if (known.has(lower)) return;
-                        if (!tagMap.has(lower)) tagMap.set(lower, { display: raw, count: 0, users: new Set() });
-                        const entry = tagMap.get(lower);
-                        entry.count++;
-                        if (userId) entry.users.add(userId);
-                    });
+                    tags.forEach(t => bump(t, 'lp', data.userId || '', ''));
                 });
-                const results = Array.from(tagMap.values()).sort((a, b) => b.count - a.count || b.users.size - a.users.size);
+                // V101.11: quiz tags ride the same scan — quiz-level CSV plus per-question
+                // CSV, from quizzesData already in memory (no reads). Marker tags and
+                // history revisions are skipped; each quiz counts a tag once.
+                const quizzes = (Array.isArray(quizzesData) ? quizzesData : []).filter(q => q && !q.isHistoryRevision);
+                quizzes.forEach(q => {
+                    const seen = new Set();
+                    const add = csv => String(csv || '').split(',').forEach(t => {
+                        const raw = t.trim();
+                        if (!raw || (window.isQuizMarkerTag && window.isQuizMarkerTag(raw))) return;
+                        const lower = raw.toLowerCase();
+                        if (seen.has(lower)) return;
+                        seen.add(lower);
+                        bump(raw, 'quiz', '', q.id);
+                    });
+                    add(q.tags);
+                    (Array.isArray(q.questions) ? q.questions : []).forEach(qq => add(qq && qq.tags));
+                });
+                const results = Array.from(tagMap.values()).sort((a, b) => b.count - a.count || b.users.size - a.users.size || a.display.localeCompare(b.display));
                 window._lptDiscoverResults = results;
                 if (results.length === 0) {
-                    statusEl.innerHTML = `<span style="color:#16a34a;">✨ All custom tags from ${snap.size} LP entries are already in your taxonomy.</span>`;
+                    statusEl.innerHTML = `<span style="color:#16a34a;">✨ Every tag from ${snap.size} LP entries and ${quizzes.length} quizzes is already in your taxonomy.</span>`;
                     return;
                 }
-                statusEl.innerHTML = `<span style="color:#1f2937;">Found <strong>${results.length}</strong> custom tag${results.length === 1 ? '' : 's'} from ${snap.size} LP entries.</span>`;
+                const fromQuiz = results.filter(r => r.quiz).length;
+                statusEl.innerHTML = `<span style="color:#1f2937;">Found <strong>${results.length}</strong> tag${results.length === 1 ? '' : 's'} not in the taxonomy, from ${snap.size} LP entries and ${quizzes.length} quizzes (${fromQuiz} on quizzes).</span>`;
                 const targetOptionsHtml = (() => {
                     let html = '<option value="">Choose axis → system…</option>';
                     [
@@ -38105,7 +38125,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     <div class="lpt-editor-row" id="lpt-discover-row-${i}">
                         <div>
                             <div class="lpt-editor-row-key">${escapeHtml(r.display)}</div>
-                            <div class="lpt-editor-row-meta">${r.count} use${r.count === 1 ? '' : 's'} · ${r.users.size} user${r.users.size === 1 ? '' : 's'}</div>
+                            <div class="lpt-editor-row-meta">${r.count} use${r.count === 1 ? '' : 's'} · ${r.lp ? `LP ${r.lp} (${r.users.size} user${r.users.size === 1 ? '' : 's'})` : 'no LP use'} · ${r.quiz ? `${r.quizIds.size} quiz${r.quizIds.size === 1 ? '' : 'zes'}` : 'no quiz use'}</div>
                         </div>
                         <div class="lpt-editor-row-actions">
                             <select id="lpt-discover-target-${i}" style="padding:4px 6px; border-radius:6px; border:1px solid #d6d3d1; font-size:0.82em; max-width:260px;">${targetOptionsHtml}</select>
