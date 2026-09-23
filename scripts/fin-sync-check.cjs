@@ -210,6 +210,21 @@ fin.finState.month = '2026-09';   // finOpen() normally sets this; the mutators 
     const s2 = fin.finSig(fin.finCanon({ tomb: { q: 3 }, expenses: [{ upd: 7, id: 'p', ts: 2 }], plans: { '2026-09': { upd: 5, daily: 1 } } }));
     check('10. finSig ignores field order', s1 === s2 && s1.length > 0, true);
 
+    // ---- 10b. Beri award wiring (V100.96) ----
+    const award = index.slice(index.indexOf('async function finAwardBeri'), index.indexOf('function finPlanFor'));
+    check('10b. one Beri per expense, capped per Bangkok-day', /const FIN_DAILY_BERI_CAP = 5;/.test(index), true);
+    check('10c. only creating an expense awards — edit and sync do not',
+        (index.match(/finAwardBeri\(/g) || []).length, 2);   // the definition + the one call in finAdd
+    check('10d. the award never blocks the entry (called after finSave/finRender)',
+        /finSave\(data\); finRender\(\);\s*\n\s*finAwardBeri\(exp\);/.test(index), true);
+    check('10e. the ledger row is the dedupe record, read inside the transaction',
+        /if \(\(await tx\.get\(bl\.ref\)\)\.exists\) return false;/.test(award), true);
+    check('10f. deterministic refId so the other device cannot re-credit', /refId: `\$\{exp\.id\}_\$\{userId\}`/.test(award), true);
+    check('10g. FIN caps on its own finAmount, leaving the Explore amount alone',
+        /finAmount/.test(award) && !/\bamount:/.test(award.replace(/amount: 1,/, '')), true);
+    check('10h. the Explore link cap still reads its own field', /REVIEW_LINK_DAILY_BERI_CAP/.test(index) && !/finAmount/.test(index.slice(index.indexOf('async function explOpenLink'), index.indexOf('// ==================================================================='))), true);
+    check('10i. admin can label the new ledger source', /fin_expense: '💰 FIN entry'/.test(read('public/admin.html')), true);
+
     // ---- 11. wiring + rules (static) ----
     check('11a. rules grant fin/{id} to the owner only, no admin branch',
         /match \/fin\/\{finUserId\} \{\s*\n\s*allow read, write: if isSignedIn\(\) && \(request\.auth\.uid == finUserId \|\| hasAuthLinkToUserId\(finUserId\)\);/.test(rules), true);
