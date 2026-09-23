@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.25)</title>
+    <title>Nika Admin (V101.26)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -4383,6 +4383,20 @@
         #reflectiveReviewModal .reflective-review-card { background:#fff; box-shadow:none; }
         #reflectiveReviewModal .reflective-history-strip { margin-bottom:0; }
         #reflectiveReviewModal .history-strip-cards { flex-direction:column; overflow-x:hidden; }
+        #reflectiveReviewModal .rr-history-toggle { width:100%; min-height:0; margin-bottom:0; padding:0; border:0; background:transparent; cursor:pointer; text-align:left; }
+        #reflectiveReviewModal .rr-history-toggle .history-strip-count { margin-left:auto; }
+        #reflectiveReviewModal .rr-history-chevron { font-size:0.65em; color:#a16207; transition:transform 0.15s ease; }
+        #reflectiveReviewModal .reflective-history-strip.rr-open .rr-history-chevron { transform:rotate(180deg); }
+        #reflectiveReviewModal .reflective-history-strip:not(.rr-open) .history-strip-cards { display:none; }
+        #reflectiveReviewModal .reflective-history-strip.rr-open .rr-history-summary { margin-bottom:6px; }
+        #reflectiveReviewModal .rr-history-summary { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; margin-top:4px; font-size:0.72em; color:#78350f; line-height:1.4; }
+        #reflectiveReviewModal .rr-history-summary:empty { display:none; }
+        #reflectiveReviewModal .rr-history-nudge { width:auto; min-height:0; padding:1px 8px; border:1px solid #fdba74; border-radius:999px; background:#fff7ed; color:#9a3412; font-size:1em; font-weight:800; cursor:pointer; }
+        #reflectiveReviewModal .rr-log-focus { margin-top:6px; padding:10px 12px; border-radius:12px; background:#fffbeb; border:1px solid #fde68a; }
+        #reflectiveReviewModal .rr-log-focus .reflective-log-content { font-size:1em; color:#1e293b; line-height:1.55; }
+        #reflectiveReviewModal .rr-log-tools { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+        #reflectiveReviewModal .rr-log-tools button { width:auto; min-height:0; padding:2px 9px; font-size:0.7em; font-weight:700; color:#b45309; background:transparent; border:1px solid rgba(245,158,11,0.4); border-radius:8px; cursor:pointer; }
+        #reflectiveReviewModal .rr-log-translation { margin-top:8px; padding-top:8px; border-top:1px dashed #fcd34d; font-size:0.88em; color:#475569; line-height:1.5; }
         #reflectiveReviewModal .history-strip-card { flex:0 0 auto; min-width:0; overflow-wrap:anywhere; }
         #reflectiveReviewModal .reflective-review-label-row { flex-wrap:wrap; }
         #reflectiveReviewModal .reflective-review-feedback > .reflective-review-label-row { align-items:flex-start; flex-direction:column; }
@@ -13176,10 +13190,13 @@
                 </div>
 
                 <div class="reflective-history-strip" id="reflective-history-strip" style="display:none;">
-                    <div class="history-strip-header">
+                    <!-- V101.26: the header is a toggle; cards stay folded behind a one-line pattern summary. -->
+                    <button type="button" class="history-strip-header rr-history-toggle" onclick="toggleReflectiveHistoryStrip()" aria-expanded="false">
                         <span class="history-strip-title">📜 Recent reflections</span>
                         <span class="history-strip-count" id="history-strip-count"></span>
-                    </div>
+                        <i class="fa-solid fa-chevron-down rr-history-chevron" aria-hidden="true"></i>
+                    </button>
+                    <div class="rr-history-summary lang-no-toggle" id="history-strip-summary"></div>
                     <div class="history-strip-cards lang-no-toggle" id="history-strip-cards"></div>
                 </div>
 
@@ -19417,7 +19434,7 @@ RULES:
                 el.dataset.collapsed = '0';
                 btn.textContent = 'Show less ▴';
             } else {
-                el.style.webkitLineClamp = '2';
+                el.style.webkitLineClamp = '3';
                 el.style.display = '-webkit-box';
                 el.dataset.collapsed = '1';
                 btn.textContent = 'Show more ▾';
@@ -19945,6 +19962,24 @@ RULES:
             const moodMap = { happy: '😊', normal: '😐', sad: '😔', tired: '😫' };
             const escapeHtml = (s) => String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
             countEl.textContent = `(${history.length})`;
+            // V101.26: one-line pattern summary — average bonus, typical length, mood mix —
+            // so the admin can judge without opening the cards. Short notes get a Probe nudge.
+            const summaryEl = document.getElementById('history-strip-summary');
+            if (summaryEl) {
+                const scored = history.filter(l => l.adminBonus !== undefined && l.adminBonus !== null && !isNaN(parseFloat(l.adminBonus)));
+                const avgBonus = scored.length ? scored.reduce((s, l) => s + parseFloat(l.adminBonus), 0) / scored.length : null;
+                const avgLen = Math.round(history.reduce((s, l) => s + String(l.content || '').trim().length, 0) / history.length);
+                const moods = {};
+                history.forEach(l => { const m = moodMap[l.mood] || '📝'; moods[m] = (moods[m] || 0) + 1; });
+                const parts = [];
+                if (avgBonus !== null) parts.push(`avg <b>+${avgBonus.toFixed(2)}</b>`);
+                parts.push(`~${avgLen} chars each`);
+                parts.push(Object.entries(moods).sort((a, b) => b[1] - a[1]).map(([m, n]) => `${m}×${n}`).join(' '));
+                const short = avgLen < 60;
+                summaryEl.innerHTML = `<span>${parts.join(' · ')}</span>` +
+                    (short ? `<button type="button" class="rr-history-nudge" title="Short notes — ask a question to deepen the reflection" onclick="selectReflectiveFocusPill(document.querySelector('#reflective-focus-pills [data-value=&quot;probe&quot;]'))">🔍 Short notes — try Probe</button>` : '');
+            }
+            toggleReflectiveHistoryStrip(false);
             cards.innerHTML = history.map(log => {
                 const mood = moodMap[log.mood] || '📝';
                 let date = '';
@@ -19963,6 +19998,45 @@ RULES:
                 </div>`;
             }).join('');
             strip.style.display = '';
+        };
+
+        window.toggleReflectiveHistoryStrip = function(forceOpen) {
+            const strip = document.getElementById('reflective-history-strip');
+            if (!strip) return;
+            const open = typeof forceOpen === 'boolean' ? forceOpen : !strip.classList.contains('rr-open');
+            strip.classList.toggle('rr-open', open);
+            const btn = strip.querySelector('.rr-history-toggle');
+            if (btn) btn.setAttribute('aria-expanded', String(open));
+        };
+
+        // V101.26: translate the reflection under review in place (Thai → English, anything else → Thai).
+        window.translateReflectiveLogContent = async function(btn) {
+            const out = document.getElementById('reflective-log-translation');
+            const raw = (document.getElementById('reflective-review-raw-content') || {}).value || '';
+            if (!btn || !out || !raw.trim()) return;
+            if (out.dataset.done === '1') {
+                out.hidden = !out.hidden;
+                btn.textContent = out.hidden ? '🌐 Show translation' : '🌐 Hide translation';
+                return;
+            }
+            if (typeof window.qtTranslateText !== 'function') { out.hidden = false; out.textContent = 'Translator not available.'; return; }
+            const target = /[฀-๿]/.test(raw) ? 'en' : 'th';
+            btn.disabled = true;
+            btn.textContent = '🌐 Translating…';
+            try {
+                const res = await window.qtTranslateText(raw, target);
+                out.textContent = res.text || '—';
+                out.dataset.done = '1';
+                out.hidden = false;
+                btn.textContent = '🌐 Hide translation';
+            } catch (e) {
+                console.warn('[reflective-translate] failed:', e);
+                out.hidden = false;
+                out.textContent = 'Translation failed: ' + (e.message || e);
+                btn.textContent = '🌐 Translate';
+            } finally {
+                btn.disabled = false;
+            }
         };
 
         window.toggleReflectiveHistoryCard = function(card) {
@@ -38595,8 +38669,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // when the source/target pair isn't supported on-device.
             if (typeof Translator !== 'undefined' && 'create' in Translator) {
                 try {
-                    const t = await Translator.create({ sourceLanguage: sourceLang, targetLanguage: targetLang });
-                    const translated = await t.translate(text);
+                    // V101.26: Tier A can hang forever (API present, model never ready — seen in an
+                    // embedded Chromium); give up after 8s and fall through to Tier B.
+                    const tierATimeout = new Promise((_, rej) => setTimeout(() => rej(new Error('Tier A timeout')), 8000));
+                    const translated = await Promise.race([
+                        Translator.create({ sourceLanguage: sourceLang, targetLanguage: targetLang }).then(t => t.translate(text)),
+                        tierATimeout
+                    ]);
                     // V94.54: validate Tier A returned non-empty before accepting.
                     // Chrome on-device Translator API can resolve with an empty
                     // string for unsupported language pairs (or transient
@@ -58763,9 +58842,16 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                             <div class="reflective-log-name" style="font-size:0.85em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${name}</div>
                             <div class="reflective-log-date" style="font-size:0.65em; opacity:0.7;">${log.timestamp ? log.timestamp.toDate().toLocaleString('en-US', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}) : '...'}</div>
                         </div>
-                        <div id="reflective-log-content-text" class="reflective-log-content" data-collapsed="1" style="font-size:0.8em; margin-top:2px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${moodEmoji} ${log.content}</div>
-                        <button type="button" id="reflective-log-content-toggle" onclick="toggleReflectiveLogContent(this)" style="display:none; margin-top:4px; padding:2px 8px; font-size:0.7em; font-weight:600; color:#f59e0b; background:transparent; border:1px solid rgba(245,158,11,0.4); border-radius:8px; cursor:pointer;">Show more ▾</button>
                     </div>
+                </div>
+                <!-- V101.26: the reflection under review is the most prominent text in the modal (and is escaped — it's intern-typed). -->
+                <div class="rr-log-focus">
+                    <div id="reflective-log-content-text" class="reflective-log-content" data-collapsed="1" style="display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">${moodEmoji} ${String(log.content || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]))}</div>
+                    <div class="rr-log-tools">
+                        <button type="button" id="reflective-log-content-toggle" onclick="toggleReflectiveLogContent(this)" style="display:none;">Show more ▾</button>
+                        <button type="button" onclick="translateReflectiveLogContent(this)">🌐 Translate</button>
+                    </div>
+                    <div id="reflective-log-translation" class="rr-log-translation lang-no-toggle" hidden></div>
                 </div>
                 ${(() => {
                     const neg = detectNegativeWording(log.content);
