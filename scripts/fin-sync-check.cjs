@@ -185,6 +185,14 @@ fin.finState.month = '2026-09';   // finOpen() normally sets this; the mutators 
     const row = index.slice(index.indexOf('<div class="fin-item"><span class="ic">'));
     check('11h. item row never prints the raw category beside the icon', /finEsc\(e\.cat\)/.test(row.slice(0, 1200)), false);
     check('11i. finCatName strips the emoji', /function finCatName\(c\)/.test(index), true);
+    // V100.91 hero: a two-row strip, no .fin-card.hero on Today, budget edited in place.
+    const today = index.slice(index.indexOf("if (finState.tab === 'today')"), index.indexOf("if (finState.tab === 'month')"));
+    check('11j. Today no longer renders the gradient hero card', /fin-card hero/.test(today), false);
+    check('11k. Month still does', /fin-card hero/.test(index.slice(index.indexOf("if (finState.tab === 'month')"))), true);
+    check('11l. budget chip toggles the inline editor', /onclick="finEditBudget\(\)"/.test(today) && /window\.finEditBudget = finEditBudget/.test(index), true);
+    check('11m. no Set row left on Today', /finSetToday\(\)">Set</.test(index), false);
+    check('11n. no-budget state does not render a negative "left"', /const noBudget = budget <= 0;/.test(today) && /noBudget \? finFmt\(spent\) : finFmt\(left\)/.test(today), true);
+    check('11o. the empty bar is drawn from 0, not from spent', /bar\(noBudget \? 0 : spent, budget\)/.test(today), true);
 
     let bad = 0;
     for (const [name, got, want] of checks) {

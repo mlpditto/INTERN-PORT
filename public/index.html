@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V100.90)</title>
+    <title>Internship Portfolio (V100.91)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -695,9 +695,25 @@
         #finModal .fin-nav button { width:30px; height:30px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; color:#475569; cursor:pointer; padding:0; margin:0; }
         #finModal .fin-card { border:1px solid #e2e8f0; border-radius:14px; padding:10px 12px; margin-bottom:8px; background:#fff; }
         #finModal .fin-card.hero { background:linear-gradient(135deg,#ecfdf5,#f0fdfa); border-color:#a7f3d0; }
+        /* V100.91: Today's hero is a borderless two-row strip (the Month tab still uses .fin-card.hero). */
+        #finModal .fin-hero { padding:2px 2px 10px; margin-bottom:8px; border-bottom:1px solid #e2e8f0; }
+        #finModal .fin-hero-row { display:flex; align-items:baseline; gap:8px; }
+        #finModal .fin-hero-row .fin-big { flex:1; min-width:0; }
+        #finModal .fin-hero-row.bar { align-items:center; margin-top:9px; }
+        #finModal .fin-hero-row.bar .fin-bar { flex:1; height:5px; margin:0; }
+        #finModal .fin-hero-row.bar .fin-sub { margin:0; white-space:nowrap; }
+        #finModal .fin-budget { width:auto; min-height:0; margin:0; padding:5px 11px; border:1px solid #a7f3d0; border-radius:999px; background:#fff; color:#065f46; font-size:0.75em; font-weight:800; cursor:pointer; white-space:nowrap; }
+        #finModal .fin-budget.unset { border-style:dashed; color:#047857; }
+        /* The open editor is wider than the chip it replaces, which pushed the Thai half of
+           the label onto a second line — hide it for the moment the editor is open. */
+        #finModal .fin-hero-row.editing .fin-big small { display:none; }
+        #finModal .fin-budget-edit { display:flex; align-items:center; gap:5px; }
+        #finModal .fin-budget-edit input { width:72px; margin:0; border:1.5px solid #6ee7b7; border-radius:999px; padding:5px 10px; font-weight:800; text-align:right; }
+        #finModal .fin-budget-ok { width:30px; height:30px; min-height:0; margin:0; padding:0; border:0; border-radius:999px; background:#10b981; color:#fff; font-weight:900; cursor:pointer; }
         #finModal .fin-lbl { font-size:0.66em; font-weight:900; text-transform:uppercase; letter-spacing:0.07em; color:#64748b; }
         #finModal .fin-big { font-size:1.8em; font-weight:900; color:#065f46; line-height:1.15; }
         #finModal .fin-big.over { color:#b91c1c; }
+        #finModal .fin-big.none { color:#94a3b8; }
         #finModal .fin-big small { font-size:0.45em; color:#64748b; font-weight:700; }
         #finModal .fin-sub { font-size:0.76em; color:#475569; margin-top:2px; }
         #finModal .fin-bar { height:8px; border-radius:999px; background:#e2e8f0; overflow:hidden; margin:8px 0 4px; }
@@ -18983,7 +18999,7 @@
         // phone and laptop see one plan — see the sync block below. Two fields were added:
         // every record carries `upd` (ms, last edit) and deletes leave `tomb[id] = ms`.
         const FIN_CATS = ['🍜 Food', '🥤 Drink', '☕ Coffee', '🚌 Travel', '🛒 Groceries', '📱 Subs', '🎉 Fun', '💊 Health', '📚 Study', '📦 Other'];
-        const finState = { tab: 'today', month: null, cat: FIN_CATS[0], selDay: null, editId: null, editCat: null };
+        const finState = { tab: 'today', month: null, cat: FIN_CATS[0], selDay: null, editId: null, editCat: null, editBudget: false };
         function finKey() { return 'fin_v1_' + (userId || 'anon'); }
         function finEmpty() { return { plans: {}, expenses: [], tomb: {} }; }
         function finLoad() {
@@ -19147,13 +19163,13 @@
         }
 
         function finOpen() {
-            finState.tab = 'today'; finState.month = finToday().slice(0, 7); finState.selDay = null; finState.editId = null;
+            finState.tab = 'today'; finState.month = finToday().slice(0, 7); finState.selDay = null; finState.editId = null; finState.editBudget = false;
             finRender();
             document.getElementById('finModal').style.display = 'flex';
             finSync();   // pull whatever the other device added since last time
         }
         function finClose() { document.getElementById('finModal').style.display = 'none'; }
-        function finTab(t) { finState.tab = t; finState.selDay = null; finState.editId = null; finRender(); }
+        function finTab(t) { finState.tab = t; finState.selDay = null; finState.editId = null; finState.editBudget = false; finRender(); }
         function finShiftMonth(delta) {
             const [y, m] = finState.month.split('-').map(Number);
             const d = new Date(y, m - 1 + delta, 1);
@@ -19217,8 +19233,15 @@
             plan.upd = Date.now();
             finSave(data); finState.selDay = null; finRender();
         }
+        // V100.91: tap the budget chip to open the inline editor; ✓ or Enter saves. An
+        // empty or invalid box just closes it — that is the only way back out, since the
+        // chip is gone while editing.
+        function finEditBudget() { finState.editBudget = !finState.editBudget; finRender(); }
         function finSetToday() {
-            const v = finRound(parseFloat(document.getElementById('fin-today-amt').value)); if (!(v >= 0)) return;
+            const el = document.getElementById('fin-today-amt');
+            const v = finRound(parseFloat(el && el.value));
+            finState.editBudget = false;
+            if (!(v >= 0)) { finRender(); return; }
             const data = finLoad(); const ym = finToday().slice(0, 7); const plan = data.plans[ym] || (data.plans[ym] = { daily: 0, days: {} });
             plan.days = plan.days || {}; plan.days[finToday()] = v; plan.upd = Date.now(); finSave(data); finRender();
         }
@@ -19239,16 +19262,25 @@
                 const today = finToday(), budget = finBudget(data, today);
                 const items = data.expenses.filter(e => e.date === today).sort((a, b) => b.ts - a.ts);
                 const spent = items.reduce((s, e) => s + e.amount, 0), left = budget - spent;
+                // V100.91: the hero is a two-row strip, not a card. The gradient box, the
+                // uppercase title and the whole "Today's budget [input] [Set]" row are gone;
+                // the budget is a chip you tap, and the % rides the bar's line.
+                // With no budget set, "left" would read as a negative (−฿164) on a full amber
+                // bar, which is the over-budget look for someone who simply hasn't set one.
+                // That state shows what was spent instead, greyed, on an empty bar.
+                const noBudget = budget <= 0;
+                const pct = noBudget ? null : Math.round(spent / budget * 100);
                 body.innerHTML = `
-                    <div class="fin-card hero">
-                        <div class="fin-lbl">Left for today · เหลือใช้วันนี้</div>
-                        <div class="fin-big${left < 0 ? ' over' : ''}">${finFmt(left)} <small>of ${finFmt(budget)}</small></div>
-                        ${bar(spent, budget)}
-                        <div class="fin-sub">Spent ${finFmt(spent)}${budget <= 0 ? ' · no budget set for today — set one below or in Plan' : ''}</div>
-                        <div class="fin-row" style="margin-top:8px;">
-                            <span class="fin-muted">Today's budget</span>
-                            <input id="fin-today-amt" type="number" inputmode="decimal" min="0" step="0.01" value="${budget || ''}" placeholder="0">
-                            <button type="button" class="fin-btn ghost sm" onclick="finSetToday()">Set</button>
+                    <div class="fin-hero">
+                        <div class="fin-hero-row${finState.editBudget ? ' editing' : ''}">
+                            <div class="fin-big${noBudget ? ' none' : (left < 0 ? ' over' : '')}">${noBudget ? finFmt(spent) : finFmt(left)} <small>${noBudget ? 'spent · ใช้ไปวันนี้' : 'left · เหลือใช้วันนี้'}</small></div>
+                            ${finState.editBudget
+                                ? `<span class="fin-budget-edit"><input id="fin-today-amt" type="number" inputmode="decimal" min="0" step="0.01" value="${budget || ''}" placeholder="0" aria-label="Today's budget" onkeydown="if(event.key==='Enter'){event.preventDefault();finSetToday()}"><button type="button" class="fin-budget-ok" onclick="finSetToday()" aria-label="Save budget">✓</button></span>`
+                                : `<button type="button" class="fin-budget${budget > 0 ? '' : ' unset'}" onclick="finEditBudget()">${budget > 0 ? `of ${finFmt(budget)} ✎` : '＋ set budget'}</button>`}
+                        </div>
+                        <div class="fin-hero-row bar">
+                            ${bar(noBudget ? 0 : spent, budget)}
+                            <span class="fin-sub">${noBudget ? 'no budget today' : pct + '% · spent ' + finFmt(spent)}</span>
                         </div>
                     </div>
                     <div class="fin-card">
@@ -19264,6 +19296,7 @@
                             ? `<div class="fin-item editing"><span class="ic">${e.cat.split(' ')[0]}</span><input id="fin-edit-time" class="fin-note fin-time" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" title="24 h · e.g. 17:45" value="${new Date(e.ts).toTimeString().slice(0, 5)}" onkeydown="if(event.key==='Enter'){event.preventDefault();finSaveItem('${e.id}')}"><input id="fin-edit-note" class="fin-note" maxlength="80" value="${finEsc(e.note)}" placeholder="Note · ข้าวเที่ยง, BTS..." onkeydown="if(event.key==='Enter'){event.preventDefault();finSaveItem('${e.id}')}" style="margin:0; flex:1; min-width:0;"><button type="button" class="fin-btn sm" onclick="finSaveItem('${e.id}')">Save</button><div class="fin-cats">${FIN_CATS.map(c => `<button type="button" class="fin-cat${c === finState.editCat ? ' on' : ''}" data-cat="${c}" onclick="finPickEditCat(this)">${c}</button>`).join('')}</div></div>`
                             : `<div class="fin-item"><span class="ic">${e.cat.split(' ')[0]}</span><span class="n" role="button" tabindex="0" title="Tap to edit note / time" onclick="finEditItem('${e.id}')">${e.note ? finEsc(e.note) : `<span class="fin-muted">${finEsc(finCatName(e.cat))} · ✎ add note</span>`}<small>${new Date(e.ts).toTimeString().slice(0, 5)} · ${finEsc(finCatName(e.cat))}</small></span><span class="a">${finFmt(e.amount)}</span><button type="button" class="del" onclick="finDel('${e.id}')" aria-label="Delete">✕</button></div>`).join('') : '<div class="fin-muted">Nothing yet today.</div>'}
                     </div>`;
+                const budgetEl = finState.editBudget && document.getElementById('fin-today-amt'); if (budgetEl) { budgetEl.focus(); budgetEl.select(); }
                 const editEl = document.getElementById('fin-edit-note'); if (editEl) editEl.focus();
                 const amt = document.getElementById('fin-amt'); if (amt && items.length === 0 && !editEl) amt.focus();
                 return;
@@ -19335,7 +19368,7 @@
         window.finOpen = finOpen; window.finClose = finClose; window.finTab = finTab; window.finShiftMonth = finShiftMonth;
         window.finPickCat = finPickCat; window.finAdd = finAdd; window.finDel = finDel; window.finSetDefault = finSetDefault;
         window.finSelDay = finSelDay; window.finSetDay = finSetDay; window.finSetToday = finSetToday;
-        window.finEditItem = finEditItem; window.finSaveItem = finSaveItem; window.finPickEditCat = finPickEditCat;
+        window.finEditItem = finEditItem; window.finSaveItem = finSaveItem; window.finPickEditCat = finPickEditCat; window.finEditBudget = finEditBudget;
         window.finSync = finSync;   // the status pill in .fin-head is a tap-to-retry button
 
         // V96.41: `source` is 'manual' when the ✅ chip is tapped, 'activity' when a
