@@ -245,7 +245,11 @@ fin.finState.month = '2026-09';   // finOpen() normally sets this; the mutators 
     check('11h. item row never prints the raw category beside the icon', /finEsc\(e\.cat\)/.test(row.slice(0, 1200)), false);
     check('11i. finCatName strips the emoji', /function finCatName\(c\)/.test(index), true);
     // V100.91 hero: a two-row strip, no .fin-card.hero on Today, budget edited in place.
-    const today = index.slice(index.indexOf("if (finState.tab === 'today')"), index.indexOf("if (finState.tab === 'month')"));
+    // Anchor on the branch's `{` and search forward — finRender's preamble also mentions
+    // `finState.tab === 'month'`, and matching that instead silently inverted these slices.
+    const todayIdx = index.indexOf("if (finState.tab === 'today') {");
+    const monthIdx = index.indexOf("if (finState.tab === 'month') {", todayIdx);
+    const today = index.slice(todayIdx, monthIdx);
     // V100.91 dropped it from Today, V100.94 from Month — nothing renders it now.
     check('11j. the gradient hero card is not rendered anywhere', /fin-card hero/.test(index), false);
     check('11l. budget chip toggles the inline editor', /onclick="finEditBudget\(\)"/.test(today) && /window\.finEditBudget = finEditBudget/.test(index), true);
@@ -266,14 +270,16 @@ fin.finState.month = '2026-09';   // finOpen() normally sets this; the mutators 
     // V100.93: the default-daily-budget card is gone; it is a chip on the month row.
     check('11w. the Default daily budget card is gone', /Default daily budget · งบต่อวันของเดือนนี้/.test(index), false);
     check('11x. the chip lives in the month nav', /id="fin-nav-extra"/.test(index) && /onclick="finEditDaily\(\)"/.test(index), true);
-    check('11y. the nav arrow rule cannot squash the chip', /#finModal \.fin-nav button\.fin-nav-arrow \{/.test(index), true);
+    // V100.98 moved the rule out of .fin-nav so it also reaches the header copy; what still
+    // has to hold is that no bare `.fin-nav button` rule exists to squash the chip.
+    check('11y. no bare .fin-nav button rule that could squash the chip', /#finModal \.fin-nav button \{/.test(index), false);
     check('11z. the month total counts per-day overrides', /Number\.isFinite\(o\) \? o : fallback/.test(index), true);
     check('11aa. the old default × days readout is gone', /\(plan\.daily \|\| 0\) \* days/.test(index), false);
-    check('11ab. the month name shortens while the editor is open', /finMonthLabel\(finState\.month\)\.slice\(0, 3\)/.test(index), true);
+    check('11ab. the month name shortens while the editor is open', /navEditing[\s\S]{0,80}finMonthShort\(finState\.month\)/.test(index), true);
     check('11ac. editDaily resets on tab and month change',
         (index.match(/finState\.editDaily = false/g) || []).length >= 4, true);
     // V100.94: Month is the same two-row strip as Today; all three of its cards are gone.
-    const month = index.slice(index.indexOf("if (finState.tab === 'month')"), index.indexOf("// plan"));
+    const month = index.slice(monthIdx, index.indexOf("// plan", monthIdx));
     check('11ad. Month renders the borderless hero, not a card', /<div class="fin-hero">/.test(month) && !/fin-card/.test(month), true);
     check('11ae. the run-on sub line is gone', /budget so far/.test(index), false);
     check('11af. with no plan there is no "of ฿0" and no %', /noPlan \? 'spent · ใช้ไปแล้วเดือนนี้' : 'of ' \+ finFmt\(planTotal\)/.test(month), true);
@@ -281,6 +287,15 @@ fin.finState.month = '2026-09';   // finOpen() normally sets this; the mutators 
     check('11ah. pace moved into the bar tooltip', /title="On pace for /.test(month), true);
     check('11ai. the Days card is one stats line', /<div class="fin-stats">/.test(month) && !/fin-kv/.test(month), true);
     // Both were only ever used by the cards this change removed.
+    // V100.98: Month's month-control moved onto the header row; Plan keeps its own row.
+    check('11ak. Month shows the header control and hides its nav row',
+        /nav\.style\.display = finState\.tab === 'plan' \? 'flex' : 'none';/.test(index)
+        && /headNav\.style\.display = finState\.tab === 'month' \? 'flex' : 'none';/.test(index), true);
+    check('11al. the header uses the short label — the full one does not fit', /finMonthShort\(finState\.month\)\);?\s*$/m.test(index) || /fin-head-month'\)\.textContent = finMonthShort/.test(index), true);
+    check('11am. the arrow rule reaches both containers', /#finModal button\.fin-nav-arrow \{/.test(index), true);
+    check('11an. the title cannot shrink-and-wrap (it did at 360px)', /#finModal \.fin-head h3 \{ white-space:nowrap; flex:0 0 auto; \}/.test(index), true);
+    check('11ao. the header label truncates instead of breaking the row at 320px',
+        /#finModal \.fin-head-nav b \{[^}]*text-overflow:ellipsis;/.test(index), true);
     check('11aj. the orphaned .fin-card.hero and .fin-kv CSS is gone',
         /#finModal \.fin-card\.hero \{/.test(index) || /#finModal \.fin-kv \{/.test(index), false);
 
