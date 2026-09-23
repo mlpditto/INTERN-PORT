@@ -1184,7 +1184,12 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
     } catch (err) {
         // V101.21: log a redacted slice of the provider body so a 4xx can be diagnosed from functions:log.
         const providerBody = sanitizeProxyErrorMessage({ message: String(JSON.stringify(err?.response?.data ?? "")).slice(0, 300) });
-        console.error("AI Proxy Error:", { message: sanitizeProxyErrorMessage(err), ...getSafeProviderError(err), provider, model, body: providerBody });
+        // V101.30: `provider` / `model` are declared inside the try — reading them here threw
+        // ReferenceError, the handler died unhandled, and the client got a non-JSON 500 that it
+        // surfaced as "JSON.parse: unexpected character at line 1 column 1" instead of the real
+        // upstream failure (Gemini 3.8 Flash 503 ×3, functions:log 2026-09-23 17:47).
+        const reqProvider = req.body?.provider, reqModel = req.body?.model;
+        console.error("AI Proxy Error:", { message: sanitizeProxyErrorMessage(err), ...getSafeProviderError(err), provider: reqProvider, model: reqModel, body: providerBody });
         return res.status(500).json({
             error: sanitizeProxyErrorMessage(err),
             details: getSafeProviderError(err)
