@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.00)</title>
+    <title>Internship Portfolio (V101.01)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11756,8 +11756,14 @@
             // Skips automatically if the source/target pair isn't supported on-device.
             if (typeof Translator !== 'undefined' && 'create' in Translator) {
                 try {
-                    const t = await Translator.create({ sourceLanguage: sourceLang, targetLanguage: targetLang });
-                    return { text: await t.translate(text), source: 'device' };
+                    // V101.01: mirrors admin V101.26 — Tier A can hang forever (API present, model
+                    // never ready), so give up after 8s; an empty result also falls through.
+                    const tierATimeout = new Promise((_, rej) => setTimeout(() => rej(new Error('Tier A timeout')), 8000));
+                    const translated = await Promise.race([
+                        Translator.create({ sourceLanguage: sourceLang, targetLanguage: targetLang }).then(t => t.translate(text)),
+                        tierATimeout
+                    ]);
+                    if (translated && translated.trim()) return { text: translated, source: 'device' };
                 } catch (e) { /* fall through */ }
             }
 
