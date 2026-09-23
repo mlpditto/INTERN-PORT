@@ -150,6 +150,45 @@ fin.finState.month = '2026-09';   // finOpen() normally sets this; the mutators 
     const w7 = writes; await sync(devA); await sync(devB);
     check('7d. converged devices stop writing', writes - w7, 0);
 
+    // ---- 7e. THE regression: Today's per-day write must not wipe Plan's monthly default ----
+    // Reported live: the month default vanished while the day overrides survived. Before
+    // V100.95 one `plan.upd` versioned the whole month, so the newer per-day write won the
+    // whole record — including its daily: 0.
+    on(devA); seed(devA, { plans: { '2026-12': { daily: 300, days: {}, dUpd: T, upd: T } }, expenses: [], tomb: {} });
+    on(devB); seed(devB, { plans: { '2026-12': { daily: 0, days: { '2026-12-22': 250 }, dayUpd: { '2026-12-22': T + 9000 }, upd: T + 9000 } }, expenses: [], tomb: {} });
+    remoteDoc = null;
+    await sync(devA);
+    await sync(devB);
+    await sync(devA);
+    const pA = stateOf(devA).plans['2026-12'], pB = stateOf(devB).plans['2026-12'];
+    check('7e. a later per-day write keeps the earlier monthly default', `${pA.daily}|${pB.daily}`, '300|300');
+    check('7f. and the per-day override survives alongside it', `${pA.days['2026-12-22']}|${pB.days['2026-12-22']}`, '250|250');
+
+    // ---- 7g. clearing an override does not come back from the other device ----
+    on(devA); seed(devA, { plans: { '2027-01': { daily: 100, days: { '2027-01-05': 500 }, dUpd: T, dayUpd: { '2027-01-05': T }, upd: T } }, expenses: [], tomb: {} });
+    remoteDoc = null;
+    await sync(devA);
+    on(devB); seed(devB, JSON.parse(devA[KEY]));
+    await sync(devB);
+    on(devB); const cleared = stateOf(devB);
+    delete cleared.plans['2027-01'].days['2027-01-05'];
+    cleared.plans['2027-01'].dayUpd['2027-01-05'] = T + 5000;
+    cleared.plans['2027-01'].upd = T + 5000;
+    seed(devB, cleared);
+    await sync(devB);
+    await sync(devA);
+    check('7g. a cleared override stays cleared on the other device', '2027-01-05' in (stateOf(devA).plans['2027-01'].days || {}), false);
+    check('7h. clearing one day leaves the month default alone', stateOf(devA).plans['2027-01'].daily, 100);
+
+    // ---- 7i. the mirror of 7e: a legacy side with a newer upd but no value for that day
+    // must not drop the other side's override just because its whole-record stamp is newer.
+    on(devA); seed(devA, { plans: { '2027-02': { daily: 0, days: { '2027-02-10': 400 }, upd: T } }, expenses: [], tomb: {} });
+    on(devB); seed(devB, { plans: { '2027-02': { daily: 0, days: {}, upd: T + 9000 } }, expenses: [], tomb: {} });
+    remoteDoc = null;
+    await sync(devA);
+    await sync(devB);
+    check('7i. a newer legacy record without that day keeps the other side\'s override', stateOf(devB).plans['2027-02'].days['2027-02-10'], 400);
+
     // ---- 8. tombstones expire, but only once the row is gone everywhere ----
     const old = Date.now() - 100 * 864e5;
     const pruned = fin.finMerge({ plans: {}, expenses: [], tomb: { old1: old, keep1: Date.now() } }, fin.finEmpty());

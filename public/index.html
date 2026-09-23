@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V100.94)</title>
+    <title>Internship Portfolio (V100.95)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -19059,6 +19059,13 @@
             const o = plan.days && plan.days[dayKey];
             return Number.isFinite(o) ? o : (Number.isFinite(plan.daily) ? plan.daily : 0);
         }
+        // V100.95: the one place a month's plan record is created, so every writer gets the
+        // stamped shape and a legacy record picks up its missing maps on first write.
+        function finPlanFor(data, ym) {
+            const p = data.plans[ym] || (data.plans[ym] = { daily: 0, days: {}, dayUpd: {} });
+            p.days = p.days || {}; p.dayUpd = p.dayUpd || {};
+            return p;
+        }
         function finSpent(data, pred) { return data.expenses.filter(pred).reduce((s, e) => s + (Number(e.amount) || 0), 0); }
 
         // ===== V100.89: cross-device sync · sync ข้ามเครื่อง =====
@@ -19096,20 +19103,63 @@
         // one whole row) but a plan month can be UNIONED at equal stamps, so its signature
         // has to carry the content or that merge would look like a no-op and never land.
         function finSig(d) {
+            // V100.95: per-field stamps are part of the signature. A cleared override leaves a
+            // stamp with no value, which changes nothing about the values alone — without the
+            // stamps that clear would look like a no-op and never reach the other device.
             const plan = k => {
-                const p = d.plans[k] || {}, days = p.days || {};
-                return k + '@' + finStamp(p) + '=' + (p.daily || 0)
-                    + '[' + Object.keys(days).sort().map(x => x + '=' + days[x]).join(';') + ']';
+                const p = d.plans[k] || {}, days = p.days || {}, du = p.dayUpd || {};
+                const dayKeys = Object.keys(days).concat(Object.keys(du).filter(x => !(x in days))).sort();
+                return k + '@' + finPlanDailyStamp(p) + '=' + (p.daily || 0)
+                    + '[' + dayKeys.map(x => x + '=' + (Number.isFinite(days[x]) ? days[x] : '-') + '@' + finPlanDayStamp(p, x)).join(';') + ']';
             };
             return d.expenses.map(e => e.id + '@' + finStamp(e)).join(',')
                 + '|' + Object.keys(d.tomb).map(k => k + '@' + d.tomb[k]).join(',')
                 + '|' + Object.keys(d.plans).map(plan).join(',');
         }
-        function finMergePlan(win, lose) {
-            if (finStamp(win) !== finStamp(lose)) return win;
-            const p = { daily: win.daily || lose.daily || 0, days: Object.assign({}, lose.days, win.days) };
-            if (finStamp(win)) p.upd = finStamp(win);
-            return p;
+        // V100.95: plan fields carry their OWN stamps. Until now one `plan.upd` versioned the
+        // whole month, and two different screens write into that month — the Today tab writes
+        // `days[today]`, the Plan tab writes `daily` — so a per-day edit on one device won the
+        // whole record and silently wiped the monthly default set on another. `dUpd` versions
+        // `daily`; `dayUpd[k]` versions each override. A key present in `dayUpd` but missing
+        // from `days` is a CLEARED override: without that the other device's copy comes back,
+        // the same resurrection the expense tombstones prevent.
+        // `upd` is still written and still read as the fallback for rows saved before this.
+        // Falling back to `upd` is only safe for a field this side actually HAS a value for.
+        // A record whose `upd` was bumped by a per-day write must not lend that timestamp to
+        // its empty `daily` — that is exactly how the default got wiped in the first place.
+        // A present `dUpd` / `dayUpd[k]` is always trusted, so an explicit clear still travels.
+        function finPlanDailyStamp(p) {
+            if (!p) return 0;
+            if (p.dUpd != null) return Number(p.dUpd) || 0;
+            return Number(p.daily) > 0 ? (Number(p.upd) || 0) : 0;
+        }
+        function finPlanDayStamp(p, k) {
+            if (!p) return 0;
+            if (p.dayUpd && p.dayUpd[k] != null) return Number(p.dayUpd[k]) || 0;
+            return Number.isFinite(p.days && p.days[k]) ? (Number(p.upd) || 0) : 0;
+        }
+        function finMergePlan(a, b) {
+            const da = finPlanDailyStamp(a), db = finPlanDailyStamp(b);
+            // Equal stamps means both sides predate dUpd — keep whichever value is set rather
+            // than letting a tie drop a budget, which is the failure this whole change is about.
+            const daily = da === db
+                ? ((a && a.daily) || (b && b.daily) || 0)
+                : ((da > db ? (a && a.daily) : (b && b.daily)) || 0);
+            const out = { daily: Number(daily) || 0, days: {}, dayUpd: {}, dUpd: Math.max(da, db), upd: Math.max(finStamp(a), finStamp(b)) };
+            const keys = new Set([].concat(
+                Object.keys((a && a.days) || {}), Object.keys((b && b.days) || {}),
+                Object.keys((a && a.dayUpd) || {}), Object.keys((b && b.dayUpd) || {})));
+            keys.forEach(k => {
+                const sa = finPlanDayStamp(a, k), sb = finPlanDayStamp(b, k);
+                // On a tie (both sides legacy) a real amount beats an absent one, same reason.
+                const win = sa === sb
+                    ? (Number.isFinite(a && a.days && a.days[k]) ? a : b)
+                    : (sa > sb ? a : b);
+                const v = win && win.days && win.days[k];
+                out.dayUpd[k] = Math.max(sa, sb);
+                if (Number.isFinite(v)) out.days[k] = v;
+            });
+            return out;
         }
         function finMerge(a, b) {
             const tomb = {};
@@ -19129,8 +19179,10 @@
             const plans = {};
             [a, b].forEach(s => Object.entries((s && s.plans) || {}).forEach(([ym, p]) => {
                 if (!p) return;
-                plans[ym] = !plans[ym] ? p
-                    : (finStamp(p) > finStamp(plans[ym]) ? finMergePlan(p, plans[ym]) : finMergePlan(plans[ym], p));
+                // Field-level now, so neither side is "the winner" and order no longer matters.
+                // A lone side still goes through it, which normalises legacy rows into the
+                // stamped shape — one migration write on the first sync after this version.
+                plans[ym] = finMergePlan(plans[ym] || null, p);
             }));
             const out = { plans: {}, expenses: [...byId.values()].sort((x, y) => (y.ts || 0) - (x.ts || 0)), tomb: {} };
             Object.keys(plans).sort().forEach(k => { out.plans[k] = plans[k]; });
@@ -19266,17 +19318,17 @@
             const v = finRound(parseFloat(el && el.value));
             finState.editDaily = false;
             if (!(v >= 0)) { finRender(); return; }
-            const data = finLoad(); const plan = data.plans[finState.month] || (data.plans[finState.month] = { daily: 0, days: {} });
-            plan.daily = v > 0 ? v : 0; plan.upd = Date.now(); finSave(data); finRender(); showToast(`Default ${finFmt(plan.daily)}/day for ${finMonthLabel(finState.month)}`);
+            const data = finLoad(), plan = finPlanFor(data, finState.month);
+            plan.daily = v > 0 ? v : 0; plan.dUpd = plan.upd = Date.now();
+            finSave(data); finRender(); showToast(`Default ${finFmt(plan.daily)}/day for ${finMonthLabel(finState.month)}`);
         }
         function finSelDay(dayKey) { finState.selDay = finState.selDay === dayKey ? null : dayKey; finRender(); }
         function finSetDay(clear) {
             const dayKey = finState.selDay; if (!dayKey) return;
-            const data = finLoad(); const plan = data.plans[finState.month] || (data.plans[finState.month] = { daily: 0, days: {} });
-            plan.days = plan.days || {};
-            if (clear) delete plan.days[dayKey];
+            const data = finLoad(), plan = finPlanFor(data, finState.month);
+            if (clear) delete plan.days[dayKey];   // the dayUpd stamp below is what makes this a clear, not a gap
             else { const v = finRound(parseFloat(document.getElementById('fin-day-amt').value)); if (!(v >= 0)) return; plan.days[dayKey] = v; }
-            plan.upd = Date.now();
+            plan.dayUpd[dayKey] = plan.upd = Date.now();
             finSave(data); finState.selDay = null; finRender();
         }
         // V100.91: tap the budget chip to open the inline editor; ✓ or Enter saves. An
@@ -19288,8 +19340,9 @@
             const v = finRound(parseFloat(el && el.value));
             finState.editBudget = false;
             if (!(v >= 0)) { finRender(); return; }
-            const data = finLoad(); const ym = finToday().slice(0, 7); const plan = data.plans[ym] || (data.plans[ym] = { daily: 0, days: {} });
-            plan.days = plan.days || {}; plan.days[finToday()] = v; plan.upd = Date.now(); finSave(data); finRender();
+            const data = finLoad(), plan = finPlanFor(data, finToday().slice(0, 7));
+            plan.days[finToday()] = v; plan.dayUpd[finToday()] = plan.upd = Date.now();
+            finSave(data); finRender();
         }
 
         function finRender() {
