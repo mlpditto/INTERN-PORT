@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.29)</title>
+    <title>Nika Admin (V101.30)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -16270,6 +16270,15 @@
                 : (window.location.hostname.endsWith('web.app') ? '/api/ai' : DIRECT_PROXY);
             const BACKUP_PROXY = DIRECT_PROXY;
             if (window.loadAIKeys) window.loadAIKeys();
+            // V101.30: a proxy 500 that dies before res.json() (e.g. an unhandled error in
+            // its catch) has a text/HTML body; response.json() then threw "JSON.parse:
+            // unexpected character at line 1 column 1" and hid the real status. Read as
+            // text and turn a non-JSON body into an error message the admin can act on.
+            const readProxyJson = async (r) => {
+                const body = await r.text();
+                try { return JSON.parse(body); }
+                catch (e) { return { error: `AI proxy returned a non-JSON ${r.status} response: ${body.replace(/\s+/g, ' ').slice(0, 160) || '(empty)'}` }; }
+            };
 
             // V96.14: per-feature cost attribution. Callers tag a call by passing
             // generationOptions.feature (a stable slug, same vocabulary as recordAiEval
@@ -16341,7 +16350,7 @@
                     body: JSON.stringify({ provider: 'gemini-aistudio', model: modelName, prompt, isJson, visionData,
                         generationOptions: generationOptions || undefined, feature: aiFeature || undefined })
                 });
-                const data = await response.json();
+                const data = await readProxyJson(response);
                 if (!response.ok || data.error) throw new Error(data.error || `Gemini 3.8 request failed (${response.status}).`);
                 if (!data.usage || (isJson && data.jsonValid !== true) || data.finishReason !== 'STOP') {
                     throw new Error('Gemini 3.8 server response is not ready. Update callAIProxy before using the trial.');
@@ -16359,7 +16368,7 @@
                     body: JSON.stringify({ provider: modernModel.provider, model: modelName, prompt, isJson, visionData,
                         generationOptions: generationOptions || undefined, feature: aiFeature || undefined })
                 });
-                const data = await response.json();
+                const data = await readProxyJson(response);
                 if (!response.ok || data.error) throw new Error(data.error || `AI request failed (${response.status}).`);
                 const expectedFinish = modernModel.adapter === 'responses' ? 'completed' : 'end_turn';
                 if (!data.usage || data.finishReason !== expectedFinish || (isJson && data.jsonValid !== true)) {
