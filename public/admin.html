@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.21)</title>
+    <title>Nika Admin (V101.22)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -17875,6 +17875,7 @@
                             <i class="fa-solid fa-spinner fa-spin" style="font-size:1.8em; color:#0891b2;"></i>
                             <div style="font-weight:800; color:#0891b2;">${(opts && opts.forceNew) ? 'Running a fresh Quality Audit…' : 'Loading the Quality Audit…'}</div>
                             <div style="font-size:0.82em; color:#64748b;">${(opts && opts.forceNew) ? `Judging every question on ${(window.AUDIT_DIMS || []).length} dimensions — this takes a moment.` : 'Fetching the saved audit, or running one if there is none.'}</div>
+                            <div id="audit-progress-meta" data-model="${escapeHtml(((window.TEXT_AI_MODELS || []).find(m => m.id === (opts.model || (document.getElementById('ai-analyzer-model-val') || {}).value)) || {}).label || '')}" style="font-size:0.85em; font-weight:700; color:#0e7490; font-variant-numeric:tabular-nums;"></div>
                         </div>`;
                 }
             }
@@ -17923,6 +17924,19 @@
             // slowing near the cap so it never hits 100% before the call returns). Same
             // approach as analyzeQuizAI V95.50. Cleared in the finally block.
             let auditProgressTimer = null;
+            // V101.22: elapsed clock + model name on both progress surfaces (the popup line
+            // above and the button), and the final time in the scorecard footer. A fresh
+            // audit is a single opaque await that can run 30-90 s; "this takes a moment"
+            // alone gave no sense of whether anything was still happening.
+            const auditStartedAt = performance.now();
+            const auditElapsed = () => { const sec = Math.floor((performance.now() - auditStartedAt) / 1000); return String(Math.floor(sec / 60)).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0'); };
+            let auditClockTimer = null;
+            const auditMetaEl = document.getElementById('audit-progress-meta');
+            if (auditMetaEl && !(opts && opts.cachedResult)) {
+                const paint = () => { auditMetaEl.textContent = (auditMetaEl.dataset.model ? auditMetaEl.dataset.model + ' · ' : '') + auditElapsed(); };
+                paint();
+                auditClockTimer = setInterval(paint, 1000);
+            }
 
             const bp = formData.blueprint || {};
 
@@ -17933,7 +17947,7 @@
                     btn.disabled = true;
                     auditProgressTimer = setInterval(() => {
                         pct = Math.min(95, pct + Math.max(1, Math.round((95 - pct) * 0.08)));
-                        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Auditing ${pct}%`;
+                        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Auditing ${pct}% · ${auditElapsed()}`;
                     }, 350);
                 }
 
@@ -18068,6 +18082,7 @@ RULES:
                 // duplication depends on the live question set, not on whether the audit
                 // scores themselves were just generated or reopened from a saved run.
                 const dupMap = window.computeQuizSetDuplicatesAll(formData.questions);
+                window._auditLastElapsed = (opts && opts.cachedResult) ? '' : auditElapsed(); // V101.22
                 renderAuditScorecard(result, aiModel, aiTokens, bp, formData.questions, (opts && opts.cachedResult) ? (opts.cachedSavedAtLabel || '') : null, dupMap);
                 if (opts.cachedStale) {
                     const notice = document.createElement('p');
@@ -18081,6 +18096,7 @@ RULES:
                 alert('Audit error: ' + e.message);
             } finally {
                 if (auditProgressTimer) clearInterval(auditProgressTimer); // V96.45: stop the progress ticker
+                if (auditClockTimer) clearInterval(auditClockTimer); // V101.22
                 // V97.85: clear the regenerate placeholder on EVERY path. On success the new
                 // scorecard has already been appended above, so this just drops the old
                 // shell; on a throw it stops a dead "Running…" box being left behind.
@@ -18289,7 +18305,7 @@ RULES:
                 ${result.gemini38Metrics ? `<div style="font-size:0.75em; color:#64748b; margin:10px 0;">Gemini 3.8 · Thinking: low · Input: ${escapeHtml(String(result.gemini38Metrics.usage?.inputTokens ?? '—'))} · Output: ${escapeHtml(String(result.gemini38Metrics.usage?.outputTokens ?? '—'))} · Thinking tokens: ${escapeHtml(String(result.gemini38Metrics.usage?.thinkingTokens ?? '—'))} · ${escapeHtml(String(result.gemini38Metrics.latencyMs ?? '—'))} ms · ${escapeHtml(result.gemini38Metrics.finishReason || '—')} · JSON: ${result.gemini38Metrics.jsonValid === true ? 'valid' : '—'}</div>` : ''}
                 ${result.terraMetrics ? `<div style="font-size:0.75em; color:#64748b; margin:10px 0;">GPT-5.6 Terra · Thinking: low · Input: ${escapeHtml(String(result.terraMetrics.usage?.inputTokens ?? '—'))} · Output: ${escapeHtml(String(result.terraMetrics.usage?.outputTokens ?? '—'))} · Thinking tokens: ${escapeHtml(String(result.terraMetrics.usage?.thinkingTokens ?? '—'))} · ${escapeHtml(String(result.terraMetrics.latencyMs ?? '—'))} ms · ${escapeHtml(result.terraMetrics.finishReason || '—')} · JSON: ${result.terraMetrics.jsonValid === true ? 'valid' : '—'}</div>` : ''}
                 <div style="margin-top:14px; padding-top:12px; border-top:1px solid #e2e8f0; font-size:0.7em; color:#94a3b8; display:flex; justify-content:space-between;">
-                    <span>🚀 Model: <b>${escapeHtml(aiModel || '')}</b> · 💡 Tokens: <b>${aiTokens.toLocaleString()}</b></span>
+                    <span>🚀 Model: <b>${escapeHtml(aiModel || '')}</b> · 💡 Tokens: <b>${aiTokens.toLocaleString()}</b>${window._auditLastElapsed ? ` · ⏱ Time: <b>${window._auditLastElapsed}</b>` : ''}</span>
                     <span style="opacity:0.7;">V93.88 Q3 · 1-pass</span>
                 </div>
             `;
