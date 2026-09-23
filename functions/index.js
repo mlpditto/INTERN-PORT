@@ -444,7 +444,11 @@ function getAudioMimeType(audioEncoding) {
 function sanitizeProxyErrorMessage(err) {
     const status = err?.response?.status;
     const providerError = err?.response?.data?.error;
-    const rawMessage = providerError?.message || err?.message || "AI proxy request failed.";
+    // V101.21: Typhoon / FastAPI-style bodies use `detail`, not `error.message` — without
+    // this a 400 reached the client as the bare axios "Request failed with status code 400".
+    const detail = err?.response?.data?.detail ?? err?.response?.data?.message;
+    const detailText = detail == null ? "" : (typeof detail === "string" ? detail : JSON.stringify(detail)).slice(0, 300);
+    const rawMessage = providerError?.message || (detailText ? `${err?.message || "Provider error"}: ${detailText}` : "") || err?.message || "AI proxy request failed.";
 
     if (status === 401 && /api key|incorrect|invalid|unauthorized/i.test(rawMessage)) {
         return "OpenAI API key was rejected. Please rotate and redeploy the OPENAI_API_KEY Firebase secret.";
@@ -790,25 +794,42 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             // with HTTP 400 when no image was attached (V93.x quiz translation + admin
             // pre-translate Phase 1 both hit this). Text path now uses the 30B text model
             // with a plain string content field; vision path keeps the array shape.
+            // V101.21: api.opentyphoon.ai no longer lists typhoon-v2.5-vision-instruct
+            // (GET /v1/models on 2026-09-23 returns typhoon-v2.5-30b-a3b-instruct,
+            // typhoon-ocr / typhoon-ocr-v1.5 / typhoon-ocr-preview and the ASR models),
+            // so every visionData call 400'd — the first real "Fill from image" hit it.
+            // Vision is now two steps: Typhoon OCR (a document VLM, strong on Thai)
+            // reads the image into text, then the text model answers the caller's
+            // prompt over that text. Same response shape, plus ocrModel / ocrText.
             const isVision = !!visionData;
-            const useModel = isVision
-                ? (model && model.includes('vision') ? model : "typhoon-v2.5-vision-instruct")
-                : (model || "typhoon-v2.5-30b-a3b-instruct");
+            const textModel = (model && !model.includes('vision') && !model.includes('ocr')) ? model : "typhoon-v2.5-30b-a3b-instruct";
+            const ocrModel = (model && model.includes('ocr')) ? model : "typhoon-ocr-v1.5";
+            const typhoonHeaders = { headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" } };
+            let promptForText = tailoredPromptT;
+            let ocrText = null;
+            let ocrTokens = 0;
+            if (isVision) {
+                const ocr = await postWithRetry('https://api.opentyphoon.ai/v1/chat/completions', {
+                    model: ocrModel,
+                    messages: [{
+                        role: "user",
+                        content: [
+                            { type: "text", text: "Below is an image of a document page. Return the plain text representation of this document as if you were reading it naturally, as markdown. Keep every Thai and English word exactly as printed, keep tables as markdown tables, and do not summarise, translate or add anything." },
+                            { type: "image_url", image_url: { url: `data:${visionData.image_mimetype};base64,${visionData.image_base64}` } }
+                        ]
+                    }],
+                    max_tokens: 8192,
+                    temperature: 0.1
+                }, typhoonHeaders);
+                ocrText = String(ocr.data?.choices?.[0]?.message?.content || "").trim();
+                ocrTokens = ocr.data?.usage?.total_tokens || 0;
+                if (!ocrText) return res.status(502).json({ error: `Typhoon OCR (${ocrModel}) returned no text for the image.`, ocrModel });
+                promptForText = tailoredPromptT + "\n\n=== TEXT READ FROM THE IMAGE (OCR) ===\n" + ocrText.slice(0, 20000) + "\n=== END OF IMAGE TEXT ===";
+            }
 
             const body = {
-                model: useModel,
-                messages: [{
-                    role: "user",
-                    content: isVision
-                        ? [
-                            { type: "text", text: tailoredPromptT },
-                            {
-                                type: "image_url",
-                                image_url: { url: `data:${visionData.image_mimetype};base64,${visionData.image_base64}` }
-                            }
-                          ]
-                        : tailoredPromptT
-                }],
+                model: textModel,
+                messages: [{ role: "user", content: promptForText }],
                 response_format: isJson ? { type: "json_object" } : undefined,
                 // No explicit cap previously → api.opentyphoon.ai's low default truncated
                 // long JSON (e.g. a 29-question quiz translation), which the client then
@@ -821,11 +842,14 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 temperature: 0.2
             };
 
-            const response = await postWithRetry('https://api.opentyphoon.ai/v1/chat/completions', body, {
-                headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" }
-            });
+            const response = await postWithRetry('https://api.opentyphoon.ai/v1/chat/completions', body, typhoonHeaders);
 
-            return res.json({ text: response.data.choices[0].message.content, tokens: response.data.usage.total_tokens });
+            return res.json({
+                text: response.data.choices[0].message.content,
+                tokens: (response.data.usage?.total_tokens || 0) + ocrTokens,
+                model: textModel,
+                ...(isVision ? { ocrModel, ocrText } : {})
+            });
         }
 
         // --- 🟤 ThaiLLM OpenThaiGPT (Phase 1: Intelligence Translate) ---
@@ -1146,7 +1170,9 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
         return res.status(400).json({ error: "Unsupported provider" });
 
     } catch (err) {
-        console.error("AI Proxy Error:", { message: sanitizeProxyErrorMessage(err), ...getSafeProviderError(err) });
+        // V101.21: log a redacted slice of the provider body so a 4xx can be diagnosed from functions:log.
+        const providerBody = sanitizeProxyErrorMessage({ message: String(JSON.stringify(err?.response?.data ?? "")).slice(0, 300) });
+        console.error("AI Proxy Error:", { message: sanitizeProxyErrorMessage(err), ...getSafeProviderError(err), provider, model, body: providerBody });
         return res.status(500).json({
             error: sanitizeProxyErrorMessage(err),
             details: getSafeProviderError(err)
