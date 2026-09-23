@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.08)</title>
+    <title>Nika Admin (V101.09)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -16322,7 +16322,7 @@
                 if (!response.ok || data.error) throw new Error(data.error || `AI request failed (${response.status}).`);
                 const expectedFinish = modernModel.adapter === 'responses' ? 'completed' : 'end_turn';
                 if (!data.usage || data.finishReason !== expectedFinish || (isJson && data.jsonValid !== true)) {
-                    throw new Error('AI server returned incomplete output.');
+                    throw new Error(`AI server returned incomplete output (${modelName}: finishReason ${data.finishReason || 'none'}, jsonValid ${data.jsonValid}).`); // V101.09
                 }
                 updateAIUsage(modernModel.provider, data.tokens || 0);
                 return { text: data.text || '', tokens: data.tokens || 0, model: data.model || modelName, raw: data };
@@ -17435,7 +17435,7 @@
                         // can exceed the proxy's default 8192-token cap and truncate mid-JSON,
                         // surfacing as a false "prose instead of JSON" banner. Request a larger
                         // output budget (proxy caps it server-side).
-                        const aiResp = await withTimeout(callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768, feature: 'quiz_analyzer' }), 280000);
+                        const aiResp = await withTimeout(callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768, feature: 'quiz_analyzer' }), 520000); // V101.09: 280s -> 520s, chain axios 500 < client 520 < function 540
                         resultRaw = aiResp.text;
                         aiTokens = aiResp.tokens;
                         aiModel = aiResp.model;
