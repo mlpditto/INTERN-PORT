@@ -83,4 +83,4 @@ async function runModernAI({ model, prompt, isJson, visionData, generationOption
         latencyMs: Date.now() - started, finishReason, jsonValid };
 }
 
-module.exports = { registry, imagePart, runModernAI };
+module.exports = { registry, imagePart, runModernAI, extractJson };
