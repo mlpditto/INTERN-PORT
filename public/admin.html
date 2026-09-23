@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.30)</title>
+    <title>Nika Admin (V101.31)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -31720,7 +31720,13 @@ ${JSON.stringify(sourceObj)}`;
             const modelButtons = document.querySelectorAll('#quiz-compare-models button');
             modelButtons.forEach(b => b.disabled = true);
             const oldText = btn ? btn.innerHTML : '';
-            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Comparing…'; }
+            // V101.31: elapsed clock on the button (mm:ss), like the Quality Audit overlay — a
+            // reasoning chip can sit here 60s+ and a bare spinner gives no sense of progress.
+            const compareStartedAt = performance.now();
+            const compareModelLabel = document.querySelector('#quiz-compare-models [aria-pressed="true"]')?.getAttribute('aria-label') || '';
+            const paintCompareClock = () => { if (!btn) return; const sec = Math.floor((performance.now() - compareStartedAt) / 1000); btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Comparing… ' + String(Math.floor(sec / 60)).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0'); btn.title = compareModelLabel; };
+            if (btn) { btn.disabled = true; paintCompareClock(); }
+            const compareClockTimer = setInterval(paintCompareClock, 1000);
             if (resultEl) resultEl.innerHTML = '';
 
             const label = q => q.shortTitle || q.title || q.id;
@@ -31796,7 +31802,8 @@ RULES:
                 console.error('[quizCompareAiDeepCompare]', e);
                 if (resultEl) resultEl.innerHTML = '<div style="padding:10px 12px; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; color:#991b1b; font-size:0.85em;">⚠️ AI compare error: ' + escapeHtml(e && e.message ? e.message : 'unknown') + '</div>';
             } finally {
-                if (btn && quizCleanup.session() === cleanupSession) { btn.disabled = false; btn.innerHTML = oldText; modelButtons.forEach(b => b.disabled = false); }
+                clearInterval(compareClockTimer);
+                if (btn && quizCleanup.session() === cleanupSession) { btn.disabled = false; btn.innerHTML = oldText; syncQuizCompareModelHint(); modelButtons.forEach(b => b.disabled = false); }
             }
         }
 
