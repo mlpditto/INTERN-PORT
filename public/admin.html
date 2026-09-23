@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.09)</title>
+    <title>Nika Admin (V101.10)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -12792,6 +12792,13 @@
                                     <option value="">Auto · guess from title & tags</option>
                                 </select>
                             </div>
+                            <!-- V101.10: Campaign (e.g. PharmCamp) is a field, not a tag. Chips list every
+                                 campaign already on a quiz; populateQuizCampaignChips() fills them. -->
+                            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #334155;">
+                                <label style="font-size:0.75em; color:#4ade80; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; white-space:nowrap;"><i class="fa-solid fa-flag"></i> Campaign</label>
+                                <div id="quiz-campaign-chips" class="glass-toggle-container lang-no-toggle" style="background:rgba(0,0,0,0.3); border:1px solid rgba(74,222,128,0.25); padding:2px; border-radius:8px; display:flex; flex-wrap:wrap; gap:1px;"></div>
+                                <input type="hidden" id="quiz-campaign" value="">
+                            </div>
                             <div style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #334155;">
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                                     <label style="font-size:0.75em; color:#4ade80; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><i class="fa-solid fa-tags"></i> Tags</label>
@@ -18547,7 +18554,8 @@ RULES:
                     title: result.title || `Case-based: ${caseItem.disease || caseItem.caseId || 'Untitled'}`,
                     shortTitle: (result.shortTitle || `CASE-${(caseItem.caseId || caseId).toString().slice(0, 14)}`).slice(0, 32),
                     description: result.description || `Generated from Alabasta case ${caseItem.caseId || caseId}`,
-                    tags: 'AI_FROM_CASE',
+                    tags: '',
+                    source: 'ai_from_case', // V101.10: provenance is a field, not a tag
                     quizType: 'case_study',
                     caseContent: result.redactedCaseContent || note,
                     totalPoints: 1.0,
@@ -22427,6 +22435,11 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             document.getElementById('quiz-description').value = q.description || "";
             document.getElementById('quiz-tags').value = q.tags || "";
             window.populateQuizSystemSelect(window.quizSystemValueFromDoc(q)); // V101.08
+            // V101.10: legacy markers leave the tag list on load; field first, tag as fallback.
+            const legacyMarkers = window.quizLegacyMarkers(q);
+            window._quizEditorLegacySource = q.source ? '' : legacyMarkers.source;
+            if (legacyMarkers.found) { document.getElementById('quiz-tags').value = window.stripQuizMarkerTags(q.tags).join(', '); refreshTagChips(); }
+            window.populateQuizCampaignChips(q.campaign || legacyMarkers.campaign);
             quizResourceCards.load(q.materials);
             refreshTagChips();
             document.getElementById('quiz-is-poll').checked = q.isPoll || false;
@@ -22519,6 +22532,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             document.getElementById('quiz-description').value = "";
             document.getElementById('quiz-tags').value = "";
             window.populateQuizSystemSelect(''); // V101.08
+            window._quizEditorLegacySource = ''; window.populateQuizCampaignChips(''); // V101.10
             quizResourceCards.load([]);
             refreshTagChips();
             document.getElementById('quiz-is-poll').checked = false;
@@ -22871,7 +22885,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const quizType = document.getElementById('quiz-type').value;
             const feedbackLimit = parseInt(document.getElementById('quiz-feedback-limit').value) || 280;
             const caseContent = document.getElementById('quiz-case-content').value;
-            const tags = window.normalizeQuizTagString(document.getElementById('quiz-tags').value); // V101.07
+            const tags = window.normalizeQuizTagList(window.stripQuizMarkerTags(document.getElementById('quiz-tags').value)).join(', '); // V101.07 normalise; V101.10 markers never re-enter tags
             const materials = quizResourceCards.read();
 
             // V93.87 Quiz Quality Q1: read blueprint, build only if any field set.
@@ -30308,6 +30322,7 @@ ${JSON.stringify(sourceObj)}`;
             const group = parts => `<span class="tag-hyg-group">${parts}</span>`;
             const cap = (list, n) => list.length > n ? `<p><small>Showing ${n} of ${list.length}.</small></p>` : '';
             const none = '<p>None.</p>';
+            const legacyCount = (Array.isArray(quizzesData) ? quizzesData : []).filter(q => !q.isHistoryRevision && window.quizLegacyMarkers(q).found).length; // V101.10
             body.innerHTML = `<div class="tag-hyg-grid">
                 <div class="tag-hyg-card"><h5>Overview</h5>
                     <p>${h.considered} quizzes · ${h.tagged} tagged · ${h.untagged} without tags · ${h.distinct} distinct tags (case-insensitive).</p>
@@ -30322,9 +30337,10 @@ ${JSON.stringify(sourceObj)}`;
                 <div class="tag-hyg-card"><h5>Singletons · ${h.singletons.length}</h5>
                     <p>Used by exactly one quiz. Candidates to fold into a common tag.</p>
                     ${h.singletons.length ? chips(h.singletons.slice(0, 60)) : none}${cap(h.singletons, 60)}</div>
-                <div class="tag-hyg-card"><h5>Machine markers · ${h.markers.length}</h5>
-                    <p>AI_VARIANT / AI_FROM_CASE / PharmCamp live inside the tag string and drive code paths.</p>
-                    ${h.markers.length ? chips(h.markers) : none}</div>
+                <div class="tag-hyg-card"><h5>Legacy markers · ${h.markers.length}</h5>
+                    <p>AI_VARIANT / AI_FROM_CASE / PharmCamp now live in the <code>source</code> / <code>campaign</code> fields. Quizzes still carrying them as tags: ${legacyCount}.</p>
+                    ${h.markers.length ? chips(h.markers) : none}
+                    ${legacyCount ? `<p><button type="button" onclick="migrateQuizMarkerTags()" style="width:auto; min-height:0; padding:5px 12px; border-radius:999px; border:1.5px solid #4361ee; background:#4361ee; color:#fff; font-size:0.9em; font-weight:800; cursor:pointer;">Move to fields · ${legacyCount} quiz${legacyCount === 1 ? '' : 'zes'}</button></p>` : ''}</div>
             </div>`;
         };
 
@@ -53821,7 +53837,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // anyway (the old d/m/พ.ศ. string was silently rejected by date inputs).
         function pharmCampDateRange() {
             const days = (quizzesData || [])
-                .filter(q => String(q.tags || '').includes('PharmCamp') && q.startTime)
+                .filter(q => window.quizCampaign(q) === 'PharmCamp' && q.startTime) // V101.10: campaign field, legacy tag fallback (exact, not substring)
                 .map(q => q.startTime.toDate())
                 .sort((a, b) => a - b);
             if (!days.length) return null;
@@ -60728,6 +60744,74 @@ RULES:
         // and goLiveNow spread formData straight into the doc, and the raw select value
         // must never land in Firestore. On window so scripts/quiz-system-select-check.cjs
         // runs the real code.
+        // V101.10: machine markers leave the tag string. Provenance lives in `source`
+        // ('ai_from_case' | 'ai_variant') and the bootcamp in `campaign` ('PharmCamp').
+        // Readers take the field first and fall back to the legacy tag, so old docs keep
+        // working until they are re-saved or migrated from the Tag hygiene panel.
+        window.quizTagList = q => String((q && q.tags) || '').split(',').map(t => t.trim()).filter(Boolean);
+        window.isQuizMarkerTag = t => /^(ai_variant|ai_from_case|pharmcamp)$/i.test(String(t || '').trim());
+        window.stripQuizMarkerTags = list => (Array.isArray(list) ? list : window.quizTagList({ tags: list })).filter(t => !window.isQuizMarkerTag(t));
+        window.quizLegacyMarkers = function (q) {
+            const keys = new Set(window.quizTagList(q).map(t => t.toLowerCase()));
+            const source = keys.has('ai_from_case') ? 'ai_from_case' : keys.has('ai_variant') ? 'ai_variant' : '';
+            const campaign = keys.has('pharmcamp') ? 'PharmCamp' : '';
+            return { source, campaign, found: !!(source || campaign) };
+        };
+        window.quizCampaign = q => (q && q.campaign) || window.quizLegacyMarkers(q).campaign;
+        window.quizSource = q => (q && q.source) || window.quizLegacyMarkers(q).source;
+        // Set on editor load when the doc carries a legacy source tag but no `source`
+        // field; the next save writes the field so the tag can go.
+        window._quizEditorLegacySource = '';
+
+        window.populateQuizCampaignChips = function (value) {
+            const rail = document.getElementById('quiz-campaign-chips');
+            const hidden = document.getElementById('quiz-campaign');
+            if (!rail || !hidden) return;
+            const current = value || '';
+            const known = new Set(['PharmCamp']);
+            (Array.isArray(quizzesData) ? quizzesData : []).forEach(q => { const c = window.quizCampaign(q); if (c) known.add(c); });
+            if (current) known.add(current);
+            hidden.value = current;
+            const chip = (v, label, extra = '') => `<div class="glass-toggle-item${current === v ? ' active' : ''}" data-value="${escapeHtml(v)}" onclick="selectQuizCampaign(this${extra})" style="font-size:0.7em; font-weight:800; padding:3px 10px; border-radius:6px; cursor:pointer;">${escapeHtml(label)}</div>`;
+            rail.innerHTML = chip('', 'None') + [...known].sort().map(c => chip(c, c)).join('') + chip('', '+ New', ', true').replace(' active', '');
+        };
+        window.selectQuizCampaign = function (el, isNew) {
+            if (isNew) {
+                const name = (prompt('Campaign name (e.g. PharmCamp):') || '').trim().replace(/\s+/g, ' ');
+                if (name) window.populateQuizCampaignChips(name);
+                return;
+            }
+            window.populateQuizCampaignChips(el.dataset.value || '');
+        };
+
+        // V101.10: one-shot migration for docs that still carry markers as tags —
+        // writes source / campaign (never overwriting an existing field) and drops
+        // the marker tags. Offered from the Tag hygiene panel while any remain.
+        window.migrateQuizMarkerTags = async function () {
+            const todo = (Array.isArray(quizzesData) ? quizzesData : []).filter(q => !q.isHistoryRevision && window.quizLegacyMarkers(q).found);
+            if (!todo.length) return;
+            if (!confirm(`Move markers out of tags on ${todo.length} quiz(zes)? Writes source / campaign and removes AI_VARIANT / AI_FROM_CASE / PharmCamp from the tag list.`)) return;
+            let done = 0;
+            try {
+                for (let i = 0; i < todo.length; i += 400) {
+                    const batch = db.batch();
+                    const slice = todo.slice(i, i + 400);
+                    slice.forEach(q => {
+                        const legacy = window.quizLegacyMarkers(q);
+                        const update = { tags: window.stripQuizMarkerTags(q.tags).join(', ') };
+                        if (legacy.source && !q.source) update.source = legacy.source;
+                        if (legacy.campaign && !q.campaign) update.campaign = legacy.campaign;
+                        batch.update(db.collection('quizzes').doc(q.id), update);
+                    });
+                    await batch.commit();
+                    done += slice.length;
+                }
+                if (typeof showToast === 'function') showToast(`✅ Moved markers on ${done} quiz(zes)`);
+            } catch (e) {
+                alert(`Marker migration stopped after ${done} quiz(zes): ${e.message}`);
+            }
+        };
+
         window.populateQuizSystemSelect = function (value) {
             const sel = document.getElementById('quiz-system-select');
             if (!sel) return;
@@ -60759,8 +60843,14 @@ RULES:
             Object.keys(fields).forEach(k => { if (fields[k] === undefined) delete fields[k]; });
             return fields;
         };
-        window.quizSystemFieldsFromEditor = forUpdate =>
-            window.quizSystemFields(document.getElementById('quiz-system-select')?.value || '', forUpdate);
+        window.quizSystemFieldsFromEditor = forUpdate => {
+            const fields = window.quizSystemFields(document.getElementById('quiz-system-select')?.value || '', forUpdate);
+            // V101.10: campaign + provenance ride the same merge (marker helpers above).
+            const campaign = (document.getElementById('quiz-campaign')?.value || '').trim();
+            if (campaign) fields.campaign = campaign; else if (forUpdate) fields.campaign = firebase.firestore.FieldValue.delete();
+            if (window._quizEditorLegacySource) fields.source = window._quizEditorLegacySource;
+            return fields;
+        };
 
         const QUIZ_TAG_MAX = 20;
         window.quizTagCanonicalForms = function () {
