@@ -36,9 +36,11 @@
         select.replaceChildren(...models.map(m => new Option(m.label, m.id)));
         select.value = value;
     }
-    window.textAIChipContents = (value, action = '') => models.map((m, i) => {
+    // V101.20: optional `filter(model)` narrows the rail (e.g. vision-capable chips only);
+    // provider headings are computed over the filtered list so none is left orphaned.
+    window.textAIChipContents = (value, action = '', filter = null) => (filter ? models.filter(filter) : models).map((m, i, list) => {
         const provider = m.label.split(' ')[0];
-        const heading = i === 0 || models[i - 1].label.split(' ')[0] !== provider
+        const heading = i === 0 || list[i - 1].label.split(' ')[0] !== provider
             ? `<span class="text-ai-provider" data-provider="${provider}">${provider}</span>` : '';
         const label = m.label.slice(provider.length + 1).replace('Flash-Lite', 'Lite');
         return `${heading}<button type="button" class="glass-toggle-item${m.id === value ? ' active' : ''}" data-value="${m.id}" aria-label="${m.label}" aria-pressed="${m.id === value}" title="${m.label} — ${m.hint}"${action ? ` onclick="${action}"` : ''}>${label}</button>`;

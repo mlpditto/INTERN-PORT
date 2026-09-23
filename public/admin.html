@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.19)</title>
+    <title>Nika Admin (V101.20)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6341,7 +6341,7 @@
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <!-- V93.08: cache-bust on taxonomy.js for the LP Firestore overlay rollout -->
     <script src="ai-model-registry.js?v=V99.89"></script>
-    <script src="ai-model-ui.js?v=V101.05"></script>
+    <script src="ai-model-ui.js?v=V101.20"></script>
     <link rel="stylesheet" href="text-ai-chips.css?v=V101.05">
     <link rel="stylesheet" href="quiz-resource-cards.css?v=V99.68">
     <link rel="stylesheet" href="case-split-studio.css?v=V100.38">
@@ -6357,6 +6357,7 @@
     <script src="taxonomy.js?v=V94.55"></script>
     <!-- V91.84: cache-busting on case-taxonomy.js so browser refetches when shim changes (script URL is otherwise constant) -->
     <script src="case-taxonomy.js?v=V94.53"></script>
+    <script src="codex-vision.js?v=V101.20"></script>
     <!-- V91.98 fix: walker skips user-content subtrees (q-text-preview / md-render / lang-no-toggle) -->
     <script src="lang-toggle.js?v=V97.44"></script>
 <link rel="stylesheet" href="audit-toolbar.css?v=V100.12">
@@ -40320,11 +40321,108 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
         // V101.19: source image an intern attached via "Fill from image". Shown only
         // in the review queue (banner + list chip); never copied to the published doc.
-        function ddaSourceImageHtml(url, esc) {
+        function ddaSourceImageHtml(url, esc, kind) {
             const safe = esc(String(url || ''));
+            // V101.20: re-extract with a stronger model than the intern's Typhoon pass.
+            // Only vision-capable chips (everything except the OpenRouter text-only path).
+            const stored = localStorage.getItem('ai_default_codex_vision_model') || 'gemini-3.8-flash';
+            const chips = (kind && typeof window.textAIChipContents === 'function')
+                ? window.textAIChipContents(stored, "selectStoredTextAIModel(this,'ai_default_codex_vision_model')", m => !m.id.startsWith('or/'))
+                : '';
+            const btn = 'width:auto; min-height:0; padding:5px 12px; border-radius:999px; font-size:0.85em; font-weight:800; cursor:pointer;';
             return `<div style="margin-bottom:8px;"><strong>📷 Source image</strong> <span style="font-size:0.85em; opacity:0.8;">attached by the intern · fields may be AI pre-filled from it, verify against it</span>`
-                + `<a href="${safe}" target="_blank" rel="noopener noreferrer" title="Open full size" style="display:block; margin-top:6px;"><img src="${safe}" alt="Source image" style="display:block; max-width:100%; max-height:240px; border-radius:8px; border:1px solid #3f3f46; object-fit:contain; background:#18181b;"></a></div>`;
+                + `<a href="${safe}" target="_blank" rel="noopener noreferrer" title="Open full size" style="display:block; margin-top:6px;"><img src="${safe}" alt="Source image" style="display:block; max-width:100%; max-height:240px; border-radius:8px; border:1px solid #3f3f46; object-fit:contain; background:#18181b;"></a>`
+                + (kind ? `<div class="dda-reextract" style="margin-top:8px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;">`
+                    + `<div class="text-ai-chips lang-no-toggle" role="group" aria-label="Vision model" id="dda-reextract-chips-${kind}">${chips}</div>`
+                    + `<button type="button" onclick="ddaReextract('${kind}')" style="${btn} border:1.5px solid #4361ee; background:#4361ee; color:#fff;">🔎 Re-extract from image</button>`
+                    + `<span id="dda-reextract-status-${kind}" style="font-size:0.85em; opacity:0.85;"></span>`
+                    + `<div id="dda-reextract-result-${kind}" style="width:100%;"></div></div>` : '')
+                + `</div>`;
         }
+        // V101.20: admin-side extraction from the intern's source image with a chosen
+        // vision chip. Fetches the Storage object (bucket CORS allows this origin),
+        // sends it through callUniversalAI with visionData, parses the shared
+        // line-based contract, and offers per-field / empty-only / overwrite apply.
+        // Applying dispatches an input event so the review form's provenance tint runs.
+        const DDA_REEXTRACT = {
+            dca: { state: () => dcaState, subject: 'drug', formPrefix: 'dca-f-', esc: v => dcaEscapeHtml(v) },
+            dxa: { state: () => dxaState, subject: 'disease', formPrefix: 'dxa-f-', esc: v => dxaEscapeHtml(v) }
+        };
+        window.ddaReextract = async function (kind) {
+            const cfg = DDA_REEXTRACT[kind];
+            const st = cfg.state();
+            const draft = (st.drafts || []).find(d => d._id === st.editingId);
+            const status = document.getElementById('dda-reextract-status-' + kind);
+            if (!draft || !draft.sourceImageUrl) { if (status) status.textContent = 'No source image on this draft.'; return; }
+            const rail = document.getElementById('dda-reextract-chips-' + kind);
+            const active = rail ? rail.querySelector('.glass-toggle-item.active') : null;
+            const model = (active && active.dataset.value) || localStorage.getItem('ai_default_codex_vision_model') || 'gemini-3.8-flash';
+            try {
+                if (status) status.textContent = '⏳ Fetching image…';
+                const resp = await fetch(draft.sourceImageUrl);
+                if (!resp.ok) throw new Error('image fetch HTTP ' + resp.status);
+                const blob = await resp.blob();
+                const image_base64 = await new Promise((res, rej) => {
+                    const r = new FileReader();
+                    r.onload = () => res(String(r.result).split(',')[1] || '');
+                    r.onerror = () => rej(new Error('Could not read the image'));
+                    r.readAsDataURL(blob);
+                });
+                if (status) status.textContent = '🔍 ' + model + ' is reading the image…';
+                const out = await callUniversalAI(model, window.CodexVision.buildPrompt(cfg.subject), false,
+                    { image_base64, image_mimetype: blob.type || 'image/jpeg' }, '', { feature: 'admin_codex_vision' });
+                st._reextract = window.CodexVision.parseLines(out.text, window.CodexVision.replyKeys(cfg.subject));
+                st._reextractModel = out.model || model;
+                ddaRenderReextract(kind);
+                if (status) status.textContent = '';
+            } catch (e) {
+                if (status) status.textContent = '⚠️ ' + (e && e.message ? e.message : 'Re-extract failed');
+            }
+        };
+        function ddaRenderReextract(kind) {
+            const cfg = DDA_REEXTRACT[kind];
+            const st = cfg.state();
+            const parsed = st._reextract || {};
+            const keys = window.CodexVision.specs[cfg.subject].keys;
+            const result = document.getElementById('dda-reextract-result-' + kind);
+            if (!result) return;
+            const esc = cfg.esc;
+            const small = 'width:auto; min-height:0; padding:3px 9px; border-radius:999px; font-size:0.8em; font-weight:800; cursor:pointer;';
+            const rows = Object.keys(keys).map(k => {
+                const v = parsed[k];
+                const cur = document.getElementById(cfg.formPrefix + keys[k]);
+                const same = !!(cur && v && String(cur.value || '').trim() === String(v).trim());
+                const action = v && !same
+                    ? `<button type="button" onclick="ddaApplyReextract('${kind}','${k}')" style="${small} border:1px solid #4361ee; background:#fff; color:#4361ee;">Apply</button>`
+                    : (same ? '<span style="opacity:0.6;">= form</span>' : '');
+                return `<tr><td style="white-space:nowrap; opacity:0.8; padding:3px 6px 3px 0;">${esc(k)}</td><td style="word-break:break-word; padding:3px 6px;">${v ? esc(v) : '<span style="opacity:0.5;">– not in image</span>'}</td><td style="white-space:nowrap; padding:3px 0;">${action}</td></tr>`;
+            }).join('');
+            result.innerHTML = `<div style="font-size:0.85em; margin:6px 0 4px;"><strong>Extracted by ${esc(st._reextractModel || 'AI')}</strong>${parsed.UNSURE ? ` · unsure: ${esc(parsed.UNSURE)}` : ''}</div>`
+                + `<table style="width:100%; border-collapse:collapse; font-size:0.85em;"><tbody>${rows}</tbody></table>`
+                + `<div style="margin-top:6px; display:flex; gap:8px; flex-wrap:wrap;">`
+                + `<button type="button" onclick="ddaApplyReextract('${kind}','__empty')" style="${small} border:1px solid #4361ee; background:#fff; color:#4361ee;">Apply to empty fields</button>`
+                + `<button type="button" onclick="ddaApplyReextract('${kind}','__all')" style="${small} border:1px solid #b45309; background:#fff; color:#b45309;">Apply all (overwrite)</button></div>`;
+        }
+        window.ddaApplyReextract = function (kind, which) {
+            const cfg = DDA_REEXTRACT[kind];
+            const st = cfg.state();
+            const parsed = st._reextract || {};
+            const keys = window.CodexVision.specs[cfg.subject].keys;
+            let n = 0;
+            Object.keys(keys).forEach(k => {
+                if (which !== '__all' && which !== '__empty' && which !== k) return;
+                const v = parsed[k];
+                if (!v) return;
+                const el = document.getElementById(cfg.formPrefix + keys[k]);
+                if (!el) return;
+                if (which === '__empty' && String(el.value || '').trim()) return;
+                el.value = v;
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                n++;
+            });
+            if (typeof showToast === 'function') showToast(n ? `✅ Applied ${n} field${n === 1 ? '' : 's'} from the image` : 'Nothing to apply');
+            ddaRenderReextract(kind);
+        };
         function dcaShowInternNotesBanner(draft) {
             const banner = document.getElementById('dca-form-intern-notes-banner');
             if (!banner) return;
@@ -40333,7 +40431,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const hasImage = draft && draft.sourceImageUrl; // V101.19
             if (!hasNotes && !hasTarget && !hasImage) { banner.style.display = 'none'; banner.innerHTML = ''; return; }
             const parts = [];
-            if (hasImage) parts.push(ddaSourceImageHtml(draft.sourceImageUrl, dcaEscapeHtml));
+            if (hasImage) parts.push(ddaSourceImageHtml(draft.sourceImageUrl, dcaEscapeHtml, 'dca'));
             if (hasTarget) {
                 const targetDrug = dcaState.codex.find(d => d._id === draft.targetDrugId);
                 const targetLabel = targetDrug ? targetDrug.genericName : draft.targetDrugId;
@@ -45026,7 +45124,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const hasImage = draft && draft.sourceImageUrl; // V101.19
             if (!hasNotes && !hasTarget && !hasImage) { banner.style.display = 'none'; banner.innerHTML = ''; return; }
             const parts = [];
-            if (hasImage) parts.push(ddaSourceImageHtml(draft.sourceImageUrl, dxaEscapeHtml));
+            if (hasImage) parts.push(ddaSourceImageHtml(draft.sourceImageUrl, dxaEscapeHtml, 'dxa'));
             if (hasTarget) {
                 const targetDisease = dxaState.codex.find(d => d._id === draft.targetDiseaseId);
                 const targetLabel = targetDisease ? targetDisease.diseaseName : draft.targetDiseaseId;
