@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V100.86)</title>
+    <title>Internship Portfolio (V100.87)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -3626,6 +3626,20 @@
                 .dc-submit-field input:focus, .dc-submit-field textarea:focus {
                     border-color: #1d4ed8; outline: none;
                 }
+                /* V100.87: "Fill from image" row shared by the Disease and Drug submit
+                   forms. width:auto + min-height:0 beat the page's global button rule. */
+                .dc-submit-image { display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; margin:2px 0 14px; padding:10px 12px; border:1px dashed #c7d2fe; border-radius:12px; background:#f8faff; }
+                .dc-submit-image-btn { width:auto; min-height:0; padding:7px 12px; border-radius:999px; border:1.5px solid #4361ee; background:#fff; color:#4361ee; font-size:0.82em; font-weight:800; cursor:pointer; }
+                .dc-submit-image-btn:disabled { opacity:0.6; cursor:default; }
+                .dc-submit-image-hint { flex:1 1 180px; font-size:0.74em; color:#64748b; line-height:1.35; }
+                .dc-submit-image-preview { display:flex; align-items:center; gap:8px; width:100%; }
+                .dc-submit-image-preview img { width:64px; height:64px; object-fit:cover; border-radius:8px; border:1px solid #e2e8f0; }
+                .dc-submit-image-meta { flex:1; font-size:0.74em; color:#475569; }
+                .dc-submit-image-remove { width:auto; min-height:0; padding:4px 9px; border-radius:999px; border:1px solid #cbd5e1; background:#fff; color:#64748b; font-size:0.78em; font-weight:700; cursor:pointer; }
+                .dc-submit-image-note { width:100%; font-size:0.76em; color:#475569; background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:6px 9px; line-height:1.4; }
+                .dc-submit-image-note.warn { color:#92400e; background:#fffbeb; border-color:#fde68a; }
+                .dc-submit-image-note.error { color:#991b1b; background:#fef2f2; border-color:#fecaca; }
+                .dc-submit-ai-filled { background:#fefce8 !important; border-color:#facc15 !important; }
                 .dc-submit-field-hint {
                     font-size: 0.72em; color: #94a3b8; margin-top: 2px;
                 }
@@ -5252,6 +5266,13 @@
                     ✨ Suggest edit for: <strong id="dx-submit-target-name"></strong>
                 </div>
                 <div id="dx-submit-error" class="dc-submit-error" style="display:none;"></div>
+                <div id="dx-image-row" class="dc-submit-image lang-no-toggle">
+                    <input type="file" id="dx-image-input" accept="image/jpeg,image/png,image/webp" hidden onchange="ddImagePicked(event, 'dx')">
+                    <button type="button" id="dx-image-btn" class="dc-submit-image-btn" onclick="document.getElementById('dx-image-input').click()">📷 Fill from image</button>
+                    <span class="dc-submit-image-hint">Infographic, textbook page or label · AI fills the empty fields, you check them · the image goes to the admin with your draft</span>
+                    <div id="dx-image-preview" class="dc-submit-image-preview" hidden><img id="dx-image-thumb" alt=""><span id="dx-image-meta" class="dc-submit-image-meta"></span><button type="button" class="dc-submit-image-remove" onclick="ddImageClear('dx')">✕ Remove</button></div>
+                    <div id="dx-image-note" class="dc-submit-image-note" hidden></div>
+                </div>
 
                 <div class="dc-submit-field">
                     <label for="dx-s-diseaseName" class="required">Disease Name · ชื่อโรค (EN)</label>
@@ -5328,6 +5349,13 @@
                     ✨ Suggest edit for: <strong id="dc-submit-target-name"></strong>
                 </div>
                 <div id="dc-submit-error" class="dc-submit-error" style="display:none;"></div>
+                <div id="dc-image-row" class="dc-submit-image lang-no-toggle">
+                    <input type="file" id="dc-image-input" accept="image/jpeg,image/png,image/webp" hidden onchange="ddImagePicked(event, 'dc')">
+                    <button type="button" id="dc-image-btn" class="dc-submit-image-btn" onclick="document.getElementById('dc-image-input').click()">📷 Fill from image</button>
+                    <span class="dc-submit-image-hint">Infographic, textbook page or label · AI fills the empty fields, you check them · the image goes to the admin with your draft</span>
+                    <div id="dc-image-preview" class="dc-submit-image-preview" hidden><img id="dc-image-thumb" alt=""><span id="dc-image-meta" class="dc-submit-image-meta"></span><button type="button" class="dc-submit-image-remove" onclick="ddImageClear('dc')">✕ Remove</button></div>
+                    <div id="dc-image-note" class="dc-submit-image-note" hidden></div>
+                </div>
 
                 <div class="dc-submit-field">
                     <label for="dc-s-genericName" class="required">Generic Name · ชื่อสามัญ</label>
@@ -16978,6 +17006,7 @@
             dxSubmitState.editingId = null;
             dxSubmitState.targetDiseaseId = null;
             dxSubmitState.targetDiseaseName = '';
+            ddImageClear('dx'); // V100.87
             // V99.48: where Back returns to. Suggest-edit always comes from the detail
             // view and edit-pending from My drafts; 'new' callers pass ctx.from.
             dxSubmitState.from = (ctx && ctx.from) || (mode === 'suggest-edit' ? 'detail' : mode === 'edit-pending' ? 'drafts' : '');
@@ -17018,6 +17047,7 @@
                     if (targetNameEl) targetNameEl.textContent = dxSubmitState.targetDiseaseName;
                 }
                 dxFillSubmitForm(draft);
+                ddSetSourceImageFromDraft('dx', draft); // V100.87
             } else if (mode === 'suggest-edit') {
                 const disease = ctx && ctx.disease;
                 if (!disease) {
@@ -17078,6 +17108,203 @@
         function ddNormField(v) {
             return Array.isArray(v) ? v.join('\n') : (v == null ? '' : String(v));
         }
+        // ─────────────────────────────────────────────────────
+        // V100.87: "Fill from image" for the Disease (dx) and Drug (dc) submit forms.
+        // Same plumbing as the Product photo flow: downscale on device, Typhoon
+        // vision through callAIProxy (the only provider open to interns), a
+        // line-based reply (Typhoon JSON is not reliable and this page has no
+        // safeJsonParse), fill ONLY empty fields, highlight what AI wrote, and tell
+        // the admin in the notes. On submit the image is uploaded content-addressed
+        // to codex-sources/{uid}/{sha256}.jpg and linked on the draft
+        // (sourceImageUrl / sourceImagePath) so the admin can check the source; it
+        // is never copied to the published codex doc.
+        const DD_IMAGE_FORMS = {
+            dx: {
+                subject: 'disease', feature: 'intern_disease_vision', notes: 'dx-s-internNotes',
+                fields: { NAME_EN: 'dx-s-diseaseName', NAME_TH: 'dx-s-thaiName', ICD10: 'dx-s-icd10', CATEGORY: 'dx-s-category', SYMPTOMS: 'dx-s-symptoms', DIAGNOSIS: 'dx-s-diagnosis', TREATMENT: 'dx-s-treatment' },
+                lines: [
+                    'NAME_EN: <disease name in English, or ->',
+                    'NAME_TH: <Thai name, or ->',
+                    'ICD10: <ICD-10 code ONLY if it is printed in the image, otherwise ->',
+                    'CATEGORY: <disease group or specialty, or ->',
+                    'SYMPTOMS: <presenting symptoms on ONE line, items separated by ; or ->',
+                    'DIAGNOSIS: <diagnostic criteria / investigations on ONE line, ; separated, or ->',
+                    'TREATMENT: <management / treatment on ONE line, ; separated, or ->'
+                ],
+                state: () => dxSubmitState
+            },
+            dc: {
+                subject: 'drug', feature: 'intern_drug_vision', notes: 'dc-s-internNotes',
+                fields: { GENERIC: 'dc-s-genericName', BRANDS: 'dc-s-brandNames', ATC: 'dc-s-atcCode', CLASS: 'dc-s-class', INDICATION: 'dc-s-indication', DOSING: 'dc-s-dosing', SIDE_EFFECTS: 'dc-s-sideEffects' },
+                lines: [
+                    'GENERIC: <generic name, or ->',
+                    'BRANDS: <brand names separated by commas, or ->',
+                    'ATC: <ATC code ONLY if it is printed in the image, otherwise ->',
+                    'CLASS: <drug class, or ->',
+                    'INDICATION: <indications on ONE line, ; separated, or ->',
+                    'DOSING: <dosing on ONE line exactly as printed, ; separated, or ->',
+                    'SIDE_EFFECTS: <side effects on ONE line, ; separated, or ->'
+                ],
+                state: () => dcSubmitState
+            }
+        };
+        function ddBuildVisionPrompt(kind) {
+            const f = DD_IMAGE_FORMS[kind];
+            return 'You are reading an image about a ' + f.subject + ' (infographic, textbook page, package or label). Extract ONLY what is visible in the image. '
+                + 'Reply with exactly these lines, one per line, in this order, and nothing else:\n'
+                + f.lines.join('\n') + '\n'
+                + 'UNSURE: <anything unreadable or uncertain, or ->\n'
+                + 'Write - when the image does not show it. Never invent codes, doses or facts. Keep the language of the image (Thai stays Thai, English stays English).';
+        }
+        // First occurrence of each KEY wins; lines without a key continue the previous
+        // value (models wrap long fields). "-" / empty = not in the image → null.
+        function ddParseVisionLines(text, keys) {
+            const out = {}; keys.forEach(k => { out[k] = null; }); out.UNSURE = null;
+            const known = new Set(keys.concat(['UNSURE']));
+            let current = null; const buf = {};
+            String(text || '').replace(/```[a-zA-Z]*/g, '').split(/\r?\n/).forEach(line => {
+                const m = line.match(/^\s*[*\-•]?\s*([A-Z0-9_]+)\s*:\s*(.*)$/); // keys like ICD10 carry digits
+                if (m && known.has(m[1])) {
+                    if (buf[m[1]] !== undefined) { current = null; return; } // repeat → ignore
+                    current = m[1]; buf[current] = m[2];
+                } else if (current && line.trim()) {
+                    buf[current] += ' ' + line.trim();
+                }
+            });
+            Object.keys(buf).forEach(k => {
+                const v = buf[k].replace(/\s+/g, ' ').trim().replace(/^[-–—]+$/, '');
+                out[k] = v && v !== '-' ? v : null;
+            });
+            return out;
+        }
+        // Fill only empty fields; highlight them until the intern edits; return what was filled.
+        function ddApplyVisionFields(kind, parsed) {
+            const f = DD_IMAGE_FORMS[kind]; const filled = [];
+            Object.keys(f.fields).forEach(key => {
+                const el = document.getElementById(f.fields[key]);
+                const value = parsed[key];
+                if (!el || !value || String(el.value || '').trim()) return;
+                const max = parseInt(el.getAttribute('maxlength'), 10) || 4000;
+                el.value = value.slice(0, max);
+                el.classList.add('dc-submit-ai-filled');
+                el.addEventListener('input', () => el.classList.remove('dc-submit-ai-filled'), { once: true });
+                filled.push(key);
+            });
+            const notes = document.getElementById(f.notes);
+            if (notes) {
+                const line = '📷 AI pre-filled from an image (Typhoon vision): ' + (filled.length ? filled.join(', ') : 'nothing usable')
+                    + (parsed.UNSURE ? '. Unsure: ' + parsed.UNSURE : '') + '. Please verify against the source image.';
+                if (!/AI pre-filled from an image/.test(notes.value)) notes.value = (notes.value ? notes.value.replace(/\s+$/, '') + '\n' : '') + line;
+            }
+            return filled;
+        }
+        function ddImageNote(kind, msg, level) {
+            const el = document.getElementById(kind + '-image-note');
+            if (!el) return;
+            el.hidden = !msg; el.textContent = msg || ''; el.className = 'dc-submit-image-note' + (level ? ' ' + level : '');
+        }
+        function ddImageShowPreview(kind, src, meta) {
+            const wrap = document.getElementById(kind + '-image-preview');
+            const img = document.getElementById(kind + '-image-thumb');
+            const m = document.getElementById(kind + '-image-meta');
+            if (!wrap || !img) return;
+            wrap.hidden = !src; img.src = src || ''; if (m) m.textContent = meta || '';
+        }
+        function ddImageClear(kind) {
+            const st = DD_IMAGE_FORMS[kind].state();
+            if (st.sourceImage && st.sourceImage.previewUrl) URL.revokeObjectURL(st.sourceImage.previewUrl);
+            st.sourceImage = null;
+            const input = document.getElementById(kind + '-image-input'); if (input) input.value = '';
+            ddImageShowPreview(kind, '', ''); ddImageNote(kind, '', '');
+        }
+        // Edit-pending: show the image already on the draft; submit keeps its url/path.
+        function ddSetSourceImageFromDraft(kind, draft) {
+            ddImageClear(kind);
+            if (!draft || !draft.sourceImageUrl) return;
+            DD_IMAGE_FORMS[kind].state().sourceImage = { url: draft.sourceImageUrl, path: draft.sourceImagePath || '', existing: true };
+            ddImageShowPreview(kind, draft.sourceImageUrl, 'Image attached to this draft');
+        }
+        async function ddImagePicked(ev, kind) {
+            const file = ev.target.files && ev.target.files[0];
+            if (!file) return;
+            const st = DD_IMAGE_FORMS[kind].state();
+            if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { ddImageNote(kind, 'Use a JPEG, PNG or WebP image', 'error'); ev.target.value = ''; return; }
+            if (file.size > PRODUCT_PHOTO_MAX_INPUT) { ddImageNote(kind, 'That image is too large (max 12 MB)', 'error'); ev.target.value = ''; return; }
+            try {
+                ddImageNote(kind, '⏳ Preparing image…', '');
+                const { blob, width, height } = await resizeProductPhoto(file);
+                if (blob.size > PRODUCT_PHOTO_MAX_UPLOAD) throw new Error('Image is still over 2 MB after resizing');
+                if (st.sourceImage && st.sourceImage.previewUrl) URL.revokeObjectURL(st.sourceImage.previewUrl);
+                const previewUrl = URL.createObjectURL(blob);
+                st.sourceImage = { blob, previewUrl, existing: false };
+                ddImageShowPreview(kind, previewUrl, width + '×' + height + ' · ' + Math.round(blob.size / 1024) + ' KB');
+                await ddReadImageWithAI(kind);
+            } catch (e) {
+                ddImageNote(kind, '⚠️ ' + (e && e.message ? e.message : 'Could not use that image'), 'error');
+            }
+        }
+        async function ddReadImageWithAI(kind) {
+            const st = DD_IMAGE_FORMS[kind].state();
+            const btn = document.getElementById(kind + '-image-btn');
+            if (!st.sourceImage || !st.sourceImage.blob) return;
+            if (btn) btn.disabled = true;
+            ddImageNote(kind, '🔍 AI is reading the image…', '');
+            try {
+                const authUser = await ensureFirebaseAuthReady(10000);
+                if (!authUser) throw new Error('Firebase auth is required');
+                const idToken = await authUser.getIdToken();
+                const image_base64 = await blobToBase64(st.sourceImage.blob);
+                const resp = await fetch(PRODUCT_AI_PROXY_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken },
+                    body: JSON.stringify({ provider: 'typhoon', prompt: ddBuildVisionPrompt(kind), isJson: false,
+                        visionData: { image_base64, image_mimetype: 'image/jpeg' }, feature: DD_IMAGE_FORMS[kind].feature })
+                });
+                const data = await resp.json().catch(() => ({}));
+                if (!resp.ok || data.error) throw new Error(data.error || ('HTTP ' + resp.status));
+                const parsed = ddParseVisionLines(data.text, Object.keys(DD_IMAGE_FORMS[kind].fields));
+                const filled = ddApplyVisionFields(kind, parsed);
+                ddImageNote(kind, filled.length
+                    ? '✅ Filled ' + filled.length + ' empty field' + (filled.length === 1 ? '' : 's') + ' (highlighted). Check every value against the image before you submit.'
+                    : '🤷 Nothing usable was read from this image. You can still submit it with the draft.', filled.length ? '' : 'warn');
+            } catch (e) {
+                ddImageNote(kind, '⚠️ AI could not read the image: ' + (e && e.message ? e.message : 'unknown error') + '. The image will still be attached.', 'warn');
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+        // Content-addressed like product photos, under the intern's own uid so the
+        // storage rule can scope writes; admins read by path.
+        async function ddUploadSourceImage(blob, uid) {
+            if (!firebase.storage) throw new Error('Storage SDK not loaded');
+            const hash = await _productSha256Hex(blob);
+            const path = 'codex-sources/' + uid + '/' + hash + '.jpg';
+            const ref = firebase.storage().ref(path);
+            try {
+                return { url: await ref.getDownloadURL(), path };
+            } catch (probeErr) {
+                if (probeErr && probeErr.code !== 'storage/object-not-found') throw probeErr;
+                const snap = await ref.put(blob, { contentType: 'image/jpeg' });
+                return { url: await snap.ref.getDownloadURL(), path };
+            }
+        }
+        // Fields to merge into the draft write. A failed upload never blocks the
+        // submit: the draft goes without the image and the intern is told.
+        async function ddSourceImageFields(kind, uid) {
+            const st = DD_IMAGE_FORMS[kind].state();
+            const img = st.sourceImage;
+            if (!img) return {};
+            if (img.existing) return { sourceImageUrl: img.url, sourceImagePath: img.path || '' };
+            try {
+                const up = await ddUploadSourceImage(img.blob, uid);
+                return { sourceImageUrl: up.url, sourceImagePath: up.path };
+            } catch (e) {
+                if (typeof showToast === 'function') showToast('⚠️ Image could not be attached (' + (e && e.message ? e.message : 'upload failed') + ') · ส่ง draft โดยไม่มีรูป');
+                return {};
+            }
+        }
+        // ─────────────────────────────────────────────────────
+
         function ddCountChanged(snapshot, current) {
             const snap = snapshot || {};
             return Object.keys(current).filter(k => ddNormField(current[k]) !== ddNormField(snap[k])).length;
@@ -17206,6 +17433,7 @@
                     });
                     // Preserve targetDiseaseId if it was set (suggest-edit draft).
                     if (dxSubmitState.targetDiseaseId) updateData.targetDiseaseId = dxSubmitState.targetDiseaseId;
+                    Object.assign(updateData, await ddSourceImageFields('dx', authUser.uid)); // V100.87
                     await db.collection('disease_codex_drafts').doc(dxSubmitState.editingId).update(updateData);
                     if (typeof showToast === 'function') showToast('💾 Draft saved · บันทึกฉบับร่างแล้ว');
                 } else {
@@ -17221,6 +17449,7 @@
                         updatedAt: nowTs
                     });
                     if (dxSubmitState.targetDiseaseId) draftData.targetDiseaseId = dxSubmitState.targetDiseaseId;
+                    Object.assign(draftData, await ddSourceImageFields('dx', authUser.uid)); // V100.87
                     await db.collection('disease_codex_drafts').add(draftData);
                     if (typeof showToast === 'function') {
                         showToast(dxSubmitState.targetDiseaseId
@@ -18016,6 +18245,7 @@
             dcSubmitState.editingId = null;
             dcSubmitState.targetDrugId = null;
             dcSubmitState.targetDrugName = '';
+            ddImageClear('dc'); // V100.87
             // V99.48: where Back returns to — see dxOpenSubmit().
             dcSubmitState.from = (ctx && ctx.from) || (mode === 'suggest-edit' ? 'detail' : mode === 'edit-pending' ? 'drafts' : '');
 
@@ -18055,6 +18285,7 @@
                     if (targetNameEl) targetNameEl.textContent = dcSubmitState.targetDrugName;
                 }
                 dcFillSubmitForm(draft);
+                ddSetSourceImageFromDraft('dc', draft); // V100.87
             } else if (mode === 'suggest-edit') {
                 const drug = ctx && ctx.drug;
                 if (!drug) {
@@ -18173,6 +18404,7 @@
                     });
                     // Preserve targetDrugId if it was set (suggest-edit draft).
                     if (dcSubmitState.targetDrugId) updateData.targetDrugId = dcSubmitState.targetDrugId;
+                    Object.assign(updateData, await ddSourceImageFields('dc', authUser.uid)); // V100.87
                     await db.collection('drug_codex_drafts').doc(dcSubmitState.editingId).update(updateData);
                     if (typeof showToast === 'function') showToast('💾 Draft saved · บันทึกฉบับร่างแล้ว');
                 } else {
@@ -18188,6 +18420,7 @@
                         updatedAt: nowTs
                     });
                     if (dcSubmitState.targetDrugId) draftData.targetDrugId = dcSubmitState.targetDrugId;
+                    Object.assign(draftData, await ddSourceImageFields('dc', authUser.uid)); // V100.87
                     await db.collection('drug_codex_drafts').add(draftData);
                     if (typeof showToast === 'function') {
                         showToast(dcSubmitState.targetDrugId

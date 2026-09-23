@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.18)</title>
+    <title>Nika Admin (V101.19)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -39147,9 +39147,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 // V94.35 Phase 5: surface intern's free-text note to admin as a
                 // truncated snippet under the submitter line. Full text is also
                 // injected into the Review form's banner (see dcaReviewDraft).
-                const notesSnippet = draft.internNotes
+                const notesSnippet = (draft.sourceImageUrl ? '<div class="dca-draft-notes-snippet">📷 Source image attached</div>' : '') + (draft.internNotes // V101.19
                     ? `<div class="dca-draft-notes-snippet">📝 ${dcaEscapeHtml(String(draft.internNotes).slice(0, 120))}${String(draft.internNotes).length > 120 ? '…' : ''}</div>`
-                    : '';
+                    : '');
                 return `
                     <div class="dca-draft-row">
                         <div class="dca-draft-row-head">
@@ -40318,13 +40318,22 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dcaSwitchView('form');
         }
 
+        // V101.19: source image an intern attached via "Fill from image". Shown only
+        // in the review queue (banner + list chip); never copied to the published doc.
+        function ddaSourceImageHtml(url, esc) {
+            const safe = esc(String(url || ''));
+            return `<div style="margin-bottom:8px;"><strong>📷 Source image</strong> <span style="font-size:0.85em; opacity:0.8;">attached by the intern · fields may be AI pre-filled from it, verify against it</span>`
+                + `<a href="${safe}" target="_blank" rel="noopener noreferrer" title="Open full size" style="display:block; margin-top:6px;"><img src="${safe}" alt="Source image" style="display:block; max-width:100%; max-height:240px; border-radius:8px; border:1px solid #3f3f46; object-fit:contain; background:#18181b;"></a></div>`;
+        }
         function dcaShowInternNotesBanner(draft) {
             const banner = document.getElementById('dca-form-intern-notes-banner');
             if (!banner) return;
             const hasNotes = draft && draft.internNotes && String(draft.internNotes).trim();
             const hasTarget = draft && draft.targetDrugId;
-            if (!hasNotes && !hasTarget) { banner.style.display = 'none'; banner.innerHTML = ''; return; }
+            const hasImage = draft && draft.sourceImageUrl; // V101.19
+            if (!hasNotes && !hasTarget && !hasImage) { banner.style.display = 'none'; banner.innerHTML = ''; return; }
             const parts = [];
+            if (hasImage) parts.push(ddaSourceImageHtml(draft.sourceImageUrl, dcaEscapeHtml));
             if (hasTarget) {
                 const targetDrug = dcaState.codex.find(d => d._id === draft.targetDrugId);
                 const targetLabel = targetDrug ? targetDrug.genericName : draft.targetDrugId;
@@ -44886,9 +44895,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 } else {
                     target = '<span class="dca-row-meta-chip">📥 new entry</span>';
                 }
-                const notesSnippet = draft.internNotes
+                const notesSnippet = (draft.sourceImageUrl ? '<div class="dca-draft-notes-snippet">📷 Source image attached</div>' : '') + (draft.internNotes // V101.19
                     ? `<div class="dca-draft-notes-snippet">📝 ${dxaEscapeHtml(String(draft.internNotes).slice(0, 120))}${String(draft.internNotes).length > 120 ? '…' : ''}</div>`
-                    : '';
+                    : '');
                 return `
                     <div class="dca-draft-row">
                         <div class="dca-draft-row-head">
@@ -45014,8 +45023,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (!banner) return;
             const hasNotes = draft && draft.internNotes && String(draft.internNotes).trim();
             const hasTarget = draft && draft.targetDiseaseId;
-            if (!hasNotes && !hasTarget) { banner.style.display = 'none'; banner.innerHTML = ''; return; }
+            const hasImage = draft && draft.sourceImageUrl; // V101.19
+            if (!hasNotes && !hasTarget && !hasImage) { banner.style.display = 'none'; banner.innerHTML = ''; return; }
             const parts = [];
+            if (hasImage) parts.push(ddaSourceImageHtml(draft.sourceImageUrl, dxaEscapeHtml));
             if (hasTarget) {
                 const targetDisease = dxaState.codex.find(d => d._id === draft.targetDiseaseId);
                 const targetLabel = targetDisease ? targetDisease.diseaseName : draft.targetDiseaseId;
