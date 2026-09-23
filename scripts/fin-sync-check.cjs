@@ -193,6 +193,26 @@ fin.finState.month = '2026-09';   // finOpen() normally sets this; the mutators 
     check('11m. no Set row left on Today', /finSetToday\(\)">Set</.test(index), false);
     check('11n. no-budget state does not render a negative "left"', /const noBudget = budget <= 0;/.test(today) && /noBudget \? finFmt\(spent\) : finFmt\(left\)/.test(today), true);
     check('11o. the empty bar is drawn from 0, not from spent', /bar\(noBudget \? 0 : spent, budget\)/.test(today), true);
+    // V100.92 plan grid: each day tinted by spend/budget, and a tracked day shows what was SPENT.
+    const plan = index.slice(index.indexOf('<div class="fin-grid">'));
+    check('11p. perDay is computed once for both Month and Plan', (index.match(/const perDay = \{\}/g) || []).length, 1);
+    check('11q. a tracked day shows spent, an untracked one its budget', /\$\{s \? Math\.round\(s\)\.toLocaleString\('en-US'\) : \(b \? Math\.round\(b\)/.test(plan), true);
+    check('11r. spend with no budget is grey, never "over"', /!\(b > 0\) \? ' nobudget'/.test(plan), true);
+    check('11s. heat rules sit after .override so the tint owns the background',
+        index.indexOf('#finModal .fin-day.cool') > index.indexOf('#finModal .fin-day.override { background'), true);
+    check('11t. .today and .sel still outrank the tint',
+        index.indexOf('#finModal .fin-day.sel {') > index.indexOf('#finModal .fin-day.hot'), true);
+    check('11u. override keeps a non-colour cue on a tinted cell', /#finModal \.fin-day\.override small \{ text-decoration:underline; \}/.test(index), true);
+    check('11v. past dimming only applies to days with nothing logged', /\$\{!s && k < today \? ' past' : ''\}/.test(plan), true);
+    // V100.93: the default-daily-budget card is gone; it is a chip on the month row.
+    check('11w. the Default daily budget card is gone', /Default daily budget · งบต่อวันของเดือนนี้/.test(index), false);
+    check('11x. the chip lives in the month nav', /id="fin-nav-extra"/.test(index) && /onclick="finEditDaily\(\)"/.test(index), true);
+    check('11y. the nav arrow rule cannot squash the chip', /#finModal \.fin-nav button\.fin-nav-arrow \{/.test(index), true);
+    check('11z. the month total counts per-day overrides', /Number\.isFinite\(o\) \? o : fallback/.test(index), true);
+    check('11aa. the old default × days readout is gone', /\(plan\.daily \|\| 0\) \* days/.test(index), false);
+    check('11ab. the month name shortens while the editor is open', /finMonthLabel\(finState\.month\)\.slice\(0, 3\)/.test(index), true);
+    check('11ac. editDaily resets on tab and month change',
+        (index.match(/finState\.editDaily = false/g) || []).length >= 4, true);
 
     let bad = 0;
     for (const [name, got, want] of checks) {

@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V100.91)</title>
+    <title>Internship Portfolio (V100.93)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -692,7 +692,11 @@
         #finModal .fin-tabs button { flex:1; border:0; background:transparent; border-radius:999px; padding:7px; font-weight:800; font-size:0.8em; color:#64748b; cursor:pointer; margin:0; width:auto; }
         #finModal .fin-tabs button.on { background:#fff; color:#065f46; box-shadow:0 1px 3px rgba(15,23,42,0.12); }
         #finModal .fin-nav { display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:8px; font-weight:800; font-size:0.9em; color:#0f172a; }
-        #finModal .fin-nav button { width:30px; height:30px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; color:#475569; cursor:pointer; padding:0; margin:0; }
+        /* Scoped to .fin-nav-arrow so it cannot squash the budget chip that also sits here. */
+        #finModal .fin-nav button.fin-nav-arrow { width:30px; height:30px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; color:#475569; cursor:pointer; padding:0; margin:0; }
+        #finModal #fin-nav-extra { margin-left:auto; }
+        #finModal #fin-nav-label { white-space:nowrap; }
+        #finModal .fin-plan-total { text-align:right; font-size:0.7em; color:#94a3b8; margin:-2px 0 8px; }
         #finModal .fin-card { border:1px solid #e2e8f0; border-radius:14px; padding:10px 12px; margin-bottom:8px; background:#fff; }
         #finModal .fin-card.hero { background:linear-gradient(135deg,#ecfdf5,#f0fdfa); border-color:#a7f3d0; }
         /* V100.91: Today's hero is a borderless two-row strip (the Month tab still uses .fin-card.hero). */
@@ -750,7 +754,23 @@
         #finModal .fin-day b { display:block; font-size:0.78em; color:#0f172a; }
         #finModal .fin-day small { display:block; font-size:0.62em; color:#64748b; }
         #finModal .fin-day.override { background:#ecfdf5; border-color:#6ee7b7; } #finModal .fin-day.override small { color:#065f46; font-weight:800; }
-        #finModal .fin-day.today { box-shadow:inset 0 0 0 2px #10b981; }
+        /* V100.92: a tracked day is tinted by how much of its budget went — the same three
+           bands the Today bar uses. These come AFTER .override on purpose: the tint owns the
+           background, so "custom amount" keeps only its underline (restated last, below).
+           Steps picked with the palette validator — the paler tints first tried were 4.9 ΔE
+           apart under tritanopia, i.e. amber and red indistinguishable. */
+        #finModal .fin-day.cool { background:#6ee7b7; border-color:#34d399; }
+        #finModal .fin-day.warm { background:#fbbf24; border-color:#f59e0b; }
+        #finModal .fin-day.hot { background:#f87171; border-color:#ef4444; }
+        #finModal .fin-day.nobudget { background:#e2e8f0; border-color:#cbd5e1; }
+        #finModal .fin-day.cool small, #finModal .fin-day.warm small, #finModal .fin-day.hot small, #finModal .fin-day.nobudget small { color:#0f172a; font-weight:800; }
+        #finModal .fin-day.override small { text-decoration:underline; }
+        #finModal .fin-legend { display:flex; flex-wrap:wrap; align-items:center; gap:3px 9px; margin-top:8px; font-size:0.68em; color:#64748b; }
+        #finModal .fin-legend span { display:inline-flex; align-items:center; gap:4px; }
+        #finModal .fin-legend i { width:11px; height:11px; border-radius:3px; border:1px solid #e2e8f0; }
+        #finModal .fin-legend i.cool { background:#6ee7b7; } #finModal .fin-legend i.warm { background:#fbbf24; } #finModal .fin-legend i.hot { background:#f87171; }
+        /* Slate, not emerald — the today ring has to read on a green, amber or red tint. */
+        #finModal .fin-day.today { box-shadow:inset 0 0 0 2px #0f172a; }
         #finModal .fin-day.sel { background:#065f46; border-color:#065f46; } #finModal .fin-day.sel b, #finModal .fin-day.sel small { color:#fff; }
         #finModal .fin-day.past { opacity:0.55; }
         #finModal .fin-muted { color:#94a3b8; font-size:0.8em; }
@@ -5199,9 +5219,11 @@
                 <button type="button" data-tab="plan" onclick="finTab('plan')">Plan</button>
             </div>
             <div class="fin-nav" id="fin-nav" style="display:none;">
-                <button type="button" onclick="finShiftMonth(-1)" aria-label="Previous month">‹</button>
+                <button type="button" class="fin-nav-arrow" onclick="finShiftMonth(-1)" aria-label="Previous month">‹</button>
                 <span id="fin-nav-label"></span>
-                <button type="button" onclick="finShiftMonth(1)" aria-label="Next month">›</button>
+                <button type="button" class="fin-nav-arrow" onclick="finShiftMonth(1)" aria-label="Next month">›</button>
+                <!-- V100.93: Plan's default daily budget lives here, beside the month name. -->
+                <span id="fin-nav-extra" style="display:none;"></span>
             </div>
             <div id="fin-body"></div>
         </div>
@@ -18999,7 +19021,7 @@
         // phone and laptop see one plan — see the sync block below. Two fields were added:
         // every record carries `upd` (ms, last edit) and deletes leave `tomb[id] = ms`.
         const FIN_CATS = ['🍜 Food', '🥤 Drink', '☕ Coffee', '🚌 Travel', '🛒 Groceries', '📱 Subs', '🎉 Fun', '💊 Health', '📚 Study', '📦 Other'];
-        const finState = { tab: 'today', month: null, cat: FIN_CATS[0], selDay: null, editId: null, editCat: null, editBudget: false };
+        const finState = { tab: 'today', month: null, cat: FIN_CATS[0], selDay: null, editId: null, editCat: null, editBudget: false, editDaily: false };
         function finKey() { return 'fin_v1_' + (userId || 'anon'); }
         function finEmpty() { return { plans: {}, expenses: [], tomb: {} }; }
         function finLoad() {
@@ -19163,18 +19185,18 @@
         }
 
         function finOpen() {
-            finState.tab = 'today'; finState.month = finToday().slice(0, 7); finState.selDay = null; finState.editId = null; finState.editBudget = false;
+            finState.tab = 'today'; finState.month = finToday().slice(0, 7); finState.selDay = null; finState.editId = null; finState.editBudget = false; finState.editDaily = false;
             finRender();
             document.getElementById('finModal').style.display = 'flex';
             finSync();   // pull whatever the other device added since last time
         }
         function finClose() { document.getElementById('finModal').style.display = 'none'; }
-        function finTab(t) { finState.tab = t; finState.selDay = null; finState.editId = null; finState.editBudget = false; finRender(); }
+        function finTab(t) { finState.tab = t; finState.selDay = null; finState.editId = null; finState.editBudget = false; finState.editDaily = false; finRender(); }
         function finShiftMonth(delta) {
             const [y, m] = finState.month.split('-').map(Number);
             const d = new Date(y, m - 1 + delta, 1);
             finState.month = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-            finState.selDay = null; finRender();
+            finState.selDay = null; finState.editDaily = false; finRender();
         }
         function finPickCat(btn) { finState.cat = btn.dataset.cat; document.querySelectorAll('#finModal .fin-cat').forEach(b => b.classList.toggle('on', b === btn)); }
         function finAdd() {
@@ -19218,8 +19240,27 @@
             }
             finState.editId = null; finRender();
         }
+        // V100.93: the month's default budget is a chip on the month row, same tap-to-edit
+        // shape as Today's. finPreviewDaily keeps the "/ month" hint honest while typing:
+        // it sums the real per-day budgets, so days with an override keep theirs instead of
+        // the old readout's default × day-count, which ignored overrides entirely.
+        function finEditDaily() { finState.editDaily = !finState.editDaily; finRender(); }
+        function finPreviewDaily(v) {
+            const el = document.getElementById('fin-plan-total'); if (!el) return;
+            const data = finLoad(), ym = finState.month, plan = data.plans[ym] || {};
+            const n = finRound(parseFloat(v)), fallback = n >= 0 ? n : 0;
+            let total = 0;
+            for (let i = 1; i <= finDaysIn(ym); i++) {
+                const o = plan.days && plan.days[finDayKey(ym, i)];
+                total += Number.isFinite(o) ? o : fallback;
+            }
+            el.textContent = `ทุกวันในเดือนนี้ · = ${finFmt(total)} / month`;
+        }
         function finSetDefault() {
-            const v = finRound(parseFloat(document.getElementById('fin-default').value));
+            const el = document.getElementById('fin-default');
+            const v = finRound(parseFloat(el && el.value));
+            finState.editDaily = false;
+            if (!(v >= 0)) { finRender(); return; }
             const data = finLoad(); const plan = data.plans[finState.month] || (data.plans[finState.month] = { daily: 0, days: {} });
             plan.daily = v > 0 ? v : 0; plan.upd = Date.now(); finSave(data); finRender(); showToast(`Default ${finFmt(plan.daily)}/day for ${finMonthLabel(finState.month)}`);
         }
@@ -19252,7 +19293,24 @@
             document.querySelectorAll('#finModal .fin-tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === finState.tab));
             const nav = document.getElementById('fin-nav');
             nav.style.display = finState.tab === 'today' ? 'none' : 'flex';
-            document.getElementById('fin-nav-label').textContent = finMonthLabel(finState.month);
+            // The open budget editor is wider than the chip it replaces and pushed the month
+            // name onto a second line at 375px — it shortens to "Sep 2026" while editing.
+            const navEditing = finState.tab === 'plan' && finState.editDaily;
+            document.getElementById('fin-nav-label').textContent = navEditing
+                ? finMonthLabel(finState.month).slice(0, 3) + ' ' + finState.month.slice(0, 4)
+                : finMonthLabel(finState.month);
+            // V100.93: on Plan, the month's default daily budget rides this row as a chip —
+            // the card, its uppercase title, the "฿ / day" label and the Save button are gone.
+            // Sitting beside the month name is also what says the value covers the whole month,
+            // which a loose Save button never did.
+            const navExtra = document.getElementById('fin-nav-extra');
+            navExtra.style.display = finState.tab === 'plan' ? '' : 'none';
+            if (finState.tab === 'plan') {
+                const d = (data.plans[finState.month] || {}).daily || 0;
+                navExtra.innerHTML = finState.editDaily
+                    ? `<span class="fin-budget-edit"><input id="fin-default" type="number" inputmode="decimal" min="0" step="0.01" value="${d || ''}" placeholder="300" aria-label="Default daily budget" oninput="finPreviewDaily(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();finSetDefault()}"><button type="button" class="fin-budget-ok" onclick="finSetDefault()" aria-label="Save">✓</button></span>`
+                    : `<button type="button" class="fin-budget${d > 0 ? '' : ' unset'}" onclick="finEditDaily()" title="Default for every day in ${finEsc(finMonthLabel(finState.month))}">${d > 0 ? `${finFmt(d)}/day ✎` : '＋ งบต่อวัน'}</button>`;
+            }
             document.getElementById('fin-head-sub').textContent = finState.tab === 'today' ? finToday() : '';
             const bar = (spent, budget) => {
                 const pct = budget > 0 ? Math.round(spent / budget * 100) : (spent > 0 ? 100 : 0);
@@ -19303,13 +19361,14 @@
             }
             const ym = finState.month, days = finDaysIn(ym), today = finToday(), isCur = today.slice(0, 7) === ym;
             const dayKeys = Array.from({ length: days }, (_, i) => finDayKey(ym, i + 1));
+            // V100.92: Month's per-day totals hoisted here — Plan's day grid needs the same map.
+            const perDay = {}; data.expenses.filter(e => e.date.slice(0, 7) === ym).forEach(e => { perDay[e.date] = (perDay[e.date] || 0) + e.amount; });
             if (finState.tab === 'month') {
                 const inMonth = e => e.date.slice(0, 7) === ym;
                 const spent = finSpent(data, inMonth);
                 const planTotal = dayKeys.reduce((s, k) => s + finBudget(data, k), 0);
                 const elapsedKeys = dayKeys.filter(k => k <= today);
                 const elapsedBudget = elapsedKeys.reduce((s, k) => s + finBudget(data, k), 0);
-                const perDay = {}; data.expenses.filter(inMonth).forEach(e => { perDay[e.date] = (perDay[e.date] || 0) + e.amount; });
                 // Only days the intern actually logged on count — otherwise a budget set on
                 // the 22nd would claim a 22-day streak of untracked days.
                 const trackedKeys = elapsedKeys.filter(k => finBudget(data, k) > 0 && perDay[k] > 0);
@@ -19344,31 +19403,33 @@
             const plan = data.plans[ym] || { daily: 0, days: {} };
             const sel = finState.selDay;
             body.innerHTML = `
-                <div class="fin-card">
-                    <div class="fin-lbl" style="margin-bottom:6px;">Default daily budget · งบต่อวันของเดือนนี้</div>
-                    <div class="fin-row">
-                        <span class="fin-muted">฿ / day</span>
-                        <input id="fin-default" type="number" inputmode="decimal" min="0" step="0.01" value="${plan.daily || ''}" placeholder="300">
-                        <button type="button" class="fin-btn ghost sm" onclick="finSetDefault()">Save</button>
-                        <span class="fin-muted" style="margin-left:auto;">= ${finFmt((plan.daily || 0) * days)} / month</span>
-                    </div>
-                </div>
+                ${finState.editDaily ? `<div class="fin-plan-total" id="fin-plan-total">ทุกวันในเดือนนี้ · = ${finFmt(dayKeys.reduce((s, k) => s + finBudget(data, k), 0))} / month</div>` : ''}
                 <div class="fin-card">
                     <div class="fin-lbl" style="margin-bottom:6px;">Per-day override · ตั้งรายวัน (tap a day)</div>
-                    <div class="fin-grid">${dayKeys.map((k, i) => { const o = plan.days && Number.isFinite(plan.days[k]); return `<button type="button" class="fin-day${o ? ' override' : ''}${k === today ? ' today' : ''}${k === sel ? ' sel' : ''}${k < today ? ' past' : ''}" onclick="finSelDay('${k}')"><b>${i + 1}</b><small>${finBudget(data, k) ? Math.round(finBudget(data, k)).toLocaleString('en-US') : '–'}</small></button>`; }).join('')}</div>
+                    <div class="fin-grid">${dayKeys.map((k, i) => {
+                        const o = plan.days && Number.isFinite(plan.days[k]);
+                        const b = finBudget(data, k), s = perDay[k] || 0;
+                        // A day with expenses but no budget has no ratio to show — grey, not red.
+                        const heat = !s ? '' : (!(b > 0) ? ' nobudget' : (s > b ? ' hot' : (s > b * 0.8 ? ' warm' : ' cool')));
+                        const tip = s
+                            ? `${finMonthLabel(ym).split(' ')[0]} ${i + 1} · spent ${finFmt(s)}${b > 0 ? ` of ${finFmt(b)} (${Math.round(s / b * 100)}%)` : ' · no budget'}`
+                            : `${finMonthLabel(ym).split(' ')[0]} ${i + 1} · budget ${b ? finFmt(b) : 'not set'} · nothing logged`;
+                        return `<button type="button" class="fin-day${o ? ' override' : ''}${heat}${k === today ? ' today' : ''}${k === sel ? ' sel' : ''}${!s && k < today ? ' past' : ''}" onclick="finSelDay('${k}')" title="${finEsc(tip)}"><b>${i + 1}</b><small>${s ? Math.round(s).toLocaleString('en-US') : (b ? Math.round(b).toLocaleString('en-US') : '–')}</small></button>`;
+                    }).join('')}</div>
                     ${sel ? `<div class="fin-row" style="margin-top:8px;">
                         <span class="fin-muted">${finMonthLabel(ym).split(' ')[0]} ${Number(sel.slice(-2))}</span>
                         <input id="fin-day-amt" type="number" inputmode="decimal" min="0" step="0.01" value="${plan.days && Number.isFinite(plan.days[sel]) ? plan.days[sel] : ''}" placeholder="${plan.daily || 0}">
                         <button type="button" class="fin-btn sm" onclick="finSetDay(false)">Set</button>
                         ${plan.days && Number.isFinite(plan.days[sel]) ? '<button type="button" class="fin-btn ghost sm" onclick="finSetDay(true)">Clear</button>' : ''}
-                    </div>` : '<div class="fin-muted" style="margin-top:6px;">Green = custom amount · outline = today.</div>'}
+                    </div>` : `<div class="fin-legend"><span><i class="cool"></i>≤80%</span><span><i class="warm"></i>81–100%</span><span><i class="hot"></i>เกินงบ</span><span class="fin-muted">วันที่มีสี = ยอดที่ใช้ · ขีดเส้นใต้ = ตั้งเอง · กรอบ = วันนี้</span></div>`}
                 </div>`;
+            const dailyEl = finState.editDaily && document.getElementById('fin-default'); if (dailyEl) { dailyEl.focus(); dailyEl.select(); }
             const dayAmt = document.getElementById('fin-day-amt'); if (dayAmt) dayAmt.focus();
         }
         window.finOpen = finOpen; window.finClose = finClose; window.finTab = finTab; window.finShiftMonth = finShiftMonth;
         window.finPickCat = finPickCat; window.finAdd = finAdd; window.finDel = finDel; window.finSetDefault = finSetDefault;
         window.finSelDay = finSelDay; window.finSetDay = finSetDay; window.finSetToday = finSetToday;
-        window.finEditItem = finEditItem; window.finSaveItem = finSaveItem; window.finPickEditCat = finPickEditCat; window.finEditBudget = finEditBudget;
+        window.finEditItem = finEditItem; window.finSaveItem = finSaveItem; window.finPickEditCat = finPickEditCat; window.finEditBudget = finEditBudget; window.finEditDaily = finEditDaily; window.finPreviewDaily = finPreviewDaily;
         window.finSync = finSync;   // the status pill in .fin-head is a tap-to-retry button
 
         // V96.41: `source` is 'manual' when the ✅ chip is tapped, 'activity' when a
