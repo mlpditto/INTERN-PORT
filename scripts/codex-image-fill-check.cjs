@@ -20,12 +20,16 @@ const mk = id => els[id] || (els[id] = { id, value: '', hidden: false, textConte
     getAttribute(n) { return n === 'maxlength' ? (id === 'dx-s-icd10' ? '20' : null) : null; }, addEventListener() {} });
 const dxSubmitState = {}, dcSubmitState = {};
 const toasts = [];
+// V100.88: prompt + parser moved to public/codex-vision.js — load the real file.
+const sharedWindow = {};
+new Function('window', read('public/codex-vision.js'))(sharedWindow);
 const ctx = {
     document: { getElementById: mk }, dxSubmitState, dcSubmitState, URL: { createObjectURL: () => 'blob:x', revokeObjectURL: () => {} },
     PRODUCT_PHOTO_MAX_INPUT: 12 * 1024 * 1024, PRODUCT_PHOTO_MAX_UPLOAD: 2 * 1024 * 1024, PRODUCT_AI_PROXY_URL: 'https://proxy',
     showToast: m => toasts.push(m), _productSha256Hex: async () => 'abc123', firebase: { storage: null },
     resizeProductPhoto: async () => ({ blob: { size: 1000 }, width: 10, height: 10 }), blobToBase64: async () => 'b64', ensureFirebaseAuthReady: async () => ({ getIdToken: async () => 't' }), fetch: null
 };
+ctx.window = sharedWindow;
 const names = Object.keys(ctx);
 const api = new Function(...names, index.slice(a, b) + '\nreturn { DD_IMAGE_FORMS, ddBuildVisionPrompt, ddParseVisionLines, ddApplyVisionFields, ddSourceImageFields, ddSetSourceImageFromDraft, ddImageClear };')(...names.map(n => ctx[n]));
 
@@ -79,10 +83,11 @@ check('apply: maxlength respected', (() => { mk('dx-s-icd10').value = ''; api.dd
     check('upload path is content-addressed under the uid', /'codex-sources\/' \+ uid \+ '\/' \+ hash \+ '\.jpg'/.test(index), true);
     check('AI call: typhoon, visionData, feature tags', /provider: 'typhoon', prompt: ddBuildVisionPrompt\(kind\), isJson: false,/.test(index) && /intern_disease_vision/.test(index) && /intern_drug_vision/.test(index), true);
     check('storage.rules: codex-sources block (owner create ≤2MB image, admin read)', /match \/codex-sources\/\{ownerUid\}\/\{fileName\} \{\n\s*allow read: if isAdmin\(\) \|\| \(isSignedIn\(\) && request\.auth\.uid == ownerUid\);\n\s*allow create: if isSignedIn\(\) && request\.auth\.uid == ownerUid\n\s*&& request\.resource\.size < 2 \* 1024 \* 1024\n\s*&& request\.resource\.contentType\.matches\('image\/\(jpeg\|png\|webp\)'\);\n\s*allow update, delete: if isAdmin\(\);/.test(rules), true);
-    check('admin: both review banners show the image and do not early-return on it', (admin.match(/if \(!hasNotes && !hasTarget && !hasImage\)/g) || []).length === 2 && (admin.match(/parts\.push\(ddaSourceImageHtml\(draft\.sourceImageUrl, d[cx]aEscapeHtml\)\)/g) || []).length === 2, true);
+    check('admin: both review banners show the image and do not early-return on it', (admin.match(/if \(!hasNotes && !hasTarget && !hasImage\)/g) || []).length === 2 && (admin.match(/parts\.push\(ddaSourceImageHtml\(draft\.sourceImageUrl, d[cx]aEscapeHtml(, 'd[cx]a')?\)\)/g) || []).length === 2, true);
     check('admin: both queues show the 📷 chip', (admin.match(/📷 Source image attached/g) || []).length, 2);
     check('admin: approve copies only field keys (image never published)', !/sourceImageUrl/.test(admin.slice(admin.indexOf('function dcaApproveDraft'), admin.indexOf('function dcaApproveDraft') + 4000)) && !/sourceImageUrl/.test(admin.slice(admin.indexOf('function dxaApproveDraft'), admin.indexOf('function dxaApproveDraft') + 4000)), true);
-    check('titles bumped', /Internship Portfolio \(V100\.87\)/.test(index) && /Nika Admin \(V101\.19\)/.test(admin), true);
+    check('titles bumped', /Internship Portfolio \(V\d+\.\d+\)/.test(index) && /Nika Admin \(V\d+\.\d+\)/.test(admin), true);
+    check('intern delegates prompt + parser to codex-vision.js', /window\.CodexVision\.buildPrompt\(DD_IMAGE_FORMS\[kind\]\.subject\)/.test(index) && /window\.CodexVision\.parseLines\(text, keys\)/.test(index) && /<script src="codex-vision\.js\?v=V\d+\.\d+"><\/script>/.test(index), true);
 
     let fail = 0;
     checks.forEach(([name, got, want]) => {

@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V100.87)</title>
+    <title>Internship Portfolio (V100.88)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -6362,6 +6362,7 @@
     <script src="taxonomy.js?v=V94.55"></script>
     <!-- V94.22: cache-busting on case-taxonomy.js so browser refetches when shim changes (script URL is otherwise constant) -->
     <script src="case-taxonomy.js?v=V94.53"></script>
+    <script src="codex-vision.js?v=V100.88"></script>
     <!-- V94.29 fix: walker now skips q-text-preview / md-render / lang-no-toggle subtrees so user content (markdown previews, quiz content) displays as-typed -->
     <script src="lang-toggle.js?v=V97.44"></script>
 
@@ -17119,64 +17120,18 @@
         // (sourceImageUrl / sourceImagePath) so the admin can check the source; it
         // is never copied to the published codex doc.
         const DD_IMAGE_FORMS = {
-            dx: {
-                subject: 'disease', feature: 'intern_disease_vision', notes: 'dx-s-internNotes',
-                fields: { NAME_EN: 'dx-s-diseaseName', NAME_TH: 'dx-s-thaiName', ICD10: 'dx-s-icd10', CATEGORY: 'dx-s-category', SYMPTOMS: 'dx-s-symptoms', DIAGNOSIS: 'dx-s-diagnosis', TREATMENT: 'dx-s-treatment' },
-                lines: [
-                    'NAME_EN: <disease name in English, or ->',
-                    'NAME_TH: <Thai name, or ->',
-                    'ICD10: <ICD-10 code ONLY if it is printed in the image, otherwise ->',
-                    'CATEGORY: <disease group or specialty, or ->',
-                    'SYMPTOMS: <presenting symptoms on ONE line, items separated by ; or ->',
-                    'DIAGNOSIS: <diagnostic criteria / investigations on ONE line, ; separated, or ->',
-                    'TREATMENT: <management / treatment on ONE line, ; separated, or ->'
-                ],
-                state: () => dxSubmitState
-            },
-            dc: {
-                subject: 'drug', feature: 'intern_drug_vision', notes: 'dc-s-internNotes',
-                fields: { GENERIC: 'dc-s-genericName', BRANDS: 'dc-s-brandNames', ATC: 'dc-s-atcCode', CLASS: 'dc-s-class', INDICATION: 'dc-s-indication', DOSING: 'dc-s-dosing', SIDE_EFFECTS: 'dc-s-sideEffects' },
-                lines: [
-                    'GENERIC: <generic name, or ->',
-                    'BRANDS: <brand names separated by commas, or ->',
-                    'ATC: <ATC code ONLY if it is printed in the image, otherwise ->',
-                    'CLASS: <drug class, or ->',
-                    'INDICATION: <indications on ONE line, ; separated, or ->',
-                    'DOSING: <dosing on ONE line exactly as printed, ; separated, or ->',
-                    'SIDE_EFFECTS: <side effects on ONE line, ; separated, or ->'
-                ],
-                state: () => dcSubmitState
-            }
+            dx: { subject: 'disease', feature: 'intern_disease_vision', notes: 'dx-s-internNotes', fields: {}, state: () => dxSubmitState },
+            dc: { subject: 'drug', feature: 'intern_drug_vision', notes: 'dc-s-internNotes', fields: {}, state: () => dcSubmitState }
         };
-        function ddBuildVisionPrompt(kind) {
+        // V100.88: reply keys, prompt and parser live in codex-vision.js (shared with the
+        // admin review "Re-extract"); the form ids follow the codex field names.
+        Object.keys(DD_IMAGE_FORMS).forEach(kind => {
             const f = DD_IMAGE_FORMS[kind];
-            return 'You are reading an image about a ' + f.subject + ' (infographic, textbook page, package or label). Extract ONLY what is visible in the image. '
-                + 'Reply with exactly these lines, one per line, in this order, and nothing else:\n'
-                + f.lines.join('\n') + '\n'
-                + 'UNSURE: <anything unreadable or uncertain, or ->\n'
-                + 'Write - when the image does not show it. Never invent codes, doses or facts. Keep the language of the image (Thai stays Thai, English stays English).';
-        }
-        // First occurrence of each KEY wins; lines without a key continue the previous
-        // value (models wrap long fields). "-" / empty = not in the image → null.
-        function ddParseVisionLines(text, keys) {
-            const out = {}; keys.forEach(k => { out[k] = null; }); out.UNSURE = null;
-            const known = new Set(keys.concat(['UNSURE']));
-            let current = null; const buf = {};
-            String(text || '').replace(/```[a-zA-Z]*/g, '').split(/\r?\n/).forEach(line => {
-                const m = line.match(/^\s*[*\-•]?\s*([A-Z0-9_]+)\s*:\s*(.*)$/); // keys like ICD10 carry digits
-                if (m && known.has(m[1])) {
-                    if (buf[m[1]] !== undefined) { current = null; return; } // repeat → ignore
-                    current = m[1]; buf[current] = m[2];
-                } else if (current && line.trim()) {
-                    buf[current] += ' ' + line.trim();
-                }
-            });
-            Object.keys(buf).forEach(k => {
-                const v = buf[k].replace(/\s+/g, ' ').trim().replace(/^[-–—]+$/, '');
-                out[k] = v && v !== '-' ? v : null;
-            });
-            return out;
-        }
+            const keys = window.CodexVision.specs[f.subject].keys;
+            Object.keys(keys).forEach(k => { f.fields[k] = kind + '-s-' + keys[k]; });
+        });
+        function ddBuildVisionPrompt(kind) { return window.CodexVision.buildPrompt(DD_IMAGE_FORMS[kind].subject); }
+        function ddParseVisionLines(text, keys) { return window.CodexVision.parseLines(text, keys); }
         // Fill only empty fields; highlight them until the intern edits; return what was filled.
         function ddApplyVisionFields(kind, parsed) {
             const f = DD_IMAGE_FORMS[kind]; const filled = [];
