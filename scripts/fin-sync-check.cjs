@@ -179,7 +179,12 @@ fin.finState.month = '2026-09';   // finOpen() normally sets this; the mutators 
     check('11d. every save schedules a push', /function finSave\(d\) \{ if \(finSaveLocal\(d\)\) finQueueSync\(\); \}/.test(index), true);
     check('11e. the sync pill is in the modal head', /id="fin-sync" onclick="finSync\(\)"/.test(index), true);
     check('11f. window.finSync is exported', /window\.finSync = finSync;/.test(index), true);
-    check('11g. version bumped', /<title>Internship Portfolio \(V100\.89\)<\/title>/.test(index), true);
+    // Not pinned to a version number — only that the title carries one (see #1336).
+    check('11g. intern version present', /<title>Internship Portfolio \(V\d+\.\d+\)<\/title>/.test(index), true);
+    // The row's .ic bubble already shows the emoji; writing e.cat out beside it doubled it.
+    const row = index.slice(index.indexOf('<div class="fin-item"><span class="ic">'));
+    check('11h. item row never prints the raw category beside the icon', /finEsc\(e\.cat\)/.test(row.slice(0, 1200)), false);
+    check('11i. finCatName strips the emoji', /function finCatName\(c\)/.test(index), true);
 
     let bad = 0;
     for (const [name, got, want] of checks) {

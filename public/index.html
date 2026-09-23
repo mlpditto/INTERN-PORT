@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V100.89)</title>
+    <title>Internship Portfolio (V100.90)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -19005,6 +19005,9 @@
         function finFmt(n) { const v = Math.round((Number(n) || 0) * 100) / 100; return '฿ ' + v.toLocaleString('en-US', Number.isInteger(v) ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
         function finRound(v) { return Math.round(v * 100) / 100; }
         function finEsc(t) { return String(t || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+        // V100.90: the item row already shows the emoji in its .ic bubble, so anywhere the
+        // category is written out beside it drops the emoji and keeps just the word.
+        function finCatName(c) { return String(c || '').slice(String(c || '').indexOf(' ') + 1); }
         function finMonthLabel(ym) { const [y, m] = ym.split('-').map(Number); return new Date(y, m - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' }); }
         function finDaysIn(ym) { const [y, m] = ym.split('-').map(Number); return new Date(y, m, 0).getDate(); }
         function finDayKey(ym, d) { return ym + '-' + String(d).padStart(2, '0'); }
@@ -19259,7 +19262,7 @@
                         <div class="fin-lbl" style="margin-bottom:4px;">Today's items</div>
                         ${items.length ? items.map(e => finState.editId === e.id
                             ? `<div class="fin-item editing"><span class="ic">${e.cat.split(' ')[0]}</span><input id="fin-edit-time" class="fin-note fin-time" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" title="24 h · e.g. 17:45" value="${new Date(e.ts).toTimeString().slice(0, 5)}" onkeydown="if(event.key==='Enter'){event.preventDefault();finSaveItem('${e.id}')}"><input id="fin-edit-note" class="fin-note" maxlength="80" value="${finEsc(e.note)}" placeholder="Note · ข้าวเที่ยง, BTS..." onkeydown="if(event.key==='Enter'){event.preventDefault();finSaveItem('${e.id}')}" style="margin:0; flex:1; min-width:0;"><button type="button" class="fin-btn sm" onclick="finSaveItem('${e.id}')">Save</button><div class="fin-cats">${FIN_CATS.map(c => `<button type="button" class="fin-cat${c === finState.editCat ? ' on' : ''}" data-cat="${c}" onclick="finPickEditCat(this)">${c}</button>`).join('')}</div></div>`
-                            : `<div class="fin-item"><span class="ic">${e.cat.split(' ')[0]}</span><span class="n" role="button" tabindex="0" title="Tap to edit note / time" onclick="finEditItem('${e.id}')">${e.note ? finEsc(e.note) : `<span class="fin-muted">${finEsc(e.cat.slice(e.cat.indexOf(' ') + 1))} · ✎ add note</span>`}<small>${new Date(e.ts).toTimeString().slice(0, 5)} · ${finEsc(e.cat)}</small></span><span class="a">${finFmt(e.amount)}</span><button type="button" class="del" onclick="finDel('${e.id}')" aria-label="Delete">✕</button></div>`).join('') : '<div class="fin-muted">Nothing yet today.</div>'}
+                            : `<div class="fin-item"><span class="ic">${e.cat.split(' ')[0]}</span><span class="n" role="button" tabindex="0" title="Tap to edit note / time" onclick="finEditItem('${e.id}')">${e.note ? finEsc(e.note) : `<span class="fin-muted">${finEsc(finCatName(e.cat))} · ✎ add note</span>`}<small>${new Date(e.ts).toTimeString().slice(0, 5)} · ${finEsc(finCatName(e.cat))}</small></span><span class="a">${finFmt(e.amount)}</span><button type="button" class="del" onclick="finDel('${e.id}')" aria-label="Delete">✕</button></div>`).join('') : '<div class="fin-muted">Nothing yet today.</div>'}
                     </div>`;
                 const editEl = document.getElementById('fin-edit-note'); if (editEl) editEl.focus();
                 const amt = document.getElementById('fin-amt'); if (amt && items.length === 0 && !editEl) amt.focus();
