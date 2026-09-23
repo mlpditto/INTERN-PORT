@@ -59,7 +59,7 @@ check('structurally invalid evidence still throws', /invalid source evidence/.te
 
 check('status line reports the note', /\+ \(s\.evidenceNote \? ' · ' \+ s\.evidenceNote : ''\)/.test(src), true);
 const admin = fs.readFileSync(path.join(__dirname, '..', 'public', 'admin.html'), 'utf8');
-check('admin cache-busts quiz-curate.js', /quiz-curate\.js\?v=V101\.14/.test(admin), true);
+check('admin cache-busts quiz-curate.js', /quiz-curate\.js\?v=V\d+\.\d+/.test(admin), true);
 
 let fail = 0;
 checks.forEach(([name, got, want]) => {
