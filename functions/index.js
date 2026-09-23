@@ -1069,11 +1069,19 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 Math.max(Number(generationOptions && generationOptions.maxOutputTokens) || 8192, 1024),
                 32768
             );
+            // V101.28: DeepSeek V4.x / Qwen 3.8 are hybrid-thinking models and OpenRouter
+            // lets them reason at will when no `reasoning` is sent. Reasoning tokens count
+            // against max_tokens, so Quiz Compare (answer ≈ 10 tokens) burned the whole
+            // 8192 cap thinking and came back `finish_reason: length` with empty content —
+            // twice, ~60s each (functions:log 2026-09-23 17:18/17:19). effort "low" = ~20%
+            // of max_tokens for thinking, same setting modern-ai.js gives OpenAI/Anthropic.
+            const orReasoningCapable = !isImageRequest && /^(deepseek|qwen)\//i.test(orModel);
             const body = {
                 model: orModel,
                 messages: [{ role: "user", content: tailoredPrompt }],
                 ...(isJson ? { response_format: { type: "json_object" } } : {}),
                 ...(isImageRequest ? { modalities: ["image", "text"] } : {}),
+                ...(orReasoningCapable ? { reasoning: { effort: "low", exclude: true } } : {}),
                 temperature: 0.7,
                 max_tokens: orMaxTokens
             };
@@ -1116,6 +1124,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             let orText = orChoice.message?.content || "";
             const orFinish = orChoice.finish_reason || null;
             const orOut = response.data.usage?.completion_tokens ?? null;
+            const orThink = response.data.usage?.completion_tokens_details?.reasoning_tokens ?? null;
             let orJsonValid = null;
             if (isJson) {
                 const cleaned = extractJson(orText);
@@ -1127,7 +1136,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                     : orFinish === "content_filter" ? "stopped by the provider's content filter"
                     : !String(orText).trim() ? "empty text" : "text is not valid JSON";
                 const head = String(orText || "").replace(/\s+/g, " ").slice(0, 200);
-                const error = `Model returned incomplete or invalid output. ${orModel}: ${why}; ${orOut ?? "?"} output tokens.${head ? ` Starts: ${head}` : ""}`;
+                const error = `Model returned incomplete or invalid output. ${orModel}: ${why}; ${orOut ?? "?"} output tokens${orThink !== null ? ` (${orThink} reasoning)` : ""}.${head ? ` Starts: ${head}` : ""}`;
                 console.error(`[openrouter] ${error}`);
                 return res.status(502).json({ error, finishReason: orFinish, jsonValid: orJsonValid, requestedModel: orModel });
             }
@@ -1136,7 +1145,10 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 tokens: response.data.usage?.total_tokens || 0,
                 model: orModel,
                 finishReason: orFinish,
-                jsonValid: orJsonValid
+                jsonValid: orJsonValid,
+                // V101.28: same shape as modern-ai.js so ai_usage gets in/out split for OpenRouter too.
+                usage: { inputTokens: response.data.usage?.prompt_tokens ?? null, outputTokens: orOut,
+                    thinkingTokens: orThink, totalTokens: response.data.usage?.total_tokens ?? null }
             });
         }
 
