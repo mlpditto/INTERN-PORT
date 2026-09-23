@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V100.84)</title>
+    <title>Internship Portfolio (V100.85)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9588,7 +9588,7 @@
 
             // V96.25: q.tags folded in — admin's own category chips (e.g. "Women's Health")
             // are free-text tags, and titles alone don't always carry the matching keyword.
-            const haystack = `${String(q.title || '')} ${String(q.shortTitle || '')} ${String(q.description || '')} ${String(q.tags || '')}`;
+            const haystack = `${String(q.title || '')} ${String(q.shortTitle || '')} ${String(q.description || '')} ${quizTagsCsv(q)}`; // V100.85
 
             // V97.37: a quiz matching THREE OR MORE body-system rules is not "about"
             // any one of them, and picking the first match just returns whichever rule
@@ -10795,14 +10795,24 @@
 
         // V100.84: tag filter for Browse. Key = lowercased tag; label = the spelling
         // used most often. Marker tags (AI_*, PharmCamp) are not topics and never show.
+        // V100.85: one reader for quiz tags, mirroring admin's quizTagList. The CSV
+        // `tags` wins while present; array-only docs fall back to `tagList`.
+        function quizTagList(q) {
+            const split = s => String(s || '').split(',').map(function (t) { return t.trim().replace(/\s+/g, ' '); }).filter(Boolean);
+            if (!q) return [];
+            if (typeof q.tags === 'string' && q.tags.trim()) return split(q.tags);
+            if (Array.isArray(q.tagList)) return q.tagList.map(function (t) { return String(t || '').trim().replace(/\s+/g, ' '); }).filter(Boolean);
+            return split(q.tags);
+        }
+        function quizTagsCsv(q) { return quizTagList(q).join(', '); }
+
         let qbTagFilter = '';
         const QB_MARKER_TAG = /^(ai_variant|ai_from_case|pharmcamp)$/i;
         function qbTagIndex(items) {
             const idx = new Map(); // key -> { forms: Map<raw, count>, count }
             (items || []).forEach(function (q) {
                 const seen = new Set();
-                String((q && q.tags) || '').split(',').forEach(function (t) {
-                    const raw = t.trim();
+                quizTagList(q).forEach(function (raw) { // V100.85
                     const key = raw.toLowerCase();
                     if (!raw || seen.has(key) || QB_MARKER_TAG.test(raw)) return;
                     seen.add(key);
@@ -10834,7 +10844,7 @@
             qbRenderList();
         }
         function qbRowTagsHtml(q) {
-            const tags = String((q && q.tags) || '').split(',').map(function (t) { return t.trim(); }).filter(function (t) { return t && !QB_MARKER_TAG.test(t); });
+            const tags = quizTagList(q).filter(function (t) { return !QB_MARKER_TAG.test(t); }); // V100.85
             if (!tags.length) return '';
             const shown = tags.slice(0, 3).map(function (t) { return qbTagChip(t.toLowerCase(), '#' + t, null); }).join('');
             const more = tags.length > 3 ? '<span class="qb-tag" style="cursor:default; border-style:dashed;">+' + (tags.length - 3) + '</span>' : '';
@@ -10854,9 +10864,9 @@
             });
             const matched = items.filter(function (q) {
                 // V100.84: tag chip filter, exact tag (case-insensitive), AND with the search box.
-                if (qbTagFilter && !String(q.tags || '').split(',').some(function (t) { return t.trim().toLowerCase() === qbTagFilter; })) return false;
+                if (qbTagFilter && !quizTagList(q).some(function (t) { return t.toLowerCase() === qbTagFilter; })) return false;
                 if (!term) return true;
-                const hay = [q.title, q.shortTitle, q.tags, q.targetGroup, q.description].filter(Boolean).join(' ').toLowerCase();
+                const hay = [q.title, q.shortTitle, quizTagsCsv(q), q.targetGroup, q.description].filter(Boolean).join(' ').toLowerCase();
                 return hay.indexOf(term) !== -1;
             });
             matched.sort(function (a, b) { return String(a.title || '').localeCompare(String(b.title || '')); });
@@ -10975,7 +10985,7 @@
         // subtle left-border color — no palette to maintain, and free-text tags
         // still group visually. Uncategorized → neutral slate.
         function qbCategoryColor(q) {
-            const raw = (q && q.tags ? String(q.tags).split(',')[0] : '') || (q && q.targetGroup) || '';
+            const raw = quizTagList(q)[0] || (q && q.targetGroup) || ''; // V100.85
             const cat = raw.trim().toLowerCase();
             if (!cat) return '#cbd5e1';
             let h = 0;
@@ -12988,8 +12998,8 @@
             const counts = {};
             const labels = {};
             (quizzesCache || []).forEach(q => {
-                if (!q || !q.tags) return;
-                String(q.tags).split(',').map(t => t.trim()).filter(Boolean).forEach(t => {
+                if (!q) return;
+                quizTagList(q).forEach(t => { // V100.85
                     if (FB_TOPIC_TAG_DENYLIST.has(t)) return;
                     const key = t.toLocaleLowerCase();
                     counts[key] = (counts[key] || 0) + 1;

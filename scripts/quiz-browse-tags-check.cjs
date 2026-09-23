@@ -11,7 +11,7 @@ function slice(startMarker, endMarker) {
     if (a < 0 || b < 0) { console.error(`marker not found: ${startMarker}`); process.exit(1); }
     return html.slice(a, b);
 }
-const listSrc = slice("        let qbTagFilter = '';", "        // V95.97: a material's display name.");
+const listSrc = slice('        function quizTagList(q) {', "        // V95.97: a material's display name."); // V100.85: starts at the shared reader
 const rowSrc = slice('        function qbCategoryColor(q) {', '        async function qbRequestQuiz(quizId) {');
 
 const els = {};
