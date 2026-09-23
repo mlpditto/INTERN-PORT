@@ -11,8 +11,10 @@ const start = html.indexOf('window.computeQuizTagHygiene = function');
 const end = html.indexOf('\n        };\n', start);
 if (start < 0 || end < 0) { console.error('computeQuizTagHygiene not found in admin.html'); process.exit(1); }
 const src = html.slice(start, end + '\n        };'.length);
+// V101.15: computeQuizTagHygiene reads through window.quizTagList — load the real reader too.
+const readerSrc = html.slice(html.indexOf('        const splitTagCsv = s =>'), html.indexOf('        window.isQuizMarkerTag = t =>'));
 const window = {};
-new Function('window', src)(window);
+new Function('window', readerSrc + '\n' + src)(window);
 
 const quizzes = [
     { id: 'A', tags: 'Headache, Pharmacotherapy, headache' },          // case variant inside one quiz

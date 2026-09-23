@@ -32,7 +32,9 @@ const ctx = {
     console
 };
 const names = Object.keys(ctx);
-const api = new Function(...names, admin.slice(a, b) + '\nreturn { lptEditorScanCustomTags };')(...names.map(n => ctx[n]));
+// V101.15: the scan reads through window.quizTagList / questionTagList — load the real reader.
+const readerSrc = admin.slice(admin.indexOf('        const splitTagCsv = s =>'), admin.indexOf('        window.isQuizMarkerTag = t =>'));
+const api = new Function(...names, readerSrc + '\n' + admin.slice(a, b) + '\nreturn { lptEditorScanCustomTags };')(...names.map(n => ctx[n]));
 
 const checks = [];
 const check = (name, got, want) => checks.push([name, got, want]);

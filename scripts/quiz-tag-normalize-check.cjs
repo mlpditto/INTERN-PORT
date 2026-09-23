@@ -14,7 +14,8 @@ function slice(startMarker, endMarker) {
     if (a < 0 || b < 0) { console.error(`marker not found: ${startMarker} … ${endMarker}`); process.exit(1); }
     return html.slice(a, b);
 }
-const hygieneSrc = slice('window.computeQuizTagHygiene = function', '\n        };\n') + '\n        };';
+const readerSrc = slice('        const splitTagCsv = s =>', '        window.isQuizMarkerTag = t =>'); // V101.15
+const hygieneSrc = readerSrc + '\n' + slice('window.computeQuizTagHygiene = function', '\n        };\n') + '\n        };';
 const editorSrc = slice('        const QUIZ_TAG_MAX = 20;', '        window.regenerateSingleAiSuggestion = async function');
 
 const els = {};

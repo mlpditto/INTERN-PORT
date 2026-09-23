@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.14)</title>
+    <title>Nika Admin (V101.15)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -18555,6 +18555,7 @@ RULES:
                     shortTitle: (result.shortTitle || `CASE-${(caseItem.caseId || caseId).toString().slice(0, 14)}`).slice(0, 32),
                     description: result.description || `Generated from Alabasta case ${caseItem.caseId || caseId}`,
                     tags: '',
+                    tagList: [], // V101.15
                     source: 'ai_from_case', // V101.10: provenance is a field, not a tag
                     quizType: 'case_study',
                     caseContent: result.redactedCaseContent || note,
@@ -22433,12 +22434,12 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             if (document.getElementById('quiz-eb-beri')) document.getElementById('quiz-eb-beri').value = (typeof q.earlyBirdBeriFirst === 'number') ? q.earlyBirdBeriFirst : '';
             if (document.getElementById('quiz-db-beri')) document.getElementById('quiz-db-beri').value = (typeof q.deadlineBeriMax === 'number') ? q.deadlineBeriMax : '';
             document.getElementById('quiz-description').value = q.description || "";
-            document.getElementById('quiz-tags').value = q.tags || "";
+            document.getElementById('quiz-tags').value = window.quizTagsCsv(q); // V101.15
             window.populateQuizSystemSelect(window.quizSystemValueFromDoc(q)); // V101.08
             // V101.10: legacy markers leave the tag list on load; field first, tag as fallback.
             const legacyMarkers = window.quizLegacyMarkers(q);
             window._quizEditorLegacySource = q.source ? '' : legacyMarkers.source;
-            if (legacyMarkers.found) { document.getElementById('quiz-tags').value = window.stripQuizMarkerTags(q.tags).join(', '); refreshTagChips(); }
+            if (legacyMarkers.found) { document.getElementById('quiz-tags').value = window.stripQuizMarkerTags(window.quizTagList(q)).join(', '); refreshTagChips(); }
             window.populateQuizCampaignChips(q.campaign || legacyMarkers.campaign);
             quizResourceCards.load(q.materials);
             refreshTagChips();
@@ -22886,6 +22887,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const feedbackLimit = parseInt(document.getElementById('quiz-feedback-limit').value) || 280;
             const caseContent = document.getElementById('quiz-case-content').value;
             const tags = window.normalizeQuizTagList(window.stripQuizMarkerTags(document.getElementById('quiz-tags').value)).join(', '); // V101.07 normalise; V101.10 markers never re-enter tags
+            const tagList = window.quizTagList({ tags }); // V101.15: array mirror, always derived from the CSV
             const materials = quizResourceCards.read();
 
             // V93.87 Quiz Quality Q1: read blueprint, build only if any field set.
@@ -22949,7 +22951,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const deadlineBeriMax = (_dbV && _dbV.value !== '') ? Math.max(0, parseInt(_dbV.value, 10) || 0) : null;
 
             return {
-                title, shortTitle, targetGroup, unlockScore, description, tags, materials, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, partialCredit, notifyGroup, quizType, feedbackLimit, caseContent, questions, blueprint,
+                title, shortTitle, targetGroup, unlockScore, description, tags, tagList, materials, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, partialCredit, notifyGroup, quizType, feedbackLimit, caseContent, questions, blueprint,
                 earlyBirdBeriFirst, deadlineBeriMax, coverUrl: QuizCover.value(),
                 startTime: document.getElementById('quiz-start-time').value,
                 deadline: document.getElementById('quiz-deadline').value
@@ -25597,7 +25599,7 @@ ${JSON.stringify(sourceObj)}`;
             let rows = window._qtBackfillCandidates.slice();
             if (q) {
                 rows = rows.filter(r => {
-                    const haystack = ((r.title || '') + ' ' + (r.shortTitle || '') + ' ' + (r.tags || '')).toLowerCase();
+                    const haystack = ((r.title || '') + ' ' + (r.shortTitle || '') + ' ' + window.quizTagsCsv(r)).toLowerCase();
                     return haystack.includes(q);
                 });
             }
@@ -25739,6 +25741,7 @@ ${JSON.stringify(sourceObj)}`;
                 unlockScore: formData.unlockScore || 0, // V95.15: score gate (0 = no gate)
                 description: formData.description,
                 tags: formData.tags || "",
+                tagList: Array.isArray(formData.tagList) ? formData.tagList : [], // V101.15
                 materials: Array.isArray(formData.materials) ? formData.materials : [],
                 totalPoints: formData.totalPoints,
                 isPoll: formData.isPoll,
@@ -30263,14 +30266,13 @@ ${JSON.stringify(sourceObj)}`;
         // Quiz-level tags only; per-question tags are counted separately, not merged.
         // On window so the harness (scripts/quiz-tag-hygiene-check.cjs) runs the real code.
         window.computeQuizTagHygiene = function (quizzes) {
-            const split = s => String(s || '').split(',').map(t => t.trim().replace(/\s+/g, ' ')).filter(Boolean);
             const byKey = new Map(); // key -> { forms: Map<raw, count>, quizIds: Set }
             const perQuestionKeys = new Set();
             let considered = 0, tagged = 0, untagged = 0;
             (quizzes || []).forEach(q => {
                 if (!q || q.isHistoryRevision) return;
                 considered++;
-                const tags = split(q.tags);
+                const tags = window.quizTagList(q); // V101.15
                 if (tags.length) tagged++; else untagged++;
                 const seen = new Set();
                 tags.forEach(raw => {
@@ -30280,7 +30282,7 @@ ${JSON.stringify(sourceObj)}`;
                     if (!seen.has(key)) { e.quizIds.add(q.id || considered); seen.add(key); }
                     byKey.set(key, e);
                 });
-                (Array.isArray(q.questions) ? q.questions : []).forEach(qq => split(qq && qq.tags).forEach(raw => perQuestionKeys.add(raw.toLowerCase())));
+                (Array.isArray(q.questions) ? q.questions : []).forEach(qq => window.questionTagList(qq).forEach(raw => perQuestionKeys.add(raw.toLowerCase())));
             });
             const fold = key => { const f = key.replace(/[^a-z0-9\u0E00-\u0E7F]/g, ''); return f.length > 3 && f.endsWith('s') ? f.slice(0, -1) : f; };
             const entries = [...byKey.entries()].map(([key, e]) => ({
@@ -30323,6 +30325,7 @@ ${JSON.stringify(sourceObj)}`;
             const cap = (list, n) => list.length > n ? `<p><small>Showing ${n} of ${list.length}.</small></p>` : '';
             const none = '<p>None.</p>';
             const legacyCount = (Array.isArray(quizzesData) ? quizzesData : []).filter(q => !q.isHistoryRevision && window.quizLegacyMarkers(q).found).length; // V101.10
+            const mirrorTodo = window.quizTagListBackfillTodo(); // V101.15
             body.innerHTML = `<div class="tag-hyg-grid">
                 <div class="tag-hyg-card"><h5>Overview</h5>
                     <p>${h.considered} quizzes · ${h.tagged} tagged · ${h.untagged} without tags · ${h.distinct} distinct tags (case-insensitive).</p>
@@ -30341,6 +30344,9 @@ ${JSON.stringify(sourceObj)}`;
                     <p>AI_VARIANT / AI_FROM_CASE / PharmCamp now live in the <code>source</code> / <code>campaign</code> fields. Quizzes still carrying them as tags: ${legacyCount}.</p>
                     ${h.markers.length ? chips(h.markers) : none}
                     ${legacyCount ? `<p><button type="button" onclick="migrateQuizMarkerTags()" style="width:auto; min-height:0; padding:5px 12px; border-radius:999px; border:1.5px solid #4361ee; background:#4361ee; color:#fff; font-size:0.9em; font-weight:800; cursor:pointer;">Move to fields · ${legacyCount} quiz${legacyCount === 1 ? '' : 'zes'}</button></p>` : ''}</div>
+                <div class="tag-hyg-card"><h5>Array mirror · ${mirrorTodo.length} to write</h5>
+                    <p>Every save now writes <code>tagList</code> (array) next to the <code>tags</code> text. Quizzes whose mirror is missing or out of date: ${mirrorTodo.length}. Readers still use the text until every quiz has a mirror.</p>
+                    ${mirrorTodo.length ? `<p><button type="button" onclick="backfillQuizTagList()" style="width:auto; min-height:0; padding:5px 12px; border-radius:999px; border:1.5px solid #4361ee; background:#4361ee; color:#fff; font-size:0.9em; font-weight:800; cursor:pointer;">Write tagList · ${mirrorTodo.length} quiz${mirrorTodo.length === 1 ? '' : 'zes'}</button></p>` : '<p>All quizzes carry a mirror.</p>'}</div>
             </div>`;
         };
 
@@ -30404,7 +30410,7 @@ ${JSON.stringify(sourceObj)}`;
                 if (!searchVal) return true;
                 return (q.title || "").toLowerCase().includes(searchVal)
                     || (q.shortTitle || "").toLowerCase().includes(searchVal)
-                    || (q.tags || "").toLowerCase().includes(searchVal);
+                    || window.quizTagsCsv(q).toLowerCase().includes(searchVal); // V101.15
             };
 
             quizzesData.forEach(q => {
@@ -30414,10 +30420,7 @@ ${JSON.stringify(sourceObj)}`;
 
                 // Collect tags for chips (from ALL quizzes regardless of filter, so admins can
                 // still discover tags in filtered states).
-                if (q.tags) q.tags.split(',').forEach(t => {
-                    const cleanT = t.trim();
-                    if (cleanT) allTags.add(cleanT);
-                });
+                window.quizTagList(q).forEach(t => allTags.add(t)); // V101.15
 
                 // V93.27: apply filter pill + global search to both lists.
                 if (!quizMatchesFilter(q)) return;
@@ -32890,9 +32893,9 @@ RULES:
                     if (ov === '__none') { buckets.__uncat.push(q); return; }
                     if (ov && buckets[ov]) { buckets[ov].push(q); return; }
                     const tagSet = new Set();
-                    const push = (str) => String(str || '').split(',').forEach(t => { const v = t.trim().toLowerCase(); if (v) tagSet.add(v); });
-                    push(q.tags);
-                    if (Array.isArray(q.questions)) q.questions.forEach(qq => push(qq && qq.tags));
+                    const push = (list) => list.forEach(t => { const v = t.toLowerCase(); if (v) tagSet.add(v); }); // V101.15: through the shared reader
+                    push(window.quizTagList(q));
+                    if (Array.isArray(q.questions)) q.questions.forEach(qq => push(window.questionTagList(qq)));
                     if (!tagSet.size) { buckets.__uncat.push(q); return; }
                     let matchedAny = false;
                     sysTokens.forEach(({ sys, tokens }) => {
@@ -33298,7 +33301,7 @@ RULES:
                             return `<div onclick="forceHideModal('quizCoverageModal'); openQuizModal('${q.id}');" style="display:flex; align-items:center; gap:8px; padding:10px 12px; border:${rowBorder}; border-radius:10px; margin-bottom:6px; cursor:pointer; background:${rowBg};${rowShadow}" onmouseover="this.style.background='${hl ? '#fef3c7' : '#f8fafc'}'" onmouseout="this.style.background='${rowBg}'">
                                 <div style="flex:1; min-width:0;">
                                     <div style="font-weight:700; color:#1e293b; font-size:0.9em;">${manual}${escapeHtml(q.title || '(untitled)')}</div>
-                                    ${q.tags ? `<div style="font-size:0.72em; color:#94a3b8; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(q.tags)}</div>` : ''}
+                                    ${window.quizTagsCsv(q) ? `<div style="font-size:0.72em; color:#94a3b8; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(window.quizTagsCsv(q))}</div>` : ''}
                                 </div>
                                 ${hlTag} ${lock} ${tmpl} ${statusBadge}
                                 ${picker}
@@ -38088,16 +38091,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const quizzes = (Array.isArray(quizzesData) ? quizzesData : []).filter(q => q && !q.isHistoryRevision);
                 quizzes.forEach(q => {
                     const seen = new Set();
-                    const add = csv => String(csv || '').split(',').forEach(t => {
-                        const raw = t.trim();
+                    const add = list => list.forEach(raw => { // V101.15: through the shared reader
                         if (!raw || (window.isQuizMarkerTag && window.isQuizMarkerTag(raw))) return;
                         const lower = raw.toLowerCase();
                         if (seen.has(lower)) return;
                         seen.add(lower);
                         bump(raw, 'quiz', '', q.id);
                     });
-                    add(q.tags);
-                    (Array.isArray(q.questions) ? q.questions : []).forEach(qq => add(qq && qq.tags));
+                    add(window.quizTagList(q));
+                    (Array.isArray(q.questions) ? q.questions : []).forEach(qq => add(window.questionTagList(qq)));
                 });
                 const results = Array.from(tagMap.values()).sort((a, b) => b.count - a.count || b.users.size - a.users.size || a.display.localeCompare(b.display));
                 window._lptDiscoverResults = results;
@@ -49587,9 +49589,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const manualCorrect = att.manualCorrect || {};
                 const gradedAnswers = att.gradedAnswers || {};
                 const answers = att.answers || [];
-                const quizFallbackRaw = qData.tags ? String(qData.tags).trim() : '';
+                const quizFallbackRaw = window.quizTagsCsv(qData);
                 qData.questions.forEach((q, qi) => {
-                    const perQRaw = (q && q.tags) ? String(q.tags).trim() : '';
+                    const perQRaw = window.questionTagList(q).join(', ');
                     const tagStr = perQRaw || quizFallbackRaw;
                     if (!tagStr) return;
                     const tags = tagStr.split(',').map(t => t.trim()).filter(Boolean);
@@ -49683,10 +49685,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const manualCorrect = att.manualCorrect || {};
                     const gradedAnswers = att.gradedAnswers || {};
                     const answers = att.answers || [];
-                    const quizFallbackRaw = qData.tags ? String(qData.tags).trim() : '';
+                    const quizFallbackRaw = window.quizTagsCsv(qData);
 
                     qData.questions.forEach((q, qi) => {
-                        const perQRaw = (q && q.tags) ? String(q.tags).trim() : '';
+                        const perQRaw = window.questionTagList(q).join(', ');
                         const tagStr = perQRaw || quizFallbackRaw;
                         if (!tagStr) return;
                         const tags = tagStr.split(',').map(t => t.trim()).filter(Boolean);
@@ -50004,8 +50006,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         function questionMatchesGroup(q, qData, groupTags) {
-            const perQRaw = (q && q.tags) ? String(q.tags).trim() : '';
-            const quizFallbackRaw = qData && qData.tags ? String(qData.tags).trim() : '';
+            const perQRaw = window.questionTagList(q).join(', ');
+            const quizFallbackRaw = window.quizTagsCsv(qData);
             const tagStr = perQRaw || quizFallbackRaw;
             if (!tagStr) return false;
             const qTags = tagStr.split(',').map(t => t.trim()).filter(Boolean);
@@ -50074,8 +50076,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             (Array.isArray(quizzesData) ? quizzesData : []).forEach(qd => {
                 if (!qd) return;
                 const questions = Array.isArray(qd.questions) ? qd.questions : [];
-                const quizFallbackRaw = qd.tags ? String(qd.tags).trim() : '';
-                const hasAnyTag = questions.some(q => q && q.tags) || quizFallbackRaw;
+                const quizFallbackRaw = window.quizTagsCsv(qd);
+                const hasAnyTag = questions.some(q => window.questionTagList(q).length) || quizFallbackRaw;
                 if (!hasAnyTag) return;
 
                 let matchCount = 0;
@@ -50086,7 +50088,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     if (tags.some(t => groupTagSet.has(t))) matchCount = 1;
                 } else {
                     questions.forEach(q => {
-                        const perQRaw = (q && q.tags) ? String(q.tags).trim() : '';
+                        const perQRaw = window.questionTagList(q).join(', ');
                         const tagStr = perQRaw || quizFallbackRaw;
                         if (!tagStr) return;
                         const qTags = tagStr.split(',').map(t => t.trim()).filter(Boolean);
@@ -60768,7 +60770,21 @@ RULES:
         // ('ai_from_case' | 'ai_variant') and the bootcamp in `campaign` ('PharmCamp').
         // Readers take the field first and fall back to the legacy tag, so old docs keep
         // working until they are re-saved or migrated from the Tag hygiene panel.
-        window.quizTagList = q => String((q && q.tags) || '').split(',').map(t => t.trim()).filter(Boolean);
+        // V101.15: ONE reader for quiz tags. Docs carry `tags` (CSV string, source of
+        // truth today) and, since V101.15, a mirrored `tagList` array written on every
+        // save (+ the Tag hygiene backfill). Readers take the CSV while it exists, so an
+        // older writer that touches only `tags` can never be shadowed by a stale array;
+        // array-only docs (a future writer) fall back to `tagList`. Flip the preference
+        // here once every writer emits tagList and the backfill has run.
+        const splitTagCsv = s => String(s || '').split(',').map(t => t.trim().replace(/\s+/g, ' ')).filter(Boolean);
+        window.quizTagList = q => {
+            if (!q) return [];
+            if (typeof q.tags === 'string' && q.tags.trim()) return splitTagCsv(q.tags);
+            if (Array.isArray(q.tagList)) return q.tagList.map(t => String(t || '').trim().replace(/\s+/g, ' ')).filter(Boolean);
+            return splitTagCsv(q.tags);
+        };
+        window.questionTagList = qq => window.quizTagList(qq); // per-question tags: CSV only, no array mirror yet
+        window.quizTagsCsv = q => window.quizTagList(q).join(', ');
         window.isQuizMarkerTag = t => /^(ai_variant|ai_from_case|pharmcamp)$/i.test(String(t || '').trim());
         window.stripQuizMarkerTags = list => (Array.isArray(list) ? list : window.quizTagList({ tags: list })).filter(t => !window.isQuizMarkerTag(t));
         window.quizLegacyMarkers = function (q) {
@@ -60818,7 +60834,8 @@ RULES:
                     const slice = todo.slice(i, i + 400);
                     slice.forEach(q => {
                         const legacy = window.quizLegacyMarkers(q);
-                        const update = { tags: window.stripQuizMarkerTags(q.tags).join(', ') };
+                        const kept = window.stripQuizMarkerTags(window.quizTagList(q));
+                        const update = { tags: kept.join(', '), tagList: kept }; // V101.15: mirror rides along
                         if (legacy.source && !q.source) update.source = legacy.source;
                         if (legacy.campaign && !q.campaign) update.campaign = legacy.campaign;
                         batch.update(db.collection('quizzes').doc(q.id), update);
@@ -60829,6 +60846,31 @@ RULES:
                 if (typeof showToast === 'function') showToast(`✅ Moved markers on ${done} quiz(zes)`);
             } catch (e) {
                 alert(`Marker migration stopped after ${done} quiz(zes): ${e.message}`);
+            }
+        };
+
+        // V101.15: quizzes whose tagList is missing or differs from the CSV. The
+        // backfill writes ONLY tagList (never touches tags), 400 per batch.
+        window.quizTagListBackfillTodo = function () {
+            return (Array.isArray(quizzesData) ? quizzesData : []).filter(q => q && !q.isHistoryRevision && typeof q.tags === 'string'
+                && JSON.stringify(Array.isArray(q.tagList) ? q.tagList : null) !== JSON.stringify(window.quizTagList(q)));
+        };
+        window.backfillQuizTagList = async function () {
+            const todo = window.quizTagListBackfillTodo();
+            if (!todo.length) return;
+            if (!confirm(`Write tagList on ${todo.length} quiz(zes)? Only the array mirror is written; the tags text is untouched.`)) return;
+            let done = 0;
+            try {
+                for (let i = 0; i < todo.length; i += 400) {
+                    const batch = db.batch();
+                    const slice = todo.slice(i, i + 400);
+                    slice.forEach(q => batch.update(db.collection('quizzes').doc(q.id), { tagList: window.quizTagList(q) }));
+                    await batch.commit();
+                    done += slice.length;
+                }
+                if (typeof showToast === 'function') showToast(`✅ tagList written on ${done} quiz(zes)`);
+            } catch (e) {
+                alert(`tagList backfill stopped after ${done} quiz(zes): ${e.message}`);
             }
         };
 

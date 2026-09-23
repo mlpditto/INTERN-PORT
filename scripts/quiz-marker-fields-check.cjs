@@ -12,7 +12,7 @@ function slice(startMarker, endMarker) {
     if (a < 0 || b < 0) { console.error(`marker not found: ${startMarker}`); process.exit(1); }
     return admin.slice(a, b);
 }
-const helpers = slice('        window.quizTagList = q =>', '        const QUIZ_TAG_MAX = 20;');
+const helpers = slice('        const splitTagCsv = s =>', '        const QUIZ_TAG_MAX = 20;'); // V101.15: starts at the shared reader
 const dateRange = slice('        function pharmCampDateRange() {', '\n        }\n') + '\n        }\n';
 
 const DELETE = { sentinel: 'FieldValue.delete()' };
@@ -80,9 +80,9 @@ check('save (add): empty campaign writes nothing', j(w.quizSystemFieldsFromEdito
 // migration
 w.migrateQuizMarkerTags().then(() => {
     check('migrate: only docs with legacy markers, history skipped', writes.map(x => x.id).join(','), 'A,B,F');
-    check('migrate: A gets source, tags stripped', j(writes[0].data), '{"tags":"Headache","source":"ai_from_case"}');
-    check('migrate: B gets campaign, tags stripped', j(writes[1].data), '{"tags":"Fever","campaign":"PharmCamp"}');
-    check('migrate: F keeps its own campaign, only tags stripped', j(writes[2].data), '{"tags":""}');
+    check('migrate: A gets source, tags stripped, mirror written', j(writes[0].data), '{"tags":"Headache","tagList":["Headache"],"source":"ai_from_case"}');
+    check('migrate: B gets campaign, tags stripped, mirror written', j(writes[1].data), '{"tags":"Fever","tagList":["Fever"],"campaign":"PharmCamp"}');
+    check('migrate: F keeps its own campaign, only tags + mirror rewritten', j(writes[2].data), '{"tags":"","tagList":[]}');
     check('migrate: toast', toasts[toasts.length - 1], '✅ Moved markers on 3 quiz(zes)');
 
     // static wiring
