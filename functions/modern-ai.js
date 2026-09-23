@@ -10,6 +10,23 @@ function imagePart(vision) {
     return { data: raw.includes('base64,') ? raw.split('base64,')[1] : raw, mime };
 }
 
+// V101.09: the old check ran JSON.parse on the raw text, so a ```json fence or one
+// line of preamble failed the whole call with no reason attached, and nothing was
+// logged. Tolerate the same shapes the client's safeJsonParse does (fences, text
+// around the outermost object/array) and hand back the cleaned text.
+function extractJson(text) {
+    let s = String(text || '').trim();
+    if (s.includes('```')) s = s.replace(/```[a-zA-Z]*\s*/g, '').replace(/```/g, '').trim();
+    try { JSON.parse(s); return s; } catch (_) {}
+    const first = s.search(/[\[{]/);
+    if (first < 0) return null;
+    const close = s[first] === '{' ? '}' : ']';
+    const last = s.lastIndexOf(close);
+    if (last <= first) return null;
+    const inner = s.slice(first, last + 1);
+    try { JSON.parse(inner); return inner; } catch (_) { return null; }
+}
+
 async function runModernAI({ model, prompt, isJson, visionData, generationOptions }, post, env) {
     const config = registry.models.find(m => m.id === model);
     if (!config || !['responses', 'messages'].includes(config.adapter)) throw new Error('Unsupported modern model');
@@ -47,9 +64,20 @@ async function runModernAI({ model, prompt, isJson, visionData, generationOption
             totalTokens: (u.input_tokens || 0) + (u.output_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0) };
     }
     let jsonValid = false;
-    try { JSON.parse(text); jsonValid = true; } catch (_) {}
-    if (finishReason !== (config.adapter === 'responses' ? 'completed' : 'end_turn') || !text.trim() || (isJson && !jsonValid)) {
-        return { error: 'Model returned incomplete or invalid output.', jsonValid, finishReason };
+    const cleaned = extractJson(text);
+    if (cleaned !== null) { jsonValid = true; if (isJson) text = cleaned; }
+    const expectedFinish = config.adapter === 'responses' ? 'completed' : 'end_turn';
+    if (finishReason !== expectedFinish || !text.trim() || (isJson && !jsonValid)) {
+        // V101.09: say WHY, with the numbers the caller needs to act (which model,
+        // how it stopped, how much it wrote against the cap) and log it — this
+        // branch used to be silent and skipped ai_usage, so it was invisible.
+        const detail = config.adapter === 'responses' && data.incomplete_details && data.incomplete_details.reason ? ` (${data.incomplete_details.reason})` : '';
+        const why = finishReason !== expectedFinish ? `stopped with ${finishReason || 'no finish reason'}${detail}`
+            : !text.trim() ? 'empty text' : 'text is not valid JSON';
+        const head = String(text || '').replace(/\s+/g, ' ').slice(0, 200);
+        const error = `Model returned incomplete or invalid output. ${model}: ${why}; ${usage.outputTokens ?? '?'} output tokens of ${max}.${head ? ` Starts: ${head}` : ''}`;
+        console.error(`[modern-ai] ${error}`);
+        return { error, jsonValid, finishReason, usage, requestedModel: model };
     }
     return { text, model: data.model || model, requestedModel: model, tokens: usage.totalTokens || 0, usage,
         latencyMs: Date.now() - started, finishReason, jsonValid };

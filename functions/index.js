@@ -383,23 +383,35 @@ async function recordAiUsage(provider, model, tokens, isAdmin, feature, usage = 
 // 80s) stops one hung provider from eating the whole 300s function budget; 2 retries
 // keeps the worst case (~3×80s + backoff) safely under 300s.
 async function postWithRetry(url, data, config = {}) {
+    // V101.09: 2 retries in general, but a provider that fails FAST (503 "high
+    // demand" from AI Studio comes back in ~1s and hit Gemini 3.8 Flash five times
+    // on 2026-09-22/23) gets up to 4 — cheap to retry and usually clears within
+    // seconds. Slow failures keep the old budget so the function timeout is safe.
     const retries = 2;
+    const quickRetries = 4;
+    const quickMs = 15000;
     const baseDelayMs = 700;
     // 2026-08-18: was 80000, which is shorter than a legitimate full-quiz audit.
     // A 10-question analysis asks for up to 32768 output tokens and routinely runs
     // past 80s, so axios aborted it, the abort was retried as if it were a network
     // blip, and the model restarted from scratch — three times, none of which could
-    // beat the same clock. 240s sits under this function's own timeoutSeconds: 300
+    // beat the same clock. The ceiling sits under this function's own timeoutSeconds
     // so a real upstream stall still surfaces as an error instead of a killed
     // container. Fast providers are unaffected; this only moves the ceiling.
-    const cfg = { timeout: 240000, ...config };
+    // V101.09: 240s -> 500s (function 300s -> 540s, quiz analyzer client 280s -> 520s).
+    //   AI Curate writes 15-25k bilingual tokens per run; a 27-question run on
+    //   GPT 6 Astra died at the 300s Cloud Run cap on 2026-09-22 23:56 (log:
+    //   "reached the maximum request timeout"). Chain stays axios < client < function.
+    const cfg = { timeout: 500000, ...config };
     let lastErr;
-    for (let attempt = 0; attempt <= retries; attempt++) {
+    const started = Date.now();
+    for (let attempt = 0; attempt <= quickRetries; attempt++) {
         try {
             return await axios.post(url, data, cfg);
         } catch (err) {
             lastErr = err;
             const status = err && err.response && err.response.status;
+            const budget = (Date.now() - started) < quickMs ? quickRetries : retries;
             // Our own timeout is not a transient failure — the next attempt starts
             // the same generation from zero against the same deadline, so it burns
             // another full run of tokens and wall-clock to fail identically.
@@ -408,10 +420,12 @@ async function postWithRetry(url, data, config = {}) {
             const quotaExhausted = providerError?.type === 'insufficient_quota'
                 || ['insufficient_quota', 'credit_balance_exhausted'].includes(providerError?.code);
             const retryable = !ownTimeout && !quotaExhausted && (!status || status === 429 || (status >= 500 && status <= 599));
-            if (!retryable || attempt === retries) throw err;
+            if (!retryable || attempt >= budget) throw err;
             const retryAfter = Number(err && err.response && err.response.headers && err.response.headers["retry-after"]);
             const backoff = (retryAfter > 0 ? Math.min(retryAfter * 1000, 10000) : baseDelayMs * Math.pow(2, attempt)) + Math.floor(Math.random() * 250);
-            console.warn(`[AI retry] ${url} attempt ${attempt + 1} failed (${status || (err && err.code) || "network"}); retrying in ${backoff}ms`);
+            // V101.09: AI Studio URLs carry the API key as ?key= — never log it.
+            const safeUrl = String(url).replace(/([?&]key=)[^&]+/i, '$1[redacted]');
+            console.warn(`[AI retry] ${safeUrl} attempt ${attempt + 1} failed (${status || (err && err.code) || "network"}); retrying in ${backoff}ms`);
             await new Promise((r) => setTimeout(r, backoff));
         }
     }
@@ -521,7 +535,7 @@ exports.ndiBrandLookup = onRequest({ cors: true, timeoutSeconds: 60, memory: "25
  * 🤖 AI Proxy Function (V89.19)
  * Handles: Gemini, OpenAI, Anthropic, OpenRouter, AI Studio, ThaiLLM, Typhoon, Cloud TTS
  */
-exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY", "GEMINI_API_KEY", "TYPHOON_API_KEY", "THAILLM_API_KEY", "JEV_AI_API_KEY"], timeoutSeconds: 300, memory: "512MiB" }, async (req, res) => {
+exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY", "GEMINI_API_KEY", "TYPHOON_API_KEY", "THAILLM_API_KEY", "JEV_AI_API_KEY"], timeoutSeconds: 540, memory: "512MiB" }, async (req, res) => { // V101.09: 300 -> 540, see postWithRetry
     try {
         // 1. Auth: Firebase ID token (replaces the public x-mlp-secret gate).
         const decoded = await verifyIdTokenFromHeader(req, res);
