@@ -288,14 +288,24 @@ fin.finState.month = '2026-09';   // finOpen() normally sets this; the mutators 
     check('11ai. the Days card is one stats line', /<div class="fin-stats">/.test(month) && !/fin-kv/.test(month), true);
     // Both were only ever used by the cards this change removed.
     // V100.98: Month's month-control moved onto the header row; Plan keeps its own row.
+    // V100.99 made the row conditional on width too — see 11ar; what still has to hold is
+    // that the two containers are mutually exclusive on Month.
     check('11ak. Month shows the header control and hides its nav row',
-        /nav\.style\.display = finState\.tab === 'plan' \? 'flex' : 'none';/.test(index)
-        && /headNav\.style\.display = finState\.tab === 'month' \? 'flex' : 'none';/.test(index), true);
+        /headNav\.style\.display = monthInHeader \? 'flex' : 'none';/.test(index), true);
     check('11al. the header uses the short label — the full one does not fit', /finMonthShort\(finState\.month\)\);?\s*$/m.test(index) || /fin-head-month'\)\.textContent = finMonthShort/.test(index), true);
     check('11am. the arrow rule reaches both containers', /#finModal button\.fin-nav-arrow \{/.test(index), true);
     check('11an. the title cannot shrink-and-wrap (it did at 360px)', /#finModal \.fin-head h3 \{ white-space:nowrap; flex:0 0 auto; \}/.test(index), true);
     check('11ao. the header label truncates instead of breaking the row at 320px',
         /#finModal \.fin-head-nav b \{[^}]*text-overflow:ellipsis;/.test(index), true);
+    // V100.99: the month group owns the middle and centres in it; that also leaves no slack,
+    // so the pill's auto margin collapses and it parks against the ✕.
+    check('11ap. the month group takes the middle and centres itself',
+        /#finModal \.fin-head-nav \{ display:flex; flex:1; justify-content:center;/.test(index), true);
+    check('11aq. the pill keeps its auto margin for the tabs with no month group',
+        /#finModal \.fin-sync \{[^}]*margin:0 0 0 auto;/.test(index), true);
+    check('11ar. below 345px the month keeps its own row rather than losing the year',
+        /matchMedia\('\(max-width: 345px\)'\)\.matches/.test(index)
+        && /nav\.style\.display = \(finState\.tab === 'plan' \|\| \(finState\.tab === 'month' && !monthInHeader\)\)/.test(index), true);
     check('11aj. the orphaned .fin-card.hero and .fin-kv CSS is gone',
         /#finModal \.fin-card\.hero \{/.test(index) || /#finModal \.fin-kv \{/.test(index), false);
 
