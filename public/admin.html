@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.15)</title>
+    <title>Nika Admin (V101.16)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -30345,7 +30345,7 @@ ${JSON.stringify(sourceObj)}`;
                     ${h.markers.length ? chips(h.markers) : none}
                     ${legacyCount ? `<p><button type="button" onclick="migrateQuizMarkerTags()" style="width:auto; min-height:0; padding:5px 12px; border-radius:999px; border:1.5px solid #4361ee; background:#4361ee; color:#fff; font-size:0.9em; font-weight:800; cursor:pointer;">Move to fields · ${legacyCount} quiz${legacyCount === 1 ? '' : 'zes'}</button></p>` : ''}</div>
                 <div class="tag-hyg-card"><h5>Array mirror · ${mirrorTodo.length} to write</h5>
-                    <p>Every save now writes <code>tagList</code> (array) next to the <code>tags</code> text. Quizzes whose mirror is missing or out of date: ${mirrorTodo.length}. Readers still use the text until every quiz has a mirror.</p>
+                    <p>Every save writes <code>tagList</code> (array) next to the <code>tags</code> text, and readers now use the array when a quiz has one. Quizzes whose mirror is missing or differs from the text: ${mirrorTodo.length}. Missing → read from the text until written; differing → an outdated client wrote the text alone, rewrite from it.</p>
                     ${mirrorTodo.length ? `<p><button type="button" onclick="backfillQuizTagList()" style="width:auto; min-height:0; padding:5px 12px; border-radius:999px; border:1.5px solid #4361ee; background:#4361ee; color:#fff; font-size:0.9em; font-weight:800; cursor:pointer;">Write tagList · ${mirrorTodo.length} quiz${mirrorTodo.length === 1 ? '' : 'zes'}</button></p>` : '<p>All quizzes carry a mirror.</p>'}</div>
             </div>`;
         };
@@ -60770,16 +60770,17 @@ RULES:
         // ('ai_from_case' | 'ai_variant') and the bootcamp in `campaign` ('PharmCamp').
         // Readers take the field first and fall back to the legacy tag, so old docs keep
         // working until they are re-saved or migrated from the Tag hygiene panel.
-        // V101.15: ONE reader for quiz tags. Docs carry `tags` (CSV string, source of
-        // truth today) and, since V101.15, a mirrored `tagList` array written on every
-        // save (+ the Tag hygiene backfill). Readers take the CSV while it exists, so an
-        // older writer that touches only `tags` can never be shadowed by a stale array;
-        // array-only docs (a future writer) fall back to `tagList`. Flip the preference
-        // here once every writer emits tagList and the backfill has run.
+        // V101.15: ONE reader for quiz tags. Docs carry `tags` (CSV string) and a
+        // mirrored `tagList` array written on every save (+ the Tag hygiene backfill).
+        // V101.16 (stage 2): the ARRAY is now the preferred source — a doc that has
+        // `tagList` is read from it; a doc without one (never re-saved, never
+        // backfilled) still falls back to the CSV. Every writer in this codebase emits
+        // both, so the two only drift if an outdated cached client writes `tags` alone;
+        // the Tag hygiene "Array mirror" card counts such drift and the backfill
+        // repairs it from the CSV. Stage 3 (per-question arrays) is not done.
         const splitTagCsv = s => String(s || '').split(',').map(t => t.trim().replace(/\s+/g, ' ')).filter(Boolean);
         window.quizTagList = q => {
             if (!q) return [];
-            if (typeof q.tags === 'string' && q.tags.trim()) return splitTagCsv(q.tags);
             if (Array.isArray(q.tagList)) return q.tagList.map(t => String(t || '').trim().replace(/\s+/g, ' ')).filter(Boolean);
             return splitTagCsv(q.tags);
         };
@@ -60851,9 +60852,11 @@ RULES:
 
         // V101.15: quizzes whose tagList is missing or differs from the CSV. The
         // backfill writes ONLY tagList (never touches tags), 400 per batch.
+        // V101.16: compare against the CSV directly — the reader now prefers the
+        // array, so going through it would hide a stale mirror from itself.
         window.quizTagListBackfillTodo = function () {
             return (Array.isArray(quizzesData) ? quizzesData : []).filter(q => q && !q.isHistoryRevision && typeof q.tags === 'string'
-                && JSON.stringify(Array.isArray(q.tagList) ? q.tagList : null) !== JSON.stringify(window.quizTagList(q)));
+                && JSON.stringify(Array.isArray(q.tagList) ? q.tagList : null) !== JSON.stringify(splitTagCsv(q.tags)));
         };
         window.backfillQuizTagList = async function () {
             const todo = window.quizTagListBackfillTodo();
@@ -60864,7 +60867,7 @@ RULES:
                 for (let i = 0; i < todo.length; i += 400) {
                     const batch = db.batch();
                     const slice = todo.slice(i, i + 400);
-                    slice.forEach(q => batch.update(db.collection('quizzes').doc(q.id), { tagList: window.quizTagList(q) }));
+                    slice.forEach(q => batch.update(db.collection('quizzes').doc(q.id), { tagList: splitTagCsv(q.tags) })); // V101.16: from the CSV, not the reader
                     await batch.commit();
                     done += slice.length;
                 }
