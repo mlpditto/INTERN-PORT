@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V100.96)</title>
+    <title>Internship Portfolio (V100.97)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -19081,10 +19081,14 @@
                 });
                 const dailyRef = window.db.collection('beri_daily').doc(`${userId}_${dateKey}`);
                 const userRef = window.db.collection('users').doc(userId);
-                const credited = await window.db.runTransaction(async tx => {
-                    if ((await tx.get(bl.ref)).exists) return false;   // already credited elsewhere
+                // V100.97: three outcomes, not two — the intern needs to know the difference
+                // between "no Beri because you already hit today's cap" and nothing happening.
+                // The already-credited case stays silent: that one is a sync artifact.
+                const res = await window.db.runTransaction(async tx => {
+                    if ((await tx.get(bl.ref)).exists) return { credited: false, atCap: false };
                     const dailySnap = await tx.get(dailyRef);
-                    if (((dailySnap.exists && dailySnap.data().finAmount) || 0) >= FIN_DAILY_BERI_CAP) return false;
+                    const earned = (dailySnap.exists && dailySnap.data().finAmount) || 0;
+                    if (earned >= FIN_DAILY_BERI_CAP) return { credited: false, atCap: true };
                     tx.set(dailyRef, {
                         userId, dateKey,
                         finAmount: firebase.firestore.FieldValue.increment(1),
@@ -19092,9 +19096,10 @@
                     }, { merge: true });
                     tx.set(userRef, { beri: firebase.firestore.FieldValue.increment(1) }, { merge: true });
                     tx.set(bl.ref, bl.data);
-                    return true;
+                    return { credited: true, atCap: earned + 1 >= FIN_DAILY_BERI_CAP };
                 });
-                if (credited) showToast('🪙 +1 Beri');
+                if (res.credited) showToast(res.atCap ? `🪙 +1 Beri · ครบ ${FIN_DAILY_BERI_CAP}/วันแล้ว` : '🪙 +1 Beri');
+                else if (res.atCap) showToast(`🪙 ครบ ${FIN_DAILY_BERI_CAP} Beri วันนี้แล้ว · พรุ่งนี้เริ่มใหม่`);
             } catch (e) {
                 console.warn('FIN Beri credit failed:', e && (e.code || e.message));   // the expense is saved either way
             }
