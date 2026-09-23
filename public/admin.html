@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.23)</title>
+    <title>Nika Admin (V101.24)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -4385,8 +4385,15 @@
         #reflectiveReviewModal .reflective-log-date { flex-shrink:0; }
         #reflectiveReviewModal .reflective-log-content { overflow-wrap:anywhere; }
         #reflectiveReviewModal .reflective-review-footer { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px 24px; flex-shrink:0; padding-top:14px; margin-top:14px; border-top:1px solid rgba(148,163,184,0.24); }
-        #reflectiveReviewModal .reflective-review-bonus-panel { flex:0 1 290px; min-width:0; }
+        #reflectiveReviewModal .reflective-review-bonus-panel { padding:10px 12px; }
+        #reflectiveReviewModal .rr-bonus-line { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; }
+        #reflectiveReviewModal .rr-bonus-line .reflective-review-label { margin:0; }
+        #reflectiveReviewModal .rr-bonus-line .reflective-bonus-row { flex:0 0 150px; }
+        #reflectiveReviewModal .rr-bonus-line .reflective-bonus-chips { flex:1 1 220px; margin-top:0; }
+        #reflectiveReviewModal .reflective-bonus-chip.ai-pick::after { content:'AI'; margin-left:4px; padding:0 4px; border-radius:5px; background:#7c3aed; color:#fff; font-size:0.78em; vertical-align:1px; }
+        #reflectiveReviewModal .reflective-bonus-suggestion.applied .suggestion-apply { display:none; }
         #reflectiveReviewModal .reflective-review-actions { flex:1 1 300px; align-items:center; justify-content:flex-end; border:0; padding:0; margin:0; }
+        #reflective-grammar-card:has(.rr-grammar-optout) [data-model-input="ai-model-grammar"] { display:none !important; } /* text-ai-chips.css forces display:flex !important */
         #reflectiveReviewModal .reflective-review-save-btn { flex:0 1 auto; padding:12px 20px; box-shadow:none; }
         #reflectiveReviewModal .reflective-review-cancel-btn { flex:0 0 auto; padding:12px 16px; background:transparent !important; color:#475569; border:1px solid #cbd5e1; }
         @media (max-width: 900px) {
@@ -4397,9 +4404,6 @@
             #reflectiveReviewModal .reflective-liquid-modal { width:calc(100% - 20px); padding:16px 12px; max-height:92dvh; }
             #reflectiveReviewModal .reflective-review-shell { gap:14px; }
             #reflectiveReviewModal .reflective-review-footer { gap:10px; padding-top:10px; margin-top:10px; }
-            #reflectiveReviewModal .reflective-review-bonus-panel { flex-basis:100%; display:grid; grid-template-columns:1fr 1fr; column-gap:10px; }
-            #reflectiveReviewModal .reflective-review-bonus-panel > .reflective-review-label-row, #reflectiveReviewModal .reflective-bonus-suggestion { grid-column:1 / -1; }
-            #reflectiveReviewModal .reflective-bonus-chips { margin-top:0; }
             #reflectiveReviewModal .reflective-review-actions { flex-direction:row; gap:8px; }
             #reflectiveReviewModal .reflective-review-save-btn { flex:1; padding:10px; }
             #reflectiveReviewModal .reflective-review-cancel-btn { padding:10px; }
@@ -13263,29 +13267,32 @@
                         </div>
                     </div>
                 </div>
-                    </section>
-                </div>
-                <div class="reflective-review-footer">
-                    <div class="reflective-review-bonus-panel">
-                        <div class="reflective-review-label-row" style="margin-bottom:6px;">
-                            <label for="reflective-review-bonus" class="reflective-review-label">Bonus Points</label>
-                        </div>
+                <!-- V101.24: bonus sits under the editor so write → score → Save read top-to-bottom in one column. -->
+                <div class="reflective-review-bonus-panel reflective-review-card">
+                    <div class="rr-bonus-line">
+                        <label for="reflective-review-bonus" class="reflective-review-label">Bonus</label>
                         <div class="reflective-bonus-row">
-                            <input type="number" id="reflective-review-bonus" class="reflective-bonus-input" value="0.5" step="0.1" min="0" style="padding:6px 12px; font-size:1em; border-radius:12px;" oninput="syncReflectiveBonusChips(this.value)">
+                            <input type="number" id="reflective-review-bonus" class="reflective-bonus-input" value="0.5" step="0.1" min="0" style="padding:6px 12px; font-size:1em; border-radius:12px;" oninput="window._rrBonusTouched = true; syncReflectiveBonusChips(this.value)">
                             <span class="reflective-bonus-unit" style="padding:6px 10px; min-width:40px; border-radius:12px; font-size:0.7em;">PTS</span>
                         </div>
-                        <div class="reflective-bonus-chips" id="reflective-bonus-chips">
+                        <div class="reflective-bonus-chips lang-no-toggle" id="reflective-bonus-chips">
                             <button type="button" class="reflective-bonus-chip" data-value="0.1" onclick="selectReflectiveBonusChip(this)">0.1</button>
+                            <button type="button" class="reflective-bonus-chip" data-value="0.2" onclick="selectReflectiveBonusChip(this)">0.2</button>
+                            <button type="button" class="reflective-bonus-chip" data-value="0.3" onclick="selectReflectiveBonusChip(this)">0.3</button>
                             <button type="button" class="reflective-bonus-chip active" data-value="0.5" onclick="selectReflectiveBonusChip(this)">0.5</button>
                             <button type="button" class="reflective-bonus-chip" data-value="1" onclick="selectReflectiveBonusChip(this)">1</button>
                         </div>
-                        <div class="reflective-bonus-suggestion lang-no-toggle" id="reflective-bonus-suggestion">
-                            <span class="suggestion-icon">💡</span>
-                            <span class="suggestion-text">AI: <b><span id="reflective-bonus-suggestion-value">--</span> pts</b> — <span id="reflective-bonus-suggestion-reason">--</span></span>
-                            <button type="button" class="suggestion-apply" onclick="applyReflectiveBonusSuggestion()">Apply</button>
-                            <button type="button" class="suggestion-close" onclick="hideReflectiveBonusSuggestion()" aria-label="Dismiss">×</button>
-                        </div>
                     </div>
+                    <div class="reflective-bonus-suggestion lang-no-toggle" id="reflective-bonus-suggestion">
+                        <span class="suggestion-icon">💡</span>
+                        <span class="suggestion-text">AI: <b><span id="reflective-bonus-suggestion-value">--</span> pts</b> — <span id="reflective-bonus-suggestion-reason">--</span></span>
+                        <button type="button" class="suggestion-apply" onclick="applyReflectiveBonusSuggestion()">Apply</button>
+                        <button type="button" class="suggestion-close" onclick="hideReflectiveBonusSuggestion()" aria-label="Dismiss">×</button>
+                    </div>
+                </div>
+                    </section>
+                </div>
+                <div class="reflective-review-footer">
             <div class="reflective-review-actions">
                 <button class="magic-btn reflective-review-save-btn" onclick="saveReflectiveReview()" title="Save & Score (Ctrl/⌘ + Enter)">Save & Score<kbd class="reflective-kbd-hint">Ctrl+↵</kbd></button>
                 <button class="btn-sm btn-dark reflective-review-cancel-btn" onclick="closeReflectiveReviewWithCleanup()" title="Cancel (Esc)">Cancel</button>
@@ -19343,11 +19350,9 @@ RULES:
             const content = document.getElementById('reflective-grammar-content');
             const badge = document.getElementById('reflective-grammar-score');
             if (!card || !content) return;
-            if (badge) {
-                badge.textContent = '🔒';
-                badge.style.cssText = 'font-size:0.72em; font-weight:900; padding:3px 10px; border-radius:999px; background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;';
-            }
-            content.innerHTML = '<div style="font-size:0.82em; color:#475569; background:#f8fafc; border-left:3px solid #94a3b8; padding:8px 11px; border-radius:0 8px 8px 0; line-height:1.5;"><i class="fa-solid fa-shield-halved" style="margin-right:6px; color:#64748b;"></i>User opted out of grammar analysis.<div style="font-size:0.88em; color:#94a3b8; margin-top:4px;">Privacy preference set in their Settings.</div></div>';
+            // V101.24: one line, no badge — the model rail is hidden by CSS while .rr-grammar-optout is shown.
+            if (badge) { badge.textContent = ''; badge.style.cssText = ''; }
+            content.innerHTML = '<div class="rr-grammar-optout" title="Privacy preference set in their Settings" style="font-size:0.8em; color:#475569; line-height:1.5;"><i class="fa-solid fa-shield-halved" style="margin-right:6px; color:#64748b;"></i>User opted out of grammar analysis.</div>';
             card.style.display = '';
         }
 
@@ -19420,6 +19425,7 @@ RULES:
 
         window.selectReflectiveBonusChip = function(btn) {
             if (!btn) return;
+            window._rrBonusTouched = true;
             const value = btn.dataset.value;
             const input = document.getElementById('reflective-review-bonus');
             if (input) input.value = value;
@@ -19945,6 +19951,20 @@ RULES:
             valEl.textContent = rounded.toFixed(1);
             reasonEl.textContent = reason ? String(reason).trim() : '—';
             banner.dataset.value = rounded;
+            // V101.24: badge the matching chip, and take the AI score outright while the admin
+            // hasn't picked one (and the log wasn't scored before) — the 0.5 default otherwise over-scores.
+            document.querySelectorAll('#reflective-bonus-chips .reflective-bonus-chip').forEach(c => {
+                const hit = parseFloat(c.dataset.value) === rounded;
+                c.classList.toggle('ai-pick', hit);
+                if (hit) c.title = 'AI suggestion'; else c.removeAttribute('title');
+            });
+            const input = document.getElementById('reflective-review-bonus');
+            const autoApply = !window._rrBonusTouched && input;
+            if (autoApply) {
+                input.value = rounded;
+                syncReflectiveBonusChips(rounded);
+            }
+            banner.classList.toggle('applied', !!autoApply);
             banner.classList.add('show');
         };
 
@@ -19964,6 +19984,7 @@ RULES:
                 matchingChip.classList.add('pulse');
                 setTimeout(() => matchingChip.classList.remove('pulse'), 500);
             }
+            window._rrBonusTouched = true;
             banner.classList.remove('show');
             if (typeof showToast === 'function') showToast(`✨ Bonus set to ${v} pts`);
         };
@@ -19971,6 +19992,7 @@ RULES:
         window.hideReflectiveBonusSuggestion = function() {
             const banner = document.getElementById('reflective-bonus-suggestion');
             if (banner) banner.classList.remove('show');
+            document.querySelectorAll('#reflective-bonus-chips .reflective-bonus-chip.ai-pick').forEach(c => { c.classList.remove('ai-pick'); c.removeAttribute('title'); });
         };
 
         window.rewriteReflectiveReview = async function(btn) {
@@ -58723,6 +58745,8 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             } catch (e) { /* non-fatal */ }
 
             document.getElementById('reflective-review-bonus').value = log.adminBonus !== undefined ? log.adminBonus : "0.5";
+            // V101.24: an already-scored log keeps its score — the AI suggestion won't auto-apply over it.
+            window._rrBonusTouched = log.adminBonus !== undefined;
             // [V93.35] Load via Quill helper — handles HTML/plaintext fallback + sanitization
             if (typeof loadReflectiveQuillContent === 'function') {
                 loadReflectiveQuillContent(log.adminCommentHtml, log.adminComment);
