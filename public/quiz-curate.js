@@ -69,14 +69,20 @@
             const ok = document.execCommand('copy'); area.remove(); return ok;
         } catch (_) { return false; }
     }
+    // V101.18: icon only (no label) — sits inline with the card heading in Compare and
+    // at the end of the toggle row in review rows, so it never costs a line.
     function copyButton(q, number, missingKey) {
-        const button = node('button', 'Copy', 'curate-source-toggle curate-copy'); button.type = 'button';
-        button.title = 'คัดลอกโจทย์และตัวเลือกเป็นข้อความ';
+        const button = node('button', undefined, 'curate-copy'); button.type = 'button';
+        const icon = (name) => '<i class="fa-solid ' + name + '" aria-hidden="true"></i>';
+        button.innerHTML = icon('fa-copy');
+        button.title = 'Copy question and choices · คัดลอกโจทย์และตัวเลือก';
+        button.setAttribute('aria-label', 'Copy question' + (number ? ' Q' + number : ''));
         button.onclick = async () => {
             const ok = await copyText(questionPlainText(q, number, missingKey));
-            button.textContent = ok ? 'Copied ✓' : 'Copy failed';
+            button.innerHTML = icon(ok ? 'fa-check' : 'fa-xmark');
+            button.classList.toggle('done', ok);
             if (typeof showToast === 'function') showToast(ok ? 'Copied question ' + (number ? 'Q' + number : '') : 'Could not copy — select the text and copy manually');
-            setTimeout(() => { button.textContent = 'Copy'; }, 1500);
+            setTimeout(() => { button.innerHTML = icon('fa-copy'); button.classList.remove('done'); }, 1500);
         };
         return button;
     }
@@ -128,8 +134,6 @@
                 controls.append(button); host.append(panel);
             }
             controls.append(copyButton(q, number, missingKey)); // V101.12
-        } else {
-            const controls = node('div', undefined, 'curate-source-controls'); controls.append(copyButton(q, number, missingKey)); host.append(controls); // V101.12
         }
     }
     function backToReview() {
@@ -147,7 +151,9 @@
         const grid = node('div', undefined, 'curate-compare-grid'); panel.append(grid);
         for (const id of [a, b]) {
             const card = node('section', undefined, 'curate-compare-card');
-            card.append(node('h4', 'Q' + id + ' · ' + (s.keep.has(id) ? 'Keep' : 'Remove') + (s.pins.has(id) ? ' · Pinned' : '')));
+            const heading = node('h4', 'Q' + id + ' · ' + (s.keep.has(id) ? 'Keep' : 'Remove') + (s.pins.has(id) ? ' · Pinned' : ''));
+            heading.append(copyButton(s.source.form.questions[id - 1], id, s.source.missingKeys.includes(id))); // V101.18: inline with the heading
+            card.append(heading);
             sourceView(card, s.source.form.questions[id - 1], true, relation.evidence.filter(e => e.id === id), s.source.missingKeys.includes(id), id); grid.append(card);
         }
         for (const [key, label] of [['shared', 'Shared objective'], ['difference', 'Key differences'], ['preference', 'Why prefer this question']]) {
