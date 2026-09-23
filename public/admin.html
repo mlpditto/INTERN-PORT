@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.27)</title>
+    <title>Nika Admin (V101.28)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -16387,12 +16387,17 @@
                         return { text: proxyData.text || proxyData.imageDataUrl || proxyData.dataUrl || '', tokens: proxyData.tokens || 0, model: proxyData.model || modelName, raw: proxyData };
                     } else {
                         const primaryError = await proxyResponse.json().catch(() => ({}));
-                        console.warn(`[AI Proxy] Primary endpoint returned status ${proxyResponse.status}. Trying backup...`);
-                        const backupResponse = await fetch(BACKUP_PROXY, {
+                        // V101.28: on GitHub Pages BACKUP_PROXY is the same URL as PROXY_URL, so a
+                        // definitive error (e.g. 502 "stopped with length") used to be re-run in
+                        // full against the identical endpoint — doubling a 60s failure to 120s.
+                        const backupIsDistinct = BACKUP_PROXY !== PROXY_URL;
+                        if (backupIsDistinct) console.warn(`[AI Proxy] Primary endpoint returned status ${proxyResponse.status}. Trying backup...`);
+                        else console.warn(`[AI Proxy] Proxy returned status ${proxyResponse.status}; no distinct backup, not repeating the call.`);
+                        const backupResponse = backupIsDistinct ? await fetch(BACKUP_PROXY, {
                             method: 'POST',
                             headers: await window._aiAuthHeaders(),
                             body: JSON.stringify({ provider: proxyProvider, model: modelName, prompt: prompt, isJson: isJson, visionData: visionData, generationOptions: generationOptions || undefined, feature: aiFeature || undefined })
-                        }).catch(() => null);
+                        }).catch(() => null) : null;
                         if (backupResponse && backupResponse.ok) {
                             const proxyData = await backupResponse.json();
                             if (proxyData.error) throw new Error(proxyData.error);
