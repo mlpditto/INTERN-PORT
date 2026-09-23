@@ -1,6 +1,6 @@
 
 const admin = require("firebase-admin");
-const { registry: aiModelRegistry, runModernAI } = require("./modern-ai");
+const { registry: aiModelRegistry, runModernAI, extractJson } = require("./modern-ai");
 admin.initializeApp();
 
 // Import migration function (wrapped in try-catch to prevent timeout)
@@ -1081,10 +1081,38 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 });
             }
 
+            // V101.17: same diagnostics as modern-ai.js for the OpenRouter text path
+            // (Qwen / DeepSeek chips). A JSON request whose reply is cut off
+            // (finish_reason "length") or is not JSON used to reach the client as bare
+            // text, where every caller failed with its own vague message ("AI must
+            // assess every original question"). Tolerate fences / preamble the way the
+            // client would, and otherwise say WHY: model, finish reason, output tokens
+            // against the cap, first 200 chars — and log it.
+            const orChoice = response.data.choices?.[0] || {};
+            let orText = orChoice.message?.content || "";
+            const orFinish = orChoice.finish_reason || null;
+            const orOut = response.data.usage?.completion_tokens ?? null;
+            let orJsonValid = null;
+            if (isJson) {
+                const cleaned = extractJson(orText);
+                orJsonValid = cleaned !== null;
+                if (orJsonValid) orText = cleaned;
+            }
+            if ((isJson && !orJsonValid) || orFinish === "length" || orFinish === "content_filter" || !String(orText).trim()) {
+                const why = orFinish === "length" ? `stopped with length (output cap ${orMaxTokens})`
+                    : orFinish === "content_filter" ? "stopped by the provider's content filter"
+                    : !String(orText).trim() ? "empty text" : "text is not valid JSON";
+                const head = String(orText || "").replace(/\s+/g, " ").slice(0, 200);
+                const error = `Model returned incomplete or invalid output. ${orModel}: ${why}; ${orOut ?? "?"} output tokens.${head ? ` Starts: ${head}` : ""}`;
+                console.error(`[openrouter] ${error}`);
+                return res.status(502).json({ error, finishReason: orFinish, jsonValid: orJsonValid, requestedModel: orModel });
+            }
             return res.json({
-                text: response.data.choices[0].message.content,
+                text: orText,
                 tokens: response.data.usage?.total_tokens || 0,
-                model: orModel
+                model: orModel,
+                finishReason: orFinish,
+                jsonValid: orJsonValid
             });
         }
 

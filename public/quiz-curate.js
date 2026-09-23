@@ -416,7 +416,14 @@
     }
     function validateProposal(data, s, n) {
         const count = s.source.form.questions.length;
-        if (!Array.isArray(data?.questions) || data.questions.length !== count) throw new Error('AI must assess every original question. Try Suggest again.');
+        // V101.17: say what came back instead of one vague line for three different failures.
+        if (!data || typeof data !== 'object') throw new Error('Model output was not valid JSON. Try Suggest again.');
+        if (!Array.isArray(data.questions)) throw new Error('Model output has no "questions" list (keys: ' + Object.keys(data).slice(0, 6).join(', ') + '). Try Suggest again.');
+        if (data.questions.length !== count) {
+            const got = new Set(data.questions.map(q => q && q.id));
+            const missing = Array.from({ length: count }, (_, i) => i + 1).filter(id => !got.has(id));
+            throw new Error('AI assessed ' + data.questions.length + ' of ' + count + ' questions' + (missing.length && missing.length <= 12 ? ' (missing Q' + missing.join(', Q') + ')' : '') + '. Try Suggest again, or a stronger model.');
+        }
         const adjust = { snapped: 0, dropped: 0, relations: 0, downgraded: 0 };
         const seen = new Set();
         for (const q of data.questions) {
@@ -492,7 +499,13 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
             s.message = 'Checking question IDs, reasons and evidence.'; render();
             s.stale = !unchanged(s);
             if (s.stale) throw new Error('The editor changed during generation. Close Curate and reopen it.');
-            const proposal = validateProposal(safeJsonParse(response.text), s, n);
+            const parsed = safeJsonParse(response.text);
+            if (!parsed) { // V101.17: name the shape of the failure (length, chars, first 200 chars)
+                const text = String(response.text || '');
+                const finish = response.raw && response.raw.finishReason ? ' finish=' + response.raw.finishReason : '';
+                throw new Error('Model output was not valid JSON (' + text.length + ' chars' + finish + '). Starts: ' + text.replace(/\s+/g, ' ').slice(0, 200));
+            }
+            const proposal = validateProposal(parsed, s, n);
             s.proposal = proposal; s.keep = new Set(proposal.filter(q => q.keep).map(q => q.id));
             s.needsSuggestion = false; s.done = true; s.view = s.keep.size < form.questions.length ? 'remove' : 'keep'; s.message = '';
             const run = { id: crypto.randomUUID(), key: requestKey, model: s.model, createdAt: Date.now(), elapsedMs: performance.now() - s.startedAt, count: form.questions.length, target: n, mode: s.mode, pins: settings.pins, instructions: settings.instructions, proposal };
