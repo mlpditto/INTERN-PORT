@@ -1075,13 +1075,23 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             // 8192 cap thinking and came back `finish_reason: length` with empty content —
             // twice, ~60s each (functions:log 2026-09-23 17:18/17:19). effort "low" = ~20%
             // of max_tokens for thinking, same setting modern-ai.js gives OpenAI/Anthropic.
-            const orReasoningCapable = !isImageRequest && /^(deepseek|qwen)\//i.test(orModel);
+            // V101.31: effort "low" did nothing for Qwen — Alibaba's endpoint lists `reasoning`
+            // but not `reasoning_effort` (openrouter.ai/api/v1/models/qwen/qwen3.8-flash/endpoints),
+            // and the very next Compare logged "8192 output tokens (8192 reasoning)". Qwen thinking
+            // models take `reasoning.max_tokens` → thinking_budget, so send a token budget there
+            // (20% of the cap, floor 1024); DeepSeek keeps effort "low". The two fields are
+            // mutually exclusive on OpenRouter, so it is one or the other per vendor.
+            const orIsQwen = /^qwen\//i.test(orModel);
+            const orReasoningCapable = !isImageRequest && (orIsQwen || /^deepseek\//i.test(orModel));
+            const orReasoning = orIsQwen
+                ? { max_tokens: Math.max(1024, Math.floor(orMaxTokens * 0.2)), exclude: true }
+                : { effort: "low", exclude: true };
             const body = {
                 model: orModel,
                 messages: [{ role: "user", content: tailoredPrompt }],
                 ...(isJson ? { response_format: { type: "json_object" } } : {}),
                 ...(isImageRequest ? { modalities: ["image", "text"] } : {}),
-                ...(orReasoningCapable ? { reasoning: { effort: "low", exclude: true } } : {}),
+                ...(orReasoningCapable ? { reasoning: orReasoning } : {}),
                 temperature: 0.7,
                 max_tokens: orMaxTokens
             };
@@ -1140,6 +1150,9 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 console.error(`[openrouter] ${error}`);
                 return res.status(502).json({ error, finishReason: orFinish, jsonValid: orJsonValid, requestedModel: orModel });
             }
+            // V101.31: one line per successful call so the thinking budget can be checked from
+            // functions:log without waiting for a failure.
+            if (orReasoningCapable) console.log(`[openrouter] ${orModel}: ${orOut ?? "?"} output tokens (${orThink ?? "?"} reasoning), finish ${orFinish}, budget ${JSON.stringify(orReasoning)}`);
             return res.json({
                 text: orText,
                 tokens: response.data.usage?.total_tokens || 0,
