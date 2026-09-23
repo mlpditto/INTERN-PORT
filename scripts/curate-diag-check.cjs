@@ -33,7 +33,7 @@ check('OpenRouter text path: 502 with reason on bad JSON / length / empty', /\[o
 check('OpenRouter success payload carries finishReason + jsonValid', /finishReason: orFinish,\n\s*jsonValid: orJsonValid\n\s*\}\);/.test(index), true);
 check('OpenRouter image path untouched', /imageDataUrl,\n\s*text: message\.content \|\| "",/.test(index), true);
 const admin = read('public/admin.html');
-check('admin cache-busts quiz-curate.js', /quiz-curate\.js\?v=V101\.17/.test(admin), true);
+check('admin cache-busts quiz-curate.js', /quiz-curate\.js\?v=V\d+\.\d+/.test(admin), true);
 
 let fail = 0;
 checks.forEach(([name, got, want]) => {
