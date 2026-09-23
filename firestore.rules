@@ -762,5 +762,14 @@ service cloud.firestore {
       allow read, create: if isAdmin();
       allow update, delete: if false;
     }
+
+    // 44. FIN — the intern's personal money plan (intern V100.89). Doc id is the
+    // effective userId, the same identity test as users/{userId}, so the LIFF
+    // anon-auth uid reaches it through user_auth_links. Deliberately NO isAdmin()
+    // branch: this is the intern's own spending, admin has no view of it anywhere
+    // in the app and should not gain one through the rules either.
+    match /fin/{finUserId} {
+      allow read, write: if isSignedIn() && (request.auth.uid == finUserId || hasAuthLinkToUserId(finUserId));
+    }
   }
 }

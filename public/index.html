@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V100.88)</title>
+    <title>Internship Portfolio (V100.89)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -686,6 +686,8 @@
         #finModal .fin-head { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
         #finModal .fin-head h3 { margin:0; font-size:1.05em; font-weight:900; color:#065f46; }
         #finModal .fin-x { margin-left:auto; width:30px; height:30px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; color:#475569; cursor:pointer; padding:0; }
+        #finModal .fin-sync { width:auto; min-height:0; margin:0 0 0 auto; padding:3px 9px; border:1px solid #e2e8f0; border-radius:999px; background:#f8fafc; color:#64748b; font-size:0.68em; font-weight:800; cursor:pointer; white-space:nowrap; font-variant-numeric:tabular-nums; }
+        #finModal .fin-sync.bad { border-color:#fecaca; background:#fef2f2; color:#b91c1c; }
         #finModal .fin-tabs { display:flex; gap:4px; background:#f1f5f9; border-radius:999px; padding:3px; margin-bottom:10px; }
         #finModal .fin-tabs button { flex:1; border:0; background:transparent; border-radius:999px; padding:7px; font-weight:800; font-size:0.8em; color:#64748b; cursor:pointer; margin:0; width:auto; }
         #finModal .fin-tabs button.on { background:#fff; color:#065f46; box-shadow:0 1px 3px rgba(15,23,42,0.12); }
@@ -5172,6 +5174,7 @@
             <div class="fin-head">
                 <h3>💰 FIN</h3>
                 <span class="fin-muted" id="fin-head-sub"></span>
+                <button type="button" class="fin-sync" id="fin-sync" onclick="finSync()" style="display:none;"></button>
                 <button type="button" class="fin-x" onclick="finClose()" aria-label="Close">✕</button>
             </div>
             <div class="fin-tabs" role="tablist">
@@ -18976,14 +18979,27 @@
         //   { plans: { 'YYYY-MM': { daily: 300, days: { 'YYYY-MM-DD': 500 } } },
         //     expenses: [ { id, date: 'YYYY-MM-DD', amount, cat, note, ts } ] }
         // V100.80: + Drink, Subs (subscriptions). Category text is stored on each expense, so reordering is safe.
+        // V100.89: the same shape now mirrors to Firestore `fin/<userId>` so the intern's
+        // phone and laptop see one plan — see the sync block below. Two fields were added:
+        // every record carries `upd` (ms, last edit) and deletes leave `tomb[id] = ms`.
         const FIN_CATS = ['🍜 Food', '🥤 Drink', '☕ Coffee', '🚌 Travel', '🛒 Groceries', '📱 Subs', '🎉 Fun', '💊 Health', '📚 Study', '📦 Other'];
         const finState = { tab: 'today', month: null, cat: FIN_CATS[0], selDay: null, editId: null, editCat: null };
         function finKey() { return 'fin_v1_' + (userId || 'anon'); }
+        function finEmpty() { return { plans: {}, expenses: [], tomb: {} }; }
         function finLoad() {
-            try { const d = JSON.parse(localStorage.getItem(finKey()) || 'null'); if (d && d.plans && Array.isArray(d.expenses)) return d; } catch (_) {}
-            return { plans: {}, expenses: [] };
+            try {
+                const d = JSON.parse(localStorage.getItem(finKey()) || 'null');
+                if (d && d.plans && Array.isArray(d.expenses)) { d.tomb = d.tomb || {}; return d; }   // v1 rows have no tomb
+            } catch (_) {}
+            return finEmpty();
         }
-        function finSave(d) { try { localStorage.setItem(finKey(), JSON.stringify(d)); } catch (_) { showToast('Could not save (storage full or blocked)'); } }
+        // finSaveLocal writes only; finSave writes AND schedules a push. finSync applies
+        // merges through finSaveLocal so landing a merge cannot re-trigger itself.
+        function finSaveLocal(d) {
+            try { localStorage.setItem(finKey(), JSON.stringify(d)); return true; }
+            catch (_) { showToast('Could not save (storage full or blocked)'); return false; }
+        }
+        function finSave(d) { if (finSaveLocal(d)) finQueueSync(); }
         function finToday() { return getBangkokDateTimeParts().dateKey; }
         // V100.82: amounts keep up to 2 decimals — whole numbers stay "฿ 67", fractions show "฿ 67.50".
         function finFmt(n) { const v = Math.round((Number(n) || 0) * 100) / 100; return '฿ ' + v.toLocaleString('en-US', Number.isInteger(v) ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -18999,10 +19015,139 @@
         }
         function finSpent(data, pred) { return data.expenses.filter(pred).reduce((s, e) => s + (Number(e.amount) || 0), 0); }
 
+        // ===== V100.89: cross-device sync · sync ข้ามเครื่อง =====
+        // FIN stays local-first. Every action lands in localStorage and the UI never
+        // waits on the network; Firestore `fin/<userId>` is only the mirror the intern's
+        // OTHER device merges from. Rules are owner-only — admin has no read, which is
+        // the same call the user made when FIN shipped local-only.
+        //
+        // Merge is per-record last-write-wins on `upd` (ms since epoch):
+        //   · expenses by id. A delete leaves `tomb[id] = ms` instead of just dropping
+        //     the row, otherwise the other device pushes its still-live copy back and
+        //     the deleted expense returns. Tombstones expire after 90 days.
+        //   · plans by month. Two devices editing DIFFERENT days of the SAME month while
+        //     both are offline still lose one side — the month is the unit, and per-day
+        //     stamps are not worth it for a one-person planner. Equal stamps (v1 rows,
+        //     written before `upd` existed) union instead of dropping, so the first sync
+        //     after this upgrade can never lose a budget the intern already set.
+        //
+        // Pull runs on finOpen(); pushes are debounced 1.2 s behind finSave(). There is
+        // deliberately no live onSnapshot listener: re-rendering under the intern's
+        // fingers mid-entry costs more than live updates buy for a single-user planner.
+        const FIN_TOMB_DAYS = 90;
+        let finSyncTimer = null, finSyncAt = 0;
+        function finStamp(o) { return Number(o && (o.upd != null ? o.upd : o.ts)) || 0; }
+        function finCanSync() { return !!(window.db && userId && firebase.auth().currentUser); }
+        function finDocRef() { return window.db.collection('fin').doc(userId); }
+        function finIsOpen() { const m = document.getElementById('finModal'); return !!m && m.style.display === 'flex'; }
+        // True while the intern has an unsent value in a box — a background merge must not
+        // re-render and wipe what they are typing. The data is already saved either way.
+        function finTyping() { const a = document.activeElement; return !!(a && a.closest && a.closest('#finModal') && /^(INPUT|TEXTAREA)$/.test(a.tagName)); }
+        // "which records at which versions" — built field by field in a fixed order, so a
+        // doc that came back from Firestore compares equal to the same data built locally
+        // however Firestore ordered the fields. Both sides must be finMerge output.
+        // Expenses need only their stamp (every edit bumps `upd`, and a merge always keeps
+        // one whole row) but a plan month can be UNIONED at equal stamps, so its signature
+        // has to carry the content or that merge would look like a no-op and never land.
+        function finSig(d) {
+            const plan = k => {
+                const p = d.plans[k] || {}, days = p.days || {};
+                return k + '@' + finStamp(p) + '=' + (p.daily || 0)
+                    + '[' + Object.keys(days).sort().map(x => x + '=' + days[x]).join(';') + ']';
+            };
+            return d.expenses.map(e => e.id + '@' + finStamp(e)).join(',')
+                + '|' + Object.keys(d.tomb).map(k => k + '@' + d.tomb[k]).join(',')
+                + '|' + Object.keys(d.plans).map(plan).join(',');
+        }
+        function finMergePlan(win, lose) {
+            if (finStamp(win) !== finStamp(lose)) return win;
+            const p = { daily: win.daily || lose.daily || 0, days: Object.assign({}, lose.days, win.days) };
+            if (finStamp(win)) p.upd = finStamp(win);
+            return p;
+        }
+        function finMerge(a, b) {
+            const tomb = {};
+            [a, b].forEach(s => Object.entries((s && s.tomb) || {}).forEach(([id, u]) => { u = Number(u) || 0; if (u > (tomb[id] || 0)) tomb[id] = u; }));
+            const byId = new Map();
+            [a, b].forEach(s => ((s && s.expenses) || []).forEach(e => {
+                if (!e || !e.id) return;
+                const prev = byId.get(e.id);
+                if (!prev || finStamp(e) > finStamp(prev)) byId.set(e.id, e);
+            }));
+            const cut = Date.now() - FIN_TOMB_DAYS * 864e5;
+            Object.keys(tomb).forEach(id => {
+                const e = byId.get(id);
+                if (e && finStamp(e) <= tomb[id]) byId.delete(id);   // the delete wins unless the row was edited after it
+                if (tomb[id] < cut && !byId.has(id)) delete tomb[id];
+            });
+            const plans = {};
+            [a, b].forEach(s => Object.entries((s && s.plans) || {}).forEach(([ym, p]) => {
+                if (!p) return;
+                plans[ym] = !plans[ym] ? p
+                    : (finStamp(p) > finStamp(plans[ym]) ? finMergePlan(p, plans[ym]) : finMergePlan(plans[ym], p));
+            }));
+            const out = { plans: {}, expenses: [...byId.values()].sort((x, y) => (y.ts || 0) - (x.ts || 0)), tomb: {} };
+            Object.keys(plans).sort().forEach(k => { out.plans[k] = plans[k]; });
+            Object.keys(tomb).sort().forEach(k => { out.tomb[k] = tomb[k]; });
+            return out;
+        }
+        function finCanon(d) { return finMerge(d, finEmpty()); }
+        function finFromRemote(d) {
+            return { plans: (d && d.plans) || {}, expenses: Array.isArray(d && d.expenses) ? d.expenses : [], tomb: (d && d.tomb) || {} };
+        }
+        function finSetSync(state, why) {
+            const el = document.getElementById('fin-sync');
+            if (!el) return;
+            const label = { syncing: '☁ …', ok: '☁ ' + new Date(finSyncAt).toTimeString().slice(0, 5), offline: '⚠ not synced', local: '📱 this device' }[state] || '';
+            const tip = {
+                syncing: 'Syncing…',
+                ok: 'Synced across your devices · tap to sync now',
+                offline: (why || 'Could not reach the server') + ' — saved on this device, tap to retry',
+                local: 'Not signed in — data stays on this device only'
+            }[state] || '';
+            el.textContent = label; el.title = tip;
+            el.style.display = label ? '' : 'none';
+            el.classList.toggle('bad', state === 'offline');
+        }
+        function finQueueSync(delay = 1200) {
+            if (!finCanSync()) { finSetSync('local'); return; }
+            clearTimeout(finSyncTimer);
+            finSyncTimer = setTimeout(finSync, delay);
+        }
+        // One transaction does read → merge → write, so two devices saving at the same
+        // moment cannot clobber each other: the loser retries against the winner's doc.
+        async function finSync() {
+            clearTimeout(finSyncTimer);
+            if (!finCanSync()) { finSetSync('local'); return; }
+            finSetSync('syncing');
+            try {
+                const ref = finDocRef();
+                const merged = await window.db.runTransaction(async tx => {
+                    const snap = await tx.get(ref);
+                    const remote = snap.exists ? finFromRemote(snap.data()) : finEmpty();
+                    const m = finMerge(finLoad(), remote);
+                    if (finSig(m) !== finSig(finCanon(remote))) {
+                        tx.set(ref, { userId, plans: m.plans, expenses: m.expenses, tomb: m.tomb, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                    }
+                    return m;
+                });
+                finSyncAt = Date.now();
+                if (finSig(merged) !== finSig(finCanon(finLoad()))) {
+                    finSaveLocal(merged);
+                    if (finIsOpen() && !finTyping()) finRender();
+                }
+                finSetSync('ok');
+            } catch (e) {
+                console.warn('FIN sync failed:', e && (e.code || e.message));
+                finSetSync('offline', e && e.code === 'permission-denied' ? 'No permission' : 'Offline');
+            }
+        }
+
         function finOpen() {
             finState.tab = 'today'; finState.month = finToday().slice(0, 7); finState.selDay = null; finState.editId = null;
             finRender();
             document.getElementById('finModal').style.display = 'flex';
+            finSync();   // pull whatever the other device added since last time
         }
         function finClose() { document.getElementById('finModal').style.display = 'none'; }
         function finTab(t) { finState.tab = t; finState.selDay = null; finState.editId = null; finRender(); }
@@ -19018,10 +19163,15 @@
             const amount = finRound(parseFloat(amtEl && amtEl.value));
             if (!(amount > 0)) { showToast('Enter an amount first'); return; }
             const data = finLoad();
-            data.expenses.unshift({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), date: finToday(), amount, cat: finState.cat, note: (noteEl.value || '').trim().slice(0, 80), ts: Date.now() });
+            data.expenses.unshift({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), date: finToday(), amount, cat: finState.cat, note: (noteEl.value || '').trim().slice(0, 80), ts: Date.now(), upd: Date.now() });
             finSave(data); finRender();
         }
-        function finDel(id) { const data = finLoad(); data.expenses = data.expenses.filter(e => e.id !== id); finSave(data); finRender(); }
+        function finDel(id) {
+            const data = finLoad();
+            data.expenses = data.expenses.filter(e => e.id !== id);
+            data.tomb[id] = Date.now();   // V100.89: tombstone, or the other device pushes its live copy back
+            finSave(data); finRender();
+        }
         // V100.79: tap an item's name to add / change its note after the fact.
         // V100.80: the same editor also takes the time (HH:MM) — the item keeps its
         // date, only the clock part of ts moves.
@@ -19044,6 +19194,7 @@
                 if (FIN_CATS.includes(finState.editCat)) e.cat = finState.editCat;
                 const m = /^(\d{1,2}):?(\d{2})$/.exec((timeEl && timeEl.value || '').trim());
                 if (m) { const [y, mo, d] = e.date.split('-').map(Number); e.ts = new Date(y, mo - 1, d, Math.min(23, Number(m[1])), Math.min(59, Number(m[2]))).getTime(); }
+                e.upd = Date.now();
                 finSave(data);
             }
             finState.editId = null; finRender();
@@ -19051,7 +19202,7 @@
         function finSetDefault() {
             const v = finRound(parseFloat(document.getElementById('fin-default').value));
             const data = finLoad(); const plan = data.plans[finState.month] || (data.plans[finState.month] = { daily: 0, days: {} });
-            plan.daily = v > 0 ? v : 0; finSave(data); finRender(); showToast(`Default ${finFmt(plan.daily)}/day for ${finMonthLabel(finState.month)}`);
+            plan.daily = v > 0 ? v : 0; plan.upd = Date.now(); finSave(data); finRender(); showToast(`Default ${finFmt(plan.daily)}/day for ${finMonthLabel(finState.month)}`);
         }
         function finSelDay(dayKey) { finState.selDay = finState.selDay === dayKey ? null : dayKey; finRender(); }
         function finSetDay(clear) {
@@ -19060,12 +19211,13 @@
             plan.days = plan.days || {};
             if (clear) delete plan.days[dayKey];
             else { const v = finRound(parseFloat(document.getElementById('fin-day-amt').value)); if (!(v >= 0)) return; plan.days[dayKey] = v; }
+            plan.upd = Date.now();
             finSave(data); finState.selDay = null; finRender();
         }
         function finSetToday() {
             const v = finRound(parseFloat(document.getElementById('fin-today-amt').value)); if (!(v >= 0)) return;
             const data = finLoad(); const ym = finToday().slice(0, 7); const plan = data.plans[ym] || (data.plans[ym] = { daily: 0, days: {} });
-            plan.days = plan.days || {}; plan.days[finToday()] = v; finSave(data); finRender();
+            plan.days = plan.days || {}; plan.days[finToday()] = v; plan.upd = Date.now(); finSave(data); finRender();
         }
 
         function finRender() {
@@ -19181,6 +19333,7 @@
         window.finPickCat = finPickCat; window.finAdd = finAdd; window.finDel = finDel; window.finSetDefault = finSetDefault;
         window.finSelDay = finSelDay; window.finSetDay = finSetDay; window.finSetToday = finSetToday;
         window.finEditItem = finEditItem; window.finSaveItem = finSaveItem; window.finPickEditCat = finPickEditCat;
+        window.finSync = finSync;   // the status pill in .fin-head is a tap-to-retry button
 
         // V96.41: `source` is 'manual' when the ✅ chip is tapped, 'activity' when a
         // submission auto-checks the intern in. Both paths stamp checkinLastDate, which
