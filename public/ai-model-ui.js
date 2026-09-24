@@ -27,6 +27,9 @@
     const trialModels = window.TEXT_AI_TRIAL_MODELS = [
         { id: 'or/x-ai/grok-4.7', label: 'Grok 4.7', short: 'Grok 4.7', hint: 'Grok 4.7 (SpaceXAI) รุ่นทดลอง สำหรับ Audit / Analyze ผ่าน OpenRouter' }
     ];
+    // V101.57: Gemini called directly (Vertex, or AI Studio `as/`) is billed to the Google Cloud
+    // billing account; `or/google/…` is billed by OpenRouter. The chip shows it (text-ai-chips.css).
+    window.isGoogleBilledModel = id => /^(gemini-|as\/)/.test(String(id || ''));
     window.normalizeTextAIModel = value => models.some(m => m.id === value) ? value : 'gpt-5.6-luna';
     // A trial id stays as-is where a caller explicitly picked it; anything else normalises as before.
     window.resolveTrialTextAIModel = value => trialModels.some(m => m.id === value) ? value : window.normalizeTextAIModel(value);
@@ -59,7 +62,8 @@
     window.textAIChipContents = (value, action = '', filter = null, extra = []) => [...(filter ? models.filter(filter) : models), ...extra].map(m => {
         const owner = LOGO_OWNERS[m.label.split(' ')[0]];
         const logo = owner ? `<span class="text-ai-logo" data-owner="${owner}" aria-hidden="true"></span>` : '';
-        return `<button type="button" class="glass-toggle-item${m.id === value ? ' active' : ''}" data-value="${m.id}" aria-label="${m.label}" aria-pressed="${m.id === value}" title="${m.label} · ${m.id} — ${m.hint}"${action ? ` onclick="${action}"` : ''}>${logo}${m.short}</button>`;
+        const google = window.isGoogleBilledModel(m.id);
+        return `<button type="button" class="glass-toggle-item${m.id === value ? ' active' : ''}" data-value="${m.id}"${google ? ' data-bill="google"' : ''} aria-label="${m.label}" aria-pressed="${m.id === value}" title="${m.label} · ${m.id}${google ? ' · Google Cloud bill' : ''} — ${m.hint}"${action ? ` onclick="${action}"` : ''}>${logo}${m.short}</button>`;
     }).join('');
     window.textAIChipsHtml = (id, value, action) => `<div class="text-ai-chips lang-no-toggle" role="group" aria-label="AI model"${id ? ` id="${id}"` : ''}>${window.textAIChipContents(value, action)}</div>`;
     window.syncRegistryModelSelect = function (id) {
