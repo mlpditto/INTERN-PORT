@@ -225,8 +225,8 @@ fin.finState.month = '2026-09';   // finOpen() normally sets this; the mutators 
     check('10h. the Explore link cap still reads its own field', /REVIEW_LINK_DAILY_BERI_CAP/.test(index) && !/finAmount/.test(index.slice(index.indexOf('async function explOpenLink'), index.indexOf('// ==================================================================='))), true);
     check('10i. admin can label the new ledger source', /fin_expense: '💰 FIN entry'/.test(read('public/admin.html')), true);
     // V100.97: three outcomes, so "capped" is distinguishable from "nothing happened".
-    check('10j. hitting the cap says so on the earning entry', /\+1 Beri · ครบ \$\{FIN_DAILY_BERI_CAP\}\/วันแล้ว/.test(award), true);
-    check('10k. entries past the cap say why they earned nothing', /ครบ \$\{FIN_DAILY_BERI_CAP\} Beri วันนี้แล้ว · พรุ่งนี้เริ่มใหม่/.test(award), true);
+    check('10j. hitting the cap says so on the earning entry', /\+1 Beri · \$\{FIN_DAILY_BERI_CAP\}\/day cap reached/.test(award), true);
+    check('10k. entries past the cap say why they earned nothing', /Daily cap of \$\{FIN_DAILY_BERI_CAP\} Beri reached · resets tomorrow/.test(award), true);
     check('10l. an already-credited expense stays silent (it is a sync artifact)',
         /\{ credited: false, atCap: false \}/.test(award), true);
 
@@ -255,7 +255,7 @@ fin.finState.month = '2026-09';   // finOpen() normally sets this; the mutators 
     check('11l. budget chip toggles the inline editor', /onclick="finEditBudget\(\)"/.test(today) && /window\.finEditBudget = finEditBudget/.test(index), true);
     check('11m. no Set row left on Today', /finSetToday\(\)">Set</.test(index), false);
     check('11n. no-budget state does not render a negative "left"', /const noBudget = budget <= 0;/.test(today) && /noBudget \? finFmt\(spent\) : finFmt\(left\)/.test(today), true);
-    check('11o. the empty bar is drawn from 0, not from spent', /bar\(noBudget \? 0 : spent, budget\)/.test(today), true);
+    check('11o. with no budget the bar row is left out, not drawn amber', /\$\{noBudget \? '' : `<div class="fin-hero-row bar">/.test(today), true);
     // V100.92 plan grid: each day tinted by spend/budget, and a tracked day shows what was SPENT.
     const plan = index.slice(index.indexOf('<div class="fin-grid">'));
     check('11p. perDay is computed once for both Month and Plan', (index.match(/const perDay = \{\}/g) || []).length, 1);
@@ -282,7 +282,7 @@ fin.finState.month = '2026-09';   // finOpen() normally sets this; the mutators 
     const month = index.slice(monthIdx, index.indexOf("// plan", monthIdx));
     check('11ad. Month renders the borderless hero, not a card', /<div class="fin-hero">/.test(month) && !/fin-card/.test(month), true);
     check('11ae. the run-on sub line is gone', /budget so far/.test(index), false);
-    check('11af. with no plan there is no "of ฿0" and no %', /noPlan \? 'spent · ใช้ไปแล้วเดือนนี้' : 'of ' \+ finFmt\(planTotal\)/.test(month), true);
+    check('11af. with no plan there is no "of ฿0" and no %', /noPlan \? 'spent this month' : 'of ' \+ finFmt\(planTotal\)/.test(month), true);
     check('11ag. with no plan the bar stays empty instead of filling amber', /bar\(noPlan \? 0 : spent, planTotal\)/.test(month), true);
     check('11ah. pace moved into the bar tooltip', /title="On pace for /.test(month), true);
     check('11ai. the Days card is one stats line', /<div class="fin-stats">/.test(month) && !/fin-kv/.test(month), true);
