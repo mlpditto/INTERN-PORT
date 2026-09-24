@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.51)</title>
+    <title>Nika Admin (V101.52)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6449,7 +6449,7 @@
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <!-- V93.08: cache-bust on taxonomy.js for the LP Firestore overlay rollout -->
     <script src="ai-model-registry.js?v=V99.89"></script>
-    <script src="ai-model-ui.js?v=V101.49"></script>
+    <script src="ai-model-ui.js?v=V101.52"></script>
     <link rel="stylesheet" href="text-ai-chips.css?v=V101.50">
     <link rel="stylesheet" href="quiz-resource-cards.css?v=V99.68">
     <link rel="stylesheet" href="case-split-studio.css?v=V100.38">
@@ -6468,7 +6468,7 @@
     <script src="codex-vision.js?v=V101.20"></script>
     <!-- V91.98 fix: walker skips user-content subtrees (q-text-preview / md-render / lang-no-toggle) -->
     <script src="lang-toggle.js?v=V97.44"></script>
-<link rel="stylesheet" href="audit-toolbar.css?v=V101.21">
+<link rel="stylesheet" href="audit-toolbar.css?v=V101.52">
 <link rel="stylesheet" href="quiz-curate.css?v=V101.18">
 <script src="quiz-revision.js?v=V100.07"></script>
 <script src="ai-usage-overview.js?v=V100.19"></script>
@@ -17548,7 +17548,7 @@
                     }, 350);
                 }
                 
-                const selectedModel = opts?.model ? normalizeTextAIModel(opts.model) : textAIModel('ai-analyzer-model-val');
+                const selectedModel = opts?.model ? resolveTrialTextAIModel(opts.model) : textAIModel('ai-analyzer-model-val'); // V101.52: a picked trial model (Grok) is not normalised to Luna
                 let resultRaw = '', aiTokens = 0, aiModel = '', result = null;
 
                 // V97.39: "🕑 Last" reopens a previously-saved analysis (Firestore
@@ -17922,9 +17922,9 @@
             result.overallScore = Math.round(rows.reduce((sum, row) => sum + row.averageScore, 0) / rows.length * 10) / 10;
         };
 
-        window.auditFixModel = () => textAIModel('quality-audit-model');
+        window.auditFixModel = () => resolveTrialTextAIModel((document.getElementById('quality-audit-model') || {}).value); // V101.52: keep a picked trial model
         window.syncAuditFixHints = function() {
-            const model = TEXT_AI_MODELS.find(m => m.id === auditFixModel());
+            const model = textAIModelInfo(auditFixModel());
             document.querySelectorAll('.audit-fix-control').forEach(host => {
                 host.querySelector('.audit-fix-model').textContent = model.label;
                 const hint = 'ใช้ ' + model.label + ' เสนอแก้ไขข้อนี้ · เปลี่ยนโมเดลได้จากแถว chips ด้านบน';
@@ -17948,16 +17948,17 @@
             const inputId = isAudit ? 'quality-audit-model' : 'rewrite-ai-model';
             const selected = isAudit ? 'gpt-5.6-luna' : textAIModel('ai-analyzer-model-val');
             const provider = TEXT_AI_MODELS.find(m => m.id === selected).label.split(' ')[0];
-            const action = `document.getElementById('${inputId}').value=this.dataset.value;this.parentElement.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b===this);b.setAttribute('aria-pressed',String(b===this))});this.closest('.audit-toolbar').querySelector('.audit-run').title='ใช้ '+this.getAttribute('aria-label')+' ทำงานนี้'` + (isAudit ? ';syncAuditFixHints()' : ";syncModelDefault('ai-analyzer-model-val',this.dataset.value)");
-            const chips = textAIChipContents(selected, action).replace(/<span class="text-ai-provider"[^>]*>.*?<\/span>/g, '').replace(/<button /g, '<button hidden ' ).replace(new RegExp('hidden ([^>]*aria-label="' + provider + ' )', 'g'), '$1');
+            const action = `document.getElementById('${inputId}').value=this.dataset.value;this.parentElement.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b===this);b.setAttribute('aria-pressed',String(b===this))});this.closest('.audit-toolbar').querySelector('.audit-run').title='ใช้ '+this.getAttribute('aria-label')+' ทำงานนี้'` + (isAudit ? ';syncAuditFixHints()' : ";if(!isTrialTextAIModel(this.dataset.value))syncModelDefault('ai-analyzer-model-val',this.dataset.value)");
+            // V101.52: trial models (Grok) are offered here only; picking one never becomes the Settings default.
+            const chips = textAIChipContents(selected, action, null, TEXT_AI_TRIAL_MODELS).replace(/<span class="text-ai-provider"[^>]*>.*?<\/span>/g, '').replace(/<button /g, '<button hidden ' ).replace(new RegExp('hidden ([^>]*aria-label="' + provider + ' )', 'g'), '$1');
             // V101.21: tabs follow TEXT_AI_MODELS (first word of each label, in order) — the
             // hard-coded three left the Qwen / DeepSeek chips (V101.05) permanently hidden.
-            const providers = [...new Set(TEXT_AI_MODELS.map(m => m.label.split(' ')[0]))];
+            const providers = [...new Set([...TEXT_AI_MODELS, ...TEXT_AI_TRIAL_MODELS].map(m => m.label.split(' ')[0]))];
             return `<div class="audit-model-row"><input type="hidden" id="${inputId}" value="${selected}"><div class="audit-providers" role="group" aria-label="Browse model providers">${providers.map(p => `<button type="button" class="audit-provider" data-provider="${p}" aria-pressed="${p === provider}" title="Show ${p} models · pick one to switch" data-th-title="ดูรุ่นของ ${p} · กดเลือกรุ่นเพื่อเปลี่ยนโมเดล" onclick="browseAuditProvider(this)">${p}</button>`).join('')}</div><div class="text-ai-chips" role="group" aria-label="AI model">${chips}</div></div>`;
         };
         window.auditToolbarHtml = function(hasResult, mode = 'audit', allowExport = false) {
             const isAudit = mode === 'audit';
-            const run = isAudit ? 'runSelectedQualityAudit(this)' : 'analyzeQuizAI(this, { forceNew: true })';
+            const run = isAudit ? 'runSelectedQualityAudit(this)' : 'runSelectedAnalyze(this)';
             const selected = isAudit ? 'gpt-5.6-luna' : textAIModel('ai-analyzer-model-val');
             const label = TEXT_AI_MODELS.find(m => m.id === selected).label;
             return `<div class="audit-toolbar lang-no-toggle"><div class="audit-toolbar-top">${window.reviewTabsHtml(mode)}<div class="audit-actions"><button type="button" class="audit-run" onclick="${run}" title="Use ${label} for this task" data-th-title="ใช้ ${label} ทำงานนี้">↻ ${isAudit ? 'Review' : 'Rewrite'}</button>${allowExport ? '<button type="button" onclick="exportAiAnalysisMd()" title="Download the analysis as Markdown" data-th-title="ดาวน์โหลดผลการวิเคราะห์เป็น Markdown">Export</button>' : ''}<button type="button" class="audit-close" onclick="closeQuizReview()" aria-label="Close review" title="Close the quiz review" data-th-title="ปิดหน้าตรวจข้อสอบ">×</button></div></div>${window.auditModelControlsHtml(hasResult, mode)}</div>${isAudit ? '<p class="audit-toolbar-note lang-no-toggle">ⓘ AI may err · Check duplicate answers and ambiguous keys.</p>' : ''}`;
@@ -17965,8 +17966,14 @@
 
         window.runSelectedQualityAudit = function(btn) {
             const model = document.getElementById('quality-audit-model').value;
-            if (!window.TEXT_AI_MODELS.some(m => m.id === model)) return;
+            if (!window.textAIModelInfo(model)) return;
             return auditQuizAI(btn, { forceNew: true, model });
+        };
+
+        // V101.52: Analyze runs the model picked in this toolbar (a trial model is kept for this run
+        // only); the value is the Settings analyzer default unless a trial chip was picked.
+        window.runSelectedAnalyze = function(btn) {
+            return analyzeQuizAI(btn, { forceNew: true, model: (document.getElementById('rewrite-ai-model') || {}).value });
         };
 
         window.renderAuditStart = function() {
@@ -18006,7 +18013,7 @@
                             <i class="fa-solid fa-spinner fa-spin" style="font-size:1.8em; color:#0891b2;"></i>
                             <div style="font-weight:800; color:#0891b2;">${(opts && opts.forceNew) ? 'Running a fresh Quality Audit…' : 'Loading the Quality Audit…'}</div>
                             <div style="font-size:0.82em; color:#64748b;">${(opts && opts.forceNew) ? `Judging every question on ${(window.AUDIT_DIMS || []).length} dimensions — this takes a moment.` : 'Fetching the saved audit, or running one if there is none.'}</div>
-                            <div id="audit-progress-meta" data-model="${escapeHtml(((window.TEXT_AI_MODELS || []).find(m => m.id === (opts.model || (document.getElementById('ai-analyzer-model-val') || {}).value)) || {}).label || '')}" style="font-size:0.85em; font-weight:700; color:#0e7490; font-variant-numeric:tabular-nums;"></div>
+                            <div id="audit-progress-meta" data-model="${escapeHtml((window.textAIModelInfo(opts.model || (document.getElementById('ai-analyzer-model-val') || {}).value) || {}).label || '')}" style="font-size:0.85em; font-weight:700; color:#0e7490; font-variant-numeric:tabular-nums;"></div>
                         </div>`;
                 }
             }

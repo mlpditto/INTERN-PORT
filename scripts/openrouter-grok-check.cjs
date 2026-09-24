@@ -100,6 +100,23 @@ const ok = (content, finish = 'stop', usage = { prompt_tokens: 100, completion_t
     check('T7 the catch does not re-send a final proxy answer', /\} catch \(e\) \{\n\s*if \(e\.proxyAnswered\) throw e;\n\s*console\.warn\('\[AI Proxy\] Link failed/.test(admin), true);
     check('T7 no leftover isProxyOnlyImageModel', /isProxyOnlyImageModel/.test(admin), false);
 
+    // T8 (V101.52) — UI opt-in: Grok is offered by the audit toolbar only, never as a default
+    const win = {}; const doc = { addEventListener() {}, getElementById: () => null };
+    new Function('window', 'document', 'localStorage', fs.readFileSync(path.join(root, 'public', 'ai-model-ui.js'), 'utf8'))(win, doc, { getItem: () => null, setItem() {} });
+    const grok = 'or/x-ai/grok-4.7';
+    check('T8 Grok is NOT in TEXT_AI_MODELS (no other rail / select / QFP / Settings)', win.TEXT_AI_MODELS.some(m => m.id === grok), false);
+    check('T8 Grok is the one trial model', JSON.stringify(win.TEXT_AI_TRIAL_MODELS.map(m => [m.id, m.short])), '[["or/x-ai/grok-4.7","Grok 4.7"]]');
+    check('T8 normaliser still maps Grok to the default (a saved default can never become Grok)', win.normalizeTextAIModel(grok), 'gpt-5.6-luna');
+    check('T8 an explicit trial pick is kept, others normalise as before', `${win.resolveTrialTextAIModel(grok)}|${win.resolveTrialTextAIModel('claude-sonnet-5')}|${win.resolveTrialTextAIModel('nope')}`, 'or/x-ai/grok-4.7|claude-sonnet-5|gpt-5.6-luna');
+    check('T8 default chip rail has no Grok', /grok/i.test(win.textAIChipContents('gpt-5.6-luna')), false);
+    const withTrial = win.textAIChipContents('gpt-5.6-luna', '', null, win.TEXT_AI_TRIAL_MODELS);
+    check('T8 trial chip: text, full name, OpenRouter id, tooltip route', /data-value="or\/x-ai\/grok-4\.7" aria-label="Grok 4\.7" aria-pressed="false" title="Grok 4\.7 · or\/x-ai\/grok-4\.7 — [^"]*OpenRouter"[^>]*>Grok 4\.7<\/button>/.test(withTrial), true);
+    const trialUses = admin.match(/TEXT_AI_TRIAL_MODELS/g) || [];
+    check('T8 admin.html offers trial models only in the audit toolbar (chips + provider tabs)', trialUses.length, 2);
+    check('T8 Analyze tab does not save a trial pick as the Settings default', /;if\(!isTrialTextAIModel\(this\.dataset\.value\)\)syncModelDefault\('ai-analyzer-model-val',this\.dataset\.value\)/.test(admin), true);
+    check('T8 Analyze + Suggest fix keep a picked trial model (no silent switch to Luna)', /const selectedModel = opts\?\.model \? resolveTrialTextAIModel\(opts\.model\)/.test(admin) && /window\.auditFixModel = \(\) => resolveTrialTextAIModel\(/.test(admin), true);
+    check('T8 Analyze runs the model picked in the toolbar', /return analyzeQuizAI\(btn, \{ forceNew: true, model: \(document\.getElementById\('rewrite-ai-model'\) \|\| \{\}\)\.value \}\);/.test(admin), true);
+
     let failed = 0;
     for (const [name, got, want] of checks) {
         const pass = got === want;

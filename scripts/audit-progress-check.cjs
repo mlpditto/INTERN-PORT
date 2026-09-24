@@ -10,7 +10,8 @@ const checks = [];
 const check = (name, got, want) => checks.push([name, got, want]);
 
 // static wiring
-check('popup: meta line carries the model label (opts.model → analyzer default)', /id="audit-progress-meta" data-model="\$\{escapeHtml\(\(\(window\.TEXT_AI_MODELS \|\| \[\]\)\.find\(m => m\.id === \(opts\.model \|\| \(document\.getElementById\('ai-analyzer-model-val'\) \|\| \{\}\)\.value\)\) \|\| \{\}\)\.label \|\| ''\)\}"/.test(admin), true);
+// V101.52: textAIModelInfo also knows the opt-in trial models (Grok), so their label shows too.
+check('popup: meta line carries the model label (opts.model → analyzer default)', admin.includes(`id="audit-progress-meta" data-model="\${escapeHtml((window.textAIModelInfo(opts.model || (document.getElementById('ai-analyzer-model-val') || {}).value) || {}).label || '')}"`), true);
 check('clock: started once per fresh run, 1 s repaint, not for cached results', /if \(auditMetaEl && !\(opts && opts\.cachedResult\)\) \{\n\s*const paint = \(\) => \{ auditMetaEl\.textContent = \(auditMetaEl\.dataset\.model \? auditMetaEl\.dataset\.model \+ ' · ' : ''\) \+ auditElapsed\(\); \};\n\s*paint\(\);\n\s*auditClockTimer = setInterval\(paint, 1000\);/.test(admin), true);
 check('button ticker shows the clock', /Auditing \$\{pct\}% · \$\{auditElapsed\(\)\}/.test(admin), true);
 check('clock cleared in finally', /if \(auditClockTimer\) clearInterval\(auditClockTimer\); \/\/ V101\.22/.test(admin), true);
