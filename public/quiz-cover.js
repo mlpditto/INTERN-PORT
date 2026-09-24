@@ -220,28 +220,50 @@ const QuizCover = (() => {
         ].join('\n');
         const token = ++revision;
         clearCandidate(); busy = true; controls(true); busyCard('Generating cover…');
+        // V101.58: when the chosen model's content filter refuses the topic (Seedream: "blocked this
+        // request through content moderation"), retrying it cannot help — try the next models in rail
+        // order until one returns an image. Any other first failure stops as before.
+        const start = AI_MODELS.findIndex(m => m.id === model);
+        const order = start < 0 ? [model] : [...AI_MODELS.slice(start), ...AI_MODELS.slice(0, start)].map(m => m.id);
+        const tried = [];
         try {
-            // V101.53: Image-API models get the collection's 3:4 as a real parameter, not just prompt text.
-            const imageApi = !!(AI_MODELS.find(m => m.id === model) || {}).imageApi;
-            const response = await window.callUniversalAI(model, prompt, false, null, '', { feature: 'quiz_cover', ...(imageApi ? { imageApi: true, aspectRatio: '3:4' } : {}) });
-            if (token !== revision) return;
-            const image = pickAiImageFromResponse(response);
-            if (!image) throw new Error('AI did not return an image — please retry');
-            const result = await fetch(image);
-            if (!result.ok) throw new Error('Could not load the AI image');
-            const blob = await result.blob();
-            if (!['image/png', 'image/jpeg', 'image/webp'].includes(blob.type) || blob.size > 10 * 1024 * 1024) throw new Error('Image must be PNG, JPG or WebP up to 10 MB');
-            const cropped = await cropToCover(blob);
-            if (token !== revision) return;
-            candidate = cropped; previewUrl = URL.createObjectURL(cropped);
-            const preview = el.querySelector('.quiz-cover-ai-preview');
-            preview.querySelector('img').src = previewUrl; preview.hidden = false;
-            status.textContent = 'Check the image and text, then Apply — or Generate again to retry';
+            for (const id of order) {
+                if (tried.length) busyCard(tried[0] + ' blocked this topic — trying ' + modelName(id) + '…');
+                let cropped;
+                try { cropped = await coverFrom(id, prompt); } catch (error) {
+                    if (token !== revision) return;
+                    if (!tried.length && !isModerationBlock(error)) throw error;
+                    tried.push(modelName(id));
+                    if (tried.length === order.length) throw new Error(tried[0] + ' blocked this topic; ' + tried.slice(1).join(', ') + ' also failed — ' + (error.message || 'please retry'));
+                    continue;
+                }
+                if (token !== revision) return;
+                candidate = cropped; previewUrl = URL.createObjectURL(cropped);
+                const preview = el.querySelector('.quiz-cover-ai-preview');
+                preview.querySelector('img').src = previewUrl; preview.hidden = false;
+                status.textContent = (tried.length ? tried[0] + ' blocked this topic (content filter) — made with ' + modelName(id) + '. ' : '') + 'Check the image and text, then Apply — or Generate again to retry';
+                return;
+            }
         } catch (error) {
             if (token === revision) status.textContent = 'Generate failed: ' + (error.message || 'please retry');
         } finally {
             if (token === revision) { busy = false; controls(false); busyCard(null); }
         }
+    }
+    const isModerationBlock = error => /moderation|content (?:filter|policy)|safety (?:filter|system)/i.test(String(error && error.message || ''));
+    // Rail text is not unique (Nano Banana 2 on two routes), so the OpenRouter one says so.
+    const modelName = id => { const m = AI_MODELS.find(x => x.id === id); return m ? m.label + (id.startsWith('or/') && AI_MODELS.some(x => x !== m && x.label === m.label) ? ' (OpenRouter)' : '') : id; };
+    async function coverFrom(model, prompt) {
+        // V101.53: Image-API models get the collection's 3:4 as a real parameter, not just prompt text.
+        const imageApi = !!(AI_MODELS.find(m => m.id === model) || {}).imageApi;
+        const response = await window.callUniversalAI(model, prompt, false, null, '', { feature: 'quiz_cover', ...(imageApi ? { imageApi: true, aspectRatio: '3:4' } : {}) });
+        const image = pickAiImageFromResponse(response);
+        if (!image) throw new Error('AI did not return an image — please retry');
+        const result = await fetch(image);
+        if (!result.ok) throw new Error('Could not load the AI image');
+        const blob = await result.blob();
+        if (!['image/png', 'image/jpeg', 'image/webp'].includes(blob.type) || blob.size > 10 * 1024 * 1024) throw new Error('Image must be PNG, JPG or WebP up to 10 MB');
+        return cropToCover(blob);
     }
     async function applyGenerated() {
         if (busy || !candidate) return;
