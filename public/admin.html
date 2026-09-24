@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.34)</title>
+    <title>Nika Admin (V101.35)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -4993,6 +4993,9 @@
         .qe-popover .glass-toggle-container { margin:0; height:auto; min-height:32px; padding:3px; border-radius:10px; gap:2px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.05); }
         .qe-lang .glass-toggle-item { font-size:0.7em; font-weight:800; padding:4px 10px; border-radius:8px; cursor:pointer; }
         .qe-translate-run { align-self:flex-start; }
+        /* V101.35: Disease Codex form — text-model rail beside AI fill / AI Review */
+        .dxa-form-model-wrap { display:flex; flex-direction:column; gap:4px; margin:8px 0 4px; }
+        .dxa-form-model-label { font-size:0.7em; font-weight:900; letter-spacing:0.06em; text-transform:uppercase; color:#475569; }
         .btn-sm {
             padding: 5px 10px;
             border-radius: 6px;
@@ -14794,6 +14797,14 @@
                         </button>
                     </div>
                     <div style="font-size:0.78em; color:#94a3b8;" id="dxa-form-doc-id"></div>
+                    <!-- V101.35: the text-model rail for AI fill / AI Review / AI ICD — these three used to read the
+                         Auto-Draft chip's localStorage value silently (a rail on the OTHER tab), unlike Drug Codex, whose
+                         drug-toolbar.js puts the rail beside its Fill/Review buttons. Same hidden input (#dxa-ai-model-val)
+                         as Auto-Draft, so both rails always agree. Filled/shown by dxaShowAiButtons(). -->
+                    <div id="dxa-form-model-wrap" class="dxa-form-model-wrap lang-no-toggle" style="display:none;">
+                        <span class="dxa-form-model-label">Text model · Fill / Review / ICD</span>
+                        <div id="dxa-form-model-rail" class="text-ai-chips lang-no-toggle" role="group" aria-label="Text model for AI fill, AI Review and AI ICD"></div>
+                    </div>
                 </div>
 
                 <div id="dxa-form-meta" class="dca-form-meta lang-no-toggle" style="display:none;"></div>
@@ -40540,6 +40551,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return `<div style="margin-bottom:8px;"><strong>📷 Source image</strong> <span style="font-size:0.85em; opacity:0.8;">attached by the intern · fields may be AI pre-filled from it, verify against it</span>`
                 + `<a href="${safe}" target="_blank" rel="noopener noreferrer" title="Open full size" style="display:block; margin-top:6px;"><img src="${safe}" alt="Source image" style="display:block; max-width:100%; max-height:240px; border-radius:8px; border:1px solid #3f3f46; object-fit:contain; background:#18181b;"></a>`
                 + (kind ? `<div class="dda-reextract" style="margin-top:8px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;">`
+                    // V101.35: named, so it reads as a different rail from the form's "Text model" one.
+                    + `<span style="flex-basis:100%; font-size:0.7em; font-weight:900; letter-spacing:0.06em; text-transform:uppercase; color:#5b21b6;">Vision model · Re-extract</span>`
                     + `<div class="text-ai-chips lang-no-toggle" role="group" aria-label="Vision model" id="dda-reextract-chips-${kind}">${chips}</div>`
                     + `<button type="button" onclick="ddaReextract('${kind}')" style="${btn} border:1.5px solid #4361ee; background:#4361ee; color:#fff;">🔎 Re-extract from image</button>`
                     + `<span id="dda-reextract-status-${kind}" style="font-size:0.85em; opacity:0.85;"></span>`
@@ -43629,13 +43642,30 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (b) { b.style.display = 'inline-flex'; b.disabled = false; b.textContent = '🤖 AI fill empty fields'; }
             const r = document.getElementById('dxa-form-ai-review-btn');
             if (r) { r.style.display = 'inline-flex'; r.disabled = false; r.textContent = '🔍 AI Review'; }
+            dxaRenderFormModelRail();
         }
         function dxaHideAiButtons() {
             const b = document.getElementById('dxa-form-ai-fill-btn');
             if (b) { b.style.display = 'none'; b.disabled = false; b.textContent = '🤖 AI fill empty fields'; }
             const r = document.getElementById('dxa-form-ai-review-btn');
             if (r) { r.style.display = 'none'; r.disabled = false; r.textContent = '🔍 AI Review'; }
+            const w = document.getElementById('dxa-form-model-wrap');
+            if (w) w.style.display = 'none';
         }
+        // V101.35: text-model rail on the Edit / Review-draft form. Writes the same hidden input the
+        // Auto-Draft rail uses and pushes the change through syncRegistryModelSelect so that rail and
+        // localStorage ('ai_default_disease_codex_model') follow; re-rendered on every form open so a
+        // pick made on the Auto-Draft rail shows up here too.
+        function dxaRenderFormModelRail() {
+            const wrap = document.getElementById('dxa-form-model-wrap'), rail = document.getElementById('dxa-form-model-rail');
+            if (!wrap || !rail || typeof window.textAIChipContents !== 'function') return;
+            const action = "document.getElementById('dxa-ai-model-val').value=this.dataset.value;window.syncRegistryModelSelect?.('dxa-ai-model-val');this.parentElement.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b===this);b.setAttribute('aria-pressed',String(b===this))})";
+            rail.innerHTML = window.textAIChipContents(textAIModel('dxa-ai-model-val'), action);
+            wrap.style.display = 'flex';
+        }
+        // Model for AI fill / AI Review / AI ICD — the rail above (normalised, so a retired id
+        // stored by an older build resolves to a live chip instead of being sent to the proxy).
+        function dxaTextModel() { return textAIModel('dxa-ai-model-val'); }
 
         // ── V95.88: per-field authorship tint (mirror of Drug dca*) — diff vs draft ──
         function dxaNormProvVal(key, v) {
@@ -43798,8 +43828,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 else if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'All fields already filled — nothing for AI to add.'; }
                 return;
             }
-            let selectedModel = DXA_AI_FALLBACK_MODEL;
-            try { const saved = localStorage.getItem(DXA_AI_LS_KEY); if (saved) selectedModel = saved; } catch (_) { /* ignore */ }
+            const selectedModel = dxaTextModel(); // V101.35: the visible rail, not a silent localStorage read
             if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
             if (btn) { btn.disabled = true; btn.textContent = '⏳ Filling ' + emptyKeys.length + ' field' + (emptyKeys.length === 1 ? '' : 's') + '…'; }
             const prompt = dxaBuildAiFillPrompt(current, emptyKeys);
@@ -43936,8 +43965,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (banner && banner.style.display !== 'none') {
                 internContext = String(banner.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 500);
             }
-            let selectedModel = DXA_AI_FALLBACK_MODEL;
-            try { const saved = localStorage.getItem(DXA_AI_LS_KEY); if (saved) selectedModel = saved; } catch (_) { /* ignore */ }
+            const selectedModel = dxaTextModel(); // V101.35: the visible rail, not a silent localStorage read
             if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
             if (btn) { btn.disabled = true; btn.textContent = '⏳ Reviewing…'; }
             const prompt = dxaBuildReviewPrompt(current, filledLines, internContext);
@@ -45089,9 +45117,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
             const thaiName = (document.getElementById('dxa-f-thaiName') || {}).value || '';
             const category = (document.getElementById('dxa-f-category') || {}).value || '';
-            let model = null;
-            try { model = localStorage.getItem(DXA_AI_LS_KEY); } catch (_) {}
-            model = model || DXA_AI_FALLBACK_MODEL;
+            const model = dxaTextModel(); // V101.35: same rail as AI fill / AI Review
             const span = btn ? btn.querySelector('.dca-ndi-btn-txt') : null;
             const origTxt = span ? span.textContent : '';
             if (btn) btn.disabled = true;
