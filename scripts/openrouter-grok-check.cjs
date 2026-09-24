@@ -22,11 +22,11 @@ const runBranch = new Function('ctx', `return (async () => {
     return undefined;
 })();`);
 
-async function call({ model, isJson = false, maxOutputTokens, reply, reject }) {
+async function call({ model, isJson = false, maxOutputTokens, reply, reject, options }) {
     const sent = [];
     const out = { status: 200, body: undefined };
     const res = { status(c) { out.status = c; return res; }, json(x) { out.body = x; return res; } };
-    const generationOptions = maxOutputTokens ? { maxOutputTokens } : undefined;
+    const generationOptions = options || (maxOutputTokens ? { maxOutputTokens } : undefined);
     const postWithRetry = async (url, body) => { sent.push({ url, body }); if (reject) throw reject; return { data: reply }; };
     const quiet = { log() {}, error() {}, warn() {} };
     let thrown = null;
@@ -84,6 +84,19 @@ const ok = (content, finish = 'stop', usage = { prompt_tokens: 100, completion_t
     const cred = await call({ model: 'x-ai/grok-4.7', reject: e402 });
     check('T6 provider error propagates to the handler (no success body)', `${cred.thrown?.message}|${cred.resBody}`, 'Request failed with status code 402|undefined');
     check('T6 one upstream request per call from this branch', cred.calls, 1);
+
+    // T9 (V101.53) — OpenRouter Image API for image-only models (Seedream 5.0 Lite, Muse Image)
+    const imgOk = { data: [{ b64_json: 'iVBORw0KGgo=', media_type: 'image/png' }], usage: { total_tokens: 4200, cost: 0.035 } };
+    const sd = await call({ model: 'bytedance-seed/seedream-5-0-lite', options: { feature: 'quiz_cover', imageApi: true, aspectRatio: '3:4' }, reply: imgOk });
+    check('T9 Seedream: posted to /api/v1/images', sd.url, 'https://openrouter.ai/api/v1/images');
+    check('T9 Seedream: body = model, prompt, n 1, aspect_ratio 3:4 (no chat fields)', JSON.stringify(sd.body), '{"model":"bytedance-seed/seedream-5-0-lite","prompt":"Audit these questions","n":1,"aspect_ratio":"3:4"}');
+    check('T9 Seedream: returns a data URL + cost', `${sd.status}|${sd.resBody.imageDataUrl}|${sd.resBody.model}|${sd.resBody.usage.costUsd}`, '200|data:image/png;base64,iVBORw0KGgo=|bytedance-seed/seedream-5-0-lite|0.035');
+    const mu = await call({ model: 'meta/muse-image', options: { imageApi: true, aspectRatio: 'tall; drop table' }, reply: imgOk });
+    check('T9 Muse: Image API, junk aspect ratio is not forwarded', `${mu.url}|${mu.body.aspect_ratio}`, 'https://openrouter.ai/api/v1/images|undefined');
+    const none = await call({ model: 'meta/muse-image', options: { imageApi: true }, reply: { data: [] } });
+    check('T9 no image in the reply → 502, not an empty success', `${none.status}|${/returned no image data/.test(none.resBody.error)}`, '502|true');
+    check('T9 existing image models keep the chat path', img.url, 'https://openrouter.ai/api/v1/chat/completions');
+    check('T9 client: imageApi callers are proxy-only', /\|\| \(proxyProvider === 'openrouter' && !!\(generationOptions && generationOptions\.imageApi\)\)/.test(admin), true);
 
     // T1 — client router: or/x-ai/… → openrouter, prefix stripped, not caught by another branch
     const r0 = admin.indexOf('let proxyProvider = "";');

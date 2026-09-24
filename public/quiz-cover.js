@@ -1,12 +1,15 @@
 /* Optional quiz covers. Uploads use the existing admin-only editor image storage. */
 const QuizCover = (() => {
     let revision = 0, busy = false, candidate = null, previewUrl = '';
-    // V100.86: icon-only chip rail replaces the <select> — icon/ariaLabel/titleTh feed the rail's markup.
+    // V100.86: chip rail replaces the <select>. V101.53: lean text chips ([owner logo] name) instead of
+    // icon-only cells so five models stay readable; `imageApi` models go through OpenRouter's Image API
+    // (POST /api/v1/images, aspect_ratio 3:4) — Seedream 5.0 Lite and Muse Image output images only.
     const AI_MODELS = [
-        { id: 'as/gemini-3.1-flash-image', icon: '🍌', ariaLabel: 'Nano Banana 2 (recommended)', titleTh: 'Nano Banana 2 · แนะนำ' },
-        // V101.50: official OpenAI Blossom (assets/logos, text-ai-chips.css) instead of an emoji.
-        { id: 'or/openai/gpt-5.4-image-2', icon: '<span class="text-ai-logo" data-owner="openai" aria-hidden="true"></span>', ariaLabel: 'GPT Image 2 via OpenRouter', titleTh: 'GPT Image 2 · ผ่าน OpenRouter' },
-        { id: 'or/google/gemini-3.1-flash-image-preview', icon: '✨', ariaLabel: 'Gemini Image Preview via OpenRouter', titleTh: 'Gemini Image Preview · ผ่าน OpenRouter' }
+        { id: 'as/gemini-3.1-flash-image', label: 'Nano Banana 2', ariaLabel: 'Nano Banana 2 (recommended)', titleTh: 'Nano Banana 2 · Google AI Studio · แนะนำ' },
+        { id: 'or/openai/gpt-5.4-image-2', logo: 'openai', label: 'Image 2', ariaLabel: 'GPT Image 2 via OpenRouter', titleTh: 'GPT-5.4 Image 2 · ผ่าน OpenRouter' },
+        { id: 'or/google/gemini-3.1-flash-image-preview', label: 'Nano Banana 2', ariaLabel: 'Gemini Image Preview via OpenRouter', titleTh: 'Nano Banana 2 (Gemini 3.1 Flash Image Preview) · ผ่าน OpenRouter' },
+        { id: 'or/bytedance-seed/seedream-5-0-lite', label: 'Seedream 5.0 Lite', imageApi: true, ariaLabel: 'ByteDance Seedream 5.0 Lite via OpenRouter', titleTh: 'ByteDance Seed: Seedream 5.0 Lite · ผ่าน OpenRouter' },
+        { id: 'or/meta/muse-image', label: 'Muse Image', imageApi: true, ariaLabel: 'Meta Muse Image via OpenRouter', titleTh: 'Meta: Muse Image · ผ่าน OpenRouter (ช้ากว่า — คิดก่อนวาด)' }
     ];
     const MODEL_PREF_KEY = 'quiz_cover_ai_model';
     const safeUrl = value => { try { const u = new URL(value); return u.protocol === 'https:' ? u.href : ''; } catch (_) { return ''; } };
@@ -121,7 +124,7 @@ const QuizCover = (() => {
 <button type="button" data-upload title="อัปโหลดภาพปก" aria-label="Upload cover">📤</button>
 <button type="button" data-remove title="นำปกออก" aria-label="Remove cover" hidden>🗑️</button>
 <span class="quiz-cover-lock" title="สไตล์คงที่ของคอลเลกชันปก: 3D pastel · แนวตั้ง 3:4 — เปลี่ยนไม่ได้ตรงนี้" aria-label="Fixed style: 3D pastel, portrait 3:4" role="img">🔒</span>
-<div class="quiz-cover-model-rail" data-model-rail role="radiogroup" aria-label="AI model">${AI_MODELS.map((model, i) => `<button type="button" data-model-chip data-value="${model.id}" class="${i === 0 ? 'active' : ''}" title="${model.titleTh}" aria-label="${model.ariaLabel}">${model.icon}</button>`).join('')}</div>
+<div class="quiz-cover-model-rail" data-model-rail role="group" aria-label="AI model">${AI_MODELS.map((model, i) => `<button type="button" data-model-chip data-value="${model.id}" class="${i === 0 ? 'active' : ''}" aria-pressed="${i === 0}" title="${model.titleTh}" aria-label="${model.ariaLabel}">${model.logo ? `<span class="text-ai-logo" data-owner="${model.logo}" aria-hidden="true"></span>` : ''}${model.label}</button>`).join('')}</div>
 <button type="button" data-prompt-toggle class="quiz-cover-plus" title="แนวภาพเพิ่มเติม (ไม่บังคับ)" aria-label="Add optional visual detail" aria-expanded="false">＋</button>
 <button type="button" data-generate class="quiz-cover-generate" title="สร้างปกด้วย AI" aria-label="Generate cover with AI">✨ Generate</button>
 <input type="text" data-prompt maxlength="300" placeholder="Optional detail — e.g. blue tones, a heart as the hero" title="แนวภาพเพิ่มเติม (ไม่บังคับ)" hidden>
@@ -131,16 +134,14 @@ const QuizCover = (() => {
         el.querySelectorAll('img').forEach(img => img.tabIndex = 0);
         const input = el.querySelector('[type=file]');
         const modelChips = el.querySelectorAll('[data-model-chip]');
+        const pickModel = value => modelChips.forEach(c => { const on = c.dataset.value === value; c.classList.toggle('active', on); c.setAttribute('aria-pressed', String(on)); });
         try {
             const savedModel = localStorage.getItem(MODEL_PREF_KEY);
-            if (AI_MODELS.some(model => model.id === savedModel)) {
-                modelChips.forEach(chip => chip.classList.toggle('active', chip.dataset.value === savedModel));
-            }
+            if (AI_MODELS.some(model => model.id === savedModel)) pickModel(savedModel);
         } catch (_) {}
         modelChips.forEach(chip => {
             chip.onclick = () => {
-                modelChips.forEach(c => c.classList.remove('active'));
-                chip.classList.add('active');
+                pickModel(chip.dataset.value);
                 try { localStorage.setItem(MODEL_PREF_KEY, chip.dataset.value); } catch (_) {}
             };
         });
@@ -200,7 +201,9 @@ const QuizCover = (() => {
         const token = ++revision;
         clearCandidate(); busy = true; controls(true); status.textContent = 'Generating cover…';
         try {
-            const response = await window.callUniversalAI(model, prompt, false, null, '', { feature: 'quiz_cover' });
+            // V101.53: Image-API models get the collection's 3:4 as a real parameter, not just prompt text.
+            const imageApi = !!(AI_MODELS.find(m => m.id === model) || {}).imageApi;
+            const response = await window.callUniversalAI(model, prompt, false, null, '', { feature: 'quiz_cover', ...(imageApi ? { imageApi: true, aspectRatio: '3:4' } : {}) });
             if (token !== revision) return;
             const image = pickAiImageFromResponse(response);
             if (!image) throw new Error('AI did not return an image — please retry');
