@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.37)</title>
+    <title>Nika Admin (V101.38)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -8154,15 +8154,14 @@
                                                         🤗 OmniVoice Voice Design
                                                     </div>
                                                     <div style="font-size:0.72em; color:#5C4300; margin-bottom:10px; line-height:1.45;">
-                                                        Pick attribute chips below — the HF Space picks a matching voice. <b>Random</b> lets it pick. <b>English Accent</b> / <b>Chinese Dialect</b> only apply when the production language matches; otherwise the value is ignored.
+                                                        Pick attributes — the Space matches a voice. <b>Auto</b> leaves it open.
                                                     </div>
                                                     <!-- V93.45 Phase 2: voice cloning toggle. When on, `/_clone_fn` endpoint is called instead of `/_design_fn`, using uploaded ref audio + transcript. Voice design chips are hidden when cloning to reduce choice paralysis (the ref audio dictates the voice profile). -->
                                                     <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; background:white; border:1.5px solid #FFD21E; border-radius:10px; margin-bottom:10px;">
                                                         <label for="tts-omnivoice-clone-toggle" style="display:flex; align-items:center; gap:8px; cursor:pointer; flex:1; font-weight:800; color:#6B4E00; font-size:0.85em; margin:0;">
                                                             <input type="checkbox" id="tts-omnivoice-clone-toggle" onchange="toggleOmnivoiceCloningMode(this.checked)" style="width:16px; height:16px; cursor:pointer;">
-                                                            🎤 Use Voice Cloning
+                                                            🎤 Voice cloning
                                                         </label>
-                                                        <span style="font-size:0.7em; color:#5C4300;">Upload a 5–30 s sample. Voice attributes below are ignored.</span>
                                                     </div>
                                                     <div id="tts-omnivoice-clone-section" style="display:none; margin-bottom:12px; padding:12px; background:white; border:1.5px solid #FFD21E; border-radius:12px;">
                                                         <!-- V93.49 Phase 2.1: per-admin reusable voice preset row. Sits above the file picker; selecting a preset auto-fills audio + transcript + instruct. Save uploads current audio to voice-refs/{hash}.{ext} + persists Firestore doc. -->
@@ -8201,10 +8200,15 @@
                                                         <div class="tts-chip-group" id="omni-chips-pitch" style="margin-bottom:6px;"></div>
                                                         <div style="font-size:0.65em; font-weight:800; color:#6B4E00; text-transform:uppercase; margin:6px 0 4px;">Style</div>
                                                         <div class="tts-chip-group" id="omni-chips-style" style="margin-bottom:6px;"></div>
+                                                        <!-- V101.38: shown only for the language they affect (see updateQwenModeUi) -->
+                                                        <div id="omni-rail-accent-en">
                                                         <div style="font-size:0.65em; font-weight:800; color:#6B4E00; text-transform:uppercase; margin:6px 0 4px;">English Accent</div>
                                                         <div class="tts-chip-group" id="omni-chips-accent-en" style="margin-bottom:6px;"></div>
+                                                        </div>
+                                                        <div id="omni-rail-dialect-cn">
                                                         <div style="font-size:0.65em; font-weight:800; color:#6B4E00; text-transform:uppercase; margin:6px 0 4px;">Chinese Dialect</div>
                                                         <div class="tts-chip-group" id="omni-chips-dialect-cn"></div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -8555,7 +8559,15 @@
                 const isQwen = backend === 'qwen' && window._ttsMode === 'single';
 
                 if (panel) panel.style.display = isQwen ? 'block' : 'none';
-                if (voiceWrap) voiceWrap.style.display = (!isQwen || mode === 'preset') ? 'block' : 'none';
+                // V101.38: OmniVoice ignores the preset speaker picker (chips or cloning pick the
+                // voice), and its accent / dialect rails only matter for English / Chinese.
+                const isOmni = backend === 'omnivoice';
+                if (voiceWrap) voiceWrap.style.display = !isOmni && (!isQwen || mode === 'preset') ? 'block' : 'none';
+                const omniLang = document.getElementById(window._ttsMode === 'dialogue' ? 'tts-language-select-d' : 'tts-language-select')?.value || 'auto';
+                const accentRail = document.getElementById('omni-rail-accent-en');
+                const dialectRail = document.getElementById('omni-rail-dialect-cn');
+                if (accentRail) accentRail.style.display = omniLang === 'auto' || omniLang.startsWith('en') ? 'block' : 'none';
+                if (dialectRail) dialectRail.style.display = omniLang === 'auto' || omniLang.startsWith('zh') ? 'block' : 'none';
                 if (designBox) designBox.style.display = isQwen && mode === 'voice_design' ? 'block' : 'none';
                 if (hintEl) {
                     hintEl.textContent = mode === 'voice_design'
@@ -8895,13 +8907,12 @@
                 omnivoice: {
                     label: 'OmniVoice',
                     engine: 'omnivoice',
-                    help: 'k2-fsa zero-shot TTS via the public HuggingFace Space (free ZeroGPU). Voice design across 600+ languages including native Thai — no API key, no Cloud Function.',
+                    help: 'k2-fsa zero-shot TTS · 600+ languages incl. native Thai.',
                     cost: {
                         tier: 'free',
                         badge: 'Free · HF Space',
                         badgeTone: 'hf',
-                        warning: 'Runs on the public HuggingFace Space (ZeroGPU community quota). Expect ~10–30s queue waits when the Space is busy, and brief outages if the Space is paused. No SLA — fall back to Qwen / Gemini / Cloud TTS for time-critical jobs.',
-                        detail: 'Voice design via Gender / Age / Pitch / Style / English Accent / Chinese Dialect chip rails. Cloning (ref audio) lives behind a later phase.'
+                        detail: 'Shared ZeroGPU — expect 10–30 s queues; the Space may be paused. For deadlines, use Gemini or Cloud TTS.'
                     },
                     capabilities: {
                         encodings: ['mp3', 'wav'],
@@ -8915,7 +8926,7 @@
                         notes: 'Single-speaker zero-shot TTS via HF Space. Default /_design_fn endpoint (voice attribute chips); /_clone_fn when "Use Voice Cloning" toggle is on (V93.45). 600+ langs incl. native Thai. RTF 0.025 ≈ 40x realtime on warm GPU. 24K byte limit (V93.58) ≈ 2 min Thai audio / much longer English — HF queue may timeout beyond that.'
                     },
                     models: [
-                        { value: 'k2-fsa/OmniVoice', label: 'OmniVoice (HF Space, free)', description: 'Public HuggingFace Space — no API key needed. Queue + ZeroGPU quota applies.', costBadge: 'Free', costTone: 'hf', costHint: 'Runs on shared HuggingFace ZeroGPU. Slow under load; great when cost matters more than SLA.' }
+                        { value: 'k2-fsa/OmniVoice', label: 'OmniVoice (k2-fsa)', description: '', costBadge: 'No API key', costTone: 'hf', costHint: '' }
                     ]
                 }
             };
@@ -9365,7 +9376,8 @@
                     return;
                 }
                 warningEl.style.cssText = `margin-top:8px; font-size:0.75em; line-height:1.45; padding:10px 12px; border-radius:12px; ${backendTone.panel}`;
-                warningEl.innerHTML = `<div><b>${backendBadge}</b> ${backendCost.detail || ''}</div><div style="margin-top:4px;">${selectedMeta.costHint || selectedMeta.description || ''}</div><div style="margin-top:4px;">${backendCost.warning || ''}</div>`;
+                const extraLines = [selectedMeta.costHint || selectedMeta.description, backendCost.warning].filter(Boolean);
+                warningEl.innerHTML = `<div><b>${backendBadge}</b> ${backendCost.detail || ''}</div>` + extraLines.map(line => `<div style="margin-top:4px;">${line}</div>`).join('');
             };
 
             window.renderTtsRuntimeHint = function() {
