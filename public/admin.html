@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.35)</title>
+    <title>Nika Admin (V101.36)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -4996,6 +4996,48 @@
         /* V101.35: Disease Codex form — text-model rail beside AI fill / AI Review */
         .dxa-form-model-wrap { display:flex; flex-direction:column; gap:4px; margin:8px 0 4px; }
         .dxa-form-model-label { font-size:0.7em; font-weight:900; letter-spacing:0.06em; text-transform:uppercase; color:#475569; }
+        /* V101.36: lean review header · status chip · short doc id · collapsed model chip */
+        .dxa-form-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; font-weight:800; color:#0f766e; }
+        .dxa-form-head #dxa-form-mode-label { font-size:1.05em; }
+        .dxa-status-chip { display:inline-flex; align-items:center; border-radius:999px; padding:2px 10px; font-size:0.72em; font-weight:800; }
+        .dxa-status-chip.is-draft { background:#fef3c7; color:#92400e; border:1px solid #fcd34d; }
+        .dxa-status-chip.is-published { background:#dcfce7; color:#166534; border:1px solid #86efac; }
+        .dxa-doc-id { font-size:0.72em; font-weight:600; color:#94a3b8; font-family:ui-monospace, Consolas, monospace; cursor:pointer; }
+        .dxa-doc-id:hover { color:#475569; }
+        .dxa-form-actions { margin-left:auto; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+        .dxa-form-actions .dxa-form-model-wrap { flex-direction:row; margin:0; }
+        .dxa-form-model-toggle { display:inline-flex; align-items:center; gap:6px; width:auto; min-height:0; padding:5px 11px; border:1px solid #fdba74; border-radius:999px; background:#fff7ed; color:#9a3412; font-size:0.78em; font-weight:800; cursor:pointer; }
+        .dxa-form-model-toggle:hover { border-color:#f59e0b; }
+        .dxa-form-model-toggle .dxa-chev { transition:transform 0.15s ease; }
+        .dxa-form-model-toggle[aria-expanded="true"] .dxa-chev { transform:rotate(180deg); }
+        .dxa-form-model-rail { flex-basis:100%; }
+        .dxa-form-model-rail[hidden] { display:none !important; }
+        /* V101.36: verified tab = green tint, no badge; the active one keeps a darker ring */
+        .dca-form-tab-btn.verified { background:#dcfce7; color:#166534; }
+        .dca-form-tab-btn.verified:hover { background:#bbf7d0; color:#14532d; }
+        .dca-form-tab-btn.verified.active { border-color:#86efac; box-shadow:inset 0 0 0 2px #16a34a; }
+        .dca-form-tab-btn.verified .dca-form-tab-badge { display:none; }
+        /* V101.36: verify chip in the section header (replaces the strip under the tabs) */
+        .dxa-verify-chip { display:inline-flex; align-items:center; gap:6px; margin-left:6px; padding:2px 4px 2px 10px; border-radius:999px; background:#fffbeb; border:1px solid #fde68a; color:#92400e; font-size:0.8em; font-weight:800; }
+        .dxa-verify-chip.done { background:#f0fdf4; border-color:#bbf7d0; color:#166534; }
+        .dxa-verify-chip-btn { width:auto; min-height:0; padding:2px 9px; border-radius:999px; border:1px solid #f59e0b; background:#f59e0b; color:#fff; font-size:0.92em; font-weight:800; cursor:pointer; }
+        .dxa-verify-chip.done .dxa-verify-chip-btn { background:transparent; border-color:transparent; color:#166534; padding:2px 6px; opacity:0.75; }
+        .dxa-verify-chip.done .dxa-verify-chip-btn:hover { opacity:1; background:#dcfce7; }
+        /* V101.36: source-image strip (Disease + Drug review) */
+        .dda-source { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:8px; }
+        .dda-source-thumb img { display:block; width:80px; height:80px; object-fit:cover; border-radius:8px; border:1px solid #a78bfa; background:#18181b; }
+        .dda-source-text { flex:1 1 200px; min-width:0; display:flex; flex-direction:column; gap:3px; }
+        .dda-source-title { font-weight:800; font-size:0.9em; }
+        .dda-source-sub { font-size:0.8em; opacity:0.85; }
+        .dda-source-actions { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+        .dda-source-btn { width:auto; min-height:0; padding:6px 12px; border-radius:999px; font-size:0.82em; font-weight:800; cursor:pointer; white-space:nowrap; }
+        .dda-source-run { border:1.5px solid #4361ee; background:#4361ee; color:#fff; }
+        .dda-source-model { border:1px solid #c4b5fd; background:#f5f3ff; color:#5b21b6; }
+        .dda-reextract-rail { flex-basis:100%; }
+        .dda-reextract-rail[hidden] { display:none !important; }
+        .dda-source-status { font-size:0.85em; opacity:0.85; flex-basis:100%; }
+        .dda-source-status:empty { display:none; }
+
         .btn-sm {
             padding: 5px 10px;
             border-radius: 6px;
@@ -14778,33 +14820,22 @@
             <div id="dxa-view-form" style="display:none;">
                 <div id="dxa-form-error" class="dca-form-error" style="display:none;"></div>
 
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <div style="font-weight:800; color:#0f766e; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                        <span id="dxa-form-mode-label">Add Disease</span>
-                        <button type="button" id="dxa-form-copy-btn" class="dca-form-copy-btn"
-                                onclick="dxaCopyDiseaseAsMarkdown('all', this)" title="Copy this disease entry as Markdown to clipboard (current form state)">
-                            📋 Copy
-                        </button>
-                        <!-- V95.80: AI fill empty + AI Review (mirror of Drug Codex). Shown on
-                             Edit / Review-draft via dxaShowAiButtons(); hidden on Add New. -->
-                        <button type="button" id="dxa-form-ai-fill-btn" class="dca-ai-draft-btn" style="display:none;"
-                                onclick="dxaAiFillEmptyFields()" title="Use AI to fill the fields that are still empty, using current form data as seed">
-                            🤖 AI fill empty fields
-                        </button>
-                        <button type="button" id="dxa-form-ai-review-btn" class="dca-ai-review-btn" style="display:none;"
-                                onclick="dxaAiReviewDraft()" title="ให้ AI ตรวจข้อมูลโรคที่กรอกแล้ว — หาจุด factual / safety / consistency (เสนอเท่านั้น admin ตัดสินเอง · อ้างความรู้โมเดล ไม่ได้เปิดแหล่งจริง)">
-                            🔍 AI Review
-                        </button>
+                <!-- V101.36 (lean review header): one row — mode/name · status chip · short doc id · actions. The model rail
+                     collapses to a chip naming the current text model; tap to open the full rail below the row. -->
+                <div class="dxa-form-head lang-no-toggle">
+                    <span id="dxa-form-mode-label">Add Disease</span>
+                    <span id="dxa-form-status-chip" class="dxa-status-chip" style="display:none;"></span>
+                    <span id="dxa-form-doc-id" class="dxa-doc-id"></span>
+                    <div class="dxa-form-actions">
+                        <button type="button" id="dxa-form-ai-fill-btn" class="dca-ai-draft-btn" style="display:none;" onclick="dxaAiFillEmptyFields()" title="AI fill empty fields · ให้ AI เติมช่องที่ยังว่าง โดยใช้ข้อมูลในฟอร์มเป็นต้นทาง">🤖 Fill</button>
+                        <button type="button" id="dxa-form-ai-review-btn" class="dca-ai-review-btn" style="display:none;" onclick="dxaAiReviewDraft()" title="AI Review · ให้ AI ตรวจข้อมูลโรคที่กรอกแล้ว — หาจุด factual / safety / consistency">🔍 Review</button>
+                        <button type="button" id="dxa-form-copy-btn" class="dca-form-copy-btn" onclick="dxaCopyDiseaseAsMarkdown('all', this)" title="Copy this disease entry as Markdown (current form state)">📋</button>
+                        <div id="dxa-form-model-wrap" class="dxa-form-model-wrap" style="display:none;">
+                            <button type="button" id="dxa-form-model-toggle" class="dxa-form-model-toggle" onclick="dxaToggleFormModelRail()" aria-expanded="false" aria-controls="dxa-form-model-rail" title="Text model for AI fill · AI Review · AI ICD — tap to change"><span aria-hidden="true">⚙️</span><span id="dxa-form-model-name">…</span><span class="dxa-chev" aria-hidden="true">⌄</span></button>
+                        </div>
                     </div>
-                    <div style="font-size:0.78em; color:#94a3b8;" id="dxa-form-doc-id"></div>
-                    <!-- V101.35: the text-model rail for AI fill / AI Review / AI ICD — these three used to read the
-                         Auto-Draft chip's localStorage value silently (a rail on the OTHER tab), unlike Drug Codex, whose
-                         drug-toolbar.js puts the rail beside its Fill/Review buttons. Same hidden input (#dxa-ai-model-val)
-                         as Auto-Draft, so both rails always agree. Filled/shown by dxaShowAiButtons(). -->
-                    <div id="dxa-form-model-wrap" class="dxa-form-model-wrap lang-no-toggle" style="display:none;">
-                        <span class="dxa-form-model-label">Text model · Fill / Review / ICD</span>
-                        <div id="dxa-form-model-rail" class="text-ai-chips lang-no-toggle" role="group" aria-label="Text model for AI fill, AI Review and AI ICD"></div>
-                    </div>
+                    <!-- ai-model-ui chips, rendered by dxaRenderFormModelRail(); same hidden input (#dxa-ai-model-val) as Auto-Draft. -->
+                    <div id="dxa-form-model-rail" class="text-ai-chips lang-no-toggle dxa-form-model-rail" role="group" aria-label="Text model for AI fill, AI Review and AI ICD" hidden></div>
                 </div>
 
                 <div id="dxa-form-meta" class="dca-form-meta lang-no-toggle" style="display:none;"></div>
@@ -14824,19 +14855,15 @@
                 <!-- Tab navigation — 8 disease sections. Default tab = Core. -->
                 <div class="dca-form-tabs" id="dxa-form-tabs" role="tablist">
                     <button type="button" class="dca-form-tab-btn active" data-section="core"     onclick="dxaSwitchSection('core')"     role="tab">📛 Core <span class="dca-form-tab-badge empty" data-section-badge="core">○</span></button>
-                    <button type="button" class="dca-form-tab-btn"        data-section="etio"     onclick="dxaSwitchSection('etio')"     role="tab">🧬 Etio &amp; Epi <span class="dca-form-tab-badge empty" data-section-badge="etio">○</span></button>
+                    <button type="button" class="dca-form-tab-btn"        data-section="etio"     onclick="dxaSwitchSection('etio')"     role="tab" title="Etiology &amp; Epidemiology">🧬 Etio <span class="dca-form-tab-badge empty" data-section-badge="etio">○</span></button>
                     <button type="button" class="dca-form-tab-btn"        data-section="clinical" onclick="dxaSwitchSection('clinical')" role="tab">🩺 Clinical <span class="dca-form-tab-badge empty" data-section-badge="clinical">○</span></button>
                     <button type="button" class="dca-form-tab-btn"        data-section="dx"       onclick="dxaSwitchSection('dx')"       role="tab">🔬 Dx <span class="dca-form-tab-badge empty" data-section-badge="dx">○</span></button>
-                    <button type="button" class="dca-form-tab-btn"        data-section="mgmt"     onclick="dxaSwitchSection('mgmt')"     role="tab">💊 Mgmt &amp; Edu <span class="dca-form-tab-badge empty" data-section-badge="mgmt">○</span></button>
+                    <button type="button" class="dca-form-tab-btn"        data-section="mgmt"     onclick="dxaSwitchSection('mgmt')"     role="tab" title="Management &amp; Education">💊 Mgmt <span class="dca-form-tab-badge empty" data-section-badge="mgmt">○</span></button>
                     <button type="button" class="dca-form-tab-btn"        data-section="refs"     onclick="dxaSwitchSection('refs')"     role="tab">🔗 Refs <span class="dca-form-tab-badge empty" data-section-badge="refs">○</span></button>
                 </div>
 
-                <!-- V95.65: per-tab verify strip — mirrors Drug Codex. Only shown for
-                     AI-drafted forms; reflects the ACTIVE section's verify state. -->
-                <div id="dxa-verify-strip" class="dca-verify-strip" style="display:none;">
-                    <span class="dca-verify-strip-text">🤖 Drafted by AI · review it, then confirm แท็บนี้ร่างโดยเอไอ ตรวจแล้วกดยืนยัน</span>
-                    <button type="button" id="dxa-verify-toggle" class="dca-verify-toggle" onclick="dxaToggleVerifyCurrent()">Mark as verified ทำเครื่องหมายว่าตรวจแล้ว</button>
-                </div>
+                <!-- V101.36: the per-tab verify strip is gone — verified tabs turn green and the active section header
+                     carries a small "✅ Verified ↩" / "🤖 AI-drafted · Mark verified" chip (dxaRefreshVerifyStrip). -->
 
                 <!-- V95.80: AI Review findings panel — rendered by dxaRenderReviewResults.
                      Advisory list grouped by section + a completeness block for empty
@@ -40539,25 +40566,41 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
         // V101.19: source image an intern attached via "Fill from image". Shown only
         // in the review queue (banner + list chip); never copied to the published doc.
+        // V101.19 / V101.36: one 80px strip — thumb (tap opens full size) · one-line provenance ·
+        // Re-extract + a chip naming the vision model. The vision rail (vision-capable chips only)
+        // opens under the strip on tap and closes on a pick; ddaReextract still reads its active chip.
         function ddaSourceImageHtml(url, esc, kind) {
             const safe = esc(String(url || ''));
-            // V101.20: re-extract with a stronger model than the intern's Typhoon pass.
-            // Only vision-capable chips (everything except the OpenRouter text-only path).
             const stored = localStorage.getItem('ai_default_codex_vision_model') || 'gemini-3.8-flash';
+            const label = ((window.TEXT_AI_MODELS || []).find(m => m.id === stored) || {}).label || stored;
             const chips = (kind && typeof window.textAIChipContents === 'function')
-                ? window.textAIChipContents(stored, "selectStoredTextAIModel(this,'ai_default_codex_vision_model')", m => !m.id.startsWith('or/'))
+                ? window.textAIChipContents(stored, `ddaPickVisionModel(this,'${kind}')`, m => !m.id.startsWith('or/'))
                 : '';
-            const btn = 'width:auto; min-height:0; padding:5px 12px; border-radius:999px; font-size:0.85em; font-weight:800; cursor:pointer;';
-            return `<div style="margin-bottom:8px;"><strong>📷 Source image</strong> <span style="font-size:0.85em; opacity:0.8;">attached by the intern · fields may be AI pre-filled from it, verify against it</span>`
-                + `<a href="${safe}" target="_blank" rel="noopener noreferrer" title="Open full size" style="display:block; margin-top:6px;"><img src="${safe}" alt="Source image" style="display:block; max-width:100%; max-height:240px; border-radius:8px; border:1px solid #3f3f46; object-fit:contain; background:#18181b;"></a>`
-                + (kind ? `<div class="dda-reextract" style="margin-top:8px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;">`
-                    // V101.35: named, so it reads as a different rail from the form's "Text model" one.
-                    + `<span style="flex-basis:100%; font-size:0.7em; font-weight:900; letter-spacing:0.06em; text-transform:uppercase; color:#5b21b6;">Vision model · Re-extract</span>`
-                    + `<div class="text-ai-chips lang-no-toggle" role="group" aria-label="Vision model" id="dda-reextract-chips-${kind}">${chips}</div>`
-                    + `<button type="button" onclick="ddaReextract('${kind}')" style="${btn} border:1.5px solid #4361ee; background:#4361ee; color:#fff;">🔎 Re-extract from image</button>`
-                    + `<span id="dda-reextract-status-${kind}" style="font-size:0.85em; opacity:0.85;"></span>`
-                    + `<div id="dda-reextract-result-${kind}" style="width:100%;"></div></div>` : '')
+            return `<div class="dda-source lang-no-toggle">`
+                + `<a href="${safe}" target="_blank" rel="noopener noreferrer" title="Open full size" class="dda-source-thumb"><img src="${safe}" alt="Source image"></a>`
+                + `<div class="dda-source-text"><div class="dda-source-title">📷 Source image · from intern</div>`
+                + `<div class="dda-source-sub">⚠️ fields may be AI pre-filled from it — verify against it</div></div>`
+                + (kind ? `<div class="dda-source-actions">`
+                    + `<button type="button" class="dda-source-btn dda-source-run" onclick="ddaReextract('${kind}')" title="Re-extract the fields from the image with the vision model on the right">🔎 Re-extract</button>`
+                    + `<button type="button" class="dda-source-btn dda-source-model" id="dda-reextract-toggle-${kind}" onclick="ddaToggleReextractRail('${kind}')" aria-expanded="false" aria-controls="dda-reextract-chips-${kind}" title="Vision model for Re-extract — tap to change">👁️ <span id="dda-reextract-model-${kind}">${esc(label)}</span> ⌄</button>`
+                    + `</div>`
+                    + `<div class="text-ai-chips lang-no-toggle dda-reextract-rail" role="group" aria-label="Vision model" id="dda-reextract-chips-${kind}" hidden>${chips}</div>`
+                    + `<span id="dda-reextract-status-${kind}" class="dda-source-status"></span>`
+                    + `<div id="dda-reextract-result-${kind}" style="width:100%;"></div>` : '')
                 + `</div>`;
+        }
+        function ddaToggleReextractRail(kind, force) {
+            const rail = document.getElementById('dda-reextract-chips-' + kind), toggle = document.getElementById('dda-reextract-toggle-' + kind);
+            if (!rail || !toggle) return;
+            const open = typeof force === 'boolean' ? force : rail.hidden;
+            rail.hidden = !open;
+            toggle.setAttribute('aria-expanded', String(open));
+        }
+        function ddaPickVisionModel(btn, kind) {
+            selectStoredTextAIModel(btn, 'ai_default_codex_vision_model');
+            const name = document.getElementById('dda-reextract-model-' + kind);
+            if (name) name.textContent = btn.getAttribute('aria-label') || btn.dataset.value;
+            ddaToggleReextractRail(kind, false);
         }
         // V101.20: admin-side extraction from the intern's source image with a chosen
         // vision chip. Fetches the Storage object (bucket CORS allows this origin),
@@ -43107,6 +43150,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 dxaState.editingId = null;
                 const modeLabel = document.getElementById('dxa-form-mode-label');
                 if (modeLabel) modeLabel.textContent = 'Add Disease · 🤖 AI draft';
+                dxaSetStatusChip(''); // V101.36
                 dxaFillForm(draftData);
                 dxaSwitchSection('core');
                 dxaSwitchView('form');
@@ -43382,6 +43426,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 badge.classList.remove('empty', 'full', 'error', 'unverified', 'verified');
                 badge.classList.add(state);
                 badge.textContent = glyph;
+                badge.closest('.dca-form-tab-btn')?.classList.toggle('verified', state === 'verified'); // V101.36: green tab instead of a ✓ badge
             });
         }
 
@@ -43398,36 +43443,39 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         // V95.65: sync the verify strip to the active tab (hidden unless AI-drafted).
+        // V95.65 → V101.36: the verify state lives on the active section's header as a small chip
+        // ('🤖 AI-drafted · Mark verified' amber, '✅ Verified ↩' green) instead of a full-width strip
+        // under the tab rail; the tab itself turns green when verified (dxaUpdateSectionBadges).
         function dxaRefreshVerifyStrip() {
-            const strip = document.getElementById('dxa-verify-strip');
-            const toggle = document.getElementById('dxa-verify-toggle');
-            if (!strip || !toggle) return;
-            const txt = strip.querySelector('.dca-verify-strip-text');
-            if (!dxaState.formAiDrafted) { strip.style.display = 'none'; return; }
-            const activeBtn = document.querySelector('#dxa-form-tabs .dca-form-tab-btn.active');
+            const modal = document.getElementById('diseaseCodexAdminModal');
+            if (!modal) return;
+            let chip = document.getElementById('dxa-verify-chip');
+            if (!dxaState.formAiDrafted) { if (chip) chip.remove(); return; }
+            const activeBtn = modal.querySelector('#dxa-form-tabs .dca-form-tab-btn.active');
             const key = activeBtn ? activeBtn.dataset.section : 'core';
             const def = DXA_SECTION_DEFS.find(d => d.key === key);
             const anyFilled = def && def.fields.some(k => {
                 const el = document.getElementById('dxa-f-' + k);
                 return el && String(el.value || '').trim().length > 0;
             });
-            strip.style.display = 'flex';
-            if (!anyFilled) {
-                strip.classList.remove('done');
-                if (txt) txt.textContent = 'ℹ️ This tab is empty — nothing to verify แท็บนี้ยังว่าง ไม่มีอะไรต้องตรวจ';
-                toggle.style.display = 'none';
-                return;
+            const header = modal.querySelector(`.dca-form-section[data-tab="${key}"] .dca-form-section-header`);
+            if (!header) { if (chip) chip.remove(); return; }
+            if (!chip) {
+                chip = document.createElement('span');
+                chip.id = 'dxa-verify-chip'; chip.className = 'dxa-verify-chip lang-no-toggle';
+                chip.innerHTML = '<span class="dxa-verify-chip-text"></span><button type="button" id="dxa-verify-toggle" class="dxa-verify-chip-btn" onclick="dxaToggleVerifyCurrent()"></button>';
             }
-            toggle.style.display = '';
+            const copyBtn = header.querySelector('.dca-form-copy-btn');
+            if (chip.parentElement !== header) header.insertBefore(chip, copyBtn || null);
+            const txt = chip.querySelector('.dxa-verify-chip-text'), btn = chip.querySelector('#dxa-verify-toggle');
+            if (!anyFilled) { chip.style.display = 'none'; return; }
+            chip.style.display = 'inline-flex';
             const done = !!dxaState.verified[key];
-            strip.classList.toggle('done', done);
-            if (done) {
-                if (txt) txt.textContent = '✅ This tab is verified ตรวจแท็บนี้แล้ว';
-                toggle.textContent = 'Undo verify ยกเลิกการตรวจ';
-            } else {
-                if (txt) txt.textContent = '🤖 AI-drafted — review, then confirm ตรวจแล้วกดยืนยัน';
-                toggle.textContent = 'Mark as verified ทำเครื่องหมายว่าตรวจแล้ว';
-            }
+            chip.classList.toggle('done', done);
+            txt.textContent = done ? '✅ Verified' : '🤖 AI-drafted';
+            btn.textContent = done ? '↩' : 'Mark verified';
+            btn.title = done ? 'Undo verify · ยกเลิกการตรวจ' : 'Reviewed this tab — mark it verified · ตรวจแล้วกดยืนยัน';
+            btn.setAttribute('aria-label', btn.title);
         }
 
         // V95.65: toggle the active tab's verified flag, then repaint badge + strip.
@@ -43639,29 +43687,48 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // Review-draft; hidden on Add New (auto-draft already covers blank forms).
         function dxaShowAiButtons() {
             const b = document.getElementById('dxa-form-ai-fill-btn');
-            if (b) { b.style.display = 'inline-flex'; b.disabled = false; b.textContent = '🤖 AI fill empty fields'; }
+            if (b) { b.style.display = 'inline-flex'; b.disabled = false; b.textContent = '🤖 Fill'; }
             const r = document.getElementById('dxa-form-ai-review-btn');
-            if (r) { r.style.display = 'inline-flex'; r.disabled = false; r.textContent = '🔍 AI Review'; }
+            if (r) { r.style.display = 'inline-flex'; r.disabled = false; r.textContent = '🔍 Review'; }
             dxaRenderFormModelRail();
         }
         function dxaHideAiButtons() {
             const b = document.getElementById('dxa-form-ai-fill-btn');
-            if (b) { b.style.display = 'none'; b.disabled = false; b.textContent = '🤖 AI fill empty fields'; }
+            if (b) { b.style.display = 'none'; b.disabled = false; b.textContent = '🤖 Fill'; }
             const r = document.getElementById('dxa-form-ai-review-btn');
-            if (r) { r.style.display = 'none'; r.disabled = false; r.textContent = '🔍 AI Review'; }
-            const w = document.getElementById('dxa-form-model-wrap');
+            if (r) { r.style.display = 'none'; r.disabled = false; r.textContent = '🔍 Review'; }
+            const w = document.getElementById('dxa-form-model-wrap'), rail = document.getElementById('dxa-form-model-rail');
             if (w) w.style.display = 'none';
+            if (rail) rail.hidden = true;
         }
-        // V101.35: text-model rail on the Edit / Review-draft form. Writes the same hidden input the
-        // Auto-Draft rail uses and pushes the change through syncRegistryModelSelect so that rail and
-        // localStorage ('ai_default_disease_codex_model') follow; re-rendered on every form open so a
-        // pick made on the Auto-Draft rail shows up here too.
+        // V101.35 / V101.36: text-model chip + rail on the Edit / Review-draft form. The chip names the
+        // current model; the rail (same hidden input as Auto-Draft, synced through syncRegistryModelSelect
+        // so that rail and localStorage follow) opens under the header row on tap and closes on a pick.
         function dxaRenderFormModelRail() {
             const wrap = document.getElementById('dxa-form-model-wrap'), rail = document.getElementById('dxa-form-model-rail');
             if (!wrap || !rail || typeof window.textAIChipContents !== 'function') return;
-            const action = "document.getElementById('dxa-ai-model-val').value=this.dataset.value;window.syncRegistryModelSelect?.('dxa-ai-model-val');this.parentElement.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b===this);b.setAttribute('aria-pressed',String(b===this))})";
+            const action = "document.getElementById('dxa-ai-model-val').value=this.dataset.value;window.syncRegistryModelSelect?.('dxa-ai-model-val');this.parentElement.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b===this);b.setAttribute('aria-pressed',String(b===this))});dxaRenderFormModelRail()";
             rail.innerHTML = window.textAIChipContents(textAIModel('dxa-ai-model-val'), action);
-            wrap.style.display = 'flex';
+            rail.hidden = true;
+            const name = document.getElementById('dxa-form-model-name'), toggle = document.getElementById('dxa-form-model-toggle');
+            if (name) name.textContent = ((window.TEXT_AI_MODELS || []).find(m => m.id === textAIModel('dxa-ai-model-val')) || {}).label || textAIModel('dxa-ai-model-val');
+            if (toggle) toggle.setAttribute('aria-expanded', 'false');
+            wrap.style.display = 'inline-flex';
+        }
+        function dxaToggleFormModelRail(force) {
+            const rail = document.getElementById('dxa-form-model-rail'), toggle = document.getElementById('dxa-form-model-toggle');
+            if (!rail || !toggle) return;
+            const open = typeof force === 'boolean' ? force : rail.hidden;
+            rail.hidden = !open;
+            toggle.setAttribute('aria-expanded', String(open));
+        }
+        // V101.36: status chip beside the name — '📥 Draft' on review, '📚 Published' on edit, hidden on Add.
+        function dxaSetStatusChip(text, kind) {
+            const chip = document.getElementById('dxa-form-status-chip');
+            if (!chip) return;
+            chip.textContent = text || '';
+            chip.className = 'dxa-status-chip' + (kind ? ' is-' + kind : '');
+            chip.style.display = text ? 'inline-flex' : 'none';
         }
         // Model for AI fill / AI Review / AI ICD — the rail above (normalised, so a retired id
         // stored by an older build resolves to a live chip instead of being sent to the proxy).
@@ -43877,7 +43944,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 console.error('[disease-codex] AI fill failed:', err);
                 if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'AI fill failed: ' + (err && err.message ? err.message : 'unknown error'); }
             } finally {
-                if (btn) { btn.disabled = false; btn.textContent = '🤖 AI fill empty fields'; }
+                if (btn) { btn.disabled = false; btn.textContent = '🤖 Fill'; }
             }
         }
 
@@ -44012,7 +44079,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 console.error('[disease-codex] AI review failed:', err);
                 if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'AI Review failed: ' + (err && err.message ? err.message : 'unknown error'); }
             } finally {
-                if (btn) { btn.disabled = false; btn.textContent = '🔍 AI Review'; }
+                if (btn) { btn.disabled = false; btn.textContent = '🔍 Review'; }
             }
         }
 
@@ -44176,7 +44243,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dxaRenderCurrentPathoVisual(dxaState.pathoVisual);
             dxaRenderMeta(data);
             const idEl = document.getElementById('dxa-form-doc-id');
-            if (idEl) idEl.textContent = (data && data._id) ? `doc: ${data._id}` : '';
+            if (idEl) { // V101.36: last 6 chars; full id in the tooltip; click copies
+                const docId = (data && data._id) ? String(data._id) : '';
+                idEl.textContent = docId ? '…' + docId.slice(-6) + ' 📋' : '';
+                idEl.title = docId ? 'doc ' + docId + ' · click to copy' : '';
+                idEl.onclick = docId ? () => { try { navigator.clipboard.writeText(docId); if (typeof showToast === 'function') showToast('Copied ' + docId); } catch (_) {} } : null;
+            }
             const err = document.getElementById('dxa-form-error');
             if (err) { err.style.display = 'none'; err.textContent = ''; }
             // V95.65: reset the per-tab verify tracker for this fresh form fill.
@@ -44316,6 +44388,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dxaHideInternNotesBanner();
             const modeLabel = document.getElementById('dxa-form-mode-label');
             if (modeLabel) modeLabel.textContent = 'Add Disease';
+            dxaSetStatusChip(''); // V101.36
             dxaHideAiButtons();
             dxaFillForm({});
             dxaSwitchSection('core');
@@ -44329,7 +44402,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dxaState.isDraftEdit = false;        // leak-defense: editing a published doc, not a draft
             dxaHideInternNotesBanner();
             const modeLabel = document.getElementById('dxa-form-mode-label');
-            if (modeLabel) modeLabel.textContent = 'Edit · ' + (disease.diseaseName || diseaseId);
+            if (modeLabel) modeLabel.textContent = '✏️ ' + (disease.diseaseName || diseaseId);
+            dxaSetStatusChip('📚 Published', 'published'); // V101.36
             dxaShowAiButtons();
             dxaFillForm(disease);
             dxaLoadProvenanceForEdit(disease); // V95.88: tint fields by intern/admin authorship
@@ -45338,7 +45412,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dxaState.editingId = draftId;
             dxaState.isDraftEdit = true;
             const modeLabel = document.getElementById('dxa-form-mode-label');
-            if (modeLabel) modeLabel.textContent = 'Review Draft · ' + (draft.diseaseName || draftId);
+            if (modeLabel) modeLabel.textContent = '📝 ' + (draft.diseaseName || draftId);
+            dxaSetStatusChip('📥 Draft', 'draft'); // V101.36
             dxaShowInternNotesBanner(draft);
             dxaShowAiButtons();
             dxaFillForm(draft);
