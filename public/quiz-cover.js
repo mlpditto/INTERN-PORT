@@ -183,6 +183,26 @@ const QuizCover = (() => {
         const preview = editor().querySelector('.quiz-cover-ai-preview');
         preview.hidden = true; preview.querySelector('img').removeAttribute('src');
     }
+    // V101.54: AI covers are cropped to the collection's 3:4 before the preview, so what the admin
+    // Applies is what they saw. Providers clamp aspect_ratio to what they support (Muse Image returns
+    // 2:3), which left side bands in the 3:4 frame. A taller image loses more from the top than the
+    // bottom (60:40) to protect the title band in the bottom 25%; a wider one is cropped evenly.
+    // Admin uploads are not touched. Already-3:4 images (±1%) are returned unchanged.
+    const COVER_RATIO = 3 / 4;
+    async function cropToCover(blob) {
+        const bitmap = await createImageBitmap(blob);
+        const { width: w, height: h } = bitmap;
+        if (Math.abs(w / h - COVER_RATIO) / COVER_RATIO <= 0.01) { bitmap.close(); return blob; }
+        let sx = 0, sy = 0, sw = w, sh = h;
+        if (w / h < COVER_RATIO) { sh = Math.round(w / COVER_RATIO); sy = Math.round((h - sh) * 0.6); }
+        else { sw = Math.round(h * COVER_RATIO); sx = Math.round((w - sw) / 2); }
+        const canvas = document.createElement('canvas');
+        canvas.width = sw; canvas.height = sh;
+        canvas.getContext('2d').drawImage(bitmap, sx, sy, sw, sh, 0, 0, sw, sh); bitmap.close();
+        const out = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', 0.92));
+        if (!out) throw new Error('Could not crop the AI image');
+        return out;
+    }
     async function generate() {
         if (busy) return;
         const el = editor(), status = el.querySelector('[role=status]');
@@ -211,9 +231,9 @@ const QuizCover = (() => {
             if (!result.ok) throw new Error('Could not load the AI image');
             const blob = await result.blob();
             if (!['image/png', 'image/jpeg', 'image/webp'].includes(blob.type) || blob.size > 10 * 1024 * 1024) throw new Error('Image must be PNG, JPG or WebP up to 10 MB');
-            const bitmap = await createImageBitmap(blob); bitmap.close();
+            const cropped = await cropToCover(blob);
             if (token !== revision) return;
-            candidate = blob; previewUrl = URL.createObjectURL(blob);
+            candidate = cropped; previewUrl = URL.createObjectURL(cropped);
             const preview = el.querySelector('.quiz-cover-ai-preview');
             preview.querySelector('img').src = previewUrl; preview.hidden = false;
             status.textContent = 'Check the image and text, then Apply — or Generate again to retry';
