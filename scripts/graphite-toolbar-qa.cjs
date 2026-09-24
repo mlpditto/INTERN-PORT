@@ -35,10 +35,11 @@ const { chromium } = require('playwright');
         });
         for (const id of ['ai-audit-popup', 'ai-analysis-popup']) {
             const popup = page.locator('#' + id);
-            assert.equal(await popup.locator('.text-ai-chips button').count(), 9);
+            // V101.05 added Qwen/DeepSeek chips; V101.21 gave them provider tabs.
+            assert.equal(await popup.locator('.text-ai-chips button').count(), 13);
             assert.equal(await popup.locator('.text-ai-chips button:visible').count(), 4);
-            assert.deepEqual(await popup.locator('.audit-provider').allTextContents(), ['Gemini', 'GPT', 'Claude']);
-            assert.deepEqual(await popup.locator('.audit-provider').evaluateAll(ns => ns.map(n => getComputedStyle(n).color)), ['rgb(168, 180, 255)', 'rgb(125, 211, 176)', 'rgb(232, 180, 154)']);
+            assert.deepEqual(await popup.locator('.audit-provider').allTextContents(), ['Gemini', 'GPT', 'Claude', 'Qwen', 'DeepSeek']);
+            assert.deepEqual(await popup.locator('.audit-provider').evaluateAll(ns => ns.map(n => getComputedStyle(n).color)), ['rgb(168, 180, 255)', 'rgb(125, 211, 176)', 'rgb(232, 180, 154)', 'rgb(201, 160, 240)', 'rgb(127, 200, 245)']);
             assert.equal(await popup.locator('[data-value="gpt-6-astra"]').textContent(), '6 Astra');
             assert.equal(await popup.locator('[data-value="gpt-6-astra"]').getAttribute('aria-label'), 'GPT 6 Astra');
             assert.equal(await popup.locator('.text-ai-chips [aria-pressed="true"]').count(), 1);
@@ -132,7 +133,7 @@ const { chromium } = require('playwright');
         assert(await page.locator('#ai-audit-popup').isVisible());
         assert.equal(await page.locator('#ai-audit-popup [data-review-tab="specialist"]').isEnabled(), true);
         assert.deepEqual(errors, []);
-        console.log('PASS: actual popup CSS, Sakura tabs, nine compact chips, no overlap at 320–1024px, audit/rewrite model routing, tabs, Export and Close');
+        console.log('PASS: actual popup CSS, Sakura tabs, thirteen compact chips, no overlap at 320–1024px, audit/rewrite model routing, tabs, Export and Close');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode=1; });
 

@@ -11,7 +11,7 @@ const { chromium } = require('playwright');
         const errors = []; page.on('pageerror', e => errors.push(e.message));
         const html = fs.readFileSync('public/admin.html', 'utf8');
         assert(html.includes('onclick="openQuizCurate()"'));
-        assert(html.includes('src="quiz-curate.js?v=V100.09"'));
+        assert(/src="quiz-curate\.js\?v=V\d+\.\d+"/.test(html)); // cache-bust version moves every release
         await page.setContent([...html.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/gi)].map(m => m[0]).join('\n') + '<input id="edit-quiz-id" value="source-quiz"><input id="ai-analyzer-model-val" value="gpt-5.6-luna">');
         await page.addStyleTag({ path: 'public/quiz-curate.css' });
         await page.addStyleTag({ path: 'public/text-ai-chips.css' });
@@ -60,7 +60,7 @@ const { chromium } = require('playwright');
         assert.equal(await page.locator('#curate-target').inputValue(), '10');
         assert.equal(await page.locator('.curate-question').count(), 14);
         assert(await saveDisabled());
-        assert.equal(await page.locator('#curate-models button').count(), 9);
+        assert.equal(await page.locator('#curate-models button').count(), await page.evaluate(() => TEXT_AI_MODELS.length)); // one chip per shared text model (V101.05 added Qwen/DeepSeek)
         await page.locator('[data-model="claude-haiku-4-5"]').click();
         assert.match(await page.locator('#curate-model').innerText(), /Claude Haiku/);
         for (const value of ['0', '15', '2.5', '']) {
@@ -89,7 +89,7 @@ const { chromium } = require('playwright');
         assert(request[1].includes('Keep key objectives.'));
         assert.equal(request[5].feature, 'quiz_curate');
         await resolve(result()); // Missing pinned Q14.
-        assert.match(await feedback(), /did not respect/); assert(await saveDisabled());
+        assert.match(await feedback(), /dropped a pinned question, with no usable priority ranking/); assert(await saveDisabled()); // V101.32 wording
         for (const mutate of [
             d => { d.questions[1].id = 1; },
             d => { d.questions[1].id = 99; },
@@ -110,11 +110,20 @@ const { chromium } = require('playwright');
         for (const mutate of [
             d => { d.questions[9].related[0].id = 10; },
             d => { d.questions[9].related[0].id = 99; },
-            d => { d.questions[9].related[0].evidence[0].quote = 'Invented source'; },
-            d => { d.questions[9].related[0].evidence.pop(); },
             d => { d.questions[9].related[0].preferenceTh = ''; },
             d => { delete d.questions[9].impactTh; }
         ]) { const bad = structuredClone(good); mutate(bad); await suggest(bad); assert.match(await feedback(), /Could not suggest/); assert(await saveDisabled()); }
+        // V101.14: an unverifiable excerpt no longer fails the run — it is dropped, the comparison
+        // goes with it when one side is left uncited, and the status line says so.
+        for (const [mutate, note] of [
+            [d => { d.questions[9].related[0].evidence[0].quote = 'Invented source'; }, /1 unverifiable excerpt dropped · 1 comparison dropped for lack of evidence/],
+            [d => { d.questions[9].related[0].evidence.pop(); }, /1 comparison dropped for lack of evidence/]
+        ]) {
+            const odd = structuredClone(good); mutate(odd); await suggest(odd);
+            assert.doesNotMatch(await feedback(), /Could not suggest/); assert.equal(await saveDisabled(), false);
+            assert.match(await page.locator('#curate-history-status').innerText(), note);
+            assert.equal(await row(10).locator('.curate-compare').count(), 0, 'dropped comparison is not rendered');
+        }
 
         await suggest(good);
         const completedLabel = await page.locator('#curate-suggest').innerText();

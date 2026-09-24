@@ -60,7 +60,7 @@ function valid() { providerData = {modelVersion:'gemini-3.8-flash-001',candidate
     const a=html.indexOf('        window.callUniversalAI = async');
     const source=html.slice(a,html.indexOf('\n        };',a)+11);
     let calls=0, status=200, failNetwork=false, sent;
-    const front={window:{AI_MODEL_REGISTRY:require('../functions/ai-model-registry.json'),location:{hostname:'mlpditto.github.io'},_aiAuthHeaders:async()=>({Authorization:'Bearer test'})},updateAIUsage(){},fetch:async (url,opts)=>{calls++;sent=JSON.parse(opts.body);if(failNetwork)throw Error('network');return {ok:status===200,status,json:async()=>status===200?{text:'{}',model:'gemini-3.8-flash-001',tokens:25,usage:{totalTokens:25},jsonValid:true,finishReason:'STOP'}:{error:'Request rejected'}};}};
+    const front={window:{AI_MODEL_REGISTRY:require('../functions/ai-model-registry.json'),location:{hostname:'mlpditto.github.io'},_aiAuthHeaders:async()=>({Authorization:'Bearer test'})},updateAIUsage(){},fetch:async (url,opts)=>{calls++;sent=JSON.parse(opts.body);if(failNetwork)throw Error('network');return {ok:status===200,status,text:async()=>JSON.stringify(status===200?{text:'{}',model:'gemini-3.8-flash-001',tokens:25,usage:{totalTokens:25},jsonValid:true,finishReason:'STOP'}:{error:'Request rejected'})};}};
     vm.createContext(front);vm.runInContext(source,front);
     const invoke=()=>front.window.callUniversalAI('gemini-3.8-flash','synthetic',true,null,'',{maxOutputTokens:32768,feature:'quiz_audit'});
     r=await invoke();assert.equal(r.raw.usage.totalTokens,25);assert.equal(sent.provider,'gemini-aistudio');assert.equal(sent.feature,'quiz_audit');assert.equal(sent.generationOptions.feature,undefined);
@@ -84,12 +84,13 @@ function valid() { providerData = {modelVersion:'gemini-3.8-flash-001',candidate
     const end=html.indexOf('\n            };',start)+15;
     for (const stored of [null, 'gemini-3.6-flash', 'gpt-5.4', 'or/xiaomi/mimo-v2.5', 'or/xiaomi/mimo-v2.5-pro']) {
         const hidden={value:'gemini-3.8-flash'};
-        const active=[];
-        const rail={querySelectorAll:()=>['gemini-3.8-flash','gemini-3.6-flash','gpt-5.4'].map(value=>({dataset:{value},classList:{toggle:(name,on)=>{if(on)active.push(value);}}}))};
-        const ctx={window:{},localStorage:{getItem:()=>stored,setItem:(key,value)=>{assert.equal(key,'ai_default_analyzer_model');assert.equal(value,'gemini-3.8-flash');}},document:{getElementById:()=>hidden},rail};
+        const synced=[];
+        const rail={};
+        // Rail active/aria-pressed state is owned by the shared registry sync (ai-model-ui.js).
+        const ctx={window:{syncRegistryModelSelect:id=>synced.push([id,hidden.value])},localStorage:{getItem:()=>stored,setItem:(key,value)=>{assert.equal(key,'ai_default_analyzer_model');assert.equal(value,'gemini-3.8-flash');}},document:{getElementById:()=>hidden},rail};
         vm.runInNewContext(html.slice(start,end)+";syncChipRailToHidden(rail,'ai-analyzer-model-val');",ctx);
         assert.equal(hidden.value,stored && !stored.startsWith('or/xiaomi/mimo') ? stored : 'gemini-3.8-flash');
-        assert.deepEqual(active,[hidden.value]);
+        assert.deepEqual(synced,[['ai-analyzer-model-val',hidden.value]]);
     }
     console.log('PASS: Gemini 3.8 auth, routing, config, usage, JSON, truncation, missing output, image regression, server-only failures, Audit isolation');
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -31,7 +31,16 @@ const { chromium } = require('playwright');
         const editorInit = html.slice(editorStart, editorEnd);
         for (let reopen = 0; reopen < 2; reopen++) {
             await page.evaluate(code => { new Function(code)(); }, editorInit);
-            for (const id of ['ai-analyzer-model-val', 'toolbar-ai-translate-model']) {
+            // V101.34: the toolbar analyzer rail is gone — #ai-analyzer-model-val is a data-native-model
+            // Settings default (value + persistence, no chips); only the Translate popover keeps a rail.
+            assert.equal(await page.locator('[data-model-input="ai-analyzer-model-val"]').count(), 0);
+            for (const value of ['gemini-3.8-flash', 'gpt-5.6-luna']) {
+                await page.evaluate(v => syncModelDefault('ai-analyzer-model-val', v), value);
+                assert.equal(await page.locator('#ai-analyzer-model-val').inputValue(), value);
+                assert.equal(await page.locator('#default-analyzer-model').inputValue(), value);
+                assert.equal(await page.evaluate(() => localStorage.getItem('ai_default_analyzer_model')), value);
+            }
+            for (const id of ['toolbar-ai-translate-model']) {
                 const rail = page.locator(`[data-model-input="${id}"]`);
                 for (const value of ['as/gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gpt-5.6-luna']) {
                     await rail.locator(`[data-value="${value}"]`).evaluate(b => b.click());
@@ -44,8 +53,8 @@ const { chromium } = require('playwright');
             }
         }
         const ids = await page.evaluate(() => TEXT_AI_MODELS.map(m => m.id));
-        assert.equal(ids.length, 9);
-        const controls = ['ai-analyzer-model-val', 'toolbar-ai-translate-model', 'ai-tagging-model-val', 'ai-model-design-enhancer', 'ai-model-grammar', 'dxa-ai-model-val', 'alabasta-case-card-refine-model', 'ai-model-review', 'research-model-select', 'tts-polish-model', 'laughtale-ai-model', 'storyteller-model-select', 'lp-ai-model', 'apd-model-a', 'apd-model-b', 'case-note-ai-model', 'default-translate-model', 'default-analyzer-model', 'default-review-model', 'default-qfp-model'];
+        assert.equal(ids.length, 13); // V101.05: + Qwen 3.8 Flash/Max, DeepSeek V4.1 Flash/V4 Pro
+        const controls = ['toolbar-ai-translate-model', 'ai-tagging-model-val', 'ai-model-design-enhancer', 'ai-model-grammar', 'dxa-ai-model-val', 'ai-model-review', 'research-model-select', 'tts-polish-model', 'laughtale-ai-model', 'storyteller-model-select', 'lp-ai-model', 'apd-model-a', 'apd-model-b', 'case-note-ai-model', 'default-translate-model', 'default-analyzer-model', 'default-review-model', 'default-qfp-model'];
         assert.equal(await page.locator('#ai-model-review').inputValue(), 'gpt-5.6-luna');
         assert.equal(await page.locator('#ai-model-design-enhancer').inputValue(), 'gpt-5.6-sol');
         for (const id of controls) {
@@ -59,11 +68,20 @@ const { chromium } = require('playwright');
             }
             assert(await rail.locator('button').evaluateAll(bs => bs.every(b => /[ก-๙]/.test(b.title))), id);
         }
+        // data-native-model selects are compact: full catalog + persisted choice, no chip rail.
+        for (const [id, key] of [['alabasta-case-card-refine-model', 'ai_default_casecard_refine_model']]) {
+            assert.equal(await page.locator(`[data-model-input="${id}"]`).count(), 0, id);
+            assert.deepEqual(await page.locator(`#${id} option`).evaluateAll(os => os.map(o => o.value)), ids, id);
+            for (const model of ids) {
+                await page.locator('#' + id).evaluate((el, v) => { el.value = v; el.dispatchEvent(new Event('change')); }, model);
+                assert.equal(await page.evaluate(k => localStorage.getItem(k), key), model, id);
+            }
+        }
         for (const pref of ['translate', 'analyzer', 'review', 'qfp']) {
             assert.deepEqual(await page.locator(`#default-${pref}-model option`).evaluateAll(os => os.map(o => o.value)), ids);
         }
         for (const railId of ['dt-models', 'dca-ai-chip-rail']) {
-            assert.equal(await page.locator(`#${railId} button`).count(), 9);
+            assert.equal(await page.locator(`#${railId} button`).count(), ids.length);
             await page.locator(`#${railId} button[data-value="claude-haiku-4-5"]`).evaluate(b => b.click());
             assert.equal(await page.locator('#dca-ai-model-val').inputValue(), 'claude-haiku-4-5');
         }
@@ -86,7 +104,7 @@ const { chromium } = require('playwright');
             imageQuizRenderModelRail();
         });
         assert.equal(await page.locator('#dynamic-model-tests .text-ai-chips').count(), 2);
-        assert.equal(await page.locator('#img-quiz-model-rail button').count(), 9);
+        assert.equal(await page.locator('#img-quiz-model-rail button').count(), ids.length);
         await page.locator('#dynamic-model-tests .text-ai-chips').first().locator('[data-value="claude-haiku-4-5"]').evaluate(b => b.click());
         assert.equal(await page.locator('#quality-audit-model').inputValue(), 'claude-haiku-4-5');
         await page.locator('#dynamic-model-tests .text-ai-chips').last().locator('[data-value="gpt-5.6-sol"]').evaluate(b => b.click());
@@ -119,6 +137,6 @@ const { chromium } = require('playwright');
         }
         await page.setViewportSize({ width: 390, height: 844 });
         await page.screenshot({ path: 'text-models-qa.png', fullPage: true });
-        console.log('PASS: 20 task/Settings controls + Drug Codex + audit/compare/image rails; nine choices, saved migration, selection routing, Thai hints and 320/390/736px rails');
+        console.log('PASS: 18 task/Settings rails + 2 native (analyzer, case-card refine) + Drug Codex + audit/compare/image rails; 13 choices, saved migration, selection routing, Thai hints and 320/390/736px rails');
     } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
