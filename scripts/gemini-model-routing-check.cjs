@@ -19,7 +19,7 @@ const back = new Function('provider', 'input', 'const req={body:{model:input}};'
     '        if (!provider') + '; return model;');
 assert.ok(!admin.includes('value="as/gemini-2.5-flash-image"'));
 assert.ok(!admin.includes('value="as/gemini-3.1-flash-image-preview"'));
-assert.ok(backend.includes('const asModel = model || "gemini-3.1-flash-image";'));
+assert.ok(backend.includes('const asModel = geminiApiModel || model || "gemini-3.1-flash-image";')); // V101.60: rerouted gemini 3.x first
 for (const [old, next] of Object.entries({
  'gemini-2.5-flash':'gemini-3.5-flash',
  'gemini-2.5-flash-lite':'gemini-3.5-flash',

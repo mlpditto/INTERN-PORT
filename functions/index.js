@@ -299,6 +299,49 @@ const axios = require("axios");
 // Configuration
 const PROJECT_ID = "intern-port-edfa7";
 const REGION = "us-central1"; // Primary for Imagen
+// V101.60: the model a `gemini` provider request resolves to — moved out of the Vertex branch so
+// callAIProxy can decide the route before reaching it. Legacy aliases map to current Flash ids.
+function resolveGoogleGeminiModel(model) {
+    let actualModelName = model || "gemini-3.5-flash";
+
+    // V93.95: Normalize only legacy/alias model names; pass current ids straight
+    //   through. The previous block (V89.90) rewrote EVERY `gemini-*` request to a
+    //   `gemini-3*` family that did not exist on Vertex AI then — every gemini
+    //   proxy call returned 404 "Publisher Model not found".
+    // V94.12: Flash chips refreshed to gemini-3.5-flash (Google I/O 2026 GA).
+    //   Removed the `gemini-3` substring catch from V93.95 — it would have
+    //   rewritten the new 3.5-flash chip back to 2.5. Pro alias still maps to
+    //   2.5-pro because gemini-3.5-pro is not GA yet (Google: June 2026).
+    // V96.85: Google discontinues Gemini 2.5 Flash/Flash-Lite/Pro on Vertex AI
+    //   2026-10-20 (email 2026-07-29). Pro chips migrated to gemini-3.6-flash
+    //   (GA 2026-07-21); treat any straggler gemini-2.5-pro request as a legacy
+    //   alias so it rewrites to 3.6 and takes the fast-fail → AI Studio
+    //   fallback below instead of hitting the dying Vertex model.
+    const reqModel = (model || '').toLowerCase();
+    const isLegacyAlias = !reqModel
+        || reqModel === 'multimodal'
+        || reqModel === 'gemini-flash'
+        || reqModel === 'gemini-pro'
+        || reqModel === 'gemini-2.5-pro'
+        || reqModel.includes('1.5')
+        || reqModel.includes('2.0');
+    if (isLegacyAlias) {
+        actualModelName = reqModel.includes('pro') ? "gemini-3.6-flash" : "gemini-3.5-flash";
+    }
+    // V94.16 HOTFIX: Vertex AI in this project's region does not currently
+    //   host the Gemini 3.x family — proxy calls just hang because axios has
+    //   no default timeout and Vertex never returns. V93.95 originally kept
+    //   the `gemini-3` substring catch specifically because of this; V94.12
+    //   removed that catch when refreshing the frontend Flash chips to
+    //   gemini-3.5-flash so legitimate AI-Studio-hosted 3.5 calls weren't
+    //   blocked. Surface the fix on the proxy side instead: fast-fail any
+    //   gemini-3.x request so callUniversalAI's catch path in admin.html
+    //   falls back to the local @google/generative-ai SDK, which targets
+    //   generativelanguage.googleapis.com — where 3.5 IS GA. Remove this
+    //   guard once Vertex AI catches up to Gemini 3.5.
+    // V101.60: callAIProxy now serves 3.x through the Gemini API itself instead of the 404 + client fallback.
+    return actualModelName;
+}
 // V95.95: AI proxy + NDI lookup authenticate via Firebase ID token instead of a
 // shared secret that shipped inside the client bundle (anyone could read it from
 // DevTools and run up provider bills). Verify `Authorization: Bearer <idToken>`;
@@ -574,9 +617,10 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
         // single interception of res.json (so we don't touch each provider branch).
         // Skips error payloads. Best-effort fire-and-forget — never blocks/breaks the reply.
         const _sendJson = res.json.bind(res);
+        let usageProvider = provider; // V101.60: `gemini` 3.x is served by the Gemini API branch and recorded as such
         res.json = (payload) => {
             if (payload && !payload.error) {
-                recordAiUsage(provider, payload.model || model, payload.tokens, callerIsAdmin, feature, payload.usage || {});
+                recordAiUsage(usageProvider, payload.model || model, payload.tokens, callerIsAdmin, feature, payload.usage || {});
             }
             return _sendJson(payload);
         };
@@ -677,56 +721,22 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             return res.json({ text: response.data.choices[0].message.content, tokens: response.data.usage.total_tokens, model: response.data.model || actualModel, requestedModel: model });
         }
 
+        // V101.60: Vertex AI in this project's region does not host Gemini 3.x (see the V94.16 note in
+        // resolveGoogleGeminiModel), and every current chip is 3.x. The proxy used to answer 404 so the
+        // browser re-sent the prompt to generativelanguage.googleapis.com with a key from localStorage —
+        // billed, but never recorded in ai_usage. Serve those here through the Gemini API branch below
+        // with GEMINI_API_KEY instead, recorded as `gemini-aistudio`. Vertex keeps any non-3.x model.
+        const geminiApiModel = provider === "gemini" && model !== "gemini-3.8-flash" && resolveGoogleGeminiModel(model).startsWith("gemini-3.")
+            ? resolveGoogleGeminiModel(model) : null;
+        if (geminiApiModel) usageProvider = "gemini-aistudio";
+
         // --- 🟣 Google Vertex AI (Gemini Multimodal / Vision) ---
-        if (provider === "gemini" && model !== "gemini-3.8-flash") {
+        if (provider === "gemini" && model !== "gemini-3.8-flash" && !geminiApiModel) {
             const auth = new GoogleAuth({ scopes: "https://www.googleapis.com/auth/cloud-platform" });
             const client = await auth.getClient();
             const token = await client.getAccessToken();
 
-            let actualModelName = model || "gemini-3.5-flash";
-
-            // V93.95: Normalize only legacy/alias model names; pass current ids straight
-            //   through. The previous block (V89.90) rewrote EVERY `gemini-*` request to a
-            //   `gemini-3*` family that did not exist on Vertex AI then — every gemini
-            //   proxy call returned 404 "Publisher Model not found".
-            // V94.12: Flash chips refreshed to gemini-3.5-flash (Google I/O 2026 GA).
-            //   Removed the `gemini-3` substring catch from V93.95 — it would have
-            //   rewritten the new 3.5-flash chip back to 2.5. Pro alias still maps to
-            //   2.5-pro because gemini-3.5-pro is not GA yet (Google: June 2026).
-            // V96.85: Google discontinues Gemini 2.5 Flash/Flash-Lite/Pro on Vertex AI
-            //   2026-10-20 (email 2026-07-29). Pro chips migrated to gemini-3.6-flash
-            //   (GA 2026-07-21); treat any straggler gemini-2.5-pro request as a legacy
-            //   alias so it rewrites to 3.6 and takes the fast-fail → AI Studio
-            //   fallback below instead of hitting the dying Vertex model.
-            const reqModel = (model || '').toLowerCase();
-            const isLegacyAlias = !reqModel
-                || reqModel === 'multimodal'
-                || reqModel === 'gemini-flash'
-                || reqModel === 'gemini-pro'
-                || reqModel === 'gemini-2.5-pro'
-                || reqModel.includes('1.5')
-                || reqModel.includes('2.0');
-            if (isLegacyAlias) {
-                actualModelName = reqModel.includes('pro') ? "gemini-3.6-flash" : "gemini-3.5-flash";
-            }
-
-            // V94.16 HOTFIX: Vertex AI in this project's region does not currently
-            //   host the Gemini 3.x family — proxy calls just hang because axios has
-            //   no default timeout and Vertex never returns. V93.95 originally kept
-            //   the `gemini-3` substring catch specifically because of this; V94.12
-            //   removed that catch when refreshing the frontend Flash chips to
-            //   gemini-3.5-flash so legitimate AI-Studio-hosted 3.5 calls weren't
-            //   blocked. Surface the fix on the proxy side instead: fast-fail any
-            //   gemini-3.x request so callUniversalAI's catch path in admin.html
-            //   falls back to the local @google/generative-ai SDK, which targets
-            //   generativelanguage.googleapis.com — where 3.5 IS GA. Remove this
-            //   guard once Vertex AI catches up to Gemini 3.5.
-            if (actualModelName.startsWith('gemini-3.')) {
-                return res.status(404).json({
-                    error: `Vertex AI in ${REGION} does not host ${actualModelName} yet; client falls back to the local Google AI Studio SDK.`,
-                    clientShouldFallback: true
-                });
-            }
+            const actualModelName = resolveGoogleGeminiModel(model);
 
             // V93.95: Gemini on Vertex AI must use the :generateContent endpoint. The
             // :predict / :rawPredict API rejects Gemini models with HTTP 400 ("Gemini
@@ -945,11 +955,11 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
         // --- 🟡 Google AI Studio (Gemini Generative Language API — image gen via Nano Banana) ---
         // V92.70: New default for Case Card + Goldenweek after OpenRouter started returning 500.
         // Uses GEMINI_API_KEY from https://aistudio.google.com/api-keys (project-bound to intern-port-edfa7).
-        if (provider === "gemini-aistudio" || (provider === "gemini" && model === "gemini-3.8-flash")) {
+        if (provider === "gemini-aistudio" || (provider === "gemini" && model === "gemini-3.8-flash") || geminiApiModel) {
             const apiKey = process.env.GEMINI_API_KEY;
             if (!apiKey) return res.status(500).json({ error: "GEMINI_API_KEY is not configured on server." });
 
-            const asModel = model || "gemini-3.1-flash-image";
+            const asModel = geminiApiModel || model || "gemini-3.1-flash-image";
             const isImageRequest = /image/i.test(asModel);
             const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${asModel}:generateContent?key=${apiKey}`;
 
