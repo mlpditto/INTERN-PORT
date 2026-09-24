@@ -18,8 +18,9 @@
         { id: 'or/deepseek/deepseek-v4-pro', label: 'DeepSeek V4 Pro', short: 'DeepSeek Pro V4', hint: 'DeepSeek รุ่นใหญ่ เหมาะกับงานวิเคราะห์ ผ่าน OpenRouter' }
     ];
     // Official marks (assets/logos, from openai.com/brand and anthropic.com/press-kit). Owners
-    // without a small official mark (Gemini, Qwen, DeepSeek) carry their name in `short` instead.
-    const LOGO_OWNERS = { GPT: 'openai', Claude: 'claude' };
+    // without a small official mark (Qwen, DeepSeek) carry their name in `short` instead.
+    // V101.55: Gemini spark (colour mark, via @lobehub/icons-static-svg, MIT); Gemini keeps its name in `short`.
+    const LOGO_OWNERS = { GPT: 'openai', Claude: 'claude', Gemini: 'gemini' };
     // V101.52: opt-in trial models. Only the audit toolbar offers them; they are NOT in
     // TEXT_AI_MODELS, so no other rail, select, Settings default or normaliser sees them.
     // Grok 4.7 trial (GROK_OPENROUTER_INTEGRATION_PLAN.md step C, 2026-09-24): Audit + Analyze.

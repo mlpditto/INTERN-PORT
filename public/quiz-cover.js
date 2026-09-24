@@ -5,9 +5,9 @@ const QuizCover = (() => {
     // icon-only cells so five models stay readable; `imageApi` models go through OpenRouter's Image API
     // (POST /api/v1/images, aspect_ratio 3:4) — Seedream 5.0 Lite and Muse Image output images only.
     const AI_MODELS = [
-        { id: 'as/gemini-3.1-flash-image', label: 'Nano Banana 2', ariaLabel: 'Nano Banana 2 (recommended)', titleTh: 'Nano Banana 2 · Google AI Studio · แนะนำ' },
+        { id: 'as/gemini-3.1-flash-image', logo: 'gemini', label: 'Nano Banana 2', ariaLabel: 'Nano Banana 2 (recommended)', titleTh: 'Nano Banana 2 · Google AI Studio · แนะนำ' },
         { id: 'or/openai/gpt-5.4-image-2', logo: 'openai', label: 'Image 2', ariaLabel: 'GPT Image 2 via OpenRouter', titleTh: 'GPT-5.4 Image 2 · ผ่าน OpenRouter' },
-        { id: 'or/google/gemini-3.1-flash-image-preview', label: 'Nano Banana 2', ariaLabel: 'Gemini Image Preview via OpenRouter', titleTh: 'Nano Banana 2 (Gemini 3.1 Flash Image Preview) · ผ่าน OpenRouter' },
+        { id: 'or/google/gemini-3.1-flash-image-preview', logo: 'gemini', label: 'Nano Banana 2', ariaLabel: 'Gemini Image Preview via OpenRouter', titleTh: 'Nano Banana 2 (Gemini 3.1 Flash Image Preview) · ผ่าน OpenRouter' },
         { id: 'or/bytedance-seed/seedream-5-0-lite', label: 'Seedream 5.0 Lite', imageApi: true, ariaLabel: 'ByteDance Seedream 5.0 Lite via OpenRouter', titleTh: 'ByteDance Seed: Seedream 5.0 Lite · ผ่าน OpenRouter' },
         { id: 'or/meta/muse-image', label: 'Muse Image', imageApi: true, ariaLabel: 'Meta Muse Image via OpenRouter', titleTh: 'Meta: Muse Image · ผ่าน OpenRouter (ช้ากว่า — คิดก่อนวาด)' }
     ];
