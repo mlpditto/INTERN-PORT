@@ -85,7 +85,8 @@ new Function(...names, admin.slice(a, b))(...names.map(n => ctx[n]));
     // V101.36: the chip click goes through ddaPickVisionModel (which also closes the rail), and
     // that is where the choice is stored — check both links of the chain.
     check('chip choice persisted under its own key', /ddaPickVisionModel\(this,'\$\{kind\}'\)/.test(admin) && /function ddaPickVisionModel\(btn, kind\) \{\s*selectStoredTextAIModel\(btn, 'ai_default_codex_vision_model'\)/.test(admin), true);
-    check('ai-model-ui: filter param, headings over the filtered list', /\(value, action = '', filter = null\) => \(filter \? models\.filter\(filter\) : models\)\.map\(\(m, i, list\)/.test(ui) && /list\[i - 1\]\.label/.test(ui), true);
+    // V101.49: chips no longer carry provider headings; the filter still narrows the rail.
+    check('ai-model-ui: filter param narrows the rail', /\(value, action = '', filter = null\) => \(filter \? models\.filter\(filter\) : models\)\.map\(/.test(ui), true);
     check('intern delegates to the shared file', /window\.CodexVision\.buildPrompt\(DD_IMAGE_FORMS\[kind\]\.subject\)/.test(index) && /<script src="codex-vision\.js\?v=V\d+\.\d+"><\/script>/.test(index), true);
     check('intern no longer carries its own key lines', !/'ICD10: <ICD-10 code ONLY if it is printed in the image, otherwise ->'/.test(index), true);
 
