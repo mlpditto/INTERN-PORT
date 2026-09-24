@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.55)</title>
+    <title>Nika Admin (V101.56)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -2359,6 +2359,9 @@
         .tag-hyg-chip { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:10px; border:1px solid #cbd5e1; background:#fff; color:#64748b; font-size:0.92em; font-weight:700; cursor:pointer; }
         .tag-hyg-chip:hover { border-color:#6366f1; color:#6366f1; }
         .tag-hyg-chip small, .tag-hyg-group small { font-weight:600; color:#94a3b8; }
+        .tag-hyg-merge { width:auto; min-height:0; margin-left:4px; padding:1px 8px; border-radius:999px; border:1.5px solid #4361ee; background:#fff; color:#4361ee; font-size:0.85em; font-weight:800; cursor:pointer; }
+        .tag-hyg-merge:hover, .tag-hyg-merge:focus-visible { background:#4361ee; color:#fff; }
+        @media (pointer:coarse) { .tag-hyg-merge { min-height:44px; padding:4px 12px; } }
         .tag-hyg-group { display:inline-flex; flex-wrap:wrap; gap:4px; align-items:center; margin:0 8px 4px 0; padding:3px 8px; border:1px dashed #cbd5e1; border-radius:10px; background:#fff; }
 
         /* V93.27 PR #13 Phase 4B: filter pills for Quiz Engine global toolbar
@@ -30607,6 +30610,10 @@ ${JSON.stringify(sourceObj)}`;
             const none = '<p>None.</p>';
             const legacyCount = (Array.isArray(quizzesData) ? quizzesData : []).filter(q => !q.isHistoryRevision && window.quizLegacyMarkers(q).found).length; // V101.10
             const mirrorTodo = window.quizTagListBackfillTodo(); // V101.15
+            // V101.56: each case-variant / near-duplicate group gets a merge button; the
+            // group (keys + spellings, most used first) is kept here for mergeQuizTagGroup(i).
+            const mergeGroups = window._quizTagMergeGroups = [];
+            const mergeBtn = (keys, forms) => `<button type="button" class="tag-hyg-merge" onclick="mergeQuizTagGroup(${mergeGroups.push({ keys, forms: forms.sort((a, b) => b.n - a.n).map(f => f.raw) }) - 1})" title="Merge these spellings into one tag on every quiz">Merge</button>`;
             body.innerHTML = `<div class="tag-hyg-grid">
                 <div class="tag-hyg-card"><h5>Overview</h5>
                     <p>${h.considered} quizzes · ${h.tagged} tagged · ${h.untagged} without tags · ${h.distinct} distinct tags (case-insensitive).</p>
@@ -30614,10 +30621,10 @@ ${JSON.stringify(sourceObj)}`;
                     <h5>Top tags</h5>${chips(h.entries.slice(0, 15))}</div>
                 <div class="tag-hyg-card"><h5>Case variants · ${h.caseVariants.length}</h5>
                     <p>Same tag, different capitalisation. Save only de-duplicates exact strings.</p>
-                    ${h.caseVariants.length ? h.caseVariants.slice(0, 30).map(e => group(e.forms.map(f => `${escapeHtml(f.raw)} <small>×${f.n}</small>`).join(' · '))).join('') : none}${cap(h.caseVariants, 30)}</div>
+                    ${h.caseVariants.length ? h.caseVariants.slice(0, 30).map(e => group(e.forms.map(f => `${escapeHtml(f.raw)} <small>×${f.n}</small>`).join(' · ') + mergeBtn([e.key], [...e.forms]))).join('') : none}${cap(h.caseVariants, 30)}</div>
                 <div class="tag-hyg-card"><h5>Near-duplicates · ${h.nearDuplicates.length}</h5>
                     <p>Differ only by punctuation, spacing or a plural "s".</p>
-                    ${h.nearDuplicates.length ? h.nearDuplicates.slice(0, 30).map(g => group(g.map(label).join(' ≈ '))).join('') : none}${cap(h.nearDuplicates, 30)}</div>
+                    ${h.nearDuplicates.length ? h.nearDuplicates.slice(0, 30).map(g => group(g.map(label).join(' ≈ ') + mergeBtn(g.map(e => e.key), g.flatMap(e => e.forms)))).join('') : none}${cap(h.nearDuplicates, 30)}</div>
                 <div class="tag-hyg-card"><h5>Singletons · ${h.singletons.length}</h5>
                     <p>Used by exactly one quiz. Candidates to fold into a common tag.</p>
                     ${h.singletons.length ? chips(h.singletons.slice(0, 60)) : none}${cap(h.singletons, 60)}</div>
@@ -61349,6 +61356,53 @@ RULES:
                 if (typeof showToast === 'function') showToast(`✅ tagList written on ${done} quiz(zes)`);
             } catch (e) {
                 alert(`tagList backfill stopped after ${done} quiz(zes): ${e.message}`);
+            }
+        };
+
+        // V101.56: merge tag spellings. Every tag whose lowercase form is in `keys`
+        // becomes `target` at its first position; later repeats (any case) drop out.
+        // Pure — scripts/quiz-tag-hygiene-check.cjs runs it.
+        window.mergeQuizTagList = function (list, keys, target) {
+            const want = new Set(keys), seen = new Set(), out = [];
+            list.forEach(t => {
+                const v = want.has(t.toLowerCase()) ? target : t;
+                if (seen.has(v.toLowerCase())) return;
+                seen.add(v.toLowerCase());
+                out.push(v);
+            });
+            return out;
+        };
+        // Quiz-level tags only (per-question tags untouched), history revisions skipped.
+        // Writes tags + tagList together, 400 per batch — same shape as migrateQuizMarkerTags.
+        window.mergeQuizTagGroup = async function (i) {
+            const g = (window._quizTagMergeGroups || [])[i];
+            if (!g) return;
+            const typed = prompt(`Merge ${g.forms.map(f => `"${f}"`).join(', ')} into one tag. Keep this spelling (edit if needed):`, g.forms[0]);
+            const target = String(typed || '').trim().replace(/\s+/g, ' ');
+            if (!target) return;
+            if (target.includes(',')) { alert('A tag cannot contain a comma.'); return; }
+            const todo = [];
+            (Array.isArray(quizzesData) ? quizzesData : []).forEach(q => {
+                if (!q || q.isHistoryRevision) return;
+                const before = window.quizTagList(q);
+                if (!before.some(t => g.keys.includes(t.toLowerCase()))) return;
+                const after = window.mergeQuizTagList(before, g.keys, target);
+                if (JSON.stringify(after) !== JSON.stringify(before)) todo.push({ q, after });
+            });
+            if (!todo.length) { if (typeof showToast === 'function') showToast('Nothing to merge'); return; }
+            if (!confirm(`Rewrite the tags on ${todo.length} quiz(zes) so they use "${target}"? Per-question tags are not changed.`)) return;
+            let done = 0;
+            try {
+                for (let j = 0; j < todo.length; j += 400) {
+                    const batch = db.batch();
+                    const slice = todo.slice(j, j + 400);
+                    slice.forEach(({ q, after }) => batch.update(db.collection('quizzes').doc(q.id), { tags: after.join(', '), tagList: after }));
+                    await batch.commit();
+                    done += slice.length;
+                }
+                if (typeof showToast === 'function') showToast(`✅ Merged into "${target}" on ${done} quiz(zes)`);
+            } catch (e) {
+                alert(`Tag merge stopped after ${done} quiz(zes): ${e.message}`);
             }
         };
 

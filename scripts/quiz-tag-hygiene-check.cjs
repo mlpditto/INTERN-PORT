@@ -13,8 +13,14 @@ if (start < 0 || end < 0) { console.error('computeQuizTagHygiene not found in ad
 const src = html.slice(start, end + '\n        };'.length);
 // V101.15: computeQuizTagHygiene reads through window.quizTagList — load the real reader too.
 const readerSrc = html.slice(html.indexOf('        const splitTagCsv = s =>'), html.indexOf('        window.isQuizMarkerTag = t =>'));
+// V101.56: the pure merge helper, also verbatim.
+const mStart = html.indexOf('window.mergeQuizTagList = function');
+const mEnd = html.indexOf('\n        };\n', mStart);
+if (mStart < 0 || mEnd < 0) { console.error('mergeQuizTagList not found in admin.html'); process.exit(1); }
+const mergeSrc = html.slice(mStart, mEnd + '\n        };'.length);
 const window = {};
-new Function('window', readerSrc + '\n' + src)(window);
+new Function('window', readerSrc + '\n' + src + '\n' + mergeSrc)(window);
+const merge = (list, keys, target) => window.mergeQuizTagList(list, keys, target).join('|');
 
 const quizzes = [
     { id: 'A', tags: 'Headache, Pharmacotherapy, headache' },          // case variant inside one quiz
@@ -40,7 +46,12 @@ const checks = [
     ['markers', h.markers.map(e => e.key).join(','), 'ai_variant'],
     ['per-question distinct', h.perQuestionDistinct, 2],
     ['per-question only', h.perQuestionOnly.join(','), 'ibuprofen'],
-    ['empty input', window.computeQuizTagHygiene([]).distinct, 0]
+    ['empty input', window.computeQuizTagHygiene([]).distinct, 0],
+    ['merge case variant in place', merge(['GERD', 'headache', 'Pharmacotherapy'], ['headache'], 'Headache'), 'GERD|Headache|Pharmacotherapy'],
+    ['merge drops later repeats', merge(['Headache', 'x', 'headache', 'Headaches'], ['headache', 'headaches'], 'Headache'), 'Headache|x'],
+    ['merge onto an existing target keeps first position', merge(['a', 'Drug Interactions', 'drug-interactions'], ['drug interactions', 'drug-interactions'], 'Drug Interactions'), 'a|Drug Interactions'],
+    ['merge leaves other tags alone', merge(['Pregnancy', 'GERD'], ['headache'], 'Headache'), 'Pregnancy|GERD'],
+    ['merge to a new spelling', merge(['clinical trial', 'X'], ['clinical trial', 'clinical trials'], 'Clinical Trials'), 'Clinical Trials|X']
 ];
 let fail = 0;
 checks.forEach(([name, got, want]) => {
