@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.38)</title>
+    <title>Nika Admin (V101.39)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -15372,7 +15372,7 @@
             <!-- γ.2: Tag editor — admin can add/remove tags + suggest from Phase A taxonomy -->
             <div style="margin-bottom:14px;">
                 <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
-                    <label style="font-weight:800; color:#374151; font-size:0.85em;">Tags 태그</label>
+                    <label style="font-weight:800; color:#374151; font-size:0.85em;">Tags</label>
                     <span style="font-size:0.7em; color:#94a3b8;">Add or remove tags before saving</span>
                 </div>
                 <div id="lnr-tags-selected" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; min-height:28px;"></div>
@@ -15380,21 +15380,22 @@
                     <input type="text" id="lnr-tag-input" placeholder="Type tag + Add..." style="flex:1; min-width:0; padding:8px 12px; border:1px solid #d8b4fe; border-radius:10px; font-size:0.82em; margin:0;" onkeypress="if(event.key==='Enter'){event.preventDefault();lnrAddTag();}">
                     <button type="button" onclick="lnrAddTag()" style="width:auto; padding:8px 14px; background:#6c5ce7; border:none; border-radius:10px; color:white; font-size:0.82em; cursor:pointer; flex-shrink:0; white-space:nowrap;">+ Add</button>
                 </div>
-                <div id="lnr-tag-autosuggest" style="display:none; margin-top:8px; padding:8px 12px; background:#fef3c7; border:1px solid #fcd34d; border-radius:8px; font-size:0.78em; color:#92400e;"></div>
-                <!-- V98.31: on-device drug-name NER. lnr-tag-autosuggest above can only ever
-                     surface tags that already exist in LP_ALL_TAGS; this finds drug names the
-                     taxonomy has never heard of. Deliberately behind a button — the model is a
-                     ~21 MB download on first use — 33.8 MB on disk, gzipped by Pages on the
-                     wire, measured 21,611 KB transferSize on the live page — and it is
-                     browser-cached after, so an admin who never
-                     clicks pays nothing. Runs locally: the note text is not sent anywhere. -->
-                <div style="margin-top:8px;">
-                    <button type="button" id="lnr-drug-scan-btn" onclick="lnrScanDrugs()" style="width:auto; min-height:auto; padding:6px 12px; background:#FFD21E; border:1px solid #FF9D00; border-radius:10px; color:#1f2937; font-size:0.78em; font-weight:700; cursor:pointer;">💊 Scan for drug names</button>
-                    <span style="font-size:0.68em; color:#94a3b8; margin-left:8px;">🤗 on-device · first run downloads ~21 MB</span>
-                    <div id="lnr-drug-hits" style="display:none; margin-top:8px; padding:8px 12px; background:#FFF8DB; border:1px solid #FFD21E; border-radius:8px; font-size:0.78em; color:#5C4300;"></div>
+                <!-- V101.39: one "Suggested tags" box for both sources — 💡 chips are taxonomy tags
+                     found in the note text (lnrAutoSuggestTags), 💊 chips come from the on-device
+                     drug-name model (lnrScanDrugs). The scan is deliberately behind a button: the
+                     model is a ~21 MB download on first use (33.8 MB on disk, gzipped by Pages,
+                     measured 21,611 KB transferSize live) and browser-cached after, so an admin who
+                     never clicks pays nothing. Runs locally: the note text is not sent anywhere. -->
+                <div id="lnr-suggest-box" style="margin-top:8px; padding:8px 12px; background:#fff; border:1px solid #e9d5ff; border-radius:8px; font-size:0.78em;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                        <span style="font-weight:700; color:#6b21a8;">Suggested tags <span style="font-weight:400; color:#94a3b8;">· tap to add</span></span>
+                        <button type="button" id="lnr-drug-scan-btn" onclick="lnrScanDrugs()" title="🤗 Runs on-device (Transformers.js) · first run downloads ~21 MB" style="width:auto; min-height:auto; padding:5px 10px; background:#FFD21E; border:1px solid #FF9D00; border-radius:10px; color:#1f2937; font-size:1em; font-weight:700; cursor:pointer; white-space:nowrap;">💊 Scan for drugs</button>
+                    </div>
+                    <div id="lnr-tag-autosuggest" style="display:none; margin-top:6px;"></div>
+                    <div id="lnr-drug-hits" style="display:none; margin-top:6px; color:#5C4300;"></div>
                 </div>
                 <details class="lnr-taxonomy" style="margin-top:8px; background:#faf5ff; border:1px solid #d8b4fe; border-radius:10px; padding:8px 12px;">
-                    <summary style="cursor:pointer; font-size:0.8em; font-weight:600; color:#6b21a8; outline:none; user-select:none;">💡 Suggested taxonomy 추천 분류</summary>
+                    <summary style="cursor:pointer; font-size:0.8em; font-weight:600; color:#6b21a8; outline:none; user-select:none;">💡 Suggested taxonomy</summary>
                     <input id="lnr-taxonomy-search" aria-label="Search suggested tags" placeholder="Search suggested tags…" oninput="lnrFilterTaxonomy()" style="margin:10px 0 0; width:100%;">
                     <div id="lnr-tag-suggested" style="padding-top:10px;"></div>
                 </details>
@@ -58341,9 +58342,9 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             }
             const chips = matches.map(t => {
                 const safe = t.replace(/'/g, "&#39;").replace(/"/g, '&quot;');
-                return `<button type="button" onclick="lnrAddTag('${safe}')" style="width:auto; min-height:auto; padding:3px 10px; background:#fcd34d; border:none; border-radius:10px; color:#78350f; font-size:0.78em; cursor:pointer; font-weight:700; margin:2px;">+ ${t}</button>`;
+                return `<button type="button" onclick="lnrAddTag('${safe}')" title="Found in the note text" style="width:auto; min-height:auto; padding:3px 10px; background:#f3e8ff; border:1px solid #d8b4fe; border-radius:10px; color:#6b21a8; font-size:1em; cursor:pointer; font-weight:700; margin:0 4px 4px 0;">💡 ${t}</button>`;
             }).join('');
-            hint.innerHTML = `💡 Detected in content — admin add as tags?<div style="margin-top:6px;">${chips}</div>`;
+            hint.innerHTML = chips;
             hint.style.display = 'block';
         }
 
@@ -58416,7 +58417,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
             const label = btn.textContent;
             btn.disabled = true;
-            btn.textContent = '💊 Loading model…';
+            btn.textContent = '💊 Loading model (~21 MB)…';
             try {
                 const ner = await lnrEnsureDrugNer();
                 btn.textContent = '💊 Scanning…';
@@ -58439,9 +58440,9 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     const safe = w.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
                     // Drop the chip once used — lnrAddTag re-renders the taxonomy box but not
                     // this one, so without it an added tag stays on offer as if it were missing.
-                    return `<button type="button" onclick="lnrAddTag('${safe}'); this.remove();" style="width:auto; min-height:auto; padding:3px 10px; background:#FFD21E; border:1px solid #FF9D00; border-radius:10px; color:#1f2937; font-size:0.78em; font-weight:700; cursor:pointer; margin:0 4px 4px 0;">+ ${safe}</button>`;
+                    return `<button type="button" onclick="lnrAddTag('${safe}'); this.remove();" style="width:auto; min-height:auto; padding:3px 10px; background:#FFD21E; border:1px solid #FF9D00; border-radius:10px; color:#1f2937; font-size:1em; font-weight:700; cursor:pointer; margin:0 4px 4px 0;" title="Drug name found on-device">💊 ${safe}</button>`;
                 }).join('');
-                show(`💊 Detected on-device — add as tags?<div style="margin-top:6px;">${chips}</div>`);
+                show(chips);
             } catch (err) {
                 console.error('[lnr-drug-ner]', err);
                 show('⚠️ Drug scan unavailable — ' + (err && err.message ? err.message : 'model failed to load') + '. See console.');
