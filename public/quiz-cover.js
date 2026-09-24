@@ -166,14 +166,14 @@ const QuizCover = (() => {
                 el.querySelector('[role=status]').textContent = 'Use PNG, JPG or WebP up to 10 MB'; return;
             }
             const token = ++revision;
-            busy = true; controls(true); el.querySelector('[role=status]').textContent = 'Uploading…';
+            busy = true; controls(true); busyCard('Uploading…');
             try {
                 const url = await upload(file);
                 if (token === revision) { set(url); el.querySelector('[role=status]').textContent = 'Save Quiz to apply'; }
             } catch (error) {
                 if (token === revision) el.querySelector('[role=status]').textContent = 'Upload failed. Try again.';
                 console.error('Quiz cover upload:', error);
-            } finally { if (token === revision || !busy) { busy = false; controls(false); } }
+            } finally { if (token === revision || !busy) { busy = false; controls(false); busyCard(null); } }
         };
         return el;
     }
@@ -199,7 +199,7 @@ const QuizCover = (() => {
             JSON.stringify({ title: title.slice(0, 300), tags: String(tags).slice(0, 300), visualPreference: el.querySelector('[data-prompt]').value.slice(0, 300) })
         ].join('\n');
         const token = ++revision;
-        clearCandidate(); busy = true; controls(true); status.textContent = 'Generating cover…';
+        clearCandidate(); busy = true; controls(true); busyCard('Generating cover…');
         try {
             // V101.53: Image-API models get the collection's 3:4 as a real parameter, not just prompt text.
             const imageApi = !!(AI_MODELS.find(m => m.id === model) || {}).imageApi;
@@ -220,23 +220,37 @@ const QuizCover = (() => {
         } catch (error) {
             if (token === revision) status.textContent = 'Generate failed: ' + (error.message || 'please retry');
         } finally {
-            if (token === revision) { busy = false; controls(false); }
+            if (token === revision) { busy = false; controls(false); busyCard(null); }
         }
     }
     async function applyGenerated() {
         if (busy || !candidate) return;
         const token = ++revision, el = editor();
-        busy = true; controls(true); el.querySelector('[role=status]').textContent = 'Uploading cover…';
+        busy = true; controls(true); busyCard('Uploading cover…');
         try {
             const url = await upload(candidate);
             if (token === revision) { set(url); el.querySelector('[role=status]').textContent = 'Cover set — Save Quiz to apply'; }
         } catch (error) {
             if (token === revision) el.querySelector('[role=status]').textContent = 'Upload failed — press Apply to retry';
         } finally {
-            if (token === revision) { busy = false; controls(false); }
+            if (token === revision) { busy = false; controls(false); busyCard(null); }
         }
     }
     function controls(disabled) { editor().querySelectorAll('button, [data-prompt]').forEach(b => b.disabled = disabled); }
+    // V101.53: busy states (generating / uploading) show in the cover card — spinner + seconds — instead
+    // of taking a whole status line. The live region still carries the text for screen readers (visually
+    // hidden while busy); results and errors keep using the line.
+    let busyTimer = 0;
+    function busyCard(label) {
+        const el = editor(), thumb = el.querySelector('.quiz-cover-editor-thumb'), status = el.querySelector('[role=status]');
+        clearInterval(busyTimer);
+        status.classList.toggle('quiz-cover-sr', !!label);
+        if (!label) { thumb.removeAttribute('data-busy'); thumb.removeAttribute('title'); return; }
+        status.textContent = label; thumb.title = label;
+        const started = Date.now();
+        const tick = () => thumb.setAttribute('data-busy', Math.round((Date.now() - started) / 1000) + 's');
+        tick(); busyTimer = setInterval(tick, 1000);
+    }
     function set(value) {
         revision++; busy = false;
         clearCandidate();
@@ -248,6 +262,7 @@ const QuizCover = (() => {
         uploadBtn.title = url ? 'เปลี่ยนภาพปก' : 'อัปโหลดภาพปก';
         uploadBtn.setAttribute('aria-label', url ? 'Replace cover' : 'Upload cover');
         el.querySelector('[data-remove]').hidden = !url;
+        busyCard(null);
         el.querySelector('[role=status]').textContent = '';
         controls(false);
     }
