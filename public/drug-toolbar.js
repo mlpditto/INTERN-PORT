@@ -25,17 +25,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const oldRail = byId('dca-ai-chip-rail');
     const rails = [rail, oldRail];
     function render(selected) {
+        // V101.50: same lean chips as every other text rail (ai-model-ui.js generator).
         rails.forEach(host => {
             host.classList.add('text-ai-chips');
-            host.replaceChildren();
-            choices.forEach(m => {
-                const button = document.createElement('button'); button.type = 'button'; button.dataset.value = m.id;
-                button.className = 'glass-toggle-item'; button.classList.toggle('active', selected === m.id);
-                button.setAttribute('aria-pressed', String(selected === m.id)); button.textContent = m.label;
-                button.onclick = () => window.dcaSelectAutoDraftModel(button);
-                button.title = m.hint;
-                host.append(button);
-            });
+            host.innerHTML = window.textAIChipContents(selected, 'dcaSelectAutoDraftModel(this)');
         });
     }
     window.dcaSelectedToolbarModel = () => byId('dca-ai-model-val').value || DCA_AI_FALLBACK_MODEL;
