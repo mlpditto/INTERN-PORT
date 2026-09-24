@@ -4,7 +4,8 @@ const QuizCover = (() => {
     // V100.86: icon-only chip rail replaces the <select> — icon/ariaLabel/titleTh feed the rail's markup.
     const AI_MODELS = [
         { id: 'as/gemini-3.1-flash-image', icon: '🍌', ariaLabel: 'Nano Banana 2 (recommended)', titleTh: 'Nano Banana 2 · แนะนำ' },
-        { id: 'or/openai/gpt-5.4-image-2', icon: '🎨', ariaLabel: 'GPT Image 2 via OpenRouter', titleTh: 'GPT Image 2 · ผ่าน OpenRouter' },
+        // V101.50: official OpenAI Blossom (assets/logos, text-ai-chips.css) instead of an emoji.
+        { id: 'or/openai/gpt-5.4-image-2', icon: '<span class="text-ai-logo" data-owner="openai" aria-hidden="true"></span>', ariaLabel: 'GPT Image 2 via OpenRouter', titleTh: 'GPT Image 2 · ผ่าน OpenRouter' },
         { id: 'or/google/gemini-3.1-flash-image-preview', icon: '✨', ariaLabel: 'Gemini Image Preview via OpenRouter', titleTh: 'Gemini Image Preview · ผ่าน OpenRouter' }
     ];
     const MODEL_PREF_KEY = 'quiz_cover_ai_model';
