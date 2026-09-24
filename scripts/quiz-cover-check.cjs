@@ -116,6 +116,25 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         await page.locator('[data-discard]').click();
         assert.equal(await page.evaluate(() => QuizCover.value()), 'https://example.com/ai.webp');
         assert.equal(await page.locator('.quiz-cover-ai-preview').isVisible(), false);
+        // V101.54: a 2:3 AI image (Muse clamps 3:4 to 2:3) is cropped to 3:4 before the preview,
+        // keeping more of the bottom (title band) than the top; a 3:4 image passes through unchanged.
+        await page.evaluate(() => {
+            const c = document.createElement('canvas'); c.width = 40; c.height = 60;
+            const x = c.getContext('2d'); x.fillStyle = '#ff0000'; x.fillRect(0, 0, 40, 60); x.fillStyle = '#0000ff'; x.fillRect(0, 45, 40, 15);
+            window.tallImage = c.toDataURL('image/png');
+            window.callUniversalAI = async () => ({ imageDataUrl: tallImage });
+        });
+        await page.locator('[data-generate]').click();
+        await page.waitForFunction(() => !QuizCover.isBusy());
+        const cropped = await page.evaluate(async () => {
+            const img = document.querySelector('.quiz-cover-ai-preview img'); await img.decode();
+            const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight; const x = c.getContext('2d'); x.drawImage(img, 0, 0);
+            const blue = x.getImageData(20, img.naturalHeight - 2, 1, 1).data;
+            return { w: img.naturalWidth, h: img.naturalHeight, bottomIsTitleBand: blue[2] > 200 && blue[0] < 60 };
+        });
+        assert.ok(Math.abs(cropped.w / cropped.h - 0.75) < 0.01 && cropped.h < 60, '2:3 AI image cropped to 3:4 (got ' + cropped.w + 'x' + cropped.h + ')');
+        assert.equal(cropped.bottomIsTitleBand, true, 'crop keeps the bottom (title band)');
+        await page.locator('[data-discard]').click();
         await page.evaluate(() => { window.callUniversalAI = async () => ({text:'No image available'}); });
         await page.locator('[data-generate]').click();
         await page.waitForFunction(() => !QuizCover.isBusy());
