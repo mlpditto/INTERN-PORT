@@ -18,7 +18,7 @@ window.CertificateFiles = (() => {
             return true;
         } catch (error) {
             console.error('Certificate archive:', error);
-            alert('PDF archive failed; export stopped. Please retry. เลขทะเบียนอาจถูกสร้างแล้ว แต่ยังไม่ได้ดาวน์โหลด PDF: ' + error.message);
+            alert('PDF archive failed; export stopped. Please retry. The certificate numbers may already have been issued, but the PDFs were not downloaded: ' + error.message);
             return false;
         }
     }
