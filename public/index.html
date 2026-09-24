@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.02)</title>
+    <title>Internship Portfolio (V101.03)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V99.86">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -3270,6 +3270,22 @@
                     cursor: pointer; white-space: nowrap; line-height: 1.2;
                 }
                 .dc-sec-chip:hover { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+                /* V101.03: icon-only jump rail (Disease detail) — one row, 44px targets, name in the tooltip */
+                .dc-sec-rail.dc-sec-rail-icons { justify-content: space-between; gap: 2px; }
+                .dc-sec-rail.dc-sec-rail-icons .dc-sec-chip { flex: 1 1 0; min-width: 40px; min-height: 40px; padding: 4px 0; font-size: 18px; line-height: 1; border-radius: 10px; }
+                /* V101.03: aliases chip + fold-out; 🌐 language chip + popover in the header row */
+                .dc-alias-chip { border: 1px dashed #93c5fd; background: transparent; color: #1d4ed8; cursor: pointer; width: auto; min-height: 0; font: inherit; font-weight: 700; }
+                .dc-detail-aliases { flex-basis: 100%; font-size: 0.95em; color: #1e40af; line-height: 1.5; padding: 2px 4px; }
+                .dc-detail-aliases[hidden] { display: none; }
+                .dc-lang-wrap { position: relative; display: inline-flex; }
+                .dc-lang-chip { display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 10px; border: 1px solid #bfdbfe; border-radius: 999px; background: #eff6ff; color: #1d4ed8; font-size: 0.78em; font-weight: 800; cursor: pointer; width: auto; min-height: 0; white-space: nowrap; }
+                .dc-lang-chip .dc-lang-chev { font-size: 0.8em; transition: transform 0.15s ease; }
+                .dc-lang-chip[aria-expanded="true"] .dc-lang-chev { transform: rotate(180deg); }
+                .dc-lang-pop { position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; display: flex; gap: 4px; padding: 6px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 10px 24px rgba(15,23,42,0.18); }
+                .dc-lang-pop[hidden] { display: none; }
+                .dc-lang-pop button { width: 44px; height: 40px; padding: 0; min-height: 0; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; font-size: 16px; cursor: pointer; }
+                .dc-lang-pop button.active { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+                .dc-lang-status { font-size: 0.72em; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
                 /* V95.02 Phase 2: section accent borders — left-stripe per
                    section category. Palette echoes admin section colors
                    (public/admin.html) so the two surfaces stay consistent. */
@@ -3374,13 +3390,12 @@
                 /* V95.45: intern submitter credit footer for user-contributed
                    Codex entries (Drug + Disease). Soft slate card with avatar. */
                 .dc-detail-credit {
-                    display: flex; align-items: center; gap: 10px;
-                    margin: 16px 20px 4px; padding: 10px 14px;
-                    background: #f8fafc; border: 1px solid #e2e8f0;
-                    border-radius: 10px;
+                    display: flex; align-items: center; gap: 8px;
+                    margin: 12px 20px 4px; padding: 0;
+                    background: transparent; border: 0;
                 }
                 .dc-detail-credit-avatar {
-                    width: 32px; height: 32px; border-radius: 50%;
+                    width: 22px; height: 22px; border-radius: 50%;
                     object-fit: cover; flex-shrink: 0;
                     border: 1px solid #e2e8f0; background: #fff;
                 }
@@ -5307,6 +5322,8 @@
                         <div id="dx-detail-chips" class="dc-detail-chips lang-no-toggle"></div>
                     </div>
                     <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+                        <!-- V101.03: 🌐 language chip + its popover, filled by dxRenderLangChip(); replaces the 6-flag bar. -->
+                        <div id="dx-detail-lang" class="dc-lang-wrap lang-no-toggle"></div>
                         <button type="button" class="dc-detail-suggest-btn" onclick="dxSuggestEdit()" title="Suggest edit — send an edit request to the admin" data-th-title="ส่งคำขอแก้ไขให้ admin" aria-label="Suggest edit">✨</button>
                         <button type="button" class="dc-detail-close" onclick="dxCloseDetail()" aria-label="Close">×</button>
                     </div>
@@ -16653,31 +16670,44 @@
             return Object.assign({}, disease, { _translationPending: true });
         }
 
-        function dxRenderLangBar(eff) {
+        // V95.11 → V101.03: the language picker is a 🌐 chip in the header row that names the
+        // current choice and opens the same six options as a popover; the old bar took the
+        // first 50px of every detail view. Status (⏳ Translating… / source badge) sits beside it.
+        function dxRenderLangChip(eff) {
+            const host = document.getElementById('dx-detail-lang');
+            if (!host) return;
             const selected = dxGetSelectedLang();
-            let statusBadge = '';
+            const cur = DC_LANGS.find(l => l.code === selected) || DC_LANGS[0];
+            const short = { orig: 'Orig', th: 'TH', en: 'EN', ko: 'KO', ja: 'JA', zh: 'ZH' }[cur.code] || cur.code.toUpperCase();
+            let status = '';
             if (eff && eff._translationPending) {
-                statusBadge = '<span style="font-size:0.75em; color:#475569; margin-left:8px; padding:2px 8px; border-radius:999px; background:#e2e8f0; font-weight:700;">⏳ Translating… แปลอยู่</span>';
+                status = '<span class="dc-lang-status" style="color:#475569; background:#e2e8f0;">⏳</span>';
             } else if (selected !== 'orig' && eff && eff._translationSource) {
                 const src = eff._translationSource;
                 const pal = DC_SOURCE_COLORS[src] || { c: '#475569', bg: '#f1f5f9' };
-                const label = DC_SOURCE_BADGES[src] || src;
-                statusBadge = `<span style="font-size:0.75em; color:${pal.c}; margin-left:8px; padding:2px 8px; border-radius:999px; background:${pal.bg}; font-weight:700;">${label}</span>`;
+                status = `<span class="dc-lang-status" style="color:${pal.c}; background:${pal.bg};" title="${escapeHtml(DC_SOURCE_BADGES[src] || src)}">${escapeHtml(DC_SOURCE_BADGES[src] || src)}</span>`;
             }
-            // Inline styles defeat the global `button { width:100% }` rule.
-            const chips = DC_LANGS.map(l => {
-                const isActive = l.code === selected;
-                const bg = isActive ? '#3b82f6' : '#f1f5f9';
-                const fg = isActive ? '#ffffff' : '#475569';
-                const bd = isActive ? '#3b82f6' : '#cbd5e1';
-                return `<button type="button" onclick="dxApplyLang('${l.code}')" title="${l.title}" style="display:inline-block; padding:6px 10px; margin:0 4px 0 0; border-radius:8px; font-size:0.9em; line-height:1; cursor:pointer; width:auto; min-width:auto; min-height:auto; flex:0 0 auto; background:${bg}; color:${fg}; border:1px solid ${bd};">${l.label}</button>`;
-            }).join('');
-            return `
-                <div class="dc-lang-bar lang-no-toggle" style="display:flex; align-items:center; flex-wrap:wrap; gap:0; padding:8px 12px; margin-bottom:10px; background:#f8fafc; border-radius:8px;">
-                    <span style="font-size:0.8em; color:#64748b; margin-right:6px;">🌐</span>
-                    ${chips}
-                    ${statusBadge}
-                </div>`;
+            const opts = DC_LANGS.map(l => `<button type="button" class="${l.code === selected ? 'active' : ''}" onclick="dxApplyLang('${l.code}')" title="${l.title}" aria-label="${l.title}">${l.label}</button>`).join('');
+            host.innerHTML = `${status}<button type="button" class="dc-lang-chip" onclick="dxToggleLangPop()" aria-expanded="false" aria-controls="dx-lang-pop" title="Language · ${cur.title} — tap to change">🌐 ${short} <span class="dc-lang-chev" aria-hidden="true">⌄</span></button><div id="dx-lang-pop" class="dc-lang-pop" hidden>${opts}</div>`;
+        }
+        function dxToggleLangPop(force) {
+            const pop = document.getElementById('dx-lang-pop'), chip = document.querySelector('#dx-detail-lang .dc-lang-chip');
+            if (!pop || !chip) return;
+            const open = typeof force === 'boolean' ? force : pop.hidden;
+            pop.hidden = !open;
+            chip.setAttribute('aria-expanded', String(open));
+        }
+        document.addEventListener('click', e => {
+            const pop = document.getElementById('dx-lang-pop');
+            if (pop && !pop.hidden && !e.target.closest('#dx-detail-lang')) dxToggleLangPop(false);
+        });
+        // V101.03: unfold / fold the full synonym list under the chips.
+        function dxToggleAliases(btn) {
+            const list = document.getElementById('dx-detail-aliases');
+            if (!list || !btn) return;
+            list.hidden = !list.hidden;
+            btn.setAttribute('aria-expanded', String(!list.hidden));
+            btn.textContent = btn.textContent.replace(/[▸▾]$/, list.hidden ? '▸' : '▾');
         }
 
         function dxApplyLang(lang) {
@@ -16701,27 +16731,33 @@
                 if (eff.icd10) chips.push(`<span class="dc-detail-chip" title="ICD-10">${escapeHtml(eff.icd10)}</span>`);
                 if (eff.category) chips.push(`<span class="dc-detail-chip">${escapeHtml(eff.category)}</span>`);
                 if (Array.isArray(eff.synonyms) && eff.synonyms.length > 0) {
-                    chips.push(`<span class="dc-detail-chip" title="Synonyms">= ${escapeHtml(eff.synonyms.slice(0, 3).join(', '))}${eff.synonyms.length > 3 ? ` +${eff.synonyms.length - 3}` : ''}</span>`);
+                    // V101.03: a count chip that unfolds the full list on tap — the 2-line
+                    // "= a, b, c +2" paragraph pushed the content down on every open.
+                    const all = eff.synonyms.map(s => escapeHtml(String(s)));
+                    const n = all.length;
+                    chips.push(`<button type="button" class="dc-detail-chip dc-alias-chip" onclick="dxToggleAliases(this)" aria-expanded="false" aria-controls="dx-detail-aliases" title="${all.join(' · ')}">= ${n} ${n === 1 ? 'alias' : 'aliases'} ▸</button>`);
+                    chips.push(`<div id="dx-detail-aliases" class="dc-detail-aliases" hidden>${all.join(' · ')}</div>`);
                 }
                 chipsEl.innerHTML = chips.join('');
             }
+            dxRenderLangChip(eff); // V101.03: 🌐 chip in the header row (was a 6-flag bar at the top of the body)
             const body = document.getElementById('dx-detail-body');
             if (!body) return;
             const sections = [
                 { key: 'epi',  title: '📈 Epidemiology', open: false, fields: [['Epidemiology', eff.epidemiology]] },
-                { key: 'etio', title: '🧬 Etiology & Pathophysiology', open: false, fields: [['Etiology', eff.etiology], ['Pathophysiology', eff.pathophysiology]] },
+                { key: 'etio', title: '🧬 Etiology & Patho', open: false, fields: [['Etiology', eff.etiology], ['Pathophysiology', eff.pathophysiology]] },
                 // V95.21 Phase 6: AI pathophysiology visual from admin's Generate
                 // Pathophysiology Visual modal. Renders only when pathoVisual.downloadUrl
                 // exists. open:true — the image is the most engaging surface.
                 (eff.pathoVisual && eff.pathoVisual.downloadUrl)
                     ? { key: 'pathovisual', title: '🎨 Pathophysiology Visual', open: false, visual: eff.pathoVisual }
                     : null,
-                { key: 'clinical', title: '🩺 Clinical Presentation', open: false, fields: [['Symptoms', eff.symptoms], ['Signs', eff.signs]] },
+                { key: 'clinical', title: '🩺 Clinical', open: false, fields: [['Symptoms', eff.symptoms], ['Signs', eff.signs]] },
                 { key: 'dx', title: '🔬 Diagnosis', open: false, fields: [['Diagnostic Criteria', eff.diagnosis], ['Investigations', eff.investigations], ['Differential Diagnosis', eff.differential]] },
                 { key: 'mgmt', title: '💊 Management', open: false, fields: [['Treatment', eff.treatment], ['Non-pharmacologic', eff.nonPharm], ['Complications', eff.complications], ['Prognosis', eff.prognosis]] },
                 // V95.13 Phase 6: Drug Codex cross-link — chips tap into the drug detail.
-                { key: 'reldrug', title: '💊 Related Drugs · ยาที่เกี่ยวข้อง', open: false, relatedDrugs: Array.isArray(eff.relatedDrugs) ? eff.relatedDrugs.filter(rd => rd && rd.id) : [] },
-                { key: 'edu', title: '📖 Education', open: false, fields: [['Patient Counseling · คำแนะนำผู้ป่วย', eff.patientCounseling], ['Red Flags', eff.redFlags], ['Clinical Pearls', eff.pearls]] },
+                { key: 'reldrug', title: '💊 Related Drugs', open: false, relatedDrugs: Array.isArray(eff.relatedDrugs) ? eff.relatedDrugs.filter(rd => rd && rd.id) : [] },
+                { key: 'edu', title: '📖 Education', open: false, fields: [['Patient Counseling', eff.patientCounseling], ['Red Flags', eff.redFlags], ['Clinical Pearls', eff.pearls]] },
                 { key: 'refs', title: '🔗 References', open: false, refs: Array.isArray(eff.references) ? eff.references.filter(Boolean) : [] }
             ];
             const html = sections.filter(Boolean).map(sec => {
@@ -16773,11 +16809,13 @@
                             <div class="dc-detail-section-body">${refsHtml}</div>
                         </details>`;
                 }
-                const fieldsHtml = sec.fields
-                    .filter(([, v]) => v && String(v).trim())
+                const filled = sec.fields.filter(([, v]) => v && String(v).trim());
+                // V101.03: a one-field section skips the sub-label — it only repeated the summary
+                // ("📈 Epidemiology" over "EPIDEMIOLOGY"). Multi-field sections keep theirs.
+                const fieldsHtml = filled
                     .map(([label, v]) => `
                         <div class="dc-detail-field">
-                            <div class="dc-detail-field-label dc-cat-label">${escapeHtml(label)}</div>
+                            ${filled.length > 1 ? `<div class="dc-detail-field-label dc-cat-label">${escapeHtml(label)}</div>` : ''}
                             <div class="dc-detail-field-value">${dxRenderFieldValue(v)}</div>
                         </div>`).join('');
                 if (!fieldsHtml) return '';
@@ -16791,8 +16829,8 @@
             // V95.45: credit the intern who submitted this entry (when present).
             // Read from the original doc, not eff — credit fields aren't translated.
             const creditHtml = codexContributorCreditHtml(disease.submittedByName, disease.submittedByPictureUrl);
-            body.innerHTML = dxRenderLangBar(eff) + (html || '<div class="dc-empty-state" style="padding:20px;">No details for this disease yet — the entry may still be in draft โรคนี้ยังไม่มีรายละเอียด</div>') + creditHtml;
-            codexBuildSectionRail(body); // V95.79: sticky jump-rail + auto-open first
+            body.innerHTML = (html || '<div class="dc-empty-state" style="padding:20px;">No details for this disease yet — the entry may still be in draft โรคนี้ยังไม่มีรายละเอียด</div>') + creditHtml;
+            codexBuildSectionRail(body, { iconOnly: true }); // V95.79: sticky jump-rail + auto-open first · V101.03: icons only
             body.scrollTop = 0;
         }
 
@@ -16819,10 +16857,12 @@
             // lang-no-toggle: exempt from lang-toggle.js auto-wrap. Without it the
             // Thai label AND a Thai intern display name (e.g. "สมชาย ใจดี") get
             // hidden under the EN-default body — see CLAUDE memory lang-toggle-thai-blank.
+            // V101.03: one quiet line — the boxed "Contributed by … เพิ่มข้อมูลโดย" card was the
+            // tallest thing after the content; the Thai reading lives in the title for the toggle.
             return `
-                <div class="dc-detail-credit lang-no-toggle">
+                <div class="dc-detail-credit lang-no-toggle" title="Contributed by ${escapeHtml(safeName)} · เพิ่มข้อมูลโดย ${escapeHtml(safeName)}">
                     ${avatar}
-                    <span class="dc-detail-credit-text">Contributed by <strong>${escapeHtml(safeName)}</strong> เพิ่มข้อมูลโดย</span>
+                    <span class="dc-detail-credit-text"><strong>${escapeHtml(safeName)}</strong></span>
                 </div>`;
         }
 
@@ -17984,7 +18024,9 @@
         // Reads the rendered <details> sections, makes a chip per section that
         // expands + scrolls to it, and auto-opens the first so the modal isn't blank.
         // Shared by Drug (dcRenderDetail) and Disease (dxRenderDetail).
-        function codexBuildSectionRail(bodyEl) {
+        // V101.03: opts.iconOnly — one row of the sections' leading emoji (name in the tooltip);
+        // the full-label chips repeated the accordion headers right under them.
+        function codexBuildSectionRail(bodyEl, opts = {}) {
             if (!bodyEl) return;
             const secs = [...bodyEl.querySelectorAll('.dc-detail-section')];
             if (secs.length < 2) { if (secs[0]) secs[0].open = true; return; }
@@ -17992,10 +18034,15 @@
                 const key = s.getAttribute('data-section-key') || ('s' + i);
                 const sum = s.querySelector('summary');
                 const label = ((sum ? sum.textContent : '') || '').replace(/\s+/g, ' ').trim() || ('Section ' + (i + 1));
+                if (opts.iconOnly) {
+                    const m = label.match(/^(\p{Extended_Pictographic}(?:️|‍\p{Extended_Pictographic})*)/u);
+                    const icon = m ? m[1] : label.slice(0, 2);
+                    return `<button type="button" class="dc-sec-chip" data-target="${escapeHtml(key)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${escapeHtml(icon)}</button>`;
+                }
                 return `<button type="button" class="dc-sec-chip" data-target="${escapeHtml(key)}">${escapeHtml(label)}</button>`;
             }).join('');
             const rail = document.createElement('div');
-            rail.className = 'dc-sec-rail lang-no-toggle';
+            rail.className = 'dc-sec-rail lang-no-toggle' + (opts.iconOnly ? ' dc-sec-rail-icons' : '');
             rail.innerHTML = chips;
             bodyEl.insertBefore(rail, secs[0]);
             rail.addEventListener('click', e => {
