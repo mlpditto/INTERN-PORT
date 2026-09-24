@@ -57,7 +57,11 @@ const QuizCover = (() => {
         if (owner && !owner.contains(event.relatedTarget)) hideHoverPreview();
     });
     document.addEventListener('focusin', event => { const image = hoverImage(event.target); if (image) showHoverPreview(image); });
-    document.addEventListener('focusout', event => { if (hoverImage(event.target)) hideHoverPreview(); });
+    // V101.46: match the owner like pointerout does — hoverImage() skips an image that has since
+    // failed to load (onerror hides it), which left the preview stuck on screen after blur.
+    document.addEventListener('focusout', event => {
+        if (event.target.closest && event.target.closest('#quiz-cover-editor img, .quiz-quick-cover, .quiz-admin-cover')) hideHoverPreview();
+    });
     document.addEventListener('scroll', hideHoverPreview, true);
     window.addEventListener('resize', hideHoverPreview);
     async function upload(file) {

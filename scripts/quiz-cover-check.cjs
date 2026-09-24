@@ -6,6 +6,10 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     try {
         const page = await browser.newPage();
         await page.route('https://quiz.test/', route => route.fulfill({body: '<div></div>', contentType: 'text/html'}));
+        // Cover URLs load a routed 1×1 PNG, so the result does not depend on the network (on CI a
+        // real example.com answers 404 fast enough to fire onerror mid-test).
+        const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+        await page.route('https://example.com/**', route => route.fulfill({status: 200, body: png, contentType: 'image/png'}));
         await page.goto('https://quiz.test/');
         await page.setContent('<div><div><input id="quiz-title"></div></div><div id="cards"></div>');
         await page.addStyleTag({content: fs.readFileSync('public/quiz-cover.css', 'utf8')});
@@ -50,6 +54,12 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.equal(await page.locator('#quiz-cover-hover-preview img').getAttribute('src'), 'https://example.com/table.webp');
         await page.locator('.quiz-quick-cover').blur();
         assert.equal(await page.locator('#quiz-cover-hover-preview').isVisible(), false);
+        // V101.46 regression: the cover image fails to load while its preview is showing → blur still hides it.
+        await page.locator('.quiz-quick-cover').focus();
+        assert.equal(await page.locator('#quiz-cover-hover-preview').isVisible(), true);
+        await page.evaluate(() => { document.querySelector('.quiz-quick-cover .quiz-admin-cover img').hidden = true; });
+        await page.locator('.quiz-quick-cover').blur();
+        assert.equal(await page.locator('#quiz-cover-hover-preview').isVisible(), false, 'Preview hides on blur even after the image failed');
         await page.evaluate(() => {window.adminApp = {storage: () => ({ref: () => ({put: async () => {}, getDownloadURL: async () => 'https://example.com/new.webp'})})};});
         // Test processing and upload with an actual canvas-generated valid image.
         await page.evaluate(async () => {
