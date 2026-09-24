@@ -25,10 +25,10 @@ async function batch(failAt, message) {
     await context.bulkPasteFindAnswers();
     return {rows,button,count,toasts,calls};
 }
-async function retries(type, code) {
-    let calls=0;
+async function retries(type, code, stepMs=0) {
+    let calls=0, now=0;
     const error=Object.assign(new Error('provider error'),{response:{status:429,data:{error:{type,code}},headers:{}}});
-    const context={axios:{post:async()=>{calls++;throw error;}},setTimeout:fn=>fn(),console:{warn:()=>{}},Math};
+    const context={axios:{post:async()=>{calls++;now+=stepMs;throw error;}},setTimeout:fn=>fn(),console:{warn:()=>{}},Math,Date:{now:()=>now}};
     vm.createContext(context);vm.runInContext(retrySource,context);
     await assert.rejects(context.postWithRetry('https://api.openai.com/v1/responses',{},{}));
     return calls;
@@ -46,6 +46,8 @@ async function retries(type, code) {
     const malformed=await batch(3,'Invalid JSON');assert.equal(malformed.calls,10);assert.match(malformed.toasts.at(-1)[0],/9\/10/);
     assert.equal(await retries('insufficient_quota','credit_balance_exhausted'),1);
     assert.equal(await retries('insufficient_quota','insufficient_quota'),1);
-    assert.equal(await retries('rate_limit_error','rate_limit_exceeded'),3,'Keep transient retry');
+    // V101.09: fast failures (<15s) get 4 retries; slow ones keep the 2-retry budget.
+    assert.equal(await retries('rate_limit_error','rate_limit_exceeded'),5,'Keep transient retry (fast)');
+    assert.equal(await retries('rate_limit_error','rate_limit_exceeded',20000),3,'Keep transient retry (slow)');
     console.log('PASS: exhausted-credit batches stop, preserve answers, explain skipped rows; transient retries remain');
 })().catch(e=>{console.error(e);process.exitCode=1;});

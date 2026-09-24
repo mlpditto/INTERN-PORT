@@ -82,7 +82,9 @@ new Function(...names, admin.slice(a, b))(...names.map(n => ctx[n]));
     check('admin loads codex-vision.js + bumped ai-model-ui', /<script src="codex-vision\.js\?v=V\d+\.\d+"><\/script>/.test(admin) && /ai-model-ui\.js\?v=V101\.20/.test(admin), true);
     check('banners pass the kind', /ddaSourceImageHtml\(draft\.sourceImageUrl, dcaEscapeHtml, 'dca'\)/.test(admin) && /ddaSourceImageHtml\(draft\.sourceImageUrl, dxaEscapeHtml, 'dxa'\)/.test(admin), true);
     check('chip rail excludes OpenRouter (text-only) models', /m => !m\.id\.startsWith\('or\/'\)/.test(admin), true);
-    check('chip choice persisted under its own key', /selectStoredTextAIModel\(this,'ai_default_codex_vision_model'\)/.test(admin), true);
+    // V101.36: the chip click goes through ddaPickVisionModel (which also closes the rail), and
+    // that is where the choice is stored — check both links of the chain.
+    check('chip choice persisted under its own key', /ddaPickVisionModel\(this,'\$\{kind\}'\)/.test(admin) && /function ddaPickVisionModel\(btn, kind\) \{\s*selectStoredTextAIModel\(btn, 'ai_default_codex_vision_model'\)/.test(admin), true);
     check('ai-model-ui: filter param, headings over the filtered list', /\(value, action = '', filter = null\) => \(filter \? models\.filter\(filter\) : models\)\.map\(\(m, i, list\)/.test(ui) && /list\[i - 1\]\.label/.test(ui), true);
     check('intern delegates to the shared file', /window\.CodexVision\.buildPrompt\(DD_IMAGE_FORMS\[kind\]\.subject\)/.test(index) && /<script src="codex-vision\.js\?v=V\d+\.\d+"><\/script>/.test(index), true);
     check('intern no longer carries its own key lines', !/'ICD10: <ICD-10 code ONLY if it is printed in the image, otherwise ->'/.test(index), true);

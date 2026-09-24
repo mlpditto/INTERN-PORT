@@ -34,10 +34,11 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.equal(await page.evaluate(() => calls), 1);
         await page.setViewportSize({width: 390, height: 800});
         await page.evaluate(() => QuizCover.set('https://example.com/cover.webp'));
-        await page.locator('#quiz-cover-editor > img').hover();
+        // V100.86: the editor cover image sits inside the .quiz-cover-editor-thumb frame.
+        await page.locator('#quiz-cover-editor .quiz-cover-editor-thumb > img').hover();
         assert.equal(await page.locator('#quiz-cover-hover-preview').isVisible(), true);
         assert.equal(await page.locator('#quiz-cover-hover-preview img').getAttribute('src'), 'https://example.com/cover.webp');
-        const sourceBox = await page.locator('#quiz-cover-editor > img').boundingBox();
+        const sourceBox = await page.locator('#quiz-cover-editor .quiz-cover-editor-thumb > img').boundingBox();
         const bubbleBox = await page.locator('#quiz-cover-hover-preview').boundingBox();
         assert.ok(bubbleBox.width > sourceBox.width * 3, 'Hover bubble enlarges the cover');
         assert.ok(bubbleBox.x >= 0 && bubbleBox.x + bubbleBox.width <= 390, 'Hover bubble stays inside the viewport');
@@ -73,11 +74,18 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         await page.locator('[data-generate]').click();
         assert.equal(await page.evaluate(() => aiCalls), 0, 'Title required');
         await page.locator('#quiz-title').fill('Cardiology');
+        // V100.86: the optional-detail field stays hidden until the ＋ toggle opens it.
+        assert.equal(await page.locator('[data-prompt]').isVisible(), false, 'Optional detail is collapsed by default');
+        await page.locator('[data-prompt-toggle]').click();
+        assert.equal(await page.locator('[data-prompt-toggle]').getAttribute('aria-expanded'), 'true');
         await page.locator('[data-prompt]').fill('Blue pastel');
         assert.equal(await page.locator('#quiz-cover-editor.lang-no-toggle').count(), 1, 'Thai controls must bypass the language text splitter');
-        assert.equal(await page.locator('[data-model] option').count(), 3, 'Three supported image models are available');
-        assert.equal(await page.locator('[data-model]').inputValue(), 'as/gemini-3.1-flash-image');
-        await page.locator('[data-model]').selectOption('or/openai/gpt-5.4-image-2');
+        // V100.86: model picker is an icon chip rail (one .active chip), not a <select>.
+        assert.equal(await page.locator('[data-model-chip]').count(), 3, 'Three supported image models are available');
+        assert.equal(await page.locator('[data-model-chip].active').count(), 1);
+        assert.equal(await page.locator('[data-model-chip].active').getAttribute('data-value'), 'as/gemini-3.1-flash-image');
+        await page.locator('[data-model-chip][data-value="or/openai/gpt-5.4-image-2"]').click();
+        assert.equal(await page.locator('[data-model-chip].active').getAttribute('data-value'), 'or/openai/gpt-5.4-image-2');
         assert.equal(await page.evaluate(() => localStorage.getItem('quiz_cover_ai_model')), 'or/openai/gpt-5.4-image-2');
         await page.locator('[data-generate]').click();
         await page.waitForFunction(() => !QuizCover.isBusy());

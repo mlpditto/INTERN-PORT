@@ -28,7 +28,8 @@ check('text step gets the caller prompt + OCR text, not the image', /promptForTe
 check('empty OCR → 502 with the model named', /return res\.status\(502\)\.json\(\{ error: `Typhoon OCR \(\$\{ocrModel\}\) returned no text for the image\.`, ocrModel \}\);/.test(t), true);
 check('response keeps {text, tokens} and adds model + ocrModel/ocrText on vision', /tokens: \(response\.data\.usage\?\.total_tokens \|\| 0\) \+ ocrTokens,\n\s*model: textModel,\n\s*\.\.\.\(isVision \? \{ ocrModel, ocrText \} : \{\}\)/.test(t), true);
 check('text model default unchanged for text calls', /"typhoon-v2\.5-30b-a3b-instruct"/.test(t), true);
-check('final catch logs provider + model + redacted body', /console\.error\("AI Proxy Error:", \{ message: sanitizeProxyErrorMessage\(err\), \.\.\.getSafeProviderError\(err\), provider, model, body: providerBody \}\);/.test(src), true);
+// V101.30: provider/model are try-scoped, so the catch reads them from req.body (a bare `provider` there threw ReferenceError).
+check('final catch logs provider + model + redacted body', /const reqProvider = req\.body\?\.provider, reqModel = req\.body\?\.model;\n\s*console\.error\("AI Proxy Error:", \{ message: sanitizeProxyErrorMessage\(err\), \.\.\.getSafeProviderError\(err\), provider: reqProvider, model: reqModel, body: providerBody \}\);/.test(src), true);
 
 // live model list (optional)
 (async () => {

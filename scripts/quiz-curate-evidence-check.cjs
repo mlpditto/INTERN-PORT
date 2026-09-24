@@ -52,7 +52,13 @@ check('clean run → empty note', s.evidenceNote, '');
 
 let threw = '';
 try { api.validateProposal({ questions: [item(1, false, 'coverage', []), item(2, true, 'coverage', []), item(3, true, 'coverage', [])] }, s, 2); } catch (e) { threw = e.message; }
-check('pins / target still enforced', /did not respect the target or pinned/.test(threw), true);
+// V101.32: an off-target / pin-dropping keep set is no longer rejected outright — it is snapped
+// to the model's `priority` ranking (pins first). Without a usable ranking it still throws.
+check('pins / target still enforced (no ranking → throws)', /dropped a pinned question, with no usable priority ranking/.test(threw), true);
+const ranked = { questions: [item(1, false, 'coverage', []), item(2, true, 'coverage', []), item(3, true, 'coverage', [])] };
+ranked.questions.forEach((q, i) => { q.priority = 3 - i; }); // Q1 ranked last, but pinned
+const snapped = api.validateProposal(ranked, s, 2);
+check('pins / target still enforced (ranked → pin kept, exactly n)', snapped.filter(q => q.keep).map(q => q.id).join(','), '1,3');
 threw = '';
 try { api.validateProposal({ questions: [item(1, true, 'coverage', [rel(2, [{ id: 9, quote: 'x' }])]), item(2, true, 'coverage', []), item(3, false, 'coverage', [])] }, s, 2); } catch (e) { threw = e.message; }
 check('structurally invalid evidence still throws', /invalid source evidence/.test(threw), true);

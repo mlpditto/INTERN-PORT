@@ -30,7 +30,8 @@ check('modern-ai exports extractJson', typeof modern.extractJson, 'function');
 check('extractJson strips fences', modern.extractJson('```json\n{"a":1}\n```'), '{"a":1}');
 check('index.js imports extractJson', /const \{ registry: aiModelRegistry, runModernAI, extractJson \} = require\("\.\/modern-ai"\);/.test(index), true);
 check('OpenRouter text path: 502 with reason on bad JSON / length / empty', /\[openrouter\] \$\{error\}/.test(index) && /orFinish === "length"/.test(index) && /return res\.status\(502\)\.json\(\{ error, finishReason: orFinish, jsonValid: orJsonValid, requestedModel: orModel \}\);/.test(index), true);
-check('OpenRouter success payload carries finishReason + jsonValid', /finishReason: orFinish,\n\s*jsonValid: orJsonValid\n\s*\}\);/.test(index), true);
+// V101.28 appended a usage block after jsonValid, so jsonValid is no longer the last key.
+check('OpenRouter success payload carries finishReason + jsonValid', /return res\.json\(\{\n\s*text: orText,[^}]*?finishReason: orFinish,\n\s*jsonValid: orJsonValid,/.test(index), true);
 check('OpenRouter image path untouched', /imageDataUrl,\n\s*text: message\.content \|\| "",/.test(index), true);
 const admin = read('public/admin.html');
 check('admin cache-busts quiz-curate.js', /quiz-curate\.js\?v=V\d+\.\d+/.test(admin), true);
