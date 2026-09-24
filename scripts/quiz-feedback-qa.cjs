@@ -35,7 +35,9 @@ const modalEnd = html.indexOf('        <!-- V92.95: Score Audit Modal',modalStar
         await page.addScriptTag({path:'public/ai-model-ui.js'});
         await page.evaluate(()=>initRegistryModelSelectors());
         await page.evaluate(async()=>{fixture=[{id:'f1',userId:'u1',displayName:'Bua',rating:7,comment:'',pointsEarned:1,timeUsedSeconds:353}];await showQuizFeedbackPanel('test');});
-        assert.equal(await page.locator('#qfp-model-pills button').count(),9);
+        // One pill per shared text-AI catalog entry (ai-model-ui.js) — a hard-coded 9 went stale when
+        // the OpenRouter models were added and the rail silently dropped a saved Qwen/DeepSeek default.
+        assert.equal(await page.locator('#qfp-model-pills button').count(),await page.evaluate(()=>TEXT_AI_MODELS.length));
         const ids = await page.locator('#qfp-model-pills button').evaluateAll(es=>es.map(e=>e.dataset.model));
         assert.deepEqual(await page.locator('#default-qfp-model option').evaluateAll(es=>es.map(e=>e.value)),ids);
         for (const saved of ['', 'gpt-4o-mini', 'unknown-model', 'gpt-6-astra', 'claude-fable-5-1']) {
@@ -70,6 +72,6 @@ const modalEnd = html.indexOf('        <!-- V92.95: Score Audit Modal',modalStar
         await page.waitForFunction(()=>document.getElementById('qfp-ai-result').textContent==='Summary');
         await page.screenshot({path:'feedback-qa.png',fullPage:true});
         assert.deepEqual(errors,[]);
-        console.log('PASS: nine chips match Settings; legacy defaults migrate; premium selections persist; two-way sync; empty/comment states; generation; mobile layout');
+        console.log('PASS: one chip per catalog model, matching Settings; legacy defaults migrate; premium selections persist; two-way sync; empty/comment states; generation; mobile layout');
     } finally {await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});

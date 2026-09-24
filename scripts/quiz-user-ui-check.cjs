@@ -30,6 +30,7 @@ const fbMarkup = html.slice(fbStart,fbEnd);
    window.showFeedbackReward=()=>{};window.closeFeedbackModal=()=>closed++;
   });
   for(const [a,b] of [
+   ['        function quizTagList(', '        let qbTagFilter'], // V100.85 shared tag reader, used by renderFeedbackTopicChips
    ['        function quizStepIsAnswered(', '        function renderQuizStep(useExistingTime'],
    ['        function qtRenderBar(', '        function qtApplyTranslation('],
    ['        function setFbRating(', '        function updateFeedbackCommentCounter('],
@@ -43,7 +44,8 @@ const fbMarkup = html.slice(fbStart,fbEnd);
   assert.equal(await page.locator('#fb-rating').inputValue(),'');
   assert.equal(await page.locator('#fb-topic-chip-rail option').count(),3);
   await page.evaluate(()=>document.getElementById('quizModal').style.display='flex');
-  await page.locator('#quiz-focus-language').selectOption('th');
+  // V100.71: the language <select> became a chip rail (qtRenderBar).
+  await page.locator('.quiz-focus-language button[aria-label="Thai"]').click();
   assert.equal(await page.evaluate(()=>selectedLanguage),'th');
   for(const width of [1440,768,390,320]){
    await page.setViewportSize({width,height:900});
