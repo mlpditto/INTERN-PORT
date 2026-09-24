@@ -27,7 +27,8 @@ const { chromium } = require('playwright');
         }
         await page.evaluate(() => {
             window.auditQuizAI = (button, options) => window.auditRequest = options;
-            window.analyzeQuizAI = () => window.rewriteRequest = textAIModel('ai-analyzer-model-val');
+            // V101.52: the toolbar passes the picked model (a trial model is kept, not normalised).
+            window.analyzeQuizAI = (button, options) => window.rewriteRequest = options && options.model ? resolveTrialTextAIModel(options.model) : textAIModel('ai-analyzer-model-val');
             window.closeQuizReview = () => window.closeRequested = true;
             window.exportAiAnalysisMd = () => window.exported = true;
             document.getElementById('ai-audit-popup').innerHTML = auditToolbarHtml(true);
@@ -35,11 +36,11 @@ const { chromium } = require('playwright');
         });
         for (const id of ['ai-audit-popup', 'ai-analysis-popup']) {
             const popup = page.locator('#' + id);
-            // V101.05 added Qwen/DeepSeek chips; V101.21 gave them provider tabs.
-            assert.equal(await popup.locator('.text-ai-chips button').count(), 13);
+            // V101.05 added Qwen/DeepSeek chips; V101.21 gave them provider tabs; V101.52 adds the Grok trial chip here only.
+            assert.equal(await popup.locator('.text-ai-chips button').count(), 14);
             assert.equal(await popup.locator('.text-ai-chips button:visible').count(), 4);
-            assert.deepEqual(await popup.locator('.audit-provider').allTextContents(), ['Gemini', 'GPT', 'Claude', 'Qwen', 'DeepSeek']);
-            assert.deepEqual(await popup.locator('.audit-provider').evaluateAll(ns => ns.map(n => getComputedStyle(n).color)), ['rgb(168, 180, 255)', 'rgb(125, 211, 176)', 'rgb(232, 180, 154)', 'rgb(201, 160, 240)', 'rgb(127, 200, 245)']);
+            assert.deepEqual(await popup.locator('.audit-provider').allTextContents(), ['Gemini', 'GPT', 'Claude', 'Qwen', 'DeepSeek', 'Grok']);
+            assert.deepEqual(await popup.locator('.audit-provider').evaluateAll(ns => ns.map(n => getComputedStyle(n).color)), ['rgb(168, 180, 255)', 'rgb(125, 211, 176)', 'rgb(232, 180, 154)', 'rgb(201, 160, 240)', 'rgb(127, 200, 245)', 'rgb(212, 212, 216)']);
             assert.equal(await popup.locator('[data-value="gpt-6-astra"]').textContent(), 'Astra 6');
             assert.equal(await popup.locator('[data-value="gpt-6-astra"]').getAttribute('aria-label'), 'GPT 6 Astra');
             assert.equal(await popup.locator('.text-ai-chips [aria-pressed="true"]').count(), 1);
@@ -66,6 +67,19 @@ const { chromium } = require('playwright');
         await page.locator('#ai-analysis-popup [data-value="claude-haiku-4-5"]').click();
         await page.locator('#ai-analysis-popup .audit-run').click();
         assert.equal(await page.evaluate(() => rewriteRequest), 'claude-haiku-4-5');
+        // V101.52 Grok trial: kept for the run, never saved as the Settings analyzer default.
+        await page.locator('#ai-analysis-popup [data-provider="Grok"]').click();
+        await page.locator('#ai-analysis-popup [data-value="or/x-ai/grok-4.7"]').click();
+        await page.locator('#ai-analysis-popup .audit-run').click();
+        assert.equal(await page.evaluate(() => rewriteRequest), 'or/x-ai/grok-4.7');
+        assert.equal(await page.locator('#ai-analyzer-model-val').inputValue(), 'claude-haiku-4-5');
+        assert.notEqual(await page.evaluate(() => localStorage.getItem('ai_default_analyzer_model')), 'or/x-ai/grok-4.7');
+        await page.locator('#ai-audit-popup [data-provider="Grok"]').click();
+        await page.locator('#ai-audit-popup [data-value="or/x-ai/grok-4.7"]').click();
+        await page.locator('#ai-audit-popup .audit-run').click();
+        assert.equal(await page.evaluate(() => auditRequest.model), 'or/x-ai/grok-4.7');
+        assert.equal(await page.evaluate(() => auditFixModel()), 'or/x-ai/grok-4.7');
+        assert.equal(await page.evaluate(() => normalizeTextAIModel('or/x-ai/grok-4.7')), 'gpt-5.6-luna');
         await page.locator('#ai-analysis-popup button', { hasText: 'Export' }).click();
         assert.equal(await page.evaluate(() => exported), true);
         await page.locator('#ai-audit-popup [data-review-tab="specialist"]').click();

@@ -20,7 +20,17 @@
     // Official marks (assets/logos, from openai.com/brand and anthropic.com/press-kit). Owners
     // without a small official mark (Gemini, Qwen, DeepSeek) carry their name in `short` instead.
     const LOGO_OWNERS = { GPT: 'openai', Claude: 'claude' };
+    // V101.52: opt-in trial models. Only the audit toolbar offers them; they are NOT in
+    // TEXT_AI_MODELS, so no other rail, select, Settings default or normaliser sees them.
+    // Grok 4.7 trial (GROK_OPENROUTER_INTEGRATION_PLAN.md step C, 2026-09-24): Audit + Analyze.
+    const trialModels = window.TEXT_AI_TRIAL_MODELS = [
+        { id: 'or/x-ai/grok-4.7', label: 'Grok 4.7', short: 'Grok 4.7', hint: 'Grok 4.7 (SpaceXAI) รุ่นทดลอง สำหรับ Audit / Analyze ผ่าน OpenRouter' }
+    ];
     window.normalizeTextAIModel = value => models.some(m => m.id === value) ? value : 'gpt-5.6-luna';
+    // A trial id stays as-is where a caller explicitly picked it; anything else normalises as before.
+    window.resolveTrialTextAIModel = value => trialModels.some(m => m.id === value) ? value : window.normalizeTextAIModel(value);
+    window.isTrialTextAIModel = value => trialModels.some(m => m.id === value);
+    window.textAIModelInfo = id => models.find(m => m.id === id) || trialModels.find(m => m.id === id);
     window.textAIModel = id => window.normalizeTextAIModel(document.getElementById(id)?.value);
     window.selectStoredTextAIModel = (button, key) => {
         localStorage.setItem(key, button.dataset.value);
@@ -44,7 +54,8 @@
     // V101.20: optional `filter(model)` narrows the rail (e.g. vision-capable chips only).
     // V101.49: lean inline chips — [owner logo] name version; no provider headings. The OpenRouter
     // route shows as the chip border (text-ai-chips.css) and in the tooltip.
-    window.textAIChipContents = (value, action = '', filter = null) => (filter ? models.filter(filter) : models).map(m => {
+    // V101.52: `extra` appends opt-in trial models (audit toolbar only).
+    window.textAIChipContents = (value, action = '', filter = null, extra = []) => [...(filter ? models.filter(filter) : models), ...extra].map(m => {
         const owner = LOGO_OWNERS[m.label.split(' ')[0]];
         const logo = owner ? `<span class="text-ai-logo" data-owner="${owner}" aria-hidden="true"></span>` : '';
         return `<button type="button" class="glass-toggle-item${m.id === value ? ' active' : ''}" data-value="${m.id}" aria-label="${m.label}" aria-pressed="${m.id === value}" title="${m.label} · ${m.id} — ${m.hint}"${action ? ` onclick="${action}"` : ''}>${logo}${m.short}</button>`;
