@@ -1081,8 +1081,12 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             // models take `reasoning.max_tokens` → thinking_budget, so send a token budget there
             // (20% of the cap, floor 1024); DeepSeek keeps effort "low". The two fields are
             // mutually exclusive on OpenRouter, so it is one or the other per vendor.
+            // V101.51: xAI Grok (x-ai/grok-4.7) reasons by default at "high" and OpenRouter marks
+            // reasoning `mandatory: true` (openrouter.ai/api/v1/models/x-ai/grok-4.7/endpoints lists
+            // both `reasoning` and `reasoning_effort`) — without a budget it would spend max_tokens
+            // thinking like DeepSeek did in V101.28. It takes the same `effort: "low"` as DeepSeek.
             const orIsQwen = /^qwen\//i.test(orModel);
-            const orReasoningCapable = !isImageRequest && (orIsQwen || /^deepseek\//i.test(orModel));
+            const orReasoningCapable = !isImageRequest && (orIsQwen || /^(deepseek|x-ai)\//i.test(orModel));
             const orReasoning = orIsQwen
                 ? { max_tokens: Math.max(1024, Math.floor(orMaxTokens * 0.2)), exclude: true }
                 : { effort: "low", exclude: true };

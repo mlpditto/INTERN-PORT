@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.50)</title>
+    <title>Nika Admin (V101.51)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -16454,7 +16454,10 @@
                 return { text: data.text || '', tokens: data.tokens || 0, model: data.model || modelName, raw: data };
             }
             // V92.70: AI Studio image models also need proxy-only path so failed proxy doesn't fall through to text-only OpenAI fallback
-            const isProxyOnlyImageModel = (proxyProvider === 'gemini-aistudio' && /image/i.test(modelName))
+            // V101.51: Grok (or/x-ai/…) trial is proxy-only too — the local OpenRouter fallback sends no
+            // response_format / max_tokens / reasoning, so it would not honour the server's contract.
+            const isProxyOnlyModel = (proxyProvider === 'openrouter' && /^x-ai\//i.test(modelName))
+                || (proxyProvider === 'gemini-aistudio' && /image/i.test(modelName))
                 || (proxyProvider === 'openrouter' && /image/i.test(modelName))
                 || (proxyProvider === 'openai' && /^gpt-image-/.test(modelName));
             try {
@@ -16489,13 +16492,18 @@
                             updateAIUsage(proxyProvider, proxyData.tokens || 0);
                             return { text: proxyData.text || proxyData.imageDataUrl || proxyData.dataUrl || '', tokens: proxyData.tokens || 0, model: proxyData.model || modelName, raw: proxyData };
                         }
-                        if (isProxyOnlyImageModel) {
-                            throw new Error(primaryError?.error || `Images proxy failed with status ${proxyResponse.status}`);
+                        if (isProxyOnlyModel) {
+                            // V101.51: the proxy answered, so this is final — flag it so the catch below
+                            // doesn't re-send the same (paid) request to the same URL.
+                            const definitive = new Error(primaryError?.error || `AI proxy failed with status ${proxyResponse.status}`);
+                            definitive.proxyAnswered = true;
+                            throw definitive;
                         }
                         console.warn('[AI Proxy] Backup failed. Attempting local fallback...');
                     }
                 }
             } catch (e) {
+                if (e.proxyAnswered) throw e;
                 console.warn('[AI Proxy] Link failed. Reason:', e.message, 'Trying backup proxy...');
                 try {
                     const backupResponse = await fetch(BACKUP_PROXY, {
@@ -16509,12 +16517,12 @@
                         updateAIUsage(proxyProvider, proxyData.tokens || 0);
                         return { text: proxyData.text || proxyData.imageDataUrl || proxyData.dataUrl || '', tokens: proxyData.tokens || 0, model: proxyData.model || modelName, raw: proxyData };
                     }
-                    if (isProxyOnlyImageModel) {
+                    if (isProxyOnlyModel) {
                         const backupError = await backupResponse.json().catch(() => ({}));
-                        throw new Error(backupError?.error || `Images proxy failed with status ${backupResponse.status}`);
+                        throw new Error(backupError?.error || `AI proxy failed with status ${backupResponse.status}`);
                     }
                 } catch (be) {
-                    if (isProxyOnlyImageModel) throw be;
+                    if (isProxyOnlyModel) throw be;
                     console.warn('[AI Proxy] Backup also failed. Using local SDK.');
                 }
             }
@@ -16655,7 +16663,7 @@
                     const d = await resp.json();
                     if (d.error) throw new Error(`Anthropic Local Error: ${d.error.message}`);
                     return { text: d.content[0].text, tokens: d.usage?.total_tokens || 0, model: modelName };
-                } else if (isProxyOnlyImageModel) {
+                } else if (isProxyOnlyModel) {
                     throw new Error("GenMage image models require the server proxy. Please check Firebase Functions deployment.");
                 } else if (modelName.includes('gpt')) {
                     const apiKey = quickApiKey || window.OPENAI_API_KEY;
