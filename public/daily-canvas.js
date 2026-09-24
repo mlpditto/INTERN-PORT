@@ -15,16 +15,18 @@ document.addEventListener('DOMContentLoaded', function () {
     note.append(byId('rl-note-fields'));
     // Attach before looking up the moved fields by ID.
     pane.append(note);
-    note.insertAdjacentHTML('beforeend', '<label for="dc-note-content" class="dc-label">Note</label><textarea id="dc-note-content" rows="6" placeholder="เก็บความรู้ วิธีคิด หรือบทเรียนที่อยากกลับมาทบทวน…"></textarea><div class="dc-footer lang-no-toggle"><span class="dc-meta">Admin review</span><button type="button" id="dc-note-submit" class="dc-submit">🎓 Save note</button></div>');
+    note.insertAdjacentHTML('beforeend', '<textarea id="dc-note-content" rows="6" aria-label="Note" placeholder="What did you learn? Key ideas, reasoning, lessons to revisit…"></textarea><div class="dc-footer lang-no-toggle"><span class="dc-meta">Reviewed by admin</span><button type="button" id="dc-note-submit" class="dc-submit">Save note</button></div>');
     byId('rl-note-fields').style.display = 'block';
     byId('rl-note-fold').hidden = true;
     byId('lp-note-title').setAttribute('aria-label', 'Note title');
     byId('lp-note-tag-input').setAttribute('aria-label', 'Add note tag');
+    byId('lp-note-tag-input').placeholder = 'Add tag · Enter';
+    byId('ln-counter').title = 'Notes saved · max 90';
     note.querySelector('.dc-footer').prepend(byId('ln-counter'));
     if (byId('ln-history')) note.append(byId('ln-history'));
     const feedback = document.createElement('section');
     feedback.id = 'dc-feedback'; feedback.className = 'dc-panel lang-no-toggle'; feedback.hidden = true;
-    feedback.innerHTML = '<label for="dc-feedback-message" class="dc-label">To Admin</label><textarea id="dc-feedback-message" rows="5" maxlength="4000" placeholder="อยากให้ช่วยเรื่องไหน หรืออยากเสนออะไร…"></textarea><label class="dc-feedback-label"><input type="checkbox" id="dc-feedback-attach"> 📎 Include Daily Canvas draft</label><p class="dc-meta">ส่งเฉพาะข้อความนี้ และข้อความพร้อมอารมณ์จาก Daily Canvas เมื่อเลือกแนบ</p><div class="dc-footer"><button type="button" id="dc-feedback-submit" class="dc-submit">↗ Send feedback</button></div><p id="dc-feedback-status" role="status"></p>';
+    feedback.innerHTML = '<textarea id="dc-feedback-message" rows="5" maxlength="4000" aria-label="Message to admin" placeholder="Need help with something, or have a suggestion?"></textarea><label class="dc-feedback-label"><input type="checkbox" id="dc-feedback-attach"> 📎 Attach today&#39;s Daily Canvas (text + mood)</label><div class="dc-footer"><button type="button" id="dc-feedback-submit" class="dc-submit">↗ Send to Admin</button></div><p id="dc-feedback-status" role="status"></p>';
     pane.append(feedback);
     const panels = [day, note, feedback], tabs = [...pane.querySelectorAll('[role="tab"]')];
     panels.forEach(p => { p.setAttribute('role', 'tabpanel'); p.setAttribute('aria-labelledby', 'dc-tab-' + p.id.slice(3)); });
