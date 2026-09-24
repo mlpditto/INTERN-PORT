@@ -126,12 +126,12 @@ window.copyPersonalSocial = async function(key) {
     const input = document.getElementById('pi-social-' + key), value = input.value.trim();
     if (!value) { input.focus(); return; }
     try { await navigator.clipboard.writeText(value); }
-    catch (_) { input.focus(); input.select(); if (!document.execCommand('copy')) { alert('Could not copy · กรุณาคัดลอกจากช่องข้อมูล'); return; } }
+    catch (_) { input.focus(); input.select(); if (!document.execCommand('copy')) { alert('Could not copy — please copy it from the field.'); return; } }
     let url;
     try { url = new URL(/^https?:\/\//i.test(value) ? value : 'https://' + value); }
-    catch (_) { alert('Copied · คัดลอกแล้ว'); return; }
-    if (!/^https?:\/\//i.test(value) && !/^[\w.-]+\.[a-z]{2,}(\/|$)/i.test(value)) { alert('Copied · คัดลอกแล้ว (กรอก URL เพื่อเปิดหน้าเว็บ)'); return; }
-    if (confirm('Copied · คัดลอกแล้ว\nOpen in a new window? · ต้องการเปิดหน้าต่างใหม่หรือไม่?\n' + url.href)) window.open(url.href, '_blank', 'noopener,noreferrer');
+    catch (_) { alert('Copied'); return; }
+    if (!/^https?:\/\//i.test(value) && !/^[\w.-]+\.[a-z]{2,}(\/|$)/i.test(value)) { alert('Copied (enter a URL to open it as a page)'); return; }
+    if (confirm('Copied\nOpen in a new window?\n' + url.href)) window.open(url.href, '_blank', 'noopener,noreferrer');
 };
 document.addEventListener('DOMContentLoaded', () => {
     ['pi-start-date','pi-end-date'].forEach(id => document.getElementById(id)?.addEventListener('input', () => updatePersonalPeriod()));
