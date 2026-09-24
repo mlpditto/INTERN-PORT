@@ -1,0 +1,70 @@
+name: QA
+
+# Runs every QA script in scripts/ (*-qa.cjs and *-check.cjs) on PRs into production,
+# so a change that breaks one is caught on the PR instead of going stale on the trunk.
+# Utilities in scripts/ (build-ai-model-registry, evaluate-ai-phase*, probe-ai-models)
+# are not tests and are not run here.
+on:
+  pull_request:
+    branches: [ production ]
+  push:
+    branches: [ production ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-${{ github.ref }}
+  cancel-in-progress: true
+
+# Same opt-in as deploy.yml (Node 20 actions are deprecated).
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      # Playwright is the only non-builtin module the scripts need. Installed outside the
+      # repo so the root package.json / lockfile are not touched.
+      - name: Install Playwright + Chromium
+        run: |
+          npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/pw" playwright@1.56.1
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+
+      - name: Run QA scripts
+        env:
+          NODE_PATH: ${{ runner.temp }}/pw/node_modules
+        run: |
+          failed=()
+          total=0
+          for f in scripts/*-qa.cjs scripts/*-check.cjs; do
+            total=$((total + 1))
+            echo "::group::$f"
+            if timeout 180 node "$f"; then
+              echo "✅ $f"
+            else
+              echo "::error file=$f::$f failed"
+              failed+=("$f")
+            fi
+            echo "::endgroup::"
+          done
+          {
+            echo "### QA: $((total - ${#failed[@]}))/$total passed"
+            for f in "${failed[@]}"; do echo "- ❌ \`$f\`"; done
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ ${#failed[@]} -gt 0 ]; then
+            echo "Failed (${#failed[@]}/$total): ${failed[*]}"
+            exit 1
+          fi
+          echo "All $total QA scripts passed"

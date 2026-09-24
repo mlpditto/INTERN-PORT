@@ -31,9 +31,10 @@ check('text model default unchanged for text calls', /"typhoon-v2\.5-30b-a3b-ins
 // V101.30: provider/model are try-scoped, so the catch reads them from req.body (a bare `provider` there threw ReferenceError).
 check('final catch logs provider + model + redacted body', /const reqProvider = req\.body\?\.provider, reqModel = req\.body\?\.model;\n\s*console\.error\("AI Proxy Error:", \{ message: sanitizeProxyErrorMessage\(err\), \.\.\.getSafeProviderError\(err\), provider: reqProvider, model: reqModel, body: providerBody \}\);/.test(src), true);
 
-// live model list (optional)
+// live model list (optional) — skipped in CI so a third-party API change can't fail a PR here.
 (async () => {
-    try {
+    if (process.env.CI) console.log('SKIP  live model list (CI)');
+    else try {
         const ctrl = new AbortController(); const tm = setTimeout(() => ctrl.abort(), 8000);
         const r = await fetch('https://api.opentyphoon.ai/v1/models', { signal: ctrl.signal }); clearTimeout(tm);
         const ids = (await r.json()).map(m => m.id);
