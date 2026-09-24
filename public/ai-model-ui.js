@@ -40,8 +40,10 @@
     // provider headings are computed over the filtered list so none is left orphaned.
     window.textAIChipContents = (value, action = '', filter = null) => (filter ? models.filter(filter) : models).map((m, i, list) => {
         const provider = m.label.split(' ')[0];
+        // V101.46: `or/` models route through OpenRouter — the heading carries an OR badge (text-ai-chips.css).
+        const route = m.id.startsWith('or/') ? ' data-route="openrouter" title="via OpenRouter"' : '';
         const heading = i === 0 || list[i - 1].label.split(' ')[0] !== provider
-            ? `<span class="text-ai-provider" data-provider="${provider}">${provider}</span>` : '';
+            ? `<span class="text-ai-provider" data-provider="${provider}"${route}>${provider}</span>` : '';
         const label = m.label.slice(provider.length + 1).replace('Flash-Lite', 'Lite');
         return `${heading}<button type="button" class="glass-toggle-item${m.id === value ? ' active' : ''}" data-value="${m.id}" aria-label="${m.label}" aria-pressed="${m.id === value}" title="${m.label} — ${m.hint}"${action ? ` onclick="${action}"` : ''}>${label}</button>`;
     }).join('');
