@@ -113,7 +113,8 @@ const { chromium } = require('playwright');
             assert.equal(await page.evaluate(() => fixRequest.model), value);
             await page.evaluate(() => document.getElementById('ai-audit-popup').style.display = 'block');
         }
-        assert(html.includes("const selectedModel = opts?.model ? normalizeTextAIModel(opts.model) : textAIModel('ai-analyzer-model-val');"));
+        // V101.52: a picked trial model (Grok) is kept; every other value still normalises.
+        assert(html.includes("const selectedModel = opts?.model ? resolveTrialTextAIModel(opts.model) : textAIModel('ai-analyzer-model-val');"));
         // Reproduce overlapping rerenders: switching must hide all Rewrites instances.
         await page.evaluate(() => {
             const rewrite = document.getElementById('ai-analysis-popup');
