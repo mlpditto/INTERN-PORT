@@ -140,6 +140,35 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         await page.waitForFunction(() => !QuizCover.isBusy());
         assert.equal(await page.evaluate(() => QuizCover.value()), 'https://example.com/ai.webp');
         assert.equal(await page.locator('.quiz-cover-ai-preview').isVisible(), false);
+        // V101.58: a content-filter block tries the next models in rail order; other failures do not.
+        await page.locator('[data-model-chip][data-value="or/bytedance-seed/seedream-5-0-lite"]').click();
+        await page.evaluate(() => {
+            window.calls = [];
+            window.callUniversalAI = async model => {
+                calls.push(model);
+                if (model.includes('seedream')) throw new Error('Seedream blocked this request through content moderation.');
+                if (model.includes('muse')) throw new Error('503 upstream timeout');
+                return { imageDataUrl: aiImage };
+            };
+        });
+        await page.locator('[data-generate]').click();
+        await page.waitForFunction(() => !QuizCover.isBusy());
+        assert.deepEqual(await page.evaluate(() => calls), ['or/bytedance-seed/seedream-5-0-lite', 'or/meta/muse-image', 'as/gemini-3.1-flash-image']);
+        assert.equal(await page.locator('.quiz-cover-ai-preview').isVisible(), true, 'Fallback image shown as a preview');
+        assert.match(await page.locator('#quiz-cover-editor [role=status]').innerText(), /Seedream 5\.0 Lite blocked this topic \(content filter\) — made with Nano Banana 2\. Check/);
+        assert.equal(await page.evaluate(() => uploads), 1, 'Fallback preview does not upload');
+        await page.locator('[data-discard]').click();
+        await page.evaluate(() => { window.calls = []; window.callUniversalAI = async model => { calls.push(model); throw new Error('network down'); }; });
+        await page.locator('[data-generate]').click();
+        await page.waitForFunction(() => !QuizCover.isBusy());
+        assert.equal(await page.evaluate(() => calls.length), 1, 'Non-moderation failure does not fan out');
+        assert.equal(await page.locator('#quiz-cover-editor [role=status]').innerText(), 'Generate failed: network down');
+        await page.evaluate(() => { window.calls = []; window.callUniversalAI = async model => { calls.push(model); throw new Error('Request rejected by content policy'); }; });
+        await page.locator('[data-generate]').click();
+        await page.waitForFunction(() => !QuizCover.isBusy());
+        assert.equal(await page.evaluate(() => calls.length), 5, 'Every model tried once');
+        assert.match(await page.locator('#quiz-cover-editor [role=status]').innerText(), /^Generate failed: Seedream 5\.0 Lite blocked this topic; Muse Image, Nano Banana 2, Image 2, Nano Banana 2 \(OpenRouter\) also failed/);
+        assert.equal(await page.locator('.quiz-cover-ai-preview').isVisible(), false);
         // Switching quiz invalidates an in-flight result, including its busy state.
         await page.evaluate(() => {
             window.callUniversalAI = () => new Promise(resolve => { window.finishOld = resolve; });
@@ -170,7 +199,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         await page.waitForFunction(() => !QuizCover.isBusy());
         assert.equal(await page.evaluate(() => QuizCover.value()), 'https://example.com/next.webp');
         assert.equal(await page.locator('.quiz-cover-ai-preview').isVisible(), false);
-        console.log('PASS: AI title validation, preview, accept, discard, invalid response, stale generation and responsive layout.');
+        console.log('PASS: AI title validation, preview, accept, discard, invalid response, content-filter fallback, stale generation and responsive layout.');
         console.log('PASS: cover load/remove/upload with mocked storage, unsafe URL rejection, locked/collapsed protection, mobile deadline, keyboard start.');
     } finally { await browser.close(); }
 })();
