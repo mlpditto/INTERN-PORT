@@ -3,8 +3,8 @@
     const models = window.TEXT_AI_MODELS = [
         // V101.49: `short` = chip text (name + version). `label` stays the full official name —
         // it is shown elsewhere and the audit toolbar filters on its first word.
-        { id: 'as/gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', short: 'Gemini Lite 3.5', hint: 'Gemini รุ่นประหยัด สำหรับงานสั้น' },
-        { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', short: 'Gemini Flash 3.8', hint: 'Gemini สำหรับวิเคราะห์และสรุปข้อมูล' },
+        { id: 'as/gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', short: 'Lite 3.5', hint: 'Gemini รุ่นประหยัด สำหรับงานสั้น' },
+        { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', short: 'Flash 3.8', hint: 'Gemini สำหรับวิเคราะห์และสรุปข้อมูล' },
         { id: 'gpt-5.6-luna', label: 'GPT 5.6 Luna', short: 'Luna 5.6', hint: 'GPT รุ่นประหยัด ค่าเริ่มต้นสำหรับงานทั่วไป' },
         { id: 'gpt-5.6-terra', label: 'GPT 5.6 Terra', short: 'Terra 5.6', hint: 'GPT สำหรับงานวิเคราะห์ที่ซับซ้อนขึ้น' },
         { id: 'gpt-5.6-sol', label: 'GPT 5.6 Sol', short: 'Sol 5.6', hint: 'GPT สำหรับงานที่ต้องการรายละเอียดมากขึ้น' },
@@ -19,7 +19,8 @@
     ];
     // Official marks (assets/logos, from openai.com/brand and anthropic.com/press-kit). Owners
     // without a small official mark (Qwen, DeepSeek) carry their name in `short` instead.
-    // V101.55: Gemini spark (colour mark, via @lobehub/icons-static-svg, MIT); Gemini keeps its name in `short`.
+    // V101.55: Gemini spark (colour mark, via @lobehub/icons-static-svg, MIT). V101.59: the spark names
+    // the owner, so Gemini's `short` drops the word like GPT / Claude.
     const LOGO_OWNERS = { GPT: 'openai', Claude: 'claude', Gemini: 'gemini' };
     // V101.52: opt-in trial models. Only the audit toolbar offers them; they are NOT in
     // TEXT_AI_MODELS, so no other rail, select, Settings default or normaliser sees them.
@@ -63,7 +64,7 @@
         const owner = LOGO_OWNERS[m.label.split(' ')[0]];
         const logo = owner ? `<span class="text-ai-logo" data-owner="${owner}" aria-hidden="true"></span>` : '';
         const google = window.isGoogleBilledModel(m.id);
-        return `<button type="button" class="glass-toggle-item${m.id === value ? ' active' : ''}" data-value="${m.id}"${google ? ' data-bill="google"' : ''} aria-label="${m.label}" aria-pressed="${m.id === value}" title="${m.label} · ${m.id}${google ? ' · Google Cloud bill' : ''} — ${m.hint}"${action ? ` onclick="${action}"` : ''}>${logo}${m.short}</button>`;
+        return `<button type="button" class="glass-toggle-item${m.id === value ? ' active' : ''}" data-value="${m.id}"${google ? ' data-bill="google"' : ''} aria-label="${m.label}" aria-pressed="${m.id === value}" title="${m.label} · ${m.id}${google ? ' · แถบสีใต้ชื่อ = ค่าใช้จ่ายเรียกเก็บผ่านบัญชี Google Cloud' : ''} — ${m.hint}"${action ? ` onclick="${action}"` : ''}>${logo}${m.short}</button>`;
     }).join('');
     window.textAIChipsHtml = (id, value, action) => `<div class="text-ai-chips lang-no-toggle" role="group" aria-label="AI model"${id ? ` id="${id}"` : ''}>${window.textAIChipContents(value, action)}</div>`;
     window.syncRegistryModelSelect = function (id) {

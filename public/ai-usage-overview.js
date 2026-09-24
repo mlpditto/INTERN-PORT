@@ -145,7 +145,7 @@
                 const maximum=Math.max(1,...rows.flatMap(r=>Object.values(r.days).map(v=>Number(v[metric.value]||0))));
                 for(const r of rows){
                     const tr=node('tr'), name=node('th',r.model);
-                    if(GOOGLE_ROUTES[r.provider||r.model]){const g=node('i',undefined,'gc-ring sm');g.title='Google Cloud bill';name.prepend(g);}
+                    if(GOOGLE_ROUTES[r.provider||r.model]){const g=node('i',undefined,'gc-ring sm');g.title='วงแหวนสี = ค่าใช้จ่ายเรียกเก็บผ่านบัญชี Google Cloud';name.prepend(g);}
                     tr.append(name);
                     for(const d of a.range){const cell=node('td'), data=r.days[d], value=data?Number(data[metric.value]||0):null;
                         const b=node('button',value===null?'—':number(value));b.type='button';

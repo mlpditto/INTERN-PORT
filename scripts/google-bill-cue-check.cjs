@@ -14,8 +14,12 @@ const assert = require('node:assert/strict'), { chromium } = require('playwright
     });
     assert.deepEqual(billed, ['as/gemini-3.5-flash-lite', 'gemini-3.8-flash']);
     assert.equal(await page.evaluate(() => isGoogleBilledModel('or/google/gemini-3.1-flash-image-preview')), false);
-    assert.match(await page.locator('#rail button[data-value="gemini-3.8-flash"]').getAttribute('title'), /Google Cloud bill/);
-    assert.equal(await page.locator('#rail .text-ai-chips').evaluate(n => getComputedStyle(n, '::after').content), '"Google Cloud bill"');
+    // V101.59: the spark names the owner (no "Gemini" in the chip text), the Thai tooltip explains the bar,
+    // and the rail has no legend line.
+    assert.equal(await page.locator('#rail button[data-value="gemini-3.8-flash"]').innerText(), 'Flash 3.8');
+    assert.match(await page.locator('#rail button[data-value="gemini-3.8-flash"]').getAttribute('title'), /แถบสีใต้ชื่อ = ค่าใช้จ่ายเรียกเก็บผ่านบัญชี Google Cloud/);
+    assert.equal(await page.locator('#rail button[data-value="gpt-5.6-luna"]').getAttribute('title').then(t => t.includes('Google Cloud')), false);
+    assert.equal(await page.locator('#rail .text-ai-chips').evaluate(n => getComputedStyle(n, '::after').content), 'none');
 
     await page.evaluate(() => {
         const date = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
@@ -40,5 +44,5 @@ const assert = require('node:assert/strict'), { chromium } = require('playwright
     await page.locator('#ov select[aria-label="Activity view"]').selectOption('Daily');
     assert.equal(await page.locator('#ov .au-scroll th .gc-ring').count(), 2);  // gemini rows only, not gpt
     for (const width of [320, 390, 1024]) { await page.setViewportSize({ width, height: 800 }); assert(await page.locator('#ov').evaluate(n => n.scrollWidth <= n.clientWidth)); }
-    console.log('PASS: Google-billed chips, rail legend, Google Cloud bill card, row rings, mobile width');
+    console.log('PASS: Google-billed chips, Thai tooltip, no rail legend, Google Cloud bill card, row rings, mobile width');
 } finally { await browser.close(); } })().catch(e => { console.error(e); process.exitCode = 1; });
