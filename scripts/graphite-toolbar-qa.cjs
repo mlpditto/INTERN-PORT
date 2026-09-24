@@ -40,7 +40,7 @@ const { chromium } = require('playwright');
             assert.equal(await popup.locator('.text-ai-chips button:visible').count(), 4);
             assert.deepEqual(await popup.locator('.audit-provider').allTextContents(), ['Gemini', 'GPT', 'Claude', 'Qwen', 'DeepSeek']);
             assert.deepEqual(await popup.locator('.audit-provider').evaluateAll(ns => ns.map(n => getComputedStyle(n).color)), ['rgb(168, 180, 255)', 'rgb(125, 211, 176)', 'rgb(232, 180, 154)', 'rgb(201, 160, 240)', 'rgb(127, 200, 245)']);
-            assert.equal(await popup.locator('[data-value="gpt-6-astra"]').textContent(), '6 Astra');
+            assert.equal(await popup.locator('[data-value="gpt-6-astra"]').textContent(), 'Astra 6');
             assert.equal(await popup.locator('[data-value="gpt-6-astra"]').getAttribute('aria-label'), 'GPT 6 Astra');
             assert.equal(await popup.locator('.text-ai-chips [aria-pressed="true"]').count(), 1);
             assert.equal(await popup.locator('.review-tab[aria-pressed="true"]').evaluate(b => getComputedStyle(b).backgroundColor), 'rgb(245, 184, 205)');

@@ -1,20 +1,25 @@
 // Shared catalog for text tasks, Settings and saved preferences.
 (function () {
     const models = window.TEXT_AI_MODELS = [
-        { id: 'as/gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', hint: 'Gemini รุ่นประหยัด สำหรับงานสั้น' },
-        { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', hint: 'Gemini สำหรับวิเคราะห์และสรุปข้อมูล' },
-        { id: 'gpt-5.6-luna', label: 'GPT 5.6 Luna', hint: 'GPT รุ่นประหยัด ค่าเริ่มต้นสำหรับงานทั่วไป' },
-        { id: 'gpt-5.6-terra', label: 'GPT 5.6 Terra', hint: 'GPT สำหรับงานวิเคราะห์ที่ซับซ้อนขึ้น' },
-        { id: 'gpt-5.6-sol', label: 'GPT 5.6 Sol', hint: 'GPT สำหรับงานที่ต้องการรายละเอียดมากขึ้น' },
-        { id: 'gpt-6-astra', label: 'GPT 6 Astra', hint: 'GPT รุ่นใหญ่ ใช้เมื่อต้องการความสามารถสูง' },
-        { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', hint: 'Claude รุ่นประหยัด สำหรับงานสั้น' },
-        { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', hint: 'Claude สำหรับงานเขียนและวิเคราะห์' },
-        { id: 'claude-fable-5-1', label: 'Claude Fable 5.1', hint: 'Claude สำหรับงานที่ต้องการรายละเอียดมากขึ้น' },
-        { id: 'or/qwen/qwen3.8-flash', label: 'Qwen 3.8 Flash', hint: 'Qwen รุ่นประหยัด ภาษาไทยดี ผ่าน OpenRouter' },
-        { id: 'or/qwen/qwen3.8-max-0902', label: 'Qwen 3.8 Max', hint: 'Qwen รุ่นใหญ่ ภาษาไทยดี สำหรับคัดและเปรียบเทียบข้อสอบ ผ่าน OpenRouter' },
-        { id: 'or/deepseek/deepseek-v4.1-flash', label: 'DeepSeek V4.1 Flash', hint: 'DeepSeek รุ่นประหยัด ผ่าน OpenRouter' },
-        { id: 'or/deepseek/deepseek-v4-pro', label: 'DeepSeek V4 Pro', hint: 'DeepSeek รุ่นใหญ่ เหมาะกับงานวิเคราะห์ ผ่าน OpenRouter' }
+        // V101.49: `short` = chip text (name + version). `label` stays the full official name —
+        // it is shown elsewhere and the audit toolbar filters on its first word.
+        { id: 'as/gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', short: 'Gemini Lite 3.5', hint: 'Gemini รุ่นประหยัด สำหรับงานสั้น' },
+        { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', short: 'Gemini Flash 3.8', hint: 'Gemini สำหรับวิเคราะห์และสรุปข้อมูล' },
+        { id: 'gpt-5.6-luna', label: 'GPT 5.6 Luna', short: 'Luna 5.6', hint: 'GPT รุ่นประหยัด ค่าเริ่มต้นสำหรับงานทั่วไป' },
+        { id: 'gpt-5.6-terra', label: 'GPT 5.6 Terra', short: 'Terra 5.6', hint: 'GPT สำหรับงานวิเคราะห์ที่ซับซ้อนขึ้น' },
+        { id: 'gpt-5.6-sol', label: 'GPT 5.6 Sol', short: 'Sol 5.6', hint: 'GPT สำหรับงานที่ต้องการรายละเอียดมากขึ้น' },
+        { id: 'gpt-6-astra', label: 'GPT 6 Astra', short: 'Astra 6', hint: 'GPT รุ่นใหญ่ ใช้เมื่อต้องการความสามารถสูง' },
+        { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', short: 'Haiku 4.5', hint: 'Claude รุ่นประหยัด สำหรับงานสั้น' },
+        { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', short: 'Sonnet 5', hint: 'Claude สำหรับงานเขียนและวิเคราะห์' },
+        { id: 'claude-fable-5-1', label: 'Claude Fable 5.1', short: 'Fable 5.1', hint: 'Claude สำหรับงานที่ต้องการรายละเอียดมากขึ้น' },
+        { id: 'or/qwen/qwen3.8-flash', label: 'Qwen 3.8 Flash', short: 'Qwen Flash 3.8', hint: 'Qwen รุ่นประหยัด ภาษาไทยดี ผ่าน OpenRouter' },
+        { id: 'or/qwen/qwen3.8-max-0902', label: 'Qwen 3.8 Max', short: 'Qwen Max 3.8', hint: 'Qwen รุ่นใหญ่ ภาษาไทยดี สำหรับคัดและเปรียบเทียบข้อสอบ ผ่าน OpenRouter' },
+        { id: 'or/deepseek/deepseek-v4.1-flash', label: 'DeepSeek V4.1 Flash', short: 'DeepSeek Flash V4.1', hint: 'DeepSeek รุ่นประหยัด ผ่าน OpenRouter' },
+        { id: 'or/deepseek/deepseek-v4-pro', label: 'DeepSeek V4 Pro', short: 'DeepSeek Pro V4', hint: 'DeepSeek รุ่นใหญ่ เหมาะกับงานวิเคราะห์ ผ่าน OpenRouter' }
     ];
+    // Official marks (assets/logos, from openai.com/brand and anthropic.com/press-kit). Owners
+    // without a small official mark (Gemini, Qwen, DeepSeek) carry their name in `short` instead.
+    const LOGO_OWNERS = { GPT: 'openai', Claude: 'claude' };
     window.normalizeTextAIModel = value => models.some(m => m.id === value) ? value : 'gpt-5.6-luna';
     window.textAIModel = id => window.normalizeTextAIModel(document.getElementById(id)?.value);
     window.selectStoredTextAIModel = (button, key) => {
@@ -36,16 +41,13 @@
         select.replaceChildren(...models.map(m => new Option(m.label, m.id)));
         select.value = value;
     }
-    // V101.20: optional `filter(model)` narrows the rail (e.g. vision-capable chips only);
-    // provider headings are computed over the filtered list so none is left orphaned.
-    window.textAIChipContents = (value, action = '', filter = null) => (filter ? models.filter(filter) : models).map((m, i, list) => {
-        const provider = m.label.split(' ')[0];
-        // V101.46: `or/` models route through OpenRouter — the heading carries an OR badge (text-ai-chips.css).
-        const route = m.id.startsWith('or/') ? ' data-route="openrouter" title="via OpenRouter"' : '';
-        const heading = i === 0 || list[i - 1].label.split(' ')[0] !== provider
-            ? `<span class="text-ai-provider" data-provider="${provider}"${route}>${provider}</span>` : '';
-        const label = m.label.slice(provider.length + 1).replace('Flash-Lite', 'Lite');
-        return `${heading}<button type="button" class="glass-toggle-item${m.id === value ? ' active' : ''}" data-value="${m.id}" aria-label="${m.label}" aria-pressed="${m.id === value}" title="${m.label} — ${m.hint}"${action ? ` onclick="${action}"` : ''}>${label}</button>`;
+    // V101.20: optional `filter(model)` narrows the rail (e.g. vision-capable chips only).
+    // V101.49: lean inline chips — [owner logo] name version; no provider headings. The OpenRouter
+    // route shows as the chip border (text-ai-chips.css) and in the tooltip.
+    window.textAIChipContents = (value, action = '', filter = null) => (filter ? models.filter(filter) : models).map(m => {
+        const owner = LOGO_OWNERS[m.label.split(' ')[0]];
+        const logo = owner ? `<span class="text-ai-logo" data-owner="${owner}" aria-hidden="true"></span>` : '';
+        return `<button type="button" class="glass-toggle-item${m.id === value ? ' active' : ''}" data-value="${m.id}" aria-label="${m.label}" aria-pressed="${m.id === value}" title="${m.label} · ${m.id} — ${m.hint}"${action ? ` onclick="${action}"` : ''}>${logo}${m.short}</button>`;
     }).join('');
     window.textAIChipsHtml = (id, value, action) => `<div class="text-ai-chips lang-no-toggle" role="group" aria-label="AI model"${id ? ` id="${id}"` : ''}>${window.textAIChipContents(value, action)}</div>`;
     window.syncRegistryModelSelect = function (id) {
