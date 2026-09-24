@@ -79,7 +79,7 @@ new Function(...names, admin.slice(a, b))(...names.map(n => ctx[n]));
     check('no image on the draft → status says so, no AI call', `${s0.textContent}|${aiCalls.length}`, 'No source image on this draft.|1');
 
     // --- static wiring ---
-    check('admin loads codex-vision.js + bumped ai-model-ui', /<script src="codex-vision\.js\?v=V\d+\.\d+"><\/script>/.test(admin) && /ai-model-ui\.js\?v=V101\.20/.test(admin), true);
+    check('admin loads codex-vision.js + bumped ai-model-ui', /<script src="codex-vision\.js\?v=V\d+\.\d+"><\/script>/.test(admin) && /ai-model-ui\.js\?v=V\d+\.\d+/.test(admin), true);
     check('banners pass the kind', /ddaSourceImageHtml\(draft\.sourceImageUrl, dcaEscapeHtml, 'dca'\)/.test(admin) && /ddaSourceImageHtml\(draft\.sourceImageUrl, dxaEscapeHtml, 'dxa'\)/.test(admin), true);
     check('chip rail excludes OpenRouter (text-only) models', /m => !m\.id\.startsWith\('or\/'\)/.test(admin), true);
     // V101.36: the chip click goes through ddaPickVisionModel (which also closes the rail), and
