@@ -10,7 +10,7 @@ const { chromium } = require('playwright');
         await page.goto('http://toolbar.test/');
         const html = fs.readFileSync('public/admin.html', 'utf8');
         const styles = [...html.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/gi)].map(m => m[0]).join('\n');
-        await page.setContent(styles + '<style>body{margin:0;background:white}</style><input id="ai-analyzer-model-val" type="hidden" value="gpt-5.6-luna"><div id="ai-audit-popup" style="width:92%;max-width:780px;margin:16px auto;padding:24px;box-sizing:border-box"></div><div id="ai-analysis-popup" style="width:92%;max-width:850px;margin:16px auto;padding:30px;box-sizing:border-box"></div>');
+        await page.setContent(styles + '<style>body{margin:0;background:white}</style><input id="ai-analyzer-model-val" type="hidden" value="gpt-6-luna"><div id="ai-audit-popup" style="width:92%;max-width:780px;margin:16px auto;padding:24px;box-sizing:border-box"></div><div id="ai-analysis-popup" style="width:92%;max-width:850px;margin:16px auto;padding:30px;box-sizing:border-box"></div>');
         await page.addStyleTag({ path: 'public/text-ai-chips.css' });
         await page.addStyleTag({ path: 'public/audit-toolbar.css' });
         await page.addScriptTag({ path: 'public/ai-model-ui.js' });
@@ -58,12 +58,12 @@ const { chromium } = require('playwright');
                 }
             }
         }
-        await page.locator('#ai-audit-popup [data-value="gpt-5.6-sol"]').click();
+        await page.locator('#ai-audit-popup [data-value="gpt-6-sol"]').click();
         await page.locator('#ai-audit-popup .audit-run').click();
-        assert.equal(await page.evaluate(() => auditRequest.model), 'gpt-5.6-sol');
+        assert.equal(await page.evaluate(() => auditRequest.model), 'gpt-6-sol');
         await page.locator('#ai-analysis-popup [data-provider="Claude"]').click();
         assert.equal(await page.locator('#ai-analysis-popup .text-ai-chips button:visible').count(), 3);
-        assert.equal(await page.locator('#rewrite-ai-model').inputValue(), 'gpt-5.6-luna');
+        assert.equal(await page.locator('#rewrite-ai-model').inputValue(), 'gpt-6-luna');
         await page.locator('#ai-analysis-popup [data-value="claude-haiku-4-5"]').click();
         await page.locator('#ai-analysis-popup .audit-run').click();
         assert.equal(await page.evaluate(() => rewriteRequest), 'claude-haiku-4-5');
@@ -79,7 +79,7 @@ const { chromium } = require('playwright');
         await page.locator('#ai-audit-popup .audit-run').click();
         assert.equal(await page.evaluate(() => auditRequest.model), 'or/x-ai/grok-4.7');
         assert.equal(await page.evaluate(() => auditFixModel()), 'or/x-ai/grok-4.7');
-        assert.equal(await page.evaluate(() => normalizeTextAIModel('or/x-ai/grok-4.7')), 'gpt-5.6-luna');
+        assert.equal(await page.evaluate(() => normalizeTextAIModel('or/x-ai/grok-4.7')), 'gpt-6-luna');
         await page.locator('#ai-analysis-popup button', { hasText: 'Export' }).click();
         assert.equal(await page.evaluate(() => exported), true);
         await page.locator('#ai-audit-popup [data-review-tab="specialist"]').click();

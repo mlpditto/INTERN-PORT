@@ -57,6 +57,24 @@ window.AI_MODEL_REGISTRY = {
       "rollout": "trial-only-defaults-unchanged"
     },
     {
+      "id": "gpt-6-luna",
+      "label": "GPT-6 Luna",
+      "provider": "openai",
+      "adapter": "responses",
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text",
+        "json"
+      ],
+      "selectable": true,
+      "access": "docs-2026-09-24",
+      "validation": "pending-live-check",
+      "rollout": "trial-only-defaults-unchanged"
+    },
+    {
       "id": "gpt-5.6-luna",
       "label": "GPT-5.6 Luna",
       "provider": "openai",
@@ -69,10 +87,11 @@ window.AI_MODEL_REGISTRY = {
         "text",
         "json"
       ],
-      "selectable": true,
+      "selectable": false,
       "access": "verified-2026-09-11",
       "validation": "text-json-vision-pass",
-      "rollout": "trial-only-defaults-unchanged"
+      "rollout": "trial-only-defaults-unchanged",
+      "replacedBy": "gpt-6-luna"
     },
     {
       "id": "claude-sonnet-5",
@@ -129,6 +148,24 @@ window.AI_MODEL_REGISTRY = {
       "rollout": "trial-only-defaults-unchanged"
     },
     {
+      "id": "gpt-6-sol",
+      "label": "GPT-6 Sol",
+      "provider": "openai",
+      "adapter": "responses",
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text",
+        "json"
+      ],
+      "selectable": true,
+      "access": "docs-2026-09-24",
+      "validation": "pending-live-check",
+      "rollout": "quiz-feedback"
+    },
+    {
       "id": "gpt-5.6-sol",
       "label": "GPT-5.6 Sol",
       "provider": "openai",
@@ -141,10 +178,11 @@ window.AI_MODEL_REGISTRY = {
         "text",
         "json"
       ],
-      "selectable": true,
+      "selectable": false,
       "access": "verified-2026-09-13",
       "validation": "vision-json-pass",
-      "rollout": "quiz-feedback"
+      "rollout": "quiz-feedback",
+      "replacedBy": "gpt-6-sol"
     }
   ]
 };

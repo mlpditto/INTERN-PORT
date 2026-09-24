@@ -104,7 +104,7 @@ const ok = (content, finish = 'stop', usage = { prompt_tokens: 100, completion_t
     const route = new Function('modelName', admin.slice(r0, r1) + '\nreturn [proxyProvider, modelName];');
     check('T1 router: or/x-ai/grok-4.7 → openrouter + x-ai/grok-4.7', JSON.stringify(route('or/x-ai/grok-4.7')), '["openrouter","x-ai/grok-4.7"]');
     check('T1 router: or/qwen still openrouter', route('or/qwen/qwen3.8-flash')[0], 'openrouter');
-    check('T1 router: gpt-5.6-luna still openai', route('gpt-5.6-luna')[0], 'openai');
+    check('T1 router: gpt-6-luna still openai', route('gpt-6-luna')[0], 'openai');
 
     // T7 — client: Grok is proxy-only and a proxy answer is not re-sent
     check('T7 proxy-only includes openrouter x-ai/ models', /const isProxyOnlyModel = \(proxyProvider === 'openrouter' && \/\^x-ai\\\/\/i\.test\(modelName\)\)/.test(admin), true);
@@ -119,10 +119,11 @@ const ok = (content, finish = 'stop', usage = { prompt_tokens: 100, completion_t
     const grok = 'or/x-ai/grok-4.7';
     check('T8 Grok is NOT in TEXT_AI_MODELS (no other rail / select / QFP / Settings)', win.TEXT_AI_MODELS.some(m => m.id === grok), false);
     check('T8 Grok is the one trial model', JSON.stringify(win.TEXT_AI_TRIAL_MODELS.map(m => [m.id, m.short])), '[["or/x-ai/grok-4.7","Grok 4.7"]]');
-    check('T8 normaliser still maps Grok to the default (a saved default can never become Grok)', win.normalizeTextAIModel(grok), 'gpt-5.6-luna');
-    check('T8 an explicit trial pick is kept, others normalise as before', `${win.resolveTrialTextAIModel(grok)}|${win.resolveTrialTextAIModel('claude-sonnet-5')}|${win.resolveTrialTextAIModel('nope')}`, 'or/x-ai/grok-4.7|claude-sonnet-5|gpt-5.6-luna');
-    check('T8 default chip rail has no Grok', /grok/i.test(win.textAIChipContents('gpt-5.6-luna')), false);
-    const withTrial = win.textAIChipContents('gpt-5.6-luna', '', null, win.TEXT_AI_TRIAL_MODELS);
+    check('T8 normaliser still maps Grok to the default (a saved default can never become Grok)', win.normalizeTextAIModel(grok), 'gpt-6-luna');
+    check('T8 retired GPT-5.6 Luna/Sol follow their GPT-6 successor', `${win.normalizeTextAIModel('gpt-5.6-luna')}|${win.normalizeTextAIModel('gpt-5.6-sol')}`, 'gpt-6-luna|gpt-6-sol');
+    check('T8 an explicit trial pick is kept, others normalise as before', `${win.resolveTrialTextAIModel(grok)}|${win.resolveTrialTextAIModel('claude-sonnet-5')}|${win.resolveTrialTextAIModel('nope')}`, 'or/x-ai/grok-4.7|claude-sonnet-5|gpt-6-luna');
+    check('T8 default chip rail has no Grok', /grok/i.test(win.textAIChipContents('gpt-6-luna')), false);
+    const withTrial = win.textAIChipContents('gpt-6-luna', '', null, win.TEXT_AI_TRIAL_MODELS);
     check('T8 trial chip: text, full name, OpenRouter id, tooltip route', /data-value="or\/x-ai\/grok-4\.7" aria-label="Grok 4\.7" aria-pressed="false" title="Grok 4\.7 · or\/x-ai\/grok-4\.7 — [^"]*OpenRouter"[^>]*>Grok 4\.7<\/button>/.test(withTrial), true);
     const trialUses = admin.match(/TEXT_AI_TRIAL_MODELS/g) || [];
     check('T8 admin.html offers trial models only in the audit toolbar (chips + provider tabs)', trialUses.length, 2);

@@ -34,7 +34,7 @@ const { chromium } = require('playwright');
             // V101.34: the toolbar analyzer rail is gone — #ai-analyzer-model-val is a data-native-model
             // Settings default (value + persistence, no chips); only the Translate popover keeps a rail.
             assert.equal(await page.locator('[data-model-input="ai-analyzer-model-val"]').count(), 0);
-            for (const value of ['gemini-3.8-flash', 'gpt-5.6-luna']) {
+            for (const value of ['gemini-3.8-flash', 'gpt-6-luna']) {
                 await page.evaluate(v => syncModelDefault('ai-analyzer-model-val', v), value);
                 assert.equal(await page.locator('#ai-analyzer-model-val').inputValue(), value);
                 assert.equal(await page.locator('#default-analyzer-model').inputValue(), value);
@@ -42,7 +42,7 @@ const { chromium } = require('playwright');
             }
             for (const id of ['toolbar-ai-translate-model']) {
                 const rail = page.locator(`[data-model-input="${id}"]`);
-                for (const value of ['as/gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gpt-5.6-luna']) {
+                for (const value of ['as/gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gpt-6-luna']) {
                     await rail.locator(`[data-value="${value}"]`).evaluate(b => b.click());
                     assert.equal(await rail.locator('.active').count(), 1);
                     assert.equal(await rail.locator('[aria-pressed="true"]').count(), 1);
@@ -55,8 +55,8 @@ const { chromium } = require('playwright');
         const ids = await page.evaluate(() => TEXT_AI_MODELS.map(m => m.id));
         assert.equal(ids.length, 13); // V101.05: + Qwen 3.8 Flash/Max, DeepSeek V4.1 Flash/V4 Pro
         const controls = ['toolbar-ai-translate-model', 'ai-tagging-model-val', 'ai-model-design-enhancer', 'ai-model-grammar', 'dxa-ai-model-val', 'ai-model-review', 'research-model-select', 'tts-polish-model', 'laughtale-ai-model', 'storyteller-model-select', 'lp-ai-model', 'apd-model-a', 'apd-model-b', 'case-note-ai-model', 'default-translate-model', 'default-analyzer-model', 'default-review-model', 'default-qfp-model'];
-        assert.equal(await page.locator('#ai-model-review').inputValue(), 'gpt-5.6-luna');
-        assert.equal(await page.locator('#ai-model-design-enhancer').inputValue(), 'gpt-5.6-sol');
+        assert.equal(await page.locator('#ai-model-review').inputValue(), 'gpt-6-luna');
+        assert.equal(await page.locator('#ai-model-design-enhancer').inputValue(), 'gpt-6-sol');
         for (const id of controls) {
             const rail = page.locator(`[data-model-input="${id}"]`);
             assert.equal(await rail.count(), 1, id);
@@ -107,18 +107,18 @@ const { chromium } = require('playwright');
         assert.equal(await page.locator('#img-quiz-model-rail button').count(), ids.length);
         await page.locator('#dynamic-model-tests .text-ai-chips').first().locator('[data-value="claude-haiku-4-5"]').evaluate(b => b.click());
         assert.equal(await page.locator('#quality-audit-model').inputValue(), 'claude-haiku-4-5');
-        await page.locator('#dynamic-model-tests .text-ai-chips').last().locator('[data-value="gpt-5.6-sol"]').evaluate(b => b.click());
-        assert.equal(await page.evaluate(() => _compareModelB()), 'gpt-5.6-sol');
+        await page.locator('#dynamic-model-tests .text-ai-chips').last().locator('[data-value="gpt-6-sol"]').evaluate(b => b.click());
+        assert.equal(await page.evaluate(() => _compareModelB()), 'gpt-6-sol');
         const lpStart = html.indexOf('        window.generateWeeklySummary =');
         await page.addScriptTag({ content: html.slice(lpStart, html.indexOf('        window.lpAppendAiToContent =', lpStart)) });
         await page.evaluate(async () => {
             window._lp = { ownerId: 'fixture', entries: [{ date: new Date().toISOString().slice(0, 10), title: 'Practice', contentMarkdown: 'Test entry' }] };
             window.callUniversalAI = async (...args) => { window.testAIArgs = args; return { text: 'Fixture summary' }; };
-            document.getElementById('lp-ai-model').value = 'gpt-5.6-sol';
+            document.getElementById('lp-ai-model').value = 'gpt-6-sol';
             await generateWeeklySummary();
         });
         assert.equal(await page.locator('#lp-ai-output').inputValue(), 'Fixture summary');
-        assert.equal(await page.evaluate(() => testAIArgs[0]), 'gpt-5.6-sol');
+        assert.equal(await page.evaluate(() => testAIArgs[0]), 'gpt-6-sol');
         assert.equal(await page.evaluate(() => typeof testAIArgs[1]), 'string');
         await page.evaluate(async () => { document.getElementById('lp-entry-content').value = 'Fixture entry'; await aiEnhanceLpEntry(); });
         assert.equal(await page.locator('#lp-ai-output').inputValue(), 'Fixture summary');

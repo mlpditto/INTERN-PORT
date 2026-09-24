@@ -23,7 +23,7 @@ const a = admin.indexOf('            const auditStartedAt = performance.now();')
 const b = admin.indexOf('            const bp = formData.blueprint || {};', a);
 if (a < 0 || b < 0) { console.error('clock block not found'); process.exit(1); }
 let now = 0;
-const meta = { textContent: '', dataset: { model: 'GPT 5.6 Luna' } };
+const meta = { textContent: '', dataset: { model: 'GPT 6 Luna' } };
 const intervals = [];
 const ctx = {
     performance: { now: () => now }, document: { getElementById: id => id === 'audit-progress-meta' ? meta : null },
@@ -32,9 +32,9 @@ const ctx = {
 const run = new Function(...Object.keys(ctx), admin.slice(a, b) + '\nreturn { auditElapsed };');
 const api = run(...Object.values(ctx));
 check('elapsed formats mm:ss', (now = 0, api.auditElapsed()), '00:00');
-check('meta painted immediately with model', meta.textContent, 'GPT 5.6 Luna · 00:00');
+check('meta painted immediately with model', meta.textContent, 'GPT 6 Luna · 00:00');
 now = 61 * 1000; intervals.forEach(i => i.fn());
-check('meta after 61 s', meta.textContent, 'GPT 5.6 Luna · 01:01');
+check('meta after 61 s', meta.textContent, 'GPT 6 Luna · 01:01');
 check('repaint interval is 1 s', intervals.length === 1 && intervals[0].ms === 1000, true);
 const meta2 = { textContent: '', dataset: { model: '' } };
 new Function(...Object.keys(ctx), admin.slice(a, b))(...Object.values({ ...ctx, document: { getElementById: () => meta2 }, opts: { cachedResult: {} } }));

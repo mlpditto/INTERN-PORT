@@ -26,7 +26,7 @@ const check = (name, got, want) => checks.push([name, got, want]);
 const html = window.auditModelControlsHtml(false, 'audit');
 const tabs = [...html.matchAll(/class="audit-provider" data-provider="([^"]+)" aria-pressed="([^"]+)"/g)].map(m => [m[1], m[2] === 'true']);
 check('one tab per provider, in model-list order', tabs.map(t => t[0]).join('|'), 'Gemini|GPT|Claude|Qwen|DeepSeek|Grok'); // V101.52: Grok trial tab
-check('GPT tab pressed for the default gpt-5.6-luna', tabs.find(t => t[0] === 'GPT')[1] && tabs.filter(t => t[1]).length === 1, true);
+check('GPT tab pressed for the default gpt-6-luna', tabs.find(t => t[0] === 'GPT')[1] && tabs.filter(t => t[1]).length === 1, true);
 const chips = [...html.matchAll(/<button (hidden )?[^>]*data-value="([^"]+)"[^>]*aria-label="([^"]+)"/g)].map(m => ({ hidden: !!m[1], id: m[2], label: m[3] }));
 check('Qwen + DeepSeek chips are rendered', chips.filter(c => c.id.startsWith('or/')).map(c => c.label).join('|'), 'Qwen 3.8 Flash|Qwen 3.8 Max|DeepSeek V4.1 Flash|DeepSeek V4 Pro|Grok 4.7');
 check('only the pressed provider\'s chips are visible initially', chips.filter(c => !c.hidden).map(c => c.label).every(l => l.startsWith('GPT ')) && chips.filter(c => !c.hidden).length === 4, true);
