@@ -91,7 +91,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         await page.locator('[data-prompt]').fill('Blue pastel');
         assert.equal(await page.locator('#quiz-cover-editor.lang-no-toggle').count(), 1, 'Thai controls must bypass the language text splitter');
         // V100.86: model picker is an icon chip rail (one .active chip), not a <select>.
-        assert.equal(await page.locator('[data-model-chip]').count(), 3, 'Three supported image models are available');
+        assert.equal(await page.locator('[data-model-chip]').count(), 5, 'Five supported image models are available'); // V101.53: + Seedream 5.0 Lite, Muse Image
         assert.equal(await page.locator('[data-model-chip].active').count(), 1);
         assert.equal(await page.locator('[data-model-chip].active').getAttribute('data-value'), 'as/gemini-3.1-flash-image');
         await page.locator('[data-model-chip][data-value="or/openai/gpt-5.4-image-2"]').click();

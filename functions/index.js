@@ -1047,6 +1047,38 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             if (orModel.includes('Llama-3.3') || orModel.includes('llama-3.3')) orModel = "meta-llama/llama-3.3-70b-instruct";
             else if (orModel.includes('Llama-3.1') || orModel.includes('llama-3.1')) orModel = "meta-llama/llama-3.1-70b-instruct";
 
+            // V101.53: OpenRouter's Image API (POST /api/v1/images — synchronous, data[].b64_json,
+            // takes aspect_ratio; docs: openrouter.ai/docs/features/multimodal/image-generation).
+            // Used when the caller opts in with generationOptions.imageApi — image-only models such as
+            // bytedance-seed/seedream-5-0-lite and meta/muse-image. The chat/completions image path
+            // below stays as it was for the existing image models.
+            if (generationOptions && generationOptions.imageApi) {
+                const aspect = String(generationOptions.aspectRatio || "");
+                const imgBody = { model: orModel, prompt, n: 1, ...(/^\d{1,2}:\d{1,2}$/.test(aspect) ? { aspect_ratio: aspect } : {}) };
+                const imgResp = await postWithRetry("https://openrouter.ai/api/v1/images", imgBody, {
+                    headers: {
+                        "Authorization": `Bearer ${apiKey}`,
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": "https://mlpditto.github.io",
+                        "X-Title": "INTERN-PORT"
+                    }
+                });
+                const first = Array.isArray(imgResp.data?.data) ? imgResp.data.data[0] : null;
+                if (!first || !first.b64_json) {
+                    return res.status(502).json({
+                        error: `OpenRouter ${orModel} returned no image data.`,
+                        details: { count: Array.isArray(imgResp.data?.data) ? imgResp.data.data.length : 0 }
+                    });
+                }
+                return res.json({
+                    imageDataUrl: `data:${first.media_type || "image/png"};base64,${first.b64_json}`,
+                    text: "",
+                    tokens: imgResp.data.usage?.total_tokens || 0,
+                    model: orModel,
+                    usage: { costUsd: imgResp.data.usage?.cost ?? null, totalTokens: imgResp.data.usage?.total_tokens ?? null }
+                });
+            }
+
             // V92.46: detect image-generation models (e.g. openai/gpt-5.4-image-2,
             // google/gemini-2.5-flash-image-preview). Image models accept the same
             // chat.completions endpoint but require modalities:["image","text"] and
