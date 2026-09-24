@@ -2,6 +2,10 @@
     let cached, loadedAt = 0, pending;
     const number = n => Number(n || 0).toLocaleString();
     const node = (tag, text, cls) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (cls) n.className = cls; return n; };
+    // V101.57: providers whose calls land on the Google Cloud bill (callAIProxy: Vertex Gemini,
+    // Gemini API via GEMINI_API_KEY, Cloud Text-to-Speech). Budget as set in Cloud Billing.
+    const GOOGLE_ROUTES = { gemini: 'Vertex AI · Gemini', 'gemini-aistudio': 'Gemini API · AI Studio', cloud_tts: 'Cloud Text-to-Speech' };
+    const GOOGLE_BUDGET = { name: 'FKB-300', thb: 300 };
     const date = d => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
     function dates(days) { return Array.from({length:days}, (_,i) => date(new Date(Date.now() - (days-1-i)*86400000))); }
     function aggregate(docs, days) {
@@ -85,6 +89,23 @@
         if(peak?.value)body.append(node('p','Peak recorded hour · '+peak.day+' · '+peak.h+':00–'+peak.h+':59 · '+number(peak.value)+' '+(metric==='count'?'calls':'tokens'),'au-note'));
         body.append(node('p','Bangkok time · Hourly data is available only for requests recorded after hourly tracking was enabled.','au-note'));
     }
+    function googleBill(a, days) {
+        const box=node('section',undefined,'gc-bill');box.setAttribute('aria-label','Google Cloud bill');
+        const head=node('div',undefined,'gc-head'), ring=node('i',undefined,'gc-ring'), link=node('a','Billing reports ↗','gc-link');
+        ring.setAttribute('aria-hidden','true');link.href='https://console.cloud.google.com/billing/reports';link.target='_blank';link.rel='noopener';
+        head.append(ring,node('strong','Google Cloud bill'),node('span','Last '+days+' days · routes billed by Google','gc-sub'),link);box.append(head);
+        const rows=Object.keys(GOOGLE_ROUTES).map(p=>({p,count:0,tokens:0}));
+        for(const m of a.models){const r=rows.find(x=>x.p===m.provider);if(r){r.count+=m.count;r.tokens+=m.tokens;}}
+        const tokens=rows.reduce((n,r)=>n+r.tokens,0), share=a.tokens?Math.round(100*tokens/a.tokens):0;
+        const bar=node('div',undefined,'gc-share-bar'), fill=node('span'), line=node('div',undefined,'gc-share');
+        fill.style.width=share+'%';bar.setAttribute('role','img');bar.setAttribute('aria-label',share+'% of recorded AI tokens went to Google-billed routes');bar.append(fill);
+        line.append(bar,node('b',share+'%'),node('small','of recorded AI tokens'));box.append(line);
+        const table=node('table',undefined,'gc-rows'), h=node('tr');['Route','Calls','Tokens'].forEach(t=>h.append(node('th',t)));table.append(h);
+        for(const r of rows){const tr=node('tr');[GOOGLE_ROUTES[r.p],number(r.count),number(r.tokens)].forEach(v=>tr.append(node('td',v)));table.append(tr);}
+        box.append(table);
+        const note=node('p',undefined,'au-note');note.append('Budget ',node('b',GOOGLE_BUDGET.name),' · ฿'+GOOGLE_BUDGET.thb+' / month — Google emails at each alert threshold. Amounts in ฿ are in Billing reports only; Firestore, Functions and Storage are billed there too but are not counted here.');
+        box.append(note);return box;
+    }
     async function mount(host, compact=false, refresh=false) {
         if (typeof host === 'string') host = document.getElementById(host);
         if (!host) return;
@@ -104,7 +125,7 @@
                 for(const [label,value] of [['Calls',number(a.calls)],['Tokens',number(a.tokens)],['Est. cost','—']]){
                     const card=node('div');card.append(node('small',label),node('strong',value));stats.append(card);
                 }
-                body.append(stats);
+                body.append(googleBill(a,Number(range.value)),stats);
                 body.append(node('p','Recorded server usage · Bangkok time · '+number(a.unattributed)+' tokens not attributed to a model.','au-note'));
                 if(!a.selected.length){body.append(node('p','No recorded usage for this period.'));return;}
                 body.append(node('h4','Activity'));
@@ -121,7 +142,9 @@
                 a.range.forEach(d=>head.append(node('th',d.slice(5))));table.append(head);
                 const maximum=Math.max(1,...rows.flatMap(r=>Object.values(r.days).map(v=>Number(v[metric.value]||0))));
                 for(const r of rows){
-                    const tr=node('tr');tr.append(node('th',r.model));
+                    const tr=node('tr'), name=node('th',r.model);
+                    if(GOOGLE_ROUTES[r.provider||r.model]){const g=node('i',undefined,'gc-ring sm');g.title='Google Cloud bill';name.prepend(g);}
+                    tr.append(name);
                     for(const d of a.range){const cell=node('td'), data=r.days[d], value=data?Number(data[metric.value]||0):null;
                         const b=node('button',value===null?'—':number(value));b.type='button';
                         const detail=r.model+' · '+d+' · '+(value===null?'No model data':number(value)+' '+(metric.value==='count'?'calls':'tokens'));
