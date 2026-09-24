@@ -5,6 +5,7 @@
     // V101.57: providers whose calls land on the Google Cloud bill (callAIProxy: Vertex Gemini,
     // Gemini API via GEMINI_API_KEY, Cloud Text-to-Speech). Budget as set in Cloud Billing.
     const GOOGLE_ROUTES = { gemini: 'Vertex AI · Gemini', 'gemini-aistudio': 'Gemini API · AI Studio', cloud_tts: 'Cloud Text-to-Speech' };
+    // V101.58: the billing account is prepay (2026-09-24) — Gemini API calls stop when the credit hits ฿0.
     const GOOGLE_BUDGET = { name: 'FKB-300', thb: 300 };
     const date = d => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
     function dates(days) { return Array.from({length:days}, (_,i) => date(new Date(Date.now() - (days-1-i)*86400000))); }
@@ -93,7 +94,8 @@
         const box=node('section',undefined,'gc-bill');box.setAttribute('aria-label','Google Cloud bill');
         const head=node('div',undefined,'gc-head'), ring=node('i',undefined,'gc-ring'), link=node('a','Billing reports ↗','gc-link');
         ring.setAttribute('aria-hidden','true');link.href='https://console.cloud.google.com/billing/reports';link.target='_blank';link.rel='noopener';
-        head.append(ring,node('strong','Google Cloud bill'),node('span','Last '+days+' days · routes billed by Google','gc-sub'),link);box.append(head);
+        const credit=node('a','Credit balance ↗','gc-link');credit.href='https://aistudio.google.com/billing';credit.target='_blank';credit.rel='noopener';
+        head.append(ring,node('strong','Google Cloud bill'),node('span','Last '+days+' days · routes billed by Google','gc-sub'),credit,link);box.append(head);
         const rows=Object.keys(GOOGLE_ROUTES).map(p=>({p,count:0,tokens:0}));
         for(const m of a.models){const r=rows.find(x=>x.p===m.provider);if(r){r.count+=m.count;r.tokens+=m.tokens;}}
         const tokens=rows.reduce((n,r)=>n+r.tokens,0), share=a.tokens?Math.round(100*tokens/a.tokens):0;
@@ -103,7 +105,7 @@
         const table=node('table',undefined,'gc-rows'), h=node('tr');['Route','Calls','Tokens'].forEach(t=>h.append(node('th',t)));table.append(h);
         for(const r of rows){const tr=node('tr');[GOOGLE_ROUTES[r.p],number(r.count),number(r.tokens)].forEach(v=>tr.append(node('td',v)));table.append(tr);}
         box.append(table);
-        const note=node('p',undefined,'au-note');note.append('Budget ',node('b',GOOGLE_BUDGET.name),' · ฿'+GOOGLE_BUDGET.thb+' / month — Google emails at each alert threshold. Amounts in ฿ are in Billing reports only; Firestore, Functions and Storage are billed there too but are not counted here.');
+        const note=node('p',undefined,'au-note');note.append(node('b','Prepay'),' — Gemini API requests stop when the credit reaches ฿0; check Credit balance and top up there. Budget alert ',node('b',GOOGLE_BUDGET.name),' · ฿'+GOOGLE_BUDGET.thb+' / month. Amounts in ฿ are in Billing only; Firestore, Functions and Storage are billed there too but are not counted here.');
         box.append(note);return box;
     }
     async function mount(host, compact=false, refresh=false) {

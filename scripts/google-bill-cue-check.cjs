@@ -34,8 +34,9 @@ const assert = require('node:assert/strict'), { chromium } = require('playwright
     assert.match(text, /Vertex AI · Gemini\s+3\s+300/);
     assert.match(text, /Gemini API · AI Studio\s+2\s+100/);
     assert.match(text, /Cloud Text-to-Speech\s+0\s+0/);
+    assert.match(text, /Prepay — Gemini API requests stop when the credit reaches ฿0/);
     assert.match(text, /FKB-300 · ฿300 \/ month/);
-    assert.equal(await card.locator('a.gc-link').getAttribute('href'), 'https://console.cloud.google.com/billing/reports');
+    assert.deepEqual(await card.locator('a.gc-link').evaluateAll(a => a.map(n => n.getAttribute('href'))), ['https://aistudio.google.com/billing', 'https://console.cloud.google.com/billing/reports']);
     await page.locator('#ov select[aria-label="Activity view"]').selectOption('Daily');
     assert.equal(await page.locator('#ov .au-scroll th .gc-ring').count(), 2);  // gemini rows only, not gpt
     for (const width of [320, 390, 1024]) { await page.setViewportSize({ width, height: 800 }); assert(await page.locator('#ov').evaluate(n => n.scrollWidth <= n.clientWidth)); }
