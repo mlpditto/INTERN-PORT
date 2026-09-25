@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.92)</title>
+    <title>Nika Admin (V101.93)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -18020,12 +18020,14 @@
                 const btn = host.querySelector('button');
                 btn.title = hint;
                 btn.setAttribute('aria-label', 'Suggest fix with ' + model.label);
-                if (!btn.disabled) btn.innerHTML = '✦' + window.aiModelLogoHtml(id);
+                // V101.93: rebuild only when the model changed. This runs on focus/pointerenter, i.e. during the
+                // first mousedown; replacing the logo under the pointer then swallowed that click (needed 2 clicks).
+                if (!btn.disabled && btn.dataset.fixModel !== id) { btn.innerHTML = '✦' + window.aiModelLogoHtml(id); btn.dataset.fixModel = id; }
             });
         };
         window.auditFixButtonHtml = function(qNumber) {
             const id = auditFixModel(), label = (textAIModelInfo(id) || {}).label || '';
-            return `<span class="audit-fix-control lang-no-toggle"><button type="button" onclick="auditSuggestFix(${qNumber}, this)" onpointerenter="syncAuditFixHints()" onfocus="syncAuditFixHints()" aria-label="Suggest fix with ${label}" aria-describedby="audit-fix-tip-${qNumber}">✦${window.aiModelLogoHtml(id)}</button><span id="audit-fix-tip-${qNumber}" class="audit-fix-tooltip" role="tooltip"></span></span>`;
+            return `<span class="audit-fix-control lang-no-toggle"><button type="button" onclick="auditSuggestFix(${qNumber}, this)" onpointerenter="syncAuditFixHints()" onfocus="syncAuditFixHints()" data-fix-model="${id}" aria-label="Suggest fix with ${label}" aria-describedby="audit-fix-tip-${qNumber}">✦${window.aiModelLogoHtml(id)}</button><span id="audit-fix-tip-${qNumber}" class="audit-fix-tooltip" role="tooltip"></span></span>`;
         };
 
         window.browseAuditProvider = function(button) {
