@@ -578,6 +578,167 @@ exports.ndiBrandLookup = onRequest({ cors: true, timeoutSeconds: 60, memory: "25
     }
 });
 
+// ============================================================
+// 🔗 Link reader — V101.77 / Expand Quiz ✏️ Custom
+// Admin pastes a link into the Custom box → the client calls this, gets the
+// page's readable text and puts it in the prompt as SOURCE PAGE. The AI
+// providers never open links themselves.
+// SSRF guard: http/https on the default ports only; every address the host
+// resolves to is checked AT CONNECT TIME (agent `lookup`), so redirects and
+// DNS rebinding go through the same check; IP-literal hosts are checked
+// before the request and on every redirect. Private, loopback, link-local
+// (incl. 169.254.169.254 metadata), CGNAT, multicast and reserved ranges are
+// refused. Web pages and plain text only, 3 MB / 15 s / 3 redirects.
+// ============================================================
+const LINK_BLOCK = (() => {
+    const net = require("net");
+    const bl = new net.BlockList();
+    [["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10], ["127.0.0.0", 8], ["169.254.0.0", 16],
+     ["172.16.0.0", 12], ["192.0.0.0", 24], ["192.0.2.0", 24], ["192.168.0.0", 16], ["198.18.0.0", 15],
+     ["198.51.100.0", 24], ["203.0.113.0", 24], ["224.0.0.0", 4], ["240.0.0.0", 4]]
+        .forEach(([a, p]) => bl.addSubnet(a, p, "ipv4"));
+    [["::", 128], ["::1", 128], ["64:ff9b::", 96], ["100::", 64], ["2001:db8::", 32], ["fc00::", 7], ["fe80::", 10], ["ff00::", 8]]
+        .forEach(([a, p]) => bl.addSubnet(a, p, "ipv6"));
+    return bl;
+})();
+function linkAddressBlocked(address) {
+    const net = require("net");
+    const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(address);
+    if (mapped) address = mapped[1];
+    const family = net.isIP(address);
+    if (!family) return true;
+    return LINK_BLOCK.check(address, family === 4 ? "ipv4" : "ipv6");
+}
+function linkHostCheck(protocol, hostname, port) {
+    const net = require("net");
+    if (protocol !== "http:" && protocol !== "https:") return "Only http and https links can be read.";
+    if (port && port !== "80" && port !== "443") return "Links on non-standard ports can't be read.";
+    const host = String(hostname || "").replace(/^\[|\]$/g, "").toLowerCase();
+    if (!host || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".internal") || host.endsWith(".local")) return "That address is not allowed.";
+    if (net.isIP(host) && linkAddressBlocked(host)) return "That address is not allowed.";
+    return "";
+}
+function linkSafeLookup(hostname, options, callback) {
+    const dns = require("dns");
+    if (typeof options === "function") { callback = options; options = {}; }
+    dns.lookup(hostname, { ...options, all: true }, (err, addresses) => {
+        if (err) return callback(err);
+        if (!addresses.length || addresses.some(a => linkAddressBlocked(a.address))) {
+            const e = new Error("That address is not allowed.");
+            e.code = "LINK_BLOCKED";
+            return callback(e);
+        }
+        if (options.all) return callback(null, addresses);
+        return callback(null, addresses[0].address, addresses[0].family);
+    });
+}
+function linkDecodeEntities(s) {
+    const named = { amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: " ", ndash: "–", mdash: "—", hellip: "…", rsquo: "’", lsquo: "‘", rdquo: "”", ldquo: "“", deg: "°", micro: "µ", plusmn: "±", times: "×" };
+    return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e) => {
+        if (e[0] === "#") {
+            const code = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+            return code > 0 && code < 0x110000 ? String.fromCodePoint(code) : m;
+        }
+        return named[e.toLowerCase()] ?? m;
+    });
+}
+function linkTextFromHtml(html) {
+    const titleMatch = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
+    const title = titleMatch ? linkDecodeEntities(titleMatch[1].replace(/\s+/g, " ").trim()) : "";
+    let body = html
+        .replace(/<!--[\s\S]*?-->/g, " ")
+        .replace(/<(script|style|noscript|svg|template|iframe|head|nav|header|footer|aside|form)\b[\s\S]*?<\/\1\s*>/gi, " ");
+    // Prefer the main content when the page marks it; else the whole body.
+    const articles = body.match(/<article\b[\s\S]*?<\/article\s*>/gi) || [];
+    const main = /<main\b[\s\S]*?<\/main\s*>/i.exec(body);
+    if (articles.length) body = articles.sort((a, b) => b.length - a.length)[0];
+    else if (main) body = main[0];
+    const text = linkDecodeEntities(body
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/?(p|div|section|article|main|li|ul|ol|tr|table|h[1-6]|blockquote|pre|dd|dt|dl|figure|figcaption)\b[^>]*>/gi, "\n")
+        .replace(/<\/t[dh]\s*>/gi, " \t ")
+        .replace(/<[^>]+>/g, " "))
+        .replace(/[ \t ]+/g, " ")
+        .replace(/ *\n */g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+    return { title, text };
+}
+function linkCharset(contentType, bytes) {
+    const fromHeader = /charset=["']?([\w-]+)/i.exec(contentType || "");
+    if (fromHeader) return fromHeader[1];
+    const head = Buffer.from(bytes.subarray(0, 4096)).toString("latin1");
+    const fromMeta = /<meta[^>]+charset=["']?([\w-]+)/i.exec(head);
+    return fromMeta ? fromMeta[1] : "utf-8";
+}
+const LINK_TEXT_MAX = 15000;
+
+exports.fetchLinkText = onRequest({ cors: true, timeoutSeconds: 60, memory: "256MiB" }, async (req, res) => {
+    let target = "";
+    try {
+        const decoded = await verifyIdTokenFromHeader(req, res);
+        if (!decoded) return; // 401 already sent
+        if (!isAdminToken(decoded)) return res.status(403).json({ error: "Admin only." });
+
+        const raw = String((req.body && req.body.url) || "").trim();
+        if (!raw || raw.length > 2000) return res.status(400).json({ error: "Missing or too long link." });
+        if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) && !/^https?:\/\//i.test(raw)) return res.status(403).json({ error: "Only http and https links can be read." });
+        let u;
+        try { u = new URL(/^https?:\/\//i.test(raw) ? raw : "https://" + raw); } catch (e) { return res.status(400).json({ error: "That isn't a valid link." }); }
+        target = u.href;
+        const bad = linkHostCheck(u.protocol, u.hostname, u.port);
+        if (bad) return res.status(403).json({ error: bad });
+
+        const http = require("http");
+        const https = require("https");
+        const resp = await axios.get(u.href, {
+            responseType: "arraybuffer",
+            timeout: 15000,
+            maxContentLength: 3 * 1024 * 1024,
+            maxRedirects: 3,
+            validateStatus: () => true,
+            httpAgent: new http.Agent({ lookup: linkSafeLookup }),
+            httpsAgent: new https.Agent({ lookup: linkSafeLookup }),
+            beforeRedirect: (opts) => {
+                const why = linkHostCheck(opts.protocol, opts.hostname, opts.port ? String(opts.port) : "");
+                if (why) { const e = new Error(why); e.code = "LINK_BLOCKED"; throw e; }
+            },
+            headers: {
+                "User-Agent": "Mozilla/5.0 (compatible; INTERN-PORT LinkReader/1.0)",
+                "Accept": "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.1"
+            }
+        });
+        if (resp.status >= 400) return res.status(502).json({ error: `The site answered HTTP ${resp.status}.` });
+        const type = String(resp.headers["content-type"] || "").toLowerCase();
+        const isHtml = /text\/html|application\/xhtml/.test(type);
+        if (!isHtml && !/^text\/plain/.test(type)) {
+            return res.status(415).json({ error: `Only web pages can be read (this link is ${type.split(";")[0] || "an unknown type"}).` });
+        }
+        const bytes = new Uint8Array(resp.data);
+        let decoder;
+        try { decoder = new TextDecoder(linkCharset(type, bytes)); } catch (e) { decoder = new TextDecoder("utf-8"); }
+        const body = decoder.decode(bytes);
+        const { title, text } = isHtml ? linkTextFromHtml(body) : { title: "", text: body.trim() };
+        if (text.length < 40) return res.status(422).json({ error: "The page has almost no readable text (it may need JavaScript or a login)." });
+        const finalUrl = (resp.request && resp.request.res && resp.request.res.responseUrl) || u.href;
+        return res.json({
+            url: finalUrl,
+            title: title.slice(0, 200),
+            text: text.slice(0, LINK_TEXT_MAX),
+            chars: text.length,
+            truncated: text.length > LINK_TEXT_MAX
+        });
+    } catch (err) {
+        const blocked = err.code === "LINK_BLOCKED" || (err.cause && err.cause.code === "LINK_BLOCKED") || /not allowed/.test(err.message || ""); // redirects wrap the guard's error
+        console.error("[fetchLinkText] failed:", target, err.code || "", err.message);
+        if (blocked) return res.status(403).json({ error: "That address is not allowed." });
+        if (err.code === "ECONNABORTED" || /timeout/i.test(err.message)) return res.status(504).json({ error: "The site took too long to answer." });
+        if (/maxContentLength/i.test(err.message)) return res.status(413).json({ error: "The page is too large (over 3 MB)." });
+        if (err.code === "ENOTFOUND") return res.status(502).json({ error: "That site could not be found." });
+        return res.status(502).json({ error: "Couldn't read the link: " + (err.message || "unknown error") });
+    }
+});
+
 /**
  * 🤖 AI Proxy Function (V89.19)
  * Handles: Gemini, OpenAI, Anthropic, OpenRouter, AI Studio, ThaiLLM, Typhoon, Cloud TTS
