@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.66)</title>
+    <title>Nika Admin (V101.67)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -4984,6 +4984,18 @@
         .qe-tool-curate { background:linear-gradient(135deg,#7c3aed,#a855f7); }
         .qe-tool-translate { background:linear-gradient(135deg,#10b981,#059669); }
         .qe-tool-review { background:linear-gradient(135deg,#7c3aed,#0891b2); }
+        /* V101.67: one tool row — Review is the only accent; the other tools are quiet with a coloured icon. */
+        .qe-tool.qe-quiet { background:#2b3450; border-color:#3a4562; color:#e6eaf3; }
+        .qe-quiet.qe-tool-pdf > i { color:#38bdf8; }
+        .qe-quiet.qe-tool-gen > i:first-child { color:#fbbf24; }
+        .qe-quiet.qe-tool-curate > span[aria-hidden] { color:#c084fc; }
+        .qe-quiet.qe-tool-translate > i:first-child { color:#34d399; }
+        .qe-divider { width:1px; height:22px; background:#3a4560; margin:0 2px; flex:0 0 auto; }
+        /* Translate is now the row's last item: anchor its popover to the row's right edge, capped at the row width,
+           so it never runs past the modal (anchored under the button it overflowed by ~400px). */
+        #quiz-editor-review-actions { position:relative; }
+        #quiz-editor-review-actions .qe-pop-wrap { position:static; }
+        #quiz-editor-review-actions .qe-popover { left:auto; right:0; width:min(600px, 100%); }
         .qe-tool .qe-chev { font-size:0.8em; transition:transform 0.15s ease; }
         .qe-tool[aria-expanded="true"] .qe-chev { transform:rotate(180deg); }
         .qe-pop-wrap { position:relative; }
@@ -6172,11 +6184,6 @@
             text-align: center;
         }
 
-        @media (max-width: 600px) {
-            #quiz-ai-tools-row { grid-template-columns: minmax(0, 1fr) !important; }
-            #quiz-ai-tools-row .glass-toggle-container { height: auto !important; min-height: 32px; }
-        }
-
         /* 🧪 Liquid Glass Toggle UI */
         .glass-toggle-container {
             display: flex;
@@ -6338,14 +6345,13 @@
         #quizManageModal .quiz-editor-fold > summary { padding:10px 12px; color:#c4b5fd; cursor:pointer; font-weight:700; }
         #quiz-editor-summary { color:#cbd5e1; font-weight:400; overflow-wrap:anywhere; }
         #quizManageModal .quiz-editor-fold-body { padding:12px; }
-        #quiz-ai-tools-row { margin:8px; }
         #quiz-editor-toolbar { flex-wrap:wrap; white-space:normal!important; overflow-x:visible!important; }
         #quiz-editor-toolbar > div { flex-wrap:wrap; }
         @media(max-width:600px) {
             #quizManageModal .quiz-editor-fold-body > div[style*="display:grid"] { grid-template-columns:minmax(0,1fr)!important; }
             #quizManageModal .quiz-editor-fold-body div { min-width:0; }
             #quizManageModal .quiz-editor-fold > summary { min-height:44px; }
-            #quiz-editor-review-actions button { min-height:44px!important; }
+            #quiz-editor-review-actions button:not(.qe-popover button) { min-height:44px!important; }
         }
 
         /* Quiz Editor — Markdown split layout (Phase 1, V91.35) */
@@ -6462,7 +6468,7 @@
     <script src="quiz-resource-cards.js?v=V99.68"></script>
     <script src="quiz-generation-rules.js?v=V99.40"></script>
     <script src="quiz-compact-toolbar.js?v=V99.41"></script>
-    <link rel="stylesheet" href="quiz-compact-toolbar.css?v=V99.41">
+    <link rel="stylesheet" href="quiz-compact-toolbar.css?v=V101.67">
     <script src="taxonomy.js?v=V94.55"></script>
     <!-- V91.84: cache-busting on case-taxonomy.js so browser refetches when shim changes (script URL is otherwise constant) -->
     <script src="case-taxonomy.js?v=V94.53"></script>
@@ -13147,17 +13153,18 @@
                          Quality review; row 2 is one labelled tool row. The toolbar no longer carries its own model rail —
                          every tool opens a popup with its own rail (Quality review, Curate, Generate more), seeded from the
                          Settings default held in #ai-analyzer-model-val (data-native-model = ai-model-ui.js syncs the value
-                         but builds no chips). Translate stays per-question, so it opens a popover with language + model. -->
-                    <div id="quiz-editor-review-actions" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:6px 12px; background:rgba(255,255,255,0.03); border-radius:12px; border:1px solid rgba(255,255,255,0.08); box-shadow:0 4px 15px rgba(0,0,0,0.1);">
-                        <button type="button" class="btn-sm qe-tool qe-tool-review lang-no-toggle" onclick="openQuizReview(this)" title="Audit this quiz's quality (score + suggested fixes)" data-th-title="ตรวจคุณภาพชุดข้อสอบ (ให้คะแนน + คำแนะนำแก้ไข)"><i class="fa-solid fa-shield-halved"></i><span>Quality review</span></button>
-                    </div>
-                    <div id="quiz-ai-tools-row" class="qe-tool-row lang-no-toggle" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:6px 12px; background:rgba(124,58,237,0.1); border-radius:12px; border:1px solid rgba(124,58,237,0.25); box-shadow:0 4px 15px rgba(0,0,0,0.1);">
+                         but builds no chips). Translate stays per-question, so it opens a popover with language + model.
+                         V101.67: one row — quiz-compact-toolbar.js prepends the MCQ/Learn/Case switch, then a divider,
+                         Review (the one accent), and four quiet tools with coloured icons and short labels. -->
+                    <div id="quiz-editor-review-actions" class="lang-no-toggle" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:6px 12px; background:rgba(255,255,255,0.03); border-radius:12px; border:1px solid rgba(255,255,255,0.08); box-shadow:0 4px 15px rgba(0,0,0,0.1);">
+                        <span class="qe-divider" aria-hidden="true"></span>
+                        <button type="button" class="btn-sm qe-tool qe-tool-review lang-no-toggle" onclick="openQuizReview(this)" title="Audit this quiz's quality (score + suggested fixes)" data-th-title="ตรวจคุณภาพชุดข้อสอบ (ให้คะแนน + คำแนะนำแก้ไข)"><i class="fa-solid fa-shield-halved"></i><span>Review</span></button>
                         <!-- V97.91: Curate opens the 🧪 Scorecard flow; saved results still open free (V97.39 / V97.41). -->
-                        <button type="button" class="btn-sm qe-tool qe-tool-pdf" onclick="openPdfToQuizModal()" title="Import questions from a PDF" data-th-title="นำเข้าโจทย์จากไฟล์ PDF"><i class="fa-solid fa-file-pdf"></i><span>Import PDF</span></button>
-                        <button type="button" class="btn-sm qe-tool qe-tool-gen" onclick="openSuggestMoreModal()" title="Generate more questions with AI" data-th-title="ให้ AI สร้างคำถามเพิ่ม"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Generate more</span></button>
-                        <button type="button" class="btn-sm qe-tool qe-tool-curate" onclick="openQuizCurate()" title="Let AI pick the number of questions you want and save them as a new set" data-th-title="ให้ AI คัดข้อสอบตามจำนวนที่ต้องการและบันทึกเป็นชุดใหม่"><span aria-hidden="true">✦</span><span>Curate</span></button>
+                        <button type="button" class="btn-sm qe-tool qe-quiet qe-tool-pdf" onclick="openPdfToQuizModal()" title="Import questions from a PDF" data-th-title="นำเข้าโจทย์จากไฟล์ PDF"><i class="fa-solid fa-file-pdf"></i><span>PDF</span></button>
+                        <button type="button" class="btn-sm qe-tool qe-quiet qe-tool-gen" onclick="openSuggestMoreModal()" title="Generate more questions with AI" data-th-title="ให้ AI สร้างคำถามเพิ่ม"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Generate</span></button>
+                        <button type="button" class="btn-sm qe-tool qe-quiet qe-tool-curate" onclick="openQuizCurate()" title="Let AI pick the number of questions you want and save them as a new set" data-th-title="ให้ AI คัดข้อสอบตามจำนวนที่ต้องการและบันทึกเป็นชุดใหม่"><span aria-hidden="true">✦</span><span>Curate</span></button>
                         <div class="qe-pop-wrap">
-                            <button type="button" id="qe-translate-btn" class="btn-sm qe-tool qe-tool-translate" onclick="toggleQuizTranslatePopover()" aria-expanded="false" aria-controls="ai-console-translate-panel" title="Translate this question with AI" data-th-title="แปลข้อสอบข้อนี้ด้วย AI"><i class="fa-solid fa-globe"></i><span>Translate</span><i class="fa-solid fa-chevron-down qe-chev" aria-hidden="true"></i></button>
+                            <button type="button" id="qe-translate-btn" class="btn-sm qe-tool qe-quiet qe-tool-translate" onclick="toggleQuizTranslatePopover()" aria-expanded="false" aria-controls="ai-console-translate-panel" title="Translate this question with AI" data-th-title="แปลข้อสอบข้อนี้ด้วย AI"><i class="fa-solid fa-globe"></i><span>Translate</span><i class="fa-solid fa-chevron-down qe-chev" aria-hidden="true"></i></button>
                             <div id="ai-console-translate-panel" class="qe-popover" hidden>
                                 <div class="qe-pop-label">Model</div>
                                 <!-- ai-model-ui.js fills this host with the shared chip rail bound to #toolbar-ai-translate-model. -->
