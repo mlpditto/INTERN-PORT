@@ -23,6 +23,12 @@ const QuizCover = (() => {
         { id: 'felt', emoji: '🧶', label: 'Felt', titleTh: 'ผ้าสักหลาดและไหมพรม', material: 'handmade felt and yarn craft illustration; visible stitching and soft fibre texture; cosy muted pastel textiles; gentle studio lighting; rounded inset panel' }
     ];
     let style = STYLES[0].id;
+    // V101.91: optional corner badge (e.g. "ICD-11 6B00") drawn by code onto the AI cover, so the text is
+    // exact — image models misspell codes. Opt-in per quiz (a code can give an answer away); the ICD-11
+    // tag only pre-fills the field when the admin opens it. Saved per quiz as coverBadge.
+    const BADGE_MAX = 24;
+    const ICD11_TAG = /(?:^|[\s,;#])(?:ICD-?11[:\s]*)?([1-9A-HJ-NP-Z][A-HJ-NP-Z][0-9][0-9A-HJ-NP-Z](?:\.[0-9A-HJ-NP-Z]{1,2})?)(?=$|[\s,;])/;
+    let baseCandidate = null, composeToken = 0;
     const safeUrl = value => { try { const u = new URL(value); return u.protocol === 'https:' ? u.href : ''; } catch (_) { return ''; } };
     const quickUploads = new Set();
     let hoverBubble = null;
@@ -136,9 +142,11 @@ const QuizCover = (() => {
 <button type="button" data-remove title="นำปกออก" aria-label="Remove cover" hidden>🗑️</button>
 <div class="quiz-cover-model-rail" data-model-rail role="group" aria-label="AI model">${AI_MODELS.map((model, i) => `<button type="button" data-model-chip data-value="${model.id}" class="${i === 0 ? 'active' : ''}" aria-pressed="${i === 0}" title="${model.titleTh}" aria-label="${model.ariaLabel}">${model.logo ? `<span class="text-ai-logo" data-owner="${model.logo}" aria-hidden="true"></span>` : ''}${model.label}</button>`).join('')}</div>
 <button type="button" data-prompt-toggle class="quiz-cover-plus" title="แนวภาพเพิ่มเติม (ไม่บังคับ)" aria-label="Add optional visual detail" aria-expanded="false">＋</button>
+<button type="button" data-badge-toggle class="quiz-cover-plus" title="ป้ายมุมปก เช่น ICD-11 6B00 (ไม่บังคับ) · ใช้กับปกที่สร้างด้วย AI" aria-label="Add corner badge" aria-expanded="false">🏷️</button>
 <button type="button" data-generate class="quiz-cover-generate" title="สร้างปกด้วย AI" aria-label="Generate cover with AI">✨ Generate</button>
 <div class="quiz-cover-style-row"><span class="quiz-cover-style-label" aria-hidden="true">🎨</span><div class="quiz-cover-style-rail" role="group" aria-label="Cover style">${STYLES.map((s, i) => `<button type="button" data-style-chip data-value="${s.id}" class="${i === 0 ? 'active' : ''}" aria-pressed="${i === 0}" title="${s.titleTh}">${s.emoji} ${s.label}</button>`).join('')}</div><span class="quiz-cover-lock" title="กรอบคงที่ทุกสไตล์: แนวตั้ง 3:4 · ภาพหลักด้านบน · แถบชื่อด้านล่าง" aria-label="Fixed frame for every style: portrait 3:4, title band" role="img">🔒</span></div>
 <input type="text" data-prompt maxlength="300" placeholder="Optional detail — e.g. blue tones, a heart as the hero" title="แนวภาพเพิ่มเติม (ไม่บังคับ)" hidden>
+<input type="text" data-badge maxlength="${BADGE_MAX}" placeholder="Corner badge — e.g. ICD-11 6B00 · empty = none" title="ป้ายมุมปก · เว้นว่าง = ไม่มีป้าย · ระวังอย่าใส่สิ่งที่เป็นคำตอบของข้อสอบ" aria-label="Corner badge text" hidden>
 <div class="quiz-cover-ai-preview" hidden><img alt="AI cover candidate"><div><button type="button" data-apply title="ใช้ปกนี้" aria-label="Apply this cover">✓</button><button type="button" data-discard title="ยกเลิกภาพนี้" aria-label="Discard this candidate">✕</button></div></div>
 <small role="status" aria-live="polite"></small>`;
         document.getElementById('quiz-title').parentElement.parentElement.after(el);
@@ -166,6 +174,21 @@ const QuizCover = (() => {
             if (show) promptInput.focus();
         };
         promptInput.oninput = () => promptToggle.classList.toggle('has-value', !!promptInput.value.trim());
+        const badgeInput = el.querySelector('[data-badge]');
+        const badgeToggle = el.querySelector('[data-badge-toggle]');
+        badgeToggle.onclick = () => {
+            const show = badgeInput.hidden;
+            badgeInput.hidden = !show;
+            badgeToggle.setAttribute('aria-expanded', String(show));
+            if (!show) return;
+            if (!badgeInput.value.trim()) {
+                const code = (String(document.getElementById('quiz-tags')?.value || '').match(ICD11_TAG) || [])[1];
+                if (code) { badgeInput.value = 'ICD-11 ' + code; badgeChanged(); }
+            }
+            badgeInput.focus();
+        };
+        let badgeTimer = 0;
+        badgeInput.oninput = () => { clearTimeout(badgeTimer); badgeTimer = setTimeout(badgeChanged, 250); };
         el.querySelector('[data-upload]').onclick = () => input.click();
         el.querySelector('[data-remove]').onclick = () => set('');
         el.querySelector('[data-generate]').onclick = generate;
@@ -191,7 +214,7 @@ const QuizCover = (() => {
     }
     function clearCandidate() {
         if (previewUrl) URL.revokeObjectURL(previewUrl);
-        candidate = null; previewUrl = '';
+        candidate = null; baseCandidate = null; previewUrl = ''; composeToken++;
         const preview = editor().querySelector('.quiz-cover-ai-preview');
         preview.hidden = true; preview.querySelector('img').removeAttribute('src');
     }
@@ -214,6 +237,48 @@ const QuizCover = (() => {
         const out = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', 0.92));
         if (!out) throw new Error('Could not crop the AI image');
         return out;
+    }
+    const badgeText = () => editor().querySelector('[data-badge]').value.trim().slice(0, BADGE_MAX);
+    // Top-left chip: navy .88 with white bold text, sized from the image width, padding from the edge.
+    async function withBadge(blob, text) {
+        if (!text) return blob;
+        if (document.fonts && document.fonts.ready) await document.fonts.ready;
+        const bitmap = await createImageBitmap(blob);
+        const canvas = document.createElement('canvas');
+        canvas.width = bitmap.width; canvas.height = bitmap.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(bitmap, 0, 0); bitmap.close();
+        const W = canvas.width, inset = Math.round(W * 0.04);
+        let size = Math.max(10, Math.round(W * 0.052));
+        const font = s => `700 ${s}px Inter, "Segoe UI", Arial, sans-serif`;
+        ctx.font = font(size);
+        while (size > 10 && ctx.measureText(text).width > W * 0.8) ctx.font = font(--size);
+        const padX = Math.round(size * 0.55), padY = Math.round(size * 0.35);
+        const w = Math.ceil(ctx.measureText(text).width) + padX * 2, h = size + padY * 2, r = Math.round(size * 0.35);
+        ctx.fillStyle = 'rgba(27, 42, 78, 0.88)';
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(inset, inset, w, h, r); else ctx.rect(inset, inset, w, h);
+        ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle';
+        ctx.fillText(text, inset + padX, inset + h / 2 + 1);
+        const out = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', 0.92));
+        if (!out) throw new Error('Could not draw the badge');
+        return out;
+    }
+    // Recompose the preview from the un-badged image whenever the badge text changes (no new AI call).
+    async function showCandidate(base) {
+        const token = ++composeToken;
+        const composed = await withBadge(base, badgeText());
+        if (token !== composeToken) return;
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        baseCandidate = base; candidate = composed; previewUrl = URL.createObjectURL(composed);
+        const preview = editor().querySelector('.quiz-cover-ai-preview');
+        preview.querySelector('img').src = previewUrl; preview.hidden = false;
+    }
+    function badgeChanged() {
+        const el = editor();
+        el.querySelector('[data-badge-toggle]').classList.toggle('has-value', !!badgeText());
+        if (baseCandidate && !busy) showCandidate(baseCandidate).catch(error => { el.querySelector('[role=status]').textContent = 'Badge failed: ' + (error.message || 'please retry'); });
     }
     async function generate() {
         if (busy) return;
@@ -250,9 +315,8 @@ const QuizCover = (() => {
                     continue;
                 }
                 if (token !== revision) return;
-                candidate = cropped; previewUrl = URL.createObjectURL(cropped);
-                const preview = el.querySelector('.quiz-cover-ai-preview');
-                preview.querySelector('img').src = previewUrl; preview.hidden = false;
+                await showCandidate(cropped);
+                if (token !== revision) return;
                 status.textContent = (tried.length ? tried[0] + ' blocked this topic (content filter) — made with ' + modelName(id) + '. ' : '') + 'Check the image and text, then Apply — or Generate again to retry';
                 return;
             }
@@ -282,6 +346,7 @@ const QuizCover = (() => {
         const token = ++revision, el = editor();
         busy = true; controls(true); busyCard('Uploading cover…');
         try {
+            if (baseCandidate) await showCandidate(baseCandidate); // badge typed within the debounce still lands
             const url = await upload(candidate);
             if (token === revision) { set(url); el.querySelector('[role=status]').textContent = 'Cover set — Save Quiz to apply'; }
         } catch (error) {
@@ -290,7 +355,7 @@ const QuizCover = (() => {
             if (token === revision) { busy = false; controls(false); busyCard(null); }
         }
     }
-    function controls(disabled) { editor().querySelectorAll('button, [data-prompt]').forEach(b => b.disabled = disabled); }
+    function controls(disabled) { editor().querySelectorAll('button, [data-prompt], [data-badge]').forEach(b => b.disabled = disabled); }
     // V101.53: busy states (generating / uploading) show in the cover card — spinner + seconds — instead
     // of taking a whole status line. The live region still carries the text for screen readers (visually
     // hidden while busy); results and errors keep using the line.
@@ -324,6 +389,12 @@ const QuizCover = (() => {
     function setStyle(value) {
         style = STYLES.some(s => s.id === value) ? value : STYLES[0].id;
         editor().querySelectorAll('[data-style-chip]').forEach(c => { const on = c.dataset.value === style; c.classList.toggle('active', on); c.setAttribute('aria-pressed', String(on)); });
+    }
+    function setBadge(value) {
+        const el = editor(), input = el.querySelector('[data-badge]'), text = String(value || '').trim().slice(0, BADGE_MAX);
+        input.value = text; input.hidden = !text;
+        el.querySelector('[data-badge-toggle]').setAttribute('aria-expanded', String(!!text));
+        el.querySelector('[data-badge-toggle]').classList.toggle('has-value', !!text);
     }
     function decorate(card, quiz, collapsed) {
         const header = card.querySelector('.assign-header'), icon = header && header.firstElementChild;
@@ -374,5 +445,5 @@ const QuizCover = (() => {
         const escaped = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, '&#39;');
         return `<span class="quiz-admin-cover" title="Quiz นี้มีปกแล้ว" data-th-title="Quiz นี้มีปกแล้ว"><img src="${escaped}" alt="Quiz cover" loading="lazy" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span hidden role="img" aria-label="Cover set; preview unavailable" title="มีปกแล้ว แต่โหลดภาพตัวอย่างไม่ได้">🖼️</span></span>`;
     }
-    return { set, setStyle, style: () => style, decorate, adminThumbnail, quickInsert, isBusy: () => busy, value: () => editor().querySelector('[type=hidden]').value };
+    return { set, setStyle, style: () => style, setBadge, badge: badgeText, decorate, adminThumbnail, quickInsert, isBusy: () => busy, value: () => editor().querySelector('[type=hidden]').value };
 })();
