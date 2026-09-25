@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.75)</title>
+    <title>Nika Admin (V101.76)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -7048,6 +7048,8 @@
                             <!-- V97.80: never audited, or audited before the questions changed. -->
                             <button type="button" class="quiz-filter-pill" data-filter="unaudited" onclick="setQuizFilter('unaudited')" title="Never audited, or audited before the questions changed">🧪 NOT AUDITED</button>
                         </div>
+                        <!-- V101.76: exam style rail (quiz.examStyle), filled by renderQuizzes; hidden while no quiz carries a style. -->
+                        <div id="quiz-style-pills" class="lang-no-toggle" style="display:none; gap:6px; align-items:center;"></div>
                         <span style="height:18px; border-left:1px solid #e2e8f0; margin:0 4px;"></span>
                         <span style="font-size:0.65em; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap;">Tags:</span>
                         <!-- V96.58: lang-no-toggle — same Thai-strip fix for the top-tags rail. -->
@@ -12960,6 +12962,13 @@
                                 <label style="font-size:0.75em; color:#4ade80; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; white-space:nowrap;"><i class="fa-solid fa-flag"></i> Campaign</label>
                                 <div id="quiz-campaign-chips" class="glass-toggle-container lang-no-toggle" style="background:rgba(0,0,0,0.3); border:1px solid rgba(74,222,128,0.25); padding:2px; border-radius:8px; display:flex; flex-wrap:wrap; gap:1px;"></div>
                                 <input type="hidden" id="quiz-campaign" value="">
+                            </div>
+                            <!-- V101.76: exam style label (SQM_EXAM_STYLES keys). Set automatically the first
+                                 time an Expand Quiz suggestion is added; populateQuizExamStyleChips() fills it. -->
+                            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #334155;">
+                                <label style="font-size:0.75em; color:#4ade80; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; white-space:nowrap;"><i class="fa-solid fa-graduation-cap"></i> Style</label>
+                                <div id="quiz-exam-style-chips" class="glass-toggle-container lang-no-toggle" style="background:rgba(0,0,0,0.3); border:1px solid rgba(74,222,128,0.25); padding:2px; border-radius:8px; display:flex; flex-wrap:wrap; gap:1px;"></div>
+                                <input type="hidden" id="quiz-exam-style" value="">
                             </div>
                             <div style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #334155;">
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
@@ -19058,6 +19067,7 @@ RULES:
             const focusLabel = focus === 'custom' ? 'CUSTOM (see ADMIN INSTRUCTIONS / SOURCE MATERIAL)' : focus.replace('_', ' ').toUpperCase();
             // V101.75: exam style (Thai PC default keeps the exact old blueprint line).
             const examStyle = window.SQM_EXAM_STYLES[(document.getElementById('suggest-style') || {}).value] || window.SQM_EXAM_STYLES.thai;
+            window._suggestMoreStyle = Object.keys(window.SQM_EXAM_STYLES).find(k => window.SQM_EXAM_STYLES[k] === examStyle); // V101.76: quiz label on Add
             const examStyleLines = examStyle.prompt(n, (document.getElementById('suggest-scope') || {}).value || 'clinical');
             
             const formData = getQuizFormData();
@@ -19199,6 +19209,7 @@ RULES:
 
             try {
                 showToast(" Regenerating with custom focus...");
+                window._suggestMoreStyle = 'thai'; // V101.76: this prompt always uses the Thai PC blueprint line
                 const selectedModel = window._suggestMoreModel || textAIModel('ai-analyzer-model-val'); // V101.34: same model the batch was generated with
                 const { text: resultRaw } = await callUniversalAI(selectedModel, prompt, true, null, '', { feature: 'quiz_suggestion' });
                 // V92.35: use shared safeJsonParse with bracket-extraction fallback
@@ -19257,7 +19268,7 @@ RULES:
                                     <i class="fa-solid fa-copy"></i>
                                 </button>
                                 <button class="btn-sm" title="Add to quiz"
-                                    onclick="addQuestionUI(${qJson}); markAiSuggestionAdded(this); showToast('Question added!');"
+                                    onclick="addQuestionUI(${qJson}); markAiSuggestionAdded(this); autoLabelQuizExamStyle(); showToast('Question added!');"
                                     style="display:inline-flex; align-items:center; gap:10px; padding:8px 18px 8px 8px; border-radius:999px; border:none; cursor:pointer;
                                         background:conic-gradient(from 200deg, #d98b7a, #c98fb0, #8b7bb8, #6f9fc0, #e0b468, #d98b7a);
                                         box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.55), 0 4px 14px rgba(139,123,184,.35);
@@ -22884,6 +22895,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             window._quizEditorLegacySource = q.source ? '' : legacyMarkers.source;
             if (legacyMarkers.found) { document.getElementById('quiz-tags').value = window.stripQuizMarkerTags(window.quizTagList(q)).join(', '); refreshTagChips(); }
             window.populateQuizCampaignChips(q.campaign || legacyMarkers.campaign);
+            window.populateQuizExamStyleChips(q.examStyle || ''); // V101.76
             quizResourceCards.load(q.materials);
             refreshTagChips();
             document.getElementById('quiz-is-poll').checked = q.isPoll || false;
@@ -22977,6 +22989,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             document.getElementById('quiz-tags').value = "";
             window.populateQuizSystemSelect(''); // V101.08
             window._quizEditorLegacySource = ''; window.populateQuizCampaignChips(''); // V101.10
+            window.populateQuizExamStyleChips(''); // V101.76
             quizResourceCards.load([]);
             refreshTagChips();
             document.getElementById('quiz-is-poll').checked = false;
@@ -30857,6 +30870,7 @@ ${JSON.stringify(sourceObj)}`;
             const inactiveGroups = {};
             const searchVal = (document.getElementById('quiz-search-global') ? document.getElementById('quiz-search-global').value : "").toLowerCase();
             const allTags = new Set();
+            const styleCounts = { __none: 0 }; // V101.76: over ALL quizzes, like the tag chips
 
             const matchesSearch = (q) => {
                 if (!searchVal) return true;
@@ -30875,8 +30889,11 @@ ${JSON.stringify(sourceObj)}`;
                 window.quizTagList(q).forEach(t => allTags.add(t)); // V101.15
 
                 // V93.27: apply filter pill + global search to both lists.
+                if (q.examStyle) styleCounts[q.examStyle] = (styleCounts[q.examStyle] || 0) + 1; else styleCounts.__none++; // V101.76
+
                 if (!quizMatchesFilter(q)) return;
                 if (!matchesSearch(q)) return;
+                if (window.currentQuizStyle && (q.examStyle || '__none') !== window.currentQuizStyle) return; // V101.76
 
                 if (isActuallyActive) {
                     activeList.push(q);
@@ -30913,6 +30930,21 @@ ${JSON.stringify(sourceObj)}`;
                 `).join('');
             } else if (chipContainer && searchVal) {
                 chipContainer.innerHTML = `<span class="badge" onclick="document.getElementById('quiz-search-global').value=''; renderQuizzes();" style="background:#fee2e2; color:#ef4444; font-size:0.75em; cursor:pointer; padding:6px 14px; border:1px solid #fecaca; border-radius:10px; font-weight:800; display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-circle-xmark"></i> Clear Search Filter</span>`;
+            }
+
+            // V101.76: exam style rail — All · one pill per style in use · — none.
+            const stylePills = document.getElementById('quiz-style-pills');
+            if (stylePills) {
+                const used = Object.keys(styleCounts).filter(k => k !== '__none');
+                const order = Object.keys(window.SQM_EXAM_STYLES || {});
+                used.sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
+                const cur = window.currentQuizStyle || '';
+                const pill = (k, label) => `<button type="button" class="quiz-filter-pill${cur === k ? ' is-active' : ''}" onclick="setQuizStyleFilter('${escapeHtml(k)}')">${escapeHtml(label)}</button>`;
+                stylePills.style.display = (used.length || cur) ? 'flex' : 'none';
+                stylePills.innerHTML = (used.length || cur)
+                    ? `<span style="height:18px; border-left:1px solid #e2e8f0; margin:0 4px;"></span><span style="font-size:0.65em; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap;">Style:</span>`
+                        + pill('', 'All') + used.map(k => pill(k, `${window.quizExamStyleLabel(k)} (${styleCounts[k]})`)).join('') + pill('__none', `— none (${styleCounts.__none})`)
+                    : '';
             }
 
             // V101.06: tag hygiene summary rides the same pass (counts over ALL of quizzesData).
@@ -31002,6 +31034,7 @@ ${JSON.stringify(sourceObj)}`;
                 // clickable 📎 badge pattern). The quizzes onSnapshot re-render clears it.
                 // Marking AS template stays in the "..." menu — only removal is one-click.
                 const templateLabel = q.isTemplate ? `<div style="margin-top:4px;"><span class="badge" title="Click to remove Template status" data-th-title="คลิกเพื่อยกเลิกสถานะ Template" style="background:orange; color:white; font-size:0.75em; cursor:pointer;" onclick="event.stopPropagation(); toggleTemplateStatus('${q.id}', true)">TEMPLATE ✕</span></div>` : '';
+                const examStyleLabel = q.examStyle ? `<span class="badge" title="Exam style — click to show only this style" onclick="event.stopPropagation(); setQuizStyleFilter('${escapeHtml(q.examStyle)}')" style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; margin-left:5px; cursor:pointer;">${escapeHtml(window.quizExamStyleLabel(q.examStyle))}</span>` : ''; // V101.76
                 const tGroup = q.targetGroup || "Public";
                 const targetGroupLabel = `<span class="badge" style="background:${tGroup === 'Public' ? '#94a3b8' : '#3b82f6'}; color:white; margin-left:5px;"><i class="fa-solid fa-users"></i> ${tGroup}</span>`;
                 // V95.18 Phase 3: flag score-gated quizzes so admin can see which are hidden
@@ -31085,7 +31118,7 @@ ${JSON.stringify(sourceObj)}`;
                             </div>
                             <div style="display:flex; flex-wrap:wrap; gap:3px; align-items:center;">
                                 ${_liveTag} ${modeLabel} ${oneTimeLabel} ${homeworkLabel}
-                                ${pollLabel} ${subjLabel} ${orderingLabel} ${flashcardLabel} ${templateLabel} ${targetGroupLabel} ${unlockLabel} ${materialsLabel} ${clicksLabel} ${notifyLabel} ${systemLabel}
+                                ${pollLabel} ${subjLabel} ${orderingLabel} ${flashcardLabel} ${templateLabel} ${targetGroupLabel} ${examStyleLabel} ${unlockLabel} ${materialsLabel} ${clicksLabel} ${notifyLabel} ${systemLabel}
                             </div>
                             <div style="margin-top:4px;"><small style="color:#999;">(${q.shortTitle || '-'})</small></div>
                         </td>
@@ -31402,11 +31435,19 @@ ${JSON.stringify(sourceObj)}`;
         function setQuizFilter(filterName) {
             window.currentQuizFilter = filterName;
             inactiveQuizPage = 1;
-            document.querySelectorAll('.quiz-filter-pill').forEach(b => {
+            document.querySelectorAll('#quiz-filter-pills .quiz-filter-pill').forEach(b => { // V101.76: scoped — #quiz-style-pills reuses the class
                 b.classList.toggle('is-active', b.dataset.filter === filterName);
             });
             renderQuizzes();
         }
+
+        // V101.76: exam style filter — '' = all, '__none' = unlabelled, else a style key.
+        window.currentQuizStyle = window.currentQuizStyle || '';
+        window.setQuizStyleFilter = function (key) {
+            window.currentQuizStyle = key || '';
+            inactiveQuizPage = 1;
+            renderQuizzes();
+        };
 
         function setQuizSort(sortValue) {
             window.currentQuizSort = sortValue;
@@ -61467,6 +61508,30 @@ RULES:
             window.populateQuizCampaignChips(el.dataset.value || '');
         };
 
+        // V101.76: exam style label. `examStyle` is a SQM_EXAM_STYLES key ('thai' |
+        // 'pebc1' | 'pebc2' | 'opra'); absent = unlabelled. Unknown keys still show as-is.
+        window.quizExamStyleLabel = key => {
+            const s = key && (window.SQM_EXAM_STYLES || {})[key];
+            return s ? `${s.flag} ${s.label}` : String(key || '');
+        };
+        window.populateQuizExamStyleChips = function (value) {
+            const rail = document.getElementById('quiz-exam-style-chips');
+            const hidden = document.getElementById('quiz-exam-style');
+            if (!rail || !hidden) return;
+            const current = value || '';
+            hidden.value = current;
+            const keys = Object.keys(window.SQM_EXAM_STYLES || {});
+            if (current && !keys.includes(current)) keys.push(current);
+            const chip = (v, label) => `<div class="glass-toggle-item${current === v ? ' active' : ''}" data-value="${escapeHtml(v)}" onclick="populateQuizExamStyleChips(this.dataset.value)" style="font-size:0.7em; font-weight:800; padding:3px 10px; border-radius:6px; cursor:pointer;">${escapeHtml(label)}</div>`;
+            rail.innerHTML = chip('', 'None') + keys.map(k => chip(k, window.quizExamStyleLabel(k))).join('');
+        };
+        // Called when an Expand Quiz suggestion is added: label an unlabelled quiz with
+        // the style the batch was generated in. Never overrides a chosen style.
+        window.autoLabelQuizExamStyle = function () {
+            const hidden = document.getElementById('quiz-exam-style');
+            if (hidden && !hidden.value && window._suggestMoreStyle) window.populateQuizExamStyleChips(window._suggestMoreStyle);
+        };
+
         // V101.10: one-shot migration for docs that still carry markers as tags —
         // writes source / campaign (never overwriting an existing field) and drops
         // the marker tags. Offered from the Tag hygiene panel while any remain.
@@ -61606,6 +61671,8 @@ RULES:
             // V101.10: campaign + provenance ride the same merge (marker helpers above).
             const campaign = (document.getElementById('quiz-campaign')?.value || '').trim();
             if (campaign) fields.campaign = campaign; else if (forUpdate) fields.campaign = firebase.firestore.FieldValue.delete();
+            const examStyle = (document.getElementById('quiz-exam-style')?.value || '').trim(); // V101.76
+            if (examStyle) fields.examStyle = examStyle; else if (forUpdate) fields.examStyle = firebase.firestore.FieldValue.delete();
             if (window._quizEditorLegacySource) fields.source = window._quizEditorLegacySource;
             return fields;
         };
