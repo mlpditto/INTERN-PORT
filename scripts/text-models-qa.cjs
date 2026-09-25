@@ -104,7 +104,9 @@ const { chromium } = require('playwright');
             imageQuizRenderModelRail();
         });
         assert.equal(await page.locator('#dynamic-model-tests .text-ai-chips').count(), 2);
-        assert.equal(await page.locator('#img-quiz-model-rail button').count(), ids.length);
+        // V101.70: the image rail drops text-only models (DeepSeek) — they cannot see the image.
+        assert.equal(await page.locator('#img-quiz-model-rail button').count(), ids.filter(id => !id.startsWith('or/deepseek/')).length);
+        assert.equal(await page.locator('#img-quiz-model-rail button[onclick*="deepseek"]').count(), 0);
         // V101.69: image → quiz defaults to GPT-6 Sol — Luna 6 cannot transcribe Thai from images.
         assert.deepEqual(await page.locator('#img-quiz-model-rail button[aria-pressed="true"]').evaluateAll(bs => bs.map(b => b.getAttribute('onclick'))), ["imageQuizToggleModel('gpt-6-sol')"]);
         await page.locator('#dynamic-model-tests .text-ai-chips').first().locator('[data-value="claude-haiku-4-5"]').evaluate(b => b.click());

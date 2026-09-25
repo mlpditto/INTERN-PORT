@@ -32,6 +32,8 @@
     // V101.57: Gemini called directly (Vertex, or AI Studio `as/`) is billed to the Google Cloud
     // billing account; `or/google/…` is billed by OpenRouter. The chip shows it (text-ai-chips.css).
     window.isGoogleBilledModel = id => /^(gemini-|as\/)/.test(String(id || ''));
+    // V101.70: DeepSeek V4 takes text only (OpenRouter lists no image input), so image features hide it.
+    window.isTextOnlyAIModel = id => /^or\/deepseek\//.test(String(id || ''));
     // V101.64: GPT-6 Luna/Sol replace 5.6, DeepSeek V4 Pro moves to its 0813 GA snapshot — saved picks move to their successor, not to the default.
     const RETIRED_TEXT_AI_MODELS = { 'gpt-5.6-luna': 'gpt-6-luna', 'gpt-5.6-sol': 'gpt-6-sol', 'or/deepseek/deepseek-v4-pro': 'or/deepseek/deepseek-v4-pro-0813' };
     window.normalizeTextAIModel = value => { value = RETIRED_TEXT_AI_MODELS[value] || value; return models.some(m => m.id === value) ? value : 'gpt-6-luna'; };
