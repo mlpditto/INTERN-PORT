@@ -32,6 +32,7 @@
         return JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item)
             ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
     }
+    const RAIL_FOLD_KEY = 'quiz_curate_rail_folded';
     function node(tag, text, className) {
         const el = document.createElement(tag); if (text !== undefined) el.textContent = text;
         if (className) el.className = className; return el;
@@ -196,9 +197,9 @@
         dialog = document.createElement('dialog');
         dialog.id = 'quiz-curate-dialog'; dialog.className = 'lang-no-toggle';
         dialog.setAttribute('aria-labelledby', 'curate-heading');
-        dialog.innerHTML = `<div class="curate-head"><div><div class="curate-kicker">QUIZ EDITOR / AI TOOLS</div><h2 id="curate-heading">✦ AI Curate</h2><div id="curate-source"></div></div><span id="curate-model" title="ใช้โมเดลที่เลือกใน Intelligence"></span><button type="button" class="curate-close" aria-label="Close AI Curate" title="ปิดการคัดข้อสอบ">×</button></div>
-            <div class="curate-main"><div class="curate-controls"><label><span id="curate-total"></span> → Keep <input id="curate-target" type="number" min="1" aria-label="Number of questions to keep" title="จำนวนข้อที่ต้องการเก็บไว้"></label><div class="curate-modes" role="group" aria-label="Selection strategy"><button type="button" data-mode="balanced" aria-pressed="true" title="รักษาความครอบคลุมหัวข้อและลดความซ้ำ">Balanced</button><button type="button" data-mode="quality" aria-pressed="false" title="เน้นความชัดเจนและคุณภาพของแต่ละข้อ">Best quality</button><button type="button" data-mode="duplicates" aria-pressed="false" title="เลือกตัวแทนของข้อที่วัดประเด็นเดียวกัน">Less overlap</button></div><button type="button" id="curate-suggest" class="curate-primary" title="ให้ AI เสนอชุดข้อสอบตามจำนวนและข้อที่ปักหมุด">✦ Suggest</button></div>
-            <details class="curate-instructions"><summary title="เพิ่มเงื่อนไขให้ AI ใช้คัดข้อสอบ">Instructions · optional</summary><textarea id="curate-instructions" maxlength="4000" aria-label="Curation instructions" placeholder="e.g. Prioritize clinical application and retain all key topics."></textarea></details>
+        dialog.innerHTML = `<div class="curate-head"><div><div class="curate-kicker">QUIZ EDITOR / AI TOOLS</div><h2 id="curate-heading">✦ AI Curate</h2><div id="curate-source"></div></div><button type="button" class="curate-close" aria-label="Close AI Curate" title="ปิดการคัดข้อสอบ">×</button></div>
+            <div class="curate-main"><div class="curate-controls"><span class="curate-keep"><span id="curate-total"></span> → Keep <span class="curate-step"><button type="button" data-step="-1" aria-label="Keep one fewer" title="ลดจำนวนข้อที่เก็บ">−</button><input id="curate-target" type="number" min="1" aria-label="Number of questions to keep" title="จำนวนข้อที่ต้องการเก็บไว้"><button type="button" data-step="1" aria-label="Keep one more" title="เพิ่มจำนวนข้อที่เก็บ">+</button></span></span><div class="curate-modes" role="group" aria-label="Selection strategy"><button type="button" data-mode="balanced" aria-pressed="true" title="รักษาความครอบคลุมหัวข้อและลดความซ้ำ">Balanced</button><button type="button" data-mode="quality" aria-pressed="false" title="เน้นความชัดเจนและคุณภาพของแต่ละข้อ">Best quality</button><button type="button" data-mode="duplicates" aria-pressed="false" title="เลือกตัวแทนของข้อที่วัดประเด็นเดียวกัน">Less overlap</button></div><button type="button" id="curate-suggest" class="curate-primary" title="ให้ AI เสนอชุดข้อสอบตามจำนวนและข้อที่ปักหมุด">✦ Suggest</button></div>
+            <details class="curate-instructions"><summary title="เพิ่มเงื่อนไขให้ AI ใช้คัดข้อสอบ (ไม่บังคับ)">✏️ Instructions</summary><textarea id="curate-instructions" maxlength="4000" aria-label="Curation instructions" placeholder="e.g. Prioritize clinical application and retain all key topics."></textarea></details>
             <div class="curate-review"><div class="curate-review-head"><div class="curate-tabs" role="group" aria-label="Proposed selection"><button type="button" data-view="keep" aria-pressed="true" title="ข้อที่เก็บไว้">Keep</button><button type="button" data-view="remove" aria-pressed="false" title="ข้อที่เสนอให้ตัด">Remove</button></div><span id="curate-coverage"></span></div><div id="curate-proposal-label"></div><div id="curate-rows"></div></div>
             <div class="curate-footer"><div id="curate-feedback" role="status" aria-live="polite"></div><button type="button" id="curate-save" class="curate-primary" title="บันทึกเป็นชุดใหม่ที่ยังไม่เปิดใช้งาน โดยต้นฉบับยังอยู่ครบ">Save as new quiz</button></div><div class="curate-note">New quizzes are saved inactive. Original questions and attempts are preserved.</div></div>`;
         document.body.append(dialog);
@@ -212,7 +213,32 @@
                 state.model = chip.dataset.model; state.needsSuggestion = true; state.done = false; state.message = ''; render();
             };
         });
-        dialog.querySelector('.curate-controls').before(models);
+        // V101.94: rail + controls share one card. ▴ folds the rail to one chip (logo + model) at the start of
+        // the controls row; the choice is remembered per browser. #curate-model is that chip's name.
+        const controls = dialog.querySelector('.curate-controls');
+        const card = node('div', undefined, 'curate-card'); controls.before(card);
+        const foldRail = node('button', '▴', 'curate-rail-fold'); foldRail.type = 'button';
+        foldRail.setAttribute('aria-label', 'Fold the model list'); foldRail.title = 'พับแถวโมเดลให้เหลือชิปเดียว';
+        models.append(foldRail);
+        const modelChip = node('button', undefined, 'curate-model-chip'); modelChip.type = 'button'; modelChip.id = 'curate-model-chip';
+        modelChip.innerHTML = '<span class="curate-model-logo"></span><span id="curate-model"></span> ▾';
+        modelChip.title = 'กดเพื่อเลือกโมเดลอื่น';
+        controls.prepend(modelChip);
+        card.append(models, controls);
+        const setFolded = folded => {
+            card.classList.toggle('folded', folded);
+            modelChip.setAttribute('aria-expanded', String(!folded));
+            try { localStorage.setItem(RAIL_FOLD_KEY, folded ? '1' : '0'); } catch (_) {}
+        };
+        foldRail.onclick = () => { setFolded(true); modelChip.focus(); };
+        modelChip.onclick = () => setFolded(false);
+        try { card.classList.toggle('folded', localStorage.getItem(RAIL_FOLD_KEY) === '1'); } catch (_) {}
+        modelChip.setAttribute('aria-expanded', String(!card.classList.contains('folded')));
+        dialog.querySelectorAll('[data-step]').forEach(button => button.onclick = () => {
+            const input = byId('curate-target');
+            const next = Math.min(Number(input.max) || Infinity, Math.max(1, Math.round(Number(input.value) || 0) + Number(button.dataset.step)));
+            input.value = next; input.oninput();
+        });
         const comparison = node('div'); comparison.id = 'curate-comparison'; comparison.hidden = true;
         dialog.querySelector('.curate-review').after(comparison);
         const backupOption = node('label'); backupOption.className = 'curate-backup-option';
@@ -237,10 +263,11 @@
             state.needsSuggestion = true; state.done = false; state.message = ''; render();
         });
         const history = node('details'); history.id = 'curate-history';
-        history.innerHTML = '<summary title="ประวัติผล AI ล่าสุด สูงสุด 5 รอบ">History</summary><div id="curate-history-list"></div>';
-        dialog.querySelector('.curate-controls').after(history);
+        history.innerHTML = '<summary title="ประวัติผล AI ล่าสุด สูงสุด 5 รอบ">🕘 History</summary><div id="curate-history-list"></div>';
+        // V101.94: Instructions · History · status sit on one small line under the card; an opened one wraps full width.
+        const foot = node('div', undefined, 'curate-foot'); card.after(foot);
         const status = node('div'); status.id = 'curate-history-status'; status.setAttribute('role', 'status');
-        history.before(status);
+        foot.append(dialog.querySelector('.curate-instructions'), history, status);
         byId('curate-suggest').onclick = () => suggest();
         byId('curate-save').onclick = () => save(false);
         apply.onclick = () => save(true);
@@ -252,8 +279,10 @@
         const focusedAction = focusedRow && { id: focusedRow.dataset.questionId, selector: document.activeElement.classList.contains('curate-pin') ? '.curate-pin' : '.curate-move' };
         const count = s.source.form.questions.length;
         dialog.setAttribute('aria-busy', String(s.busy || s.saving));
-        byId('curate-model').textContent = (window.TEXT_AI_MODELS.find(m => m.id === s.model)?.label || s.model);
-        byId('curate-model').title = 'เปลี่ยนโมเดลได้จากแถว chips ด้านล่าง ก่อนกด Suggest';
+        const modelInfo = window.TEXT_AI_MODELS.find(m => m.id === s.model);
+        byId('curate-model').textContent = modelInfo?.short || modelInfo?.label || s.model;
+        byId('curate-model-chip').setAttribute('aria-label', 'Model: ' + (modelInfo?.label || s.model) + ' — show all models');
+        byId('curate-model-chip').querySelector('.curate-model-logo').innerHTML = window.aiModelLogoHtml ? window.aiModelLogoHtml(s.model) : '';
         dialog.querySelectorAll('[data-model]').forEach(chip => chip.setAttribute('aria-pressed', String(chip.dataset.model === s.model)));
         dialog.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === s.mode)));
         dialog.querySelectorAll('[data-view]').forEach(b => {
