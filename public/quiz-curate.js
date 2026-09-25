@@ -202,9 +202,10 @@
             <div class="curate-review"><div class="curate-review-head"><div class="curate-tabs" role="group" aria-label="Proposed selection"><button type="button" data-view="keep" aria-pressed="true" title="ข้อที่เก็บไว้">Keep</button><button type="button" data-view="remove" aria-pressed="false" title="ข้อที่เสนอให้ตัด">Remove</button></div><span id="curate-coverage"></span></div><div id="curate-proposal-label"></div><div id="curate-rows"></div></div>
             <div class="curate-footer"><div id="curate-feedback" role="status" aria-live="polite"></div><button type="button" id="curate-save" class="curate-primary" title="บันทึกเป็นชุดใหม่ที่ยังไม่เปิดใช้งาน โดยต้นฉบับยังอยู่ครบ">Save as new quiz</button></div><div class="curate-note">New quizzes are saved inactive. Original questions and attempts are preserved.</div></div>`;
         document.body.append(dialog);
-        const models = node('div', undefined, 'curate-models'); models.id = 'curate-models'; models.setAttribute('role', 'group'); models.setAttribute('aria-label', 'AI model');
-        models.innerHTML = window.textAIChipContents(null);
-        models.querySelectorAll('button').forEach(chip => {
+        // V101.88: shared provider-logo rail (Expand Quiz / audit toolbar) — logo tabs + name-only chips.
+        const models = node('div', undefined, 'curate-models audit-toolbar'); models.id = 'curate-models';
+        models.innerHTML = window.providerModelRailHtml('curate-model-val', null, '');
+        models.querySelectorAll('.text-ai-chips > button').forEach(chip => {
             chip.dataset.model = chip.dataset.value;
             chip.onclick = () => {
                 if (!state || state.busy || state.saving || state.saved) return;
@@ -338,6 +339,9 @@
             busy: false, saving: false, saved: false, stale: false, needsSuggestion: true, proposal: null, message: '' };
         if (source.sourceId) state.serverBaseline = db.collection('quizzes').doc(source.sourceId).get({ source: 'server' })
             .then(doc => ({ exists: doc.exists, data: doc.exists ? doc.data() : null }), error => ({ error }));
+        const provider = (window.TEXT_AI_MODELS.find(m => m.id === state.model)?.label || '').split(' ')[0];
+        const providerTab = dialog.querySelector(`.audit-provider[data-provider="${provider}"]`);
+        if (providerTab) window.browseAuditProvider(providerTab); // open on the current model's provider
         byId('curate-source').textContent = (source.form.title || 'Untitled quiz') + ' · ' + source.form.questions.length + ' questions';
         byId('curate-total').textContent = source.form.questions.length;
         byId('curate-target').max = source.form.questions.length;
