@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.73)</title>
+    <title>Nika Admin (V101.74)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -4991,6 +4991,29 @@
         .qe-quiet.qe-tool-curate > span[aria-hidden] { color:#c084fc; }
         .qe-quiet.qe-tool-translate > i:first-child { color:#34d399; }
         .qe-divider { width:1px; height:22px; background:#3a4560; margin:0 2px; flex:0 0 auto; }
+        /* V101.74: Expand Quiz modal — inline labels, chips, provider-logo rail, one summarising button. */
+        #ai-suggest-config-modal .sqm-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+        #ai-suggest-config-modal .sqm-head h3 { margin:0; color:#7c3aed; font-size:1.1em; display:flex; align-items:center; gap:8px; }
+        #ai-suggest-config-modal .sqm-close { width:30px; height:30px; min-height:30px; padding:0; border:none; border-radius:50%; background:#f1f5f9; color:#64748b; cursor:pointer; }
+        #ai-suggest-config-modal .sqm-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:12px; }
+        #ai-suggest-config-modal .sqm-lb { font-size:0.72em; color:#94a3b8; min-width:48px; }
+        #ai-suggest-config-modal .sqm-chip { width:auto; min-height:32px; padding:5px 11px; border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc; color:#334155; font-size:0.8em; font-weight:600; cursor:pointer; }
+        #ai-suggest-config-modal .sqm-chip.on { background:#7c3aed; border-color:#7c3aed; color:#fff; }
+        #ai-suggest-config-modal .sqm-num { width:64px; padding:6px 8px; border:1.5px solid #c4b5fd; border-radius:8px; font-weight:700; text-align:center; }
+        #ai-suggest-config-modal .sqm-seg { display:inline-flex; background:#f1f5f9; border-radius:10px; padding:2px; }
+        #ai-suggest-config-modal .sqm-seg button { width:auto; min-height:30px; padding:5px 12px; border:none; border-radius:8px; background:transparent; color:#64748b; font-size:0.8em; font-weight:700; cursor:pointer; }
+        #ai-suggest-config-modal .sqm-seg button.on { background:#fff; color:#1e293b; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+        #ai-suggest-config-modal .sqm-rail { flex:1; min-width:0; margin:0; padding:5px 6px; }
+        #ai-suggest-config-modal .sqm-rail .audit-model-row { margin-top:0; padding-top:0; border-top:0; gap:5px; }
+        #ai-suggest-config-modal .sqm-custom { margin-top:8px; }
+        #ai-suggest-config-modal .sqm-custom textarea { width:100%; box-sizing:border-box; padding:8px 10px; border:1.5px solid #c4b5fd; border-radius:10px; background:#faf5ff; font:inherit; font-size:0.85em; line-height:1.5; resize:vertical; }
+        #ai-suggest-config-modal .sqm-warn, #ai-suggest-config-modal .sqm-need { margin-top:5px; padding:4px 8px; border-radius:7px; font-size:0.75em; }
+        #ai-suggest-config-modal .sqm-warn { background:#fef3c7; border:1px solid #fcd34d; color:#92400e; }
+        #ai-suggest-config-modal .sqm-need { background:#fee2e2; border:1px solid #fca5a5; color:#991b1b; }
+        #ai-suggest-config-modal .sqm-warn[hidden], #ai-suggest-config-modal .sqm-need[hidden], #ai-suggest-config-modal .sqm-custom[hidden], #ai-suggest-config-modal .sqm-num[hidden] { display:none; }
+        #ai-suggest-config-modal .sqm-go { width:100%; margin-top:16px; padding:11px 14px; border:none; border-radius:14px; background:linear-gradient(135deg,#7c3aed,#9b59b6); color:#fff; font-weight:800; font-size:0.95em; cursor:pointer; }
+        #ai-suggest-config-modal .sqm-go small { display:block; margin-top:2px; font-size:0.78em; font-weight:500; opacity:0.85; }
+        @media (pointer:coarse) { #ai-suggest-config-modal .sqm-chip, #ai-suggest-config-modal .sqm-seg button { min-height:44px; } }
         /* Translate is now the row's last item: anchor its popover to the row's right edge, capped at the row width,
            so it never runs past the modal (anchored under the button it overflowed by ~400px). */
         #quiz-editor-review-actions { position:relative; }
@@ -17966,20 +17989,25 @@
                 b.hidden = !b.getAttribute('aria-label').startsWith(button.dataset.provider + ' ');
             });
         };
+        // V101.74: provider-logo tabs + name-only chips for one hidden model input — shared by the
+        // Scorecard/Rewrites toolbar and the Expand Quiz modal (same markup either way).
+        window.providerModelRailHtml = function(inputId, selected, action, extra = []) {
+            const provider = (([...TEXT_AI_MODELS, ...extra].find(m => m.id === selected) || TEXT_AI_MODELS[0]).label || '').split(' ')[0];
+            // V101.52: trial models (Grok) are offered here only; picking one never becomes the Settings default.
+            // V101.65: the provider tab carries the logo, so the chips here are names only.
+            const chips = textAIChipContents(selected, action, null, extra).replace(/<span class="text-ai-provider"[^>]*>.*?<\/span>/g, '').replace(/<span class="text-ai-logo"[^>]*><\/span>/g, '').replace(/<button /g, '<button hidden ' ).replace(new RegExp('hidden ([^>]*aria-label="' + provider + ' )', 'g'), '$1');
+            const providerLogo = { Gemini: 'gemini', GPT: 'openai', Claude: 'claude', Qwen: 'qwen', DeepSeek: 'deepseek', Grok: 'grok' };
+            // V101.21: tabs follow TEXT_AI_MODELS (first word of each label, in order) — the
+            // hard-coded three left the Qwen / DeepSeek chips (V101.05) permanently hidden.
+            const providers = [...new Set([...TEXT_AI_MODELS, ...extra].map(m => m.label.split(' ')[0]))];
+            return `<div class="audit-model-row"><input type="hidden" id="${inputId}" value="${selected}"><div class="audit-providers" role="group" aria-label="Browse model providers">${providers.map(p => `<button type="button" class="audit-provider" data-provider="${p}" aria-pressed="${p === provider}" aria-label="${p}" title="${p} models · pick one to switch" data-th-title="รุ่นของ ${p} · กดเลือกรุ่นเพื่อเปลี่ยนโมเดล" onclick="browseAuditProvider(this)">${providerLogo[p] ? `<span class="text-ai-logo" data-owner="${providerLogo[p]}" aria-hidden="true"></span>` : p}</button>`).join('')}</div><div class="text-ai-chips" role="group" aria-label="AI model">${chips}</div></div>`;
+        };
         window.auditModelControlsHtml = function(hasResult, mode = 'audit') {
             const isAudit = mode === 'audit';
             const inputId = isAudit ? 'quality-audit-model' : 'rewrite-ai-model';
             const selected = isAudit ? 'gpt-6-luna' : textAIModel('ai-analyzer-model-val');
-            const provider = TEXT_AI_MODELS.find(m => m.id === selected).label.split(' ')[0];
             const action = `document.getElementById('${inputId}').value=this.dataset.value;this.parentElement.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b===this);b.setAttribute('aria-pressed',String(b===this))});this.closest('.audit-toolbar').querySelector('.audit-run').title='ใช้ '+this.getAttribute('aria-label')+' ทำงานนี้'` + (isAudit ? ';syncAuditFixHints()' : ";if(!isTrialTextAIModel(this.dataset.value))syncModelDefault('ai-analyzer-model-val',this.dataset.value)");
-            // V101.52: trial models (Grok) are offered here only; picking one never becomes the Settings default.
-            // V101.65: the provider tab carries the logo, so the chips here are names only.
-            const chips = textAIChipContents(selected, action, null, TEXT_AI_TRIAL_MODELS).replace(/<span class="text-ai-provider"[^>]*>.*?<\/span>/g, '').replace(/<span class="text-ai-logo"[^>]*><\/span>/g, '').replace(/<button /g, '<button hidden ' ).replace(new RegExp('hidden ([^>]*aria-label="' + provider + ' )', 'g'), '$1');
-            const providerLogo = { Gemini: 'gemini', GPT: 'openai', Claude: 'claude', Qwen: 'qwen', DeepSeek: 'deepseek', Grok: 'grok' };
-            // V101.21: tabs follow TEXT_AI_MODELS (first word of each label, in order) — the
-            // hard-coded three left the Qwen / DeepSeek chips (V101.05) permanently hidden.
-            const providers = [...new Set([...TEXT_AI_MODELS, ...TEXT_AI_TRIAL_MODELS].map(m => m.label.split(' ')[0]))];
-            return `<div class="audit-model-row"><input type="hidden" id="${inputId}" value="${selected}"><div class="audit-providers" role="group" aria-label="Browse model providers">${providers.map(p => `<button type="button" class="audit-provider" data-provider="${p}" aria-pressed="${p === provider}" aria-label="${p}" title="${p} models · pick one to switch" data-th-title="รุ่นของ ${p} · กดเลือกรุ่นเพื่อเปลี่ยนโมเดล" onclick="browseAuditProvider(this)">${providerLogo[p] ? `<span class="text-ai-logo" data-owner="${providerLogo[p]}" aria-hidden="true"></span>` : p}</button>`).join('')}</div><div class="text-ai-chips" role="group" aria-label="AI model">${chips}</div></div>`;
+            return window.providerModelRailHtml(inputId, selected, action, TEXT_AI_TRIAL_MODELS);
         };
         window.auditToolbarHtml = function(hasResult, mode = 'audit', allowExport = false) {
             const isAudit = mode === 'audit';
@@ -18847,75 +18875,98 @@ RULES:
         window.openSuggestMoreModal = function() {
             const modal = document.createElement('div');
             modal.id = 'ai-suggest-config-modal';
-            modal.style = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:400px; background:white; padding:25px; border-radius:24px; box-shadow:0 15px 50px rgba(0,0,0,0.25); z-index:10005; font-family:'Inter', sans-serif; border: 1px solid #eee;";
+            modal.className = 'lang-no-toggle';
+            modal.style = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:min(420px, calc(100vw - 24px)); max-height:92vh; overflow-y:auto; box-sizing:border-box; background:white; padding:18px 20px; border-radius:22px; box-shadow:0 15px 50px rgba(0,0,0,0.25); z-index:10005; font-family:'Inter', sans-serif;";
             
+            // V101.74: lean pass (mockup "After") — inline mini-labels instead of uppercase headings, count chips
+            // (± opens the number box), provider-logo model rail (providerModelRailHtml, one row instead of five),
+            // Focus chips incl. ✏️ Custom (own instructions and/or pasted source text), one summarising button.
+            // Ids read by suggestMoreQuestionsAI are unchanged: suggest-n, suggest-diff, suggest-focus,
+            // suggest-more-model, btn-suggest-start; new: suggest-custom.
+            const sqmModel = textAIModel('ai-analyzer-model-val');
+            const sqmAction = "document.getElementById('suggest-more-model').value=this.dataset.value;this.parentElement.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b===this);b.setAttribute('aria-pressed',String(b===this))});sqmSummary()";
+            const sqmFocus = [['new_topics', '🧭 New topics', 'Explore new related topics'], ['critical_thinking', '🧠 Reasoning', 'Critical thinking and analysis'], ['real_world', '🏥 Real-world', 'Real-world application scenarios'], ['different_styles', '🔀 Mixed', 'Mix different question types'], ['custom', '✏️ Custom', 'Your own instructions, or paste text from a source to write questions from']];
             modal.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                    <h3 style="margin:0; color:#8e44ad; display:flex; align-items:center; gap:10px;">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> Expand Quiz
-                    </h3>
-                    <button onclick="this.parentElement.parentElement.remove()" style="border:none; background:#f1f5f9; color:#64748b; width:30px; height:30px; border-radius:50%; cursor:pointer;">✕</button>
+                <div class="sqm-head">
+                    <h3><i class="fa-solid fa-wand-magic-sparkles"></i> Expand quiz</h3>
+                    <button type="button" class="sqm-close" onclick="this.closest('#ai-suggest-config-modal').remove()" aria-label="Close" title="Close">✕</button>
                 </div>
-                
-                <div style="margin-bottom:15px;">
-                    <label style="display:block; font-size:0.7em; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">How many more questions?</label>
-                    <div style="display:flex; gap:10px; align-items:center;">
-                        <input type="number" id="suggest-n" value="3" min="1" max="10" style="flex:1; padding:12px; border:1.5px solid #e2e8f0; border-radius:12px; font-weight:800; text-align:center; font-size:1.1em; color:#1e293b;">
-                        <div style="display:flex; gap:5px; flex:2;">
-                            <button onclick="document.getElementById('suggest-n').value=1" style="flex:1; border:1px solid #e2e8f0; background:#f8fafc; border-radius:10px; font-size:0.75em; font-weight:700; cursor:pointer; padding:8px;">1</button>
-                            <button onclick="document.getElementById('suggest-n').value=3" style="flex:1; border:1px solid #e2e8f0; background:#f8fafc; border-radius:10px; font-size:0.75em; font-weight:700; cursor:pointer; padding:8px;">3</button>
-                            <button onclick="document.getElementById('suggest-n').value=5" style="flex:1; border:1px solid #e2e8f0; background:#f8fafc; border-radius:10px; font-size:0.75em; font-weight:700; cursor:pointer; padding:8px;">5</button>
-                        </div>
-                    </div>
+                <div class="sqm-row"><span class="sqm-lb">Add</span>
+                    ${[1, 3, 5, 10].map(v => `<button type="button" class="sqm-chip sqm-n${v === 3 ? ' on' : ''}" aria-pressed="${v === 3}" onclick="sqmSetCount(this, ${v})">${v}</button>`).join('')}
+                    <button type="button" class="sqm-chip" onclick="sqmToggleCustomCount(this)" title="Type another number (1–10)" aria-label="Type another number" aria-expanded="false">±</button>
+                    <input type="number" id="suggest-n" value="3" min="1" max="10" class="sqm-num" hidden oninput="sqmCountTyped()" aria-label="Number of questions">
                 </div>
-
-                <div style="margin-bottom:15px;">
-                    <label style="display:block; font-size:0.7em; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Target Difficulty</label>
-                    <div style="display:flex; gap:5px; background:#f1f5f9; padding:4px; border-radius:14px;">
-                        <button class="sq-diff-btn" data-val="easy" style="flex:1; border:none; background:white; padding:10px; border-radius:10px; font-size:0.8em; font-weight:800; cursor:pointer; transition:all 0.2s; box-shadow:0 2px 4px rgba(0,0,0,0.05);" onclick="setSqDiff(this, 'easy')">Easy</button>
-                        <button class="sq-diff-btn" data-val="medium" style="flex:1; border:none; background:transparent; padding:10px; border-radius:10px; font-size:0.8em; font-weight:800; cursor:pointer; color:#64748b;" onclick="setSqDiff(this, 'medium')">Medium</button>
-                        <button class="sq-diff-btn" data-val="hard" style="flex:1; border:none; background:transparent; padding:10px; border-radius:10px; font-size:0.8em; font-weight:800; cursor:pointer; color:#64748b;" onclick="setSqDiff(this, 'hard')">Hard</button>
+                <div class="sqm-row"><span class="sqm-lb">Level</span>
+                    <div class="sqm-seg" role="group" aria-label="Difficulty">
+                        <button type="button" class="sq-diff-btn on" data-val="easy" onclick="setSqDiff(this, 'easy')">Easy</button>
+                        <button type="button" class="sq-diff-btn" data-val="medium" onclick="setSqDiff(this, 'medium')">Medium</button>
+                        <button type="button" class="sq-diff-btn" data-val="hard" onclick="setSqDiff(this, 'hard')">Hard</button>
                     </div>
                     <input type="hidden" id="suggest-diff" value="easy">
                 </div>
-
-                <!-- V101.34: this modal used to read the toolbar rail; the rail is gone, so it carries its own (seeded from the Settings default). -->
-                <div style="margin-bottom:15px;">
-                    <label style="display:block; font-size:0.7em; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Model</label>
-                    ${window.textAIChipsHtml('suggest-more-models', textAIModel('ai-analyzer-model-val'), "document.getElementById('suggest-more-model').value=this.dataset.value;this.parentElement.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b===this);b.setAttribute('aria-pressed',String(b===this))})")}
-                    <input type="hidden" id="suggest-more-model" value="${textAIModel('ai-analyzer-model-val')}">
+                <div class="sqm-row"><span class="sqm-lb">Model</span>
+                    <div class="audit-toolbar sqm-rail lang-no-toggle">${window.providerModelRailHtml('suggest-more-model', sqmModel, sqmAction)}</div>
                 </div>
-
-                <div style="margin-bottom:25px;">
-                    <label style="display:block; font-size:0.7em; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Variety Focus</label>
-                    <select id="suggest-focus" style="width:100%; padding:12px; border:1.5px solid #e2e8f0; border-radius:14px; font-size:0.9em; font-weight:600; background:white; color:#1e293b; outline:none; cursor:pointer;">
-                        <option value="new_topics">Explore New Related Topics</option>
-                        <option value="critical_thinking">Critical Thinking & Analysis</option>
-                        <option value="real_world">Real-world Application Scenarios</option>
-                        <option value="different_styles">Mix Different Question Types</option>
-                    </select>
+                <div class="sqm-row"><span class="sqm-lb">Focus</span>
+                    ${sqmFocus.map(([v, label, title], i) => `<button type="button" class="sqm-chip sqm-focus${i === 0 ? ' on' : ''}" aria-pressed="${i === 0}" data-val="${v}" title="${title}" onclick="sqmSetFocus(this)">${label}</button>`).join('')}
+                    <input type="hidden" id="suggest-focus" value="new_topics">
                 </div>
-
-                <div style="display:flex; gap:12px;">
-                    <button onclick="this.parentElement.parentElement.remove()" style="flex:1; padding:14px; border:none; background:#f1f5f9; border-radius:16px; font-weight:700; color:#64748b; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#e2e8f0'">Cancel</button>
-                    <button onclick="suggestMoreQuestionsAI()" id="btn-suggest-start" style="flex:2; padding:14px; border:none; background:linear-gradient(135deg, #8e44ad, #9b59b6); color:white; border-radius:16px; font-weight:800; cursor:pointer; box-shadow:0 10px 25px rgba(142,68,173,0.3); transition:all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'">
-                        Generate Suggestions
-                    </button>
+                <div class="sqm-custom" hidden>
+                    <textarea id="suggest-custom" rows="4" maxlength="6000" oninput="sqmCustomTyped()" placeholder="Extra instructions, e.g. focus on renal dose adjustment — and/or paste text from a source to write the questions from" aria-label="Custom focus: instructions or source text"></textarea>
+                    <div class="sqm-need" hidden>Type instructions or paste source text first.</div>
+                    <div class="sqm-warn" hidden>⚠ AI won't open links — paste the text from that page instead.</div>
                 </div>
+                <button type="button" onclick="suggestMoreQuestionsAI()" id="btn-suggest-start" class="sqm-go"></button>
             `;
             document.body.appendChild(modal);
+            sqmSummary();
         };
 
         window.setSqDiff = function(btn, val) {
-            document.querySelectorAll('.sq-diff-btn').forEach(b => {
-                b.style.background = 'transparent';
-                b.style.color = '#64748b';
-                b.style.boxShadow = 'none';
-            });
-            btn.style.background = 'white';
-            btn.style.color = '#1e293b';
-            btn.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
+            document.querySelectorAll('#ai-suggest-config-modal .sq-diff-btn').forEach(b => b.classList.toggle('on', b === btn));
             document.getElementById('suggest-diff').value = val;
+            sqmSummary();
+        };
+        // V101.74: Expand Quiz helpers — chips mirror their hidden/number inputs; the button restates the pick.
+        const sqmPress = (btn, group) => document.querySelectorAll('#ai-suggest-config-modal ' + group).forEach(b => { b.classList.toggle('on', b === btn); b.setAttribute('aria-pressed', String(b === btn)); });
+        window.sqmSetCount = function(btn, n) {
+            sqmPress(btn, '.sqm-n');
+            document.getElementById('suggest-n').value = n;
+            sqmSummary();
+        };
+        window.sqmToggleCustomCount = function(btn) {
+            const input = document.getElementById('suggest-n');
+            input.hidden = !input.hidden;
+            btn.setAttribute('aria-expanded', String(!input.hidden));
+            if (!input.hidden) input.focus();
+        };
+        window.sqmCountTyped = function() {
+            const input = document.getElementById('suggest-n');
+            const n = Math.max(1, Math.min(10, parseInt(input.value, 10) || 1));
+            document.querySelectorAll('#ai-suggest-config-modal .sqm-n').forEach(b => { const on = Number(b.textContent) === n; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+            sqmSummary();
+        };
+        window.sqmSetFocus = function(btn) {
+            sqmPress(btn, '.sqm-focus');
+            document.getElementById('suggest-focus').value = btn.dataset.val;
+            const box = document.querySelector('#ai-suggest-config-modal .sqm-custom');
+            box.hidden = btn.dataset.val !== 'custom';
+            if (!box.hidden) document.getElementById('suggest-custom').focus();
+            sqmSummary();
+        };
+        window.sqmCustomTyped = function() {
+            const text = document.getElementById('suggest-custom').value;
+            document.querySelector('#ai-suggest-config-modal .sqm-warn').hidden = !/https?:\/\/|www\./i.test(text);
+            if (text.trim()) document.querySelector('#ai-suggest-config-modal .sqm-need').hidden = true;
+        };
+        window.sqmSummary = function() {
+            const btn = document.getElementById('btn-suggest-start');
+            if (!btn) return;
+            const n = Math.max(1, Math.min(10, parseInt(document.getElementById('suggest-n').value, 10) || 3));
+            const level = (document.querySelector('#ai-suggest-config-modal .sq-diff-btn.on') || {}).textContent || 'Easy';
+            const focus = ((document.querySelector('#ai-suggest-config-modal .sqm-focus.on') || {}).textContent || '').replace(/^\S+\s/, '');
+            const model = window.aiModelShortName(document.getElementById('suggest-more-model').value);
+            btn.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> Generate ${n} question${n === 1 ? '' : 's'}<small>${escapeHtml([level, focus, model].filter(Boolean).join(' · '))}</small>`;
         };
 
         window.suggestMoreQuestionsAI = async function() {
@@ -18923,6 +18974,14 @@ RULES:
             const diff = document.getElementById('suggest-diff').value || 'easy';
             const focus = document.getElementById('suggest-focus').value || 'new_topics';
             const btn = document.getElementById('btn-suggest-start');
+            // V101.74: ✏️ Custom — the admin's own instructions and/or pasted source text. Required when picked.
+            const customText = focus === 'custom' ? (document.getElementById('suggest-custom')?.value || '').trim() : '';
+            if (focus === 'custom' && !customText) {
+                document.querySelector('#ai-suggest-config-modal .sqm-need').hidden = false;
+                document.getElementById('suggest-custom').focus();
+                return;
+            }
+            const focusLabel = focus === 'custom' ? 'CUSTOM (see ADMIN INSTRUCTIONS / SOURCE MATERIAL)' : focus.replace('_', ' ').toUpperCase();
             
             const formData = getQuizFormData();
             const existingQs = formData.questions.map((q, i) => `Q${i+1}: ${q.q}`).join('\n');
@@ -18945,10 +19004,14 @@ RULES:
                 
                 --- EXISTING QUESTIONS ---
                 ${existingQs}
-                
+                ${customText ? `
+                --- ADMIN INSTRUCTIONS / SOURCE MATERIAL ---
+                ${customText}
+                (Follow these instructions. If a passage of source text is included, base the new questions on it and do not add facts it does not support. You cannot open links — ignore any URL rather than guessing what the page says.)
+                ` : ''}
                 --- QUALITY REQUIREMENTS ---
                 - Difficulty: ${diff.toUpperCase()} - Make questions genuinely challenging, not just harder vocabulary
-                - Focus: ${focus.replace('_', ' ').toUpperCase()} - Create deeper learning opportunities
+                - Focus: ${focusLabel} - Create deeper learning opportunities
                 - Language: ${primaryLanguage} (Mandatory - match existing questions)
                 - CRITICAL: Questions must test UNDERSTANDING, not just memorization
                 - Cognitive-level mix across the ${n} questions (Thai Pharmacy Council exam blueprint, recall:interpretation:problem-solving = 3:8:4): mostly INTERPRETATION (apply given patient/case data to reach an answer), some PROBLEM-SOLVING (multi-step clinical reasoning), at most 1 in 5 pure RECALL
@@ -18991,7 +19054,7 @@ RULES:
                 console.error(e);
                 alert("Suggestion error: " + e.message);
                 btn.disabled = false;
-                btn.innerHTML = "Generate Suggestions";
+                sqmSummary();
             }
         };
 
