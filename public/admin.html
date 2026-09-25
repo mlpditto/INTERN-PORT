@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.77)</title>
+    <title>Nika Admin (V101.78)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6488,7 +6488,7 @@
     <link rel="stylesheet" href="quiz-resource-cards.css?v=V99.68">
     <link rel="stylesheet" href="case-split-studio.css?v=V100.38">
     <script src="case-studio-steps.js?v=V100.38" defer></script>
-    <link rel="stylesheet" href="reflection-compact.css?v=V99.68">
+    <link rel="stylesheet" href="reflection-compact.css?v=V101.78">
     <script src="reflection-compact.js?v=V99.68"></script>
     <script src="storyteller-insights.js?v=V99.68"></script>
     <link rel="stylesheet" href="storyteller-insights.css?v=V99.68">
@@ -11470,7 +11470,7 @@
                     <button id="lt-bulk-delete-btn" onclick="ltBulkDelete()" style="width:auto; min-height:0; padding:6px 16px; border-radius:10px; border:none; background:#dc2626; color:#fff; font-weight:800; font-size:0.8em; cursor:pointer;">🗑 Delete selected ลบที่เลือก</button>
                 </div>
 
-                <div id="laughtale-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap:25px;">
+                <div id="laughtale-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap:14px;">
                     <!-- Archived Reflective Logs injected here -->
                 </div>
             </div>
@@ -56353,12 +56353,19 @@ Save it anyway?`;
                 const dateObj = log.timestamp?.toDate() || new Date();
                 const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📔';
                 const user = (usersData || []).find(u => u.id === log.userId) || {};
-                
+                // V101.78: lean card — one header row (name · date · mood · ✨ pts · ☐ · ⋯),
+                // feedback as a one-line 💬 peek, no footer.
+                const shortDate = dateObj.toLocaleDateString('en-GB', dateObj.getFullYear() === new Date().getFullYear() ? { day: '2-digit', month: '2-digit' } : { day: '2-digit', month: '2-digit', year: '2-digit' });
+                const hasFeedback = !!(log.adminComment || log.adminCommentHtml);
+                const bonus = Number(log.adminBonus) || 0;
+
                 return `
                     <article id="ltcard-${log.id}" class="laugh-card lt-compact lang-no-toggle">
                         <header class="lt-compact-header">
-                            <img class="lt-avatar" src="${escapeHtml(log.pictureUrl || user.pictureUrl || '')}" alt="User profile" width="44" height="44">
-                            <div class="lt-identity"><div class="lt-name">${escapeHtml(user.displayName || 'Intern')}</div><small>${dateObj.toLocaleDateString('en-GB')} · ${moodEmoji}</small></div>
+                            <img class="lt-avatar" src="${escapeHtml(log.pictureUrl || user.pictureUrl || '')}" alt="User profile" width="32" height="32">
+                            <div class="lt-identity"><span class="lt-name">${escapeHtml(user.displayName || 'Intern')}</span><small title="${dateObj.toLocaleDateString('en-GB')}">${shortDate} ${moodEmoji}</small></div>
+                            <button class="lt-score-pill${bonus ? '' : ' is-zero'}" onclick="document.getElementById('lt-score-${log.id}').hidden = !document.getElementById('lt-score-${log.id}').hidden" title="Bonus points · click to edit" aria-label="Edit bonus points">✨ +${bonus}</button>
+                            <input type="checkbox" class="lt-sel" id="ltsel-${log.id}" ${window._ltSelected && window._ltSelected.has(log.id) ? 'checked' : ''} onclick="ltToggleSelect('${log.id}', event)" title="Select" aria-label="Select">
                             <details class="lt-card-menu"><summary aria-label="Card actions">⋯</summary><div>
                                 <button onclick="copyLaughCard('ltcard-${log.id}')">📋 Copy</button>
                                 <button onclick="blindLaughCard('ltcard-${log.id}')">🙈 Blind identity</button>
@@ -56367,18 +56374,13 @@ Save it anyway?`;
                             </div></details>
                         </header>
                         <div class="lt-user-content">${log.content}</div>
-                        <details class="lt-feedback-details"><summary>💬 Admin feedback <span>Read more</span></summary>
-                            <div class="lt-feedback-peek" aria-hidden="true">${(log.adminComment || log.adminCommentHtml) ? renderAdminCommentSafe(log) : '-'}</div>
-                            <div class="lt-admin-feedback">${(log.adminComment || log.adminCommentHtml) ? renderAdminCommentSafe(log) : '-'}</div>
-                        </details>
-                        <footer><label><input type="checkbox" id="ltsel-${log.id}" ${window._ltSelected && window._ltSelected.has(log.id) ? 'checked' : ''} onclick="ltToggleSelect('${log.id}', event)"> Select</label>
-                            <button class="lt-score-pill" onclick="document.getElementById('lt-score-${log.id}').hidden = !document.getElementById('lt-score-${log.id}').hidden" aria-label="Edit bonus points">+${Number(log.adminBonus) || 0} pts ✏️</button>
-                        </footer>
+                        ${hasFeedback ? `<details class="lt-feedback-details"><summary title="Admin feedback · click to expand"><span aria-hidden="true">💬</span><div class="lt-feedback-peek" aria-hidden="true">${renderAdminCommentSafe(log)}</div></summary>
+                            <div class="lt-admin-feedback">${renderAdminCommentSafe(log)}</div>
+                        </details>` : ''}
                         <form id="lt-score-${log.id}" class="lt-score-form" hidden onsubmit="event.preventDefault(); saveLaughCardScore('${log.id}', this)">
-                            <label>Bonus points (0–2)<input name="bonus" type="number" min="0" max="2" step="0.001" required value="${Number(log.adminBonus) || 0}"></label>
-                            <label>Reason<input name="reason" required maxlength="500" placeholder="Why is the score changing?"></label>
-                            <small>${log.pointsClaimed === true ? 'Claimed · total score changes by the difference.' : 'Not claimed · updates the bonus available to claim.'}</small>
-                            <div><button type="button" onclick="this.closest('form').hidden=true">Cancel</button><button type="submit">Save score</button></div>
+                            <div class="lt-score-row"><input name="bonus" type="number" min="0" max="2" step="0.001" required value="${bonus}" title="Bonus points 0–2" aria-label="Bonus points 0–2"><input name="reason" required maxlength="500" placeholder="📝 Reason" aria-label="Reason"></div>
+                            <small>${log.pointsClaimed === true ? '✅ Claimed · total moves by the difference' : '⏳ Not claimed yet'}</small>
+                            <div><button type="button" onclick="this.closest('form').hidden=true" title="Cancel" aria-label="Cancel">✕</button><button type="submit">💾 Save</button></div>
                             <p role="status" aria-live="polite"></p>
                         </form>
                     </article>
