@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.84)</title>
+    <title>Nika Admin (V101.85)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -19154,8 +19154,8 @@ RULES:
                 - Use "what if" scenarios and hypothetical situations
                 - Incorporate clinical reasoning or decision-making elements
                 
-                JSON SCHEMA:
-                [
+                JSON SCHEMA (a JSON object whose "questions" array holds all ${n} questions):
+                {"questions": [
                   {
                     "q": "Challenging question that requires deep thinking...",
                     "type": "choice",
@@ -19164,7 +19164,7 @@ RULES:
                     "timer": 60,
                     "explanation": "Detailed explanation of why this is correct and why others are wrong..."
                   }
-                ]`;
+                ]}`;
 
                 const selectedModel = window._suggestMoreModel = textAIModel(document.getElementById('suggest-more-model') ? 'suggest-more-model' : 'ai-analyzer-model-val'); // V101.34: modal rail, else Settings default
                 const { text: resultRaw } = await callUniversalAI(selectedModel, prompt, true, null, '', { feature: 'quiz_suggestion' });
@@ -19175,7 +19175,9 @@ RULES:
                 const configModal = document.getElementById('ai-suggest-config-modal');
                 if (configModal) configModal.remove();
 
-                showAiSuggestionsPopup(suggestions);
+                // V101.85: say so when the model sent fewer than asked, instead of a silent short list.
+                const got = showAiSuggestionsPopup(suggestions);
+                if (got && got < Number(n)) showToast(`AI returned ${got} of ${n} questions.`);
 
             } catch(e) {
                 console.error(e);
@@ -19235,8 +19237,8 @@ RULES:
             - Distractors must be conceptually plausible but clearly incorrect
             - Each question should have educational value beyond the existing ones
 
-            JSON SCHEMA:
-            [
+            JSON SCHEMA (a JSON object whose "questions" array holds all ${n} questions):
+            {"questions": [
               {
                 "q": "Challenging question text...",
                 "type": "choice",
@@ -19245,7 +19247,7 @@ RULES:
                 "timer": 60,
                 "explanation": "Detailed explanation..."
               }
-            ]`;
+            ]}`;
 
             try {
                 showToast(" Regenerating with custom focus...");
@@ -19352,6 +19354,7 @@ RULES:
             `;
 
             document.body.appendChild(resultDiv);
+            return suggestions.length;
         };
 
         // V100.93: one-click copy of a single AI-suggested question (stem + options,
