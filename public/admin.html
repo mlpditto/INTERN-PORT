@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.70)</title>
+    <title>Nika Admin (V101.71)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -17552,17 +17552,23 @@
                 // V97.44: skip the spinner for a cachedResult replay — that path is now the
                 // DEFAULT flow (Specialist opens a saved analysis first when one exists), and
                 // it never awaits an AI call, so a "0%" flash would just be visual noise.
+                const selectedModel = opts?.model ? resolveTrialTextAIModel(opts.model) : textAIModel('ai-analyzer-model-val'); // V101.52: a picked trial model (Grok) is not normalised to Luna
+                // V101.71: the ticker also names the model and shows elapsed time, like the Scorecard (V101.22).
                 if (btn && !(opts && opts.cachedResult)) {
                     let pct = 0;
-                    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Analyzing 0%`;
+                    const startedAt = performance.now();
+                    const paint = () => {
+                        const sec = Math.floor((performance.now() - startedAt) / 1000);
+                        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Rewriting ${pct}% · ${escapeHtml(window.aiModelShortName(selectedModel))} · ${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
+                    };
+                    paint();
                     btn.disabled = true;
                     analyzeProgressTimer = setInterval(() => {
                         pct = Math.min(95, pct + Math.max(1, Math.round((95 - pct) * 0.08)));
-                        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Analyzing ${pct}%`;
+                        paint();
                     }, 350);
                 }
-                
-                const selectedModel = opts?.model ? resolveTrialTextAIModel(opts.model) : textAIModel('ai-analyzer-model-val'); // V101.52: a picked trial model (Grok) is not normalised to Luna
+
                 let resultRaw = '', aiTokens = 0, aiModel = '', result = null;
 
                 // V97.39: "🕑 Last" reopens a previously-saved analysis (Firestore
@@ -18299,7 +18305,9 @@ RULES:
                         el.disabled = true;
                         if (el.dataset.reviewTab === tabId) el.textContent = 'Loading…';
                     });
-                    await tab.run(document.createElement('button'));
+                    // V101.71: hand the run the tab itself so its live progress (% · model · mm:ss) shows on it;
+                    // a detached button used to swallow that, leaving only "Loading…" for a minute or more.
+                    await tab.run(controls.find(el => el.dataset.reviewTab === tabId) || document.createElement('button'));
                 }
                 const targets = [...document.querySelectorAll('[id="' + tab.popupId + '"]')];
                 if (!targets.length) return;
