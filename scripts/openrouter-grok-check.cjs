@@ -137,6 +137,20 @@ const ok = (content, finish = 'stop', usage = { prompt_tokens: 100, completion_t
     const uaUnreach = admin.indexOf('OpenRouter model selected but proxy is unreachable', uaStart);
     check('T10 proxy-answered error is thrown before the "unreachable" fallback', uaStart > 0 && uaThrow > uaStart && uaThrow < uaUnreach, true);
     check('T10 "support image input" becomes a plain "can\'t read images" message', /support image input\/i\.test\(raw\)[\s\S]{0,500}can't read images — pick another model/.test(admin), true);
+    // V101.92: a provider safety-filter stop becomes a plain "declined" message, and a proxy-only model
+    // throws the rewritten message (definitive used to throw the raw one, skipping every rewrite).
+    {
+        const a = admin.indexOf('const raw = String(primaryError.error);', uaStart);
+        const b = admin.indexOf('                                    : raw;', a) + '                                    : raw;'.length;
+        const rewrite = new Function('primaryError', 'modelName', 'proxyProvider', 'window', `let proxyAnsweredError = ''; ${admin.slice(a, b)} return proxyAnsweredError;`);
+        const w = { aiModelShortName: id => ({ 'claude-opus-5-5': 'Opus 5.5', 'gpt-6-sol': 'Sol 6' })[id] || id };
+        const run = error => rewrite({ error }, error.includes('gpt') ? 'gpt-6-sol' : 'claude-opus-5-5', 'modern', w);
+        const refusal = run('Model returned incomplete or invalid output. claude-opus-5-5: stopped with refusal; 0 output tokens of 32768.');
+        check('T11 Anthropic refusal → "Opus 5.5 declined this request", raw kept after a blank line', /^Opus 5\.5 declined this request — the provider's safety filter[\s\S]*Pick another model and run again\.\n\n\(Model returned incomplete[\s\S]*refusal/.test(refusal), true);
+        check('T11 OpenAI content_filter → declined', run('gpt-6-sol: stopped with incomplete (content_filter); 0 output tokens').startsWith('Sol 6 declined this request'), true);
+        check('T11 a length stop is NOT called a refusal', run('claude-opus-5-5: stopped with max_tokens; 32768 output tokens of 32768.'), 'claude-opus-5-5: stopped with max_tokens; 32768 output tokens of 32768.');
+        check('T11 proxy-only models throw the rewritten message', /const definitive = new Error\(proxyAnsweredError \|\| primaryError\?\.error/.test(admin), true);
+    }
     check('T10 the message names the chip (or/ prefix restored before aiModelShortName)', admin.includes("window.aiModelShortName(proxyProvider === 'openrouter' && !modelName.startsWith('or/') ? 'or/' + modelName : modelName)"), true);
     check('T8 retired ids follow their successor', `${win.normalizeTextAIModel('gpt-5.6-luna')}|${win.normalizeTextAIModel('gpt-5.6-sol')}|${win.normalizeTextAIModel('or/deepseek/deepseek-v4-pro')}`, 'gpt-6-luna|gpt-6-sol|or/deepseek/deepseek-v4-pro-0813');
     check('T8 an explicit trial pick is kept, others normalise as before', `${win.resolveTrialTextAIModel(grok)}|${win.resolveTrialTextAIModel('claude-sonnet-5')}|${win.resolveTrialTextAIModel('nope')}`, 'or/x-ai/grok-4.7|claude-sonnet-5|gpt-6-luna');
