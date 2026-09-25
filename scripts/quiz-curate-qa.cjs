@@ -16,6 +16,11 @@ const { chromium } = require('playwright');
         await page.addStyleTag({ path: 'public/quiz-curate.css' });
         await page.addStyleTag({ path: 'public/text-ai-chips.css' });
         await page.addScriptTag({ path: 'public/ai-model-ui.js' });
+        // V101.88: Curate uses the shared provider rail, which lives in admin.html's inline script.
+        await page.addStyleTag({ path: 'public/audit-toolbar.css' });
+        const railStart = html.indexOf('window.browseAuditProvider = function'), railEnd = html.indexOf('window.auditModelControlsHtml = function');
+        assert(railStart > 0 && railEnd > railStart, 'provider rail helpers found in admin.html');
+        await page.addScriptTag({ content: html.slice(railStart, railEnd) });
         await page.evaluate(() => {
             window.fixture = {
                 title: 'Clinical assessment', targetGroup: 'Interns', totalPoints: 1.4,
@@ -60,7 +65,13 @@ const { chromium } = require('playwright');
         assert.equal(await page.locator('#curate-target').inputValue(), '10');
         assert.equal(await page.locator('.curate-question').count(), 14);
         assert(await saveDisabled());
-        assert.equal(await page.locator('#curate-models button').count(), await page.evaluate(() => TEXT_AI_MODELS.length)); // one chip per shared text model (V101.05 added Qwen/DeepSeek)
+        assert.equal(await page.locator('#curate-models .text-ai-chips > button').count(), await page.evaluate(() => TEXT_AI_MODELS.length)); // one chip per shared text model (V101.05 added Qwen/DeepSeek)
+        // V101.88: provider-logo tabs; opens on the current model's provider (gpt-6-luna → GPT), other chips hidden.
+        assert.equal(await page.locator('#curate-models .audit-provider').count(), await page.evaluate(() => new Set(TEXT_AI_MODELS.map(m => m.label.split(' ')[0])).size));
+        assert.equal(await page.locator('#curate-models .audit-provider[aria-pressed="true"]').getAttribute('data-provider'), 'GPT');
+        assert(await page.locator('[data-model="gpt-6-luna"]').isVisible());
+        assert(!(await page.locator('[data-model="claude-haiku-4-5"]').isVisible()));
+        await page.locator('#curate-models .audit-provider[data-provider="Claude"]').click();
         await page.locator('[data-model="claude-haiku-4-5"]').click();
         assert.match(await page.locator('#curate-model').innerText(), /Claude Haiku/);
         for (const value of ['0', '15', '2.5', '']) {
