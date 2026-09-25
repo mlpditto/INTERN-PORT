@@ -109,7 +109,9 @@ const { chromium } = require('playwright');
             await page.locator('#ai-audit-popup [data-value="' + value + '"]').click();
             const fix = page.locator('.audit-fix-control button');
             assert((await fix.getAttribute('title')).includes(label));
-            assert.equal(await page.locator('.audit-fix-model').innerText(), label);
+            // V101.84: icon-only ✦ button — the picked model shows as its owner logo, the name in aria-label.
+            assert.equal(await fix.locator('.text-ai-logo').getAttribute('data-owner'), { GPT: 'openai', Gemini: 'gemini' }[label.split(' ')[0]]);
+            assert((await fix.getAttribute('aria-label')).includes(label));
             await fix.focus();
             assert(await page.locator('.audit-fix-tooltip').isVisible());
             await page.evaluate(() => auditSuggestFix(1, document.querySelector('.audit-fix-control button')));
