@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.74)</title>
+    <title>Nika Admin (V101.75)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -5014,6 +5014,10 @@
         #ai-suggest-config-modal .sqm-go { width:100%; margin-top:16px; padding:11px 14px; border:none; border-radius:14px; background:linear-gradient(135deg,#7c3aed,#9b59b6); color:#fff; font-weight:800; font-size:0.95em; cursor:pointer; }
         #ai-suggest-config-modal .sqm-go small { display:block; margin-top:2px; font-size:0.78em; font-weight:500; opacity:0.85; }
         @media (pointer:coarse) { #ai-suggest-config-modal .sqm-chip, #ai-suggest-config-modal .sqm-seg button { min-height:44px; } }
+        /* V101.75: exam style row (twemoji flags), scope row and the one-line style hint. */
+        #ai-suggest-config-modal .sqm-style img.emoji { width:1.15em; height:1.15em; vertical-align:-0.2em; margin-right:2px; }
+        #ai-suggest-config-modal .sqm-scope-row[hidden], #ai-suggest-config-modal .sqm-style-hint[hidden] { display:none; }
+        #ai-suggest-config-modal .sqm-style-hint { margin:6px 0 0 54px; padding:5px 8px; border:1px solid #bbf7d0; border-radius:7px; background:#f0fdf4; color:#475569; font-size:0.72em; line-height:1.5; }
         /* Translate is now the row's last item: anchor its popover to the row's right edge, capped at the row width,
            so it never runs past the modal (anchored under the button it overflowed by ~400px). */
         #quiz-editor-review-actions { position:relative; }
@@ -18896,6 +18900,18 @@ RULES:
                     <button type="button" class="sqm-chip" onclick="sqmToggleCustomCount(this)" title="Type another number (1–10)" aria-label="Type another number" aria-expanded="false">±</button>
                     <input type="number" id="suggest-n" value="3" min="1" max="10" class="sqm-num" hidden oninput="sqmCountTyped()" aria-label="Number of questions">
                 </div>
+                <div class="sqm-row sqm-style-row"><span class="sqm-lb">Style</span>
+                    ${Object.entries(window.SQM_EXAM_STYLES).map(([k, s], i) => `<button type="button" class="sqm-chip sqm-style${i === 0 ? ' on' : ''}" aria-pressed="${i === 0}" data-val="${k}" title="${s.title}" onclick="sqmSetStyle(this)">${s.flag} ${s.label}</button>`).join('')}
+                    <input type="hidden" id="suggest-style" value="thai">
+                </div>
+                <div class="sqm-row sqm-scope-row" hidden><span class="sqm-lb">Scope</span>
+                    <div class="sqm-seg" role="group" aria-label="Scope">
+                        <button type="button" class="sqm-scope on" data-val="clinical" onclick="sqmSetScope(this)">Clinical only</button>
+                        <button type="button" class="sqm-scope" data-val="full" onclick="sqmSetScope(this)">+ Law &amp; systems</button>
+                    </div>
+                    <input type="hidden" id="suggest-scope" value="clinical">
+                </div>
+                <div class="sqm-style-hint" hidden></div>
                 <div class="sqm-row"><span class="sqm-lb">Level</span>
                     <div class="sqm-seg" role="group" aria-label="Difficulty">
                         <button type="button" class="sq-diff-btn on" data-val="easy" onclick="setSqDiff(this, 'easy')">Easy</button>
@@ -18919,9 +18935,64 @@ RULES:
                 <button type="button" onclick="suggestMoreQuestionsAI()" id="btn-suggest-start" class="sqm-go"></button>
             `;
             document.body.appendChild(modal);
+            // Flag emoji render as letters on Windows — twemoji only the Style row (Focus chip text is read back).
+            const sqmStyleRow = modal.querySelector('.sqm-style-row');
+            if (window.twemoji && sqmStyleRow) twemoji.parse(sqmStyleRow, { folder: 'svg', ext: '.svg' });
             sqmSummary();
         };
 
+        // V101.75: exam styles for Expand quiz. Written in our own words from the public blueprints
+        // (PEBC Qualifying Exam 2026 blueprint; APC Intern Written Exam guide) — never real exam items.
+        // `prompt(n, scope)` returns the prompt lines that replace the Thai-blueprint cognitive-mix line.
+        window.SQM_EXAM_STYLES = {
+            thai: { flag: '🇹🇭', label: 'Thai PC', title: 'Thai Pharmacy Council blueprint (default)', hint: '', scope: false,
+                prompt: n => `- Cognitive-level mix across the ${n} questions (Thai Pharmacy Council exam blueprint, recall:interpretation:problem-solving = 3:8:4): mostly INTERPRETATION (apply given patient/case data to reach an answer), some PROBLEM-SOLVING (multi-step clinical reasoning), at most 1 in 5 pure RECALL` },
+            pebc1: { flag: '🇨🇦', label: 'PEBC I', title: 'PEBC Qualifying Exam Part I — applied MCQ, from the public 2026 blueprint', scope: true,
+                hint: 'Applied case-based MCQ · clinical care ~45%, then dispensing, health promotion, safety · generic names. Our own questions in PEBC Part I style — not real PEBC items.',
+                prompt: (n, scope) => [
+                    `- Exam style: PEBC Part I-style (Canadian Pharmacist Qualifying Exam, MCQ), modelled on the public 2026 blueprint. Write original items; never reproduce or closely paraphrase real PEBC questions.`,
+                    `- Format: APPLIED single-best-answer MCQ with 4-5 options; most items open with a short patient case (age, sex, conditions, current medicines, relevant labs) and ask for a decision, not a recalled fact.`,
+                    `- Content mix across the ${n} questions: mostly clinical care (patient assessment, care plan, implementation, monitoring ≈ 45% of the blueprint), then dispensing/distribution accuracy (≈ 14%), plus health promotion, quality and medication safety, communication/collaboration and professionalism.`,
+                    scope === 'full'
+                        ? `- Scope: Canadian practice context allowed where it fits (NAPRA drug schedules, federal/provincial regulation); use generic drug names.`
+                        : `- Scope: clinical only — no Canadian law, drug schedules or provincial rules; use generic drug names and internationally accepted guidelines.`
+                ].join('\n                ') },
+            pebc2: { flag: '🇨🇦', label: 'PEBC II · OSCE', title: 'PEBC Qualifying Exam Part II — OSCE station style, from the public station format', scope: true,
+                hint: 'OSCE stations as questions · counselling / drug-therapy-problem / written-response tasks · best-response MCQ or a marking guide. Our own stations — not real PEBC items.',
+                prompt: (n, scope) => [
+                    `- Exam style: PEBC Part II-style OSCE STATIONS (Canadian Pharmacist Qualifying Exam), modelled on the public station format. Write original stations; never reproduce real PEBC stations.`,
+                    `- Each question is one station: open with the instruction the candidate reads at the door (setting, who they meet — a patient, caregiver or prescriber — and the task), then ask about the candidate's action.`,
+                    `- Mix station types across the ${n} questions: counselling a patient, resolving a drug therapy problem or ethical dilemma with a patient or health professional, and responding in writing to a message or request for advice.`,
+                    `- Interactive stations: single-best-answer MCQ asking for the BEST thing to say or do next (4-5 options; distractors are plausible but unsafe, incomplete or unprofessional responses).`,
+                    `- Written-response stations: {"type": "short_answer", "options": ["<marking guide: the 3-5 key points a full-mark answer must contain>"], "correct": [0]}.`,
+                    scope === 'full'
+                        ? `- Scope: Canadian practice context allowed where it fits (NAPRA schedules, documentation and referral rules).`
+                        : `- Scope: clinical and communication only — no Canadian law or schedules.`
+                ].join('\n                ') },
+            opra: { flag: '🇦🇺', label: 'OPRA', title: 'APC OPRA exam — foundation sciences linked to clinical practice, from the public exam guide', scope: false,
+                hint: 'Single-answer MCQ, 4 options · biomedical and pharmaceutical science applied to cases · therapeutics & patient care ~45% · no law. Our own questions in OPRA style — not real APC items.',
+                prompt: n => [
+                    `- Exam style: OPRA-style (Australian Pharmacy Council readiness assessment), modelled on the public exam guide. Write original items; never reproduce or closely paraphrase real APC questions.`,
+                    `- Format: single-best-answer MCQ with EXACTLY 4 options (1 correct, 3 plausible distractors). SI units; generic drug names.`,
+                    `- Link foundation science to practice: each item applies biomedical or pharmaceutical science (pharmacology, pharmacokinetics, physiology/pathophysiology, pharmaceutics, medicinal chemistry) to a short, often multi-step primary-care case — no rote recall.`,
+                    `- Content mix across the ${n} questions: about half therapeutics and patient care (special populations, harm minimisation, health promotion), the rest the underlying biomedical, pharmaceutical and clinical sciences.`,
+                    `- Scope: no Australian or NZ legislation or practice standards (OPRA does not test them).`
+                ].join('\n                ') }
+        };
+        window.sqmSetStyle = function(btn) {
+            sqmPress(btn, '.sqm-style');
+            const key = btn.dataset.val, style = window.SQM_EXAM_STYLES[key];
+            document.getElementById('suggest-style').value = key;
+            document.querySelector('#ai-suggest-config-modal .sqm-scope-row').hidden = !style.scope;
+            const hint = document.querySelector('#ai-suggest-config-modal .sqm-style-hint');
+            hint.textContent = style.hint; hint.hidden = !style.hint;
+            sqmSummary();
+        };
+        window.sqmSetScope = function(btn) {
+            document.querySelectorAll('#ai-suggest-config-modal .sqm-scope').forEach(b => b.classList.toggle('on', b === btn));
+            document.getElementById('suggest-scope').value = btn.dataset.val;
+            sqmSummary();
+        };
         window.setSqDiff = function(btn, val) {
             document.querySelectorAll('#ai-suggest-config-modal .sq-diff-btn').forEach(b => b.classList.toggle('on', b === btn));
             document.getElementById('suggest-diff').value = val;
@@ -18966,7 +19037,10 @@ RULES:
             const level = (document.querySelector('#ai-suggest-config-modal .sq-diff-btn.on') || {}).textContent || 'Easy';
             const focus = ((document.querySelector('#ai-suggest-config-modal .sqm-focus.on') || {}).textContent || '').replace(/^\S+\s/, '');
             const model = window.aiModelShortName(document.getElementById('suggest-more-model').value);
-            btn.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> Generate ${n} question${n === 1 ? '' : 's'}<small>${escapeHtml([level, focus, model].filter(Boolean).join(' · '))}</small>`;
+            const styleKey = (document.getElementById('suggest-style') || {}).value || 'thai';
+            const styleDef = window.SQM_EXAM_STYLES[styleKey] || window.SQM_EXAM_STYLES.thai;
+            const style = styleKey === 'thai' ? '' : styleDef.label + (styleDef.scope ? ((document.getElementById('suggest-scope') || {}).value === 'full' ? ' · + Law' : ' · Clinical') : '');
+            btn.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> Generate ${n} question${n === 1 ? '' : 's'}<small>${escapeHtml([style, level, focus, model].filter(Boolean).join(' · '))}</small>`;
         };
 
         window.suggestMoreQuestionsAI = async function() {
@@ -18982,6 +19056,9 @@ RULES:
                 return;
             }
             const focusLabel = focus === 'custom' ? 'CUSTOM (see ADMIN INSTRUCTIONS / SOURCE MATERIAL)' : focus.replace('_', ' ').toUpperCase();
+            // V101.75: exam style (Thai PC default keeps the exact old blueprint line).
+            const examStyle = window.SQM_EXAM_STYLES[(document.getElementById('suggest-style') || {}).value] || window.SQM_EXAM_STYLES.thai;
+            const examStyleLines = examStyle.prompt(n, (document.getElementById('suggest-scope') || {}).value || 'clinical');
             
             const formData = getQuizFormData();
             const existingQs = formData.questions.map((q, i) => `Q${i+1}: ${q.q}`).join('\n');
@@ -19014,7 +19091,7 @@ RULES:
                 - Focus: ${focusLabel} - Create deeper learning opportunities
                 - Language: ${primaryLanguage} (Mandatory - match existing questions)
                 - CRITICAL: Questions must test UNDERSTANDING, not just memorization
-                - Cognitive-level mix across the ${n} questions (Thai Pharmacy Council exam blueprint, recall:interpretation:problem-solving = 3:8:4): mostly INTERPRETATION (apply given patient/case data to reach an answer), some PROBLEM-SOLVING (multi-step clinical reasoning), at most 1 in 5 pure RECALL
+                ${examStyleLines}
                 - Include real-world scenarios, critical thinking, and application
                 - Distractors must be conceptually plausible but clearly incorrect
                 - Each question should have educational value beyond the existing ones
@@ -19194,7 +19271,7 @@ RULES:
                         </div>
                         <div style="font-weight:800; color:#1e293b; font-size:1.05em; margin-bottom:15px; line-height:1.4;">${q.q}</div>
                         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-                            ${q.options.map((opt, optIdx) => `
+                            ${q.type === 'short_answer' ? `<div style="grid-column:1/-1; font-size:0.85em; padding:8px 12px; border-radius:10px; background:#ecfdf5; color:#059669; border:1px solid #10b981; font-weight:700;">✍️ Answer: ${escapeHtml((q.options || [])[0] || '')}</div>` : (q.options || []).map((opt, optIdx) => `
                                 <div style="font-size:0.85em; padding:8px 12px; border-radius:10px; background:${q.correct.includes(optIdx) ? '#ecfdf5' : '#f8fafc'}; color:${q.correct.includes(optIdx) ? '#059669' : '#64748b'}; border:1px solid ${q.correct.includes(optIdx) ? '#10b981' : '#e2e8f0'}; font-weight:${q.correct.includes(optIdx) ? '700' : '500'};">
                                     ${String.fromCharCode(65 + optIdx)}. ${opt}
                                 </div>
