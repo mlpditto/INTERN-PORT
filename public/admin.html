@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.71)</title>
+    <title>Nika Admin (V101.72)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -16474,6 +16474,10 @@
                 || (proxyProvider === 'gemini-aistudio' && /image/i.test(modelName))
                 || (proxyProvider === 'openrouter' && /image/i.test(modelName))
                 || (proxyProvider === 'openai' && /^gpt-image-/.test(modelName));
+            // V101.72: the proxy's own error when it DID answer (non-2xx). Without it a definite answer
+            // such as OpenRouter's "No endpoints found that support image input" (DeepSeek V4 Pro + an
+            // image) fell through the local-key fallbacks and surfaced as "proxy is unreachable".
+            let proxyAnsweredError = '';
             try {
 
                 if (proxyProvider !== "") {
@@ -16489,6 +16493,12 @@
                         return { text: proxyData.text || proxyData.imageDataUrl || proxyData.dataUrl || '', tokens: proxyData.tokens || 0, model: proxyData.model || modelName, raw: proxyData };
                     } else {
                         const primaryError = await proxyResponse.json().catch(() => ({}));
+                        if (primaryError && primaryError.error) {
+                            const raw = String(primaryError.error);
+                            proxyAnsweredError = /support image input/i.test(raw)
+                                ? `${window.aiModelShortName ? window.aiModelShortName(modelName) : modelName} can't read images — pick another model for this task.`
+                                : raw;
+                        }
                         // V101.28: on GitHub Pages BACKUP_PROXY is the same URL as PROXY_URL, so a
                         // definitive error (e.g. 502 "stopped with length") used to be re-run in
                         // full against the identical endpoint — doubling a 60s failure to 120s.
@@ -16697,6 +16707,7 @@
                 // but no local OpenRouter key is configured AND the proxy chain
                 // is down. The generic "No provider active" message hid the real
                 // gap from admin — they don't know an OpenRouter key is required.
+                if (proxyAnsweredError) throw new Error(proxyAnsweredError);
                 if (proxyProvider === 'openrouter') {
                     throw new Error("OpenRouter model selected but proxy is unreachable and no local OpenRouter key is set. Open the AI Keys modal and paste a key from openrouter.ai/keys (format sk-or-v1-...), then retry.");
                 }
