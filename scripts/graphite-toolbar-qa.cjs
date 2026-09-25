@@ -118,6 +118,16 @@ const { chromium } = require('playwright');
             assert.equal(await page.evaluate(() => fixRequest.model), value);
             await page.evaluate(() => document.getElementById('ai-audit-popup').style.display = 'block');
         }
+        // V101.93: ONE real mouse click on the logo must run it. focus/pointerenter used to rebuild the button
+        // under the pointer during the first mousedown, which swallowed that click (the steps above only
+        // ever called auditSuggestFix directly, so they could not see it).
+        await page.evaluate(() => { document.activeElement && document.activeElement.blur(); window.fixRequest = null; });
+        await page.mouse.move(0, 0);
+        const fixLogo = await page.locator('.audit-fix-control .text-ai-logo').boundingBox();
+        await page.mouse.move(fixLogo.x + fixLogo.width / 2, fixLogo.y + fixLogo.height / 2, { steps: 5 });
+        await page.mouse.down(); await page.mouse.up();
+        assert.equal(await page.evaluate(() => window.fixRequest && window.fixRequest.model), 'gemini-3.8-flash', 'one click runs Suggest fix');
+        await page.evaluate(() => document.getElementById('ai-audit-popup').style.display = 'block');
         // V101.52: a picked trial model (Grok) is kept; every other value still normalises.
         assert(html.includes("const selectedModel = opts?.model ? resolveTrialTextAIModel(opts.model) : textAIModel('ai-analyzer-model-val');"));
         // Reproduce overlapping rerenders: switching must hide all Rewrites instances.
