@@ -107,6 +107,11 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.match(await page.evaluate(() => aiArgs[1]), /established INTERN-PORT quiz cover collection/);
         assert.equal(await page.evaluate(() => aiArgs[0]), 'or/openai/gpt-5.4-image-2');
         assert.equal(await page.evaluate(() => aiArgs[5].feature), 'quiz_cover');
+        // V101.90: six style chips; Clay is the default and keeps the pre-V101.90 prompt byte-for-byte.
+        assert.equal(await page.locator('[data-style-chip]').count(), 6);
+        assert.equal(await page.locator('[data-style-chip].active').getAttribute('data-value'), 'clay');
+        assert.equal(await page.evaluate(() => QuizCover.style()), 'clay');
+        assert.ok((await page.evaluate(() => aiArgs[1])).includes('Keep the collection style consistent: portrait 3:4; premium soft 3D clay illustration; pastel lavender, peach and related soft accent colours; gentle studio lighting; rounded inset panel; polished tactile surfaces; one large, clear hero subject in the upper 75%; generous safe margins; clean ivory title band in the bottom 25%.'), 'Clay prompt unchanged');
         await page.locator('[data-apply]').click();
         await page.waitForFunction(() => QuizCover.value() === 'https://example.com/ai.webp');
         assert.equal(await page.evaluate(() => uploads), 1);
@@ -116,6 +121,25 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         await page.locator('[data-discard]').click();
         assert.equal(await page.evaluate(() => QuizCover.value()), 'https://example.com/ai.webp');
         assert.equal(await page.locator('.quiz-cover-ai-preview').isVisible(), false);
+        // V101.90: another style swaps only the material; the fixed frame (title band) stays in the prompt.
+        await page.locator('[data-style-chip][data-value="watercolor"]').click();
+        assert.equal(await page.evaluate(() => QuizCover.style()), 'watercolor');
+        assert.equal(await page.locator('[data-style-chip][data-value="watercolor"]').getAttribute('aria-pressed'), 'true');
+        assert.equal(await page.locator('[data-style-chip][aria-pressed="true"]').count(), 1);
+        await page.locator('[data-generate]').click();
+        await page.waitForFunction(() => !QuizCover.isBusy());
+        const watercolorPrompt = await page.evaluate(() => aiArgs[1]);
+        assert.match(watercolorPrompt, /watercolour illustration on textured paper/);
+        assert.doesNotMatch(watercolorPrompt, /3D clay/);
+        assert.match(watercolorPrompt, /clean ivory title band in the bottom 25%/);
+        await page.locator('[data-discard]').click();
+        // Loading a quiz: saved style is restored; missing / unknown (pre-V101.90 quizzes) → Clay.
+        await page.evaluate(() => QuizCover.setStyle('felt'));
+        assert.equal(await page.locator('[data-style-chip].active').getAttribute('data-value'), 'felt');
+        for (const legacy of [undefined, '', 'neon']) {
+            await page.evaluate(v => QuizCover.setStyle(v), legacy);
+            assert.equal(await page.evaluate(() => QuizCover.style()), 'clay', 'fallback for ' + legacy);
+        }
         // V101.54: a 2:3 AI image (Muse clamps 3:4 to 2:3) is cropped to 3:4 before the preview,
         // keeping more of the bottom (title band) than the top; a 3:4 image passes through unchanged.
         await page.evaluate(() => {
