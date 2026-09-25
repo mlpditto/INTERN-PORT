@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.64)</title>
+    <title>Nika Admin (V101.65)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6469,7 +6469,7 @@
     <script src="codex-vision.js?v=V101.20"></script>
     <!-- V91.98 fix: walker skips user-content subtrees (q-text-preview / md-render / lang-no-toggle) -->
     <script src="lang-toggle.js?v=V97.44"></script>
-<link rel="stylesheet" href="audit-toolbar.css?v=V101.52">
+<link rel="stylesheet" href="audit-toolbar.css?v=V101.65">
 <link rel="stylesheet" href="quiz-curate.css?v=V101.18">
 <script src="quiz-revision.js?v=V100.07"></script>
 <script src="ai-usage-overview.js?v=V101.59"></script>
@@ -17957,18 +17957,20 @@
             const provider = TEXT_AI_MODELS.find(m => m.id === selected).label.split(' ')[0];
             const action = `document.getElementById('${inputId}').value=this.dataset.value;this.parentElement.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b===this);b.setAttribute('aria-pressed',String(b===this))});this.closest('.audit-toolbar').querySelector('.audit-run').title='ใช้ '+this.getAttribute('aria-label')+' ทำงานนี้'` + (isAudit ? ';syncAuditFixHints()' : ";if(!isTrialTextAIModel(this.dataset.value))syncModelDefault('ai-analyzer-model-val',this.dataset.value)");
             // V101.52: trial models (Grok) are offered here only; picking one never becomes the Settings default.
-            const chips = textAIChipContents(selected, action, null, TEXT_AI_TRIAL_MODELS).replace(/<span class="text-ai-provider"[^>]*>.*?<\/span>/g, '').replace(/<button /g, '<button hidden ' ).replace(new RegExp('hidden ([^>]*aria-label="' + provider + ' )', 'g'), '$1');
+            // V101.65: the provider tab carries the logo, so the chips here are names only.
+            const chips = textAIChipContents(selected, action, null, TEXT_AI_TRIAL_MODELS).replace(/<span class="text-ai-provider"[^>]*>.*?<\/span>/g, '').replace(/<span class="text-ai-logo"[^>]*><\/span>/g, '').replace(/<button /g, '<button hidden ' ).replace(new RegExp('hidden ([^>]*aria-label="' + provider + ' )', 'g'), '$1');
+            const providerLogo = { Gemini: 'gemini', GPT: 'openai', Claude: 'claude', Qwen: 'qwen', DeepSeek: 'deepseek', Grok: 'grok' };
             // V101.21: tabs follow TEXT_AI_MODELS (first word of each label, in order) — the
             // hard-coded three left the Qwen / DeepSeek chips (V101.05) permanently hidden.
             const providers = [...new Set([...TEXT_AI_MODELS, ...TEXT_AI_TRIAL_MODELS].map(m => m.label.split(' ')[0]))];
-            return `<div class="audit-model-row"><input type="hidden" id="${inputId}" value="${selected}"><div class="audit-providers" role="group" aria-label="Browse model providers">${providers.map(p => `<button type="button" class="audit-provider" data-provider="${p}" aria-pressed="${p === provider}" title="Show ${p} models · pick one to switch" data-th-title="ดูรุ่นของ ${p} · กดเลือกรุ่นเพื่อเปลี่ยนโมเดล" onclick="browseAuditProvider(this)">${p}</button>`).join('')}</div><div class="text-ai-chips" role="group" aria-label="AI model">${chips}</div></div>`;
+            return `<div class="audit-model-row"><input type="hidden" id="${inputId}" value="${selected}"><div class="audit-providers" role="group" aria-label="Browse model providers">${providers.map(p => `<button type="button" class="audit-provider" data-provider="${p}" aria-pressed="${p === provider}" aria-label="${p}" title="${p} models · pick one to switch" data-th-title="รุ่นของ ${p} · กดเลือกรุ่นเพื่อเปลี่ยนโมเดล" onclick="browseAuditProvider(this)">${providerLogo[p] ? `<span class="text-ai-logo" data-owner="${providerLogo[p]}" aria-hidden="true"></span>` : p}</button>`).join('')}</div><div class="text-ai-chips" role="group" aria-label="AI model">${chips}</div></div>`;
         };
         window.auditToolbarHtml = function(hasResult, mode = 'audit', allowExport = false) {
             const isAudit = mode === 'audit';
             const run = isAudit ? 'runSelectedQualityAudit(this)' : 'runSelectedAnalyze(this)';
             const selected = isAudit ? 'gpt-6-luna' : textAIModel('ai-analyzer-model-val');
             const label = TEXT_AI_MODELS.find(m => m.id === selected).label;
-            return `<div class="audit-toolbar lang-no-toggle"><div class="audit-toolbar-top">${window.reviewTabsHtml(mode)}<div class="audit-actions"><button type="button" class="audit-run" onclick="${run}" title="Use ${label} for this task" data-th-title="ใช้ ${label} ทำงานนี้">↻ ${isAudit ? 'Review' : 'Rewrite'}</button>${allowExport ? '<button type="button" onclick="exportAiAnalysisMd()" title="Download the analysis as Markdown" data-th-title="ดาวน์โหลดผลการวิเคราะห์เป็น Markdown">Export</button>' : ''}<button type="button" class="audit-close" onclick="closeQuizReview()" aria-label="Close review" title="Close the quiz review" data-th-title="ปิดหน้าตรวจข้อสอบ">×</button></div></div>${window.auditModelControlsHtml(hasResult, mode)}</div>${isAudit ? '<p class="audit-toolbar-note lang-no-toggle">ⓘ AI may err · Check duplicate answers and ambiguous keys.</p>' : ''}`;
+            return `<div class="audit-toolbar lang-no-toggle"><div class="audit-toolbar-top">${window.reviewTabsHtml(mode)}<div class="audit-actions"><button type="button" class="audit-run" onclick="${run}" title="Use ${label} for this task" data-th-title="ใช้ ${label} ทำงานนี้">↻ ${isAudit ? 'Review' : 'Rewrite'}</button>${allowExport ? '<button type="button" onclick="exportAiAnalysisMd()" title="Download the analysis as Markdown" data-th-title="ดาวน์โหลดผลการวิเคราะห์เป็น Markdown">Export</button>' : ''}<button type="button" class="audit-close" onclick="closeQuizReview()" aria-label="Close review" title="Close the quiz review" data-th-title="ปิดหน้าตรวจข้อสอบ">×</button></div></div>${window.auditModelControlsHtml(hasResult, mode)}</div>`;
         };
 
         window.runSelectedQualityAudit = function(btn) {
@@ -18041,7 +18043,7 @@
                         const saved = snap.exists ? (snap.data() || {}).lastAiAudit : null;
                         if (saved) {
                             let savedAtLabel = '';
-                            if (saved.savedAt && typeof saved.savedAt.toDate === 'function') savedAtLabel = saved.savedAt.toDate().toLocaleString();
+                            if (saved.savedAt && typeof saved.savedAt.toDate === 'function') savedAtLabel = saved.savedAt.toDate().toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
                             return await auditQuizAI(clickedBtn, {
                                 cachedResult: saved.result,
                                 cachedModel: saved.model,
@@ -18229,12 +18231,11 @@ RULES:
                 const dupMap = window.computeQuizSetDuplicatesAll(formData.questions);
                 window._auditLastElapsed = (opts && opts.cachedResult) ? '' : auditElapsed(); // V101.22
                 renderAuditScorecard(result, aiModel, aiTokens, bp, formData.questions, (opts && opts.cachedResult) ? (opts.cachedSavedAtLabel || '') : null, dupMap);
+                // V101.65: stale = an "Edited" chip in the summary line + a highlighted Review button, not a banner.
                 if (opts.cachedStale) {
-                    const notice = document.createElement('p');
-                    notice.textContent = 'Questions were edited after this review — run Review again. The results below are from the earlier review.';
-                    notice.title = 'คำถามมีการแก้ไข ควรตรวจใหม่ — ผลด้านล่างเป็นผลตรวจเดิม';
-                    notice.style = 'color:#92400e; background:#fffbeb; padding:12px; border-radius:8px;';
-                    document.getElementById('ai-audit-popup').prepend(notice);
+                    const popup = document.getElementById('ai-audit-popup');
+                    popup.querySelector('.audit-meta-stale').hidden = false;
+                    popup.querySelector('.audit-run').classList.add('audit-run-stale');
                 }
 
             } catch (e) {
@@ -18349,7 +18350,6 @@ RULES:
             };
             const dimLabel = window.auditDimLabels('label');
             const overall = Number(result.overallScore || 0).toFixed(1);
-            const overallBg = result.overallScore >= 4 ? '#dcfce7' : result.overallScore >= 3 ? '#fef9c3' : '#fee2e2';
             const overallColor = result.overallScore >= 4 ? '#15803d' : result.overallScore >= 3 ? '#a16207' : '#b91c1c';
 
             // V97.71: the dup panel recommends which of a pair to delete, and the numbers
@@ -18431,29 +18431,25 @@ RULES:
             modal.id = 'ai-audit-popup';
             modal.className = 'lang-no-toggle';
             modal.style = 'position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:92%; max-width:780px; max-height:85vh; background:white; padding:26px; border-radius:24px; box-shadow:0 20px 60px rgba(0,0,0,0.3); z-index:10001; overflow-y:auto; font-family:Inter, sans-serif;';
-            // V97.41: banner when this render came from a saved audit instead of a fresh
-            // AI call — mirrors analyzeQuizAI's savedBannerHtml (V97.39).
-            const savedBannerHtml = savedAtLabel !== null && savedAtLabel !== undefined ? `
-                <div style="background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; padding:10px 16px; border-radius:12px; margin-bottom:16px; font-size:0.85em; display:flex; align-items:center; gap:8px;">
-                    <i class="fa-solid fa-clock-rotate-left"></i> Showing a saved audit${savedAtLabel ? ` from ${savedAtLabel}` : ''} — no tokens spent. เลือกโมเดลแล้วกดตรวจใหม่เมื่อต้องการรันอีกครั้ง.
-                </div>
-            ` : '';
+            // V101.65: one summary line replaces the saved-audit banner (V97.41), the Overall
+            // Quality card, the per-model metrics lines and the footer; detail lives in tooltips.
+            const metricLine = (name, m) => m ? `${name} · Input ${m.usage?.inputTokens ?? '—'} · Output ${m.usage?.outputTokens ?? '—'} · Thinking ${m.usage?.thinkingTokens ?? '—'} · ${m.latencyMs ?? '—'} ms · ${m.finishReason || '—'} · JSON ${m.jsonValid === true ? 'valid' : '—'}` : '';
+            const tokens = Number(aiTokens) || 0;
+            const runDetail = [`Tokens: ${tokens.toLocaleString()}`, window._auditLastElapsed ? `Time: ${window._auditLastElapsed}` : '', metricLine('Gemini 3.8', result.gemini38Metrics), metricLine('GPT-5.6 Terra', result.terraMetrics)].filter(Boolean).join('\n');
+            const modelName = (window.textAIModelInfo && window.textAIModelInfo(aiModel) || {}).short || (window.AI_MODEL_REGISTRY?.models.find(m => m.id === aiModel) || {}).label || aiModel || '';
+            const metaHtml = `<div class="audit-meta">
+                <span class="audit-meta-score" style="color:${overallColor}" title="Overall quality ${overall} / 5${blueprintBloom ? ` · blueprint Bloom = ${escapeHtml(blueprintBloom)}` : ''}">${stars(result.overallScore)} ${overall}</span>
+                <span>· ${result.perQuestionAudit.length} Q</span>
+                ${savedAtLabel !== null && savedAtLabel !== undefined ? `<span title="Saved review — no tokens spent. Pick a model and press Review to run again." data-th-title="ผลตรวจที่บันทึกไว้ ไม่เสียโทเคน · เลือกโมเดลแล้วกด Review เพื่อตรวจใหม่">· <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> ${escapeHtml(savedAtLabel || 'Saved')}</span>` : ''}
+                <span title="${escapeHtml(runDetail)}">· ${escapeHtml(modelName)} · ${tokens >= 1000 ? (tokens / 1000).toFixed(1) + 'k' : tokens} tok</span>
+                <span class="audit-meta-stale" hidden title="Questions were edited after this review — press Review to run it again" data-th-title="คำถามมีการแก้ไข ควรตรวจใหม่ — ผลด้านล่างเป็นผลตรวจเดิม">⚠ Edited</span>
+                <span class="audit-meta-info" tabindex="0" aria-label="AI may err. Check duplicate answers and ambiguous keys." title="AI may err · Check duplicate answers and ambiguous keys.">ⓘ</span>
+            </div>`;
 
             modal.innerHTML = `
                 ${window.auditToolbarHtml(true)}
-                ${savedBannerHtml}
-                <div style="background:${overallBg}; padding:18px; border-radius:14px; margin-bottom:18px; text-align:center;">
-                    <div style="font-size:0.75em; color:${overallColor}; font-weight:800; letter-spacing:0.8px; text-transform:uppercase; margin-bottom:6px;">Overall Quality</div>
-                    <div style="font-size:1.6em; color:${overallColor}; font-weight:900;">${stars(result.overallScore)} ${overall} / 5</div>
-                    <div style="font-size:0.75em; color:${overallColor}; opacity:0.8; margin-top:4px;">${result.perQuestionAudit.length} question${result.perQuestionAudit.length === 1 ? '' : 's'} audited${blueprintBloom ? ` · blueprint Bloom = ${escapeHtml(blueprintBloom)}` : ''}</div>
-                </div>
+                ${metaHtml}
                 ${perQHtml}
-                ${result.gemini38Metrics ? `<div style="font-size:0.75em; color:#64748b; margin:10px 0;">Gemini 3.8 · Thinking: low · Input: ${escapeHtml(String(result.gemini38Metrics.usage?.inputTokens ?? '—'))} · Output: ${escapeHtml(String(result.gemini38Metrics.usage?.outputTokens ?? '—'))} · Thinking tokens: ${escapeHtml(String(result.gemini38Metrics.usage?.thinkingTokens ?? '—'))} · ${escapeHtml(String(result.gemini38Metrics.latencyMs ?? '—'))} ms · ${escapeHtml(result.gemini38Metrics.finishReason || '—')} · JSON: ${result.gemini38Metrics.jsonValid === true ? 'valid' : '—'}</div>` : ''}
-                ${result.terraMetrics ? `<div style="font-size:0.75em; color:#64748b; margin:10px 0;">GPT-5.6 Terra · Thinking: low · Input: ${escapeHtml(String(result.terraMetrics.usage?.inputTokens ?? '—'))} · Output: ${escapeHtml(String(result.terraMetrics.usage?.outputTokens ?? '—'))} · Thinking tokens: ${escapeHtml(String(result.terraMetrics.usage?.thinkingTokens ?? '—'))} · ${escapeHtml(String(result.terraMetrics.latencyMs ?? '—'))} ms · ${escapeHtml(result.terraMetrics.finishReason || '—')} · JSON: ${result.terraMetrics.jsonValid === true ? 'valid' : '—'}</div>` : ''}
-                <div style="margin-top:14px; padding-top:12px; border-top:1px solid #e2e8f0; font-size:0.7em; color:#94a3b8; display:flex; justify-content:space-between;">
-                    <span>🚀 Model: <b>${escapeHtml(aiModel || '')}</b> · 💡 Tokens: <b>${aiTokens.toLocaleString()}</b>${window._auditLastElapsed ? ` · ⏱ Time: <b>${window._auditLastElapsed}</b>` : ''}</span>
-                    <span style="opacity:0.7;">V93.88 Q3 · 1-pass</span>
-                </div>
             `;
             document.body.appendChild(modal);
             syncAuditFixHints();

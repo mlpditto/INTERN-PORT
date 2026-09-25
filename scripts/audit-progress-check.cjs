@@ -16,7 +16,7 @@ check('clock: started once per fresh run, 1 s repaint, not for cached results', 
 check('button ticker shows the clock', /Auditing \$\{pct\}% · \$\{auditElapsed\(\)\}/.test(admin), true);
 check('clock cleared in finally', /if \(auditClockTimer\) clearInterval\(auditClockTimer\); \/\/ V101\.22/.test(admin), true);
 check('scorecard gets the final time on fresh runs only', /window\._auditLastElapsed = \(opts && opts\.cachedResult\) \? '' : auditElapsed\(\); \/\/ V101\.22\n\s*renderAuditScorecard\(/.test(admin), true);
-check('scorecard footer prints ⏱ Time next to model + tokens', /💡 Tokens: <b>\$\{aiTokens\.toLocaleString\(\)\}<\/b>\$\{window\._auditLastElapsed \? ` · ⏱ Time: <b>\$\{window\._auditLastElapsed\}<\/b>` : ''\}/.test(admin), true);
+check('scorecard summary line keeps tokens + time in its tooltip (V101.65)', admin.includes("[`Tokens: ${tokens.toLocaleString()}`, window._auditLastElapsed ? `Time: ${window._auditLastElapsed}` : ''"), true);
 
 // functional: run the real elapsed formatter + paint through a tiny harness of the helper block
 const a = admin.indexOf('            const auditStartedAt = performance.now();');
