@@ -73,7 +73,7 @@ deceptive: `fetch()` of a download URL fails with a bare network error while **N
 the same URL opens the file fine, so it reads as a code bug rather than a bucket setting.
 That is what happened to the applicant-document PDF viewer on 2026-09-09.
 
-Running it: this repo's machines have no `gcloud`, so use **Google Cloud Shell** — and click
+Running it: the shop machine (MLP111) has `gcloud`; the HP machine does not, so there use **Google Cloud Shell** — and click
 **Open Terminal** first, because Cloud Shell now opens on the Editor with Gemini Code Assist,
 where a pasted command becomes a request to edit a file instead of a command to run. Verify
 with:
