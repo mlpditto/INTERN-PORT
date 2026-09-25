@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.76)</title>
+    <title>Nika Admin (V101.77)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -18939,7 +18939,7 @@ RULES:
                 <div class="sqm-custom" hidden>
                     <textarea id="suggest-custom" rows="4" maxlength="6000" oninput="sqmCustomTyped()" placeholder="Extra instructions, e.g. focus on renal dose adjustment — and/or paste text from a source to write the questions from" aria-label="Custom focus: instructions or source text"></textarea>
                     <div class="sqm-need" hidden>Type instructions or paste source text first.</div>
-                    <div class="sqm-warn" hidden>⚠ AI won't open links — paste the text from that page instead.</div>
+                    <div class="sqm-warn" hidden>🔗 Links are read first and their page text goes to the AI (web pages only, up to 3).</div>
                 </div>
                 <button type="button" onclick="suggestMoreQuestionsAI()" id="btn-suggest-start" class="sqm-go"></button>
             `;
@@ -19084,9 +19084,27 @@ RULES:
                 : 'Thai';
             
             try {
-                btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Brainstorming...`;
                 btn.disabled = true;
-                
+                // V101.77: links in the Custom box are read server-side (fetchLinkText) and
+                // their page text goes into the prompt; a link that can't be read stops here.
+                const links = [...new Set(customText.match(/\bhttps?:\/\/[^\s<>"')\]]+|\bwww\.[^\s<>"')\]]+/gi) || [])].map(u => u.replace(/[.,;:]+$/, ''));
+                if (links.length > 3) throw new Error(`Up to 3 links can be read — this box has ${links.length}.`);
+                const pages = [];
+                for (const [i, link] of links.entries()) {
+                    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Reading link ${i + 1}/${links.length}...`;
+                    const resp = await fetch('https://us-central1-intern-port-edfa7.cloudfunctions.net/fetchLinkText', {
+                        method: 'POST', headers: await window._aiAuthHeaders(), body: JSON.stringify({ url: link })
+                    });
+                    const data = await resp.json().catch(() => ({}));
+                    if (!resp.ok || data.error) throw new Error(`Couldn't read ${link}\n${data.error || 'HTTP ' + resp.status}\n\nRemove the link or paste the page text instead.`);
+                    pages.push(`[${data.title || link}] (${data.url || link})${data.truncated ? ' — first part of the page only' : ''}\n${data.text}`);
+                }
+                const pagesBlock = pages.length ? `
+                --- SOURCE PAGES (text read from the admin's links) ---
+                ${pages.join('\n\n')}
+                ` : '';
+                btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Brainstorming...`;
+
                 const prompt = `You are an expert educational assessment designer. Create exactly ${n} HIGH-QUALITY, CHALLENGING questions that enhance the quiz "${quizTitle}" beyond simple translation.
                 
                 --- EXISTING QUESTIONS ---
@@ -19094,8 +19112,8 @@ RULES:
                 ${customText ? `
                 --- ADMIN INSTRUCTIONS / SOURCE MATERIAL ---
                 ${customText}
-                (Follow these instructions. If a passage of source text is included, base the new questions on it and do not add facts it does not support. You cannot open links — ignore any URL rather than guessing what the page says.)
-                ` : ''}
+                (Follow these instructions. If a passage of source text is included, base the new questions on it and do not add facts it does not support. ${pages.length ? 'The text of the linked pages is under SOURCE PAGES — use it as source text.' : 'You cannot open links — ignore any URL rather than guessing what the page says.'})
+                ${pagesBlock}` : ''}
                 --- QUALITY REQUIREMENTS ---
                 - Difficulty: ${diff.toUpperCase()} - Make questions genuinely challenging, not just harder vocabulary
                 - Focus: ${focusLabel} - Create deeper learning opportunities
