@@ -62,7 +62,7 @@ const { chromium } = require('playwright');
         await page.locator('#ai-audit-popup .audit-run').click();
         assert.equal(await page.evaluate(() => auditRequest.model), 'gpt-6-sol');
         await page.locator('#ai-analysis-popup [data-provider="Claude"]').click();
-        assert.equal(await page.locator('#ai-analysis-popup .text-ai-chips button:visible').count(), 3);
+        assert.equal(await page.locator('#ai-analysis-popup .text-ai-chips button:visible').count(), 4); // Claude: Haiku 4.5, Sonnet 5, Opus 5.5, Fable 5.1
         assert.equal(await page.locator('#rewrite-ai-model').inputValue(), 'gpt-6-luna');
         await page.locator('#ai-analysis-popup [data-value="claude-haiku-4-5"]').click();
         await page.locator('#ai-analysis-popup .audit-run').click();
