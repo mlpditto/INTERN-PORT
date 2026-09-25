@@ -39,7 +39,7 @@ with sync_playwright() as p:
     page.evaluate('''() => {
         window._bulkPasteParsed=Array.from({length:10},()=>({include:true,q:'Test',options:['A','B'],correct:[]}));
         window.requestModels=[];window.disabledDuringRun=[];window.callUniversalAI=()=>{};
-        document.getElementById('ai-analyzer-model-val').value='gpt-5.6-luna';
+        document.getElementById('ai-analyzer-model-val').value='gpt-6-luna';
         window._aiFindAnswerCore=async(q,options,model)=>{
             requestModels.push(model);disabledDuringRun.push(document.getElementById('bp-ai-model').disabled);
             return {picks:[0],conf:90,rationale:'Test'};
@@ -50,7 +50,7 @@ with sync_playwright() as p:
     assert page.evaluate('requestModels') == ['claude-haiku-4-5']*10
     assert page.evaluate('disabledDuringRun.every(Boolean)')
     assert select.is_enabled()
-    assert page.locator('#ai-analyzer-model-val').input_value() == 'gpt-5.6-luna'
+    assert page.locator('#ai-analyzer-model-val').input_value() == 'gpt-6-luna'
     bounds=select.bounding_box()
     assert bounds['x']>=0 and bounds['x']+bounds['width']<=390
     print('PASS: shared model catalog, saved selection, 10 requests use EVIE model, run lock, independent analyzer, mobile width')

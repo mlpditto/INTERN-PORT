@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.dcaSyncAutoDraftChipFromStorage = () => {
         let saved;
         try { saved = localStorage.getItem(DCA_AI_LS_KEY); } catch (_) {}
-        const selected = choices.some(m => m.id === saved) ? saved : 'gpt-5.6-luna';
+        const selected = choices.some(m => m.id === saved) ? saved : 'gpt-6-luna';
         byId('dca-ai-model-val').value = selected; localStorage.setItem(DCA_AI_LS_KEY, selected); render(selected);
     };
     dcaSyncAutoDraftChipFromStorage();

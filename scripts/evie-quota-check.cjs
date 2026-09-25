@@ -17,7 +17,7 @@ async function batch(failAt, message) {
             if(n===failAt) throw new Error(message);
             return {picks:[0],conf:90,rationale:'Test'};
         }},
-        document:{getElementById:id=>id==='bp-find-btn'?button:id==='bp-preview-count'?count:{value:'gpt-5.6-luna'}},
+        document:{getElementById:id=>id==='bp-find-btn'?button:id==='bp-preview-count'?count:{value:'gpt-6-luna'}},
         renderBulkPastePreview:()=>{count.textContent='Preview';},
         showToast:(...args)=>toasts.push(args), console:{warn:()=>{}}
     };

@@ -9,7 +9,7 @@ const assert = require('node:assert/strict'), { chromium } = require('playwright
     await page.addStyleTag({ path: 'public/ai-usage-overview.css' });
     await page.addScriptTag({ path: 'public/ai-model-ui.js' });
     const billed = await page.evaluate(() => {
-        document.getElementById('rail').innerHTML = textAIChipsHtml('', 'gpt-5.6-luna', '');
+        document.getElementById('rail').innerHTML = textAIChipsHtml('', 'gpt-6-luna', '');
         return [...document.querySelectorAll('#rail button[data-bill="google"]')].map(b => b.dataset.value);
     });
     assert.deepEqual(billed, ['as/gemini-3.5-flash-lite', 'gemini-3.8-flash']);
@@ -18,7 +18,7 @@ const assert = require('node:assert/strict'), { chromium } = require('playwright
     // and the rail has no legend line.
     assert.equal(await page.locator('#rail button[data-value="gemini-3.8-flash"]').innerText(), 'Flash 3.8');
     assert.match(await page.locator('#rail button[data-value="gemini-3.8-flash"]').getAttribute('title'), /แถบสีใต้ชื่อ = ค่าใช้จ่ายเรียกเก็บผ่านบัญชี Google Cloud/);
-    assert.equal(await page.locator('#rail button[data-value="gpt-5.6-luna"]').getAttribute('title').then(t => t.includes('Google Cloud')), false);
+    assert.equal(await page.locator('#rail button[data-value="gpt-6-luna"]').getAttribute('title').then(t => t.includes('Google Cloud')), false);
     assert.equal(await page.locator('#rail .text-ai-chips').evaluate(n => getComputedStyle(n, '::after').content), 'none');
 
     await page.evaluate(() => {
@@ -26,7 +26,7 @@ const assert = require('node:assert/strict'), { chromium } = require('playwright
         const docs = [{ date, totalCount: 10, totalTokens: 1000, models: {
             a: { provider: 'gemini', model: 'gemini-3.5-flash', count: 3, tokens: 300 },
             b: { provider: 'gemini-aistudio', model: 'gemini-3.8-flash', count: 2, tokens: 100 },
-            c: { provider: 'openai', model: 'gpt-5.6-luna', count: 5, tokens: 600 } } }];
+            c: { provider: 'openai', model: 'gpt-6-luna', count: 5, tokens: 600 } } }];
         window.db = { collection: () => ({ where: () => ({ orderBy: () => ({ get: async () => ({ docs: docs.map(d => ({ data: () => d })) }) }) }) }) };
     });
     await page.addScriptTag({ path: 'public/ai-usage-overview.js' });

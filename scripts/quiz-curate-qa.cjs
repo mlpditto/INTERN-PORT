@@ -12,7 +12,7 @@ const { chromium } = require('playwright');
         const html = fs.readFileSync('public/admin.html', 'utf8');
         assert(html.includes('onclick="openQuizCurate()"'));
         assert(/src="quiz-curate\.js\?v=V\d+\.\d+"/.test(html)); // cache-bust version moves every release
-        await page.setContent([...html.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/gi)].map(m => m[0]).join('\n') + '<input id="edit-quiz-id" value="source-quiz"><input id="ai-analyzer-model-val" value="gpt-5.6-luna">');
+        await page.setContent([...html.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/gi)].map(m => m[0]).join('\n') + '<input id="edit-quiz-id" value="source-quiz"><input id="ai-analyzer-model-val" value="gpt-6-luna">');
         await page.addStyleTag({ path: 'public/quiz-curate.css' });
         await page.addStyleTag({ path: 'public/text-ai-chips.css' });
         await page.addScriptTag({ path: 'public/ai-model-ui.js' });

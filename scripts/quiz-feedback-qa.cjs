@@ -42,7 +42,7 @@ const modalEnd = html.indexOf('        <!-- V92.95: Score Audit Modal',modalStar
         assert.deepEqual(await page.locator('#default-qfp-model option').evaluateAll(es=>es.map(e=>e.value)),ids);
         for (const saved of ['', 'gpt-4o-mini', 'unknown-model', 'gpt-6-astra', 'claude-fable-5-1']) {
             await page.evaluate(saved=>{localStorage.setItem('ai_default_qfp_model',saved);delete document.getElementById('default-qfp-model').dataset.registryReady;initRegistryModelSelectors();},saved);
-            const expected=ids.includes(saved)?saved:'gpt-5.6-luna';
+            const expected=ids.includes(saved)?saved:'gpt-6-luna';
             assert.equal(await page.locator('#default-qfp-model').inputValue(),expected);
             assert.equal(await page.locator('#ai-model-selector').inputValue(),expected);
             assert.equal(await page.evaluate(()=>localStorage.getItem('ai_default_qfp_model')),expected);

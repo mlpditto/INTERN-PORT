@@ -5,17 +5,18 @@
         // it is shown elsewhere and the audit toolbar filters on its first word.
         { id: 'as/gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', short: 'Lite 3.5', hint: 'Gemini รุ่นประหยัด สำหรับงานสั้น' },
         { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', short: 'Flash 3.8', hint: 'Gemini สำหรับวิเคราะห์และสรุปข้อมูล' },
-        { id: 'gpt-5.6-luna', label: 'GPT 5.6 Luna', short: 'Luna 5.6', hint: 'GPT รุ่นประหยัด ค่าเริ่มต้นสำหรับงานทั่วไป' },
+        { id: 'gpt-6-luna', label: 'GPT 6 Luna', short: 'Luna 6', hint: 'GPT รุ่นประหยัด ค่าเริ่มต้นสำหรับงานทั่วไป' },
         { id: 'gpt-5.6-terra', label: 'GPT 5.6 Terra', short: 'Terra 5.6', hint: 'GPT สำหรับงานวิเคราะห์ที่ซับซ้อนขึ้น' },
-        { id: 'gpt-5.6-sol', label: 'GPT 5.6 Sol', short: 'Sol 5.6', hint: 'GPT สำหรับงานที่ต้องการรายละเอียดมากขึ้น' },
+        { id: 'gpt-6-sol', label: 'GPT 6 Sol', short: 'Sol 6', hint: 'GPT สำหรับงานที่ต้องการรายละเอียดมากขึ้น' },
         { id: 'gpt-6-astra', label: 'GPT 6 Astra', short: 'Astra 6', hint: 'GPT รุ่นใหญ่ ใช้เมื่อต้องการความสามารถสูง' },
         { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', short: 'Haiku 4.5', hint: 'Claude รุ่นประหยัด สำหรับงานสั้น' },
         { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', short: 'Sonnet 5', hint: 'Claude สำหรับงานเขียนและวิเคราะห์' },
+        { id: 'claude-opus-5-5', label: 'Claude Opus 5.5', short: 'Opus 5.5', hint: 'Claude รุ่นใหญ่ ถูกกว่า Fable สำหรับงานวิเคราะห์ที่ซับซ้อน' },
         { id: 'claude-fable-5-1', label: 'Claude Fable 5.1', short: 'Fable 5.1', hint: 'Claude สำหรับงานที่ต้องการรายละเอียดมากขึ้น' },
         { id: 'or/qwen/qwen3.8-flash', label: 'Qwen 3.8 Flash', short: 'Qwen Flash 3.8', hint: 'Qwen รุ่นประหยัด ภาษาไทยดี ผ่าน OpenRouter' },
         { id: 'or/qwen/qwen3.8-max-0902', label: 'Qwen 3.8 Max', short: 'Qwen Max 3.8', hint: 'Qwen รุ่นใหญ่ ภาษาไทยดี สำหรับคัดและเปรียบเทียบข้อสอบ ผ่าน OpenRouter' },
         { id: 'or/deepseek/deepseek-v4.1-flash', label: 'DeepSeek V4.1 Flash', short: 'DeepSeek Flash V4.1', hint: 'DeepSeek รุ่นประหยัด ผ่าน OpenRouter' },
-        { id: 'or/deepseek/deepseek-v4-pro', label: 'DeepSeek V4 Pro', short: 'DeepSeek Pro V4', hint: 'DeepSeek รุ่นใหญ่ เหมาะกับงานวิเคราะห์ ผ่าน OpenRouter' }
+        { id: 'or/deepseek/deepseek-v4-pro-0813', label: 'DeepSeek V4 Pro', short: 'DeepSeek Pro V4', hint: 'DeepSeek รุ่นใหญ่ เหมาะกับงานวิเคราะห์ ผ่าน OpenRouter' }
     ];
     // Official marks (assets/logos, from openai.com/brand and anthropic.com/press-kit). Owners
     // without a small official mark (Qwen, DeepSeek) carry their name in `short` instead.
@@ -31,7 +32,9 @@
     // V101.57: Gemini called directly (Vertex, or AI Studio `as/`) is billed to the Google Cloud
     // billing account; `or/google/…` is billed by OpenRouter. The chip shows it (text-ai-chips.css).
     window.isGoogleBilledModel = id => /^(gemini-|as\/)/.test(String(id || ''));
-    window.normalizeTextAIModel = value => models.some(m => m.id === value) ? value : 'gpt-5.6-luna';
+    // V101.64: GPT-6 Luna/Sol replace 5.6, DeepSeek V4 Pro moves to its 0813 GA snapshot — saved picks move to their successor, not to the default.
+    const RETIRED_TEXT_AI_MODELS = { 'gpt-5.6-luna': 'gpt-6-luna', 'gpt-5.6-sol': 'gpt-6-sol', 'or/deepseek/deepseek-v4-pro': 'or/deepseek/deepseek-v4-pro-0813' };
+    window.normalizeTextAIModel = value => { value = RETIRED_TEXT_AI_MODELS[value] || value; return models.some(m => m.id === value) ? value : 'gpt-6-luna'; };
     // A trial id stays as-is where a caller explicitly picked it; anything else normalises as before.
     window.resolveTrialTextAIModel = value => trialModels.some(m => m.id === value) ? value : window.normalizeTextAIModel(value);
     window.isTrialTextAIModel = value => trialModels.some(m => m.id === value);
