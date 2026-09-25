@@ -70,8 +70,8 @@ window.AI_MODEL_REGISTRY = {
         "json"
       ],
       "selectable": true,
-      "access": "docs-2026-09-24",
-      "validation": "pending-live-check",
+      "access": "verified-2026-09-25",
+      "validation": "text-json-pass",
       "rollout": "trial-only-defaults-unchanged"
     },
     {
@@ -125,8 +125,8 @@ window.AI_MODEL_REGISTRY = {
         "json"
       ],
       "selectable": true,
-      "access": "docs-2026-09-25",
-      "validation": "pending-live-check",
+      "access": "verified-2026-09-25",
+      "validation": "text-json-pass",
       "rollout": "trial-only-defaults-unchanged"
     },
     {
@@ -179,8 +179,8 @@ window.AI_MODEL_REGISTRY = {
         "json"
       ],
       "selectable": true,
-      "access": "docs-2026-09-24",
-      "validation": "pending-live-check",
+      "access": "verified-2026-09-25",
+      "validation": "text-json-pass",
       "rollout": "quiz-feedback"
     },
     {
