@@ -223,6 +223,52 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         await page.waitForFunction(() => !QuizCover.isBusy());
         assert.equal(await page.evaluate(() => QuizCover.value()), 'https://example.com/next.webp');
         assert.equal(await page.locator('.quiz-cover-ai-preview').isVisible(), false);
+        // V101.91: corner badge — drawn by code onto the AI image, never sent to the model; an ICD-11 tag
+        // pre-fills the field only when the admin opens it. A red 300×400 image; the chip lands at ~(12,12).
+        await page.evaluate(() => {
+            const tags = document.createElement('input'); tags.id = 'quiz-tags'; tags.value = 'Psychiatry, 6B00, anxiety'; document.body.append(tags);
+            const c = document.createElement('canvas'); c.width = 300; c.height = 400;
+            const x = c.getContext('2d'); x.fillStyle = '#ff0000'; x.fillRect(0, 0, 300, 400);
+            window.redImage = c.toDataURL('image/png');
+            window.callUniversalAI = async (...args) => { window.aiArgs = args; return { imageDataUrl: redImage }; };
+            window.uploadedBlobs = [];
+            window.adminApp = {storage: () => ({ref: () => ({put: async blob => { uploadedBlobs.push(blob); }, getDownloadURL: async () => 'https://example.com/badge.webp'})})};
+            window.cornerOf = async source => {
+                const bitmap = await createImageBitmap(source instanceof Blob ? source : await (await fetch(source.src)).blob());
+                const c = document.createElement('canvas'); c.width = bitmap.width; c.height = bitmap.height;
+                const x = c.getContext('2d'); x.drawImage(bitmap, 0, 0);
+                const [r, , b] = x.getImageData(20, 22, 1, 1).data; return r < 120 && b > 40 ? 'badge' : 'plain';
+            };
+        });
+        const corner = () => page.evaluate(() => cornerOf(document.querySelector('.quiz-cover-ai-preview img')));
+        assert.equal(await page.locator('[data-badge]').isVisible(), false, 'Badge field collapsed by default');
+        assert.equal(await page.evaluate(() => QuizCover.badge()), '');
+        await page.locator('[data-generate]').click();
+        await page.waitForFunction(() => !QuizCover.isBusy());
+        assert.equal(await corner(), 'plain', 'No badge text → no chip');
+        await page.locator('[data-badge-toggle]').click();
+        assert.equal(await page.locator('[data-badge]').inputValue(), 'ICD-11 6B00', 'ICD-11 tag pre-fills the field');
+        assert.equal(await page.locator('[data-badge-toggle]').getAttribute('aria-expanded'), 'true');
+        await page.waitForFunction(() => cornerOf(document.querySelector('.quiz-cover-ai-preview img')).then(v => v === 'badge'));
+        await page.locator('[data-badge]').fill('');
+        await page.waitForFunction(() => cornerOf(document.querySelector('.quiz-cover-ai-preview img')).then(v => v === 'plain'));
+        for (const width of [320, 1100]) {
+            await page.setViewportSize({width, height: 800});
+            assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'No overflow with the badge field open');
+        }
+        await page.locator('[data-badge]').fill('ICD-11 6B00');
+        await page.locator('[data-apply]').click(); // inside the 250 ms debounce: Apply must still upload the badge
+        await page.waitForFunction(() => QuizCover.value() === 'https://example.com/badge.webp');
+        assert.equal(await page.evaluate(() => cornerOf(uploadedBlobs.at(-1))), 'badge', 'Uploaded cover carries the badge');
+        assert.doesNotMatch(await page.evaluate(() => aiArgs[1]), /ICD-11 6B00/, 'Badge text never goes into the AI prompt (the bare tag already did, as before)');
+        assert.equal(await page.evaluate(() => QuizCover.badge()), 'ICD-11 6B00', 'Badge survives Apply for Save');
+        await page.evaluate(() => QuizCover.setBadge('x'.repeat(40)));
+        assert.equal(await page.evaluate(() => QuizCover.badge().length), 24);
+        await page.evaluate(() => QuizCover.setBadge(undefined));
+        assert.equal(await page.evaluate(() => QuizCover.badge()), '');
+        assert.equal(await page.locator('[data-badge]').isVisible(), false);
+        // V101.91: the Image 2 chip's OpenAI Blossom is the white file on the dark bar.
+        assert.match(await page.locator('.quiz-cover-model-rail .text-ai-logo[data-owner="openai"]').evaluate(e => getComputedStyle(e).backgroundImage), /openai-blossom-white/);
         console.log('PASS: AI title validation, preview, accept, discard, invalid response, content-filter fallback, stale generation and responsive layout.');
         console.log('PASS: cover load/remove/upload with mocked storage, unsafe URL rejection, locked/collapsed protection, mobile deadline, keyboard start.');
     } finally { await browser.close(); }
