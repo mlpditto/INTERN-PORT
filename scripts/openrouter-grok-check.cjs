@@ -8,7 +8,7 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const src = fs.readFileSync(path.join(root, 'functions', 'index.js'), 'utf8').replace(/\r\n/g, '\n');
 const admin = fs.readFileSync(path.join(root, 'public', 'admin.html'), 'utf8').replace(/\r\n/g, '\n');
-const { extractJson } = require(path.join(root, 'functions', 'modern-ai.js'));
+const { extractJson, imagePart } = require(path.join(root, 'functions', 'modern-ai.js'));
 const checks = [];
 const check = (name, got, want) => checks.push([name, got, want]);
 
@@ -17,12 +17,12 @@ const a = src.indexOf('if (provider === "openrouter") {');
 const b = src.indexOf('// --- 🟢 Jev AI', a);
 if (a < 0 || b < 0) throw new Error('OpenRouter branch not found in functions/index.js');
 const runBranch = new Function('ctx', `return (async () => {
-    const { provider, prompt, isJson, model, generationOptions, req, res, postWithRetry, extractJson, process, console } = ctx;
+    const { provider, prompt, isJson, model, generationOptions, visionData, req, res, postWithRetry, extractJson, imagePart, process, console } = ctx;
     ${src.slice(a, b)}
     return undefined;
 })();`);
 
-async function call({ model, isJson = false, maxOutputTokens, reply, reject, options }) {
+async function call({ model, isJson = false, maxOutputTokens, reply, reject, options, visionData = null }) {
     const sent = [];
     const out = { status: 200, body: undefined };
     const res = { status(c) { out.status = c; return res; }, json(x) { out.body = x; return res; } };
@@ -31,8 +31,8 @@ async function call({ model, isJson = false, maxOutputTokens, reply, reject, opt
     const quiet = { log() {}, error() {}, warn() {} };
     let thrown = null;
     try {
-        await runBranch({ provider: 'openrouter', prompt: 'Audit these questions', isJson, model, generationOptions,
-            req: { body: { generationOptions } }, res, postWithRetry, extractJson,
+        await runBranch({ provider: 'openrouter', prompt: 'Audit these questions', isJson, model, generationOptions, visionData,
+            req: { body: { generationOptions } }, res, postWithRetry, extractJson, imagePart,
             process: { env: { OPENROUTER_API_KEY: 'sk-or-test' } }, console: quiet });
     } catch (e) { thrown = e; }
     return { body: sent[0]?.body, url: sent[0]?.url, calls: sent.length, status: out.status, resBody: out.body, thrown };
@@ -51,6 +51,17 @@ const ok = (content, finish = 'stop', usage = { prompt_tokens: 100, completion_t
     check('T2 Grok: no image modalities on a text model', g.body.modalities, undefined);
     const gd = await call({ model: 'x-ai/grok-4.7', reply: ok('plain answer') });
     check('T2 Grok: default cap 8192 and no response_format for text calls', `${gd.body.max_tokens}|${gd.body.response_format}`, '8192|undefined');
+
+    // T-V (V101.70) — the caller's image reaches OpenRouter (it used to be dropped: Qwen answered "No image was provided")
+    const visImg = { image_base64: 'data:image/png;base64,iVBORw0KGgo=', image_mimetype: 'image/png' };
+    const v = await call({ model: 'qwen/qwen3.8-flash', isJson: true, visionData: visImg, reply: ok('{"text":"x"}') });
+    check('T-V vision: content is [text, image_url]', JSON.stringify((v.body.messages[0].content || []).map(p => p.type)), '["text","image_url"]');
+    check('T-V vision: data URL rebuilt once (prefix stripped by imagePart)', v.body.messages[0].content[1].image_url.url, 'data:image/png;base64,iVBORw0KGgo=');
+    check('T-V vision: prompt kept as the text part', v.body.messages[0].content[0].text.startsWith('Audit these questions'), true);
+    const vt = await call({ model: 'qwen/qwen3.8-flash', reply: ok('x') });
+    check('T-V no image: content stays a plain string', typeof vt.body.messages[0].content, 'string');
+    const vg = await call({ model: 'openai/gpt-5.4-image-2', visionData: visImg, reply: { choices: [{ message: { content: '', images: [{ image_url: { url: 'data:image/png;base64,AA' } }] } }] } });
+    check('T-V image generation keeps the prompt-only body', typeof vg.body.messages[0].content, 'string');
 
     // T3 — regression: other OpenRouter models keep their exact body
     const q = await call({ model: 'qwen/qwen3.8-flash', isJson: true, maxOutputTokens: 8192, reply: ok('{}') });

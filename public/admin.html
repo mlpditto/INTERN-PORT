@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.69)</title>
+    <title>Nika Admin (V101.70)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6456,7 +6456,7 @@
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <!-- V93.08: cache-bust on taxonomy.js for the LP Firestore overlay rollout -->
     <script src="ai-model-registry.js?v=V101.69"></script>
-    <script src="ai-model-ui.js?v=V101.64"></script>
+    <script src="ai-model-ui.js?v=V101.70"></script>
     <link rel="stylesheet" href="text-ai-chips.css?v=V101.62">
     <link rel="stylesheet" href="quiz-resource-cards.css?v=V99.68">
     <link rel="stylesheet" href="case-split-studio.css?v=V100.38">
@@ -24647,7 +24647,8 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 const reader = new FileReader();
                 reader.onload = async () => {
                     const base64 = reader.result.split(',')[1];
-                    const aiModel = textAIModel('ai-analyzer-model-val');
+                    // V101.70: a text-only Settings default (DeepSeek V4 Pro) can't read the image — use Gemini 3.8 Flash.
+                    const aiModel = isTextOnlyAIModel(textAIModel('ai-analyzer-model-val')) ? 'gemini-3.8-flash' : textAIModel('ai-analyzer-model-val');
                     const aiLang = item.querySelector('.ai-lang-quiz').value;
 
                     const prompt = `Task: Extract quiz question and options from this image.
@@ -29073,7 +29074,8 @@ ${JSON.stringify(sourceObj)}`;
 
         // The nine text models also accept images through their server adapters.
         // Image generation and speech synthesis retain their specialist models.
-        const IMG_QUIZ_VISION_MODELS = window.TEXT_AI_MODELS;
+        // V101.70: minus the text-only models (DeepSeek V4 Pro) — they cannot see the image.
+        const IMG_QUIZ_VISION_MODELS = window.TEXT_AI_MODELS.filter(m => !window.isTextOnlyAIModel(m.id));
         // V101.69: default is GPT-6 Sol, not Luna 6. Vision smoke 2026-09-25: Luna 6 read numbers, shapes and
         // colours but invented Thai words (0/3 exact transcriptions; Luna 5.6 got 2/3); Sol 6 and Opus 5.5 read
         // Thai correctly. Question images here are mostly Thai, so the cheap default produced wrong questions.

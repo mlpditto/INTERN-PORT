@@ -28,7 +28,7 @@ check('suggest() reads finishReason from the proxy payload', /response\.raw && r
 
 check('modern-ai exports extractJson', typeof modern.extractJson, 'function');
 check('extractJson strips fences', modern.extractJson('```json\n{"a":1}\n```'), '{"a":1}');
-check('index.js imports extractJson', /const \{ registry: aiModelRegistry, runModernAI, extractJson \} = require\("\.\/modern-ai"\);/.test(index), true);
+check('index.js imports extractJson', /const \{[^}]*\bextractJson\b[^}]*\} = require\("\.\/modern-ai"\);/.test(index), true);
 check('OpenRouter text path: 502 with reason on bad JSON / length / empty', /\[openrouter\] \$\{error\}/.test(index) && /orFinish === "length"/.test(index) && /return res\.status\(502\)\.json\(\{ error, finishReason: orFinish, jsonValid: orJsonValid, requestedModel: orModel \}\);/.test(index), true);
 // V101.28 appended a usage block after jsonValid, so jsonValid is no longer the last key.
 check('OpenRouter success payload carries finishReason + jsonValid', /return res\.json\(\{\n\s*text: orText,[^}]*?finishReason: orFinish,\n\s*jsonValid: orJsonValid,/.test(index), true);

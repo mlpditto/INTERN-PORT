@@ -1,6 +1,6 @@
 
 const admin = require("firebase-admin");
-const { registry: aiModelRegistry, runModernAI, extractJson } = require("./modern-ai");
+const { registry: aiModelRegistry, imagePart, runModernAI, extractJson } = require("./modern-ai");
 admin.initializeApp();
 
 // Import migration function (wrapped in try-catch to prevent timeout)
@@ -1132,9 +1132,18 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             const orReasoning = orIsQwen
                 ? { max_tokens: Math.max(1024, Math.floor(orMaxTokens * 0.2)), exclude: true }
                 : { effort: "low", exclude: true };
+            // V101.70: attach the caller's image. This branch used to send the prompt only, so every
+            // OpenRouter text model (Qwen, DeepSeek, Grok) answered about an image it never saw — Qwen
+            // 3.8 Flash replied "No image was provided in this request."; the rest invented Thai text
+            // (vision smoke 2026-09-25). A text-only model (DeepSeek V4) now fails loudly on
+            // OpenRouter instead. Image-generation requests keep the prompt-only shape.
+            const orImage = !isImageRequest ? imagePart(visionData) : null;
+            const orContent = orImage
+                ? [{ type: "text", text: tailoredPrompt }, { type: "image_url", image_url: { url: `data:${orImage.mime};base64,${orImage.data}` } }]
+                : tailoredPrompt;
             const body = {
                 model: orModel,
-                messages: [{ role: "user", content: tailoredPrompt }],
+                messages: [{ role: "user", content: orContent }],
                 ...(isJson ? { response_format: { type: "json_object" } } : {}),
                 ...(isImageRequest ? { modalities: ["image", "text"] } : {}),
                 ...(orReasoningCapable ? { reasoning: orReasoning } : {}),
