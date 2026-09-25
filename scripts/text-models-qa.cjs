@@ -88,7 +88,7 @@ const { chromium } = require('playwright');
         await page.evaluate(() => initRegistryModelSelectors());
         assert.equal(await page.locator('[data-model-input]').count(), controls.length);
         for (const [from, to] of [
-            ['        window.auditModelControlsHtml =', '        window.auditToolbarHtml ='],
+            ['        // V101.74: provider-logo tabs', '        window.auditToolbarHtml ='], // providerModelRailHtml + auditModelControlsHtml
             ['        window._compareModelB =', '        window.generateAiProposalB ='],
             ['        const IMG_QUIZ_VISION_MODELS =', '        function imageQuizUpdateCount()']
         ]) {

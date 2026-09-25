@@ -143,8 +143,12 @@ const ok = (content, finish = 'stop', usage = { prompt_tokens: 100, completion_t
     check('T8 default chip rail has no Grok', /grok/i.test(win.textAIChipContents('gpt-6-luna')), false);
     const withTrial = win.textAIChipContents('gpt-6-luna', '', null, win.TEXT_AI_TRIAL_MODELS);
     check('T8 trial chip: text, full name, OpenRouter id, tooltip route', /data-value="or\/x-ai\/grok-4\.7" aria-label="Grok 4\.7" aria-pressed="false" title="Grok 4\.7 · or\/x-ai\/grok-4\.7 — [^"]*OpenRouter"[^>]*>Grok 4\.7<\/button>/.test(withTrial), true);
+    // V101.74: the rail builder is shared (providerModelRailHtml); trial models reach it only through the
+    // audit toolbar's call — the Expand Quiz modal passes no `extra`, so Grok stays audit-only.
     const trialUses = admin.match(/TEXT_AI_TRIAL_MODELS/g) || [];
-    check('T8 admin.html offers trial models only in the audit toolbar (chips + provider tabs)', trialUses.length, 2);
+    check('T8 admin.html offers trial models only in the audit toolbar (one call site)', `${trialUses.length}|${/return window\.providerModelRailHtml\(inputId, selected, action, TEXT_AI_TRIAL_MODELS\);/.test(admin)}`, '1|true');
+    check('T8 shared rail adds trial chips + tabs only from `extra`', /textAIChipContents\(selected, action, null, extra\)[\s\S]{0,900}\[\.\.\.TEXT_AI_MODELS, \.\.\.extra\]\.map/.test(admin), true);
+    check('T8 Expand Quiz rail passes no trial models', /providerModelRailHtml\('suggest-more-model', sqmModel, sqmAction\)/.test(admin), true);
     check('T8 Analyze tab does not save a trial pick as the Settings default', /;if\(!isTrialTextAIModel\(this\.dataset\.value\)\)syncModelDefault\('ai-analyzer-model-val',this\.dataset\.value\)/.test(admin), true);
     check('T8 Analyze + Suggest fix keep a picked trial model (no silent switch to Luna)', /const selectedModel = opts\?\.model \? resolveTrialTextAIModel\(opts\.model\)/.test(admin) && /window\.auditFixModel = \(\) => resolveTrialTextAIModel\(/.test(admin), true);
     check('T8 Analyze runs the model picked in the toolbar', /return analyzeQuizAI\(btn, \{ forceNew: true, model: \(document\.getElementById\('rewrite-ai-model'\) \|\| \{\}\)\.value \}\);/.test(admin), true);
