@@ -37,7 +37,7 @@ const { chromium } = require('playwright');
         for (const id of ['ai-audit-popup', 'ai-analysis-popup']) {
             const popup = page.locator('#' + id);
             // V101.05 added Qwen/DeepSeek chips; V101.21 gave them provider tabs; V101.52 adds the Grok trial chip here only.
-            assert.equal(await popup.locator('.text-ai-chips button').count(), 14);
+            assert.equal(await popup.locator('.text-ai-chips button').count(), 15); // V101.64: + Claude Opus 5.5
             assert.equal(await popup.locator('.text-ai-chips button:visible').count(), 4);
             assert.deepEqual(await popup.locator('.audit-provider').allTextContents(), ['Gemini', 'GPT', 'Claude', 'Qwen', 'DeepSeek', 'Grok']);
             assert.deepEqual(await popup.locator('.audit-provider').evaluateAll(ns => ns.map(n => getComputedStyle(n).color)), ['rgb(168, 180, 255)', 'rgb(125, 211, 176)', 'rgb(232, 180, 154)', 'rgb(201, 160, 240)', 'rgb(127, 200, 245)', 'rgb(212, 212, 216)']);
