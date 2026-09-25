@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.91)</title>
+    <title>Nika Admin (V101.92)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -16540,10 +16540,15 @@
                         const primaryError = await proxyResponse.json().catch(() => ({}));
                         if (primaryError && primaryError.error) {
                             const raw = String(primaryError.error);
+                            // modelName has lost its "or/" prefix by now; put it back so the chip name resolves.
+                            const chipName = window.aiModelShortName ? window.aiModelShortName(proxyProvider === 'openrouter' && !modelName.startsWith('or/') ? 'or/' + modelName : modelName) : modelName;
                             proxyAnsweredError = /support image input/i.test(raw)
-                                // modelName has lost its "or/" prefix by now; put it back so the chip name resolves.
-                                ? `${window.aiModelShortName ? window.aiModelShortName(proxyProvider === 'openrouter' && !modelName.startsWith('or/') ? 'or/' + modelName : modelName) : modelName} can't read images — pick another model for this task.`
-                                : raw;
+                                ? `${chipName} can't read images — pick another model for this task.`
+                                // V101.92: a provider safety-filter stop (Anthropic stop_reason "refusal", OpenAI
+                                // content_filter) came out as "incomplete or invalid output" and read like a bug.
+                                : /stopped with (?:refusal|content_filter)|\(content_filter\)/i.test(raw)
+                                    ? `${chipName} declined this request — the provider's safety filter stopped it before any output. It can flag pathogen, toxin or weapon-related topics even in medical teaching. Pick another model and run again.\n\n(${raw})`
+                                    : raw;
                         }
                         // V101.28: on GitHub Pages BACKUP_PROXY is the same URL as PROXY_URL, so a
                         // definitive error (e.g. 502 "stopped with length") used to be re-run in
@@ -16565,7 +16570,7 @@
                         if (isProxyOnlyModel) {
                             // V101.51: the proxy answered, so this is final — flag it so the catch below
                             // doesn't re-send the same (paid) request to the same URL.
-                            const definitive = new Error(primaryError?.error || `AI proxy failed with status ${proxyResponse.status}`);
+                            const definitive = new Error(proxyAnsweredError || primaryError?.error || `AI proxy failed with status ${proxyResponse.status}`); // V101.92: the rewritten message
                             definitive.proxyAnswered = true;
                             throw definitive;
                         }
