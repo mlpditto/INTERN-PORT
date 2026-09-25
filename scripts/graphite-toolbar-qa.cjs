@@ -39,7 +39,10 @@ const { chromium } = require('playwright');
             // V101.05 added Qwen/DeepSeek chips; V101.21 gave them provider tabs; V101.52 adds the Grok trial chip here only.
             assert.equal(await popup.locator('.text-ai-chips button').count(), 15); // V101.64: + Claude Opus 5.5
             assert.equal(await popup.locator('.text-ai-chips button:visible').count(), 4);
-            assert.deepEqual(await popup.locator('.audit-provider').allTextContents(), ['Gemini', 'GPT', 'Claude', 'Qwen', 'DeepSeek', 'Grok']);
+            // V101.65: provider tabs are logos named by aria-label; the chips next to them carry no logo.
+            assert.deepEqual(await popup.locator('.audit-provider').evaluateAll(ns => ns.map(n => n.getAttribute('aria-label'))), ['Gemini', 'GPT', 'Claude', 'Qwen', 'DeepSeek', 'Grok']);
+            assert.deepEqual(await popup.locator('.audit-provider .text-ai-logo').evaluateAll(ns => ns.map(n => n.dataset.owner)), ['gemini', 'openai', 'claude', 'qwen', 'deepseek', 'grok']);
+            assert.equal(await popup.locator('.text-ai-chips .text-ai-logo').count(), 0);
             assert.deepEqual(await popup.locator('.audit-provider').evaluateAll(ns => ns.map(n => getComputedStyle(n).color)), ['rgb(168, 180, 255)', 'rgb(125, 211, 176)', 'rgb(232, 180, 154)', 'rgb(201, 160, 240)', 'rgb(127, 200, 245)', 'rgb(212, 212, 216)']);
             assert.equal(await popup.locator('[data-value="gpt-6-astra"]').textContent(), 'Astra 6');
             assert.equal(await popup.locator('[data-value="gpt-6-astra"]').getAttribute('aria-label'), 'GPT 6 Astra');
