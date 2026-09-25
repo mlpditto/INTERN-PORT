@@ -104,9 +104,10 @@ const { chromium } = require('playwright');
             imageQuizRenderModelRail();
         });
         assert.equal(await page.locator('#dynamic-model-tests .text-ai-chips').count(), 2);
-        // V101.70: the image rail drops text-only models (DeepSeek) — they cannot see the image.
-        assert.equal(await page.locator('#img-quiz-model-rail button').count(), ids.filter(id => !id.startsWith('or/deepseek/')).length);
-        assert.equal(await page.locator('#img-quiz-model-rail button[onclick*="deepseek"]').count(), 0);
+        // V101.70: the image rail drops text-only models (DeepSeek V4 Pro); V4.1 Flash reads images and stays.
+        assert.equal(await page.locator('#img-quiz-model-rail button').count(), ids.filter(id => !id.startsWith('or/deepseek/deepseek-v4-pro')).length);
+        assert.equal(await page.locator('#img-quiz-model-rail button[onclick*="deepseek-v4-pro"]').count(), 0);
+        assert.equal(await page.locator('#img-quiz-model-rail button[onclick*="deepseek-v4.1-flash"]').count(), 1);
         // V101.69: image → quiz defaults to GPT-6 Sol — Luna 6 cannot transcribe Thai from images.
         assert.deepEqual(await page.locator('#img-quiz-model-rail button[aria-pressed="true"]').evaluateAll(bs => bs.map(b => b.getAttribute('onclick'))), ["imageQuizToggleModel('gpt-6-sol')"]);
         await page.locator('#dynamic-model-tests .text-ai-chips').first().locator('[data-value="claude-haiku-4-5"]').evaluate(b => b.click());
