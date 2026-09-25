@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.85)</title>
+    <title>Nika Admin (V101.86)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -18860,12 +18860,12 @@ RULES:
                 --- REQUIREMENTS ---
                 1. Follow ALL suggestions (clinical integration, variety, merging redundancy).
                 2. Maintain the same question schema as the input.
-                3. Output ONLY a valid JSON array of question objects. 
+                3. Output ONLY a valid JSON object whose "questions" array holds ALL the improved questions.
                 4. Do NOT wrap in markdown code blocks.
                 5. Output in Thai (or keeping original language mix).
-                
-                JSON QUESTION SCHEMA EXAMPLE:
-                [
+
+                JSON SCHEMA EXAMPLE:
+                {"questions": [
                   {
                     "q": "Improved question text...",
                     "type": "choice",
@@ -18873,16 +18873,18 @@ RULES:
                     "correct": [0],
                     "timer": 60
                   }
-                ]`;
+                ]}`;
 
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-3.8-flash';
                 const { text: resultJson } = await callUniversalAI(selectedModel, prompt, true, null, '', { feature: 'quiz_bulk_improve' });
 
                 // V92.35: use shared safeJsonParse with bracket-extraction fallback
-                const newQuestions = safeJsonParse(resultJson);
-                if (!newQuestions) throw new Error('AI returned invalid JSON. First 200 chars: ' + String(resultJson || '').slice(0, 200));
+                const parsed = safeJsonParse(resultJson);
+                if (!parsed) throw new Error('AI returned invalid JSON. First 200 chars: ' + String(resultJson || '').slice(0, 200));
+                // V101.86: JSON mode (json_object) needs a top-level object → {"questions":[...]}; a bare array still works.
+                const newQuestions = Array.isArray(parsed) ? parsed : parsed.questions;
 
-                if (newQuestions && Array.isArray(newQuestions)) {
+                if (Array.isArray(newQuestions) && newQuestions.length) {
                     const container = document.getElementById('quiz-questions-container');
                     container.innerHTML = "";
                     newQuestions.forEach(q => addQuestionUI(q));
@@ -28663,31 +28665,25 @@ ${JSON.stringify(sourceObj)}`;
                 1. Create exactly ${qCount} questions based on the key concepts in the content.
                 2. Use a mix of Multiple Choice (4 options) and Short Answer questions.
                 3. Ensure options for Multiple Choice are plausible but clearly distinct.
-                4. Output strictly valid JSON array of objects. No additional talk or formatting.
-                
+                4. Output strictly valid JSON: an object whose "questions" array holds all ${qCount} questions. No additional talk or formatting.
+
                 SCHEMA:
-                [{
+                {"questions": [{
                   "q": "The question text...",
                   "type": "choice" | "short_answer",
                   "options": ["A", "B", "C", "D"],
                   "correct": [index],
                   "timer": 60
-                }]
+                }]}
                 
                 LANGUAGE: Match the primary language of the content.`;
 
                 const res = await callUniversalAI(model, systemPrompt, true, null, '', { feature: 'kb_to_quiz' });
-                let quizJson = [];
-                
-                try {
-                    const match = res.text.match(/\[[\s\S]*\]/);
-                    if (match) {
-                        quizJson = JSON.parse(match[0]);
-                    } else {
-                        throw new Error("Invalid AI format");
-                    }
-                } catch (e) {
-                    throw new Error("AI failed to return structured quiz data. Please try again or use a different document.");
+                // V101.86: {"questions":[...]} (JSON mode needs a top-level object); a bare array still works.
+                const parsed = safeJsonParse(res.text);
+                const quizJson = Array.isArray(parsed) ? parsed : (parsed && parsed.questions);
+                if (!Array.isArray(quizJson)) {
+                    throw new Error("AI failed to return structured quiz data. Please try again or use a different document.\n\nFirst 200 chars: " + String(res.text || '').slice(0, 200));
                 }
 
                 if (quizJson.length > 0) {
