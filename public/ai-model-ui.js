@@ -11,6 +11,7 @@
         { id: 'gpt-6-astra', label: 'GPT 6 Astra', short: 'Astra 6', hint: 'GPT รุ่นใหญ่ ใช้เมื่อต้องการความสามารถสูง' },
         { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', short: 'Haiku 4.5', hint: 'Claude รุ่นประหยัด สำหรับงานสั้น' },
         { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', short: 'Sonnet 5', hint: 'Claude สำหรับงานเขียนและวิเคราะห์' },
+        { id: 'claude-opus-5-5', label: 'Claude Opus 5.5', short: 'Opus 5.5', hint: 'Claude รุ่นใหญ่ ถูกกว่า Fable สำหรับงานวิเคราะห์ที่ซับซ้อน' },
         { id: 'claude-fable-5-1', label: 'Claude Fable 5.1', short: 'Fable 5.1', hint: 'Claude สำหรับงานที่ต้องการรายละเอียดมากขึ้น' },
         { id: 'or/qwen/qwen3.8-flash', label: 'Qwen 3.8 Flash', short: 'Qwen Flash 3.8', hint: 'Qwen รุ่นประหยัด ภาษาไทยดี ผ่าน OpenRouter' },
         { id: 'or/qwen/qwen3.8-max-0902', label: 'Qwen 3.8 Max', short: 'Qwen Max 3.8', hint: 'Qwen รุ่นใหญ่ ภาษาไทยดี สำหรับคัดและเปรียบเทียบข้อสอบ ผ่าน OpenRouter' },
