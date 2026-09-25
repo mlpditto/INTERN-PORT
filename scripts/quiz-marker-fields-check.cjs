@@ -31,7 +31,7 @@ const quizzesData = [
 ];
 const toasts = [];
 const ctx = {
-    window: { CASE_SYSTEMS: [] }, document: { getElementById: mk }, quizzesData, db,
+    window: { CASE_SYSTEMS: [], SQM_EXAM_STYLES: { thai: { flag: '🇹🇭', label: 'Thai PC' }, pebc1: { flag: '🇨🇦', label: 'PEBC I' } } }, document: { getElementById: mk }, quizzesData, db,
     escapeHtml: v => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])),
     firebase: { firestore: { FieldValue: { delete: () => DELETE } } },
     confirm: () => true, prompt: () => ' Winter  Camp ', alert: m => { throw new Error('alert: ' + m); },
@@ -71,11 +71,22 @@ check('chips: new name becomes a chip', /data-value="Winter Camp"/.test(mk('quiz
 // side fields merged into every save
 mk('quiz-system-select').value = '';
 w._quizEditorLegacySource = 'ai_from_case';
-check('save (update): campaign + legacy source written', j(w.quizSystemFieldsFromEditor(true)), '{"coverageSystem":"<DELETE>","diseaseSystemKey":"<DELETE>","campaign":"Winter Camp","source":"ai_from_case"}');
+check('save (update): campaign + legacy source written', j(w.quizSystemFieldsFromEditor(true)), '{"coverageSystem":"<DELETE>","diseaseSystemKey":"<DELETE>","campaign":"Winter Camp","examStyle":"<DELETE>","source":"ai_from_case"}');
 w._quizEditorLegacySource = '';
 mk('quiz-campaign').value = '';
-check('save (update): empty campaign deletes the field', j(w.quizSystemFieldsFromEditor(true)), '{"coverageSystem":"<DELETE>","diseaseSystemKey":"<DELETE>","campaign":"<DELETE>"}');
+check('save (update): empty campaign deletes the field', j(w.quizSystemFieldsFromEditor(true)), '{"coverageSystem":"<DELETE>","diseaseSystemKey":"<DELETE>","campaign":"<DELETE>","examStyle":"<DELETE>"}');
 check('save (add): empty campaign writes nothing', j(w.quizSystemFieldsFromEditor(false)), '{}');
+
+// V101.76: exam style label
+w.populateQuizExamStyleChips('');
+check('style chips: None + one per SQM_EXAM_STYLES key', (mk('quiz-exam-style-chips').innerHTML.match(/data-value=/g) || []).length, 3);
+w._suggestMoreStyle = 'pebc1'; w.autoLabelQuizExamStyle();
+check('style: Expand Add labels an unlabelled quiz', mk('quiz-exam-style').value, 'pebc1');
+w._suggestMoreStyle = 'thai'; w.autoLabelQuizExamStyle();
+check('style: Expand Add never overrides a chosen style', mk('quiz-exam-style').value, 'pebc1');
+check('style: label = flag + name', w.quizExamStyleLabel('pebc1'), '🇨🇦 PEBC I');
+check('save (add): exam style written', j(w.quizSystemFieldsFromEditor(false)), '{"examStyle":"pebc1"}');
+mk('quiz-exam-style').value = '';
 
 // migration
 w.migrateQuizMarkerTags().then(() => {
