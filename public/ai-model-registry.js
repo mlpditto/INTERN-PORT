@@ -72,7 +72,8 @@ window.AI_MODEL_REGISTRY = {
       "selectable": true,
       "access": "verified-2026-09-25",
       "validation": "text-json-pass",
-      "rollout": "trial-only-defaults-unchanged"
+      "rollout": "trial-only-defaults-unchanged",
+      "visionNote": "2026-09-25: reads numbers/shapes/colours but invents Thai text (0/3); do not use for Thai OCR"
     },
     {
       "id": "gpt-5.6-luna",
@@ -126,7 +127,7 @@ window.AI_MODEL_REGISTRY = {
       ],
       "selectable": true,
       "access": "verified-2026-09-25",
-      "validation": "text-json-pass",
+      "validation": "text-json-vision-pass",
       "rollout": "trial-only-defaults-unchanged"
     },
     {
@@ -180,7 +181,7 @@ window.AI_MODEL_REGISTRY = {
       ],
       "selectable": true,
       "access": "verified-2026-09-25",
-      "validation": "text-json-pass",
+      "validation": "text-json-vision-pass",
       "rollout": "quiz-feedback"
     },
     {
