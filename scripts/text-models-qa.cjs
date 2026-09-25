@@ -105,6 +105,8 @@ const { chromium } = require('playwright');
         });
         assert.equal(await page.locator('#dynamic-model-tests .text-ai-chips').count(), 2);
         assert.equal(await page.locator('#img-quiz-model-rail button').count(), ids.length);
+        // V101.69: image → quiz defaults to GPT-6 Sol — Luna 6 cannot transcribe Thai from images.
+        assert.deepEqual(await page.locator('#img-quiz-model-rail button[aria-pressed="true"]').evaluateAll(bs => bs.map(b => b.getAttribute('onclick'))), ["imageQuizToggleModel('gpt-6-sol')"]);
         await page.locator('#dynamic-model-tests .text-ai-chips').first().locator('[data-value="claude-haiku-4-5"]').evaluate(b => b.click());
         assert.equal(await page.locator('#quality-audit-model').inputValue(), 'claude-haiku-4-5');
         await page.locator('#dynamic-model-tests .text-ai-chips').last().locator('[data-value="gpt-6-sol"]').evaluate(b => b.click());
