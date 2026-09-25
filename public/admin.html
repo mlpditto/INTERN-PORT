@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.65)</title>
+    <title>Nika Admin (V101.66)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6469,7 +6469,7 @@
     <script src="codex-vision.js?v=V101.20"></script>
     <!-- V91.98 fix: walker skips user-content subtrees (q-text-preview / md-render / lang-no-toggle) -->
     <script src="lang-toggle.js?v=V97.44"></script>
-<link rel="stylesheet" href="audit-toolbar.css?v=V101.65">
+<link rel="stylesheet" href="audit-toolbar.css?v=V101.66">
 <link rel="stylesheet" href="quiz-curate.css?v=V101.18">
 <script src="quiz-revision.js?v=V100.07"></script>
 <script src="ai-usage-overview.js?v=V101.59"></script>
@@ -17492,7 +17492,7 @@
                         const saved = snap.exists ? (snap.data() || {}).lastAiAnalysis : null;
                         if (saved) {
                             let savedAtLabel = '';
-                            if (saved.savedAt && typeof saved.savedAt.toDate === 'function') savedAtLabel = saved.savedAt.toDate().toLocaleString();
+                            if (saved.savedAt && typeof saved.savedAt.toDate === 'function') savedAtLabel = saved.savedAt.toDate().toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
                             return await analyzeQuizAI(clickedBtn, {
                                 cachedResult: { analysisText: saved.analysisText, items: saved.items || [], suggestedTitles: saved.suggestedTitles || null },
                                 cachedModel: saved.model,
@@ -17751,19 +17751,19 @@
                     </div>
                 ` : '';
 
-                // V97.39: banner when this render came from a saved record instead of a
-                // fresh AI call — so the admin knows the Fix/Compare buttons below are
-                // still live-actionable, but the analysis text itself is not brand new.
-                const savedBannerHtml = (opts && opts.cachedResult) ? `
-                    <div style="background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; padding:10px 16px; border-radius:12px; margin-bottom:16px; font-size:0.85em; display:flex; align-items:center; gap:8px;">
-                        <i class="fa-solid fa-clock-rotate-left"></i> Showing a saved analysis${opts.cachedSavedAtLabel ? ` from ${opts.cachedSavedAtLabel}` : ''} — no tokens spent. Hit 🔄 Regenerate for a fresh run.
-                    </div>
-                ` : '';
+                // V101.65: one summary line (as on the Scorecard) replaces the saved-analysis banner
+                // (V97.39) and the footer; the Fix/Compare buttons below stay live either way.
+                const rewriteTokens = Number(aiTokens) || 0;
+                const metaHtml = `<div class="audit-meta">
+                    <span>${(result.items || []).length} rewrite${(result.items || []).length === 1 ? '' : 's'}</span>
+                    ${(opts && opts.cachedResult) ? `<span title="Saved analysis — no tokens spent. Pick a model and press Rewrite to run again." data-th-title="ผลวิเคราะห์ที่บันทึกไว้ ไม่เสียโทเคน · เลือกโมเดลแล้วกด Rewrite เพื่อรันใหม่">· <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> ${escapeHtml(opts.cachedSavedAtLabel || 'Saved')}</span>` : ''}
+                    <span title="Tokens: ${rewriteTokens.toLocaleString()}">· ${escapeHtml(window.aiModelShortName(aiModel))} · ${rewriteTokens >= 1000 ? (rewriteTokens / 1000).toFixed(1) + 'k' : rewriteTokens} tok</span>
+                </div>`;
 
                 resultDiv.innerHTML = `
                     ${window.auditToolbarHtml(true, 'specialist', true)}
 
-                    ${savedBannerHtml}
+                    ${metaHtml}
                     ${titleSection}
 
                     <details style="margin-bottom:16px; background:#fafafa; border:1px solid #f0f0f0; border-radius:14px; padding:10px 16px;">
@@ -17783,15 +17783,6 @@
                             onclick="applyQuizImprovements()">
                             Run ✨
                         </button>
-                    </div>
-
-                    <div style="text-align:right;">
-                        <button class="btn-sm btn-dark" onclick="closeQuizReview();" style="padding:8px 25px; border-radius:10px;">Close</button>
-                    </div>
-
-                    <div style="margin-top:20px; padding-top:15px; border-top:1px solid #eee; font-size:0.7em; color:#999; display:flex; justify-content:space-between;">
-                        <span>🚀 Model: <b>${aiModel}</b> | 💡 Tokens: <b>${aiTokens.toLocaleString()}</b></span>
-                        <span style="opacity:0.6">V90.20 Unified Analysis</span>
                     </div>
                 `;
                 document.body.appendChild(resultDiv);
@@ -18342,6 +18333,9 @@ RULES:
             }
         };
 
+        // V101.65: chip name for a model id in the Scorecard / Rewrites summary line; a retired id
+        // (e.g. a saved GPT-5.6 run) falls back to its registry label, then to the raw id.
+        window.aiModelShortName = id => (window.textAIModelInfo && window.textAIModelInfo(id) || {}).short || (window.AI_MODEL_REGISTRY?.models.find(m => m.id === id) || {}).label || id || '';
         function renderAuditScorecard(result, aiModel, aiTokens, blueprint, questions, savedAtLabel, dupMap) {
             const blueprintBloom = (blueprint && blueprint.bloomLevel) || null;
             const stars = (n) => {
@@ -18436,7 +18430,7 @@ RULES:
             const metricLine = (name, m) => m ? `${name} · Input ${m.usage?.inputTokens ?? '—'} · Output ${m.usage?.outputTokens ?? '—'} · Thinking ${m.usage?.thinkingTokens ?? '—'} · ${m.latencyMs ?? '—'} ms · ${m.finishReason || '—'} · JSON ${m.jsonValid === true ? 'valid' : '—'}` : '';
             const tokens = Number(aiTokens) || 0;
             const runDetail = [`Tokens: ${tokens.toLocaleString()}`, window._auditLastElapsed ? `Time: ${window._auditLastElapsed}` : '', metricLine('Gemini 3.8', result.gemini38Metrics), metricLine('GPT-5.6 Terra', result.terraMetrics)].filter(Boolean).join('\n');
-            const modelName = (window.textAIModelInfo && window.textAIModelInfo(aiModel) || {}).short || (window.AI_MODEL_REGISTRY?.models.find(m => m.id === aiModel) || {}).label || aiModel || '';
+            const modelName = window.aiModelShortName(aiModel);
             const metaHtml = `<div class="audit-meta">
                 <span class="audit-meta-score" style="color:${overallColor}" title="Overall quality ${overall} / 5${blueprintBloom ? ` · blueprint Bloom = ${escapeHtml(blueprintBloom)}` : ''}">${stars(result.overallScore)} ${overall}</span>
                 <span>· ${result.perQuestionAudit.length} Q</span>
