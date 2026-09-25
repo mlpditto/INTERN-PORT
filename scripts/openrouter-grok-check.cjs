@@ -136,7 +136,8 @@ const ok = (content, finish = 'stop', usage = { prompt_tokens: 100, completion_t
     const uaThrow = admin.indexOf('if (proxyAnsweredError) throw new Error(proxyAnsweredError);', uaStart);
     const uaUnreach = admin.indexOf('OpenRouter model selected but proxy is unreachable', uaStart);
     check('T10 proxy-answered error is thrown before the "unreachable" fallback', uaStart > 0 && uaThrow > uaStart && uaThrow < uaUnreach, true);
-    check('T10 "support image input" becomes a plain "can\'t read images" message', /support image input\/i\.test\(raw\)[\s\S]{0,200}can't read images — pick another model/.test(admin), true);
+    check('T10 "support image input" becomes a plain "can\'t read images" message', /support image input\/i\.test\(raw\)[\s\S]{0,500}can't read images — pick another model/.test(admin), true);
+    check('T10 the message names the chip (or/ prefix restored before aiModelShortName)', admin.includes("window.aiModelShortName(proxyProvider === 'openrouter' && !modelName.startsWith('or/') ? 'or/' + modelName : modelName)"), true);
     check('T8 retired ids follow their successor', `${win.normalizeTextAIModel('gpt-5.6-luna')}|${win.normalizeTextAIModel('gpt-5.6-sol')}|${win.normalizeTextAIModel('or/deepseek/deepseek-v4-pro')}`, 'gpt-6-luna|gpt-6-sol|or/deepseek/deepseek-v4-pro-0813');
     check('T8 an explicit trial pick is kept, others normalise as before', `${win.resolveTrialTextAIModel(grok)}|${win.resolveTrialTextAIModel('claude-sonnet-5')}|${win.resolveTrialTextAIModel('nope')}`, 'or/x-ai/grok-4.7|claude-sonnet-5|gpt-6-luna');
     check('T8 default chip rail has no Grok', /grok/i.test(win.textAIChipContents('gpt-6-luna')), false);
