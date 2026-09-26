@@ -5097,15 +5097,16 @@
         #ai-audit-popup .audit-pick { width:18px; height:18px; margin:0; accent-color:#6366f1; cursor:pointer; flex:none; }
         #ai-audit-popup .audit-batch { position:sticky; top:-26px; z-index:3; display:flex; align-items:center; gap:10px; margin:0 0 12px; padding:8px 12px; border-radius:12px; background:#eef2ff; border:1px solid #c7d2fe; box-shadow:0 6px 16px rgba(99,102,241,.15); }
         #ai-audit-popup .audit-batch[hidden] { display:none; }
-        #ai-audit-popup .audit-batch-n { font-size:0.9em; color:#3730a3; }
         #ai-audit-popup .audit-batch-fix { margin-left:auto; width:auto; min-height:0; height:36px; display:inline-flex; align-items:center; gap:6px; padding:0 12px; border:none; border-radius:10px; background:#6366f1; color:#fff; font-weight:700; cursor:pointer; }
         #ai-audit-popup .audit-batch-fix:disabled { opacity:.5; cursor:not-allowed; }
         #ai-audit-popup .audit-batch-fix .text-ai-logo { width:18px; height:18px; margin:0; padding:2px; box-sizing:content-box; border-radius:50%; background-color:#fff; background-origin:content-box; }
         #ai-audit-popup .audit-batch-fix .text-ai-logo[data-owner="openai"] { background-image:url(assets/logos/openai-blossom-black.svg); }
-        #ai-audit-popup .audit-batch-x { font-size:0.85em; opacity:.9; }
-        #ai-audit-popup .audit-batch-clear { width:30px; height:30px; min-height:0; padding:0; border:none; border-radius:8px; background:transparent; color:#64748b; cursor:pointer; }
-        #ai-audit-popup .audit-batch-clear:hover { background:#e0e7ff; color:#3730a3; }
-        @media (pointer:coarse) { #ai-audit-popup .audit-pick { width:24px; height:24px; } #ai-audit-popup .audit-batch-fix, #ai-audit-popup .audit-batch-clear { height:44px; } #ai-audit-popup .audit-batch-clear { width:44px; } }
+        /* V102.16: ⊟ n = count + deselect all in one icon button (was ☑ n … ×n … ×). */
+        #ai-audit-popup .audit-batch-clear { width:auto; height:36px; min-height:0; margin:0; padding:0 10px; display:inline-flex; align-items:center; gap:6px; border:1px solid #c7d2fe; border-radius:10px; background:#fff; color:#3730a3; font-size:0.95em; cursor:pointer; }
+        #ai-audit-popup .audit-batch-clear i { font-size:1.1em; color:#6366f1; }
+        #ai-audit-popup .audit-batch-clear:hover { background:#e0e7ff; border-color:#a5b4fc; }
+        #ai-audit-popup .audit-batch-clear:hover i { color:#dc2626; }
+        @media (pointer:coarse) { #ai-audit-popup .audit-pick { width:24px; height:24px; } #ai-audit-popup .audit-batch-fix, #ai-audit-popup .audit-batch-clear { height:44px; } }
         #ai-suggest-config-modal .sqm-style img.emoji { width:1.15em; height:1.15em; vertical-align:-0.2em; margin-right:2px; }
         #ai-suggest-config-modal .sqm-scope-row[hidden], #ai-suggest-config-modal .sqm-style-hint[hidden] { display:none; }
         #ai-suggest-config-modal .sqm-style-hint { margin:6px 0 0 54px; padding:5px 8px; border:1px solid #bbf7d0; border-radius:7px; background:#f0fdf4; color:#475569; font-size:0.72em; line-height:1.5; }
@@ -18130,7 +18131,7 @@
             const btn = document.getElementById('audit-batch-fix');
             if (btn.dataset.running) return;
             const id = auditFixModel(), label = (textAIModelInfo(id) || {}).label || id;
-            btn.innerHTML = '✦' + window.aiModelLogoHtml(id) + '<span class="audit-batch-x">×' + n + '</span>';
+            btn.innerHTML = '✦' + window.aiModelLogoHtml(id); // V102.16: the count lives once, on ⊟
             // V102.16: no cap — more than AUDIT_BATCH_MAX runs in rounds of AUDIT_BATCH_MAX (one AI call each).
             const rounds = Math.ceil(n / AUDIT_BATCH_MAX);
             btn.disabled = false;
@@ -18697,9 +18698,8 @@ RULES:
                 ${window.auditToolbarHtml(true)}
                 ${metaHtml}
                 <div class="audit-batch" id="audit-batch" hidden>
-                    <span class="audit-batch-n" title="จำนวนข้อที่เลือก"><i class="fa-regular fa-square-check" aria-hidden="true"></i> <b id="audit-batch-count">0</b></span>
+                    <button type="button" class="audit-batch-clear" onclick="auditPickClear()" aria-label="Deselect all" title="ยกเลิกเลือกทั้งหมด"><i class="fa-solid fa-square-minus" aria-hidden="true"></i><b id="audit-batch-count">0</b></button>
                     <button type="button" id="audit-batch-fix" class="audit-batch-fix" onclick="auditBatchFix(this)"></button>
-                    <button type="button" class="audit-batch-clear" onclick="auditPickClear()" aria-label="Clear selection" title="ล้างที่เลือก"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
                 </div>
                 ${perQHtml}
             `;

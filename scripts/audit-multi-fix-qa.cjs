@@ -69,6 +69,11 @@ const remap = cut('                if (onlyQNumbers && onlyQNumbers.length && Ar
         await picks.nth(4).check(); await picks.nth(2).check();
         assert.equal(await page.locator('#audit-batch').isVisible(), true);
         assert.equal(await page.locator('#audit-batch-count').innerText(), '2');
+        // V102.16: the count appears once (⊟ n, which is also Deselect all); ✦ carries only the logo; no separate ×
+        assert.equal(await page.locator('#audit-batch .audit-batch-clear').getAttribute('aria-label'), 'Deselect all');
+        assert.equal(await page.locator('#audit-batch .audit-batch-clear .fa-square-minus').count(), 1);
+        assert.equal((await page.locator('#audit-batch-fix').textContent()).trim(), '✦', 'no ×n on the run button');
+        assert.equal(await page.locator('#audit-batch .fa-xmark').count(), 0, 'no separate clear ×');
         const fix = page.locator('#audit-batch-fix');
         assert.equal(await fix.locator('.text-ai-logo').getAttribute('data-owner'), 'openai', 'batch button shows the Quality Audit model logo');
         assert.match(await fix.getAttribute('title'), /2 ข้อพร้อมกัน/);
