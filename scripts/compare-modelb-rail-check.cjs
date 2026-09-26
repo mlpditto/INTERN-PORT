@@ -35,19 +35,42 @@ const modelB = cut('        window._compareModelB = function', '        window.g
         assert.deepEqual(chips.filter(c => !c.owner).map(c => c.label), [], 'every chip has a logo');
         assert.equal(await page.locator('#b .text-ai-logo[data-owner="grok"]').evaluate(e => getComputedStyle(e).filter), 'invert(1)', 'white Grok mark is dark on the light rail');
 
-        // V102.12: OpenRouter theme — grape tint + grape border + Grape→Volt bar + corner glyph; the pick stays amber.
+        // V102.12: OpenRouter theme — grape tint + grape border + Grape→Volt bar + corner glyph.
         const orLook = sel => page.locator(sel).evaluate(b => { const s = getComputedStyle(b), a = getComputedStyle(b, '::after'), z = getComputedStyle(b, '::before'); return { bg: s.backgroundColor, img: s.backgroundImage, border: s.borderTopColor, bar: a.backgroundImage, glyph: z.backgroundImage }; });
         const qwen = await orLook('#b button[aria-label="Qwen 3.8 Flash"]');
         assert.match(qwen.img, /rgba\(118, 36, 244, 0\.1\)/, 'grape tint');
         assert.equal(qwen.border, 'rgb(118, 36, 244)', 'grape border');
         assert.match(qwen.bar, /rgb\(118, 36, 244\).*rgb\(200, 255, 0\)/, 'Grape→Volt bar');
         assert.match(qwen.glyph, /glyph-grape\.svg/, 'corner glyph');
-        const luna = await orLook('#b button[aria-label="GPT 6 Luna"]');
-        assert.deepEqual([luna.img, luna.glyph], ['none', 'none'], 'official chips unchanged');
-        await page.locator('#b button[aria-label="Qwen 3.8 Max"]').click();
-        const picked = await orLook('#b button[aria-label="Qwen 3.8 Max"]');
-        assert.deepEqual([picked.bg, picked.img], ['rgb(245, 158, 11)', 'none'], 'picked OpenRouter chip is plain amber');
-        assert.match(picked.glyph, /glyph-grape\.svg/, 'picked chip keeps the glyph');
+        // V102.13: vendor themes — unpicked tint + border + bar in the vendor colour; picked = vendor colour solid, white name + logo.
+        const look = sel => page.locator(sel).evaluate(b => { const s = getComputedStyle(b), a = getComputedStyle(b, '::after'), l = b.querySelector('.text-ai-logo'), ls = l && getComputedStyle(l); return { vendor: b.dataset.vendor, bg: s.backgroundColor, img: s.backgroundImage, border: s.borderTopColor, color: s.color, bar: a.backgroundColor + '|' + a.backgroundImage, logo: ls ? ls.backgroundImage.replace(/^.*\//, '') + '|' + ls.filter : '' }; });
+        const pick = async label => { await page.locator(`#b button[aria-label="${label}"]`).click(); return look(`#b button[aria-label="${label}"]`); };
+        await page.locator('#b button[aria-label="Claude Sonnet 5"]').click();
+        const luna = await look('#b button[aria-label="GPT 6 Luna"]');
+        assert.equal(luna.vendor, 'openai');
+        assert.match(luna.img, /rgba\(13, 13, 13, 0\.05\)/, 'GPT ink tint');
+        assert.deepEqual([luna.border, luna.bar.split('|')[0]], ['rgb(13, 13, 13)', 'rgb(13, 13, 13)'], 'GPT ink border + bar');
+        const haiku = await look('#b button[aria-label="Claude Haiku 4.5"]');
+        assert.deepEqual([haiku.vendor, haiku.border, haiku.bar.split('|')[0]], ['claude', 'rgb(227, 165, 140)', 'rgb(217, 119, 87)'], 'Claude clay border + bar');
+        const flash = await look('#b button[aria-label="Gemini 3.8 Flash"]');
+        assert.deepEqual([flash.vendor, flash.border], ['gemini', 'rgb(174, 203, 250)'], 'Gemini blue border');
+        assert.match(flash.bar, /rgb\(66, 133, 244\)/, 'Gemini keeps the Google-bill rainbow bar');
+        const sonnet = await look('#b button[aria-label="Claude Sonnet 5"]');
+        assert.deepEqual([sonnet.bg, sonnet.img, sonnet.color], ['rgb(217, 119, 87)', 'none', 'rgb(255, 255, 255)'], 'picked Claude = clay solid, white name (no amber)');
+        assert.match(sonnet.logo, /invert\(1\)/, 'white Claude mark');
+        const lunaOn = await pick('GPT 6 Luna');
+        assert.deepEqual([lunaOn.bg, lunaOn.color], ['rgb(13, 13, 13)', 'rgb(255, 255, 255)'], 'picked GPT = ink solid');
+        assert.match(lunaOn.logo, /^openai-blossom-white\.svg/, 'white OpenAI blossom');
+        const flashOn = await pick('Gemini 3.8 Flash');
+        assert.match(flashOn.img, /rgb\(66, 133, 244\).*rgb\(155, 114, 203\)/, 'picked Gemini = blue→purple');
+        const picked = await pick('Qwen 3.8 Max');
+        assert.deepEqual([picked.bg, picked.color], ['rgb(118, 36, 244)', 'rgb(255, 255, 255)'], 'picked OpenRouter = grape solid');
+        assert.match(picked.bar, /rgb\(200, 255, 0\)/, 'Volt bar on the grape pick');
+        assert.match(await page.locator('#b button[aria-label="Qwen 3.8 Max"]').evaluate(b => getComputedStyle(b, '::before').backgroundImage), /glyph-grape\.svg/, 'picked chip keeps the glyph');
+        // the audit toolbar and Curate paint their own amber pick — the vendor colour must still win there
+        await page.evaluate(() => { const w = document.createElement('div'); w.className = 'audit-toolbar'; w.id = 'at'; w.innerHTML = textAIChipsHtml('', 'claude-opus-5-5', ''); document.body.append(w); });
+        assert.deepEqual(await page.locator('#at button[aria-pressed="true"]').evaluate(b => [getComputedStyle(b).backgroundColor, getComputedStyle(b).color]), ['rgb(217, 119, 87)', 'rgb(255, 255, 255)'], 'audit toolbar pick uses the vendor colour');
+        await page.evaluate(() => document.getElementById('at').remove());
 
         // picking Grok is kept (trial ids used to normalise back to Luna)
         await page.locator('#b button[aria-label="Grok 4.7"]').click();
@@ -61,6 +84,6 @@ const modelB = cut('        window._compareModelB = function', '        window.g
         assert.equal(await page.evaluate(() => (textAIChipsHtml('', 'gpt-6-luna', '').match(/data-owner="(qwen|deepseek)"/g) || []).length), 4);
         assert.equal(await page.evaluate(() => /grok/.test(textAIChipsHtml('', 'gpt-6-luna', ''))), false, 'Grok stays opt-in');
         assert.deepEqual(errors, []);
-        console.log('PASS: Model B rail — Qwen/DeepSeek/Grok logos, Grok offered + kept, retired ids migrate, Grok opt-in elsewhere, OpenRouter tint/bar/glyph');
+        console.log('PASS: Model B rail — Qwen/DeepSeek/Grok logos, Grok offered + kept, retired ids migrate, Grok opt-in elsewhere, OpenRouter tint/bar/glyph, vendor themes (tint/border/bar, solid pick) incl. audit toolbar');
     } finally { await browser.close(); }
 })();
