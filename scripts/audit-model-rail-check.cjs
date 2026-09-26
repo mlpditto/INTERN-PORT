@@ -47,7 +47,7 @@ const grokTab = tabEls.find(t => t.dataset.provider === 'Grok'); grokTab.closest
 window.browseAuditProvider(grokTab);
 check('browse: Grok tab shows only the Grok trial chip', chipEls.filter(c => !c.hidden).map(c => c.label).join('|'), 'Grok 4.7');
 check('css: Grok tab colour', css.includes('.audit-provider[data-provider="Grok"]{color:#d4d4d8}'), true);
-check('css: OpenRouter border survives the toolbar button rule, selected stays amber', css.includes('.audit-toolbar .text-ai-chips>button[data-value^="or/"]:not([aria-pressed="true"]){border-color:#6e8b1e}'), true);
+check('css: OpenRouter grape border survives the toolbar button rule (V102.14)', css.includes('.audit-toolbar .text-ai-chips>button[data-value^="or/"]:not([aria-pressed="true"]){border-color:var(--or-grape)}'), true);
 check('admin cache-busts audit-toolbar.css', /audit-toolbar\.css\?v=V\d+\.\d+/.test(admin) && !/audit-toolbar\.css\?v=V100\.12/.test(admin), true);
 
 let fail = 0;
