@@ -73,7 +73,26 @@ const { chromium } = require('playwright');
         assert(!(await page.locator('[data-model="claude-haiku-4-5"]').isVisible()));
         await page.locator('#curate-models .audit-provider[data-provider="Claude"]').click();
         await page.locator('[data-model="claude-haiku-4-5"]').click();
-        assert.match(await page.locator('#curate-model').innerText(), /Claude Haiku/);
+        // V101.94: the header pill is gone; #curate-model is the short name on the folded-rail chip, full name in its aria-label.
+        assert.match(await page.locator('#curate-model').textContent(), /^Haiku 4\.5$/);
+        assert.match(await page.locator('#curate-model-chip').getAttribute('aria-label'), /Claude Haiku/);
+        // − / + stepper (no native spinner): clamps to 1..total and marks the proposal stale like typing does.
+        await page.locator('#curate-target').fill('13');
+        await page.locator('[data-step="1"]').click(); assert.equal(await page.locator('#curate-target').inputValue(), '14');
+        await page.locator('[data-step="1"]').click(); assert.equal(await page.locator('#curate-target').inputValue(), '14', 'max = question count');
+        await page.locator('#curate-target').fill('1');
+        await page.locator('[data-step="-1"]').click(); assert.equal(await page.locator('#curate-target').inputValue(), '1', 'min 1');
+        // ▴ folds the rail into one chip at the start of the controls row; the chip unfolds it; remembered per browser.
+        assert.equal(await page.locator('#curate-model-chip').isVisible(), false, 'rail open by default');
+        await page.locator('.curate-rail-fold').click();
+        assert.equal(await page.locator('#curate-models').isVisible(), false);
+        assert.equal(await page.locator('#curate-model-chip').isVisible(), true);
+        assert.equal(await page.evaluate(() => localStorage.getItem('quiz_curate_rail_folded')), '1');
+        await page.locator('#curate-model-chip').click();
+        assert.equal(await page.locator('#curate-models').isVisible(), true);
+        assert.equal(await page.evaluate(() => localStorage.getItem('quiz_curate_rail_folded')), '0');
+        // Instructions · History · status share one line under the card.
+        assert.equal(await page.locator('.curate-foot > .curate-instructions + #curate-history + #curate-history-status').count(), 1);
         for (const value of ['0', '15', '2.5', '']) {
             await page.locator('#curate-target').fill(value); await page.locator('#curate-suggest').click();
             assert.equal(await page.evaluate(() => calls.length), 0); assert(await saveDisabled());
