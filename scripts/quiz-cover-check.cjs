@@ -12,6 +12,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         await page.route('https://example.com/**', route => route.fulfill({status: 200, body: png, contentType: 'image/png'}));
         await page.goto('https://quiz.test/');
         await page.setContent('<div><div><input id="quiz-title"></div></div><div id="cards"></div>');
+        await page.addStyleTag({content: fs.readFileSync('public/text-ai-chips.css', 'utf8')}); // --or-volt, logos (admin loads it too)
         await page.addStyleTag({content: fs.readFileSync('public/quiz-cover.css', 'utf8')});
         await page.addScriptTag({content: fs.readFileSync('public/quiz-cover.js', 'utf8')});
         await page.evaluate(() => {
@@ -269,6 +270,15 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.equal(await page.locator('[data-badge]').isVisible(), false);
         // V101.91: the Image 2 chip's OpenAI Blossom is the white file on the dark bar.
         assert.match(await page.locator('.quiz-cover-model-rail .text-ai-logo[data-owner="openai"]').evaluate(e => getComputedStyle(e).backgroundImage), /openai-blossom-white/);
+        // V102.07: the picked model stands out — unpicked names fade; logos and the OpenRouter Volt underline stay full.
+        const railLook = await page.locator('.quiz-cover-model-rail button').evaluateAll(bs => bs.map(b => { const s = getComputedStyle(b), l = b.querySelector('.text-ai-logo'); return { active: b.classList.contains('active'), or: b.dataset.value.startsWith('or/'), opacity: s.opacity, color: s.color, shadow: s.boxShadow, logo: l ? getComputedStyle(l).filter + '|' + getComputedStyle(l).opacity : 'none|1' }; }));
+        assert.equal(railLook.filter(r => r.active).length, 1, 'exactly one model is picked');
+        for (const r of railLook) {
+            assert.equal(r.opacity, '1', 'chips never fade as a whole');
+            assert.equal(r.logo, 'none|1', 'logos stay full colour');
+            if (!r.active) assert.match(r.color, /0\.45\)$/, 'unpicked name fades');
+            if (r.or) assert.match(r.shadow, /rgb\(200, 255, 0\)/, 'OpenRouter Volt underline stays');
+        }
         console.log('PASS: AI title validation, preview, accept, discard, invalid response, content-filter fallback, stale generation and responsive layout.');
         console.log('PASS: cover load/remove/upload with mocked storage, unsafe URL rejection, locked/collapsed protection, mobile deadline, keyboard start.');
     } finally { await browser.close(); }
