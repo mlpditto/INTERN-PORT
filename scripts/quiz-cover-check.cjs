@@ -279,6 +279,14 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
             if (!r.active) assert.match(r.color, /0\.45\)$/, 'unpicked name fades');
             if (r.or) assert.match(r.shadow, /rgb\(200, 255, 0\)/, 'OpenRouter Volt underline stays');
         }
+        // V102.08: the style rail gets the same pick treatment (emoji stay full colour, names of the rest fade).
+        const styleLook = await page.locator('.quiz-cover-style-rail button').evaluateAll(bs => bs.map(b => { const s = getComputedStyle(b); return { active: b.classList.contains('active'), opacity: s.opacity, color: s.color, shadow: s.boxShadow }; }));
+        assert.equal(styleLook.filter(r => r.active).length, 1, 'exactly one style is picked');
+        for (const r of styleLook) {
+            assert.equal(r.opacity, '1', 'style chips never fade as a whole');
+            if (r.active) assert.match(r.shadow, /rgb\(196, 181, 253\)/, 'picked style has the ring');
+            else assert.match(r.color, /0\.45\)$/, 'unpicked style name fades');
+        }
         console.log('PASS: AI title validation, preview, accept, discard, invalid response, content-filter fallback, stale generation and responsive layout.');
         console.log('PASS: cover load/remove/upload with mocked storage, unsafe URL rejection, locked/collapsed protection, mobile deadline, keyboard start.');
     } finally { await browser.close(); }
