@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.01)</title>
+    <title>Nika Admin (V102.02)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -5048,6 +5048,16 @@
         #ai-suggestions-popup .cpy-key { background:#f59e0b; color:#fff; }
         #ai-suggestions-popup .cpy-nokey { background:#e2e8f0; color:#64748b; overflow:hidden; }
         #ai-suggestions-popup .cpy-nokey::after { content:''; position:absolute; left:50%; top:50%; width:16px; height:2px; background:#64748b; transform:translate(-50%, -50%) rotate(-45deg); }
+        /* V102.02: Add all = enso circle (the card ADD's halo, round, icon + count); ⭐ armed = green "▶ Score with …". */
+        #ai-suggestions-popup .ai-sugg-enso { position:relative; width:40px; height:40px; min-height:0; padding:0; border:none; border-radius:50%; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; font-size:1em; color:#fffaf2;
+            background:conic-gradient(from 200deg, #d98b7a, #c98fb0, #8b7bb8, #6f9fc0, #e0b468, #d98b7a); box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.55), 0 4px 14px rgba(139,123,184,.35); }
+        #ai-suggestions-popup .ai-sugg-enso .ai-sugg-count { position:absolute; right:-6px; top:-6px; min-width:19px; height:19px; padding:0 4px; border-radius:10px; border:2px solid #fff; background:#8b7bb8; color:#fff; font:700 10px/15px Inter, Arial, sans-serif; }
+        #ai-suggestions-popup .ai-sugg-enso.done { background:linear-gradient(135deg,#c7cad1,#a8acb5); box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.5); cursor:default; }
+        #ai-suggestions-popup #ai-sugg-score-all.armed { background:#16a34a !important; color:#fff !important; box-shadow:0 0 0 3px #bbf7d0; }
+        #ai-suggestions-popup .ai-sugg-score-rail { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:-6px 0 16px; padding:8px 10px; border-radius:12px; }
+        #ai-suggestions-popup .ai-sugg-score-rail[hidden] { display:none; }
+        #ai-suggestions-popup .ai-sugg-rail-lb { font-size:0.75em; color:#64748b; font-weight:600; }
+        #ai-suggestions-popup .ai-sugg-score-rail .audit-model-row { margin:0; padding:0; border:0; }
         #ai-suggestions-popup .cpy-all { position:absolute; right:-7px; top:-7px; min-width:18px; height:16px; padding:0 4px; border-radius:8px; border:2px solid #fff; font:700 9px/12px Inter, Arial, sans-serif; color:#fff; }
         #ai-suggest-config-modal .sqm-style img.emoji { width:1.15em; height:1.15em; vertical-align:-0.2em; margin-right:2px; }
         #ai-suggest-config-modal .sqm-scope-row[hidden], #ai-suggest-config-modal .sqm-style-hint[hidden] { display:none; }
@@ -19392,11 +19402,15 @@ RULES:
             const scoreModel = window.auditFixModel ? window.auditFixModel() : 'gpt-6-luna';
             const tbBase = 'width:auto; display:inline-flex; align-items:center; gap:6px; padding:8px 12px; border-radius:10px; font-weight:700; font-size:0.8em; cursor:pointer;';
             const tbIcon = 'width:38px; height:36px; padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:10px; font-size:1.05em; cursor:pointer;';
+            // V102.02: ⭐ Score all is two presses — the first opens this rail (default: last pick, else the Quality Audit model).
+            let scorePick = scoreModel;
+            try { scorePick = localStorage.getItem('ai_sugg_score_model') || scoreModel; } catch (_) {}
+            const scoreRailHtml = `<div class="audit-toolbar ai-sugg-score-rail" id="ai-sugg-score-rail" hidden><span class="ai-sugg-rail-lb">Score with</span>${window.providerModelRailHtml('ai-sugg-score-model', scorePick, 'aiSuggScorePick(this)')}</div>`;
             const toolbarHtml = `<div class="ai-sugg-toolbar" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:-10px 0 16px;">
                     <button type="button" class="btn-sm cpy-btn" onclick="copyAllAiSuggestions(true, this)" title="คัดลอกทุกข้อ พร้อมเฉลยและคำอธิบาย" aria-label="Copy all with answer key" style="${tbIcon} background:#16a34a; color:#fff; border:none;"><i class="fa-solid fa-clipboard-check"></i><span class="cpy-all" style="background:#15803d;">all</span></button>
                     <button type="button" class="btn-sm cpy-btn" onclick="copyAllAiSuggestions(false, this)" title="คัดลอกทุกข้อ เฉพาะโจทย์และตัวเลือก ไม่มีเฉลย" aria-label="Copy all without answer key" style="${tbIcon} background:#f1f5f9; color:#475569; border:1.5px solid #cbd5e1;"><i class="fa-solid fa-clipboard-list"></i><span class="cpy-all" style="background:#475569;">all</span></button>
-                    <button type="button" class="btn-sm" id="ai-sugg-add-all" onclick="addAllAiSuggestions(this)" title="เพิ่มทุกข้อที่ยังไม่ได้เพิ่มเข้าควิซ" style="${tbBase} background:#7c3aed; color:#fff; border:none;"><i class="fa-solid fa-plus"></i> Add all (${suggestions.length})</button>
-                    <button type="button" class="btn-sm" id="ai-sugg-score-all" onclick="scoreAiSuggestions(this)" title="ให้คะแนน ${(window.AUDIT_DIMS || []).length || 7} มิติแบบ Quality Review ด้วยโมเดลของ Quality Audit · เรียก AI 1 ครั้ง" style="${tbBase} margin-left:auto; background:#f59e0b; color:#2b1a05; border:none;">⭐ Score all <small style="font-weight:600; opacity:.8;">· ${escapeHtml(window.aiModelShortName ? window.aiModelShortName(scoreModel) : scoreModel)}</small></button>
+                    <button type="button" class="btn-sm ai-sugg-enso" id="ai-sugg-add-all" onclick="addAllAiSuggestions(this)" title="เพิ่มทุกข้อที่ยังไม่ได้เพิ่มเข้าควิซ" aria-label="Add all ${suggestions.length} questions"><i class="fa-solid fa-plus"></i><span class="ai-sugg-count">${suggestions.length}</span></button>
+                    <button type="button" class="btn-sm" id="ai-sugg-score-all" onclick="scoreAiSuggestions(this)" title="กดครั้งแรกเลือกโมเดล · กดอีกครั้งเพื่อให้คะแนน ${(window.AUDIT_DIMS || []).length || 7} มิติแบบ Quality Review (เรียก AI 1 ครั้ง)" style="${tbBase} margin-left:auto; background:#f59e0b; color:#2b1a05; border:none;">⭐ Score all</button>
                 </div>`;
             let itemsHtml = suggestions.map((q, i) => {
                 const qJson = JSON.stringify(q).replace(/'/g, "\\'").replace(/"/g, "&quot;");
@@ -19449,6 +19463,7 @@ RULES:
 
                 <div style="margin-bottom:20px;">
                     ${toolbarHtml}
+                    ${scoreRailHtml}
                     ${itemsHtml}
                 </div>
 
@@ -19513,7 +19528,10 @@ RULES:
             if (!popup || !all) return;
             const left = popup.querySelectorAll('.ai-sugg-add:not(:disabled)').length;
             all.disabled = left === 0;
-            all.innerHTML = left ? `<i class="fa-solid fa-plus"></i> Add all (${left})` : '<i class="fa-solid fa-check"></i> All added';
+            all.classList.toggle('done', left === 0);
+            all.innerHTML = left ? `<i class="fa-solid fa-plus"></i><span class="ai-sugg-count">${left}</span>` : '<i class="fa-solid fa-check"></i>';
+            all.setAttribute('aria-label', left ? `Add all ${left} questions` : 'All questions added');
+            all.title = left ? `เพิ่มอีก ${left} ข้อที่ยังไม่ได้เพิ่มเข้าควิซ` : 'เพิ่มครบทุกข้อแล้ว';
         };
         window.addAllAiSuggestions = function(btn) {
             const popup = document.getElementById('ai-suggestions-popup'), items = window._aiSuggestItems || [];
@@ -19528,10 +19546,38 @@ RULES:
             showToast(added ? `${added} question${added === 1 ? '' : 's'} added!` : 'All questions already added');
         };
         // ⭐ Score all: one call on the Quality Audit model with the same 7-dimension rubric as Quality Review.
+        // V102.02: first press arms (opens the model rail), second press runs; Esc or a click outside disarms.
+        const aiSuggScoreLabel = id => window.aiModelShortName ? window.aiModelShortName(id) : id;
+        window.aiSuggScoreDisarm = function() {
+            const btn = document.getElementById('ai-sugg-score-all'), rail = document.getElementById('ai-sugg-score-rail');
+            if (rail) rail.hidden = true;
+            if (btn && btn.classList.contains('armed')) { btn.classList.remove('armed'); btn.innerHTML = btn.dataset.idle || '⭐ Score all'; }
+            document.removeEventListener('keydown', window._aiSuggScoreEsc, true);
+            document.removeEventListener('pointerdown', window._aiSuggScoreOutside, true);
+        };
+        window._aiSuggScoreEsc = e => { if (e.key === 'Escape') { e.stopPropagation(); window.aiSuggScoreDisarm(); } };
+        window._aiSuggScoreOutside = e => { if (!e.target.closest('#ai-sugg-score-rail, #ai-sugg-score-all')) window.aiSuggScoreDisarm(); };
+        window.aiSuggScorePick = function(chip) {
+            const input = document.getElementById('ai-sugg-score-model'), btn = document.getElementById('ai-sugg-score-all');
+            input.value = chip.dataset.value;
+            chip.parentElement.querySelectorAll('button').forEach(b => { b.classList.toggle('active', b === chip); b.setAttribute('aria-pressed', String(b === chip)); });
+            try { localStorage.setItem('ai_sugg_score_model', chip.dataset.value); } catch (_) {}
+            if (btn && btn.classList.contains('armed')) btn.innerHTML = `▶ Score with ${escapeHtml(aiSuggScoreLabel(chip.dataset.value))}`;
+        };
         window.scoreAiSuggestions = async function(btn) {
             const items = window._aiSuggestItems || [];
             if (!items.length || btn.disabled) return;
-            const model = window.auditFixModel ? window.auditFixModel() : 'gpt-6-luna';
+            const input = document.getElementById('ai-sugg-score-model'), rail = document.getElementById('ai-sugg-score-rail');
+            if (rail && !btn.classList.contains('armed')) {
+                btn.dataset.idle = btn.innerHTML;
+                btn.classList.add('armed'); rail.hidden = false;
+                btn.innerHTML = `▶ Score with ${escapeHtml(aiSuggScoreLabel(input.value))}`;
+                document.addEventListener('keydown', window._aiSuggScoreEsc, true);
+                document.addEventListener('pointerdown', window._aiSuggScoreOutside, true);
+                return;
+            }
+            const model = (input && input.value) || (window.auditFixModel ? window.auditFixModel() : 'gpt-6-luna');
+            window.aiSuggScoreDisarm();
             const label = window.aiModelShortName ? window.aiModelShortName(model) : model;
             const oldHtml = btn.innerHTML, started = performance.now();
             const tick = () => { const s = Math.floor((performance.now() - started) / 1000); btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Scoring ${items.length} · ${escapeHtml(label)} · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
@@ -19584,6 +19630,7 @@ RULES:
                 let scored = 0;
                 list.forEach(entry => { const i = Number(entry && entry.qNumber) - 1; if (items[i] && window.renderAiSuggestionScore(i, entry)) scored++; });
                 btn.innerHTML = `⭐ Score again <small style="font-weight:600; opacity:.8;">· ${escapeHtml(label)}</small>`;
+                btn.dataset.idle = btn.innerHTML;
                 if (scored < items.length) showToast(`Scored ${scored} of ${items.length} — Score again for the rest.`);
             } catch (error) {
                 btn.innerHTML = oldHtml;
