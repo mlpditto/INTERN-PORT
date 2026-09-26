@@ -35,6 +35,20 @@ const modelB = cut('        window._compareModelB = function', '        window.g
         assert.deepEqual(chips.filter(c => !c.owner).map(c => c.label), [], 'every chip has a logo');
         assert.equal(await page.locator('#b .text-ai-logo[data-owner="grok"]').evaluate(e => getComputedStyle(e).filter), 'invert(1)', 'white Grok mark is dark on the light rail');
 
+        // V102.12: OpenRouter theme — grape tint + grape border + Grape→Volt bar + corner glyph; the pick stays amber.
+        const orLook = sel => page.locator(sel).evaluate(b => { const s = getComputedStyle(b), a = getComputedStyle(b, '::after'), z = getComputedStyle(b, '::before'); return { bg: s.backgroundColor, img: s.backgroundImage, border: s.borderTopColor, bar: a.backgroundImage, glyph: z.backgroundImage }; });
+        const qwen = await orLook('#b button[aria-label="Qwen 3.8 Flash"]');
+        assert.match(qwen.img, /rgba\(118, 36, 244, 0\.1\)/, 'grape tint');
+        assert.equal(qwen.border, 'rgb(118, 36, 244)', 'grape border');
+        assert.match(qwen.bar, /rgb\(118, 36, 244\).*rgb\(200, 255, 0\)/, 'Grape→Volt bar');
+        assert.match(qwen.glyph, /glyph-grape\.svg/, 'corner glyph');
+        const luna = await orLook('#b button[aria-label="GPT 6 Luna"]');
+        assert.deepEqual([luna.img, luna.glyph], ['none', 'none'], 'official chips unchanged');
+        await page.locator('#b button[aria-label="Qwen 3.8 Max"]').click();
+        const picked = await orLook('#b button[aria-label="Qwen 3.8 Max"]');
+        assert.deepEqual([picked.bg, picked.img], ['rgb(245, 158, 11)', 'none'], 'picked OpenRouter chip is plain amber');
+        assert.match(picked.glyph, /glyph-grape\.svg/, 'picked chip keeps the glyph');
+
         // picking Grok is kept (trial ids used to normalise back to Luna)
         await page.locator('#b button[aria-label="Grok 4.7"]').click();
         assert.equal(await page.evaluate(() => window._compareModelB()), 'or/x-ai/grok-4.7');
@@ -47,6 +61,6 @@ const modelB = cut('        window._compareModelB = function', '        window.g
         assert.equal(await page.evaluate(() => (textAIChipsHtml('', 'gpt-6-luna', '').match(/data-owner="(qwen|deepseek)"/g) || []).length), 4);
         assert.equal(await page.evaluate(() => /grok/.test(textAIChipsHtml('', 'gpt-6-luna', ''))), false, 'Grok stays opt-in');
         assert.deepEqual(errors, []);
-        console.log('PASS: Model B rail — Qwen/DeepSeek/Grok logos, Grok offered + kept, retired ids migrate, Grok opt-in elsewhere');
+        console.log('PASS: Model B rail — Qwen/DeepSeek/Grok logos, Grok offered + kept, retired ids migrate, Grok opt-in elsewhere, OpenRouter tint/bar/glyph');
     } finally { await browser.close(); }
 })();
