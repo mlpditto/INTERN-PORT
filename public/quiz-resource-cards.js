@@ -4,6 +4,7 @@
    when it has text (textarea, so multi-line notes keep their line breaks). */
 window.quizResourceCards = (() => {
     let originals = [];
+    let baseline = '[]';
     const grid = () => document.getElementById('quiz-resource-grid');
     const count = () => grid().querySelectorAll('article').length;
     // Colour + icon by destination (hostname only — nothing is sent anywhere).
@@ -29,8 +30,30 @@ window.quizResourceCards = (() => {
         if (/\.pdf$/i.test(u.pathname)) return { name: 'PDF', color: '#b91c1c', icon: 'fa-solid fa-file-pdf' };
         return { name: 'Link', color: '#4338ca', icon: 'fa-solid fa-link' };
     }
+    // V102.09: header state next to the count — ✓ dim = unchanged · 💾 bouncing + 🟠 = changed, not saved yet ·
+    // ✓ green = Save Quiz just ran. Compared against the loaded list, so undoing an edit goes back to ✓.
+    const snapshot = () => JSON.stringify(Array.from(grid().querySelectorAll('article'), c =>
+        Array.from(c.querySelectorAll('[data-field]'), f => f.value.trim())));
+    const STATES = {
+        clean: ['✓', 'บันทึกพร้อมกับ Quiz', 'Saved with the quiz'],
+        dirty: ['💾', 'ยังไม่บันทึก — กด Save Quiz', 'Unsaved changes — press Save Quiz'],
+        saved: ['✓', 'บันทึกแล้ว', 'Saved']
+    };
+    function setState(state) {
+        const el = document.getElementById('quiz-resource-state');
+        if (!el || el.dataset.state === state) return;
+        const [icon, th, en] = STATES[state];
+        el.dataset.state = state; el.textContent = icon; el.title = th; el.setAttribute('aria-label', en);
+    }
+    function track() {
+        const el = document.getElementById('quiz-resource-state');
+        if (snapshot() !== baseline) setState('dirty');
+        else if (el && el.dataset.state === 'dirty') setState('clean');
+    }
+    function saved() { baseline = snapshot(); setState('saved'); }
     function update() {
         document.getElementById('quiz-resource-count').textContent = count();
+        track();
         if (!count()) {
             const empty = document.createElement('p');
             empty.className = 'resource-empty';
@@ -86,6 +109,7 @@ window.quizResourceCards = (() => {
         const showNote = on => { noteRow.hidden = !on; noteBtn.classList.toggle('on', !!note.value.trim()); if (on) fitNote(note); };
         noteBtn.onclick = () => { showNote(true); note.focus(); };
         note.addEventListener('input', () => { fitNote(note); noteBtn.classList.toggle('on', !!note.value.trim()); });
+        card.addEventListener('input', track);
         note.addEventListener('blur', () => { if (!note.value.trim()) showNote(false); });
         card.querySelector('.res-del').onclick = () => { card.remove(); update(); };
         grid().append(card);
@@ -118,7 +142,9 @@ window.quizResourceCards = (() => {
         originals = Array.isArray(materials) ? materials : [];
         grid().replaceChildren();
         originals.forEach(material => add(material));
+        baseline = snapshot();
+        setState('clean');
         update();
     }
-    return { load, add, read, count };
+    return { load, add, read, count, saved };
 })();
