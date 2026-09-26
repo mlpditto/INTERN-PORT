@@ -14,15 +14,20 @@ const slice = (startMarker, endMarker) => {
 const audit = slice('        window.AUDIT_DIMS = [', '        window.auditDimLabels = function') + slice('        window.auditDimLabels = function', '\n        };\n') + '\n        };\n';
 const compareText = slice('        window._compareQText = function', '\n        };\n') + '\n        };\n';
 const popup = slice('        window.showAiSuggestionsPopup = function', '        // --- 🎨 Design Lab Logic');
+const rail = slice('        window.browseAuditProvider = function', '        window.auditModelControlsHtml = function');
 
 (async () => {
     const browser = await chromium.launch();
     try {
         const page = await browser.newPage({ viewport: { width: 1000, height: 900 } });
         const errors = []; page.on('pageerror', e => errors.push(e.message));
+        await page.route('https://suggest.test/', r => r.fulfill({ body: '<meta charset="utf-8"><body></body>', contentType: 'text/html' })); // a real origin: localStorage works
+        await page.goto('https://suggest.test/');
         await page.setContent('<meta charset="utf-8"><body></body>');
         // V101.99: the real admin CSS (its global `details summary` reset and button sizes caused the two layout bugs fixed here).
         await page.addStyleTag({ content: [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(m => m[1]).join('\n') });
+        // V102.02: the rail's own stylesheets (admin loads them as <link>, not inline) — hidden-chip rule and layout live there.
+        for (const css of ['public/text-ai-chips.css', 'public/audit-toolbar.css']) await page.addStyleTag({ content: fs.readFileSync(css, 'utf8') });
         await page.evaluate(() => {
             window.escapeHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
             window.toasts = []; window.showToast = m => toasts.push(m);
@@ -31,10 +36,12 @@ const popup = slice('        window.showAiSuggestionsPopup = function', '       
             window.copied = []; window.unifiedCopyToClipboard = (text) => copied.push(text);
             window.getQuizFormData = () => ({ title: 'Contraception', blueprint: {} });
             window.auditFixModel = () => 'gpt-6-luna';
-            window.aiModelShortName = id => ({ 'gpt-6-luna': 'Luna 6' })[id] || id;
+            window.aiModelShortName = id => ({ 'gpt-6-luna': 'Luna 6', 'gpt-6-sol': 'Sol 6', 'claude-sonnet-5': 'Sonnet 5' })[id] || id;
             window.safeJsonParse = JSON.parse;
         });
-        await page.addScriptTag({ content: audit + compareText + popup });
+        await page.addScriptTag({ path: 'public/ai-model-ui.js' });
+        await page.addScriptTag({ content: rail + audit + compareText + popup });
+        const scoreTwice = async () => { await page.locator('#ai-sugg-score-all').click(); await page.locator('#ai-sugg-score-all').click(); };
         const items = [
             { q: 'Q one stem', type: 'choice', options: ['a1', 'b1', 'c1', 'd1'], correct: [2], explanation: 'why one' },
             { q: 'Q two stem — choose TWO', type: 'choice', options: ['a2', 'b2', 'c2', 'd2', 'e2'], correct: [0, 2], explanation: 'why two' },
@@ -44,8 +51,12 @@ const popup = slice('        window.showAiSuggestionsPopup = function', '       
 
         // toolbar + per-card buttons
         assert.equal(await page.locator('.ai-sugg-toolbar button').count(), 4);
-        assert.match(await page.locator('#ai-sugg-add-all').innerText(), /Add all \(3\)/);
-        assert.match((await page.locator('#ai-sugg-score-all').textContent()).replace(/\s+/g, ' '), /Score all · Luna 6/);
+        // V102.02: Add all = enso circle, icon + count badge, no text.
+        assert.equal(await page.locator('#ai-sugg-add-all.ai-sugg-enso .fa-plus').count(), 1);
+        assert.equal(await page.locator('#ai-sugg-add-all .ai-sugg-count').innerText(), '3');
+        assert.equal(await page.locator('#ai-sugg-add-all').getAttribute('aria-label'), 'Add all 3 questions');
+        assert.equal((await page.locator('#ai-sugg-score-all').textContent()).trim(), '⭐ Score all');
+        assert.equal(await page.locator('#ai-sugg-score-rail').isVisible(), false, 'model rail hidden until the first press');
         assert.equal(await page.locator('[aria-label="Copy without answer key"]').count(), 3);
         // V101.99: icon-only — per card copy + key badge (B), toolbar answer / question sheet + "all" tag (C).
         assert.equal(await page.locator('[aria-label="Copy with answer key"] .cpy-badge.cpy-key .fa-key').count(), 3);
@@ -72,10 +83,11 @@ const popup = slice('        window.showAiSuggestionsPopup = function', '       
         // one card ADD, then Add all adds only the rest
         await page.locator('.ai-sugg-add').first().click();
         assert.deepEqual(await page.evaluate(() => added), ['Q one stem']);
-        assert.match(await page.locator('#ai-sugg-add-all').innerText(), /Add all \(2\)/);
+        assert.equal(await page.locator('#ai-sugg-add-all .ai-sugg-count').innerText(), '2');
         await page.locator('#ai-sugg-add-all').click();
         assert.deepEqual(await page.evaluate(() => added), ['Q one stem', 'Q two stem — choose TWO', 'Q three stem']);
-        assert.match(await page.locator('#ai-sugg-add-all').innerText(), /All added/);
+        assert.equal(await page.locator('#ai-sugg-add-all').getAttribute('aria-label'), 'All questions added');
+        assert.equal(await page.locator('#ai-sugg-add-all.done .fa-check').count(), 1);
         assert.equal(await page.locator('#ai-sugg-add-all').isDisabled(), true);
         assert.equal(await page.locator('.ai-sugg-add:not(:disabled)').count(), 0);
         assert(await page.evaluate(() => labels) >= 1, 'exam-style auto label runs');
@@ -90,10 +102,30 @@ const popup = slice('        window.showAiSuggestionsPopup = function', '       
                 { qNumber: 3, scores: sc(4, 4, 4, 4, 2, 3, 5), averageScore: 3.7 }
             ] }) }; };
         });
+        // V102.02: first press arms — rail opens on the Quality Audit model, nothing is called yet.
+        await page.locator('#ai-sugg-score-all').click();
+        assert.equal(await page.locator('#ai-sugg-score-rail').isVisible(), true);
+        assert.equal(await page.locator('#ai-sugg-score-all').innerText(), '▶ Score with Luna 6');
+        assert.equal(await page.locator('#ai-sugg-score-rail [data-value="gpt-6-luna"]').getAttribute('aria-pressed'), 'true');
+        assert.equal(await page.evaluate(() => calls.length), 0, 'arming does not call the AI');
+        await page.keyboard.press('Escape');
+        assert.equal(await page.locator('#ai-sugg-score-rail').isVisible(), false, 'Esc disarms');
+        assert.equal(await page.locator('#ai-sugg-score-all').innerText(), '⭐ Score all');
+        await page.locator('#ai-sugg-score-all').click();
+        await page.locator('.ai-sugg-card, #ai-suggestions-popup h2').first().click();
+        assert.equal(await page.locator('#ai-sugg-score-rail').isVisible(), false, 'a click outside disarms');
+        assert.equal(await page.evaluate(() => calls.length), 0);
+        // arm again, switch to Sol 6 (GPT tab already open), run with it; the pick is remembered
+        await page.locator('#ai-sugg-score-all').click();
+        await page.locator('#ai-sugg-score-rail [data-value="gpt-6-sol"]').click();
+        assert.equal(await page.locator('#ai-sugg-score-all').innerText(), '▶ Score with Sol 6');
+        assert.equal(await page.evaluate(() => localStorage.getItem('ai_sugg_score_model')), 'gpt-6-sol');
         await page.locator('#ai-sugg-score-all').click();
         await page.waitForFunction(() => /Score again/.test(document.getElementById('ai-sugg-score-all').textContent));
+        assert.equal(await page.locator('#ai-sugg-score-rail').isVisible(), false, 'rail closes when it runs');
+        assert.match((await page.locator('#ai-sugg-score-all').textContent()).replace(/\s+/g, ' '), /Score again · Sol 6/);
         const call = await page.evaluate(() => ({ model: calls[0][0], isJson: calls[0][2], feature: calls[0][5].feature, prompt: calls[0][1], n: calls.length }));
-        assert.equal(call.n, 1); assert.equal(call.model, 'gpt-6-luna'); assert.equal(call.isJson, true); assert.equal(call.feature, 'quiz_suggest_score');
+        assert.equal(call.n, 1); assert.equal(call.model, 'gpt-6-sol'); assert.equal(call.isJson, true); assert.equal(call.feature, 'quiz_suggest_score');
         assert.match(call.prompt, /RUBRIC — score each question on 7 dimensions/);
         assert.match(call.prompt, /Q2 \(choice\): Q two stem — choose TWO[\s\S]*correct: A,C/);
         assert.match(call.prompt, /"perQuestionAudit"/);
@@ -108,21 +140,24 @@ const popup = slice('        window.showAiSuggestionsPopup = function', '       
 
         // a short reply says so; a failure restores the button
         await page.evaluate(() => { window.callUniversalAI = async () => ({ text: JSON.stringify({ perQuestionAudit: [{ qNumber: 1, scores: { clarity: 5 } }] }) }); });
-        await page.locator('#ai-sugg-score-all').click();
+        await scoreTwice();
         await page.waitForFunction(() => toasts.some(t => /Scored 1 of 3/.test(t)));
         await page.evaluate(() => { window.callUniversalAI = async () => { throw new Error('Opus 5.5 declined this request'); }; window.alerts = []; window.alert = m => alerts.push(m); });
-        await page.locator('#ai-sugg-score-all').click();
+        await scoreTwice();
         await page.waitForFunction(() => alerts.length === 1);
         assert.match(await page.evaluate(() => alerts[0]), /Score error: Opus 5\.5 declined/);
         assert.equal(await page.locator('#ai-sugg-score-all').isDisabled(), false);
 
         // a regenerated popup ignores a stale score reply
         await page.evaluate(() => { window.callUniversalAI = () => new Promise(r => { window.finishScore = r; }); });
-        await page.locator('#ai-sugg-score-all').click();
+        await scoreTwice();
+        // a new popup opens on the remembered model
+        
         await page.evaluate(s => { document.getElementById('ai-suggestions-popup').remove(); showAiSuggestionsPopup(s); }, items);
         await page.evaluate(() => finishScore({ text: JSON.stringify({ perQuestionAudit: [{ qNumber: 1, scores: { clarity: 5 }, averageScore: 5 }] }) }));
         await page.waitForTimeout(100);
         assert.equal(await page.locator('#ai-sugg-avg-0').innerText(), '', 'stale scores not painted on the new set');
+        assert.equal(await page.locator('#ai-sugg-score-rail [data-value="gpt-6-sol"]').getAttribute('aria-pressed'), 'true', 'a new popup opens on the remembered model');
 
         for (const width of [390, 1000]) {
             await page.setViewportSize({ width, height: 900 });
