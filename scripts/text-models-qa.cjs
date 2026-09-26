@@ -48,7 +48,9 @@ const { chromium } = require('playwright');
                     assert.equal(await rail.locator('[aria-pressed="true"]').count(), 1);
                     assert.equal(await rail.locator('[aria-pressed="true"]').getAttribute('data-value'), value);
                     assert.equal(await page.locator('#' + id).inputValue(), value);
-                    assert.equal(await rail.locator('button').evaluateAll(bs => bs.filter(b => getComputedStyle(b).backgroundColor === 'rgb(245, 158, 11)').length), 1);
+                    // V102.13: the pick is the vendor colour, solid, white name (was the one amber) — still exactly one
+                    // (the rail sits in a closed popover here, so a lift/transform would not read).
+                    assert.equal(await rail.locator('button').evaluateAll(bs => bs.filter(b => getComputedStyle(b).color === 'rgb(255, 255, 255)').length), 1);
                 }
             }
         }

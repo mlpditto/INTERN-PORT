@@ -156,7 +156,7 @@ const ok = (content, finish = 'stop', usage = { prompt_tokens: 100, completion_t
     check('T8 an explicit trial pick is kept, others normalise as before', `${win.resolveTrialTextAIModel(grok)}|${win.resolveTrialTextAIModel('claude-sonnet-5')}|${win.resolveTrialTextAIModel('nope')}`, 'or/x-ai/grok-4.7|claude-sonnet-5|gpt-6-luna');
     check('T8 default chip rail has no Grok', /grok/i.test(win.textAIChipContents('gpt-6-luna')), false);
     const withTrial = win.textAIChipContents('gpt-6-luna', '', null, win.TEXT_AI_TRIAL_MODELS);
-    check('T8 trial chip: text, full name, OpenRouter id, tooltip route', /data-value="or\/x-ai\/grok-4\.7" aria-label="Grok 4\.7" aria-pressed="false" title="Grok 4\.7 · or\/x-ai\/grok-4\.7 — [^"]*OpenRouter"[^>]*><span class="text-ai-logo" data-owner="grok" aria-hidden="true"><\/span>Grok 4\.7<\/button>/.test(withTrial), true); // V102.11: + Grok mark
+    check('T8 trial chip: text, full name, OpenRouter id, tooltip route', /data-value="or\/x-ai\/grok-4\.7" data-vendor="grok" aria-label="Grok 4\.7" aria-pressed="false" title="Grok 4\.7 · or\/x-ai\/grok-4\.7 — [^"]*OpenRouter"[^>]*><span class="text-ai-logo" data-owner="grok" aria-hidden="true"><\/span>Grok 4\.7<\/button>/.test(withTrial), true); // V102.11: + Grok mark
     // V101.74: the rail builder is shared (providerModelRailHtml); trial models reach it only through the
     // audit toolbar's call — the Expand Quiz modal passes no `extra`, so Grok stays audit-only.
     const trialUses = admin.match(/TEXT_AI_TRIAL_MODELS/g) || [];
