@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.95)</title>
+    <title>Nika Admin (V101.96)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -26796,9 +26796,8 @@ ${JSON.stringify(sourceObj)}`;
                         isCorrect = true;
                     } else if (hasChoice) {
                         const target = q.correct;
-                        const sAns = Array.isArray(userAns) ? userAns : (userAns !== undefined && userAns !== null ? [userAns] : []);
-                        const tAns = Array.isArray(target) ? target : (target !== undefined && target !== null ? [target] : []);
-                        isCorrect = sAns.length > 0 && sAns.length === tAns.length && sAns.every(v => tAns.includes(v));
+                        const sAns = parseStoredChoiceAnswer(userAns); // V101.96: multi answers are stored joined
+                        isCorrect = choiceAnswerMatches(target, userAns);
                         sAns.forEach(idx => {
                             const i = Number(idx);
                             if (Number.isFinite(i) && i >= 0 && i < perQ[qi].optionPicks.length) {
@@ -27468,14 +27467,11 @@ ${JSON.stringify(sourceObj)}`;
                         let partialFrac = null; // V95.73: non-null only for partial-credit multi-answer
                         if (isChoice) {
                             const target = q.correct;
-                            const sAns = Array.isArray(studentAns) ? studentAns : (studentAns !== undefined && studentAns !== null ? [studentAns] : []);
                             const tAns = Array.isArray(target) ? target : (target !== undefined && target !== null ? [target] : []);
                             if (quiz.partialCredit && tAns.length > 1) {
                                 partialFrac = scorePartialMultiChoice(tAns.map(Number), parseStoredChoiceAnswer(studentAns));
                                 isCorrect = partialFrac >= 1;
-                            } else if (tAns.length === 0) isCorrect = false;
-                            else if (tAns.length === 1 && sAns.length === 1) isCorrect = (String(sAns[0]).trim() === String(tAns[0]).trim());
-                            else isCorrect = (sAns.length === tAns.length && tAns.every(v => sAns.map(String).includes(String(v))));
+                            } else isCorrect = choiceAnswerMatches(tAns, studentAns);
                             isCorrect = isCorrect || isManuallyCorrect;
                         } else {
                             isCorrect = !!((att.gradedAnswers && att.gradedAnswers[i]) || isManuallyCorrect);
@@ -27868,12 +27864,7 @@ ${JSON.stringify(sourceObj)}`;
                     let isCorrect = false;
                     if (isChoice) {
                         const target = q.correct;
-                        const sAns = Array.isArray(studentAns) ? studentAns : (studentAns !== undefined && studentAns !== null ? [studentAns] : []);
-                        const tAns = Array.isArray(target) ? target : (target !== undefined && target !== null ? [target] : []);
-                        if (tAns.length > 0) {
-                            if (tAns.length === 1 && sAns.length === 1) isCorrect = (String(sAns[0]).trim() === String(tAns[0]).trim());
-                            else isCorrect = (sAns.length === tAns.length && tAns.every(v => sAns.map(String).includes(String(v))));
-                        }
+                        isCorrect = choiceAnswerMatches(target, studentAns); // V101.96
                     } else {
                         isCorrect = !!((att.gradedAnswers && att.gradedAnswers[i]) || isManuallyCorrect);
                     }
@@ -30116,6 +30107,17 @@ ${JSON.stringify(sourceObj)}`;
             return String(stored).split('\n---\n').map(s => parseInt(s, 10)).filter(n => Number.isFinite(n));
         }
 
+        // V101.96: exact-set match on PARSED indices. Seven scoring / review / analytics paths compared the raw
+        // stored value, so a correct multi-answer attempt (stored joined, e.g. "0 --- 2") counted as wrong —
+        // on Approve, Mark correct, score edits, answer review and the question analytics. Single answers unchanged.
+        function choiceAnswerMatches(target, stored) {
+            const t = (Array.isArray(target) ? target : (target !== undefined && target !== null ? [target] : [])).map(Number);
+            const s = parseStoredChoiceAnswer(stored);
+            return t.length > 0 && s.length === t.length && t.every(v => s.includes(v));
+        }
+        window.choiceAnswerMatches = choiceAnswerMatches;
+        window.parseStoredChoiceAnswer = parseStoredChoiceAnswer;
+
         function calculateAttemptScoring(att, quiz) {
             const qList = quiz.questions || [];
             const qCount = Math.max(1, qList.length);
@@ -30140,8 +30142,7 @@ ${JSON.stringify(sourceObj)}`;
                     if (quiz.partialCredit && tAns.length > 1) {
                         autoFraction = scorePartialMultiChoice(tAns.map(Number), parseStoredChoiceAnswer(userAns));
                     } else {
-                        const sAns = Array.isArray(userAns) ? userAns : (userAns !== undefined && userAns !== null ? [userAns] : []);
-                        autoFraction = (sAns.length > 0 && sAns.length === tAns.length && sAns.every(v => tAns.includes(v))) ? 1 : 0;
+                        autoFraction = choiceAnswerMatches(tAns, userAns) ? 1 : 0;
                     }
                 } else {
                     autoFraction = (att.gradedAnswers && att.gradedAnswers[i]) ? 1 : 0;
@@ -50340,9 +50341,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     } else if ((q.type || 'choice') === 'choice') {
                         const userAns = answers[qi];
                         const target = q.correct;
-                        const sAns = Array.isArray(userAns) ? userAns : (userAns !== undefined && userAns !== null ? [userAns] : []);
-                        const tAns = Array.isArray(target) ? target : (target !== undefined && target !== null ? [target] : []);
-                        isCorrect = sAns.length > 0 && sAns.length === tAns.length && sAns.every(v => tAns.includes(v));
+                        isCorrect = window.choiceAnswerMatches(target, userAns); // V101.96
                     } else {
                         isCorrect = !!gradedAnswers[qi];
                     }
@@ -50439,9 +50438,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         } else if ((q.type || 'choice') === 'choice') {
                             const userAns = answers[qi];
                             const target = q.correct;
-                            const sAns = Array.isArray(userAns) ? userAns : (userAns !== undefined && userAns !== null ? [userAns] : []);
-                            const tAns = Array.isArray(target) ? target : (target !== undefined && target !== null ? [target] : []);
-                            isCorrect = sAns.length > 0 && sAns.length === tAns.length && sAns.every(v => tAns.includes(v));
+                            isCorrect = window.choiceAnswerMatches(target, userAns); // V101.96
                         } else {
                             isCorrect = !!gradedAnswers[qi];
                         }
@@ -50768,9 +50765,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     } else if ((q.type || 'choice') === 'choice') {
                         const userAns = answers[qi];
                         const target = q.correct;
-                        const sAns = Array.isArray(userAns) ? userAns : (userAns !== undefined && userAns !== null ? [userAns] : []);
-                        const tAns = Array.isArray(target) ? target : (target !== undefined && target !== null ? [target] : []);
-                        isCorrect = sAns.length > 0 && sAns.length === tAns.length && sAns.every(v => tAns.includes(v));
+                        isCorrect = window.choiceAnswerMatches(target, userAns); // V101.96
                     } else {
                         isCorrect = !!gradedAnswers[qi];
                     }
