@@ -270,22 +270,21 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.equal(await page.locator('[data-badge]').isVisible(), false);
         // V101.91: the Image 2 chip's OpenAI Blossom is the white file on the dark bar.
         assert.match(await page.locator('.quiz-cover-model-rail .text-ai-logo[data-owner="openai"]').evaluate(e => getComputedStyle(e).backgroundImage), /openai-blossom-white/);
-        // V102.07: the picked model stands out — unpicked names fade; logos and the OpenRouter Volt underline stay full.
-        const railLook = await page.locator('.quiz-cover-model-rail button').evaluateAll(bs => bs.map(b => { const s = getComputedStyle(b), l = b.querySelector('.text-ai-logo'); return { active: b.classList.contains('active'), or: b.dataset.value.startsWith('or/'), opacity: s.opacity, color: s.color, shadow: s.boxShadow, logo: l ? getComputedStyle(l).filter + '|' + getComputedStyle(l).opacity : 'none|1' }; }));
-        assert.equal(railLook.filter(r => r.active).length, 1, 'exactly one model is picked');
-        for (const r of railLook) {
-            assert.equal(r.opacity, '1', 'chips never fade as a whole');
-            assert.equal(r.logo, 'none|1', 'logos stay full colour');
-            if (!r.active) assert.match(r.color, /0\.45\)$/, 'unpicked name fades');
-            if (r.or) assert.match(r.shadow, /rgb\(200, 255, 0\)/, 'OpenRouter Volt underline stays');
-        }
-        // V102.08: the style rail gets the same pick treatment (emoji stay full colour, names of the rest fade).
-        const styleLook = await page.locator('.quiz-cover-style-rail button').evaluateAll(bs => bs.map(b => { const s = getComputedStyle(b); return { active: b.classList.contains('active'), opacity: s.opacity, color: s.color, shadow: s.boxShadow }; }));
-        assert.equal(styleLook.filter(r => r.active).length, 1, 'exactly one style is picked');
-        for (const r of styleLook) {
-            assert.equal(r.opacity, '1', 'style chips never fade as a whole');
-            if (r.active) assert.match(r.shadow, /rgb\(196, 181, 253\)/, 'picked style has the ring');
-            else assert.match(r.color, /0\.45\)$/, 'unpicked style name fades');
+        // V102.10: AI Curate theme on both rails — glass pills, amber pick, OpenRouter olive border, official = plain glass;
+        // unpicked names fade, logos stay full colour.
+        const look = sel => page.locator(sel).evaluateAll(bs => bs.map(b => { const s = getComputedStyle(b), l = b.querySelector('.text-ai-logo'); return { active: b.classList.contains('active'), or: (b.dataset.value || '').startsWith('or/'), opacity: s.opacity, color: s.color, bg: s.backgroundColor, border: s.borderTopColor, logo: l ? getComputedStyle(l).filter + '|' + getComputedStyle(l).opacity : 'none|1' }; }));
+        for (const sel of ['.quiz-cover-model-rail button', '.quiz-cover-style-rail button']) {
+            const rows = await look(sel);
+            assert.equal(rows.filter(r => r.active).length, 1, 'exactly one pick in ' + sel);
+            for (const r of rows) {
+                assert.equal(r.opacity, '1', 'chips never fade as a whole');
+                assert.equal(r.logo, 'none|1', 'logos stay full colour');
+                if (r.active) assert.deepEqual([r.bg, r.color], ['rgb(241, 181, 94)', 'rgb(33, 26, 16)'], 'Curate amber pick');
+                else {
+                    assert.match(r.color, /0\.5\)$/, 'unpicked name fades');
+                    assert.equal(r.border, r.or ? 'rgb(110, 139, 30)' : 'rgba(255, 255, 255, 0.14)', 'OpenRouter olive border, official plain glass');
+                }
+            }
         }
         console.log('PASS: AI title validation, preview, accept, discard, invalid response, content-filter fallback, stale generation and responsive layout.');
         console.log('PASS: cover load/remove/upload with mocked storage, unsafe URL rejection, locked/collapsed protection, mobile deadline, keyboard start.');
