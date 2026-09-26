@@ -92,11 +92,12 @@ const markup = html.slice(html.indexOf('<header><div><strong>📚 Materials'), h
             if (width === 1000) assert(await rows.nth(0).locator('.res-line').evaluate(l => l.getBoundingClientRect().height) <= 52, 'single line on desktop');
         }
 
-        // V102.09: save state next to the count — ✓ dim → 💾 (bounce + amber dot) on change → ✓ green after Save Quiz.
+        // V102.09: one 💾 next to the count — dim/still → bounce + amber dot on change → pop + green ring after Save Quiz.
         const st = page.locator('#quiz-resource-state');
         const stateOf = () => st.evaluate(e => [e.dataset.state, e.textContent, e.title]);
         await page.evaluate(() => quizResourceCards.load([{ name: 'A', url: 'https://youtu.be/a' }, { name: 'B', url: 'https://youtu.be/b' }]));
-        assert.deepEqual(await stateOf(), ['clean', '✓', 'บันทึกพร้อมกับ Quiz']);
+        assert.deepEqual(await stateOf(), ['clean', '💾', 'บันทึกพร้อมกับ Quiz']);
+        assert.deepEqual(await st.evaluate(e => [getComputedStyle(e).filter, getComputedStyle(e).opacity, getComputedStyle(e).animationName]), ['grayscale(1)', '0.45', 'none'], 'unchanged = dim + still');
         assert.equal(await page.getByText('Changes are saved with the quiz.').count(), 0, 'footer line removed');
         const title = rows.nth(0).locator('.res-title');
         await title.fill('A2');
@@ -108,8 +109,8 @@ const markup = html.slice(html.indexOf('<header><div><strong>📚 Materials'), h
         await page.evaluate(() => quizResourceCards.add({ name: 'C', url: 'https://youtu.be/c' }));
         assert.equal((await stateOf())[0], 'dirty', 'adding a link');
         await page.evaluate(() => quizResourceCards.saved());
-        assert.deepEqual(await stateOf(), ['saved', '✓', 'บันทึกแล้ว']);
-        assert.equal(await st.evaluate(e => getComputedStyle(e).color), 'rgb(74, 222, 128)', 'green after save');
+        assert.deepEqual(await stateOf(), ['saved', '💾', 'บันทึกแล้ว']);
+        assert.deepEqual(await st.evaluate(e => [getComputedStyle(e).animationName, getComputedStyle(e, '::after').animationName, getComputedStyle(e, '::after').borderTopColor]), ['quiz-res-pop', 'quiz-res-ring', 'rgb(74, 222, 128)'], 'pop + green ring after save');
         await rows.nth(2).locator('.res-del').click();
         assert.equal((await stateOf())[0], 'dirty', 'deleting after a save');
         await page.evaluate(() => quizResourceCards.load([{ name: 'X', url: 'https://youtu.be/x' }, { name: 'Y', url: 'https://youtu.be/y' }, { name: 'Z', url: 'https://youtu.be/z' }]));
@@ -123,6 +124,6 @@ const markup = html.slice(html.indexOf('<header><div><strong>📚 Materials'), h
         assert.equal(await page.locator('.resource-empty').isVisible(), true);
         assert.equal(await page.locator('#quiz-resource-count').innerText(), '0');
         assert.deepEqual(errors, []);
-        console.log('PASS: resource rows — chip opens in one click (a, _blank, noopener), site colour/icon, no labels, note fold/keep multi-line, schema round-trip, paste-a-link → chip, ✎ edit, invalid shown on read, delete/empty, 1000/390 px layout, save state ✓/💾/✓ green');
+        console.log('PASS: resource rows — chip opens in one click (a, _blank, noopener), site colour/icon, no labels, note fold/keep multi-line, schema round-trip, paste-a-link → chip, ✎ edit, invalid shown on read, delete/empty, 1000/390 px layout, save state 💾 dim / bounce / pop');
     } finally { await browser.close(); }
 })();

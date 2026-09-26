@@ -30,14 +30,14 @@ window.quizResourceCards = (() => {
         if (/\.pdf$/i.test(u.pathname)) return { name: 'PDF', color: '#b91c1c', icon: 'fa-solid fa-file-pdf' };
         return { name: 'Link', color: '#4338ca', icon: 'fa-solid fa-link' };
     }
-    // V102.09: header state next to the count — ✓ dim = unchanged · 💾 bouncing + 🟠 = changed, not saved yet ·
-    // ✓ green = Save Quiz just ran. Compared against the loaded list, so undoing an edit goes back to ✓.
+    // V102.09: one 💾 next to the count, animated by state — dim/still = unchanged · bouncing + 🟠 = changed, not
+    // saved yet · pop + green ring = Save Quiz just ran. Compared against the loaded list, so undoing an edit goes back to ✓.
     const snapshot = () => JSON.stringify(Array.from(grid().querySelectorAll('article'), c =>
         Array.from(c.querySelectorAll('[data-field]'), f => f.value.trim())));
     const STATES = {
-        clean: ['✓', 'บันทึกพร้อมกับ Quiz', 'Saved with the quiz'],
+        clean: ['💾', 'บันทึกพร้อมกับ Quiz', 'Saved with the quiz'],
         dirty: ['💾', 'ยังไม่บันทึก — กด Save Quiz', 'Unsaved changes — press Save Quiz'],
-        saved: ['✓', 'บันทึกแล้ว', 'Saved']
+        saved: ['💾', 'บันทึกแล้ว', 'Saved']
     };
     function setState(state) {
         const el = document.getElementById('quiz-resource-state');
