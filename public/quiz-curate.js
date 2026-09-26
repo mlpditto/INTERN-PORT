@@ -22,7 +22,20 @@
         const missingKeys = [...document.querySelectorAll('.quiz-q-item')].flatMap((item, i) => shouldMarkQuestionMissingAnswer(item) ? [i + 1] : []);
         return { sourceId: byId('edit-quiz-id').value || null, form, missingKeys };
     }
-    function unchanged(s) { return JSON.stringify(snapshot()) === s.signature; }
+    // V101.95: block only when what Curate sends and saves per question changed — questions, missing-answer marks,
+    // case text, blueprint, quiz id. Any other editor field (title, tags, cover, dates…) is refreshed into the source
+    // silently: the old whole-form check blocked Suggest whenever an unrelated field moved (e.g. a merge in another tab).
+    const core = snap => JSON.stringify({ sourceId: snap.sourceId, missingKeys: snap.missingKeys, caseContent: snap.form.caseContent,
+        blueprint: snap.form.blueprint, questions: snap.form.questions });
+    function unchanged(s) {
+        const current = snapshot(), now = core(current);
+        if (now === s.core) { s.source = JSON.parse(JSON.stringify(current)); return true; }
+        const was = JSON.parse(s.core), is = JSON.parse(now);
+        const fields = Object.keys(is).filter(k => JSON.stringify(was[k]) !== JSON.stringify(is[k])).map(k => k !== 'questions' ? k
+            : 'questions (' + [...Array(Math.max(was.questions.length, is.questions.length)).keys()].filter(i => JSON.stringify(was.questions[i]) !== JSON.stringify(is.questions[i])).map(i => 'Q' + (i + 1)).join(' ') + ')');
+        console.warn('[curate] editor changed since Curate opened:', fields.join(', '));
+        return false;
+    }
     function target(s) {
         const value = Number(byId('curate-target').value);
         return Number.isInteger(value) && value >= 1 && value <= s.source.form.questions.length ? value : null;
@@ -187,7 +200,7 @@
         const n = target(s);
         if (!n) return 'Enter a whole number between 1 and ' + s.source.form.questions.length + '.';
         if (s.pins.size > n) return 'Pinned questions exceed the target. Increase the target or unpin questions.';
-        if (s.stale) return 'The editor changed. Close Curate and reopen it to use the latest questions.';
+        if (s.stale) return 'The editor changed since Curate opened. Select ↻ Use latest questions.';
         if (!s.proposal || s.needsSuggestion) return 'Select Suggest to generate a proposal for these settings.';
         if (s.keep.size !== n) return s.keep.size + ' selected · target ' + n + ' — adjust your selection or Suggest again.';
         return '';
@@ -268,6 +281,10 @@
         const foot = node('div', undefined, 'curate-foot'); card.after(foot);
         const status = node('div'); status.id = 'curate-history-status'; status.setAttribute('role', 'status');
         foot.append(dialog.querySelector('.curate-instructions'), history, status);
+        // V101.95: when the editor's questions changed, this takes Suggest's place — no close / reopen needed.
+        const reload = node('button', '↻ Use latest questions', 'curate-primary'); reload.type = 'button'; reload.id = 'curate-reload'; reload.hidden = true;
+        reload.title = 'อ่านคำถามล่าสุดจาก Editor อีกครั้ง โดยคงจำนวน โหมด โมเดล และคำสั่งเดิมไว้';
+        byId('curate-suggest').after(reload); reload.onclick = reloadSource;
         byId('curate-suggest').onclick = () => suggest();
         byId('curate-save').onclick = () => save(false);
         apply.onclick = () => save(true);
@@ -350,6 +367,7 @@
         byId('curate-apply').textContent = s.applying ? 'Applying…' : 'Remove ' + (count - s.keep.size) + ' from original';
         dialog.querySelector('.curate-main > .curate-note').textContent = 'Remove updates the inactive original. Create backup quiz is optional; required history versions are preserved. Split creates a new quiz from removed questions.';
         byId('curate-suggest').textContent = s.busy ? 'Processing · ' + elapsed(s) : s.done ? 'Run again' : '✦ Suggest';
+        byId('curate-suggest').hidden = !!s.stale; byId('curate-reload').hidden = !s.stale;
         byId('curate-suggest').title = s.busy ? 'ความคืบหน้าตามขั้นตอนงาน API ไม่รายงานเปอร์เซ็นต์ประมวลผลจริงของโมเดล' : 'ให้ AI เสนอข้อที่ควรเก็บและตัด';
         renderComparison(s);
         if (focusedAction && !s.compare && !s.busy && !s.saving) {
@@ -363,8 +381,14 @@
         if (source.form.questions.length < 2) return showToast('Add at least two questions to curate.');
         if (source.form.quizType === 'read_only' || source.form.isPoll) return showToast('AI Curate is for assessment questions, not learning pages or polls.');
         setup();
-        state = { source: JSON.parse(JSON.stringify(source)), signature: JSON.stringify(source), model: textAIModel('ai-analyzer-model-val'),
-            keep: new Set(source.form.questions.map((_, i) => i + 1)), pins: new Set(), mode: 'balanced', view: 'keep',
+        startSession(source);
+        dialog.showModal(); byId('curate-target').focus();
+        loadHistory(state);
+    };
+    // Fresh session from an editor snapshot. `keep` carries the admin's settings across ↻ Use latest questions.
+    function startSession(source, keep = {}) {
+        state = { source: JSON.parse(JSON.stringify(source)), core: core(source), model: keep.model || textAIModel('ai-analyzer-model-val'),
+            keep: new Set(source.form.questions.map((_, i) => i + 1)), pins: new Set(), mode: keep.mode || 'balanced', view: 'keep',
             busy: false, saving: false, saved: false, stale: false, needsSuggestion: true, proposal: null, message: '' };
         if (source.sourceId) state.serverBaseline = db.collection('quizzes').doc(source.sourceId).get({ source: 'server' })
             .then(doc => ({ exists: doc.exists, data: doc.exists ? doc.data() : null }), error => ({ error }));
@@ -374,14 +398,21 @@
         byId('curate-source').textContent = (source.form.title || 'Untitled quiz') + ' · ' + source.form.questions.length + ' questions';
         byId('curate-total').textContent = source.form.questions.length;
         byId('curate-target').max = source.form.questions.length;
-        byId('curate-target').value = Math.min(10, source.form.questions.length - 1);
-        byId('curate-instructions').value = ''; dialog.querySelector('.curate-instructions').open = false;
+        byId('curate-target').value = Math.min(Number(keep.target) || 10, source.form.questions.length - 1);
+        byId('curate-instructions').value = keep.instructions || ''; dialog.querySelector('.curate-instructions').open = !!keep.instructions;
         byId('curate-create-backup').checked = true;
         byId('curate-history').open = false; byId('curate-history-list').replaceChildren();
         byId('curate-history-status').textContent = source.sourceId ? 'Checking saved results…' : 'Save this quiz first to enable history.';
-        render(); dialog.showModal(); byId('curate-target').focus();
+        render();
+    }
+    function reloadSource() {
+        const s = state; if (!s || s.busy || s.saving) return;
+        const source = snapshot();
+        if (source.form.questions.length < 2 || source.form.quizType === 'read_only' || source.form.isPoll) { s.message = 'The editor no longer has assessment questions to curate.'; render(); return; }
+        clearInterval(s.timer);
+        startSession(source, { model: s.model, mode: s.mode, target: byId('curate-target').value, instructions: byId('curate-instructions').value });
         loadHistory(state);
-    };
+    }
     function requestSettings(s) {
         return { version: 1, form: s.source.form, model: s.model, target: target(s), mode: s.mode,
             pins: [...s.pins].sort((a, b) => a - b), instructions: byId('curate-instructions').value.trim() };
@@ -552,7 +583,7 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
             if (state !== s) return;
             s.message = 'Checking question IDs, reasons and evidence.'; render();
             s.stale = !unchanged(s);
-            if (s.stale) throw new Error('The editor changed during generation. Close Curate and reopen it.');
+            if (s.stale) throw new Error('The editor changed during generation. Select ↻ Use latest questions.');
             const parsed = safeJsonParse(response.text);
             if (!parsed) { // V101.17: name the shape of the failure (length, chars, first 200 chars)
                 const text = String(response.text || '');
@@ -592,7 +623,7 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
         if (split && (!attempts.empty || !sessions.empty)) throw new Error('This quiz has attempts or exam sessions. Use Save as new quiz to preserve its history.');
         const history = [...attempts.docs, ...sessions.docs].filter(doc => !doc.data().quizRevisionId);
         if (history.length > 450) throw new Error('This quiz has too many history records for one atomic removal. No changes saved.');
-        if (!unchanged(s)) throw new Error('The editor changed. Close Curate and reopen it.');
+        if (!unchanged(s)) { s.stale = true; throw new Error('The editor changed since Curate opened. Select ↻ Use latest questions.'); }
         const removed = s.source.form.questions.map((_, i) => i + 1).filter(id => !s.keep.has(id));
         const createBackup = split || (operation.createBackup ?? byId('curate-create-backup').checked);
         const preserveVersion = createBackup || history.length > 0;
@@ -646,7 +677,7 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
             if (apply && (!s.source.sourceId || ids.length === form.questions.length)) throw new Error('Select fewer questions from a saved quiz before applying.');
             s.saving = true; s.applying = apply; s.splitting = split; s.message = apply ? 'Checking the original quiz and its history…' : 'Saving a new inactive quiz…'; render();
             if (!await ensureAuthForQuizWrite(6000)) throw new Error('Sign in with your admin account, then retry.');
-            if (!unchanged(s)) { s.stale = true; throw new Error('The editor changed. Close Curate and reopen it.'); }
+            if (!unchanged(s)) { s.stale = true; throw new Error('The editor changed since Curate opened. Select ↻ Use latest questions.'); }
             const timestamp = firebase.firestore.FieldValue.serverTimestamp();
             if (apply) {
                 if (await applyToCurrent(s, ids, timestamp, split) === false) { s.message = 'Apply cancelled. No changes saved.'; return; }
