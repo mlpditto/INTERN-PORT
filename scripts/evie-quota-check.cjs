@@ -39,12 +39,12 @@ async function retries(type, code, stepMs=0) {
     assert.ok(exhausted.rows.every(r=>r.correct[0]===1),'Preserve existing answers');
     assert.equal(exhausted.button.disabled,false);
     assert.match(exhausted.count.title,/credits|quota/i); // V102.04: the reason is in the hover; the line itself is short
-    assert.equal(exhausted.count.textContent,'⚠ 0/10');
+    assert.equal(exhausted.count.textContent,'0/10'); // V102.15: inside the ring; red = failed
     assert.match(exhausted.toasts.at(-1)[0],/9.*skipped/i);
     const partial=await batch(2,'You exceeded your current quota.');
     assert.equal(partial.calls,3);assert.equal(partial.rows[0].correct[0],0);assert.equal(partial.rows[2].correct[0],1);
     const success=await batch(-1,'');assert.equal(success.calls,10);assert.match(success.toasts.at(-1)[0],/10\/10/);
-    assert.equal(success.count.textContent,'✓ 10/10');assert.match(success.count.title,/E\.V\.I\.E\. done 10\/10/);
+    assert.equal(success.count.textContent,'10/10');assert.match(success.count.title,/E\.V\.I\.E\. done 10\/10/);
     const malformed=await batch(3,'Invalid JSON');assert.equal(malformed.calls,10);assert.match(malformed.toasts.at(-1)[0],/9\/10/);
     assert.equal(await retries('insufficient_quota','credit_balance_exhausted'),1);
     assert.equal(await retries('insufficient_quota','insufficient_quota'),1);
