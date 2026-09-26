@@ -62,12 +62,26 @@ with sync_playwright() as p:
         };
         window.renderBulkPastePreview=()=>{};window.showToast=()=>{};
     }''')
+    # V102.05: picking a model is the go signal. Nothing selected → only the model changes.
+    page.evaluate('_bulkPasteParsed.forEach(r => r.include = false)')
+    chip.click(); page.locator('#bp-model-rail [data-value="claude-opus-5-5"]').click()
+    assert page.evaluate('requestModels.length') == 0, 'no run without selected questions'
+    assert select.input_value() == 'claude-opus-5-5'
+    # selected questions → the pick starts E.V.I.E. at once with that model (chip + select locked meanwhile)
+    page.evaluate('_bulkPasteParsed.forEach(r => r.include = true)')
+    chip.click(); page.locator('#bp-model-rail [data-value="claude-sonnet-5"]').click()
+    page.wait_for_function('requestModels.length === 10')
+    assert page.evaluate('requestModels') == ['claude-sonnet-5']*10, 'picking a model runs E.V.I.E. right away'
+    assert page.evaluate('disabledDuringRun.every(Boolean)')
+    page.wait_for_function("!document.getElementById('bp-model-chip').disabled")
+    page.evaluate('requestModels.length = 0; disabledDuringRun.length = 0')
+    # 🎯 still re-runs with the current model
     page.locator('#bp-find-btn').click()
-    assert page.evaluate('requestModels') == ['claude-haiku-4-5']*10
+    assert page.evaluate('requestModels') == ['claude-sonnet-5']*10
     assert page.evaluate('disabledDuringRun.every(Boolean)')
     assert select.is_enabled() and chip.is_enabled()
     assert page.locator('#ai-analyzer-model-val').input_value() == 'gpt-6-luna'
     bounds=chip.bounding_box()
     assert bounds['x']>=0 and bounds['x']+bounds['width']<=390
-    print('PASS: shared model catalog, logo chip + rail pick (Esc closes), saved selection, 10 requests use EVIE model, run lock (select + chip), independent analyzer, mobile width')
+    print('PASS: shared model catalog, logo chip + rail pick (Esc closes), pick auto-runs E.V.I.E. (not without a selection), saved selection, 10 requests use EVIE model, run lock (select + chip), independent analyzer, mobile width')
     browser.close()
