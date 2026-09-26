@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.05)</title>
+    <title>Nika Admin (V102.06)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -5070,6 +5070,19 @@
         .bp-model-rail[hidden] { display:none; }
         .bp-model-rail .audit-model-row { margin:0; padding:0; border:0; }
         @media (pointer:coarse) { .bp-model-chip { height:44px; } }
+        /* V102.06: Scorecard multi-select — a checkbox per card + a sticky bar: ☑ n · ✦ logo ×n · ×. */
+        #ai-audit-popup .audit-pick { width:18px; height:18px; margin:0; accent-color:#6366f1; cursor:pointer; flex:none; }
+        #ai-audit-popup .audit-batch { position:sticky; top:-26px; z-index:3; display:flex; align-items:center; gap:10px; margin:0 0 12px; padding:8px 12px; border-radius:12px; background:#eef2ff; border:1px solid #c7d2fe; box-shadow:0 6px 16px rgba(99,102,241,.15); }
+        #ai-audit-popup .audit-batch[hidden] { display:none; }
+        #ai-audit-popup .audit-batch-n { font-size:0.9em; color:#3730a3; }
+        #ai-audit-popup .audit-batch-fix { margin-left:auto; width:auto; min-height:0; height:36px; display:inline-flex; align-items:center; gap:6px; padding:0 12px; border:none; border-radius:10px; background:#6366f1; color:#fff; font-weight:700; cursor:pointer; }
+        #ai-audit-popup .audit-batch-fix:disabled { opacity:.5; cursor:not-allowed; }
+        #ai-audit-popup .audit-batch-fix .text-ai-logo { width:18px; height:18px; margin:0; padding:2px; box-sizing:content-box; border-radius:50%; background-color:#fff; background-origin:content-box; }
+        #ai-audit-popup .audit-batch-fix .text-ai-logo[data-owner="openai"] { background-image:url(assets/logos/openai-blossom-black.svg); }
+        #ai-audit-popup .audit-batch-x { font-size:0.85em; opacity:.9; }
+        #ai-audit-popup .audit-batch-clear { width:30px; height:30px; min-height:0; padding:0; border:none; border-radius:8px; background:transparent; color:#64748b; cursor:pointer; }
+        #ai-audit-popup .audit-batch-clear:hover { background:#e0e7ff; color:#3730a3; }
+        @media (pointer:coarse) { #ai-audit-popup .audit-pick { width:24px; height:24px; } #ai-audit-popup .audit-batch-fix, #ai-audit-popup .audit-batch-clear { height:44px; } #ai-audit-popup .audit-batch-clear { width:44px; } }
         #ai-suggest-config-modal .sqm-style img.emoji { width:1.15em; height:1.15em; vertical-align:-0.2em; margin-right:2px; }
         #ai-suggest-config-modal .sqm-scope-row[hidden], #ai-suggest-config-modal .sqm-style-hint[hidden] { display:none; }
         #ai-suggest-config-modal .sqm-style-hint { margin:6px 0 0 54px; padding:5px 8px; border:1px solid #bbf7d0; border-radius:7px; background:#f0fdf4; color:#475569; font-size:0.72em; line-height:1.5; }
@@ -17494,8 +17507,16 @@
             // inject the audit's weakest dimension + Thai reviewer note so the rewrite
             // targets that specific finding instead of a generic "make it harder".
             const _auditDimNames = window.auditDimLabels('suggestLabel');
-            const _hasAudit = auditNote && (auditNote.rationale || auditNote.weakestDim);
-            const auditBlock = _hasAudit ? `
+            // V102.06: a batch fix passes one finding per question (array aligned with `questions`).
+            const noteLine = n => [n.weakestDim ? `weakest ${_auditDimNames[n.weakestDim] || n.weakestDim}${(n.weakestVal != null) ? ` (${n.weakestVal}/5)` : ''}` : '', n.rationale ? `reviewer note (Thai): ${n.rationale}` : ''].filter(Boolean).join(' · ');
+            const batchNotes = Array.isArray(auditNote) ? auditNote.map((n, i) => (n && (n.rationale || n.weakestDim)) ? `- Q${i + 1}: ${noteLine(n)}` : '').filter(Boolean) : [];
+            const _hasAudit = !Array.isArray(auditNote) && auditNote && (auditNote.rationale || auditNote.weakestDim);
+            const auditBlock = batchNotes.length ? `
+
+                ⚠️ AUDIT FINDINGS — each question's improvedQuestion MUST directly fix ITS finding first:
+                ${batchNotes.join('\n                ')}
+                Prioritise fixing these weaknesses above all else; keep each question's topic and the intent of its correct answer. Return one item per question listed, with its qNumber.
+` : _hasAudit ? `
 
                 ⚠️ AUDIT FINDING for the question above — the improvedQuestion MUST directly fix THIS first:
                 ${auditNote.weakestDim ? `- Weakest dimension: ${_auditDimNames[auditNote.weakestDim] || auditNote.weakestDim}${(auditNote.weakestVal != null) ? ` (scored ${auditNote.weakestVal}/5)` : ''}` : ''}
@@ -17582,7 +17603,7 @@
             // opts.cachedResult (already resolved — e.g. a delete-triggered re-render) both
             // skip this check; opts.onlyQNumber (Audit's "Suggest fix", a scoped 1-question
             // ask) always wants a fresh answer for that specific question, never a stale save.
-            if (!(opts && (opts.cachedResult || opts.forceNew || opts.onlyQNumber))) {
+            if (!(opts && (opts.cachedResult || opts.forceNew || opts.onlyQNumber || opts.onlyQNumbers))) {
                 const quizId = (document.getElementById('edit-quiz-id') || {}).value || null;
                 if (quizId) {
                     // Immediate feedback for the Firestore round-trip below — the spinner set
@@ -17618,7 +17639,12 @@
             // question and remap the returned item's qNumber back to the real index after
             // parse so Compare/Fix/Apply still target the right question.
             const onlyQNumber = (opts && opts.onlyQNumber) || null;
-            const promptQuestions = (onlyQNumber && formData.questions[onlyQNumber - 1])
+            // V102.06: the Scorecard's batch fix scopes to several questions (1-based numbers, quiz order).
+            const onlyQNumbers = (opts && Array.isArray(opts.onlyQNumbers))
+                ? opts.onlyQNumbers.filter(n => formData.questions[n - 1]) : null;
+            const promptQuestions = (onlyQNumbers && onlyQNumbers.length)
+                ? onlyQNumbers.map(n => formData.questions[n - 1])
+                : (onlyQNumber && formData.questions[onlyQNumber - 1])
                 ? [formData.questions[onlyQNumber - 1]]
                 : formData.questions;
 
@@ -17745,6 +17771,15 @@
                 // (which read the FULL question list) target the audited question, not Q1.
                 if (onlyQNumber && Array.isArray(result.items)) {
                     result.items.forEach(it => { it.qNumber = onlyQNumber; });
+                }
+                // V102.06: batch scope — the model numbers the subset 1..k; map back to the real questions.
+                if (onlyQNumbers && onlyQNumbers.length && Array.isArray(result.items)) {
+                    result.items = result.items.filter(it => {
+                        const k = (it.qNumber !== undefined && it.qNumber !== null) ? Number(it.qNumber) : (it.index !== undefined ? Number(it.index) + 1 : NaN);
+                        if (!onlyQNumbers[k - 1]) return false;
+                        it.qNumber = onlyQNumbers[k - 1]; delete it.index;
+                        return true;
+                    });
                 }
 
                 const analysis = result.analysisText || "Analysis complete.";
@@ -18058,6 +18093,42 @@
                 // first mousedown; replacing the logo under the pointer then swallowed that click (needed 2 clicks).
                 if (!btn.disabled && btn.dataset.fixModel !== id) { btn.innerHTML = '✦' + window.aiModelLogoHtml(id); btn.dataset.fixModel = id; }
             });
+            if (window.auditPickChanged) window.auditPickChanged(); // V102.06: batch button shows the same model
+        };
+        // V102.06: multi-select on the Scorecard → one ✦ call for every picked question (≤ AUDIT_BATCH_MAX).
+        const AUDIT_BATCH_MAX = 10;
+        window.auditPickChanged = function() {
+            const bar = document.getElementById('audit-batch');
+            if (!bar) return;
+            const n = document.querySelectorAll('#ai-audit-popup .audit-pick:checked').length;
+            bar.hidden = n === 0;
+            document.getElementById('audit-batch-count').textContent = n;
+            const btn = document.getElementById('audit-batch-fix');
+            if (btn.dataset.running) return;
+            const id = auditFixModel(), label = (textAIModelInfo(id) || {}).label || id;
+            btn.innerHTML = '✦' + window.aiModelLogoHtml(id) + '<span class="audit-batch-x">×' + n + '</span>';
+            btn.disabled = n > AUDIT_BATCH_MAX;
+            btn.title = n > AUDIT_BATCH_MAX ? `เลือกได้สูงสุด ${AUDIT_BATCH_MAX} ข้อต่อครั้ง` : `ใช้ ${label} เสนอแก้ ${n} ข้อพร้อมกัน · เรียก AI 1 ครั้ง`;
+            btn.setAttribute('aria-label', `Suggest fixes for ${n} selected questions with ${label}`);
+        };
+        window.auditPickClear = function() {
+            document.querySelectorAll('#ai-audit-popup .audit-pick:checked').forEach(c => { c.checked = false; });
+            window.auditPickChanged();
+        };
+        window.auditBatchFix = async function(btn) {
+            const nums = [...document.querySelectorAll('#ai-audit-popup .audit-pick:checked')].map(c => Number(c.dataset.q)).filter(n => n > 0).sort((a, b) => a - b);
+            if (!nums.length || nums.length > AUDIT_BATCH_MAX) return;
+            if (nums.length === 1) return window.auditSuggestFix(nums[0], btn);
+            const notes = nums.map(n => (window._lastAuditByQ && window._lastAuditByQ[n]) || null);
+            btn.dataset.running = '1';
+            try {
+                await window.analyzeQuizAI(btn, { onlyQNumbers: nums, auditNote: notes, model: auditFixModel() });
+            } finally { delete btn.dataset.running; }
+            const popup = document.getElementById('ai-analysis-popup');
+            if (!popup) { await window.showReviewTab('audit'); window.auditPickChanged(); return; }
+            await window.showReviewTab('specialist');
+            const got = new Set((window._aiAnalysisItems || []).map(it => it.qNumber)).size;
+            showToast(got < nums.length ? `✓ Fixes proposed for ${got} of ${nums.length} questions` : `✓ Fixes proposed for ${nums.length} questions`);
         };
         window.auditFixButtonHtml = function(qNumber) {
             const id = auditFixModel(), label = (textAIModelInfo(id) || {}).label || '';
@@ -18539,6 +18610,7 @@ RULES:
                 return `<div style="background:#fcfdff; border:1.5px solid #e2e8f0; border-radius:14px; padding:14px; margin-bottom:10px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding:6px 10px; background:${headerBg}; border-radius:8px;">
                         <div style="display:flex; align-items:center; gap:8px;">
+                            <input type="checkbox" class="audit-pick" data-q="${q.qNumber}" onchange="auditPickChanged()" aria-label="Select Q${q.qNumber} for a batch fix" title="เลือกข้อนี้ เพื่อเสนอแก้หลายข้อพร้อมกัน">
                             <b style="color:#1e293b; font-size:1em;">Q${q.qNumber}</b>
                             ${question ? `<button id="audit-preview-btn-${q.qNumber}" onclick="toggleAuditPreview(${q.qNumber})" title="Show the actual question + options" style="background:rgba(15,23,42,0.06); border:none; border-radius:8px; padding:3px 9px; font-size:0.72em; font-weight:700; color:#475569; cursor:pointer; display:inline-flex; align-items:center; gap:4px;"><i class="fa-solid fa-eye"></i> Preview</button>` : ''}
                         </div>
@@ -18580,6 +18652,11 @@ RULES:
             modal.innerHTML = `
                 ${window.auditToolbarHtml(true)}
                 ${metaHtml}
+                <div class="audit-batch" id="audit-batch" hidden>
+                    <span class="audit-batch-n" title="จำนวนข้อที่เลือก"><i class="fa-regular fa-square-check" aria-hidden="true"></i> <b id="audit-batch-count">0</b></span>
+                    <button type="button" id="audit-batch-fix" class="audit-batch-fix" onclick="auditBatchFix(this)"></button>
+                    <button type="button" class="audit-batch-clear" onclick="auditPickClear()" aria-label="Clear selection" title="ล้างที่เลือก"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+                </div>
                 ${perQHtml}
             `;
             document.body.appendChild(modal);
