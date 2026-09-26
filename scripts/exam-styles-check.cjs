@@ -55,11 +55,35 @@ check('say: native text + language', [S.japan.say, S.china.say], [{ text: 'こ�
     new Function('window', 'SpeechSynthesisUtterance', src.slice(sa, sb))(win, Utterance);
     check('say: japan speaks こくし in ja-JP with the Japanese voice', [win.sqmSayStyle('japan'), spoken.at(-1).text, spoken.at(-1).lang, spoken.at(-1).voice && spoken.at(-1).voice.name], [true, 'こくし', 'ja-JP', 'Haruka']);
     check('say: china speaks 执业药师 in zh-CN (zh_CN voice matched)', [win.sqmSayStyle('china'), spoken.at(-1).text, spoken.at(-1).voice && spoken.at(-1).voice.name], [true, '执业药师', 'Huihui']);
-    check('say: a new pick cancels the previous one first', spoken.filter(x => x === 'cancel').length, 2);
+    check('say: nothing speaking → no cancel() before speak() (Chrome can drop the utterance)', spoken.filter(x => x === 'cancel').length, 0);
     check('say: Thai PC / PEBC stay silent', [win.sqmSayStyle('thai'), win.sqmSayStyle('pebc1')], [false, false]);
     const noSpeech = { SQM_EXAM_STYLES: S };
     new Function('window', 'SpeechSynthesisUtterance', src.slice(sa, sb))(noSpeech, undefined);
     check('say: no speech support → silent, no error', noSpeech.sqmSayStyle('japan'), false);
+    // V102.01: first press on a fresh page — getVoices() is [] until Chrome loads them; wait for voiceschanged.
+    {
+        let list = [], listeners = [], timers = [];
+        const said = [];
+        const synth = { speaking: false, pending: false, getVoices: () => list, cancel: () => said.push('cancel'), speak: u => said.push(u),
+            addEventListener: (ev, fn) => listeners.push(fn), removeEventListener: () => {} };
+        const w = { SQM_EXAM_STYLES: S, speechSynthesis: synth };
+        const realSetTimeout = setTimeout;
+        global.setTimeout = (fn, ms) => { timers.push(fn); return 0; };
+        new Function('window', 'SpeechSynthesisUtterance', src.slice(sa, sb))(w, Utterance);
+        w.sqmSayStyle('japan');
+        check('first press: nothing spoken while the voice list is empty', said.length, 0);
+        list = voices; listeners.forEach(fn => fn());
+        check('first press: speaks with the Japanese voice once voices arrive', [said.length, said[0] && said[0].voice && said[0].voice.name, said[0] && said[0].text], [1, 'Haruka', 'こくし']);
+        timers.forEach(fn => fn());
+        check('first press: the 1.5 s fallback does not speak a second time', said.length, 1);
+        list = []; listeners = []; timers = [];
+        w.sqmSayStyle('china'); timers.forEach(fn => fn());
+        check('first press: no voices ever → still speaks (browser default) after the timeout', [said.length, said.at(-1).text, said.at(-1).voice], [2, '执业药师', undefined]);
+        synth.speaking = true; list = voices; w.sqmSayStyle('japan');
+        check('while speaking, a new pick cancels first', said.slice(-2).map(x => x === 'cancel' ? 'cancel' : x.text), ['cancel', 'こくし']);
+        global.setTimeout = realSetTimeout;
+    }
+    check('voices warmed when the Expand quiz modal opens', /twemoji\.parse\(sqmStyleRow[^\n]*\n[^\n]*speechSynthesis\.getVoices\(\)/.test(src), true);
     check('say: called from the chip handler', /sqmSummary\(\);\s*window\.sqmSayStyle\(key\);/.test(src), true);
 }
 
