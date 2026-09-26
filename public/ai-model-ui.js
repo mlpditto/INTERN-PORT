@@ -22,7 +22,9 @@
     // without a small official mark (Qwen, DeepSeek) carry their name in `short` instead.
     // V101.55: Gemini spark (colour mark, via @lobehub/icons-static-svg, MIT). V101.59: the spark names
     // the owner, so Gemini's `short` drops the word like GPT / Claude.
-    const LOGO_OWNERS = { GPT: 'openai', Claude: 'claude', Gemini: 'gemini' };
+    // V102.11: Qwen / DeepSeek / Grok marks (assets/logos, already on the provider tabs) on every chip too — their
+    // `short` keeps the name, since aiModelShortName shows it where no logo is drawn.
+    const LOGO_OWNERS = { GPT: 'openai', Claude: 'claude', Gemini: 'gemini', Qwen: 'qwen', DeepSeek: 'deepseek', Grok: 'grok' };
     // V101.52: opt-in trial models. Only the audit toolbar offers them; they are NOT in
     // TEXT_AI_MODELS, so no other rail, select, Settings default or normaliser sees them.
     // Grok 4.7 trial (GROK_OPENROUTER_INTEGRATION_PLAN.md step C, 2026-09-24): Audit + Analyze.
@@ -72,7 +74,7 @@
         const google = window.isGoogleBilledModel(m.id);
         return `<button type="button" class="glass-toggle-item${m.id === value ? ' active' : ''}" data-value="${m.id}"${google ? ' data-bill="google"' : ''} aria-label="${m.label}" aria-pressed="${m.id === value}" title="${m.label} · ${m.id}${google ? ' · แถบสีใต้ชื่อ = ค่าใช้จ่ายเรียกเก็บผ่านบัญชี Google Cloud' : ''} — ${m.hint}"${action ? ` onclick="${action}"` : ''}>${logo}${m.short}</button>`;
     }).join('');
-    window.textAIChipsHtml = (id, value, action) => `<div class="text-ai-chips lang-no-toggle" role="group" aria-label="AI model"${id ? ` id="${id}"` : ''}>${window.textAIChipContents(value, action)}</div>`;
+    window.textAIChipsHtml = (id, value, action, extra = []) => `<div class="text-ai-chips lang-no-toggle" role="group" aria-label="AI model"${id ? ` id="${id}"` : ''}>${window.textAIChipContents(value, action, null, extra)}</div>`;
     window.syncRegistryModelSelect = function (id) {
         const input = document.getElementById(id);
         if (!input) return;

@@ -156,11 +156,12 @@ const ok = (content, finish = 'stop', usage = { prompt_tokens: 100, completion_t
     check('T8 an explicit trial pick is kept, others normalise as before', `${win.resolveTrialTextAIModel(grok)}|${win.resolveTrialTextAIModel('claude-sonnet-5')}|${win.resolveTrialTextAIModel('nope')}`, 'or/x-ai/grok-4.7|claude-sonnet-5|gpt-6-luna');
     check('T8 default chip rail has no Grok', /grok/i.test(win.textAIChipContents('gpt-6-luna')), false);
     const withTrial = win.textAIChipContents('gpt-6-luna', '', null, win.TEXT_AI_TRIAL_MODELS);
-    check('T8 trial chip: text, full name, OpenRouter id, tooltip route', /data-value="or\/x-ai\/grok-4\.7" aria-label="Grok 4\.7" aria-pressed="false" title="Grok 4\.7 · or\/x-ai\/grok-4\.7 — [^"]*OpenRouter"[^>]*>Grok 4\.7<\/button>/.test(withTrial), true);
+    check('T8 trial chip: text, full name, OpenRouter id, tooltip route', /data-value="or\/x-ai\/grok-4\.7" aria-label="Grok 4\.7" aria-pressed="false" title="Grok 4\.7 · or\/x-ai\/grok-4\.7 — [^"]*OpenRouter"[^>]*><span class="text-ai-logo" data-owner="grok" aria-hidden="true"><\/span>Grok 4\.7<\/button>/.test(withTrial), true); // V102.11: + Grok mark
     // V101.74: the rail builder is shared (providerModelRailHtml); trial models reach it only through the
     // audit toolbar's call — the Expand Quiz modal passes no `extra`, so Grok stays audit-only.
     const trialUses = admin.match(/TEXT_AI_TRIAL_MODELS/g) || [];
-    check('T8 admin.html offers trial models only in the audit toolbar (one call site)', `${trialUses.length}|${/return window\.providerModelRailHtml\(inputId, selected, action, TEXT_AI_TRIAL_MODELS\);/.test(admin)}`, '1|true');
+    // V102.11: + the Compare modal's Model B rail (user asked for Grok there); still no Settings default.
+    check('T8 admin.html offers trial models only in the audit toolbar + Model B (two call sites)', `${trialUses.length}|${/return window\.providerModelRailHtml\(inputId, selected, action, TEXT_AI_TRIAL_MODELS\);/.test(admin)}|${/textAIChipsHtml\('', window\._compareModelB\(\), 'window\.setCompareModelB\(this\)', TEXT_AI_TRIAL_MODELS\)/.test(admin)}`, '2|true|true');
     check('T8 shared rail adds trial chips + tabs only from `extra`', /textAIChipContents\(selected, action, null, extra\)[\s\S]{0,900}\[\.\.\.TEXT_AI_MODELS, \.\.\.extra\]\.map/.test(admin), true);
     check('T8 Expand Quiz rail passes no trial models', /providerModelRailHtml\('suggest-more-model', sqmModel, sqmAction\)/.test(admin), true);
     check('T8 Analyze tab does not save a trial pick as the Settings default', /;if\(!isTrialTextAIModel\(this\.dataset\.value\)\)syncModelDefault\('ai-analyzer-model-val',this\.dataset\.value\)/.test(admin), true);
