@@ -21,6 +21,8 @@ const popup = slice('        window.showAiSuggestionsPopup = function', '       
         const page = await browser.newPage({ viewport: { width: 1000, height: 900 } });
         const errors = []; page.on('pageerror', e => errors.push(e.message));
         await page.setContent('<meta charset="utf-8"><body></body>');
+        // V101.99: the real admin CSS (its global `details summary` reset and button sizes caused the two layout bugs fixed here).
+        await page.addStyleTag({ content: [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(m => m[1]).join('\n') });
         await page.evaluate(() => {
             window.escapeHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
             window.toasts = []; window.showToast = m => toasts.push(m);
@@ -45,18 +47,25 @@ const popup = slice('        window.showAiSuggestionsPopup = function', '       
         assert.match(await page.locator('#ai-sugg-add-all').innerText(), /Add all \(3\)/);
         assert.match((await page.locator('#ai-sugg-score-all').textContent()).replace(/\s+/g, ' '), /Score all · Luna 6/);
         assert.equal(await page.locator('[aria-label="Copy without answer key"]').count(), 3);
+        // V101.99: icon-only — per card copy + key badge (B), toolbar answer / question sheet + "all" tag (C).
+        assert.equal(await page.locator('[aria-label="Copy with answer key"] .cpy-badge.cpy-key .fa-key').count(), 3);
+        assert.equal(await page.locator('[aria-label="Copy without answer key"] .cpy-badge.cpy-nokey .fa-key').count(), 3);
+        assert.equal(await page.locator('[aria-label="Copy all with answer key"] .fa-clipboard-check').count(), 1);
+        assert.equal(await page.locator('[aria-label="Copy all without answer key"] .fa-clipboard-list').count(), 1);
+        for (const label of ['Copy all with answer key', 'Copy all without answer key']) assert.equal((await page.locator(`[aria-label="${label}"]`).textContent()).trim(), 'all', label + ' shows no text but the all tag');
+        for (const label of ['Copy with answer key', 'Copy without answer key']) assert.equal((await page.locator(`[aria-label="${label}"]`).first().textContent()).trim(), '', label + ' is icon-only');
 
         // copy without key (card 2), copy all with / without key
         await page.locator('[aria-label="Copy without answer key"]').nth(1).click();
         let text = await page.evaluate(() => copied.at(-1));
         assert.match(text, /^Q two stem — choose TWO\nA\) a2\nB\) b2/);
         assert.doesNotMatch(text, /✅|why two|เฉลย/, 'no answer key, no explanation');
-        await page.locator('.ai-sugg-toolbar button', { hasText: /^\s*Copy all\s*$/ }).click();
+        await page.locator('[aria-label="Copy all with answer key"]').click();
         text = await page.evaluate(() => copied.at(-1));
         assert.match(text, /^Q1\. Q one stem/); assert.match(text, /Q3\. Q three stem/);
         assert.match(text, /✅ C\. c1/); assert.match(text, /✅ A\. a2[\s\S]*✅ C\. c2/, 'multi-answer key marks both');
         assert.match(text, /💡 why one/); assert.match(text, /\n\n---\n\n/);
-        await page.locator('.ai-sugg-toolbar button', { hasText: 'no key' }).click();
+        await page.locator('[aria-label="Copy all without answer key"]').click();
         text = await page.evaluate(() => copied.at(-1));
         assert.match(text, /^Q1\. Q one stem\nA\) a1/); assert.doesNotMatch(text, /✅|💡/);
 
@@ -95,6 +104,7 @@ const popup = slice('        window.showAiSuggestionsPopup = function', '       
         assert.equal(await page.locator('#ai-sugg-score-0').innerHTML().then(h => h.includes('<b>อ่อน</b>')), false, 'rationale is escaped');
         assert.match(await page.locator('#ai-sugg-score-0').innerText(), /ตัวลวง <b>อ่อน<\/b>/);
         assert.equal(await page.locator('#ai-sugg-score-2 details').count(), 1);
+        assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('#ai-sugg-score-0 summary'), '::before').content), '"▸"', 'disclosure marker shown despite the global summary reset');
 
         // a short reply says so; a failure restores the button
         await page.evaluate(() => { window.callUniversalAI = async () => ({ text: JSON.stringify({ perQuestionAudit: [{ qNumber: 1, scores: { clarity: 5 } }] }) }); });
@@ -117,6 +127,8 @@ const popup = slice('        window.showAiSuggestionsPopup = function', '       
         for (const width of [390, 1000]) {
             await page.setViewportSize({ width, height: 900 });
             assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no horizontal overflow at ' + width);
+            // V101.99: every card button stays inside its card (the ADD button used to hang off the edge at 390 px).
+            assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#ai-suggestions-popup button')].filter(b => { const card = b.closest('div[style*="border-radius:20px"]'); if (!card) return false; const r = b.getBoundingClientRect(), c = card.getBoundingClientRect(); return r.right > c.right + 1 || r.left < c.left - 1; }).map(b => b.getAttribute('aria-label') || b.textContent.trim())), [], 'buttons inside their card at ' + width);
         }
         assert.deepEqual(errors, []);
         console.log('PASS: suggestions popup — copy no-key, Copy all ±key, Add all after single adds, Score all (Audit model, rubric, multi-answer key, avg fallback, escaped rationale, short reply, error, stale reply), 390/1000px');
