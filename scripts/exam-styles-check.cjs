@@ -21,7 +21,7 @@ check('Thai PC prompt unchanged', S.thai.prompt(5), '- Cognitive-level mix acros
 
 // Japan: 5 options, choose-TWO items say so in the stem and list both indices, linked practice pairs.
 const jp = S.japan.prompt(5, 'clinical');
-check('japan: flag + scope toggle', [S.japan.flag, S.japan.label, S.japan.scope], ['🇯🇵', 'Japan', true]);
+check('japan: flag + romanised label + scope toggle', [S.japan.flag, S.japan.label, S.japan.scope], ['🇯🇵', 'Kokushi', true]);
 check('japan: EXACTLY 5 options', /EXACTLY 5 options/.test(jp), true);
 check('japan: choose TWO stated in the stem, correct lists both', /choose TWO[\s\S]*stem itself must end with an explicit instruction[\s\S]*"correct" lists BOTH indices/.test(jp), true);
 check('japan: linked pairs restate the case', /LINKED PAIRS[\s\S]*restates the case/.test(jp), true);
@@ -32,7 +32,7 @@ check('japan: no interpolated comparison leaks into the text', /\d+ [<>]=? \d+/.
 
 // China: A / B / C / X, X = at least two correct + explicit select-all stem, SI units, no TCM.
 const cn = S.china.prompt(10, 'clinical');
-check('china: flag + scope toggle', [S.china.flag, S.china.label, S.china.scope], ['🇨🇳', 'China', true]);
+check('china: flag + romanised label + scope toggle', [S.china.flag, S.china.label, S.china.scope], ['🇨🇳', 'Zhíyè Yàoshī', true]);
 check('china: all four item types', ['A (最佳选择题)', 'B (配伍选择题)', 'C (综合分析选择题)', 'X (多项选择题)'].every(x => cn.includes(x)), true);
 check('china: B sets share the SAME options in the SAME order', /SAME 5 options in the SAME order/.test(cn), true);
 check('china: X = at least two correct, select-all stem, all indices', /AT LEAST TWO correct[\s\S]*select all correct answers[\s\S]*"correct" lists every correct index/.test(cn), true);
@@ -40,6 +40,28 @@ check('china: SI units + no TCM', [/mmol\/L/.test(cn), /No traditional Chinese m
 check('china: small n favours A (+ one X from 2 questions)', [S.china.prompt(1, 'clinical'), S.china.prompt(3, 'clinical')].map(p => /mostly A/.test(p) + '|' + /plus one X/.test(p)), ['true|false', 'true|true']);
 check('china: clinical scope excludes law, full allows it', [/no Chinese pharmacy law/.test(cn), /Chinese pharmacy law and administration allowed/.test(S.china.prompt(10, 'full'))], [true, true]);
 check('china: no interpolated comparison leaks into the text', /\d+ [<>]=? \d+/.test(S.china.prompt(3, 'clinical')), false);
+
+// V102.00: picking Kokushi / Zhíyè Yàoshī speaks the native name (browser speech, no AI call); others stay silent.
+check('say: only the two romanised styles', Object.keys(S).filter(k => S[k].say), ['japan', 'china']);
+check('say: native text + language', [S.japan.say, S.china.say], [{ text: 'こくし', lang: 'ja-JP' }, { text: '执业药师', lang: 'zh-CN' }]);
+{
+    const sa = src.indexOf('        window.sqmSayStyle = function(key) {');
+    const sb = src.indexOf('\n        };\n', sa) + 11;
+    if (sa < 0) throw new Error('sqmSayStyle not found');
+    const spoken = [];
+    const voices = [{ lang: 'en-US', name: 'en' }, { lang: 'ja-JP', name: 'Haruka' }, { lang: 'zh_CN', name: 'Huihui' }];
+    const win = { SQM_EXAM_STYLES: S, speechSynthesis: { getVoices: () => voices, cancel: () => spoken.push('cancel'), speak: u => spoken.push(u) } };
+    function Utterance(text) { this.text = text; }
+    new Function('window', 'SpeechSynthesisUtterance', src.slice(sa, sb))(win, Utterance);
+    check('say: japan speaks こくし in ja-JP with the Japanese voice', [win.sqmSayStyle('japan'), spoken.at(-1).text, spoken.at(-1).lang, spoken.at(-1).voice && spoken.at(-1).voice.name], [true, 'こくし', 'ja-JP', 'Haruka']);
+    check('say: china speaks 执业药师 in zh-CN (zh_CN voice matched)', [win.sqmSayStyle('china'), spoken.at(-1).text, spoken.at(-1).voice && spoken.at(-1).voice.name], [true, '执业药师', 'Huihui']);
+    check('say: a new pick cancels the previous one first', spoken.filter(x => x === 'cancel').length, 2);
+    check('say: Thai PC / PEBC stay silent', [win.sqmSayStyle('thai'), win.sqmSayStyle('pebc1')], [false, false]);
+    const noSpeech = { SQM_EXAM_STYLES: S };
+    new Function('window', 'SpeechSynthesisUtterance', src.slice(sa, sb))(noSpeech, undefined);
+    check('say: no speech support → silent, no error', noSpeech.sqmSayStyle('japan'), false);
+    check('say: called from the chip handler', /sqmSummary\(\);\s*window\.sqmSayStyle\(key\);/.test(src), true);
+}
 
 let failed = 0;
 for (const [name, got, want] of checks) {

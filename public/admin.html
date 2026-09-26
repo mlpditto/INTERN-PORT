@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.99)</title>
+    <title>Nika Admin (V102.00)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -19039,7 +19039,8 @@ RULES:
                     `- Content mix across the ${n} questions: about half therapeutics and patient care (special populations, harm minimisation, health promotion), the rest the underlying biomedical, pharmaceutical and clinical sciences.`,
                     `- Scope: no Australian or NZ legislation or practice standards (OPRA does not test them).`
                 ].join('\n                ') },
-            japan: { flag: '🇯🇵', label: 'Japan', title: 'Japan National Examination for Pharmacists (薬剤師国家試験) — essential / theory / practice items, from the public format', scope: true,
+            // V102.00: romanised exam names on the chips; `say` = what the chip speaks when picked (speechSynthesis).
+            japan: { flag: '🇯🇵', label: 'Kokushi', say: { text: 'こくし', lang: 'ja-JP' }, title: 'Kokushi (国試 · こくし) — Japan National Examination for Pharmacists (薬剤師国家試験): essential / theory / practice items, from the public format · กดแล้วออกเสียง', scope: true,
                 hint: '5-option MCQ · some items "choose TWO" (5肢択二) · practice items as linked pairs: one case, two questions from different angles (実務 + another subject). Our own questions in Japan-exam style — not real items.',
                 prompt: (n, scope) => [
                     `- Exam style: Japan National Examination for Pharmacists (薬剤師国家試験)-style, modelled on its public format (必須 essential · 理論 theory · 実践 practice). Write original items; never reproduce or closely paraphrase real exam questions.`,
@@ -19051,7 +19052,7 @@ RULES:
                         ? `- Scope: Japanese law, systems and ethics allowed where it fits (法規・制度・倫理 — e.g. the Pharmaceuticals and Medical Devices Act, pharmacist duties).`
                         : `- Scope: clinical and scientific only — no Japanese law, insurance or regulatory questions.`
                 ].join('\n                ') },
-            china: { flag: '🇨🇳', label: 'China', title: 'China Licensed Pharmacist Examination (国家执业药师职业资格考试, Western-medicine track) — A / B / C / X item types, from the public format', scope: true,
+            china: { flag: '🇨🇳', label: 'Zhíyè Yàoshī', say: { text: '执业药师', lang: 'zh-CN' }, title: 'Zhíyè Yàoshī (执业药师) — China National Licensed Pharmacist Examination (国家执业药师职业资格考试, Western-medicine track): A / B / C / X item types, from the public format · กดแล้วออกเสียง', scope: true,
                 hint: 'Four item types: A best answer · B sets sharing one option list · C case-analysis sets · X multiple answers (at least 2 correct, all-or-nothing). Western-medicine track, no TCM. Our own questions in China-exam style — not real items.',
                 prompt: (n, scope) => [
                     `- Exam style: China Licensed Pharmacist Examination (国家执业药师职业资格考试)-style, Western-medicine track, modelled on its public item types. Write original items; never reproduce or closely paraphrase real exam questions. No traditional Chinese medicine content.`,
@@ -19075,6 +19076,21 @@ RULES:
             const hint = document.querySelector('#ai-suggest-config-modal .sqm-style-hint');
             hint.textContent = style.hint; hint.hidden = !style.hint;
             sqmSummary();
+            window.sqmSayStyle(key);
+        };
+        // V102.00: a style with `say` (Kokushi, Zhíyè Yàoshī) speaks its native name when the admin picks it —
+        // browser speech only, no AI call. Uses a voice for that language when one is installed; silent without speech.
+        window.sqmSayStyle = function(key) {
+            const say = (window.SQM_EXAM_STYLES[key] || {}).say, synth = window.speechSynthesis;
+            if (!say || !synth || typeof SpeechSynthesisUtterance === 'undefined') return false;
+            const u = new SpeechSynthesisUtterance(say.text);
+            u.lang = say.lang; u.rate = 0.85;
+            const base = say.lang.slice(0, 2).toLowerCase();
+            const voice = synth.getVoices().find(v => String(v.lang || '').replace('_', '-').toLowerCase() === say.lang.toLowerCase())
+                || synth.getVoices().find(v => String(v.lang || '').toLowerCase().startsWith(base));
+            if (voice) u.voice = voice;
+            synth.cancel(); synth.speak(u);
+            return true;
         };
         window.sqmSetScope = function(btn) {
             document.querySelectorAll('#ai-suggest-config-modal .sqm-scope').forEach(b => b.classList.toggle('on', b === btn));
