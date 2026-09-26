@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.03)</title>
+    <title>Nika Admin (V102.04)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -5059,6 +5059,17 @@
         #ai-suggestions-popup .ai-sugg-rail-lb { font-size:0.75em; color:#64748b; font-weight:600; }
         #ai-suggestions-popup .ai-sugg-score-rail .audit-model-row { margin:0; padding:0; border:0; }
         #ai-suggestions-popup .cpy-all { position:absolute; right:-7px; top:-7px; min-width:18px; height:16px; padding:0 4px; border-radius:8px; border:2px solid #fff; font:700 9px/12px Inter, Arial, sans-serif; color:#fff; }
+        /* V102.04: Bulk Paste E.V.I.E. model chip + its rail (light violet — the old purple pill hid that it was a picker). */
+        .bp-model-chip { flex:none; width:auto; min-height:0; height:32px; padding:0 10px; display:inline-flex; align-items:center; gap:6px; border:1px solid #c4b5fd; border-radius:999px; background:#f5f3ff; color:#4c1d95; font-size:0.8em; font-weight:700; cursor:pointer; white-space:nowrap; }
+        .bp-model-chip:hover:not(:disabled) { border-color:#7c3aed; }
+        .bp-model-chip:disabled { opacity:.55; cursor:progress; }
+        .bp-model-chip .text-ai-logo { width:15px; height:15px; margin:0; }
+        .bp-model-chip .fa-chevron-down { font-size:0.75em; color:#7c3aed; }
+        .bp-model-chip[aria-expanded="true"] .fa-chevron-down { transform:rotate(180deg); }
+        .bp-model-rail { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:-4px 0 12px; padding:8px 10px; border-radius:12px; }
+        .bp-model-rail[hidden] { display:none; }
+        .bp-model-rail .audit-model-row { margin:0; padding:0; border:0; }
+        @media (pointer:coarse) { .bp-model-chip { height:44px; } }
         #ai-suggest-config-modal .sqm-style img.emoji { width:1.15em; height:1.15em; vertical-align:-0.2em; margin-right:2px; }
         #ai-suggest-config-modal .sqm-scope-row[hidden], #ai-suggest-config-modal .sqm-style-hint[hidden] { display:none; }
         #ai-suggest-config-modal .sqm-style-hint { margin:6px 0 0 54px; padding:5px 8px; border:1px solid #bbf7d0; border-radius:7px; background:#f0fdf4; color:#475569; font-size:0.72em; line-height:1.5; }
@@ -29178,6 +29189,7 @@ ${JSON.stringify(sourceObj)}`;
             if (findBtn) findBtn.disabled = false;
             const modelSelect = document.getElementById('bp-ai-model');
             if (modelSelect) modelSelect.disabled = false;
+            if (window.bpSyncModelChip) window.bpSyncModelChip();
             document.getElementById('bp-input-stage').style.display = 'block';
             document.getElementById('bp-preview-stage').style.display = 'none';
             modal.style.display = 'block';
@@ -29247,13 +29259,60 @@ ${JSON.stringify(sourceObj)}`;
             renderBulkPastePreview();
         }
 
+        // V102.04: E.V.I.E. model chip — owner logo + short name + ▾; unfolds the shared provider rail (same as Curate).
+        // Picks go through the hidden #bp-ai-model select + a change event, so ai-model-ui keeps saving the choice.
+        window.bpSyncModelChip = function() {
+            const sel = document.getElementById('bp-ai-model'), chip = document.getElementById('bp-model-chip');
+            if (!sel || !chip) return;
+            const id = sel.value || 'gemini-3.8-flash';
+            const name = window.aiModelShortName ? window.aiModelShortName(id) : id;
+            const full = ((window.textAIModelInfo && window.textAIModelInfo(id)) || {}).label || name;
+            chip.innerHTML = (window.aiModelLogoHtml ? window.aiModelLogoHtml(id) : '') + '<span>' + escapeHtml(name) + '</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>';
+            chip.disabled = sel.disabled;
+            chip.title = 'E.V.I.E. ใช้ ' + full + ' · กดเพื่อเปลี่ยนโมเดล';
+            chip.setAttribute('aria-label', 'E.V.I.E. model: ' + full + ' — change');
+            if (sel.disabled) window.bpCloseModelRail();
+        };
+        window._bpRailEsc = e => { if (e.key === 'Escape') { e.stopPropagation(); window.bpCloseModelRail(); } };
+        window._bpRailOutside = e => { if (!e.target.closest('#bp-model-rail, #bp-model-chip')) window.bpCloseModelRail(); };
+        window.bpCloseModelRail = function() {
+            const rail = document.getElementById('bp-model-rail'), chip = document.getElementById('bp-model-chip');
+            if (rail) rail.hidden = true;
+            if (chip) chip.setAttribute('aria-expanded', 'false');
+            document.removeEventListener('keydown', window._bpRailEsc, true);
+            document.removeEventListener('pointerdown', window._bpRailOutside, true);
+        };
+        window.bpToggleModelRail = function() {
+            const rail = document.getElementById('bp-model-rail'), sel = document.getElementById('bp-ai-model');
+            if (!rail || !sel || sel.disabled) return;
+            if (!rail.hidden) return window.bpCloseModelRail();
+            rail.innerHTML = window.providerModelRailHtml('bp-model-pick', sel.value, 'bpPickModel(this)');
+            rail.hidden = false;
+            document.getElementById('bp-model-chip').setAttribute('aria-expanded', 'true');
+            document.addEventListener('keydown', window._bpRailEsc, true);
+            document.addEventListener('pointerdown', window._bpRailOutside, true);
+        };
+        window.bpPickModel = function(btn) {
+            const sel = document.getElementById('bp-ai-model');
+            if (!sel || sel.disabled) return;
+            sel.value = btn.dataset.value;
+            sel.dispatchEvent(new Event('change')); // ai-model-ui saves it (ai_text_bp-ai-model)
+            window.bpCloseModelRail();
+            if (window.bpSyncModelChip) window.bpSyncModelChip();
+        };
         function renderBulkPastePreview() {
+            if (window.bpSyncModelChip) window.bpSyncModelChip();
             const list = document.getElementById('bp-preview-list');
             const rows = window._bulkPasteParsed;
             // V97.84: E.V.I.E.'s resting line. This slot is hers between runs — the loop
             // overwrites it with J.A.R.V.I.S.'s per-question counter and this render puts
             // it back after each one.
-            document.getElementById('bp-preview-count').textContent = "We're online and ready.";
+            // V102.04: less text — the line shows selected/total; E.V.I.E.'s words live in the hover.
+            const bpCount = document.getElementById('bp-preview-count'), bpSel = rows.filter(r => r.include).length;
+            bpCount.textContent = bpSel + '/' + rows.length;
+            bpCount.title = "E.V.I.E. · online and ready — " + bpSel + ' of ' + rows.length + ' questions selected';
+            const bpDot = document.getElementById('bp-status-dot');
+            if (bpDot && bpDot.style) bpDot.style.background = '#22c55e';
             list.innerHTML = rows.map((r, i) => {
                 const confBadge = r.conf != null
                     ? '<span style="font-size:0.72em; font-weight:800; padding:2px 8px; border-radius:8px; color:#fff; background:' + (r.conf >= 80 ? '#16a34a' : (r.conf >= 60 ? '#f59e0b' : '#ef4444')) + ';">AI ' + r.conf + '%</span>'
@@ -29393,6 +29452,7 @@ ${JSON.stringify(sourceObj)}`;
             const model = modelEl && modelEl.value ? modelEl.value : 'gemini-3.8-flash';
             const countEl = document.getElementById('bp-preview-count');
             if (modelEl) modelEl.disabled = true;
+            if (window.bpSyncModelChip) window.bpSyncModelChip();
             btn.disabled = true; const origLabel = btn.textContent;
             let done = 0, failed = 0, quotaExhausted = false;
             let lastError = '';
@@ -29405,7 +29465,10 @@ ${JSON.stringify(sourceObj)}`;
                 // single-question improve menu doing exactly this work. So the run reads
                 // as a handoff: E.V.I.E. accepts, J.A.R.V.I.S. counts through, E.V.I.E.
                 // reports back in the toast below.
-                countEl.textContent = '🎯 J.A.R.V.I.S. ' + (done + 1) + '/' + rows.length;
+                countEl.textContent = '🎯 ' + (done + 1) + '/' + rows.length; // V102.04: name in the hover
+                countEl.title = 'J.A.R.V.I.S. answering question ' + (done + 1) + ' of ' + rows.length;
+                const runDot = document.getElementById('bp-status-dot');
+                if (runDot && runDot.style) runDot.style.background = '#f59e0b';
                 try {
                     const core = await window._aiFindAnswerCore(r.q, r.options, model, '');
                     r.correct = core.picks;
@@ -29423,13 +29486,17 @@ ${JSON.stringify(sourceObj)}`;
             }
             btn.disabled = false; btn.textContent = origLabel;
             if (modelEl) modelEl.disabled = false;
+            if (window.bpSyncModelChip) window.bpSyncModelChip();
             const skipped = rows.length - done;
             const summary = '🎯 E.V.I.E. done ' + (done - failed) + '/' + rows.length
                 + (failed ? ' (' + failed + ' failed' + (skipped ? ', ' + skipped + ' skipped' : '') + ')' : '');
             const reason = quotaExhausted
                 ? 'API credits/quota exhausted (' + model + ') — choose another provider above or add API credits.'
                 : lastError;
-            countEl.textContent = summary + (reason ? ' — ' + reason : '');
+            countEl.textContent = (failed ? '⚠ ' : '✓ ') + (done - failed) + '/' + rows.length;
+            countEl.title = summary + (reason ? ' — ' + reason : '');
+            const doneDot = document.getElementById('bp-status-dot');
+            if (doneDot && doneDot.style) doneDot.style.background = failed ? '#ef4444' : '#22c55e';
             showToast(summary + (reason ? ' — ' + reason : ' — verify before saving'), failed ? 'warning' : 'success');
         }
 
@@ -64011,7 +64078,7 @@ Summarize in English in 3–5 concise lines:
                 <!-- V100.85: status + actions + model collapsed onto one line (was 2 rows) -->
                 <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:nowrap;">
                     <span style="display:flex; align-items:center; gap:6px; flex:1 1 auto; min-width:0;">
-                        <span style="width:7px; height:7px; border-radius:50%; background:#22c55e; flex:none;"></span>
+                        <span id="bp-status-dot" style="width:7px; height:7px; border-radius:50%; background:#22c55e; flex:none;"></span>
                         <span id="bp-preview-count" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:800; color:#6d28d9; font-size:0.9em;"></span>
                     </span>
                     <div style="display:flex; background:#f5f3ff; border:1px solid #ede9fe; border-radius:12px; overflow:hidden; flex:none;">
@@ -64022,13 +64089,11 @@ Summarize in English in 3–5 concise lines:
                              improve-menu assistant keeps the name J.A.R.V.I.S. -->
                         <button id="bp-find-btn" onclick="bulkPasteFindAnswers()" title="E.V.I.E. suggests an answer for every selected question (advisory — verify before saving)" style="border:none; background:linear-gradient(135deg,#8b5cf6,#7c3aed); color:white; width:36px; height:34px; display:flex; align-items:center; justify-content:center; font-size:14px; cursor:pointer;">🎯</button>
                     </div>
-                    <div style="display:flex; align-items:center; gap:6px; background:#6d28d9; border-radius:999px; padding:6px 10px 6px 12px; flex:none;">
-                        <span aria-hidden="true" style="font-size:12px;">✨</span>
-                        <select id="bp-ai-model" data-native-model aria-label="E.V.I.E. model" style="appearance:none; -webkit-appearance:none; border:none; background:transparent; color:#fff; font:inherit; font-size:0.78em; font-weight:700; max-width:130px; cursor:pointer;">
-                            <option value="gemini-3.8-flash" style="color:#1f2937;">Gemini 3.8 Flash</option>
-                        </select>
-                    </div>
+                    <!-- V102.04: E.V.I.E. model = owner-logo chip that unfolds the shared model rail; the hidden select keeps the catalogue + saved pick. -->
+                    <button type="button" id="bp-model-chip" class="bp-model-chip" onclick="bpToggleModelRail()" aria-expanded="false" aria-controls="bp-model-rail"></button>
+                    <select id="bp-ai-model" data-native-model aria-label="E.V.I.E. model" hidden><option value="gemini-3.8-flash">Gemini 3.8 Flash</option></select>
                 </div>
+                <div id="bp-model-rail" class="audit-toolbar bp-model-rail" hidden></div>
                 <div id="bp-preview-list" style="max-height:44vh; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding:2px;"></div>
                 <div style="margin-top:16px; border-top:1px solid #eee; padding-top:14px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
                     <span style="font-size:0.75em; color:#999; font-style:italic;">* Appended to the current quiz · click an option to mark it correct · always check AI answer keys before saving</span>
