@@ -269,6 +269,13 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.equal(await page.locator('[data-badge]').isVisible(), false);
         // V101.91: the Image 2 chip's OpenAI Blossom is the white file on the dark bar.
         assert.match(await page.locator('.quiz-cover-model-rail .text-ai-logo[data-owner="openai"]').evaluate(e => getComputedStyle(e).backgroundImage), /openai-blossom-white/);
+        // V102.07: the picked model stands out — the others fade to half opacity with a grey logo.
+        const railLook = await page.locator('.quiz-cover-model-rail button').evaluateAll(bs => bs.map(b => [b.classList.contains('active'), getComputedStyle(b).opacity, getComputedStyle(b.querySelector('.text-ai-logo') || b).filter]));
+        assert.equal(railLook.filter(r => r[0]).length, 1, 'exactly one model is picked');
+        for (const [active, opacity, filter] of railLook) {
+            assert.equal(opacity, active ? '1' : '0.5');
+            if (!active) assert.match(filter, /grayscale|none/);
+        }
         console.log('PASS: AI title validation, preview, accept, discard, invalid response, content-filter fallback, stale generation and responsive layout.');
         console.log('PASS: cover load/remove/upload with mocked storage, unsafe URL rejection, locked/collapsed protection, mobile deadline, keyboard start.');
     } finally { await browser.close(); }
