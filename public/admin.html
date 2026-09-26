@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.00)</title>
+    <title>Nika Admin (V102.01)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -18997,6 +18997,7 @@ RULES:
             // Flag emoji render as letters on Windows — twemoji only the Style row (Focus chip text is read back).
             const sqmStyleRow = modal.querySelector('.sqm-style-row');
             if (window.twemoji && sqmStyleRow) twemoji.parse(sqmStyleRow, { folder: 'svg', ext: '.svg' });
+            if (window.speechSynthesis) speechSynthesis.getVoices(); // V102.01: Chrome loads voices on first ask — ask now, not on the chip press
             sqmSummary();
         };
 
@@ -19080,16 +19081,30 @@ RULES:
         };
         // V102.00: a style with `say` (Kokushi, Zhíyè Yàoshī) speaks its native name when the admin picks it —
         // browser speech only, no AI call. Uses a voice for that language when one is installed; silent without speech.
+        // V102.01: on a fresh page Chrome's getVoices() is [] until it has loaded them; the first press then had no voice
+        // and fell back to the default English one, which says nothing for こくし / 执业药师. Wait (≤1.5 s) for the list,
+        // and cancel() only when something is actually speaking — cancel() right before speak() can drop the utterance.
         window.sqmSayStyle = function(key) {
             const say = (window.SQM_EXAM_STYLES[key] || {}).say, synth = window.speechSynthesis;
             if (!say || !synth || typeof SpeechSynthesisUtterance === 'undefined') return false;
-            const u = new SpeechSynthesisUtterance(say.text);
-            u.lang = say.lang; u.rate = 0.85;
-            const base = say.lang.slice(0, 2).toLowerCase();
-            const voice = synth.getVoices().find(v => String(v.lang || '').replace('_', '-').toLowerCase() === say.lang.toLowerCase())
-                || synth.getVoices().find(v => String(v.lang || '').toLowerCase().startsWith(base));
-            if (voice) u.voice = voice;
-            synth.cancel(); synth.speak(u);
+            const pick = () => {
+                const voices = synth.getVoices(), base = say.lang.slice(0, 2).toLowerCase();
+                return voices.find(v => String(v.lang || '').replace('_', '-').toLowerCase() === say.lang.toLowerCase())
+                    || voices.find(v => String(v.lang || '').toLowerCase().startsWith(base));
+            };
+            const speak = voice => {
+                const u = new SpeechSynthesisUtterance(say.text);
+                u.lang = say.lang; u.rate = 0.85;
+                if (voice) u.voice = voice;
+                if (synth.speaking || synth.pending) synth.cancel();
+                synth.speak(u);
+            };
+            const voice = pick();
+            if (voice || synth.getVoices().length) { speak(voice); return true; }
+            let done = false;
+            const go = () => { if (done) return; done = true; synth.removeEventListener && synth.removeEventListener('voiceschanged', go); speak(pick()); };
+            if (synth.addEventListener) synth.addEventListener('voiceschanged', go);
+            setTimeout(go, 1500);
             return true;
         };
         window.sqmSetScope = function(btn) {
