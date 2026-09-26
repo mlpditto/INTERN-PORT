@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V101.97)</title>
+    <title>Nika Admin (V101.98)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -19343,17 +19343,30 @@ RULES:
             resultDiv.className = 'lang-no-toggle';
             resultDiv.style = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:90%; max-width:800px; max-height:85vh; background:#f8fafc; padding:30px; border-radius:32px; box-shadow:0 30px 80px rgba(0,0,0,0.3); z-index:10002; overflow-y:auto; font-family:'Inter', sans-serif; border: 1px solid #fff;";
 
+            // V101.98: the set lives on window so the new index-based buttons (copy no-key, Add all, Score all) reach it.
+            window._aiSuggestItems = suggestions;
+            const scoreModel = window.auditFixModel ? window.auditFixModel() : 'gpt-6-luna';
+            const tbBase = 'width:auto; display:inline-flex; align-items:center; gap:6px; padding:8px 12px; border-radius:10px; font-weight:700; font-size:0.8em; cursor:pointer;';
+            const toolbarHtml = `<div class="ai-sugg-toolbar" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:-10px 0 16px;">
+                    <button type="button" class="btn-sm" onclick="copyAllAiSuggestions(true, this)" title="คัดลอกทุกข้อ พร้อมเฉลยและคำอธิบาย" style="${tbBase} background:#0891b2; color:#fff; border:none;"><i class="fa-solid fa-copy"></i> Copy all</button>
+                    <button type="button" class="btn-sm" onclick="copyAllAiSuggestions(false, this)" title="คัดลอกทุกข้อ เฉพาะโจทย์และตัวเลือก ไม่มีเฉลย" style="${tbBase} background:#fff; color:#0e7490; border:1.5px solid #0891b2;"><i class="fa-regular fa-copy"></i> Copy all · no key</button>
+                    <button type="button" class="btn-sm" id="ai-sugg-add-all" onclick="addAllAiSuggestions(this)" title="เพิ่มทุกข้อที่ยังไม่ได้เพิ่มเข้าควิซ" style="${tbBase} background:#7c3aed; color:#fff; border:none;"><i class="fa-solid fa-plus"></i> Add all (${suggestions.length})</button>
+                    <button type="button" class="btn-sm" id="ai-sugg-score-all" onclick="scoreAiSuggestions(this)" title="ให้คะแนน ${(window.AUDIT_DIMS || []).length || 7} มิติแบบ Quality Review ด้วยโมเดลของ Quality Audit · เรียก AI 1 ครั้ง" style="${tbBase} margin-left:auto; background:#f59e0b; color:#2b1a05; border:none;">⭐ Score all <small style="font-weight:600; opacity:.8;">· ${escapeHtml(window.aiModelShortName ? window.aiModelShortName(scoreModel) : scoreModel)}</small></button>
+                </div>`;
             let itemsHtml = suggestions.map((q, i) => {
                 const qJson = JSON.stringify(q).replace(/'/g, "\\'").replace(/"/g, "&quot;");
                 return `
                     <div style="background:white; border:1px solid #e2e8f0; border-radius:20px; padding:20px; margin-bottom:15px; box-shadow:0 4px 6px rgba(0,0,0,0.02); transition:transform 0.2s;">
                         <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; gap:8px;">
-                            <span style="background:#8e44ad; color:white; padding:4px 10px; border-radius:8px; font-size:0.75em; font-weight:800;">Suggested Q${i+1}</span>
+                            <span style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><span style="background:#8e44ad; color:white; padding:4px 10px; border-radius:8px; font-size:0.75em; font-weight:800; white-space:nowrap;">Suggested Q${i+1}</span><span id="ai-sugg-avg-${i}"></span></span>
                             <div style="display:flex; align-items:center; gap:8px;">
-                                <button class="btn-sm" title="Copy question + options" onclick="copyAiSuggestedQuestion(${qJson})" style="background:#0891b2; color:#fff; border:none; width:34px; height:34px; border-radius:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.9em;">
+                                <button class="btn-sm" title="Copy question + options + answer key + explanation" onclick="copyAiSuggestedQuestion(${qJson})" style="background:#0891b2; color:#fff; border:none; width:34px; height:34px; border-radius:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.9em;">
                                     <i class="fa-solid fa-copy"></i>
                                 </button>
-                                <button class="btn-sm" title="Add to quiz"
+                                <button class="btn-sm" title="Copy question + options only — no answer key" aria-label="Copy without answer key" onclick="copyAiSuggestionNoKey(${i}, this)" style="background:#fff; color:#0e7490; border:1.5px solid #0891b2; width:34px; height:34px; border-radius:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.9em;">
+                                    <i class="fa-regular fa-copy"></i>
+                                </button>
+                                <button class="btn-sm ai-sugg-add" data-i="${i}" title="Add to quiz"
                                     onclick="addQuestionUI(${qJson}); markAiSuggestionAdded(this); autoLabelQuizExamStyle(); showToast('Question added!');"
                                     style="display:inline-flex; align-items:center; gap:10px; padding:8px 18px 8px 8px; border-radius:999px; border:none; cursor:pointer;
                                         background:conic-gradient(from 200deg, #d98b7a, #c98fb0, #8b7bb8, #6f9fc0, #e0b468, #d98b7a);
@@ -19366,6 +19379,7 @@ RULES:
                                 </button>
                             </div>
                         </div>
+                        <div id="ai-sugg-score-${i}"></div>
                         <div style="font-weight:800; color:#1e293b; font-size:1.05em; margin-bottom:15px; line-height:1.4;">${q.q}</div>
                         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
                             ${q.type === 'short_answer' ? `<div style="grid-column:1/-1; font-size:0.85em; padding:8px 12px; border-radius:10px; background:#ecfdf5; color:#059669; border:1px solid #10b981; font-weight:700;">✍️ Answer: ${escapeHtml((q.options || [])[0] || '')}</div>` : (q.options || []).map((opt, optIdx) => `
@@ -19389,6 +19403,7 @@ RULES:
                 </div>
 
                 <div style="margin-bottom:20px;">
+                    ${toolbarHtml}
                     ${itemsHtml}
                 </div>
 
@@ -19408,9 +19423,7 @@ RULES:
         // already embeds each suggestion as an inline object literal for the Add-to-Quiz
         // button, and this button reuses the exact same qJson.
         window.copyAiSuggestedQuestion = function(q) {
-            const correct = Array.isArray(q.correct) ? q.correct : [];
-            const opts = (q.options || []).map((opt, i) => `${correct.includes(i) ? '✅' : '  '} ${String.fromCharCode(65 + i)}. ${opt}`).join('\n');
-            const text = `${q.q}\n\n${opts}` + (q.explanation ? `\n\n💡 ${q.explanation}` : '');
+            const text = window.aiSuggestionText(q, true);
             navigator.clipboard.writeText(text)
                 .then(() => showToast('📋 Copied'))
                 .catch(() => alert('Copy failed — clipboard permission blocked?'));
@@ -19430,6 +19443,131 @@ RULES:
             if (ring) ring.innerHTML = '<i class="fa-solid fa-check"></i>';
             const label = btn.querySelector('.enso-label');
             if (label) label.textContent = 'Added';
+            window.refreshAiSuggestAddAll();
+        };
+
+        // V101.98: whole-set tools for the AI Suggested Questions popup.
+        // With key = the per-card copy format (✅ marks + 💡 explanation); without = _compareQText (Q + options only).
+        window.aiSuggestionText = function(q, withKey) {
+            if (!withKey) return window._compareQText(q, false);
+            const correct = Array.isArray(q.correct) ? q.correct : [];
+            const opts = (q.options || []).map((opt, i) => `${correct.includes(i) ? '✅' : '  '} ${String.fromCharCode(65 + i)}. ${opt}`).join('\n');
+            return `${q.q}\n\n${opts}` + (q.explanation ? `\n\n💡 ${q.explanation}` : '');
+        };
+        window.copyAiSuggestionNoKey = function(i, btn) {
+            const q = (window._aiSuggestItems || [])[i];
+            if (q) unifiedCopyToClipboard(window.aiSuggestionText(q, false), btn);
+        };
+        window.copyAllAiSuggestions = function(withKey, btn) {
+            const items = window._aiSuggestItems || [];
+            if (!items.length) return;
+            unifiedCopyToClipboard(items.map((q, i) => `Q${i + 1}. ` + window.aiSuggestionText(q, withKey)).join('\n\n---\n\n'), btn);
+        };
+        window.refreshAiSuggestAddAll = function() {
+            const popup = document.getElementById('ai-suggestions-popup'), all = document.getElementById('ai-sugg-add-all');
+            if (!popup || !all) return;
+            const left = popup.querySelectorAll('.ai-sugg-add:not(:disabled)').length;
+            all.disabled = left === 0;
+            all.innerHTML = left ? `<i class="fa-solid fa-plus"></i> Add all (${left})` : '<i class="fa-solid fa-check"></i> All added';
+        };
+        window.addAllAiSuggestions = function(btn) {
+            const popup = document.getElementById('ai-suggestions-popup'), items = window._aiSuggestItems || [];
+            if (!popup) return;
+            let added = 0;
+            popup.querySelectorAll('.ai-sugg-add:not(:disabled)').forEach(b => {
+                const q = items[Number(b.dataset.i)];
+                if (!q) return;
+                addQuestionUI(q); markAiSuggestionAdded(b); added++;
+            });
+            if (added) autoLabelQuizExamStyle();
+            showToast(added ? `${added} question${added === 1 ? '' : 's'} added!` : 'All questions already added');
+        };
+        // ⭐ Score all: one call on the Quality Audit model with the same 7-dimension rubric as Quality Review.
+        window.scoreAiSuggestions = async function(btn) {
+            const items = window._aiSuggestItems || [];
+            if (!items.length || btn.disabled) return;
+            const model = window.auditFixModel ? window.auditFixModel() : 'gpt-6-luna';
+            const label = window.aiModelShortName ? window.aiModelShortName(model) : model;
+            const oldHtml = btn.innerHTML, started = performance.now();
+            const tick = () => { const s = Math.floor((performance.now() - started) / 1000); btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Scoring ${items.length} · ${escapeHtml(label)} · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+            btn.disabled = true; tick();
+            const timer = setInterval(tick, 1000);
+            try {
+                const form = getQuizFormData(), bp = form.blueprint || {};
+                const bpLines = [];
+                if (bp.difficulty) bpLines.push(`- intended difficulty: ${bp.difficulty}/5`);
+                if (bp.bloomLevel) bpLines.push(`- intended Bloom level: ${bp.bloomLevel}`);
+                if (bp.learningObjective) bpLines.push(`- learning objective: ${bp.learningObjective}`);
+                const qList = items.map((q, i) => {
+                    const optsList = (q.options || []).map((o, oi) => `    ${String.fromCharCode(65 + oi)}. ${o}`).join('\n');
+                    const keys = (Array.isArray(q.correct) ? q.correct : [q.correct]).map(c => String.fromCharCode(65 + Number(c))).join(',');
+                    return `Q${i + 1} (${q.type || 'choice'}): ${q.q}\n${optsList}\n  correct: ${keys}`;
+                }).join('\n\n');
+                const prompt = `You are a Quality Auditor for medical-education multiple-choice questions. The questions below are NEW candidates an AI proposed for the quiz "${form.title || ''}"; judge each on its own merit.
+
+RUBRIC — score each question on ${window.AUDIT_DIMS.length} dimensions, INTEGER 1-5 (1 = poor, 5 = excellent):
+${window.auditRubricText()}
+${bpLines.length ? `\nBLUEPRINT CONTEXT (admin's stated intent — judge each Q against this):\n${bpLines.join('\n')}\n` : '\nNote: no blueprint set — judge each Q on absolute merit; for "bloomLevel" use detected demand only.\n'}
+QUESTIONS:
+${qList}
+
+OUTPUT FORMAT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
+{
+  "perQuestionAudit": [
+    {
+      "qNumber": 1,
+      "scores": ${window.auditScoresExample()},
+      "averageScore": 3.8,
+      "detectedBloomName": "Apply",
+      "rationale": "Thai feedback ≤200 chars: cite the lowest-scoring dim and ONE concrete fix."
+    }
+  ]
+}
+
+RULES:
+- "rationale" MUST be in Thai (admin-facing).
+- Scores are INTEGERS 1-5 only. averageScore = mean of the ${window.AUDIT_DIMS.length} scores rounded to 1 decimal.
+- "detectedBloomName" is one of: Remember, Understand, Apply, Analyze, Evaluate, Create.
+- A question may have more than one correct option (all listed after "correct:"); judge the key as a set.
+- If you score "keyDefensibility" 1 or 2, the rationale MUST name the option letter you believe is correct and why.
+- Return one entry per question in input order. Do NOT skip any.`;
+                const { text } = await callUniversalAI(model, prompt, true, null, '', { maxOutputTokens: 16384, feature: 'quiz_suggest_score' });
+                if (window._aiSuggestItems !== items) return; // the popup was regenerated meanwhile
+                const parsed = safeJsonParse(text);
+                const list = Array.isArray(parsed) ? parsed : parsed && (parsed.perQuestionAudit || parsed.questions);
+                if (!Array.isArray(list) || !list.length) throw new Error('No scores in the reply. Starts: ' + String(text || '').replace(/\s+/g, ' ').slice(0, 160));
+                let scored = 0;
+                list.forEach(entry => { const i = Number(entry && entry.qNumber) - 1; if (items[i] && window.renderAiSuggestionScore(i, entry)) scored++; });
+                btn.innerHTML = `⭐ Score again <small style="font-weight:600; opacity:.8;">· ${escapeHtml(label)}</small>`;
+                if (scored < items.length) showToast(`Scored ${scored} of ${items.length} — Score again for the rest.`);
+            } catch (error) {
+                btn.innerHTML = oldHtml;
+                alert('Score error: ' + error.message);
+            } finally {
+                clearInterval(timer);
+                btn.disabled = false;
+            }
+        };
+        window.renderAiSuggestionScore = function(i, entry) {
+            const avgEl = document.getElementById('ai-sugg-avg-' + i), slot = document.getElementById('ai-sugg-score-' + i);
+            if (!avgEl || !slot) return false;
+            const dims = window.auditDimLabels('label'), scores = entry.scores || {};
+            const keys = Object.keys(dims).filter(k => Number.isFinite(Number(scores[k])) && scores[k] !== null && scores[k] !== '');
+            if (!keys.length) return false;
+            const avg = Number(entry.averageScore) > 0 ? Number(entry.averageScore) : keys.reduce((s, k) => s + Number(scores[k]), 0) / keys.length;
+            const stars = n => { const v = Math.max(0, Math.min(5, Math.round(n))); return '<span style="color:#fbbf24; letter-spacing:1px;">' + '★'.repeat(v) + '<span style="color:#cbd5e1;">' + '☆'.repeat(5 - v) + '</span></span>'; };
+            const bg = avg >= 4 ? '#dcfce7' : avg >= 3 ? '#fef9c3' : '#fee2e2';
+            avgEl.innerHTML = `<span title="Quality Review average" style="background:${bg}; padding:3px 10px; border-radius:8px; font-size:0.85em;">${stars(avg)} <b style="margin-left:4px; color:#1e293b;">${avg.toFixed(1)}</b></span>`;
+            const low = keys.slice().sort((a, b) => Number(scores[a]) - Number(scores[b]))[0];
+            const rows = keys.map(k => `<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid #f1f5f9; font-size:0.85em;">
+                    <span style="color:#475569; font-weight:500;">${escapeHtml(dims[k])}${k === 'bloomLevel' && entry.detectedBloomName ? ` <span style="color:#64748b; font-size:0.85em;">(${escapeHtml(entry.detectedBloomName)})</span>` : ''}</span>
+                    <span>${stars(Number(scores[k]))} <b style="color:#475569; margin-left:6px;">${Number(scores[k])}</b></span></div>`).join('');
+            slot.innerHTML = `<details style="margin:0 0 12px; font-size:0.9em;">
+                    <summary style="cursor:pointer; color:#475569; font-weight:600;">${keys.length} dimensions · lowest ${escapeHtml(dims[low])} ${Number(scores[low])}</summary>
+                    <div style="margin-top:6px;">${rows}</div>
+                </details>
+                ${entry.rationale ? `<div style="margin:-4px 0 12px; padding:8px 12px; background:#f8fafc; border-left:3px solid #0891b2; border-radius:6px; font-size:0.85em; color:#334155; line-height:1.55;">💬 ${escapeHtml(entry.rationale)}</div>` : ''}`;
+            return true;
         };
 
 
