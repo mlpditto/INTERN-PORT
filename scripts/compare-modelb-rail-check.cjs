@@ -70,6 +70,7 @@ const modelB = cut('        window._compareModelB = function', '        window.g
         // the audit toolbar and Curate paint their own amber pick — the vendor colour must still win there
         await page.evaluate(() => { const w = document.createElement('div'); w.className = 'audit-toolbar'; w.id = 'at'; w.innerHTML = textAIChipsHtml('', 'claude-opus-5-5', ''); document.body.append(w); });
         assert.deepEqual(await page.locator('#at button[aria-pressed="true"]').evaluate(b => [getComputedStyle(b).backgroundColor, getComputedStyle(b).color]), ['rgb(217, 119, 87)', 'rgb(255, 255, 255)'], 'audit toolbar pick uses the vendor colour');
+        assert.equal(await page.locator('#at button[aria-label="Qwen 3.8 Flash"]').evaluate(b => getComputedStyle(b).borderTopColor), 'rgb(118, 36, 244)', 'V102.14: audit toolbar OpenRouter border is grape (was olive)');
         await page.evaluate(() => document.getElementById('at').remove());
 
         // picking Grok is kept (trial ids used to normalise back to Luna)
