@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.16)</title>
+    <title>Nika Admin (V102.17)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -16563,6 +16563,15 @@
             if (/^(gpt-5\.6-|gpt-6-|claude-(sonnet|opus|fable)-5)/.test(modelName) && !window.AI_MODEL_REGISTRY) {
                 throw new Error('Model registry failed to load. Refresh before running AI.');
             }
+            // V102.17: one wording for a proxy error, shared by the registry path below (Opus/Sonnet/Fable 5, GPT-6)
+            // and the generic proxy path — the registry path threw the raw text and skipped the V101.92 rewrite.
+            const explainProxyError = (raw, chipName) => /support image input/i.test(raw)
+                ? `${chipName} can't read images — pick another model for this task.`
+                // V101.92: a provider safety-filter stop (Anthropic stop_reason "refusal", OpenAI
+                // content_filter) came out as "incomplete or invalid output" and read like a bug.
+                : /stopped with (?:refusal|content_filter)|\(content_filter\)/i.test(raw)
+                    ? `${chipName} declined this request — the provider's safety filter stopped it before any output. It can flag pathogen, toxin or weapon-related topics even in medical teaching. Pick another model and run again.\n\n(${raw})`
+                    : raw;
             const modernModel = window.AI_MODEL_REGISTRY?.models.find(m => m.id === modelName && ['responses', 'messages'].includes(m.adapter));
             if (modernModel && proxyProvider === modernModel.provider) {
                 const response = await fetch(PROXY_URL, {
@@ -16571,7 +16580,7 @@
                         generationOptions: generationOptions || undefined, feature: aiFeature || undefined })
                 });
                 const data = await readProxyJson(response);
-                if (!response.ok || data.error) throw new Error(data.error || `AI request failed (${response.status}).`);
+                if (!response.ok || data.error) throw new Error(data.error ? explainProxyError(String(data.error), window.aiModelShortName ? window.aiModelShortName(modelName) : modelName) : `AI request failed (${response.status}).`);
                 const expectedFinish = modernModel.adapter === 'responses' ? 'completed' : 'end_turn';
                 if (!data.usage || data.finishReason !== expectedFinish || (isJson && data.jsonValid !== true)) {
                     throw new Error(`AI server returned incomplete output (${modelName}: finishReason ${data.finishReason || 'none'}, jsonValid ${data.jsonValid}).`); // V101.09
@@ -16612,13 +16621,7 @@
                             const raw = String(primaryError.error);
                             // modelName has lost its "or/" prefix by now; put it back so the chip name resolves.
                             const chipName = window.aiModelShortName ? window.aiModelShortName(proxyProvider === 'openrouter' && !modelName.startsWith('or/') ? 'or/' + modelName : modelName) : modelName;
-                            proxyAnsweredError = /support image input/i.test(raw)
-                                ? `${chipName} can't read images — pick another model for this task.`
-                                // V101.92: a provider safety-filter stop (Anthropic stop_reason "refusal", OpenAI
-                                // content_filter) came out as "incomplete or invalid output" and read like a bug.
-                                : /stopped with (?:refusal|content_filter)|\(content_filter\)/i.test(raw)
-                                    ? `${chipName} declined this request — the provider's safety filter stopped it before any output. It can flag pathogen, toxin or weapon-related topics even in medical teaching. Pick another model and run again.\n\n(${raw})`
-                                    : raw;
+                            proxyAnsweredError = explainProxyError(raw, chipName);
                         }
                         // V101.28: on GitHub Pages BACKUP_PROXY is the same URL as PROXY_URL, so a
                         // definitive error (e.g. 502 "stopped with length") used to be re-run in
