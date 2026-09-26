@@ -41,9 +41,14 @@ const remap = cut('                if (onlyQNumbers && onlyQNumbers.length && Ar
             window.calls = [];
             window.showReviewTab = async tab => { window.lastTab = tab; };
             window.analyzeQuizAI = async (btn, opts) => {
-                calls.push(opts);
-                const nums = opts.onlyQNumbers || [opts.onlyQNumber];
-                window._aiAnalysisItems = nums.slice(0, window.returnCount || nums.length).map(n => ({ qNumber: n, improvedQuestion: { q: 'fixed ' + n } }));
+                calls.push(JSON.parse(JSON.stringify(opts)));
+                document.getElementById('ai-analysis-popup')?.remove(); // the real one replaces its popup
+                if (opts.cachedResult) window._aiAnalysisItems = opts.cachedResult.items; // V102.16: merged rounds replay
+                else {
+                    const nums = opts.onlyQNumbers || [opts.onlyQNumber];
+                    window._aiAnalysisItems = nums.slice(0, window.returnCount || nums.length).map(n => ({ qNumber: n, improvedQuestion: { q: 'fixed ' + n } }));
+                    window._aiAnalysisText = 'round ' + nums[0]; window._aiAnalysisTokens = 1000; window._aiAnalysisModel = opts.model;
+                }
                 if (!document.getElementById('ai-analysis-popup')) { const d = document.createElement('div'); d.id = 'ai-analysis-popup'; document.body.append(d); }
             };
         });
@@ -92,9 +97,29 @@ const remap = cut('                if (onlyQNumbers && onlyQNumbers.length && Ar
         await fix.click();
         await page.waitForFunction(() => calls.length === 3);
         assert.equal(await page.evaluate(() => calls[2].onlyQNumber), 7, 'one pick uses the single-question fix');
-        for (let i = 0; i < 11; i++) await picks.nth(i).check();
-        assert.equal(await fix.isDisabled(), true, 'more than 10 cannot run');
-        assert.match(await fix.getAttribute('title'), /สูงสุด 10 ข้อ/);
+        // V102.16: more than 10 → rounds of 10, merged into one Specialist view (no cap)
+        await page.locator('.audit-batch-clear').click();
+        for (let i = 0; i < 12; i++) await picks.nth(i).check();
+        assert.equal(await fix.isDisabled(), false, '12 picks can run');
+        assert.match(await fix.getAttribute('title'), /12 ข้อ · เรียก AI 2 รอบ \(รอบละ 10 ข้อ\)/);
+        await page.evaluate(() => { calls.length = 0; });
+        await fix.click();
+        await page.waitForFunction(() => calls.length === 3);
+        const r = await page.evaluate(() => calls);
+        assert.deepEqual(r[0].onlyQNumbers, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 'round 1 = first 10');
+        assert.deepEqual(r[1].onlyQNumbers, [11, 12], 'round 2 = the rest');
+        assert.deepEqual(r[1].auditNote.map(n => n.rationale), ['แก้ข้อ 11', 'แก้ข้อ 12'], 'each round carries its own findings');
+        assert.equal(r[2].batchMerged, true, 'merged replay');
+        assert.deepEqual(r[2].cachedResult.items.map(it => it.qNumber), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], 'every fix in one view');
+        assert.equal(r[2].cachedTokens, 2000, 'tokens summed');
+        await page.waitForFunction(() => toasts.some(t => /Fixes proposed for 12 questions/.test(t)));
+        assert.equal(await page.evaluate(() => window.lastTab), 'specialist');
+        // a failed round is skipped, the other still shows
+        await page.evaluate(() => { calls.length = 0; const real = window.analyzeQuizAI; window.analyzeQuizAI = async (b, o) => { if (o.onlyQNumbers && o.onlyQNumbers[0] === 1) { calls.push(o); document.getElementById('ai-analysis-popup')?.remove(); return; } return real(b, o); }; });
+        await fix.click();
+        await page.waitForFunction(() => calls.length === 3);
+        assert.deepEqual(await page.evaluate(() => calls[2].cachedResult.items.map(it => it.qNumber)), [11, 12]);
+        await page.waitForFunction(() => toasts.some(t => /2 of 12/.test(t)));
 
         // prompt: one finding line per question in the batch; the single-question block unchanged
         const prompt = await page.evaluate(q => buildQuizAnalyzePrompt([q[0], q[1], q[2]], '', [{ weakestDim: 'clarity', weakestVal: 2, rationale: 'สั้นลง' }, null, { weakestDim: 'itemFlaws', weakestVal: 1 }]), questions);
@@ -116,7 +141,11 @@ const remap = cut('                if (onlyQNumbers && onlyQNumbers.length && Ar
 
         await page.setViewportSize({ width: 390, height: 800 });
         assert.equal(await page.evaluate(() => { const b = document.getElementById('audit-batch').getBoundingClientRect(), p = document.getElementById('ai-audit-popup').getBoundingClientRect(); return b.right <= p.right + 1 && b.left >= p.left - 1; }), true, 'bar fits the popup at 390 px');
+        // V102.16: the merged replay is saved as the last analysis and shows no "Saved analysis" badge
+        assert.ok(html.includes("if (!(opts && opts.cachedResult && !opts.batchMerged)) { // V102.16"), 'merged batch is saved');
+        assert.ok(html.includes('${(opts && opts.cachedResult && !opts.batchMerged) ? `<span title="Saved analysis'), 'no saved badge on a merged batch');
+        assert.ok(html.includes('window._aiAnalysisTokens = aiTokens || 0;'), 'rounds can sum tokens');
         assert.deepEqual(errors, []);
-        console.log('PASS: scorecard multi-select — checkbox per card, bar count/logo/cap/clear, one call with every picked question + its finding, specialist tab + toast (short reply), single pick → single fix, batch prompt lines, result remap, 390 px');
+        console.log('PASS: scorecard multi-select — checkbox per card, bar count/logo/cap/clear, one call with every picked question + its finding, specialist tab + toast (short reply), single pick → single fix, >10 → rounds of 10 merged (failed round skipped), batch prompt lines, result remap, 390 px');
     } finally { await browser.close(); }
 })();

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.15)</title>
+    <title>Nika Admin (V102.16)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -17833,6 +17833,7 @@
                 // from callUniversalAI's actual resolution (may differ from selectedModel if
                 // the proxy fell back); selectedModel is the chip choice as final fallback.
                 window._aiAnalysisModel = aiModel || selectedModel || null;
+                window._aiAnalysisTokens = aiTokens || 0; // V102.16: the Scorecard batch fix sums its rounds
                 // V97.39: kept alongside the other _aiAnalysis* globals so 💾 Export can read
                 // the suggested titles too, not just the analysis text + per-question items.
                 window._aiAnalysisSuggestedTitles = result.suggestedTitles || null;
@@ -17846,7 +17847,7 @@
                 // again. Skip when THIS render came from a cached record (nothing new to
                 // save) or the quiz hasn't been saved yet (no doc to attach it to).
                 // Fire-and-forget — a failed save shouldn't block showing the result.
-                if (!(opts && opts.cachedResult)) {
+                if (!(opts && opts.cachedResult && !opts.batchMerged)) { // V102.16: a merged batch is new work — save it
                     const _quizIdForSave = (document.getElementById('edit-quiz-id') || {}).value || null;
                     if (_quizIdForSave) {
                         db.collection('quizzes').doc(_quizIdForSave).update({
@@ -17931,7 +17932,7 @@
                 const rewriteTokens = Number(aiTokens) || 0;
                 const metaHtml = `<div class="audit-meta">
                     <span>${(result.items || []).length} rewrite${(result.items || []).length === 1 ? '' : 's'}</span>
-                    ${(opts && opts.cachedResult) ? `<span title="Saved analysis — no tokens spent. Pick a model and press Rewrite to run again." data-th-title="ผลวิเคราะห์ที่บันทึกไว้ ไม่เสียโทเคน · เลือกโมเดลแล้วกด Rewrite เพื่อรันใหม่">· <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> ${escapeHtml(opts.cachedSavedAtLabel || 'Saved')}</span>` : ''}
+                    ${(opts && opts.cachedResult && !opts.batchMerged) ? `<span title="Saved analysis — no tokens spent. Pick a model and press Rewrite to run again." data-th-title="ผลวิเคราะห์ที่บันทึกไว้ ไม่เสียโทเคน · เลือกโมเดลแล้วกด Rewrite เพื่อรันใหม่">· <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> ${escapeHtml(opts.cachedSavedAtLabel || 'Saved')}</span>` : ''}
                     <span title="Tokens: ${rewriteTokens.toLocaleString()}">· ${escapeHtml(window.aiModelShortName(aiModel))} · ${rewriteTokens >= 1000 ? (rewriteTokens / 1000).toFixed(1) + 'k' : rewriteTokens} tok</span>
                 </div>`;
 
@@ -18117,7 +18118,8 @@
             });
             if (window.auditPickChanged) window.auditPickChanged(); // V102.06: batch button shows the same model
         };
-        // V102.06: multi-select on the Scorecard → one ✦ call for every picked question (≤ AUDIT_BATCH_MAX).
+        // V102.06: multi-select on the Scorecard → one ✦ call for every picked question.
+        // V102.16: AUDIT_BATCH_MAX is now the round size — more picks run in rounds, merged into one Specialist view.
         const AUDIT_BATCH_MAX = 10;
         window.auditPickChanged = function() {
             const bar = document.getElementById('audit-batch');
@@ -18129,9 +18131,11 @@
             if (btn.dataset.running) return;
             const id = auditFixModel(), label = (textAIModelInfo(id) || {}).label || id;
             btn.innerHTML = '✦' + window.aiModelLogoHtml(id) + '<span class="audit-batch-x">×' + n + '</span>';
-            btn.disabled = n > AUDIT_BATCH_MAX;
-            btn.title = n > AUDIT_BATCH_MAX ? `เลือกได้สูงสุด ${AUDIT_BATCH_MAX} ข้อต่อครั้ง` : `ใช้ ${label} เสนอแก้ ${n} ข้อพร้อมกัน · เรียก AI 1 ครั้ง`;
-            btn.setAttribute('aria-label', `Suggest fixes for ${n} selected questions with ${label}`);
+            // V102.16: no cap — more than AUDIT_BATCH_MAX runs in rounds of AUDIT_BATCH_MAX (one AI call each).
+            const rounds = Math.ceil(n / AUDIT_BATCH_MAX);
+            btn.disabled = false;
+            btn.title = rounds > 1 ? `ใช้ ${label} เสนอแก้ ${n} ข้อ · เรียก AI ${rounds} รอบ (รอบละ ${AUDIT_BATCH_MAX} ข้อ) แล้วรวมผล` : `ใช้ ${label} เสนอแก้ ${n} ข้อพร้อมกัน · เรียก AI 1 ครั้ง`;
+            btn.setAttribute('aria-label', `Suggest fixes for ${n} selected questions with ${label}` + (rounds > 1 ? ` in ${rounds} rounds` : ''));
         };
         window.auditPickClear = function() {
             document.querySelectorAll('#ai-audit-popup .audit-pick:checked').forEach(c => { c.checked = false; });
@@ -18139,15 +18143,33 @@
         };
         window.auditBatchFix = async function(btn) {
             const nums = [...document.querySelectorAll('#ai-audit-popup .audit-pick:checked')].map(c => Number(c.dataset.q)).filter(n => n > 0).sort((a, b) => a - b);
-            if (!nums.length || nums.length > AUDIT_BATCH_MAX) return;
+            if (!nums.length) return;
             if (nums.length === 1) return window.auditSuggestFix(nums[0], btn);
-            const notes = nums.map(n => (window._lastAuditByQ && window._lastAuditByQ[n]) || null);
+            const model = auditFixModel(), noteOf = n => (window._lastAuditByQ && window._lastAuditByQ[n]) || null;
+            const rounds = [];
+            for (let i = 0; i < nums.length; i += AUDIT_BATCH_MAX) rounds.push(nums.slice(i, i + AUDIT_BATCH_MAX));
+            const items = [], texts = [];
+            let tokens = 0, usedModel = '';
             btn.dataset.running = '1';
             try {
-                await window.analyzeQuizAI(btn, { onlyQNumbers: nums, auditNote: notes, model: auditFixModel() });
+                for (const [k, chunk] of rounds.entries()) {
+                    if (rounds.length > 1) btn.title = `รอบ ${k + 1}/${rounds.length} · ${chunk.length} ข้อ`;
+                    window._aiAnalysisItems = null;
+                    await window.analyzeQuizAI(btn, { onlyQNumbers: chunk, auditNote: chunk.map(noteOf), model });
+                    // a failed round (no popup / prose fallback) is skipped; the others still count
+                    if (!document.getElementById('ai-analysis-popup') || !Array.isArray(window._aiAnalysisItems)) continue;
+                    items.push(...window._aiAnalysisItems);
+                    texts.push(window._aiAnalysisText || '');
+                    tokens += window._aiAnalysisTokens || 0;
+                    usedModel = window._aiAnalysisModel || usedModel;
+                }
+                // several rounds → one Specialist view with every fix (same render path, saved as the last analysis)
+                if (rounds.length > 1 && items.length) {
+                    await window.analyzeQuizAI(btn, { cachedResult: { analysisText: texts.filter(Boolean).join('\n\n'), items, suggestedTitles: null }, cachedModel: usedModel || model, cachedTokens: tokens, batchMerged: true });
+                }
             } finally { delete btn.dataset.running; }
             const popup = document.getElementById('ai-analysis-popup');
-            if (!popup) { await window.showReviewTab('audit'); window.auditPickChanged(); return; }
+            if (!popup || (rounds.length > 1 && !items.length)) { popup?.remove(); await window.showReviewTab('audit'); window.auditPickChanged(); return; }
             await window.showReviewTab('specialist');
             const got = new Set((window._aiAnalysisItems || []).map(it => it.qNumber)).size;
             showToast(got < nums.length ? `✓ Fixes proposed for ${got} of ${nums.length} questions` : `✓ Fixes proposed for ${nums.length} questions`);
