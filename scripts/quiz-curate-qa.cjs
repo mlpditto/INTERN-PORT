@@ -41,7 +41,7 @@ const { chromium } = require('playwright');
             window.showToast = message => window.toast = message;
             window.safeJsonParse = JSON.parse;
             window.authOK = true;
-            window.ensureAuthForQuizWrite = async () => { if (window.authEdit) fixture.title += ' changed'; return authOK; };
+            window.ensureAuthForQuizWrite = async () => { if (window.authEdit) fixture.questions[0].q += ' changed'; return authOK; }; // V101.95: only question data counts as an editor change
             window.calls = []; window.writes = []; window.docCount = 0; window.writeFail = false;
             window.callUniversalAI = (...args) => { calls.push(args); return new Promise((resolve, reject) => { window.aiResolve = resolve; window.aiReject = reject; }); };
             window.firebase = { firestore: { FieldValue: { serverTimestamp: () => 'SERVER_TIMESTAMP' } } };
@@ -277,8 +277,19 @@ const { chromium } = require('playwright');
         await page.evaluate(() => window.oldResolve = aiResolve); await close(); await open();
         await page.evaluate(data => oldResolve({ text: JSON.stringify(data) }), result());
         assert(await saveDisabled()); assert.equal(await page.locator('.curate-question').count(), 14);
-        await page.locator('#curate-suggest').click(); await page.evaluate(() => fixture.title += ' edited');
-        await resolve(result()); assert.match(await feedback(), /editor changed/); assert(await saveDisabled()); await close();
+        await page.locator('#curate-suggest').click(); await page.evaluate(() => fixture.questions[1].q += ' edited');
+        await resolve(result()); assert.match(await feedback(), /editor changed/); assert(await saveDisabled());
+        // V101.95: ↻ Use latest questions takes Suggest's place and re-reads the editor, keeping target / mode / model / instructions.
+        assert.equal(await page.locator('#curate-suggest').isVisible(), false);
+        const kept = await page.evaluate(() => ({ target: document.getElementById('curate-target').value, mode: document.querySelector('#quiz-curate-dialog [data-mode][aria-pressed="true"]').dataset.mode, model: document.getElementById('curate-model').textContent, instructions: document.getElementById('curate-instructions').value }));
+        await page.locator('#curate-reload').click();
+        assert.equal(await page.locator('#curate-reload').isVisible(), false);
+        assert.equal(await page.locator('#curate-suggest').isVisible(), true);
+        assert.doesNotMatch(await feedback(), /editor changed/);
+        assert.deepEqual(await page.evaluate(() => ({ target: document.getElementById('curate-target').value, mode: document.querySelector('#quiz-curate-dialog [data-mode][aria-pressed="true"]').dataset.mode, model: document.getElementById('curate-model').textContent, instructions: document.getElementById('curate-instructions').value })), kept);
+        assert.match(await page.locator('.curate-question').first().innerText(), /Clinical question 1/);
+        await suggest(result()); assert.doesNotMatch(await feedback(), /editor changed/); assert.equal(await saveDisabled(), false, 'reloaded session can suggest');
+        await close();
         await page.evaluate(() => fixture = structuredClone(original)); await open(); await suggest(result());
         await page.evaluate(() => window.authEdit = true); await page.locator('#curate-save').click();
         assert.match(await feedback(), /editor changed/); assert.equal(await page.evaluate(() => writes.length), 3);
@@ -286,6 +297,18 @@ const { chromium } = require('playwright');
         await page.keyboard.press('Escape');
         assert.equal(await page.locator('#quiz-curate-dialog').isVisible(), false);
         assert.equal(await page.evaluate(() => window.editorClosed), undefined, 'Escape preserves the editor');
+        // V101.95: a title / tags change after opening (e.g. a merge in another tab) no longer blocks — it is picked up and saved.
+        await page.evaluate(() => { fixture = structuredClone(original); authOK = true; window.authEdit = false; });
+        await open();
+        await page.evaluate(() => { fixture.title = 'Retitled elsewhere'; fixture.tags = 'moved'; });
+        await suggest(result());
+        assert.doesNotMatch(await feedback(), /editor changed/);
+        assert.equal(await page.locator('#curate-reload').isVisible(), false);
+        const writesBeforeRetitle = await page.evaluate(() => writes.length);
+        await page.locator('#curate-save').click();
+        await page.waitForFunction(n => writes.length > n, writesBeforeRetitle);
+        assert.match(await page.evaluate(() => writes.at(-1).data.title), /Retitled elsewhere/, 'saved copy uses the latest title');
+        await close();
         // Apply uses an atomic backup/update and refuses live or historical quizzes.
         await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
         await page.evaluate(() => {
