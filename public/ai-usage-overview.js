@@ -37,6 +37,23 @@
         }).finally(()=>pending=null);
         return pending;
     }
+    // V102.20: each hour = a stacked bar — height = volume, bands = share per model owner in its logo colour; the
+    // Official API vs OpenRouter share goes in the legend, the hover and the bubble. The route comes from the hourly
+    // key (base64url of "provider:model", written by recordAiUsage) and the owner from provider + model id — no backend change.
+    const OWNERS=[['google','Google','var(--g-grad)'],['openai','OpenAI','#0d0d0d'],['anthropic','Anthropic','#D97757'],['qwen','Qwen','#6336E7'],['deepseek','DeepSeek','#4D6BFE'],['grok','Grok','#71717a'],['other','Other','#cbd5e1']];
+    const routeOf=key=>{try{return atob(String(key).replace(/-/g,'+').replace(/_/g,'/')).split(':')[0];}catch(_){return '';}};
+    const ownerOf=(prov,model)=>{const m=String(model||'').toLowerCase();
+        if(prov==='openai')return 'openai';if(prov==='anthropic')return 'anthropic';if(/^(gemini|cloud_tts)/.test(prov))return 'google';
+        return /gemini|gemma|imagen|^google\//.test(m)?'google':/claude|^anthropic\//.test(m)?'anthropic':/qwen/.test(m)?'qwen':/deepseek/.test(m)?'deepseek':/grok|^x-ai\//.test(m)?'grok':/^(openai\/|gpt|o\d|dall-e|whisper)/.test(m)?'openai':'other';};
+    function mixOf(v,metric){
+        const mix={},route={official:0,openrouter:0};let sum=0;
+        for(const [key,m] of Object.entries(v?.models||{})){const n=Number(m[metric]||0);if(!n)continue;const prov=routeOf(key),o=ownerOf(prov,m.model);mix[o]=(mix[o]||0)+n;route[prov==='openrouter'?'openrouter':'official']+=n;sum+=n;}
+        const rest=Math.max(0,Number(v?.[metric]||0)-sum);if(rest)mix.other=(mix.other||0)+rest;
+        return {mix,route,total:sum+rest};
+    }
+    const share=(n,of)=>of?Math.round(100*n/of):0;
+    const routeText=r=>{const all=r.official+r.openrouter;return all?'Official API '+share(r.official,all)+'% · OpenRouter '+share(r.openrouter,all)+'%':'';};
+    const mixText=x=>OWNERS.filter(([k])=>x.mix[k]).sort((a,b)=>x.mix[b[0]]-x.mix[a[0]]).map(([k,l])=>l+' '+share(x.mix[k],x.total)+'%').join(' · ');
     let closeBubble;
     function modelBubble(anchor, day, hour, data) {
         closeBubble?.();
@@ -45,7 +62,10 @@
         const heading=node('div',undefined,'au-bubble-heading');heading.append(node('strong',day+' · '+hour+':00–'+hour+':59'),close);bubble.append(heading,node('small','Bangkok time'));
         if(!data)bubble.append(node('p','No recorded usage for this hour.'));
         else {
-            bubble.append(node('p',number(data.count)+' calls · '+number(data.tokens)+' tokens'),node('h4','Top models by tokens'));
+            const mx=mixOf(data,'tokens'); // V102.20
+            bubble.append(node('p',number(data.count)+' calls · '+number(data.tokens)+' tokens'));
+            if(mx.total)bubble.append(node('small',[mixText(mx),routeText(mx.route)].filter(Boolean).join(' · '),'au-bubble-mix'));
+            bubble.append(node('h4','Top models by tokens'));
             const rows=Object.values(data.models||{}).sort((a,b)=>Number(b.tokens||0)-Number(a.tokens||0));
             rows.slice(0,3).forEach((m,i)=>{
                 const row=node('div',undefined,'au-model-rank');const label=window.TEXT_AI_MODELS?.find(x=>x.id===m.model)?.label||m.model;
@@ -73,14 +93,26 @@
         const values=a.selected.flatMap(d=>Object.values(d.hours||{}));
         const max=Math.max(1,...values.map(v=>Number(v[metric]||0)));
         const readout=node('p','Select an hour for models and features. Gray means no recorded data.','au-note');readout.setAttribute('role','status');
+        // V102.20: legend = each owner's share of the period (logo colours) + Official API vs OpenRouter
+        const sumMix={mix:{},route:{official:0,openrouter:0},total:0};
+        for(const d of a.selected)for(const v of Object.values(d.hours||{})){const x=mixOf(v,metric);for(const k in x.mix)sumMix.mix[k]=(sumMix.mix[k]||0)+x.mix[k];sumMix.route.official+=x.route.official;sumMix.route.openrouter+=x.route.openrouter;sumMix.total+=x.total;}
+        if(sumMix.total){const legend=node('div',undefined,'au-mix-legend');
+            for(const [k,l,c] of OWNERS)if(sumMix.mix[k]){const s=node('span');const sw=node('i');sw.style.background=c;s.append(sw,l+' ',node('b',share(sumMix.mix[k],sumMix.total)+'%'));legend.append(s);}
+            const rt=routeText(sumMix.route);if(rt)legend.append(node('span',rt,'au-route'));
+            body.append(legend);}
         for(const day of a.range){
             const tr=node('tr');tr.append(node('th',day.slice(5)));
             for(let h=0;h<24;h++){
                 const hour=String(h).padStart(2,'0'), v=a.selected.find(d=>d.date===day)?.hours?.[hour];
                 const td=node('td'), b=node('button',v?'':'—');b.type='button';b.style.minWidth='24px';
                 const label=day+' · '+hour+':00–'+hour+':59 · '+(v?number(v.count)+' calls · '+number(v.tokens)+' tokens':'No recorded data');
-                b.title=label;b.setAttribute('aria-label',label);
-                b.style.background=v?'rgba(99,102,241,'+(0.12+0.7*Number(v[metric]||0)/max)+')':'#edf0f5';
+                const mx=v?mixOf(v,metric):null, detail=mx&&mx.total?[mixText(mx),routeText(mx.route)].filter(Boolean).join(' · '):'';
+                b.title=label+(detail?'\n'+detail:'');b.setAttribute('aria-label',label+(detail?' · '+detail:''));b.className='au-cell';
+                if(mx&&mx.total){ // V102.20: stacked bar — height = volume, bands = owner share (logo colours)
+                    const bar=node('span',undefined,'au-mix');bar.style.height=Math.round(25+75*Number(v[metric]||0)/max)+'%';
+                    for(const [k,,c] of OWNERS)if(mx.mix[k]){const seg=node('i');seg.style.flexGrow=mx.mix[k];seg.style.background=c;bar.append(seg);}
+                    b.append(bar);
+                }
                 b.setAttribute('aria-haspopup','dialog');b.setAttribute('aria-expanded','false');b.onclick=()=>{readout.textContent=label;modelBubble(b,day,hour,v);};
                 td.append(b);tr.append(td);
             }table.append(tr);
