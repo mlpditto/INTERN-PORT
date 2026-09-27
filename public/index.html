@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.12)</title>
+    <title>Internship Portfolio (V101.13)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.05">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10486,22 +10486,22 @@
         };
         // V101.11: a random quote to read before starting — short, well-attributed education / medicine lines.
         const QUIZ_START_QUOTES = [
-            ['Education is the most powerful weapon which you can use to change the world.', 'Nelson Mandela'],
-            ['The good physician treats the disease; the great physician treats the patient who has the disease.', 'William Osler'],
-            ['Medicine is a science of uncertainty and an art of probability.', 'William Osler'],
-            ['Listen to your patient, he is telling you the diagnosis.', 'William Osler'],
-            ['Wherever the art of medicine is loved, there is also a love of humanity.', 'Hippocrates'],
-            ['The expert in anything was once a beginner.', 'Helen Hayes'],
-            ['Success is the sum of small efforts, repeated day in and day out.', 'Robert Collier'],
-            ['The beautiful thing about learning is that no one can take it away from you.', 'B.B. King'],
-            ['An investment in knowledge pays the best interest.', 'Benjamin Franklin'],
-            ['Live as if you were to die tomorrow. Learn as if you were to live forever.', 'Mahatma Gandhi'],
-            ['It always seems impossible until it is done.', 'Nelson Mandela'],
-            ['Learning never exhausts the mind.', 'Leonardo da Vinci'],
-            ['Education is not preparation for life; education is life itself.', 'John Dewey'],
-            ['Develop a passion for learning. If you do, you will never cease to grow.', "Anthony J. D'Angelo"],
-            ['Wisdom begins in wonder.', 'Socrates'],
-            ['The roots of education are bitter, but the fruit is sweet.', 'Aristotle']
+            ['Education is the most powerful weapon which you can use to change the world.', 'Nelson Mandela', 'mandela-weapon'],
+            ['The good physician treats the disease; the great physician treats the patient who has the disease.', 'William Osler', 'osler-physician'],
+            ['Medicine is a science of uncertainty and an art of probability.', 'William Osler', 'osler-uncertainty'],
+            ['Listen to your patient, he is telling you the diagnosis.', 'William Osler', 'osler-listen'],
+            ['Wherever the art of medicine is loved, there is also a love of humanity.', 'Hippocrates', 'hippocrates-humanity'],
+            ['The expert in anything was once a beginner.', 'Helen Hayes', 'hayes-beginner'],
+            ['Success is the sum of small efforts, repeated day in and day out.', 'Robert Collier', 'collier-small-efforts'],
+            ['The beautiful thing about learning is that no one can take it away from you.', 'B.B. King', 'bbking-learning'],
+            ['An investment in knowledge pays the best interest.', 'Benjamin Franklin', 'franklin-investment'],
+            ['Live as if you were to die tomorrow. Learn as if you were to live forever.', 'Mahatma Gandhi', 'gandhi-learn-forever'],
+            ['It always seems impossible until it is done.', 'Nelson Mandela', 'mandela-impossible'],
+            ['Learning never exhausts the mind.', 'Leonardo da Vinci', 'davinci-mind'],
+            ['Education is not preparation for life; education is life itself.', 'John Dewey', 'dewey-life'],
+            ['Develop a passion for learning. If you do, you will never cease to grow.', "Anthony J. D'Angelo", 'dangelo-passion'],
+            ['Wisdom begins in wonder.', 'Socrates', 'socrates-wonder'],
+            ['The roots of education are bitter, but the fruit is sweet.', 'Aristotle', 'aristotle-roots']
         ];
         // V101.12: a young, bright female English voice from what the device offers (the server's Cloud TTS is
         // admin-only). First match wins: iOS/macOS Zoe · Nicky · Ava · Allison · Samantha, Edge Jenny · Aria ·
@@ -10521,9 +10521,14 @@
                 const cBtn = document.getElementById('qsc-confirm'), xBtn = document.getElementById('qsc-cancel');
                 // V101.11: the quote card is the play button when the device can speak (LINE on some Android
                 // phones cannot — then it is plain text, no speaker, no role).
-                const card = document.getElementById('qsc-quote'), canSpeak = 'speechSynthesis' in window && typeof SpeechSynthesisUtterance === 'function';
+                // V101.13: each quote has a recorded clip (Google Chirp 3 HD "Aoede", assets/quotes/<slug>.mp3) — the same
+                // young voice on every phone, incl. Androids without speech; the device voice is only the fallback.
+                const card = document.getElementById('qsc-quote'), canTts = 'speechSynthesis' in window && typeof SpeechSynthesisUtterance === 'function';
+                const canAudio = typeof window.Audio === 'function', canSpeak = canAudio || canTts;
+                let audio = null;
                 let quote = null;
-                function hush() { if (canSpeak) window.speechSynthesis.cancel(); card.classList.remove('speaking'); card.setAttribute('aria-pressed', 'false'); }
+                const quiet = () => { card.classList.remove('speaking'); card.setAttribute('aria-pressed', 'false'); };
+                function hush() { if (audio) { audio.pause(); audio = null; } if (canTts) window.speechSynthesis.cancel(); quiet(); }
                 function showQuote() {
                     hush();
                     let next; do { next = QUIZ_START_QUOTES[Math.floor(Math.random() * QUIZ_START_QUOTES.length)]; } while (QUIZ_START_QUOTES.length > 1 && next === quote);
@@ -10531,20 +10536,30 @@
                     document.getElementById('qsc-quote-text').textContent = quote[0];
                     document.getElementById('qsc-quote-author').textContent = '— ' + quote[1];
                 }
-                function speak() {
-                    if (!canSpeak) return;
-                    if (card.classList.contains('speaking')) return hush();
-                    hush();
+                function speakDevice() {
+                    if (!canTts) return quiet();
                     const u = new SpeechSynthesisUtterance(quote[0] + ' — ' + quote[1]);
                     u.lang = 'en-US'; u.rate = 1.05; u.pitch = 1.15; // V101.12: brighter, a touch quicker
                     const voice = quizQuoteVoice();
                     if (voice) { u.voice = voice; u.lang = voice.lang; }
-                    u.onend = u.onerror = function () { card.classList.remove('speaking'); card.setAttribute('aria-pressed', 'false'); };
-                    card.classList.add('speaking'); card.setAttribute('aria-pressed', 'true');
+                    u.onend = u.onerror = quiet;
                     window.speechSynthesis.speak(u);
                 }
+                function speak() {
+                    if (!canSpeak) return;
+                    if (card.classList.contains('speaking')) return hush();
+                    hush();
+                    card.classList.add('speaking'); card.setAttribute('aria-pressed', 'true');
+                    if (!canAudio || !quote[2]) return speakDevice();
+                    const clip = audio = new Audio('assets/quotes/' + quote[2] + '.mp3');
+                    const fallBack = () => { if (audio === clip) { audio = null; speakDevice(); } }; // offline / blocked → device voice
+                    clip.onended = () => { if (audio === clip) { audio = null; quiet(); } };
+                    clip.onerror = fallBack;
+                    const played = clip.play();
+                    if (played && played.catch) played.catch(fallBack);
+                }
                 card.classList.toggle('can-speak', canSpeak);
-                if (canSpeak) window.speechSynthesis.getVoices(); // V101.12: Chrome loads the voice list lazily — warm it up on open
+                if (canTts) window.speechSynthesis.getVoices(); // V101.12: Chrome loads the voice list lazily — warm it up on open
                 if (canSpeak) {
                     card.setAttribute('role', 'button'); card.tabIndex = 0;
                     card.title = 'แตะเพื่อฟังคำคม · แตะอีกครั้งเพื่อหยุด';
