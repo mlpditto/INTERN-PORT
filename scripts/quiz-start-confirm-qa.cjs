@@ -23,7 +23,7 @@ async function open(browser, withSpeech) {
         if (speech) {
             window.SpeechSynthesisUtterance = function (text) { this.text = text; };
             // the real speechSynthesis is a read-only accessor — replace it on the instance
-            Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: { speak: u => { spoken.push(u); window.lastU = u; }, cancel: () => { cancels++; }, getVoices: () => [{ lang: 'en-US', name: 'Test' }] } });
+            Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: { speak: u => { spoken.push(u); window.lastU = u; }, cancel: () => { cancels++; }, getVoices: () => (window.testVoices || [{ lang: 'en-US', name: 'Test' }]) } });
         } else { delete Window.prototype.speechSynthesis; delete window.SpeechSynthesisUtterance; }
     }, [modal, withSpeech]);
     await page.addScriptTag({ content: js + '\nwindow.quizStartConfirm = quizStartConfirm; window.QUIZ_START_QUOTES = QUIZ_START_QUOTES;' });
@@ -56,17 +56,27 @@ async function open(browser, withSpeech) {
         assert.equal(await card.locator('.qsc-voice b i').first().evaluate(i => getComputedStyle(i).animationName), 'qsc-wave', 'moves while speaking');
         assert.equal(await page.evaluate(() => spoken.length), 1);
         assert.equal(await page.evaluate(() => [lastU.text, lastU.lang, lastU.voice.lang].join('|')), q1[0] + ' — ' + q1[1].slice(2) + '|en-US|en-US');
+        assert.deepEqual(await page.evaluate(() => [lastU.rate, lastU.pitch]), [1.05, 1.15], 'V101.12: brighter, a touch quicker');
         assert.match(await card.getAttribute('class'), /speaking/);
                 await card.click();
         assert.doesNotMatch(await card.getAttribute('class'), /speaking/, 'tap again stops');
         await page.evaluate(() => { document.getElementById('qsc-quote').click(); lastU.onend(); });
         assert.doesNotMatch(await card.getAttribute('class'), /speaking/, 'ends by itself');
+        // V101.12: the young female voice wins over whatever else the device lists; falls back to any en-US
+        const pickFrom = list => page.evaluate(l => { window.testVoices = l; document.getElementById('qsc-quote').click(); const n = lastU.voice && lastU.voice.name; document.getElementById('qsc-quote').click(); return n; }, list);
+        assert.equal(await pickFrom([{ lang: 'en-US', name: 'Microsoft David' }, { lang: 'en-US', name: 'Microsoft Jenny Online (Natural)' }, { lang: 'en-GB', name: 'Samantha' }]), 'Microsoft Jenny Online (Natural)');
+        assert.equal(await pickFrom([{ lang: 'en-US', name: 'Samantha' }, { lang: 'en-US', name: 'Zoe (Premium)' }]), 'Zoe (Premium)', 'Zoe before Samantha');
+        assert.equal(await pickFrom([{ lang: 'th-TH', name: 'Kanya' }, { lang: 'en-US', name: 'Google US English' }]), 'Google US English');
+        assert.equal(await pickFrom([{ lang: 'en-us', name: 'English United States', voiceURI: 'en-us-x-sfg-local' }, { lang: 'en-us', name: 'English United States', voiceURI: 'en-us-x-iom-local' }]), 'English United States');
+        assert.equal(await pickFrom([{ lang: 'en-US', name: 'Fred' }]), 'Fred', 'otherwise any en-US voice');
+        await page.evaluate(() => { window.testVoices = null; });
         // 🔀 = another quote, never speaks, stops any speech
         await card.click();
+        const spokeBefore = await page.evaluate(() => spoken.length);
         await page.locator('#qsc-shuffle').click();
         const q2 = await page.evaluate(() => document.getElementById('qsc-quote-text').textContent);
         assert.notEqual(q2, q1[0], 'a different quote');
-        assert.equal(await page.evaluate(() => spoken.length), 3, 'shuffle does not speak');
+        assert.equal(await page.evaluate(() => spoken.length), spokeBefore, 'shuffle does not speak');
         assert.doesNotMatch(await card.getAttribute('class'), /speaking/);
         // Korean toggle repaints the rule + buttons
         await page.locator('#qsc-lang-chips button').click();

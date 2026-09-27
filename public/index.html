@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.11)</title>
+    <title>Internship Portfolio (V101.12)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.05">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10503,6 +10503,15 @@
             ['Wisdom begins in wonder.', 'Socrates'],
             ['The roots of education are bitter, but the fruit is sweet.', 'Aristotle']
         ];
+        // V101.12: a young, bright female English voice from what the device offers (the server's Cloud TTS is
+        // admin-only). First match wins: iOS/macOS Zoe · Nicky · Ava · Allison · Samantha, Edge Jenny · Aria ·
+        // Michelle, Chrome "Google US English", Android Google TTS female ids, then any voice named female, then en-US.
+        const QUIZ_QUOTE_VOICES = [/\b(Zoe|Nicky)\b/i, /\b(Jenny|Aria|Michelle)\b/i, /\b(Ava|Allison|Samantha)\b/i, /Google US English/i, /en-us-x-(sfg|tpc|iob|iog)/i, /female/i];
+        function quizQuoteVoice() {
+            const voices = (window.speechSynthesis.getVoices() || []).filter(v => /^en/i.test(v.lang || ''));
+            for (const re of QUIZ_QUOTE_VOICES) { const v = voices.find(x => re.test(x.name || '') || re.test(x.voiceURI || '')); if (v) return v; }
+            return voices.find(v => /^en[-_]US/i.test(v.lang)) || voices[0] || null;
+        }
         // V95.56: tappable language chip (Korean ⇄ English); Thai rides the hovers.
         function quizStartConfirm(quizTitle) {
             return new Promise(function (resolve) {
@@ -10527,14 +10536,15 @@
                     if (card.classList.contains('speaking')) return hush();
                     hush();
                     const u = new SpeechSynthesisUtterance(quote[0] + ' — ' + quote[1]);
-                    u.lang = 'en-US'; u.rate = 0.95;
-                    const voice = window.speechSynthesis.getVoices().find(v => /^en[-_]US/i.test(v.lang)) || window.speechSynthesis.getVoices().find(v => /^en/i.test(v.lang));
-                    if (voice) u.voice = voice;
+                    u.lang = 'en-US'; u.rate = 1.05; u.pitch = 1.15; // V101.12: brighter, a touch quicker
+                    const voice = quizQuoteVoice();
+                    if (voice) { u.voice = voice; u.lang = voice.lang; }
                     u.onend = u.onerror = function () { card.classList.remove('speaking'); card.setAttribute('aria-pressed', 'false'); };
                     card.classList.add('speaking'); card.setAttribute('aria-pressed', 'true');
                     window.speechSynthesis.speak(u);
                 }
                 card.classList.toggle('can-speak', canSpeak);
+                if (canSpeak) window.speechSynthesis.getVoices(); // V101.12: Chrome loads the voice list lazily — warm it up on open
                 if (canSpeak) {
                     card.setAttribute('role', 'button'); card.tabIndex = 0;
                     card.title = 'แตะเพื่อฟังคำคม · แตะอีกครั้งเพื่อหยุด';
