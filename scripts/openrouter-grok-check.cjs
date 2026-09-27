@@ -140,11 +140,14 @@ const ok = (content, finish = 'stop', usage = { prompt_tokens: 100, completion_t
     // V101.92: a provider safety-filter stop becomes a plain "declined" message, and a proxy-only model
     // throws the rewritten message (definitive used to throw the raw one, skipping every rewrite).
     {
-        const a = admin.indexOf('const raw = String(primaryError.error);', uaStart);
-        const b = admin.indexOf('                                    : raw;', a) + '                                    : raw;'.length;
-        const rewrite = new Function('primaryError', 'modelName', 'proxyProvider', 'window', `let proxyAnsweredError = ''; ${admin.slice(a, b)} return proxyAnsweredError;`);
+        // V102.17: the wording is one helper (explainProxyError) used by the registry path AND the generic proxy path.
+        const a = admin.indexOf('            const explainProxyError = (raw, chipName) =>');
+        const b = admin.indexOf('                    : raw;', a) + '                    : raw;'.length;
+        const helper = new Function(`${admin.slice(a, b)} return explainProxyError;`)();
         const w = { aiModelShortName: id => ({ 'claude-opus-5-5': 'Opus 5.5', 'gpt-6-sol': 'Sol 6' })[id] || id };
-        const run = error => rewrite({ error }, error.includes('gpt') ? 'gpt-6-sol' : 'claude-opus-5-5', 'modern', w);
+        const run = error => helper(error, w.aiModelShortName(error.includes('gpt') ? 'gpt-6-sol' : 'claude-opus-5-5'));
+        check('T11 registry path (Opus/Sonnet/Fable 5, GPT-6) uses the rewrite', admin.includes("throw new Error(data.error ? explainProxyError(String(data.error), window.aiModelShortName ? window.aiModelShortName(modelName) : modelName)"), true);
+        check('T11 generic proxy path uses the rewrite', admin.includes('proxyAnsweredError = explainProxyError(raw, chipName);'), true);
         const refusal = run('Model returned incomplete or invalid output. claude-opus-5-5: stopped with refusal; 0 output tokens of 32768.');
         check('T11 Anthropic refusal → "Opus 5.5 declined this request", raw kept after a blank line', /^Opus 5\.5 declined this request — the provider's safety filter[\s\S]*Pick another model and run again\.\n\n\(Model returned incomplete[\s\S]*refusal/.test(refusal), true);
         check('T11 OpenAI content_filter → declined', run('gpt-6-sol: stopped with incomplete (content_filter); 0 output tokens').startsWith('Sol 6 declined this request'), true);
