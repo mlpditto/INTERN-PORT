@@ -48,12 +48,16 @@ async function open(browser, withSpeech) {
         const card = page.locator('#qsc-quote');
         assert.equal(await card.getAttribute('role'), 'button');
         assert.notEqual(await card.locator('.qsc-voice').evaluate(e => getComputedStyle(e).display), 'none', 'speaker shown');
+        // V101.11: a soundwave line (5 bars) instead of a speaker — still at rest, moving while speaking
+        assert.equal(await card.locator('.qsc-voice b i').count(), 5);
+        assert.equal(await card.locator('.qsc-voice .fa-volume-high').count(), 0, 'no speaker icon');
+        assert.equal(await card.locator('.qsc-voice b i').first().evaluate(i => getComputedStyle(i).animationName), 'none', 'still at rest');
         await card.click();
+        assert.equal(await card.locator('.qsc-voice b i').first().evaluate(i => getComputedStyle(i).animationName), 'qsc-wave', 'moves while speaking');
         assert.equal(await page.evaluate(() => spoken.length), 1);
         assert.equal(await page.evaluate(() => [lastU.text, lastU.lang, lastU.voice.lang].join('|')), q1[0] + ' — ' + q1[1].slice(2) + '|en-US|en-US');
         assert.match(await card.getAttribute('class'), /speaking/);
-        assert.equal(await card.locator('.qsc-voice b').isVisible(), true, 'bars move while speaking');
-        await card.click();
+                await card.click();
         assert.doesNotMatch(await card.getAttribute('class'), /speaking/, 'tap again stops');
         await page.evaluate(() => { document.getElementById('qsc-quote').click(); lastU.onend(); });
         assert.doesNotMatch(await card.getAttribute('class'), /speaking/, 'ends by itself');
