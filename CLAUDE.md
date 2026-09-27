@@ -143,6 +143,17 @@ For multi-step tasks, state a brief plan:
 5. Merge → workflow deploys → verify: live site updated
 ```
 
+### Working in a cloud session (Claude Code on the web)
+
+`CLAUDE_CODE_REMOTE=true` means you are on an Anthropic cloud VM, not the owner's Windows machine. Differences:
+
+- **Context:** the local auto-memory is not here. If `~/intern-port-memory/MEMORY.md` exists (cloned by `scripts/cloud-setup.sh`), read it first — house style (lean · inline · less text, chip rails, 3–5 mockups before a design change), the live versions and the pending smoke-test list. Treat it as **read-only**: do not commit to the memory repo from the cloud; end your reply with the memory updates the desktop session should record.
+- **Setup:** `bash scripts/cloud-setup.sh` (safe to re-run) installs Playwright + Chromium into `~/.pw`; run the QA suite with `bash scripts/run-qa.sh` (optionally a name filter, e.g. `bash scripts/run-qa.sh cover`). Same scripts and version as `.github/workflows/qa.yml`.
+- **Git:** same flow — branch from `origin/production`, PR into `production`, bump versions as usual, merge only when the owner says so (“merge เลย”).
+- **No credentials here:** gcloud / firebase logins live on the owner's machine only. Do not deploy functions or rules, read Firestore, or call Cloud TTS from the cloud — say what the owner should run locally instead. This repo is **public**: never write keys, tokens or service-account JSON into it.
+- **Can't test here:** the LINE LIFF app (intern) and the signed-in admin. Verify with the harness tests + screenshots, and list the manual smoke steps for the owner.
+- Windows-only notes in the memory (D:\ paths, PowerShell, OneDrive, `gcloud.cmd` full path) do not apply.
+
 ### Security Considerations
 - **Firebase Security Rules**: Never weaken existing rules
 - **Data Validation**: Always validate user inputs on both client and server
