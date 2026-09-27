@@ -11,6 +11,8 @@ const html = fs.readFileSync('public/index.html', 'utf8').replace(/\r/g, '');
 const slice = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b, i); if (i < 0 || j < 0) throw new Error('slice: ' + a); return html.slice(i, j); };
 const modal = slice('    <div id="quizStartConfirmModal"', '    <div id="quizModal" class="modal">');
 const js = slice('        const QUIZ_START_I18N = {', '        async function confirmRunQuiz(quizId) {');
+// V101.14: the materials helpers the header tile reuses (cover-ribbon palette, LIFF-safe open, floating list)
+const matJs = slice('        function materialKind(url) {', '        // V95.12: render a quiz');
 const styles = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(m => m[1]).join('\n');
 
 // every quote has its clip, and no clip is left without a quote
@@ -22,7 +24,7 @@ for (const [, , slug] of quotes) {
 }
 assert.deepEqual(fs.readdirSync(dir).filter(f => f.endsWith('.mp3')).sort(), quotes.map(q => q[2] + '.mp3').sort(), 'no orphan clips');
 
-async function open(browser, { speech = true, audio = true } = {}) {
+async function open(browser, { speech = true, audio = true, quiz = null } = {}) {
     const page = await browser.newPage({ viewport: { width: 390, height: 800 } });
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.route('https://intern.test/', r => r.fulfill({ body: '<meta charset="utf-8"><body></body>', contentType: 'text/html' }));
@@ -32,6 +34,9 @@ async function open(browser, { speech = true, audio = true } = {}) {
         document.body.insertAdjacentHTML('beforeend', m);
         window.escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
         window.spoken = []; window.cancels = 0; window.audios = []; window.audioFails = false;
+        window.materialDisplayName = (m, i) => m.name || 'Material ' + (i + 1);
+        window.logged = 0; window.qzLogMaterialClick = () => logged++;
+        window.liff = { isInClient: () => true, openWindow: o => { window.opened = o; } };
         if (speech) {
             window.SpeechSynthesisUtterance = function (text) { this.text = text; };
             // the real speechSynthesis is a read-only accessor — replace it on the instance
@@ -45,8 +50,8 @@ async function open(browser, { speech = true, audio = true } = {}) {
             };
         } else delete window.Audio;
     }, [modal, speech, audio]);
-    await page.addScriptTag({ content: js + '\nwindow.quizStartConfirm = quizStartConfirm; window.QUIZ_START_QUOTES = QUIZ_START_QUOTES;' });
-    await page.evaluate(() => { window.result = null; quizStartConfirm('Central Neuropathic Pain').then(v => { window.result = v; }); });
+    await page.addScriptTag({ content: matJs + js + '\nwindow.quizStartConfirm = quizStartConfirm; window.QUIZ_START_QUOTES = QUIZ_START_QUOTES;' });
+    await page.evaluate(q => { window.result = null; quizStartConfirm('Central Neuropathic Pain', q).then(v => { window.result = v; }); }, quiz);
     return { page, errors };
 }
 const tick = page => page.evaluate(() => new Promise(r => setTimeout(r, 0)));
@@ -55,6 +60,9 @@ const tick = page => page.evaluate(() => new Promise(r => setTimeout(r, 0)));
     const browser = await chromium.launch();
     try {
         const { page, errors } = await open(browser);
+        // V101.14: no materials → the header tile stays 📋; Cancel / Start are icon-only
+        assert.equal(await page.locator('#qsc-ic').innerText(), '📋');
+        assert.deepEqual(await page.evaluate(() => [document.getElementById('qsc-confirm').textContent, document.getElementById('qsc-confirm').getAttribute('aria-label'), document.getElementById('qsc-confirm').title, document.getElementById('qsc-cancel').textContent, document.getElementById('qsc-cancel').getAttribute('aria-label')]), ['▶', 'Start', 'เริ่มทำแบบทดสอบ', '✕', 'Cancel']);
         // lean: name header, no duplicate title / bullet, one rule with its Thai + full text in the hover
         assert.equal(await page.locator('#qsc-quizname').innerText(), 'Central Neuropathic Pain');
         assert.equal(await page.locator('#qsc-title, #qsc-rules').count(), 0, 'duplicate title + bullet removed');
@@ -108,7 +116,7 @@ const tick = page => page.evaluate(() => new Promise(r => setTimeout(r, 0)));
         // Korean toggle repaints the rule + buttons
         await page.locator('#qsc-lang-chips button').click();
         assert.match(await page.locator('#qsc-key').innerText(), /나가기·새로고침 금지/);
-        assert.equal(await page.locator('#qsc-confirm').innerText(), '▶ 시작');
+        assert.deepEqual(await page.evaluate(() => [document.getElementById('qsc-confirm').textContent, document.getElementById('qsc-confirm').getAttribute('aria-label'), document.getElementById('qsc-cancel').textContent, document.getElementById('qsc-cancel').getAttribute('aria-label')]), ['▶', '시작', '✕', '취소'], 'V101.14: icon-only buttons, the word is the accessible name');
         // rule + buttons fit at 390 px
         const foot = await page.evaluate(() => { const f = document.querySelector('.qsc-foot'), c = document.querySelector('#quizStartConfirmModal .modal-content').getBoundingClientRect(); const ys = [...f.children].map(e => Math.round(e.getBoundingClientRect().top)); return { rows: new Set(ys.map(y => Math.round(y / 20))).size <= 2, fits: [...f.children].every(e => e.getBoundingClientRect().right <= c.right + 1) }; });
         assert.deepEqual(foot, { rows: true, fits: true });
@@ -130,12 +138,39 @@ const tick = page => page.evaluate(() => new Promise(r => setTimeout(r, 0)));
         assert.deepEqual(e2, []);
         await p2.close();
 
+        // V101.14: one file → the header tile IS the file button (cover-ribbon colour + icon, ↓ under it)
+        const { page: p4, errors: e4 } = await open(browser, { quiz: { id: 'q1', materials: [{ url: 'https://example.com/files/slides.pdf', name: 'Slides' }] } });
+        const tile = p4.locator('#qsc-ic a.qsc-mat');
+        assert.equal(await tile.count(), 1);
+        assert.equal(await tile.evaluate(a => getComputedStyle(a).backgroundColor), 'rgb(220, 38, 38)', 'PDF = red');
+        assert.equal(await tile.locator('.fa-file-pdf').count(), 1);
+        assert.equal(await tile.locator('.qsc-mat-dn .fa-arrow-down').count(), 1);
+        assert.match(await tile.getAttribute('title'), /PDF\): Slides/);
+        await tile.click();
+        assert.deepEqual(await p4.evaluate(() => [opened.url, opened.external, logged, window.result]), ['https://example.com/files/slides.pdf', true, 1, null], 'opens outside LINE, logged, quiz not started');
+        assert.deepEqual(e4, []);
+        await p4.close();
+        // several files → count badge; the list floats above the modal (z > .modal 9999); a pick opens + closes it
+        const { page: p5, errors: e5 } = await open(browser, { quiz: { id: 'q2', materials: [{ url: 'https://1drv.ms/b/x', name: 'Deck' }, { url: 'https://youtu.be/abc', name: 'Video' }, { url: 'https://example.org/a', name: 'Notes' }] } });
+        const sum = p5.locator('#qsc-ic summary.qsc-mat');
+        assert.equal(await sum.locator('.qsc-mat-n').innerText(), '3');
+        assert.equal(await sum.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(3, 100, 184)', 'first file OneDrive = blue');
+        await sum.click();
+        await p5.waitForSelector('body > .quiz-material-list');
+        assert.ok(await p5.evaluate(() => Number(getComputedStyle(document.querySelector('body > .quiz-material-list')).zIndex) > 9999), 'list above the modal');
+        await p5.locator('body > .quiz-material-list a').nth(1).click();
+        assert.equal(await p5.evaluate(() => opened.url), 'https://youtu.be/abc');
+        await p5.waitForFunction(() => !document.querySelector('#qsc-ic details').open);
+        assert.equal(await p5.evaluate(() => window.result), null, 'quiz not started');
+        assert.deepEqual(e5, []);
+        await p5.close();
+
         // neither clips nor speech: plain text, no soundwave, no role
         const { page: p3, errors: e3 } = await open(browser, { speech: false, audio: false });
         assert.equal(await p3.locator('#qsc-quote').getAttribute('role'), null);
         assert.equal(await p3.locator('#qsc-quote .qsc-voice').evaluate(e => getComputedStyle(e).display), 'none');
         assert.ok((await p3.locator('#qsc-quote-text').innerText()).length > 10, 'the quote still shows');
         assert.deepEqual(e3, []);
-        console.log('PASS: quiz start card — name header, one rule, random quote, tap = recorded Aoede clip (play/stop/end), device-voice fallback (young female first), 🔀 stops + new quote, KR toggle, start stops audio, no-speech phones still hear the clip, 16 clips on disk, 390 px');
+        console.log('PASS: quiz start card — header tile = materials button (1 file / several → floating list above the modal / none → 📋), icon-only ✕ ▶, name header, one rule, random quote, tap = recorded Aoede clip (play/stop/end), device-voice fallback (young female first), 🔀 stops + new quote, KR toggle, start stops audio, no-speech phones still hear the clip, 16 clips on disk, 390 px');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
