@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.23)</title>
+    <title>Nika Admin (V102.24)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -2357,6 +2357,19 @@
         .tag-hyg-chip { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:10px; border:1px solid #cbd5e1; background:#fff; color:#64748b; font-size:0.92em; font-weight:700; cursor:pointer; }
         .tag-hyg-chip:hover { border-color:#6366f1; color:#6366f1; }
         .tag-hyg-chip small, .tag-hyg-group small { font-weight:600; color:#94a3b8; }
+        /* V102.24: fold one-off tags table */
+        #quizTagFoldModal .qtf-table { max-height:62vh; overflow:auto; border:1px solid #e2e8f0; border-radius:10px; }
+        #quizTagFoldModal .qtf-row { display:grid; grid-template-columns:28px minmax(200px,1.4fr) minmax(220px,1fr) 60px; gap:10px; align-items:center; padding:7px 10px; border-bottom:1px solid #f1f5f9; font-size:0.82em; }
+        #quizTagFoldModal .qtf-row.is-head { position:sticky; top:0; background:#f8fafc; font-weight:800; color:#64748b; font-size:0.72em; z-index:1; }
+        #quizTagFoldModal .qtf-row.is-keep { opacity:0.55; }
+        #quizTagFoldModal .qtf-tag { min-width:0; }
+        #quizTagFoldModal .qtf-tag b { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#1e293b; }
+        #quizTagFoldModal .qtf-tag small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#94a3b8; }
+        #quizTagFoldModal .qtf-row select { width:100%; min-height:0; padding:4px 6px; border:1px solid #cbd5e1; border-radius:8px; font-size:0.95em; background:#fff; }
+        #quizTagFoldModal .qtf-row select.a-map { border-color:#93c5fd; background:#eff6ff; }
+        #quizTagFoldModal .qtf-row select.a-drop { border-color:#fecaca; background:#fef2f2; }
+        #quizTagFoldModal .qtf-state { font-size:0.8em; font-weight:800; text-align:center; }
+        #quizTagFoldModal .qtf-btn { width:auto; min-height:0; padding:7px 16px; border-radius:9px; font-weight:800; font-size:0.85em; cursor:pointer; }
         /* V102.23: AI tag review table */
         #quizAiTagModal .qat-table { max-height:62vh; overflow:auto; border:1px solid #e2e8f0; border-radius:10px; }
         #quizAiTagModal .qat-row { display:grid; grid-template-columns:28px minmax(180px,1.3fr) 150px minmax(260px,2fr) 70px; gap:10px; align-items:center; padding:8px 10px; border-bottom:1px solid #f1f5f9; font-size:0.82em; }
@@ -14426,6 +14439,24 @@
                 <div style="display:flex; gap:8px;">
                     <button type="button" id="qat-stop" class="qat-btn" onclick="window._qatCancel = true" style="background:#fff; color:#b91c1c; border:1px solid #fecaca;">Stop</button>
                     <button type="button" id="qat-save" class="qat-btn" onclick="saveQuizAiTags()" style="background:#4f46e5; color:#fff; border:none;">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- V102.24: fold one-off tags — AI proposes Map (→ approved tag) / Keep / Drop per
+         singleton; nothing is written until Save, and only ticked rows are applied. -->
+    <div id="quizTagFoldModal" class="modal lang-no-toggle" style="z-index:4400;">
+        <div class="modal-content" style="max-width:900px;">
+            <span class="close-modal" onclick="closeQuizTagFold()">&times;</span>
+            <h3 style="margin:0 0 4px 0; color:#3730a3;">🧹 Fold one-off tags <small id="qtf-scope" style="font-weight:600; color:#64748b; font-size:0.6em;"></small></h3>
+            <div id="qtf-status" style="font-size:0.8em; color:#475569; margin-bottom:10px;"></div>
+            <div id="qtf-table" class="qtf-table"></div>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:12px; flex-wrap:wrap;">
+                <small style="color:#94a3b8;">Map = replace with an approved tag · Keep = leave as an extra · Drop = remove</small>
+                <div style="display:flex; gap:8px;">
+                    <button type="button" class="qtf-btn" onclick="window._qtfCancel = true" style="background:#fff; color:#b91c1c; border:1px solid #fecaca;">Stop</button>
+                    <button type="button" id="qtf-save" class="qtf-btn" onclick="saveQuizTagFold()" style="background:#4f46e5; color:#fff; border:none;">Save</button>
                 </div>
             </div>
         </div>
@@ -31377,6 +31408,7 @@ ${JSON.stringify(sourceObj)}`;
                     ${h.nearDuplicates.length ? h.nearDuplicates.slice(0, 30).map(g => group(g.map(label).join(' ≈ ') + mergeBtn(g.map(e => e.key), g.flatMap(e => e.forms)))).join('') : none}${cap(h.nearDuplicates, 30)}</div>
                 <div class="tag-hyg-card"><h5>Singletons · ${h.singletons.length}</h5>
                     <p>Used by exactly one quiz. Candidates to fold into a common tag.</p>
+                    ${window.quizTagFoldCandidates().length ? `<p><button type="button" onclick="openQuizTagFold()" style="width:auto; min-height:0; padding:5px 12px; border-radius:999px; border:1.5px solid #4f46e5; background:#4f46e5; color:#fff; font-size:0.9em; font-weight:800; cursor:pointer;">✨ Fold with AI · ${window.quizTagFoldCandidates().length}</button></p>` : ''}
                     ${h.singletons.length ? chips(h.singletons.slice(0, 60)) : none}${cap(h.singletons, 60)}</div>
                 <div class="tag-hyg-card"><h5>Legacy markers · ${h.markers.length}</h5>
                     <p>AI_VARIANT / AI_FROM_CASE / PharmCamp now live in the <code>source</code> / <code>campaign</code> fields. Quizzes still carrying them as tags: ${legacyCount}.</p>
@@ -62564,6 +62596,165 @@ ${JSON.stringify(items)}`;
                 window._qatRows = window._qatRows.filter(r => !(r.accept && r.state === 'ready'));
                 if (window._qatRows.length) renderQuizAiTagReview('Saved — remaining rows were not ticked or had errors');
                 else closeQuizAiTagReview();
+            } catch (e) {
+                alert(`Saving stopped after ${done} quiz(zes): ${e.message}`);
+            }
+        };
+
+        // ── V102.24: fold one-off tags (step 3) ───────────────────────────────
+        // Candidates = quiz-level tags used by exactly one quiz that are neither in
+        // QUIZ_TAG_VOCAB nor machine markers. AI proposes map / keep / drop per tag
+        // (40 per call); only ticked map/drop rows are written.
+        const QTF_BATCH = 40;
+        window._qtfRows = [];
+        window._qtfCancel = false;
+        window.quizTagFoldCandidates = function () {
+            if (typeof window.computeQuizTagHygiene !== 'function' || !Array.isArray(quizzesData)) return [];
+            const live = quizzesData.filter(q => q && !q.isHistoryRevision);
+            return window.computeQuizTagHygiene(live).singletons
+                .filter(e => !window.QUIZ_TAG_KIND.has(e.key) && !window.isQuizMarkerTag(e.key))
+                .map(e => {
+                    const q = live.find(x => window.quizTagList(x).some(t => t.toLowerCase() === e.key));
+                    return { key: e.key, tag: e.forms[0].raw, quizId: q && q.id, quizTitle: (q && (q.title || q.shortTitle)) || '' };
+                })
+                .filter(c => c.quizId);
+        };
+        // Accept only "map" to an exact vocabulary tag, "keep" or "drop".
+        window.qtfCleanDecision = function (raw) {
+            const action = String(raw && raw.action || '').toLowerCase();
+            if (action === 'map') {
+                const hit = window.QUIZ_TAG_KIND.get(String(raw.target || '').trim().toLowerCase());
+                return hit ? { action: 'map', target: hit.tag } : { action: 'keep', target: '' };
+            }
+            return { action: action === 'drop' ? 'drop' : 'keep', target: '' };
+        };
+        window.qtfBuildPrompt = function (items) {
+            const v = window.QUIZ_TAG_VOCAB;
+            const all = [...v.skill, ...Object.values(v.topic).flat(), ...v.population];
+            return `You clean up quiz tags. Each item is a tag used by only one quiz, with that quiz's title.
+Decide for each tag:
+- "map": the tag is a narrower or differently worded form of ONE approved tag → give that approved tag as "target" (exact spelling).
+- "keep": the tag is a useful specific detail worth keeping as an extra — a drug or product name, a named guideline, exam or scale.
+- "drop": the tag is noise or too vague to help anyone find the quiz (e.g. "Symptoms", "Education", "Quiz").
+Prefer "map" whenever an approved tag fits. Tags may be Thai or English.
+
+APPROVED TAGS:
+${all.join(' | ')}
+
+Return JSON only: {"results":[{"tag":"<tag exactly as given>","action":"map|keep|drop","target":"<approved tag or empty>"}]}
+
+ITEMS:
+${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0, 120) })))}`;
+        };
+        window.openQuizTagFold = async function () {
+            const pool = window.quizTagFoldCandidates();
+            if (!pool.length) { showToast('No one-off tags to fold'); return; }
+            if (!confirm(`Ask AI how to fold ${pool.length} one-off tag(s)? (${Math.ceil(pool.length / QTF_BATCH)} AI call(s) · nothing is saved until you press Save)`)) return;
+            window._qtfCancel = false;
+            window._qtfRows = pool.map(c => ({ ...c, action: 'keep', target: '', aiAction: '', state: 'wait', accept: false }));
+            document.getElementById('qtf-scope').textContent = `${pool.length} one-off tags`;
+            forceShowModal('quizTagFoldModal', 'block');
+            renderQuizTagFold();
+            const model = document.getElementById('ai-tagging-model-val')?.value || 'gemini-3.5-flash';
+            const batches = Math.ceil(pool.length / QTF_BATCH);
+            for (let b = 0; b < batches; b++) {
+                if (window._qtfCancel) break;
+                const slice = window._qtfRows.slice(b * QTF_BATCH, (b + 1) * QTF_BATCH);
+                slice.forEach(r => { r.state = 'busy'; });
+                renderQuizTagFold(`AI ${b + 1} / ${batches} · ${model}`);
+                try {
+                    if (typeof window.callUniversalAI !== 'function') throw new Error('AI engine not ready');
+                    const res = await window.callUniversalAI(model, window.qtfBuildPrompt(slice), true, null, '', { feature: 'quiz_tag_fold' });
+                    const parsed = window.safeJsonParse(res && res.text);
+                    const results = parsed && Array.isArray(parsed.results) ? parsed.results : null;
+                    if (!results) throw new Error('AI returned no results. First 160 chars: ' + String(res && res.text || '').slice(0, 160));
+                    slice.forEach(r => {
+                        const hit = results.find(x => x && String(x.tag || '').trim().toLowerCase() === r.key);
+                        if (!hit) { r.state = 'error'; r.error = 'No answer for this tag'; return; }
+                        const d = window.qtfCleanDecision(hit);
+                        r.action = d.action; r.target = d.target; r.aiAction = d.action;
+                        r.state = 'ready';
+                        r.accept = d.action !== 'keep';
+                    });
+                } catch (e) {
+                    console.error('[Fold tags]', e);
+                    slice.forEach(r => { r.state = 'error'; r.error = e.message; });
+                }
+                renderQuizTagFold();
+            }
+            renderQuizTagFold(window._qtfCancel ? 'Stopped' : 'Done — check each row, then Save');
+        };
+        window.renderQuizTagFold = function (status) {
+            const rows = window._qtfRows;
+            const statusEl = document.getElementById('qtf-status');
+            if (status !== undefined) statusEl.dataset.msg = status;
+            const n = a => rows.filter(r => r.state === 'ready' && r.action === a).length;
+            const ticked = rows.filter(r => r.accept && r.state === 'ready' && r.action !== 'keep').length;
+            statusEl.textContent = `${statusEl.dataset.msg || ''} · map ${n('map')} · keep ${n('keep')} · drop ${n('drop')} · ${ticked} ticked`;
+            document.getElementById('qtf-save').textContent = `Save ${ticked}`;
+            const v = window.QUIZ_TAG_VOCAB;
+            const opt = (val, label, cur) => `<option value="${escapeHtml(val)}"${val === cur ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+            const grp = (label, list, cur) => `<optgroup label="${escapeHtml(label)}">${list.map(t => opt('map:' + t, '→ ' + t, cur)).join('')}</optgroup>`;
+            const head = '<div class="qtf-row is-head"><span></span><span>One-off tag · quiz</span><span>Action</span><span>State</span></div>';
+            document.getElementById('qtf-table').innerHTML = head + rows.map((r, i) => {
+                const cur = r.action === 'map' ? 'map:' + r.target : r.action;
+                const choices = opt('keep', 'Keep as extra', cur) + opt('drop', 'Drop', cur) + grp('Skill', v.skill, cur)
+                    + Object.entries(v.topic).map(([k, list]) => grp('Topic · ' + k, list, cur)).join('') + grp('Population', v.population, cur);
+                const state = r.state === 'ready' ? (r.action === r.aiAction ? '<span style="color:#15803d;">AI</span>' : '<span style="color:#4f46e5;">edited</span>')
+                    : r.state === 'busy' ? '<i class="fa-solid fa-spinner fa-spin"></i>'
+                    : r.state === 'error' ? `<span style="color:#b91c1c;" title="${escapeHtml(r.error || '')}">error</span>` : '<span style="color:#cbd5e1;">…</span>';
+                return `<div class="qtf-row${r.state === 'ready' && r.action === 'keep' ? ' is-keep' : ''}">
+                    <input type="checkbox" ${r.accept ? 'checked' : ''} ${r.state === 'ready' && r.action !== 'keep' ? '' : 'disabled'} onchange="window._qtfRows[${i}].accept = this.checked; renderQuizTagFold()" aria-label="Apply this row">
+                    <span class="qtf-tag"><b title="${escapeHtml(r.tag)}">${escapeHtml(r.tag)}</b><small title="${escapeHtml(r.quizTitle)}">${escapeHtml(r.quizTitle)}</small></span>
+                    <select class="a-${escapeHtml(r.action)}" onchange="qtfSetAction(${i}, this.value)" ${r.state === 'ready' ? '' : 'disabled'}>${choices}</select>
+                    <span class="qtf-state">${state}</span>
+                </div>`;
+            }).join('');
+        };
+        window.qtfSetAction = function (i, value) {
+            const r = window._qtfRows[i];
+            if (value.startsWith('map:')) { r.action = 'map'; r.target = value.slice(4); }
+            else { r.action = value === 'drop' ? 'drop' : 'keep'; r.target = ''; }
+            r.accept = r.action !== 'keep';
+            renderQuizTagFold();
+        };
+        window.closeQuizTagFold = function () {
+            window._qtfCancel = true;
+            forceHideModal('quizTagFoldModal');
+        };
+        window.saveQuizTagFold = async function () {
+            const rows = window._qtfRows.filter(r => r.accept && r.state === 'ready' && r.action !== 'keep');
+            const lists = new Map(); // quizId -> working tag list
+            const byId = new Map((Array.isArray(quizzesData) ? quizzesData : []).map(q => [q.id, q]));
+            rows.forEach(r => {
+                const q = byId.get(r.quizId);
+                if (!q) return;
+                const cur = lists.get(q.id) || window.quizTagList(q);
+                lists.set(q.id, r.action === 'map'
+                    ? window.mergeQuizTagList(cur, [r.key], r.target)
+                    : cur.filter(t => t.toLowerCase() !== r.key));
+            });
+            const todo = [];
+            lists.forEach((list, id) => {
+                const before = window.quizTagList(byId.get(id));
+                const after = window.normalizeQuizTagList(list);
+                if (JSON.stringify(after) !== JSON.stringify(before)) todo.push({ id, after });
+            });
+            if (!todo.length) { showToast('Nothing to save'); return; }
+            if (!confirm(`Apply ${rows.length} fold(s) across ${todo.length} quiz(zes)? Per-question tags are not changed.`)) return;
+            let done = 0;
+            try {
+                for (let j = 0; j < todo.length; j += 400) {
+                    const batch = db.batch();
+                    const slice = todo.slice(j, j + 400);
+                    slice.forEach(({ id, after }) => batch.update(db.collection('quizzes').doc(id), { tags: after.join(', '), tagList: after }));
+                    await batch.commit();
+                    done += slice.length;
+                }
+                showToast(`✅ Folded tags on ${done} quiz(zes)`);
+                window._qtfRows = window._qtfRows.filter(r => !(r.accept && r.state === 'ready' && r.action !== 'keep'));
+                if (window._qtfRows.some(r => r.state !== 'ready' || r.action !== 'keep')) renderQuizTagFold('Saved — rows left were kept, unticked or had errors');
+                else closeQuizTagFold();
             } catch (e) {
                 alert(`Saving stopped after ${done} quiz(zes): ${e.message}`);
             }
