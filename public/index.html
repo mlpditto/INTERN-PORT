@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.09)</title>
+    <title>Internship Portfolio (V101.10)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.05">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -942,15 +942,24 @@
         /* lean: collapse the body entirely when it has no content (no deadline/desc/materials)
            so empty cards don't carry dead vertical space. :empty ignores whitespace-only nodes. */
         .assign-body:empty { padding: 0; }
-        .quiz-material-row { display:flex; align-items:flex-start; gap:8px; }
-        .quiz-material-description { flex:1; min-width:0; }
-        .quiz-material-download { display:inline-flex; align-items:center; gap:5px; min-height:32px; color:#6250ba; font-size:.85em; text-decoration:none; white-space:nowrap; cursor:pointer; }
-        .quiz-material-picker { margin-left:auto; flex-shrink:0; }
-        .quiz-material-picker>summary { list-style:none; }
-        .quiz-material-picker>summary::-webkit-details-marker { display:none; }
-        .quiz-material-picker[open] { flex-shrink:1; min-width:0; }
-        .quiz-material-list { display:flex; flex-direction:column; max-width:220px; }
-        .quiz-material-list a { white-space:normal; overflow-wrap:anywhere; }
+        /* V102.21: pre-quiz materials = one ribbon on the cover's top-left corner, coloured by file type (PDF red,
+           OneDrive blue, YouTube red, Drive green, Canva violet…); the file name is in the hover. Several files: the
+           ribbon shows the first type's icon + a count and opens a floating list (the card clips overflow). */
+        .quiz-mat-anchor { position:relative; display:inline-flex; flex:none; align-self:flex-start; }
+        .quiz-mat-box { position:absolute; left:-7px; top:8px; z-index:3; }
+        .quiz-mat-ribbon { position:relative; display:inline-flex; align-items:center; gap:4px; height:26px; padding:0 8px 0 7px; border-radius:0 8px 8px 0; background:var(--mk, #6d28d9); color:#fff; font-size:12px; font-weight:700; line-height:1; text-decoration:none; box-shadow:0 3px 8px rgba(15,23,42,.28); cursor:pointer; list-style:none; white-space:nowrap; }
+        .quiz-mat-ribbon::-webkit-details-marker { display:none; }
+        .quiz-mat-ribbon::before { content:''; position:absolute; left:0; bottom:-6px; border:3px solid rgba(15,23,42,.55); border-left-color:transparent; border-bottom-color:transparent; }
+        .quiz-mat-ribbon::after { content:''; position:absolute; inset:-8px -6px; } /* bigger touch target */
+        .quiz-mat-ribbon .fa-arrow-down { font-size:.85em; opacity:.9; }
+        /* no cover (plain 42px icon): a small tab under the icon instead of a corner ribbon */
+        .quiz-mat-anchor:not(:has(.quiz-cover-thumb)) .quiz-mat-box { left:50%; top:auto; bottom:-12px; transform:translateX(-50%); }
+        .quiz-mat-anchor:not(:has(.quiz-cover-thumb)) .quiz-mat-ribbon { height:22px; padding:0 6px; border-radius:8px; font-size:11px; }
+        .quiz-mat-anchor:not(:has(.quiz-cover-thumb)) .quiz-mat-ribbon::before { display:none; }
+        .quiz-material-list { position:fixed; z-index:9000; display:flex; flex-direction:column; gap:2px; min-width:200px; max-width:min(280px, calc(100vw - 16px)); padding:6px; border-radius:12px; background:#fff; box-shadow:0 12px 30px rgba(15,23,42,.18); border:1px solid #ede9fe; }
+        .quiz-material-list a { display:flex; align-items:center; gap:8px; min-height:40px; padding:4px 8px; border-radius:8px; color:#334155; font-size:.9em; text-decoration:none; white-space:normal; overflow-wrap:anywhere; }
+        .quiz-material-list a:hover { background:#f5f3ff; }
+        .quiz-material-list a i { width:18px; text-align:center; color:var(--mk, #6d28d9); }
 
         .assign-meta {
             display: flex;
@@ -10244,13 +10253,8 @@
                     // the card stays expandable.
                     const hasViewedAnswers = !!attempt && !!localStorage.getItem('quizAnswersViewed_' + q.id);
                     const isCollapsed = (isExpired && (!attempt || attempt.status === 'abandoned')) || hasViewedAnswers;
-                    // Materials are available before starting; reuse the Details row.
-                    const materialActions = quizMaterialActionsHtml(q);
-                    const materialsInBody = !!bodyHtml.trim() && !isCollapsed;
-                    const metaMaterialsChip = materialsInBody ? '' : materialActions;
-                    if (materialsInBody && materialActions) {
-                        bodyHtml = `<div class="quiz-material-row"><div class="quiz-material-description">${bodyHtml}</div>${materialActions}</div>`;
-                    }
+                    // Materials are available before starting. V102.21: one ribbon on the cover (attached after decorate).
+                    card._materialRibbon = quizMaterialActionsHtml(q);
 
                     // V94.46/V94.48: card tint by state.
                     // V94.48: status-retake (orange) takes precedence — covers the surprise
@@ -10278,7 +10282,7 @@
                                         ? '<small style="color:#94a3b8; font-weight:normal; margin-left:5px;">✓ Reviewed ดูเฉลยแล้ว</small>'
                                         : '<small style="color:#ef233c; font-weight:normal; margin-left:5px;">Expired หมดเวลา</small>') : ''}
                                 </h4>
-                                ${(quizMetaTitleSuffix || metaMaterialsChip || statusBadge || typeTags.length) ? `<div class="quiz-mission-meta" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; align-items:center;">${quizMetaTitleSuffix}${metaMaterialsChip}${statusBadge}${typeTags.join('')}</div>` : ''}
+                                ${(quizMetaTitleSuffix || statusBadge || typeTags.length) ? `<div class="quiz-mission-meta" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; align-items:center;">${quizMetaTitleSuffix}${statusBadge}${typeTags.join('')}</div>` : ''}
                             </div>
                             ${isCollapsed
                                 ? '<i class="fa-solid fa-chevron-down" style="color:#ccc; font-size:0.9em; margin-left:10px;"></i>'
@@ -10290,6 +10294,7 @@
                 }
 
                 if (item.type === 'quiz') QuizCover.decorate(card, item.data, card.querySelector('.assign-header[onclick]') !== null);
+                if (card._materialRibbon) attachQuizMaterialRibbon(card, card._materialRibbon); // V102.21
                 assignmentContainer.appendChild(card);
             });
 
@@ -11037,18 +11042,58 @@
             return 'Attachment #' + ((i | 0) + 1);
         }
 
-        // Compact pre-quiz access: one link, or a file picker for multiple resources.
+        // V102.21: file type from the link (hostname / extension only) → ribbon colour + icon. Same palette as the
+        // admin Materials rows (quiz-resource-cards.js).
+        function materialKind(url) {
+            let u = null; try { u = new URL(String(url || '').trim()); } catch (_) { /* generic */ }
+            const host = u ? u.hostname.replace(/^www\./, '') : '';
+            if (/(^|\.)1drv\.ms$|(^|\.)onedrive\.live\.com$|(^|\.)sharepoint\.com$/.test(host)) return { label: 'OneDrive', color: '#0364b8', icon: 'fa-solid fa-cloud' };
+            if (/(^|\.)youtube\.com$|(^|\.)youtu\.be$/.test(host)) return { label: 'YouTube', color: '#dc2626', icon: 'fa-brands fa-youtube' };
+            if (/(^|\.)(drive|docs)\.google\.com$/.test(host)) return { label: 'Google Drive', color: '#1e8e3e', icon: 'fa-brands fa-google-drive' };
+            if (/(^|\.)canva\.com$/.test(host)) return { label: 'Canva', color: '#7d2ae8', icon: 'fa-solid fa-palette' };
+            if (u && /\.pdf$/i.test(u.pathname)) return { label: 'PDF', color: '#dc2626', icon: 'fa-solid fa-file-pdf' };
+            return { label: 'Link', color: '#6d28d9', icon: 'fa-solid fa-file-arrow-down' };
+        }
+        // Compact pre-quiz access: one ribbon link, or a ribbon that opens a list for several files.
+        // V102.21: rendered as a ribbon on the cover (attachQuizMaterialRibbon), not in the meta / Details row.
         function quizMaterialActionsHtml(q) {
             const mats = (q && Array.isArray(q.materials) ? q.materials : []).filter(m => m && /^https?:\/\//i.test(String(m.url || '').trim()));
             if (!mats.length) return '';
-            const links = mats.map((m, i) => {
-                const url = escapeHtml(String(m.url).trim());
-                const name = escapeHtml(materialDisplayName(m, i));
-                return `<a class="quiz-material-download" href="${url}" target="_blank" rel="noopener noreferrer" title="Open the document to download: ${name}" data-th-title="เปิดเอกสารเพื่อดาวน์โหลด: ${name}" aria-label="Download: ${name}" data-quiz-id="${escapeHtml(String(q.id || ''))}" data-mat-url="${url}" data-mat-name="${name}" onclick="event.stopPropagation(); qzOpenMaterial(event, this)"><i class="fa-solid fa-download" aria-hidden="true"></i>${mats.length === 1 ? 'Download' : name}</a>`;
-            }).join('');
-            return mats.length === 1 ? links : `<details class="quiz-material-picker" onclick="event.stopPropagation()"><summary class="quiz-material-download" title="Pick a document to download before the quiz" data-th-title="เลือกเอกสารเพื่อดาวน์โหลดก่อนทำ Quiz"><i class="fa-solid fa-download" aria-hidden="true"></i>Download (${mats.length})</summary><div class="quiz-material-list">${links}</div></details>`;
+            const qid = escapeHtml(String(q.id || ''));
+            const link = (m, i, cls, inner) => {
+                const url = escapeHtml(String(m.url).trim()), name = escapeHtml(materialDisplayName(m, i)), k = materialKind(m.url);
+                return `<a class="${cls} quiz-material-download" style="--mk:${k.color}" href="${url}" target="_blank" rel="noopener noreferrer" title="ดาวน์โหลด (${k.label}): ${name}" aria-label="Download ${k.label}: ${name}" data-quiz-id="${qid}" data-mat-url="${url}" data-mat-name="${name}" onclick="event.stopPropagation(); qzOpenMaterial(event, this)">${inner(k, name)}</a>`;
+            };
+            if (mats.length === 1) return `<span class="quiz-mat-box">${link(mats[0], 0, 'quiz-mat-ribbon', k => `<i class="${k.icon}" aria-hidden="true"></i><i class="fa-solid fa-arrow-down" aria-hidden="true"></i>`)}</span>`;
+            const first = materialKind(mats[0].url);
+            const list = mats.map((m, i) => link(m, i, '', (k, name) => `<i class="${k.icon}" aria-hidden="true"></i>${name}`)).join('');
+            return `<details class="quiz-mat-box" onclick="event.stopPropagation()" ontoggle="qzMaterialPick(this)"><summary class="quiz-mat-ribbon" style="--mk:${first.color}" title="เลือกเอกสาร ${mats.length} ไฟล์ก่อนทำ Quiz" aria-label="Download: pick one of ${mats.length} files"><i class="${first.icon}" aria-hidden="true"></i>${mats.length}</summary><div class="quiz-material-list">${list}</div></details>`;
         }
-
+        // V102.21: the ribbon sits on the cover (or the plain icon) — wrap the header's first child so it can anchor.
+        function attachQuizMaterialRibbon(card, html) {
+            const header = html && card.querySelector('.assign-header'), first = header && header.firstElementChild;
+            if (!first) return;
+            const anchor = document.createElement('span');
+            anchor.className = 'quiz-mat-anchor';
+            first.replaceWith(anchor); anchor.append(first);
+            anchor.insertAdjacentHTML('beforeend', html);
+        }
+        // The card clips overflow and transforms on hover / tap (which would re-anchor a fixed child), so while open the
+        // list moves to <body>, floats under the ribbon, and goes back when closed (outside tap, scroll or a pick).
+        function qzMaterialPick(box) {
+            const list = box._list || box.querySelector('.quiz-material-list');
+            if (!list) return;
+            box._list = list;
+            if (!box.open) { box.append(list); return; }
+            document.body.append(list);
+            const r = box.querySelector('summary').getBoundingClientRect();
+            list.style.left = Math.max(8, Math.min(r.left, innerWidth - list.offsetWidth - 8)) + 'px';
+            list.style.top = Math.max(8, Math.min(r.bottom + 8, innerHeight - list.offsetHeight - 8)) + 'px';
+            const shut = () => { box.open = false; document.removeEventListener('pointerdown', outside, true); window.removeEventListener('scroll', shut, true); list.removeEventListener('click', picked, true); };
+            const outside = e => { if (!box.contains(e.target) && !list.contains(e.target)) shut(); };
+            const picked = () => setTimeout(shut, 0);
+            document.addEventListener('pointerdown', outside, true); window.addEventListener('scroll', shut, true); list.addEventListener('click', picked, true); // capture: the links stop propagation
+        }
         function qzOpenMaterial(event, link) {
             qzLogMaterialClick(link);
             if (typeof liff !== 'undefined' && liff.isInClient()) {
@@ -11067,7 +11112,7 @@
             const mats = (q && Array.isArray(q.materials)) ? q.materials.filter(function (m) { return m && m.url; }) : [];
             if (!mats.length) return '';
             // V95.93 lean: the locked hint now rides the meta line next to pts
-            // (metaMaterialsChip in renderAssignments) — no body row before completion.
+            // (V102.21: the cover ribbon, attachQuizMaterialRibbon) — no body row before completion.
             if (!done) return '';
             const qid = escapeHtml(String((q && q.id) || ''));
             const links = mats.map(function (m, i) {
