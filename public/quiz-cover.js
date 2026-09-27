@@ -20,7 +20,12 @@ const QuizCover = (() => {
         { id: 'flat', emoji: '📐', label: 'Flat vector', titleTh: 'ภาพเวกเตอร์แบน', material: 'clean flat vector illustration; simple geometric shapes; limited harmonious palette on a light background; crisp edges, no gradients or photographic texture; rounded inset panel' },
         { id: 'watercolor', emoji: '🖌️', label: 'Watercolor', titleTh: 'สีน้ำบนกระดาษ', material: 'soft watercolour illustration on textured paper; light transparent washes with gentle bleeding edges; calm pastel palette; rounded inset panel' },
         { id: 'isometric', emoji: '🧊', label: 'Isometric', titleTh: 'ไอโซเมตริก 3D', material: 'isometric 3D illustration; soft low-poly forms seen from an isometric angle; clean pastel studio background; gentle ambient shading; rounded inset panel' },
-        { id: 'felt', emoji: '🧶', label: 'Felt', titleTh: 'ผ้าสักหลาดและไหมพรม', material: 'handmade felt and yarn craft illustration; visible stitching and soft fibre texture; cosy muted pastel textiles; gentle studio lighting; rounded inset panel' }
+        { id: 'felt', emoji: '🧶', label: 'Felt', titleTh: 'ผ้าสักหลาดและไหมพรม', material: 'handmade felt and yarn craft illustration; visible stitching and soft fibre texture; cosy muted pastel textiles; gentle studio lighting; rounded inset panel' },
+        // V102.18: comic-style looks. Each forbids its genre's own lettering (speech bubbles, sound effects, poster
+        // credits) — the prompt's one-title rule would otherwise lose to the style's habits.
+        { id: 'comics', emoji: '💥', label: 'Comics', titleTh: 'การ์ตูนคอมิกส์อเมริกัน · เส้นหมึก + เม็ดสกรีน', material: 'bold American comic-book illustration; confident black ink outlines; flat bright colours with halftone dot shading; dynamic angle; no speech bubbles, captions or sound-effect lettering; rounded inset panel' },
+        { id: 'manga', emoji: '🎌', label: 'Manga', titleTh: 'มังงะญี่ปุ่น · เส้นขาวดำ + สกรีนโทน', material: 'Japanese manga illustration; clean expressive black line art with screentone shading and speed lines; mostly monochrome with one or two soft accent colours; no speech bubbles or Japanese lettering; rounded inset panel' },
+        { id: 'poster', emoji: '🎬', label: 'Movie poster', titleTh: 'โปสเตอร์ภาพยนตร์ · แสงดราม่า', material: 'cinematic movie-poster illustration; dramatic key light and rim light; rich colour grading and atmospheric depth; heroic central composition; no credits, billing block, tagline or rating text; rounded inset panel' }
     ];
     let style = STYLES[0].id;
     // V101.91: optional corner badge (e.g. "ICD-11 6B00") drawn by code onto the AI cover, so the text is

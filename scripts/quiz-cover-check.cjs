@@ -108,8 +108,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.match(await page.evaluate(() => aiArgs[1]), /established INTERN-PORT quiz cover collection/);
         assert.equal(await page.evaluate(() => aiArgs[0]), 'or/openai/gpt-5.4-image-2');
         assert.equal(await page.evaluate(() => aiArgs[5].feature), 'quiz_cover');
-        // V101.90: six style chips; Clay is the default and keeps the pre-V101.90 prompt byte-for-byte.
-        assert.equal(await page.locator('[data-style-chip]').count(), 6);
+        // V101.90: style chips (V102.18: nine — + Comics / Manga / Movie poster); Clay is the default and keeps the pre-V101.90 prompt byte-for-byte.
+        assert.equal(await page.locator('[data-style-chip]').count(), 9);
         assert.equal(await page.locator('[data-style-chip].active').getAttribute('data-value'), 'clay');
         assert.equal(await page.evaluate(() => QuizCover.style()), 'clay');
         assert.ok((await page.evaluate(() => aiArgs[1])).includes('Keep the collection style consistent: portrait 3:4; premium soft 3D clay illustration; pastel lavender, peach and related soft accent colours; gentle studio lighting; rounded inset panel; polished tactile surfaces; one large, clear hero subject in the upper 75%; generous safe margins; clean ivory title band in the bottom 25%.'), 'Clay prompt unchanged');
@@ -134,6 +134,20 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.doesNotMatch(watercolorPrompt, /3D clay/);
         assert.match(watercolorPrompt, /clean ivory title band in the bottom 25%/);
         await page.locator('[data-discard]').click();
+        // V102.18: Comics / Manga / Movie poster — each forbids its genre's lettering and keeps the fixed frame.
+        for (const [id, material, noText] of [['comics', /comic-book illustration/, /no speech bubbles, captions or sound-effect lettering/], ['manga', /manga illustration/, /no speech bubbles or Japanese lettering/], ['poster', /movie-poster illustration/, /no credits, billing block, tagline or rating text/]]) {
+            await page.locator(`[data-style-chip][data-value="${id}"]`).click();
+            await page.locator('[data-generate]').click();
+            await page.waitForFunction(() => !QuizCover.isBusy());
+            const pr = await page.evaluate(() => aiArgs[1]);
+            assert.match(pr, material, id + ' material');
+            assert.match(pr, noText, id + ' forbids its lettering');
+            assert.match(pr, /clean ivory title band in the bottom 25%/, id + ' keeps the frame');
+            assert.match(pr, /No other text, logos, watermarks/, id + ' keeps the one-title rule');
+            await page.locator('[data-discard]').click();
+        }
+        assert.equal(await page.locator('[data-style-chip]').count(), 9);
+        await page.locator('[data-style-chip][data-value="watercolor"]').click();
         // Loading a quiz: saved style is restored; missing / unknown (pre-V101.90 quizzes) → Clay.
         await page.evaluate(() => QuizCover.setStyle('felt'));
         assert.equal(await page.locator('[data-style-chip].active').getAttribute('data-value'), 'felt');
