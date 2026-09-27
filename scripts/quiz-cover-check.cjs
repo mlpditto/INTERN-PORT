@@ -148,6 +148,10 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         }
         assert.equal(await page.locator('[data-style-chip]').count(), 9);
         await page.locator('[data-style-chip][data-value="watercolor"]').click();
+        // V102.18: only the picked chip shows its name; the others are emoji-only; hover = name · Thai description.
+        const names = await page.locator('[data-style-chip]').evaluateAll(bs => bs.map(b => [b.dataset.value, getComputedStyle(b.querySelector('.quiz-cover-style-name')).display !== 'none', b.title, b.getAttribute('aria-label')]));
+        assert.deepEqual(names.filter(n => n[1]).map(n => n[0]), ['watercolor'], 'only the picked name shows');
+        assert.deepEqual(names.find(n => n[0] === 'manga').slice(2), ['Manga · มังงะญี่ปุ่น · เส้นขาวดำ + สกรีนโทน', 'Manga']);
         // Loading a quiz: saved style is restored; missing / unknown (pre-V101.90 quizzes) → Clay.
         await page.evaluate(() => QuizCover.setStyle('felt'));
         assert.equal(await page.locator('[data-style-chip].active').getAttribute('data-value'), 'felt');
