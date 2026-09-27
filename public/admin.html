@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.22)</title>
+    <title>Nika Admin (V102.23)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -2357,6 +2357,24 @@
         .tag-hyg-chip { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:10px; border:1px solid #cbd5e1; background:#fff; color:#64748b; font-size:0.92em; font-weight:700; cursor:pointer; }
         .tag-hyg-chip:hover { border-color:#6366f1; color:#6366f1; }
         .tag-hyg-chip small, .tag-hyg-group small { font-weight:600; color:#94a3b8; }
+        /* V102.23: AI tag review table */
+        #quizAiTagModal .qat-table { max-height:62vh; overflow:auto; border:1px solid #e2e8f0; border-radius:10px; }
+        #quizAiTagModal .qat-row { display:grid; grid-template-columns:28px minmax(180px,1.3fr) 150px minmax(260px,2fr) 70px; gap:10px; align-items:center; padding:8px 10px; border-bottom:1px solid #f1f5f9; font-size:0.82em; }
+        #quizAiTagModal .qat-row.is-head { position:sticky; top:0; background:#f8fafc; font-weight:800; color:#64748b; font-size:0.72em; z-index:1; }
+        #quizAiTagModal .qat-title { min-width:0; }
+        #quizAiTagModal .qat-title b { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#1e293b; }
+        #quizAiTagModal .qat-title small { color:#94a3b8; }
+        #quizAiTagModal .qat-row select { width:100%; min-height:0; padding:4px 6px; border:1px solid #cbd5e1; border-radius:8px; font-size:0.95em; background:#fff; }
+        #quizAiTagModal .qat-row select.is-changed { border-color:#f59e0b; background:#fffbeb; }
+        #quizAiTagModal .qat-chips { display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
+        #quizAiTagModal .qat-chip { display:inline-flex; align-items:center; gap:3px; padding:2px 4px 2px 8px; border-radius:999px; font-size:0.9em; font-weight:700; }
+        #quizAiTagModal .qat-chip.k-topic { background:#e0f2fe; color:#075985; }
+        #quizAiTagModal .qat-chip.k-skill { background:#ede9fe; color:#5b21b6; }
+        #quizAiTagModal .qat-chip.k-population { background:#fef3c7; color:#92400e; }
+        #quizAiTagModal .qat-chip button { width:auto; min-height:0; padding:0 4px; gap:0; border:0; background:transparent; color:inherit; cursor:pointer; font-size:1em; line-height:1; }
+        #quizAiTagModal .qat-chips select { width:auto; font-size:0.9em; color:#475569; }
+        #quizAiTagModal .qat-state { font-size:0.8em; font-weight:800; text-align:center; }
+        #quizAiTagModal .qat-btn { width:auto; min-height:0; padding:7px 16px; border-radius:9px; font-weight:800; font-size:0.85em; cursor:pointer; }
         .tag-hyg-merge { width:auto; min-height:0; margin-left:4px; padding:1px 8px; border-radius:999px; border:1.5px solid #4361ee; background:#fff; color:#4361ee; font-size:0.85em; font-weight:800; cursor:pointer; }
         .tag-hyg-merge:hover, .tag-hyg-merge:focus-visible { background:#4361ee; color:#fff; }
         @media (pointer:coarse) { .tag-hyg-merge { min-height:44px; padding:4px 12px; } }
@@ -7187,6 +7205,7 @@
                         <!-- V97.05: spot overlapping/duplicate questions across the selected quizzes before deciding to merge/retire any. -->
                         <button onclick="openQuizMerge([...selectedQuizIds])" title="Merge the selected sets into a new quiz" data-th-title="รวมชุดที่เลือกเป็น Quiz ใหม่" style="padding:6px 14px;border:0;border-radius:8px;background:#7c3aed;color:white;cursor:pointer;">Merge</button>
                         <button onclick="openQuizCompareModal()" title="Compare question stems across the selected quizzes — flags likely-duplicate questions" style="padding:6px 14px; border:none; border-radius:8px; background:#0891b2; color:#fff; font-size:0.78em; font-weight:800; cursor:pointer;">🔍 Compare</button>
+                        <button onclick="openQuizAiTagReview([...selectedQuizIds])" title="AI suggests System + Topic + Skill for the selected quizzes · ให้ AI เสนอแท็ก" style="padding:6px 14px; border:none; border-radius:8px; background:#4f46e5; color:#fff; font-size:0.78em; font-weight:800; cursor:pointer;">🏷️ AI tags</button>
                         <button onclick="bulkDeleteQuizzes()" style="padding:6px 14px; border:none; border-radius:8px; background:#ef4444; color:#fff; font-size:0.78em; font-weight:800; cursor:pointer;">🗑️ Delete</button>
                         <button onclick="clearQuizSelection()" style="padding:6px 12px; border:1px solid #c7d2fe; border-radius:8px; background:#fff; color:#3730a3; font-size:0.78em; font-weight:800; cursor:pointer;">Clear</button>
                     </div>
@@ -14394,6 +14413,24 @@
          #ct-editor-form (per-system form). openCaseTaxonomyEditor() seeds the
          local working copy from window.CASE_SYSTEMS; Save writes to Firestore
          taxonomy/case (rules added in V94.53 Phase 1 already allow admin write). -->
+    <!-- V102.23: AI tag review — suggests System + Topic + Skill (+ Population) from
+         QUIZ_TAG_VOCAB for many quizzes, then saves only the rows you keep ticked. -->
+    <div id="quizAiTagModal" class="modal lang-no-toggle" style="z-index:4400;">
+        <div class="modal-content" style="max-width:1100px;">
+            <span class="close-modal" onclick="closeQuizAiTagReview()">&times;</span>
+            <h3 style="margin:0 0 4px 0; color:#3730a3; display:flex; align-items:center; gap:8px;">🏷️ AI tags <small id="qat-scope" style="font-weight:600; color:#64748b; font-size:0.6em;"></small></h3>
+            <div id="qat-status" style="font-size:0.8em; color:#475569; margin-bottom:10px;"></div>
+            <div id="qat-table" class="qat-table"></div>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:12px; flex-wrap:wrap;">
+                <small style="color:#94a3b8;">Existing tags are kept · new tags come only from the approved list · แท็กเดิมไม่ถูกลบ</small>
+                <div style="display:flex; gap:8px;">
+                    <button type="button" id="qat-stop" class="qat-btn" onclick="window._qatCancel = true" style="background:#fff; color:#b91c1c; border:1px solid #fecaca;">Stop</button>
+                    <button type="button" id="qat-save" class="qat-btn" onclick="saveQuizAiTags()" style="background:#4f46e5; color:#fff; border:none;">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="caseTaxonomyEditorModal" class="modal" style="z-index:4400;">
         <div class="modal-content" style="max-width:760px;">
             <span class="close-modal" onclick="closeCaseTaxonomyEditor()">&times;</span>
@@ -31526,7 +31563,8 @@ ${JSON.stringify(sourceObj)}`;
                         : pct >= 40 ? 'background:#fef9c3; color:#a16207; border:1px solid #fde68a;'
                         : 'background:#fee2e2; color:#b91c1c; border:1px solid #fecaca;';
                     const tip = `Tags complete = System + Topic + Skill. ${c.untagged} without tags · ${c.system} missing System · ${c.topic} missing Topic · ${c.skill} missing Skill — click to filter`;
-                    tagStatEl.innerHTML = `<span title="${tip}" style="${skin} font-size:0.72em; font-weight:800; border-radius:10px; padding:6px 11px;">🏷️ Tags: ${c.complete} / ${total}</span>`;
+                    tagStatEl.innerHTML = `<span title="${tip}" style="${skin} font-size:0.72em; font-weight:800; border-radius:10px; padding:6px 11px;">🏷️ Tags: ${c.complete} / ${total}</span>`
+                        + (c.complete < total ? `<button type="button" onclick="event.stopPropagation(); openQuizAiTagReview(null)" title="AI-tag every incomplete quiz (${total - c.complete}) · ให้ AI เติมแท็กที่ยังไม่ครบ" aria-label="AI-tag incomplete quizzes" style="width:auto; min-height:0; margin-left:4px; padding:4px 8px; border:1px solid #c7d2fe; border-radius:10px; background:#eef2ff; color:#4338ca; font-size:0.72em; cursor:pointer;">✨</button>` : ''); // V102.23
                 }
             }
 
@@ -62344,6 +62382,191 @@ RULES:
             if (r.complete) return true;
             const names = { system: 'System', topic: 'Topic tag', skill: 'Skill tag' };
             return confirm(`🏷️ Tags incomplete — missing: ${r.missing.map(k => names[k]).join(', ')}.\nComplete = System + 1–3 Topic + 1 Skill (pick from the suggestions).\nแท็กยังไม่ครบ\n\n${action} anyway?`);
+        };
+
+        // ── V102.23: AI tag review (step 2) ─────────────────────────────────
+        // AI proposes vocabulary tags for up to 8 quizzes per call; the admin
+        // reviews every row (system select, removable chips, + add) and only the
+        // ticked, finished rows are written. Existing tags are always kept.
+        window._qatRows = [];
+        window._qatCancel = false;
+        const QAT_BATCH = 8;
+        const qatSystems = () => Object.keys(window.QUIZ_TAG_VOCAB.topic);
+        const qatSystemLabel = key => {
+            const sys = (window._qcovSystems || window.CASE_SYSTEMS || []).find(x => x.key === key);
+            return sys ? `${sys.emoji || ''} ${(sys.label && sys.label.en) || key}`.trim() : key;
+        };
+        // Keep only exact vocabulary strings (canonical spelling); topics ≤ 3, skill = 1.
+        window.qatCleanProposal = function (raw) {
+            const pick = (list, kind) => (Array.isArray(list) ? list : [list]).map(t => window.QUIZ_TAG_KIND.get(String(t || '').trim().toLowerCase())).filter(x => x && x.kind === kind).map(x => x.tag);
+            const uniq = a => [...new Set(a)];
+            const system = qatSystems().includes(String(raw && raw.system || '')) ? raw.system : '';
+            return {
+                system,
+                topic: uniq(pick(raw && raw.topics, 'topic')).slice(0, 3),
+                skill: uniq(pick(raw && raw.skill, 'skill')).slice(0, 1),
+                population: uniq(pick(raw && raw.population, 'population')).slice(0, 1)
+            };
+        };
+        window.qatBuildPrompt = function (quizzes) {
+            const v = window.QUIZ_TAG_VOCAB;
+            const topics = Object.entries(v.topic).map(([k, list]) => `${k}: ${list.join(' | ')}`).join('\n');
+            const items = quizzes.map(q => ({
+                id: q.id,
+                title: String(q.title || q.shortTitle || '').slice(0, 200),
+                description: String(q.description || '').slice(0, 300),
+                currentTags: window.stripQuizMarkerTags(window.quizTagList(q)).slice(0, 12),
+                questions: (Array.isArray(q.questions) ? q.questions : []).slice(0, 6).map(x => String((x && x.q) || '').slice(0, 160))
+            }));
+            return `You tag pharmacy-education quizzes with a FIXED vocabulary. Use the exact spelling below; never invent tags.
+
+SYSTEM keys with their TOPIC tags:
+${topics}
+
+SKILL tags: ${v.skill.join(' | ')}
+POPULATION tags (optional): ${v.population.join(' | ')}
+
+For each quiz choose:
+- system: exactly one SYSTEM key. Non-clinical subjects (AI, business, language, general science) use "other".
+- topics: 1 to 3 TOPIC tags (from any system's list) that the quiz is mainly about.
+- skill: exactly one SKILL tag for the main kind of knowledge tested. Non-pharmacy subjects use "General Knowledge".
+- population: [] unless the quiz clearly focuses on children, older adults, or pregnancy/lactation.
+Quiz text may be Thai or English.
+
+Return JSON only: {"results":[{"id":"<id>","system":"<key>","topics":["..."],"skill":"...","population":[]}]}
+
+QUIZZES:
+${JSON.stringify(items)}`;
+        };
+
+        window.openQuizAiTagReview = async function (ids) {
+            const all = (Array.isArray(quizzesData) ? quizzesData : []).filter(q => q && !q.isHistoryRevision);
+            const pool = Array.isArray(ids) ? all.filter(q => ids.includes(q.id)) : all.filter(q => !window.quizTagCompleteness(q).complete);
+            if (!pool.length) { showToast('Nothing to tag — every quiz is complete'); return; }
+            if (!confirm(`Ask AI to suggest tags for ${pool.length} quiz(zes)? (${Math.ceil(pool.length / QAT_BATCH)} AI call(s) · nothing is saved until you press Save)`)) return;
+            window._qatCancel = false;
+            window._qatRows = pool.map(q => ({
+                id: q.id, title: q.title || q.shortTitle || q.id,
+                curSystem: q.coverageSystem || '', system: q.coverageSystem || '', aiSystem: '',
+                add: { topic: [], skill: [], population: [] }, state: 'wait', accept: false
+            }));
+            document.getElementById('qat-scope').textContent = Array.isArray(ids) ? `${pool.length} selected` : `${pool.length} incomplete`;
+            forceShowModal('quizAiTagModal', 'block');
+            renderQuizAiTagReview();
+            const model = document.getElementById('ai-tagging-model-val')?.value || 'gemini-3.5-flash';
+            const batches = Math.ceil(pool.length / QAT_BATCH);
+            for (let b = 0; b < batches; b++) {
+                if (window._qatCancel) break;
+                const slice = pool.slice(b * QAT_BATCH, (b + 1) * QAT_BATCH);
+                slice.forEach(q => { window._qatRows.find(r => r.id === q.id).state = 'busy'; });
+                renderQuizAiTagReview(`AI ${b + 1} / ${batches} · ${model}`);
+                try {
+                    if (typeof window.callUniversalAI !== 'function') throw new Error('AI engine not ready');
+                    const res = await window.callUniversalAI(model, window.qatBuildPrompt(slice), true, null, '', { feature: 'quiz_tagging_bulk' });
+                    const parsed = window.safeJsonParse(res && res.text);
+                    const results = parsed && Array.isArray(parsed.results) ? parsed.results : null;
+                    if (!results) throw new Error('AI returned no results. First 160 chars: ' + String(res && res.text || '').slice(0, 160));
+                    slice.forEach(q => {
+                        const row = window._qatRows.find(r => r.id === q.id);
+                        const hit = results.find(x => x && x.id === q.id);
+                        if (!hit) { row.state = 'error'; row.error = 'No answer for this quiz'; return; }
+                        const clean = window.qatCleanProposal(hit);
+                        const have = new Set(window.quizTagList(q).map(t => t.toLowerCase()));
+                        ['topic', 'skill', 'population'].forEach(k => { row.add[k] = clean[k].filter(t => !have.has(t.toLowerCase())); });
+                        row.aiSystem = clean.system;
+                        if (!row.system || row.system === '__none') row.system = clean.system;
+                        row.state = 'ready';
+                        row.accept = true;
+                    });
+                } catch (e) {
+                    console.error('[AI tags]', e);
+                    slice.forEach(q => { const row = window._qatRows.find(r => r.id === q.id); row.state = 'error'; row.error = e.message; });
+                }
+                renderQuizAiTagReview();
+            }
+            renderQuizAiTagReview(window._qatCancel ? 'Stopped' : 'Done — review, untick rows you do not want, then Save');
+        };
+
+        window.renderQuizAiTagReview = function (status) {
+            const rows = window._qatRows;
+            const byId = new Map((Array.isArray(quizzesData) ? quizzesData : []).map(q => [q.id, q]));
+            const ready = rows.filter(r => r.state === 'ready').length;
+            const ticked = rows.filter(r => r.accept && r.state === 'ready').length;
+            const statusEl = document.getElementById('qat-status');
+            if (status !== undefined) statusEl.dataset.msg = status;
+            statusEl.textContent = `${statusEl.dataset.msg || ''} · ${ready} / ${rows.length} suggested · ${ticked} ticked`;
+            document.getElementById('qat-save').textContent = `Save ${ticked}`;
+            const sysOpts = sel => qatSystems().map(k => `<option value="${k}"${k === sel ? ' selected' : ''}>${escapeHtml(qatSystemLabel(k))}</option>`).join('');
+            const addOpts = () => {
+                const v = window.QUIZ_TAG_VOCAB;
+                const grp = (label, list) => `<optgroup label="${escapeHtml(label)}">${list.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('')}</optgroup>`;
+                return '<option value="">+ add</option>' + grp('Skill', v.skill) + Object.entries(v.topic).map(([k, list]) => grp(`Topic · ${k}`, list)).join('') + grp('Population', v.population);
+            };
+            const stateCell = r => r.state === 'ready' ? (window.quizTagCompletenessFrom(r.system, [...window.quizTagList(byId.get(r.id)), ...r.add.topic, ...r.add.skill]).complete ? '<span style="color:#15803d;">✓ full</span>' : '<span style="color:#b45309;">partial</span>')
+                : r.state === 'busy' ? '<i class="fa-solid fa-spinner fa-spin"></i>'
+                : r.state === 'error' ? `<span style="color:#b91c1c;" title="${escapeHtml(r.error || '')}">error</span>` : '<span style="color:#cbd5e1;">…</span>';
+            const head = '<div class="qat-row is-head"><span></span><span>Quiz</span><span>System</span><span>New tags</span><span>State</span></div>';
+            document.getElementById('qat-table').innerHTML = head + rows.map((r, i) => {
+                const q = byId.get(r.id);
+                const existing = window.stripQuizMarkerTags(window.quizTagList(q));
+                const chips = ['topic', 'skill', 'population'].flatMap(k => r.add[k].map(t => `<span class="qat-chip k-${k}">${escapeHtml(t)}<button type="button" onclick="qatRemove(${i}, '${k}', ${JSON.stringify(t).replace(/"/g, '&quot;')})" aria-label="Remove">×</button></span>`)).join('');
+                const changed = r.curSystem && r.system !== r.curSystem;
+                return `<div class="qat-row">
+                    <input type="checkbox" ${r.accept ? 'checked' : ''} ${r.state === 'ready' ? '' : 'disabled'} onchange="window._qatRows[${i}].accept = this.checked; renderQuizAiTagReview()" aria-label="Keep this row">
+                    <span class="qat-title"><b title="${escapeHtml(r.title)}">${escapeHtml(r.title)}</b><small title="${escapeHtml(existing.join(', '))}">${existing.length ? `keeps ${existing.length} existing tag${existing.length === 1 ? '' : 's'}` : 'no tags yet'}</small></span>
+                    <select class="${changed ? 'is-changed' : ''}" title="${changed ? `Changes ${escapeHtml(r.curSystem)} → ${escapeHtml(r.system)}` : (r.aiSystem && r.aiSystem !== r.system ? `AI suggests ${escapeHtml(r.aiSystem)}` : '')}" onchange="window._qatRows[${i}].system = this.value; renderQuizAiTagReview()" ${r.state === 'ready' ? '' : 'disabled'}><option value="">—</option>${sysOpts(r.system)}</select>
+                    <span class="qat-chips">${chips}${r.state === 'ready' ? `<select onchange="qatAdd(${i}, this.value)">${addOpts()}</select>` : ''}${r.aiSystem && r.curSystem && r.aiSystem !== r.curSystem && r.system === r.curSystem ? `<button type="button" onclick="window._qatRows[${i}].system = '${escapeHtml(r.aiSystem)}'; renderQuizAiTagReview()" title="Use the AI system" style="width:auto; min-height:0; padding:2px 8px; border:1px dashed #f59e0b; border-radius:999px; background:#fffbeb; color:#92400e; font-size:0.85em; cursor:pointer;">AI → ${escapeHtml(r.aiSystem)}</button>` : ''}</span>
+                    <span class="qat-state">${stateCell(r)}</span>
+                </div>`;
+            }).join('');
+        };
+        window.qatRemove = function (i, kind, tag) {
+            const r = window._qatRows[i];
+            r.add[kind] = r.add[kind].filter(t => t !== tag);
+            renderQuizAiTagReview();
+        };
+        window.qatAdd = function (i, tag) {
+            const hit = window.QUIZ_TAG_KIND.get(String(tag || '').toLowerCase());
+            if (!hit) return;
+            const r = window._qatRows[i];
+            if (!r.add[hit.kind].includes(hit.tag)) r.add[hit.kind].push(hit.tag);
+            renderQuizAiTagReview();
+        };
+        window.closeQuizAiTagReview = function () {
+            window._qatCancel = true;
+            forceHideModal('quizAiTagModal');
+        };
+        window.saveQuizAiTags = async function () {
+            const byId = new Map((Array.isArray(quizzesData) ? quizzesData : []).map(q => [q.id, q]));
+            const todo = [];
+            window._qatRows.filter(r => r.accept && r.state === 'ready').forEach(r => {
+                const q = byId.get(r.id);
+                if (!q) return;
+                const before = window.quizTagList(q);
+                const after = window.normalizeQuizTagList([...before, ...r.add.topic, ...r.add.skill, ...r.add.population]);
+                const upd = {};
+                if (JSON.stringify(after) !== JSON.stringify(before)) { upd.tags = after.join(', '); upd.tagList = after; }
+                if (r.system && r.system !== (q.coverageSystem || '')) Object.assign(upd, window.quizSystemFields(r.system, true));
+                if (Object.keys(upd).length) todo.push({ id: r.id, upd });
+            });
+            if (!todo.length) { showToast('Nothing to save'); return; }
+            if (!confirm(`Write tags / system on ${todo.length} quiz(zes)? Existing tags are kept.`)) return;
+            let done = 0;
+            try {
+                for (let j = 0; j < todo.length; j += 400) {
+                    const batch = db.batch();
+                    const slice = todo.slice(j, j + 400);
+                    slice.forEach(({ id, upd }) => batch.update(db.collection('quizzes').doc(id), upd));
+                    await batch.commit();
+                    done += slice.length;
+                }
+                showToast(`✅ Tags saved on ${done} quiz(zes)`);
+                window._qatRows = window._qatRows.filter(r => !(r.accept && r.state === 'ready'));
+                if (window._qatRows.length) renderQuizAiTagReview('Saved — remaining rows were not ticked or had errors');
+                else closeQuizAiTagReview();
+            } catch (e) {
+                alert(`Saving stopped after ${done} quiz(zes): ${e.message}`);
+            }
         };
 
         const QUIZ_TAG_MAX = 20;
