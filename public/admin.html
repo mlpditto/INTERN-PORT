@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.21)</title>
+    <title>Nika Admin (V102.22)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -7127,7 +7127,7 @@
                      Search box was moved here from the inactive wrapper so it filters BOTH lists.
                      Filter pills + sort dropdown are new. -->
                 <div style="background:#fff; padding:14px 18px; border-radius:14px; margin-bottom:18px; border:1px solid #e2e8f0; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
-                    <div style="display:grid; grid-template-columns: 1fr auto auto; gap:12px; align-items:center; margin-bottom:10px;">
+                    <div style="display:grid; grid-template-columns: 1fr auto auto auto; gap:12px; align-items:center; margin-bottom:10px;">
                         <div style="position:relative;">
                             <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:14px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:0.9em;"></i>
                             <input type="text" id="quiz-search-global" placeholder="Search title, short title, or tag (Active + Inactive)..." oninput="renderQuizzes()" style="width:100%; padding:9px 15px 9px 42px; border-radius:12px; border:1.5px solid #cbd5e1; font-size:0.88em; outline:none; transition:0.3s; background:white; color:#1e293b;" onfocus="this.style.borderColor='#6366f1'; this.style.boxShadow='0 0 0 4px rgba(99,102,241,0.08)';" onblur="this.style.borderColor='#cbd5e1'; this.style.boxShadow='none';">
@@ -7141,6 +7141,8 @@
                         <!-- V97.80: audit coverage across every quiz, filled by renderQuizzes.
                              Clicking it jumps straight to the 🧪 NOT AUDITED chip. -->
                         <span id="quiz-audit-stat" onclick="setQuizFilter('unaudited')" style="cursor:pointer; white-space:nowrap;"></span>
+                        <!-- V102.22: tag completeness (System + Topic + Skill, QUIZ_TAG_VOCAB) — click = 🏷️ INCOMPLETE. -->
+                        <span id="quiz-tag-stat" onclick="setQuizFilter('tagsincomplete')" style="cursor:pointer; white-space:nowrap;"></span>
                     </div>
                     <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; border-top:1px solid #f1f5f9; padding-top:10px;">
                         <span style="font-size:0.65em; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap;">
@@ -7155,6 +7157,7 @@
                             <button type="button" class="quiz-filter-pill" data-filter="materials" onclick="setQuizFilter('materials')">📎 MATERIALS</button>
                             <!-- V97.80: never audited, or audited before the questions changed. -->
                             <button type="button" class="quiz-filter-pill" data-filter="unaudited" onclick="setQuizFilter('unaudited')" title="Never audited, or audited before the questions changed">🧪 NOT AUDITED</button>
+                            <button type="button" class="quiz-filter-pill" data-filter="tagsincomplete" onclick="setQuizFilter('tagsincomplete')" title="Missing System, Topic or Skill tag · tag ยังไม่ครบ">🏷️ INCOMPLETE</button>
                         </div>
                         <!-- V101.76: exam style rail (quiz.examStyle), filled by renderQuizzes; hidden while no quiz carries a style. -->
                         <div id="quiz-style-pills" class="lang-no-toggle" style="display:none; gap:6px; align-items:center;"></div>
@@ -26660,6 +26663,7 @@ ${JSON.stringify(sourceObj)}`;
                 const proceed = confirm(`⚠️ Question ${droppedNums.join(', ')} ${droppedNums.length > 1 ? 'are' : 'is'} incomplete (blank text or empty option) and will NOT be saved.\n\nSave the other ${validQuestions.length} question(s) anyway?`);
                 if (!proceed) return;
             }
+            if (!window.confirmQuizEditorTags('Save')) return; // V102.22
 
             const data = {
                 title: formData.title,
@@ -26819,6 +26823,7 @@ ${JSON.stringify(sourceObj)}`;
                 }
             }
 
+            if (!window.confirmQuizEditorTags('Go live')) return; // V102.22
             if (!confirm("🚀 Launch Quiz Immediately? (Status will be set to ACTIVE)")) return;
 
             // Force Active
@@ -31500,6 +31505,31 @@ ${JSON.stringify(sourceObj)}`;
                 }
             }
 
+            // V102.22: tag completeness over ALL quizzes (same reasoning as the audit pill).
+            const tagStatEl = document.getElementById('quiz-tag-stat');
+            if (tagStatEl) {
+                const total = quizzesData.length;
+                const c = { complete: 0, untagged: 0, system: 0, topic: 0, skill: 0 };
+                quizzesData.forEach(q => {
+                    const r = window.quizTagCompleteness(q);
+                    if (r.complete) c.complete++;
+                    if (r.untagged) c.untagged++;
+                    if (!r.system) c.system++;
+                    if (!r.topic) c.topic++;
+                    if (!r.skill) c.skill++;
+                });
+                if (!total) {
+                    tagStatEl.innerHTML = '';
+                } else {
+                    const pct = Math.round((c.complete / total) * 100);
+                    const skin = pct >= 80 ? 'background:#dcfce7; color:#15803d; border:1px solid #86efac;'
+                        : pct >= 40 ? 'background:#fef9c3; color:#a16207; border:1px solid #fde68a;'
+                        : 'background:#fee2e2; color:#b91c1c; border:1px solid #fecaca;';
+                    const tip = `Tags complete = System + Topic + Skill. ${c.untagged} without tags · ${c.system} missing System · ${c.topic} missing Topic · ${c.skill} missing Skill — click to filter`;
+                    tagStatEl.innerHTML = `<span title="${tip}" style="${skin} font-size:0.72em; font-weight:800; border-radius:10px; padding:6px 11px;">🏷️ Tags: ${c.complete} / ${total}</span>`;
+                }
+            }
+
             // V93.99 PR 2b: group all attempts by quizId once per render so generateRow
             // reads attemptsByQuiz[q.id] instead of re-scanning quizAttemptsAllCache for
             // every row (was O(rows × attempts)).
@@ -31995,6 +32025,7 @@ ${JSON.stringify(sourceObj)}`;
             if (f === 'locked') return (parseFloat(q.unlockScore) || 0) > 0; // V95.19: score-gated quizzes
             if (f === 'materials') return Array.isArray(q.materials) && q.materials.some(m => m && m.url); // V95.31: has downloadable materials
             if (f === 'unaudited') return window.quizNeedsAudit(q); // V97.80: never audited, or stale
+            if (f === 'tagsincomplete') return !window.quizTagCompleteness(q).complete; // V102.22
             return true;
         }
 
@@ -62258,6 +62289,63 @@ RULES:
             return fields;
         };
 
+        // V102.22: controlled vocabulary for "complete tags" — approved 2026-09-27
+        // (docs/QUIZ-TAG-VOCABULARY-DRAFT.md). Complete = a System (coverageSystem,
+        // '__none' does not count) + 1–3 Topic tags + 1 Skill tag. Population tags
+        // and free extras (drug names…) are allowed but never count. Matching is
+        // case-insensitive on the exact tag text.
+        window.QUIZ_TAG_VOCAB = {
+            skill: ['Pharmacotherapy', 'Pharmacology & MOA', 'Pharmacokinetics & Dosing', 'Drug Safety & Interactions', 'Patient Counseling',
+                'Pharmaceutics & Formulation', 'Evidence & Research', 'Pharmacy Practice & Management', 'Basic Sciences', 'General Knowledge'],
+            population: ['Pediatrics', 'Geriatrics', 'Pregnancy & Lactation'],
+            topic: {
+                cardio: ['Hypertension', 'Dyslipidemia', 'Heart Failure', 'Antithrombotic Therapy', 'Chest Pain & ACS'],
+                endocrine: ['Diabetes', 'Obesity & Weight Management', 'Thyroid Disorders', 'Osteoporosis'],
+                renal: ['Kidney Disease', 'Urinary Tract Infection'],
+                gi: ['GERD & Dyspepsia', 'Peptic Ulcer & H. pylori', 'Constipation & Diarrhea', 'Functional GI & Gut–Brain Axis', 'Liver Disease & DILI'],
+                respiratory: ['Allergic Rhinitis', 'Asthma & COPD', 'Cough & Common Cold', 'Sleep Apnea'],
+                infection: ['Antibiotics & Stewardship', 'Fungal Infections', 'STI & HIV', 'Emerging Infections & Vaccines'],
+                neuro: ['Migraine & Headache', 'Sleep & Insomnia', 'Dementia', "Parkinson's Disease", 'Epilepsy', 'Neuropathic Pain', 'Vertigo'],
+                mental: ['Depression & Anxiety', 'Psychosis', 'Substance Use & Smoking Cessation'],
+                msk: ['Pain & Analgesics', 'Osteoarthritis', 'Gout', 'Rheumatic & Autoimmune Disease', 'Muscle Spasm'],
+                skin: ['Acne', 'Hyperpigmentation', 'Photoprotection & Skin Aging', 'Dermatitis & Eczema', 'Topical Corticosteroids', 'Wound & Scar Care', 'Vitiligo'],
+                womens_health: ['Contraception', 'Menopause & HRT', 'Vaginal Infections'],
+                ent: ['Eye Health', 'Oral & Dental Care'],
+                heme: ['Anemia & Hematology', 'Oncology & Targeted Therapy'],
+                other: ['Vitamins & Supplements', 'Travel Medicine', 'Emergency & Critical Care', 'Polypharmacy & Deprescribing',
+                    'AI & Digital Health', 'Biotechnology & Genomics', 'Business & Marketing', 'Language & Communication']
+            }
+        };
+        window.QUIZ_TAG_KIND = (() => {
+            const m = new Map();
+            const v = window.QUIZ_TAG_VOCAB;
+            v.skill.forEach(t => m.set(t.toLowerCase(), { kind: 'skill', tag: t }));
+            v.population.forEach(t => m.set(t.toLowerCase(), { kind: 'population', tag: t }));
+            Object.entries(v.topic).forEach(([sys, list]) => list.forEach(t => m.set(t.toLowerCase(), { kind: 'topic', tag: t, system: sys })));
+            return m;
+        })();
+        window.quizTagCompletenessFrom = function (system, tags) {
+            const list = window.stripQuizMarkerTags(Array.isArray(tags) ? tags : window.quizTagList({ tags }));
+            const kinds = list.map(t => (window.QUIZ_TAG_KIND.get(t.toLowerCase()) || {}).kind);
+            const r = {
+                untagged: list.length === 0,
+                system: !!system && system !== '__none',
+                topic: kinds.includes('topic'),
+                skill: kinds.includes('skill')
+            };
+            r.missing = ['system', 'topic', 'skill'].filter(k => !r[k]);
+            r.complete = r.missing.length === 0;
+            return r;
+        };
+        window.quizTagCompleteness = q => window.quizTagCompletenessFrom(q && q.coverageSystem, window.quizTagList(q));
+        // Save / Go live: warn (never block) when the editor's tags are incomplete.
+        window.confirmQuizEditorTags = function (action) {
+            const r = window.quizTagCompletenessFrom(document.getElementById('quiz-system-select')?.value || '', document.getElementById('quiz-tags')?.value || '');
+            if (r.complete) return true;
+            const names = { system: 'System', topic: 'Topic tag', skill: 'Skill tag' };
+            return confirm(`🏷️ Tags incomplete — missing: ${r.missing.map(k => names[k]).join(', ')}.\nComplete = System + 1–3 Topic + 1 Skill (pick from the suggestions).\nแท็กยังไม่ครบ\n\n${action} anyway?`);
+        };
+
         const QUIZ_TAG_MAX = 20;
         window.quizTagCanonicalForms = function () {
             const map = new Map();
@@ -62297,6 +62385,13 @@ RULES:
                 seen.add(key);
                 out.push({ raw: String(raw).trim(), hint });
             };
+            // V102.22: the approved vocabulary comes first; the Topic hint names its system.
+            const vocab = window.QUIZ_TAG_VOCAB;
+            if (vocab) {
+                vocab.skill.forEach(t => push(t, 'Skill'));
+                Object.entries(vocab.topic).forEach(([sys, list]) => list.forEach(t => push(t, `Topic · ${sys}`)));
+                vocab.population.forEach(t => push(t, 'Population'));
+            }
             if (typeof window.computeQuizTagHygiene === 'function' && typeof quizzesData !== 'undefined') {
                 window.computeQuizTagHygiene(quizzesData).entries.filter(e => !/^ai_/.test(e.key)).forEach(e => push(e.forms[0].raw, `${e.count} quiz${e.count === 1 ? '' : 'zes'}`)); // machine markers (AI_VARIANT, AI_FROM_CASE) are never suggested
             }
