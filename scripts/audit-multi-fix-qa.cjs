@@ -13,6 +13,7 @@ const cut = (start, end, includeEnd = false) => {
 const slices = [
     cut('        window.AUDIT_DIMS = [', '        window.auditDimLabels = function'),
     cut('        window.auditDimLabels = function', '\n        };\n', true),
+    cut('        window.reviewRunLock = function', '        window.REVIEW_TABS ='),
     cut('        window.REVIEW_TABS =', '        // The rail is rendered'),
     cut('        window.reviewTabsHtml =', '\n        };', true),
     cut('        window.auditFixModel =', '        window.renderAuditStart ='),
@@ -146,6 +147,16 @@ const remap = cut('                if (onlyQNumbers && onlyQNumbers.length && Ar
 
         await page.setViewportSize({ width: 390, height: 800 });
         assert.equal(await page.evaluate(() => { const b = document.getElementById('audit-batch').getBoundingClientRect(), p = document.getElementById('ai-audit-popup').getBoundingClientRect(); return b.right <= p.right + 1 && b.left >= p.left - 1; }), true, 'bar fits the popup at 390 px');
+        // V102.19: a fresh run keeps this scorecard readable — controls lock (↻ Review stays solid), a thin bar runs on top
+        await page.evaluate(() => { const r = document.createElement('button'); r.className = 'audit-run'; r.textContent = 'Grok 4.7 · 00:16'; document.querySelector('#ai-audit-popup').prepend(r); reviewRunLock(document.getElementById('ai-audit-popup'), true); });
+        const lk = await page.evaluate(() => { const p = document.getElementById('ai-audit-popup'), cs = s => getComputedStyle(p.querySelector(s)); return { pick: [cs('.audit-pick').pointerEvents, cs('.audit-pick').opacity], run: [cs('.audit-run').pointerEvents, cs('.audit-run').opacity], bar: cs('.review-run-bar').position, busy: p.getAttribute('aria-busy') }; });
+        assert.deepEqual(lk.pick, ['none', '0.45'], 'checkboxes lock');
+        assert.deepEqual(lk.run, ['none', '1'], '↻ Review shows the run, not faded');
+        assert.equal(lk.bar, 'sticky');
+        assert.equal(lk.busy, 'true');
+        await page.evaluate(() => { reviewRunLock(document.getElementById('ai-audit-popup'), false); document.querySelector('#ai-audit-popup > .audit-run').remove(); });
+        assert.equal(await page.locator('#ai-audit-popup .review-run-bar').count(), 0, 'unlock removes the bar');
+        assert.equal(await page.locator('#ai-audit-popup .audit-pick').first().evaluate(e => getComputedStyle(e).pointerEvents), 'auto');
         // V102.16: the merged replay is saved as the last analysis and shows no "Saved analysis" badge
         assert.ok(html.includes("if (!(opts && opts.cachedResult && !opts.batchMerged)) { // V102.16"), 'merged batch is saved');
         assert.ok(html.includes('${(opts && opts.cachedResult && !opts.batchMerged) ? `<span title="Saved analysis'), 'no saved badge on a merged batch');
