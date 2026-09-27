@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.20)</title>
+    <title>Nika Admin (V102.21)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -13989,6 +13989,12 @@
                     <i class="fa-solid fa-key" style="color:#b45309;"></i>
                     <span style="font-weight:700; color:#92400e;">Enrollment CODE</span>
                     <code id="gs-enrollment-code" style="background:#fef3c7; padding:2px 8px; border-radius:999px; color:#92400e; font-weight:800; letter-spacing:0.03em;">-</code>
+                </div>
+                <!-- V102.21: Connect Google (intern V101.16) — shown only when linked. -->
+                <div id="gs-google-chip" title="Google connected — can sign in without LINE · เชื่อมต่อ Google แล้ว" style="display:none; align-items:center; gap:6px; background:#ecfdf3; border:1px solid #bbf7d0; border-radius:999px; padding:3px 4px 3px 10px;">
+                    <span aria-hidden="true">🌐</span>
+                    <code id="gs-google-email" style="background:#dcfce7; padding:2px 8px; border-radius:999px; color:#166534; font-weight:700; max-width:190px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">-</code>
+                    <button type="button" onclick="gsDisconnectGoogle()" aria-label="Disconnect Google" title="ยกเลิกการเชื่อมต่อ Google" style="width:26px; height:26px; min-height:0; min-width:0; padding:0; gap:0; display:inline-flex; align-items:center; justify-content:center; border:none; border-radius:50%; background:transparent; color:#b91c1c; cursor:pointer;"><i class="fa-solid fa-link-slash"></i></button>
                 </div>
 </div>
 <div id="gs-profile-body" class="gs-profile-cards lang-no-toggle">
@@ -35026,6 +35032,38 @@ RULES:
             }
         }
 
+        // V102.21: 🌐 chip for interns who connected Google (intern V101.16).
+        // Disconnect deletes user_auth_links/{googleUid} (the only thing that lets
+        // that Google account open this user) and clears users.googleLink.
+        function gsRenderGoogleChip(user) {
+            const link = user && user.googleLink;
+            const chip = document.getElementById('gs-google-chip');
+            chip.style.display = (link && link.uid) ? 'flex' : 'none';
+            const email = document.getElementById('gs-google-email');
+            email.textContent = (link && link.email) || 'Google';
+            email.title = (link && link.email) || '';
+        }
+
+        async function gsDisconnectGoogle() {
+            const uid = document.getElementById('gs-uid').value;
+            const user = usersData.find(u => u.id === uid);
+            const link = user && user.googleLink;
+            if (!link || !link.uid) return;
+            if (!confirm(`Disconnect Google (${link.email || link.uid}) from ${user.displayName || uid}?
+They can connect again from LINE.
+ยกเลิกการเชื่อมต่อ Google?`)) return;
+            try {
+                await db.collection('user_auth_links').doc(link.uid).delete();
+                await db.collection('users').doc(uid).update({ googleLink: firebase.firestore.FieldValue.delete() });
+                delete user.googleLink;
+                gsRenderGoogleChip(user);
+                showToast('Google disconnected');
+            } catch (e) {
+                console.error('[gsDisconnectGoogle]', e);
+                showToast('Could not disconnect Google: ' + (e.message || e.code));
+            }
+        }
+
         // V98.22 lean: show/hide the First/Middle/Last certificate-name inputs.
         let gsLanguage = 'en';
         function gsText(en, th) { return gsLanguage === 'th' ? th : en; }
@@ -35182,6 +35220,7 @@ RULES:
             document.getElementById('gs-enrollment-code').innerText = enrollmentCode;
             document.getElementById('gs-enrollment-chip').style.display =
                 (enrollmentCode && enrollmentCode !== '-') ? 'flex' : 'none';
+            gsRenderGoogleChip(user);
             document.getElementById('gs-user-score').innerText = parseFloat((user?.score || 0).toFixed(2));
             document.getElementById('gs-user-beri').innerText = user?.beri || 0;
 
@@ -47023,7 +47062,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 <div style="display:flex; align-items:center; gap:10px;">
                                     <img src="${d.pictureUrl}" class="user-pic" style="flex-shrink:0;">
                                     <div style="min-width:0;">
-                                        <div style="font-weight:bold; line-height:1.25;">${d.displayName}</div>
+                                        <div style="font-weight:bold; line-height:1.25;">${d.displayName}${d.googleLink && d.googleLink.uid ? ` <span title="Google connected · ${escapeHtml(d.googleLink.email || '')}" aria-label="Google connected" style="font-size:0.85em;">🌐</span>` : ''}</div>
                                         ${certNameDisplay}
                                     </div>
                                 </div>
