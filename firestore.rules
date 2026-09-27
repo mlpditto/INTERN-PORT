@@ -32,6 +32,17 @@ service cloud.firestore {
         );
     }
 
+    // V101.16 Connect Google: a Google account may only point its auth link at
+    // the user a live, unused web_link_codes/{code} was issued for.
+    function validWebLinkCode(code, data) {
+      return code is string && code.matches('^[a-f0-9]{32}$')
+        && exists(/databases/$(database)/documents/web_link_codes/$(code))
+        && get(/databases/$(database)/documents/web_link_codes/$(code)).data.userId == data.effectiveUserId
+        && get(/databases/$(database)/documents/web_link_codes/$(code)).data.rawLiffUserId == data.rawLiffUserId
+        && get(/databases/$(database)/documents/web_link_codes/$(code)).data.used == false
+        && get(/databases/$(database)/documents/web_link_codes/$(code)).data.expiresAt > request.time;
+    }
+
     function hasAuthLinkToUserId(userId) {
       return isSignedIn()
         && exists(/databases/$(database)/documents/user_auth_links/$(request.auth.uid))
@@ -389,9 +400,39 @@ service cloud.firestore {
     // 21. Auth link registry for legacy data migration
     match /user_auth_links/{authUid} {
       allow read: if isAdmin() || (isSignedIn() && authUid == request.auth.uid);
+      // V101.16: Google sign-ins (non-admin) need a Connect Google code, unless
+      // the target user is unchanged (the LINE boot re-upserting its own link).
       allow create, update: if isSignedIn()
         && authUid == request.auth.uid
-        && request.resource.data.authUid == request.auth.uid;
+        && request.resource.data.authUid == request.auth.uid
+        && (request.auth.token.firebase.sign_in_provider != 'google.com'
+            || isAdmin()
+            || (resource != null && resource.data.effectiveUserId == request.resource.data.effectiveUserId)
+            || validWebLinkCode(request.resource.data.get('linkCode', ''), request.resource.data));
+      allow delete: if isAdmin();
+    }
+
+    // V101.16: one-time Connect Google codes (32 hex, ≤ 60 min, single use).
+    // Created from the LINE session of the user they're for; redeemed once by
+    // a Google sign-in in the same batch that writes its user_auth_links doc.
+    match /web_link_codes/{code} {
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
+      allow create: if isSignedIn()
+        && code.matches('^[a-f0-9]{32}$')
+        && request.resource.data.keys().hasOnly(['userId', 'rawLiffUserId', 'displayName', 'createdByAuthUid', 'createdAt', 'expiresAt', 'used'])
+        && hasAuthLinkToUserId(request.resource.data.userId)
+        && request.resource.data.createdByAuthUid == request.auth.uid
+        && request.resource.data.used == false
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt < request.time + duration.value(60, 'm');
+      allow update: if isSignedIn()
+        && request.auth.token.firebase.sign_in_provider == 'google.com'
+        && resource.data.used == false
+        && resource.data.expiresAt > request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['used', 'usedBy', 'usedAt'])
+        && request.resource.data.used == true
+        && request.resource.data.usedBy == request.auth.uid;
       allow delete: if isAdmin();
     }
 

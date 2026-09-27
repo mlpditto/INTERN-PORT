@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.15)</title>
+    <title>Internship Portfolio (V101.16)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.05">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -2326,7 +2326,7 @@
             to { bottom: 30px; opacity: 1; }
         }
     </style>
-<link rel="stylesheet" href="personal-profile-tabs.css?v=V101.15">
+<link rel="stylesheet" href="personal-profile-tabs.css?v=V101.16">
 <script src="personal-profile-tabs.js?v=V101.07"></script>
 <link rel="stylesheet" href="submit-system-grid.css?v=V99.72">
 <script defer src="submit-system-grid.js?v=V99.71"></script>
@@ -6079,7 +6079,9 @@
                  (`socials.facebook`), never as a whole-map replace: the admin profile modal
                  writes the same map, and a whole-map write from either form would wipe the
                  keys that form does not carry. -->
-            <details class="pi-socials"><summary>🔗 Social</summary><div class="pi-social-list">
+            <details class="pi-socials"><summary>🔗 Social</summary>
+<div id="pi-google-row" class="pi-google-row"><span class="pi-google-ic" aria-hidden="true"><i class="fa-brands fa-google"></i></span><span class="pi-google-text"><span id="pi-google-title">Connect Google</span><small id="pi-google-sub" title="ใช้แอปจากเบราว์เซอร์โดยไม่ต้องผ่าน LINE">Use the app without LINE</small></span><button type="button" id="pi-google-btn" class="pi-google-btn" onclick="connectGoogleAccount()">Connect</button></div>
+<div class="pi-social-list">
 <label title="Facebook"><button type="button" class="pi-soc-fb" title="คัดลอก Facebook" aria-label="Copy facebook link" onclick="copyPersonalSocial('facebook')"><i class="fa-brands fa-facebook-f" aria-hidden="true"></i></button><input id="pi-social-facebook" type="text" aria-label="Facebook" placeholder="Facebook" maxlength="500"></label>
 <label title="LINE ID"><button type="button" class="pi-soc-line" title="คัดลอก LINE ID" aria-label="Copy line link" onclick="copyPersonalSocial('line')"><i class="fa-brands fa-line" aria-hidden="true"></i></button><input id="pi-social-line" type="text" aria-label="LINE ID" placeholder="LINE ID" maxlength="500"></label>
 <label title="Instagram"><button type="button" class="pi-soc-ig" title="คัดลอก Instagram" aria-label="Copy instagram link" onclick="copyPersonalSocial('instagram')"><i class="fa-brands fa-instagram" aria-hidden="true"></i></button><input id="pi-social-instagram" type="text" aria-label="Instagram" placeholder="Instagram" maxlength="500"></label>
@@ -7111,8 +7113,28 @@
                 updateStatus("Initializing LIFF...");
                 await initLiffWithRetry(3); // V95.51: retry flaky liff.init (10s timeout each) before failing
 
+                // V101.16: sign-in without LINE — only ever outside the LINE app, so
+                // the in-LINE boot below is untouched. ?link=CODE finishes a Connect
+                // Google started from Personal Info → Social; a Google user already
+                // linked through such a code opens their own account directly.
+                if (!liff.isInClient()) {
+                    const linkCode = urlParams.get('link');
+                    if (linkCode) { showGoogleLinkScreen(linkCode); return; }
+                    const googleSession = await resolveGoogleBrowserSession(runtimeAuthUser);
+                    if (googleSession) {
+                        userId = googleSession.userId;
+                        userProfile = googleSession.profile;
+                        isGoogleBrowserSession = true;
+                        syncPreferredLanguage();
+                        hookLangToggleSync();
+                        enterMainApp(urlParams);
+                        return;
+                    }
+                }
+
                 updateStatus("Checking Login Status...");
                 if (!liff.isLoggedIn()) {
+                    if (!liff.isInClient()) { showSignInChooser(); return; }
                     updateStatus("Not Logged In. Redirecting...");
                     document.getElementById('btn-manual-login').style.display = 'inline-block';
                     liff.login();
@@ -7173,6 +7195,17 @@
                     return;
                 }
 
+                enterMainApp(urlParams);
+            } catch (e) {
+                console.error("Init failed:", e);
+                showInitError(e && e.message ? e.message : String(e));
+            }
+        }
+        // Removed direct main() call to prevent double execution or execution before SDK load
+
+        // V101.16: the post-sign-in half of main(), shared by the LINE boot and the
+        // Google browser session (moved out of main() verbatim).
+        function enterMainApp(urlParams) {
                 document.getElementById('loading-overlay').classList.add('hidden');
                 document.getElementById('main-app').classList.remove('hidden');
                 mountGrandLineToolSections();
@@ -7205,12 +7238,194 @@
 
                 // Start Timer Loop
                 setInterval(checkExpiry, 1000);
+        }
+
+        // ── V101.16: Connect Google — use the app outside LINE ──────────────
+        // Only for accounts that already signed in through LINE: Personal Info →
+        // Social → Connect writes a one-time web_link_codes/{code} (15 min) and
+        // opens ?link=CODE in the phone's browser (Google blocks sign-in inside the
+        // LINE WebView). There the user signs in with Google and one batch writes
+        // user_auth_links/{googleUid} → the same effectiveUserId and marks the code
+        // used; firestore.rules checks the code. After that, Google sign-in on the
+        // plain site URL opens the same account. `linkCode` on the link doc is what
+        // tells a Connect-Google link apart from an admin's own Google session.
+        let isGoogleBrowserSession = false;
+
+        async function resolveGoogleBrowserSession(authUser) {
+            if (!authUser || authUser.isAnonymous) return null;
+            if (!(authUser.providerData || []).some(p => p && p.providerId === 'google.com')) return null;
+            try {
+                const link = await db.collection('user_auth_links').doc(authUser.uid).get();
+                const d = link.exists ? link.data() : null;
+                if (!d || d.providerId !== 'google.com' || !d.linkCode || !d.effectiveUserId) return null;
+                const userDoc = await db.collection('users').doc(d.effectiveUserId).get();
+                const u = userDoc.exists ? userDoc.data() : {};
+                return {
+                    userId: d.effectiveUserId,
+                    profile: {
+                        userId: d.effectiveUserId,
+                        displayName: u.displayName || authUser.displayName || '',
+                        pictureUrl: u.pictureUrl || authUser.photoURL || ''
+                    }
+                };
             } catch (e) {
-                console.error("Init failed:", e);
-                showInitError(e && e.message ? e.message : String(e));
+                console.warn('[google-session] lookup failed:', e && e.message);
+                return null;
             }
         }
-        // Removed direct main() call to prevent double execution or execution before SDK load
+
+        function renderBootCard(html) {
+            const overlay = document.getElementById('loading-overlay');
+            overlay.classList.remove('hidden');
+            overlay.innerHTML = `<div class="lang-no-toggle" style="background:#fff; border-radius:16px; padding:24px 20px; max-width:340px; width:86%; text-align:center; box-shadow:0 12px 40px rgba(0,0,0,.35); color:#1e293b;">${html}</div>`;
+        }
+
+        const BOOT_LINE_BTN = `<button onclick="liff.login()" style="background:#06c755; color:#fff; font-size:0.98em;"><i class="fa-brands fa-line"></i> Continue with LINE</button>`;
+        const bootGoogleBtn = (handler) => `<button onclick="${handler}" style="margin-top:10px; background:#fff; color:#1f2937; border:1px solid #d1d5db; font-size:0.98em;"><i class="fa-brands fa-google" style="color:#4285f4;"></i> Continue with Google</button>`;
+        const BOOT_MSG = `<div id="boot-google-msg" style="margin-top:14px; font-size:0.78em; color:#64748b; line-height:1.5;"></div>`;
+
+        function showSignInChooser() {
+            renderBootCard(`
+                <div style="font-size:2.2em; margin-bottom:6px;">👋</div>
+                <div style="font-weight:800; font-size:1.1em; margin-bottom:16px;">Sign in เข้าสู่ระบบ</div>
+                ${BOOT_LINE_BTN}
+                ${bootGoogleBtn('signInWithGoogleForBrowser()')}
+                ${BOOT_MSG}`);
+            document.getElementById('boot-google-msg').textContent =
+                'Google works once you have connected it in LINE → Personal Info → Social · ใช้ Google ได้หลังเชื่อมต่อในแอป LINE ก่อน';
+        }
+
+        function setBootMsg(text, isError) {
+            const el = document.getElementById('boot-google-msg');
+            if (!el) return;
+            el.textContent = text;
+            el.style.color = isError ? '#b91c1c' : '#64748b';
+        }
+
+        function isPopupCancel(e) {
+            return e && (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request');
+        }
+
+        async function signInWithGoogleForBrowser() {
+            try {
+                const cred = await firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider());
+                if (await resolveGoogleBrowserSession(cred.user)) { location.reload(); return; }
+                const email = cred.user && cred.user.email;
+                await firebase.auth().signOut();
+                setBootMsg(`${email || 'This Google account'} isn't connected yet — open the app in LINE → Personal Info → Social → Connect Google first. ยังไม่ได้เชื่อมต่อบัญชีนี้`, true);
+            } catch (e) {
+                if (!isPopupCancel(e)) setBootMsg('Google sign-in failed: ' + (e.message || e.code), true);
+            }
+        }
+
+        async function showGoogleLinkScreen(code) {
+            renderBootCard('<div class="loader" style="margin:10px auto;"></div><div style="font-size:0.9em;">Checking link…</div>');
+            let data = null;
+            if (/^[a-f0-9]{32}$/.test(code)) {
+                try {
+                    const snap = await db.collection('web_link_codes').doc(code).get();
+                    data = snap.exists ? snap.data() : null;
+                } catch (e) {
+                    console.warn('[google-link] code lookup failed:', e && e.message);
+                }
+            }
+            const expiresMs = data && data.expiresAt && data.expiresAt.toMillis ? data.expiresAt.toMillis() : 0;
+            if (!data || data.used || expiresMs < Date.now()) {
+                renderBootCard(`
+                    <div style="font-size:2.2em; margin-bottom:6px;">⌛</div>
+                    <div style="font-weight:800; margin-bottom:8px;">Link expired or already used</div>
+                    <div style="font-size:0.85em; color:#475569; line-height:1.55;">Open the app in LINE → Personal Info → Social and tap Connect again. ลิงก์หมดอายุ กรุณากด Connect ใหม่ในแอป LINE</div>`);
+                return;
+            }
+            renderBootCard(`
+                <div style="font-size:2.2em; margin-bottom:6px;">🔗</div>
+                <div style="font-weight:800; font-size:1.05em; margin-bottom:4px;">Connect Google</div>
+                <div id="boot-link-name" style="font-size:0.9em; color:#475569; margin-bottom:16px;"></div>
+                ${bootGoogleBtn(`completeGoogleLink('${code}')`)}
+                ${BOOT_MSG}`);
+            document.getElementById('boot-link-name').textContent = 'to ' + (data.displayName || 'your account');
+            setBootMsg('Next time, sign in with this Google account without LINE · ครั้งต่อไปเข้าด้วย Google ได้เลย');
+        }
+
+        async function completeGoogleLink(code) {
+            try {
+                const cred = await firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider());
+                const googleUser = cred.user;
+                const snap = await db.collection('web_link_codes').doc(code).get();
+                const data = snap.exists ? snap.data() : null;
+                if (!data || data.used) throw new Error('This link was already used — tap Connect again in LINE.');
+                const now = firebase.firestore.FieldValue.serverTimestamp();
+                const batch = db.batch();
+                batch.set(db.collection('user_auth_links').doc(googleUser.uid), {
+                    authUid: googleUser.uid,
+                    effectiveUserId: data.userId,
+                    rawLiffUserId: data.rawLiffUserId,
+                    displayName: data.displayName || '',
+                    pictureUrl: '',
+                    providerId: 'google.com',
+                    linkCode: code,
+                    email: googleUser.email || '',
+                    lastSeenAt: now
+                });
+                batch.update(db.collection('web_link_codes').doc(code), { used: true, usedBy: googleUser.uid, usedAt: now });
+                await batch.commit();
+                await db.collection('users').doc(data.userId).set({
+                    googleLink: { uid: googleUser.uid, email: googleUser.email || '', linkedAt: now }
+                }, { merge: true });
+                renderBootCard(`
+                    <div style="font-size:2.2em; margin-bottom:6px;">✅</div>
+                    <div style="font-weight:800; margin-bottom:6px;">Google connected</div>
+                    <div id="boot-link-email" style="font-size:0.85em; color:#475569; margin-bottom:16px;"></div>
+                    <button onclick="location.replace(location.pathname)" style="background:#7c3aed; color:#fff;">Open the app เปิดแอป</button>`);
+                document.getElementById('boot-link-email').textContent = googleUser.email || '';
+            } catch (e) {
+                if (!isPopupCancel(e)) setBootMsg('Could not connect: ' + (e.message || e.code), true);
+            }
+        }
+
+        async function connectGoogleAccount() {
+            const btn = document.getElementById('pi-google-btn');
+            const authUser = firebase.auth().currentUser;
+            if (!userId || !authUser) return;
+            const code = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
+            btn.disabled = true;
+            try {
+                await db.collection('web_link_codes').doc(code).set({
+                    userId: userId,
+                    rawLiffUserId: (userProfile && userProfile.userId) || userId,
+                    displayName: (userProfile && userProfile.displayName) || '',
+                    createdByAuthUid: authUser.uid,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    expiresAt: firebase.firestore.Timestamp.fromMillis(Date.now() + 15 * 60 * 1000),
+                    used: false
+                });
+            } catch (e) {
+                console.warn('[google-link] could not create code:', e && e.message);
+                showToast('Could not start Google connect — try again เริ่มเชื่อมต่อไม่สำเร็จ');
+                btn.disabled = false;
+                return;
+            }
+            const url = location.origin + location.pathname + '?link=' + code;
+            if (window.liff && liff.isInClient()) liff.openWindow({ url: url, external: true });
+            else location.href = url;
+            btn.disabled = false;
+        }
+
+        function signOutGoogleSession() {
+            firebase.auth().signOut().then(() => location.replace(location.pathname));
+        }
+
+        function renderGoogleLinkRow(d) {
+            const link = d && d.googleLink;
+            const connected = !!(link && link.uid);
+            document.getElementById('pi-google-row').classList.toggle('is-connected', connected);
+            document.getElementById('pi-google-title').textContent = connected ? 'Google connected' : 'Connect Google';
+            document.getElementById('pi-google-sub').textContent = connected ? (link.email || '') : 'Use the app without LINE';
+            const btn = document.getElementById('pi-google-btn');
+            btn.hidden = connected && !isGoogleBrowserSession;
+            btn.textContent = connected ? 'Sign out' : 'Connect';
+            btn.onclick = connected ? signOutGoogleSession : connectGoogleAccount;
+        }
 
         // V94.59 / Phase 3.3: write user's preferred LINE notification language
         // (derived from KR/TH UI toggle state in localStorage) to Firestore.
@@ -7532,6 +7747,7 @@
                     ['facebook', 'line', 'instagram', 'tiktok', 'duolingo'].forEach(k => {
                         document.getElementById('pi-social-' + k).value = _soc[k] || '';
                     });
+                    renderGoogleLinkRow(d);
                     window._bucketItems = Array.isArray(d.bucketList) ? d.bucketList : [];
                 } else {
                     window._bucketItems = [];
