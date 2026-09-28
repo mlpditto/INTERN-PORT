@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.27)</title>
+    <title>Nika Admin (V102.28)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -2338,6 +2338,27 @@
             background: #e2e8f0;
             margin: 4px 0;
         }
+        /* V102.28: quiz row Action rail — status pill (= Live control) + outline icons */
+        .qa-rail { display:flex; align-items:center; gap:6px; flex-wrap:nowrap; }
+        .qa-rail .quiz-more-menu { margin-left:0; }
+        .qa-rail .quiz-more-menu:last-child { margin-left:auto; }
+        .qa-ib { position:relative; width:32px; height:32px; min-height:0; padding:0; gap:0; flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; border-radius:9px; border:1px solid #e2e8f0; background:#fff; color:#64748b; font-size:0.9em; cursor:pointer; transition:0.15s; }
+        .qa-ib:hover { border-color:#94a3b8; color:#1e293b; }
+        .qa-ib.is-set { color:#15803d; border-color:#86efac; background:#f0fdf4; }
+        .qa-n { position:absolute; top:-7px; right:-7px; min-width:17px; height:17px; padding:0 4px; border-radius:9px; background:#4361ee; color:#fff; font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center; line-height:1; }
+        .qa-ib.is-set .qa-n { background:#16a34a; }
+        .qa-pill { display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 10px; border-radius:9px; font-size:0.78em; font-weight:800; white-space:nowrap; border:1px solid transparent; }
+        .qa-pill.is-off { background:#fff; color:#15803d; border-color:#86efac; }
+        .qa-pill.is-live { background:#16a34a; color:#fff; }
+        .qa-pill.is-expired { background:#fef3c7; color:#92400e; border-color:#fde68a; }
+        .qa-pill.is-sched { background:#ffedd5; color:#9a3412; border-color:#fed7aa; }
+        .qa-caret { font-size:0.8em; opacity:0.7; }
+        .qa-dot { width:8px; height:8px; border-radius:50%; background:#bbf7d0; box-shadow:0 0 0 3px rgba(187,247,208,0.35); }
+        .qa-live-body { left:0; right:auto; min-width:230px; }
+        .qa-mh { font-size:0.72em; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.4px; padding:6px 10px 2px; }
+        .qa-chips { display:flex; flex-wrap:wrap; gap:4px; padding:4px 8px 6px; }
+        .qa-chip { width:auto; min-height:0; padding:4px 9px; border-radius:999px; border:1px solid #cbd5e1; background:#fff; color:#334155; font-size:0.78em; font-weight:800; cursor:pointer; }
+        .qa-chip:hover { border-color:#16a34a; color:#15803d; background:#f0fdf4; }
 
         /* V101.06: Tag hygiene panel under the Quiz Engine toolbar. Counts come from
            quizzesData via renderQuizTagHygiene(); chips reuse the tag-rail look. */
@@ -7272,7 +7293,6 @@
                                 <th>Title</th>
                                 <th class="hide-mobile">Questions</th>
                                 <th class="hide-mobile">Score/Q</th>
-                                <th>Status</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
@@ -7295,7 +7315,6 @@
                                 <th>Title</th>
                                 <th class="hide-mobile">Questions</th>
                                 <th class="hide-mobile">Score/Q</th>
-                                <th>Status</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
@@ -31398,7 +31417,8 @@ ${JSON.stringify(sourceObj)}`;
                     const hrs = Math.floor(diff / 3600000);
                     const mins = Math.floor((diff % 3600000) / 60000);
                     const secs = Math.floor((diff % 60000) / 1000);
-                    el.innerText = `⏳ ${hrs}h ${mins}m ${secs}s`;
+                    // V102.28: the Live pill carries data-short → "3h 12m" / "2d 4h"
+                    el.innerText = el.dataset.short ? (hrs >= 48 ? `${Math.floor(hrs / 24)}d ${hrs % 24}h` : `${hrs}h ${mins}m`) : `⏳ ${hrs}h ${mins}m ${secs}s`;
                 }
             });
 
@@ -31741,27 +31761,6 @@ ${JSON.stringify(sourceObj)}`;
 
             // Helper to render row
             const generateRow = (q, isActiveSection) => {
-                let statusInfo = "";
-                const start = getSafeDate(q.startTime);
-                const dead = getSafeDate(q.deadline);
-
-                if (!q.isActive) {
-                    statusInfo = '<span class="badge" style="background:#6c757d">Inactive</span>';
-                } else if (dead && now > dead) {
-                    // V93.21: short "Expired DD/M" badge + full date in title tooltip
-                    // (salvaged from PR #13 Phase 1C). Less visual noise in row;
-                    // hover for the precise timestamp.
-                    statusInfo = `<span class="badge" title="${dead.toLocaleString('en-US')}" style="background:#6c757d">Expired ${dead.getDate()}/${dead.getMonth() + 1}</span>`;
-                } else {
-                    if (start && now < start) {
-                        // V93.23: short "Sched DD/M" badge + full date in title tooltip
-                        // (PR #13 Phase 5B). Mirror of V93.21 Expired badge format.
-                        statusInfo = `<span class="badge" title="${start.toLocaleString('en-US')}" style="background:#ff9f1c">Sched ${start.getDate()}/${start.getMonth() + 1}</span>`;
-                    } else {
-                        statusInfo = `<span class="badge" style="background:#2ec4b6">Active</span> <br> <small class="quiz-countdown" data-deadline="${dead ? dead.toISOString() : ''}" style="font-weight:bold; color:#ef233c;"></small>`;
-                    }
-                }
-
                 const hasWriting = q.questions && q.questions.some(x => x.type === 'short_answer' || x.type === 'tweetstorm');
                 const hasOrdering = q.questions && q.questions.some(x => x.type === 'ordering');
                 const hasFlashcard = q.questions && q.questions.some(x => x.type === 'flashcard');
@@ -31814,17 +31813,6 @@ ${JSON.stringify(sourceObj)}`;
                     ? _covList.map(s => `<span class="badge" title="Category from Quiz Coverage — click to see the quizzes in it" data-th-title="หมวดตาม Quiz Coverage — คลิกดู quiz ในหมวดนี้" style="background:#eef2ff; color:#4338ca; border:1px solid #c7d2fe; margin-left:5px; cursor:pointer;" onclick="event.stopPropagation(); window.openQuizCoverageList('${s.key}', '${q.id}')">${s.emoji} ${escapeHtml(s.label.en)}</span>`).join('')
                     : (covBuckets ? `<span class="badge" title="Uncategorized — click to view or assign from the Uncategorized list" data-th-title="ยังไม่จัดหมวด — คลิกเพื่อดู/จัดหมวดจากรายการ" style="background:#fffbeb; color:#b45309; border:1px solid #fde68a; margin-left:5px; cursor:pointer;" onclick="event.stopPropagation(); window.openQuizCoverageList('__uncat', '${q.id}')">📥 Uncategorized</span>` : '');
 
-
-                const timerOptions = [1, 2, 4, 8, 12, 24, 48, 72, 120, 168];
-                // V93.26 PR #13 Phase 2B: Timer SELECT now shows on inactive section too.
-                // Choosing a duration there sets deadline + flips isActive=true in one click
-                // (setQuizDuration already writes `isActive: true`). Label hints at the dual action.
-                const timerMenu = `
-                    <select class="btn-sm" onchange="setQuizDuration('${q.id}', this.value)" style="width: auto; background: ${isActiveSection ? '#e0f2f1' : '#ecfdf5'}; color: ${isActiveSection ? '#00695c' : '#047857'}; border: 1px solid ${isActiveSection ? '#b2dfdb' : '#a7f3d0'}; cursor: pointer; border-radius: 4px; padding: 2px 4px;">
-                        <option value="">${isActiveSection ? '⏲️ Timer' : '🚀 Go Live + Timer'}</option>
-                        ${timerOptions.map(h => `<option value="${h}">${h}h</option>`).join('')}
-                    </select>
-                `;
 
                 const pointsVal = parseFloat(q.totalPoints) || 1.0;
                 const pointsColor = pointsVal > 5 ? '#d81b60' : (pointsVal > 1 ? '#8338ec' : '#444');
@@ -31915,42 +31903,20 @@ ${JSON.stringify(sourceObj)}`;
                             </div>
                             <small style="color:#999; font-size: 0.72em; font-weight: bold; text-transform: uppercase;">pts</small>
                         </td>
-                        <td>${statusInfo}</td>
-                        <td style="min-width:180px; vertical-align: middle;">
-                            <!-- Row 1: Primary Controls -->
-                            <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
-                                <button class="btn-sm" onclick="event.stopPropagation(); openQuizModal('${q.id}')" title="Edit Quiz Content" 
-                                    style="background:#3b82f6; color:white; border:none; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1.1em; transition:0.2s; box-shadow:0 3px 6px rgba(59,130,246,0.2);">
-                                    📝
-                                </button>
-                                <button class="btn-sm" onclick="event.stopPropagation(); toggleQuizStatus('${q.id}', ${q.isActive})" title="${q.isActive ? 'End Quiz' : 'Go Live'}"
-                                    style="background:${q.isActive ? '#64748b' : 'linear-gradient(135deg, #10b981, #059669)'}; color:white; border:none; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1.1em; transition:0.2s; box-shadow:0 3px 6px rgba(0,0,0,0.1);">
-                                    ${q.isActive ? '⏹️' : '🚀'}
-                                </button>
-                                <button class="btn-sm" style="background:#4361ee; color:white; border:none; width:45px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; gap:4px; cursor:pointer; font-weight:900; box-shadow:0 3px 6px rgba(67,97,238,0.2);" 
-                                    onclick="event.stopPropagation(); showQuizParticipants('${q.id}')" title="View Participants">
-                                    👥 <span style="font-size:0.85em;">${(window.quizCounts && window.quizCounts[q.id]) || 0}</span>
-                                </button>
-                                ${timerMenu}
-                            </div>
-                            <!-- Row 2: Secondary Tools (V93.25 PR #13 Phase 2A: 7 buttons collapsed into ⋯ More) -->
-                            <!-- V98.84: the 🎓 shortcut used to carry an isActiveSection && gate, so it
-                                 vanished on the Inactive / Templates table. It enforced nothing — the Exam
-                                 Sessions tab's own quiz dropdown (populateExamQuizSelect) filters on question
-                                 type alone, and neither openQuickLaunchExamModal nor _createExamSessionDoc
-                                 reads isActive — so an inactive quiz could always be launched, just through
-                                 the other door. Eligibility is the question that actually matters here. -->
-                            <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:8px;">
-                                ${isExamEligibleQuiz(q) ? `
-                                <button class="btn-sm" style="background:#faf5ff; color:#6b21a8; border:1px solid #e9d5ff; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1em; transition:0.2s;"
-                                    onclick="event.stopPropagation(); openQuickLaunchExamModal('${q.id}')" title="Launch as Exam Session">
-                                    🎓
-                                </button>` : ''}
+                        <td style="min-width:260px; vertical-align: middle;">
+                            <!-- V102.28: one rail — the status pill IS the Live control (Status column
+                                 removed; Go Live + Timer select merged into its menu), then outline icons:
+                                 edit · participants · homework · ⋯ (🎓 Exam moved into ⋯). -->
+                            <div class="qa-rail">
+                                ${window.quizLivePillHtml(q)}
+                                <button type="button" class="qa-ib" onclick="event.stopPropagation(); openQuizModal('${q.id}')" title="Edit · แก้ไข" aria-label="Edit quiz"><i class="fa-solid fa-pen"></i></button>
+                                <button type="button" class="qa-ib" onclick="event.stopPropagation(); showQuizParticipants('${q.id}')" title="Participants · ผู้เข้าร่วม" aria-label="Participants"><i class="fa-solid fa-users"></i>${(window.quizCounts && window.quizCounts[q.id]) ? `<span class="qa-n">${window.quizCounts[q.id]}</span>` : ''}</button>
+                                <button type="button" class="qa-ib${q.isHomework && (q.assignedUsers || []).length ? ' is-set' : ''}" onclick="event.stopPropagation(); openHomeworkAssignModal('${q.id}')" title="Homework · มอบหมายการบ้าน" aria-label="Assign homework"><i class="fa-solid fa-book"></i>${q.isHomework && (q.assignedUsers || []).length ? `<span class="qa-n">${q.assignedUsers.length}</span>` : ''}</button>
                                 <details class="quiz-more-menu">
-                                    <summary class="btn-sm" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1em; transition:0.2s;" title="More actions">⋯</summary>
+                                    <summary class="qa-ib" title="More · เพิ่มเติม" aria-label="More actions"><i class="fa-solid fa-ellipsis"></i></summary>
                                     <div class="quiz-more-menu-body" role="menu">
+                                        ${isExamEligibleQuiz(q) ? `<button type="button" class="quiz-more-menu-item" onclick="closeQuizMoreMenus(); openQuickLaunchExamModal('${q.id}')">🎓 Launch as Exam</button>` : ''}
                                         <button type="button" class="quiz-more-menu-item" onclick="closeQuizMoreMenus(); duplicateQuiz('${q.id}')">♻️ Duplicate</button>
-                                        <button type="button" class="quiz-more-menu-item" onclick="closeQuizMoreMenus(); openHomeworkAssignModal('${q.id}')">📚 Assign as Homework</button>
                                         ${(q.isPoll || hasWriting) ? `<button type="button" class="quiz-more-menu-item" onclick="closeQuizMoreMenus(); showPollResults('${q.id}')">📊 View Results / Analytics</button>` : ''}
                                         <button type="button" class="quiz-more-menu-item" onclick="closeQuizMoreMenus(); showQuizDiscussions('${q.id}')">💬 Discussion Board</button>
                                         <button type="button" class="quiz-more-menu-item" onclick="closeQuizMoreMenus(); showQuizFeedbackPanel('${q.id}')">⭐ User Feedback</button>
@@ -32014,7 +31980,7 @@ ${JSON.stringify(sourceObj)}`;
                 if (showPrefixHeaders && currentPrefix && currentPrefix !== lastPrefix) {
                     tbodyInactive.innerHTML += `
                         <tr style="background:#f8fafc; pointer-events:none;">
-                            <td colspan="5" style="padding:10px 15px; border-left:4px solid #6366f1;">
+                            <td colspan="4" style="padding:10px 15px; border-left:4px solid #6366f1;">
                                 <div style="display:flex; align-items:center; gap:8px; font-weight:900; font-size:0.78em; color:#475569; text-transform:uppercase; letter-spacing:1px;">
                                     <i class="fa-solid fa-folder-open" style="color:#6366f1;"></i> Topic: ${currentPrefix}
                                 </div>
@@ -32026,7 +31992,7 @@ ${JSON.stringify(sourceObj)}`;
                     // First non-prefix item after prefixed items
                     tbodyInactive.innerHTML += `
                         <tr style="background:#f8fafc; pointer-events:none;">
-                            <td colspan="5" style="padding:10px 15px; border-left:4px solid #94a3b8;">
+                            <td colspan="4" style="padding:10px 15px; border-left:4px solid #94a3b8;">
                                 <div style="display:flex; align-items:center; gap:8px; font-weight:900; font-size:0.78em; color:#94a3b8; text-transform:uppercase; letter-spacing:1px;">
                                     <i class="fa-solid fa-box-archive"></i> Others / General
                                 </div>
@@ -32493,6 +32459,37 @@ ${JSON.stringify(sourceObj)}`;
             const t = (q && q.lastLiveAt && typeof q.lastLiveAt.toDate === 'function') ? q.lastLiveAt.toDate() : null;
             return t ? (Date.now() - t.getTime()) <= QUIZ_RECENT_LIVE_MS : false;
         }
+
+        // V102.28: the status pill that replaced the Status column + Go Live + Timer select.
+        // The whole pill opens a menu (never acts on one click, so a quiz can't be ended
+        // by accident); every menu action reuses setQuizDuration / toggleQuizStatus.
+        const QUIZ_TIMER_HOURS = [1, 2, 4, 8, 12, 24, 48, 72, 120, 168];
+        const quizTimerLabel = h => h >= 24 && h % 24 === 0 ? `${h / 24}d` : `${h}h`;
+        window.quizLiveState = function (q, now) {
+            now = now || new Date();
+            const start = getSafeDate(q.startTime), dead = getSafeDate(q.deadline);
+            if (!q.isActive) return { kind: 'off' };
+            if (dead && now > dead) return { kind: 'expired', dead };
+            if (start && now < start) return { kind: 'sched', start };
+            return { kind: 'live', dead };
+        };
+        window.quizLivePillHtml = function (q) {
+            const st = window.quizLiveState(q);
+            const d = x => `${x.getDate()}/${x.getMonth() + 1}`;
+            let cls, label, title;
+            if (st.kind === 'off') { cls = 'is-off'; label = '<i class="fa-solid fa-play"></i> Go live'; title = 'Inactive — open to go live · ยังไม่เปิด'; }
+            else if (st.kind === 'expired') { cls = 'is-expired'; label = `<i class="fa-solid fa-clock"></i> Expired ${d(st.dead)}`; title = `Expired ${st.dead.toLocaleString('en-US')} · หมดเวลาแล้ว`; }
+            else if (st.kind === 'sched') { cls = 'is-sched'; label = `<i class="fa-solid fa-calendar-day"></i> Sched ${d(st.start)}`; title = `Starts ${st.start.toLocaleString('en-US')} · ตั้งเวลาเริ่มไว้`; }
+            else { cls = 'is-live'; label = `<span class="qa-dot"></span> Live${st.dead ? ` · <span class="quiz-countdown" data-short="1" data-deadline="${st.dead.toISOString()}"></span>` : ''}`; title = st.dead ? `Live until ${st.dead.toLocaleString('en-US')} · เปิดอยู่` : 'Live, no timer · เปิดอยู่ ไม่มีกำหนดปิด'; }
+            const chips = QUIZ_TIMER_HOURS.map(h => `<button type="button" class="qa-chip" onclick="closeQuizMoreMenus(); setQuizDuration('${q.id}', ${h})">${quizTimerLabel(h)}</button>`).join('');
+            const body = st.kind === 'off'
+                ? `<div class="qa-mh">Go live for</div><div class="qa-chips">${chips}</div>
+                   <button type="button" class="quiz-more-menu-item" onclick="closeQuizMoreMenus(); toggleQuizStatus('${q.id}', false)"><i class="fa-solid fa-play"></i> Go live · no timer</button>`
+                : `<div class="qa-mh">${st.kind === 'expired' ? 'Reopen for' : 'Timer from now'}</div><div class="qa-chips">${chips}</div>
+                   <div class="quiz-more-menu-divider"></div>
+                   <button type="button" class="quiz-more-menu-item is-danger" onclick="closeQuizMoreMenus(); toggleQuizStatus('${q.id}', true)"><i class="fa-solid fa-stop"></i> End now</button>`;
+            return `<details class="quiz-more-menu qa-live"><summary class="qa-pill ${cls}" title="${title}" aria-label="${title}">${label} <i class="fa-solid fa-chevron-down qa-caret"></i></summary><div class="quiz-more-menu-body qa-live-body" role="menu">${body}</div></details>`;
+        };
 
         async function toggleQuizStatus(id, current) {
             const updates = { isActive: !current };
