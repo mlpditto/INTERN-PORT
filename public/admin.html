@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.28)</title>
+    <title>Nika Admin (V102.29)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -2339,6 +2339,10 @@
             margin: 4px 0;
         }
         /* V102.28: quiz row Action rail — status pill (= Live control) + outline icons */
+        .qa-title { width:auto; min-height:0; padding:0; margin:0; gap:0; border:0; background:none; font:inherit; color:inherit; text-align:left; cursor:pointer; display:inline; }
+        .qa-title:hover, .qa-title:focus-visible { text-decoration:underline; text-decoration-color:#94a3b8; text-underline-offset:3px; }
+        .qa-title-pen { margin-left:6px; font-size:0.7em; color:#94a3b8; opacity:0; transition:opacity 0.15s; }
+        .qa-title:hover .qa-title-pen, .qa-title:focus-visible .qa-title-pen { opacity:1; }
         .qa-rail { display:flex; align-items:center; gap:6px; flex-wrap:nowrap; }
         .qa-rail .quiz-more-menu { margin-left:0; }
         .qa-rail .quiz-more-menu:last-child { margin-left:auto; }
@@ -31775,7 +31779,6 @@ ${JSON.stringify(sourceObj)}`;
                 const flashcardLabel = hasFlashcard ? '<span class="badge" style="background:#26a69a; color:white;">⚡ FLASHCARD</span>' : '';
 
                 const oneTimeLabel = q.oneTimeMode ? '<span class="badge" style="background:#f57f17; color:white;">🔄 ONE-TIME</span>' : '';
-                const homeworkLabel = q.isHomework ? `<span class="badge" style="background:#2e7d32; color:white;">📚 HW${q.assignedUsers && q.assignedUsers.length ? ' (' + q.assignedUsers.length + ')' : ''}</span>` : '';
                 // V95.43: badge is now a one-click un-template toggle (mirrors the V95.32
                 // clickable 📎 badge pattern). The quizzes onSnapshot re-render clears it.
                 // Marking AS template stays in the "..." menu — only removal is one-click.
@@ -31837,7 +31840,7 @@ ${JSON.stringify(sourceObj)}`;
 
                 // V95.62: 🆕 "Recently Live" tag — quiz is live now or was within 30 days
                 // V95.63: English-only label
-                const _liveTag = quizRecentlyLive(q)
+                const _liveTag = quizRecentlyLive(q) && !q.isActive // V102.29: the Live pill covers "live now"
                     ? `<span title="Live now or within the last 30 days" style="font-size:0.7em; background:#dcfce7; color:#15803d; border:1px solid #86efac; padding:2px 7px; border-radius:8px; font-weight:800; white-space:nowrap;">🆕 Recently Live</span>`
                     : '';
 
@@ -31846,13 +31849,13 @@ ${JSON.stringify(sourceObj)}`;
                         <td>
                             <div style="font-weight:800; color:#333; margin-bottom:3px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                                 <input type="checkbox" class="quiz-bulk-cb" onchange="toggleQuizSelection('${q.id}', this.checked)" ${selectedQuizIds.has(q.id) ? 'checked' : ''} title="Select for bulk action" style="width:15px; height:15px; cursor:pointer; flex-shrink:0;">
-                                <span class="quiz-admin-title">${QuizCover.adminThumbnail(q.coverUrl, q.id)}<span>${q.title ? q.title.replace(/\s*\(Template\)$/i, '') : '-'}</span></span>
+                                <span class="quiz-admin-title">${QuizCover.adminThumbnail(q.coverUrl, q.id)}<span><button type="button" class="qa-title" onclick="event.stopPropagation(); openQuizModal('${q.id}')" title="Edit · แก้ไข">${escapeHtml(q.title ? q.title.replace(/\s*\(Template\)$/i, '') : '-')}<i class="fa-solid fa-pen qa-title-pen" aria-hidden="true"></i></button></span></span>
                                 <span id="fb-badge-${q.id}" style="font-size:0.7em; background:#fff7ed; color:#b45309; border:1px solid #fed7aa; border-radius:8px; padding:2px 7px; font-weight:800; cursor:pointer; white-space:nowrap;" onclick="event.stopPropagation(); showQuizFeedbackPanel('${q.id}')" title="View user feedback">⭐ —</span>
                                 ${window.quizAuditBadgeHtml(q)}
                                 ${_easyBadge}${_hardBadge}${_cheatBadge}
                             </div>
                             <div style="display:flex; flex-wrap:wrap; gap:3px; align-items:center;">
-                                ${_liveTag} ${modeLabel} ${oneTimeLabel} ${homeworkLabel}
+                                ${_liveTag} ${modeLabel} ${oneTimeLabel}
                                 ${pollLabel} ${subjLabel} ${orderingLabel} ${flashcardLabel} ${templateLabel} ${targetGroupLabel} ${examStyleLabel} ${unlockLabel} ${materialsLabel} ${clicksLabel} ${notifyLabel} ${systemLabel}
                             </div>
                             <div style="margin-top:4px;"><small style="color:#999;">(${q.shortTitle || '-'})</small></div>
@@ -31906,10 +31909,9 @@ ${JSON.stringify(sourceObj)}`;
                         <td style="min-width:260px; vertical-align: middle;">
                             <!-- V102.28: one rail — the status pill IS the Live control (Status column
                                  removed; Go Live + Timer select merged into its menu), then outline icons:
-                                 edit · participants · homework · ⋯ (🎓 Exam moved into ⋯). -->
+                                 participants · homework · ⋯ (🎓 Exam moved into ⋯). V102.29: edit = click the title. -->
                             <div class="qa-rail">
                                 ${window.quizLivePillHtml(q)}
-                                <button type="button" class="qa-ib" onclick="event.stopPropagation(); openQuizModal('${q.id}')" title="Edit · แก้ไข" aria-label="Edit quiz"><i class="fa-solid fa-pen"></i></button>
                                 <button type="button" class="qa-ib" onclick="event.stopPropagation(); showQuizParticipants('${q.id}')" title="Participants · ผู้เข้าร่วม" aria-label="Participants"><i class="fa-solid fa-users"></i>${(window.quizCounts && window.quizCounts[q.id]) ? `<span class="qa-n">${window.quizCounts[q.id]}</span>` : ''}</button>
                                 <button type="button" class="qa-ib${q.isHomework && (q.assignedUsers || []).length ? ' is-set' : ''}" onclick="event.stopPropagation(); openHomeworkAssignModal('${q.id}')" title="Homework · มอบหมายการบ้าน" aria-label="Assign homework"><i class="fa-solid fa-book"></i>${q.isHomework && (q.assignedUsers || []).length ? `<span class="qa-n">${q.assignedUsers.length}</span>` : ''}</button>
                                 <details class="quiz-more-menu">
