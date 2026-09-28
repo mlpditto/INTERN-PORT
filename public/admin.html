@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.24)</title>
+    <title>Nika Admin (V102.25)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -26731,7 +26731,8 @@ ${JSON.stringify(sourceObj)}`;
                 const proceed = confirm(`⚠️ Question ${droppedNums.join(', ')} ${droppedNums.length > 1 ? 'are' : 'is'} incomplete (blank text or empty option) and will NOT be saved.\n\nSave the other ${validQuestions.length} question(s) anyway?`);
                 if (!proceed) return;
             }
-            if (!window.confirmQuizEditorTags('Save')) return; // V102.22
+            if (!(await window.confirmQuizEditorTags('Save'))) return; // V102.22 · V102.25 dialog (may apply AI tags)
+            Object.assign(formData, (({ tags, tagList }) => ({ tags, tagList }))(getQuizFormData())); // V102.25: pick up tags applied in the dialog
 
             const data = {
                 title: formData.title,
@@ -26891,7 +26892,7 @@ ${JSON.stringify(sourceObj)}`;
                 }
             }
 
-            if (!window.confirmQuizEditorTags('Go live')) return; // V102.22
+            if (!(await window.confirmQuizEditorTags('Go live'))) return; // V102.22 · V102.25 dialog; formData is read below
             if (!confirm("🚀 Launch Quiz Immediately? (Status will be set to ACTIVE)")) return;
 
             // Force Active
@@ -62409,12 +62410,172 @@ RULES:
         };
         window.quizTagCompleteness = q => window.quizTagCompletenessFrom(q && q.coverageSystem, window.quizTagList(q));
         // Save / Go live: warn (never block) when the editor's tags are incomplete.
+        // V102.25: our own dialog instead of confirm() — four choices (Fix with AI /
+        // Pick myself / Save anyway / Cancel), and a browser that was told to stop
+        // showing confirm() can no longer silently cancel every Save. It is a plain
+        // fixed overlay, NOT a .modal, so forceShowModal never hides the editor.
+        // Resolves true = go ahead with the save, false = stop.
         window.confirmQuizEditorTags = function (action) {
             const r = window.quizTagCompletenessFrom(document.getElementById('quiz-system-select')?.value || '', document.getElementById('quiz-tags')?.value || '');
-            if (r.complete) return true;
-            const names = { system: 'System', topic: 'Topic tag', skill: 'Skill tag' };
-            return confirm(`🏷️ Tags incomplete — missing: ${r.missing.map(k => names[k]).join(', ')}.\nComplete = System + 1–3 Topic + 1 Skill (pick from the suggestions).\nแท็กยังไม่ครบ\n\n${action} anyway?`);
+            if (r.complete) return Promise.resolve(true);
+            return new Promise(resolve => {
+                window._qtx = { action, resolve, missing: r.missing, prop: null, error: '' };
+                qtxRender('ask');
+            });
         };
+        // One quiz → vocabulary proposal, from the editor's current content. Shared
+        // by the dialog's Fix with AI and the editor's ✨ AI Suggest button.
+        window.suggestEditorVocabTags = async function () {
+            const fd = getQuizFormData();
+            if (!fd.title && !(fd.questions || []).length) throw new Error('Add a title or questions first.');
+            if (typeof window.callUniversalAI !== 'function') throw new Error('AI engine not ready — try again in a moment.');
+            const quiz = { id: 'editor', title: fd.title, shortTitle: fd.shortTitle, description: fd.description, tags: fd.tags, questions: fd.questions };
+            const model = document.getElementById('ai-tagging-model-val')?.value || 'gemini-3.5-flash';
+            const res = await window.callUniversalAI(model, window.qatBuildPrompt([quiz]), true, null, '', { feature: 'quiz_tagging' });
+            const parsed = window.safeJsonParse(res && res.text);
+            const list = parsed && Array.isArray(parsed.results) ? parsed.results : [];
+            const hit = list.find(x => x && x.id === 'editor') || list[0];
+            if (!hit) throw new Error('AI returned no suggestion. First 160 chars: ' + String(res && res.text || '').slice(0, 160));
+            const clean = window.qatCleanProposal(hit);
+            const have = new Set(window.quizTagList({ tags: fd.tags }).map(t => t.toLowerCase()));
+            const add = {};
+            ['topic', 'skill', 'population'].forEach(k => { add[k] = clean[k].filter(t => !have.has(t.toLowerCase())); });
+            const cur = document.getElementById('quiz-system-select')?.value || '';
+            return { aiSystem: clean.system, system: (cur && cur !== '__none') ? cur : clean.system, add };
+        };
+        // Write a proposal into the editor (tags merged, System only when it differs).
+        // Returns true when the System select changed.
+        window.qtxApply = function (prop) {
+            const tagsEl = document.getElementById('quiz-tags');
+            const merged = window.normalizeQuizTagList([...window.quizTagList({ tags: tagsEl.value }), ...prop.add.topic, ...prop.add.skill, ...prop.add.population]);
+            tagsEl.value = merged.join(', ');
+            if (typeof window.refreshTagChips === 'function') window.refreshTagChips();
+            if (typeof window.refreshQuizTagSuggestions === 'function') window.refreshQuizTagSuggestions();
+            const sel = document.getElementById('quiz-system-select');
+            if (sel && prop.system && sel.value !== prop.system) {
+                sel.value = prop.system;
+                sel.dispatchEvent(new Event('change'));
+                return sel.value === prop.system;
+            }
+            return false;
+        };
+        function qtxOverlay() {
+            let el = document.getElementById('qtx-overlay');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'qtx-overlay';
+                el.className = 'lang-no-toggle';
+                el.setAttribute('role', 'dialog');
+                el.setAttribute('aria-modal', 'true');
+                el.setAttribute('aria-labelledby', 'qtx-title');
+                el.style.cssText = 'position:fixed; inset:0; z-index:6000; background:rgba(15,23,42,0.55); display:flex; align-items:center; justify-content:center; padding:16px;';
+                el.addEventListener('keydown', e => { if (e.key === 'Escape') qtxFinish(false); });
+                document.body.appendChild(el);
+            }
+            el.style.display = 'flex';
+            return el;
+        }
+        function qtxFinish(go) {
+            const st = window._qtx;
+            const el = document.getElementById('qtx-overlay');
+            if (el) el.style.display = 'none';
+            window._qtx = null;
+            if (st && st.resolve) st.resolve(!!go);
+        }
+        window.qtxChoose = async function (choice) {
+            const st = window._qtx;
+            if (!st) return;
+            if (choice === 'cancel') return qtxFinish(false);
+            if (choice === 'anyway') return qtxFinish(true);
+            if (choice === 'pick') {
+                qtxFinish(false);
+                const input = document.getElementById('quiz-tag-input');
+                const details = input && input.closest('details');
+                if (details) details.open = true;
+                if (input && input.offsetParent) { input.scrollIntoView({ block: 'center', behavior: 'smooth' }); setTimeout(() => input.focus(), 300); }
+                else showToast('Open the Tags section to add a Topic and a Skill');
+                return;
+            }
+            if (choice === 'ai') {
+                qtxRender('busy');
+                try {
+                    const prop = await window.suggestEditorVocabTags();
+                    if (window._qtx !== st) return; // closed while waiting
+                    st.prop = prop;
+                    qtxRender('result');
+                } catch (e) {
+                    if (window._qtx !== st) return;
+                    st.error = e.message || String(e);
+                    qtxRender('error');
+                }
+                return;
+            }
+            if (choice === 'back') return qtxRender('ask');
+            if (choice === 'apply' || choice === 'applysave') {
+                window.qtxApply(st.prop);
+                showToast('✅ AI tags applied');
+                return qtxFinish(choice === 'applysave');
+            }
+        };
+        window.qtxEdit = function (op, kind, value) {
+            const st = window._qtx;
+            if (!st || !st.prop) return;
+            if (op === 'remove') st.prop.add[kind] = st.prop.add[kind].filter(t => t !== value);
+            if (op === 'add') {
+                const hit = window.QUIZ_TAG_KIND.get(String(value || '').toLowerCase());
+                if (hit && !st.prop.add[hit.kind].includes(hit.tag)) st.prop.add[hit.kind].push(hit.tag);
+            }
+            if (op === 'system') st.prop.system = value;
+            qtxRender('result');
+        };
+        function qtxRender(view) {
+            const st = window._qtx;
+            if (!st) return;
+            const el = qtxOverlay();
+            const names = { system: 'System', topic: 'Topic', skill: 'Skill' };
+            const btn = (choice, label, primary) => `<button type="button" onclick="qtxChoose('${choice}')" style="width:auto; min-height:0; padding:8px 14px; border-radius:9px; font-weight:800; font-size:0.85em; cursor:pointer; ${primary ? 'background:#4f46e5; color:#fff; border:none;' : 'background:#fff; color:#334155; border:1px solid #cbd5e1;'}">${label}</button>`;
+            const chip = (text, bg, fg, extra) => `<span style="display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:999px; background:${bg}; color:${fg}; font-size:0.8em; font-weight:700;">${text}${extra || ''}</span>`;
+            const lowerAction = st.action.toLowerCase();
+            let body = '';
+            if (view === 'ask') {
+                const sys = document.getElementById('quiz-system-select')?.value || '';
+                body = `<h3 id="qtx-title" style="margin:0 0 4px; font-size:1.05em; color:#1e293b;">🏷️ Tags incomplete</h3>
+                    <p style="margin:0 0 10px; font-size:0.85em; color:#64748b;">Missing ${st.missing.map(k => names[k]).join(', ')} · แท็กยังไม่ครบ</p>
+                    <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;">
+                        ${sys && sys !== '__none' ? chip(escapeHtml(sys), '#dcfce7', '#166534') : ''}
+                        ${st.missing.map(k => chip('+ ' + names[k], '#fff', '#b91c1c', '').replace('background:#fff;', 'background:#fff; border:1px dashed #fca5a5;')).join('')}
+                    </div>
+                    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                        ${btn('ai', '✨ Fix with AI', true)}${btn('pick', '✋ Pick myself')}${btn('anyway', `${escapeHtml(st.action)} anyway`)}${btn('cancel', 'Cancel')}
+                    </div>`;
+            } else if (view === 'busy') {
+                body = `<h3 id="qtx-title" style="margin:0 0 10px; font-size:1.05em; color:#1e293b;">✨ AI is reading this quiz…</h3>
+                    <p style="margin:0 0 14px; font-size:0.85em; color:#64748b;"><i class="fa-solid fa-spinner fa-spin"></i> ${escapeHtml(document.getElementById('ai-tagging-model-val')?.value || 'gemini-3.5-flash')}</p>
+                    <div style="display:flex; gap:8px;">${btn('back', 'Back')}</div>`;
+            } else if (view === 'error') {
+                body = `<h3 id="qtx-title" style="margin:0 0 6px; font-size:1.05em; color:#b91c1c;">AI could not suggest tags</h3>
+                    <p style="margin:0 0 14px; font-size:0.8em; color:#64748b; word-break:break-word;">${escapeHtml(st.error)}</p>
+                    <div style="display:flex; flex-wrap:wrap; gap:8px;">${btn('ai', '↻ Try again', true)}${btn('back', 'Back')}</div>`;
+            } else {
+                const p = st.prop;
+                const colors = { topic: ['#e0f2fe', '#075985'], skill: ['#ede9fe', '#5b21b6'], population: ['#fef3c7', '#92400e'] };
+                const x = (k, t) => `<button type="button" onclick="qtxEdit('remove','${k}',${JSON.stringify(t).replace(/"/g, '&quot;')})" aria-label="Remove ${escapeHtml(t)}" style="width:auto; min-height:0; padding:0 2px; gap:0; border:0; background:transparent; color:inherit; cursor:pointer; font-size:1em; line-height:1;">×</button>`;
+                const chips = ['topic', 'skill', 'population'].flatMap(k => p.add[k].map(t => chip(escapeHtml(t), colors[k][0], colors[k][1], x(k, t)))).join('');
+                const v = window.QUIZ_TAG_VOCAB;
+                const grp = (label, list) => `<optgroup label="${escapeHtml(label)}">${list.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('')}</optgroup>`;
+                const addSel = `<select onchange="qtxEdit('add','',this.value)" style="width:auto; min-height:0; padding:3px 6px; border:1px dashed #94a3b8; border-radius:999px; font-size:0.8em; background:#fff; color:#475569;"><option value="">+ add</option>${grp('Skill', v.skill)}${Object.entries(v.topic).map(([k, l]) => grp('Topic · ' + k, l)).join('')}${grp('Population', v.population)}</select>`;
+                const sysSel = `<select onchange="qtxEdit('system','',this.value)" style="width:auto; min-height:0; padding:3px 6px; border:1px solid #86efac; border-radius:999px; font-size:0.8em; background:#dcfce7; color:#166534;"><option value="">System —</option>${Object.keys(v.topic).map(k => `<option value="${k}"${k === p.system ? ' selected' : ''}>${escapeHtml(k)}</option>`).join('')}</select>`;
+                const aiHint = p.aiSystem && p.aiSystem !== p.system ? `<button type="button" onclick="qtxEdit('system','',${JSON.stringify(p.aiSystem).replace(/"/g, '&quot;')})" title="Use the AI system" style="width:auto; min-height:0; padding:3px 9px; border:1px dashed #f59e0b; border-radius:999px; background:#fffbeb; color:#92400e; font-size:0.8em; cursor:pointer;">AI → ${escapeHtml(p.aiSystem)}</button>` : '';
+                const after = window.quizTagCompletenessFrom(p.system, [...window.quizTagList({ tags: document.getElementById('quiz-tags')?.value || '' }), ...p.add.topic, ...p.add.skill]);
+                body = `<h3 id="qtx-title" style="margin:0 0 4px; font-size:1.05em; color:#1e293b;">✨ AI suggests</h3>
+                    <p style="margin:0 0 10px; font-size:0.85em; color:#64748b;">Tap × to remove · existing tags are kept · ${after.complete ? '<b style="color:#15803d;">complete</b>' : '<b style="color:#b45309;">still missing ' + after.missing.map(k => names[k]).join(', ') + '</b>'}</p>
+                    <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:14px;">${sysSel}${aiHint}${chips || '<span style="font-size:0.8em; color:#94a3b8;">No new tags</span>'}${addSel}</div>
+                    <div style="display:flex; flex-wrap:wrap; gap:8px;">${btn('applysave', `Apply &amp; ${escapeHtml(lowerAction)}`, true)}${btn('apply', 'Apply only')}${btn('back', 'Back')}</div>`;
+            }
+            el.innerHTML = `<div style="background:#fff; border-radius:16px; padding:20px; max-width:480px; width:100%; max-height:90vh; overflow:auto; box-shadow:0 20px 50px rgba(0,0,0,0.35);">${body}</div>`;
+            const first = el.querySelector('button, select');
+            if (first) first.focus();
+        }
 
         // ── V102.23: AI tag review (step 2) ─────────────────────────────────
         // AI proposes vocabulary tags for up to 8 quizzes per call; the admin
@@ -62883,47 +63044,19 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
             }
         };
 
+        // V102.25: suggests from QUIZ_TAG_VOCAB (System + Topic + Skill + Population)
+        // through the same prompt as the Save dialog and the AI tag review — it used
+        // to ask for 5–8 free-text tags, which kept creating one-off tags. Merges into
+        // the list; the System select is only filled when it is Auto / Uncategorized.
         window.autoTagQuizAI = async function(btn) {
-            if (typeof showToast === 'function') showToast("🔍 AI analyzing content...");
-
-            const formData = typeof getQuizFormData === 'function' ? getQuizFormData() : null;
-            if (!formData || (!formData.title && (!formData.questions || formData.questions.length === 0))) {
-                return alert("Please enter a title or add questions first.");
-            }
-
             const oldText = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analyzing...';
-
             try {
-                const qTextContent = (formData.questions || []).slice(0, 50).map((q, i) => `Q${i+1}: ${q.q}`).join('\n');
-                const contentToAnalyze = `Title: ${formData.title}\nDescription: ${formData.description || ""}\nQuestions:\n${qTextContent}`;
-
-                const prompt = `Analyze this medical quiz content and provide 5-8 comma-separated medical tags.\nContent:\n${contentToAnalyze}\n\nOUTPUT FORMAT: Just comma-separated tags.`;
-
-                const modelVal = document.getElementById('ai-tagging-model-val')?.value || 'gemini-3.5-flash';
-                
-                if (typeof window.callUniversalAI !== 'function') {
-                    console.error("❌ [AI Tagging] Engine Missing. Status:", window.AI_CORE_READY);
-                    throw new Error("AI engine is missing or still initializing. Status: " + window.AI_CORE_READY);
-                }
-
-                const response = await window.callUniversalAI(modelVal, prompt, false, null, '', { feature: 'quiz_tagging' });
-                const suggestedTags = response.text;
-
-                if (suggestedTags && suggestedTags.trim().length > 2) {
-                    const cleanTags = suggestedTags.replace(/```/g, "").replace(/tags:/gi, "").replace(/tag:/gi, "").trim();
-                    const tagInput = document.getElementById('quiz-tags');
-                    if (tagInput) {
-                        // V101.07: merge into the existing list instead of replacing it;
-                        // the normaliser de-dupes case-insensitively and caps the list.
-                        const before = window.normalizeQuizTagList(tagInput.value);
-                        const after = window.normalizeQuizTagList([...before, ...cleanTags.split(/[,\n]/)]);
-                        tagInput.value = after.join(', ');
-                        if (typeof refreshTagChips === 'function') refreshTagChips();
-                        if (typeof showToast === 'function') showToast(`✅ AI added ${after.length - before.length} new tag(s)`);
-                    }
-                }
+                const prop = await window.suggestEditorVocabTags();
+                const n = prop.add.topic.length + prop.add.skill.length + prop.add.population.length;
+                const sysChanged = window.qtxApply(prop);
+                showToast(n || sysChanged ? `✅ AI added ${n} tag(s)${sysChanged ? ` · System → ${prop.system}` : ''}` : 'Tags already match the AI suggestion');
             } catch (e) {
                 alert("AI Tagging Error: " + e.message);
             } finally {
