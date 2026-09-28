@@ -14,12 +14,14 @@ function slice(startMarker, endMarker) {
     if (a < 0 || b < 0) { console.error(`marker not found: ${startMarker} … ${endMarker}`); process.exit(1); }
     return html.slice(a, b);
 }
-const readerSrc = slice('        const splitTagCsv = s =>', '        window.isQuizMarkerTag = t =>'); // V101.15
+const readerSrc = slice('        const splitTagCsv = s =>', '        window.quizLegacyMarkers = function'); // V101.15 · V102.25: + isQuizMarkerTag / stripQuizMarkerTags
 const hygieneSrc = readerSrc + '\n' + slice('window.computeQuizTagHygiene = function', '\n        };\n') + '\n        };';
-const editorSrc = slice('        const QUIZ_TAG_MAX = 20;', '        window.regenerateSingleAiSuggestion = async function');
+// V102.25: AI Suggest now goes through suggestEditorVocabTags / qtxApply, which live in the
+// QUIZ_TAG_VOCAB block just above QUIZ_TAG_MAX — load it too.
+const editorSrc = slice('        window.QUIZ_TAG_VOCAB = {', '        window.regenerateSingleAiSuggestion = async function');
 
 const els = {};
-const mk = id => els[id] || (els[id] = { id, innerHTML: '', value: '', dataset: {}, disabled: false });
+const mk = id => els[id] || (els[id] = { id, innerHTML: '', value: '', dataset: {}, disabled: false, dispatchEvent: () => true });
 const document = { getElementById: mk };
 const window = {};
 const toasts = [];
@@ -39,7 +41,7 @@ const ctx = {
     alert: m => alerts.push(m),
     prompt: () => promptAnswer,
     confirm: () => { throw new Error('confirm() must not be called any more'); },
-    getQuizFormData: () => ({ title: 'T', questions: [{ q: 'q1' }] }),
+    getQuizFormData: () => ({ title: 'T', questions: [{ q: 'q1' }], tags: mk('quiz-tags').value }),
     triggerAutoSave: () => {}
 };
 // refreshTagChips / editTagChip are called bare inside the block; expose after load.
@@ -67,7 +69,8 @@ check('chips rendered', (mk('quiz-tag-chips-container').innerHTML.match(/fa-circ
 // autocomplete: existing tags first (canonical, by count), then systems/symptoms, then LP; current tags excluded
 const opts = [...mk('quiz-tag-suggestions').innerHTML.matchAll(/<option value="([^"]*)">([^<]*)<\/option>/g)].map(m => [m[1], m[2]]);
 check('suggestions exclude tags already on the quiz', opts.some(o => o[0].toLowerCase() === 'headache' || o[0].toLowerCase() === 'fever'), false);
-check('suggestions start with existing tags (ties alphabetical)', opts[0].join('|'), 'Drug Interaction|1 quiz');
+check('suggestions start with the approved vocabulary (V102.22)', opts[0].join('|'), 'Pharmacotherapy|Skill');
+check('…then existing tags (ties alphabetical)', opts.find(o => /quiz/.test(o[1])).join('|'), 'Drug Interaction|1 quiz');
 check('machine markers are never suggested', opts.some(o => /^ai_/i.test(o[0])), false);
 check('suggestions include system label + symptom + LP tag', ['Neurological', 'Dizziness', 'cough'].every(v => opts.some(o => o[0] === v)), true);
 
@@ -76,12 +79,15 @@ promptAnswer = ' DRUG INTERACTION ';
 window.editTagChip(1);
 check('editTagChip canonicalises', mk('quiz-tags').value, 'Headache, Drug Interaction');
 
-// autoTagQuizAI: merges instead of replacing, never calls confirm()
-window.callUniversalAI = async () => ({ text: 'Tags: Migraine, headache\nDrug interaction, Pediatric Dosing' });
+// autoTagQuizAI (V102.25): vocabulary only — merges, drops invented tags, fills an Auto System, never calls confirm()
+window.callUniversalAI = async () => ({ text: JSON.stringify({ results: [{ id: 'editor', system: 'neuro', topics: ['migraine & headache', 'Invented Topic'], skill: ['Drug Safety & Interactions', 'Pharmacotherapy'], population: [] }] }) });
+window.safeJsonParse = t => { try { return JSON.parse(t); } catch (_) { return null; } };
+mk('quiz-system-select').value = '';
 const btn = { innerHTML: 'AI Suggest', disabled: false };
 window.autoTagQuizAI(btn).then(() => {
-    check('AI Suggest merges + de-dupes', mk('quiz-tags').value, 'Headache, Drug Interaction, Migraine, Pediatric Dosing');
-    check('AI Suggest toast counts new tags', toasts[toasts.length - 1], '✅ AI added 2 new tag(s)');
+    check('AI Suggest merges vocabulary tags only', mk('quiz-tags').value, 'Headache, Drug Interaction, Migraine & Headache, Drug Safety & Interactions');
+    check('AI Suggest fills an Auto System', mk('quiz-system-select').value, 'neuro');
+    check('AI Suggest toast counts new tags', toasts[toasts.length - 1], '✅ AI added 2 tag(s) · System → neuro');
     check('button restored', `${btn.disabled}|${btn.innerHTML}`, 'false|AI Suggest');
     check('no alerts', alerts.length, 0);
 
