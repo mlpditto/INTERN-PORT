@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.40)</title>
+    <title>Nika Admin (V102.41)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -7725,8 +7725,8 @@
                     style="display:none; gap:8px; flex-wrap:wrap; align-items:center; padding-left:12px; border-left:1px solid var(--border-color);"></div>
             </div>
             <!-- V102.33: the leaderboard strip repeated the table's 🥇🥈🥉 rows, so it is hidden.
-                 It still renders: its hidden chart-/stats- divs fill _lbChartCache, which
-                 openLbPopup() needs — the rank cell in the table now opens that popup. -->
+                 V102.41: and no longer rendered — see renderLeaderboard(). The rank cell opens
+                 the Insight popup (openLbPopup → openUserHub), which loads its own data. -->
             <div id="leaderboardList" style="display:none;"></div>
             <!-- V102.32: Badge Stats moved here from the Dashboard (V102.30). Follows the
                  User Hub group chip rail; tap a count to filter the table below to those
@@ -48290,7 +48290,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
         async function renderLeaderboard() {
             const l = document.getElementById("leaderboardList");
-            if (!l) return;
+            // V102.41: the strip is hidden (V102.33) and nothing reads what it builds —
+            // openLbPopup is the openUserHub wrapper, not the old _lbChartCache reader — yet
+            // loadLeaderboardCharts still ran 4 reads per user for up to 20 users per
+            // section on every users snapshot. Skip it while hidden.
+            if (!l || l.style.display === 'none') return;
             l.innerHTML = "";
             if (!usersData.length) { l.innerHTML = "<div style='text-align:center;padding:20px;color:#999;'>No user data found.</div>"; return; }
 
