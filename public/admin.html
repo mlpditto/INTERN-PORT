@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.37)</title>
+    <title>Nika Admin (V102.38)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -14165,6 +14165,21 @@
                     style="background:none; border:none; color:#94a3b8; font-size:0.78em; cursor:pointer; margin:0; padding:2px 0;"><i class="fa-solid fa-gear"></i><span data-gs-en="Manage groups" data-gs-th="จัดการกลุ่ม">Manage groups</span></button>
                 <button type="button" onclick="openGroupSettingsUI()"
                     style="background:none; border:none; color:#94a3b8; font-size:0.78em; cursor:pointer; margin:0; padding:2px 0;"><i class="fa-solid fa-sliders"></i><span data-gs-en="Group visibility settings" data-gs-th="การแสดงผลกลุ่ม">Group visibility settings</span></button>
+                <button type="button" id="gs-merge-btn" onclick="toggleGroupMerge()" aria-expanded="false" title="Merge one group name into another — e.g. Extern → EXTERN"
+                    style="background:none; border:none; color:#94a3b8; font-size:0.78em; cursor:pointer; margin:0; padding:2px 0;">⇄ <span data-gs-en="Merge groups" data-gs-th="รวมกลุ่ม">Merge groups</span></button>
+            </div>
+            <!-- V102.38: Merge groups. Lists every exact spelling in use (users, pre-reg,
+                 quizzes, events, divisions, visibility settings) so case variants such as
+                 "Extern" / "EXTERN" show separately, previews what will change, then
+                 rewrites them all in batched writes. -->
+            <div id="gs-merge-panel" class="lang-no-toggle" hidden style="margin:0 0 14px; padding:12px; border:1px solid #e2e8f0; border-radius:12px; background:#f8fafc;">
+                <div style="font-size:0.78em; font-weight:800; color:#64748b; margin-bottom:6px;">From</div>
+                <div id="gs-merge-from" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;"></div>
+                <div style="font-size:0.78em; font-weight:800; color:#64748b; margin-bottom:6px;">Into</div>
+                <div id="gs-merge-into" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;"></div>
+                <div id="gs-merge-preview" role="status" style="font-size:0.8em; color:#334155; margin-bottom:10px;"></div>
+                <button type="button" id="gs-merge-go" onclick="runGroupMerge()" disabled
+                    style="width:auto; min-height:0; margin:0; padding:7px 14px; border:none; border-radius:10px; background:#b45309; color:#fff; font-weight:700; font-size:0.82em; cursor:pointer;">⇄ Merge</button>
             </div>
 
             </div>
@@ -22986,22 +23001,25 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const config = Object.values(divisionConfig || {}).flat();
             const predefined = Object.keys(groupColorMap);
 
-            const raw = [...users, ...config, ...predefined];
-            const uniqueMap = {};
-
-            raw.forEach(g => {
+            // V102.38: the chip shows the spelling the DATA uses most. It used to prefer
+            // the groupColorMap key ('Extern', 'Intern'), so picking the chip for a user
+            // wrote "Extern" next to nine "EXTERN" users — that is how the twin groups
+            // appeared. A predefined name now only shows when no user or division uses it.
+            const spellings = {}; // UPPER key -> { exact spelling: uses }
+            [...users, ...config].forEach(g => {
                 if (!g) return;
                 const trimmed = g.trim();
                 const key = trimmed.toUpperCase();
-
-                // Determine best casing: priority to predefined, then first encounter
-                if (predefined.includes(trimmed)) { // Check for exact match in predefined
-                    uniqueMap[key] = trimmed;
-                } else if (!uniqueMap[key]) {
-                    uniqueMap[key] = trimmed;
-                }
+                spellings[key] = spellings[key] || {};
+                spellings[key][trimmed] = (spellings[key][trimmed] || 0) + 1;
             });
-            return Object.values(uniqueMap).sort((a, b) => a.localeCompare(b));
+            predefined.forEach(g => {
+                const key = g.trim().toUpperCase();
+                if (!spellings[key]) spellings[key] = { [g.trim()]: 0 };
+            });
+            return Object.values(spellings)
+                .map(forms => Object.entries(forms).sort((a, b) => b[1] - a[1])[0][0])
+                .sort((a, b) => a.localeCompare(b));
         }
 
         auth.onAuthStateChanged(async user => {
@@ -35339,6 +35357,15 @@ They can connect again from LINE.
                 if (!inp.parentNode) return;
                 const name = inp.value.trim();
                 if (!name) { cancel(); return; }
+                // V102.38: "extern" when "EXTERN" exists picks EXTERN instead of creating a twin.
+                const twin = [...list.querySelectorAll('.gs-chip')].find(c => (c.dataset.group || '').trim().toUpperCase() === name.toUpperCase());
+                if (twin) {
+                    cancel();
+                    gsPickGroup(twin, twin.dataset.group);
+                    const hint = document.getElementById('gs-new-hint');
+                    if (hint) { hint.textContent = `“${twin.dataset.group}” already exists — picked it instead.`; hint.style.display = 'block'; }
+                    return;
+                }
                 document.getElementById('gs-input').value = name;
                 document.getElementById('gs-current-group').textContent = name;
                 list.querySelectorAll('.gs-chip').forEach(c => { c.setAttribute('aria-pressed', 'false'); c.style.background = '#fff'; c.style.color = '#334155'; c.style.borderColor = '#e2e8f0'; });
@@ -35356,6 +35383,95 @@ They can connect again from LINE.
             inp.addEventListener('blur', commit);
             chipEl.replaceWith(inp);
             inp.focus();
+        }
+
+        // V102.38: Merge groups — every exact spelling of a group name in use, where it lives.
+        const gsMerge = { from: null, into: null };
+        function groupNameUses() {
+            const uses = new Map(); // exact name -> { users, pre, quizzes, events, divisions, settings }
+            const bump = (name, k) => {
+                if (!name) return;
+                if (!uses.has(name)) uses.set(name, { users: 0, pre: 0, quizzes: 0, events: 0, divisions: 0, settings: 0 });
+                uses.get(name)[k]++;
+            };
+            usersData.forEach(u => bump(u.group || 'Public', 'users'));
+            preRegData.forEach(p => { if (!p.claimed) bump(p.group, 'pre'); });
+            quizzesData.forEach(q => { if (q && q.targetGroup && !String(q.id).startsWith('--')) bump(q.targetGroup, 'quizzes'); });
+            (eventsCache || []).forEach(e => (e.targetGroups || []).forEach(g => { if (g !== '__public__') bump(g, 'events'); }));
+            Object.values(divisionConfig || {}).forEach(gs => (gs || []).forEach(g => bump(g, 'divisions')));
+            Object.keys(groupSettings || {}).forEach(g => bump(g, 'settings'));
+            return uses;
+        }
+        function _gsMergeChip(name, n, on, pick) {
+            return `<button type="button" onclick="${pick}(this.dataset.g)" data-g="${escapeHtml(name)}" aria-pressed="${on}" style="width:auto; min-height:0; margin:0; padding:5px 11px; border-radius:999px; border:1.5px solid ${on ? 'var(--primary)' : '#e2e8f0'}; background:${on ? 'var(--primary)' : '#fff'}; color:${on ? '#fff' : '#334155'}; font:inherit; font-size:0.8em; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;"><span style="width:8px; height:8px; border-radius:50%; background:${getGroupColor(name)};"></span>${escapeHtml(name)} <span style="opacity:0.7;">${n}</span></button>`;
+        }
+        function renderGroupMerge() {
+            const uses = groupNameUses();
+            const names = [...uses.keys()].sort((a, b) => a.localeCompare(b));
+            const total = u => u.users + u.pre + u.quizzes + u.events + u.divisions + u.settings;
+            document.getElementById('gs-merge-from').innerHTML = names.filter(n => n !== 'Public').map(n => _gsMergeChip(n, uses.get(n).users, n === gsMerge.from, 'gsMergePickFrom')).join('');
+            document.getElementById('gs-merge-into').innerHTML = names.filter(n => n !== gsMerge.from).map(n => _gsMergeChip(n, uses.get(n).users, n === gsMerge.into, 'gsMergePickInto')).join('');
+            const prev = document.getElementById('gs-merge-preview');
+            const go = document.getElementById('gs-merge-go');
+            if (!gsMerge.from || !gsMerge.into) { prev.textContent = 'Pick the name to retire (From), then the one to keep (Into).'; go.disabled = true; return; }
+            const u = uses.get(gsMerge.from) || { users: 0, pre: 0, quizzes: 0, events: 0, divisions: 0, settings: 0 };
+            const parts = [[u.users, 'users'], [u.pre, 'pre-reg'], [u.quizzes, 'quizzes'], [u.events, 'events'], [u.divisions, 'division slots'], [u.settings, 'visibility setting']].filter(x => x[0]).map(x => `${x[0]} ${x[1]}`);
+            prev.innerHTML = `“<b>${escapeHtml(gsMerge.from)}</b>” → “<b>${escapeHtml(gsMerge.into)}</b>”: ${parts.join(' · ') || 'nothing references it'}`;
+            go.disabled = !total(u);
+        }
+        function gsMergePickFrom(g) { gsMerge.from = g; if (gsMerge.into === g) gsMerge.into = null; renderGroupMerge(); }
+        function gsMergePickInto(g) { gsMerge.into = g; renderGroupMerge(); }
+        function toggleGroupMerge() {
+            const panel = document.getElementById('gs-merge-panel');
+            panel.hidden = !panel.hidden;
+            document.getElementById('gs-merge-btn').setAttribute('aria-expanded', String(!panel.hidden));
+            if (!panel.hidden) { gsMerge.from = gsMerge.into = null; renderGroupMerge(); }
+        }
+        async function runGroupMerge() {
+            const from = gsMerge.from, into = gsMerge.into;
+            if (!from || !into || from === into || from === 'Public') return;
+            const uses = groupNameUses().get(from);
+            if (!uses) return;
+            if (!confirm(`Merge group "${from}" into "${into}"?\n\n${document.getElementById('gs-merge-preview').textContent}\n\nEvery place that uses "${from}" is rewritten to "${into}". This changes the database.`)) return;
+            const go = document.getElementById('gs-merge-go');
+            go.disabled = true; go.textContent = 'Merging…';
+            // Firestore batches cap at 500 writes, so collect the ops and commit in chunks.
+            const ops = [];
+            usersData.filter(u => (u.group || 'Public') === from).forEach(u => ops.push(b => b.update(db.collection('users').doc(u.id), { group: into })));
+            preRegData.filter(p => !p.claimed && p.group === from).forEach(p => ops.push(b => b.update(db.collection('pre_users').doc(p.id), { group: into })));
+            quizzesData.filter(q => q && q.targetGroup === from && !String(q.id).startsWith('--')).forEach(q => ops.push(b => b.update(db.collection('quizzes').doc(q.id), { targetGroup: into })));
+            (eventsCache || []).filter(e => (e.targetGroups || []).includes(from)).forEach(e => {
+                const next = [...new Set(e.targetGroups.map(g => g === from ? into : g))];
+                ops.push(b => b.update(db.collection('events').doc(e.id), { targetGroups: next }));
+            });
+            if (uses.divisions) {
+                const next = {};
+                Object.entries(divisionConfig || {}).forEach(([d, gs]) => { next[d] = [...new Set((gs || []).map(g => g === from ? into : g))]; });
+                ops.push(b => b.set(db.collection('quizzes').doc('--divisions-config--'), next));
+            }
+            if (uses.settings) {
+                const next = { ...groupSettings };
+                if (!next[into]) next[into] = next[from]; // keep the retired name's visibility if the kept one has none
+                delete next[from];
+                ops.push(b => b.set(db.collection('quizzes').doc('--group-settings--'), next));
+            }
+            try {
+                for (let i = 0; i < ops.length; i += 450) {
+                    const batch = db.batch();
+                    ops.slice(i, i + 450).forEach(op => op(batch));
+                    await batch.commit();
+                }
+                showToast(`Merged "${from}" into "${into}" · ${ops.length} updates`);
+                gsMerge.from = gsMerge.into = null;
+                if (activeUserGroup === from) setUserGroupFilter(into);
+            } catch (e) {
+                console.error(e);
+                alert('Merge stopped: ' + e.message + '\n\nSome updates may already be saved. Re-open Merge groups — any names still left will show again.');
+            } finally {
+                go.textContent = '⇄ Merge';
+                renderGroupMerge();
+                setTimeout(renderGroupMerge, 1500); // again once the listeners have echoed the writes
+            }
         }
 
         function toggleGroupManageMode() {
@@ -35463,6 +35579,8 @@ They can connect again from LINE.
             suggestions.innerHTML = allGroups.map(g => `<option value="${g}">`).join('');
 
             list.classList.remove('gs-managing');
+            document.getElementById('gs-merge-panel').hidden = true; // V102.38
+            document.getElementById('gs-merge-btn').setAttribute('aria-expanded', 'false');
             const _gsManageBtn = document.getElementById('gs-manage-btn');
             if (_gsManageBtn) _gsManageBtn.innerHTML = '<i class="fa-solid fa-gear"></i> Manage groups';
             const curUp = (input.value || 'Public').toUpperCase();
