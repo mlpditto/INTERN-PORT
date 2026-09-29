@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.32)</title>
+    <title>Nika Admin (V102.33)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -7654,45 +7654,29 @@
         </div>
 
         <div id="tab-users" class="tab-content">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:15px;">
-                <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:250px;">
-                    <h3 style="margin:0; font-size:1.3em; color:var(--primary); font-weight:900;">🏆 Elite Board</h3>
-                    <div style="position:relative; flex:1; max-width:220px;">
-                        <input type="text" id="userSearch" placeholder="🔍 Search Users..." onkeyup="filterUsers()"
-                            style="width:100%; border-radius:14px; border:1px solid #ddd; padding:8px 12px 8px 35px; font-size:0.85em; font-weight:600;">
-                    </div>
-                    <span id="user-count-label" style="font-size:0.75em; color:#94a3b8; font-weight:800; background:#f1f5f9; padding:4px 12px; border-radius:20px;"></span>
+            <!-- V102.33 — User Hub lean (variant B): one toolbar line of icon chips. The
+                 "N users" pill went (the All chip carries the count); Range folds behind 📅;
+                 Units / Entry / Decay are icon-only (names in title/aria-label); 🏅 opens
+                 Badge Stats; 📤 is the leaderboard Share that used to sit on the strip. -->
+            <div class="lang-no-toggle" style="display:flex; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+                <h3 style="margin:0; font-size:1.3em;" title="Elite Board" aria-label="Elite Board">🏆</h3>
+                <input type="text" id="userSearch" placeholder="🔍" aria-label="Search users" title="Search users" onkeyup="filterUsers()"
+                    style="width:140px; height:34px; margin:0; border-radius:10px; border:1px solid var(--border-color); padding:0 10px; font-size:0.85em; font-weight:600;">
+                <button type="button" id="lb-range-chip" onclick="toggleRangeBox()" title="Score range (dates)" aria-label="Score range" aria-expanded="false" style="width:34px; height:34px; min-height:0; padding:0; margin:0; border-radius:10px; border:1px solid var(--border-color); background:var(--bg-card); font-size:1.05em; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">📅</button>
+                <div id="lb-range-box" style="display:none; align-items:center; gap:6px; background:var(--bg-card); padding:4px 10px; border-radius:10px; border:1px solid var(--border-color); font-size:0.8em; font-weight:700;">
+                    <input type="date" id="lb-global-start" onchange="renderTable('users'); updateRangeChip()" aria-label="From"
+                        style="padding:4px; margin:0; border:none; background:#f9fbff; font-weight:900; cursor:pointer; color:var(--primary); border-radius:8px;">
+                    <span style="opacity:0.3">–</span>
+                    <input type="date" id="lb-global-end" onchange="renderTable('users'); updateRangeChip()" aria-label="To"
+                        style="padding:4px; margin:0; border:none; background:#f9fbff; font-weight:900; cursor:pointer; color:var(--primary); border-radius:8px;">
                 </div>
-
-                <div style="display:flex; align-items:center; gap:12px; background:white; padding:8px 18px; border-radius:16px; border:1.5px solid #edf2f7; font-size:0.8em; font-weight:700; box-shadow:0 4px 6px rgba(0,0,0,0.02);">
-                    📅 Range:
-                    <input type="date" id="lb-global-start" onchange="renderTable('users')"
-                        style="padding:4px; border:none; background:#f9fbff; font-weight:900; cursor:pointer; color:var(--primary); border-radius:8px;">
-                    <span style="opacity:0.3">-</span>
-                    <input type="date" id="lb-global-end" onchange="renderTable('users')"
-                        style="padding:4px; border:none; background:#f9fbff; font-weight:900; cursor:pointer; color:var(--primary); border-radius:8px;">
-                </div>
-
-                <!-- V99.45 — Elite Board Phase 4: four solid-colour buttons competed with the
-                     title. Units / Entry / Progress are one quiet outline group; Decay stands
-                     apart in a warning outline, because it is the one that takes points. -->
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <div style="display:flex; gap:6px;">
-                        <button class="btn-sm" onclick="openDivisionsModal()"
-                            style="background:var(--bg-card); color:var(--text-main); border:1px solid var(--border-color); border-radius:12px; padding:7px 14px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">🛡️ Units</button>
-                        <button class="btn-sm" onclick="openPreRegModal()"
-                            style="background:var(--bg-card); color:var(--text-main); border:1px solid var(--border-color); border-radius:12px; padding:7px 14px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">👥 Entry</button>
-                        <!-- V100.82: "🎯 Progress ▾" popover removed — its 2 items (Goals,
-                             Certificates) moved into the global ➕ Create menu. -->
-                    </div>
-                    <span aria-hidden="true" style="width:1px; align-self:stretch; background:var(--border-color);"></span>
-                    <!-- V97.73: manual runner for the nightly check-in decay. Preview-then-
-                         apply, same shape as the digest panel: the endpoint behind Preview
-                         holds no write path at all, and Apply only appears once a preview
-                         has rendered — because this one takes points off real people. -->
-                    <button class="btn-sm" onclick="previewCheckinDecay()"
-                        style="background:rgba(245, 158, 11, 0.10); color:color-mix(in srgb, #d97706 75%, var(--text-main)); border:1px solid rgba(217, 119, 6, 0.45); border-radius:12px; padding:7px 14px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'" title="Preview the daily no-check-in decay">⏳ Decay</button>
-                </div>
+                <span style="flex:1"></span>
+                <button type="button" id="bstat-chip" onclick="toggleBadgeStatsPanel()" title="Badge Stats — interns whose app has synced badges" aria-label="Badge Stats" aria-expanded="false" style="width:34px; height:34px; min-height:0; padding:0; margin:0; border-radius:10px; border:1px solid var(--border-color); background:var(--bg-card); font-size:1.05em; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; width:auto; padding:0 10px; gap:5px; font-size:0.85em; font-weight:700;">🏅 <span id="bstat-chip-n">–</span></button>
+                <button type="button" onclick="openShareModalForGroup(activeUserGroup === 'All' ? 'Global Leaderboard' : activeUserGroup)" title="Share ranking" aria-label="Share ranking" style="width:34px; height:34px; min-height:0; padding:0; margin:0; border-radius:10px; border:1px solid var(--border-color); background:var(--bg-card); font-size:1.05em; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">📤</button>
+                <button type="button" onclick="openDivisionsModal()" title="Units" aria-label="Units" style="width:34px; height:34px; min-height:0; padding:0; margin:0; border-radius:10px; border:1px solid var(--border-color); background:var(--bg-card); font-size:1.05em; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">🛡️</button>
+                <button type="button" onclick="openPreRegModal()" title="Entry (pre-registration)" aria-label="Entry" style="width:34px; height:34px; min-height:0; padding:0; margin:0; border-radius:10px; border:1px solid var(--border-color); background:var(--bg-card); font-size:1.05em; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">👥</button>
+                <!-- V97.73: manual runner for the nightly check-in decay (preview, then apply) — kept apart in a warning outline because it takes points. -->
+                <button type="button" onclick="previewCheckinDecay()" title="Preview the daily no-check-in decay" aria-label="Decay" style="width:34px; height:34px; min-height:0; padding:0; margin:0; border-radius:10px; border:1px solid var(--border-color); background:var(--bg-card); font-size:1.05em; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; border-color:rgba(217, 119, 6, 0.45); background:rgba(245, 158, 11, 0.10);">⏳</button>
             </div>
 
             <div id="decay-box" class="lang-no-toggle" style="display:none; margin-bottom:18px; border:1px solid #d8dee7; border-radius:12px; background:#f8fafc; padding:12px 14px;">
@@ -7713,8 +7697,8 @@
 
             <!-- V99.45 — Elite Board Phase 4: group tabs and Know Yourself share one rail
                  (they used to sit either side of the leaderboard). -->
-            <div style="display:flex; align-items:center; gap:8px 12px; flex-wrap:wrap; padding-bottom:10px; margin-bottom:15px; border-bottom:2px solid #f0f0f0;">
-                <div id="user-group-tabs" style="display:flex; gap:8px; overflow-x:auto; min-width:0; max-width:100%;"></div>
+            <div style="display:flex; align-items:center; gap:6px 10px; flex-wrap:wrap; padding-bottom:10px; margin-bottom:12px; border-bottom:1px solid var(--border-color);">
+                <div id="user-group-tabs" style="display:flex; gap:6px; overflow-x:auto; min-width:0; max-width:100%;"></div>
                 <!-- V98.49: "Know Yourself" filter for the table. Rendered by
                      renderUserPersFilter() from the group-filtered rows and hidden
                      entirely while nobody in view has self-reported anything — the
@@ -7724,11 +7708,14 @@
                 <div id="user-pers-filter" class="lang-no-toggle"
                     style="display:none; gap:8px; flex-wrap:wrap; align-items:center; padding-left:12px; border-left:1px solid var(--border-color);"></div>
             </div>
-            <div id="leaderboardList" style="margin-bottom:25px; overflow-x:auto;"></div>
+            <!-- V102.33: the leaderboard strip repeated the table's 🥇🥈🥉 rows, so it is hidden.
+                 It still renders: its hidden chart-/stats- divs fill _lbChartCache, which
+                 openLbPopup() needs — the rank cell in the table now opens that popup. -->
+            <div id="leaderboardList" style="display:none;"></div>
             <!-- V102.32: Badge Stats moved here from the Dashboard (V102.30). Follows the
                  User Hub group chip rail; tap a count to filter the table below to those
                  interns. Reads users/{uid}.badges from usersData — no new query. -->
-            <details id="badge-stats-panel" class="lang-no-toggle" ontoggle="if (this.open) renderBadgeStats()" style="margin-bottom:14px; border:1px solid #e2e8f0; border-radius:12px; background:#fff;">
+            <details id="badge-stats-panel" class="lang-no-toggle" ontoggle="if (this.open) renderBadgeStats()" style="display:none; margin-bottom:14px; border:1px solid #e2e8f0; border-radius:12px; background:#fff;">
                 <summary style="padding:10px 14px; cursor:pointer; font-weight:700; color:var(--primary); list-style:none; display:flex; align-items:center; gap:8px;">
                     <i class="fa-solid fa-medal"></i> Badge Stats
                     <span id="bstat-summary" style="font-size:0.78em; font-weight:600; color:#64748b; margin-left:auto;"></span>
@@ -7739,15 +7726,12 @@
                 <table id="usersTable" class="lang-no-toggle">
                     <thead>
                         <tr>
-                            <th style="width:40px;">Rank</th>
-                            <th>User (Cert Name)</th>
-                            <th>Group</th>
-                            <th>Status</th>
-                            <th style="width:100px;">Score / Beri</th>
-                            <th style="width:70px; text-align:center;">Logs</th>
-                            <th style="width:96px;"><button type="button" id="user-badge-sort" onclick="toggleUserBadgeSort()" aria-pressed="false" title="Sort by badges" style="width:auto; min-height:0; margin:0; padding:0; background:none; border:none; font:inherit; font-weight:inherit; color:inherit; cursor:pointer;">Badges ↕</button></th>
-                            <th>Period</th>
-                            <th>Actions</th>
+                            <th style="width:40px;" title="Rank">#</th>
+                            <th>User <button type="button" id="user-badge-sort" onclick="toggleUserBadgeSort()" aria-pressed="false" title="Sort by badges" style="width:auto; min-height:0; margin:0 0 0 6px; padding:0 4px; background:none; border:none; font:inherit; font-weight:inherit; color:inherit; cursor:pointer;">🏅↕</button></th>
+                            <th style="width:70px;" title="Score">⭐</th>
+                            <th style="width:60px;" title="Beri">🪙</th>
+                            <th title="Internship period">⏳</th>
+                            <th aria-label="Actions"></th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -35694,12 +35678,13 @@ They can connect again from LINE.
                     count = allUsersAndPre.filter(u => (u.group || 'Public') === g).length;
                 }
 
+                // V102.33 (lean B): icon + count only; the group name is the title / aria-label.
                 return `<button onclick="setUserGroupFilter('${safeGroup}')" style="
-                    padding:6px 16px; border-radius:20px; border:2px solid ${isActive ? color : '#ddd'};
+                    width:auto; min-height:0; padding:5px 11px; border-radius:20px; border:2px solid ${isActive ? color : '#ddd'};
                     background:${isActive ? color : '#fff'}; color:${isActive ? '#fff' : color};
                     font-size:0.82em; font-weight:bold; cursor:pointer; white-space:nowrap;
                     display:flex; align-items:center; gap:5px; transition:all 0.2s;
-                "><i class="fa-solid ${icon}"></i> <span class="lang-no-toggle">${g}</span> <span style="background:${isActive ? 'rgba(255,255,255,0.3)' : '#eee'}; padding:1px 7px; border-radius:10px; font-size:0.85em;">${count}</span></button>`;
+" title="${escapeHtml(g)}" aria-label="${escapeHtml(g)} · ${count}"><i class="fa-solid ${icon}"></i> <span style="background:${isActive ? 'rgba(255,255,255,0.3)' : '#eee'}; padding:1px 7px; border-radius:10px; font-size:0.85em;">${count}</span></button>`;
             }).join('');
         }
 
@@ -35808,8 +35793,46 @@ They can connect again from LINE.
         }
 
         function renderBadgeStatsIfOpen() {
+            renderBadgeStatsChip();
             const panel = document.getElementById('badge-stats-panel');
-            if (panel && panel.open) renderBadgeStats();
+            if (panel && panel.open && panel.style.display !== 'none') renderBadgeStats();
+        }
+
+        // V102.33 (lean B): 🏅 toolbar chip = synced/total for the current group; it
+        // shows / hides the Badge Stats card (no longer a permanent full-width bar).
+        function renderBadgeStatsChip() {
+            const n = document.getElementById('bstat-chip-n');
+            if (!n) return;
+            const g = activeUserGroup;
+            const inGroup = u => g === 'All' || (divisionConfig && divisionConfig[g] ? divisionConfig[g].includes(u.group || 'Public') : (u.group || 'Public') === g);
+            const users = usersData.filter(u => !u.isIgnored && !u.isPreReg && inGroup(u));
+            n.textContent = `${users.filter(u => u.badges && typeof u.badges === 'object').length}/${users.length}`;
+        }
+        function toggleBadgeStatsPanel() {
+            const panel = document.getElementById('badge-stats-panel');
+            const chip = document.getElementById('bstat-chip');
+            if (!panel) return;
+            const show = panel.style.display === 'none';
+            panel.style.display = show ? '' : 'none';
+            panel.open = show;
+            if (chip) chip.setAttribute('aria-expanded', String(show));
+            if (show) renderBadgeStats();
+        }
+        function toggleRangeBox() {
+            const box = document.getElementById('lb-range-box');
+            const chip = document.getElementById('lb-range-chip');
+            if (!box) return;
+            const show = box.style.display === 'none';
+            box.style.display = show ? 'flex' : 'none';
+            if (chip) chip.setAttribute('aria-expanded', String(show));
+        }
+        // The 📅 chip turns primary while a range is set, so a period-scored table is never unexplained.
+        function updateRangeChip() {
+            const chip = document.getElementById('lb-range-chip');
+            if (!chip) return;
+            const on = !!((document.getElementById('lb-global-start') || {}).value || (document.getElementById('lb-global-end') || {}).value);
+            chip.style.borderColor = on ? 'var(--primary)' : 'var(--border-color)';
+            chip.style.background = on ? '#eef2ff' : 'var(--bg-card)';
         }
 
         // Tier an intern holds on one badge: 0 = none, 1-4 = Bronze…Diamond, null = app never synced.
@@ -35837,7 +35860,7 @@ They can connect again from LINE.
         function toggleUserBadgeSort() {
             window._userBadgeSort = !window._userBadgeSort;
             const btn = document.getElementById('user-badge-sort');
-            if (btn) { btn.setAttribute('aria-pressed', String(window._userBadgeSort)); btn.textContent = window._userBadgeSort ? 'Badges ▾' : 'Badges ↕'; }
+            if (btn) { btn.setAttribute('aria-pressed', String(window._userBadgeSort)); btn.textContent = window._userBadgeSort ? '🏅▾' : '🏅↕'; }
             renderTable('users');
         }
 
@@ -47188,8 +47211,6 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     data.sort((a, b) => (b.score || 0) - (a.score || 0));
                 }
 
-                const countLabel = document.getElementById('user-count-label');
-                if (countLabel) countLabel.innerText = `${data.length} users`;
 
                 // V99.42 — Elite Board Phase 1: the table is three sections, not one
                 // ranked list. Active users lead, followed by pending pre-registrations.
@@ -47204,7 +47225,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 data = [...secAct, ...secPend, ...secIgn];
                 // A search that only matches an ignored user must still show them.
                 usersIgnOpen = !!window._userIgnOpen || !!t;
-                const secHead = html => `<tr class="u-sec-row"><td colspan="9" style="padding:0; background:var(--bg-body); border-top:1px solid var(--border-color);">${html}</td></tr>`;
+                const secHead = html => `<tr class="u-sec-row"><td colspan="6" style="padding:0; background:var(--bg-body); border-top:1px solid var(--border-color);">${html}</td></tr>`;
                 const secLabel = (label, n, color) => `<span style="display:inline-flex; align-items:center; gap:6px; padding:7px 12px; font-size:0.78em; font-weight:800; color:${color};">${label} <span style="background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-sub); padding:0 8px; border-radius:10px; font-size:0.92em;">${n}</span></span>`;
                 usersHeads = new Map();
                 if (secPend.length) usersHeads.set(secPend[0], secHead(secLabel('<i class="fa-solid fa-hourglass-half"></i> Pending requests', secPend.length, '#b45309')));
@@ -47287,20 +47308,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     if (rank === 1) rankDisplay = '<span style="font-size:1.4em;">🥇</span>';
                     else if (rank === 2) rankDisplay = '<span style="font-size:1.4em;">🥈</span>';
                     else if (rank === 3) rankDisplay = '<span style="font-size:1.4em;">🥉</span>';
+                    // V102.33: the rank opens the activity popup the hidden leaderboard strip used to.
+                    if (rank) rankDisplay = `<button type="button" onclick="openLbPopup('${d.id}')" title="Open activity" style="width:auto; min-height:0; margin:0; padding:2px 4px; background:none; border:none; cursor:pointer; font:inherit;">${rankDisplay}</button>`;
+                    // Group = a colour dot on the avatar (name in the title); tap to change group.
+                    const avatarWithDot = (uid, pic, grp) => `<span style="position:relative; display:inline-block; flex-shrink:0;"><img src="${pic}" class="user-pic" style="display:block;"><button type="button" onclick="setUserGroup('${uid}', '${String(grp).replace(/'/g, "\\'")}')" title="${escapeHtml(grp)} — change group" aria-label="Group ${escapeHtml(grp)}" style="position:absolute; right:-3px; bottom:-3px; width:13px; height:13px; min-height:0; padding:0; margin:0; border-radius:50%; border:2px solid var(--bg-card, #fff); background:${getGroupColor(grp)}; cursor:pointer;"></button></span>`;
 
                     if (d.isPreReg) {
                         const dateStr = (d.startDate && d.endDate) ? `${d.startDate} ~ ${d.endDate}` : '<span style="color:#ccc; font-size:0.8em;">-</span>';
                         tbody.innerHTML += `<tr style="background:#fcfcfc;">
                             <td style="text-align:center;">-</td>
-                            <td><img src="${d.pictureUrl}" class="user-pic"> <span style="font-weight:bold; color:#777;">⏳ ${d.displayName}</span><div style="font-size:0.75em; color:var(--primary); margin-top:3px; padding-left:40px;">Code: <b style="background:#f3f0ff; padding:2px 8px; border-radius:10px; border:1px dashed var(--primary); font-family:monospace;">${d.code}</b></div></td>
-                            <!-- V100.83: Style 1+3 combined — tinted pill (colored bg/border) + neutral
-                                 text (always readable regardless of hue) + a precise color dot, replacing
-                                 the old solid-fill + white-text + icon treatment. -->
-                            <td><span class="badge" style="background:color-mix(in srgb, ${getGroupColor(d.group)} 10%, white); border:1.5px solid color-mix(in srgb, ${getGroupColor(d.group)} 32%, transparent); color:#334155; font-size:0.8em; display:inline-flex; align-items:center; gap:7px;"><span style="width:8px; height:8px; border-radius:50%; background:${getGroupColor(d.group)}; flex-shrink:0;"></span><span class="lang-no-toggle">${d.group}</span></span></td>
-                            <!-- V100.84: icon-only — text label dropped per request; title/aria-label
-                                 keep the meaning available on hover and to screen readers. -->
-                            <td><span class="badge" style="background:#ffc107; color:black; display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; padding:0; border-radius:50%;" title="Pending Req." aria-label="Pending request"><i class="fa-solid fa-hourglass-half"></i></span></td>
-                            <td>-</td>
+                            <td><div style="display:flex; align-items:center; gap:10px;">${avatarWithDot(d.id, d.pictureUrl, d.group || 'Public')}<div style="min-width:0;"><span style="font-weight:bold; color:#777;">⏳ ${d.displayName}</span><div style="font-size:0.75em; color:var(--primary); margin-top:3px;">🔑 <b style="background:#f3f0ff; padding:2px 8px; border-radius:10px; border:1px dashed var(--primary); font-family:monospace;">${d.code}</b></div></div></div></td>
                             <td>-</td>
                             <td>-</td>
                             <td style="font-size:0.78em; white-space:nowrap;">${dateStr}</td>
@@ -47383,57 +47400,34 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             <button type="button" class="u-row-kebab" onclick="openUserRowMenu(event, '${d.id}')" aria-haspopup="menu" aria-expanded="false" aria-label="More actions" title="More actions"><i class="fa-solid fa-ellipsis"></i></button>
                         </div>`;
 
+                    // V102.33 (lean B): 9 columns → 6. Group = dot on the avatar; 📝 logs and 🏅
+                    // badges sit under the name; Status went (ignore ⇄ show lives in ⋯, and the
+                    // Hidden section already says who is ignored); Set / 👁 LIFF moved into ⋯.
+                    const logsN = reflectiveLogsCache.filter(lg => lg.userId === d.id).length;
                     tbody.innerHTML += `<tr class="${ignored ? 'u-ignored' : ''}">
                             <td style="text-align:center;">${rankDisplay}</td>
                             <td>
                                 <div style="display:flex; align-items:center; gap:10px;">
-                                    <img src="${d.pictureUrl}" class="user-pic" style="flex-shrink:0;">
+                                    ${avatarWithDot(d.id, d.pictureUrl, group)}
                                     <div style="min-width:0;">
-                                        <div style="font-weight:bold; line-height:1.25;">${d.displayName}${d.googleLink && d.googleLink.uid ? ` <span title="Google connected · ${escapeHtml(d.googleLink.email || '')}" aria-label="Google connected" style="font-size:0.85em;">🌐</span>` : ''}</div>
+                                        <div style="font-weight:bold; line-height:1.25;">${d.displayName}${d.googleLink && d.googleLink.uid ? ` <span title="Google connected · ${escapeHtml(d.googleLink.email || '')}" aria-label="Google connected" style="font-size:0.85em;">🌐</span>` : ''}${ignored ? ' <span title="Hidden from boards (⋯ to show)" aria-label="Hidden from boards">🙈</span>' : ''}</div>
                                         ${certNameDisplay}
+                                        <div style="display:flex; align-items:center; gap:6px; margin-top:2px; font-size:0.78em; color:var(--text-sub);">
+                                            ${userBadgesCellHtml(d)}
+                                            <button type="button" onclick="setReflectiveSearch('${(d.displayName || d.id).replace(/'/g, "\\'")}')" title="All submitted journals, pending and reviewed" data-th-title="Journal ที่ส่งทั้งหมด รวมรายการที่รอตรวจและตรวจแล้ว" style="width:auto; min-height:0; margin:0; padding:0 2px; background:none; border:none; font:inherit; color:${logsN ? '#e67e22' : '#cbd5e1'}; cursor:pointer;">📝${logsN}</button>
+                                        </div>
                                     </div>
                                 </div>
                             </td>
-                            <!-- V98.10 lean: the Group cell only carries the change-group
-                                 control while the table shows every group (filter = All).
-                                 With a group tab active the pill just repeats the tab, so
-                                 the cell goes empty. V99.44: soft tint instead of a solid
-                                 fill; text mixed with --text-main so it reads in dark mode. -->
-                            <!-- V100.83: same Style 1+3 combined treatment as the PreReg row above —
-                                 tinted bg/border + neutral text + color dot instead of a colored-text
-                                 tint. Still the group-reassign button (onclick unchanged). -->
-                            <td>${activeUserGroup === 'All' ? `<button class="btn-sm" style="font-size:0.75em; padding:4px 10px; background:color-mix(in srgb, ${getGroupColor(group)} 10%, white); color:#334155; border:1.5px solid color-mix(in srgb, ${getGroupColor(group)} 32%, transparent); display:flex; align-items:center; gap:7px; font-weight:700;" onclick="setUserGroup('${d.id}', '${group}')"><span style="width:8px; height:8px; border-radius:50%; background:${getGroupColor(group)}; flex-shrink:0;"></span><span class="lang-no-toggle">${group}</span></button>` : ''}</td>
-                            <!-- V98.10 lean: "active" is the default — a bright green pill on
-                                 every row was noise. Active rows get a faint icon-only toggle
-                                 (still the way to ignore someone); "ignored" keeps its pill. -->
-                            <td>${ignored
-                                ? `<button class="btn-sm" onclick="toggleIgnoreUser('${d.id}',true)" style="border:none; border-radius:15px; padding:3px 12px; font-weight:800; font-size:0.75em; cursor:pointer; background:#f1f3f5; color:#adb5bd;"><i class="fa-solid fa-eye-slash"></i> ignored</button>`
-                                : `<button class="btn-sm" onclick="toggleIgnoreUser('${d.id}',false)" title="Active — click to hide from boards" style="border:none; background:transparent; color:#94a3b8; font-size:0.95em; cursor:pointer; padding:2px 6px; min-height:auto;"><i class="fa-solid fa-circle-check"></i></button>`}</td>
-                            <td>
-                                <div style="display:flex; flex-direction:column; gap:2px; align-items:flex-start;">
-                                    <span style="font-weight:700; color:var(--primary); font-size:1em;">${d.periodScore !== undefined ? `${d.periodScore.toFixed(2)} <span style="font-size:0.75em; color:#999; font-weight:400;">(+${parseFloat((d.score || 0).toFixed(2))})</span>` : parseFloat((d.score || 0).toFixed(2))}</span>
-                                    <span style="font-size:0.72em; color:#c2410c; background:#fff7ed; border:1px solid #fed7aa; border-radius:5px; padding:1px 6px; white-space:nowrap; font-weight:600;" title="Beri balance"><span aria-hidden="true">🪙</span>  ${Math.round(d.beri || 0)}</span>
-                                </div>
-                            </td>
-                            <td style="text-align:center;">
-                                <span class="badge" style="background:rgba(230,126,34,0.1); color:#e67e22; border:1px solid rgba(230,126,34,0.2); font-weight:bold; cursor:pointer;" onclick="setReflectiveSearch('${(d.displayName || d.id).replace(/'/g, "\\'")}')" title="All submitted journals, pending and reviewed" data-th-title="Journal ที่ส่งทั้งหมด รวมรายการที่รอตรวจและตรวจแล้ว">
-                                    <i class="fa-solid fa-pen-fancy"></i> ${reflectiveLogsCache.filter(lg => lg.userId === d.id).length}
-                                </span>
-                            </td>
-                            <td>${userBadgesCellHtml(d)}</td>
+                            <td><span style="font-weight:700; color:var(--primary);">${d.periodScore !== undefined ? `${d.periodScore.toFixed(2)} <span style="font-size:0.75em; color:#999; font-weight:400;">(+${parseFloat((d.score || 0).toFixed(2))})</span>` : parseFloat((d.score || 0).toFixed(2))}</span></td>
+                            <td><span style="font-weight:600; color:#c2410c;" title="Beri balance">${Math.round(d.beri || 0)}</span></td>
                             <td style="font-size:0.84em;">
                                 <div>
-                                    <!-- V98.16 lean: the full YYYY-MM-DD ~ YYYY-MM-DD string
-                                         folds behind a chevron. V99.44 (Phase 3): the days-left
-                                         bar and the Set / LIFF-visibility controls share one
-                                         line; the .row-detail stays the chevron line's next
-                                         sibling, which is what toggleRowDetail() looks for. -->
                                     <div style="display:flex; align-items:center; gap:6px; flex-wrap:nowrap;">
                                         ${daysRemainingHtml || `<span style="${d.hidePeriod ? 'text-decoration:line-through; color:#94a3b8;' : 'font-weight:700; color:#475569;'} font-family:monospace; font-size:0.92em;">${dateStr}</span>`}
                                         ${daysRemainingHtml ? `<button type="button" onclick="toggleRowDetail(this)" style="border:none; background:transparent; color:#94a3b8; cursor:pointer; font-size:0.8em; padding:0 2px; line-height:1;" title="Show dates"><i class="fa-solid fa-chevron-down"></i></button>` : ''}
+                                        ${d.hidePeriod ? '<span title="Hidden in LIFF (⋯ to show)" aria-label="Hidden in LIFF">🙈</span>' : ''}
                                         ${certStatus}
-                                        <button class="btn-sm" onclick="openPeriodModal('${d.id}', '${d.displayName}', '${d.startDate || ''}', '${d.endDate || ''}')" style="font-size:0.68em; height:20px; padding:0 6px; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; border-radius:5px; display:flex; align-items:center; gap:3px; flex-shrink:0;" title="Adjust Period"><i class="fa-solid fa-calendar-plus"></i> Set</button>
-                                        <button class="btn-sm" onclick="toggleHidePeriod('${d.id}', ${d.hidePeriod === true})" style="width:22px; height:20px; background:${d.hidePeriod ? '#fee2e2' : '#f0fdf4'}; color:${d.hidePeriod ? '#ef4444' : '#22c55e'}; border:1px solid ${d.hidePeriod ? '#fecaca' : '#dcfce7'}; border-radius:5px; display:flex; align-items:center; justify-content:center; flex-shrink:0;" title="${d.hidePeriod ? 'Hidden in LIFF' : 'Visible in LIFF'}"><i class="fa-solid ${d.hidePeriod ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
                                     </div>
                                     ${daysRemainingHtml ? `<div class="row-detail" style="display:none; margin-top:3px;"><span style="${d.hidePeriod ? 'text-decoration:line-through; color:#94a3b8;' : 'font-weight:700; color:#475569;'} font-family:monospace; font-size:0.92em;">${dateStr}</span></div>` : ''}
                                 </div>
@@ -47495,6 +47489,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const apdOwner = applicantOwnerFor(u);
             const apdCount = apdOwner ? applicantDocCount(apdOwner) : 0;
             const items = [
+                // V102.33 (lean B): Set period, LIFF visibility and ignore moved here from the row.
+                ['📅', 'Set period', () => openPeriodModal(uid, u.displayName, u.startDate || '', u.endDate || '')],
+                [u.hidePeriod ? '👁' : '🙈', u.hidePeriod ? 'Show period in LIFF' : 'Hide period in LIFF', () => toggleHidePeriod(uid, u.hidePeriod === true)],
+                [u.isIgnored ? '👀' : '🙈', u.isIgnored ? 'Show on boards' : 'Hide from boards', () => toggleIgnoreUser(uid, u.isIgnored === true)],
+                'sep',
                 ['🎓', 'Certificate', () => openCertModal(uid)],
                 ['📜', 'Score history', () => showHistory(uid, u.displayName, u.score || 0)],
                 // V98.57: log work handed in outside the app (LINE, in person).
@@ -49923,7 +49922,18 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             ].filter(o => o.k === 'all' || o.count > 0);
             if (!opts.some(o => o.k === window._userPersFilter)) window._userPersFilter = 'all';
             el.style.display = 'flex';
-            el.innerHTML = `<span style="font-size:0.72em; color:#94a3b8; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; margin-right:2px;">Know Yourself</span>` +
+            // V102.33 (lean B): the rail folds into one 🧭 chip; tap to open it. An active
+            // filter shows on the chip so a narrowed table never looks unexplained.
+            const cur = opts.find(o => o.k === window._userPersFilter) || opts[0];
+            const railOpen = !!window._persRailOpen;
+            const persToggle = `<button type="button" onclick="window._persRailOpen = !window._persRailOpen; renderTable('users');" aria-expanded="${railOpen}" title="Know Yourself" aria-label="Know Yourself" style="
+                        width:auto; min-height:0; padding:5px 11px; border-radius:20px;
+                        border:2px solid ${cur.k === 'all' ? '#ddd' : cur.color}; background:#fff; color:${cur.k === 'all' ? '#64748b' : cur.color};
+                        font-size:0.78em; font-weight:bold; cursor:pointer; white-space:nowrap;
+                        display:flex; align-items:center; gap:5px; font-family:inherit;
+                    ">🧭${cur.k === 'all' ? '' : ' ' + cur.label} ${railOpen ? '▴' : '▾'}</button>`;
+            if (!railOpen) { el.innerHTML = persToggle; return; }
+            el.innerHTML = persToggle +
                 opts.map(o => {
                     const on = o.k === window._userPersFilter;
                     return `<button onclick="setUserPersFilter('${o.k}')" style="
