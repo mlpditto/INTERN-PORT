@@ -231,7 +231,10 @@ exports.getLeaderboard = onCall(async (request) => {
             score: Number(u.score) || 0,
             group: u.group || 'Public',
             reflectiveTotalLogs: Number(u.reflectiveTotalLogs) || 0,
-            reflectiveBestStreak: Number(u.reflectiveBestStreak) || 0
+            reflectiveBestStreak: Number(u.reflectiveBestStreak) || 0,
+            // Team Player (intern V101.25) leaves camp users out of the group total.
+            // A boolean only — still no identity in the projection.
+            ignored: u.isIgnored === true
         };
     });
     return { rows, count: rows.length };
