@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.31)</title>
+    <title>Nika Admin (V102.32)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -7095,17 +7095,6 @@
                         <div id="qcov-grid" style="padding:12px 14px; border-top:1px solid #eef2ff; display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:8px;"></div>
                     </details>
 
-                    <!-- V102.30: Badge stats — how many interns hold each Achievements tier.
-                         Reads users/{uid}.badges, which the intern app writes since V101.18,
-                         from usersData (no new query). Follows the board group chip rail;
-                         camp (isIgnored) and pre-registered users are left out, as in other stats. -->
-                    <details id="badge-stats-panel" class="lang-no-toggle" ontoggle="if (this.open) renderBadgeStats()" style="margin-top:10px; border:1px solid #e2e8f0; border-radius:12px; background:#fff;">
-                        <summary style="padding:10px 14px; cursor:pointer; font-weight:700; color:var(--primary); list-style:none; display:flex; align-items:center; gap:8px;">
-                            <i class="fa-solid fa-medal"></i> Badge Stats
-                            <span id="bstat-summary" style="font-size:0.78em; font-weight:600; color:#64748b; margin-left:auto;"></span>
-                        </summary>
-                        <div id="bstat-body" style="padding:10px 14px; border-top:1px solid #eef2ff; overflow-x:auto;"></div>
-                    </details>
 
                     <!-- V97.53: LINE push quota for the current Bangkok month, read from
                          line_usage/{YYYY-MM} (written by pushLineFlex via the Admin SDK).
@@ -7736,6 +7725,16 @@
                     style="display:none; gap:8px; flex-wrap:wrap; align-items:center; padding-left:12px; border-left:1px solid var(--border-color);"></div>
             </div>
             <div id="leaderboardList" style="margin-bottom:25px; overflow-x:auto;"></div>
+            <!-- V102.32: Badge Stats moved here from the Dashboard (V102.30). Follows the
+                 User Hub group chip rail; tap a count to filter the table below to those
+                 interns. Reads users/{uid}.badges from usersData — no new query. -->
+            <details id="badge-stats-panel" class="lang-no-toggle" ontoggle="if (this.open) renderBadgeStats()" style="margin-bottom:14px; border:1px solid #e2e8f0; border-radius:12px; background:#fff;">
+                <summary style="padding:10px 14px; cursor:pointer; font-weight:700; color:var(--primary); list-style:none; display:flex; align-items:center; gap:8px;">
+                    <i class="fa-solid fa-medal"></i> Badge Stats
+                    <span id="bstat-summary" style="font-size:0.78em; font-weight:600; color:#64748b; margin-left:auto;"></span>
+                </summary>
+                <div id="bstat-body" style="padding:10px 14px; border-top:1px solid #eef2ff; overflow-x:auto;"></div>
+            </details>
             <div style="overflow-x:auto;">
                 <table id="usersTable" class="lang-no-toggle">
                     <thead>
@@ -7746,6 +7745,7 @@
                             <th>Status</th>
                             <th style="width:100px;">Score / Beri</th>
                             <th style="width:70px; text-align:center;">Logs</th>
+                            <th style="width:96px;"><button type="button" id="user-badge-sort" onclick="toggleUserBadgeSort()" aria-pressed="false" title="Sort by badges" style="width:auto; min-height:0; margin:0; padding:0; background:none; border:none; font:inherit; font-weight:inherit; color:inherit; cursor:pointer;">Badges ↕</button></th>
                             <th>Period</th>
                             <th>Actions</th>
                         </tr>
@@ -35754,56 +35754,134 @@ They can connect again from LINE.
             drawKanban();
             renderAlabastaCases();
             renderGroupUsersPanel();
-            renderBadgeStatsIfOpen();
         }
 
-        // V102.30: mirror of achievementCatalog in index.html — [id, title, number of
-        // tier steps, tier of a one-step badge]. Add a row here when a badge is added there.
+        // V102.30: mirror of achievementCatalog in index.html — add a row here when a badge
+        // is added there. steps = number of tiers; oneOff = tier of a one-step badge.
         const BADGE_STATS_DEFS = [
-            ['on_fire', 'On Fire', 4], ['early_bird', 'Early Bird', 3], ['quiz_master', 'Quiz Master', 4],
-            ['perfectionist', 'Perfectionist', 3], ['case_hunter', 'Case Hunter', 4], ['reflective_mind', 'Reflective Mind', 4],
-            ['mentor_feedback', 'Mentor Feedback', 3], ['quest_finisher', 'Quest Finisher', 3], ['graduate', 'Graduate', 1, 3],
-            ['speedrunner', 'Speedrunner', 3], ['explorer', 'Explorer', 3], ['night_owl', 'Night Owl', 1, 3],
-            ['codex_contributor', 'Codex Contributor', 3], ['legend', 'Legend', 1, 4]
+            { id: 'on_fire', title: 'On Fire', art: 'flame', steps: 4 }, { id: 'early_bird', title: 'Early Bird', art: 'bird', steps: 3 },
+            { id: 'quiz_master', title: 'Quiz Master', art: 'book', steps: 4 }, { id: 'perfectionist', title: 'Perfectionist', art: 'star', steps: 3 },
+            { id: 'case_hunter', title: 'Case Hunter', art: 'stethoscope', steps: 4 }, { id: 'reflective_mind', title: 'Reflective Mind', art: 'pen', steps: 4 },
+            { id: 'mentor_feedback', title: 'Mentor Feedback', art: 'message', steps: 3 }, { id: 'quest_finisher', title: 'Quest Finisher', art: 'flag', steps: 3 },
+            { id: 'graduate', title: 'Graduate', art: 'award', steps: 1, oneOff: 3 }, { id: 'speedrunner', title: 'Speedrunner', art: 'zap', steps: 3 },
+            { id: 'explorer', title: 'Explorer', art: 'compass', steps: 3 }, { id: 'night_owl', title: 'Night Owl', art: 'owl', steps: 1, oneOff: 3 },
+            { id: 'codex_contributor', title: 'Codex Contributor', art: 'pill', steps: 3 }, { id: 'legend', title: 'Legend', art: 'gem', steps: 1, oneOff: 4 }
         ];
         const BADGE_STATS_TIERS = [['Bronze', '#a0592a'], ['Silver', '#5b6b80'], ['Gold', '#8f6200'], ['Diamond', '#4c3aa8']];
+
+        // V102.32: badge art copied from index.html (BADGE_TIERS / BADGE_ART / badgeSvgHtml)
+        // so the User Hub shows the same pictures interns see. Keep the two in sync.
+        const BADGE_TIERS = [
+            { name: 'LOCKED',  rim: '#d5d9de', dark: '#b3b9c0', pale: '#ffffff', fg: '#6b7178' },
+            { name: 'BRONZE',  rim: '#c9793f', dark: '#8a4b1f', pale: '#fdebd9', fg: '#8a4b1f' },
+            { name: 'SILVER',  rim: '#b3bfcc', dark: '#6b7a8f', pale: '#f1f4f8', fg: '#4b5a6e' },
+            { name: 'GOLD',    rim: '#f5c542', dark: '#b8860b', pale: '#fff4cc', fg: '#7a5600' },
+            { name: 'DIAMOND', rim: '#a597ff', dark: '#5b47d6', pale: '#ece9ff', fg: '#4c3aa8' }
+        ];
+        const BADGE_ART = {
+            flame: { face: '#ff9a1f', svg: `<circle cx="50" cy="46" r="25" fill="#ffc15e" opacity="0.55"/><rect x="28" y="63" width="44" height="8" rx="4" fill="#8a5a33" transform="rotate(12 50 67)"/><rect x="28" y="63" width="44" height="8" rx="4" fill="#a86f40" transform="rotate(-12 50 67)"/><path d="M50 18C58 29 67 36 67 50C67 60 59 67 50 67C41 67 33 60 33 50C33 42 38 37 42 31C43 37 46 40 48 40C47 33 48 25 50 18Z" fill="#ff4d2e"/><path d="M50 33C55 40 60 45 60 52C60 58 55 63 50 63C45 63 40 58 40 52C40 48 43 45 46 41C47 45 49 47 50 47C49 43 49 38 50 33Z" fill="#ffb020"/><path d="M50 45C53 49.5 55.5 52 55.5 55.5C55.5 58.8 53 61 50 61C47 61 44.5 58.8 44.5 55.5C44.5 53 47 50.5 50 45Z" fill="#fff1a8"/><circle cx="35" cy="28" r="1.6" fill="#fff1a8"/><circle cx="65" cy="24" r="1.3" fill="#fff1a8"/><circle cx="70" cy="40" r="1.1" fill="#fff1a8"/>` },
+            bird: { face: '#ff8f7a', svg: `<circle cx="50" cy="46" r="26" fill="#ffd6c9"/><circle cx="31" cy="29" r="1.3" fill="#fff"/><circle cx="67" cy="25" r="1.1" fill="#fff"/><circle cx="70" cy="52" r="1.2" fill="#fff"/><path d="M27 47L33 43.5C35 39 42 38 45 41.5C50 45 56 45 62 42L74 30L77 31.5L66 46C64 54 55 60 46 60C38 60 33 55 33 50L27.5 48.5Z" fill="#e2553f"/><path d="M44 47C50 45 58 46 63 44C60 51 53 55 46 54Z" fill="#f07a66"/><circle cx="35.5" cy="44.6" r="1.3" fill="#fff"/><path d="M45 59.5L44.5 65M51 59L51.5 65" stroke="#e2553f" stroke-width="1.8" stroke-linecap="round"/><circle cx="30" cy="74" r="6" fill="#fff"/><circle cx="40" cy="71" r="8" fill="#fff"/><circle cx="52" cy="73" r="7" fill="#fff"/><circle cx="63" cy="70" r="8" fill="#fff"/><circle cx="72" cy="74" r="6" fill="#fff"/><rect x="30" y="73" width="42" height="7" fill="#fff"/>` },
+            book: { face: '#23a8f2', svg: `<rect x="27" y="62" width="46" height="10" rx="2" fill="#e2553f"/><rect x="67" y="64" width="4" height="6" fill="#fff6e0"/><rect x="31" y="52" width="41" height="10" rx="2" fill="#ffc933"/><rect x="66" y="54" width="4" height="6" fill="#fff6e0"/><rect x="28" y="42" width="42" height="10" rx="2" fill="#5bc31c"/><rect x="64" y="44" width="4" height="6" fill="#fff6e0"/><path d="M38 30V37C38 39.5 44 41.5 50 41.5C56 41.5 62 39.5 62 37V30L50 35Z" fill="#2e3860"/><path d="M50 17L72 26L50 35L28 26Z" fill="#1e2540"/><path d="M67 28V37" stroke="#ffc933" stroke-width="2" stroke-linecap="round"/><circle cx="67" cy="38.5" r="2.2" fill="#ffc933"/>` },
+            star: { face: '#c47cf7', svg: `<circle cx="50" cy="46" r="26" fill="#dcaefc"/><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z" transform="translate(27.2 23.2) scale(1.9)" fill="#ffd84a" stroke="#e0a800" stroke-width="0.8" stroke-linejoin="round"/><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z" transform="translate(41.6 37.4) scale(0.7)" fill="#fff4b8"/><path d="M72 18l1.6 4.2 4.2 1.6-4.2 1.6-1.6 4.2-1.6-4.2-4.2-1.6 4.2-1.6z" fill="#fff"/><path d="M27 62l1.2 3 3 1.2-3 1.2-1.2 3-1.2-3-3-1.2 3-1.2z" fill="#fff"/>` },
+            stethoscope: { face: '#f25555', svg: `<rect x="32" y="22" width="40" height="52" rx="5" fill="#a86f40"/><rect x="36" y="28" width="32" height="42" rx="2" fill="#fff"/><rect x="44" y="18" width="16" height="7" rx="2" fill="#c9ced6"/><path d="M40 37H64M40 44H60M40 51H62" stroke="#c9ced6" stroke-width="2.5" stroke-linecap="round"/><path d="M48 61H58M53 56V66" stroke="#f25555" stroke-width="3.2" stroke-linecap="round"/><path d="M28 26C21 40 24 58 38 64" fill="none" stroke="#1e2540" stroke-width="3" stroke-linecap="round"/><circle cx="40" cy="65" r="5.5" fill="#9aa3ad" stroke="#1e2540" stroke-width="2"/>` },
+            pen: { face: '#14a8b8', svg: `<rect x="26" y="22" width="40" height="52" rx="4" fill="#fff"/><rect x="26" y="22" width="8" height="52" rx="3" fill="#ffd84a"/><path d="M40 34H60M40 42H60M40 50H54" stroke="#b7dfe4" stroke-width="2.5" stroke-linecap="round"/><path d="M50 66C44 62 44 57 47 56C48.5 55.5 50 57 50 58C50 57 51.5 55.5 53 56C56 57 56 62 50 66Z" fill="#f06bb8"/><g transform="rotate(35 66 48)"><rect x="62" y="24" width="8" height="5" rx="1" fill="#f06bb8"/><rect x="62" y="29" width="8" height="3" fill="#c9ced6"/><rect x="62" y="32" width="8" height="30" fill="#f7b500"/><path d="M62 62L66 70L70 62Z" fill="#fde0b0"/><path d="M65 68L66 70L67 68Z" fill="#1e2540"/></g>` },
+            message: { face: '#7c6cf0', svg: `<rect x="22" y="20" width="46" height="32" rx="9" fill="#fff"/><path d="M32 50L29 62L42 51Z" fill="#fff"/><circle cx="35" cy="36" r="3.2" fill="#7c6cf0"/><circle cx="45" cy="36" r="3.2" fill="#7c6cf0"/><circle cx="55" cy="36" r="3.2" fill="#7c6cf0"/><rect x="48" y="48" width="32" height="22" rx="8" fill="#ffd84a"/><path d="M70 68L76 77L63 69Z" fill="#ffd84a"/><path d="M64 65C59 61.5 59 57 62 56.5C63.5 56 64 57.5 64 58.5C64 57.5 64.5 56 66 56.5C69 57 69 61.5 64 65Z" fill="#f25555"/>` },
+            flag: { face: '#8fd6ff', svg: `<circle cx="72" cy="24" r="5" fill="#fff1a8"/><path d="M20 76L40 42L54 60L64 48L81 76Z" fill="#3d8f0f"/><path d="M26 76L50 32L74 76Z" fill="#8a6b52"/><path d="M50 32L57 45L53 42.5L50 46.5L47 42.5L43 45Z" fill="#fff"/><path d="M50 32V16" stroke="#1e2540" stroke-width="2" stroke-linecap="round"/><path d="M50 16L63 20.5L50 25Z" fill="#e2553f"/>` },
+            award: { face: '#f7b500', svg: `<rect x="24" y="54" width="52" height="14" rx="7" fill="#fff6e0"/><circle cx="26" cy="61" r="7" fill="#efdfb8"/><rect x="46" y="54" width="7" height="14" fill="#e2553f"/><path d="M47 68L45 77L49.5 74L52 68Z" fill="#e2553f"/><path d="M36 33V41C36 44 43 46.5 50 46.5C57 46.5 64 44 64 41V33L50 39Z" fill="#2e3860"/><path d="M50 17L76 28.5L50 40L24 28.5Z" fill="#1e2540"/><circle cx="50" cy="28.5" r="2" fill="#ffd84a"/><path d="M50 28.5L71 31V42" fill="none" stroke="#ff9f1c" stroke-width="2" stroke-linecap="round"/><circle cx="71" cy="43.5" r="2.4" fill="#ff9f1c"/>` },
+            owl: { face: '#3b5bd6', svg: `<circle cx="70" cy="26" r="9" fill="#ffe08a"/><circle cx="73.5" cy="23.5" r="7.5" fill="#3b5bd6"/><path d="M28 20.5l2.2 3-2.2 3-2.2-3z" fill="#fff"/><path d="M40 15.5l1.5 2-1.5 2-1.5-2z" fill="#fff" opacity="0.8"/><path d="M22 36l1.5 2-1.5 2-1.5-2z" fill="#fff" opacity="0.8"/><rect x="20" y="70" width="60" height="5" rx="2.5" fill="#7a5230"/><path d="M36 46C30 52 31 62 38 66C36 58 36 52 36 46Z" fill="#141a30"/><path d="M64 46C70 52 69 62 62 66C64 58 64 52 64 46Z" fill="#141a30"/><path d="M36 29L41.5 36Q50 33 58.5 36L64 29L65 44C66 58 60 70 50 70C40 70 34 58 35 44Z" fill="#1e2540"/><ellipse cx="50" cy="61" rx="8.5" ry="7" fill="#2e3860"/><circle cx="43.5" cy="45" r="6.2" fill="#fff"/><circle cx="56.5" cy="45" r="6.2" fill="#fff"/><circle cx="43.5" cy="44.5" r="3.6" fill="#ffc933"/><circle cx="56.5" cy="44.5" r="3.6" fill="#ffc933"/><circle cx="43.5" cy="44" r="2" fill="#1e2540"/><circle cx="56.5" cy="44" r="2" fill="#1e2540"/><circle cx="44.3" cy="43.2" r="0.8" fill="#fff"/><circle cx="57.3" cy="43.2" r="0.8" fill="#fff"/><path d="M47.8 51L52.2 51L50 55.5Z" fill="#ff9f1c"/><ellipse cx="45.5" cy="70.5" rx="2.6" ry="1.7" fill="#ff9f1c"/><ellipse cx="54.5" cy="70.5" rx="2.6" ry="1.7" fill="#ff9f1c"/>` },
+            zap: { face: '#f7b500', svg: `<path d="M18 40H26M15 48H24M18 56H26" stroke="#fff" stroke-width="3" stroke-linecap="round"/><rect x="45" y="20" width="10" height="6" rx="2" fill="#1e2540"/><circle cx="52" cy="49" r="21" fill="#fff" stroke="#1e2540" stroke-width="4"/><path d="M52 49V35" stroke="#e2553f" stroke-width="3" stroke-linecap="round"/><path d="M52 49L61 54" stroke="#1e2540" stroke-width="3" stroke-linecap="round"/><circle cx="52" cy="49" r="2.6" fill="#1e2540"/><path d="M72 54L63 67H69L66 78L77 63H71L74 54Z" fill="#ff4d2e" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>` },
+            compass: { face: '#18b89a', svg: `<path d="M22 28L36 23L50 28L64 23L78 28V70L64 75L50 70L36 75L22 70Z" fill="#fff6e0"/><path d="M36 23V75M50 28V70M64 23V75" stroke="#e8d9b5" stroke-width="1.5"/><path d="M28 64C36 58 40 46 52 44" fill="none" stroke="#e2553f" stroke-width="2" stroke-dasharray="3 3" stroke-linecap="round"/><path d="M56 36L62 42M62 36L56 42" stroke="#e2553f" stroke-width="3" stroke-linecap="round"/><circle cx="66" cy="61" r="8.5" fill="#1e2540"/><path d="M66 54L68.5 61L66 68L63.5 61Z" fill="#ffd84a"/><path d="M66 54L68.5 61H63.5Z" fill="#ff4d2e"/>` },
+            gem: { face: '#5b47d6', svg: `<path d="M34 30H66L77 43L50 74L23 43Z" fill="#7fe3ff"/><path d="M34 30H66L58 43H42Z" fill="#c2f3ff"/><path d="M23 43H77M34 30L42 43L50 30L58 43L66 30M42 43L50 74L58 43" fill="none" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><path d="M74 16l1.6 4.2 4.2 1.6-4.2 1.6-1.6 4.2-1.6-4.2-4.2-1.6 4.2-1.6z" fill="#fff"/><path d="M25 60l1.2 3 3 1.2-3 1.2-1.2 3-1.2-3-3-1.2 3-1.2z" fill="#fff"/>` },
+            pill: { face: '#f06bb8', svg: `<g transform="rotate(-35 46 42)"><rect x="29" y="34" width="34" height="16" rx="8" fill="#fff"/><path d="M46 34H37A8 8 0 0 0 37 50H46Z" fill="#23a8f2"/><rect x="36" y="37" width="16" height="3" rx="1.5" fill="#fff" opacity="0.6"/></g><circle cx="63" cy="62" r="10" fill="#ffd84a"/><path d="M55.5 62H70.5" stroke="#e0a800" stroke-width="2" stroke-linecap="round"/><path d="M26 64h7M29.5 60.5v7" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>` },
+            secret: { face: '#9aa3ad', svg: `<rect x="30" y="42" width="40" height="30" rx="3" fill="#c47cf7"/><rect x="27" y="34" width="46" height="10" rx="3" fill="#dcaefc"/><rect x="47" y="34" width="6" height="38" fill="#ffd84a"/><path d="M50 34C44 23 35 27 42 34ZM50 34C56 23 65 27 58 34Z" fill="#ffd84a"/><circle cx="50" cy="58" r="9" fill="#fff"/><text x="50" y="64" text-anchor="middle" font-size="17" font-weight="900" fill="#9d5dcc" font-family="Nunito, sans-serif">?</text>` }
+        };
+        function badgeSvgHtml(art, tierIdx, px, withPill) {
+            const a = BADGE_ART[art] || BADGE_ART.award;
+            const t = BADGE_TIERS[tierIdx] || BADGE_TIERS[0];
+            const locked = tierIdx === 0;
+            const vbH = withPill ? 116 : 98;
+            return `<svg viewBox="0 0 100 ${vbH}" width="${px}" height="${Math.round(px * vbH / 100)}" aria-hidden="true" focusable="false" style="flex:none;${locked ? 'filter:grayscale(1);' : ''}">`
+                + `<rect x="6" y="10" width="88" height="86" rx="24" fill="${t.dark}"/><rect x="6" y="4" width="88" height="84" rx="24" fill="${t.rim}"/><rect x="12" y="10" width="76" height="72" rx="19" fill="${a.face}"/>`
+                + `<g opacity="${locked ? 0.45 : 1}">${a.svg}</g>`
+                + (withPill ? `<rect x="14" y="84" width="72" height="26" rx="13" fill="${t.pale}" stroke="${t.dark}" stroke-width="3"/><text x="50" y="102" text-anchor="middle" font-size="12.5" font-weight="900" fill="${t.fg}" font-family="system-ui, sans-serif">${t.name}</text>` : '')
+                + `</svg>`;
+        }
 
         function renderBadgeStatsIfOpen() {
             const panel = document.getElementById('badge-stats-panel');
             if (panel && panel.open) renderBadgeStats();
         }
 
+        // Tier an intern holds on one badge: 0 = none, 1-4 = Bronze…Diamond, null = app never synced.
+        function userBadgeTier(u, id) {
+            if (!u || !u.badges || typeof u.badges !== 'object') return null;
+            const def = BADGE_STATS_DEFS.find(d => d.id === id);
+            const level = Number((u.badges[id] || {}).level) || 0;
+            if (!def || !level) return 0;
+            return def.steps === 1 ? (def.oneOff || 3) : Math.min(level, 4);
+        }
+        // Sort key: earned badges first, then the sum of their tiers.
+        function userBadgeScore(u) {
+            let earned = 0, tiers = 0;
+            BADGE_STATS_DEFS.forEach(d => { const t = userBadgeTier(u, d.id) || 0; if (t) { earned++; tiers += t; } });
+            return earned * 100 + tiers;
+        }
+
+        function userBadgesCellHtml(u) {
+            if (!u || !u.badges || typeof u.badges !== 'object') return '<span style="color:#cbd5e1;" title="App has not saved badges yet">—</span>';
+            const held = BADGE_STATS_DEFS.map(d => ({ d, t: userBadgeTier(u, d.id) })).filter(x => x.t).sort((a, b) => b.t - a.t);
+            const minis = held.slice(0, 3).map(x => `<span title="${escapeHtml(x.d.title)} · ${BADGE_TIERS[x.t].name}">${badgeSvgHtml(x.d.art, x.t, 22, false)}</span>`).join('');
+            return `<div style="display:flex; align-items:center; gap:2px;">${minis}<span style="margin-left:4px; font-size:0.78em; font-weight:700; color:#64748b;">${held.length}/${BADGE_STATS_DEFS.length}</span></div>`;
+        }
+
+        function toggleUserBadgeSort() {
+            window._userBadgeSort = !window._userBadgeSort;
+            const btn = document.getElementById('user-badge-sort');
+            if (btn) { btn.setAttribute('aria-pressed', String(window._userBadgeSort)); btn.textContent = window._userBadgeSort ? 'Badges ▾' : 'Badges ↕'; }
+            renderTable('users');
+        }
+
+        function setUserBadgeFilter(id, tier) {
+            const cur = window._userBadgeFilter;
+            window._userBadgeFilter = (cur && cur.id === id && cur.tier === tier) ? null : { id, tier };
+            renderBadgeStats();
+            renderTable('users');
+        }
+
         function renderBadgeStats() {
             const body = document.getElementById('bstat-body');
             const summary = document.getElementById('bstat-summary');
             if (!body) return;
-            const group = activeBoardGroup;
-            const users = usersData.filter(u => !u.isIgnored && !u.isPreReg && (group === 'All' || (u.group || 'Public') === group));
+            // Same group rule as renderTable('users'): a division tab covers its groups.
+            const g = activeUserGroup;
+            const inGroup = u => g === 'All' || (divisionConfig && divisionConfig[g] ? divisionConfig[g].includes(u.group || 'Public') : (u.group || 'Public') === g);
+            const users = usersData.filter(u => !u.isIgnored && !u.isPreReg && inGroup(u));
             const synced = users.filter(u => u.badges && typeof u.badges === 'object');
-            if (summary) summary.textContent = `${synced.length}/${users.length} synced${group === 'All' ? '' : ' · ' + group}`;
+            const bf = window._userBadgeFilter;
+            const bfDef = bf && BADGE_STATS_DEFS.find(d => d.id === bf.id);
+            if (summary) summary.textContent = `${synced.length}/${users.length} synced${g === 'All' ? '' : ' · ' + g}${bfDef ? ` · filter: ${bfDef.title} ${bf.tier ? BADGE_STATS_TIERS[bf.tier - 1][0] : 'None'}` : ''}`;
             if (!synced.length) {
                 body.innerHTML = '<div style="color:#64748b; font-size:0.85em;">No intern in this view has opened the app since badges shipped (intern V101.18).</div>';
                 return;
             }
             const th = 'padding:6px 6px; font-size:0.78em; white-space:nowrap;';
-            const td = 'padding:6px 6px; text-align:center; border-top:1px solid #f1f5f9;';
-            const rows = BADGE_STATS_DEFS.map(([id, title, steps, oneOff]) => {
-                const counts = [0, 0, 0, 0];
-                let none = 0;
-                synced.forEach(u => {
-                    const level = Number((u.badges[id] || {}).level) || 0;
-                    if (!level) { none++; return; }
-                    counts[(steps === 1 ? (oneOff || 3) : Math.min(level, 4)) - 1]++;
-                });
-                const offered = t => steps === 1 ? t === (oneOff || 3) : t <= steps;
-                const cells = counts.map((c, i) => `<td style="${td}">${offered(i + 1) ? (c ? `<strong>${c}</strong>` : '<span style="color:#cbd5e1;">0</span>') : '<span style="color:#e2e8f0;">—</span>'}</td>`).join('');
-                return `<tr><td style="${td} text-align:left; font-weight:600;">${escapeHtml(title)}</td><td style="${td} color:#94a3b8;">${none}</td>${cells}</tr>`;
+            const td = 'padding:2px 4px; text-align:center; border-top:1px solid #f1f5f9;';
+            const cell = (id, tier, n, color) => {
+                const on = bf && bf.id === id && bf.tier === tier;
+                return `<button type="button" onclick="setUserBadgeFilter('${id}', ${tier})" aria-pressed="${on}" title="Show these interns in the table below" style="width:auto; min-width:34px; min-height:30px; margin:0; padding:2px 8px; border-radius:8px; border:1px solid ${on ? '#4361ee' : 'transparent'}; background:${on ? '#eef2ff' : 'transparent'}; font:inherit; cursor:pointer; color:${color};">${n ? `<strong>${n}</strong>` : n}</button>`;
+            };
+            const rows = BADGE_STATS_DEFS.map(d => {
+                const counts = [0, 0, 0, 0, 0];
+                synced.forEach(u => { counts[userBadgeTier(u, d.id) || 0]++; });
+                const offered = t => d.steps === 1 ? t === (d.oneOff || 3) : t <= d.steps;
+                const tierCells = [1, 2, 3, 4].map(t => `<td style="${td}">${offered(t) ? cell(d.id, t, counts[t], counts[t] ? '#1e293b' : '#cbd5e1') : '<span style="color:#e2e8f0;">—</span>'}</td>`).join('');
+                return `<tr><td style="${td} text-align:left; font-weight:600;"><span style="display:inline-flex; align-items:center; gap:6px;">${badgeSvgHtml(d.art, 3, 20, false)}${escapeHtml(d.title)}</span></td><td style="${td}">${cell(d.id, 0, counts[0], '#94a3b8')}</td>${tierCells}</tr>`;
             }).join('');
             body.innerHTML = `<table class="admin-table" style="width:100%; border-collapse:collapse;">
                 <thead><tr><th style="${th} text-align:left;">Badge</th><th style="${th} color:#94a3b8;">None</th>${BADGE_STATS_TIERS.map(([n, c]) => `<th style="${th} color:${c};">${n}</th>`).join('')}</tr></thead>
                 <tbody>${rows}</tbody>
             </table>
-            <div style="margin-top:8px; font-size:0.75em; color:#94a3b8;">Counts only interns whose app has saved badges; the rest appear after their next app open. — = tier not offered for that badge.</div>`;
+            <div style="margin-top:8px; font-size:0.75em; color:#94a3b8;">Tap a number to show those interns in the table below; tap again to clear. Counts only interns whose app has saved badges. — = tier not offered.</div>`;
         }
 
         // Per-user Quiz/Journal/Case status for #board-group-tabs' active group,
@@ -35876,6 +35954,7 @@ They can connect again from LINE.
             renderUserGroupTabs();
             renderTable('users');
             renderLeaderboard();
+            renderBadgeStatsIfOpen();
         }
 
         // V91.90: System filter state — 'all' or any key from CASE_SYSTEMS
@@ -47080,6 +47159,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 if (window._userPersFilter && window._userPersFilter !== 'all') {
                     data = data.filter(u => userPersBucket(u) === window._userPersFilter);
                 }
+                // V102.32: a tapped Badge Stats cell narrows the table to that badge + tier.
+                if (window._userBadgeFilter) {
+                    const bf = window._userBadgeFilter;
+                    data = data.filter(u => userBadgeTier(u, bf.id) === bf.tier);
+                }
 
                 // 🔥 Period Calculation & Sorting ([Version: V86.96])
                 if (hasRange) {
@@ -47115,11 +47199,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const secPend = data.filter(u => u.isPreReg);
                 const secAct = data.filter(u => !u.isPreReg && !u.isIgnored);
                 const secIgn = data.filter(u => !u.isPreReg && u.isIgnored);
+                usersRank = new Map(secAct.map((u, i) => [u, i + 1])); // rank stays the score rank
+                if (window._userBadgeSort) secAct.sort((a, b) => userBadgeScore(b) - userBadgeScore(a)); // V102.32; stable, so score order breaks ties
                 data = [...secAct, ...secPend, ...secIgn];
-                usersRank = new Map(secAct.map((u, i) => [u, i + 1]));
                 // A search that only matches an ignored user must still show them.
                 usersIgnOpen = !!window._userIgnOpen || !!t;
-                const secHead = html => `<tr class="u-sec-row"><td colspan="8" style="padding:0; background:var(--bg-body); border-top:1px solid var(--border-color);">${html}</td></tr>`;
+                const secHead = html => `<tr class="u-sec-row"><td colspan="9" style="padding:0; background:var(--bg-body); border-top:1px solid var(--border-color);">${html}</td></tr>`;
                 const secLabel = (label, n, color) => `<span style="display:inline-flex; align-items:center; gap:6px; padding:7px 12px; font-size:0.78em; font-weight:800; color:${color};">${label} <span style="background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-sub); padding:0 8px; border-radius:10px; font-size:0.92em;">${n}</span></span>`;
                 usersHeads = new Map();
                 if (secPend.length) usersHeads.set(secPend[0], secHead(secLabel('<i class="fa-solid fa-hourglass-half"></i> Pending requests', secPend.length, '#b45309')));
@@ -47215,6 +47300,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             <!-- V100.84: icon-only — text label dropped per request; title/aria-label
                                  keep the meaning available on hover and to screen readers. -->
                             <td><span class="badge" style="background:#ffc107; color:black; display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; padding:0; border-radius:50%;" title="Pending Req." aria-label="Pending request"><i class="fa-solid fa-hourglass-half"></i></span></td>
+                            <td>-</td>
                             <td>-</td>
                             <td>-</td>
                             <td style="font-size:0.78em; white-space:nowrap;">${dateStr}</td>
@@ -47334,6 +47420,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                     <i class="fa-solid fa-pen-fancy"></i> ${reflectiveLogsCache.filter(lg => lg.userId === d.id).length}
                                 </span>
                             </td>
+                            <td>${userBadgesCellHtml(d)}</td>
                             <td style="font-size:0.84em;">
                                 <div>
                                     <!-- V98.16 lean: the full YYYY-MM-DD ~ YYYY-MM-DD string
