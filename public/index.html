@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.25)</title>
+    <title>Internship Portfolio (V101.26)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.05">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7928,7 +7928,10 @@
             if (!firebase || !firebase.functions) return;
             try {
                 const res = await firebase.functions().httpsCallable('getLeaderboard')({});
-                const rows = (res && res.data && res.data.rows) || [];
+                // V101.26: camp users (isIgnored → `ignored`, sent since the V101.25 getLeaderboard
+                // deploy) are left off every intern leaderboard, as the admin boards already do.
+                // Your own row always stays, even if you are in camp.
+                const rows = ((res && res.data && res.data.rows) || []).filter(r => !r.ignored || r.id === userId);
                 const mine = myOwnRow();
                 allUsersData = rows.map(r => (r.id === userId)
                     ? Object.assign({}, r, {
