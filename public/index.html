@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.21)</title>
+    <title>Internship Portfolio (V101.22)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.05">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -6795,7 +6795,7 @@
                     pct = next ? Math.min(100, Math.round(value / next * 100)) : 100;
                 }
                 const goal = next && def.id !== 'graduate' ? ` · ${next} ${def.unit}` : '';
-                return { def, level, tierIdx, count, pct, done: !next, goal, known };
+                return { def, level, tierIdx, count, pct, done: !next, goal, known, value: known ? value : null };
             });
         }
 
@@ -6824,23 +6824,55 @@
             const list = computeAchievements();
             const head = document.getElementById('achievements-count');
             if (head) head.textContent = `${list.filter(a => a.level > 0).length} / ${list.length}`;
-            box.innerHTML = list.map(a => (a.def.secret && !a.level) ? `<div style="display:flex; gap:14px; align-items:center; padding:14px 4px; border-bottom:2px solid #eef0f3;">
+            box.innerHTML = list.map(a => (a.def.secret && !a.level) ? `<div style="display:flex; gap:14px; align-items:center; padding:14px 4px; border-bottom:2px solid #eef0f3; text-align:left;">
                 ${badgeSvgHtml('secret', 0, 68, true)}
                 <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:5px;">
                     <strong style="font-size:1.02em; font-weight:900; color:#3c3c3c;">Secret</strong>
                     <div style="font-size:0.8em; font-weight:600; color:#6b7178;">Keep going to discover this one <span class="lang-th">badge ลับ ทำกิจกรรมต่อไปเพื่อค้นหา</span></div>
                 </div>
-            </div>` : `<div style="display:flex; gap:14px; align-items:center; padding:14px 4px; border-bottom:2px solid #eef0f3;">
+            </div>` : `<div title="${achLadderText(a)}" style="display:flex; gap:14px; align-items:center; padding:14px 4px; border-bottom:2px solid #eef0f3; text-align:left;">
                 ${badgeSvgHtml(a.def.art, a.tierIdx, 68, true)}
                 <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:5px;">
-                    <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
                         <strong style="font-size:1.02em; font-weight:900; color:#3c3c3c;">${a.def.title}</strong>
-                        <span style="font-size:0.78em; font-weight:800; color:#6b7178; white-space:nowrap;">${a.count}</span>
+                        <span style="display:inline-flex; align-items:center; gap:4px; font-size:0.78em; font-weight:800; color:#6b7178; white-space:nowrap;">${a.count}
+                            <button type="button" onclick="toggleAchInfo('${a.def.id}')" aria-expanded="${achInfoOpen.has(a.def.id)}" aria-label="How to earn ${a.def.title}" style="width:30px; height:30px; min-height:0; padding:0; margin:0; border-radius:50%; border:2px solid ${achInfoOpen.has(a.def.id) ? '#1487c7' : '#e5e7ea'}; background:${achInfoOpen.has(a.def.id) ? '#e8f4fd' : '#fff'}; color:#1487c7; font:inherit; font-weight:900; font-size:0.95em; line-height:1; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">i</button>
+                        </span>
                     </div>
                     <div style="height:14px; border-radius:7px; background:#e5e7ea; overflow:hidden;"><div style="height:100%; width:${a.pct}%; border-radius:7px; background:${a.done ? '#5bc31c' : '#f7b500'};"></div></div>
                     <div style="font-size:0.8em; font-weight:600; color:#6b7178; line-height:1.35;">${a.def.desc}${a.goal} <span class="lang-th">${a.def.th}</span></div>
+                    ${achInfoOpen.has(a.def.id) ? achDetailHtml(a) : ''}
                 </div>
             </div>`).join('');
+        }
+
+        // V101.22: ⓘ on each row — the full tier ladder (✓ = reached), where the intern
+        // stands, and when the current level was saved. The same ladder is the row's
+        // hover title on desktop. Rows that say "Complete" otherwise gave no reason why.
+        const achInfoOpen = new Set();
+        function toggleAchInfo(id) {
+            if (achInfoOpen.has(id)) achInfoOpen.delete(id); else achInfoOpen.add(id);
+            renderAchievementsList();
+        }
+        function _achLadder(a) {
+            const n = a.def.steps.length;
+            return a.def.steps.map((step, i) => {
+                const t = BADGE_TIERS[n === 1 ? (a.def.oneOffTier || 3) : i + 1];
+                const label = a.def.id === 'graduate' ? 'finish the internship' : (a.def.unit ? `${step} ${a.def.unit}` : 'once');
+                return { name: t.name.charAt(0) + t.name.slice(1).toLowerCase(), t, label, reached: a.level > i };
+            });
+        }
+        function achLadderText(a) {
+            return _achLadder(a).map(x => `${x.name}: ${x.label}${x.reached ? ' ✓' : ''}`).join(' · ');
+        }
+        function achDetailHtml(a) {
+            const chips = _achLadder(a).map(x => `<span style="display:inline-flex; align-items:center; padding:3px 8px; border-radius:10px; font-size:0.76em; font-weight:800; border:1.5px solid ${x.reached ? x.t.dark : '#e5e7ea'}; background:${x.reached ? x.t.pale : '#fff'}; color:${x.reached ? x.t.fg : '#8b9199'};">${x.reached ? '✓ ' : ''}${x.name} · ${x.label}</span>`).join('');
+            const you = a.def.id === 'graduate' ? `You: ${a.count}` : !a.def.unit ? (a.level ? 'You: unlocked' : 'You: not yet') : (a.known ? `You: ${a.value} ${a.def.unit}` : 'You: loading…');
+            const saved = storedBadges()[a.def.id];
+            const at = saved && saved.earnedAt && typeof saved.earnedAt.toDate === 'function' && a.level
+                ? ` · reached ${saved.earnedAt.toDate().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : '';
+            return `<div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:2px;">${chips}</div>
+                <div style="font-size:0.76em; font-weight:700; color:#3c3c3c;">${you}${at}</div>`;
         }
 
         function openAchievementsModal() {
