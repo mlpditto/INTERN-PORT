@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.39)</title>
+    <title>Nika Admin (V102.40)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -4695,6 +4695,9 @@
                 <button class="insight-tab-btn" onclick="switchInsightTab('history')" id="tab-btn-history" style="padding:8px 20px; border-radius:8px; border:none; font-weight:700; font-size:0.85em; cursor:pointer; transition:all 0.3s; background:transparent; color:#64748b;">
                     <i class="fa-solid fa-list-ul"></i> History
                 </button>
+                <button class="insight-tab-btn" onclick="switchInsightTab('badges')" id="tab-btn-badges" style="padding:8px 20px; border-radius:8px; border:none; font-weight:700; font-size:0.85em; cursor:pointer; transition:all 0.3s; background:transparent; color:#64748b;">
+                    🏅 Badges
+                </button>
             </div>
 
             <!-- Activity Container -->
@@ -4829,6 +4832,13 @@
                 <div id="hub-history-list" class="lang-no-toggle" style="margin-bottom:15px;"></div>
                 
                 <div id="hub-history-pagination" style="display:flex; justify-content:center; align-items:center; gap:6px; flex-wrap:wrap; padding-top:10px; border-top:1px dashed #f1f5f9; min-height:40px;"></div>
+            </div>
+
+            <!-- V102.40: 🏅 Badges — every Achievements badge of this intern, from
+                 users/{uid}.badges (tier + the date that level was saved). -->
+            <div id="insight-badges-view" class="lang-no-toggle" style="display:none;">
+                <div id="hub-badges-summary" style="font-weight:800; color:#334155; margin-bottom:12px;">-</div>
+                <div id="hub-badges-list" style="display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px;"></div>
             </div>
             
             <div id="lb-popup-footer" style="margin-top:20px; border-top:1.5px solid #f1f5f9; padding-top:15px;"></div>
@@ -48675,6 +48685,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             document.getElementById('insight-quiz-view').style.display = tab === 'quiz' ? 'block' : 'none';
             document.getElementById('insight-backlog-view').style.display = tab === 'backlog' ? 'block' : 'none';
             document.getElementById('insight-history-view').style.display = tab === 'history' ? 'block' : 'none';
+            document.getElementById('insight-badges-view').style.display = tab === 'badges' ? 'block' : 'none';
             
             if (tab === 'quiz' && window._currentPopupUser) {
                 if (typeof syncQuizInsightWindowPills === 'function') syncQuizInsightWindowPills();
@@ -48682,7 +48693,37 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
             if (tab === 'backlog' && window._currentPopupUser) renderHubBacklog(window._currentPopupUser);
             if (tab === 'history' && window._currentPopupUser) renderHubHistoryPage();
+            if (tab === 'badges' && window._currentPopupUser) renderHubBadges(window._currentPopupUser);
         };
+
+        // V102.40: the Insight 🏅 tab — same art and tiers as the intern Achievements list.
+        // Level + date come from users/{uid}.badges; progress numbers live only in the app.
+        function renderHubBadges(userId) {
+            const list = document.getElementById('hub-badges-list');
+            const summary = document.getElementById('hub-badges-summary');
+            if (!list || !summary) return;
+            const u = (usersData || []).find(x => x.id === userId);
+            if (!u || !u.badges || typeof u.badges !== 'object') {
+                summary.textContent = '🏅 —';
+                list.innerHTML = '<div style="grid-column:1 / -1; color:#94a3b8; font-size:0.85em;">The app has not saved badges for this intern yet — they appear after the next app open.</div>';
+                return;
+            }
+            const fmt = ts => (ts && typeof ts.toDate === 'function') ? ts.toDate().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+            const rows = BADGE_STATS_DEFS.map(d => ({ d, t: userBadgeTier(u, d.id) || 0 }));
+            const held = rows.filter(r => r.t).length;
+            summary.innerHTML = `🏅 ${held}/${rows.length} <span style="font-weight:600; color:#64748b;">· ${rows.filter(r => r.t >= 3).length} Gold+</span>`;
+            list.innerHTML = rows.map(({ d, t }) => {
+                const tier = BADGE_TIERS[t];
+                const when = t ? fmt((u.badges[d.id] || {}).earnedAt) : '';
+                return `<div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid #f1f5f9; border-radius:12px; background:${t ? '#fff' : '#fafafa'};">
+                    ${badgeSvgHtml(d.art, t, 44, true)}
+                    <div style="min-width:0;">
+                        <div style="font-weight:800; font-size:0.9em; color:${t ? '#1e293b' : '#94a3b8'};">${escapeHtml(d.title)}</div>
+                        <div style="font-size:0.75em; font-weight:700; color:${t ? tier.fg : '#cbd5e1'};">${t ? tier.name.charAt(0) + tier.name.slice(1).toLowerCase() : 'Not yet'}${when ? ` <span style="color:#94a3b8; font-weight:600;">· ${when}</span>` : ''}</div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
 
         function getHubQuizApprovalKey(log) {
             const text = String(log?.text || '');
