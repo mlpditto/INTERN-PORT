@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.34)</title>
+    <title>Nika Admin (V102.35)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -47462,7 +47462,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     // V102.33 (lean B): 9 columns → 6. Group = dot on the avatar; 📝 logs and 🏅
                     // badges sit under the name; Status went (ignore ⇄ show lives in ⋯, and the
                     // Hidden section already says who is ignored); Set / 👁 LIFF moved into ⋯.
-                    const logsN = reflectiveLogsCache.filter(lg => lg.userId === d.id).length;
+                    const logsN = reflectiveLogsCache.filter(lg => lg.userId === d.id && !lg.isArchived).length; // V102.35: same set Reflective Review lists
                     tbody.innerHTML += `<tr class="${ignored ? 'u-ignored' : ''}">
                             <td style="text-align:center;">${rankDisplay}</td>
                             <td>
@@ -47473,7 +47473,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                         ${certNameDisplay}
                                         <div style="display:flex; align-items:center; gap:6px; margin-top:2px; font-size:0.78em; color:var(--text-sub);">
                                             ${userBadgesCellHtml(d)}
-                                            <button type="button" onclick="setReflectiveSearch('${(d.displayName || d.id).replace(/'/g, "\\'")}')" title="All submitted journals, pending and reviewed" data-th-title="Journal ที่ส่งทั้งหมด รวมรายการที่รอตรวจและตรวจแล้ว" style="width:auto; min-height:0; margin:0; padding:0 2px; background:none; border:none; font:inherit; color:${logsN ? '#e67e22' : '#cbd5e1'}; cursor:pointer;">📝${logsN}</button>
+                                            <button type="button" onclick="setReflectiveSearch('${(d.displayName || d.id).replace(/'/g, "\\'")}', '${d.id}')" title="All submitted journals, pending and reviewed" data-th-title="Journal ที่ส่งทั้งหมด รวมรายการที่รอตรวจและตรวจแล้ว" style="width:auto; min-height:0; margin:0; padding:0 2px; background:none; border:none; font:inherit; color:${logsN ? '#e67e22' : '#cbd5e1'}; cursor:pointer;">📝${logsN}</button>
                                         </div>
                                     </div>
                                 </div>
@@ -53457,7 +53457,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                     </div>
                                 </td>
                                 <td style="text-align:center;">
-                                    <span class="badge" style="background:rgba(230,126,34,0.1); color:#e67e22; border:1px solid rgba(230,126,34,0.2); font-weight:bold; cursor:pointer;" onclick="setReflectiveSearch('${(d.displayName || d.id).replace(/'/g, "\\'")}')" title="All submitted journals, pending and reviewed" data-th-title="Journal ที่ส่งทั้งหมด รวมรายการที่รอตรวจและตรวจแล้ว">
+                                    <span class="badge" style="background:rgba(230,126,34,0.1); color:#e67e22; border:1px solid rgba(230,126,34,0.2); font-weight:bold; cursor:pointer;" onclick="setReflectiveSearch('${(d.displayName || d.id).replace(/'/g, "\\'")}', '${d.id}')" title="All submitted journals, pending and reviewed" data-th-title="Journal ที่ส่งทั้งหมด รวมรายการที่รอตรวจและตรวจแล้ว">
                                         <i class="fa-solid fa-pen-fancy"></i> ${reflectiveLogsCache.filter(lg => lg.userId === d.id).length}
                                     </span>
                                 </div>
@@ -56971,98 +56971,144 @@ Save it anyway?`;
         }
 
         // --- 🔥 [Version: V84.8] Reflective Log System (Admin) ---
+        // V102.35: one listener only. Every call used to add another onSnapshot on the
+        // whole reflective_logs collection (each search keystroke, the Show Reviewed box,
+        // tab switches, the 📝 button), so reads and re-renders multiplied through a
+        // session. The first call subscribes; later calls re-filter the cached logs.
+        let reflectiveAdminUnsub = null;
         function loadReflectiveLogsAdmin() {
-            db.collection("reflective_logs")
+            if (reflectiveAdminUnsub) { renderReflectiveLogsAdmin(); return; }
+            reflectiveAdminUnsub = db.collection("reflective_logs")
                 .onSnapshot(snapshot => {
                     reflectiveLogsCache = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
                     // Client-side sort to replace missing composite index constraint
                     reflectiveLogsCache.sort((a,b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0));
-                    renderGroupUsersPanel();
-
-                    // 🔥 Refresh User Table if open to update Log counts [Version: V89.54]
-                    if (activeTab === 'tab-users') renderTable('users');
-                    
-                    const searchBox = document.getElementById('reflective-search');
-                    const search = searchBox ? searchBox.value.toLowerCase() : "";
-                    const showReviewed = document.getElementById('show-reviewed-logs')?.checked || false;
-                    
-                    const pendingLogs = reflectiveLogsCache.filter(log => {
-                        const isPending = !log.adminComment && (log.adminBonus === undefined || log.adminBonus === null) && !log.isArchived;
-                        if (log.isArchived) return false;
-                        
-                        let match = true;
-                        if (search) {
-                            match = (log.content || "").toLowerCase().includes(search) || (log.userName || log.displayName || "").toLowerCase().includes(search);
-                        }
-                        
-                        if (showReviewed) return match;
-                        return isPending && match;
-                    });
-                    
-                    const pendingCount = reflectiveLogsCache.filter(log => !log.adminComment && (log.adminBonus === undefined || log.adminBonus === null) && !log.isArchived).length;
-                    
-                    document.getElementById('stat-reflective-count').innerText = pendingCount;
-                    document.getElementById('chip-reflective').style.display = pendingCount > 0 ? "flex" : "none";
-                    
-                    const section = document.getElementById('reflective-log-review-section');
-                    const tbody = document.querySelector("#reflectiveLogsTable tbody");
-                    
-                    if (section && tbody) {
-                        // Section is visible if there are pending logs OR if the admin is explicitly searching/viewing reviewed
-                        section.style.display = (pendingCount > 0 || search || showReviewed) ? "block" : "none";
-                        updateReviewQueueEmptyState();
-                        tbody.innerHTML = "";
-                        
-                        pendingLogs.forEach(log => {
-                            const time = log.timestamp ? log.timestamp.toDate().toLocaleString('en-US') : 'Just now...';
-                            const uImg = log.pictureUrl || 'https://via.placeholder.com/40';
-                            const uName = log.userName || log.displayName || 'Unknown';
-                            const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
-                            const isFinished = log.adminComment || log.adminBonus !== undefined;
-                            
-                            tbody.innerHTML += `
-                                <tr style="${isFinished ? 'opacity:0.7; background:#fafafa;' : ''}">
-                                    <td style="font-size:0.8em;">${time}</td>
-                                    <td>
-                                        <div style="display:flex; align-items:center; gap:8px;">
-                                            <img src="${uImg}" style="width:30px; height:30px; border-radius:50%;">
-                                            <div style="font-weight:bold;">${uName}</div>
-                                        </div>
-                                    </td>
-                                    <td style="font-size:1.5em; text-align:center;">${moodEmoji}</td>
-                                    <td style="font-size:0.85em; color:#444;">
-                                        <div style="font-weight:500;">${log.content}</div>
-                                        ${getNegativeBadgeHtml(log.content)}
-                                        ${(log.adminComment || log.adminCommentHtml) ? `<div style="font-size:0.9em; color:#d35400; border-top:1px dashed #eee; margin-top:5px; padding-top:3px;">💬 ${renderAdminCommentSafe(log)}</div>` : ''}
-                                    </td>
-                                    <td>
-                                        <button class="btn-sm" style="background:#d35400; color:white; border:none;" onclick="event.stopPropagation(); reviewReflective('${log.id}')">
-                                            <i class="fa-solid fa-comment-dots"></i> ${isFinished ? 'Edit Review' : 'Review'}
-                                        </button>
-                                        ${isFinished ? `<button class="btn-sm" style="background:#6c757d; color:white; border:none; margin-top:4px;" onclick="archiveReflective('${log.id}')"><i class="fa-solid fa-box-archive"></i> Archive</button>` : ''}
-                                        <button class="btn-sm" style="background:#ef4444; color:white; border:none; margin-top:4px;" onclick="deleteReflectiveLog('${log.id}')"><i class="fa-solid fa-trash"></i> Delete</button>
-                                    </td>
-                                </tr>
-                            `;
-                        });
-                    }
-                    
-                    if (document.getElementById('tab-laughtale')?.classList.contains('active')) renderLaughTale();
-                    drawKanban(); // Sync with Kanban
+                    renderReflectiveLogsAdmin();
                 }, error => {
                     console.error("🔥 Error loading admin reflective logs:", error);
                     showToast("Error loading logs: " + error.message);
+                    reflectiveAdminUnsub = null; // allow a later call to retry
                 });
         }
 
-        function setReflectiveSearch(name) {
-            switchTab('ReflectiveLogs');
+        // Filters + renders the cached logs (was the body of the snapshot callback).
+        function renderReflectiveLogsAdmin() {
+            renderGroupUsersPanel();
+
+            // 🔥 Refresh User Table if open to update Log counts [Version: V89.54]
+            if (activeTab === 'tab-users') renderTable('users');
+            
             const searchBox = document.getElementById('reflective-search');
-            if (searchBox) {
-                searchBox.value = name;
-                document.getElementById('show-reviewed-logs').checked = true; // Show all to find the specific user
-                loadReflectiveLogsAdmin(); // Trigger re-filter
+            const search = searchBox ? searchBox.value.toLowerCase() : "";
+            const showReviewed = document.getElementById('show-reviewed-logs')?.checked || false;
+            
+            const pendingLogs = reflectiveLogsCache.filter(log => {
+                const isPending = !log.adminComment && (log.adminBonus === undefined || log.adminBonus === null) && !log.isArchived;
+                if (log.isArchived) return false;
+                
+                let match = true;
+                if (window._reflUserFilter && log.userId !== window._reflUserFilter) return false; // V102.35: 📝 from the User Hub
+                if (search) {
+                    match = (log.content || "").toLowerCase().includes(search) || (log.userName || log.displayName || "").toLowerCase().includes(search);
+                }
+                
+                if (showReviewed) return match;
+                return isPending && match;
+            });
+            
+            const pendingCount = reflectiveLogsCache.filter(log => !log.adminComment && (log.adminBonus === undefined || log.adminBonus === null) && !log.isArchived).length;
+            
+            document.getElementById('stat-reflective-count').innerText = pendingCount;
+            document.getElementById('chip-reflective').style.display = pendingCount > 0 ? "flex" : "none";
+            
+            const section = document.getElementById('reflective-log-review-section');
+            const tbody = document.querySelector("#reflectiveLogsTable tbody");
+            
+            if (section && tbody) {
+                // Section is visible if there are pending logs OR if the admin is explicitly searching/viewing reviewed
+                section.style.display = (pendingCount > 0 || search || showReviewed) ? "block" : "none";
+                updateReviewQueueEmptyState();
+                tbody.innerHTML = "";
+                
+                pendingLogs.forEach(log => {
+                    const time = log.timestamp ? log.timestamp.toDate().toLocaleString('en-US') : 'Just now...';
+                    const uImg = log.pictureUrl || 'https://via.placeholder.com/40';
+                    const uName = log.userName || log.displayName || 'Unknown';
+                    const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
+                    const isFinished = log.adminComment || log.adminBonus !== undefined;
+                    
+                    tbody.innerHTML += `
+                        <tr style="${isFinished ? 'opacity:0.7; background:#fafafa;' : ''}">
+                            <td style="font-size:0.8em;">${time}</td>
+                            <td>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <img src="${uImg}" style="width:30px; height:30px; border-radius:50%;">
+                                    <div style="font-weight:bold;">${uName}</div>
+                                </div>
+                            </td>
+                            <td style="font-size:1.5em; text-align:center;">${moodEmoji}</td>
+                            <td style="font-size:0.85em; color:#444;">
+                                <div style="font-weight:500;">${log.content}</div>
+                                ${getNegativeBadgeHtml(log.content)}
+                                ${(log.adminComment || log.adminCommentHtml) ? `<div style="font-size:0.9em; color:#d35400; border-top:1px dashed #eee; margin-top:5px; padding-top:3px;">💬 ${renderAdminCommentSafe(log)}</div>` : ''}
+                            </td>
+                            <td>
+                                <button class="btn-sm" style="background:#d35400; color:white; border:none;" onclick="event.stopPropagation(); reviewReflective('${log.id}')">
+                                    <i class="fa-solid fa-comment-dots"></i> ${isFinished ? 'Edit Review' : 'Review'}
+                                </button>
+                                ${isFinished ? `<button class="btn-sm" style="background:#6c757d; color:white; border:none; margin-top:4px;" onclick="archiveReflective('${log.id}')"><i class="fa-solid fa-box-archive"></i> Archive</button>` : ''}
+                                <button class="btn-sm" style="background:#ef4444; color:white; border:none; margin-top:4px;" onclick="deleteReflectiveLog('${log.id}')"><i class="fa-solid fa-trash"></i> Delete</button>
+                            </td>
+                        </tr>
+                    `;
+                });
             }
+            
+            if (document.getElementById('tab-laughtale')?.classList.contains('active')) renderLaughTale();
+            drawKanban(); // Sync with Kanban
+        }
+
+        // V102.35: the 📝 count used to call switchTab('ReflectiveLogs'), a tab that no
+        // longer exists, so the click did nothing. It now opens the Dashboard's Reflective
+        // Review filtered to this user by id (a name search also matched other users and
+        // log text), reviewed logs included, and scrolls to it. A "👤 name ✕" chip beside
+        // the search box shows the filter and clears it.
+        function setReflectiveSearch(name, uid) {
+            window._reflUserFilter = uid || null;
+            window._reflUserFilterName = name || '';
+            const searchBox = document.getElementById('reflective-search');
+            if (searchBox) searchBox.value = uid ? '' : (name || '');
+            const reviewed = document.getElementById('show-reviewed-logs');
+            if (reviewed) reviewed.checked = true; // all of this user's logs, not just pending
+            switchTab('tab-sidequest');
+            loadReflectiveLogsAdmin();
+            renderReflectiveUserChip();
+            const section = document.getElementById('reflective-log-review-section');
+            if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        function clearReflectiveUserFilter() {
+            window._reflUserFilter = null;
+            const reviewed = document.getElementById('show-reviewed-logs');
+            if (reviewed) reviewed.checked = false;
+            renderReflectiveUserChip();
+            loadReflectiveLogsAdmin();
+        }
+        function renderReflectiveUserChip() {
+            const box = document.getElementById('reflective-search');
+            if (!box) return;
+            let chip = document.getElementById('refl-user-chip');
+            if (!window._reflUserFilter) { if (chip) chip.remove(); return; }
+            if (!chip) {
+                chip = document.createElement('button');
+                chip.type = 'button';
+                chip.id = 'refl-user-chip';
+                chip.className = 'lang-no-toggle';
+                chip.title = 'Show every intern again';
+                chip.onclick = clearReflectiveUserFilter;
+                chip.style.cssText = 'width:auto; min-height:0; margin:0; padding:4px 10px; border-radius:20px; border:1px solid #f9e79f; background:#fff; color:#d35400; font:inherit; font-size:0.8em; font-weight:700; cursor:pointer; white-space:nowrap;';
+                box.parentElement.insertBefore(chip, box);
+            }
+            chip.textContent = `👤 ${window._reflUserFilterName} ✕`;
         }
 
         // V91.71: Listener for Learning Note submissions (Kanban Section 9)
