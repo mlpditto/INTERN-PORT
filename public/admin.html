@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.38)</title>
+    <title>Nika Admin (V102.39)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -23022,6 +23022,20 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 .sort((a, b) => a.localeCompare(b));
         }
 
+        // V102.39: one spelling per group wherever a name is SAVED. A picked or typed
+        // name that matches an existing group case-insensitively takes that group's
+        // spelling (getGlobalGroups = the most-used one); a comma list such as
+        // "Junior,Extern" (quiz / quest audiences) is fixed part by part.
+        function canonicalGroupName(name) {
+            const t = String(name || '').trim();
+            if (!t) return t;
+            if (t.toUpperCase() === 'PUBLIC') return 'Public';
+            return getGlobalGroups().find(g => g.toUpperCase() === t.toUpperCase()) || t;
+        }
+        function canonicalGroupList(raw) {
+            return [...new Set(String(raw || '').split(',').map(canonicalGroupName).filter(Boolean))].join(',');
+        }
+
         auth.onAuthStateChanged(async user => {
             if (!user) return;
 
@@ -23810,17 +23824,16 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         function refreshQuizTargetGroupOptions() {
             const sel = document.getElementById('quiz-target-group');
             if (!sel) return;
-            const known = new Set([...sel.options].map(o => o.value));
-            const groups = [...new Set((typeof usersData !== 'undefined' ? usersData : [])
-                .map(u => (u && u.group ? String(u.group).trim() : ''))
-                .filter(Boolean))].sort((a, b) => a.localeCompare(b));
+            // V102.39: canonical names only — "Extern" and "EXTERN" used to be two options.
+            const known = new Set([...sel.options].map(o => o.value.toUpperCase()));
+            const groups = getGlobalGroups();
             groups.forEach(g => {
-                if (known.has(g)) return;
+                if (known.has(g.toUpperCase())) return;
                 const opt = document.createElement('option');
                 opt.value = g;
                 opt.text = g;
                 sel.add(opt);
-                known.add(g);
+                known.add(g.toUpperCase());
             });
         }
 
@@ -23828,7 +23841,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const sel = document.getElementById('quiz-target-group');
             if (!sel) return;
             refreshQuizTargetGroupOptions();
-            const wanted = String(value || 'Public');
+            const wanted = canonicalGroupList(value) || 'Public'; // V102.39: a saved "Extern" lands on the EXTERN option
             if (![...sel.options].some(o => o.value === wanted)) {
                 // a group nobody currently belongs to still has to survive a round-trip
                 const opt = document.createElement('option');
@@ -24026,6 +24039,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 const prevQuiz = editingId ? quizzesData.find(x => x.id === editingId) : null;
                 targetGroup = (prevQuiz && prevQuiz.targetGroup) || "Public";
             }
+            targetGroup = canonicalGroupList(targetGroup) || 'Public'; // V102.39
             const unlockScore = Math.max(0, parseFloat(document.getElementById('quiz-unlock-score')?.value) || 0);
             const description = document.getElementById('quiz-description').value;
             const totalPoints = parseFloat(document.getElementById('quiz-total-points').value) || 1.0;
@@ -35391,12 +35405,14 @@ They can connect again from LINE.
             const uses = new Map(); // exact name -> { users, pre, quizzes, events, divisions, settings }
             const bump = (name, k) => {
                 if (!name) return;
-                if (!uses.has(name)) uses.set(name, { users: 0, pre: 0, quizzes: 0, events: 0, divisions: 0, settings: 0 });
+                if (!uses.has(name)) uses.set(name, { users: 0, pre: 0, quizzes: 0, quests: 0, events: 0, divisions: 0, settings: 0 });
                 uses.get(name)[k]++;
             };
             usersData.forEach(u => bump(u.group || 'Public', 'users'));
             preRegData.forEach(p => { if (!p.claimed) bump(p.group, 'pre'); });
-            quizzesData.forEach(q => { if (q && q.targetGroup && !String(q.id).startsWith('--')) bump(q.targetGroup, 'quizzes'); });
+            const parts = raw => String(raw || '').split(',').map(x => x.trim()).filter(Boolean);
+            quizzesData.forEach(q => { if (q && !String(q.id).startsWith('--')) parts(q.targetGroup).forEach(g => bump(g, 'quizzes')); });
+            (questsCache || []).forEach(q => parts(q && q.targetGroup).forEach(g => bump(g, 'quests'))); // V102.39
             (eventsCache || []).forEach(e => (e.targetGroups || []).forEach(g => { if (g !== '__public__') bump(g, 'events'); }));
             Object.values(divisionConfig || {}).forEach(gs => (gs || []).forEach(g => bump(g, 'divisions')));
             Object.keys(groupSettings || {}).forEach(g => bump(g, 'settings'));
@@ -35408,14 +35424,14 @@ They can connect again from LINE.
         function renderGroupMerge() {
             const uses = groupNameUses();
             const names = [...uses.keys()].sort((a, b) => a.localeCompare(b));
-            const total = u => u.users + u.pre + u.quizzes + u.events + u.divisions + u.settings;
+            const total = u => u.users + u.pre + u.quizzes + u.quests + u.events + u.divisions + u.settings;
             document.getElementById('gs-merge-from').innerHTML = names.filter(n => n !== 'Public').map(n => _gsMergeChip(n, uses.get(n).users, n === gsMerge.from, 'gsMergePickFrom')).join('');
             document.getElementById('gs-merge-into').innerHTML = names.filter(n => n !== gsMerge.from).map(n => _gsMergeChip(n, uses.get(n).users, n === gsMerge.into, 'gsMergePickInto')).join('');
             const prev = document.getElementById('gs-merge-preview');
             const go = document.getElementById('gs-merge-go');
             if (!gsMerge.from || !gsMerge.into) { prev.textContent = 'Pick the name to retire (From), then the one to keep (Into).'; go.disabled = true; return; }
-            const u = uses.get(gsMerge.from) || { users: 0, pre: 0, quizzes: 0, events: 0, divisions: 0, settings: 0 };
-            const parts = [[u.users, 'users'], [u.pre, 'pre-reg'], [u.quizzes, 'quizzes'], [u.events, 'events'], [u.divisions, 'division slots'], [u.settings, 'visibility setting']].filter(x => x[0]).map(x => `${x[0]} ${x[1]}`);
+            const u = uses.get(gsMerge.from) || { users: 0, pre: 0, quizzes: 0, quests: 0, events: 0, divisions: 0, settings: 0 };
+            const parts = [[u.users, 'users'], [u.pre, 'pre-reg'], [u.quizzes, 'quizzes'], [u.quests, 'quests'], [u.events, 'events'], [u.divisions, 'division slots'], [u.settings, 'visibility setting']].filter(x => x[0]).map(x => `${x[0]} ${x[1]}`);
             prev.innerHTML = `“<b>${escapeHtml(gsMerge.from)}</b>” → “<b>${escapeHtml(gsMerge.into)}</b>”: ${parts.join(' · ') || 'nothing references it'}`;
             go.disabled = !total(u);
         }
@@ -35439,7 +35455,19 @@ They can connect again from LINE.
             const ops = [];
             usersData.filter(u => (u.group || 'Public') === from).forEach(u => ops.push(b => b.update(db.collection('users').doc(u.id), { group: into })));
             preRegData.filter(p => !p.claimed && p.group === from).forEach(p => ops.push(b => b.update(db.collection('pre_users').doc(p.id), { group: into })));
-            quizzesData.filter(q => q && q.targetGroup === from && !String(q.id).startsWith('--')).forEach(q => ops.push(b => b.update(db.collection('quizzes').doc(q.id), { targetGroup: into })));
+            // V102.39: audiences can be comma lists ("Junior,Extern") — swap the one part.
+            const swapList = raw => {
+                const list = String(raw || '').split(',').map(x => x.trim()).filter(Boolean);
+                return list.includes(from) ? [...new Set(list.map(g => g === from ? into : g))].join(',') : null;
+            };
+            quizzesData.filter(q => q && !String(q.id).startsWith('--')).forEach(q => {
+                const next = swapList(q.targetGroup);
+                if (next !== null) ops.push(b => b.update(db.collection('quizzes').doc(q.id), { targetGroup: next }));
+            });
+            (questsCache || []).forEach(q => {
+                const next = q && swapList(q.targetGroup);
+                if (next) ops.push(b => b.update(db.collection('quests').doc(q.id), { targetGroup: next }));
+            });
             (eventsCache || []).filter(e => (e.targetGroups || []).includes(from)).forEach(e => {
                 const next = [...new Set(e.targetGroups.map(g => g === from ? into : g))];
                 ops.push(b => b.update(db.collection('events').doc(e.id), { targetGroups: next }));
@@ -35672,7 +35700,7 @@ They can connect again from LINE.
             if (saveBtn.disabled) return;
             const status = document.getElementById('gs-save-status');
             const uid = document.getElementById('gs-uid').value;
-            const newGroup = document.getElementById('gs-input').value.trim() || "Public";
+            const newGroup = canonicalGroupName(document.getElementById('gs-input').value) || "Public"; // V102.39
             const fnameTh = document.getElementById('gs-fullname-th').value.trim();
             const fnameEn = document.getElementById('gs-firstname-en').value.trim();
             const mnameEn = document.getElementById('gs-middlename-en').value.trim();
@@ -54389,7 +54417,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const activeGroups = new Map();
             activeGroups.set('Public', 0);
             (usersData || []).filter(u => !u.isIgnored).forEach(u => {
-                const g = (u.group || 'Public').trim();
+                const g = canonicalGroupName(u.group || 'Public'); // V102.39: one card per group, not per spelling
                 activeGroups.set(g, (activeGroups.get(g) || 0) + 1);
             });
 
@@ -54422,7 +54450,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function updateDQGroupUserCount(g) {
             const el = document.getElementById('dq-group-user-count');
             if (!el) return;
-            const members = (usersData || []).filter(u => !u.isIgnored && (g === 'Public' || (u.group || 'Public').trim() === g));
+            const members = (usersData || []).filter(u => !u.isIgnored && (g === 'Public' || (u.group || 'Public').trim().toUpperCase() === String(g).toUpperCase()));
             if (members.length === 0) { el.innerHTML = ''; return; }
             const chips = members.map(u =>
                 `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:0.75em;font-weight:700;background:#f1f5f9;color:#334155;border:1px solid #e2e8f0;">${u.displayName || u.id}</span>`
@@ -54525,7 +54553,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 question: questionText,
                 imageUrl: document.getElementById('q-img').value,
                 questLink: document.getElementById('q-link').value,
-                targetGroup: document.getElementById('q-target-group-manual').value.trim() || "",
+                targetGroup: canonicalGroupList(document.getElementById('q-target-group-manual').value) || "", // V102.39
                 tag: document.getElementById('q-tag').value || "",
                 baseScore: parseFloat(document.getElementById('q-score').value),
                 durationMinutes: parseInt(document.getElementById('q-duration').value),
@@ -56871,7 +56899,7 @@ Save it anyway?`;
             const event=eventsCache.find(e=>e.id===id);if(!event)return;
             const d=document.createElement('dialog');d.className='ag-modal';d.innerHTML='<h3>👥 Agenda audience</h3><p class="aud-title"></p><div class="aud-options"></div><p role="status"></p><button class="aud-cancel">Cancel</button><button class="aud-save">Save audience</button>';
             d.querySelector('.aud-title').textContent=event.title;
-            const selected=new Set(event.targetGroups||[]),options=[['__public__','🌐 Public · All groups'],...[...new Set(usersData.map(u=>u.group||'Public'))].sort().map(g=>[g,g])];
+            const selected=new Set(event.targetGroups||[]),options=[['__public__','🌐 Public · All groups'],...getGlobalGroups().map(g=>[g,g])];
             options.forEach(([value,label])=>{const l=document.createElement('label'),c=document.createElement('input');c.type='checkbox';c.value=value;c.checked=selected.has(value);c.style.width='auto';c.onchange=()=>{if(c.checked){if(value==='__public__')selected.clear();else selected.delete('__public__');selected.add(value);}else selected.delete(value);d.querySelectorAll('input').forEach(n=>n.checked=selected.has(n.value));};l.append(c,document.createTextNode(label));d.querySelector('.aud-options').append(l);});
             const hint=document.createElement('p');hint.textContent='No selection: visible only to the creator and Admin.';d.querySelector('.aud-options').after(hint);
             d.querySelector('.aud-cancel').onclick=()=>d.close();d.addEventListener('close',()=>d.remove());d.querySelector('.aud-save').onclick=async()=>{d.querySelector('.aud-save').disabled=true;try{await db.collection('events').doc(id).update({targetGroups:[...selected]});d.close();}catch(e){d.querySelector('[role=status]').textContent='Could not save. Please retry.';d.querySelector('.aud-save').disabled=false;}};document.body.append(d);d.showModal();
