@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.42)</title>
+    <title>Nika Admin (V102.43)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -36019,13 +36019,24 @@ They can connect again from LINE.
             const held = BADGE_STATS_DEFS.map(d => ({ d, t: userBadgeTier(u, d.id) })).filter(x => x.t).sort((a, b) => b.t - a.t);
             const minis = held.slice(0, 3).map(x => `<span title="${escapeHtml(x.d.title)} · ${BADGE_TIERS[x.t].name}">${badgeSvgHtml(x.d.art, x.t, 22, false)}</span>`).join('');
             // V102.34: the minis + n/14 are one button that opens every badge (openUserBadgesPop).
-            return `<button type="button" onclick="openUserBadgesPop(event, '${u.id}')" aria-haspopup="dialog" aria-expanded="false" title="All badges" style="width:auto; min-height:0; margin:0; padding:1px 4px; border:1px solid transparent; border-radius:8px; background:none; font:inherit; cursor:pointer; display:flex; align-items:center; gap:2px;">${minis}<span style="margin-left:4px; font-size:0.78em; font-weight:700; color:#64748b;">${held.length}/${BADGE_STATS_DEFS.length}</span></button>`;
+            return `<button type="button" onclick="openUserBadgesPop(event, '${u.id}')" onmouseenter="openUserBadgesPop(event, '${u.id}', true)" onmouseleave="scheduleCloseUserBadgesPop()" aria-haspopup="dialog" aria-expanded="false" title="All badges" style="width:auto; min-height:0; margin:0; padding:1px 4px; border:1px solid transparent; border-radius:8px; background:none; font:inherit; cursor:pointer; display:flex; align-items:center; gap:2px;">${minis}<span style="margin-left:4px; font-size:0.78em; font-weight:700; color:#64748b;">${held.length}/${BADGE_STATS_DEFS.length}</span></button>`;
         }
 
         // V102.34: small popover with all 14 badges of one intern, in catalog order:
         // earned = art + tier name, not yet = grey art. The hover title adds the date
         // the level was saved (users.badges[id].earnedAt). Reads usersData only.
+        // V102.43: hover previews the popover; a click pins it (stays until an outside
+        // click, Escape, or a second click). Moving from the row into the popover keeps a
+        // hover preview open, so it can be read.
+        let userBadgesPopCloseTimer = null;
+        function scheduleCloseUserBadgesPop() {
+            clearTimeout(userBadgesPopCloseTimer);
+            if (window._userBadgesPopPinned) return;
+            userBadgesPopCloseTimer = setTimeout(() => { if (!window._userBadgesPopPinned) closeUserBadgesPop(); }, 180);
+        }
         function closeUserBadgesPop() {
+            clearTimeout(userBadgesPopCloseTimer);
+            window._userBadgesPopPinned = false;
             const pop = document.getElementById('user-badges-pop');
             if (!pop || pop.hidden) return;
             pop.hidden = true;
@@ -36033,11 +36044,19 @@ They can connect again from LINE.
             window._userBadgesPopTrigger = null;
             if (trig) trig.setAttribute('aria-expanded', 'false');
         }
-        function openUserBadgesPop(ev, uid) {
+        function openUserBadgesPop(ev, uid, hover) {
             ev.stopPropagation();
             const trig = ev.currentTarget;
-            if (window._userBadgesPopTrigger === trig) { closeUserBadgesPop(); return; }
+            clearTimeout(userBadgesPopCloseTimer);
+            if (window._userBadgesPopTrigger === trig) {
+                if (hover) return;                                                    // already showing
+                if (window._userBadgesPopPinned) { closeUserBadgesPop(); return; }   // second click closes
+                window._userBadgesPopPinned = true;                                  // click on a hover preview pins it
+                return;
+            }
+            if (hover && window._userBadgesPopPinned) return; // a pinned popover wins over hovering other rows
             closeUserBadgesPop();
+            window._userBadgesPopPinned = !hover;
             const u = (usersData || []).find(x => x.id === uid);
             if (!u) return;
             let pop = document.getElementById('user-badges-pop');
@@ -36050,6 +36069,8 @@ They can connect again from LINE.
                 pop.style.cssText = 'position:fixed; z-index:1000; width:340px; padding:10px 12px 12px; background:var(--bg-card, #fff); border:1px solid var(--border-color); border-radius:12px; box-shadow:0 12px 28px rgba(15, 23, 42, 0.18);';
                 document.body.appendChild(pop);
                 document.addEventListener('click', e => { if (!pop.contains(e.target)) closeUserBadgesPop(); });
+                pop.addEventListener('mouseenter', () => clearTimeout(userBadgesPopCloseTimer));
+                pop.addEventListener('mouseleave', scheduleCloseUserBadgesPop);
                 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeUserBadgesPop(); });
                 window.addEventListener('scroll', closeUserBadgesPop, true);
                 window.addEventListener('resize', closeUserBadgesPop);
