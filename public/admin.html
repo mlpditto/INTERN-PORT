@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.36)</title>
+    <title>Nika Admin (V102.37)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -43,8 +43,7 @@
                 'editCaseNoteModal',
                 'caseReviewScoreModal',
                 'aiStorytellerModal',
-                'liffPreviewModal',
-                'quickReviewModal'
+                'liffPreviewModal'
             ];
             const isExclusive = exclusiveModals.includes(id);
 
@@ -60716,74 +60715,28 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             currentPeriodUserId = '';
         }
 
+        // V102.37: the Dashboard stat chips (Access / Reflective / Claimed / Quiz / Work)
+        // used to move their review section into a #quickReviewModal that is no longer in
+        // the page, so every chip threw. The sections already sit on this Dashboard tab:
+        // show the section, scroll to it and flash its border. Nothing is moved, so the
+        // review modals opened from inside a section keep stacking as before.
         function openQuickReview(type) {
-            const modal = document.getElementById('quickReviewModal');
-            const titleEl = document.getElementById('quick-review-title');
-            const container = document.getElementById('quick-review-container');
-            
-            let sourceId = "";
-            let title = "";
-            let icon = "";
-            let accentColor = "";
-            
-            if (type === 'access') {
-                sourceId = 'access-request-section';
-                title = "Access Requests";
-                icon = "fa-user-plus";
-                accentColor = "#6f42c1";
-            } else if (type === 'reflective') {
-                sourceId = 'reflective-log-review-section';
-                title = "Reflective Review";
-                icon = "fa-book-journal-whills";
-                accentColor = "#d35400";
-            } else if (type === 'claimed') {
-                sourceId = 'points-claimed-section';
-                title = "Points Claimed";
-                icon = "fa-hand-holding-dollar";
-                accentColor = "#00b894";
-            } else if (type === 'quiz') {
-                sourceId = 'quiz-pending-section';
-                title = "Pending Quiz Reviews";
-                icon = "fa-clock-rotate-left";
-                accentColor = "var(--primary)";
-            } else if (type === 'work') {
-                sourceId = 'general-work-review-section';
-                title = "General Works Management";
-                icon = "fa-briefcase";
-                accentColor = "var(--success)";
-            }
-            
-            const source = document.getElementById(sourceId);
+            const sections = {
+                access:     ['access-request-section', '#6f42c1'],
+                reflective: ['reflective-log-review-section', '#d35400'],
+                claimed:    ['points-claimed-section', '#00b894'],
+                quiz:       ['quiz-pending-section', 'var(--primary)'],
+                work:       ['general-work-review-section', 'var(--success)']
+            };
+            const entry = sections[type];
+            const source = entry && document.getElementById(entry[0]);
             if (!source) return;
-            
-            // Setup Modal Header
-            titleEl.innerHTML = `<i class="fa-solid ${icon}"></i> ${title}`;
-            modal.querySelector('.modal-content').style.borderTop = `5px solid ${accentColor}`;
-            
-            // Cache original position to return it later
-            window.lastReviewSource = source;
-            window.lastReviewParent = source.parentElement;
-            window.lastReviewNextSibling = source.nextElementSibling;
-            
-            // Move into modal
-            container.innerHTML = "";
-            container.appendChild(source);
-            source.style.display = "block"; // Show if it was hidden
-            
-            modal.style.display = "block";
-        }
-
-        function closeQuickReview() {
-            const modal = document.getElementById('quickReviewModal');
-            const source = window.lastReviewSource;
-            if (source && window.lastReviewParent) {
-                // Return to original position
-                window.lastReviewParent.insertBefore(source, window.lastReviewNextSibling);
-                
-                // If it was hidden because it's empty, and it's still empty, let the listeners handle it
-                // Most of these sections have logic to display:none if data.length === 0 in their respective render functions
-            }
-            modal.style.display = "none";
+            if (activeTab !== 'tab-sidequest') switchTab('tab-sidequest');
+            source.style.display = 'block';
+            source.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            source.style.transition = 'box-shadow 0.3s';
+            source.style.boxShadow = `0 0 0 3px ${entry[1]}`;
+            setTimeout(() => { source.style.boxShadow = ''; }, 1600);
         }
 
         // --- UI Preview ([Version: V86.14]) ---
