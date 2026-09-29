@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.17)</title>
+    <title>Internship Portfolio (V101.18)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.05">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -5889,6 +5889,29 @@
         </div>
     </div>
 
+    <!-- V101.18: level-up moment for a new badge tier (queued by checkAchievementUnlocks) -->
+    <style>
+        @keyframes achPop { 0% { transform: scale(.4); opacity: 0; } 70% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
+        #achievementUnlockModal .ach-pop { animation: achPop .55s ease-out both; }
+        #achievementUnlockModal .ach-btn { width: 100%; min-height: 50px; padding: 0 12px; border-radius: 16px; font: inherit; font-weight: 900; letter-spacing: .6px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        @media (prefers-reduced-motion: reduce) { #achievementUnlockModal .ach-pop { animation: none; } }
+    </style>
+    <div id="achievementUnlockModal" class="modal" style="z-index: 10004;" role="dialog" aria-modal="true" aria-labelledby="ach-unlock-title">
+        <div class="modal-content"
+            style="max-width: 400px; border-radius: 24px; padding: 28px 20px 20px; text-align: center; position: relative; overflow: hidden;">
+            <div id="ach-unlock-confetti" aria-hidden="true" style="position:absolute; inset:0; pointer-events:none;"></div>
+            <div id="ach-unlock-kicker" style="position:relative; font-weight:900; letter-spacing:1.5px; font-size:0.8em;"></div>
+            <div id="ach-unlock-badge" style="position:relative; display:flex; justify-content:center; margin:12px 0;"></div>
+            <div id="ach-unlock-pips" style="position:relative; display:flex; gap:6px; justify-content:center; margin-bottom:12px;"></div>
+            <h3 id="ach-unlock-title" style="position:relative; margin:0; font-weight:900; font-size:1.35em; color:#3c3c3c;"></h3>
+            <p id="ach-unlock-desc" style="position:relative; margin:6px 0 18px; color:#6b7178; font-weight:600;"></p>
+            <div style="position:relative; display:flex; flex-direction:column; gap:10px;">
+                <button type="button" class="ach-btn" onclick="shareAchievementUnlock()" style="border:2px solid #e5e7ea; border-bottom-width:5px; background:#fff; color:#1487c7;">SHARE TO LINE</button>
+                <button type="button" class="ach-btn" onclick="showNextAchievementUnlock()" style="border:none; border-bottom:5px solid #3f8a0c; background:#53b515; color:#fff;">CONTINUE</button>
+            </div>
+        </div>
+    </div>
+
     <!-- V97.09: Schedule as a popup instead of the fifth accordion. Same panes,
          same JS — only the container changed. .modal-content is already
          max-height:80vh / overflow-y:auto, so the 7-row heatmap needs no new CSS.
@@ -6716,11 +6739,13 @@
         function computeAchievements() {
             const m = collectAchievementMetrics();
             const legacyIds = new Set(Array.isArray(myOwnRow().reflectiveBadges) ? myOwnRow().reflectiveBadges : []);
+            const stored = storedBadges();
             return achievementCatalog.map(def => {
                 const value = m[def.metric];
                 const known = value !== null && value !== undefined;
                 let level = known ? def.steps.filter(s => value >= s).length : 0;
                 Object.entries(def.legacy || {}).forEach(([id, floor]) => { if (legacyIds.has(id)) level = Math.max(level, floor); });
+                level = Math.min(def.steps.length, Math.max(level, Number((stored[def.id] || {}).level) || 0)); // V101.18: a saved level never drops
                 const n = def.steps.length;
                 const tierIdx = level === 0 ? 0 : (n === 1 ? 3 : level);
                 const next = level < n ? def.steps[level] : null;
@@ -6735,7 +6760,7 @@
                     pct = next ? Math.min(100, Math.round(value / next * 100)) : 100;
                 }
                 const goal = next && def.id !== 'graduate' ? ` · ${next} ${def.unit}` : '';
-                return { def, level, tierIdx, count, pct, done: !next, goal };
+                return { def, level, tierIdx, count, pct, done: !next, goal, known };
             });
         }
 
@@ -6743,6 +6768,7 @@
         // unlockedIds is kept for the existing caller; legacy ids are read in computeAchievements.
         function updateEarnedBadgesBar(unlockedIds) {
             const container = document.getElementById('u-earned-badges');
+            achievementSourceReady('user');
             if (!container) return;
             if (schCheckinDays === null) schLoadCheckinDays().then(() => updateEarnedBadgesBar());
             const list = computeAchievements();
@@ -6779,6 +6805,131 @@
             renderAchievementsList();
             document.getElementById('achievementsModal').style.display = 'flex';
             if (schCheckinDays === null) schLoadCheckinDays().then(renderAchievementsList);
+        }
+
+        // V101.18: Phase 2 — each badge's level is remembered in users/{uid}.badges
+        // ({ [id]: { level, earnedAt } }) and a rise shows the level-up moment.
+        // An id missing from the map means "never evaluated": it is seeded silently, so
+        // the first run after deploy (and any badge added later) does not flood the
+        // intern with pop-ups for things they already had. The check waits until every
+        // source below has loaded once, so a half-loaded page never seeds low levels.
+        const ACH_SOURCES = ['user', 'quiz', 'quests', 'reflective', 'logs', 'notes', 'cases'];
+        const achReady = new Set();
+        let achCheckTimer = null, achWriting = false, achUnlockQueue = [], achUnlockShown = null;
+
+        function storedBadges() {
+            const b = myOwnRow().badges;
+            return b && typeof b === 'object' ? b : {};
+        }
+
+        function achievementSourceReady(name) {
+            achReady.add(name);
+            if (!ACH_SOURCES.every(s => achReady.has(s))) return;
+            clearTimeout(achCheckTimer);
+            achCheckTimer = setTimeout(checkAchievementUnlocks, 1500);
+        }
+
+        async function checkAchievementUnlocks() {
+            if (achWriting || !userId || typeof db === 'undefined') return;
+            if (schCheckinDays === null) { schLoadCheckinDays().then(() => achievementSourceReady('user')); return; }
+            const stored = storedBadges();
+            const updates = {}, ups = [];
+            computeAchievements().forEach(a => {
+                if (!a.known) return;
+                const prev = stored[a.def.id];
+                const stamp = a.level ? firebase.firestore.FieldValue.serverTimestamp() : null;
+                if (!prev) updates[a.def.id] = { level: a.level, earnedAt: stamp };
+                else if (a.level > (Number(prev.level) || 0)) { updates[a.def.id] = { level: a.level, earnedAt: stamp }; ups.push(a); }
+            });
+            if (!Object.keys(updates).length) return;
+            achWriting = true;
+            try {
+                await db.collection('users').doc(userId).set({ badges: updates }, { merge: true });
+                // The users snapshot echoes this; patch the local copy now so a re-check before it lands is a no-op.
+                if (window.myUserDoc) window.myUserDoc.badges = { ...(window.myUserDoc.badges || {}), ...updates };
+                ups.forEach(a => achUnlockQueue.push(a));
+                if (!achUnlockShown) showNextAchievementUnlock();
+                updateEarnedBadgesBar();
+            } catch (e) {
+                console.warn('[achievements] save failed:', e);
+            } finally {
+                achWriting = false;
+            }
+        }
+
+        function _achLevelText(a, level) {
+            if (a.def.id === 'graduate') return 'Internship complete';
+            return `${a.def.steps[level - 1]} ${a.def.unit}`;
+        }
+
+        function showNextAchievementUnlock() {
+            const modal = document.getElementById('achievementUnlockModal');
+            const a = achUnlockQueue.shift() || null;
+            achUnlockShown = a;
+            if (!modal) return;
+            if (!a) { modal.style.display = 'none'; return; }
+            const t = BADGE_TIERS[a.tierIdx];
+            const n = a.def.steps.length;
+            const tierName = t.name.charAt(0) + t.name.slice(1).toLowerCase();
+            document.getElementById('ach-unlock-kicker').textContent = a.level === 1 ? 'NEW BADGE' : 'LEVEL UP';
+            document.getElementById('ach-unlock-kicker').style.color = t.fg;
+            document.getElementById('ach-unlock-title').textContent = `${a.def.title} · ${tierName}`;
+            const next = a.level < n ? ` · Next: ${a.def.steps[a.level]} ${a.def.unit}` : '';
+            document.getElementById('ach-unlock-desc').innerHTML = `${a.def.desc} — ${_achLevelText(a, a.level)}${next} <span class="lang-th">${a.def.th}</span>`;
+            document.getElementById('ach-unlock-pips').innerHTML = n > 1 ? a.def.steps.map((_, i) =>
+                `<span style="width:34px; height:9px; border-radius:5px; background:${i < a.level ? BADGE_TIERS[i + 1].rim : '#e5e7ea'};"></span>`).join('') : '';
+            const COLORS = ['#ff9a1f', '#f7b500', '#23a8f2', '#c47cf7', '#5bc31c', '#f06bb8'];
+            document.getElementById('ach-unlock-confetti').innerHTML = [8, 22, 38, 60, 76, 90, 14, 84, 30, 68].map((x, i) =>
+                `<span style="position:absolute; left:${x}%; top:${i < 6 ? 4 + (i % 3) * 5 : 30 + (i % 4) * 9}%; width:${i % 2 ? 8 : 11}px; height:${i % 2 ? 8 : 5}px; border-radius:2px; background:${COLORS[i % COLORS.length]}; transform:rotate(${i * 37}deg);"></span>`).join('');
+            const badge = document.getElementById('ach-unlock-badge');
+            badge.innerHTML = badgeSvgHtml(a.def.art, a.tierIdx, 150, true);
+            badge.classList.remove('ach-pop'); void badge.offsetWidth; badge.classList.add('ach-pop'); // replay the pop per badge
+            modal.style.display = 'flex';
+        }
+
+        // Share: a Flex card via shareTargetPicker when the LIFF app has it enabled,
+        // else the OS share sheet, else the clipboard (same fallbacks as qzShareLink).
+        async function shareAchievementUnlock() {
+            const a = achUnlockShown;
+            if (!a) return;
+            const t = BADGE_TIERS[a.tierIdx];
+            const url = `https://liff.line.me/${USER_LIFF_ID}`;
+            const who = (userProfile && userProfile.displayName) || myOwnRow().displayName || '';
+            const headline = `🏅 ${a.def.title} · ${t.name}`;
+            const detail = `${a.def.desc} — ${_achLevelText(a, a.level)}`;
+            try {
+                if (window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker')) {
+                    await liff.shareTargetPicker([{
+                        type: 'flex', altText: headline, contents: {
+                            type: 'bubble', size: 'kilo',
+                            header: { type: 'box', layout: 'vertical', backgroundColor: t.dark, paddingAll: '16px', contents: [
+                                { type: 'text', text: a.level === 1 ? '🏅 NEW BADGE' : '🏅 LEVEL UP', color: '#ffffff', size: 'xs', weight: 'bold' },
+                                { type: 'text', text: a.def.title, color: '#ffffff', size: 'xl', weight: 'bold', wrap: true },
+                                { type: 'text', text: t.name, color: '#ffffff', size: 'sm', weight: 'bold' }
+                            ] },
+                            body: { type: 'box', layout: 'vertical', spacing: 'sm', contents: [
+                                { type: 'text', text: detail, wrap: true, size: 'sm', color: '#3c3c3c' },
+                                ...(who ? [{ type: 'text', text: who, size: 'xs', color: '#6b7178', wrap: true }] : [])
+                            ] },
+                            footer: { type: 'box', layout: 'vertical', contents: [
+                                { type: 'button', style: 'primary', color: '#53b515', height: 'sm', action: { type: 'uri', label: 'Open Internship Portfolio', uri: url } }
+                            ] }
+                        }
+                    }]);
+                    return;
+                }
+            } catch (e) {
+                console.warn('[achievements] shareTargetPicker failed, falling back:', e);
+            }
+            const text = `${headline}\n${detail}\n${url}`;
+            if (navigator.share) { navigator.share({ text }).catch(() => {}); return; }
+            const done = () => alert('Copied — paste it into a LINE chat');
+            const fail = () => alert('Copy failed');
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(done).catch(() => explCopyLinkFallback(text, done, fail));
+            } else {
+                explCopyLinkFallback(text, done, fail);
+            }
         }
 
         // --- Initialization ---
@@ -9484,7 +9635,7 @@
             return colors[tag] || '#6b7280';
         }
         function loadAllQuests() { db.collection("quests").orderBy("createdAt", "desc").limit(20).onSnapshot(s => { questsCache = s.docs.map(doc => ({ id: doc.id, ...doc.data() })); renderAssignments(); renderHistory(); updateGrandLineDashboard(); }, e => handleFirestoreListenerError('quests listener', e)); }
-        function loadMySubmissions() { db.collection("quest_submissions").where("userId", "==", userId).onSnapshot(s => { mySubmissionsCache = {}; s.forEach(doc => { mySubmissionsCache[doc.data().questId] = { id: doc.id, ...doc.data() }; }); renderAssignments(); renderHistory(); updateGrandLineDashboard(); }, e => handleFirestoreListenerError('quest submissions listener', e)); }
+        function loadMySubmissions() { db.collection("quest_submissions").where("userId", "==", userId).onSnapshot(s => { mySubmissionsCache = {}; s.forEach(doc => { mySubmissionsCache[doc.data().questId] = { id: doc.id, ...doc.data() }; }); renderAssignments(); renderHistory(); updateGrandLineDashboard(); achievementSourceReady('quests'); }, e => handleFirestoreListenerError('quest submissions listener', e)); }
 
         // --- Quiz System ---
         // (Variables declared globally)
@@ -9528,6 +9679,7 @@
                 updateGrandLineDashboard();
                 // V96.27: quiz completion feeds the Mission "Done" badge too.
                 if (typeof updateMissionDoneBadge === 'function') updateMissionDoneBadge();
+                achievementSourceReady('quiz');
             }, e => handleFirestoreListenerError('quiz attempts listener', e));
         }
 
@@ -20514,6 +20666,7 @@
                     .onSnapshot(s => {
                         reflectiveLogsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                         renderReflectiveLogs();
+                        achievementSourceReady('reflective');
                     }, e => {
                         console.error("Error loading reflective logs:", e);
                         if (e && e.code === 'permission-denied') notifyMissingFirebaseAuth('reflective logs');
@@ -22619,6 +22772,7 @@ async function archiveDoneCard(cardId) {
                 }
                 myReflectiveLogsUnsub = db.collection("reflective_logs").where("userId", "==", userId).onSnapshot(s => {
                     profileActivityState.logs = 'ready';
+                    achievementSourceReady('logs');
                     window.myReflectiveLogsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                     renderHistory();
                     updateGrandLineDashboard();
@@ -22638,6 +22792,7 @@ async function archiveDoneCard(cardId) {
                 myLpEntriesUnsub = db.collection('learning_path_entries').where('userId', '==', userId).onSnapshot(s => {
                     // V92.16: hide soft-deleted entries from the intern's view
                     profileActivityState.notes = 'ready';
+                    achievementSourceReady('notes');
                     window.myLpEntriesCache = s.docs.map(d => ({ id: d.id, ...d.data() })).filter(e => !e.deleted);
                     if (typeof renderLnCounter === 'function') renderLnCounter();
                     if (typeof renderLnHistory === 'function') renderLnHistory();
@@ -25307,6 +25462,7 @@ async function archiveDoneCard(cardId) {
                     return bTs - aTs;
                 });
                 profileActivityState.cases = 'ready';
+                achievementSourceReady('cases');
                 window.myCasesCache = cases;
                 renderCaseGrouped(cases);
                 renderCaseSystemCards(); // V94.79: refresh the per-system counters on the Log Case cards
