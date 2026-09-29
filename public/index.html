@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.20)</title>
+    <title>Internship Portfolio (V101.21)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.05">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -6672,7 +6672,7 @@
         // steps = thresholds per level. 4 steps → Bronze…Diamond, 3 → Bronze…Gold, 1 → Gold.
         // legacy = old reflectiveBadges id → minimum level it guarantees.
         const achievementCatalog = [
-            { id: 'on_fire', art: 'flame', title: 'On Fire', unit: 'days', steps: [3, 7, 14, 30], metric: 'bestStreak', desc: 'Keep an activity streak going', th: 'ทำกิจกรรมต่อเนื่อง (เช็คอิน / log / case)', legacy: { streak_3: 1, streak_7: 2 } },
+            { id: 'on_fire', art: 'flame', title: 'On Fire', unit: 'days', steps: [3, 7, 14, 30], metric: 'bestStreak', desc: 'Submit something every day (Quiz, Journal, Case or Explore)', th: 'ส่งงานทุกวันอย่างน้อย 1 อย่าง', legacy: { streak_3: 1, streak_7: 2 } },
             { id: 'early_bird', art: 'bird', title: 'Early Bird', unit: 'check-ins', steps: [5, 15, 30], metric: 'earlyCheckins', desc: 'Check in before 12:00', th: 'เช็คอินก่อนเที่ยง' },
             { id: 'quiz_master', art: 'book', title: 'Quiz Master', unit: 'questions', steps: [10, 50, 150, 300], metric: 'quizQuestions', desc: 'Answer quiz questions', th: 'ตอบคำถาม quiz สะสม' },
             { id: 'perfectionist', art: 'star', title: 'Perfectionist', unit: 'quizzes', steps: [1, 5, 15], metric: 'perfectQuizzes', desc: 'Score 100% on a quiz', th: 'ได้คะแนนเต็มใน quiz' },
@@ -6716,9 +6716,8 @@
 
         function collectAchievementMetrics() {
             const me = myOwnRow();
-            // Past check-in days arrive with the lazy checkin_logs read (schLoadCheckinDays).
+            // V101.21: submission days only (collectActivityDates), same as the Daily Streak chip.
             const days = collectActivityDates();
-            if (schCheckinDays) schCheckinDays.forEach(k => days.add(k));
             const refl = collectReflectiveMetrics(reflectiveLogsCache || []);
             const DONE = ['pending', 'approved', 'completed'];
             let quizQuestions = 0, perfectQuizzes = 0, fastPerfect = 0, nightSubmits = 0;
@@ -6754,7 +6753,7 @@
                 }
             }
             return {
-                bestStreak: Math.max(_longestDateRun(days), computeEngagementStreak().streak, (myCheckin && myCheckin.bestStreak) || 0, refl.longestStreak || 0),
+                bestStreak: Math.max(_longestDateRun(days), computeEngagementStreak().streak, refl.longestStreak || 0),
                 earlyCheckins: schEarlyCheckins,   // null until the check-in read lands
                 codexApproved: achCodexApproved,   // null until achLoadCodexApproved lands
                 quizQuestions,
@@ -10062,6 +10061,7 @@
                     status: 'pending',
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
+                awardEngagementBonusIfDue(); // V101.21: an Explore review is a submission day for the streak
                 document.getElementById('exploreReviewModal').style.display = 'none';
                 alert('Review submitted! Waiting for admin approval.');
             } catch (e) {
@@ -10120,6 +10120,7 @@
                 status: 'pending',
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
+            awardEngagementBonusIfDue(); // V101.21: an Explore link suggestion is a submission day for the streak
             document.getElementById('sl-title').value = '';
             document.getElementById('sl-url').value = '';
             slSetType('line_man');
@@ -13713,6 +13714,8 @@
                     // decay — sitting a quiz is showing up. Practice runs are excluded on
                     // purpose: they record no attempt and carry no score.
                     tryDailyCheckin('activity');
+                    // V101.21: a quiz is a submission day for the streak too.
+                    awardEngagementBonusIfDue();
 
                     // A. Kanban Sync
                     if (currentQuiz.isHomework) {
@@ -14602,6 +14605,7 @@
         let schCheckinDays = null;      // Set of 'YYYY-MM-DD', null until loaded
         let schCheckinLoading = null;   // in-flight promise, so concurrent opens share one read
         let schEarlyCheckins = null;    // V101.17: daily check-ins before 12:00 Bangkok (Early Bird badge), same read
+        let schActivityDays = null;     // V101.21: days a submission auto-credited the check-in (source 'activity') — streak history
 
         function schLoadCheckinDays() {
             if (schCheckinDays) return Promise.resolve(schCheckinDays);
@@ -14616,19 +14620,24 @@
                 .get()
                 .then(snap => {
                     const days = new Set();
+                    const activityDays = new Set();
                     let early = 0;
                     snap.forEach(doc => {
                         const d = doc.data() || {};
                         if (d.type === 'daily_checkin' && d.dateKey) days.add(d.dateKey);
+                        if (d.type === 'daily_checkin' && d.dateKey && d.source === 'activity') activityDays.add(d.dateKey);
                         if (d.type === 'daily_checkin' && d.timestamp && d.timestamp.toDate && getBangkokDateTimeParts(d.timestamp.toDate()).hour < 12) early++;
                     });
                     schCheckinDays = days;
                     schEarlyCheckins = early;
+                    schActivityDays = activityDays;
+                    if (typeof renderDailyCheckinCard === 'function') renderDailyCheckinCard(); // streak can now see the history
                     return days;
                 })
                 .catch(err => {
                     console.warn('[schedule] check-in days unavailable:', err && err.message);
                     schCheckinDays = new Set();   // cache the empty result; do not retry on every render
+                    schActivityDays = new Set();
                     return schCheckinDays;
                 })
                 .finally(() => { schCheckinLoading = null; });
@@ -19750,19 +19759,22 @@
             return logs.concat(notes);
         }
 
-        // Union of every day the user did ANY of: daily check-in, reflective log, case submit.
+        // V101.21: the streak counts SUBMISSION days only — at least one Quiz, Journal
+        // (Daily Reflection / Learning Note), Case or Explore that day. A bare ✅ check-in
+        // no longer counts (user decision 2026-09-29). Submissions the caches cannot see —
+        // a product listing, or older quiz days (quiz_attempts keeps only the latest attempt
+        // per quiz) — come from check-in logs with source 'activity' (schLoadCheckinDays).
+        // Feeds the Daily Streak chip, the +0.05 7-day bonus and the On Fire badge.
         function collectActivityDates() {
             const set = new Set();
             const add = ts => { if (ts && ts.toDate) set.add(getBangkokDateTimeParts(ts.toDate()).dateKey); };
             (window.myReflectiveLogsCache || []).forEach(l => add(l.timestamp));
             (window.myLpEntriesCache || []).forEach(n => add(n.createdAt)); // V95.88: Learning Note counts as a Log activity
             (window.myCasesCache || []).forEach(c => add(c.timestamp));
-            // reconstruct the stored check-in run (only lastDate + currentStreak are kept client-side)
-            const c = myCheckin || {};
-            if (c.lastDate) {
-                const n = Math.max(1, c.currentStreak || 1);
-                for (let i = 0; i < n; i++) set.add(_shiftDateKey(c.lastDate, -i));
-            }
+            Object.values(quizAttemptsCache || {}).forEach(a => { if (a && ['pending', 'approved', 'completed'].includes(a.status)) add(a.timestamp); });
+            Object.values(myExploreReviewsCache || {}).forEach(r => add(r && r.createdAt));
+            (myLinkSuggestionsCache || []).forEach(x => add(x.createdAt));
+            if (schActivityDays) schActivityDays.forEach(k => set.add(k));
             return set;
         }
 
@@ -19782,6 +19794,7 @@
         // Award the +0.05 milestone once per day when the engagement streak hits a 7-day multiple.
         async function awardEngagementBonusIfDue() {
             if (!userId) return;
+            await schLoadCheckinDays(); // V101.21: activity-check-in history must be in before the streak is judged
             const todayKey = getBangkokDateTimeParts().dateKey;
             const { streak } = computeEngagementStreak(todayKey); // an activity just happened → count today
             if (streak <= 0 || streak % CHECKIN_STREAK_BONUS_EVERY !== 0) return;
@@ -20497,9 +20510,10 @@
                     // update local state immediately (listener will refresh again)
                     myCheckin = { currentStreak: result.streak, bestStreak: result.best, lastDate: todayKey };
                     renderDailyCheckinCard();
-                    // V96.41: the 'activity' callers already fire this themselves right
-                    // after their own submit, so paying it here too would be a duplicate.
-                    if (isManual) await awardEngagementBonusIfDue(); // pay the +0.05 if this push hit a 7-day multiple
+                    // V101.21: a bare manual check-in is not a submission, so it no longer
+                    // feeds the streak or its +0.05 bonus; the 'activity' callers pay that
+                    // themselves right after their own submit.
+                    if (!isManual && schActivityDays) schActivityDays.add(todayKey);
                 }
             } catch (err) {
                 console.warn('Daily check-in transaction failed:', err);
