@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.33)</title>
+    <title>Nika Admin (V102.34)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -35854,7 +35854,66 @@ They can connect again from LINE.
             if (!u || !u.badges || typeof u.badges !== 'object') return '<span style="color:#cbd5e1;" title="App has not saved badges yet">—</span>';
             const held = BADGE_STATS_DEFS.map(d => ({ d, t: userBadgeTier(u, d.id) })).filter(x => x.t).sort((a, b) => b.t - a.t);
             const minis = held.slice(0, 3).map(x => `<span title="${escapeHtml(x.d.title)} · ${BADGE_TIERS[x.t].name}">${badgeSvgHtml(x.d.art, x.t, 22, false)}</span>`).join('');
-            return `<div style="display:flex; align-items:center; gap:2px;">${minis}<span style="margin-left:4px; font-size:0.78em; font-weight:700; color:#64748b;">${held.length}/${BADGE_STATS_DEFS.length}</span></div>`;
+            // V102.34: the minis + n/14 are one button that opens every badge (openUserBadgesPop).
+            return `<button type="button" onclick="openUserBadgesPop(event, '${u.id}')" aria-haspopup="dialog" aria-expanded="false" title="All badges" style="width:auto; min-height:0; margin:0; padding:1px 4px; border:1px solid transparent; border-radius:8px; background:none; font:inherit; cursor:pointer; display:flex; align-items:center; gap:2px;">${minis}<span style="margin-left:4px; font-size:0.78em; font-weight:700; color:#64748b;">${held.length}/${BADGE_STATS_DEFS.length}</span></button>`;
+        }
+
+        // V102.34: small popover with all 14 badges of one intern, in catalog order:
+        // earned = art + tier name, not yet = grey art. The hover title adds the date
+        // the level was saved (users.badges[id].earnedAt). Reads usersData only.
+        function closeUserBadgesPop() {
+            const pop = document.getElementById('user-badges-pop');
+            if (!pop || pop.hidden) return;
+            pop.hidden = true;
+            const trig = window._userBadgesPopTrigger;
+            window._userBadgesPopTrigger = null;
+            if (trig) trig.setAttribute('aria-expanded', 'false');
+        }
+        function openUserBadgesPop(ev, uid) {
+            ev.stopPropagation();
+            const trig = ev.currentTarget;
+            if (window._userBadgesPopTrigger === trig) { closeUserBadgesPop(); return; }
+            closeUserBadgesPop();
+            const u = (usersData || []).find(x => x.id === uid);
+            if (!u) return;
+            let pop = document.getElementById('user-badges-pop');
+            if (!pop) {
+                pop = document.createElement('div');
+                pop.id = 'user-badges-pop';
+                pop.className = 'lang-no-toggle';
+                pop.setAttribute('role', 'dialog');
+                pop.hidden = true;
+                pop.style.cssText = 'position:fixed; z-index:1000; width:340px; padding:10px 12px 12px; background:var(--bg-card, #fff); border:1px solid var(--border-color); border-radius:12px; box-shadow:0 12px 28px rgba(15, 23, 42, 0.18);';
+                document.body.appendChild(pop);
+                document.addEventListener('click', e => { if (!pop.contains(e.target)) closeUserBadgesPop(); });
+                document.addEventListener('keydown', e => { if (e.key === 'Escape') closeUserBadgesPop(); });
+                window.addEventListener('scroll', closeUserBadgesPop, true);
+                window.addEventListener('resize', closeUserBadgesPop);
+            }
+            const fmt = ts => (ts && typeof ts.toDate === 'function') ? ts.toDate().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+            const cells = BADGE_STATS_DEFS.map(d => {
+                const t = userBadgeTier(u, d.id) || 0;
+                const tier = BADGE_TIERS[t];
+                const when = t ? fmt((u.badges[d.id] || {}).earnedAt) : '';
+                const tip = `${d.title} · ${t ? tier.name.charAt(0) + tier.name.slice(1).toLowerCase() : 'not yet'}${when ? ' · ' + when : ''}`;
+                return `<div title="${escapeHtml(tip)}" style="display:flex; flex-direction:column; align-items:center; gap:2px; min-width:0;">
+                    ${badgeSvgHtml(d.art, t, 38, false)}
+                    <span style="font-size:0.62em; font-weight:800; letter-spacing:0.3px; color:${t ? tier.fg : '#cbd5e1'};">${t ? tier.name : '·'}</span>
+                </div>`;
+            }).join('');
+            const held = BADGE_STATS_DEFS.filter(d => userBadgeTier(u, d.id)).length;
+            pop.setAttribute('aria-label', `Badges of ${u.displayName || ''}`);
+            pop.innerHTML = `<div style="display:flex; align-items:center; gap:6px; margin-bottom:8px; font-size:0.85em; font-weight:800; color:var(--text-main);">🏅 ${escapeHtml(u.displayName || '')} <span style="color:#64748b; font-weight:700;">${held}/${BADGE_STATS_DEFS.length}</span></div>
+                <div style="display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:8px 4px;">${cells}</div>`;
+            pop.hidden = false;
+            window._userBadgesPopTrigger = trig;
+            trig.setAttribute('aria-expanded', 'true');
+            const r = trig.getBoundingClientRect();
+            const pw = pop.offsetWidth, ph = pop.offsetHeight;
+            let top = r.bottom + 4;
+            if (top + ph > window.innerHeight - 8) top = Math.max(8, r.top - ph - 4);
+            pop.style.top = top + 'px';
+            pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - pw - 8)) + 'px';
         }
 
         function toggleUserBadgeSort() {
