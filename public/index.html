@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.16)</title>
+    <title>Internship Portfolio (V101.17)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.05">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -5876,6 +5876,19 @@
         </div>
     </div>
 
+    <!-- V101.17: Achievements — tiered badges, Duolingo-style list (filled by renderAchievementsList) -->
+    <div id="achievementsModal" class="modal" style="z-index: 10003;">
+        <div class="modal-content"
+            style="max-width: 480px; max-height: 90vh; overflow-y: auto; border-radius: 20px; padding: 20px 18px; position:relative;">
+            <button type="button" aria-label="Close achievements"
+                onclick="document.getElementById('achievementsModal').style.display='none'"
+                style="position:absolute; top:10px; right:10px; width:34px; height:34px; min-height:0; padding:0; border:none; border-radius:50%; background:linear-gradient(135deg, #ff6b35, #e53935); color:#fff; font-size:20px; font-weight:900; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 14px rgba(229,57,53,0.35);">×</button>
+            <h3 style="margin:0 0 4px 0; font-weight:900; color:#3c3c3c;">🏅 Achievements <span id="achievements-count" style="font-size:0.7em; color:#6b7178;"></span></h3>
+            <p style="margin:0 0 4px 0; color:#6b7178; font-size:0.85em;">Badges add no points — they show how far you've come. <span class="lang-th">badge ไม่มีคะแนน เป็นรางวัลบอกความก้าวหน้า</span></p>
+            <div id="achievements-list"></div>
+        </div>
+    </div>
+
     <!-- V97.09: Schedule as a popup instead of the fifth accordion. Same panes,
          same JS — only the container changed. .modal-content is already
          max-height:80vh / overflow-y:auto, so the 7-row heatmap needs no new CSS.
@@ -6604,6 +6617,169 @@
             { id: 'reviewed_5', icon: '💬', title: 'Mentor Feedback', desc: 'Receive 5 feedbacks ได้รับ feedback 5 ครั้ง', cond: m => m.reviewedLogs >= 5 },
             { id: 'bonus_3', icon: '🎁', title: 'Bonus Hunter', desc: 'Claim 3 bonuses from feedback รับโบนัสจาก feedback 3 ครั้ง', cond: m => m.claimedBonuses >= 3 }
         ];
+        // V101.17: Achievements — Duolingo-style tiered badges (Phase 1).
+        // Tiers are computed live from data this page already loads; nothing new is
+        // written and badges carry no points. The old reflectiveBadges ids still sync
+        // (syncReflectiveGamification) and act as a floor here, so nobody loses a badge.
+        // Tier = rim + pill colour; face colour + picture belong to the badge.
+        const BADGE_TIERS = [
+            { name: 'LOCKED',  rim: '#d5d9de', dark: '#b3b9c0', pale: '#ffffff', fg: '#6b7178' },
+            { name: 'BRONZE',  rim: '#c9793f', dark: '#8a4b1f', pale: '#fdebd9', fg: '#8a4b1f' },
+            { name: 'SILVER',  rim: '#b3bfcc', dark: '#6b7a8f', pale: '#f1f4f8', fg: '#4b5a6e' },
+            { name: 'GOLD',    rim: '#f5c542', dark: '#b8860b', pale: '#fff4cc', fg: '#7a5600' },
+            { name: 'DIAMOND', rim: '#a597ff', dark: '#5b47d6', pale: '#ece9ff', fg: '#4c3aa8' }
+        ];
+        const BADGE_ART = {
+            flame: { face: '#ff9a1f', svg: `<circle cx="50" cy="46" r="25" fill="#ffc15e" opacity="0.55"/><rect x="28" y="63" width="44" height="8" rx="4" fill="#8a5a33" transform="rotate(12 50 67)"/><rect x="28" y="63" width="44" height="8" rx="4" fill="#a86f40" transform="rotate(-12 50 67)"/><path d="M50 18C58 29 67 36 67 50C67 60 59 67 50 67C41 67 33 60 33 50C33 42 38 37 42 31C43 37 46 40 48 40C47 33 48 25 50 18Z" fill="#ff4d2e"/><path d="M50 33C55 40 60 45 60 52C60 58 55 63 50 63C45 63 40 58 40 52C40 48 43 45 46 41C47 45 49 47 50 47C49 43 49 38 50 33Z" fill="#ffb020"/><path d="M50 45C53 49.5 55.5 52 55.5 55.5C55.5 58.8 53 61 50 61C47 61 44.5 58.8 44.5 55.5C44.5 53 47 50.5 50 45Z" fill="#fff1a8"/><circle cx="35" cy="28" r="1.6" fill="#fff1a8"/><circle cx="65" cy="24" r="1.3" fill="#fff1a8"/><circle cx="70" cy="40" r="1.1" fill="#fff1a8"/>` },
+            bird: { face: '#ff8f7a', svg: `<circle cx="50" cy="46" r="26" fill="#ffd6c9"/><circle cx="31" cy="29" r="1.3" fill="#fff"/><circle cx="67" cy="25" r="1.1" fill="#fff"/><circle cx="70" cy="52" r="1.2" fill="#fff"/><path d="M27 47L33 43.5C35 39 42 38 45 41.5C50 45 56 45 62 42L74 30L77 31.5L66 46C64 54 55 60 46 60C38 60 33 55 33 50L27.5 48.5Z" fill="#e2553f"/><path d="M44 47C50 45 58 46 63 44C60 51 53 55 46 54Z" fill="#f07a66"/><circle cx="35.5" cy="44.6" r="1.3" fill="#fff"/><path d="M45 59.5L44.5 65M51 59L51.5 65" stroke="#e2553f" stroke-width="1.8" stroke-linecap="round"/><circle cx="30" cy="74" r="6" fill="#fff"/><circle cx="40" cy="71" r="8" fill="#fff"/><circle cx="52" cy="73" r="7" fill="#fff"/><circle cx="63" cy="70" r="8" fill="#fff"/><circle cx="72" cy="74" r="6" fill="#fff"/><rect x="30" y="73" width="42" height="7" fill="#fff"/>` },
+            book: { face: '#23a8f2', svg: `<rect x="27" y="62" width="46" height="10" rx="2" fill="#e2553f"/><rect x="67" y="64" width="4" height="6" fill="#fff6e0"/><rect x="31" y="52" width="41" height="10" rx="2" fill="#ffc933"/><rect x="66" y="54" width="4" height="6" fill="#fff6e0"/><rect x="28" y="42" width="42" height="10" rx="2" fill="#5bc31c"/><rect x="64" y="44" width="4" height="6" fill="#fff6e0"/><path d="M38 30V37C38 39.5 44 41.5 50 41.5C56 41.5 62 39.5 62 37V30L50 35Z" fill="#2e3860"/><path d="M50 17L72 26L50 35L28 26Z" fill="#1e2540"/><path d="M67 28V37" stroke="#ffc933" stroke-width="2" stroke-linecap="round"/><circle cx="67" cy="38.5" r="2.2" fill="#ffc933"/>` },
+            star: { face: '#c47cf7', svg: `<circle cx="50" cy="46" r="26" fill="#dcaefc"/><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z" transform="translate(27.2 23.2) scale(1.9)" fill="#ffd84a" stroke="#e0a800" stroke-width="0.8" stroke-linejoin="round"/><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z" transform="translate(41.6 37.4) scale(0.7)" fill="#fff4b8"/><path d="M72 18l1.6 4.2 4.2 1.6-4.2 1.6-1.6 4.2-1.6-4.2-4.2-1.6 4.2-1.6z" fill="#fff"/><path d="M27 62l1.2 3 3 1.2-3 1.2-1.2 3-1.2-3-3-1.2 3-1.2z" fill="#fff"/>` },
+            stethoscope: { face: '#f25555', svg: `<rect x="32" y="22" width="40" height="52" rx="5" fill="#a86f40"/><rect x="36" y="28" width="32" height="42" rx="2" fill="#fff"/><rect x="44" y="18" width="16" height="7" rx="2" fill="#c9ced6"/><path d="M40 37H64M40 44H60M40 51H62" stroke="#c9ced6" stroke-width="2.5" stroke-linecap="round"/><path d="M48 61H58M53 56V66" stroke="#f25555" stroke-width="3.2" stroke-linecap="round"/><path d="M28 26C21 40 24 58 38 64" fill="none" stroke="#1e2540" stroke-width="3" stroke-linecap="round"/><circle cx="40" cy="65" r="5.5" fill="#9aa3ad" stroke="#1e2540" stroke-width="2"/>` },
+            pen: { face: '#14a8b8', svg: `<rect x="26" y="22" width="40" height="52" rx="4" fill="#fff"/><rect x="26" y="22" width="8" height="52" rx="3" fill="#ffd84a"/><path d="M40 34H60M40 42H60M40 50H54" stroke="#b7dfe4" stroke-width="2.5" stroke-linecap="round"/><path d="M50 66C44 62 44 57 47 56C48.5 55.5 50 57 50 58C50 57 51.5 55.5 53 56C56 57 56 62 50 66Z" fill="#f06bb8"/><g transform="rotate(35 66 48)"><rect x="62" y="24" width="8" height="5" rx="1" fill="#f06bb8"/><rect x="62" y="29" width="8" height="3" fill="#c9ced6"/><rect x="62" y="32" width="8" height="30" fill="#f7b500"/><path d="M62 62L66 70L70 62Z" fill="#fde0b0"/><path d="M65 68L66 70L67 68Z" fill="#1e2540"/></g>` },
+            message: { face: '#7c6cf0', svg: `<rect x="22" y="20" width="46" height="32" rx="9" fill="#fff"/><path d="M32 50L29 62L42 51Z" fill="#fff"/><circle cx="35" cy="36" r="3.2" fill="#7c6cf0"/><circle cx="45" cy="36" r="3.2" fill="#7c6cf0"/><circle cx="55" cy="36" r="3.2" fill="#7c6cf0"/><rect x="48" y="48" width="32" height="22" rx="8" fill="#ffd84a"/><path d="M70 68L76 77L63 69Z" fill="#ffd84a"/><path d="M64 65C59 61.5 59 57 62 56.5C63.5 56 64 57.5 64 58.5C64 57.5 64.5 56 66 56.5C69 57 69 61.5 64 65Z" fill="#f25555"/>` },
+            flag: { face: '#8fd6ff', svg: `<circle cx="72" cy="24" r="5" fill="#fff1a8"/><path d="M20 76L40 42L54 60L64 48L81 76Z" fill="#3d8f0f"/><path d="M26 76L50 32L74 76Z" fill="#8a6b52"/><path d="M50 32L57 45L53 42.5L50 46.5L47 42.5L43 45Z" fill="#fff"/><path d="M50 32V16" stroke="#1e2540" stroke-width="2" stroke-linecap="round"/><path d="M50 16L63 20.5L50 25Z" fill="#e2553f"/>` },
+            award: { face: '#f7b500', svg: `<rect x="24" y="54" width="52" height="14" rx="7" fill="#fff6e0"/><circle cx="26" cy="61" r="7" fill="#efdfb8"/><rect x="46" y="54" width="7" height="14" fill="#e2553f"/><path d="M47 68L45 77L49.5 74L52 68Z" fill="#e2553f"/><path d="M36 33V41C36 44 43 46.5 50 46.5C57 46.5 64 44 64 41V33L50 39Z" fill="#2e3860"/><path d="M50 17L76 28.5L50 40L24 28.5Z" fill="#1e2540"/><circle cx="50" cy="28.5" r="2" fill="#ffd84a"/><path d="M50 28.5L71 31V42" fill="none" stroke="#ff9f1c" stroke-width="2" stroke-linecap="round"/><circle cx="71" cy="43.5" r="2.4" fill="#ff9f1c"/>` }
+        };
+        // steps = thresholds per level. 4 steps → Bronze…Diamond, 3 → Bronze…Gold, 1 → Gold.
+        // legacy = old reflectiveBadges id → minimum level it guarantees.
+        const achievementCatalog = [
+            { id: 'on_fire', art: 'flame', title: 'On Fire', unit: 'days', steps: [3, 7, 14, 30], metric: 'bestStreak', desc: 'Keep an activity streak going', th: 'ทำกิจกรรมต่อเนื่อง (เช็คอิน / log / case)', legacy: { streak_3: 1, streak_7: 2 } },
+            { id: 'early_bird', art: 'bird', title: 'Early Bird', unit: 'check-ins', steps: [5, 15, 30], metric: 'earlyCheckins', desc: 'Check in before 12:00', th: 'เช็คอินก่อนเที่ยง' },
+            { id: 'quiz_master', art: 'book', title: 'Quiz Master', unit: 'questions', steps: [10, 50, 150, 300], metric: 'quizQuestions', desc: 'Answer quiz questions', th: 'ตอบคำถาม quiz สะสม' },
+            { id: 'perfectionist', art: 'star', title: 'Perfectionist', unit: 'quizzes', steps: [1, 5, 15], metric: 'perfectQuizzes', desc: 'Score 100% on a quiz', th: 'ได้คะแนนเต็มใน quiz' },
+            { id: 'case_hunter', art: 'stethoscope', title: 'Case Hunter', unit: 'cases', steps: [1, 5, 15, 30], metric: 'cases', desc: 'Submit cases', th: 'ส่ง case' },
+            { id: 'reflective_mind', art: 'pen', title: 'Reflective Mind', unit: 'logs', steps: [1, 7, 15, 30], metric: 'reflectiveLogs', desc: 'Write Daily Reflections', th: 'เขียน Daily Reflection', legacy: { first_log: 1, writer_7: 2 } },
+            { id: 'mentor_feedback', art: 'message', title: 'Mentor Feedback', unit: 'reviews', steps: [1, 5, 15], metric: 'reviewedLogs', desc: 'Get mentor feedback on your logs', th: 'ได้รับ feedback จากพี่เลี้ยง', legacy: { bonus_3: 1, reviewed_5: 2 } },
+            { id: 'quest_finisher', art: 'flag', title: 'Quest Finisher', unit: 'quests', steps: [1, 5, 10], metric: 'questsDone', desc: 'Submit quests', th: 'ส่ง quest สำเร็จ' },
+            { id: 'graduate', art: 'award', title: 'Graduate', unit: 'days', steps: [1], metric: 'graduated', desc: 'Finish your internship', th: 'ฝึกงานจนครบกำหนด' }
+        ];
+
+        function badgeSvgHtml(art, tierIdx, px, withPill) {
+            const a = BADGE_ART[art] || BADGE_ART.award;
+            const t = BADGE_TIERS[tierIdx] || BADGE_TIERS[0];
+            const locked = tierIdx === 0;
+            const vbH = withPill ? 116 : 98;
+            return `<svg viewBox="0 0 100 ${vbH}" width="${px}" height="${Math.round(px * vbH / 100)}" aria-hidden="true" focusable="false" style="flex:none;${locked ? 'filter:grayscale(1);' : ''}">`
+                + `<rect x="6" y="10" width="88" height="86" rx="24" fill="${t.dark}"/><rect x="6" y="4" width="88" height="84" rx="24" fill="${t.rim}"/><rect x="12" y="10" width="76" height="72" rx="19" fill="${a.face}"/>`
+                + `<g opacity="${locked ? 0.45 : 1}">${a.svg}</g>`
+                + (withPill ? `<rect x="14" y="84" width="72" height="26" rx="13" fill="${t.pale}" stroke="${t.dark}" stroke-width="3"/><text x="50" y="102" text-anchor="middle" font-size="12.5" font-weight="900" fill="${t.fg}" font-family="system-ui, sans-serif">${t.name}</text>` : '')
+                + `</svg>`;
+        }
+
+        function _longestDateRun(keys) {
+            const sorted = Array.from(keys).sort();
+            let best = 0, run = 0, prev = null;
+            sorted.forEach(k => {
+                run = (prev && _shiftDateKey(prev, 1) === k) ? run + 1 : 1;
+                if (run > best) best = run;
+                prev = k;
+            });
+            return best;
+        }
+
+        function collectAchievementMetrics() {
+            const me = myOwnRow();
+            // Past check-in days arrive with the lazy checkin_logs read (schLoadCheckinDays).
+            const days = collectActivityDates();
+            if (schCheckinDays) schCheckinDays.forEach(k => days.add(k));
+            const refl = collectReflectiveMetrics(reflectiveLogsCache || []);
+            const DONE = ['pending', 'approved', 'completed'];
+            let quizQuestions = 0, perfectQuizzes = 0;
+            Object.values(quizAttemptsCache || {}).forEach(a => {
+                if (!a || !DONE.includes(a.status)) return;
+                const total = Number(a.totalQuestions) || 0;
+                quizQuestions += total;
+                if (total > 0 && Number(a.correctCount) >= total) perfectQuizzes++;
+            });
+            let graduated = 0, dayNow = 0, dayTotal = 0;
+            if (me.startDate && me.endDate && !me.notAnInternship) {
+                const s = schParseDay(me.startDate), e = schParseDay(me.endDate);
+                if (s && e && e >= s) {
+                    dayTotal = Math.round((e - s) / 86400000) + 1;
+                    dayNow = Math.max(0, Math.min(dayTotal, Math.floor((Date.now() - s) / 86400000) + 1));
+                    graduated = Date.now() >= e.getTime() ? 1 : 0;
+                }
+            }
+            return {
+                bestStreak: Math.max(_longestDateRun(days), computeEngagementStreak().streak, (myCheckin && myCheckin.bestStreak) || 0, refl.longestStreak || 0),
+                earlyCheckins: schEarlyCheckins,   // null until the check-in read lands
+                quizQuestions,
+                perfectQuizzes,
+                cases: (window.myCasesCache || []).length,
+                reflectiveLogs: refl.totalLogs || 0,
+                reviewedLogs: refl.reviewedLogs || 0,
+                questsDone: Object.values(mySubmissionsCache || {}).filter(s => s && s.status === 'submitted').length,
+                graduated, dayNow, dayTotal
+            };
+        }
+
+        function computeAchievements() {
+            const m = collectAchievementMetrics();
+            const legacyIds = new Set(Array.isArray(myOwnRow().reflectiveBadges) ? myOwnRow().reflectiveBadges : []);
+            return achievementCatalog.map(def => {
+                const value = m[def.metric];
+                const known = value !== null && value !== undefined;
+                let level = known ? def.steps.filter(s => value >= s).length : 0;
+                Object.entries(def.legacy || {}).forEach(([id, floor]) => { if (legacyIds.has(id)) level = Math.max(level, floor); });
+                const n = def.steps.length;
+                const tierIdx = level === 0 ? 0 : (n === 1 ? 3 : level);
+                const next = level < n ? def.steps[level] : null;
+                let count, pct;
+                if (def.id === 'graduate') {
+                    count = level ? 'Complete' : (m.dayTotal ? `Day ${m.dayNow} / ${m.dayTotal}` : '—');
+                    pct = level ? 100 : (m.dayTotal ? Math.round(m.dayNow / m.dayTotal * 100) : 0);
+                } else if (!known) {
+                    count = '…'; pct = 0;
+                } else {
+                    count = next ? `${Math.min(value, next)} / ${next}` : 'Complete';
+                    pct = next ? Math.min(100, Math.round(value / next * 100)) : 100;
+                }
+                const goal = next && def.id !== 'graduate' ? ` · ${next} ${def.unit}` : '';
+                return { def, level, tierIdx, count, pct, done: !next, goal };
+            });
+        }
+
+        // Earned badges row inside the profile ⋯ panel + entry point to the full list.
+        // unlockedIds is kept for the existing caller; legacy ids are read in computeAchievements.
+        function updateEarnedBadgesBar(unlockedIds) {
+            const container = document.getElementById('u-earned-badges');
+            if (!container) return;
+            if (schCheckinDays === null) schLoadCheckinDays().then(() => updateEarnedBadgesBar());
+            const list = computeAchievements();
+            const earned = list.filter(a => a.level > 0).sort((a, b) => b.tierIdx - a.tierIdx);
+            const minis = earned.slice(0, 5).map(a => badgeSvgHtml(a.def.art, a.tierIdx, 30, false)).join('');
+            container.innerHTML = `<button type="button" onclick="openAchievementsModal()" style="width:100%; min-height:44px; display:flex; align-items:center; gap:8px; padding:6px 10px; border:2px solid #e5e7ea; border-bottom-width:4px; border-radius:14px; background:#fff; cursor:pointer; font:inherit; color:#3c3c3c;">
+                <span style="display:flex; gap:3px; align-items:center;">${minis || badgeSvgHtml('award', 0, 30, false)}</span>
+                <span style="flex:1; text-align:left; font-weight:800; font-size:0.85em;">Achievements <span style="color:#6b7178; font-weight:700;">${earned.length}/${list.length}</span></span>
+                <span aria-hidden="true" style="color:#a4aab1; font-weight:900;">›</span>
+            </button>`;
+            container.style.display = 'flex';
+        }
+
+        function renderAchievementsList() {
+            const box = document.getElementById('achievements-list');
+            if (!box) return;
+            const list = computeAchievements();
+            const head = document.getElementById('achievements-count');
+            if (head) head.textContent = `${list.filter(a => a.level > 0).length} / ${list.length}`;
+            box.innerHTML = list.map(a => `<div style="display:flex; gap:14px; align-items:center; padding:14px 4px; border-bottom:2px solid #eef0f3;">
+                ${badgeSvgHtml(a.def.art, a.tierIdx, 68, true)}
+                <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:5px;">
+                    <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;">
+                        <strong style="font-size:1.02em; font-weight:900; color:#3c3c3c;">${a.def.title}</strong>
+                        <span style="font-size:0.78em; font-weight:800; color:#6b7178; white-space:nowrap;">${a.count}</span>
+                    </div>
+                    <div style="height:14px; border-radius:7px; background:#e5e7ea; overflow:hidden;"><div style="height:100%; width:${a.pct}%; border-radius:7px; background:${a.done ? '#5bc31c' : '#f7b500'};"></div></div>
+                    <div style="font-size:0.8em; font-weight:600; color:#6b7178; line-height:1.35;">${a.def.desc}${a.goal} <span class="lang-th">${a.def.th}</span></div>
+                </div>
+            </div>`).join('');
+        }
+
+        function openAchievementsModal() {
+            renderAchievementsList();
+            document.getElementById('achievementsModal').style.display = 'flex';
+            if (schCheckinDays === null) schLoadCheckinDays().then(renderAchievementsList);
+        }
 
         // --- Initialization ---
         function updateStatus(msg) {
@@ -8293,19 +8469,6 @@
             } catch (e) {
                 el.click();
             }
-        }
-
-        // V94.04: Earned badges as metrics bar row 3
-        function updateEarnedBadgesBar(unlockedIds) {
-            const container = document.getElementById('u-earned-badges');
-            if (!container) return;
-            const unlocked = new Set(unlockedIds || []);
-            const earned   = reflectiveBadgeCatalog.filter(b => unlocked.has(b.id));
-            if (!earned.length) { container.style.display = 'none'; return; }
-            container.innerHTML = earned.map(b =>
-                `<span style="display:inline-flex;align-items:center;gap:3px;padding:3px 8px;background:#fdf4ff;border:1px solid #e9d5ff;border-radius:20px;color:#7c3aed;font-weight:600;">${b.icon} ${b.title}</span>`
-            ).join('');
-            container.style.display = 'flex';
         }
 
         function checkGraduation(data) {
@@ -14219,6 +14382,7 @@
         // feedback_firestore_rules_not_filters).
         let schCheckinDays = null;      // Set of 'YYYY-MM-DD', null until loaded
         let schCheckinLoading = null;   // in-flight promise, so concurrent opens share one read
+        let schEarlyCheckins = null;    // V101.17: daily check-ins before 12:00 Bangkok (Early Bird badge), same read
 
         function schLoadCheckinDays() {
             if (schCheckinDays) return Promise.resolve(schCheckinDays);
@@ -14233,11 +14397,14 @@
                 .get()
                 .then(snap => {
                     const days = new Set();
+                    let early = 0;
                     snap.forEach(doc => {
                         const d = doc.data() || {};
                         if (d.type === 'daily_checkin' && d.dateKey) days.add(d.dateKey);
+                        if (d.type === 'daily_checkin' && d.timestamp && d.timestamp.toDate && getBangkokDateTimeParts(d.timestamp.toDate()).hour < 12) early++;
                     });
                     schCheckinDays = days;
+                    schEarlyCheckins = early;
                     return days;
                 })
                 .catch(err => {
