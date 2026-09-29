@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.29)</title>
+    <title>Nika Admin (V102.30)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -7093,6 +7093,18 @@
                         </summary>
                         <button type="button" id="qcov-expand" onclick="toggleQuizCoverageSummary()" aria-expanded="false" style="margin:8px 14px; width:auto; padding:6px 10px;">Show all systems</button>
                         <div id="qcov-grid" style="padding:12px 14px; border-top:1px solid #eef2ff; display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:8px;"></div>
+                    </details>
+
+                    <!-- V102.30: Badge stats — how many interns hold each Achievements tier.
+                         Reads users/{uid}.badges, which the intern app writes since V101.18,
+                         from usersData (no new query). Follows the board group chip rail;
+                         camp (isIgnored) and pre-registered users are left out, as in other stats. -->
+                    <details id="badge-stats-panel" class="lang-no-toggle" ontoggle="if (this.open) renderBadgeStats()" style="margin-top:10px; border:1px solid #e2e8f0; border-radius:12px; background:#fff;">
+                        <summary style="padding:10px 14px; cursor:pointer; font-weight:700; color:var(--primary); list-style:none; display:flex; align-items:center; gap:8px;">
+                            <i class="fa-solid fa-medal"></i> Badge Stats
+                            <span id="bstat-summary" style="font-size:0.78em; font-weight:600; color:#64748b; margin-left:auto;"></span>
+                        </summary>
+                        <div id="bstat-body" style="padding:10px 14px; border-top:1px solid #eef2ff; overflow-x:auto;"></div>
                     </details>
 
                     <!-- V97.53: LINE push quota for the current Bangkok month, read from
@@ -34013,6 +34025,7 @@ RULES:
                 drawKanban();
                 renderAlabastaCases();
                 if (typeof renderAllExamRecentHosts === 'function') renderAllExamRecentHosts();
+                renderBadgeStatsIfOpen();
             }, e => console.error("🔥 [Firestore Error] users:", e));
 
             db.collection("side_quests").orderBy("createdAt", "desc").onSnapshot(renderKanban, e => console.error("🔥 [Firestore Error] side_quests:", e));
@@ -35741,6 +35754,55 @@ They can connect again from LINE.
             drawKanban();
             renderAlabastaCases();
             renderGroupUsersPanel();
+            renderBadgeStatsIfOpen();
+        }
+
+        // V102.30: mirror of achievementCatalog in index.html — [id, title, number of
+        // tier steps, tier of a one-step badge]. Add a row here when a badge is added there.
+        const BADGE_STATS_DEFS = [
+            ['on_fire', 'On Fire', 4], ['early_bird', 'Early Bird', 3], ['quiz_master', 'Quiz Master', 4],
+            ['perfectionist', 'Perfectionist', 3], ['case_hunter', 'Case Hunter', 4], ['reflective_mind', 'Reflective Mind', 4],
+            ['mentor_feedback', 'Mentor Feedback', 3], ['quest_finisher', 'Quest Finisher', 3], ['graduate', 'Graduate', 1, 3],
+            ['speedrunner', 'Speedrunner', 3], ['explorer', 'Explorer', 3], ['night_owl', 'Night Owl', 1, 3], ['legend', 'Legend', 1, 4]
+        ];
+        const BADGE_STATS_TIERS = [['Bronze', '#a0592a'], ['Silver', '#5b6b80'], ['Gold', '#8f6200'], ['Diamond', '#4c3aa8']];
+
+        function renderBadgeStatsIfOpen() {
+            const panel = document.getElementById('badge-stats-panel');
+            if (panel && panel.open) renderBadgeStats();
+        }
+
+        function renderBadgeStats() {
+            const body = document.getElementById('bstat-body');
+            const summary = document.getElementById('bstat-summary');
+            if (!body) return;
+            const group = activeBoardGroup;
+            const users = usersData.filter(u => !u.isIgnored && !u.isPreReg && (group === 'All' || (u.group || 'Public') === group));
+            const synced = users.filter(u => u.badges && typeof u.badges === 'object');
+            if (summary) summary.textContent = `${synced.length}/${users.length} synced${group === 'All' ? '' : ' · ' + group}`;
+            if (!synced.length) {
+                body.innerHTML = '<div style="color:#64748b; font-size:0.85em;">No intern in this view has opened the app since badges shipped (intern V101.18).</div>';
+                return;
+            }
+            const th = 'padding:6px 6px; font-size:0.78em; white-space:nowrap;';
+            const td = 'padding:6px 6px; text-align:center; border-top:1px solid #f1f5f9;';
+            const rows = BADGE_STATS_DEFS.map(([id, title, steps, oneOff]) => {
+                const counts = [0, 0, 0, 0];
+                let none = 0;
+                synced.forEach(u => {
+                    const level = Number((u.badges[id] || {}).level) || 0;
+                    if (!level) { none++; return; }
+                    counts[(steps === 1 ? (oneOff || 3) : Math.min(level, 4)) - 1]++;
+                });
+                const offered = t => steps === 1 ? t === (oneOff || 3) : t <= steps;
+                const cells = counts.map((c, i) => `<td style="${td}">${offered(i + 1) ? (c ? `<strong>${c}</strong>` : '<span style="color:#cbd5e1;">0</span>') : '<span style="color:#e2e8f0;">—</span>'}</td>`).join('');
+                return `<tr><td style="${td} text-align:left; font-weight:600;">${escapeHtml(title)}</td><td style="${td} color:#94a3b8;">${none}</td>${cells}</tr>`;
+            }).join('');
+            body.innerHTML = `<table class="admin-table" style="width:100%; border-collapse:collapse;">
+                <thead><tr><th style="${th} text-align:left;">Badge</th><th style="${th} color:#94a3b8;">None</th>${BADGE_STATS_TIERS.map(([n, c]) => `<th style="${th} color:${c};">${n}</th>`).join('')}</tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+            <div style="margin-top:8px; font-size:0.75em; color:#94a3b8;">Counts only interns whose app has saved badges; the rest appear after their next app open. — = tier not offered for that badge.</div>`;
         }
 
         // Per-user Quiz/Journal/Case status for #board-group-tabs' active group,
