@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.47)</title>
+    <title>Nika Admin (V102.48)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -215,7 +215,39 @@
         /* V102.47: quiz feedback triage chip (fbTriageChip) */
         .fb-tri { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; margin-left: 6px; border-radius: 50%; font-size: 0.85em; vertical-align: middle; }
         .fb-tri.open { background: #fee2e2; box-shadow: 0 0 0 2px #fca5a5; }
-        .fb-tri-done { width: 22px; height: 22px; min-height: auto; margin: 0 0 0 4px; padding: 0; border-radius: 50%; border: 1px solid #86efac; background: #f0fdf4; color: #16a34a; font-size: 0.75em; font-weight: 800; cursor: pointer; vertical-align: middle; box-shadow: none; }
+        /* V102.48: feedback issues (fbRenderIssues) — one card per problem, closed once with "Fixed in V…" */
+        .fbi-wrap { display: flex; flex-direction: column; gap: 10px; }
+        .fbi-strip { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+        .fbi-sc, .fbi-pill, .fbi-v, .fbi-close { width: auto; min-height: auto; margin: 0; font-family: inherit; cursor: pointer; box-shadow: none; }
+        .fbi-sc { padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; border: 1px solid var(--border-color, #e2e8f0); background: var(--bg-card, #fff); color: #475569; }
+        .fbi-sc.on { background: #0f172a; color: #fff; border-color: #0f172a; }
+        .fbi { display: flex; gap: 12px; align-items: flex-start; border: 1px solid var(--border-color, #e2e8f0); border-radius: 16px; padding: 12px 14px; background: var(--bg-card, #fff); cursor: pointer; text-align: left; }
+        .fbi-ic { font-size: 22px; line-height: 1; }
+        .fbi-body { flex: 1; min-width: 0; }
+        .fbi-t { font-weight: 700; font-size: 15px; color: var(--text-main, #0f172a); }
+        .fbi-m { font-size: 12px; color: #64748b; margin-top: 2px; }
+        .fbi-tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; margin-left: 6px; vertical-align: middle; background: #e2e8f0; color: #475569; }
+        .fbi-tag.fresh { background: #fee2e2; color: #b91c1c; } .fbi-tag.resolved { background: #dcfce7; color: #15803d; } .fbi-tag.reopened { background: #dc2626; color: #fff; }
+        .fbi.fbi-fresh { border-color: #fecaca; background: #fff7f7; }
+        .fbi.fbi-quiet, .fbi.fbi-dismissed { opacity: .75; }
+        .fbi.fbi-resolved { border-color: #bbf7d0; background: #f0fdf4; }
+        .fbi.fbi-reopened { border-color: #dc2626; box-shadow: 0 0 0 3px #fee2e2; }
+        .fbi-act { display: flex; gap: 6px; flex-shrink: 0; }
+        .fbi-pill { padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; border: 1px solid #e2e8f0; background: #fff; color: #475569; white-space: nowrap; }
+        .fbi-pill.fix { border-color: #86efac; background: #f0fdf4; color: #15803d; }
+        .fbi-fix { border-top: 1px dashed #e2e8f0; margin-top: 10px; padding-top: 10px; cursor: default; }
+        .fbi-hint { font-size: 12px; color: #64748b; }
+        .fbi-rail { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+        .fbi-v { padding: 5px 11px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid #e2e8f0; background: #fff; color: #0f172a; }
+        .fbi-v small { color: #64748b; font-weight: 400; margin-left: 4px; }
+        .fbi-v.sug { box-shadow: 0 0 0 2px #bbf7d0; }
+        .fbi-v.on { border-color: #16a34a; background: #16a34a; color: #fff; } .fbi-v.on small { color: #dcfce7; }
+        .fbi-prev { font-size: 12px; color: #15803d; margin: 4px 0 8px; }
+        .fbi-close { padding: 6px 14px; border-radius: 999px; border: 0; background: #16a34a; color: #fff; font-weight: 700; font-size: 12px; }
+        .fbi-close:disabled { opacity: .45; cursor: default; }
+        .fbi-reports { display: grid; gap: 4px; font-size: 12px; color: #334155; margin-top: 8px; cursor: default; }
+        .fbi-reports div { display: flex; gap: 8px; } .fbi-reports div > span:first-child { color: #64748b; width: 52px; flex-shrink: 0; }
+        .fbi-empty { color: #94a3b8; text-align: center; padding: 20px; }
         .fb-fix-count { margin-left: 5px; padding: 0 6px; border-radius: 999px; background: #dc2626; color: #fff; font-size: 0.75em; font-weight: 800; }
         .fb-fix-count:empty { display: none; }
         .lang-toggle-btn.active {
@@ -57412,13 +57444,15 @@ Save it anyway?`;
             all.forEach(f => { userCounts[f.userId] = (userCounts[f.userId] || 0) + 1; });
 
             let filterHtml = `<button onclick="window._laughTaleUserFilter=null; renderQuizFeedbackCards()" style="flex:none; padding:8px 20px; border-radius:15px; border:none; font-weight:900; background:${!window._laughTaleUserFilter ? '#4361ee; color:white; transform:scale(1.05); box-shadow:0 5px 15px rgba(67,97,238,0.3);' : 'white; color:#64748b;'} cursor:pointer; transition:0.3s; box-shadow:0 4px 8px rgba(0,0,0,0.05); font-size:0.85em;">ALL (${all.length})</button>`;
-            // V102.47: triage — feedback that still needs a fix (🐞 bug / ❌ question problem).
-            const fixCount = all.filter(fbNeedsFix).length;
+            // V102.48: urgent reports are grouped into issues; the red count is fresh + back-again issues.
+            const issues = await fbLoadIssues();
+            const hot = issues.filter(i => ['fresh', 'reopened'].includes(fbIssueState(i))).length;
+            const liveIssues = issues.filter(i => fbIssueState(i) !== 'dismissed').length;
             const fixEl = document.getElementById('lt-src-quiz-fix');
-            if (fixEl) fixEl.textContent = fixCount ? String(fixCount) : '';
-            if (fixCount > 0 || window._laughTaleUserFilter === '__fix__') {
-                const on = window._laughTaleUserFilter === '__fix__';
-                filterHtml += `<button onclick="window._laughTaleUserFilter='__fix__'; renderQuizFeedbackCards()" title="Needs a fix: app bug or question problem" style="flex:none; padding:8px 16px; border-radius:15px; border:none; font-weight:900; background:${on ? '#dc2626; color:white;' : '#fee2e2; color:#b91c1c;'} cursor:pointer; box-shadow:0 4px 8px rgba(0,0,0,0.05); font-size:0.85em;">🐞❌ ${fixCount}</button>`;
+            if (fixEl) fixEl.textContent = hot ? String(hot) : '';
+            if (issues.length || window._laughTaleUserFilter === '__issues__') {
+                const on = window._laughTaleUserFilter === '__issues__';
+                filterHtml += `<button onclick="window._laughTaleUserFilter='__issues__'; renderQuizFeedbackCards()" title="Problems to fix, grouped from bug / question reports" style="flex:none; padding:8px 16px; border-radius:15px; border:none; font-weight:900; background:${on ? '#0f172a; color:white;' : hot ? '#fee2e2; color:#b91c1c;' : 'white; color:#64748b;'} cursor:pointer; box-shadow:0 4px 8px rgba(0,0,0,0.05); font-size:0.85em;">⚑ Issues ${liveIssues}</button>`;
             }
             Object.keys(userCounts).forEach(uid => {
                 const u = (usersData || []).find(x => x.id === uid) || { displayName: 'Intern' };
@@ -57426,8 +57460,11 @@ Save it anyway?`;
             });
             if (filterBar) filterBar.innerHTML = filterHtml;
 
-            const filtered = window._laughTaleUserFilter === '__fix__' ? all.filter(fbNeedsFix)
-                : window._laughTaleUserFilter ? all.filter(f => f.userId === window._laughTaleUserFilter) : all;
+            if (window._laughTaleUserFilter === '__issues__') {
+                container.innerHTML = `<div style="grid-column:1/-1;">${fbRenderIssues()}</div>`;
+                return;
+            }
+            const filtered = window._laughTaleUserFilter ? all.filter(f => f.userId === window._laughTaleUserFilter) : all;
             container.innerHTML = filtered.map(fb => {
                 const dateObj = fb.timestamp?.toDate() || new Date();
                 const user = (usersData || []).find(u => u.id === fb.userId) || {};
@@ -63693,36 +63730,220 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
         let _qfpSort = 'recent';  // recent | rating
 
         // V102.47: quiz feedback triage — quiz_feedback.triage = { category, urgent, by, at,
-        // resolvedAt? } is written hourly by the triageQuizFeedback function (keyword rules +
-        // AI). Urgent = bug or content problem; ✓ sets triage.resolvedAt.
+        // issueId? } is written hourly by the triageQuizFeedback function (keyword rules + AI).
+        // V102.48: urgent reports are grouped into feedback_issues (same function) and resolved
+        // ONCE per issue with "Fixed in V…" — the per-comment ✓ is gone. An issue's state is
+        // derived, never stored, so a bug coming back is noticed without any server code:
+        //   resolved  = status 'resolved' and no report after resolvedVersionAt
+        //   reopened  = status 'resolved' but a report came after it (🔁 back again)
+        //   dismissed = status 'dismissed' (⏸ not a problem / by design)
+        //   fresh     = open and the last report is within FB_FRESH_DAYS
+        //   quiet     = open and older (💤) — shown, not counted in the red badges
         const FB_TRIAGE_ICON = {
             bug: ['🐞', 'App bug'], content: ['❌', 'Question / answer problem'],
             difficulty: ['🧗', 'Too hard / language'], request: ['💡', 'Request'],
             praise: ['👍', 'Praise'], noise: ['·', 'No content']
         };
-        function fbNeedsFix(f) { return !!(f && f.triage && f.triage.urgent && !f.triage.resolvedAt); }
+        const FB_FRESH_DAYS = 60;
+        window._fbIssues = null;
+        async function fbLoadIssues(force) {
+            if (window._fbIssues && !force) return window._fbIssues;
+            try {
+                const snap = await db.collection('feedback_issues').get();
+                window._fbIssues = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            } catch (e) {
+                console.warn('feedback_issues load failed:', e.message);
+                window._fbIssues = window._fbIssues || [];
+            }
+            return window._fbIssues;
+        }
+        const fbMs = (t) => !t ? 0 : t.toMillis ? t.toMillis() : t instanceof Date ? t.getTime() : Number(t) || 0;
+        function fbIssueState(i) {
+            if (!i) return null;
+            if (i.status === 'dismissed') return 'dismissed';
+            if (i.status === 'resolved') return fbMs(i.lastReportAt) > fbMs(i.resolvedVersionAt) ? 'reopened' : 'resolved';
+            return Date.now() - fbMs(i.lastReportAt) <= FB_FRESH_DAYS * 864e5 ? 'fresh' : 'quiet';
+        }
+        function fbIssueOf(f) {
+            const id = f && f.triage && f.triage.issueId;
+            return (id && (window._fbIssues || []).find(i => i.id === id)) || null;
+        }
+        // The red badges count fresh + reopened issues only.
+        function fbNeedsFix(f) {
+            if (!(f && f.triage && f.triage.urgent)) return false;
+            const i = fbIssueOf(f);
+            if (i) return ['fresh', 'reopened'].includes(fbIssueState(i));
+            return Date.now() - fbMs(f.timestamp) <= FB_FRESH_DAYS * 864e5;   // not grouped yet
+        }
         function fbTriageChip(f) {
             const t = f && f.triage;
             if (!t || !FB_TRIAGE_ICON[t.category]) return '';
             const [icon, label] = FB_TRIAGE_ICON[t.category];
-            const open = fbNeedsFix(f);
-            return `<span class="fb-tri${open ? ' open' : ''}" title="${label}${t.urgent ? (open ? ' · needs a fix' : ' · fixed') : ''}">${icon}</span>` +
-                (open ? `<button class="fb-tri-done" onclick="event.stopPropagation(); fbTriageResolve('${f.id}')" title="Mark as fixed" aria-label="Mark as fixed">✓</button>` : '');
+            const i = fbIssueOf(f), st = i && fbIssueState(i);
+            const note = !t.urgent ? '' : st === 'resolved' ? ` · fixed in ${i.resolvedVersion || 'an update'}` : fbNeedsFix(f) ? ' · needs a fix' : st ? ` · ${st}` : '';
+            return `<span class="fb-tri${fbNeedsFix(f) ? ' open' : ''}" title="${label}${note}">${icon}</span>`;
         }
-        async function fbTriageResolve(id) {
-            try {
-                await db.collection('quiz_feedback').doc(id).update({ 'triage.resolvedAt': firebase.firestore.FieldValue.serverTimestamp() });
-            } catch (e) {
-                alert('Could not mark as fixed: ' + e.message);
-                return;
+
+        // ---- Issue view (Laugh Tale → 🧠 Quiz → ⚑ Issues) ----
+        const FB_STATE_UI = {
+            fresh: ['🔴', 'Fresh'], reopened: ['🔁', 'Back again'], quiet: ['💤', 'Quiet'],
+            resolved: ['✅', 'Fixed'], dismissed: ['⏸', 'Not a problem']
+        };
+        window._fbIssueView = 'open';   // 'open' = fresh + reopened + quiet, or one state
+        window._fbIssueOpen = null;     // expanded issue id
+        window._fbPick = null;          // { id, v, at } chosen in the version rail
+        const fbDay = (ms) => new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+        const fbAgoDays = (ms) => Math.max(0, Math.floor((Date.now() - ms) / 864e5));
+        const fbReports = (i) => (i.reportIds || []).map(id => (window._quizFeedbackCache || []).find(f => f.id === id)).filter(Boolean)
+            .sort((a, b) => fbMs(a.timestamp) - fbMs(b.timestamp));
+        const fbQuizName = (id) => { const q = (quizzesData || []).find(x => x.id === id); return (q && (q.shortTitle || q.title)) || 'Quiz'; };
+
+        // Intern versions from the public repo's commits, cached per window.
+        window._fbVersionCache = {};
+        async function fbVersionsAfter(i) {
+            const from = fbMs(i.lastReportAt), key = String(from);
+            if (window._fbVersionCache[key]) return window._fbVersionCache[key];
+            // Newest-first pages: walk them all, or the versions right after the report —
+            // the likely fix — fall off page 1 (a busy month is 100+ commits).
+            const since = new Date(from).toISOString(), until = new Date(from + 30 * 864e5).toISOString();
+            const commits = [];
+            for (let page = 1; page <= 5; page++) {
+                const res = await fetch(`https://api.github.com/repos/mlpditto/INTERN-PORT/commits?sha=production&path=public/index.html&per_page=100&page=${page}&since=${since}&until=${until}`);
+                if (!res.ok) throw new Error('GitHub ' + res.status);
+                const batch = await res.json();
+                commits.push(...batch);
+                if (batch.length < 100) break;
             }
-            [window._quizFeedbackCache || [], _qfpFeedbacks].forEach(list => list.forEach(f => {
-                if (f.id === id && f.triage) f.triage.resolvedAt = new Date();
-            }));
-            _quizFeedbackAgg = null;   // recount the ⚠ badges
+            const seen = {};
+            for (const c of commits) {
+                const msg = String((c.commit && c.commit.message) || '').split('\n')[0];
+                const m = msg.match(/\bIntern\s+(V\d+\.\d+)/i) || msg.match(/\b(V\d+\.\d+)\s+intern\b/i);
+                const at = Date.parse(c.commit.committer.date);
+                if (m && (!seen[m[1]] || seen[m[1]].at > at)) seen[m[1]] = { v: m[1], at, msg };
+            }
+            return (window._fbVersionCache[key] = Object.values(seen).sort((a, b) => a.at - b.at));
+        }
+        // Suggested version: most issue keywords in its commit message; ties → earliest.
+        function fbSuggest(i, versions) {
+            const kw = (i.keywords || []).map(k => String(k).toLowerCase()).filter(Boolean);
+            let best = versions[0] || null, score = 0;
+            for (const v of versions) {
+                const s = kw.filter(k => v.msg.toLowerCase().includes(k)).length;
+                if (s > score) { best = v; score = s; }
+            }
+            return best;
+        }
+
+        function fbRenderIssues() {
+            const issues = (window._fbIssues || []).map(i => ({ ...i, st: fbIssueState(i) }));
+            const counts = {};
+            issues.forEach(i => { counts[i.st] = (counts[i.st] || 0) + 1; });
+            const view = window._fbIssueView;
+            const show = issues.filter(i => view === 'open' ? ['fresh', 'reopened', 'quiet'].includes(i.st) : i.st === view)
+                .sort((a, b) => ['reopened', 'fresh', 'quiet', 'resolved', 'dismissed'].indexOf(a.st) - ['reopened', 'fresh', 'quiet', 'resolved', 'dismissed'].indexOf(b.st)
+                    || fbMs(b.lastReportAt) - fbMs(a.lastReportAt));
+            const chip = (key, label) => `<button type="button" class="fbi-sc${view === key ? ' on' : ''}" onclick="window._fbIssueView='${key}'; renderQuizFeedbackCards()">${label}</button>`;
+            const strip = [chip('open', `Open ${(counts.fresh || 0) + (counts.reopened || 0) + (counts.quiet || 0)}`)]
+                .concat(Object.keys(FB_STATE_UI).filter(k => counts[k]).map(k => chip(k, `${FB_STATE_UI[k][0]} ${counts[k]}`))).join('');
+            const cards = show.map(fbIssueCard).join('') || `<p class="fbi-empty">No issues here.</p>`;
+            return `<div class="fbi-wrap"><div class="fbi-strip">${strip}</div>${cards}</div>`;
+        }
+
+        function fbIssueCard(i) {
+            const esc = qfpEscapeHtml, st = i.st || fbIssueState(i);
+            const last = fbMs(i.lastReportAt), first = fbMs(i.firstReportAt);
+            const tag = st === 'fresh' ? `Fresh · ${fbAgoDays(last)} d`
+                : st === 'quiet' ? `💤 Quiet ${fbAgoDays(last)} d`
+                : st === 'resolved' ? `✅ Fixed in ${esc(i.resolvedVersion || 'update')} · ${fbDay(fbMs(i.resolvedVersionAt))}`
+                : st === 'reopened' ? `🔁 Back again · ${fbReports(i).filter(r => fbMs(r.timestamp) > fbMs(i.resolvedVersionAt)).length} after ${esc(i.resolvedVersion || 'the fix')}`
+                : '⏸ Not a problem';
+            const quizzes = (i.quizIds || []).length === 1 ? esc(fbQuizName(i.quizIds[0])) : `${(i.quizIds || []).length} quizzes`;
+            const isOpen = window._fbIssueOpen === i.id;
+            const act = ['resolved', 'dismissed'].includes(st)
+                ? `<button type="button" class="fbi-pill" onclick="event.stopPropagation(); fbIssueReopen('${i.id}')" title="Open again">↺</button>`
+                : `<button type="button" class="fbi-pill fix" onclick="event.stopPropagation(); fbIssueStartFix('${i.id}')">Fixed in V…</button>` +
+                  `<button type="button" class="fbi-pill" onclick="event.stopPropagation(); fbIssueDismiss('${i.id}')" title="Not a problem / by design">⏸</button>`;
+            return `<div class="fbi fbi-${st}" onclick="window._fbIssueOpen = window._fbIssueOpen === '${i.id}' ? null : '${i.id}'; renderQuizFeedbackCards()">
+                <div class="fbi-ic">${(FB_TRIAGE_ICON[i.category] || ['⚑'])[0]}</div>
+                <div class="fbi-body">
+                    <div class="fbi-t lang-no-toggle">${esc(i.title)} <span class="fbi-tag ${st}">${tag}</span></div>
+                    <div class="fbi-m"><b>${i.count || (i.reportIds || []).length} report${(i.count || 1) === 1 ? '' : 's'}</b> · ${fbDay(first)}${first !== last ? ' – ' + fbDay(last) : ''} · <span class="lang-no-toggle">${quizzes}</span></div>
+                    ${isOpen ? fbIssueDetail(i, st) : ''}
+                </div>
+                <div class="fbi-act">${act}</div>
+            </div>`;
+        }
+
+        function fbIssueDetail(i, st) {
+            const esc = qfpEscapeHtml, reps = fbReports(i);
+            const pick = window._fbPick && window._fbPick.id === i.id ? window._fbPick : null;
+            let rail = '';
+            if (pick) {
+                const vs = pick.versions || [];
+                const chips = [`<button type="button" class="fbi-v${pick.v === null ? ' on' : ''}" onclick="event.stopPropagation(); fbIssuePick('${i.id}', null, ${Date.now()})">Today<small>no version</small></button>`]
+                    .concat(vs.filter((v, n) => n < 7 || v.v === pick.sug || v.v === pick.v).map(v => `<button type="button" class="fbi-v${pick.v === v.v ? ' on' : ''}${pick.sug === v.v ? ' sug' : ''}" title="${esc(v.msg)}" onclick="event.stopPropagation(); fbIssuePick('${i.id}', '${v.v}', ${v.at})">${v.v}<small>${fbDay(v.at)}</small></button>`)).join('');
+                const closes = pick.at ? reps.filter(r => fbMs(r.timestamp) <= pick.at).length : 0;
+                rail = `<div class="fbi-fix" onclick="event.stopPropagation()">
+                    <div class="fbi-hint">Fixed in (intern versions after the last report${pick.loading ? ' · loading…' : pick.error ? ' · ' + esc(pick.error) : ''})</div>
+                    <div class="fbi-rail">${chips}</div>
+                    ${pick.at ? `<div class="fbi-prev">Closes <b>${closes}/${reps.length}</b> reports (up to ${fbDay(pick.at)}); a report after that reopens it.</div>` : ''}
+                    <button type="button" class="fbi-close" ${pick.at ? '' : 'disabled'} onclick="fbIssueResolve('${i.id}')">Close issue</button>
+                </div>`;
+            }
+            const list = reps.map(r => `<div><span>${fbDay(fbMs(r.timestamp))}</span><span class="lang-no-toggle">"${esc(qfpNormalizeTopic(r.comment).slice(0, 110))}" · ${esc(fbQuizName(r.quizId))}</span></div>`).join('');
+            return `${rail}<div class="fbi-reports" onclick="event.stopPropagation()">${list}</div>`;
+        }
+
+        async function fbIssueStartFix(id) {
+            const i = (window._fbIssues || []).find(x => x.id === id);
+            if (!i) return;
+            window._fbIssueOpen = id;
+            window._fbPick = { id, v: undefined, at: 0, loading: true, versions: [] };
+            renderQuizFeedbackCards();
+            try {
+                const versions = await fbVersionsAfter(i);
+                const sug = fbSuggest(i, versions);
+                window._fbPick = { id, versions, sug: sug && sug.v, v: sug ? sug.v : undefined, at: sug ? sug.at : 0 };
+            } catch (e) {
+                window._fbPick = { id, versions: [], error: e.message, v: undefined, at: 0 };
+            }
+            renderQuizFeedbackCards();
+        }
+        function fbIssuePick(id, v, at) {
+            if (!window._fbPick || window._fbPick.id !== id) return;
+            window._fbPick = { ...window._fbPick, v, at };
+            renderQuizFeedbackCards();
+        }
+        async function fbIssueWrite(id, patch) {
+            try {
+                await db.collection('feedback_issues').doc(id).update(patch);
+            } catch (e) {
+                alert('Could not update the issue: ' + e.message);
+                return false;
+            }
+            await fbLoadIssues(true);
+            _quizFeedbackAgg = null;   // recount the badges
             if (document.getElementById('qfp-comments')) { qfpRenderFilterRail(); qfpRenderComments(); }
             if (window._laughTaleSource === 'quiz' && window._quizFeedbackCache) renderQuizFeedbackCards();
             loadQuizFeedbackBadges();
+            return true;
+        }
+        async function fbIssueResolve(id) {
+            const p = window._fbPick;
+            if (!p || p.id !== id || !p.at) return;
+            window._fbPick = null;
+            await fbIssueWrite(id, {
+                status: 'resolved', resolvedVersion: p.v || null,
+                resolvedVersionAt: firebase.firestore.Timestamp.fromMillis(p.at),
+                resolvedOn: firebase.firestore.FieldValue.serverTimestamp(),
+                resolvedBy: (firebase.auth().currentUser || {}).email || null
+            });
+        }
+        function fbIssueDismiss(id) {
+            return fbIssueWrite(id, { status: 'dismissed', resolvedOn: firebase.firestore.FieldValue.serverTimestamp(), resolvedBy: (firebase.auth().currentUser || {}).email || null });
+        }
+        function fbIssueReopen(id) {
+            return fbIssueWrite(id, { status: 'open', resolvedVersion: null, resolvedVersionAt: null });
         }
 
         function qfpEscapeHtml(text) {
@@ -63808,6 +64029,8 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
                     return;
                 }
             }
+
+            await fbLoadIssues();   // V102.48: the 🐞❌ chip + Fix filter read the issue state
 
             if (!_qfpFeedbacks.length) {
                 document.getElementById('qfp-comments').innerHTML = `<p style="text-align:center;color:#94a3b8;padding:20px;">No feedback for this quiz yet.</p>`;
@@ -64596,15 +64819,16 @@ Summarize in English in 3–5 concise lines:
                     badge.innerText = `⭐ ${avg} (${count})${agg[qid].fix ? ' 🐞' + agg[qid].fix : ''}`;
                 }
             });
-            // V102.47: total still needing a fix, on Laugh Tale's 🧠 Quiz source button.
-            const total = Object.values(agg).reduce((n, a) => n + (a.fix || 0), 0);
+            // V102.48: Laugh Tale's 🧠 Quiz button counts ISSUES (fresh + back again), not reports.
+            const hot = (window._fbIssues || []).filter(i => ['fresh', 'reopened'].includes(fbIssueState(i))).length;
             const el = document.getElementById('lt-src-quiz-fix');
-            if (el) el.textContent = total ? String(total) : '';
+            if (el) el.textContent = hot ? String(hot) : '';
         }
 
         async function loadQuizFeedbackBadges() {
             if (!quizzesData.length) return;
             try {
+                await fbLoadIssues();   // fbNeedsFix reads the issue state
                 if (!_quizFeedbackAgg || Date.now() - _quizFeedbackAggTime > QUIZ_FEEDBACK_CACHE_TTL) {
                     const snap = await db.collection('quiz_feedback').get();
                     const agg = {};
