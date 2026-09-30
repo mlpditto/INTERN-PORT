@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.48)</title>
+    <title>Nika Admin (V102.49)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -47647,6 +47647,20 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         daysRemainingHtml = `<span style="display:inline-flex; flex-direction:column; gap:3px; min-width:96px;" title="${_rem} days remaining / ${_total} days total"><span style="display:block; height:5px; border-radius:3px; background:var(--border-color); overflow:hidden;"><span style="display:block; height:100%; width:${_pct}%; background:${_remColor};"></span></span><span style="font-size:0.8em; color:var(--text-sub); white-space:nowrap; font-weight:600;"><b style="color:${_remColor};">${_rem}d</b> left · ${_total}d</span></span>`;
                     }
 
+                    // V102.49: hours from the time clock (syncInternHours), shown once a goal is set.
+                    let hoursHtml = '';
+                    if (d.internHoursTarget > 0) {
+                        const _ih = d.internHours || {};
+                        const _h = _ih.status === 'ok' ? (_ih.total || 0) : 0;
+                        const _hPct = Math.min(100, Math.round(_h / d.internHoursTarget * 100));
+                        const _hColor = _h >= d.internHoursTarget ? '#16a34a' : '#2563eb';
+                        const _hTip = _ih.status === 'ok' ? `${_ih.days || 0} days in the time clock` + (_ih.syncedAt && _ih.syncedAt.toDate ? ` · synced ${_ih.syncedAt.toDate().toLocaleString('en-GB')}` : '')
+                            : _ih.status === 'no-match' ? 'Name not found in the time clock — tap to fix'
+                            : _ih.status === 'ambiguous' ? 'Two people share this name in the time clock — tap to fix'
+                            : 'Not synced yet';
+                        hoursHtml = `<button type="button" onclick="setInternHours('${d.id}')" title="${escapeHtml(_hTip)}" style="display:inline-flex; flex-direction:column; gap:3px; min-width:96px; width:auto; min-height:0; margin:3px 0 0; padding:0; background:none; border:none; font:inherit; cursor:pointer; text-align:left;"><span style="display:block; height:5px; border-radius:3px; background:var(--border-color); overflow:hidden;"><span style="display:block; height:100%; width:${_hPct}%; background:${_hColor};"></span></span><span style="font-size:0.8em; color:var(--text-sub); white-space:nowrap; font-weight:600;">${_ih.status === 'ok' ? '' : '⚠ '}<b style="color:${_hColor};">${_h.toFixed(1)}</b> / ${d.internHoursTarget} h</span></button>`;
+                    }
+
                     const userCode = d.enrollmentCode || preRegData.find(p => p.claimedBy === d.id)?.code || preRegData.find(p => p.sourceUserId === d.id)?.code || '';
                     const codeDisplay = userCode ? `<div style="font-size:0.75em; color:#6f42c1; font-weight:bold; margin-top:1px;"><i class="fa-solid fa-key"></i> Code: ${userCode}</div>` : '';
 
@@ -47726,6 +47740,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                         ${certStatus}
                                     </div>
                                     ${daysRemainingHtml ? `<div class="row-detail" style="display:none; margin-top:3px;"><span style="${d.hidePeriod ? 'text-decoration:line-through; color:#94a3b8;' : 'font-weight:700; color:#475569;'} font-family:monospace; font-size:0.92em;">${dateStr}</span></div>` : ''}
+                                    ${hoursHtml}
                                 </div>
                             </td>
                             <td>${actionsGroup}</td>
@@ -47787,6 +47802,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const items = [
                 // V102.33 (lean B): Set period, LIFF visibility and ignore moved here from the row.
                 ['📅', 'Set period', () => openPeriodModal(uid, u.displayName, u.startDate || '', u.endDate || '')],
+                ['⏱', 'Internship hours…', () => setInternHours(uid)], // V102.49
                 [u.hidePeriod ? '👁' : '🙈', u.hidePeriod ? 'Show period in LIFF' : 'Hide period in LIFF', () => toggleHidePeriod(uid, u.hidePeriod === true)],
                 [u.isIgnored ? '👀' : '🙈', u.isIgnored ? 'Show on boards' : 'Hide from boards', () => toggleIgnoreUser(uid, u.isIgnored === true)],
                 'sep',
@@ -47830,6 +47846,38 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             m.querySelector('[role="menuitem"]')?.focus({ preventScroll: true });
         }
         async function adjDec(id) { try { const valInput = document.getElementById(`adj-${id}`); let v = valInput.value; if (!v) return alert("Please specify score."); v = v.replace(',', '.'); const scoreVal = parseFloat(v); if (isNaN(scoreVal)) return alert("Invalid score value."); const n = prompt("Reason (Note):"); if (!n) return; const editor = (auth && auth.currentUser) || {}; await db.collection("users").doc(id).update({ score: firebase.firestore.FieldValue.increment(scoreVal) }); await db.collection("checkin_logs").add({ userId: id, type: 'manual_adjust', amount: scoreVal, note: n, timestamp: firebase.firestore.FieldValue.serverTimestamp(), createdByUid: editor.uid || 'unknown', createdByEmail: editor.email || ALLOWED_EMAIL }); showToast("Saved!"); valInput.value = ""; valInput.blur(); } catch (e) { alert("Error saving score: " + e.message); } }
+
+        // V102.49: internship hours goal + the name that links this intern to the time
+        // clock (time.mlp-int.work). The LINE ids differ between the two apps, so the
+        // link is the name: timeName, or fullName when they already match.
+        async function setInternHours(uid) {
+            const u = (usersData || []).find(x => x.id === uid) || {};
+            const t = prompt(`Internship hours goal for ${u.displayName || uid} (0 = stop):`, u.internHoursTarget || '');
+            if (t === null) return;
+            const target = parseFloat(String(t).replace(',', '.') || '0');
+            if (isNaN(target) || target < 0) return alert('Invalid hours.');
+            let nameUpdate = {};
+            if (target > 0) {
+                const nm = prompt('Name exactly as in the time clock (time.mlp-int.work):', u.timeName || u.fullName || '');
+                if (nm === null) return;
+                const clean = nm.replace(/\s+/g, ' ').trim();
+                nameUpdate = { timeName: clean && clean !== String(u.fullName || '').replace(/\s+/g, ' ').trim() ? clean : firebase.firestore.FieldValue.delete() };
+            }
+            try {
+                await db.collection('users').doc(uid).update({ internHoursTarget: target, ...nameUpdate });
+            } catch (e) { return alert('Error saving: ' + e.message); }
+            if (!(target > 0)) return showToast('Hours goal removed');
+            showToast('Saved — syncing hours…');
+            try {
+                const res = await adminApp.functions().httpsCallable('syncInternHoursNow')({});
+                const r = ((res.data && res.data.results) || []).find(x => x.id === uid);
+                if (!r) showToast('Saved');
+                else if (r.status === 'ok') showToast(`⏱ ${r.total.toFixed(1)} h over ${r.days} days`);
+                else alert(r.status === 'ambiguous' ? `Two people are named "${r.name}" in the time clock. Enter a name only this intern has.` : `"${r.name}" was not found in the time clock. Check the spelling there and try again.`);
+            } catch (e) {
+                alert('Saved. Hours sync is not available yet (' + e.message + ') — they will appear after the next nightly sync.');
+            }
+        }
 
         // V98.57: log a Work submission on behalf of a user.
         let alwTargetId = null;
