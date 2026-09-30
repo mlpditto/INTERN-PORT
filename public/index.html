@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.28)</title>
+    <title>Internship Portfolio (V101.29)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.05">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -673,14 +673,21 @@
             outline-offset: 3px;
         }
 
-        .unified-metrics-bar.lean-activity { display:flex; flex-direction:row; flex-wrap:wrap; align-items:center; gap:8px; padding:6px 10px; }
+        /* V101.29: no boxed bar — the row sits on the card water like the top rail. */
+        .unified-metrics-bar.lean-activity { display:flex; flex-direction:row; flex-wrap:wrap; align-items:center; gap:8px; padding:4px 0; background:transparent; border:0; }
         .lean-activity #daily-checkin-card { flex:1; min-width:0; }
         .activity-row, .activity-actions { display:flex; align-items:center; gap:6px; }
         .activity-actions { margin-left:auto; }
         .activity-row button, .activity-more { width:auto; min-height:44px; padding:6px 10px; margin:0; border:1px solid #e2e8f0; border-radius:8px; background:#fff; color:#334155; font-family:inherit; font-size:0.75em; white-space:nowrap; cursor:pointer; }
-        .activity-checked { color:#15803d; font-size:0.75em; white-space:nowrap; }
-        .activity-hint { color:#9a3412; font-size:0.72em; }
-        .activity-row button.activity-fin { border-color:#a7f3d0; background:#ecfdf5; color:#065f46; }
+        /* V101.29: lean activity rail — colour carries the state (orange = to do,
+           green = done today); no ☑/✓. Scoped by id to beat the 44px rule below. */
+        #daily-checkin-card .act-streak { display:inline-flex; align-items:center; gap:6px; height:36px; min-height:36px; padding:0 12px; border-radius:999px; font-weight:700; font-size:0.8em; white-space:nowrap; }
+        #daily-checkin-card .act-streak.todo { background:linear-gradient(135deg,#f97316,#ea580c); color:#fff; border:0; box-shadow:0 3px 10px rgba(234,88,12,.3); }
+        #daily-checkin-card .act-streak.done { background:rgba(240,253,244,.9); color:#15803d; border:1px solid #bbf7d0; }
+        #daily-checkin-card .act-gift { font-size:0.85em; padding:0 6px; border-radius:999px; background:#fef3c7; color:#92400e; }
+        #daily-checkin-card .act-ic { width:36px; height:36px; min-height:36px; padding:0; border-radius:50%; font-size:1em; background:rgba(255,255,255,.85); display:inline-flex; align-items:center; justify-content:center; }
+        #daily-checkin-card .act-ic.done { background:#dcfce7; border-color:#86efac; box-shadow:0 0 0 2px rgba(34,197,94,.25); }
+        .lean-activity .activity-more { width:36px; height:36px; min-width:36px; min-height:36px; padding:0; border-radius:50%; background:rgba(255,255,255,.6); }
         /* V100.78: FIN money-plan popup */
         #finModal .modal-content { text-align:left; padding:14px 14px calc(18px + env(safe-area-inset-bottom)); max-width:430px; max-height:88vh; }
         #finModal .fin-head { display:flex; align-items:center; gap:6px; margin-bottom:8px; }
@@ -798,7 +805,6 @@
         #finModal .fin-day.past { opacity:0.55; }
         #finModal .fin-muted { color:#94a3b8; font-size:0.8em; }
         .activity-more { min-width:44px; background:transparent; }
-        .activity-mobile { display:none; }
         #activity-details { flex-basis:100%; min-width:0; border-top:1px solid #e2e8f0; padding-top:8px; }
         #activity-details[hidden] { display:none; }
         #activity-details { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px 24px; font-size:13px; }
@@ -814,8 +820,6 @@
         @media(max-width:600px) { #activity-details { grid-template-columns:minmax(0,1fr); } }
         #activity-history p { margin:0 0 6px; }
         @media(max-width:700px) {
-            .activity-desktop { display:none !important; }
-            .activity-mobile { display:inline; }
             .activity-row button { padding:6px 8px; }
             .lean-activity { gap:4px !important; }
         }
@@ -19928,17 +19932,16 @@
             const { streak, doneToday } = computeEngagementStreak();
             const bonus = `+${CHECKIN_STREAK_BONUS_AMOUNT.toFixed(2)}`;
 
-            let hint;
+            // V101.29: the hint sentence became a short 🎁 tag inside the streak pill;
+            // the full wording lives in the pill's title / aria-label.
+            let gift = '', giftTitle = '';
             if (doneToday) {
                 const rem = streak % CHECKIN_STREAK_BONUS_EVERY;
                 const left = CHECKIN_STREAK_BONUS_EVERY - rem;
-                hint = (rem === 0 && streak > 0)
-                    ? `🎁 Bonus ${bonus} · Earned`
-                    : `🎁 Bonus ${bonus} · ${left}d`;
-            } else {
-                const projected = streak + 1;
-                if (projected % CHECKIN_STREAK_BONUS_EVERY === 0) hint = `🎁 Bonus ${bonus} · Due today`;
-                else hint = streak > 0 ? '🔥 Keep your streak' : '🔥 Start your streak';
+                if (rem === 0 && streak > 0) { gift = '🎁'; giftTitle = `Bonus ${bonus} earned`; }
+                else { gift = `🎁 ${left}d`; giftTitle = `Bonus ${bonus} in ${left} days`; }
+            } else if ((streak + 1) % CHECKIN_STREAK_BONUS_EVERY === 0) {
+                gift = '🎁 today'; giftTitle = `Bonus ${bonus} if you check in today`;
             }
 
             const checkDone = (myCheckin || {}).lastDate === todayKey;
@@ -19947,12 +19950,19 @@
 
             const logCap = _activityChipCaption(_combinedLogCache(), [profileActivityState.logs, profileActivityState.notes]);
             const caseCap = _activityChipCaption(window.myCasesCache, [profileActivityState.cases]);
-            const chipCheck = checkDone ? '<span class="activity-checked" aria-label="Checked in today">✓ Today</span>' : '<button type="button" id="daily-checkin-btn" onclick="tryDailyCheckin()">☑ Check in</button>';
-            const activityChip = (icon, label, action, fn, done, caption) => `<button aria-label="${action}${done ? ' again · already sent today' : ''} · ${caption}" data-th-aria-label="${action}${done ? ' เพิ่มเติม · ส่งแล้ววันนี้' : ''} · ${caption}" type="button" onclick="${fn}"><span class="activity-desktop">${icon} ${action}</span><span class="activity-mobile">${label}</span>${done ? ' ✓' : ''}</button>`;
-            const chipLog = activityChip('📝', 'Log', 'Log', 'gotoLog()', logDone, logCap);
-            const chipCase = activityChip('🩺', 'Case', 'Case', 'gotoCaseSubmit()', caseDone, caseCap);
-            // V100.78: FIN — personal money plan (localStorage). Not a daily task, so no ✓ state.
-            const chipFin = '<button type="button" class="activity-fin" onclick="finOpen()" aria-label="FIN · monthly money plan"><span class="activity-desktop">💰 FIN</span><span class="activity-mobile">FIN</span></button>';
+            // V101.29: lean rail — one streak pill (orange = check in now, green = done)
+            // and icon circles that turn green when sent today. No ☑/✓: colour is the state,
+            // and the words stay in title / aria-label.
+            const streakText = `🔥${streak}${gift ? ` <span class="act-gift">${gift}</span>` : ''}`;
+            const streakLabel = `${streak}-day streak${giftTitle ? ' · ' + giftTitle : ''}`;
+            const chipCheck = checkDone
+                ? `<span class="act-streak done" title="Checked in today · ${streakLabel}" aria-label="Checked in today · ${streakLabel}">${streakText}</span>`
+                : `<button type="button" id="daily-checkin-btn" class="act-streak todo" onclick="tryDailyCheckin()" title="Check in · ${streakLabel}" aria-label="Check in · ${streakLabel}">${streakText}</button>`;
+            const activityChip = (icon, action, fn, done, caption) => `<button class="act-ic${done ? ' done' : ''}" title="${action}${done ? ' · sent today' : ''}" aria-label="${action}${done ? ' again · already sent today' : ''} · ${caption}" data-th-aria-label="${action}${done ? ' เพิ่มเติม · ส่งแล้ววันนี้' : ''} · ${caption}" type="button" onclick="${fn}">${icon}</button>`;
+            const chipLog = activityChip('📝', 'Log', 'gotoLog()', logDone, logCap);
+            const chipCase = activityChip('🩺', 'Case', 'gotoCaseSubmit()', caseDone, caseCap);
+            // V100.78: FIN — personal money plan (localStorage). Not a daily task, so it never turns green.
+            const chipFin = '<button type="button" class="act-ic" onclick="finOpen()" title="FIN · money plan" aria-label="FIN · monthly money plan">💰</button>';
 
             // V97.52: the 🔥 count is the metrics rail's chip now, written from HERE because
             // this function owns computeEngagementStreak(). The rail used to print
@@ -19961,7 +19971,7 @@
             const fireChip = document.getElementById('badge-streak');
             if (fireChip) fireChip.textContent = `${streak} ${streak === 1 ? "day" : "days"}`;
 
-            el.innerHTML = `<div class="activity-row">${chipCheck}<span class="activity-hint activity-desktop">${hint}</span><div class="activity-actions">${chipFin}${chipLog}${chipCase}</div></div>`;
+            el.innerHTML = `<div class="activity-row">${chipCheck}<div class="activity-actions">${chipFin}${chipLog}${chipCase}</div></div>`;
             window.monthlyProgress?.update({logs:window.myReflectiveLogsCache ? _combinedLogCache() : null,cases:window.myCasesCache,targets:{...myOwnRow().monthlyTargets,...(!myOwnRow().monthlyTargets?.quiz&&myOwnRow().learningGoal?.kind==='monthly'?{quiz:myOwnRow().learningGoal.target}:{})},save:t=>{const goal=myOwnRow().learningGoal;return db.collection('users').doc(userId).update({monthlyTargets:t,...(!goal||goal.kind==='monthly'?{learningGoal:t.quiz?{kind:'monthly',target:t.quiz}:firebase.firestore.FieldValue.delete()}:{}),...(t.quiz?{['learningGoalHistory.'+window.internshipProgress.cycle('monthly').key]:{kind:'monthly',target:t.quiz}}:{})});}});
             const history = document.getElementById('activity-history');
             if (history) history.innerHTML = `<p>Log: ${logCap}${logDone ? ' · ส่งแล้ววันนี้ ✓' : ''}</p><p>Case: ${caseCap}${caseDone ? ' · ส่งแล้ววันนี้ ✓' : ''}</p>`;
