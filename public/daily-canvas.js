@@ -7,8 +7,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const day = document.createElement('section');
     day.id = 'dc-day'; day.className = 'dc-panel';
     while (pane.firstChild) day.append(pane.firstChild);
-    pane.innerHTML = '<header class="dc-header lang-no-toggle"><strong>🔥 Journal</strong><span></span></header><div class="dc-tabs lang-no-toggle" role="tablist" aria-label="Journal"><button type="button" id="dc-tab-day" role="tab" aria-controls="dc-day" aria-selected="true">🌤 Daily Canvas</button><button type="button" id="dc-tab-note" role="tab" aria-controls="dc-note" aria-selected="false" tabindex="-1">🎓 Learning Note</button><button type="button" id="dc-tab-feedback" role="tab" aria-controls="dc-feedback" aria-selected="false" tabindex="-1">💬 Feedback</button></div>';
-    pane.querySelector('.dc-header span').textContent = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Bangkok' }).format(new Date());
+    // V101.35: one light row instead of the dark header + a row of big tabs —
+    // 🔥 + three small pill tabs (full names in the title) + the date.
+    pane.innerHTML = '<div class="dc-bar lang-no-toggle"><span class="dc-fire" title="Journal" aria-hidden="true">🔥</span><div class="dc-tabs" role="tablist" aria-label="Journal"><button type="button" id="dc-tab-day" role="tab" aria-controls="dc-day" aria-selected="true" title="Daily Canvas">🌤 Canvas</button><button type="button" id="dc-tab-note" role="tab" aria-controls="dc-note" aria-selected="false" tabindex="-1" title="Learning Note">🎓 Note</button><button type="button" id="dc-tab-feedback" role="tab" aria-controls="dc-feedback" aria-selected="false" tabindex="-1" title="Feedback to admin">💬 Feedback</button></div><span class="dc-date"></span></div>';
+    pane.querySelector('.dc-date').textContent = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Bangkok' }).format(new Date());
     pane.append(day);
     const note = document.createElement('section');
     note.id = 'dc-note'; note.className = 'dc-panel'; note.hidden = true;
