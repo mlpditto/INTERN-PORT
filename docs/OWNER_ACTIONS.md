@@ -27,16 +27,28 @@
 **Steps (payment — owner only):** open https://aistudio.google.com → **Billing** → switch the project to **Prepay** → buy credits → turn on **auto-reload** so it does not run dry.
 **Verify:** generate one image from an admin AI tool after switching. Then mark this row ✅ with the date; the script stops warning.
 
-### SMOKE-LIFF — new intern features, on a phone in LINE
-None of these has been run on a real LINE account yet (all were verified with harnesses on the real code).
-1. Tap **🌊** in the profile rail → the popup opens **under the button**, showing the training site's canal and 🛣 road stats.
-2. Tap **📍** → LINE asks for location → data appears for where you are.
-3. Tap **🏠 +** → confirm → 🔔 turns on (this writes `users.floodWatch`).
-4. Tap the **EN** button → it cycles EN → KR → TH → K·T; the LINE message language (`preferredLanguage`) follows.
-5. The check-in row under the card:
-   - **Before checking in:** an orange `🔥N` pill. Tap it → it turns green.
-   - **After sending a Log or Case:** that circle turns green.
-6. Do two quizzes in a row: Next and Previous should work on the second one (regression check for V94.62, see Q-TIMER in §4).
+### SMOKE-LIFF — new intern features, on a phone in LINE (intern V101.27 → V101.33)
+None of these has been run on a real LINE account yet (all were verified with harnesses on the real code). Open the app fresh (V101.33 in the footer).
+
+**Profile card, before tapping anything**
+1. **Top rail:** one row of five circles: 👤 · EN · 🌊 · ⚙ · ↻. There is no ⋯ menu any more.
+2. **Water:** behind the card, water sits at the training site's level. After step 7 it **slopes** from your home (left) to the site (right), with **🏠 / 🏥 circles on the card edges** at each side's level, ringed orange or red when that side is at risk.
+3. **Sky:** the part above the water matches the site's weather: sun glow, soft clouds, rain streaks, or a night tint.
+
+**🌊 popup**
+4. Tap **🌊** → the popup opens **under the button** with the site's canal and 🛣 road stats and a **weather row** (`☁️ 32°/38° · ☂ 52% 15:00 · 😷 74`). The credit line names Open-Meteo.
+5. Tap **📍** → LINE asks for location → flood + weather data appear for where you are.
+6. Close it with Esc, a tap outside, or 🌊 again.
+7. Tap **🏠 +** → confirm → 🔔 turns on (this writes `users.floodWatch`) → the card water starts to slope.
+
+**Language and the check-in row**
+8. Tap **EN** → it cycles EN → KR → TH → K·T; the LINE message language (`preferredLanguage`) follows.
+9. **Before checking in:** an orange `🔥N` pill. Tap it → it turns green. **After sending a Log or Case:** that circle turns green.
+10. Tap **…** at the end of the row → the panel has **🏆 Leaderboard** on the "✨ Next" line (and **Request Certificate** next to 🏅 once you have enough points).
+
+**Moved items and a regression check**
+11. **👤 Info → 🔗 Social** has the **Enrollment Key** row; **Match** opens the key screen above Info.
+12. Do two quizzes in a row: Next and Previous should work on the second one (regression check for V94.62, see Q-TIMER in §4).
 
 ### SMOKE-ADMIN — quiz feedback issues (admin V102.48)
 Both issues were **closed on 2026-09-30** at the owner's request (by Claude Code, via a guarded Firestore write):
@@ -70,6 +82,6 @@ First test: a cloud task that runs `bash scripts/run-qa.sh`.
 ## 4. Done
 | ID | Item | When |
 |---|---|---|
-| FLOOD | Flood watch live: intern V101.27–V101.30, `floodPointCheck` + `checkFloodAlerts`, Floodboard roads | 2026-09-30 |
+| FLOOD | Flood watch live: intern V101.27–V101.33 — `floodPointCheck` + `checkFloodAlerts`, Floodboard roads, popup under 🌊, sloped home→site water, Open-Meteo sky + weather row + PM2.5 | 2026-09-30 |
 | TRIAGE | Quiz feedback triage live: admin V102.47, `triageQuizFeedback`, 62/62 labelled | 2026-09-30 |
 | Q-TIMER | "Next/Previous locked until the question timer ends" — the 7 🐞 reports (2026-04-21 → 05-12) are the Quiz #2 bug **already fixed in V94.62 on 2026-05-15**: submit left the shared nav buttons `disabled`, and every quiz start now resets them too. No report since. No code change; the triage labels were right about the past, not the present | 2026-09-30 |
