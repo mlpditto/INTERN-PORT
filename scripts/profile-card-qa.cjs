@@ -42,9 +42,13 @@ assert.match(elements['daily-checkin-card'].innerHTML, /กำลังโหล
 vm.runInContext("Object.keys(profileActivityState).forEach(k => profileActivityState[k] = 'ready')", ctx);
 ctx.renderDailyCheckinCard();
 assert.match(elements['daily-checkin-card'].innerHTML, /ยังไม่เคยส่ง/);
-assert.match(elements['daily-checkin-card'].innerHTML, /Bonus \+0.05 · 4d/);
+// V101.29: the bonus countdown is a 🎁 tag in the green streak pill; the wording is in aria-label.
+assert.match(elements['daily-checkin-card'].innerHTML, /class="act-streak done"[^>]*aria-label="Checked in today · 3-day streak · Bonus \+0.05 in 4 days"/);
+assert.match(elements['daily-checkin-card'].innerHTML, /🔥3 <span class="act-gift">🎁 4d<\/span>/);
+assert.doesNotMatch(elements['daily-checkin-card'].innerHTML, /[☑✓]/);
 logToday = true; ctx.renderDailyCheckinCard();
 assert.match(elements['daily-checkin-card'].innerHTML, /Log เพิ่มเติม · ส่งแล้ววันนี้/);
+assert.match(elements['daily-checkin-card'].innerHTML, /class="act-ic done"[^>]*onclick="gotoLog\(\)"/);
 const timeline = ctx.updateTimelineBar;
 for (const [start,end,profile,word] of [
     ['1988-11-08','2088-11-08',{notAnInternship:true},'ส่วนตัว'],
