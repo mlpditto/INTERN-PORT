@@ -34,10 +34,80 @@
     function riskOf(p) { return p && p.data && RANK[p.data.risk] ? p.data.risk : null; }
     function homeSet() { return !!(fw && fw.home && isFinite(fw.home.lat) && isFinite(fw.home.lon)); }
 
+    // V101.33: weather + air quality from Open-Meteo (free, keyless, CORS *; CC BY 4.0).
+    // Called straight from the page — coordinates rounded to 2 dp (~1 km): weather needs
+    // no more, and the home pin never leaves the device at full precision.
+    var WX_TTL = 15 * 60 * 1000;
+    function loadWeather(key, lat, lon) {
+        var p = places[key];
+        if (p.wx && p.wxAt && Date.now() - p.wxAt < WX_TTL && p.wxLat === lat && p.wxLon === lon) return;
+        var ll = 'latitude=' + lat.toFixed(2) + '&longitude=' + lon.toFixed(2) + '&timezone=Asia%2FBangkok';
+        var get = function (u) { return fetch(u).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }); };
+        Promise.all([
+            get('https://api.open-meteo.com/v1/forecast?' + ll + '&current=temperature_2m,apparent_temperature,weather_code,is_day,precipitation&hourly=precipitation_probability&forecast_hours=7'),
+            get('https://air-quality-api.open-meteo.com/v1/air-quality?' + ll + '&current=pm2_5,us_aqi')
+        ]).then(function (res) {
+            var w = res[0], q = res[1];
+            if (!w || !w.current) return;
+            var c = w.current, h = w.hourly || {}, peak = { pop: 0, at: '' };
+            (h.precipitation_probability || []).forEach(function (v, i) {
+                if (v > peak.pop) peak = { pop: v, at: String((h.time || [])[i] || '').slice(11, 16) };
+            });
+            p.wx = {
+                code: c.weather_code, day: c.is_day === 1, temp: Math.round(c.temperature_2m), feels: Math.round(c.apparent_temperature),
+                rainMm: c.precipitation || 0, pop: peak.pop, popAt: peak.at,
+                aqi: q && q.current && q.current.us_aqi != null ? Math.round(q.current.us_aqi) : null,
+                pm25: q && q.current ? q.current.pm2_5 : null
+            };
+            p.wxAt = Date.now(); p.wxLat = lat; p.wxLon = lon;
+            paint(); render();
+        });
+    }
+    // WMO weather code → sky + icon.
+    function wxKind(wx) {
+        var c = wx.code;
+        if (c >= 95) return 'storm';
+        if ((c >= 51 && c <= 67) || (c >= 80 && c <= 82)) return 'rain';
+        if (c === 45 || c === 48) return 'fog';
+        if (c >= 2) return 'cloud';
+        return 'clear';
+    }
+    function wxIcon(wx) {
+        return { storm: '⛈️', rain: '🌧️', fog: '🌫️', cloud: wx.code === 2 ? (wx.day ? '⛅' : '☁️') : '☁️', clear: wx.day ? '☀️' : '🌙' }[wxKind(wx)];
+    }
+    function aqiClass(v) { return v <= 50 ? 'good' : v <= 100 ? 'mod' : v <= 150 ? 'usg' : 'bad'; }
+
+    // A · the sky above the card water: mood only, no text. Site weather.
+    function skyHtml(wx) {
+        if (!wx) return '';
+        var k = wxKind(wx), out = '<div class="fw-sky' + (wx.day ? '' : ' night') + (k === 'rain' || k === 'storm' ? ' wet' : '') + '" aria-hidden="true">';
+        if (k === 'clear' && wx.day) out += '<div class="fw-sun"></div>';
+        if (k === 'clear' && !wx.day) out += '<div class="fw-moon"></div>';
+        if (k !== 'clear') out += '<div class="fw-cloud c1"></div><div class="fw-cloud c2"></div><div class="fw-cloud c3"></div>';
+        if (k === 'rain' || k === 'storm') {
+            var n = k === 'storm' || wx.rainMm >= 5 ? 34 : 18;
+            for (var i = 0; i < n; i++) {
+                out += '<i class="fw-drop" style="left:' + ((i * 2.97 + (i % 3) * 1.1) % 100).toFixed(1) + '%;animation-delay:-' + ((i * 0.137) % 1.1).toFixed(2) +
+                    's;animation-duration:' + (0.9 + (i % 4) * 0.12).toFixed(2) + 's"></i>';
+            }
+        }
+        return out + '</div>';
+    }
+    // C + D · one row in the popup: now, rain chance in the next 6 h, air quality.
+    function wxRow(wx) {
+        if (!wx) return '';
+        return '<div class="fw-wx" title="Weather · Open-Meteo">' +
+            '<span title="Now · feels like ' + wx.feels + '°">' + wxIcon(wx) + ' <b>' + wx.temp + '°</b><small>/' + wx.feels + '°</small></span>' +
+            '<span title="Chance of rain, next 6 h (peak)"><i class="fa-solid fa-umbrella" style="color:#3b82f6"></i><b>' + wx.pop + '%</b>' + (wx.pop >= 30 && wx.popAt ? ' ' + wx.popAt : '') + '</span>' +
+            (wx.aqi != null ? '<span title="PM2.5 ' + (wx.pm25 != null ? wx.pm25 : '?') + ' µg/m³ · US AQI ' + wx.aqi + '">😷 <span class="fw-aqi ' + aqiClass(wx.aqi) + '">' + wx.aqi + '</span></span>' : '') +
+            '</div>';
+    }
+
     function load(key, lat, lon) {
         var p = places[key];
         p.lat = lat; p.lon = lon; p.loading = true; p.err = null;
         render();
+        loadWeather(key, lat, lon);
         return firebase.functions().httpsCallable('floodPointCheck')({ lat: lat, lon: lon })
             .then(function (r) { p.data = r.data; p.at = Date.now(); })
             .catch(function (e) { p.err = (e && e.message) || 'unavailable'; console.warn('[flood] ' + key, e); })
@@ -54,7 +124,7 @@
             btn.setAttribute('aria-label', 'Flood watch: site ' + (site || '—') + (home ? ', home ' + home : ''));
         }
         var water = document.getElementById('fw-water');
-        if (water) water.innerHTML = slopeWater(home, site);
+        if (water) water.innerHTML = skyHtml(places.site.wx) + slopeWater(home, site);
     }
 
     // V101.32: the card water shows BOTH places — one surface sloping from home (left)
@@ -91,9 +161,14 @@
         var svg = '<svg class="fw-slope" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true"><defs>' + grad('fwgFront', 0) + grad('fwgBack', 1) + '</defs>' +
             layer(LEVEL[L] + 1.5, LEVEL[R] + 1.5, 20, 'url(#fwgBack)', ' opacity=".55"') + layer(LEVEL[L], LEVEL[R], 0, 'url(#fwgFront)') + '</svg>';
         // Which side is which: only needed once there are two places.
+        // V101.33: larger glass markers with a ring in the side's risk colour.
+        var RING = { low: null, moderate: '#f97316', high: '#dc2626' };
+        var marker = function (side, emoji, level, risk, def, title) {
+            return '<span class="fw-side" style="' + side + ':-13px;bottom:calc(' + level + '% - 13px);border-color:' + (RING[risk] || def) +
+                '" title="' + title + ': ' + risk + '">' + emoji + '</span>';
+        };
         var icons = home && site
-            ? '<span class="fw-side" style="left:4px;bottom:calc(' + LEVEL[L] + '% + 1px)" title="Home">🏠</span>' +
-              '<span class="fw-side" style="right:4px;bottom:calc(' + LEVEL[R] + '% + 1px)" title="Training site">🏥</span>'
+            ? marker('left', '🏠', LEVEL[L], L, '#60a5fa', 'Home') + marker('right', '🏥', LEVEL[R], R, '#2dd4bf', 'Training site')
             : '';
         return svg + icons;
     }
@@ -156,11 +231,14 @@
         else if (!d) body = '<div class="fw-h"><span class="fw-dot"></span>—</div>';
         else {
             var t = p.at ? new Date(p.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }) : '';
-            var meta = [d.canal ? esc(d.canal.name) + (d.canal.km != null ? ' · ' + d.canal.km + ' km' : '') : '', t, 'BKK FloodWatch' + (d.road ? ' · Floodboard (CC BY 4.0)' : '')]
+            var meta = [d.canal ? esc(d.canal.name) + (d.canal.km != null ? ' · ' + d.canal.km + ' km' : '') : '', t,
+                'BKK FloodWatch' + (d.road ? ' · Floodboard (CC BY 4.0)' : '') + (p.wx ? ' · Open-Meteo (CC BY 4.0)' : '')]
                 .filter(Boolean).join(' · ');
             body = '<div class="fw-h"><span class="fw-dot' + (risk ? ' fw-' + risk : '') + '"></span>' + esc(d.title || '—') + '</div>' +
-                '<div class="fw-stats">' + stats(d) + '</div><div class="fw-meta">' + meta + '</div>';
+                '<div class="fw-stats">' + stats(d) + '</div>' + wxRow(p.wx) + '<div class="fw-meta">' + meta + '</div>';
         }
+        // Flood data can fail on its own (FloodWatch is flaky); the weather row still shows.
+        if (!d && p.wx && !p.loading) body += wxRow(p.wx);
         sheet.innerHTML = '<div class="fw-water' + (risk ? ' fw-' + risk : '') + '" aria-hidden="true"></div>' +
             '<div class="fw-top">' + top + '</div>' + body;
     }
