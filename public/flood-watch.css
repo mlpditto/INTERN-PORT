@@ -1,0 +1,92 @@
+/* V101.27 Flood watch — see flood-watch.js.
+   Water sits BEHIND the profile card content (isolation + z-index:-1). The card
+   must not get overflow:hidden: that would clip the ⋯ More dropdown. */
+
+/* Rail button — same 28px circle as its neighbours */
+.fw-tb {
+    position: relative;
+    width: 28px; height: 28px; min-height: auto;
+    border-radius: 50%; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.8em; box-shadow: none;
+    background: #f8f9fa; color: #94a3b8; border: 1px solid #eee;
+}
+.fw-tb.fw-r-low      { background: #e0f2fe; color: #0284c7; border-color: #bae6fd; }
+.fw-tb.fw-r-moderate { background: #ffedd5; color: #ea580c; border-color: #fdba74; }
+.fw-tb.fw-r-high     { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
+.fw-tb .fw-home-dot {
+    display: none; position: absolute; right: -2px; top: -2px;
+    width: 9px; height: 9px; border-radius: 50%; border: 2px solid #fff;
+}
+.fw-tb.fw-h-low .fw-home-dot      { display: block; background: #0284c7; }
+.fw-tb.fw-h-moderate .fw-home-dot { display: block; background: #ea580c; }
+.fw-tb.fw-h-high .fw-home-dot     { display: block; background: #dc2626; }
+.fw-tb.fw-h-high::after {
+    content: ""; position: absolute; inset: -3px; border-radius: 50%;
+    border: 2px solid #dc2626; animation: fwPulse 1.6s ease-out infinite;
+}
+@keyframes fwPulse { from { opacity: .8; transform: scale(.9); } to { opacity: 0; transform: scale(1.35); } }
+
+/* Water behind the card */
+#section-profile-combined.fw-bg { isolation: isolate; }
+.fw-water {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: -1;
+    pointer-events: none; border-radius: 0 0 15px 11px;
+    height: 0; transition: height .8s ease, background-color .8s ease;
+}
+.fw-water::before, .fw-water::after {
+    content: ""; position: absolute; left: 0; right: 0; top: -14px; height: 16px;
+    background-repeat: repeat-x; background-size: 120px 16px;
+    animation: fwDrift 7s linear infinite;
+}
+.fw-water::before { opacity: .55; }
+.fw-water::after { top: -9px; animation-duration: 11s; animation-direction: reverse; }
+@keyframes fwDrift { from { background-position: 0 0; } to { background-position: 120px 0; } }
+
+.fw-water.fw-low { height: 16%; background-color: #e0f2fe; }
+.fw-water.fw-low::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 16' preserveAspectRatio='none'%3E%3Cpath d='M0 8 Q15 0 30 8 T60 8 T90 8 T120 8 V16 H0Z' fill='%23bae6fd'/%3E%3C/svg%3E"); }
+.fw-water.fw-low::after  { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 16' preserveAspectRatio='none'%3E%3Cpath d='M0 8 Q15 0 30 8 T60 8 T90 8 T120 8 V16 H0Z' fill='%23e0f2fe'/%3E%3C/svg%3E"); }
+.fw-water.fw-moderate { height: 34%; background-color: #dbeafe; }
+.fw-water.fw-moderate::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 16' preserveAspectRatio='none'%3E%3Cpath d='M0 8 Q15 0 30 8 T60 8 T90 8 T120 8 V16 H0Z' fill='%2393c5fd'/%3E%3C/svg%3E"); }
+.fw-water.fw-moderate::after  { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 16' preserveAspectRatio='none'%3E%3Cpath d='M0 8 Q15 0 30 8 T60 8 T90 8 T120 8 V16 H0Z' fill='%23dbeafe'/%3E%3C/svg%3E"); }
+.fw-water.fw-high { height: 55%; background-color: #fee2e2; }
+.fw-water.fw-high::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 16' preserveAspectRatio='none'%3E%3Cpath d='M0 8 Q15 0 30 8 T60 8 T90 8 T120 8 V16 H0Z' fill='%23fca5a5'/%3E%3C/svg%3E"); }
+.fw-water.fw-high::after  { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 16' preserveAspectRatio='none'%3E%3Cpath d='M0 8 Q15 0 30 8 T60 8 T90 8 T120 8 V16 H0Z' fill='%23fee2e2'/%3E%3C/svg%3E"); }
+
+/* Bottom sheet */
+.fw-scrim { position: fixed; inset: 0; background: rgba(15, 23, 42, .4); z-index: 10050; }
+.fw-sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10051;
+    max-width: 600px; margin: 0 auto;
+    background: #fff; border-radius: 18px 18px 0 0;
+    padding: 8px 16px calc(14px + env(safe-area-inset-bottom));
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, .14);
+    overflow: hidden; isolation: isolate; text-align: left;
+    transition: transform .2s ease;
+}
+.fw-sheet .fw-water { border-radius: 0; height: 38%; }
+.fw-grab { width: 40px; height: 4px; background: #cbd5e1; border-radius: 4px; margin: 0 auto 10px; }
+.fw-top { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+.fw-ic {
+    position: relative; width: 34px; height: 34px; min-height: auto; margin: 0; padding: 0;
+    border-radius: 50%; border: 1px solid #e2e8f0; background: rgba(255, 255, 255, .85);
+    font-size: 15px; color: #334155; box-shadow: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; text-decoration: none;
+}
+.fw-ic.on { border-color: #0369a1; box-shadow: 0 0 0 2px #bae6fd; }
+.fw-ic.bell-on { background: #0369a1; color: #fff; border-color: #0369a1; }
+.fw-ic .fw-plus {
+    position: absolute; right: -3px; bottom: -3px; width: 14px; height: 14px; border-radius: 50%;
+    background: #0369a1; color: #fff; font: 700 10px/14px system-ui; text-align: center;
+}
+.fw-sp { flex: 1; }
+.fw-h { display: flex; gap: 8px; align-items: center; font-weight: 600; font-size: .95em; color: #0f172a; margin-bottom: 8px; min-height: 1.4em; }
+.fw-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; background: #94a3b8; }
+.fw-dot.fw-low { background: #22c55e; } .fw-dot.fw-moderate { background: #f97316; } .fw-dot.fw-high { background: #dc2626; }
+.fw-stats { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .9em; color: #1e293b; margin-bottom: 6px; }
+.fw-stats span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.fw-meta { font-size: .72em; color: #64748b; }
+
+@media (prefers-reduced-motion: reduce) {
+    .fw-water::before, .fw-water::after, .fw-tb.fw-h-high::after { animation: none; }
+}

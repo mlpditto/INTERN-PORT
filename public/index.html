@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.26)</title>
+    <title>Internship Portfolio (V101.27)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.05">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -2343,6 +2343,7 @@
 <link rel="stylesheet" href="case-insight-rail.css?v=V100.54">
 <script src="quiz-cover.js?v=V101.09"></script>
 <script src="activity-rewards.js?v=V100.49"></script><link rel="stylesheet" href="activity-rewards.css?v=V100.49">
+<script src="flood-watch.js?v=V101.27"></script><link rel="stylesheet" href="flood-watch.css?v=V101.27">
 </head>
 
 <body>
@@ -2388,9 +2389,13 @@
                         style="width: 28px; height: 28px; border-radius: 50%; padding: 0; background: #fef3e7; color: #e67e22; border: 1px solid #fbd9b5; display: flex; align-items: center; justify-content: center; min-height: auto; font-size: 0.8em;">
                         <i class="fa-solid fa-user-pen"></i>
                     </button>
-                    <!-- V94.23 Phase α: Language toggles (KR + TH) -->
-                    <button id="lang-toggle-kr" class="btn-sm lang-toggle-btn" onclick="toggleLang('kr')" title="Toggle Korean labels" aria-pressed="false" aria-label="Toggle Korean labels">KR</button>
-                    <button id="lang-toggle-th" class="btn-sm lang-toggle-btn" onclick="toggleLang('th')" title="Toggle Thai labels" aria-pressed="false" aria-label="Toggle Thai labels">TH</button>
+                    <!-- V101.27: KR + TH merged into one button — tap cycles EN → KR → TH → K·T
+                         (lang-toggle.js cycleLang; label set by its applyState). -->
+                    <button id="lang-toggle-cycle" class="btn-sm lang-toggle-btn" onclick="cycleLang()" title="Language: tap to switch" aria-label="Language (tap to switch)">EN</button>
+                    <!-- V101.27: Flood watch (flood-watch.js). Colour = training-site risk, dot = home. -->
+                    <button id="fw-btn" class="btn-sm fw-tb" onclick="fwOpen()" title="Flood watch" data-th-title="เฝ้าระวังน้ำท่วม" aria-label="Flood watch">
+                        <i class="fa-solid fa-water"></i><span class="fw-home-dot"></span>
+                    </button>
                     <!-- V94.80: Settings (privacy preferences — grammar analysis opt-out) -->
                     <button class="btn-sm" onclick="openSettingsModal()" title="Settings" data-th-title="ตั้งค่า" aria-label="Settings"
                         style="width: 28px; height: 28px; border-radius: 50%; padding: 0; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; min-height: auto; font-size: 0.8em;">
@@ -6548,7 +6553,7 @@
     <script src="case-taxonomy.js?v=V94.53"></script>
     <script src="codex-vision.js?v=V100.88"></script>
     <!-- V94.29 fix: walker now skips q-text-preview / md-render / lang-no-toggle subtrees so user content (markdown previews, quiz content) displays as-typed -->
-    <script src="lang-toggle.js?v=V97.44"></script>
+    <script src="lang-toggle.js?v=V101.27"></script>
 
     <script>
         const USER_LIFF_ID = "2008959998-yjcNpaGt"; // ✅ Updated ID
@@ -7678,6 +7683,8 @@
                 loadMorningQuizBonusStatus();
                 loadUnifiedSubmissions(); // 🔥 V94.07: previously orphan — wires unified-history listener (Work > History tab; stats card / filter pills / streak chip / sparkline depend on this)
 
+                if (typeof fwInit === 'function') fwInit(); // V101.27: flood watch (flood-watch.js)
+
                 applyTabDeepLink(urlParams);
 
                 // Start Timer Loop
@@ -7902,6 +7909,14 @@
                 original(lang);
                 syncPreferredLanguage();
             };
+            // V101.27: the rail's single language button calls cycleLang instead.
+            const originalCycle = window.cycleLang;
+            if (typeof originalCycle === 'function') {
+                window.cycleLang = function() {
+                    originalCycle();
+                    syncPreferredLanguage();
+                };
+            }
             window._langToggleSyncHooked = true;
         }
 
@@ -8068,6 +8083,7 @@
                     // leaderboard query and stays empty for non-admins.
                     window.myUserDoc = Object.assign({ id: userId }, da);
                     if (typeof schRefreshOpenPane === 'function') schRefreshOpenPane();
+                    if (typeof fwOnUserDoc === 'function') fwOnUserDoc(da.floodWatch); // V101.27
 
                     // Render Special Awards (Support multiple V78.91)
                     const awardEl = document.getElementById('u-award-badge');
