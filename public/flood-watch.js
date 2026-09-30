@@ -8,8 +8,9 @@
  * High; this file is the in-app view and the opt-in.
  *
  * UI (no new rows): the 🌊 circle in the profile rail (#fw-btn, colour = site,
- * dot = home), water behind #section-profile-combined (height = worst of site
- * and home), and a popup anchored under the button on tap (V101.28).
+ * dot = home), water behind #section-profile-combined (V101.32: sloping from the
+ * home level on the left to the site level on the right), and a popup anchored under
+ * the button on tap (V101.28).
  *
  * Writes only users/{userId}.floodWatch = { optIn, home: { lat, lon }, updatedAt }
  * (coordinates rounded to 3 dp, ~100 m). Uses the page globals db / userId.
@@ -53,10 +54,48 @@
             btn.setAttribute('aria-label', 'Flood watch: site ' + (site || '—') + (home ? ', home ' + home : ''));
         }
         var water = document.getElementById('fw-water');
-        if (water) {
-            var worst = [site, home].filter(Boolean).sort(function (a, b) { return RANK[b] - RANK[a]; })[0];
-            water.className = 'fw-water' + (worst ? ' fw-' + worst : '');
+        if (water) water.innerHTML = slopeWater(home, site);
+    }
+
+    // V101.32: the card water shows BOTH places — one surface sloping from home (left)
+    // to the training site (right), each side at its own height and colour family
+    // (home blue, site teal, red when High). Without a home it is flat at the site.
+    var LEVEL = { low: 16, moderate: 34, high: 55 };   // % of the card height
+    var HOME_C = { low: ['#dbeafe', '#93c5fd'], moderate: ['#bfdbfe', '#60a5fa'], high: ['#fee2e2', '#f87171'] };
+    var SITE_C = { low: ['#dcfaf3', '#99f6e4'], moderate: ['#b8f3e6', '#5eead4'], high: ['#fee2e2', '#f87171'] };
+    var still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Wavy top edge in a 1000×100 box, y = % from the bottom, smoothstep slope yL → yR.
+    function surface(yL, yR, phase) {
+        var d = 'M0,100';
+        for (var x = 0; x <= 1000; x += 10) {
+            var t = x / 1000, y = yL + (yR - yL) * (t * t * (3 - 2 * t));
+            d += ' L' + x + ',' + (100 - y + 1.6 * Math.sin((x + phase) / 38)).toFixed(2);
         }
+        return d + ' L1000,100 Z';
+    }
+    // One layer; the wave drifts by morphing between two phases (SMIL works in LINE's WebView).
+    function layer(yL, yR, phase, fill, extra) {
+        var a = surface(yL, yR, phase), b = surface(yL, yR, phase + 119);
+        return '<path d="' + a + '" fill="' + fill + '"' + (extra || '') + '>' +
+            (still ? '' : '<animate attributeName="d" dur="7s" repeatCount="indefinite" values="' + a + ';' + b + ';' + a + '"/>') + '</path>';
+    }
+    function slopeWater(home, site) {
+        if (!home && !site) return '';
+        var L = home || site, R = site || home;
+        var lc = (home ? HOME_C : SITE_C)[L], rc = (site ? SITE_C : HOME_C)[R];
+        var grad = function (id, i) {
+            return '<linearGradient id="' + id + '" x1="0" x2="1"><stop offset="0" stop-color="' + lc[i] + '"/><stop offset=".35" stop-color="' + lc[i] +
+                '"/><stop offset=".65" stop-color="' + rc[i] + '"/><stop offset="1" stop-color="' + rc[i] + '"/></linearGradient>';
+        };
+        var svg = '<svg class="fw-slope" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true"><defs>' + grad('fwgFront', 0) + grad('fwgBack', 1) + '</defs>' +
+            layer(LEVEL[L] + 1.5, LEVEL[R] + 1.5, 20, 'url(#fwgBack)', ' opacity=".55"') + layer(LEVEL[L], LEVEL[R], 0, 'url(#fwgFront)') + '</svg>';
+        // Which side is which: only needed once there are two places.
+        var icons = home && site
+            ? '<span class="fw-side" style="left:4px;bottom:calc(' + LEVEL[L] + '% + 1px)" title="Home">🏠</span>' +
+              '<span class="fw-side" style="right:4px;bottom:calc(' + LEVEL[R] + '% + 1px)" title="Training site">🏥</span>'
+            : '';
+        return svg + icons;
     }
 
     function stats(d) {
@@ -164,7 +203,7 @@
             card.classList.add('fw-bg');
             var w = document.createElement('div');
             w.id = 'fw-water';
-            w.className = 'fw-water';
+            w.className = 'fw-card-water';
             w.setAttribute('aria-hidden', 'true');
             card.insertBefore(w, card.firstChild);
         }
