@@ -10,7 +10,6 @@
 | ID | Item | Status | Priority |
 |---|---|---|---|
 | **PREPAY** | AI Studio Gemini API billing: switch Postpay → Prepay before **2026-10-12** | ⬜ open — 12 d left on 2026-09-30 | 1 |
-| **Q-TIMER** | Decide: should a quiz lock Next/Previous until each question's timer ends? | 🖐️ decision (7 intern reports) | 1 |
 | **SMOKE-LIFF** | Try the new intern features in LINE on a phone | ⬜ open | 2 |
 | **SMOKE-ADMIN** | Look at quiz feedback triage in admin | ⬜ open | 2 |
 | **CLOUD** | Finish the Claude Code on the web setup at claude.ai/code | ⬜ optional | 3 |
@@ -28,12 +27,6 @@
 **Steps (payment — owner only):** open https://aistudio.google.com → **Billing** → switch the project to **Prepay** → buy credits → turn on **auto-reload** so it does not run dry.
 **Verify:** generate one image from an admin AI tool after switching. Then mark this row ✅ with the date; the script stops warning.
 
-### Q-TIMER — Next/Previous locked until the question timer ends
-**Why:** the AI feedback triage (admin V102.47) labelled **7 comments from different interns** as 🐞 bug. All seven describe one problem: Next and Previous do nothing until the per-question timer (~60 s) runs out, mostly from the **second quiz in a row** (a refresh fixes it).
-**Decision needed:** is a minimum time per question **intended** for some quiz types?
-- **Intended:** say so, and we show the countdown on the button instead.
-- **Not intended:** it is a bug; the task "Fix quiz Next/Previous locked until timer ends" is ready to start.
-
 ### SMOKE-LIFF — new intern features, on a phone in LINE
 None of these has been run on a real LINE account yet (all were verified with harnesses on the real code).
 1. Tap **🌊** in the profile rail → the popup opens **under the button**, showing the training site's canal and 🛣 road stats.
@@ -43,13 +36,15 @@ None of these has been run on a real LINE account yet (all were verified with ha
 5. The check-in row under the card:
    - **Before checking in:** an orange `🔥N` pill. Tap it → it turns green.
    - **After sending a Log or Case:** that circle turns green.
-6. Do two quizzes in a row and note whether Next works on the second one (see Q-TIMER).
+6. Do two quizzes in a row: Next and Previous should work on the second one (regression check for V94.62, see Q-TIMER in §4).
 
 ### SMOKE-ADMIN — quiz feedback triage
 Admin → Laugh Tale → **🧠 Quiz**. Check that:
-- The button shows a red **7**, and a **🐞❌ 7** filter appears.
+- The button shows a red count, and a **🐞❌** filter appears.
 - Every card has a category chip.
 - **✓** on one of them lowers every count by one.
+
+The 7 🐞 cards are old reports of a bug fixed in V94.62 (see Q-TIMER in §4), so mark them ✓ while testing.
 
 ### CLOUD — Claude Code on the web (optional)
 At claude.ai/code:
@@ -71,3 +66,4 @@ First test: a cloud task that runs `bash scripts/run-qa.sh`.
 |---|---|---|
 | FLOOD | Flood watch live: intern V101.27–V101.30, `floodPointCheck` + `checkFloodAlerts`, Floodboard roads | 2026-09-30 |
 | TRIAGE | Quiz feedback triage live: admin V102.47, `triageQuizFeedback`, 62/62 labelled | 2026-09-30 |
+| Q-TIMER | "Next/Previous locked until the question timer ends" — the 7 🐞 reports (2026-04-21 → 05-12) are the Quiz #2 bug **already fixed in V94.62 on 2026-05-15**: submit left the shared nav buttons `disabled`, and every quiz start now resets them too. No report since. No code change; the triage labels were right about the past, not the present | 2026-09-30 |
