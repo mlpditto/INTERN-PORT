@@ -4006,6 +4006,8 @@ exports.runCheckinDecayNow = onCall({ timeoutSeconds: 300 }, async (request) => 
 // it around this lat/lon" from the nearest BMA/HII canal gauges, rain forecast
 // and Traffy reports. It sends no CORS headers, so the intern page cannot call
 // it directly; floodPointCheck is the pass-through.
+// Road depth/closures come from Floodboard (see fetchFloodboardRoads); the risk
+// used everywhere is the worse of canal and road.
 //
 // risk: high | moderate | low | info (info = no gauge close enough, i.e.
 // outside Bangkok/BMR — shown, never alerted on).
@@ -4049,13 +4051,99 @@ function floodSummary(d) {
     };
 }
 
-async function fetchFloodPoint(lat, lon) {
-    const res = await axios.get(FLOOD_API, {
-        params: { lat: lat.toFixed(4), lon: lon.toFixed(4) },
+// ---- Floodboard roads (https://floodboard.org, CC BY 4.0) ----
+// FloodWatch measures canals; Floodboard measures ROADS: depth in cm, closures and
+// a per-vehicle verdict per road segment, merged from BMA road sensors, iTIC/Longdo,
+// Traffy, news and crowd reports. One GeoJSON (~3 MB, refreshed every 30 s) covers
+// Bangkok; only the still-flooded segments are kept, cached per instance for 60 s.
+const FLOODBOARD_ROADS = 'https://floodboard.org/api/export/roads.geojson';
+const FLOODBOARD_BOX = { s: 13.45, w: 100.25, n: 14.15, e: 100.95 };
+const FB_TRUSTED = ['bma_sensor', 'longdo'];   // sensors / agencies, not single reports
+let fbRoadsCache = { at: 0, segs: null };
+
+async function fetchFloodboardRoads() {
+    if (fbRoadsCache.segs && Date.now() - fbRoadsCache.at < 60000) return fbRoadsCache.segs;
+    const res = await axios.get(FLOODBOARD_ROADS, {
         headers: { 'User-Agent': 'INTERN-PORT flood-watch (github.com/mlpditto/INTERN-PORT)' },
-        timeout: 15000
+        timeout: 20000
     });
-    return floodSummary(res.data || {});
+    const segs = ((res.data && res.data.features) || [])
+        .filter(f => f.properties && !f.properties.cleared && f.geometry && f.geometry.type === 'MultiLineString')
+        .map(f => ({ p: f.properties, lines: f.geometry.coordinates }));
+    fbRoadsCache = { at: Date.now(), segs };
+    return segs;
+}
+
+// Flooded roads around a point: the nearest one within 500 m and a road risk.
+// High only with a closure or ≥ 30 cm within 300 m that a sensor/agency backs or
+// that Floodboard rates conf ≥ 0.4 — one unconfirmed report never sends LINE.
+function roadsNear(segs, lat, lon) {
+    const b = FLOODBOARD_BOX;
+    if (lat < b.s || lat > b.n || lon < b.w || lon > b.e) return null;   // outside coverage
+    const kx = 111320 * Math.cos(lat * Math.PI / 180), ky = 110540;
+    const distTo = (lines) => {
+        let best = Infinity;
+        for (const line of lines) for (let i = 0; i < line.length; i++) {
+            const ax = (line[i][0] - lon) * kx, ay = (line[i][1] - lat) * ky;
+            const q = line[i + 1] || line[i];
+            const bx = (q[0] - lon) * kx, by = (q[1] - lat) * ky;
+            const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
+            const t = len2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2)) : 0;
+            best = Math.min(best, Math.hypot(ax + t * dx, ay + t * dy));
+        }
+        return best;
+    };
+    const near = [];
+    for (const s of segs) {
+        const m = distTo(s.lines);
+        if (m <= 500) near.push({ m, p: s.p });
+    }
+    near.sort((x, y) => x.m - y.m);
+    const trusted = (p) => (p.sources || []).some(x => FB_TRUSTED.includes(x)) || p.conf >= 0.4;
+    let risk = 'low';
+    if (near.some(({ m, p }) => m <= 300 && trusted(p) && (p.closedAll || (p.depthCm || 0) >= 30))) risk = 'high';
+    else if (near.length) risk = 'moderate';
+    const n0 = near[0];
+    return {
+        risk,
+        n: near.length,
+        maxDepthCm: near.reduce((mx, { p }) => Math.max(mx, p.depthCm || 0), 0) || null,
+        nearest: n0 ? {
+            name: n0.p.name || n0.p.nameEn || '',
+            m: Math.round(n0.m),
+            depthCm: n0.p.depthCm == null ? null : n0.p.depthCm,
+            closed: !!n0.p.closedAll,
+            motorbike: (n0.p.verdict || {}).motorbike || null,
+            sedan: (n0.p.verdict || {}).sedan || null,
+            sensor: (n0.p.sources || []).includes('bma_sensor')
+        } : null
+    };
+}
+
+// Canal (FloodWatch) + road (Floodboard), fetched in parallel. Risk is the worse of
+// the two; either source alone still answers when the other is down.
+async function fetchFloodPoint(lat, lon) {
+    const [fw, fb] = await Promise.allSettled([
+        axios.get(FLOOD_API, {
+            params: { lat: lat.toFixed(4), lon: lon.toFixed(4) },
+            headers: { 'User-Agent': 'INTERN-PORT flood-watch (github.com/mlpditto/INTERN-PORT)' },
+            timeout: 15000
+        }),
+        fetchFloodboardRoads()
+    ]);
+    const road = fb.status === 'fulfilled' ? roadsNear(fb.value, lat, lon) : null;
+    if (fw.status !== 'fulfilled' && !road) throw (fw.reason || fb.reason);
+    const s = fw.status === 'fulfilled'
+        ? floodSummary(fw.value.data || {})
+        : { risk: 'info', title: '', desc: '', canal: null, traffy6h: 0, rain24mm: null };
+    const rank = { info: 0, low: 1, moderate: 2, high: 3 };
+    s.canalRisk = s.risk;
+    s.road = road;
+    if (road && rank[road.risk] > rank[s.risk]) s.risk = road.risk;
+    if (!s.title && road) {
+        s.title = road.n ? `มีถนนน้ำท่วม ${road.n} ช่วงในรัศมี 500 ม.` : 'ถนนรอบจุดนี้ไม่มีรายงานน้ำท่วม';
+    }
+    return s;
 }
 
 function floodMapUrl(lat, lon) {
@@ -4072,8 +4160,13 @@ function floodAlertText(where, s, lat, lon) {
         lines.push(`${c.name}${c.km != null ? ` (${c.km} กม.)` : ''}${bank}`);
         if (c.change24cm != null) lines.push(`24 ชม. ที่ผ่านมา: ${c.change24cm > 0 ? '+' : ''}${c.change24cm} ซม.`);
     }
+    const r = s.road && s.road.nearest;
+    if (r) {
+        const depth = r.closed ? 'ปิดการจราจร' : r.depthCm != null ? `ลึก ~${r.depthCm} ซม.` : 'มีน้ำท่วม';
+        lines.push(`ถนน: ${r.name || 'ไม่ทราบชื่อ'} ${depth} (${r.m} ม.)${r.sensor ? ' · เซนเซอร์ กทม.' : ''}`);
+    }
     if (s.traffy6h) lines.push(`Traffy รายงานน้ำท่วม ${s.traffy6h} จุดในรัศมี 1 กม. (6 ชม.)`);
-    lines.push(`แผนที่: ${floodMapUrl(lat, lon)}`, 'ข้อมูล: BKK FloodWatch');
+    lines.push(`แผนที่: ${floodMapUrl(lat, lon)}`, `ข้อมูล: BKK FloodWatch${s.road ? ' · Floodboard (CC BY 4.0)' : ''}`);
     return lines.filter(Boolean).join('\n');
 }
 

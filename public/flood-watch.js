@@ -1,7 +1,8 @@
 /* V101.27 Flood watch — nearby flood risk for the training site, the intern's
  * home and "near me".
  *
- * Data: BKK FloodWatch 2026 (https://flood.autobahn.bot, github.com/bejranonda/flood2026,
+ * Data: BKK FloodWatch 2026 (canals) + Floodboard (roads, CC BY 4.0, V101.30) via floodPointCheck.
+ * FloodWatch: (https://flood.autobahn.bot, github.com/bejranonda/flood2026,
  * MIT) through the floodPointCheck callable (the API sends no CORS headers).
  * The hourly checkFloodAlerts function pushes LINE when the home rises to
  * High; this file is the in-app view and the opt-in.
@@ -73,6 +74,17 @@
             out.push('<span title="Last 24 h"><i class="fa-solid fa-arrow-' + (up ? 'up' : 'down') +
                 '" style="color:' + (up ? '#dc2626' : '#16a34a') + '"></i>' + Math.abs(c.change24cm) + ' cm</span>');
         }
+        // V101.30: nearest flooded road within 500 m (Floodboard), coloured by the
+        // motorbike verdict; name, distance and verdicts are in the title.
+        var r = d.road && d.road.nearest;
+        if (r) {
+            var rc = r.closed || r.motorbike === 'blocked' ? '#dc2626' : r.motorbike === 'risky' ? '#ea580c' : '#ca8a04';
+            out.push('<span title="Flooded road: ' + esc(r.name || '—') + ' · ' + r.m + ' m · motorbike ' + esc(r.motorbike || '?') +
+                ', sedan ' + esc(r.sedan || '?') + (r.sensor ? ' · BMA sensor' : '') + '" style="color:' + rc + '"><i class="fa-solid fa-road"></i><b>' +
+                (r.closed ? 'closed' : r.depthCm != null ? r.depthCm + ' cm' : 'wet') + '</b> ' + r.m + ' m</span>');
+        } else if (d.road) {
+            out.push('<span title="No flooded road within 500 m" style="color:#16a34a"><i class="fa-solid fa-road"></i>0</span>');
+        }
         if (d.rain24mm != null) {
             out.push('<span title="Rain next 24 h"><i class="fa-solid fa-cloud-rain" style="color:#64748b"></i>' + d.rain24mm + ' mm</span>');
         }
@@ -105,7 +117,7 @@
         else if (!d) body = '<div class="fw-h"><span class="fw-dot"></span>—</div>';
         else {
             var t = p.at ? new Date(p.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }) : '';
-            var meta = [d.canal ? esc(d.canal.name) + (d.canal.km != null ? ' · ' + d.canal.km + ' km' : '') : '', t, 'BKK FloodWatch']
+            var meta = [d.canal ? esc(d.canal.name) + (d.canal.km != null ? ' · ' + d.canal.km + ' km' : '') : '', t, 'BKK FloodWatch' + (d.road ? ' · Floodboard (CC BY 4.0)' : '')]
                 .filter(Boolean).join(' · ');
             body = '<div class="fw-h"><span class="fw-dot' + (risk ? ' fw-' + risk : '') + '"></span>' + esc(d.title || '—') + '</div>' +
                 '<div class="fw-stats">' + stats(d) + '</div><div class="fw-meta">' + meta + '</div>';
