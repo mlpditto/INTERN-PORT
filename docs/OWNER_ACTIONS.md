@@ -12,7 +12,6 @@
 | **PREPAY** | AI Studio Gemini API billing: switch Postpay → Prepay before **2026-10-12** | ⬜ open — 12 d left on 2026-09-30 | 1 |
 | **SMOKE-LIFF** | Try the new intern features in LINE on a phone | ⬜ open | 2 |
 | **SMOKE-ADMIN** | Try admin V102.46 → V102.48 (language button, feedback labels, issues) and check the ❌ quiz | ⬜ open | 2 |
-| **HOURS** | Internship hours from the time clock (admin V102.49): grant read access, deploy 2 functions, set goals | ⬜ open | 2 |
 | **CLOUD** | Finish the Claude Code on the web setup at claude.ai/code | ⬜ optional | 3 |
 | FN | Every exported Cloud Function is deployed and ACTIVE | ✅ *script* (25/25 on 2026-09-30) | — |
 | RULES | `firestore.rules` / `storage.rules` identical to live | ✅ *script* | — |
@@ -76,15 +75,6 @@ Both issues were **closed on 2026-09-30** at the owner's request (by Claude Code
    - **⏸** marks an issue "Not a problem".
 8. **Later, on its own:** the next 🐞/❌ comment is grouped within the hour. The red count comes back only for issues with a report in the last 60 days, and for fixed issues that get a new report (🔁 Back again).
 
-### HOURS — internship hours from the time clock (admin V102.49)
-**What it does:** every night at 00:15 (and right after an admin saves a goal) `syncInternHours` reads clock-in/out from the time clock's Firebase project `in-out-dashboard` and writes each intern's total to `users.internHours`. Only interns with a goal (`internHoursTarget` > 0) are read. Hours = real time from clock-in to clock-out, paired per day exactly like the time dashboard; only days inside the intern's period count.
-**Why a name, not a LINE id:** the two LINE channels (`2008951813` time clock, `2008959998` INTERN-PORT) sit under different LINE providers, so the same person has different LINE ids. The link is the name: the one typed in ⏱, or `fullName` when it already matches the time clock's name.
-**Steps (owner only, once):**
-1. Give this project's functions read access to the time clock — Google Cloud console, project **in-out-dashboard** → IAM → **Grant access** → principal `367076866368-compute@developer.gserviceaccount.com` → role **Cloud Datastore Viewer** (read only). Or: `gcloud projects add-iam-policy-binding in-out-dashboard --member=serviceAccount:367076866368-compute@developer.gserviceaccount.com --role=roles/datastore.viewer`
-2. `firebase deploy --only functions:syncInternHours,functions:syncInternHoursNow`
-3. Admin → User Hub → ⋯ on an intern → **⏱ Internship hours…** → type the goal (e.g. 280), then check the name matches the time clock. A toast shows the hours found.
-**Verify:** Bua's bar shows about the same total as the time dashboard's "ปีนี้" figure for her period. ⚠ on the bar = name not found or shared by two people; tap it to fix the name.
-
 ### CLOUD — Claude Code on the web (optional)
 At claude.ai/code:
 1. Install the Claude GitHub App on `INTERN-PORT` **and** `INTERN-PORT-claude-memory`, then attach the memory repo to sessions.
@@ -98,11 +88,13 @@ First test: a cloud task that runs `bash scripts/run-qa.sh`.
   - Functions: `FUNCTIONS_DISCOVERY_TIMEOUT=60 firebase deploy --only functions:<name>` from a clean `production` checkout, after `npm --prefix functions ci`.
   - Rules: `firebase deploy --only firestore:rules`.
   - The script turns 🔴 on any function or rules drift.
+- **Internship hours (V102.49).** To add an intern: User Hub → ⋯ → **⏱ Internship hours…** → goal, then the name exactly as in the time clock (time.mlp-int.work). The two LINE channels sit under different providers, so the link is the name, not a LINE id. ⚠ on the hours bar = name not found or shared by two people; tap it to fix. Totals refresh nightly at 00:15 (`syncInternHours`), reading project `in-out-dashboard` as `367076866368-compute@developer.gserviceaccount.com` (Cloud Datastore Viewer there — removing that role stops the sync).
 - **LINE quota.** The Noti OA has 300 pushes a month, shared by every notification. Only the daily digest, per-intern quiz scores and flood alerts (on a rise to High, max 1/place/day) push. The `line_usage` counter undercounts, so trust the 429s in the function logs.
 
 ## 4. Done
 | ID | Item | When |
 |---|---|---|
+| HOURS | Internship hours from the time clock live: admin V102.49, `syncInternHours` + `syncInternHoursNow` deployed, Cloud Datastore Viewer granted on `in-out-dashboard`; Bua 151.1 h / 17 days, matching the time clock | 2026-10-01 |
 | FLOOD | Flood watch live: intern V101.27–V101.33 — `floodPointCheck` + `checkFloodAlerts`, Floodboard roads, popup under 🌊, sloped home→site water, Open-Meteo sky + weather row + PM2.5 | 2026-09-30 |
 | TRIAGE | Quiz feedback triage live: admin V102.47, `triageQuizFeedback`, 62/62 labelled | 2026-09-30 |
 | Q-TIMER | "Next/Previous locked until the question timer ends" — the 7 🐞 reports (2026-04-21 → 05-12) are the Quiz #2 bug **already fixed in V94.62 on 2026-05-15**: submit left the shared nav buttons `disabled`, and every quiz start now resets them too. No report since. No code change; the triage labels were right about the past, not the present | 2026-09-30 |
