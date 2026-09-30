@@ -3997,3 +3997,156 @@ exports.runCheckinDecayNow = onCall({ timeoutSeconds: 300 }, async (request) => 
     requireAdminCallable(request);
     return await runCheckinDecay('manual', { apply: true });
 });
+
+// ============================================================
+// Flood watch — nearby flood risk for the training site and each intern's home
+// ------------------------------------------------------------
+// Data: BKK FloodWatch 2026 (https://flood.autobahn.bot, source
+// github.com/bejranonda/flood2026, MIT). Its /api/point answers "how risky is
+// it around this lat/lon" from the nearest BMA/HII canal gauges, rain forecast
+// and Traffy reports. It sends no CORS headers, so the intern page cannot call
+// it directly; floodPointCheck is the pass-through.
+//
+// risk: high | moderate | low | info (info = no gauge close enough, i.e.
+// outside Bangkok/BMR — shown, never alerted on).
+//
+// LINE quota (300/month, shared): push ONLY when a place goes UP to `high`,
+// at most once per place per Bangkok day. The site alert goes to the group
+// (one message for everyone); a home alert goes to that intern alone.
+// State for that rule lives in flood_status/{userId} and flood_status/_site
+// (Admin SDK only; admin-read in rules).
+// ============================================================
+const FLOOD_API = 'https://flood.autobahn.bot/api/point';
+// Keep in sync with FLOOD_SITE in public/index.html.
+const FLOOD_SITE = { lat: 13.8099, lon: 100.6223, label: 'MedLife Plus @Bangkapi' };
+const FLOOD_RISKS = ['high', 'moderate', 'low', 'info'];
+
+function validFloodCoord(lat, lon) {
+    // Thailand's bounding box — anything else is a typo or a spoofed call.
+    return Number.isFinite(lat) && Number.isFinite(lon)
+        && lat >= 5.5 && lat <= 20.5 && lon >= 97.3 && lon <= 105.7;
+}
+
+// The API answer is ~20 KB; keep the few fields the card and the alert read.
+function floodSummary(d) {
+    const f = d.forecast || {};
+    const nc = d.nearest_canal || null;
+    const st = nc && nc.station;
+    return {
+        risk: FLOOD_RISKS.includes(f.risk) ? f.risk : 'info',
+        title: String(f.title || '').slice(0, 200),
+        desc: String(f.desc || '').slice(0, 400),
+        canal: st ? {
+            name: st.name_th || st.name_en || st.code || '',
+            status: st.status || null,
+            km: typeof nc.distance_km === 'number' ? nc.distance_km : null,
+            freeboardM: typeof st.freeboard_m === 'number' ? st.freeboard_m : null,
+            change24cm: st.observed24 && typeof st.observed24.change_cm === 'number' ? st.observed24.change_cm : null,
+            stale: st.stale === true
+        } : null,
+        traffy6h: (d.evidence && Number(d.evidence.traffy_flood_reports_1km_6h)) || 0,
+        rain24mm: typeof d.rain_next24_mm === 'number' ? d.rain_next24_mm : null
+    };
+}
+
+async function fetchFloodPoint(lat, lon) {
+    const res = await axios.get(FLOOD_API, {
+        params: { lat: lat.toFixed(4), lon: lon.toFixed(4) },
+        headers: { 'User-Agent': 'INTERN-PORT flood-watch (github.com/mlpditto/INTERN-PORT)' },
+        timeout: 15000
+    });
+    return floodSummary(res.data || {});
+}
+
+function floodMapUrl(lat, lon) {
+    return `https://flood.autobahn.bot/#p=${lat.toFixed(4)},${lon.toFixed(4)}`;
+}
+
+function floodAlertText(where, s, lat, lon) {
+    const lines = [`🌊 เตือนน้ำท่วม: ${where} ความเสี่ยงสูง`, s.title];
+    if (s.canal) {
+        const c = s.canal;
+        const bank = c.freeboardM == null ? ''
+            : c.freeboardM >= 0 ? ` · ต่ำกว่าตลิ่ง ${Math.round(c.freeboardM * 100)} ซม.`
+            : ` · เกินตลิ่ง ${Math.round(-c.freeboardM * 100)} ซม.`;
+        lines.push(`${c.name}${c.km != null ? ` (${c.km} กม.)` : ''}${bank}`);
+        if (c.change24cm != null) lines.push(`24 ชม. ที่ผ่านมา: ${c.change24cm > 0 ? '+' : ''}${c.change24cm} ซม.`);
+    }
+    if (s.traffy6h) lines.push(`Traffy รายงานน้ำท่วม ${s.traffy6h} จุดในรัศมี 1 กม. (6 ชม.)`);
+    lines.push(`แผนที่: ${floodMapUrl(lat, lon)}`, 'ข้อมูล: BKK FloodWatch');
+    return lines.filter(Boolean).join('\n');
+}
+
+// Intern "near me" / site / home check. Any signed-in user (the intern page
+// signs in anonymously); coordinates are not stored.
+exports.floodPointCheck = onCall({ timeoutSeconds: 30 }, async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
+    const lat = Number(request.data && request.data.lat);
+    const lon = Number(request.data && request.data.lon);
+    if (!validFloodCoord(lat, lon)) throw new HttpsError('invalid-argument', 'lat/lon outside Thailand');
+    try {
+        return { ...(await fetchFloodPoint(lat, lon)), checkedAt: Date.now() };
+    } catch (e) {
+        console.warn('[floodPointCheck] upstream failed:', e && e.message);
+        throw new HttpsError('unavailable', 'Flood data unavailable');
+    }
+});
+
+// Hourly: training site + every opted-in home (users/{id}.floodWatch
+// = { optIn: true, home: { lat, lon } }, written by the intern page).
+exports.checkFloodAlerts = onSchedule({
+    schedule: 'every 60 minutes',
+    timeZone: 'Asia/Bangkok',
+    region: 'us-central1',
+    timeoutSeconds: 300,
+    memory: '256MiB',
+    secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_GROUP_ID']
+}, async (event) => {
+    const db = admin.firestore();
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+    const cache = new Map();   // homes a few metres apart share one upstream call
+    const check = (lat, lon) => {
+        const key = `${lat.toFixed(3)},${lon.toFixed(3)}`;
+        if (!cache.has(key)) cache.set(key, fetchFloodPoint(lat, lon));
+        return cache.get(key);
+    };
+
+    // One place: fetch, compare with the stored state, push on a rise to high.
+    async function run(docId, lat, lon, where, target) {
+        const ref = db.collection('flood_status').doc(docId);
+        const prev = (await ref.get()).data() || {};
+        let s;
+        try {
+            s = await check(lat, lon);
+        } catch (e) {
+            await ref.set({ error: String((e && e.message) || e).slice(0, 200), errorAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+            return 'error';
+        }
+        const update = { risk: s.risk, summary: s, checkedAt: admin.firestore.FieldValue.serverTimestamp(), error: null };
+        const rose = s.risk === 'high' && prev.risk !== 'high' && prev.lastAlertDay !== today;
+        if (rose && target && target.to) {
+            const [r] = await pushLineFlex('floodAlert', [target],
+                () => ({ type: 'text', text: floodAlertText(where, s, lat, lon) }), `doc=${docId}`);
+            if (r && r.ok) update.lastAlertDay = today;
+        }
+        await ref.set(update, { merge: true });
+        return s.risk;
+    }
+
+    const counts = { high: 0, moderate: 0, low: 0, info: 0, error: 0 };
+    const groupId = process.env.ADMIN_LINE_GROUP_ID;
+    const siteRisk = await run('_site', FLOOD_SITE.lat, FLOOD_SITE.lon, 'ที่ฝึกงาน',
+        groupId ? { to: groupId, label: 'group' } : null);
+
+    const snap = await db.collection('users').where('floodWatch.optIn', '==', true).get();
+    for (const doc of snap.docs) {
+        const home = (doc.data().floodWatch || {}).home || {};
+        const lat = Number(home.lat), lon = Number(home.lon);
+        if (!validFloodCoord(lat, lon)) continue;
+        // users/{id} is keyed by the Noti OA's LINE userId, so it is the push target.
+        const risk = await run(doc.id, lat, lon, 'ใกล้บ้าน',
+            doc.id.startsWith('U') ? { to: doc.id, label: 'intern' } : null);
+        counts[risk] = (counts[risk] || 0) + 1;
+    }
+    console.log(`[checkFloodAlerts] site=${siteRisk} homes=${JSON.stringify(counts)} upstreamCalls=${cache.size}`);
+});

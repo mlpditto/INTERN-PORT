@@ -224,6 +224,14 @@
             thBtn.classList.toggle('active', thOn);
             thBtn.setAttribute('aria-pressed', thOn ? 'true' : 'false');
         }
+        // V101.27: one button for both flags — label shows the current state.
+        var cycleBtn = document.getElementById('lang-toggle-cycle');
+        if (cycleBtn) {
+            var label = krOn && thOn ? 'K·T' : krOn ? 'KR' : thOn ? 'TH' : 'EN';
+            cycleBtn.textContent = label;
+            cycleBtn.classList.toggle('active', krOn || thOn);
+            cycleBtn.setAttribute('aria-label', 'Language: ' + label + ' (tap to switch)');
+        }
         applyAttrLangSwap(body);
     }
 
@@ -272,6 +280,19 @@
         var key = lang === 'kr' ? 'uiLangKR' : 'uiLangTH';
         var newOn = !isLangOn(lang);
         localStorage.setItem(key, newOn ? '1' : '0');
+        applyState();
+    };
+
+    // V101.27: KR + TH merged into one button. Cycles through all four states
+    // of the two independent flags: EN → KR → TH → KR+TH → EN.
+    window.cycleLang = function () {
+        var kr = isLangOn('kr'), th = isLangOn('th');
+        var next = !kr && !th ? [true, false]
+            : kr && !th ? [false, true]
+            : !kr && th ? [true, true]
+            : [false, false];
+        localStorage.setItem('uiLangKR', next[0] ? '1' : '0');
+        localStorage.setItem('uiLangTH', next[1] ? '1' : '0');
         applyState();
     };
 
