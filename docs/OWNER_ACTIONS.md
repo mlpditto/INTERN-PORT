@@ -11,7 +11,7 @@
 |---|---|---|---|
 | **PREPAY** | AI Studio Gemini API billing: switch Postpay → Prepay before **2026-10-12** | ⬜ open — 12 d left on 2026-09-30 | 1 |
 | **SMOKE-LIFF** | Try the new intern features in LINE on a phone | ⬜ open | 2 |
-| **SMOKE-ADMIN** | Look at quiz feedback triage in admin | ⬜ open | 2 |
+| **SMOKE-ADMIN** | Check the closed feedback issues in admin and the ❌ quiz | ⬜ open | 2 |
 | **CLOUD** | Finish the Claude Code on the web setup at claude.ai/code | ⬜ optional | 3 |
 | FN | Every exported Cloud Function is deployed and ACTIVE | ✅ *script* (25/25 on 2026-09-30) | — |
 | RULES | `firestore.rules` / `storage.rules` identical to live | ✅ *script* | — |
@@ -39,14 +39,18 @@ None of these has been run on a real LINE account yet (all were verified with ha
 6. Do two quizzes in a row: Next and Previous should work on the second one (regression check for V94.62, see Q-TIMER in §4).
 
 ### SMOKE-ADMIN — quiz feedback issues (admin V102.48)
-Admin → Laugh Tale → **🧠 Quiz**. Check that:
-- The button shows a red **1**: the fresh ❌ issue from 5 Aug.
-- **⚑ Issues 2** opens two issue cards:
-  - **❌** "มีข้อสอบบางข้อที่คล้ายกันเกินไป" (Fresh).
-  - **🐞** "กดข้อต่อไปไม่ได้ก่อนครบเวลา", 7 reports (💤 Quiet).
-- Every feedback card still has its category chip.
+Both issues were **closed on 2026-09-30** at the owner's request (by Claude Code, via a guarded Firestore write):
+- **🐞** "กดข้อต่อไปไม่ได้ก่อนครบเวลา", 7 reports → **Fixed in V94.62 · 15 May** (the Q-TIMER fix, §4).
+- **❌** "มีข้อสอบบางข้อที่คล้ายกันเกินไป", 1 report on quiz ผู้ป่วยโรคไตเรื้อรังระยะสุดท้าย → **Today**. The quiz itself was *not* checked or edited.
 
-Then close the 🐞 issue: **Fixed in V…**. The chip **V94.62 · 15 May** should be suggested (the Q-TIMER fix, §4) and the preview should say "Closes 7/7". Press **Close issue**; it moves under ✅. For the ❌ issue, fix the quiz, then close it with **Today**, or use **⏸** if the questions are fine.
+Admin → Laugh Tale → **🧠 Quiz**. Check that:
+- The button shows **no red count**.
+- **⚑ Issues** shows `Open 0` and **✅ 2**. Under ✅ there are two green cards: "✅ Fixed in V94.62 · 15 May" and "✅ Fixed in update · 30 Sep".
+- Every feedback card still has its category chip; the two issues' reports read "fixed" on hover.
+
+Then:
+- **❌ quiz:** look at ผู้ป่วยโรคไตเรื้อรังระยะสุดท้าย for the near-duplicate questions. If they are still there, press **↺** on the card to reopen the issue, fix the quiz, and close it again with **Today**.
+- **"Fixed in V…" flow:** it has not been clicked in a real browser yet. Try it on the next new issue, or reopen one with ↺ and close it again; the version chips come live from GitHub.
 
 ### CLOUD — Claude Code on the web (optional)
 At claude.ai/code:
