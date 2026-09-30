@@ -3998,6 +3998,33 @@ exports.runCheckinDecayNow = onCall({ timeoutSeconds: 300 }, async (request) => 
     return await runCheckinDecay('manual', { apply: true });
 });
 
+// V102.49: internship hours from the MLP time clock (see intern-hours.js). Reads the
+// in-out-dashboard project's Firestore with this project's runtime service account,
+// which needs Cloud Datastore Viewer there (docs/OWNER_ACTIONS.md, HOURS).
+const { syncInternHours } = require('./intern-hours');
+let _timeDb = null;
+function timeClockDb() {
+    if (!_timeDb) _timeDb = admin.initializeApp({ projectId: 'in-out-dashboard' }, 'time-clock').firestore();
+    return _timeDb;
+}
+
+// 00:15 Bangkok — after the day's last clock-out, and clear of the 00:05 decay run.
+exports.syncInternHours = onSchedule({
+    schedule: '15 0 * * *',
+    timeZone: 'Asia/Bangkok',
+    region: 'us-central1',
+    timeoutSeconds: 300,
+    memory: '256MiB'
+}, async (event) => {
+    await syncInternHours(admin.firestore(), timeClockDb(), admin.firestore.FieldValue);
+});
+
+// Admin "⏱ Internship hours" — runs right after a goal or a name is saved.
+exports.syncInternHoursNow = onCall({ timeoutSeconds: 120 }, async (request) => {
+    requireAdminCallable(request);
+    return await syncInternHours(admin.firestore(), timeClockDb(), admin.firestore.FieldValue);
+});
+
 // ============================================================
 // Flood watch — nearby flood risk for the training site and each intern's home
 // ------------------------------------------------------------

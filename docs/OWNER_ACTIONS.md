@@ -12,6 +12,7 @@
 | **PREPAY** | AI Studio Gemini API billing: switch Postpay → Prepay before **2026-10-12** | ⬜ open — 12 d left on 2026-09-30 | 1 |
 | **SMOKE-LIFF** | Try the new intern features in LINE on a phone | ⬜ open | 2 |
 | **SMOKE-ADMIN** | Try admin V102.46 → V102.48 (language button, feedback labels, issues) and check the ❌ quiz | ⬜ open | 2 |
+| **HOURS** | Internship hours from the time clock (admin V102.49): grant read access, deploy 2 functions, set goals | ⬜ open | 2 |
 | **CLOUD** | Finish the Claude Code on the web setup at claude.ai/code | ⬜ optional | 3 |
 | FN | Every exported Cloud Function is deployed and ACTIVE | ✅ *script* (25/25 on 2026-09-30) | — |
 | RULES | `firestore.rules` / `storage.rules` identical to live | ✅ *script* | — |
@@ -74,6 +75,15 @@ Both issues were **closed on 2026-09-30** at the owner's request (by Claude Code
    - **Close issue** moves it back under ✅.
    - **⏸** marks an issue "Not a problem".
 8. **Later, on its own:** the next 🐞/❌ comment is grouped within the hour. The red count comes back only for issues with a report in the last 60 days, and for fixed issues that get a new report (🔁 Back again).
+
+### HOURS — internship hours from the time clock (admin V102.49)
+**What it does:** every night at 00:15 (and right after an admin saves a goal) `syncInternHours` reads clock-in/out from the time clock's Firebase project `in-out-dashboard` and writes each intern's total to `users.internHours`. Only interns with a goal (`internHoursTarget` > 0) are read. Hours = real time from clock-in to clock-out, paired per day exactly like the time dashboard; only days inside the intern's period count.
+**Why a name, not a LINE id:** the two LINE channels (`2008951813` time clock, `2008959998` INTERN-PORT) sit under different LINE providers, so the same person has different LINE ids. The link is the name: the one typed in ⏱, or `fullName` when it already matches the time clock's name.
+**Steps (owner only, once):**
+1. Give this project's functions read access to the time clock — Google Cloud console, project **in-out-dashboard** → IAM → **Grant access** → principal `367076866368-compute@developer.gserviceaccount.com` → role **Cloud Datastore Viewer** (read only). Or: `gcloud projects add-iam-policy-binding in-out-dashboard --member=serviceAccount:367076866368-compute@developer.gserviceaccount.com --role=roles/datastore.viewer`
+2. `firebase deploy --only functions:syncInternHours,functions:syncInternHoursNow`
+3. Admin → User Hub → ⋯ on an intern → **⏱ Internship hours…** → type the goal (e.g. 280), then check the name matches the time clock. A toast shows the hours found.
+**Verify:** Bua's bar shows about the same total as the time dashboard's "ปีนี้" figure for her period. ⚠ on the bar = name not found or shared by two people; tap it to fix the name.
 
 ### CLOUD — Claude Code on the web (optional)
 At claude.ai/code:
