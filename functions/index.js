@@ -4150,3 +4150,103 @@ exports.checkFloodAlerts = onSchedule({
     }
     console.log(`[checkFloodAlerts] site=${siteRisk} homes=${JSON.stringify(counts)} upstreamCalls=${cache.size}`);
 });
+
+// ============================================================
+// Quiz feedback triage — label every quiz_feedback comment so the
+// few that need fixing (an app bug, a wrong/duplicated question) do not
+// sit unseen among the praise.
+// ------------------------------------------------------------
+// Pattern from BKK FloodWatch (github.com/bejranonda/flood2026, ai.py, MIT):
+//   - keyword rules first: instant, no AI, and they only ever ADD urgency;
+//   - the AI refines the category; it may add urgency, never remove it;
+//   - off the request path (hourly), stops at the first AI failure and
+//     retries next run (the cursor only moves past labelled docs).
+// Writes quiz_feedback/{id}.triage = { category, urgent, by, at }. The admin
+// sets triage.resolvedAt when an urgent one is dealt with.
+// Cursor: _meta/feedback_triage.lastTs (timestamp of the last labelled doc).
+// ============================================================
+const FB_CATEGORIES = ['bug', 'content', 'difficulty', 'request', 'praise', 'noise'];
+const FB_URGENT = ['bug', 'content'];
+const FB_MODEL = 'gpt-6-luna';
+const FB_RULES = [
+    ['bug', /กด\s*(next|ถัดไป|ต่อ|ส่ง)\s*ไม่ได้|ค้างอยู่|เด้งออก|บั๊?[คก]|\bbug\b|\berror\b|รีเฟรช|refresh|โหลดไม่|ไม่ยอม(โหลด|ขึ้น)|\bcrash/i],
+    ['content', /(เฉลย|คำตอบ|โจทย์)[^\n]{0,12}(ผิด|ไม่ถูก|ซ้ำ)|ข้อ(สอบ)?\S{0,12}(ซ้ำ|ใกล้เคียงกัน)|พิมพ์ผิด|\btypo\b|wrong answer|ไม่มีข้อ(ที่)?ถูก/i]
+];
+const FB_PROMPT = `Classify ONE learner comment left after a quiz in a pharmacy internship app. The comment may be in Thai or English.
+Categories:
+- bug: the app or website misbehaves (buttons, timer, loading, display, saving).
+- content: a question, answer key, choice or explanation is wrong, unclear, duplicated or has a typo.
+- difficulty: the quiz is too hard, too easy or too long, or its language is hard to understand.
+- request: asks for other topics, formats, languages or features.
+- praise: a positive or neutral reflection on the quiz or on what was learned.
+- noise: no real content (emoji only, one filler word).
+If several apply, pick the one an admin must act on first: bug > content > difficulty > request > praise.
+urgent = true only when an admin must fix something (bug or content).
+Reply with JSON only: {"category": "<one of the six>", "urgent": true|false}`;
+
+function triageFeedbackRules(comment) {
+    const t = String(comment || '').trim();
+    if (!/[\p{L}\p{N}]/u.test(t)) return { category: 'noise', urgent: false };
+    for (const [category, re] of FB_RULES) if (re.test(t)) return { category, urgent: true };
+    return null;   // undecided: the AI labels it
+}
+
+function parseTriageLabel(text) {
+    const m = String(text || '').match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    let d;
+    try { d = JSON.parse(m[0]); } catch (_) { return null; }
+    if (!FB_CATEGORIES.includes(d.category) || typeof d.urgent !== 'boolean') return null;
+    return { category: d.category, urgent: d.urgent };
+}
+
+// Returns a label, or throws when the AI is unavailable (the caller stops the run).
+async function triageOneFeedback(f) {
+    const rules = triageFeedbackRules(f.comment);
+    if (rules && rules.category === 'noise') return { ...rules, by: 'rules' };
+    const prompt = `${FB_PROMPT}\n\nRating given: ${typeof f.rating === 'number' ? f.rating + '/10' : 'none'}\nComment:\n"""${String(f.comment).slice(0, 1500)}"""`;
+    const result = await runModernAI({ model: FB_MODEL, prompt, isJson: true, generationOptions: { maxOutputTokens: 1024 } }, postWithRetry, process.env);
+    if (result.error) throw new Error(result.error);
+    recordAiUsage('openai', result.model || FB_MODEL, result.tokens, true, 'feedback_triage', result.usage || {});
+    const ai = parseTriageLabel(result.text);
+    if (!ai) return rules ? { ...rules, by: 'rules' } : { category: 'praise', urgent: false, by: 'unparsed' };
+    // The AI may add urgency, never remove it: a rules hit keeps its category.
+    if (rules && !FB_URGENT.includes(ai.category)) return { ...rules, by: 'rules+' + FB_MODEL };
+    return { category: ai.category, urgent: ai.urgent || FB_URGENT.includes(ai.category), by: FB_MODEL };
+}
+
+exports.triageQuizFeedback = onSchedule({
+    schedule: 'every 60 minutes',
+    timeZone: 'Asia/Bangkok',
+    region: 'us-central1',
+    timeoutSeconds: 300,
+    memory: '256MiB',
+    secrets: ['OPENAI_API_KEY']
+}, async (event) => {
+    const db = admin.firestore();
+    const cursorRef = db.collection('_meta').doc('feedback_triage');
+    const lastTs = ((await cursorRef.get()).data() || {}).lastTs || null;
+    let q = db.collection('quiz_feedback').orderBy('timestamp', 'asc');
+    if (lastTs) q = q.where('timestamp', '>', lastTs);
+    const snap = await q.limit(40).get();
+
+    const counts = {};
+    let cursor = null, stopped = null;
+    for (const doc of snap.docs) {
+        const f = doc.data();
+        if (!f.triage && String(f.comment || '').trim()) {
+            let label;
+            try {
+                label = await triageOneFeedback(f);
+            } catch (e) {
+                stopped = String((e && e.message) || e).slice(0, 200);
+                break;   // AI unavailable: keep the cursor here and retry next run
+            }
+            await doc.ref.update({ triage: { ...label, at: admin.firestore.FieldValue.serverTimestamp() } });
+            counts[label.category] = (counts[label.category] || 0) + 1;
+        }
+        if (f.timestamp) cursor = f.timestamp;
+    }
+    if (cursor) await cursorRef.set({ lastTs: cursor, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    console.log(`[triageQuizFeedback] scanned=${snap.size} labelled=${JSON.stringify(counts)}${stopped ? ` stopped: ${stopped}` : ''}`);
+});
