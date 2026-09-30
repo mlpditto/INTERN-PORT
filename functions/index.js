@@ -4254,8 +4254,9 @@ exports.checkFloodAlerts = onSchedule({
 //   - the AI refines the category; it may add urgency, never remove it;
 //   - off the request path (hourly), stops at the first AI failure and
 //     retries next run (the cursor only moves past labelled docs).
-// Writes quiz_feedback/{id}.triage = { category, urgent, by, at }. The admin
-// sets triage.resolvedAt when an urgent one is dealt with.
+// Writes quiz_feedback/{id}.triage = { category, urgent, by, at, issueId? }; urgent
+// reports are then grouped into feedback_issues (see groupUrgentFeedback), which the
+// admin resolves once per issue ("fixed in V…") instead of ✓ per comment.
 // Cursor: _meta/feedback_triage.lastTs (timestamp of the last labelled doc).
 // ============================================================
 const FB_CATEGORIES = ['bug', 'content', 'difficulty', 'request', 'praise', 'noise'];
@@ -4341,5 +4342,73 @@ exports.triageQuizFeedback = onSchedule({
         if (f.timestamp) cursor = f.timestamp;
     }
     if (cursor) await cursorRef.set({ lastTs: cursor, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-    console.log(`[triageQuizFeedback] scanned=${snap.size} labelled=${JSON.stringify(counts)}${stopped ? ` stopped: ${stopped}` : ''}`);
+    const grouped = stopped ? { skipped: 'ai-down' } : await groupUrgentFeedback(db);
+    console.log(`[triageQuizFeedback] scanned=${snap.size} labelled=${JSON.stringify(counts)} issues=${JSON.stringify(grouped)}${stopped ? ` stopped: ${stopped}` : ''}`);
 });
+
+// ---- Issues: urgent reports grouped by underlying problem (admin V102.48) ----
+// feedback_issues/{id} = { category, title, keywords[], reportIds[], quizIds[], count,
+//   firstReportAt, lastReportAt, status: open|resolved|dismissed, resolvedVersion,
+//   resolvedVersionAt, resolvedOn, resolvedBy }. Server writes the grouping; the admin
+//   only sets status/resolved*. "Back again" is not stored: an issue resolved at
+//   resolvedVersionAt with a report after it is shown as reopened (admin.html).
+const FB_GROUP_PROMPT = `You group learner reports from a pharmacy internship quiz app into ISSUES. An issue is one underlying problem an admin fixes once.
+- bug: same symptom = same issue, even when worded differently or seen on different quizzes (e.g. "the Next button does nothing" and "I must wait for the timer before Next works" are one issue).
+- content: only the same problem in the same quiz is one issue.
+Reply with JSON only: {"issue": "<an existing issue id, or new>", "title": "<for a new issue: a short Thai title of the problem, max 60 characters>", "keywords": ["<3-6 lowercase English words a developer's commit message fixing it would contain>"]}`;
+
+async function groupUrgentFeedback(db) {
+    const issuesSnap = await db.collection('feedback_issues').get();
+    const issues = issuesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const pending = (await db.collection('quiz_feedback').where('triage.urgent', '==', true).get()).docs
+        .filter(d => !(d.data().triage || {}).issueId && d.data().timestamp)
+        .sort((a, b) => a.data().timestamp.toMillis() - b.data().timestamp.toMillis())
+        .slice(0, 30);
+    const out = { joined: 0, created: 0 };
+    for (const doc of pending) {
+        const f = doc.data(), cat = f.triage.category;
+        const cands = issues.filter(i => i.category === cat).map(i => ({ id: i.id, title: i.title, quizIds: i.quizIds, sample: i.sample }));
+        const prompt = `${FB_GROUP_PROMPT}\n\nExisting ${cat} issues: ${cands.length ? JSON.stringify(cands) : 'none'}\n\nNew ${cat} report — quiz ${f.quizId}:\n"""${String(f.comment).slice(0, 800)}"""`;
+        let result;
+        try {
+            result = await runModernAI({ model: FB_MODEL, prompt, isJson: true, generationOptions: { maxOutputTokens: 1024 } }, postWithRetry, process.env);
+        } catch (e) { out.stopped = String(e.message || e).slice(0, 120); break; }
+        if (result.error) { out.stopped = String(result.error).slice(0, 120); break; }
+        recordAiUsage('openai', result.model || FB_MODEL, result.tokens, true, 'feedback_issue_group', result.usage || {});
+        let g = {};
+        try { g = JSON.parse((String(result.text).match(/\{[\s\S]*\}/) || ['{}'])[0]); } catch (_) { }
+        const ts = f.timestamp;
+        const hit = issues.find(i => i.id === g.issue && i.category === cat);
+        if (hit) {
+            await db.collection('feedback_issues').doc(hit.id).update({
+                reportIds: admin.firestore.FieldValue.arrayUnion(doc.id),
+                quizIds: admin.firestore.FieldValue.arrayUnion(f.quizId || '?'),
+                count: admin.firestore.FieldValue.increment(1),
+                firstReportAt: hit.firstReportAt && hit.firstReportAt.toMillis() < ts.toMillis() ? hit.firstReportAt : ts,
+                lastReportAt: hit.lastReportAt && hit.lastReportAt.toMillis() > ts.toMillis() ? hit.lastReportAt : ts,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            if (!hit.lastReportAt || hit.lastReportAt.toMillis() < ts.toMillis()) hit.lastReportAt = ts;
+            if (!hit.firstReportAt || hit.firstReportAt.toMillis() > ts.toMillis()) hit.firstReportAt = ts;
+            hit.quizIds = [...new Set([...(hit.quizIds || []), f.quizId || '?'])];
+            await doc.ref.update({ 'triage.issueId': hit.id });
+            out.joined++;
+        } else {
+            const ref = db.collection('feedback_issues').doc();
+            const issue = {
+                category: cat,
+                title: String(g.title || f.comment || '').replace(/\s+/g, ' ').slice(0, 60),
+                keywords: (Array.isArray(g.keywords) ? g.keywords : []).map(k => String(k).toLowerCase().slice(0, 30)).slice(0, 6),
+                sample: String(f.comment || '').replace(/\s+/g, ' ').slice(0, 160),
+                reportIds: [doc.id], quizIds: [f.quizId || '?'], count: 1,
+                firstReportAt: ts, lastReportAt: ts, status: 'open',
+                createdAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            };
+            await ref.set(issue);
+            await doc.ref.update({ 'triage.issueId': ref.id });
+            issues.push({ id: ref.id, ...issue });
+            out.created++;
+        }
+    }
+    return out;
+}

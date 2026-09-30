@@ -638,6 +638,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Quiz feedback issues (admin V102.48) — urgent quiz_feedback reports grouped by
+    // problem. triageQuizFeedback (Admin SDK) creates and extends them; the admin only
+    // resolves / dismisses / reopens (status + resolved* fields). No client create/delete.
+    match /feedback_issues/{issueId} {
+      allow read: if isAdmin();
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'resolvedVersion', 'resolvedVersionAt', 'resolvedOn', 'resolvedBy']);
+      allow create, delete: if false;
+    }
+
     // 32b. AI quality/eval metrics (V96.05 Evaluation pillar) — one doc per
     // Bangkok day, ai_evals/{YYYY-MM-DD}. UNLIKE ai_usage, the accept/reject
     // signals originate in the admin UI (Apply / dismiss / save), so the client
