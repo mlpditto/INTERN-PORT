@@ -53,19 +53,27 @@
 .fw-water.fw-high::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 16' preserveAspectRatio='none'%3E%3Cpath d='M0 8 Q15 0 30 8 T60 8 T90 8 T120 8 V16 H0Z' fill='%23fca5a5'/%3E%3C/svg%3E"); }
 .fw-water.fw-high::after  { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 16' preserveAspectRatio='none'%3E%3Cpath d='M0 8 Q15 0 30 8 T60 8 T90 8 T120 8 V16 H0Z' fill='%23fee2e2'/%3E%3C/svg%3E"); }
 
-/* Bottom sheet */
-.fw-scrim { position: fixed; inset: 0; background: rgba(15, 23, 42, .4); z-index: 10050; }
+/* V101.28: popup anchored under #fw-btn (was a bottom sheet). Positioned in page
+   coordinates by fwOpen, so it scrolls with the card; --ax = arrow x. The scrim is
+   transparent and only catches the outside click. */
+.fw-scrim { position: fixed; inset: 0; background: transparent; z-index: 10050; }
 .fw-sheet {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10051;
-    max-width: 600px; margin: 0 auto;
-    background: #fff; border-radius: 18px 18px 0 0;
-    padding: 8px 16px calc(14px + env(safe-area-inset-bottom));
-    box-shadow: 0 -6px 24px rgba(0, 0, 0, .14);
-    overflow: hidden; isolation: isolate; text-align: left;
-    transition: transform .2s ease;
+    position: absolute; z-index: 10051;
+    width: min(340px, calc(100vw - 24px)); box-sizing: border-box;
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 16px;
+    padding: 12px 14px 14px;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, .18);
+    isolation: isolate; text-align: left;
+    animation: fwPop .14s ease-out;
+    transform-origin: var(--ax, 90%) 0;
 }
-.fw-sheet .fw-water { border-radius: 0; height: 38%; }
-.fw-grab { width: 40px; height: 4px; background: #cbd5e1; border-radius: 4px; margin: 0 auto 10px; }
+.fw-sheet::before {
+    content: ""; position: absolute; top: -7px; left: calc(var(--ax, 90%) - 7px);
+    width: 12px; height: 12px; background: #fff; transform: rotate(45deg);
+    border-left: 1px solid #e2e8f0; border-top: 1px solid #e2e8f0;
+}
+@keyframes fwPop { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+.fw-sheet .fw-water { border-radius: 0 0 15px 15px; height: 38%; }
 .fw-top { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
 .fw-ic {
     position: relative; width: 34px; height: 34px; min-height: auto; margin: 0; padding: 0;
@@ -88,5 +96,5 @@
 .fw-meta { font-size: .72em; color: #64748b; }
 
 @media (prefers-reduced-motion: reduce) {
-    .fw-water::before, .fw-water::after, .fw-tb.fw-h-high::after { animation: none; }
+    .fw-water::before, .fw-water::after, .fw-tb.fw-h-high::after, .fw-sheet { animation: none; }
 }

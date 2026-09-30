@@ -8,7 +8,7 @@
  *
  * UI (no new rows): the 🌊 circle in the profile rail (#fw-btn, colour = site,
  * dot = home), water behind #section-profile-combined (height = worst of site
- * and home), and a bottom sheet on tap.
+ * and home), and a popup anchored under the button on tap (V101.28).
  *
  * Writes only users/{userId}.floodWatch = { optIn, home: { lat, lon }, updatedAt }
  * (coordinates rounded to 3 dp, ~100 m). Uses the page globals db / userId.
@@ -111,7 +111,19 @@
                 '<div class="fw-stats">' + stats(d) + '</div><div class="fw-meta">' + meta + '</div>';
         }
         sheet.innerHTML = '<div class="fw-water' + (risk ? ' fw-' + risk : '') + '" aria-hidden="true"></div>' +
-            '<div class="fw-grab"></div><div class="fw-top">' + top + '</div>' + body;
+            '<div class="fw-top">' + top + '</div>' + body;
+    }
+
+    // Anchor the popup under the rail button, kept inside the viewport.
+    function place() {
+        var btn = document.getElementById('fw-btn');
+        if (!sheet || !btn) return;
+        var r = btn.getBoundingClientRect();
+        var w = sheet.offsetWidth, vw = document.documentElement.clientWidth;
+        var left = Math.min(Math.max(12, r.right - w), vw - w - 12);
+        sheet.style.top = (r.bottom + window.scrollY + 10) + 'px';
+        sheet.style.left = (left + window.scrollX) + 'px';
+        sheet.style.setProperty('--ax', Math.round(r.left + r.width / 2 - left) + 'px');
     }
 
     function getPosition() {
@@ -130,23 +142,9 @@
         if (scrim) scrim.remove();
         sheet = scrim = null;
         document.removeEventListener('keydown', onKey);
+        window.removeEventListener('resize', place);
     }
     function onKey(e) { if (e.key === 'Escape') close(); }
-
-    // Pull the sheet down to close.
-    function dragToClose(el) {
-        var y0 = null, dy = 0;
-        el.addEventListener('touchstart', function (e) { y0 = e.touches[0].clientY; dy = 0; }, { passive: true });
-        el.addEventListener('touchmove', function (e) {
-            if (y0 == null) return;
-            dy = Math.max(0, e.touches[0].clientY - y0);
-            el.style.transform = 'translateY(' + dy + 'px)';
-        }, { passive: true });
-        el.addEventListener('touchend', function () {
-            if (dy > 70) close(); else el.style.transform = '';
-            y0 = null;
-        });
-    }
 
     window.fwInit = function () {
         var card = document.getElementById('section-profile-combined');
@@ -176,7 +174,7 @@
     };
 
     window.fwOpen = function () {
-        if (sheet) return;
+        if (sheet) return close();   // the rail button toggles
         scrim = document.createElement('div');
         scrim.className = 'fw-scrim';
         scrim.onclick = close;
@@ -187,9 +185,10 @@
         document.body.appendChild(scrim);
         document.body.appendChild(sheet);
         document.addEventListener('keydown', onKey);
-        dragToClose(sheet);
+        window.addEventListener('resize', place);
         tab = homeSet() && riskOf(places.home) === 'high' ? 'home' : 'site';
         render();
+        place();
         var p = places[tab];
         if (p.lat != null && !p.loading && (!p.at || Date.now() - p.at > STALE_MS)) load(tab, p.lat, p.lon);
     };
