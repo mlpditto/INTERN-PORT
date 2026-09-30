@@ -27,8 +27,8 @@
 **Steps (payment — owner only):** open https://aistudio.google.com → **Billing** → switch the project to **Prepay** → buy credits → turn on **auto-reload** so it does not run dry.
 **Verify:** generate one image from an admin AI tool after switching. Then mark this row ✅ with the date; the script stops warning.
 
-### SMOKE-LIFF — new intern features, on a phone in LINE (intern V101.27 → V101.33)
-None of these has been run on a real LINE account yet (all were verified with harnesses on the real code). Open the app fresh (V101.33 in the footer).
+### SMOKE-LIFF — new intern features, on a phone in LINE (intern V101.27 → V101.34)
+None of these has been run on a real LINE account yet (all were verified with harnesses on the real code). Open the app fresh (V101.34 in the footer).
 
 **Profile card, before tapping anything**
 1. **Top rail:** one row of five circles: 👤 · EN · 🌊 · ⚙ · ↻. There is no ⋯ menu any more.
@@ -47,7 +47,7 @@ None of these has been run on a real LINE account yet (all were verified with ha
 10. Tap **…** at the end of the row → the panel has **🏆 Leaderboard** on the "✨ Next" line (and **Request Certificate** next to 🏅 once you have enough points).
 
 **Moved items and a regression check**
-11. **👤 Info → 🔗 Social** has the **Enrollment Key** row; **Match** opens the key screen above Info.
+11. **👤 Info** has a **🔑 Match** chip next to the title; it opens the Enrollment Key screen above Info (× returns to Info).
 12. Do two quizzes in a row: Next and Previous should work on the second one (regression check for V94.62, see Q-TIMER in §4).
 
 ### SMOKE-ADMIN — admin V102.46 → V102.48, signed in as the owner
