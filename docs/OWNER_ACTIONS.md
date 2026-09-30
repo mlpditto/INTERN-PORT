@@ -11,7 +11,7 @@
 |---|---|---|---|
 | **PREPAY** | AI Studio Gemini API billing: switch Postpay → Prepay before **2026-10-12** | ⬜ open — 12 d left on 2026-09-30 | 1 |
 | **SMOKE-LIFF** | Try the new intern features in LINE on a phone | ⬜ open | 2 |
-| **SMOKE-ADMIN** | Check the closed feedback issues in admin and the ❌ quiz | ⬜ open | 2 |
+| **SMOKE-ADMIN** | Try admin V102.46 → V102.48 (language button, feedback labels, issues) and check the ❌ quiz | ⬜ open | 2 |
 | **CLOUD** | Finish the Claude Code on the web setup at claude.ai/code | ⬜ optional | 3 |
 | FN | Every exported Cloud Function is deployed and ACTIVE | ✅ *script* (25/25 on 2026-09-30) | — |
 | RULES | `firestore.rules` / `storage.rules` identical to live | ✅ *script* | — |
@@ -50,19 +50,30 @@ None of these has been run on a real LINE account yet (all were verified with ha
 11. **👤 Info → 🔗 Social** has the **Enrollment Key** row; **Match** opens the key screen above Info.
 12. Do two quizzes in a row: Next and Previous should work on the second one (regression check for V94.62, see Q-TIMER in §4).
 
-### SMOKE-ADMIN — quiz feedback issues (admin V102.48)
+### SMOKE-ADMIN — admin V102.46 → V102.48, signed in as the owner
+None of this has been clicked in a real admin session yet (all verified with harnesses on the real code). Open admin fresh (V102.48 in the tab title).
+
+**V102.46 · one language button**
+1. The header has **one** language button, not KR + TH. Tapping it cycles **EN → KR → TH → K·T → EN**, and the labels switch with it.
+
+**V102.47 · feedback labels** (the hourly `triageQuizFeedback` labels every quiz comment)
+2. **Laugh Tale → 🧠 Quiz:** every feedback card has a small category chip (🐞 bug · ❌ question · 🧗 hard · 💡 request · 👍 praise · · noise); hover shows its name.
+3. **Quiz Engine:** open a quiz's ⭐ rating badge → the per-quiz feedback panel shows the same chip on each card. The **🐞❌ Fix** filter chip appears only when that quiz has an open fresh issue (none today).
+
+**V102.48 · issues** (reports about one problem grouped; closed once)
 Both issues were **closed on 2026-09-30** at the owner's request (by Claude Code, via a guarded Firestore write):
 - **🐞** "กดข้อต่อไปไม่ได้ก่อนครบเวลา", 7 reports → **Fixed in V94.62 · 15 May** (the Q-TIMER fix, §4).
 - **❌** "มีข้อสอบบางข้อที่คล้ายกันเกินไป", 1 report on quiz ผู้ป่วยโรคไตเรื้อรังระยะสุดท้าย → **Today**. The quiz itself was *not* checked or edited.
 
-Admin → Laugh Tale → **🧠 Quiz**. Check that:
-- The button shows **no red count**.
-- **⚑ Issues** shows `Open 0` and **✅ 2**. Under ✅ there are two green cards: "✅ Fixed in V94.62 · 15 May" and "✅ Fixed in update · 30 Sep".
-- Every feedback card still has its category chip; the two issues' reports read "fixed" on hover.
-
-Then:
-- **❌ quiz:** look at ผู้ป่วยโรคไตเรื้อรังระยะสุดท้าย for the near-duplicate questions. If they are still there, press **↺** on the card to reopen the issue, fix the quiz, and close it again with **Today**.
-- **"Fixed in V…" flow:** it has not been clicked in a real browser yet. Try it on the next new issue, or reopen one with ↺ and close it again; the version chips come live from GitHub.
+4. **🧠 Quiz** shows **no red count**; quiz-row rating badges show `⭐ x (n)` with no 🐞.
+5. **⚑ Issues** shows `Open 0` and **✅ 2**: two green cards, "✅ Fixed in V94.62 · 15 May" and "✅ Fixed in update · 30 Sep". Tapping a card lists its reports.
+6. **❌ quiz:** look at ผู้ป่วยโรคไตเรื้อรังระยะสุดท้าย for the near-duplicate questions. If they are still there, press **↺** on the card to reopen the issue, fix the quiz, and close it again with **Today**.
+7. **"Fixed in V…" flow** (never clicked live): reopen one issue with **↺**, then press **Fixed in V…**.
+   - The version chips load from GitHub, and the suggested one has a green ring.
+   - The preview says "Closes N/N".
+   - **Close issue** moves it back under ✅.
+   - **⏸** marks an issue "Not a problem".
+8. **Later, on its own:** the next 🐞/❌ comment is grouped within the hour. The red count comes back only for issues with a report in the last 60 days, and for fixed issues that get a new report (🔁 Back again).
 
 ### CLOUD — Claude Code on the web (optional)
 At claude.ai/code:
