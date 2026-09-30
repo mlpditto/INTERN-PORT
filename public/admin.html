@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.46)</title>
+    <title>Nika Admin (V102.47)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -212,6 +212,12 @@
             background: #e9ecef;
             border-color: #ddd;
         }
+        /* V102.47: quiz feedback triage chip (fbTriageChip) */
+        .fb-tri { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; margin-left: 6px; border-radius: 50%; font-size: 0.85em; vertical-align: middle; }
+        .fb-tri.open { background: #fee2e2; box-shadow: 0 0 0 2px #fca5a5; }
+        .fb-tri-done { width: 22px; height: 22px; min-height: auto; margin: 0 0 0 4px; padding: 0; border-radius: 50%; border: 1px solid #86efac; background: #f0fdf4; color: #16a34a; font-size: 0.75em; font-weight: 800; cursor: pointer; vertical-align: middle; box-shadow: none; }
+        .fb-fix-count { margin-left: 5px; padding: 0 6px; border-radius: 999px; background: #dc2626; color: #fff; font-size: 0.75em; font-weight: 800; }
+        .fb-fix-count:empty { display: none; }
         .lang-toggle-btn.active {
             background: linear-gradient(135deg, #667eea, #764ba2);
             color: #fff;
@@ -11640,7 +11646,7 @@
                         <button class="lt-icon" onclick="toggleGlobalBlind()" id="btn-global-blind" title="Straw Hat Mode: hide / show all identities" aria-label="Hide all identities" style="color:#f39c12;">👒</button>
                         <div class="lt-src" role="group" aria-label="Source">
                             <button id="lt-src-btn-reflections" aria-pressed="true" onclick="setLaughTaleSource('reflections')">📓 Reflections</button>
-                            <button id="lt-src-btn-quiz" aria-pressed="false" onclick="setLaughTaleSource('quiz')" title="Quiz feedback">🧠 Quiz</button>
+                            <button id="lt-src-btn-quiz" aria-pressed="false" onclick="setLaughTaleSource('quiz')" title="Quiz feedback">🧠 Quiz<span id="lt-src-quiz-fix" class="fb-fix-count" title="Needs a fix"></span></button>
                         </div>
                     </div>
                     <div class="lt-head-row">
@@ -57406,13 +57412,22 @@ Save it anyway?`;
             all.forEach(f => { userCounts[f.userId] = (userCounts[f.userId] || 0) + 1; });
 
             let filterHtml = `<button onclick="window._laughTaleUserFilter=null; renderQuizFeedbackCards()" style="flex:none; padding:8px 20px; border-radius:15px; border:none; font-weight:900; background:${!window._laughTaleUserFilter ? '#4361ee; color:white; transform:scale(1.05); box-shadow:0 5px 15px rgba(67,97,238,0.3);' : 'white; color:#64748b;'} cursor:pointer; transition:0.3s; box-shadow:0 4px 8px rgba(0,0,0,0.05); font-size:0.85em;">ALL (${all.length})</button>`;
+            // V102.47: triage — feedback that still needs a fix (🐞 bug / ❌ question problem).
+            const fixCount = all.filter(fbNeedsFix).length;
+            const fixEl = document.getElementById('lt-src-quiz-fix');
+            if (fixEl) fixEl.textContent = fixCount ? String(fixCount) : '';
+            if (fixCount > 0 || window._laughTaleUserFilter === '__fix__') {
+                const on = window._laughTaleUserFilter === '__fix__';
+                filterHtml += `<button onclick="window._laughTaleUserFilter='__fix__'; renderQuizFeedbackCards()" title="Needs a fix: app bug or question problem" style="flex:none; padding:8px 16px; border-radius:15px; border:none; font-weight:900; background:${on ? '#dc2626; color:white;' : '#fee2e2; color:#b91c1c;'} cursor:pointer; box-shadow:0 4px 8px rgba(0,0,0,0.05); font-size:0.85em;">🐞❌ ${fixCount}</button>`;
+            }
             Object.keys(userCounts).forEach(uid => {
                 const u = (usersData || []).find(x => x.id === uid) || { displayName: 'Intern' };
                 filterHtml += `<button onclick="window._laughTaleUserFilter='${uid}'; renderQuizFeedbackCards()" style="flex:none; padding:8px 20px; border-radius:15px; border:none; font-weight:900; background:${window._laughTaleUserFilter === uid ? '#4361ee; color:white; transform:scale(1.05); box-shadow:0 5px 15px rgba(67,97,238,0.3);' : 'white; color:#64748b;'} cursor:pointer; transition:0.3s; box-shadow:0 4px 8px rgba(0,0,0,0.05); font-size:0.85em;">${u.displayName} (${userCounts[uid]})</button>`;
             });
             if (filterBar) filterBar.innerHTML = filterHtml;
 
-            const filtered = window._laughTaleUserFilter ? all.filter(f => f.userId === window._laughTaleUserFilter) : all;
+            const filtered = window._laughTaleUserFilter === '__fix__' ? all.filter(fbNeedsFix)
+                : window._laughTaleUserFilter ? all.filter(f => f.userId === window._laughTaleUserFilter) : all;
             container.innerHTML = filtered.map(fb => {
                 const dateObj = fb.timestamp?.toDate() || new Date();
                 const user = (usersData || []).find(u => u.id === fb.userId) || {};
@@ -57446,6 +57461,7 @@ Save it anyway?`;
                         <div style="margin-top:10px; margin-bottom:18px; background:#eef2ff; border-radius:12px; padding:8px 14px; display:flex; align-items:center; gap:8px;" title="${quizTitleFull}">
                             <span style="background:#4361ee; color:white; font-size:0.65em; font-weight:900; padding:2px 8px; border-radius:6px; letter-spacing:1px; flex-shrink:0;">QUIZ</span>
                             <span class="lang-no-toggle" style="font-size:0.82em; font-weight:800; color:#3730a3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${quizTitle}${quizTitleFull.length > 40 ? '…' : ''}</span>
+                            <span style="margin-left:auto; flex-shrink:0;">${fbTriageChip(fb)}</span>
                         </div>
                         <div style="display:flex; align-items:center; gap:18px; margin-bottom:20px;">
                             <img class="lt-avatar" src="${user.pictureUrl || ''}" style="width:56px; height:56px; border-radius:50%; border:3px solid var(--bg-card); box-shadow:0 10px 20px rgba(0,0,0,0.12);" onerror="this.style.display='none'">
@@ -63676,6 +63692,39 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
         let _qfpFilter = 'all';   // all | unscored | short | low
         let _qfpSort = 'recent';  // recent | rating
 
+        // V102.47: quiz feedback triage — quiz_feedback.triage = { category, urgent, by, at,
+        // resolvedAt? } is written hourly by the triageQuizFeedback function (keyword rules +
+        // AI). Urgent = bug or content problem; ✓ sets triage.resolvedAt.
+        const FB_TRIAGE_ICON = {
+            bug: ['🐞', 'App bug'], content: ['❌', 'Question / answer problem'],
+            difficulty: ['🧗', 'Too hard / language'], request: ['💡', 'Request'],
+            praise: ['👍', 'Praise'], noise: ['·', 'No content']
+        };
+        function fbNeedsFix(f) { return !!(f && f.triage && f.triage.urgent && !f.triage.resolvedAt); }
+        function fbTriageChip(f) {
+            const t = f && f.triage;
+            if (!t || !FB_TRIAGE_ICON[t.category]) return '';
+            const [icon, label] = FB_TRIAGE_ICON[t.category];
+            const open = fbNeedsFix(f);
+            return `<span class="fb-tri${open ? ' open' : ''}" title="${label}${t.urgent ? (open ? ' · needs a fix' : ' · fixed') : ''}">${icon}</span>` +
+                (open ? `<button class="fb-tri-done" onclick="event.stopPropagation(); fbTriageResolve('${f.id}')" title="Mark as fixed" aria-label="Mark as fixed">✓</button>` : '');
+        }
+        async function fbTriageResolve(id) {
+            try {
+                await db.collection('quiz_feedback').doc(id).update({ 'triage.resolvedAt': firebase.firestore.FieldValue.serverTimestamp() });
+            } catch (e) {
+                alert('Could not mark as fixed: ' + e.message);
+                return;
+            }
+            [window._quizFeedbackCache || [], _qfpFeedbacks].forEach(list => list.forEach(f => {
+                if (f.id === id && f.triage) f.triage.resolvedAt = new Date();
+            }));
+            _quizFeedbackAgg = null;   // recount the ⚠ badges
+            if (document.getElementById('qfp-comments')) { qfpRenderFilterRail(); qfpRenderComments(); }
+            if (window._laughTaleSource === 'quiz' && window._quizFeedbackCache) renderQuizFeedbackCards();
+            loadQuizFeedbackBadges();
+        }
+
         function qfpEscapeHtml(text) {
             return String(text || '')
                 .replace(/&/g, '&amp;')
@@ -63881,7 +63930,7 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
                         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
                             <div>
                                 <span style="font-weight:800;font-size:0.9em;color:#1e293b;">${qfpEscapeHtml(f.displayName || 'Anonymous')}</span>
-                                <span style="margin-left:6px;font-size:0.8em;font-weight:700;color:#64748b;">${typeof f.rating === 'number' ? 'Rating ' + f.rating + '/10' : ''}</span>
+                                <span style="margin-left:6px;font-size:0.8em;font-weight:700;color:#64748b;">${typeof f.rating === 'number' ? 'Rating ' + f.rating + '/10' : ''}</span>${fbTriageChip(f)}
                                 ${typeof f.pointsEarned === 'number' && f.pointsEarned > 0 ? `<span style="margin-left:8px;font-size:0.72em;font-weight:800;color:#065f46;background:#d1fae5;border:1px solid #6ee7b7;border-radius:999px;padding:2px 8px;" title="Reward points earned — deleting reverts them" data-th-title="คะแนนรางวัลที่ได้รับ การลบจะคืนคะแนนส่วนนี้">Bonus +${f.pointsEarned.toFixed(1)}</span>` : ''}
                             </div>
                             <div style="font-size:0.75em;color:#94a3b8;">${dateStr} · ⏱ ${mins}:${String(secs).padStart(2,'0')}</div>
@@ -63933,6 +63982,7 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
                 case 'unscored': return rc.length > 0 && typeof f.aiFeedbackScore !== 'number';
                 case 'short':    return rc.length > 0 && rc.length < 100;
                 case 'low':      return typeof f.rating === 'number' && f.rating <= 5;
+                case 'fix':      return fbNeedsFix(f);
                 default:         return true;
             }
         }
@@ -63967,6 +64017,7 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
                 unscored: _qfpFeedbacks.filter(f => norm(f).length > 0 && typeof f.aiFeedbackScore !== 'number').length,
                 short: _qfpFeedbacks.filter(f => { const n = norm(f).length; return n > 0 && n < 100; }).length,
                 low: _qfpFeedbacks.filter(f => typeof f.rating === 'number' && f.rating <= 5).length,
+                fix: _qfpFeedbacks.filter(fbNeedsFix).length,
             };
             const chip = (key, label, count) => {
                 const active = _qfpFilter === key;
@@ -63979,6 +64030,7 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
             rail.innerHTML = `
                 <div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;">
                     ${chip('all', 'All', counts.all)}
+                    ${counts.fix > 0 || _qfpFilter === 'fix' ? chip('fix', '🐞❌ Fix', counts.fix) : ''}
                     ${chip('unscored', 'Unscored', counts.unscored)}
                     ${chip('short', 'Short <100', counts.short)}
                     ${chip('low', 'Low rating', counts.low)}
@@ -64541,9 +64593,13 @@ Summarize in English in 3–5 concise lines:
                 const badge = document.getElementById(`fb-badge-${qid}`);
                 if (badge && count > 0) {
                     const avg = (sum / count).toFixed(1);
-                    badge.innerText = `⭐ ${avg} (${count})`;
+                    badge.innerText = `⭐ ${avg} (${count})${agg[qid].fix ? ' 🐞' + agg[qid].fix : ''}`;
                 }
             });
+            // V102.47: total still needing a fix, on Laugh Tale's 🧠 Quiz source button.
+            const total = Object.values(agg).reduce((n, a) => n + (a.fix || 0), 0);
+            const el = document.getElementById('lt-src-quiz-fix');
+            if (el) el.textContent = total ? String(total) : '';
         }
 
         async function loadQuizFeedbackBadges() {
@@ -64555,8 +64611,9 @@ Summarize in English in 3–5 concise lines:
                     snap.docs.forEach(d => {
                         const f = d.data();
                         if (!f.quizId) return;
-                        if (!agg[f.quizId]) agg[f.quizId] = { sum: 0, count: 0 };
+                        if (!agg[f.quizId]) agg[f.quizId] = { sum: 0, count: 0, fix: 0 };
                         if (typeof f.rating === 'number') { agg[f.quizId].sum += f.rating; agg[f.quizId].count++; }
+                        if (fbNeedsFix(f)) agg[f.quizId].fix++;
                     });
                     _quizFeedbackAgg = agg;
                     _quizFeedbackAggTime = Date.now();
