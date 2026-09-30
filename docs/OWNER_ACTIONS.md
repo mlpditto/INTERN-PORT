@@ -38,13 +38,15 @@ None of these has been run on a real LINE account yet (all were verified with ha
    - **After sending a Log or Case:** that circle turns green.
 6. Do two quizzes in a row: Next and Previous should work on the second one (regression check for V94.62, see Q-TIMER in §4).
 
-### SMOKE-ADMIN — quiz feedback triage
+### SMOKE-ADMIN — quiz feedback issues (admin V102.48)
 Admin → Laugh Tale → **🧠 Quiz**. Check that:
-- The button shows a red count, and a **🐞❌** filter appears.
-- Every card has a category chip.
-- **✓** on one of them lowers every count by one.
+- The button shows a red **1**: the fresh ❌ issue from 5 Aug.
+- **⚑ Issues 2** opens two issue cards:
+  - **❌** "มีข้อสอบบางข้อที่คล้ายกันเกินไป" (Fresh).
+  - **🐞** "กดข้อต่อไปไม่ได้ก่อนครบเวลา", 7 reports (💤 Quiet).
+- Every feedback card still has its category chip.
 
-The 7 🐞 cards are old reports of a bug fixed in V94.62 (see Q-TIMER in §4), so mark them ✓ while testing.
+Then close the 🐞 issue: **Fixed in V…**. The chip **V94.62 · 15 May** should be suggested (the Q-TIMER fix, §4) and the preview should say "Closes 7/7". Press **Close issue**; it moves under ✅. For the ❌ issue, fix the quiz, then close it with **Today**, or use **⏸** if the questions are fine.
 
 ### CLOUD — Claude Code on the web (optional)
 At claude.ai/code:
