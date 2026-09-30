@@ -134,6 +134,7 @@ For multi-step tasks, state a brief plan:
 - **`main` is legacy** — kept temporarily for safety. Do not branch from it. Dependabot may still target it; cherry-pick to `production` when needed.
 - **GitHub Pages** deploys via `.github/workflows/deploy.yml` on push to `production` (serves `public/`).
 - **Live URLs**: https://mlpditto.github.io/INTERN-PORT/ (intern, LIFF-gated) and https://mlpditto.github.io/INTERN-PORT/admin.html (admin).
+- **Live vs repo, and what needs the owner**: `node scripts/owner-status.cjs` (read-only; needs gcloud) checks deployed functions, live rules, live versions, LINE quota, scheduled jobs and TTL; the tracker is [docs/OWNER_ACTIONS.md](docs/OWNER_ACTIONS.md).
 
 ```
 1. Update version numbers → verify: consistent in public/index.html, public/admin.html
