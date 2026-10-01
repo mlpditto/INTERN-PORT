@@ -64,7 +64,7 @@ window.activityRewards = (() => {
         return names[r.source||r.type]||'Recorded adjustment';
     }
     function bind(tile,key){
-        tile.dataset.rewardKey=key;tile.setAttribute('aria-controls','mp-reward-detail');tile.title=(tile.querySelector('small')?.textContent||'')+' · ดูที่มาของ Points และ Beri ที่บันทึกแล้ว';tile.onclick=()=>show(key,document.getElementById('monthly-progress'));
+        tile.dataset.rewardKey=key;tile.setAttribute('aria-controls','mp-reward-detail');tile.title=`${labels[key]} · เดือนนี้ ${tile.dataset.n||0}${tile.dataset.target?' จากเป้า '+tile.dataset.target:''} · ${summary(key).replace(' pt',' คะแนน')} · กดดูที่มา`;tile.setAttribute('aria-label',tile.title);tile.onclick=()=>show(key,document.getElementById('monthly-progress'));
         const reward=node('span',summary(key));reward.className='mp-reward';tile.append(reward);
     }
     function decorate(host, activities={}) {
@@ -81,7 +81,7 @@ window.activityRewards = (() => {
         [['explore','credited opens'],['event','requests'],['drug','submitted'],['disease','submitted'],['product','submitted']].forEach(([key,unit])=>{
             const tile=node('button');tile.type='button';tile.className='mp-card';tile.append(node('strong',labels[key]));
             const rows=sources[key], count=rows?rows.filter(current).filter(r=>!['draft','rejected','unsuccessful'].includes(r.status)).length:null;
-            const value=node('span',errors.has(key)?'—':count===null?'—':count.toLocaleString());value.className='mp-value';tile.append(value,node('small',errors.has(key)?'Unavailable':count===null?'Loading…':unit));bind(tile,key);pending(tile,rows);grid.append(tile);
+            const value=node('span',errors.has(key)?'—':count===null?'—':count.toLocaleString());value.className='mp-value';tile.dataset.n=count||0;tile.style.setProperty('--mp-pct',count>0?100:0);tile.append(value,node('small',errors.has(key)?'Unavailable':count===null?'Loading…':unit));bind(tile,key);pending(tile,rows);grid.append(tile);
         });
         historyChip();
         if(errors.size){const retry=node('button','Retry unavailable data');retry.type='button';retry.onclick=()=>{identity='';start();};host.append(retry);}
