@@ -276,6 +276,51 @@ service cloud.firestore {
       allow update: if isAdmin();
     }
 
+    // V102.54 / V101.46: Event Stamps — a one-off badge for having been at an event.
+    // The claim code lives in its OWN admin-only doc, because `events` is readable by
+    // every intern in the audience: a code stored there would be a code nobody has to
+    // be in the room to read.
+    match /event_codes/{eventId} {
+      allow read, write: if isAdmin();
+    }
+
+    // A stamp is a SNAPSHOT (title, date, badge art) on purpose: purgePastEvents()
+    // deletes a finished event and its join requests, and a badge must outlive both.
+    // Doc id = `${eventId}_${userId}`, so one person holds one stamp per event.
+    // The admin gives or takes one directly. An intern may create their OWN only with
+    //   - the right code, inside its validFrom..validUntil window (the event day),
+    //   - a join request for that event made under this same auth uid,
+    //   - art / title / date copied exactly from the event, so the snapshot cannot lie.
+    // The code is kept on the stamp because rules can only check what is written;
+    // reading it back needs a stamp of the same event, i.e. having been there.
+    match /event_stamps/{stampId} {
+      function evCode(eid) { return get(/databases/$(database)/documents/event_codes/$(eid)).data; }
+      function evDoc(eid) { return get(/databases/$(database)/documents/events/$(eid)).data; }
+      function evInterest(iid) { return get(/databases/$(database)/documents/event_interests/$(iid)).data; }
+      function codeClaimOk(d) {
+        return d.keys().hasOnly(['eventId', 'userId', 'authUid', 'displayName', 'title', 'eventDate', 'badge', 'via', 'code', 'interestId', 'createdAt'])
+          && d.via == 'code'
+          && d.authUid == request.auth.uid
+          && d.createdAt == request.time
+          && stampId == d.eventId + '_' + d.userId
+          && exists(/databases/$(database)/documents/event_codes/$(d.eventId))
+          && d.code == evCode(d.eventId).code
+          && request.time >= evCode(d.eventId).validFrom
+          && request.time <= evCode(d.eventId).validUntil
+          && exists(/databases/$(database)/documents/event_interests/$(d.interestId))
+          && evInterest(d.interestId).eventId == d.eventId
+          && evInterest(d.interestId).authUid == request.auth.uid
+          && evInterest(d.interestId).userId == d.userId
+          && d.badge == evDoc(d.eventId).badge
+          && d.title == evDoc(d.eventId).title
+          && d.eventDate == evDoc(d.eventId).eventDate;
+      }
+      allow read: if isSignedIn();
+      allow create: if isAdmin() || (isSignedIn() && codeClaimOk(request.resource.data));
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
     // Applicant documents (CV/résumé attached to a pre-registration), V98.58.
     // A SEPARATE collection on purpose: pre_users above is `read: if true` so the
     // public claim flow can look a code up, and a Storage download URL is a bearer

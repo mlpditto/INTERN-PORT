@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.45)</title>
+    <title>Internship Portfolio (V101.46)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -5846,6 +5846,7 @@
                 style="position:absolute; top:10px; right:10px; width:34px; height:34px; min-height:0; padding:0; border:none; border-radius:50%; background:linear-gradient(135deg, #ff6b35, #e53935); color:#fff; font-size:20px; font-weight:900; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 14px rgba(229,57,53,0.35);">×</button>
             <h3 style="margin:0 0 4px 0; font-weight:900; color:#3c3c3c;">🏅 Achievements <span id="achievements-count" style="font-size:0.7em; color:#6b7178;"></span></h3>
             <p style="margin:0 0 4px 0; color:#6b7178; font-size:0.85em;">Badges add no points — they show how far you've come. <span class="lang-th">badge ไม่มีคะแนน เป็นรางวัลบอกความก้าวหน้า</span></p>
+            <div id="achievements-memories"></div>
             <div id="achievements-list"></div>
         </div>
     </div>
@@ -6670,6 +6671,72 @@
                 + `</svg>`;
         }
 
+        // V101.46 / V102.54: Event Stamps — a one-off badge per event (event_stamps).
+        // Same frame as badgeSvgHtml, always the Gold rim (one-off rule), the event's
+        // scene on the face, the pill = the event date, and the viewer's LINE picture in
+        // a corner. The picture is drawn when shown, never baked in: pictureUrl changes.
+        // 'photo' = an uploaded logo / group photo filling the face; its avatar goes
+        // top-right so it does not cover the name on a logo.
+        // index.html and admin.html each hold a copy — keep both in sync.
+        const _evSpark = (x, y, s) => `<path d="M${x} ${y - 4 * s}l${1.2 * s} ${2.8 * s} ${2.8 * s} ${1.2 * s}-${2.8 * s} ${1.2 * s}-${1.2 * s} ${2.8 * s}-${1.2 * s}-${2.8 * s}-${2.8 * s}-${1.2 * s} ${2.8 * s}-${1.2 * s}z" fill="#fff"/>`;
+        const EVENT_ART = {
+            movie: { label: '🎬 Movie', face: '#e2553f', svg:
+                `<g transform="rotate(-10 64 28)"><rect x="50" y="16" width="30" height="8" rx="1.5" fill="#1e2540"/><path d="M54 16h5l-3 8h-5zM64 16h5l-3 8h-5zM74 16h5l-3 8h-5z" fill="#fff"/></g>`
+                + `<rect x="51" y="27" width="29" height="17" rx="2" fill="#2e3860"/><path d="M55 33h14M55 38h9" stroke="#9aa3ad" stroke-width="2" stroke-linecap="round"/>`
+                + `<circle cx="27" cy="41" r="6" fill="#fff6e0"/><circle cx="35" cy="35" r="7" fill="#fff6e0"/><circle cx="45" cy="37" r="7" fill="#fff6e0"/><circle cx="52" cy="43" r="5" fill="#fff6e0"/><circle cx="39" cy="42" r="6" fill="#fff6e0"/><circle cx="33" cy="33" r="2" fill="#ffd84a"/><circle cx="47" cy="35" r="2" fill="#ffd84a"/>`
+                + `<path d="M22 43H56L51 79H27Z" fill="#fff"/><path d="M29 43h6l1 36h-5zM41 43h6l-1 36h-5z" fill="#c0392b"/><rect x="22" y="43" width="34" height="4" fill="#ffd84a"/>`
+                + _evSpark(20, 24, 1) },
+            dinner: { label: '🍽️ Dinner', face: '#18b89a', svg:
+                `<circle cx="42" cy="56" r="21" fill="#fff"/><circle cx="42" cy="56" r="14" fill="#e3f6f2"/><circle cx="37" cy="54" r="5" fill="#ff9f1c"/><circle cx="46" cy="59" r="4" fill="#5bc31c"/><circle cx="45" cy="51" r="3" fill="#e2553f"/>`
+                + `<path d="M15 40v12M18 40v12M21 40v12M15 52c0 3 6 3 6 0M18 54v20" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/>`
+                + `<g transform="rotate(-14 64 30)"><path d="M58 15H69L68 27Q63.5 33 59 27Z" fill="#fff"/><path d="M58.6 21H68.4L68 27Q63.5 33 59 27Z" fill="#e2553f"/><path d="M63.5 31V41M59 41H68" stroke="#fff" stroke-width="2" stroke-linecap="round"/></g>`
+                + `<g transform="rotate(14 76 30)"><path d="M71 15H82L81 27Q76.5 33 72 27Z" fill="#fff"/><path d="M71.6 21H81.4L81 27Q76.5 33 72 27Z" fill="#ffd84a"/><path d="M76.5 31V41M72 41H81" stroke="#fff" stroke-width="2" stroke-linecap="round"/></g>`
+                + _evSpark(70, 10, 0.9) },
+            seminar: { label: '🎤 Seminar', face: '#7c6cf0', svg:
+                `<rect x="32" y="16" width="20" height="32" rx="10" fill="#1e2540"/><path d="M35 25h14M35 30h14M35 35h14" stroke="#5b6690" stroke-width="2"/>`
+                + `<path d="M27 38Q27 56 42 56Q57 56 57 38" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round"/><path d="M42 56V68" stroke="#fff" stroke-width="3.2"/><rect x="31" y="68" width="22" height="6" rx="3" fill="#fff"/>`
+                + `<path d="M62 22q6 8 0 16M68 17q10 13 0 26M74 13q13 17 0 34" fill="none" stroke="#ffd84a" stroke-width="2.6" stroke-linecap="round"/>`
+                + _evSpark(20, 22, 1) },
+            sport: { label: '⚽ Sport', face: '#5bc31c', svg:
+                `<path d="M14 40h10M11 49h12M14 58h10" stroke="#fff" stroke-width="3" stroke-linecap="round"/>`
+                + `<circle cx="44" cy="48" r="20" fill="#ff9f1c"/><path d="M44 28v40M24 48h40M30 34q10 14 0 28M58 34q-10 14 0 28" fill="none" stroke="#8a4b1f" stroke-width="2"/>`
+                + `<path d="M68 14v26" stroke="#1e2540" stroke-width="2" stroke-linecap="round"/><path d="M68 14l13 4.5-13 4.5z" fill="#fff"/>` + _evSpark(78, 34, 0.9) },
+            volunteer: { label: '🤝 Volunteer', face: '#f06bb8', svg:
+                `<path d="M42 66C24 54 18 44 22 35C26 27 37 27 42 35C47 27 58 27 62 35C66 44 60 54 42 66Z" fill="#fff"/><path d="M37 44h10M42 39v10" stroke="#f06bb8" stroke-width="3.4" stroke-linecap="round"/>`
+                + `<path d="M18 70Q30 62 42 70Q54 62 64 66" fill="none" stroke="#ffd84a" stroke-width="4" stroke-linecap="round"/>`
+                + `<path d="M72 20C66 16 64 13 65.5 10.5C67 8.5 70 8.5 72 11C74 8.5 77 8.5 78.5 10.5C80 13 78 16 72 20Z" fill="#ffd84a"/><path d="M80 34C76.5 31.5 75.5 30 76.3 28.5C77.2 27.3 79 27.3 80 28.8C81 27.3 82.8 27.3 83.7 28.5C84.5 30 83.5 31.5 80 34Z" fill="#fff"/>` },
+            trip: { label: '✈️ Trip', face: '#23a8f2', svg:
+                `<circle cx="28" cy="26" r="8" fill="#fff1a8"/><path d="M14 80L36 48L48 62L58 52L66 62L62 80Z" fill="#1e7fc0"/><path d="M36 48L41 55L38 54L36 57L34 54L31 55Z" fill="#fff"/>`
+                + `<path d="M22 44Q40 30 58 30" fill="none" stroke="#fff" stroke-width="1.8" stroke-dasharray="3 3" stroke-linecap="round"/>`
+                + `<g transform="rotate(-20 70 26)"><path d="M56 26h26a4 4 0 0 1 0 5H56z" fill="#fff"/><path d="M66 26l6-12h4l-2 12zM66 31l6 10h4l-2-10zM56 26l-4-6h4l4 6z" fill="#fff"/><circle cx="76" cy="28.5" r="1.2" fill="#23a8f2"/></g>` },
+            photo: { label: '📷 Logo / photo', face: '#ffffff', svg: '' }
+        };
+        let _evClipN = 0;
+        // 'YYYY-MM-DD' -> 'DD.MM.YYYY' (the pill).
+        function evStampDateText(d) {
+            const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d || '');
+            return m ? `${m[3]}.${m[2]}.${m[1]}` : '';
+        }
+        // badge = { template, face, imageUrl } as stored on the event and copied to each stamp.
+        function eventBadgeSvgHtml(badge, avatarUrl, px, pillText) {
+            const b = badge || {};
+            const art = EVENT_ART[b.template] || EVENT_ART.movie;
+            const t = BADGE_TIERS[3];
+            const vbH = pillText ? 116 : 98;
+            const id = 'evstamp' + (++_evClipN);
+            const isPhoto = b.template === 'photo' && /^(data:image\/|https:)/.test(b.imageUrl || '');
+            const ay = isPhoto ? 24 : 68;
+            const face = /^#[0-9a-f]{6}$/i.test(b.face || '') ? b.face : art.face;
+            return `<svg viewBox="0 0 100 ${vbH}" width="${px}" height="${Math.round(px * vbH / 100)}" aria-hidden="true" focusable="false" style="flex:none; overflow:visible;">`
+                + `<rect x="6" y="10" width="88" height="86" rx="24" fill="${t.dark}"/><rect x="6" y="4" width="88" height="84" rx="24" fill="${t.rim}"/><rect x="12" y="10" width="76" height="72" rx="19" fill="${face}"/>`
+                + (isPhoto
+                    ? `<clipPath id="${id}f"><rect x="12" y="10" width="76" height="72" rx="19"/></clipPath><image href="${escapeHtml(b.imageUrl)}" x="12" y="10" width="76" height="72" clip-path="url(#${id}f)" preserveAspectRatio="xMidYMid slice"/>`
+                    : `<g>${art.svg}</g>`)
+                + (avatarUrl ? `<clipPath id="${id}a"><circle cx="79" cy="${ay}" r="14"/></clipPath><circle cx="79" cy="${ay + 2}" r="17.5" fill="${t.dark}"/><circle cx="79" cy="${ay}" r="17.5" fill="#fff"/><image href="${escapeHtml(avatarUrl)}" x="65" y="${ay - 14}" width="28" height="28" clip-path="url(#${id}a)" preserveAspectRatio="xMidYMid slice"/>` : '')
+                + (pillText ? `<rect x="14" y="84" width="72" height="26" rx="13" fill="${t.pale}" stroke="${t.dark}" stroke-width="3"/><text x="50" y="102" text-anchor="middle" font-size="11.5" font-weight="900" letter-spacing="0.3" fill="${t.fg}" font-family="system-ui, sans-serif">${escapeHtml(pillText)}</text>` : '')
+                + `</svg>`;
+        }
+
         function _longestDateRun(keys) {
             const sorted = Array.from(keys).sort();
             let best = 0, run = 0, prev = null;
@@ -6787,6 +6854,7 @@
         function updateEarnedBadgesBar(unlockedIds) {
             const container = document.getElementById('u-earned-badges');
             achievementSourceReady('user');
+            evStampsLoad();   // V101.46: once — Event Stamps listener
             if (!container) return;
             if (schCheckinDays === null) schLoadCheckinDays().then(() => updateEarnedBadgesBar());
             if (achCodexApproved === null && !achCodexLoading) achLoadCodexApproved().then(n => { if (n !== null) updateEarnedBadgesBar(); });
@@ -6809,6 +6877,7 @@
         function renderAchievementsList() {
             const box = document.getElementById('achievements-list');
             if (!box) return;
+            renderEventMemories();
             const list = computeAchievements();
             const head = document.getElementById('achievements-count');
             if (head) head.textContent = `${list.filter(a => a.level > 0).length} / ${list.length}`;
@@ -6953,6 +7022,7 @@
             achUnlockShown = a;
             if (!modal) return;
             if (!a) { modal.style.display = 'none'; return; }
+            if (a.stamp) { showEventStampUnlock(a.stamp); return; }   // V101.46: same modal, event variant
             const t = BADGE_TIERS[a.tierIdx];
             const n = a.def.steps.length;
             const tierName = t.name.charAt(0) + t.name.slice(1).toLowerCase();
@@ -6977,6 +7047,7 @@
         async function shareAchievementUnlock() {
             const a = achUnlockShown;
             if (!a) return;
+            if (a.stamp) return shareEventStamp(a.stamp);
             const t = BADGE_TIERS[a.tierIdx];
             const url = `https://liff.line.me/${USER_LIFF_ID}`;
             const who = (userProfile && userProfile.displayName) || myOwnRow().displayName || '';
@@ -7007,6 +7078,156 @@
                 console.warn('[achievements] shareTargetPicker failed, falling back:', e);
             }
             const text = `${headline}\n${detail}\n${url}`;
+            if (navigator.share) { navigator.share({ text }).catch(() => {}); return; }
+            const done = () => alert('Copied — paste it into a LINE chat');
+            const fail = () => alert('Copy failed');
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(done).catch(() => explCopyLinkFallback(text, done, fail));
+            } else {
+                explCopyLinkFallback(text, done, fail);
+            }
+        }
+
+        // ---- V101.46: Event Stamps --------------------------------------------------
+        // A one-off badge for having been at an event: event_stamps/{eventId}_{userId}.
+        // The admin gives it, or the intern types the code shown at the event — on the
+        // event day, for an event they asked to join (firestore.rules checks all of it).
+        // Shown as "Memories" above the Achievements list; NOT counted in n/15.
+        let myEventStamps = [], evStampsStarted = false;
+        const EV_STAMPS_SEEN_KEY = 'ip_event_stamps_seen_v1';
+
+        function evMyPicture() {
+            return (typeof userProfile !== 'undefined' && userProfile && userProfile.pictureUrl) || myOwnRow().pictureUrl || '';
+        }
+
+        function evStampsLoad() {
+            if (evStampsStarted || !userId || typeof db === 'undefined') return;
+            evStampsStarted = true;
+            ensureFirebaseAuthReady().then(authUser => {
+                if (!authUser) { evStampsStarted = false; return; }
+                db.collection('event_stamps').where('userId', '==', userId).onSnapshot(s => {
+                    myEventStamps = s.docs.map(d => ({ id: d.id, ...d.data() }))
+                        .sort((a, b) => String(b.eventDate || '').localeCompare(String(a.eventDate || '')));
+                    evStampsQueueNew();
+                    renderEventMemories();
+                    schRefreshOpenPane();
+                }, e => handleFirestoreListenerError('event stamps listener', e));
+            }).catch(() => { evStampsStarted = false; });
+        }
+
+        // A stamp this device has not shown yet gets the level-up moment once.
+        function evStampsQueueNew() {
+            let seen;
+            try { seen = new Set(JSON.parse(localStorage.getItem(EV_STAMPS_SEEN_KEY) || '[]')); } catch (e) { seen = new Set(); }
+            const fresh = myEventStamps.filter(s => !seen.has(s.id));
+            if (!fresh.length) return;
+            fresh.forEach(s => { seen.add(s.id); achUnlockQueue.push({ stamp: s }); });
+            try { localStorage.setItem(EV_STAMPS_SEEN_KEY, JSON.stringify([...seen])); } catch (e) { /* private mode */ }
+            if (!achUnlockShown) showNextAchievementUnlock();
+        }
+
+        function showEventStampUnlock(s) {
+            const t = BADGE_TIERS[3];
+            const kicker = document.getElementById('ach-unlock-kicker');
+            kicker.textContent = '🎟️ EVENT STAMP';
+            kicker.style.color = t.fg;
+            document.getElementById('ach-unlock-title').textContent = s.title || 'Event';
+            document.getElementById('ach-unlock-desc').innerHTML = `${escapeHtml(evStampDateText(s.eventDate))} · You were there <span class="lang-th">ได้รับจากการเข้าร่วมกิจกรรม</span>`;
+            document.getElementById('ach-unlock-pips').innerHTML = '';
+            const COLORS = ['#ff9a1f', '#f7b500', '#23a8f2', '#c47cf7', '#5bc31c', '#f06bb8'];
+            document.getElementById('ach-unlock-confetti').innerHTML = [8, 22, 38, 60, 76, 90, 14, 84, 30, 68].map((x, i) =>
+                `<span style="position:absolute; left:${x}%; top:${i < 6 ? 4 + (i % 3) * 5 : 30 + (i % 4) * 9}%; width:${i % 2 ? 8 : 11}px; height:${i % 2 ? 8 : 5}px; border-radius:2px; background:${COLORS[i % COLORS.length]}; transform:rotate(${i * 37}deg);"></span>`).join('');
+            const badge = document.getElementById('ach-unlock-badge');
+            badge.innerHTML = eventBadgeSvgHtml(s.badge, evMyPicture(), 150, evStampDateText(s.eventDate));
+            badge.classList.remove('ach-pop'); void badge.offsetWidth; badge.classList.add('ach-pop');
+            document.getElementById('achievementUnlockModal').style.display = 'flex';
+        }
+
+        function renderEventMemories() {
+            const box = document.getElementById('achievements-memories');
+            if (!box) return;
+            if (!myEventStamps.length) { box.innerHTML = ''; return; }
+            const pic = evMyPicture();
+            const n = myEventStamps.length;
+            box.innerHTML = `<div class="lang-no-toggle" style="background:#fff8e6; border:2px solid #f5e0a8; border-radius:16px; padding:10px 6px 8px; margin:8px 0 4px; text-align:left;">
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:0 6px 6px;"><strong style="font-weight:900; color:#7a5600;">🎟️ Memories</strong><span style="font-size:0.75em; font-weight:800; color:#7a5600;">${n} event${n > 1 ? 's' : ''}</span></div>
+                <div style="display:flex; gap:4px; overflow-x:auto; padding-bottom:4px;">${myEventStamps.map(s => `<div title="${escapeHtml((s.title || '') + ' · ' + evStampDateText(s.eventDate))}" style="flex:none; width:92px; text-align:center;">${eventBadgeSvgHtml(s.badge, pic, 72, evStampDateText(s.eventDate))}<div style="font-size:0.7em; font-weight:800; color:#3c3c3c; line-height:1.2; margin-top:2px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">${escapeHtml(s.title || '')}</div></div>`).join('')}</div>
+            </div>`;
+        }
+
+        // Under an official event that has a badge (schEventRowHtml): the code box on the
+        // day, or a line saying where the person stands.
+        function evStampRowHtml(e, joined) {
+            if (!e.badge || e.kind === 'social') return '';
+            const mine = myEventStamps.find(s => s.eventId === e.id);
+            const line = (txt, color) => `<div style="display:flex; align-items:center; gap:8px; margin-top:6px; padding-top:6px; border-top:1px dashed #e9d5ff;">${eventBadgeSvgHtml(e.badge, mine ? evMyPicture() : '', 34)}<span style="flex:1; font-size:0.68em; font-weight:700; color:${color};">${txt}</span></div>`;
+            if (mine) return line('🎟️ Event stamp received — see Achievements ▸ Memories', '#15803d');
+            if (!joined) return line('🏅 This event has a badge — tap Join to be able to get it', '#6d28d9');
+            const today = getBangkokDateTimeParts().dateKey;
+            if (e.eventDate > today) return line('🏅 On the day, enter the code shown at the event to get the badge', '#6d28d9');
+            if (e.eventDate < today) return line('🏅 The code was for the event day — ask the admin if you were there', '#94a3b8');
+            return line('At the event? Enter the code for your badge', '#6d28d9')
+                + `<div style="display:flex; gap:6px; margin-top:6px;">
+                    <input id="ev-code-${e.id}" type="text" autocomplete="off" autocapitalize="characters" maxlength="6" placeholder="CODE" aria-label="Event code" style="flex:1; min-width:0; border:2px solid #e9d5ff; border-radius:10px; padding:6px 10px; font-weight:900; letter-spacing:3px; text-transform:uppercase; font-size:0.9em; box-sizing:border-box;">
+                    <button type="button" onclick="evClaimStamp('${e.id}')" style="width:auto; min-height:0; padding:0 14px; border:none; border-bottom:4px solid #5b21b6; background:#7c3aed; color:#fff; border-radius:10px; font-weight:900; font-size:0.78em; cursor:pointer;">CLAIM</button>
+                </div>`;
+        }
+
+        async function evClaimStamp(eventId) {
+            const e = (schEventsCache || []).find(x => x.id === eventId);
+            if (!e || !e.badge) return;
+            const input = document.getElementById('ev-code-' + eventId);
+            const code = ((input && input.value) || '').trim().toUpperCase();
+            const interestId = schMyEventInterests[eventId];
+            if (!/^[A-Z0-9]{6}$/.test(code)) { alert('The code is 6 letters / numbers.'); return; }
+            if (!interestId) { alert('Tap Join first.'); return; }
+            try {
+                const authUser = await ensureFirebaseAuthReady(10000);
+                if (!authUser) throw new Error('Firebase auth is required');
+                await db.collection('event_stamps').doc(eventId + '_' + userId).set({
+                    eventId, userId, authUid: authUser.uid,
+                    displayName: (typeof userProfile !== 'undefined' && userProfile.displayName) || '',
+                    title: e.title || '', eventDate: e.eventDate || '', badge: e.badge,
+                    via: 'code', code, interestId,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            } catch (err) {
+                alert(err && err.code === 'permission-denied'
+                    ? 'That code was not accepted. It works only on the event day, on the phone you tapped Join with — check the code, or ask the admin to give you the stamp.'
+                    : 'Could not claim: ' + ((err && err.message) || err));
+            }
+        }
+
+        async function shareEventStamp(s) {
+            const t = BADGE_TIERS[3];
+            const url = `https://liff.line.me/${USER_LIFF_ID}`;
+            const who = (userProfile && userProfile.displayName) || myOwnRow().displayName || '';
+            const headline = `🎟️ ${s.title || 'Event'} · ${evStampDateText(s.eventDate)}`;
+            try {
+                if (window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker')) {
+                    await liff.shareTargetPicker([{
+                        type: 'flex', altText: headline, contents: {
+                            type: 'bubble', size: 'kilo',
+                            header: { type: 'box', layout: 'vertical', backgroundColor: t.dark, paddingAll: '16px', contents: [
+                                { type: 'text', text: '🎟️ EVENT STAMP', color: '#ffffff', size: 'xs', weight: 'bold' },
+                                { type: 'text', text: s.title || 'Event', color: '#ffffff', size: 'xl', weight: 'bold', wrap: true },
+                                { type: 'text', text: evStampDateText(s.eventDate) || ' ', color: '#ffffff', size: 'sm', weight: 'bold' }
+                            ] },
+                            body: { type: 'box', layout: 'vertical', spacing: 'sm', contents: [
+                                { type: 'text', text: 'I was there!', wrap: true, size: 'sm', color: '#3c3c3c' },
+                                ...(who ? [{ type: 'text', text: who, size: 'xs', color: '#6b7178', wrap: true }] : [])
+                            ] },
+                            footer: { type: 'box', layout: 'vertical', contents: [
+                                { type: 'button', style: 'primary', color: '#53b515', height: 'sm', action: { type: 'uri', label: 'Open Internship Portfolio', uri: url } }
+                            ] }
+                        }
+                    }]);
+                    return;
+                }
+            } catch (e) {
+                console.warn('[event stamp] shareTargetPicker failed, falling back:', e);
+            }
+            const text = `${headline}\nI was there!\n${url}`;
             if (navigator.share) { navigator.share({ text }).catch(() => {}); return; }
             const done = () => alert('Copied — paste it into a LINE chat');
             const fail = () => alert('Copy failed');
@@ -14907,6 +15128,7 @@
                 ${opts.hideTitle ? '' : `<div style="font-size:0.68em; color:#94a3b8; margin-top:3px;">${when}</div>`}
                 ${evEventLinksHtml(e, '#7c3aed')}
                 ${e.description ? `<div style="font-size:0.7em; color:#475569; margin-top:3px;">${escapeHtml(e.description)}</div>` : ''}
+                ${evStampRowHtml(e, joined)}
             </div>`;
         }
 
