@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.50)</title>
+    <title>Nika Admin (V102.51)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -36064,9 +36064,9 @@ They can connect again from LINE.
             if (!u || !u.badges || typeof u.badges !== 'object') return '<span style="color:#cbd5e1;" title="App has not saved badges yet">—</span>';
             const held = BADGE_STATS_DEFS.map(d => ({ d, t: userBadgeTier(u, d.id) })).filter(x => x.t).sort((a, b) => b.t - a.t);
             const minis = held.slice(0, 3).map(x => `<span title="${escapeHtml(x.d.title)} · ${BADGE_TIERS[x.t].name}">${badgeSvgHtml(x.d.art, x.t, 22, false)}</span>`).join('');
-            // V102.50: the n/15 lives only in this row; the popover no longer repeats name + count.
-            // V102.34: the minis + n/14 are one button that opens every badge (openUserBadgesPop).
-            return `<button type="button" onclick="openUserBadgesPop(event, '${u.id}')" onmouseenter="openUserBadgesPop(event, '${u.id}', true)" onmouseleave="scheduleCloseUserBadgesPop()" aria-haspopup="dialog" aria-expanded="false" title="All badges" style="width:auto; min-height:0; margin:0; padding:1px 4px; border:1px solid transparent; border-radius:8px; background:none; font:inherit; cursor:pointer; display:flex; align-items:center; gap:2px;">${minis}<span style="margin-left:4px; font-size:0.78em; font-weight:700; color:#64748b;">${held.length}/${BADGE_STATS_DEFS.length}</span></button>`;
+            // V102.51: n/15 is a faint watermark inside the popover only; the row shows just the minis.
+            // V102.34: the minis are one button that opens every badge (openUserBadgesPop).
+            return `<button type="button" onclick="openUserBadgesPop(event, '${u.id}')" onmouseenter="openUserBadgesPop(event, '${u.id}', true)" onmouseleave="scheduleCloseUserBadgesPop()" aria-haspopup="dialog" aria-expanded="false" title="All badges" style="width:auto; min-height:0; margin:0; padding:1px 4px; border:1px solid transparent; border-radius:8px; background:none; font:inherit; cursor:pointer; display:flex; align-items:center; gap:2px;">${minis}</button>`;
         }
 
         // V102.34: small popover with all 14 badges of one intern, in catalog order:
@@ -36134,7 +36134,9 @@ They can connect again from LINE.
                 </div>`;
             }).join('');
             pop.setAttribute('aria-label', `Badges of ${u.displayName || ''}`);
-            pop.innerHTML = `<div style="display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:8px 4px;">${cells}</div>`;
+            const held = BADGE_STATS_DEFS.filter(d => userBadgeTier(u, d.id)).length;
+            pop.innerHTML = `<span aria-hidden="true" style="position:absolute; right:12px; bottom:4px; font-size:3.4em; font-weight:900; line-height:1; letter-spacing:-1px; color:var(--text-main); opacity:0.07; pointer-events:none; user-select:none;">${held}/${BADGE_STATS_DEFS.length}</span>
+                <div style="position:relative; display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:8px 4px;">${cells}</div>`;
             pop.hidden = false;
             window._userBadgesPopTrigger = trig;
             trig.setAttribute('aria-expanded', 'true');
