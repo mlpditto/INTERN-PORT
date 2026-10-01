@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.38)</title>
+    <title>Internship Portfolio (V101.39)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -2287,13 +2287,13 @@
 <link rel="stylesheet" href="history-compact.css?v=V99.81"><link rel="stylesheet" href="delete-requests.css?v=V100.40">
 <link rel="stylesheet" href="case-compact.css?v=V99.88">
 <script src="internship-progress.js?v=V100.35"></script><link rel="stylesheet" href="internship-progress.css?v=V100.36">
-<script src="monthly-progress.js?v=V100.48"></script><link rel="stylesheet" href="monthly-progress.css?v=V100.42">
+<script src="monthly-progress.js?v=V101.39"></script><link rel="stylesheet" href="monthly-progress.css?v=V101.39">
 <script src="assigned-goals.js?v=V100.30"></script><link rel="stylesheet" href="assigned-goals.css?v=V100.30">
 <link rel="stylesheet" href="quiz-user-focus.css?v=V100.39">
 <link rel="stylesheet" href="quiz-cover.css?v=V100.57">
 <link rel="stylesheet" href="case-insight-rail.css?v=V100.54">
 <script src="quiz-cover.js?v=V101.09"></script>
-<script src="activity-rewards.js?v=V100.49"></script><link rel="stylesheet" href="activity-rewards.css?v=V100.49">
+<script src="activity-rewards.js?v=V101.39"></script><link rel="stylesheet" href="activity-rewards.css?v=V101.39">
 <script src="flood-watch.js?v=V101.37"></script><link rel="stylesheet" href="flood-watch.css?v=V101.37">
 </head>
 
@@ -2467,8 +2467,8 @@
                             <div id="u-lifetime-counts" class="activity-totals">กิจกรรมที่ได้คะแนน <span id="unified-total">0</span> · เช็กอินสะสม <span id="unified-checkin">0</span></div>
                         </section>
                         <section class="mp-achievements" aria-label="Learning progress">
-                            <div class="metric-badge" id="badge-cert"><span title="Progress toward the certificate" data-th-title="ความคืบหน้าสู่ประกาศนียบัตร" aria-label="Certificate">🏅</span><strong id="badge-cert-text">—</strong><span class="badge-progress-mini"><span id="badge-cert-bar" style="width:0%"></span></span><button type="button" id="cert-menu-item" class="mp-inline-btn" style="display:none;"></button></div>
-                            <div class="metric-badge" id="badge-rank"><span title="Points needed for the next level" data-th-title="คะแนนที่ต้องการเพื่อขึ้นระดับถัดไป">✨ Next</span><strong id="badge-rank-text">—</strong><span class="badge-progress-mini" hidden><span id="badge-rank-bar" style="width:0%"></span></span><button type="button" class="mp-inline-btn" onclick="openLeaderboard()" title="Leaderboard" data-th-title="อันดับ" aria-label="Leaderboard">🏆 Leaderboard</button></div>
+                            <div class="metric-badge" id="badge-cert"><span title="ความคืบหน้าสู่ประกาศนียบัตร" data-th-title="ความคืบหน้าสู่ประกาศนียบัตร" aria-label="Certificate">🏅</span><strong id="badge-cert-text">—</strong><span class="badge-progress-mini"><span id="badge-cert-bar" style="width:0%"></span></span><button type="button" id="cert-menu-item" class="mp-inline-btn" style="display:none;"></button></div>
+                            <div class="metric-badge" id="badge-rank"><span title="คะแนนที่ต้องการเพื่อขึ้นระดับถัดไป" data-th-title="คะแนนที่ต้องการเพื่อขึ้นระดับถัดไป" aria-label="Next level">✨</span><strong id="badge-rank-text">—</strong><span class="badge-progress-mini" hidden><span id="badge-rank-bar" style="width:0%"></span></span><button type="button" class="mp-inline-btn" onclick="openLeaderboard()" title="อันดับ (Leaderboard)" data-th-title="อันดับ (Leaderboard)" aria-label="Leaderboard">🏆</button></div>
                             <div class="metric-badge"><span>🔥 Streak</span><strong id="badge-streak">—</strong><small id="badge-today">—</small></div>
                         </section>
                         <div id="u-earned-badges" style="display:none; flex-wrap:wrap; gap:5px;"></div>
@@ -14233,8 +14233,9 @@
             // V95.50: show only the points still needed to rank up (not the next-rank name),
             // e.g. "→ 4.62 pts". The progress bar already conveys "toward next rank"; the rank
             // name was redundant with the current-LV badge and read as contradicting it.
-            if (rankText) rankText.textContent = nextRank.required > 0 ? `${nextRank.required.toFixed(2)} pts to go` : 'Max level';
-            if (rankBadge) rankBadge.title = nextRank.required > 0 ? `${nextRank.required.toFixed(2)} points to next rank` : 'Max level reached';
+            // V101.39: number only — it sits inline with the month now; the words are the ✨ hover (Thai).
+            if (rankText) rankText.textContent = nextRank.required > 0 ? nextRank.required.toFixed(2) : '🎓';
+            if (rankBadge) rankBadge.title = nextRank.required > 0 ? `อีก ${nextRank.required.toFixed(2)} คะแนนจะขึ้นระดับถัดไป` : 'ถึงระดับสูงสุดแล้ว';
             if (rankBar) {
                 const rankPct = nextRank.required > 0
                     ? Math.max(0, Math.min(100, ((nextRank.threshold - nextRank.required) / nextRank.threshold) * 100))
@@ -14248,9 +14249,11 @@
             if (certBar) {
                 const _certMe = (typeof myOwnRow === 'function') ? myOwnRow() : {};
                 const certNeed = certRequiredPoints(_certMe.startDate, _certMe.endDate);
-                certBar.parentElement && certBar.parentElement.setAttribute('title', `${currentScore.toFixed(2)} / ${certNeed} points toward the certificate`);
+                const certTip = `คะแนนสะสม ${currentScore.toFixed(2)} จาก ${certNeed} เพื่อรับประกาศนียบัตร`;
+                certBar.parentElement && certBar.parentElement.setAttribute('title', certTip);
+                const certBox = document.getElementById('badge-cert'); if (certBox) certBox.title = certTip;
                 const certText = document.getElementById('badge-cert-text');
-                if (certText) certText.textContent = `${currentScore.toFixed(2)} / ${certNeed} pts`;
+                if (certText) certText.textContent = `${currentScore.toFixed(2)}/${certNeed}`;
                 const certPct = Math.max(0, Math.min(100, (currentScore / certNeed) * 100));
                 certBar.style.width = `${certPct.toFixed(1)}%`;
             }
