@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.56)</title>
+    <title>Nika Admin (V102.57)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -36379,6 +36379,160 @@ They can connect again from LINE.
             } catch (e) { alert('Could not remove: ' + e.message); }
         }
 
+        // ---- V102.57: badge PNG export (admin only) ---------------------------------
+        // 1024 px wide, transparent. Layouts: the badge alone, + its name, + the person.
+        // A stamp's avatar can only be the 8-bit one (a data URL): a LINE photo is
+        // cross-origin and would taint the canvas. Blank = no person (from Badge Stats).
+        let badgeExportState = null;
+
+        function badgeExportInner(st) {
+            return st.kind === 'stamp'
+                ? eventBadgeSvgHtml(st.badge, st.avatarOn && st.avatar8 ? st.avatar8 : '', 100, evStampDateText(st.eventDate), true)
+                : badgeSvgHtml(st.art, st.tierIdx, 100, true);
+        }
+
+        function badgeExportSvg(st, layout, px) {
+            const H = layout === 'badge' ? 116 : layout === 'title' ? 138 : 156;
+            const txt = (y, size, weight, s) => `<text x="50" y="${y}" text-anchor="middle" font-size="${size}" font-weight="${weight}" fill="#3c3c3c" stroke="#ffffff" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke" font-family="Nunito, Mitr, system-ui, sans-serif"${String(s).length > 16 ? ' textLength="92" lengthAdjust="spacingAndGlyphs"' : ''}>${escapeHtml(s)}</text>`;
+            const inner = badgeExportInner(st).replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '');
+            const who = [st.person, st.sub].filter(Boolean).join(' · ');
+            return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 ${H}" width="${px}" height="${Math.round(px * H / 100)}" style="overflow:visible;">`
+                + `<g>${inner}</g>`
+                + (layout !== 'badge' ? txt(130, 10, 900, st.title || '') : '')
+                + (layout === 'person' && who ? txt(146, 7.5, 700, who) : '')
+                + `</svg>`;
+        }
+
+        function badgeExportFileName(st) {
+            const slug = s => String(s || '').toLowerCase().replace(/[^a-z0-9฀-๿]+/g, '-').replace(/^-+|-+$/g, '');
+            const tier = st.kind === 'stamp' ? (st.eventDate || '') : (BADGE_TIERS[st.tierIdx] || BADGE_TIERS[0]).name.toLowerCase();
+            return [slug(st.title) || 'badge', tier, st.layout === 'person' ? slug(st.person) : ''].filter(Boolean).join('-') + '.png';
+        }
+
+        function badgeExportPng(st) {
+            const W = 1024, H = st.layout === 'badge' ? 116 : st.layout === 'title' ? 138 : 156;
+            const svg = badgeExportSvg(st, st.layout, W);
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onerror = () => reject(new Error('The badge picture could not be drawn.'));
+                img.onload = () => {
+                    const c = document.createElement('canvas');
+                    c.width = W;
+                    c.height = Math.round(W * H / 100);
+                    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);   // canvas starts transparent
+                    c.toBlob(b => b ? resolve(b) : reject(new Error('PNG encoding failed.')), 'image/png');
+                };
+                img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+            });
+        }
+
+        function openBadgeExport(st) {
+            closeUserBadgesPop();
+            badgeExportState = st;
+            let box = document.getElementById('badge-export-dialog');
+            if (!box) {
+                box = document.createElement('div');
+                box.id = 'badge-export-dialog';
+                box.className = 'lang-no-toggle';
+                box.setAttribute('role', 'dialog');
+                box.setAttribute('aria-modal', 'true');
+                box.style.cssText = 'position:fixed; inset:0; z-index:10050; display:flex; align-items:center; justify-content:center; background:rgba(15, 23, 42, 0.45); padding:16px;';
+                box.addEventListener('click', e => { if (e.target === box) closeBadgeExport(); });
+                document.addEventListener('keydown', e => { if (e.key === 'Escape' && badgeExportState) closeBadgeExport(); });
+                document.body.appendChild(box);
+            }
+            box.style.display = 'flex';
+            renderBadgeExport();
+        }
+
+        function closeBadgeExport() {
+            const box = document.getElementById('badge-export-dialog');
+            if (box) box.style.display = 'none';
+            badgeExportState = null;
+        }
+
+        // A person's earned badge (User Hub popover).
+        function openBadgeExportFor(uid, defId) {
+            const u = (usersData || []).find(x => x.id === uid);
+            const d = BADGE_STATS_DEFS.find(x => x.id === defId);
+            const t = u && d ? (userBadgeTier(u, defId) || 0) : 0;
+            if (!t) return;
+            openBadgeExport({ kind: 'ach', art: d.art, tierIdx: t, title: d.title, person: u.displayName || '', layout: 'person' });   // the pill already says the tier
+        }
+
+        // A person's Event Stamp (User Hub popover Memories strip).
+        function openStampExport(stampId) {
+            const s = eventStampsCache.find(x => x.id === stampId);
+            if (!s) return;
+            const u = (usersData || []).find(x => x.id === s.userId) || {};
+            openBadgeExport({ kind: 'stamp', badge: s.badge, eventDate: s.eventDate, title: s.title || '', person: u.displayName || s.displayName || '', avatar8: u.avatar8 || '', avatarOn: !!u.avatar8, layout: 'person' });
+        }
+
+        // No person: any tier the badge offers (Badge Stats).
+        function openBlankBadgeExport(defId) {
+            const d = BADGE_STATS_DEFS.find(x => x.id === defId);
+            if (!d) return;
+            const tiers = d.steps === 1 ? [d.oneOff || 3] : [1, 2, 3, 4].slice(0, d.steps);
+            openBadgeExport({ kind: 'ach', blank: true, art: d.art, tierIdx: tiers[tiers.length - 1], tiers, title: d.title, layout: 'badge' });
+        }
+
+        function badgeExportSet(key, value) {
+            if (!badgeExportState) return;
+            badgeExportState[key] = value;
+            renderBadgeExport();
+        }
+
+        function renderBadgeExport() {
+            const box = document.getElementById('badge-export-dialog');
+            const st = badgeExportState;
+            if (!box || !st) return;
+            const checker = 'background-color:#fff; background-image:linear-gradient(45deg,#e5e7eb 25%,transparent 25%),linear-gradient(-45deg,#e5e7eb 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e5e7eb 75%),linear-gradient(-45deg,transparent 75%,#e5e7eb 75%); background-size:16px 16px; background-position:0 0,0 8px,8px -8px,-8px 0;';
+            const chip = (on, onclick, label, disabled) => `<button type="button" onclick="${onclick}" ${disabled ? 'disabled' : ''} style="width:auto; min-height:0; padding:3px 10px; font-size:0.74em; font-weight:700; cursor:${disabled ? 'default' : 'pointer'}; opacity:${disabled ? 0.5 : 1}; border-radius:999px; border:1px solid ${on ? '#ddd6fe' : '#e2e8f0'}; background:${on ? '#f5f3ff' : '#fff'}; color:${on ? '#7c3aed' : '#64748b'};">${label}</button>`;
+            const layouts = (st.blank ? [['badge', 'Badge only'], ['title', '+ badge name']] : [['badge', 'Badge only'], ['title', '+ badge name'], ['person', '+ name & person']]);
+            const thumbs = layouts.map(([k, label]) => `<button type="button" onclick="badgeExportSet('layout', '${k}')" aria-pressed="${st.layout === k}" style="width:auto; min-height:0; margin:0; padding:0; border:none; background:none; cursor:pointer; text-align:center; font:inherit;">
+                    <div style="${checker} border-radius:12px; padding:8px; display:flex; justify-content:center; outline:${st.layout === k ? '3px solid #7c3aed' : '1px solid #e2e8f0'};">${badgeExportSvg(st, k, 104)}</div>
+                    <div style="font-size:0.72em; font-weight:800; margin-top:5px; color:${st.layout === k ? '#6d28d9' : '#475569'};">${label}</div></button>`).join('');
+            const tierChips = st.blank && st.tiers.length > 1 ? `<span style="color:#64748b; font-weight:700;">Tier</span>${st.tiers.map(t => chip(st.tierIdx === t, `badgeExportSet('tierIdx', ${t})`, BADGE_TIERS[t].name.charAt(0) + BADGE_TIERS[t].name.slice(1).toLowerCase())).join('')}` : '';
+            const avatarChips = st.kind === 'stamp' ? `<span style="color:#64748b; font-weight:700;">Avatar</span>${chip(st.avatarOn, 'badgeExportSet(\'avatarOn\', true)', '👾 8-bit', !st.avatar8)}${chip(!st.avatarOn, 'badgeExportSet(\'avatarOn\', false)', 'None')}${st.avatar8 ? '' : '<span style="color:#94a3b8;">no 8-bit avatar yet (User Hub ⋯)</span>'}` : '';
+            box.innerHTML = `<div style="background:var(--bg-card, #fff); color:var(--text-main, #1e293b); border-radius:16px; padding:16px; width:min(600px, 100%); max-height:92vh; overflow:auto; box-shadow:0 20px 40px rgba(15, 23, 42, 0.25);">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;"><b>⬇ ${st.blank ? 'Blank badge — ' + escapeHtml(st.title) : 'Export badge — ' + escapeHtml(st.person || '')}</b>
+                    <button type="button" onclick="closeBadgeExport()" aria-label="Close" style="margin-left:auto; width:32px; height:32px; min-height:0; padding:0; border:none; background:transparent; font-size:20px; cursor:pointer; color:#94a3b8;">×</button></div>
+                <div style="display:grid; grid-template-columns:repeat(${layouts.length}, minmax(0, 1fr)); gap:10px;">${thumbs}</div>
+                <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:12px; font-size:0.85em;">${tierChips}${avatarChips}<span style="margin-left:auto; color:#94a3b8; font-size:0.85em;">1024 px · transparent PNG</span></div>
+                <div style="display:flex; gap:8px; margin-top:12px;">
+                    <button type="button" onclick="badgeExportDownload()" style="flex:1; min-height:0; padding:9px; border:none; border-radius:10px; background:#7c3aed; color:#fff; font-weight:800; font-size:0.86em; cursor:pointer;">⬇ Download PNG</button>
+                    <button type="button" onclick="badgeExportCopy()" style="width:auto; min-height:0; padding:9px 14px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; color:#334155; font-weight:800; font-size:0.86em; cursor:pointer;">Copy image</button>
+                </div>
+                <div style="font-size:0.7em; color:#94a3b8; margin-top:8px;">File: ${escapeHtml(badgeExportFileName(st))}</div>
+            </div>`;
+        }
+
+        async function badgeExportDownload() {
+            const st = badgeExportState;
+            if (!st) return;
+            try {
+                const blob = await badgeExportPng(st);
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = badgeExportFileName(st);
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+            } catch (e) { alert('Could not export: ' + e.message); }
+        }
+
+        async function badgeExportCopy() {
+            const st = badgeExportState;
+            if (!st) return;
+            if (!(navigator.clipboard && navigator.clipboard.write && window.ClipboardItem)) { alert('This browser cannot copy images — use Download PNG.'); return; }
+            try {
+                const blob = await badgeExportPng(st);
+                await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                showToast('Image copied');
+            } catch (e) { alert('Could not copy: ' + e.message); }
+        }
+
         // V102.54: Event Stamps under the badge grid — not part of the n/15 count.
         function userMemoriesStripHtml(u) {
             const list = eventStampsCache
@@ -36387,7 +36541,7 @@ They can connect again from LINE.
             if (!list.length) return '';
             return `<div style="position:relative; border-top:2px dashed #f5e0a8; margin-top:8px; padding-top:6px; display:flex; flex-wrap:wrap; align-items:center; gap:6px;">
                 <span style="font-size:0.72em; font-weight:900; color:#7a5600; white-space:nowrap;">🎟️ Memories ${list.length}</span>
-                ${list.map(s => `<span title="${escapeHtml((s.title || '') + ' · ' + evStampDateText(s.eventDate))}">${eventBadgeSvgHtml(s.badge, u.avatar8 || u.pictureUrl || '', 34, '', !!u.avatar8)}</span>`).join('')}
+                ${list.map(s => `<span role="button" tabindex="0" data-sid="${escapeHtml(s.id)}" onclick="openStampExport(this.dataset.sid)" onkeydown="if (event.key === 'Enter') this.click()" style="cursor:pointer;" title="${escapeHtml((s.title || '') + ' · ' + evStampDateText(s.eventDate) + ' · click to export PNG')}">${eventBadgeSvgHtml(s.badge, u.avatar8 || u.pictureUrl || '', 34, '', !!u.avatar8)}</span>`).join('')}
             </div>`;
         }
 
@@ -36428,7 +36582,8 @@ They can connect again from LINE.
                 const tier = BADGE_TIERS[t];
                 const when = t ? fmt((u.badges[d.id] || {}).earnedAt) : '';
                 const tip = `${d.title} · ${t ? tier.name.charAt(0) + tier.name.slice(1).toLowerCase() : 'not yet'}${when ? ' · ' + when : ''}`;
-                return `<div title="${escapeHtml(tip)}" style="display:flex; flex-direction:column; align-items:center; gap:2px; min-width:0;">
+                // V102.57: an earned badge opens the PNG export for this person.
+                return `<div title="${escapeHtml(tip + (t ? ' · click to export PNG' : ''))}"${t ? ` role="button" tabindex="0" data-uid="${escapeHtml(uid)}" onclick="openBadgeExportFor(this.dataset.uid, '${d.id}')" onkeydown="if (event.key === 'Enter') this.click()"` : ''} style="display:flex; flex-direction:column; align-items:center; gap:2px; min-width:0;${t ? ' cursor:pointer;' : ''}">
                     ${badgeSvgHtml(d.art, t, 38, false)}
                     <span style="font-size:0.62em; font-weight:800; letter-spacing:0.3px; color:${t ? tier.fg : '#cbd5e1'};">${t ? tier.name : '·'}</span>
                 </div>`;
@@ -36490,7 +36645,7 @@ They can connect again from LINE.
                 synced.forEach(u => { counts[userBadgeTier(u, d.id) || 0]++; });
                 const offered = t => d.steps === 1 ? t === (d.oneOff || 3) : t <= d.steps;
                 const tierCells = [1, 2, 3, 4].map(t => `<td style="${td}">${offered(t) ? cell(d.id, t, counts[t], counts[t] ? '#1e293b' : '#cbd5e1') : '<span style="color:#e2e8f0;">—</span>'}</td>`).join('');
-                return `<tr><td style="${td} text-align:left; font-weight:600;"><span style="display:inline-flex; align-items:center; gap:6px;">${badgeSvgHtml(d.art, 3, 20, false)}${escapeHtml(d.title)}</span></td><td style="${td}">${cell(d.id, 0, counts[0], '#94a3b8')}</td>${tierCells}</tr>`;
+                return `<tr><td style="${td} text-align:left; font-weight:600;"><span style="display:inline-flex; align-items:center; gap:6px;">${badgeSvgHtml(d.art, 3, 20, false)}${escapeHtml(d.title)}<button type="button" onclick="openBlankBadgeExport('${d.id}')" title="Export a blank ${escapeHtml(d.title)} badge (no person) as PNG" aria-label="Export blank ${escapeHtml(d.title)} PNG" style="width:auto; min-height:0; margin:0; padding:1px 6px; border:1px solid #e2e8f0; border-radius:6px; background:#fff; color:#64748b; font-size:0.85em; cursor:pointer;">⬇</button></span></td><td style="${td}">${cell(d.id, 0, counts[0], '#94a3b8')}</td>${tierCells}</tr>`;
             }).join('');
             body.innerHTML = `<table class="admin-table" style="width:100%; border-collapse:collapse;">
                 <thead><tr><th style="${th} text-align:left;">Badge</th><th style="${th} color:#94a3b8;">None</th>${BADGE_STATS_TIERS.map(([n, c]) => `<th style="${th} color:${c};">${n}</th>`).join('')}</tr></thead>
