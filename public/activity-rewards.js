@@ -74,7 +74,7 @@ window.activityRewards = (() => {
         const totals=node('small');totals.className='mp-reward-total';
         if(rewardReady()){
             const net=key=>(sources[key]||[]).filter(current).reduce((sum,r)=>sum+(Number.isFinite(Number(r.amount))?Number(r.amount):0),0);
-            totals.textContent=`${net('points').toFixed(2)} Points · ${net('beri').toLocaleString()} Beri`;
+            totals.textContent=`${net('points').toFixed(2)} · 🪙 ${net('beri').toLocaleString()}`;totals.title='คะแนนและ Beri ของเดือนนี้';
         }else totals.textContent=summary('other');
         host.querySelector('.mp-head').append(totals);
         [...grid.children].slice(0,3).forEach((tile,i)=>{const key=categories[i];bind(tile,key);pending(tile,activities[key]);});
