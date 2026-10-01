@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.51)</title>
+    <title>Nika Admin (V102.52)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -12532,41 +12532,51 @@
             </div>
         </div>
 
+        <!-- V102.52: Divisions editor, lean — Solo pool on top, one bucket per division; tap a group chip, pick where it goes.
+             One group sits in ONE division (moving takes it out of the others), so nobody is ranked on two boards.
+             Edits stay in divDraft until Save; closing the modal throws the draft away. -->
+        <style>
+            #divisionsModal .modal-content { align-self:center; height:auto; }   /* flex overlay would stretch it to max-height (90vh) */
+            #divisionsModal .dv-head { display:flex; align-items:center; gap:8px; margin:0 0 12px; }
+            #divisionsModal .dv-head h3 { margin:0; }
+            #divisionsModal .dv-help { width:20px; height:20px; border-radius:50%; background:#e0f2fe; color:#0369a1; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; cursor:help; }
+            #divisionsModal .dv-solo { display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:8px 10px; border-radius:12px; background:#f8fafc; margin-bottom:10px; }
+            #divisionsModal .dv-solo > small { color:#64748b; font-weight:700; margin-right:2px; }
+            #divisionsModal .dv-bucket { border:1px solid #e2e8f0; border-radius:12px; padding:8px 10px; margin-bottom:8px; background:#fff; }
+            #divisionsModal .dv-bucket-head { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+            #divisionsModal .dv-bucket-head small { color:#64748b; }
+            #divisionsModal .dv-row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+            #divisionsModal .dv-empty { color:#94a3b8; font-size:0.85em; }
+            #divisionsModal .dv-chip { width:auto; min-height:0; margin:0; display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:999px; border:1px solid; font:inherit; font-size:12.5px; font-weight:700; cursor:pointer; }
+            #divisionsModal .dv-chip small { font-weight:600; opacity:.7; }
+            #divisionsModal .dv-chip.on { box-shadow:0 0 0 2px #4f46e5; }
+            #divisionsModal .dv-menu { flex-basis:100%; display:flex; flex-wrap:wrap; gap:6px; padding:6px 0 2px; }
+            #divisionsModal .dv-menu button, #divisionsModal .dv-foot button { width:auto; min-height:30px; margin:0; padding:0 12px; border-radius:8px; font:inherit; cursor:pointer; }
+            #divisionsModal .dv-menu button { border:1px solid #c7d2fe; background:#eef2ff; color:#3730a3; font-weight:700; }
+            #divisionsModal .dv-menu button[data-to=""] { border-color:#e2e8f0; background:#fff; color:#64748b; }
+            #divisionsModal .dv-del { width:26px; min-height:26px; height:26px; margin:0 0 0 auto; padding:0; border:0; border-radius:50%; background:#fef2f2; color:#dc2626; cursor:pointer; }
+            #divisionsModal .dv-foot { display:flex; align-items:center; gap:8px; margin-top:12px; }
+            #divisionsModal .dv-foot input { flex:1; min-width:0; margin:0; }
+            #divisionsModal .dv-foot .dv-add { border:1px dashed #94a3b8; background:#fff; color:#475569; font-weight:800; }
+            #divisionsModal .dv-foot .dv-save { display:inline-flex; align-items:center; gap:6px; border:0; background:#10b981; color:#fff; font-weight:700; min-height:36px; padding:0 16px; }
+            #divisionsModal .dv-foot .dv-save:disabled { opacity:.5; cursor:default; }
+            #divisionsModal .dv-dot { display:none; width:7px; height:7px; border-radius:50%; background:#fde047; }
+            #divisionsModal .dv-save.dirty .dv-dot { display:inline-block; }
+        </style>
         <div id="divisionsModal" class="modal">
             <div class="modal-content" style="max-width:500px; text-align:left;">
                 <span class="close-modal" onclick="closeModal()">&times;</span>
-                <h3>🛡️ Manage Divisions</h3>
-                <p style="font-size:0.85em; color:#666; margin-bottom:15px;">
-                    Users from different Groups can be ranked together in a Division.
-                </p>
-
-                <div
-                    style="background:#e7f5ff; padding:12px; border-radius:8px; border:1px solid #a5d8ff; font-size:0.8em; margin-bottom:20px; color:#1864ab; line-height:1.5;">
-                    <i class="fa-solid fa-layer-group"></i> <b>Structure Hierarchy:</b><br>
-                    1. <b>Group:</b> Real organization the user belongs to (1 person per group).<br>
-                    2. <b>Division:</b> Ranking board (1 division can include multiple groups).<br>
-                    <small>* e.g., Create a "Technical" division to have IT and Dev groups compete together.</small>
+                <div class="dv-head">
+                    <h3>🛡️ Divisions</h3>
+                    <span class="dv-help" aria-label="Group = the user's real unit (one per person). Division = a ranking board that joins several groups. Groups in no division are ranked on their own."
+                        title="Group = หน่วยจริงของผู้ใช้ (1 คน 1 กลุ่ม) · Division = กระดานจัดอันดับที่รวมหลายกลุ่ม เช่น รวม IT + Dev เป็น &quot;Technical&quot; · กลุ่มที่ไม่อยู่ใน Division ใด (Solo) จัดอันดับเฉพาะในกลุ่มตัวเอง · แตะชิปกลุ่มเพื่อย้าย">i</span>
                 </div>
-                <div id="div-list-admin"
-                    style="margin-bottom:20px; border:1px solid #eee; border-radius:8px; padding:10px; background:#fafafa; max-height:200px; overflow-y:auto;">
-                    <!-- List of divisions -->
+                <div id="div-editor" class="lang-no-toggle" onclick="onDivEditorClick(event)"></div>
+                <div class="dv-foot">
+                    <input type="text" id="new-div-name" placeholder="New division" aria-label="New division name" onkeydown="if (event.key === 'Enter') addDivision()">
+                    <button type="button" class="dv-add" onclick="addDivision()" title="สร้าง Division" aria-label="Add division">＋</button>
+                    <button type="button" id="div-save" class="dv-save" onclick="saveDivisions()" disabled title="บันทึกการเปลี่ยนแปลง"><span class="dv-dot"></span>Save</button>
                 </div>
-
-                <h4 style="margin-bottom:10px;">➕ Add New Division</h4>
-                <div style="display:flex; flex-direction:column; gap:10px;">
-                    <input type="text" id="new-div-name" placeholder="Division Name (e.g. Division 1)">
-                    <div style="font-size:0.8em; color:#666;">Select Groups to include:</div>
-                    <div id="div-group-picker"
-                        style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:5px; max-height:100px; overflow-y:auto; padding:10px; background:#f9f9f9; border-radius:8px; border:1px dashed #ccc;">
-                        <!-- Groups from system -->
-                    </div>
-                    <input type="text" id="new-div-groups" placeholder="Selected: IT, Marketing..." readonly
-                        style="background:#f0f0f0;">
-                    <button class="btn-primary" onclick="addDivision()" style="width:auto;">Add</button>
-                </div>
-
-                <button class="btn-success" style="width:100%; margin-top:20px; padding:12px;"
-                    onclick="saveDivisions()">🚀 Save All Config</button>
             </div>
         </div>
         <div id="archiveModal" class="modal">
@@ -48549,77 +48559,97 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         // 🔥 Division Management Functions ([Version: V77.8])
+        // V102.52: Solo pool + buckets. Edits go to divDraft; Save writes it and copies it into divisionConfig.
+        let divDraft = {};
+        let divPick = '';
         function openDivisionsModal() {
+            divDraft = JSON.parse(JSON.stringify(divisionConfig || {}));
+            divPick = '';
+            document.getElementById('new-div-name').value = '';
+            setDivDirty(false);
             document.getElementById('divisionsModal').style.display = 'flex';
             renderDivisionAdminList();
-
-            // Populate group picker
-            const picker = document.getElementById('div-group-picker');
-            // 🔥 Unified & Case-insensitive groups ([Version: V82.0])
-            const allGroups = getGlobalGroups();
-            picker.innerHTML = allGroups.map(g => `
-                <button class="btn-sm div-picker-btn" id="div-pick-${g}" style="background:#fff; color:#333; border:1px solid #ddd;" onclick="toggleGroupToDiv('${g}')">${g}</button>
-            `).join('');
         }
 
-        function toggleGroupToDiv(group) {
-            const input = document.getElementById('new-div-groups');
-            const btn = document.getElementById(`div-pick-${group}`);
-            let current = input.value.split(',').map(g => g.trim()).filter(g => g);
+        function setDivDirty(on) {
+            const b = document.getElementById('div-save');
+            if (!b) return;
+            b.disabled = !on;
+            b.classList.toggle('dirty', on);
+        }
 
-            if (current.includes(group)) {
-                current = current.filter(g => g !== group);
-                btn.style.background = "#fff";
-                btn.style.borderColor = "#ddd";
-            } else {
-                current.push(group);
-                btn.style.background = "var(--primary)";
-                btn.style.color = "white";
-                btn.style.borderColor = "var(--primary)";
-            }
-            input.value = current.join(', ');
+        function divGroupCount(group) {
+            const key = String(group).trim().toUpperCase();
+            return (usersData || []).filter(u => (u.group || 'Public').trim().toUpperCase() === key).length;
         }
 
         function renderDivisionAdminList() {
-            const container = document.getElementById('div-list-admin');
-            container.innerHTML = "";
-            Object.entries(divisionConfig).forEach(([name, groups]) => {
-                container.innerHTML += `
-                        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #eee;">
-                            <div>
-                                <strong>${name}</strong><br>
-                                <small style="color:#666;">Groups: ${groups.join(', ')}</small>
-                            </div>
-                            <button class="btn-sm btn-danger" onclick="removeDivision('${name}')" style="font-size:0.7em;">✕</button>
-                        </div>
-                    `;
+            const box = document.getElementById('div-editor');
+            if (!box) return;
+            const names = Object.keys(divDraft);
+            const used = new Set(Object.values(divDraft).flat().map(g => String(g).toUpperCase()));
+            const solo = getGlobalGroups().filter(g => !used.has(g.toUpperCase()));
+            const chip = g => {
+                const c = getGroupColor(g), n = divGroupCount(g);
+                return `<button type="button" class="dv-chip${divPick === g ? ' on' : ''}" data-g="${escapeHtml(g)}" style="color:${c}; background:${c}1f; border-color:${c}55;" title="${escapeHtml(g)} · ${n} คน · แตะเพื่อย้าย"><i class="fa-solid ${getGroupIcon(g)}"></i>${escapeHtml(g)}<small>${n}</small></button>`;
+            };
+            const menu = `<div class="dv-menu">${names.map(n => `<button type="button" data-to="${escapeHtml(n)}" title="ย้าย ${escapeHtml(divPick)} ไป ${escapeHtml(n)}">🛡️ ${escapeHtml(n)}</button>`).join('')}<button type="button" data-to="" title="ไม่อยู่ใน Division ใด — จัดอันดับเฉพาะในกลุ่มตัวเอง">↩ Solo</button></div>`;
+            const row = list => list.map(chip).join('') + (list.includes(divPick) ? menu : '');
+            let h = `<div class="dv-solo" title="กลุ่มที่ยังไม่อยู่ใน Division ใด — จัดอันดับเฉพาะในกลุ่มตัวเอง"><small>Solo</small>${solo.length ? row(solo) : '<small class="dv-empty">—</small>'}</div>`;
+            names.forEach(n => {
+                const gs = divDraft[n] || [];
+                const total = gs.reduce((s, g) => s + divGroupCount(g), 0);
+                h += `<section class="dv-bucket"><div class="dv-bucket-head"><b>🛡️ ${escapeHtml(n)}</b><small title="ผู้ใช้ทั้งหมดใน Division นี้">👥 ${total}</small><button type="button" class="dv-del" data-del="${escapeHtml(n)}" title="ลบ Division (กลุ่มกลับไป Solo)" aria-label="Delete division ${escapeHtml(n)}">✕</button></div><div class="dv-row">${gs.length ? row(gs) : '<small class="dv-empty">แตะกลุ่มใน Solo เพื่อย้ายเข้ามา</small>'}</div></section>`;
             });
+            if (!names.length) h += '<p class="dv-empty">ยังไม่มี Division · ตั้งชื่อด้านล่างแล้วกด ＋</p>';
+            box.innerHTML = h;
+        }
+
+        function onDivEditorClick(e) {
+            const to = e.target.closest('[data-to]');
+            if (to) { moveGroupToDivision(divPick, to.dataset.to); return; }
+            const del = e.target.closest('[data-del]');
+            if (del) { removeDivision(del.dataset.del); return; }
+            const c = e.target.closest('.dv-chip');
+            if (c) { divPick = divPick === c.dataset.g ? '' : c.dataset.g; renderDivisionAdminList(); return; }
+            if (divPick) { divPick = ''; renderDivisionAdminList(); }
+        }
+
+        // One group lives in one division: take it out of every bucket, then drop it in the target ('' = Solo).
+        function moveGroupToDivision(group, name) {
+            if (!group) return;
+            const key = group.toUpperCase();
+            Object.keys(divDraft).forEach(k => { divDraft[k] = (divDraft[k] || []).filter(g => String(g).toUpperCase() !== key); });
+            if (name && divDraft[name]) divDraft[name].push(group);
+            divPick = '';
+            setDivDirty(true);
+            renderDivisionAdminList();
         }
 
         function addDivision() {
-            const name = document.getElementById('new-div-name').value.trim();
-            const grps = document.getElementById('new-div-groups').value.split(',').map(g => g.trim()).filter(g => g);
-            if (!name || grps.length === 0) return alert("Please enter name and at least one group.");
-            divisionConfig[name] = grps;
+            const el = document.getElementById('new-div-name');
+            const name = el.value.trim();
+            if (!name) { el.focus(); return; }
+            if (divDraft[name]) { showToast('มี Division ชื่อนี้แล้ว'); return; }
+            divDraft[name] = [];
+            el.value = '';
+            setDivDirty(true);
             renderDivisionAdminList();
-            document.getElementById('new-div-name').value = '';
-            document.getElementById('new-div-groups').value = '';
-            // Reset Picker UI
-            document.querySelectorAll('.div-picker-btn').forEach(b => {
-                b.style.background = "#fff";
-                b.style.color = "#333";
-                b.style.borderColor = "#ddd";
-            });
         }
 
         function removeDivision(name) {
-            delete divisionConfig[name];
+            delete divDraft[name];
+            setDivDirty(true);
             renderDivisionAdminList();
         }
 
         async function saveDivisions() {
             try {
-                await db.collection("quizzes").doc("--divisions-config--").set(divisionConfig);
+                await db.collection("quizzes").doc("--divisions-config--").set(divDraft);
+                // mutate, not reassign — every reader holds this same object
+                Object.keys(divisionConfig).forEach(k => delete divisionConfig[k]);
+                Object.assign(divisionConfig, JSON.parse(JSON.stringify(divDraft)));
+                setDivDirty(false);
                 showToast("Divisions Saved!");
                 document.getElementById('divisionsModal').style.display = 'none';
             } catch (e) { alert(e.message); }
