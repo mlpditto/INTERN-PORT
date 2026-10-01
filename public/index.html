@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.47)</title>
+    <title>Internship Portfolio (V101.48)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -6721,7 +6721,9 @@
             return m ? `${m[3]}.${m[2]}.${m[1]}` : '';
         }
         // badge = { template, face, imageUrl } as stored on the event and copied to each stamp.
-        function eventBadgeSvgHtml(badge, avatarUrl, px, pillText) {
+        // pixel = avatarUrl is a users.avatar8 pixel portrait (V101.48 / V102.56): drawn square and
+        // crisp, no round photo ring — its stepped edge + ink outline is the frame.
+        function eventBadgeSvgHtml(badge, avatarUrl, px, pillText, pixel) {
             const b = badge || {};
             const art = EVENT_ART[b.template] || EVENT_ART.movie;
             const t = BADGE_TIERS[3];
@@ -6729,13 +6731,15 @@
             const id = 'evstamp' + (++_evClipN);
             const isPhoto = b.template === 'photo' && /^(data:image\/|https:)/.test(b.imageUrl || '');
             const ay = isPhoto ? 24 : 68;
+            const py = isPhoto ? 4 : 48;   // top of a pixel avatar (40×40)
             const face = /^#[0-9a-f]{6}$/i.test(b.face || '') ? b.face : art.face;
             return `<svg viewBox="0 0 100 ${vbH}" width="${px}" height="${Math.round(px * vbH / 100)}" aria-hidden="true" focusable="false" style="flex:none; overflow:visible;">`
                 + `<rect x="6" y="10" width="88" height="86" rx="24" fill="${t.dark}"/><rect x="6" y="4" width="88" height="84" rx="24" fill="${t.rim}"/><rect x="12" y="10" width="76" height="72" rx="19" fill="${face}"/>`
                 + (isPhoto
                     ? `<clipPath id="${id}f"><rect x="12" y="10" width="76" height="72" rx="19"/></clipPath><image href="${escapeHtml(b.imageUrl)}" x="12" y="10" width="76" height="72" clip-path="url(#${id}f)" preserveAspectRatio="xMidYMid slice"/>`
                     : `<g>${art.svg}</g>`)
-                + (avatarUrl ? `<clipPath id="${id}a"><circle cx="79" cy="${ay}" r="14"/></clipPath><circle cx="79" cy="${ay + 2}" r="17.5" fill="${t.dark}"/><circle cx="79" cy="${ay}" r="17.5" fill="#fff"/><image href="${escapeHtml(avatarUrl)}" x="65" y="${ay - 14}" width="28" height="28" clip-path="url(#${id}a)" preserveAspectRatio="xMidYMid slice"/>` : '')
+                + (avatarUrl && pixel ? `<image href="${escapeHtml(avatarUrl)}" x="60" y="${py}" width="40" height="40" style="image-rendering:pixelated"/>` : '')
+                + (avatarUrl && !pixel ? `<clipPath id="${id}a"><circle cx="79" cy="${ay}" r="14"/></clipPath><circle cx="79" cy="${ay + 2}" r="17.5" fill="${t.dark}"/><circle cx="79" cy="${ay}" r="17.5" fill="#fff"/><image href="${escapeHtml(avatarUrl)}" x="65" y="${ay - 14}" width="28" height="28" clip-path="url(#${id}a)" preserveAspectRatio="xMidYMid slice"/>` : '')
                 + (pillText ? `<rect x="14" y="84" width="72" height="26" rx="13" fill="${t.pale}" stroke="${t.dark}" stroke-width="3"/><text x="50" y="102" text-anchor="middle" font-size="11.5" font-weight="900" letter-spacing="0.3" fill="${t.fg}" font-family="system-ui, sans-serif">${escapeHtml(pillText)}</text>` : '')
                 + `</svg>`;
         }
@@ -7109,6 +7113,11 @@
         function evMyPicture() {
             return (typeof userProfile !== 'undefined' && userProfile && userProfile.pictureUrl) || myOwnRow().pictureUrl || '';
         }
+        // V101.48: [url, pixel] — the admin-made 8-bit manga avatar wins over the photo.
+        function evMyAvatar() {
+            const a8 = myOwnRow().avatar8;
+            return /^data:image\/png;base64,/.test(a8 || '') ? [a8, true] : [evMyPicture(), false];
+        }
 
         function evStampsLoad() {
             if (evStampsStarted || !userId || typeof db === 'undefined') return;
@@ -7150,7 +7159,8 @@
             document.getElementById('ach-unlock-confetti').innerHTML = [8, 22, 38, 60, 76, 90, 14, 84, 30, 68].map((x, i) =>
                 `<span style="position:absolute; left:${x}%; top:${i < 6 ? 4 + (i % 3) * 5 : 30 + (i % 4) * 9}%; width:${i % 2 ? 8 : 11}px; height:${i % 2 ? 8 : 5}px; border-radius:2px; background:${COLORS[i % COLORS.length]}; transform:rotate(${i * 37}deg);"></span>`).join('');
             const badge = document.getElementById('ach-unlock-badge');
-            badge.innerHTML = eventBadgeSvgHtml(s.badge, evMyPicture(), 150, evStampDateText(s.eventDate));
+            const [av, avPx] = evMyAvatar();
+            badge.innerHTML = eventBadgeSvgHtml(s.badge, av, 150, evStampDateText(s.eventDate), avPx);
             badge.classList.remove('ach-pop'); void badge.offsetWidth; badge.classList.add('ach-pop');
             document.getElementById('achievementUnlockModal').style.display = 'flex';
         }
@@ -7159,11 +7169,12 @@
             const box = document.getElementById('achievements-memories');
             if (!box) return;
             if (!myEventStamps.length) { box.innerHTML = ''; return; }
-            const pic = evMyPicture();
+            const [pic, picPx] = evMyAvatar();
             const n = myEventStamps.length;
             box.innerHTML = `<div class="lang-no-toggle" style="background:#fff8e6; border:2px solid #f5e0a8; border-radius:16px; padding:10px 6px 8px; margin:8px 0 4px; text-align:left;">
                 <div style="display:flex; justify-content:space-between; align-items:center; padding:0 6px 6px;"><strong style="font-weight:900; color:#7a5600;">🎟️ Memories</strong><span style="font-size:0.75em; font-weight:800; color:#7a5600;">${n} event${n > 1 ? 's' : ''}</span></div>
-                <div style="display:flex; gap:4px; overflow-x:auto; padding-bottom:4px;">${myEventStamps.map(s => `<div title="${escapeHtml((s.title || '') + ' · ' + evStampDateText(s.eventDate))}" style="flex:none; width:92px; text-align:center;">${eventBadgeSvgHtml(s.badge, pic, 72, evStampDateText(s.eventDate))}<div style="font-size:0.7em; font-weight:800; color:#3c3c3c; line-height:1.2; margin-top:2px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">${escapeHtml(s.title || '')}</div></div>`).join('')}</div>
+                <div style="display:flex; gap:4px; overflow-x:auto; padding-bottom:4px;">${myEventStamps.map(s => `<div title="${escapeHtml((s.title || '') + ' · ' + evStampDateText(s.eventDate))}" style="flex:none; width:92px; text-align:center;">${eventBadgeSvgHtml(s.badge, pic, 72, evStampDateText(s.eventDate), picPx)}<div style="font-size:0.7em; font-weight:800; color:#3c3c3c; line-height:1.2; margin-top:2px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">${escapeHtml(s.title || '')}</div></div>`).join('')}</div>
+                <div style="font-size:0.68em; color:#8a6d1f; padding:2px 6px 0; line-height:1.4;">👾 Your stamps may show an 8-bit manga version of your LINE photo. The admin makes it with AI (Google Gemini) from your profile picture — ask the admin if you would rather not. <span class="lang-th">รูปบน stamp อาจเป็นภาพ 8-bit สไตล์มังงะที่ admin ให้ AI (Google Gemini) วาดจากรูปโปรไฟล์ LINE ของคุณ หากไม่ต้องการ แจ้ง admin ได้</span></div>
             </div>`;
         }
 
@@ -7172,7 +7183,8 @@
         function evStampRowHtml(e, joined) {
             if (!e.badge || e.kind === 'social') return '';
             const mine = myEventStamps.find(s => s.eventId === e.id);
-            const line = (txt, color) => `<div style="display:flex; align-items:center; gap:8px; margin-top:6px; padding-top:6px; border-top:1px dashed #e9d5ff;">${eventBadgeSvgHtml(e.badge, mine ? evMyPicture() : '', 34)}<span style="flex:1; font-size:0.68em; font-weight:700; color:${color};">${txt}</span></div>`;
+            const [myAv, myAvPx] = mine ? evMyAvatar() : ['', false];
+            const line = (txt, color) => `<div style="display:flex; align-items:center; gap:8px; margin-top:6px; padding-top:6px; border-top:1px dashed #e9d5ff;">${eventBadgeSvgHtml(e.badge, myAv, 34, '', myAvPx)}<span style="flex:1; font-size:0.68em; font-weight:700; color:${color};">${txt}</span></div>`;
             if (mine) return line('🎟️ Event stamp received — see Achievements ▸ Memories', '#15803d');
             if (!joined) return line('🏅 This event has a badge — tap Join to be able to get it', '#6d28d9');
             const today = getBangkokDateTimeParts().dateKey;

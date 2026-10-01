@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.55)</title>
+    <title>Nika Admin (V102.56)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -36095,7 +36095,9 @@ They can connect again from LINE.
             return m ? `${m[3]}.${m[2]}.${m[1]}` : '';
         }
         // badge = { template, face, imageUrl } as stored on the event and copied to each stamp.
-        function eventBadgeSvgHtml(badge, avatarUrl, px, pillText) {
+        // pixel = avatarUrl is a users.avatar8 pixel portrait (V101.48 / V102.56): drawn square and
+        // crisp, no round photo ring — its stepped edge + ink outline is the frame.
+        function eventBadgeSvgHtml(badge, avatarUrl, px, pillText, pixel) {
             const b = badge || {};
             const art = EVENT_ART[b.template] || EVENT_ART.movie;
             const t = BADGE_TIERS[3];
@@ -36103,13 +36105,15 @@ They can connect again from LINE.
             const id = 'evstamp' + (++_evClipN);
             const isPhoto = b.template === 'photo' && /^(data:image\/|https:)/.test(b.imageUrl || '');
             const ay = isPhoto ? 24 : 68;
+            const py = isPhoto ? 4 : 48;   // top of a pixel avatar (40×40)
             const face = /^#[0-9a-f]{6}$/i.test(b.face || '') ? b.face : art.face;
             return `<svg viewBox="0 0 100 ${vbH}" width="${px}" height="${Math.round(px * vbH / 100)}" aria-hidden="true" focusable="false" style="flex:none; overflow:visible;">`
                 + `<rect x="6" y="10" width="88" height="86" rx="24" fill="${t.dark}"/><rect x="6" y="4" width="88" height="84" rx="24" fill="${t.rim}"/><rect x="12" y="10" width="76" height="72" rx="19" fill="${face}"/>`
                 + (isPhoto
                     ? `<clipPath id="${id}f"><rect x="12" y="10" width="76" height="72" rx="19"/></clipPath><image href="${escapeHtml(b.imageUrl)}" x="12" y="10" width="76" height="72" clip-path="url(#${id}f)" preserveAspectRatio="xMidYMid slice"/>`
                     : `<g>${art.svg}</g>`)
-                + (avatarUrl ? `<clipPath id="${id}a"><circle cx="79" cy="${ay}" r="14"/></clipPath><circle cx="79" cy="${ay + 2}" r="17.5" fill="${t.dark}"/><circle cx="79" cy="${ay}" r="17.5" fill="#fff"/><image href="${escapeHtml(avatarUrl)}" x="65" y="${ay - 14}" width="28" height="28" clip-path="url(#${id}a)" preserveAspectRatio="xMidYMid slice"/>` : '')
+                + (avatarUrl && pixel ? `<image href="${escapeHtml(avatarUrl)}" x="60" y="${py}" width="40" height="40" style="image-rendering:pixelated"/>` : '')
+                + (avatarUrl && !pixel ? `<clipPath id="${id}a"><circle cx="79" cy="${ay}" r="14"/></clipPath><circle cx="79" cy="${ay + 2}" r="17.5" fill="${t.dark}"/><circle cx="79" cy="${ay}" r="17.5" fill="#fff"/><image href="${escapeHtml(avatarUrl)}" x="65" y="${ay - 14}" width="28" height="28" clip-path="url(#${id}a)" preserveAspectRatio="xMidYMid slice"/>` : '')
                 + (pillText ? `<rect x="14" y="84" width="72" height="26" rx="13" fill="${t.pale}" stroke="${t.dark}" stroke-width="3"/><text x="50" y="102" text-anchor="middle" font-size="11.5" font-weight="900" letter-spacing="0.3" fill="${t.fg}" font-family="system-ui, sans-serif">${escapeHtml(pillText)}</text>` : '')
                 + `</svg>`;
         }
@@ -36203,6 +36207,178 @@ They can connect again from LINE.
             window._userBadgesPopTrigger = null;
             if (trig) trig.setAttribute('aria-expanded', 'false');
         }
+
+        // ---- V102.56: manga 8-bit avatar (users/{id}.avatar8) -----------------------
+        // LINE photo → AI redraw as a manga portrait (gemini-aistudio image edit; the proxy
+        // fetches the LINE picture itself, a browser can't read it) → 32×32 pixel art here
+        // → the admin approves → saved on the user. Event stamps show it instead of the
+        // round photo. Interns are told in their Memories strip; there is no opt-in.
+        const AVATAR8_MODEL = 'as/gemini-3.1-flash-image';
+        const AVATAR8_PROMPT = 'Redraw the person in this photo as a cute 1990s anime / manga character, head and shoulders, facing forward, centred, filling the frame. '
+            + 'Keep: hair style and colour, glasses if any, skin tone, the main clothing colour. '
+            + 'Style: big expressive anime eyes with a white highlight, small nose, simple smile, light blush, flat cel shading, thick dark outlines, plain light background. '
+            + 'No text, no logos, no other people. Square image.';
+        let avatar8State = null;   // { uid, busy, result, error }
+
+        // Any square-ish image → 32×32 pixels in its own 16 colours (k-means), cut to a stepped
+        // circle with a 1 px ink outline. Returned at 1× (34×34 PNG, a few KB); badges scale it
+        // up with image-rendering:pixelated.
+        function avatar8FromImage(src) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onerror = () => reject(new Error('The AI image could not be read.'));
+                img.onload = () => {
+                    const N = 32, M = N + 2, r0 = N / 2, INK = [26, 26, 46];
+                    const c = document.createElement('canvas');
+                    c.width = c.height = N;
+                    const x = c.getContext('2d');
+                    x.imageSmoothingQuality = 'high';
+                    const side = Math.min(img.width, img.height);
+                    x.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, N, N);
+                    const d = x.getImageData(0, 0, N, N).data;
+                    const grid = new Array(M * M).fill(null);
+                    const inside = [];
+                    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+                        const dx = i + 0.5 - r0, dy = j + 0.5 - r0;
+                        if (dx * dx + dy * dy > r0 * r0) continue;
+                        const o = (j * N + i) * 4, p = [d[o], d[o + 1], d[o + 2]];
+                        grid[(j + 1) * M + (i + 1)] = p;
+                        inside.push(p);
+                    }
+                    const dist = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
+                    const K = 16;
+                    let pal = Array.from({ length: K }, (_, k) => inside[Math.floor((k + 0.5) * inside.length / K)].slice());
+                    for (let it = 0; it < 10; it++) {
+                        const sum = pal.map(() => [0, 0, 0, 0]);
+                        inside.forEach(p => {
+                            let bi = 0;
+                            pal.forEach((q, k) => { if (dist(p, q) < dist(p, pal[bi])) bi = k; });
+                            sum[bi][0] += p[0]; sum[bi][1] += p[1]; sum[bi][2] += p[2]; sum[bi][3]++;
+                        });
+                        pal = pal.map((q, k) => sum[k][3] ? [sum[k][0] / sum[k][3], sum[k][1] / sum[k][3], sum[k][2] / sum[k][3]].map(Math.round) : q);
+                    }
+                    const out = grid.map(p => p && pal.reduce((b, q) => dist(p, q) < dist(p, b) ? q : b, pal[0]));
+                    for (let j = 0; j < M; j++) for (let i = 0; i < M; i++) {
+                        if (grid[j * M + i]) continue;
+                        if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => { const ii = i + a, jj = j + b; return ii >= 0 && jj >= 0 && ii < M && jj < M && grid[jj * M + ii]; })) out[j * M + i] = INK;
+                    }
+                    const o = document.createElement('canvas');
+                    o.width = o.height = M;
+                    const ox = o.getContext('2d');
+                    out.forEach((p, k) => { if (!p) return; ox.fillStyle = `rgb(${p.join(',')})`; ox.fillRect(k % M, Math.floor(k / M), 1, 1); });
+                    resolve(o.toDataURL('image/png'));
+                };
+                img.src = src;
+            });
+        }
+
+        function openAvatar8Dialog(uid) {
+            closeUserRowMenu(false);
+            avatar8State = { uid, busy: false, result: '', error: '' };
+            let box = document.getElementById('avatar8-dialog');
+            if (!box) {
+                box = document.createElement('div');
+                box.id = 'avatar8-dialog';
+                box.className = 'lang-no-toggle';
+                box.setAttribute('role', 'dialog');
+                box.setAttribute('aria-modal', 'true');
+                box.style.cssText = 'position:fixed; inset:0; z-index:10050; display:flex; align-items:center; justify-content:center; background:rgba(15, 23, 42, 0.45); padding:16px;';
+                box.addEventListener('click', e => { if (e.target === box) closeAvatar8Dialog(); });
+                document.body.appendChild(box);
+            }
+            box.style.display = 'flex';
+            renderAvatar8Dialog();
+        }
+
+        function closeAvatar8Dialog() {
+            const box = document.getElementById('avatar8-dialog');
+            if (box) box.style.display = 'none';
+            avatar8State = null;
+        }
+
+        function renderAvatar8Dialog() {
+            const box = document.getElementById('avatar8-dialog');
+            const st = avatar8State;
+            if (!box || !st) return;
+            const u = (usersData || []).find(x => x.id === st.uid) || {};
+            const shown = st.result || u.avatar8 || '';
+            const canAsk = /^https:\/\/(profile|obs|sprofile)\.line-scdn\.net\//.test(u.pictureUrl || '');
+            const pix = (src, n) => src ? `<img src="${escapeHtml(src)}" alt="" width="${n}" height="${n}" style="image-rendering:pixelated; display:block;">` : `<div style="width:${n}px; height:${n}px; border-radius:12px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:0.7em; font-weight:800;">none yet</div>`;
+            const btn = (label, onclick, primary, disabled) => `<button type="button" onclick="${onclick}" ${disabled ? 'disabled' : ''} style="width:auto; min-height:0; padding:8px 14px; border-radius:10px; font-weight:800; font-size:0.82em; cursor:${disabled ? 'default' : 'pointer'}; opacity:${disabled ? 0.5 : 1}; ${primary ? 'border:none; background:#7c3aed; color:#fff;' : 'border:1px solid #e2e8f0; background:#fff; color:#334155;'}">${label}</button>`;
+            box.innerHTML = `<div style="background:var(--bg-card, #fff); color:var(--text-main, #1e293b); border-radius:16px; padding:16px; width:min(520px, 100%); box-shadow:0 20px 40px rgba(15, 23, 42, 0.25);">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;"><b>👾 8-bit avatar — ${escapeHtml(u.displayName || st.uid)}</b>
+                    <button type="button" onclick="closeAvatar8Dialog()" aria-label="Close" style="margin-left:auto; width:32px; height:32px; min-height:0; padding:0; border:none; background:transparent; font-size:20px; cursor:pointer; color:#94a3b8;">×</button></div>
+                <div style="display:flex; gap:12px; align-items:center; justify-content:center; flex-wrap:wrap;">
+                    <div style="text-align:center;">${u.pictureUrl ? `<img src="${escapeHtml(u.pictureUrl)}" alt="" width="84" height="84" style="border-radius:50%; object-fit:cover; display:block;">` : pix('', 84)}<div style="font-size:0.68em; color:#64748b; font-weight:700; margin-top:4px;">LINE photo</div></div>
+                    <div style="color:#cbd5e1; font-size:1.3em;">→</div>
+                    <div style="text-align:center;">${st.busy ? `<div style="width:96px; height:96px; display:flex; align-items:center; justify-content:center; color:#7c3aed; font-size:0.75em; font-weight:800;">Drawing…</div>` : pix(shown, 96)}<div style="font-size:0.68em; color:#64748b; font-weight:700; margin-top:4px;">${st.result ? 'new · not saved' : (u.avatar8 ? 'saved' : '8-bit')}</div></div>
+                    <div style="color:#cbd5e1; font-size:1.3em;">→</div>
+                    <div>${eventBadgeSvgHtml({ template: 'movie' }, shown || u.pictureUrl || '', 84, evStampDateText(schAdminTodayKey()), !!shown)}</div>
+                </div>
+                ${st.error ? `<div style="margin-top:10px; font-size:0.78em; font-weight:700; color:#b91c1c;">${escapeHtml(st.error)}</div>` : ''}
+                ${canAsk ? '' : `<div style="margin-top:10px; font-size:0.78em; font-weight:700; color:#b45309;">No LINE profile picture on this account, so there is nothing to redraw.</div>`}
+                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;">
+                    ${btn(st.result || u.avatar8 ? '↻ Redraw' : '🎨 Draw with AI', 'avatar8Generate()', !st.result, st.busy || !canAsk)}
+                    ${st.result ? btn('✓ Use this avatar', 'avatar8Save()', true, st.busy) : ''}
+                    ${u.avatar8 && !st.result ? btn('Remove', 'avatar8Remove()', false, st.busy) : ''}
+                </div>
+                <div style="font-size:0.7em; color:#94a3b8; margin-top:8px; line-height:1.45;">The LINE photo is sent to Google Gemini (AI Studio) to draw the portrait. Interns are told this under their Memories.</div>
+            </div>`;
+        }
+
+        async function avatar8Generate() {
+            const st = avatar8State;
+            if (!st || st.busy) return;
+            const u = (usersData || []).find(x => x.id === st.uid);
+            if (!u || !u.pictureUrl) return;
+            st.busy = true; st.error = '';
+            renderAvatar8Dialog();
+            try {
+                const resp = await window.callUniversalAI(AVATAR8_MODEL, AVATAR8_PROMPT, false, { imageUrl: u.pictureUrl }, '', { feature: 'avatar8' });
+                // imageDataUrl first: the proxy also returns the model's text, and callUniversalAI puts text first.
+                const raw = (resp && ((resp.raw && resp.raw.imageDataUrl) || resp.imageDataUrl || resp.text)) || '';
+                if (!/^data:image\//.test(raw)) throw new Error('The AI answered without an image. Try ↻ Redraw.');
+                st.result = await avatar8FromImage(raw);
+            } catch (e) {
+                st.error = 'Could not draw: ' + ((e && e.message) || e);
+            }
+            st.busy = false;
+            if (avatar8State === st) renderAvatar8Dialog();
+        }
+
+        async function avatar8Save() {
+            const st = avatar8State;
+            if (!st || !st.result) return;
+            st.busy = true;
+            renderAvatar8Dialog();
+            try {
+                await db.collection('users').doc(st.uid).update({
+                    avatar8: st.result,
+                    avatar8At: firebase.firestore.FieldValue.serverTimestamp(),
+                    avatar8By: (auth.currentUser || {}).email || ''
+                });
+                showToast('8-bit avatar saved');
+                closeAvatar8Dialog();
+            } catch (e) {
+                st.busy = false; st.error = 'Could not save: ' + e.message;
+                renderAvatar8Dialog();
+            }
+        }
+
+        async function avatar8Remove() {
+            const st = avatar8State;
+            if (!st || !confirm('Remove this 8-bit avatar? Stamps go back to the LINE photo.')) return;
+            try {
+                await db.collection('users').doc(st.uid).update({
+                    avatar8: firebase.firestore.FieldValue.delete(),
+                    avatar8At: firebase.firestore.FieldValue.delete(),
+                    avatar8By: firebase.firestore.FieldValue.delete()
+                });
+                showToast('8-bit avatar removed');
+                closeAvatar8Dialog();
+            } catch (e) { alert('Could not remove: ' + e.message); }
+        }
+
         // V102.54: Event Stamps under the badge grid — not part of the n/15 count.
         function userMemoriesStripHtml(u) {
             const list = eventStampsCache
@@ -36211,7 +36387,7 @@ They can connect again from LINE.
             if (!list.length) return '';
             return `<div style="position:relative; border-top:2px dashed #f5e0a8; margin-top:8px; padding-top:6px; display:flex; flex-wrap:wrap; align-items:center; gap:6px;">
                 <span style="font-size:0.72em; font-weight:900; color:#7a5600; white-space:nowrap;">🎟️ Memories ${list.length}</span>
-                ${list.map(s => `<span title="${escapeHtml((s.title || '') + ' · ' + evStampDateText(s.eventDate))}">${eventBadgeSvgHtml(s.badge, u.pictureUrl || '', 34)}</span>`).join('')}
+                ${list.map(s => `<span title="${escapeHtml((s.title || '') + ' · ' + evStampDateText(s.eventDate))}">${eventBadgeSvgHtml(s.badge, u.avatar8 || u.pictureUrl || '', 34, '', !!u.avatar8)}</span>`).join('')}
             </div>`;
         }
 
@@ -47921,6 +48097,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 [u.isIgnored ? '👀' : '🙈', u.isIgnored ? 'Show on boards' : 'Hide from boards', () => toggleIgnoreUser(uid, u.isIgnored === true)],
                 'sep',
                 ['🎓', 'Certificate', () => openCertModal(uid)],
+                ['👾', u.avatar8 ? '8-bit avatar ✓' : '8-bit avatar…', () => openAvatar8Dialog(uid)], // V102.56
                 ['📜', 'Score history', () => showHistory(uid, u.displayName, u.score || 0)],
                 // V98.57: log work handed in outside the app (LINE, in person).
                 ['<i class="fa-solid fa-upload"></i>', 'Log work for this user', () => openAdminLogWorkModal(uid)],

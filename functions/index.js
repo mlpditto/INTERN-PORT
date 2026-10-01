@@ -1142,6 +1142,23 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                         data: asB64
                     }
                 });
+            } else if (visionData && visionData.imageUrl) {
+                // V102.56: manga 8-bit avatar — the admin page sends the intern's LINE
+                // pictureUrl and the picture is fetched HERE, because a browser cannot read
+                // profile.line-scdn.net pixels (no CORS). Admin only, LINE hosts only, no
+                // redirects, 5 MB cap: the proxy must never fetch an arbitrary URL.
+                let pic = null;
+                try { pic = new URL(String(visionData.imageUrl)); } catch (e) { pic = null; }
+                if (!callerIsAdmin || !pic || pic.protocol !== "https:" || !/^(profile|obs|sprofile)\.line-scdn\.net$/.test(pic.hostname)) {
+                    return res.status(400).json({ error: "imageUrl is accepted only for a LINE profile picture, from an admin." });
+                }
+                const picRes = await axios.get(pic.href, { responseType: "arraybuffer", timeout: 15000, maxRedirects: 0, maxContentLength: 5 * 1024 * 1024 });
+                asParts.push({
+                    inlineData: {
+                        mimeType: String(picRes.headers["content-type"] || "image/jpeg").split(";")[0],
+                        data: Buffer.from(picRes.data).toString("base64")
+                    }
+                });
             }
             const textConfig = {
                 ...(isJson ? { responseMimeType: "application/json" } : {}),
