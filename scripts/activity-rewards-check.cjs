@@ -26,7 +26,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
    send('review_link_clicks',[{linkId:'l1'}]);send('event_interests',[{eventTitle:'Requested event'}]);send('drug_codex_drafts',[{status:'approved'},{status:'pending'}]);send('disease_codex_drafts',[]);send('product_listings',[]);
   });
   assert.equal(await page.locator('.mp-card').count(),8);
-  const quiz=page.locator('[data-reward-key=quiz]');assert.match(await quiz.innerText(),/0.80 pt · 5 Beri/);assert.equal(await quiz.locator('.mp-value').innerText(),'1');assert.equal(await quiz.getAttribute('data-target'),'3');assert.match(await quiz.getAttribute('title'),/จากเป้า 3/);
+  const quiz=page.locator('[data-reward-key=quiz]');assert.match(await quiz.innerText(),/0.80 pt · 5 Beri/);assert.equal(await quiz.locator('.mp-value').innerText(),'1');assert.equal(await quiz.getAttribute('data-target'),'3');assert.equal(await quiz.getAttribute('data-pt'),'0.80');assert.match(await quiz.getAttribute('title'),/จากเป้า 3/);
   assert.match(await page.locator('[data-reward-key=drug]').innerText(),/0.50 pt/);
   assert.match(await page.locator('[data-reward-key=event]').textContent(),/requests/);
   assert.equal(await page.locator('#monthly-progress [data-reward-key=other]').count(),0);
@@ -35,10 +35,10 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
   await page.locator('#history-adjustment-records').getByRole('button',{name:'Close',exact:true}).click();
   assert.equal(await page.locator('#history-adjustments').getAttribute('aria-expanded'),'false');
   await quiz.click();assert.match(await page.locator('.mp-reward-detail').innerText(),/Quiz correction/);assert.match(await page.locator('.mp-reward-detail').innerText(),/-0.20 Points/);
-  for(const width of [320,390,736,1100]){await page.setViewportSize({width,height:1400});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.equal(await page.locator('.mp-grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length),8);}
+  for(const width of [320,390,736,1100]){await page.setViewportSize({width,height:1400});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.equal(await page.locator('.mp-grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length),width<=600?4:8);}
   await page.evaluate(()=>listeners.beri_ledger.fail(new Error('denied')));assert.match(await page.locator('[data-reward-key=quiz]').innerText(),/unavailable/);
   await page.getByRole('button',{name:'Retry unavailable data'}).click();assert.equal(await page.evaluate(()=>stopped),7);
   assert.deepEqual(errors,[]);
-  console.log('PASS: 8 tiles; one 8-column icon strip at every width; quiz dedup/practice exclusion; month filter; posted rewards and reversals; codex mapping; request label; errors and retry. Firestore mocked.');
+  console.log('PASS: 8 tiles; icon + caption strip, 8 columns (4 at <=600px); quiz dedup/practice exclusion; month filter; posted rewards and reversals; codex mapping; request label; errors and retry. Firestore mocked.');
  }finally{await browser.close();}
 })();

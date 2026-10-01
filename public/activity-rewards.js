@@ -64,7 +64,7 @@ window.activityRewards = (() => {
         return names[r.source||r.type]||'Recorded adjustment';
     }
     function bind(tile,key){
-        tile.dataset.rewardKey=key;tile.setAttribute('aria-controls','mp-reward-detail');tile.title=`${labels[key]} · เดือนนี้ ${tile.dataset.n||0}${tile.dataset.target?' จากเป้า '+tile.dataset.target:''} · ${summary(key).replace(' pt',' คะแนน')} · กดดูที่มา`;tile.setAttribute('aria-label',tile.title);tile.onclick=()=>show(key,document.getElementById('monthly-progress'));
+        tile.dataset.rewardKey=key;tile.setAttribute('aria-controls','mp-reward-detail');tile.title=`${labels[key]} · เดือนนี้ ${tile.dataset.n||0}${tile.dataset.target?' จากเป้า '+tile.dataset.target:''} · ${summary(key).replace(' pt',' คะแนน')} · กดดูที่มา`;tile.setAttribute('aria-label',tile.title);tile.dataset.pt=(summary(key).match(/^(-?[0-9.]+) pt/)||[])[1]||'';tile.onclick=()=>show(key,document.getElementById('monthly-progress'));
         const reward=node('span',summary(key));reward.className='mp-reward';tile.append(reward);
     }
     function decorate(host, activities={}) {
