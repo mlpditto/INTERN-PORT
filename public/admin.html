@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.52)</title>
+    <title>Nika Admin (V102.53)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6092,6 +6092,26 @@
         }
 
         /* V99.43: Users-table row ⋯ menu — one shared popover, see openUserRowMenu() */
+        /* V102.53: ⭐ / 🪙 numbers are the adjust buttons; 4 quick actions beside ⋯; the number editor popover */
+        .u-num-tap { width: auto; min-height: 0; margin: 0; padding: 0 0 1px; border: 0; border-bottom: 1px dashed currentColor; border-radius: 0; background: none; font: inherit; cursor: pointer; color: inherit; }
+        .u-num-tap:hover { background: rgba(99, 102, 241, 0.08); }
+        .u-row-quick { display: flex; align-items: center; justify-content: flex-end; gap: 4px; flex-wrap: nowrap; }
+        .u-row-quick > button:not(.u-row-kebab) { width: 28px; height: 28px; min-height: 0; margin: 0; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: transparent; color: var(--text-sub); cursor: pointer; font-size: 0.85em; }
+        .u-row-quick > button:not(.u-row-kebab):hover { background: var(--bg-hover, #f1f5f9); }
+        #num-adj-pop { position: fixed; z-index: 1000; padding: 8px 10px; background: var(--bg-card, #fff); border: 1px solid #10b981; border-radius: 12px; box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18); }
+        #num-adj-pop[data-kind="beri"] { border-color: #ea580c; }
+        #num-adj-pop .na-head { display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px; font-size: 0.85em; }
+        #num-adj-pop .na-to { color: #059669; font-weight: 700; }
+        #num-adj-pop[data-kind="beri"] .na-to { color: #ea580c; }
+        #num-adj-pop .na-who { margin-left: auto; color: var(--text-sub); }
+        #num-adj-pop .na-row { display: flex; align-items: center; gap: 6px; }
+        #num-adj-pop input { margin: 0; height: 30px; font-size: 0.85em; }
+        #num-adj-pop .na-amt { width: 70px; appearance: textfield; -moz-appearance: textfield; }
+        #num-adj-pop .na-amt::-webkit-inner-spin-button, #num-adj-pop .na-amt::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        #num-adj-pop .na-note { width: 170px; }
+        #num-adj-pop .na-save { width: auto; min-height: 30px; margin: 0; padding: 0 14px; border: 0; border-radius: 8px; background: #10b981; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+        #num-adj-pop[data-kind="beri"] .na-save { background: #ea580c; }
+        #num-adj-pop .na-save:disabled { opacity: 0.45; cursor: default; }
         .u-row-kebab { width: 28px; height: 28px; min-height: 0; margin: 0; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-card); color: var(--text-sub); cursor: pointer; font-size: 0.85em; }
         .u-row-kebab:hover, .u-row-kebab[aria-expanded="true"] { color: var(--text-main); border-color: #94a3b8; }
         .u-row-menu { position: fixed; z-index: 1000; min-width: 220px; padding: 5px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18); display: flex; flex-direction: column; }
@@ -34984,7 +35004,7 @@ RULES:
                 const link = reviewLinksCache.find(l => l.id === r.linkId) || {};
                 // Optional, admin-facing only — no automatic Beri formula from this;
                 // if verified as a real purchase, award bonus Beri separately via the
-                // manual adjBeri() control in Elite Board, not from this queue.
+                // manual Beri adjust in User Hub (tap the 🪙 number, openNumAdjust), not from this queue.
                 const spendHtml = (r.spendAmount != null)
                     ? `<div style="font-size:0.76em; color:#b45309; font-weight:700; margin-top:2px;">💸 แจ้งยอดใช้จ่าย ฿${r.spendAmount} — ตรวจสอบแล้วให้ Beri เพิ่มเองผ่าน Elite Board</div>`
                     : '';
@@ -47697,27 +47717,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         </div>
                     `;
 
-                    // V99.43 — Elite Board Phase 2: the seven per-row buttons (🎓 📜 log-work
-                    // 📎 merge key delete) live in one shared ⋯ menu, openUserRowMenu().
-                    // Adj and Beri stay inline — they are the controls used most.
-                    // V99.44 (Phase 3): Adj · Beri · ⋯ on one line instead of two stacked rows.
+                    // V99.43 — Elite Board Phase 2: the per-row buttons live in one shared ⋯ menu, openUserRowMenu().
+                    // V102.53: Adj / Beri left this column — tap the ⭐ / 🪙 number instead (openNumAdjust). The four
+                    // actions used most sit beside ⋯ (they stay in the menu too); userRowQuick looks the user up by id.
                     const actionsGroup = `
-                        <div style="display:flex; align-items:center; gap:4px; flex-wrap:nowrap;">
-                            <div style="display:flex; align-items:center; gap:4px; background:rgba(236, 253, 245, 0.75); border:1px solid #bbf7d0; border-radius:8px; padding:4px;">
-                                <input type="number" step="0.1" id="adj-${d.id}" placeholder="0.0" style="width:62px; margin:0; height:24px; font-size:0.75em;" onkeypress="if(event.key==='Enter')adjDec('${d.id}')">
-                                <button class="btn-sm btn-success" style="height:24px; min-height:auto; padding:0 8px; font-size:0.72em;" onclick="adjDec('${d.id}')">Adj</button>
-                            </div>
-                            <!-- V96.52: manual Beri adjust — e.g. crediting an offline/real-world
-                                 purchase. Mirrors the score Adj control above exactly (same
-                                 prompt-for-reason flow) but writes users.beri + a separate
-                                 beri_adjustments audit doc, kept OUT of checkin_logs so it can
-                                 never get summed into the score-denominated dashboards that
-                                 already read that collection (manual_adjust type, dashboard
-                                 totals, etc.). -->
-                            <div style="display:flex; align-items:center; gap:4px; background:rgba(255, 251, 235, 0.85); border:1px solid #fde68a; border-radius:8px; padding:4px;">
-                                <input type="number" step="1" id="beri-adj-${d.id}" placeholder="🪙 0" style="width:62px; margin:0; height:24px; font-size:0.75em;" onkeypress="if(event.key==='Enter')adjBeri('${d.id}')">
-                                <button class="btn-sm" style="height:24px; min-height:auto; padding:0 8px; font-size:0.72em; background:#ea580c; color:white;" onclick="adjBeri('${d.id}')" title="Adjust Beri (e.g. offline purchase credit)">Beri</button>
-                            </div>
+                        <div class="u-row-quick">
+                            <button type="button" onclick="userRowQuick('${d.id}', 'period')" title="ตั้งช่วงฝึกงาน" aria-label="Set period">📅</button>
+                            <button type="button" onclick="userRowQuick('${d.id}', 'history')" title="ประวัติคะแนน" aria-label="Score history">📜</button>
+                            <button type="button" onclick="userRowQuick('${d.id}', 'log')" title="บันทึกงานแทนผู้ใช้" aria-label="Log work for this user"><i class="fa-solid fa-upload"></i></button>
+                            <button type="button" onclick="userRowQuick('${d.id}', 'cert')" title="ใบประกาศ" aria-label="Certificate">🎓</button>
                             <button type="button" class="u-row-kebab" onclick="openUserRowMenu(event, '${d.id}')" aria-haspopup="menu" aria-expanded="false" aria-label="More actions" title="More actions"><i class="fa-solid fa-ellipsis"></i></button>
                         </div>`;
 
@@ -47740,8 +47748,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                     </div>
                                 </div>
                             </td>
-                            <td><span style="font-weight:700; color:var(--primary);">${d.periodScore !== undefined ? `${d.periodScore.toFixed(2)} <span style="font-size:0.75em; color:#999; font-weight:400;">(+${parseFloat((d.score || 0).toFixed(2))})</span>` : parseFloat((d.score || 0).toFixed(2))}</span></td>
-                            <td><span style="font-weight:600; color:#c2410c;" title="Beri balance">${Math.round(d.beri || 0)}</span></td>
+                            <td><button type="button" class="u-num-tap" onclick="openNumAdjust(event, '${d.id}', 'score')" title="แตะเพื่อปรับคะแนน (+/−)" aria-label="Adjust score"><span style="font-weight:700; color:var(--primary);">${d.periodScore !== undefined ? `${d.periodScore.toFixed(2)} <span style="font-size:0.75em; color:#999; font-weight:400;">(+${parseFloat((d.score || 0).toFixed(2))})</span>` : parseFloat((d.score || 0).toFixed(2))}</span></button></td>
+                            <td><button type="button" class="u-num-tap" onclick="openNumAdjust(event, '${d.id}', 'beri')" title="แตะเพื่อปรับ Beri (+/−)" aria-label="Adjust Beri"><span style="font-weight:600; color:#c2410c;">${Math.round(d.beri || 0)}</span></button></td>
                             <td style="font-size:0.84em;">
                                 <div>
                                     <div style="display:flex; align-items:center; gap:6px; flex-wrap:nowrap;">
@@ -47856,7 +47864,88 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             window._userRowMenuTrigger = trig;
             m.querySelector('[role="menuitem"]')?.focus({ preventScroll: true });
         }
-        async function adjDec(id) { try { const valInput = document.getElementById(`adj-${id}`); let v = valInput.value; if (!v) return alert("Please specify score."); v = v.replace(',', '.'); const scoreVal = parseFloat(v); if (isNaN(scoreVal)) return alert("Invalid score value."); const n = prompt("Reason (Note):"); if (!n) return; const editor = (auth && auth.currentUser) || {}; await db.collection("users").doc(id).update({ score: firebase.firestore.FieldValue.increment(scoreVal) }); await db.collection("checkin_logs").add({ userId: id, type: 'manual_adjust', amount: scoreVal, note: n, timestamp: firebase.firestore.FieldValue.serverTimestamp(), createdByUid: editor.uid || 'unknown', createdByEmail: editor.email || ALLOWED_EMAIL }); showToast("Saved!"); valInput.value = ""; valInput.blur(); } catch (e) { alert("Error saving score: " + e.message); } }
+        // V102.53: called by openNumAdjust with the amount and the reason; writes exactly what the old Adj button wrote.
+        async function adjDec(id, scoreVal, note) {
+            const editor = (auth && auth.currentUser) || {};
+            await db.collection("users").doc(id).update({ score: firebase.firestore.FieldValue.increment(scoreVal) });
+            await db.collection("checkin_logs").add({ userId: id, type: 'manual_adjust', amount: scoreVal, note, timestamp: firebase.firestore.FieldValue.serverTimestamp(), createdByUid: editor.uid || 'unknown', createdByEmail: editor.email || ALLOWED_EMAIL });
+        }
+
+        function userRowQuick(uid, act) {
+            const u = (usersData || []).find(x => x.id === uid);
+            if (!u) return;
+            if (act === 'period') openPeriodModal(uid, u.displayName, u.startDate || '', u.endDate || '');
+            else if (act === 'history') showHistory(uid, u.displayName, u.score || 0);
+            else if (act === 'log') openAdminLogWorkModal(uid);
+            else if (act === 'cert') openCertModal(uid);
+        }
+
+        // V102.53: score / Beri are adjusted by tapping the number in the row (the Adj / Beri column is gone).
+        // A small editor opens beside the number: ± amount + reason (required) + Save. It lives on <body>, not in
+        // the table, so a users onSnapshot re-render does not wipe what the admin is typing.
+        function closeNumAdjust() {
+            const p = document.getElementById('num-adj-pop');
+            if (p) p.hidden = true;
+            window._numAdj = null;
+        }
+        function openNumAdjust(ev, uid, kind) {
+            ev.stopPropagation();
+            const u = (usersData || []).find(x => x.id === uid);
+            if (!u) return;
+            let p = document.getElementById('num-adj-pop');
+            if (!p) {
+                p = document.createElement('div');
+                p.id = 'num-adj-pop';
+                p.className = 'lang-no-toggle';
+                p.setAttribute('role', 'dialog');
+                p.hidden = true;
+                document.body.appendChild(p);
+                document.addEventListener('click', e => { if (!p.hidden && !p.contains(e.target) && !e.target.closest('.u-num-tap')) closeNumAdjust(); });
+                document.addEventListener('keydown', e => { if (e.key === 'Escape') closeNumAdjust(); });
+            }
+            const beri = kind === 'beri';
+            const now = beri ? Math.round(u.beri || 0) : parseFloat((u.score || 0).toFixed(2));
+            window._numAdj = { uid, kind, now };
+            p.dataset.kind = kind;
+            p.setAttribute('aria-label', `${beri ? 'Adjust Beri' : 'Adjust score'} · ${u.displayName || ''}`);
+            p.innerHTML = `<div class="na-head"><b>${beri ? '🪙' : '⭐'} ${now}</b><span class="na-to"></span><span class="na-who">${escapeHtml(u.displayName || '')}</span></div>
+                <div class="na-row">
+                    <input type="number" class="na-amt" step="${beri ? 1 : 0.1}" placeholder="±0" aria-label="${beri ? 'Beri' : 'Points'} to add (negative to remove)" title="${beri ? 'จำนวน Beri ที่จะเพิ่ม (ใส่ลบเพื่อหัก)' : 'คะแนนที่จะเพิ่ม (ใส่ลบเพื่อหัก)'}">
+                    <input type="text" class="na-note" placeholder="Reason" aria-label="Reason (required)" title="${beri ? 'เหตุผล (จำเป็น) เช่น ยอดซื้อนอกระบบ' : 'เหตุผล (จำเป็น)'}">
+                    <button type="button" class="na-save" disabled>Save</button>
+                </div>`;
+            const amt = p.querySelector('.na-amt'), note = p.querySelector('.na-note'), save = p.querySelector('.na-save'), to = p.querySelector('.na-to');
+            const parse = () => { const v = parseFloat(String(amt.value).replace(',', '.')); return beri ? Math.trunc(v) : v; };
+            const sync = () => {
+                const v = parse();
+                const ok = Number.isFinite(v) && v !== 0;
+                to.textContent = ok ? ` → ${beri ? now + v : (now + v).toFixed(2)}` : '';
+                save.disabled = !ok || !note.value.trim();
+            };
+            amt.oninput = note.oninput = sync;
+            const submit = async () => {
+                const v = parse();
+                if (save.disabled) return;
+                save.disabled = true;
+                try {
+                    if (beri) await adjBeriCore(uid, v, note.value.trim());
+                    else await adjDec(uid, v, note.value.trim());
+                    showToast(beri ? 'Beri saved!' : 'Saved!');
+                    closeNumAdjust();
+                } catch (e) { save.disabled = false; alert((beri ? 'Error saving Beri: ' : 'Error saving score: ') + e.message); }
+            };
+            save.onclick = submit;
+            amt.onkeydown = note.onkeydown = e => { if (e.key === 'Enter') submit(); };
+            p.hidden = false;
+            const r = ev.currentTarget.getBoundingClientRect();
+            const pw = p.offsetWidth, ph = p.offsetHeight;
+            let top = r.bottom + 4;
+            if (top + ph > window.innerHeight - 8) top = Math.max(8, r.top - ph - 4);
+            p.style.top = top + 'px';
+            p.style.left = Math.max(8, Math.min(r.left - 8, window.innerWidth - pw - 8)) + 'px';
+            amt.focus();
+        }
+
 
         // V102.49: internship hours goal + the name that links this intern to the time
         // clock (time.mlp-int.work). The LINE ids differ between the two apps, so the
@@ -48014,22 +48103,6 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 refId: adjRef.id, note: note || 'Manual adjust', createdByUid: editor.uid || null
             });
             await bl.ref.set(bl.data);
-        }
-
-        async function adjBeri(id) {
-            try {
-                const valInput = document.getElementById(`beri-adj-${id}`);
-                let v = valInput.value;
-                if (!v) return alert("Please specify a Beri amount.");
-                v = v.replace(',', '.');
-                const beriVal = parseInt(v, 10);
-                if (isNaN(beriVal) || beriVal === 0) return alert("Invalid Beri amount.");
-                const n = prompt("Reason (Note) — e.g. offline purchase amount:");
-                if (!n) return;
-                await adjBeriCore(id, beriVal, n);
-                showToast("Beri saved!");
-                valInput.value = ""; valInput.blur();
-            } catch (e) { alert("Error saving Beri: " + e.message); }
         }
 
         // ===================================================================
