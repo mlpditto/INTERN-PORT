@@ -158,13 +158,14 @@
             return '<linearGradient id="' + id + '" x1="0" x2="1"><stop offset="0" stop-color="' + lc[i] + '"/><stop offset=".35" stop-color="' + lc[i] +
                 '"/><stop offset=".65" stop-color="' + rc[i] + '"/><stop offset="1" stop-color="' + rc[i] + '"/></linearGradient>';
         };
-        var svg = '<svg class="fw-slope" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true"><defs>' + grad('fwgFront', 0) + grad('fwgBack', 1) + '</defs>' +
+        var fill = '<div class="fw-fill" style="background:linear-gradient(to right,' + lc[0] + ' 35%,' + rc[0] + ' 65%)"></div>';
+        var svg = fill + '<svg class="fw-slope" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true"><defs>' + grad('fwgFront', 0) + grad('fwgBack', 1) + '</defs>' +
             layer(LEVEL[L] + 1.5, LEVEL[R] + 1.5, 20, 'url(#fwgBack)', ' opacity=".55"') + layer(LEVEL[L], LEVEL[R], 0, 'url(#fwgFront)') + '</svg>';
         // Which side is which: only needed once there are two places.
         // V101.33: larger glass markers with a ring in the side's risk colour.
         var RING = { low: null, moderate: '#f97316', high: '#dc2626' };
         var marker = function (side, emoji, level, risk, def, title) {
-            return '<span class="fw-side" style="' + side + ':-13px;bottom:calc(' + level + '% - 13px);border-color:' + (RING[risk] || def) +
+            return '<span class="fw-side" style="' + side + ':-13px;top:calc(var(--fw-base, 100%) * ' + (1 - level / 100) + ' - 13px);border-color:' + (RING[risk] || def) +
                 '" title="' + title + ': ' + risk + '">' + emoji + '</span>';
         };
         var icons = home && site
@@ -275,6 +276,18 @@
     }
     function onKey(e) { if (e.key === 'Escape') close(); }
 
+    // V101.36: the surface keeps its collapsed-card height. Levels are % of --fw-base (the card
+    // without the opened activity details); the .fw-fill below carries the same water down.
+    function fit() {
+        var card = document.getElementById('section-profile-combined');
+        if (!card) return;
+        var det = document.getElementById('activity-details');
+        var open = det && !det.hidden && det.offsetHeight > 0;
+        var wt = document.getElementById('fw-water');
+        if (wt) wt.classList.toggle('fw-open', !!open);
+        card.style.setProperty('--fw-base', (card.offsetHeight - (open ? det.offsetHeight + 8 : 0)) + 'px');
+    }
+
     window.fwInit = function () {
         var card = document.getElementById('section-profile-combined');
         if (card && !document.getElementById('fw-water')) {
@@ -285,6 +298,9 @@
             w.setAttribute('aria-hidden', 'true');
             card.insertBefore(w, card.firstChild);
         }
+        if (card && window.ResizeObserver) new ResizeObserver(fit).observe(card);
+        window.addEventListener('resize', fit);
+        fit();
         load('site', SITE.lat, SITE.lon);
     };
 
