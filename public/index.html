@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.44)</title>
+    <title>Internship Portfolio (V101.45)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -546,6 +546,13 @@
         /* Profile header: tools occupy their own row at every viewport width. */
         /* V101.41: the avatar (46px) sits in the corner, beside the tool rail instead of under it. --rail-h = rail row height;
            the rail keeps a 50px left pad so it wraps before it could run under the avatar. */
+        /* V101.45: name in the rail row + group as avatar ring / corner icon */
+        #profile-quick-actions > #u-name-row { flex:1 1 0; min-width:0; align-self:center; margin:0 auto 0 0; }
+        #section-profile-combined #profile-quick-actions #u-name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; max-width:100%; }
+        #section-profile-combined #u-group-badge { display:none !important; }
+        #section-profile-combined #u-img { box-shadow:0 2px 6px rgba(15,23,42,.14); }
+        #u-group-dot { position:absolute; left:-3px; bottom:-3px; width:18px; height:18px; border-radius:50%; color:#fff; display:flex; align-items:center; justify-content:center; font-size:9px; border:2px solid #fff; box-sizing:border-box; }
+        #u-group-dot[hidden] { display:none; }
         #section-profile-combined { --rail-h: 32px; }
         @media (pointer: coarse) { #section-profile-combined { --rail-h: 48px; } #section-profile-combined #profile-quick-actions { gap: 4px; } }
         #section-profile-combined #profile-quick-actions { padding-left: 50px; }
@@ -2319,6 +2326,15 @@
                 style="padding: 12px; position: relative; border-left: 5px solid #e67e22;">
                 <!-- Quick Actions toolbar -->
                 <div id="profile-quick-actions">
+                    <!-- V101.45: name sits in the rail row, beside the avatar (left), buttons stay right; a long name ends in …
+                         The group chip is hidden — the group is the avatar ring colour + the corner icon (#u-group-dot). -->
+                    <h3
+                        id="u-name-row" style="margin: 0; font-size: 1em; display: flex; align-items: center; gap: 4px;">
+                        <span class="lang-no-toggle" id="u-name"
+                            >User</span>
+                        <span id="u-group-badge"
+                            style="display:none; background:#4361ee; color:white; font-size:0.5em; padding:2px 6px; border-radius:8px; font-weight:bold;">Public</span>
+                    </h3>
                     <!-- V101.31: the ⋯ More menu that stood here is gone — Leaderboard and the
                          certificate moved into the activity details (…) panel, the Enrollment
                          Key match into Info → Social. -->
@@ -2364,18 +2380,12 @@
                 <div class="profile-info-row">
                     <div style="position: relative; flex-shrink: 0;">
                         <img id="u-img" class="profile-img" src=""
-                            style="width: 46px; height: 46px; border-width: 2px;">
+                            style="width: 46px; height: 46px; border-width: 3px;">
+                        <span id="u-group-dot" hidden></span>
                         <div id="u-award-badge"
                             style="position: absolute; bottom: -3px; right: -3px; transform: scale(0.7);"></div>
                     </div>
                     <div style="flex-grow: 1; min-width: 0;">
-                        <h3
-                            style="margin: 0; font-size: 1em; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
-                            <span class="lang-no-toggle" id="u-name"
-                                >User</span>
-                            <span id="u-group-badge"
-                                style="display:none; background:#4361ee; color:white; font-size:0.5em; padding:2px 6px; border-radius:8px; font-weight:bold;">Public</span>
-                        </h3>
                         <div style="margin-top: 2px;">
                             <span id="u-division-badge"
                                 style="display:none; background:#343a40; color:white; font-size:0.6em; padding:2px 6px; border-radius:8px; font-weight:bold; opacity:0.8;">Division</span>
@@ -7989,7 +7999,7 @@
                     if (checkinCountEl) checkinCountEl.textContent = da.checkinTotalCount || 0;
                     document.getElementById('u-group-badge').innerHTML = `<i class="fa-solid ${getGroupIcon(myGroup)}"></i> ${myGroup}`;
                     document.getElementById('u-group-badge').style.background = getGroupColor(myGroup);
-                    document.getElementById('u-group-badge').style.display = myGroup !== 'Public' ? 'inline-block' : 'none';
+                    document.getElementById('u-group-badge').style.display = myGroup !== 'Public' ? 'inline-block' : 'none'; paintProfileGroup(myGroup);
 
                     if (da.startDate) {
                         document.getElementById('u-start-date').value = da.startDate;
@@ -8530,7 +8540,7 @@
                 myScore = parseFloat(userData.score || 0); // V95.33: keep unlock gate in sync
                 document.getElementById('u-group-badge').innerHTML = `<i class="fa-solid ${getGroupIcon(myGroup)}"></i> ${myGroup}`;
                 document.getElementById('u-group-badge').style.background = getGroupColor(myGroup);
-                document.getElementById('u-group-badge').style.display = myGroup !== 'Public' ? 'inline-block' : 'none';
+                document.getElementById('u-group-badge').style.display = myGroup !== 'Public' ? 'inline-block' : 'none'; paintProfileGroup(myGroup);
                 document.getElementById('u-start-date').value = userData.startDate || "";
                 document.getElementById('u-end-date').value = userData.endDate || "";
                 document.getElementById('u-start-date-text').innerText = userData.startDate ? formatCustomDate(userData.startDate) : 'Start Date';
@@ -24408,6 +24418,15 @@ async function archiveDoneCard(cardId) {
             document.getElementById('unified-submit-modal').style.display = 'none';
         }
 
+        // V101.45: the profile shows the group as the avatar ring colour + a corner icon (the chip is hidden).
+        function paintProfileGroup(group) {
+            const show = !!group && group !== 'Public';
+            const c = getGroupColor(group);
+            const img = document.getElementById('u-img'), dot = document.getElementById('u-group-dot');
+            if (img) { img.style.borderColor = show ? c : ''; img.title = show ? 'กลุ่ม ' + group : ''; }
+            if (dot) { dot.hidden = !show; dot.style.background = c; dot.title = 'กลุ่ม ' + group; dot.innerHTML = `<i class="fa-solid ${getGroupIcon(group)}"></i>`; }
+        }
+
         // --- Helpers for Group UI ---
         function getGroupColor(g) {
             // Sync with Admin Panel colors
@@ -24425,7 +24444,7 @@ async function archiveDoneCard(cardId) {
                 "Admin": "#343a40",
                 "Junior": "#17a2b8"
             };
-            return colors[g] || "#6c757d";
+            return colors[g] || (typeof groupColorMap !== 'undefined' && groupColorMap[g]) || "#6c757d";   // V101.45: Pharmacists etc. came out grey
         }
 
         function getGroupIcon(g) {
@@ -24443,7 +24462,7 @@ async function archiveDoneCard(cardId) {
                 "Admin": "fa-user-shield",
                 "Junior": "fa-child"
             };
-            return icons[g] || "fa-users";
+            return icons[g] || (typeof groupIconMap !== 'undefined' && groupIconMap[g]) || "fa-users";
         }
 
         // --- Case Submission & Tracking (V84.1) ---
