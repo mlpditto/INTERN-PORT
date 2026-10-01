@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.41)</title>
+    <title>Internship Portfolio (V101.42)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -6779,11 +6779,16 @@
             if (schCheckinDays === null) schLoadCheckinDays().then(() => updateEarnedBadgesBar());
             if (achCodexApproved === null && !achCodexLoading) achLoadCodexApproved().then(n => { if (n !== null) updateEarnedBadgesBar(); });
             const list = computeAchievements();
-            const earned = list.filter(a => a.level > 0).sort((a, b) => b.tierIdx - a.tierIdx);
-            const minis = earned.slice(0, 5).map(a => badgeSvgHtml(a.def.art, a.tierIdx, 30, false)).join('');
-            container.innerHTML = `<button type="button" onclick="openAchievementsModal()" style="width:100%; min-height:44px; display:flex; align-items:center; gap:8px; padding:6px 10px; border:2px solid #e5e7ea; border-bottom-width:4px; border-radius:14px; background:#fff; cursor:pointer; font:inherit; color:#3c3c3c;">
-                <span style="display:flex; gap:3px; align-items:center;">${minis || badgeSvgHtml('award', 0, 30, false)}</span>
-                <span style="flex:1; text-align:left; font-weight:800; font-size:0.85em;">Achievements <span style="color:#6b7178; font-weight:700;">${earned.length}/${list.length}</span></span>
+            const earned = list.filter(a => a.level > 0).length;
+            // V101.42: every badge, in catalog order — earned in colour, not yet as a faint shadow. No "Achievements n/15" text:
+            // the row itself is the count. Names / tier / how to earn are the (Thai) hover; the whole row opens the full list.
+            const badges = list.map(a => {
+                const got = a.level > 0;
+                const tip = `${a.def.title} · ${got ? BADGE_TIERS[a.tierIdx].name.charAt(0) + BADGE_TIERS[a.tierIdx].name.slice(1).toLowerCase() : 'ยังไม่ได้'}${a.def.th ? ' — ' + a.def.th : ''}`;
+                return `<span title="${escapeHtml(tip)}" style="display:flex; justify-content:center; min-width:0;${got ? '' : ' opacity:.3; filter:grayscale(1);'}">${badgeSvgHtml(a.def.art, got ? a.tierIdx : 0, 30, false).replace('style="flex:none;', 'style="flex:none; width:100%; max-width:30px; height:auto;')}</span>`;
+            }).join('');
+            container.innerHTML = `<button type="button" onclick="openAchievementsModal()" title="ป้ายความสำเร็จ ${earned}/${list.length} · แตะเพื่อดูทั้งหมด" aria-label="Achievements ${earned} of ${list.length}" style="width:100%; min-height:44px; display:flex; align-items:center; gap:8px; padding:6px 10px; border:2px solid #e5e7ea; border-bottom-width:4px; border-radius:14px; background:#fff; cursor:pointer; font:inherit; color:#3c3c3c;">
+                <span style="flex:1; min-width:0; display:grid; grid-template-columns:repeat(${list.length}, minmax(0, 30px)); justify-content:start; gap:4px; align-items:center;">${badges}</span>
                 <span aria-hidden="true" style="color:#a4aab1; font-weight:900;">›</span>
             </button>`;
             container.style.display = 'flex';
