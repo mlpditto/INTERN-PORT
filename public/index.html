@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.35)</title>
+    <title>Internship Portfolio (V101.36)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -568,13 +568,16 @@
         .expl-shop-actions .expl-peer-button { width:auto; min-width:44px; min-height:44px; padding:0 6px; border:1px solid #e2e8f0; border-radius:10px; font-size:12px; background:#fff; color:#475569; cursor:pointer; }
         .expl-peer-list { overflow-wrap:anywhere; }
         .expl-peer-list[hidden] { display:none; }
+        /* V101.36: days left of the internship as a faint number behind the card, top-left (set by updateTimelineBar). */
+        #section-profile-combined { isolation: isolate; }
+        #u-days-left-bg { position:absolute; left:10px; top:0; z-index:-1; pointer-events:none; user-select:none; line-height:1; color:#475569; opacity:.09; font-weight:900; font-size:56px; letter-spacing:-2px; }
+        #u-days-left-bg small { font-size:14px; letter-spacing:0; font-weight:800; margin-left:2px; }
         .profile-score-summary { text-align: right; min-width: 0; }
-        .profile-score-values, .profile-score-ranks { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:6px 10px; }
+        .profile-score-values { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:6px 12px; }
         .profile-score-values > div { display:flex; align-items:baseline; gap:4px; }
         .profile-score-unit { font-size:12px; color:#64748b; }
-        .profile-score-ranks { margin-top:6px; font-size:12px; color:#64748b; }
-        .profile-score-ranks #u-crew-rank { overflow-wrap:anywhere; min-width:0; }
-        .profile-score-ranks #u-division-rank-badge { color:#c2410c; white-space:nowrap; }
+        .profile-score-values #u-crew-rank { font-size:12px; font-weight:700; color:#475569; white-space:nowrap; }
+        .profile-score-values #u-division-rank-badge { font-size:12px; color:#c2410c; white-space:nowrap; }
         #section-profile-combined #u-name {
             white-space: normal;
             overflow-wrap: anywhere;
@@ -2307,6 +2310,7 @@
             <!-- 🔥 Combined Profile & Status Section (V77.19) -->
             <div id="section-profile-combined" class="card"
                 style="padding: 12px; position: relative; border-left: 5px solid #e67e22;">
+                <div id="u-days-left-bg" aria-hidden="true" hidden></div>
                 <!-- Quick Actions toolbar -->
                 <div id="profile-quick-actions">
                     <!-- V101.31: the ⋯ More menu that stood here is gone — Leaderboard and the
@@ -2363,6 +2367,11 @@
                         <!-- Compact Date & Graduation Info -->
                         <div style="margin-top: 4px; display: flex; flex-direction: column; gap: 3px;">
                             <div style="display: flex; flex-wrap: wrap; gap: 4px; font-size: 0.75em;">
+                                <!-- V101.36: Start / End moved out of the header — they are edited in Info → Period (pi-start-date / pi-end-date)
+                                     and in the Schedule popup. The nodes stay (hidden): saveMyDates(), the users listener and the
+                                     enrolment path still read and write #u-start-date / #u-end-date. The days left now show as a faint
+                                     background number, top-left of the card (#u-days-left-bg). -->
+                                <div hidden>
                                 <div
                                     style="position: relative; display: inline-flex; align-items: center; gap: 3px; background: #f8f9fa; padding: 2px 6px; border-radius: 5px; border: 1px solid #e9ecef; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
                                     <i class="fa-regular fa-calendar" style="color:#667eea; font-size:0.8em;"></i>
@@ -2379,6 +2388,7 @@
                                         style="color:#444; font-weight:500; min-width:60px; text-align:center;">End
                                         Date</span>
                                     <input type="date" id="u-end-date" hidden><button type="button" onclick="schEditDates()" aria-label="Edit training dates" title="Edit internship period" data-th-title="แก้ไขช่วงฝึกงาน" style="position:absolute;inset:0;width:100%;min-height:0;padding:0;opacity:0;cursor:pointer"></button>
+                                </div>
                                 </div>
                                 <!-- V97.05: Schedule entry point, sitting with the dates
                                      because that is where "time" already lives on this card.
@@ -2399,7 +2409,7 @@
                                     <span id="u-schedule-badge"
                                         style="display:none; background:#7c3aed; color:#fff; font-size:0.82em; font-weight:800; border-radius:999px; padding:0 6px;"></span>
                                 </button>
-                                <div id="date-alert" onclick="schFocusStartDate()"
+                                <div id="date-alert" onclick="openPersonalInfoModal()"
                                     style="display:none; color:#e09f3e; font-size:0.95em; font-weight:bold; align-self:center; margin-left:2px; cursor:pointer;">
                                     <i class="fa-solid fa-circle-exclamation"></i> Please complete internship dates กรุณาระบุวันฝึกงานให้ครบ <span style="opacity:0.7;">›</span></div>
                             </div>
@@ -2432,11 +2442,11 @@
                         <div class="profile-score-values">
                             <div><span id="u-score" class="score-text" style="font-size:1.2em; line-height:1;">0</span><span class="profile-score-unit">pts</span></div>
                             <div id="u-beri-box" title="Beri — earned from the Explore tab" data-th-title="เบลลี่ จากแท็บ Explore">
-                                <span id="u-beri" class="score-text" style="font-size:0.85em; line-height:1; color:#b45309;">🪙 0</span><span class="profile-score-unit">Beri</span>
+                                <span id="u-beri" class="score-text" style="font-size:0.85em; line-height:1; color:#b45309;">🪙 0</span>
                             </div>
-                        </div>
-                        <div class="profile-score-ranks">
-                            <span id="u-crew-rank">LV.1 Rookie Navigator</span>
+                            <!-- V101.36: level + division rank ride the same line as pts / Beri
+                                 (they used to be a second row). The level NAME is the title. -->
+                            <span id="u-crew-rank" title="LV.1 Rookie Navigator">LV.1</span>
                             <span id="u-division-rank-badge" style="display:none;"></span>
                         </div>
                     </div>
@@ -8640,8 +8650,10 @@
                     : invalid ? 'ยังไม่มีช่วงฝึกงานที่ใช้คำนวณได้ · ตรวจสอบวันเริ่มและวันจบ' : '';
                 status.style.display = status.textContent ? 'block' : 'none';
             }
+            const daysBg = document.getElementById('u-days-left-bg');
             if (personal || invalid || tooLong) {
                 if (prog) prog.style.display = 'none';
+                if (daysBg) daysBg.hidden = true;
                 return;
             }
             if (prog) prog.style.display = 'block';
@@ -8668,6 +8680,11 @@
                 : '';
             document.getElementById('u-tl-label').innerHTML        = `Day ${daysPassed} of ${totalDays}${paceHtml}`;
             document.getElementById('u-tl-remaining').textContent  = pct >= 100 ? '🎓 Completed' : `⏳ ${daysLeft} days left`;
+            if (daysBg) {
+                daysBg.hidden = false;
+                daysBg.innerHTML = pct >= 100 ? '🎓' : `${daysLeft}<small>d</small>`;
+                daysBg.title = pct >= 100 ? 'Completed' : `${daysLeft} days left`;
+            }
             document.getElementById('u-tl-bar').style.width        = pct + '%';
             document.getElementById('u-tl-bar').style.background   = `linear-gradient(90deg,${barColor},${barColor}cc)`;
         }
@@ -14309,7 +14326,11 @@
                 rankBarEl.style.width = `${rankPct.toFixed(1)}%`;
             }
             if (nextEl) nextEl.textContent = `${nextRank.label}`;
-            if (rankEl) rankEl.textContent = getCrewRankByScore(score);
+            if (rankEl) {
+                const crewRank = getCrewRankByScore(score);
+                rankEl.textContent = crewRank.split(' ')[0];   // "LV.2" — the full name is the hover title
+                rankEl.title = crewRank;
+            }
             if (certificateEl) {
                 if (score >= 30) {
                     certificateEl.textContent = 'Certificate';
@@ -15834,7 +15855,7 @@
                 if (myRank > 0) {
                     floatingBadge.textContent = `🏆 #${myRank}`;
                     floatingBadge.setAttribute('aria-label', `Rank ${myRank} in division`);
-                    floatingBadge.style.display = 'block';
+                    floatingBadge.style.display = 'inline';
                 } else {
                     floatingBadge.style.display = 'none';
                 }
