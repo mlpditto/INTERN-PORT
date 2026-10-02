@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.68)</title>
+    <title>Nika Admin (V102.69)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -57906,6 +57906,24 @@ Save it anyway?`;
                 for (const e of finished) {
                     const snap = await db.collection('event_interests').where('eventId', '==', e.id).get();
                     const people = snap.docs.map(d => (d.data() || {})).map(v => v.displayName || v.userId || '?');
+                    // V102.69: the event goes to event_history first (PONEGLYPH ▸ Memories reads it).
+                    // A badged event is NOT deleted if that write fails — the stamp roster would be lost.
+                    try {
+                        const st = eventStampsCache.filter(s => s.eventId === e.id);
+                        await db.collection('event_history').doc(e.id).set({
+                            eventId: e.id, title: e.title || '', eventDate: e.eventDate || '', timeText: e.timeText || '',
+                            location: e.location || '', targetGroups: e.targetGroups || [],
+                            badge: e.badge || null,
+                            stampCount: st.length,
+                            stamps: st.map(s => ({ userId: s.userId, displayName: s.displayName || '', via: s.via || '' })),
+                            interested: people,
+                            archivedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            archivedByEmail: by.email || ''
+                        });
+                    } catch (err) {
+                        console.error('event_history write failed:', err);
+                        if (e.badge) continue;
+                    }
                     await db.collection('admin_logs').add({
                         userId: '',
                         action: 'event_auto_deleted',
