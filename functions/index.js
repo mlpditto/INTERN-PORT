@@ -4298,7 +4298,7 @@ function floodAlertText(where, s, lat, lon) {
 // ---- Early warning by email (training site only) ----
 // Before a place reaches High (LINE) the nearest canal gauge can already be climbing at the
 // watch mark: rising >= 3 cm/h with <= 10 cm left to the watch level (or already over it).
-// One email a day to the owner; no LINE quota used. Gmail SMTP with an App Password kept in
+// At most two emails a day (08:00 and 16:00 Bangkok) to the owner; no LINE quota used. Gmail SMTP with an App Password kept in
 // the GMAIL_APP_PASSWORD secret (the account is also the sender).
 const FLOOD_MAIL = 'medlifeplus@gmail.com';
 
@@ -4328,7 +4328,7 @@ function floodEarlyMail(w, s, lat, lon) {
     const rd = s.road && s.road.nearest;
     lines.push(rd ? `ถนนใกล้สุดที่ท่วม: ${rd.name} ${rd.closed ? 'ปิดการจราจร' : rd.depthCm != null ? `ลึก ~${rd.depthCm} ซม.` : ''} (${rd.m} ม.)` : 'ถนนรอบจุดยังไม่มีรายงานน้ำท่วม');
     lines.push('', `แผนที่: ${floodMapUrl(lat, lon)}`, '', s.pop.credit + ' (ไม่ใช่ประกาศทางการ)',
-        'เตือนล่วงหน้านี้ส่งไม่เกินวันละครั้ง · ข้อความ LINE ยังส่งเฉพาะเมื่อความเสี่ยงถึงระดับสูง');
+        'เตือนล่วงหน้านี้ส่งวันละไม่เกิน 2 ครั้ง (08:00 / 16:00) · ข้อความ LINE ยังส่งเฉพาะเมื่อความเสี่ยงถึงระดับสูง');
     return {
         subject: `🌊 น้ำใกล้เกณฑ์เฝ้าระวัง: ${c.name} ${f(c.wl)} ม. (+${c.deltaCm} ซม./ชม.)`,
         text: lines.join('\n')
@@ -4361,7 +4361,7 @@ exports.floodPointCheck = onCall({ timeoutSeconds: 30 }, async (request) => {
 // Hourly: training site + every opted-in home (users/{id}.floodWatch
 // = { optIn: true, home: { lat, lon } }, written by the intern page).
 exports.checkFloodAlerts = onSchedule({
-    schedule: 'every 60 minutes',
+    schedule: '0 * * * *',   // on the hour, so the 08:00 / 16:00 early-warning emails go out at 08:00 / 16:00
     timeZone: 'Asia/Bangkok',
     region: 'us-central1',
     timeoutSeconds: 300,
@@ -4370,6 +4370,7 @@ exports.checkFloodAlerts = onSchedule({
 }, async (event) => {
     const db = admin.firestore();
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+    const hourBkk = Number(new Date().toLocaleString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', hour12: false })) % 24;
     const cache = new Map();   // homes a few metres apart share one upstream call
     const check = (lat, lon) => {
         const key = `${lat.toFixed(3)},${lon.toFixed(3)}`;
@@ -4395,14 +4396,15 @@ exports.checkFloodAlerts = onSchedule({
                 () => ({ type: 'text', text: floodAlertText(where, s, lat, lon) }), `doc=${docId}`);
             if (r && r.ok) update.lastAlertDay = today;
         }
-        // Early warning email: the training site only, once per Bangkok day.
-        if (docId === '_site' && prev.lastEmailDay !== today) {
+        // Early warning email: the training site only, at the 08:00 and 16:00 runs (Bangkok), once per slot.
+        const slot = `${today} ${hourBkk}`;
+        if (docId === '_site' && (hourBkk === 8 || hourBkk === 16) && prev.lastEmailSlot !== slot) {
             const w = floodEarlyWarning(s);
             if (w) {
                 try {
                     const m = floodEarlyMail(w, s, lat, lon);
                     await sendFloodMail(m.subject, m.text);
-                    update.lastEmailDay = today;
+                    update.lastEmailSlot = slot;
                 } catch (e) {
                     console.warn('[checkFloodAlerts] early-warning email failed:', e && e.message);   // retried next hour
                 }
