@@ -45,7 +45,7 @@ const modelB = cut('        window._compareModelB = function', '        window.g
         // V102.13: vendor themes — unpicked tint + border + bar in the vendor colour; picked = vendor colour solid, white name + logo.
         const look = sel => page.locator(sel).evaluate(b => { const s = getComputedStyle(b), a = getComputedStyle(b, '::after'), l = b.querySelector('.text-ai-logo'), ls = l && getComputedStyle(l); return { vendor: b.dataset.vendor, bg: s.backgroundColor, img: s.backgroundImage, border: s.borderTopColor, color: s.color, bar: a.backgroundColor + '|' + a.backgroundImage, logo: ls ? ls.backgroundImage.replace(/^.*\//, '') + '|' + ls.filter : '' }; });
         const pick = async label => { await page.locator(`#b button[aria-label="${label}"]`).click(); return look(`#b button[aria-label="${label}"]`); };
-        await page.locator('#b button[aria-label="Claude Sonnet 5"]').click();
+        await page.locator('#b button[aria-label="Claude Sonnet 5.5"]').click();
         const luna = await look('#b button[aria-label="GPT 6 Luna"]');
         assert.equal(luna.vendor, 'openai');
         assert.match(luna.img, /rgba\(13, 13, 13, 0\.05\)/, 'GPT ink tint');
@@ -55,7 +55,7 @@ const modelB = cut('        window._compareModelB = function', '        window.g
         const flash = await look('#b button[aria-label="Gemini 3.8 Flash"]');
         assert.deepEqual([flash.vendor, flash.border], ['gemini', 'rgb(174, 203, 250)'], 'Gemini blue border');
         assert.match(flash.bar, /rgb\(66, 133, 244\)/, 'Gemini keeps the Google-bill rainbow bar');
-        const sonnet = await look('#b button[aria-label="Claude Sonnet 5"]');
+        const sonnet = await look('#b button[aria-label="Claude Sonnet 5.5"]');
         assert.deepEqual([sonnet.bg, sonnet.img, sonnet.color], ['rgb(217, 119, 87)', 'none', 'rgb(255, 255, 255)'], 'picked Claude = clay solid, white name (no amber)');
         assert.match(sonnet.logo, /invert\(1\)/, 'white Claude mark');
         const lunaOn = await pick('GPT 6 Luna');
