@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.57)</title>
+    <title>Nika Admin (V102.58)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -36486,6 +36486,13 @@ They can connect again from LINE.
             openBadgeExport({ kind: 'stamp', badge: s.badge, eventDate: s.eventDate, title: s.title || '', person: u.displayName || s.displayName || '', avatar8: u.avatar8 || '', pictureUrl: u.pictureUrl || '', avatar: u.avatar8 ? '8bit' : (u.pictureUrl ? 'photo' : 'none'), layout: 'person' });
         }
 
+        // V102.58: an event's stamp with no person — the event's art + date (event list ⬇).
+        function openEventBlankExport(eventId) {
+            const e = eventsCache.find(x => x.id === eventId);
+            if (!e || !e.badge) return;
+            openBadgeExport({ kind: 'stamp', blank: true, badge: e.badge, eventDate: e.eventDate, title: e.title || '', avatar: 'none', layout: 'badge' });
+        }
+
         // No person: any tier the badge offers (Badge Stats).
         function openBlankBadgeExport(defId) {
             const d = BADGE_STATS_DEFS.find(x => x.id === defId);
@@ -36510,8 +36517,8 @@ They can connect again from LINE.
             const thumbs = layouts.map(([k, label]) => `<button type="button" onclick="badgeExportSet('layout', '${k}')" aria-pressed="${st.layout === k}" style="width:auto; min-height:0; margin:0; padding:0; border:none; background:none; cursor:pointer; text-align:center; font:inherit;">
                     <div style="${checker} border-radius:12px; padding:8px; display:flex; justify-content:center; outline:${st.layout === k ? '3px solid #7c3aed' : '1px solid #e2e8f0'};">${badgeExportSvg(st, k, 104)}</div>
                     <div style="font-size:0.72em; font-weight:800; margin-top:5px; color:${st.layout === k ? '#6d28d9' : '#475569'};">${label}</div></button>`).join('');
-            const tierChips = st.blank && st.tiers.length > 1 ? `<span style="color:#64748b; font-weight:700;">Tier</span>${st.tiers.map(t => chip(st.tierIdx === t, `badgeExportSet('tierIdx', ${t})`, BADGE_TIERS[t].name.charAt(0) + BADGE_TIERS[t].name.slice(1).toLowerCase())).join('')}` : '';
-            const avatarChips = st.kind === 'stamp' ? `<span style="color:#64748b; font-weight:700;">In the circle</span>${chip(st.avatar === '8bit', "badgeExportSet('avatar', '8bit')", '👾 8-bit manga', !st.avatar8)}${chip(st.avatar === 'photo', "badgeExportSet('avatar', 'photo')", '📷 LINE photo', !st.pictureUrl)}${chip(st.avatar === 'none', "badgeExportSet('avatar', 'none')", 'None')}${st.avatar8 ? '' : '<span style="color:#94a3b8;">no 8-bit yet (User Hub ⋯ → 👾)</span>'}` : '';
+            const tierChips = st.blank && st.tiers && st.tiers.length > 1 ? `<span style="color:#64748b; font-weight:700;">Tier</span>${st.tiers.map(t => chip(st.tierIdx === t, `badgeExportSet('tierIdx', ${t})`, BADGE_TIERS[t].name.charAt(0) + BADGE_TIERS[t].name.slice(1).toLowerCase())).join('')}` : '';
+            const avatarChips = st.kind === 'stamp' && !st.blank ? `<span style="color:#64748b; font-weight:700;">In the circle</span>${chip(st.avatar === '8bit', "badgeExportSet('avatar', '8bit')", '👾 8-bit manga', !st.avatar8)}${chip(st.avatar === 'photo', "badgeExportSet('avatar', 'photo')", '📷 LINE photo', !st.pictureUrl)}${chip(st.avatar === 'none', "badgeExportSet('avatar', 'none')", 'None')}${st.avatar8 ? '' : '<span style="color:#94a3b8;">no 8-bit yet (User Hub ⋯ → 👾)</span>'}` : '';
             box.innerHTML = `<div style="background:var(--bg-card, #fff); color:var(--text-main, #1e293b); border-radius:16px; padding:16px; width:min(600px, 100%); max-height:92vh; overflow:auto; box-shadow:0 20px 40px rgba(15, 23, 42, 0.25);">
                 <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;"><b>⬇ ${st.blank ? 'Blank badge — ' + escapeHtml(st.title) : 'Export badge — ' + escapeHtml(st.person || '')}</b>
                     <button type="button" onclick="closeBadgeExport()" aria-label="Close" style="margin-left:auto; width:32px; height:32px; min-height:0; padding:0; border:none; background:transparent; font-size:20px; cursor:pointer; color:#94a3b8;">×</button></div>
@@ -49379,9 +49386,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const summary = document.getElementById('hub-badges-summary');
             if (!list || !summary) return;
             const u = (usersData || []).find(x => x.id === userId);
+            // V102.58: this person's Event Stamps (click one = PNG export), under the badges.
+            const stamps = u ? eventStampsCache.filter(s => s.userId === u.id).sort((a, b) => String(b.eventDate || '').localeCompare(String(a.eventDate || ''))) : [];
+            const memories = stamps.length ? `<div style="grid-column:1 / -1; margin-top:4px; padding:8px 10px; border:2px dashed #f5e0a8; border-radius:12px; background:#fffdf5;">
+                    <div style="font-weight:900; font-size:0.82em; color:#7a5600; margin-bottom:6px;">🎟️ Memories ${stamps.length} <span style="font-weight:600; color:#94a3b8;">· click to export PNG</span></div>
+                    <div style="display:flex; flex-wrap:wrap; gap:8px;">${stamps.map(s => `<button type="button" data-sid="${escapeHtml(s.id)}" onclick="openStampExport(this.dataset.sid)" title="${escapeHtml((s.title || '') + ' · ' + evStampDateText(s.eventDate) + ' · export PNG')}" style="width:auto; min-height:0; margin:0; padding:0; border:none; background:none; cursor:pointer; text-align:center; font:inherit;">${eventBadgeSvgHtml(s.badge, u.avatar8 || u.pictureUrl || '', 52, evStampDateText(s.eventDate), !!u.avatar8)}<div style="font-size:0.68em; font-weight:800; color:#334155; max-width:64px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(s.title || '')}</div></button>`).join('')}</div>
+                </div>` : '';
             if (!u || !u.badges || typeof u.badges !== 'object') {
                 summary.textContent = '🏅 —';
-                list.innerHTML = '<div style="grid-column:1 / -1; color:#94a3b8; font-size:0.85em;">The app has not saved badges for this intern yet — they appear after the next app open.</div>';
+                list.innerHTML = '<div style="grid-column:1 / -1; color:#94a3b8; font-size:0.85em;">The app has not saved badges for this intern yet — they appear after the next app open.</div>' + memories;
                 return;
             }
             const fmt = ts => (ts && typeof ts.toDate === 'function') ? ts.toDate().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
@@ -49393,12 +49406,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const when = t ? fmt((u.badges[d.id] || {}).earnedAt) : '';
                 return `<div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid #f1f5f9; border-radius:12px; background:${t ? '#fff' : '#fafafa'};">
                     ${badgeSvgHtml(d.art, t, 44, true)}
-                    <div style="min-width:0;">
+                    <div style="min-width:0; flex:1;">
                         <div style="font-weight:800; font-size:0.9em; color:${t ? '#1e293b' : '#94a3b8'};">${escapeHtml(d.title)}</div>
                         <div style="font-size:0.75em; font-weight:700; color:${t ? tier.fg : '#cbd5e1'};">${t ? tier.name.charAt(0) + tier.name.slice(1).toLowerCase() : 'Not yet'}${when ? ` <span style="color:#94a3b8; font-weight:600;">· ${when}</span>` : ''}</div>
                     </div>
+                    ${t ? `<button type="button" data-uid="${escapeHtml(u.id)}" onclick="openBadgeExportFor(this.dataset.uid, '${d.id}')" title="Export this badge as PNG" aria-label="Export this badge as PNG" style="width:auto; min-height:0; margin:0; padding:2px 7px; border:1px solid #e2e8f0; border-radius:6px; background:#fff; color:#64748b; font-size:0.8em; cursor:pointer; flex:none;">⬇</button>` : ''}
                 </div>`;
-            }).join('');
+            }).join('') + memories;
         }
 
         function getHubQuizApprovalKey(log) {
@@ -57474,7 +57488,9 @@ Save it anyway?`;
                     : s.via === 'code' ? 'border-color:#f5c542; background:#fffbeb; color:#7a5600;'
                     : 'border-color:#86efac; background:#f0fdf4; color:#15803d;';
                 const pic = userOf(uid).pictureUrl;
-                return `<button type="button" data-uid="${escapeHtml(uid)}" onclick="evToggleStamp('${e.id}', this.dataset.uid)" title="${s ? 'Has the stamp (' + (s.via === 'code' ? 'used the code' : 'given by admin') + ') — click to take it back' : 'Click to give the stamp'}" style="width:auto; min-height:0; display:inline-flex; align-items:center; gap:4px; padding:2px 8px 2px 2px; border:1px solid; border-radius:999px; font-size:0.72em; font-weight:700; cursor:pointer; ${look}">${pic ? `<img src="${escapeHtml(pic)}" alt="" style="width:18px; height:18px; border-radius:50%; object-fit:cover;">` : '<span style="width:18px; text-align:center;">👤</span>'}${escapeHtml(name)}${s ? (s.via === 'code' ? ' 🎟️' : ' ✓') : ''}</button>`;
+                // V102.58: a stamped person also gets ⬇ (PNG export of their stamp).
+                const dl = s ? `<button type="button" data-sid="${escapeHtml(s.id)}" onclick="openStampExport(this.dataset.sid)" title="Export this stamp as PNG" aria-label="Export this stamp as PNG" style="width:auto; min-height:0; margin:0; padding:2px 7px; border:1px solid #e2e8f0; border-radius:6px; background:#fff; color:#64748b; font-size:0.8em; cursor:pointer; flex:none;">⬇</button>` : '';
+                return `<span style="display:inline-flex; align-items:center; gap:2px;"><button type="button" data-uid="${escapeHtml(uid)}" onclick="evToggleStamp('${e.id}', this.dataset.uid)" title="${s ? 'Has the stamp (' + (s.via === 'code' ? 'used the code' : 'given by admin') + ') — click to take it back' : 'Click to give the stamp'}" style="width:auto; min-height:0; display:inline-flex; align-items:center; gap:4px; padding:2px 8px 2px 2px; border:1px solid; border-radius:999px; font-size:0.72em; font-weight:700; cursor:pointer; ${look}">${pic ? `<img src="${escapeHtml(pic)}" alt="" style="width:18px; height:18px; border-radius:50%; object-fit:cover;">` : '<span style="width:18px; text-align:center;">👤</span>'}${escapeHtml(name)}${s ? (s.via === 'code' ? ' 🎟️' : ' ✓') : ''}</button>${dl}</span>`;
             };
             const asked = new Set(people.map(p => p.userId));
             const chips = people.map(p => chip(p.userId, p.displayName || p.userId))
@@ -57485,6 +57501,7 @@ Save it anyway?`;
             return `<div style="margin-top:6px; padding:6px 8px; border:1px dashed #f5e0a8; border-radius:8px; background:#fffdf5;">
                 <div style="display:flex; align-items:center; gap:8px; font-size:0.74em; color:#334155;">
                     ${eventBadgeSvgHtml(e.badge, '', 28)}
+                    <button type="button" onclick="openEventBlankExport('${e.id}')" title="Export this event stamp blank (no person) as PNG" aria-label="Export this event stamp blank (no person) as PNG" style="width:auto; min-height:0; margin:0; padding:2px 7px; border:1px solid #e2e8f0; border-radius:6px; background:#fff; color:#64748b; font-size:0.8em; cursor:pointer; flex:none;">⬇</button>
                     <span><b>${stamps.length}</b> stamped${code ? ` · Code <b style="font-family:ui-monospace, monospace; letter-spacing:2px; color:#7a5600;">${escapeHtml(code)}</b> <span style="color:#94a3b8;">(event day only)</span>` : ''}</span>
                 </div>
                 <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">${chips.join('')}
