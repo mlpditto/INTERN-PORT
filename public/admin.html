@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.64)</title>
+    <title>Nika Admin (V102.65)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -3843,6 +3843,26 @@
         .evs-av img { width:100%; height:100%; border-radius:50%; object-fit:cover; display:block; }
         .evs-av.code { border-color:#f5c542; } .evs-av.none { border-color:#cbd5e1; border-style:dashed; opacity:.55; filter:grayscale(1); }
         .evs-dl { position:absolute; right:-6px; bottom:-6px; width:15px; height:15px; min-height:0; padding:0; margin:0; border-radius:50%; border:1px solid #e2e8f0; background:#fff; color:#64748b; font-size:9px; line-height:1; cursor:pointer; }
+        /* V102.65: Daily Quest form — two columns (form | live preview), glass, icon labels. */
+        .dqf-head { display:flex; align-items:center; gap:6px; margin-bottom:8px; }
+        .dqf-head h2 { margin:0; flex:1; font-size:1.15em; color:#1e293b; }
+        .dqf-grid { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); gap:12px; align-items:start; }
+        .dqf-r { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:7px; }
+        .dqf-r > input[type=text] { flex:1 1 0; min-width:0; margin:0; }
+        .dqf textarea, .dqf input[type=text], .dqf input[type=datetime-local] { box-sizing:border-box; padding:6px 10px; border:1px solid rgba(148,163,184,.45); border-radius:12px; background:rgba(255,255,255,.72); font-size:.88em; }
+        .dqf textarea { width:100%; min-height:72px; resize:vertical; font-family:inherit; line-height:1.5; }
+        .dqf-chips { display:flex; flex-wrap:wrap; gap:5px; flex:1 1 0; min-width:0; }
+        .dqf-pv { border-radius:16px; padding:8px; background:rgba(238,242,247,.75); border:1px solid #e2e8f0; }
+        .dqf-pills { display:flex; gap:6px; margin-top:7px; }
+        .dqf-pill { flex:1; min-width:0; display:flex; align-items:center; gap:5px; padding:4px 9px; border-radius:14px; border:1px solid; font-weight:800; cursor:help; }
+        .dqf-pill i { font-style:normal; font-size:.8em; opacity:.85; flex:none; }
+        .dqf-pill input { width:100%; min-width:0; margin:0; border:none; background:transparent; padding:0; outline:none; text-align:right; font-size:1.05em; font-weight:900; color:inherit; }
+        .dqf-pill input[type=datetime-local] { text-align:left; font-size:.82em; font-weight:700; }
+        .dqf-foot { display:flex; gap:8px; justify-content:flex-end; align-items:center; margin-top:10px; padding-top:10px; border-top:1px solid rgba(148,163,184,.3); }
+        .dqf-btn { width:auto; min-height:0; margin:0; padding:7px 18px; border-radius:999px; font:inherit; font-size:.85em; font-weight:800; cursor:pointer; border:1px solid #dbe3ef; background:#fff; color:#475569; }
+        .dqf-btn.dark { background:#111827; color:#fff; border-color:#111827; }
+        .dqf-btn.post { background:linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 55%), #d35400; color:#fff; border:0; box-shadow:0 6px 14px rgba(211,84,0,.35); }
+        @media (max-width:700px) { .dqf-grid { grid-template-columns:1fr; } }
         .grp-chip:hover { transform:translateY(-1px); opacity:1; }
         .grp-chip.grp-empty { border-style:dashed; }
         .grp-chip.on, .grp-chip[aria-pressed="true"] {
@@ -12489,97 +12509,50 @@
 
                 <!-- 2. Daily Quest Form -->
                 <div id="form-quest-container" style="display:none; text-align:left;">
-                    <!-- Header -->
-                    <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:14px; gap:10px;">
+                    <div class="dqf">
+                    <div class="dqf-head">
+                        <h2>New Daily Quest</h2>
+                        <button onclick="openDuplicateQuestModal()" type="button" class="grp-chip" style="--c:#4f46e5;" title="Duplicate from a recent Daily Quest" aria-label="Duplicate from a recent Daily Quest"><i class="fa-solid fa-copy"></i> Duplicate</button>
+                        <button onclick="openArchiveModal()" type="button" class="grp-chip" style="--c:#64748b;" title="History" aria-label="History"><i class="fa-solid fa-clock-rotate-left"></i></button>
+                    </div>
+                    <div class="dqf-grid">
                         <div>
-                            <h2 style="margin:0; color:#1e293b;">New Daily Quest</h2>
-                            <div style="font-size:0.78em; color:#94a3b8; font-weight:700; margin-top:3px;">Save as draft, schedule, or post now without changing score rules.</div>
-                        </div>
-                        <div style="display:flex; gap:6px; flex-shrink:0;">
-                            <button onclick="openDuplicateQuestModal()" type="button" title="Duplicate from a recent Daily Quest (V92.32)" style="white-space:nowrap; background:#eef2ff; border:1px solid #c7d2fe; border-radius:10px; padding:7px 13px; font-size:0.75em; font-weight:800; color:#4338ca; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.15s;" onmouseover="this.style.background='#e0e7ff'" onmouseout="this.style.background='#eef2ff'">
-                                <i class="fa-solid fa-copy"></i> Duplicate
-                            </button>
-                            <button onclick="openArchiveModal()" type="button" style="white-space:nowrap; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:7px 13px; font-size:0.75em; font-weight:800; color:#64748b; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.15s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#f8fafc'">
-                                <i class="fa-solid fa-clock-rotate-left"></i> History
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Prompt textarea -->
-                    <div style="margin-bottom:12px;">
-                        <textarea id="q-text" placeholder="📝 Enter mission content or required answer... (Supports new lines)"
-                            style="width:100%; height:105px; padding:14px; border-radius:14px; border:1px solid #dbe3ef; font-family:inherit; resize:vertical; font-size:0.95em; line-height:1.55; background:#fff; box-sizing:border-box;"></textarea>
-                    </div>
-
-                    <!-- Image URL + Reference Link (V92.33: live URL validation) -->
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:14px;">
-                        <div>
-                            <label style="font-size:0.75em; font-weight:bold; color:#777; display:block; margin-bottom:4px;">🖼️ Image URL</label>
-                            <input type="text" id="q-img" oninput="validateQuestUrl(this)" placeholder="https://..." style="width:100%; margin:0; border-radius:12px; box-sizing:border-box;">
-                        </div>
-                        <div>
-                            <label style="font-size:0.75em; font-weight:bold; color:#777; display:block; margin-bottom:4px;">🔗 Reference Link</label>
-                            <input type="text" id="q-link" oninput="validateQuestUrl(this)" placeholder="Reference link..." style="width:100%; margin:0; border-radius:12px; box-sizing:border-box;">
-                        </div>
-                    </div>
-
-                    <!-- Target Group (card picker) -->
-                    <div style="margin-bottom:14px;">
-                        <label style="font-size:0.75em; font-weight:bold; color:#64748b; display:block; margin-bottom:6px;">
-                            👥 Target Group <span style="font-weight:500; color:#b0bec5; font-size:0.9em;">— active users only</span>
-                        </label>
-                        <input type="hidden" id="q-target-group-manual" value="Public">
-                        <div id="dq-group-cards" style="display:flex; flex-wrap:wrap; gap:8px; min-height:38px;">
-                            <span style="color:#94a3b8; font-size:0.8em; align-self:center;">Loading groups…</span>
-                        </div>
-                        <div class="lang-no-toggle" id="dq-group-user-count" style="margin-top:6px; font-size:0.78em; color:#64748b; min-height:18px;"></div>
-                    </div>
-
-                    <!-- Tag (card picker) -->
-                    <div style="margin-bottom:14px;">
-                        <label style="font-size:0.75em; font-weight:bold; color:#64748b; display:block; margin-bottom:6px;">🏷️ Tag</label>
-                        <input type="hidden" id="q-tag" value="">
-                        <div id="dq-tag-cards" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
-                    </div>
-
-                    <!-- Compact row: Scheduled · Expires · Duration · Score (V92.32: tooltips on each card) -->
-                    <div style="display:grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap:8px; margin-bottom:16px;">
-                        <div title="Optional. If set, the quest goes live at this time. Required when using the Schedule action; leave blank for Post Now or Save Draft." style="background:#eff6ff; border:1.5px solid #bfdbfe; border-radius:14px; padding:10px 12px; cursor:help;">
-                            <label style="font-size:0.68em; font-weight:800; color:#3b82f6; display:block; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.05em;">⏰ Scheduled Start</label>
-                            <input type="datetime-local" id="q-start-time" oninput="updateScheduleButtonState()" style="width:100%; margin:0; border:none; background:transparent; font-size:0.85em; color:#1e3a8a; font-weight:700; padding:0; outline:none;">
-                        </div>
-                        <div title="Hours until the quest expires. Counts from Scheduled Start (if set) or from Post Now. After expiry, users who haven't submitted move to Expired and forfeit the score." style="background:#fefce8; border:1.5px solid #fde68a; border-radius:14px; padding:10px 12px; text-align:center; cursor:help;">
-                            <label style="font-size:0.68em; font-weight:800; color:#d97706; display:block; margin-bottom:2px; text-transform:uppercase; letter-spacing:0.05em;">⏳ Expires (h)</label>
-                            <input type="number" id="q-hours" value="24" min="1" style="text-align:center; width:100%; margin:0; border:none; background:transparent; font-size:1.25em; font-weight:900; color:#92400e; padding:0; outline:none;">
-                        </div>
-                        <div title="Estimated minutes for users to complete this quest. Informational only — shown on the user's backlog card; does not affect scoring or expiry." style="background:#f0fdf4; border:1.5px solid #bbf7d0; border-radius:14px; padding:10px 12px; text-align:center; cursor:help;">
-                            <label style="font-size:0.68em; font-weight:800; color:#16a34a; display:block; margin-bottom:2px; text-transform:uppercase; letter-spacing:0.05em;">⏱ Dur (min)</label>
-                            <input type="number" id="q-duration" value="60" min="1" style="text-align:center; width:100%; margin:0; border:none; background:transparent; font-size:1.25em; font-weight:900; color:#14532d; padding:0; outline:none;">
-                        </div>
-                        <div title="Score awarded when the admin approves a submission. Typical range 0.1 (light task) to 2 (heavy task). Step 0.1." style="background:#fdf4ff; border:1.5px solid #e9d5ff; border-radius:14px; padding:10px 12px; text-align:center; cursor:help;">
-                            <label style="font-size:0.68em; font-weight:800; color:#9333ea; display:block; margin-bottom:2px; text-transform:uppercase; letter-spacing:0.05em;">⭐ Score</label>
-                            <input type="number" id="q-score" value="1" step="0.1" min="0" style="text-align:center; width:100%; margin:0; border:none; background:transparent; font-size:1.25em; font-weight:900; color:#581c87; padding:0; outline:none;">
-                        </div>
-                    </div>
-
-                    <!-- V93.82 — Daily Quest live preview (closes pending item #7).
-                         Mirrors the intern's "none"-state quest card while admin types. -->
-                    <details id="dq-preview-section" open style="margin-bottom:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; overflow:hidden;">
-                        <summary style="cursor:pointer; padding:10px 14px; font-size:0.78em; font-weight:800; color:#475569; user-select:none; display:flex; align-items:center; gap:6px; list-style:none;">
-                            <i class="fa-solid fa-eye" style="color:#6366f1;"></i> Live Preview <span style="font-weight:600; color:#94a3b8;">— what the intern will see</span>
-                        </summary>
-                        <div id="dq-preview-content" style="padding:14px; background:#eef2f7; border-top:1px solid #e2e8f0;">
-                            <div id="dq-preview-card" class="dq-preview-card">
-                                <!-- Rendered by renderDailyQuestPreview() -->
+                            <textarea id="q-text" rows="3" placeholder="📝 Enter mission content or required answer... (Supports new lines)"></textarea>
+                            <!-- Image URL + Reference Link (V92.33: live URL validation) -->
+                            <div class="dqf-r"><span class="evf-ic" title="Image URL">🖼️</span><input type="text" id="q-img" oninput="validateQuestUrl(this)" placeholder="Image URL  https://..."></div>
+                            <div class="dqf-r"><span class="evf-ic" title="Reference Link">🔗</span><input type="text" id="q-link" oninput="validateQuestUrl(this)" placeholder="Reference link..."></div>
+                            <div class="dqf-r">
+                                <span class="evf-ic" title="Target Group — active users only">👥</span>
+                                <input type="hidden" id="q-target-group-manual" value="Public">
+                                <div id="dq-group-cards" class="dqf-chips"><span style="color:#94a3b8; font-size:0.8em; align-self:center;">Loading groups…</span></div>
+                                <span class="lang-no-toggle" id="dq-group-user-count" style="flex:none;"></span>
+                            </div>
+                            <div class="dqf-r">
+                                <span class="evf-ic" title="Tag">🏷️</span>
+                                <input type="hidden" id="q-tag" value="">
+                                <div id="dq-tag-cards" class="dqf-chips"></div>
                             </div>
                         </div>
-                    </details>
-
-                    <!-- Action buttons -->
-                    <div style="display:flex; gap:10px; justify-content:flex-end; align-items:center; border-top:1px solid #eef2f7; padding-top:14px;">
-                        <button class="btn-sm" onclick="createQuest('draft')" style="background:#f8fafc; color:#475569; border:1px solid #dbe3ef; padding:10px 16px; border-radius:12px; font-weight:900;">Save Draft</button>
-                        <button id="quest-schedule-btn" class="btn-sm" onclick="createQuest('schedule')" style="background:#111827; color:white; border:none; padding:10px 16px; border-radius:12px; font-weight:900;">Schedule</button>
-                        <button class="magic-btn" onclick="createQuest('post')" style="min-width:180px; background:#d35400; margin:0;">Post Now</button>
+                        <div>
+                            <!-- V93.82 — live preview: mirrors the intern's "none"-state quest card (renderDailyQuestPreview) -->
+                            <div class="dqf-pv" title="Live preview — what the intern will see"><div id="dq-preview-card" class="dq-preview-card"></div></div>
+                            <div class="dqf-pills">
+                                <div class="dqf-pill" title="Scheduled start — optional. Required for Schedule; leave blank for Post Now or Save Draft." style="flex:1 1 100%; background:#eff6ff; border-color:#bfdbfe; color:#1e3a8a;">
+                                    <i>⏰</i><input type="datetime-local" id="q-start-time" oninput="updateScheduleButtonState()">
+                                </div>
+                            </div>
+                            <div class="dqf-pills">
+                                <div class="dqf-pill" title="Expires after (hours). Counts from Scheduled Start or from Post Now; users who have not submitted forfeit the score." style="background:#fefce8; border-color:#fde68a; color:#92400e;"><i>⏳ h</i><input type="number" id="q-hours" value="24" min="1"></div>
+                                <div class="dqf-pill" title="Estimated minutes to complete — informational only." style="background:#f0fdf4; border-color:#bbf7d0; color:#14532d;"><i>⏱ min</i><input type="number" id="q-duration" value="60" min="1"></div>
+                                <div class="dqf-pill" title="Score awarded when the admin approves a submission (typically 0.1–2)." style="background:#fdf4ff; border-color:#e9d5ff; color:#581c87;"><i>⭐</i><input type="number" id="q-score" value="1" step="0.1" min="0"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="dqf-foot">
+                        <button class="dqf-btn" onclick="createQuest('draft')">Draft</button>
+                        <button id="quest-schedule-btn" class="dqf-btn dark" onclick="createQuest('schedule')">Schedule</button>
+                        <button class="dqf-btn post" onclick="createQuest('post')">Post Now</button>
+                    </div>
                     </div>
                 </div>
             </div>
@@ -55233,17 +55206,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const container = document.getElementById('dq-tag-cards');
             if (!container) return;
             const current = (document.getElementById('q-tag')?.value || '').trim();
+            // V102.65: glass chips in the tag colour; unselected ones are icon-only (name in the tooltip).
             container.innerHTML = DQ_TAGS.map(t => {
                 const sel = t.val === current;
-                return `<button type="button" onclick="setQuestTag('${t.val}')"
-                    style="border:2px solid ${sel ? t.color : '#e2e8f0'};
-                           background:${sel ? t.color : '#f8fafc'};
-                           color:${sel ? 'white' : '#64748b'};
-                           border-radius:10px; padding:7px 13px; font-size:0.78em; font-weight:800;
-                           cursor:pointer; display:inline-flex; align-items:center; gap:5px;
-                           transition:all 0.15s; white-space:nowrap;">
-                    <i class="fa-solid ${t.icon}" style="font-size:0.85em;"></i> ${t.label}
-                </button>`;
+                return `<button type="button" class="grp-chip${sel ? ' on' : ''}" style="--c:${t.color}; padding:3px ${sel ? 11 : 9}px;" onclick="setQuestTag('${t.val}')" title="${t.label}" aria-label="${t.label}" aria-pressed="${sel}"><i class="fa-solid ${t.icon}" style="font-size:.85em;"></i>${sel ? ' ' + t.label : ''}</button>`;
             }).join('');
         }
 
@@ -55270,19 +55236,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const current = (document.getElementById('q-target-group-manual')?.value || 'Public').trim();
 
             container.innerHTML = [...activeGroups.entries()].map(([g, cnt]) => {
-                const color = getGroupColor(g);
-                const icon = getGroupIcon(g);
                 const sel = g.toLowerCase() === current.toLowerCase();
-                const countBadge = cnt > 0 ? `<span style="background:${sel ? 'rgba(255,255,255,0.3)' : color+'22'}; color:${sel ? 'white' : color}; border-radius:999px; padding:1px 6px; font-size:0.75em; margin-left:2px;">${cnt}</span>` : '';
-                return `<button type="button" onclick="setQuestGroup('${g}')"
-                    style="border:2px solid ${sel ? color : '#e2e8f0'};
-                           background:${sel ? color : '#f8fafc'};
-                           color:${sel ? 'white' : '#475569'};
-                           border-radius:12px; padding:8px 14px; font-size:0.8em; font-weight:800;
-                           cursor:pointer; display:inline-flex; align-items:center; gap:6px;
-                           transition:all 0.15s; white-space:nowrap;">
-                    <i class="fa-solid ${icon}" style="font-size:0.9em;"></i> <span class="lang-no-toggle">${g}</span>${countBadge}
-                </button>`;
+                return `<button type="button" class="grp-chip${sel ? ' on' : ''}" style="--c:${getGroupColor(g)};" onclick="setQuestGroup('${g}')" aria-pressed="${sel}"><i class="fa-solid ${getGroupIcon(g)}" style="font-size:.85em;"></i> <span class="lang-no-toggle">${g}</span>${cnt > 0 ? ` <small>${cnt}</small>` : ''}</button>`;
             }).join('');
         }
 
@@ -55298,10 +55253,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (!el) return;
             const members = (usersData || []).filter(u => !u.isIgnored && (g === 'Public' || (u.group || 'Public').trim().toUpperCase() === String(g).toUpperCase()));
             if (members.length === 0) { el.innerHTML = ''; return; }
-            const chips = members.map(u =>
-                `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:0.75em;font-weight:700;background:#f1f5f9;color:#334155;border:1px solid #e2e8f0;">${u.displayName || u.id}</span>`
-            ).join('');
-            el.innerHTML = `<span style="font-weight:700;color:#475569;">Will send to ${members.length} recipients จะส่งถึง คน:</span> <span style="display:inline-flex;flex-wrap:wrap;gap:4px;margin-left:4px;">${chips}</span>`;
+            // V102.65: just "→ N" — the names are in the tooltip instead of a wall of chips.
+            el.innerHTML = `<span class="grp-chip" style="--c:#64748b; padding:2px 9px; font-size:.78em; cursor:help;" title="${escapeHtml('Will send to ' + members.length + ' recipients · จะส่งถึง ' + members.length + ' คน: ' + members.map(u => u.displayName || u.id).join(', '))}">→ ${members.length}</span>`;
         }
 
         // V93.82 — Daily Quest live preview (closes pending item #7).
