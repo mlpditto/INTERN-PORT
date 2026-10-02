@@ -113,6 +113,24 @@ window.AI_MODEL_REGISTRY = {
       "rollout": "trial-only-defaults-unchanged"
     },
     {
+      "id": "claude-sonnet-5-5",
+      "label": "Claude Sonnet 5.5",
+      "provider": "anthropic",
+      "adapter": "messages",
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text",
+        "json"
+      ],
+      "selectable": true,
+      "access": "verified-2026-10-02",
+      "validation": "text-json-vision-pass",
+      "rollout": "trial-only-defaults-unchanged"
+    },
+    {
       "id": "claude-opus-5-5",
       "label": "Claude Opus 5.5",
       "provider": "anthropic",

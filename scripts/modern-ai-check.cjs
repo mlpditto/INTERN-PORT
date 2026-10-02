@@ -44,6 +44,24 @@ const origErr = console.error; console.error = m => logged.push(String(m));
     r = await runModernAI({ ...req('claude-sonnet-5'), isJson: false }, claude('plain prose answer'), env);
     check('non-JSON call: prose passes untouched', r.text, 'plain prose answer');
 
+    // V102.61: Claude Sonnet 5.5 — server-side fallback on, no `thinking` field; Sonnet 5 unchanged.
+    const sent = [];
+    const capture = (data) => async (url, body, opts) => { sent.push({ body, headers: opts.headers }); return { data }; };
+    const ok55 = { model: 'claude-sonnet-5-5', stop_reason: 'end_turn', content: [{ type: 'text', text: '{"a":1}' }], usage: { input_tokens: 10, output_tokens: 5 } };
+    r = await runModernAI(req('claude-sonnet-5-5'), capture(ok55), env);
+    check('sonnet 5.5: fallbacks "default" sent', sent[0].body.fallbacks, 'default');
+    check('sonnet 5.5: fallback beta header sent', sent[0].headers['anthropic-beta'], 'server-side-fallback-2026-07-01');
+    check('sonnet 5.5: no thinking field (adaptive at effort low)', 'thinking' in sent[0].body, false);
+    check('sonnet 5.5: effort low', sent[0].body.output_config.effort, 'low');
+    r = await runModernAI(req('claude-sonnet-5'), capture({ ...ok55, model: 'claude-sonnet-5' }), env);
+    check('sonnet 5: no fallbacks field', 'fallbacks' in sent[1].body, false);
+    check('sonnet 5: no beta header', 'anthropic-beta' in sent[1].headers, false);
+    // a cyber decline rescued by Sonnet 5 inside the same call: a `fallback` block, then the text
+    r = await runModernAI(req('claude-sonnet-5-5'), capture({ ...ok55, model: 'claude-sonnet-5', content: [{ type: 'fallback', from: { model: 'claude-sonnet-5-5' }, to: { model: 'claude-sonnet-5' } }, { type: 'text', text: '{"b":2}' }] }), env);
+    check('fallback block ignored, text read', r.text, '{"b":2}');
+    r = await runModernAI(req('claude-sonnet-5-5'), capture({ ...ok55, stop_reason: 'refusal', content: [] }), env);
+    check('refusal still reported as an error', /claude-sonnet-5-5: stopped with refusal/.test(r.error), true);
+
     // key redaction used by postWithRetry in index.js
     const src = require('fs').readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
     const m = src.match(/replace\((\/\(\[\?&\]key=\)\[\^&\]\+\/i), '\$1\[redacted\]'\)/);

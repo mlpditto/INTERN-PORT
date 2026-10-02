@@ -53,9 +53,17 @@ async function runModernAI({ model, prompt, isJson, visionData, generationOption
         if (!env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not configured on server.');
         const content = [{ type: 'text', text: textPrompt }];
         if (image) content.push({ type: 'image', source: { type: 'base64', media_type: image.mime, data: image.data } });
+        // V102.61: Claude Sonnet 5.5 declines (stop_reason "refusal") in more categories than
+        // Sonnet 5. Server-side fallback re-runs "cyber" / "frontier_llm" declines on Sonnet 5
+        // inside the same call; bio / reasoning_extraction / general_harms still come back as a
+        // refusal, which the finish-reason check below reports. No `thinking` field: omitted =
+        // adaptive thinking, which at effort low skips thinking on most simple requests.
+        const fallback = model === 'claude-sonnet-5-5';
         ({ data } = await post('https://api.anthropic.com/v1/messages', {
-            model, max_tokens: max, output_config: { effort: 'low' }, messages: [{ role: 'user', content }]
-        }, { headers: { 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' } }));
+            model, max_tokens: max, output_config: { effort: 'low' }, messages: [{ role: 'user', content }],
+            ...(fallback ? { fallbacks: 'default' } : {})
+        }, { headers: { 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json',
+            ...(fallback ? { 'anthropic-beta': 'server-side-fallback-2026-07-01' } : {}) } }));
         text = (data.content || []).filter(c => c.type === 'text').map(c => c.text || '').join('');
         finishReason = data.stop_reason;
         const u = data.usage || {};
