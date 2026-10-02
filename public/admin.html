@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.58)</title>
+    <title>Nika Admin (V102.59)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -3818,19 +3818,21 @@
         }
 
 
-        /* V99.52: selection grid; empty groups remain selectable. */
-        #groupSelectModal #gs-list { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; max-height:360px; overflow-y:auto; margin-bottom:14px; }
-        #groupSelectModal .gs-chip { min-width:0; min-height:48px; white-space:normal !important; text-align:left; }
-        #groupSelectModal .gs-chip-name { flex:1; min-width:0; overflow-wrap:anywhere; }
-        #groupSelectModal .gs-chip-count { flex-shrink:0; font-size:12px; }
-        #groupSelectModal .gs-chip.gs-empty:not([aria-pressed="true"]) { background:#f8fafc !important; color:#64748b !important; border-style:dashed !important; }
-        #groupSelectModal .gs-empty:not([aria-pressed="true"]) .gs-dot { opacity:0.35; }
-        #groupSelectModal .gs-chip[aria-pressed="true"] .gs-chip-name::before { content:'✓ '; }
-        #groupSelectModal .gs-section-heading { grid-column:1 / -1; margin:10px 0 2px; font-size:12px; color:#64748b; }
+        /* V102.59: ONE group chip for every group list (picker, Groups & Divisions) — see groupChipHtml(). */
+        .grp-chip { width:auto; min-height:0; margin:0; display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:999px; border:1px solid; font:inherit; font-size:12.5px; font-weight:700; cursor:pointer; white-space:nowrap; }
+        .grp-chip small { font-weight:600; opacity:.7; }
+        .grp-chip.grp-empty { border-style:dashed; }
+        .grp-chip.on, .grp-chip[aria-pressed="true"] { box-shadow:0 0 0 2px #4f46e5; }
+        .grp-chip[aria-pressed="true"]::before { content:'✓'; }
+        /* V102.59: the picker is sections by division (renderGsGroupList), no longer a 3-column grid. */
+        #groupSelectModal #gs-list { max-height:360px; overflow-y:auto; margin-bottom:14px; }
+        #groupSelectModal .gs-sec { margin-bottom:10px; }
+        #groupSelectModal .gs-sec-head { font-size:12px; font-weight:800; color:#475569; margin-bottom:6px; }
+        #groupSelectModal .gs-sec-head small { font-weight:600; color:#94a3b8; }
+        #groupSelectModal .gs-sec-row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
         #groupSelectModal #gs-save-btn { min-width:160px; flex-shrink:0; border-radius:12px; font-size:14px; background:#455cf5; color:white; }
         #groupSelectModal #gs-save-btn:disabled { opacity:0.65; cursor:wait; }
-        @media(max-width:600px) { #groupSelectModal #gs-list { grid-template-columns:repeat(2,minmax(0,1fr)); } #groupSelectModal .gs-chip { padding:10px 8px !important; } }
-        @media(max-width:380px) { #groupSelectModal #gs-list { grid-template-columns:minmax(0,1fr); } #groupSelectModal #gs-save-btn { width:100%; } }
+        @media(max-width:380px) { #groupSelectModal #gs-save-btn { width:100%; } }
         #groupSelectModal [hidden] { display:none !important; }
         #groupSelectModal .gs-profile-title { font-weight:700; color:var(--text-sub); }
         #groupSelectModal .gs-inline-group { margin:18px 0; }
@@ -7747,7 +7749,7 @@
                 <span style="flex:1"></span>
                 <button type="button" id="bstat-chip" onclick="toggleBadgeStatsPanel()" title="Badge Stats — interns whose app has synced badges" aria-label="Badge Stats" aria-expanded="false" style="width:34px; height:34px; min-height:0; padding:0; margin:0; border-radius:10px; border:1px solid var(--border-color); background:var(--bg-card); font-size:1.05em; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; width:auto; padding:0 10px; gap:5px; font-size:0.85em; font-weight:700;">🏅 <span id="bstat-chip-n">–</span></button>
                 <button type="button" onclick="openShareModalForGroup(activeUserGroup === 'All' ? 'Global Leaderboard' : activeUserGroup)" title="Share ranking" aria-label="Share ranking" style="width:34px; height:34px; min-height:0; padding:0; margin:0; border-radius:10px; border:1px solid var(--border-color); background:var(--bg-card); font-size:1.05em; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">📤</button>
-                <button type="button" onclick="openDivisionsModal()" title="Units" aria-label="Units" style="width:34px; height:34px; min-height:0; padding:0; margin:0; border-radius:10px; border:1px solid var(--border-color); background:var(--bg-card); font-size:1.05em; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">🛡️</button>
+                <button type="button" onclick="openDivisionsModal()" title="Groups &amp; Divisions" aria-label="Groups and Divisions" style="width:34px; height:34px; min-height:0; padding:0; margin:0; border-radius:10px; border:1px solid var(--border-color); background:var(--bg-card); font-size:1.05em; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">🛡️</button>
                 <button type="button" onclick="openPreRegModal()" title="Entry (pre-registration)" aria-label="Entry" style="width:34px; height:34px; min-height:0; padding:0; margin:0; border-radius:10px; border:1px solid var(--border-color); background:var(--bg-card); font-size:1.05em; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">👥</button>
                 <!-- V97.73: manual runner for the nightly check-in decay (preview, then apply) — kept apart in a warning outline because it takes points. -->
                 <button type="button" onclick="previewCheckinDecay()" title="Preview the daily no-check-in decay" aria-label="Decay" style="width:34px; height:34px; min-height:0; padding:0; margin:0; border-radius:10px; border:1px solid var(--border-color); background:var(--bg-card); font-size:1.05em; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; border-color:rgba(217, 119, 6, 0.45); background:rgba(245, 158, 11, 0.10);">⏳</button>
@@ -12590,11 +12592,27 @@
             <div class="modal-content" style="max-width:500px; text-align:left;">
                 <span class="close-modal" onclick="closeModal()">&times;</span>
                 <div class="dv-head">
-                    <h3>🛡️ Divisions</h3>
+                    <h3>🛡️ Groups &amp; Divisions</h3>
                     <span class="dv-help" aria-label="Group = the user's real unit (one per person). Division = a ranking board that joins several groups. Groups in no division are ranked on their own."
                         title="Group = หน่วยจริงของผู้ใช้ (1 คน 1 กลุ่ม) · Division = กระดานจัดอันดับที่รวมหลายกลุ่ม เช่น รวม IT + Dev เป็น &quot;Technical&quot; · กลุ่มที่ไม่อยู่ใน Division ใด (Solo) จัดอันดับเฉพาะในกลุ่มตัวเอง · แตะชิปกลุ่มเพื่อย้าย">i</span>
                 </div>
                 <div id="div-editor" class="lang-no-toggle" onclick="onDivEditorClick(event)"></div>
+                <!-- V102.59: Merge (exact spellings, e.g. Extern → EXTERN) moved here from the per-user picker. -->
+                <div style="margin:4px 0 8px;"><button type="button" id="gs-merge-btn" onclick="toggleGroupMerge()" aria-expanded="false" title="Merge one group name into another — e.g. Extern → EXTERN" style="width:auto; min-height:0; margin:0; padding:2px 0; background:none; border:none; color:#64748b; font-size:0.8em; cursor:pointer;">⇄ Merge / fix spellings</button></div>
+                <!-- V102.38: Merge groups. Lists every exact spelling in use (users, pre-reg,
+                     quizzes, events, divisions, visibility settings) so case variants such as
+                     "Extern" / "EXTERN" show separately, previews what will change, then
+                     rewrites them all in batched writes. -->
+                <div id="gs-merge-panel" class="lang-no-toggle" hidden style="margin:0 0 14px; padding:12px; border:1px solid #e2e8f0; border-radius:12px; background:#f8fafc;">
+                    <div style="font-size:0.78em; font-weight:800; color:#64748b; margin-bottom:6px;">From</div>
+                    <div id="gs-merge-from" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;"></div>
+                    <div style="font-size:0.78em; font-weight:800; color:#64748b; margin-bottom:6px;">Into</div>
+                    <div id="gs-merge-into" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;"></div>
+                    <div id="gs-merge-preview" role="status" style="font-size:0.8em; color:#334155; margin-bottom:10px;"></div>
+                    <button type="button" id="gs-merge-go" onclick="runGroupMerge()" disabled
+                        style="width:auto; min-height:0; margin:0; padding:7px 14px; border:none; border-radius:10px; background:#b45309; color:#fff; font-weight:700; font-size:0.82em; cursor:pointer;">⇄ Merge</button>
+                </div>
+
                 <div class="dv-foot">
                     <input type="text" id="new-div-name" placeholder="New division" aria-label="New division name" onkeydown="if (event.key === 'Enter') addDivision()">
                     <button type="button" class="dv-add" onclick="addDivision()" title="สร้าง Division" aria-label="Add division">＋</button>
@@ -14240,27 +14258,10 @@
                  Visibility Settings taking a second full-width button under Save. The
                  static "Group Organization" callout that used to sit here just repeated
                  the hint line above the chip rail; its wording survives as the tooltip. -->
+            <!-- V102.59: rename / merge / visibility / delete / divisions all live in ONE window now. -->
             <div style="display:flex; align-items:center; gap:16px; margin:0 0 14px;">
-                <button type="button" id="gs-manage-btn" onclick="toggleGroupManageMode()"
-                    title="Groups separate fields and let you assign tasks/quizzes to the relevant team."
-                    style="background:none; border:none; color:#94a3b8; font-size:0.78em; cursor:pointer; margin:0; padding:2px 0;"><i class="fa-solid fa-gear"></i><span data-gs-en="Manage groups" data-gs-th="จัดการกลุ่ม">Manage groups</span></button>
-                <button type="button" onclick="openGroupSettingsUI()"
-                    style="background:none; border:none; color:#94a3b8; font-size:0.78em; cursor:pointer; margin:0; padding:2px 0;"><i class="fa-solid fa-sliders"></i><span data-gs-en="Group visibility settings" data-gs-th="การแสดงผลกลุ่ม">Group visibility settings</span></button>
-                <button type="button" id="gs-merge-btn" onclick="toggleGroupMerge()" aria-expanded="false" title="Merge one group name into another — e.g. Extern → EXTERN"
-                    style="background:none; border:none; color:#94a3b8; font-size:0.78em; cursor:pointer; margin:0; padding:2px 0;">⇄ <span data-gs-en="Merge groups" data-gs-th="รวมกลุ่ม">Merge groups</span></button>
-            </div>
-            <!-- V102.38: Merge groups. Lists every exact spelling in use (users, pre-reg,
-                 quizzes, events, divisions, visibility settings) so case variants such as
-                 "Extern" / "EXTERN" show separately, previews what will change, then
-                 rewrites them all in batched writes. -->
-            <div id="gs-merge-panel" class="lang-no-toggle" hidden style="margin:0 0 14px; padding:12px; border:1px solid #e2e8f0; border-radius:12px; background:#f8fafc;">
-                <div style="font-size:0.78em; font-weight:800; color:#64748b; margin-bottom:6px;">From</div>
-                <div id="gs-merge-from" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;"></div>
-                <div style="font-size:0.78em; font-weight:800; color:#64748b; margin-bottom:6px;">Into</div>
-                <div id="gs-merge-into" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;"></div>
-                <div id="gs-merge-preview" role="status" style="font-size:0.8em; color:#334155; margin-bottom:10px;"></div>
-                <button type="button" id="gs-merge-go" onclick="runGroupMerge()" disabled
-                    style="width:auto; min-height:0; margin:0; padding:7px 14px; border:none; border-radius:10px; background:#b45309; color:#fff; font-weight:700; font-size:0.82em; cursor:pointer;">⇄ Merge</button>
+                <button type="button" onclick="openDivisionsModal()" title="Rename, merge, delete groups · visibility · divisions"
+                    style="background:none; border:none; color:#94a3b8; font-size:0.78em; cursor:pointer; margin:0; padding:2px 0;"><i class="fa-solid fa-gear"></i> <span data-gs-en="Groups &amp; Divisions" data-gs-th="กลุ่มและ Division">Groups &amp; Divisions</span></button>
             </div>
 
             </div>
@@ -23075,6 +23076,24 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const key = Object.keys(groupIconMap).find(k => k.toUpperCase() === input || k.toUpperCase() === group.split('-')[0].trim().toUpperCase() || k.toUpperCase() === group.split(' ')[0].trim().toUpperCase());
 
             return groupIconMap[key] || 'fa-tag';
+        }
+
+        // V102.59: one count rule for every group list — ACTIVE people (not hidden from the
+        // boards). The Divisions editor used to count everyone (EXTERN 13) while the picker
+        // counted active only (EXTERN 2); the total now lives in the chip's tooltip.
+        function groupActiveCount(group) {
+            const key = String(group || 'Public').trim().toUpperCase();
+            return (usersData || []).filter(u => !u.isIgnored && (u.group || 'Public').trim().toUpperCase() === key).length;
+        }
+        function groupTotalCount(group) {
+            const key = String(group || 'Public').trim().toUpperCase();
+            return (usersData || []).filter(u => (u.group || 'Public').trim().toUpperCase() === key).length;
+        }
+        // The one group chip: icon + group colour + active count. o = { cls, on, attrs, hint }
+        function groupChipHtml(g, o = {}) {
+            const c = getGroupColor(g), a = groupActiveCount(g), t = groupTotalCount(g), empty = a === 0;
+            const tip = `${g} · ${a} active${t > a ? ` · ${t} total (${t - a} hidden)` : ''}${o.hint ? ' · ' + o.hint : ''}`;
+            return `<button type="button" class="grp-chip${empty ? ' grp-empty' : ''}${o.cls ? ' ' + o.cls : ''}${o.on ? ' on' : ''}" ${o.attrs || ''} title="${escapeHtml(tip)}" style="color:${empty ? '#94a3b8' : c}; background:${empty ? '#f8fafc' : c + '1f'}; border-color:${empty ? '#cbd5e1' : c + '55'};"><i class="fa-solid ${getGroupIcon(g)}"></i>${escapeHtml(g.trim() || 'ไม่ระบุชื่อ')}<small>${a}</small></button>`;
         }
 
         function getGlobalGroups() {
@@ -35430,30 +35449,46 @@ They can connect again from LINE.
             }
         }
 
+        // V102.59: the per-user picker only PICKS. Groups come in sections — one per
+        // division ("ranked together") then Solo — as the same chip the Groups &
+        // Divisions window uses; groups with nobody active fold into "+ N empty"
+        // (still in the DOM, so gsNewGroup's twin check sees them).
+        let gsEmptyOpen = false;
+        function renderGsGroupList() {
+            const list = document.getElementById('gs-list');
+            if (!list) return;
+            const curUp = (document.getElementById('gs-input').value || 'Public').trim().toUpperCase();
+            const all = getGlobalGroups();
+            const placed = new Set();
+            const sections = Object.keys(divisionConfig || {}).map(name => {
+                const keys = new Set((divisionConfig[name] || []).map(g => String(g).trim().toUpperCase()));
+                const gs = all.filter(g => keys.has(g.toUpperCase()));
+                gs.forEach(g => placed.add(g));
+                return [`🛡️ ${escapeHtml(name)}`, 'ranked together', gs];
+            });
+            sections.push(['Solo', 'ranked on their own', all.filter(g => !placed.has(g))]);
+            const chip = g => groupChipHtml(g, { cls: 'gs-chip', attrs: `data-group="${escapeHtml(g)}" aria-pressed="${g.toUpperCase() === curUp}" onclick="gsPickGroup(this, this.dataset.group)"` });
+            list.innerHTML = sections.filter(([, , gs]) => gs.length).map(([title, note, gs]) => {
+                const live = gs.filter(g => groupActiveCount(g) > 0 || g.toUpperCase() === curUp);
+                const empty = gs.filter(g => !live.includes(g));
+                return `<div class="gs-sec"><div class="gs-sec-head">${title} <small>${note}</small></div><div class="gs-sec-row">${live.map(chip).join('')}${empty.length ? `<span class="gs-sec-empty" style="display:${gsEmptyOpen ? 'contents' : 'none'};">${empty.map(chip).join('')}</span>${gsEmptyOpen ? '' : `<button type="button" class="grp-chip grp-empty" onclick="gsEmptyOpen = true; renderGsGroupList();" style="color:#64748b; background:#fff; border-color:#cbd5e1;">+ ${empty.length} empty</button>`}` : ''}</div></div>`;
+            }).join('') + `<div class="gs-sec-row"><button type="button" class="grp-chip grp-empty gs-chip-new" onclick="gsNewGroup(this)" style="color:#475569; background:#fff; border-color:#cbd5e1;"><i class="fa-solid fa-plus"></i> New group</button></div>`;
+        }
+
         // V98.18 lean: chip-rail group picker for the User Hub modal.
         function gsPickGroup(el, g) {
             const list = document.getElementById('gs-list');
-            if (list && list.classList.contains('gs-managing')) return;
             document.getElementById('gs-input').value = g;
             document.getElementById('gs-current-group').textContent = g.trim() || 'ไม่ระบุชื่อ';
-            list.querySelectorAll('.gs-chip').forEach(c => {
-                c.setAttribute('aria-pressed', 'false');
-                c.style.background = '#fff';
-                c.style.color = '#334155';
-                c.style.borderColor = '#e2e8f0';
-            });
+            list.querySelectorAll('.gs-chip').forEach(c => c.setAttribute('aria-pressed', 'false'));
             el.setAttribute('aria-pressed', 'true');
             document.getElementById('gs-save-status').textContent = 'กลุ่มที่เลือก: ' + (g.trim() || 'ไม่ระบุชื่อ');
-            el.style.background = 'var(--primary)';
-            el.style.color = '#fff';
-            el.style.borderColor = 'var(--primary)';
         }
 
         // V98.30: "+ New" chip → inline input → a dashed "pending" chip. The new
         // group name lands in #gs-input.value; confirmSetGroup creates it on Save.
         function gsNewGroup(chipEl) {
             const list = document.getElementById('gs-list');
-            if (list && list.classList.contains('gs-managing')) return;
             const inp = document.createElement('input');
             inp.type = 'text';
             inp.placeholder = 'new group name';
@@ -35474,7 +35509,7 @@ They can connect again from LINE.
                 }
                 document.getElementById('gs-input').value = name;
                 document.getElementById('gs-current-group').textContent = name;
-                list.querySelectorAll('.gs-chip').forEach(c => { c.setAttribute('aria-pressed', 'false'); c.style.background = '#fff'; c.style.color = '#334155'; c.style.borderColor = '#e2e8f0'; });
+                list.querySelectorAll('.gs-chip').forEach(c => c.setAttribute('aria-pressed', 'false'));
                 const pend = document.createElement('div');
                 pend.style.cssText = 'display:flex; align-items:center; gap:5px; font-size:0.85em; font-weight:700; padding:6px 12px; border-radius:8px; white-space:nowrap; border:1px dashed var(--primary); background:#eef2ff; color:var(--primary);';
                 pend.innerHTML = `<i class="fa-solid fa-plus"></i> ${escapeHtml(name)} <span style="font-size:0.72em; opacity:0.7;">new</span>`;
@@ -35583,6 +35618,7 @@ They can connect again from LINE.
                 }
                 showToast(`Merged "${from}" into "${into}" · ${ops.length} updates`);
                 gsMerge.from = gsMerge.into = null;
+                grpDraftRename(from, into); // V102.59
                 if (activeUserGroup === from) setUserGroupFilter(into);
             } catch (e) {
                 console.error(e);
@@ -35592,17 +35628,6 @@ They can connect again from LINE.
                 renderGroupMerge();
                 setTimeout(renderGroupMerge, 1500); // again once the listeners have echoed the writes
             }
-        }
-
-        function toggleGroupManageMode() {
-            const list = document.getElementById('gs-list');
-            if (!list) return;
-            const on = list.classList.toggle('gs-managing');
-            list.querySelectorAll('.gs-del').forEach(x => { x.style.display = on ? 'inline-flex' : 'none'; });
-            const btn = document.getElementById('gs-manage-btn');
-            if (btn) btn.innerHTML = on
-                ? '<i class="fa-solid fa-check"></i> Done'
-                : '<i class="fa-solid fa-gear"></i> Manage groups';
         }
 
         function toggleGsGroups() {
@@ -35688,7 +35713,6 @@ They can connect again from LINE.
             document.getElementById('gs-lastname-en').oninput = updateGsFullname;
 
             const input = document.getElementById('gs-input');
-            const list = document.getElementById('gs-list');
             input.value = current || "Public";
             document.getElementById('gs-current-group').textContent = input.value.trim() || 'ไม่ระบุชื่อ';
 
@@ -35698,33 +35722,8 @@ They can connect again from LINE.
             const suggestions = document.getElementById('gs-suggestions');
             suggestions.innerHTML = allGroups.map(g => `<option value="${g}">`).join('');
 
-            list.classList.remove('gs-managing');
-            document.getElementById('gs-merge-panel').hidden = true; // V102.38
-            document.getElementById('gs-merge-btn').setAttribute('aria-expanded', 'false');
-            const _gsManageBtn = document.getElementById('gs-manage-btn');
-            if (_gsManageBtn) _gsManageBtn.innerHTML = '<i class="fa-solid fa-gear"></i> Manage groups';
-            const curUp = (input.value || 'Public').toUpperCase();
-            let emptyHeadingShown = false;
-            const groupCounts = new Map(allGroups.map(g => [g, usersData.filter(u => !u.isIgnored && (u.group || 'Public').toUpperCase() === g.toUpperCase()).length]));
-            list.innerHTML = [...allGroups].sort((a,b) => Number(groupCounts.get(a) === 0) - Number(groupCounts.get(b) === 0)).map(g => {
-                const activeCount = usersData.filter(u => !u.isIgnored && (u.group || "Public").toUpperCase() === g.toUpperCase()).length;
-                const isCur = g.toUpperCase() === curUp;
-                const heading = activeCount === 0 && !emptyHeadingShown ? '<div class="gs-section-heading" data-gs-en="No users yet" data-gs-th="ยังไม่มีผู้ใช้">No users yet</div>' : '';
-                if (activeCount === 0) emptyHeadingShown = true;
-                return `
-                    ${heading}<div class="gs-chip ${activeCount === 0 ? 'gs-empty' : ''}" data-group="${escapeHtml(g)}" role="button" aria-pressed="${isCur}" tabindex="0" onclick="gsPickGroup(this, this.dataset.group)" onkeydown="if(event.target === this &amp;&amp; (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); this.click(); }"
-                        style="display:flex; align-items:center; gap:6px; font-size:0.85em; font-weight:600; padding:6px 12px; border-radius:8px; cursor:pointer; white-space:nowrap; border:1px solid ${isCur ? 'var(--primary)' : '#e2e8f0'}; background:${isCur ? 'var(--primary)' : '#fff'}; color:${isCur ? '#fff' : '#334155'};">
-                        <span class="gs-dot" style="width:9px; height:9px; border-radius:50%; background:${getGroupColor(g)}; flex-shrink:0;"></span>
-                        <span class="gs-chip-name">${escapeHtml(g.trim() || 'ไม่ระบุชื่อ')}</span>
-                        <span class="gs-chip-count">${activeCount} คน</span>
-                        ${g !== 'Public' ? `<span class="gs-del" style="display:none; align-items:center; margin-left:2px;" onclick="event.stopPropagation(); deleteGroupGlobally(this.closest('.gs-chip').dataset.group)" title="Delete this group"><i class="fa-solid fa-xmark" style="color:#ef4444;"></i></span>` : ''}
-                    </div>
-                `;
-            }).join('') + `
-                <div class="gs-chip-new" role="button" tabindex="0" onclick="gsNewGroup(this)" onkeydown="if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); this.click(); }"
-                    style="display:flex; align-items:center; gap:5px; font-size:0.85em; font-weight:700; padding:6px 12px; border-radius:8px; cursor:pointer; white-space:nowrap; border:1px dashed #cbd5e1; background:#fff; color:#64748b;">
-                    <i class="fa-solid fa-plus" style="font-size:0.85em;"></i> New
-                </div>`;
+            gsEmptyOpen = false;
+            renderGsGroupList();
 
             const _nh = document.getElementById('gs-new-hint');
             if (_nh) { _nh.style.display = 'none'; _nh.textContent = ''; }
@@ -35872,10 +35871,13 @@ They can connect again from LINE.
                 await batch.commit();
                 showToast("Group deleted successfully!");
 
-                // Refresh modal
+                // V102.59: Delete now runs from the Groups & Divisions window. Only touch the
+                // per-user picker when it is actually open (it used to always re-open it).
+                grpDraftRename(groupName, null);
+                const pickerOpen = document.getElementById('groupSelectModal').style.display !== 'none';
                 const uid = document.getElementById('gs-uid').value;
                 const currentInput = document.getElementById('gs-input').value;
-                setUserGroup(uid, currentInput === groupName ? "Public" : currentInput);
+                if (pickerOpen && uid) setUserGroup(uid, currentInput === groupName ? "Public" : currentInput);
             } catch (e) {
                 console.error(e);
                 alert("Error deleting group: " + e.message);
@@ -49092,8 +49094,54 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             divPick = '';
             document.getElementById('new-div-name').value = '';
             setDivDirty(false);
-            document.getElementById('divisionsModal').style.display = 'flex';
+            document.getElementById('gs-merge-panel').hidden = true; // V102.38 panel lives here since V102.59
+            document.getElementById('gs-merge-btn').setAttribute('aria-expanded', 'false');
+            const m = document.getElementById('divisionsModal');
+            m.style.zIndex = '4050'; // V102.59: above the per-user picker (4000), below Visibility (4100)
+            m.style.display = 'flex';
             renderDivisionAdminList();
+        }
+
+        // V102.59: a group was renamed / merged (into) or deleted (into = null) — the
+        // database is already rewritten; make the unsaved Divisions draft agree, so a
+        // later Save can't put the old name back, and refresh whichever lists are open.
+        function grpDraftRename(from, into) {
+            if (typeof divDraft === 'object' && divDraft) {
+                const key = String(from).toUpperCase();
+                Object.keys(divDraft).forEach(d => {
+                    const next = (divDraft[d] || []).map(g => String(g).toUpperCase() === key ? into : g).filter(Boolean);
+                    divDraft[d] = [...new Set(next)];
+                });
+            }
+            divPick = '';
+            if (document.getElementById('divisionsModal').style.display === 'flex') renderDivisionAdminList();
+            setTimeout(() => {
+                if (document.getElementById('divisionsModal').style.display === 'flex') renderDivisionAdminList();
+                if (document.getElementById('groupSelectModal').style.display !== 'none') renderGsGroupList();
+            }, 1500); // once the listeners have echoed the writes
+        }
+
+        // Chip-menu actions. Each writes to the database at once (not on Save), the same
+        // as before — they reuse the existing merge panel / delete / visibility code.
+        function grpAction(act, g) {
+            if (act === 'rename') {
+                const name = (prompt(`Rename group "${g}" to:`, g) || '').trim();
+                if (!name || name === g) return;
+                const panel = document.getElementById('gs-merge-panel');
+                if (panel.hidden) toggleGroupMerge();
+                gsMerge.from = g; gsMerge.into = name;
+                renderGroupMerge();
+                panel.scrollIntoView({ block: 'nearest' });
+            } else if (act === 'merge') {
+                const panel = document.getElementById('gs-merge-panel');
+                if (panel.hidden) toggleGroupMerge();
+                gsMergePickFrom(g);
+                panel.scrollIntoView({ block: 'nearest' });
+            } else if (act === 'visibility') {
+                openGroupSettingsUI();
+            } else if (act === 'delete') {
+                deleteGroupGlobally(g);
+            }
         }
 
         function setDivDirty(on) {
@@ -49103,9 +49151,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             b.classList.toggle('dirty', on);
         }
 
+        // V102.59: active people only — the same rule as every other group list (groupActiveCount).
         function divGroupCount(group) {
-            const key = String(group).trim().toUpperCase();
-            return (usersData || []).filter(u => (u.group || 'Public').trim().toUpperCase() === key).length;
+            return groupActiveCount(group);
         }
 
         function renderDivisionAdminList() {
@@ -49114,23 +49162,28 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const names = Object.keys(divDraft);
             const used = new Set(Object.values(divDraft).flat().map(g => String(g).toUpperCase()));
             const solo = getGlobalGroups().filter(g => !used.has(g.toUpperCase()));
-            const chip = g => {
-                const c = getGroupColor(g), n = divGroupCount(g);
-                return `<button type="button" class="dv-chip${divPick === g ? ' on' : ''}" data-g="${escapeHtml(g)}" style="color:${c}; background:${c}1f; border-color:${c}55;" title="${escapeHtml(g)} · ${n} คน · แตะเพื่อย้าย"><i class="fa-solid ${getGroupIcon(g)}"></i>${escapeHtml(g)}<small>${n}</small></button>`;
-            };
-            const menu = `<div class="dv-menu">${names.map(n => `<button type="button" data-to="${escapeHtml(n)}" title="ย้าย ${escapeHtml(divPick)} ไป ${escapeHtml(n)}">🛡️ ${escapeHtml(n)}</button>`).join('')}<button type="button" data-to="" title="ไม่อยู่ใน Division ใด — จัดอันดับเฉพาะในกลุ่มตัวเอง">↩ Solo</button></div>`;
+            const chip = g => groupChipHtml(g, { cls: 'dv-chip', on: divPick === g, attrs: `data-g="${escapeHtml(g)}"`, hint: 'tap for actions' });
+            // V102.59: the chip menu = where it is ranked (Move to) + what happens to the group itself.
+            const a = groupActiveCount(divPick), t = groupTotalCount(divPick);
+            const menu = `<div class="dv-menu" style="flex-direction:column; gap:6px; font-size:12.5px;">
+                <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;"><small style="color:#64748b; font-weight:700;">Move to</small>${names.map(n => `<button type="button" data-to="${escapeHtml(n)}" title="ย้าย ${escapeHtml(divPick)} ไป ${escapeHtml(n)}">🛡️ ${escapeHtml(n)}</button>`).join('')}<button type="button" data-to="" title="ไม่อยู่ใน Division ใด — จัดอันดับเฉพาะในกลุ่มตัวเอง">↩ Solo</button></div>
+                <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;"><small style="color:#64748b; font-weight:700;">Group</small><button type="button" data-act="rename">✏️ Rename</button><button type="button" data-act="merge">⇄ Merge into…</button><button type="button" data-act="visibility">👁 Visibility</button>${String(divPick).toUpperCase() === 'PUBLIC' ? '' : '<button type="button" data-act="delete" style="color:#dc2626; border-color:#fecaca; background:#fff;">🗑 Delete</button>'}</div>
+                <div style="font-size:11.5px; color:#64748b;">${escapeHtml(divPick)} · <b>${a} active</b>${t > a ? ` · ${t} total (${t - a} hidden from boards)` : ''} · Rename / Merge / Delete change the database right away</div>
+            </div>`;
             const row = list => list.map(chip).join('') + (list.includes(divPick) ? menu : '');
             let h = `<div class="dv-solo" title="กลุ่มที่ยังไม่อยู่ใน Division ใด — จัดอันดับเฉพาะในกลุ่มตัวเอง"><small>Solo</small>${solo.length ? row(solo) : '<small class="dv-empty">—</small>'}</div>`;
             names.forEach(n => {
                 const gs = divDraft[n] || [];
                 const total = gs.reduce((s, g) => s + divGroupCount(g), 0);
-                h += `<section class="dv-bucket"><div class="dv-bucket-head"><b>🛡️ ${escapeHtml(n)}</b><small title="ผู้ใช้ทั้งหมดใน Division นี้">👥 ${total}</small><button type="button" class="dv-del" data-del="${escapeHtml(n)}" title="ลบ Division (กลุ่มกลับไป Solo)" aria-label="Delete division ${escapeHtml(n)}">✕</button></div><div class="dv-row">${gs.length ? row(gs) : '<small class="dv-empty">แตะกลุ่มใน Solo เพื่อย้ายเข้ามา</small>'}</div></section>`;
+                h += `<section class="dv-bucket"><div class="dv-bucket-head"><b>🛡️ ${escapeHtml(n)}</b><small title="ผู้ใช้ที่แสดงบนบอร์ดใน Division นี้">👥 ${total} active</small><button type="button" class="dv-del" data-del="${escapeHtml(n)}" title="ลบ Division (กลุ่มกลับไป Solo)" aria-label="Delete division ${escapeHtml(n)}">✕</button></div><div class="dv-row">${gs.length ? row(gs) : '<small class="dv-empty">แตะกลุ่มใน Solo เพื่อย้ายเข้ามา</small>'}</div></section>`;
             });
             if (!names.length) h += '<p class="dv-empty">ยังไม่มี Division · ตั้งชื่อด้านล่างแล้วกด ＋</p>';
             box.innerHTML = h;
         }
 
         function onDivEditorClick(e) {
+            const act = e.target.closest('[data-act]');
+            if (act) { grpAction(act.dataset.act, divPick); return; }
             const to = e.target.closest('[data-to]');
             if (to) { moveGroupToDivision(divPick, to.dataset.to); return; }
             const del = e.target.closest('[data-del]');
@@ -49177,6 +49230,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 setDivDirty(false);
                 showToast("Divisions Saved!");
                 document.getElementById('divisionsModal').style.display = 'none';
+                if (document.getElementById('groupSelectModal').style.display !== 'none') renderGsGroupList(); // V102.59
             } catch (e) { alert(e.message); }
         }
 
