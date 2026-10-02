@@ -9,7 +9,15 @@ def take(start, end):
     return html[a:html.index(end, a)]
 css = '\n'.join(re.findall(r'<style[^>]*>(.*?)</style>', html, re.S))
 css += (root / 'public/case-insight-rail.css').read_text(encoding='utf-8')
-markup = take('                        <div id="case-pane-systems"', '                        <!-- V96.78: Product Listing')
+def take_div(marker):
+    # V101.54: My Cases is the Work ▸ Cases pane now — take the balanced <div> that carries the marker
+    a = html.rindex('<div', 0, html.index(marker))
+    depth = 0
+    for m in re.finditer(r'</?div\b', html[a:]):
+        depth += -1 if m.group(0) == '</div' else 1
+        if depth == 0:
+            return html[a:html.index('>', a + m.start()) + 1]
+markup = take_div('id="work-pane-cases"').replace('class="work-tab-pane"', 'class="work-tab-pane active"')
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
     page = browser.new_page(accept_downloads=True)
@@ -24,10 +32,9 @@ with sync_playwright() as p:
         window.myCasesCache=['gi','neuro','other'].map((key,i)=>({caseId:'DEMO-'+i,diseaseSystemKey:key,status:'reviewed',symptomTags:['Sample symptom'],adminBonus:.1,note:'Sample note',timestamp:{toMillis:()=>Date.now()-i*40*86400000,toDate:()=>new Date(Date.now()-i*40*86400000)}}));
         window.userProfile={displayName:'Demo'};
     }''')
-    for code in [take('        function escapeHtml(', '        // ─'), take('        function switchCaseTab(', '        // V96.78: Product kept'), take('        function renderCaseStats(', '        function initCaseComposer('), take('        function setCaseSystemFilter(', '        async function submitCase('), take('        function renderCaseGrouped(', '        initCaseComposer();')]:
+    for code in [take('        function escapeHtml(', '        // ─'), take('        function renderCaseStats(', '        function initCaseComposer('), take('        function setCaseSystemFilter(', '        async function submitCase('), take('        function renderCaseGrouped(', '        initCaseComposer();')]:
         page.add_script_tag(content=code)
-    page.evaluate('window.tintCaseSection=()=>{}; switchCaseTab("stats")')
-    assert page.evaluate('caseActiveTab') == 'systems'
+    page.evaluate('renderCaseGrouped(window.myCasesCache)')
     assert page.locator('.case-card').count() == 3
     assert '2/3' in page.locator('.case-rail-metrics').inner_text()
     for width in [1440,768,390,320]:
