@@ -4295,6 +4295,54 @@ function floodAlertText(where, s, lat, lon) {
     return lines.filter(Boolean).join('\n');
 }
 
+// ---- Early warning by email (training site only) ----
+// Before a place reaches High (LINE) the nearest canal gauge can already be climbing at the
+// watch mark: rising >= 3 cm/h with <= 10 cm left to the watch level (or already over it).
+// One email a day to the owner; no LINE quota used. Gmail SMTP with an App Password kept in
+// the GMAIL_APP_PASSWORD secret (the account is also the sender).
+const FLOOD_MAIL = 'medlifeplus@gmail.com';
+
+function floodEarlyWarning(s) {
+    const c = s && s.pop && s.pop.canals && s.pop.canals[0];
+    if (!c || c.km > 3 || c.wl == null || c.warn == null || c.deltaCm == null || c.level === 'unk') return null;
+    const leftCm = Math.round((c.warn - c.wl) * 100);
+    if (c.deltaCm < 3 || leftCm > 10) return null;
+    return { c, leftCm };
+}
+
+function floodEarlyMail(w, s, lat, lon) {
+    const { c, leftCm } = w;
+    const f = (v) => (Math.round(v * 100) / 100).toFixed(2);
+    const state = leftCm > 0 ? `เหลืออีก ${leftCm} ซม. ถึงเกณฑ์เฝ้าระวัง` : leftCm === 0 ? 'ถึงเกณฑ์เฝ้าระวังแล้ว' : `เกินเกณฑ์เฝ้าระวังแล้ว ${-leftCm} ซม.`;
+    const lines = [
+        `ที่ฝึกงาน (${FLOOD_SITE.label}): คลองใกล้สุดกำลังขึ้น`,
+        '',
+        `${c.name} (${c.km} กม.)`,
+        `ระดับน้ำ ${f(c.wl)} ม.รทก. · เกณฑ์เฝ้าระวัง ${f(c.warn)}${c.crit != null ? ` · วิกฤต ${f(c.crit)}` : ''}`,
+        `ขึ้น +${c.deltaCm} ซม. ใน 1 ชม. · ${state}`
+    ];
+    if (c.maxYday != null) lines.push(`เมื่อวานสูงสุด ${f(c.maxYday)} ม.`);
+    const r = s.pop.rains && s.pop.rains[0];
+    if (r) lines.push(`ฝนที่ตกจริง (${r.name} ${r.km} กม.): 1 ชม. ${r.r1h == null ? '—' : r.r1h} · 3 ชม. ${r.r3h == null ? '—' : r.r3h} · 24 ชม. ${r.r24h == null ? '—' : r.r24h} มม.`);
+    if (s.pop.city && s.pop.city.raining) lines.push(`ทั่ว กทม. ฝนตกอยู่ ${s.pop.city.raining} สถานี`);
+    const rd = s.road && s.road.nearest;
+    lines.push(rd ? `ถนนใกล้สุดที่ท่วม: ${rd.name} ${rd.closed ? 'ปิดการจราจร' : rd.depthCm != null ? `ลึก ~${rd.depthCm} ซม.` : ''} (${rd.m} ม.)` : 'ถนนรอบจุดยังไม่มีรายงานน้ำท่วม');
+    lines.push('', `แผนที่: ${floodMapUrl(lat, lon)}`, '', s.pop.credit + ' (ไม่ใช่ประกาศทางการ)',
+        'เตือนล่วงหน้านี้ส่งไม่เกินวันละครั้ง · ข้อความ LINE ยังส่งเฉพาะเมื่อความเสี่ยงถึงระดับสูง');
+    return {
+        subject: `🌊 น้ำใกล้เกณฑ์เฝ้าระวัง: ${c.name} ${f(c.wl)} ม. (+${c.deltaCm} ซม./ชม.)`,
+        text: lines.join('\n')
+    };
+}
+
+async function sendFloodMail(subject, text) {
+    const pass = process.env.GMAIL_APP_PASSWORD;
+    if (!pass) throw new Error('GMAIL_APP_PASSWORD not set');
+    const nodemailer = require('nodemailer');   // lazy: only the hourly job needs it
+    const tx = nodemailer.createTransport({ host: 'smtp.gmail.com', port: 465, secure: true, auth: { user: FLOOD_MAIL, pass } });
+    await tx.sendMail({ from: `"INTERN-PORT Flood" <${FLOOD_MAIL}>`, to: FLOOD_MAIL, subject, text });
+}
+
 // Intern "near me" / site / home check. Any signed-in user (the intern page
 // signs in anonymously); coordinates are not stored.
 exports.floodPointCheck = onCall({ timeoutSeconds: 30 }, async (request) => {
@@ -4318,7 +4366,7 @@ exports.checkFloodAlerts = onSchedule({
     region: 'us-central1',
     timeoutSeconds: 300,
     memory: '256MiB',
-    secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_GROUP_ID']
+    secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_GROUP_ID', 'GMAIL_APP_PASSWORD']
 }, async (event) => {
     const db = admin.firestore();
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
@@ -4346,6 +4394,19 @@ exports.checkFloodAlerts = onSchedule({
             const [r] = await pushLineFlex('floodAlert', [target],
                 () => ({ type: 'text', text: floodAlertText(where, s, lat, lon) }), `doc=${docId}`);
             if (r && r.ok) update.lastAlertDay = today;
+        }
+        // Early warning email: the training site only, once per Bangkok day.
+        if (docId === '_site' && prev.lastEmailDay !== today) {
+            const w = floodEarlyWarning(s);
+            if (w) {
+                try {
+                    const m = floodEarlyMail(w, s, lat, lon);
+                    await sendFloodMail(m.subject, m.text);
+                    update.lastEmailDay = today;
+                } catch (e) {
+                    console.warn('[checkFloodAlerts] early-warning email failed:', e && e.message);   // retried next hour
+                }
+            }
         }
         await ref.set(update, { merge: true });
         return s.risk;
