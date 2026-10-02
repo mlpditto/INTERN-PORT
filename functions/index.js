@@ -4164,25 +4164,106 @@ function roadsNear(segs, lat, lon) {
     };
 }
 
+// ---- POPNIX Flood (https://flood.pop.in.th) ----
+// BMA Drainage Dept. gauges re-served by POPNIX: canal levels with a 24 h trend, road
+// flood sensors and rain gauges, refreshed every 5-10 min. Free incl. commercial use; the
+// credit line below is required and the data is "not official". Its docs promise CORS *
+// but no Access-Control header is sent (checked 2026-10-02), so it goes through here too.
+// 300 req/min/IP; the three lists (~230 KB) are cached per instance for 60 s.
+const POPNIX = 'https://flood.pop.in.th';
+const POPNIX_CREDIT = 'ข้อมูล: สำนักการระบายน้ำ กรุงเทพมหานคร ผ่าน POPNIX Flood';
+let popnixCache = { at: 0, data: null };
+
+async function fetchPopnixAll() {
+    if (popnixCache.data && Date.now() - popnixCache.at < 60000) return popnixCache.data;
+    const get = (p) => axios.get(POPNIX + p, {
+        headers: { 'User-Agent': 'INTERN-PORT flood-watch (github.com/mlpditto/INTERN-PORT)' },
+        timeout: 15000
+    }).then(r => r.data);
+    const [overview, rain, roads] = await Promise.all([get('/api_overview.php'), get('/api_rain.php'), get('/api_roads.php')]);
+    popnixCache = { at: Date.now(), data: { overview, rain, roads } };
+    return popnixCache.data;
+}
+
+function kmBetween(lat1, lon1, lat2, lon2) {
+    const t = x => x * Math.PI / 180, dl = t(lat2 - lat1), dn = t(lon2 - lon1);
+    const h = Math.sin(dl / 2) ** 2 + Math.cos(t(lat1)) * Math.cos(t(lat2)) * Math.sin(dn / 2) ** 2;
+    return 2 * 6371 * Math.asin(Math.sqrt(h));
+}
+
+// The few fields the popup reads: 3 nearest canal gauges (the first with its 24 h spark),
+// 2 nearest rain gauges + the city-wide rain count, 2 nearest road sensors within 3 km.
+function popnixNear(all, lat, lon) {
+    const num = v => (typeof v === 'number' && isFinite(v) ? v : null);
+    const nearest = (list, n, maxKm) => (list || [])
+        .filter(s => num(s.lat) != null && num(s.lng) != null)
+        .map(s => ({ s, km: kmBetween(lat, lon, s.lat, s.lng) }))
+        .filter(x => maxKm == null || x.km <= maxKm)
+        .sort((x, y) => x.km - y.km).slice(0, n);
+    const canals = nearest(all.overview.stations, 3, 6).filter(x => x.s.online !== false).map(({ s, km }, i) => ({
+        name: String(s.name || '').slice(0, 80), km: Math.round(km * 10) / 10,
+        wl: num(s.wl), warn: num(s.warn), crit: num(s.crit),
+        level: ['ok', 'warn', 'crit'].includes(s.level) ? s.level : 'unk',   // POPNIX: ok | warn | crit | unk
+        trend: ['up', 'down', 'flat'].includes(s.trend) ? s.trend : 'flat',
+        deltaCm: num(s.delta) == null ? null : Math.round(s.delta * 100),
+        dayCm: num(s.delta_day) == null ? null : Math.round(s.delta_day * 100),
+        maxYday: num(s.max_yday),
+        spark: i === 0 && Array.isArray(s.spark) ? s.spark.map(num).filter(v => v != null).slice(-24) : null
+    }));
+    const rainSum = all.rain.summary || {};
+    const rains = nearest(all.rain.stations, 2, 8).map(({ s, km }) => ({
+        name: String(s.name || '').slice(0, 80), km: Math.round(km * 10) / 10, r1h: num(s.r1h), r3h: num(s.r3h), r24h: num(s.r24h)
+    }));
+    const roads = nearest(all.roads.roads, 2, 3).map(({ s, km }) => ({
+        name: String(s.name || '').slice(0, 80), km: Math.round(km * 10) / 10, depthCm: num(s.depth), level: String(s.level || '')
+    }));
+    return {
+        canals, rains, roads,
+        city: {
+            raining: num(rainSum.raining),
+            max1h: rainSum.max1h ? { name: String(rainSum.max1h.name || '').slice(0, 60), v: num(rainSum.max1h.v) } : null,
+            floodedRoads: num((all.roads.summary || {}).flood)
+        },
+        ageMin: num((all.overview.summary || {}).age_min),
+        stale: !!((all.overview.summary || {}).stale),
+        credit: POPNIX_CREDIT
+    };
+}
+
 // Canal (FloodWatch) + road (Floodboard), fetched in parallel. Risk is the worse of
 // the two; either source alone still answers when the other is down.
 async function fetchFloodPoint(lat, lon) {
-    const [fw, fb] = await Promise.allSettled([
+    const [fw, fb, pn] = await Promise.allSettled([
         axios.get(FLOOD_API, {
             params: { lat: lat.toFixed(4), lon: lon.toFixed(4) },
             headers: { 'User-Agent': 'INTERN-PORT flood-watch (github.com/mlpditto/INTERN-PORT)' },
             timeout: 15000
         }),
-        fetchFloodboardRoads()
+        fetchFloodboardRoads(),
+        fetchPopnixAll()
     ]);
     const road = fb.status === 'fulfilled' ? roadsNear(fb.value, lat, lon) : null;
-    if (fw.status !== 'fulfilled' && !road) throw (fw.reason || fb.reason);
+    let pop = null;
+    if (pn.status === 'fulfilled') {
+        try { pop = popnixNear(pn.value, lat, lon); } catch (e) { console.warn('[popnix] parse failed:', e && e.message); }
+    }
+    if (fw.status !== 'fulfilled' && !road && !pop) throw (fw.reason || fb.reason || pn.reason);
     const s = fw.status === 'fulfilled'
         ? floodSummary(fw.value.data || {})
         : { risk: 'info', title: '', desc: '', canal: null, traffy6h: 0, rain24mm: null };
     const rank = { info: 0, low: 1, moderate: 2, high: 3 };
     s.canalRisk = s.risk;
     s.road = road;
+    s.pop = pop;
+    s.src = { fw: fw.status === 'fulfilled', fb: fb.status === 'fulfilled', pop: !!pop };
+    // FloodWatch down: POPNIX stands in for the canal risk, but never above Moderate —
+    // LINE (High only) is still driven by FloodWatch + Floodboard alone.
+    if (fw.status !== 'fulfilled' && pop && pop.canals.length) {
+        const c = pop.canals[0];
+        s.canalRisk = s.risk = c.km <= 3 && c.level === 'crit' ? 'moderate' : 'low';
+        s.title = c.level === 'crit' ? `${c.name} เกินระดับวิกฤต`
+            : c.level === 'warn' ? `${c.name} เกินระดับเฝ้าระวัง` : 'ระดับน้ำคลองรอบจุดนี้ปกติ';
+    }
     if (road && rank[road.risk] > rank[s.risk]) s.risk = road.risk;
     if (!s.title && road) {
         s.title = road.n ? `มีถนนน้ำท่วม ${road.n} ช่วงในรัศมี 500 ม.` : 'ถนนรอบจุดนี้ไม่มีรายงานน้ำท่วม';
