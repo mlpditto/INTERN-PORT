@@ -202,6 +202,22 @@ exports.generatePreviewToken = onCall(async (request) => {
     return { token };
 });
 
+// === Explore link logos: find a shop's logo from its page (og:image / touch icon) ===
+// Admin-only. Returns the image as a data URL so the admin can PREVIEW it and approve; nothing is
+// stored here — the admin page resizes it and uploads to Storage (link-logos/). The fetch of an
+// admin-typed URL is SSRF-guarded in link-logo.js. Lazy require keeps cold start / discovery light.
+exports.fetchLinkLogo = onCall({ timeoutSeconds: 60, memory: '512MiB' }, async (request) => {
+    requireAdminCallable(request);
+    const url = String((request.data && request.data.url) || '').trim();
+    if (!url) throw new HttpsError('invalid-argument', 'url is required');
+    try {
+        return await require('./link-logo').findLinkLogo(url);
+    } catch (e) {
+        console.warn('[fetchLinkLogo]', url.slice(0, 120), e && e.message);
+        throw new HttpsError('failed-precondition', (e && e.message) || 'Could not read that page');
+    }
+});
+
 // === V97.10: intern leaderboard projection ===
 // The intern page used to run `db.collection("users").orderBy("score","desc")`
 // straight from the client. Since the `users` read rule was scoped to your own
