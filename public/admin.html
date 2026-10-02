@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.59)</title>
+    <title>Nika Admin (V102.60)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6121,10 +6121,11 @@
         /* V102.36: User Hub group chips are icon + count; the name slides in on hover /
            keyboard focus and stays on the selected chip, so two groups sharing an icon
            can still be told apart without waiting for the native title tooltip. */
-        #user-group-tabs .ugt-name { display: none; margin-left: 2px; }
-        #user-group-tabs button:hover .ugt-name,
-        #user-group-tabs button:focus-visible .ugt-name,
-        #user-group-tabs button[aria-pressed="true"] .ugt-name { display: inline; }
+        #user-group-tabs .grp-name { display: none; }
+        #user-group-tabs .grp-chip:hover .grp-name,
+        #user-group-tabs .grp-chip:focus-visible .grp-name,
+        #user-group-tabs .grp-chip[aria-pressed="true"] .grp-name { display: inline; }
+        #user-group-tabs .grp-chip { flex-shrink: 0; }
         .u-row-menu button { width: 100%; min-height: 0; margin: 0; padding: 7px 10px; display: flex; align-items: center; gap: 10px; border: none; border-radius: 6px; background: transparent; color: var(--text-main); font: inherit; font-size: 0.82em; font-weight: 600; text-align: left; cursor: pointer; }
         .u-row-menu button:hover, .u-row-menu button:focus-visible { background: var(--bg-body); outline: none; }
         .u-row-menu button.danger { color: #dc2626; }
@@ -23090,10 +23091,15 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             return (usersData || []).filter(u => (u.group || 'Public').trim().toUpperCase() === key).length;
         }
         // The one group chip: icon + group colour + active count. o = { cls, on, attrs, hint }
+        // V102.60: also { icon, color, active, total } for chips that are not one group
+        // (the User Hub "All" / division chips sum their groups — still active people).
         function groupChipHtml(g, o = {}) {
-            const c = getGroupColor(g), a = groupActiveCount(g), t = groupTotalCount(g), empty = a === 0;
+            const c = o.color || getGroupColor(g);
+            const a = o.active !== undefined ? o.active : groupActiveCount(g);
+            const t = o.total !== undefined ? o.total : groupTotalCount(g);
+            const empty = a === 0;
             const tip = `${g} · ${a} active${t > a ? ` · ${t} total (${t - a} hidden)` : ''}${o.hint ? ' · ' + o.hint : ''}`;
-            return `<button type="button" class="grp-chip${empty ? ' grp-empty' : ''}${o.cls ? ' ' + o.cls : ''}${o.on ? ' on' : ''}" ${o.attrs || ''} title="${escapeHtml(tip)}" style="color:${empty ? '#94a3b8' : c}; background:${empty ? '#f8fafc' : c + '1f'}; border-color:${empty ? '#cbd5e1' : c + '55'};"><i class="fa-solid ${getGroupIcon(g)}"></i>${escapeHtml(g.trim() || 'ไม่ระบุชื่อ')}<small>${a}</small></button>`;
+            return `<button type="button" class="grp-chip${empty ? ' grp-empty' : ''}${o.cls ? ' ' + o.cls : ''}${o.on ? ' on' : ''}" ${o.attrs || ''} title="${escapeHtml(tip)}" style="color:${empty ? '#94a3b8' : c}; background:${empty ? '#f8fafc' : c + '1f'}; border-color:${empty ? '#cbd5e1' : c + '55'};"><i class="fa-solid ${o.icon || getGroupIcon(g)}"></i><span class="grp-name">${escapeHtml(g.trim() || 'ไม่ระบุชื่อ')}</span><small>${a}</small></button>`;
         }
 
         function getGlobalGroups() {
@@ -35913,33 +35919,18 @@ They can connect again from LINE.
             const allOptions = ['All', ...divs, ...groups.filter(g => !divs.includes(g))];
 
             const campOn = !!window._userCampView;
+            // V102.60: the same chip + count rule as the picker and Groups & Divisions —
+            // ACTIVE users (not hidden, not pending). Pending requests keep their own section
+            // in the table; hidden (camp) users are the 🙈 chip.
+            const active = usersData.filter(u => !u.isIgnored);
+            const inGroups = (gs, list) => { const keys = new Set(gs.map(x => String(x).trim().toUpperCase())); return list.filter(u => keys.has((u.group || 'Public').trim().toUpperCase())).length; };
             container.innerHTML = allOptions.map(g => {
                 const isActive = !campOn && g === activeUserGroup;
-                const icon = g === 'All' ? 'fa-users' : getGroupIcon(g);
-                const color = g === 'All' ? '#333' : getGroupColor(g);
-                const safeGroup = String(g).replace(/'/g, "\\'");
-                
-                let count = 0;
-                if (g === 'All') count = allUsersAndPre.length;
-                else if (divisionConfig && divisionConfig[g]) {
-                    count = allUsersAndPre.filter(u => divisionConfig[g].includes(u.group || 'Public')).length;
-                } else {
-                    count = allUsersAndPre.filter(u => (u.group || 'Public') === g).length;
-                }
-
-                // V102.33 (lean B): icon + count only; the group name is the title / aria-label.
-                return `<button onclick="setUserGroupFilter('${safeGroup}')" style="
-                    width:auto; min-height:0; padding:5px 11px; border-radius:20px; border:2px solid ${isActive ? color : '#ddd'};
-                    background:${isActive ? color : '#fff'}; color:${isActive ? '#fff' : color};
-                    font-size:0.82em; font-weight:bold; cursor:pointer; white-space:nowrap;
-                    display:flex; align-items:center; gap:5px; transition:all 0.2s;
-" title="${escapeHtml(g)}" aria-label="${escapeHtml(g)} · ${count}" aria-pressed="${isActive}"><i class="fa-solid ${icon}"></i><span class="ugt-name lang-no-toggle">${escapeHtml(g)}</span> <span style="background:${isActive ? 'rgba(255,255,255,0.3)' : '#eee'}; padding:1px 7px; border-radius:10px; font-size:0.85em;">${count}</span></button>`;
-            }).join('') + (campCount ? `<button onclick="toggleUserCampView()" style="
-                    width:auto; min-height:0; padding:5px 11px; border-radius:20px; border:2px solid ${campOn ? '#64748b' : '#ddd'};
-                    background:${campOn ? '#64748b' : '#fff'}; color:${campOn ? '#fff' : '#64748b'};
-                    font-size:0.82em; font-weight:bold; cursor:pointer; white-space:nowrap;
-                    display:flex; align-items:center; gap:5px; transition:all 0.2s;
-" title="Camp · hidden from boards, not ranked" aria-label="Camp · ${campCount}" aria-pressed="${campOn}">🙈 <span style="background:${campOn ? 'rgba(255,255,255,0.3)' : '#eee'}; padding:1px 7px; border-radius:10px; font-size:0.85em;">${campCount}</span></button>` : '');
+                const attrs = `data-g="${escapeHtml(g)}" onclick="setUserGroupFilter(this.dataset.g)" aria-pressed="${isActive}"`;
+                if (g === 'All') return groupChipHtml('All', { attrs, icon: 'fa-users', color: '#334155', active: active.length, total: usersData.length, hint: 'show every group' });
+                if (divisionConfig && divisionConfig[g]) return groupChipHtml(g, { attrs, icon: 'fa-shield-halved', color: '#4f46e5', active: inGroups(divisionConfig[g], active), total: inGroups(divisionConfig[g], usersData), hint: 'division' });
+                return groupChipHtml(g, { attrs });
+            }).join('') + (campCount ? `<button type="button" class="grp-chip${campOn ? ' on' : ''}" onclick="toggleUserCampView()" aria-pressed="${campOn}" title="Camp · hidden from boards, not ranked · ${campCount}" style="color:#64748b; background:#f1f5f9; border-color:#cbd5e155;">🙈<span class="grp-name">Camp</span><small>${campCount}</small></button>` : '');
         }
 
         // Chip rail (house style — chips over dropdowns). Was a <select> + Reset
