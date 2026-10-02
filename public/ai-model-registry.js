@@ -107,7 +107,7 @@ window.AI_MODEL_REGISTRY = {
         "text",
         "json"
       ],
-      "selectable": true,
+      "selectable": false,
       "access": "verified-2026-09-11",
       "validation": "text-json-vision-pass",
       "rollout": "trial-only-defaults-unchanged"
