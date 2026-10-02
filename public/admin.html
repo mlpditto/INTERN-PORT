@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.69)</title>
+    <title>Nika Admin (V102.70)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -3871,6 +3871,16 @@
         .tkf-user { position:relative; padding:2px 11px 2px 3px; }
         .tkf-user img { width:20px; height:20px; border-radius:50%; object-fit:cover; display:block; }
         #sq-user-list { max-height:150px; overflow-y:auto; }
+        /* V102.70: PONEGLYPH ▸ Memories timeline */
+        .pm-tl { position:relative; margin:10px 0 0 10px; padding-left:20px; border-left:2px dashed rgba(148,163,184,.55); }
+        .pm-mo { margin:14px 0 0 -10px; font-weight:800; color:#64748b; font-size:.78em; letter-spacing:.06em; }
+        .pm-card { position:relative; display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px; padding:10px 12px; border-radius:16px; background:linear-gradient(180deg, rgba(255,255,255,.85), rgba(255,255,255,.55)); border:1px solid rgba(255,255,255,.9); box-shadow:0 2px 8px rgba(15,23,42,.07); }
+        .pm-card::before { content:""; position:absolute; left:-29px; top:24px; width:12px; height:12px; border-radius:50%; background:#f5c542; border:2px solid #fff; box-shadow:0 0 0 2px #b8860b; }
+        .pm-card .pm-t { flex:1; min-width:150px; }
+        .pm-card .pm-t b { display:block; }
+        .pm-card .pm-t small { color:#94a3b8; }
+        .pm-av { width:26px; height:26px; min-height:0; padding:0; margin:0 -6px 0 0; border-radius:50%; border:2px solid #fff; background:#94a3b8; color:#fff; font-size:10px; font-weight:800; display:inline-grid; place-items:center; overflow:hidden; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.2); }
+        .pm-av img { width:100%; height:100%; object-fit:cover; display:block; }
         .grp-chip:hover { transform:translateY(-1px); opacity:1; }
         .grp-chip.grp-empty { border-style:dashed; }
         .grp-chip.on, .grp-chip[aria-pressed="true"] {
@@ -12101,6 +12111,7 @@
                         <div style="display:flex; background:#f1f5f9; border-radius:12px; padding:3px; gap:3px;">
                             <button id="lp-btn-my" onclick="lpSetView('my')" style="padding:7px 16px; border:none; border-radius:10px; font-size:0.85em; font-weight:700; background:#1d4ed8; color:#fff; cursor:pointer;">My Path</button>
                             <button id="lp-btn-interns" onclick="lpSetView('interns')" style="padding:7px 16px; border:none; border-radius:10px; font-size:0.85em; font-weight:700; background:transparent; color:#64748b; cursor:pointer;">kro͞o</button>
+                            <button id="lp-btn-memories" onclick="lpSetView('memories')" title="Event memories — finished events and their stamps" style="padding:7px 16px; border:none; border-radius:10px; font-size:0.85em; font-weight:700; background:transparent; color:#64748b; cursor:pointer;">🎟️ Memories</button>
                         </div>
                     </div>
                 </div>
@@ -12221,6 +12232,14 @@
                 </div>
 
                 <!-- Monitor panel (hidden by default) -->
+                <!-- V102.70: Memories — finished events (event_history) + the stamps given, as a timeline. -->
+                <div id="lp-memories-panel" class="lang-no-toggle" style="display:none; margin-top:16px;">
+                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                        <b style="font-size:1.05em;">🎟️ Memories</b><span id="pm-count" class="grp-chip" style="--c:#b8860b; padding:2px 10px;"></span>
+                        <input type="search" id="pm-search" placeholder="🔎 Search an event…" oninput="lpRenderMemories()" style="margin-left:auto; width:220px; max-width:100%; padding:6px 12px; border:1px solid rgba(148,163,184,.45); border-radius:999px; background:rgba(255,255,255,.72); font-size:.85em; box-sizing:border-box;">
+                    </div>
+                    <div id="pm-list" class="pm-tl"></div>
+                </div>
                 <div id="lp-monitor-panel" style="display:none; margin-top:16px; background:#fff; border:1px solid var(--border-color); border-radius:16px; padding:14px; box-shadow:0 8px 20px rgba(15,23,42,0.05);">
                     <div style="font-weight:800; color:#1e1b4b; font-size:0.95em; margin-bottom:12px;">📊 Monitor: Intern Learning Paths</div>
                     <!-- Group tabs -->
@@ -58852,28 +58871,88 @@ Save it anyway?`;
 
         window.lpSetView = function(view) {
             window._lp.view = view;
-            const btnMy = document.getElementById('lp-btn-my');
-            const btnInt = document.getElementById('lp-btn-interns');
-            const monPanel = document.getElementById('lp-monitor-panel');
-            const mainGrid = document.getElementById('lp-main-grid');
-            const pathStrip = document.getElementById('lp-path-strip');
-            const statsStrip = document.getElementById('lp-stats-strip');
-            if (view === 'my') {
-                if (btnMy) { btnMy.style.background = '#1d4ed8'; btnMy.style.color = '#fff'; }
-                if (btnInt) { btnInt.style.background = 'transparent'; btnInt.style.color = '#64748b'; }
-                if (monPanel) monPanel.style.display = 'none';
-                if (mainGrid) mainGrid.style.display = 'grid';
-                if (pathStrip) pathStrip.style.display = 'block';
-                if (statsStrip) statsStrip.style.display = 'grid';
-            } else {
-                if (btnMy) { btnMy.style.background = 'transparent'; btnMy.style.color = '#64748b'; }
-                if (btnInt) { btnInt.style.background = '#1d4ed8'; btnInt.style.color = '#fff'; }
-                if (monPanel) monPanel.style.display = 'block';
-                if (mainGrid) mainGrid.style.display = 'none';
-                if (pathStrip) pathStrip.style.display = 'none';
-                if (statsStrip) statsStrip.style.display = 'none';
-                lpLoadInternList();
+            const show = (id, on, disp) => { const el = document.getElementById(id); if (el) el.style.display = on ? disp : 'none'; };
+            [['lp-btn-my', 'my'], ['lp-btn-interns', 'interns'], ['lp-btn-memories', 'memories']].forEach(([id, v]) => {
+                const b = document.getElementById(id);
+                if (b) { b.style.background = view === v ? '#1d4ed8' : 'transparent'; b.style.color = view === v ? '#fff' : '#64748b'; }
+            });
+            show('lp-monitor-panel', view === 'interns', 'block');
+            show('lp-memories-panel', view === 'memories', 'block');
+            show('lp-main-grid', view === 'my', 'grid');
+            show('lp-path-strip', view === 'my', 'block');
+            show('lp-stats-strip', view === 'my', 'grid');
+            if (view === 'interns') lpLoadInternList();
+            if (view === 'memories') lpLoadMemories();
+        };
+
+        // V102.70: Memories = event_history (finished events, written by purgePastEvents) + finished
+        // badged events that are still live (not purged yet). Newest first, grouped by month.
+        window._pm = { items: [], loaded: false };
+        window.lpLoadMemories = async function() {
+            const box = document.getElementById('pm-list');
+            if (box && !window._pm.loaded) box.innerHTML = '<div class="mut" style="padding:12px; color:#94a3b8;">…</div>';
+            let docs = [];
+            try {
+                const snap = await db.collection('event_history').orderBy('eventDate', 'desc').get();
+                docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            } catch (e) {
+                console.warn('event_history read failed', e);
+                if (box) box.innerHTML = '<div style="padding:12px; color:#b91c1c; font-size:.85em;">Could not read event_history (' + escapeHtml(e.code || e.message || '') + ')</div>';
+                return;
             }
+            const have = new Set(docs.map(d => d.id));
+            const today = schAdminTodayKey();
+            const live = (eventsCache || []).filter(e => e.badge && e.eventDate && e.eventDate <= today && !have.has(e.id)).map(e => {
+                const st = eventStampsCache.filter(s => s.eventId === e.id);
+                return { id: e.id, title: e.title, eventDate: e.eventDate, timeText: e.timeText, location: e.location, targetGroups: e.targetGroups || [], badge: e.badge,
+                    stampCount: st.length, stamps: st.map(s => ({ userId: s.userId, displayName: s.displayName, via: s.via })), live: true };
+            });
+            window._pm.items = docs.concat(live).sort((x, y) => String(y.eventDate || '').localeCompare(String(x.eventDate || '')));
+            window._pm.loaded = true;
+            lpRenderMemories();
+        };
+
+        window.lpRenderMemories = function() {
+            const box = document.getElementById('pm-list');
+            if (!box) return;
+            const q = String((document.getElementById('pm-search') || {}).value || '').trim().toLowerCase();
+            const items = window._pm.items.filter(it => !q || (String(it.title || '') + ' ' + String(it.location || '')).toLowerCase().includes(q));
+            const cnt = document.getElementById('pm-count');
+            if (cnt) cnt.textContent = window._pm.items.length;
+            if (!items.length) {
+                box.innerHTML = '<div style="padding:14px; color:#94a3b8; font-size:.85em;">' + (window._pm.items.length ? 'No match.' : 'No finished events yet — they appear here once they end.') + '</div>';
+                return;
+            }
+            const MON = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+            let lastMo = '', html = '';
+            items.forEach(it => {
+                const m = /^(\d{4})-(\d{2})/.exec(it.eventDate || '');
+                const mo = m ? MON[+m[2] - 1] + ' ' + m[1] : '—';
+                if (mo !== lastMo) { html += '<div class="pm-mo">' + mo + '</div>'; lastMo = mo; }
+                const stamps = it.stamps || [];
+                const avs = stamps.slice(0, 8).map(s => {
+                    const u = (usersData || []).find(x => x.id === s.userId) || {};
+                    const inner = u.pictureUrl ? '<img src="' + escapeHtml(u.pictureUrl) + '" alt="" referrerpolicy="no-referrer">' : escapeHtml([...String(s.displayName || '?').trim()][0] || '?');
+                    return '<button type="button" class="pm-av" title="' + escapeHtml((s.displayName || s.userId) + ' — export this stamp') + '" onclick="openStampExport(\'' + escapeHtml(it.id + '_' + s.userId) + '\')">' + inner + '</button>';
+                }).join('');
+                const more = stamps.length > 8 ? '<small style="color:#94a3b8; margin-left:8px;">+' + (stamps.length - 8) + '</small>' : '';
+                const groups = (it.targetGroups || []).join(' · ');
+                const meta = [evStampDateText(it.eventDate), groups, it.location ? '📍 ' + escapeHtml(it.location) : ''].filter(Boolean).join(' · ');
+                html += '<div class="pm-card">' +
+                    (it.badge ? eventBadgeSvgHtml(it.badge, '', 52, evStampDateText(it.eventDate)) : '') +
+                    '<div class="pm-t"><b>' + escapeHtml(it.title || '—') + (it.live ? ' <small title="Finished, not archived yet">⏳</small>' : '') + '</b><small>' + meta + '</small></div>' +
+                    '<span style="display:inline-flex; align-items:center; padding-right:6px;">' + avs + more + '</span>' +
+                    '<span class="grp-chip" style="--c:#b8860b; padding:2px 9px; cursor:default;" title="Stamps given">' + (it.stampCount != null ? it.stampCount : stamps.length) + ' 🎟️</span>' +
+                    (it.badge ? '<button type="button" class="grp-chip" style="--c:#64748b; padding:2px 8px;" title="Export this stamp blank (no person) as PNG" aria-label="Export blank stamp as PNG" data-i="' + escapeHtml(it.id) + '" onclick="lpMemExport(this.dataset.i)">⬇</button>' : '') +
+                    '</div>';
+            });
+            box.innerHTML = html;
+        };
+
+        window.lpMemExport = function(id) {
+            const it = window._pm.items.find(x => x.id === id);
+            if (!it || !it.badge) return;
+            openBadgeExport({ kind: 'stamp', blank: true, badge: it.badge, eventDate: it.eventDate, title: it.title || '', avatar: 'none', layout: 'badge' });
         };
 
         window.lpSetTimeline = function(period) {
