@@ -209,6 +209,69 @@
         return out.join('');
     }
 
+    // V101.51 · POPNIX Flood (BMA drainage gauges, via floodPointCheck → d.pop).
+    var LV = { ok: 'ok', warn: 'warn', crit: 'crit' };
+    function m2(v) { return v == null ? '—' : (Math.round(v * 100) / 100).toFixed(2); }
+
+    // A · the nearest canal gauge: level, cm/h, 24 h line against its watch / critical marks.
+    function trendHtml(pop) {
+        var c = pop && pop.canals && pop.canals[0];
+        if (!c || c.wl == null) return '';
+        var arrow = c.trend === 'up' ? '▲' : c.trend === 'down' ? '▼' : '▶';
+        var rate = c.deltaCm == null ? '' : '<span class="fw-rate ' + c.trend + '" title="Change in the last hour">' + arrow + ' ' + (c.deltaCm > 0 ? '+' : '') + c.deltaCm + ' cm/h</span>';
+        var left = c.warn != null && c.wl < c.warn ? Math.round((c.warn - c.wl) * 100) : null;
+        var svg = '';
+        var sp = c.spark;
+        if (sp && sp.length > 2) {
+            var lo = Math.min.apply(null, sp), hi = Math.max.apply(null, sp);
+            [c.warn, c.crit].forEach(function (t) { if (t != null && t >= lo - 0.12 && t <= hi + 0.12) { lo = Math.min(lo, t); hi = Math.max(hi, t); } });
+            var span = (hi - lo) || 0.1, W = 240, H = 40;
+            var y = function (v) { return (H - 3 - (v - lo) / span * (H - 6)).toFixed(1); };
+            var line = function (t, col) { return t != null && t >= lo && t <= hi ? '<line x1="0" x2="' + W + '" y1="' + y(t) + '" y2="' + y(t) + '" stroke="' + col + '" stroke-dasharray="4 3" stroke-width="1"/>' : ''; };
+            var pts = sp.map(function (v, i) { return (i * W / (sp.length - 1)).toFixed(1) + ',' + y(v); }).join(' ');
+            svg = '<svg class="fw-spark" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true">' + line(c.warn, '#f59e0b') + line(c.crit, '#ef4444') +
+                '<polyline points="' + pts + '" fill="none" stroke="#0284c7" stroke-width="2" stroke-linejoin="round"/></svg>';
+        }
+        var marks = (c.warn != null ? 'watch ' + m2(c.warn) : '') + (c.crit != null ? ' · critical ' + m2(c.crit) : '');
+        return '<div class="fw-tr" title="' + esc(c.name) + ' · ' + c.km + ' km · ' + esc(marks) + (c.maxYday != null ? ' · yesterday max ' + m2(c.maxYday) : '') + '">' +
+            '<div class="fw-tr-h"><i class="fa-solid fa-water"></i><b>' + m2(c.wl) + '</b><small>m</small><span class="fw-lv ' + (LV[c.level] || 'unk') + '">' +
+            (c.level === 'crit' ? 'critical' : c.level === 'warn' ? 'watch' : c.level === 'ok' ? 'ok' : '?') + '</span>' + rate +
+            (left != null && left <= 15 ? '<span class="fw-left" title="Until the watch level">' + left + ' cm to watch</span>' : '') + '</div>' + svg + '</div>';
+    }
+
+    // B · rain that actually fell (nearest gauge) + how many gauges are raining city-wide.
+    function rainHtml(pop) {
+        var r = pop && pop.rains && pop.rains[0];
+        if (!r) return '';
+        var v = function (x) { return x == null ? '—' : x; };
+        var city = pop.city && pop.city.raining ? '<span class="fw-city" title="Rain gauges reporting rain, Bangkok-wide' +
+            (pop.city.max1h ? ' · max ' + pop.city.max1h.v + ' mm/h at ' + esc(pop.city.max1h.name) : '') + '"><i class="fa-solid fa-cloud-showers-heavy"></i>' + pop.city.raining + '</span>' : '';
+        return '<div class="fw-rain" title="Rain that fell: last 1 h / 3 h / 24 h · ' + esc(r.name) + ' · ' + r.km + ' km">' +
+            '<i class="fa-solid fa-cloud-rain" style="color:#3b82f6"></i><b>' + v(r.r1h) + '</b><small>1h</small><b>' + v(r.r3h) + '</b><small>3h</small><b>' + v(r.r24h) + '</b><small>24h mm</small>' + city + '</div>';
+    }
+
+    // C · the other gauges around: next two canals and the nearest road sensors.
+    function nearHtml(pop) {
+        if (!pop) return '';
+        var rows = [];
+        (pop.canals || []).slice(1).forEach(function (c) {
+            rows.push('<div class="fw-nr"><i class="fa-solid fa-water"></i><span>' + esc(c.name) + '</span><small>' + c.km + ' km</small><span class="fw-lv ' + (LV[c.level] || 'unk') + '">' + m2(c.wl) +
+                '</span><i class="fw-ar ' + c.trend + '">' + (c.trend === 'up' ? '▲' : c.trend === 'down' ? '▼' : '') + '</i></div>');
+        });
+        (pop.roads || []).forEach(function (r) {
+            rows.push('<div class="fw-nr"><i class="fa-solid fa-road"></i><span>' + esc(r.name) + '</span><small>' + r.km + ' km</small><span class="fw-lv ' + (r.level === 'dry' ? 'ok' : r.level === 'flood' ? 'crit' : 'warn') + '">' +
+                (r.depthCm == null ? '—' : r.depthCm + ' cm') + '</span></div>');
+        });
+        return rows.length ? '<div class="fw-near">' + rows.join('') + '</div>' : '';
+    }
+
+    // D · which sources answered (a dot each); the POPNIX credit line is required by its terms.
+    function srcDots(d) {
+        if (!d.src) return '';
+        var one = function (ok, label) { return '<i class="fw-sd ' + (ok ? 'on' : 'off') + '" title="' + label + (ok ? '' : ' — not answering') + '"></i>'; };
+        return '<span class="fw-src" title="FloodWatch · Floodboard · POPNIX Flood">' + one(d.src.fw, 'FloodWatch') + one(d.src.fb, 'Floodboard') + one(d.src.pop, 'POPNIX Flood') + '</span>';
+    }
+
     function render() {
         if (!sheet) return;
         var p = places[tab];
@@ -233,10 +296,10 @@
         else {
             var t = p.at ? new Date(p.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }) : '';
             var meta = [d.canal ? esc(d.canal.name) + (d.canal.km != null ? ' · ' + d.canal.km + ' km' : '') : '', t,
-                'BKK FloodWatch' + (d.road ? ' · Floodboard (CC BY 4.0)' : '') + (p.wx ? ' · Open-Meteo (CC BY 4.0)' : '')]
+                'BKK FloodWatch' + (d.road ? ' · Floodboard (CC BY 4.0)' : '') + (d.pop ? ' · ' + esc(d.pop.credit) : '') + (p.wx ? ' · Open-Meteo (CC BY 4.0)' : '')]
                 .filter(Boolean).join(' · ');
             body = '<div class="fw-h"><span class="fw-dot' + (risk ? ' fw-' + risk : '') + '"></span>' + esc(d.title || '—') + '</div>' +
-                '<div class="fw-stats">' + stats(d) + '</div>' + wxRow(p.wx) + '<div class="fw-meta">' + meta + '</div>';
+                '<div class="fw-stats">' + stats(d) + '</div>' + trendHtml(d.pop) + rainHtml(d.pop) + nearHtml(d.pop) + wxRow(p.wx) + '<div class="fw-meta">' + srcDots(d) + meta + '</div>';
         }
         // Flood data can fail on its own (FloodWatch is flaky); the weather row still shows.
         if (!d && p.wx && !p.loading) body += wxRow(p.wx);
