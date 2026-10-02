@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.71)</title>
+    <title>Nika Admin (V102.72)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -17391,6 +17391,56 @@
             } catch (e) { console.warn('recordAiEval failed:', e && e.message); }
         };
 
+        // V102.72: per-model speed. Every feature-tagged callUniversalAI is timed by ONE wrapper
+        // (so every feature and return path is covered) and summed into
+        // ai_evals/{day}.latency.{model}.{feature} = { n, ms, fail }. A failure counts in `fail`
+        // only — a fast error never lowers the average. Buffered 5 s so a bulk run is one write.
+        const _aiLat = {};
+        let _aiLatTimer = null;
+        const _aiLatKey = s => String(s == null ? '' : s).replace(/[~*/[].]/g, '_').slice(0, 80) || 'unknown';
+        function _flushAiLatency() {
+            _aiLatTimer = null;
+            try {
+                if (typeof db === 'undefined' || !db) return;
+                const inc = v => firebase.firestore.FieldValue.increment(v);
+                const latency = {};
+                Object.entries(_aiLat).forEach(([m, feats]) => {
+                    latency[m] = {};
+                    Object.entries(feats).forEach(([f, v]) => {
+                        latency[m][f] = {};
+                        ['n', 'ms', 'fail'].forEach(k => { if (v[k]) latency[m][f][k] = inc(v[k]); });
+                        delete feats[f];
+                    });
+                    delete _aiLat[m];
+                });
+                if (!Object.keys(latency).length) return;
+                const day = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+                db.collection('ai_evals').doc(day).set({ date: day, latency }, { merge: true })
+                    .catch(e => console.warn('recordAiLatency write failed:', e && e.message));
+            } catch (e) { console.warn('recordAiLatency failed:', e && e.message); }
+        }
+        window.recordAiLatency = function(feature, model, ms, ok) {
+            const m = _aiLatKey(model), f = _aiLatKey(feature);
+            const v = ((_aiLat[m] = _aiLat[m] || {})[f] = _aiLat[m][f] || { n: 0, ms: 0, fail: 0 });
+            if (ok) { v.n += 1; v.ms += Math.round(ms); } else { v.fail += 1; }
+            if (!_aiLatTimer) _aiLatTimer = setTimeout(_flushAiLatency, 5000);
+        };
+        const _callUniversalAIRaw = window.callUniversalAI;
+        window.callUniversalAI = async function(modelName, prompt, isJson, visionData, quickApiKey, generationOptions) {
+            const feature = (generationOptions && generationOptions.feature) || '';
+            const t0 = performance.now();
+            try {
+                const r = await _callUniversalAIRaw.apply(this, arguments);
+                const ms = performance.now() - t0;
+                if (feature) window.recordAiLatency(feature, (r && r.model) || modelName, ms, true);
+                if (r && typeof r === 'object') r.ms = Math.round(ms);
+                return r;
+            } catch (e) {
+                if (feature) window.recordAiLatency(feature, modelName, 0, false);
+                throw e;
+            }
+        };
+
         // V96.05 — 7-day AI quality panel (mirror of loadAiUsage7d). For features
         // with a clear positive/total outcome pair, shows an accept/keep rate.
         const AI_EVAL_RATE = {
@@ -17456,6 +17506,30 @@
                         html += `<div style="display:flex; justify-content:space-between; padding:3px 0; font-size:0.85em;">
                             <span style="color:#4b5563; font-weight:700;">${m}</span>
                             <span style="color:#7a6207;">applied ${ap} · suggested ${sg}${pct != null ? ` <b style="color:${col};">(${pct}%)</b>` : ''}</span>
+                        </div>`;
+                    });
+                }
+                // V102.72: speed by model (avg seconds per successful call), fastest first.
+                const lat = {};
+                snap.forEach(doc => {
+                    Object.entries(doc.data().latency || {}).forEach(([m, feats]) => {
+                        const t = lat[m] = lat[m] || { n: 0, ms: 0, fail: 0, cn: 0, cms: 0 };
+                        Object.entries(feats || {}).forEach(([f, v]) => {
+                            t.n += v.n || 0; t.ms += v.ms || 0; t.fail += v.fail || 0;
+                            if (f === 'quiz_2model_compare') { t.cn += v.n || 0; t.cms += v.ms || 0; }
+                        });
+                    });
+                });
+                const latRows = Object.entries(lat).filter(([, t]) => t.n > 0).sort((a, b) => a[1].ms / a[1].n - b[1].ms / b[1].n);
+                if (latRows.length) {
+                    html += `<div style="margin-top:8px; padding-top:6px; border-top:1px dashed #d8b4fe; font-size:0.72em; font-weight:900; color:#6d28d9; text-transform:uppercase; letter-spacing:0.4px;">Speed by model · avg per call</div>`;
+                    latRows.forEach(([m, t], i) => {
+                        const avg = (t.ms / t.n / 1000).toFixed(1);
+                        const cmp = t.cn ? ` · ⚖️ compare <b>${(t.cms / t.cn / 1000).toFixed(1)}s</b> (${t.cn})` : '';
+                        const fail = t.fail ? ` · <span style="color:#b91c1c;">${t.fail} failed</span>` : '';
+                        html += `<div style="display:flex; justify-content:space-between; gap:8px; padding:3px 0; font-size:0.85em;">
+                            <span style="color:#4b5563; font-weight:700;">${i === 0 ? '⚡ ' : ''}${String(m).replace(/[<>&]/g, '')}</span>
+                            <span style="color:#7a6207; text-align:right;"><b style="color:${i === 0 ? '#15803d' : '#374151'};">${avg}s</b> · ${t.n} calls${cmp}${fail}</span>
                         </div>`;
                     });
                 }
@@ -62363,8 +62437,13 @@ ${steerBlock}
 
         window.generateAiProposalB = async function(qIdx, arrIdx, btn) {
             const oldHtml = btn ? btn.innerHTML : null;
+            let tick = null;   // V102.72: elapsed-seconds counter on the button
             try {
-                if (btn) { btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Comparing...'; btn.disabled = true; }
+                if (btn) {
+                    const t0 = Date.now();
+                    const paint = () => { btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Comparing… ' + Math.floor((Date.now() - t0) / 1000) + 's'; };
+                    paint(); btn.disabled = true; tick = setInterval(paint, 1000);
+                }
                 const item = window._aiAnalysisItems[arrIdx];
                 const originalQ = getQuizFormData().questions[qIdx];
                 const modelB = window._compareModelB();
@@ -62413,6 +62492,8 @@ ${steerBlock}
                 console.error('2-model compare error:', e);
                 alert('Model B failed: ' + e.message);
                 if (btn) { btn.innerHTML = oldHtml; btn.disabled = false; }
+            } finally {
+                if (tick) clearInterval(tick);
             }
         };
 
