@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.65)</title>
+    <title>Nika Admin (V102.66)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -3863,6 +3863,14 @@
         .dqf-btn.dark { background:#111827; color:#fff; border-color:#111827; }
         .dqf-btn.post { background:linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 55%), #d35400; color:#fff; border:0; box-shadow:0 6px 14px rgba(211,84,0,.35); }
         @media (max-width:700px) { .dqf-grid { grid-template-columns:1fr; } }
+        /* V102.66: Kanban Task form — same two-column glass layout; chips for priority / project / assignees. */
+        .dqf input[type=date] { box-sizing:border-box; padding:6px 10px; border:1px solid rgba(148,163,184,.45); border-radius:12px; background:rgba(255,255,255,.72); font-size:.88em; }
+        .tkf-proj { cursor:pointer; }
+        .tkf-proj:has(input:checked), .tkf-user:has(input:checked) { color:#fff; background:linear-gradient(180deg, rgba(255,255,255,.42) 0%, rgba(255,255,255,.08) 48%, rgba(255,255,255,0) 52%), var(--c); border-color:color-mix(in srgb, var(--c) 60%, #fff); box-shadow:inset 0 1px 0 rgba(255,255,255,.6), 0 6px 16px color-mix(in srgb, var(--c) 38%, transparent); transform:translateY(-1px); }
+        .tkf-proj input, .tkf-user input { position:absolute; opacity:0; width:0; height:0; margin:0; pointer-events:none; }
+        .tkf-user { --c:#4361ee; position:relative; padding:2px 11px 2px 3px; }
+        .tkf-user img { width:20px; height:20px; border-radius:50%; object-fit:cover; display:block; }
+        #sq-user-list { max-height:150px; overflow-y:auto; }
         .grp-chip:hover { transform:translateY(-1px); opacity:1; }
         .grp-chip.grp-empty { border-style:dashed; }
         .grp-chip.on, .grp-chip[aria-pressed="true"] {
@@ -12488,23 +12496,25 @@
 
                 <!-- 1. Kanban Task Form -->
                 <div id="form-task-container">
-                    <h2 id="task-modal-title" style="margin-top:0;">New Task</h2><input type="hidden" id="edit-id">
-                    <div style="display:flex; gap:10px;"><input type="text" id="sq-title" placeholder="Topic"
-                            style="flex:2;"><select id="sq-priority" style="flex:1;">
-                            <option value="Low">Low</option>
-                            <option value="Medium" selected>Medium</option>
-                            <option value="High">High</option>
-                        </select></div><textarea id="sq-desc" rows="3" placeholder="Description"></textarea>
-                    <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;"><input type="date"
-                            id="sq-due" style="flex:1;"><label
-                            style="flex:1; cursor:pointer; background:#fff0f5; padding:8px; border-radius:6px; border:1px solid #e83e8c; color:#e83e8c; font-weight:bold;"><input
-                                type="checkbox" id="sq-isProject" style="width:auto; margin:0;"> 💖 Mark as Project</label>
+                    <div class="dqf">
+                    <div class="dqf-head">
+                        <h2 id="task-modal-title">New Task</h2><input type="hidden" id="edit-id"><input type="hidden" id="sq-priority" value="Medium">
+                        <span id="sq-priority-chips" style="display:inline-flex; gap:5px;"></span>
+                        <label class="grp-chip tkf-proj" style="--c:#e83e8c;" title="Mark as Project"><input type="checkbox" id="sq-isProject">💖 Project</label>
                     </div>
-                    <p style="text-align:left; font-weight:bold; margin-bottom:5px;">Assign to:</p>
-                    <div class="lang-no-toggle" id="sq-user-list"
-                        style="display:flex; flex-wrap:wrap; gap:5px; max-height:100px; overflow-y:auto; border:1px solid #ddd; padding:10px; border-radius:8px; background:#fafafa;">
+                    <div class="dqf-grid">
+                        <div>
+                            <div class="dqf-r" style="margin-top:0;"><input type="text" id="sq-title" placeholder="Topic"></div>
+                            <div class="dqf-r"><textarea id="sq-desc" rows="3" placeholder="Description"></textarea></div>
+                            <div class="dqf-r"><span class="evf-ic" title="Due date">📅</span><input type="date" id="sq-due" style="flex:1; min-width:0;"></div>
+                        </div>
+                        <div>
+                            <div class="dqf-r" style="margin-top:0;"><span class="evf-ic" title="Assign to">👥</span><span id="sq-sel-count" style="font-size:.78em; color:#94a3b8;"></span></div>
+                            <div class="lang-no-toggle dqf-chips" id="sq-user-list" onchange="updateTaskSelCount()" style="margin-top:7px;"></div>
+                        </div>
                     </div>
-                    <button class="magic-btn" style="width:100%; margin-top:15px;" onclick="saveSideQuest()">🚀 Save Task</button>
+                    <div class="dqf-foot"><button class="dqf-btn post" style="background:linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 55%), #4361ee; box-shadow:0 6px 14px rgba(67,97,238,.35);" onclick="saveSideQuest()">🚀 Save Task</button></div>
+                    </div>
                 </div>
 
                 <!-- 2. Daily Quest Form -->
@@ -54017,6 +54027,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 document.getElementById('sq-title').value = "";
                 document.getElementById('sq-desc').value = "";
             }
+            renderTaskPriority();
+            updateTaskSelCount();
         }
 
         // V92.33 — URL validation helper for Daily Quest form
@@ -54627,18 +54639,35 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         async function deleteHistoryLog(logId, amount) { if (!confirm(`Delete log and revert ${amount} points?`)) return; try { await db.collection("users").doc(currentHistoryUserId).update({ score: firebase.firestore.FieldValue.increment(-amount) }); await db.collection("checkin_logs").doc(logId).delete(); showToast("Reverted!"); const user = usersData.find(u => u.id === currentHistoryUserId); showHistory(currentHistoryUserId, user ? user.displayName : 'User', (user ? user.score : 0) - amount); } catch (e) { alert(e.message); } }
-        function updateAssigneeList() { 
-            const d = document.getElementById('sq-user-list'); 
-            d.innerHTML = ""; 
-            usersData.forEach(u => { 
-                if (!u.isIgnored) {
-                    d.innerHTML += `<div class="sq-user-item" style="margin-bottom:5px;">
-                        <input type="checkbox" class="sq-user-check" value="${u.id}" data-name="${u.displayName}" data-pic="${u.pictureUrl}"> 
-                        <img src="${u.pictureUrl}" alt="${u.displayName}" onclick="event.stopPropagation(); openUserProfile('${u.id}')" style="cursor:pointer; transition:0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
-                        <span onclick="event.stopPropagation(); openUserProfile('${u.id}')" style="cursor:pointer; flex:1;">${u.displayName}</span>
-                    </div>`; 
-                }
-            }); 
+        // V102.66: assignees are avatar chips (the checkbox stays, hidden, as .sq-user-check — saveSideQuest reads it).
+        function updateAssigneeList() {
+            const d = document.getElementById('sq-user-list');
+            if (!d) return;
+            d.innerHTML = (usersData || []).filter(u => !u.isIgnored).map(u =>
+                `<label class="grp-chip tkf-user" title="${escapeHtml(u.displayName || '')}"><input type="checkbox" class="sq-user-check" value="${u.id}" data-name="${escapeHtml(u.displayName || '')}" data-pic="${escapeHtml(u.pictureUrl || '')}"><img src="${escapeHtml(u.pictureUrl || '')}" alt="" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"><span>${escapeHtml(u.displayName || u.id)}</span></label>`
+            ).join('');
+            updateTaskSelCount();
+        }
+
+        function updateTaskSelCount() {
+            const el = document.getElementById('sq-sel-count');
+            if (!el) return;
+            const n = document.querySelectorAll('.sq-user-check:checked').length;
+            el.textContent = n ? n + ' selected' : '';
+        }
+
+        // Priority = three glass chips; the value lives in the hidden #sq-priority (Low | Medium | High).
+        function renderTaskPriority() {
+            const box = document.getElementById('sq-priority-chips'), inp = document.getElementById('sq-priority');
+            if (!box || !inp) return;
+            if (!['Low', 'Medium', 'High'].includes(inp.value)) inp.value = 'Medium';
+            box.innerHTML = [['Low', '#16a34a'], ['Medium', '#d97706'], ['High', '#dc2626']].map(([v, c]) =>
+                `<button type="button" class="grp-chip${inp.value === v ? ' on' : ''}" style="--c:${c};" aria-pressed="${inp.value === v}" onclick="setTaskPriority('${v}')">${v}</button>`).join('');
+        }
+        function setTaskPriority(v) {
+            const inp = document.getElementById('sq-priority');
+            if (inp) inp.value = v;
+            renderTaskPriority();
         }
 
         function openUserProfile(userId) {
