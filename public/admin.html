@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.59)</title>
+    <title>Nika Admin (V102.60)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -3819,11 +3819,33 @@
 
 
         /* V102.59: ONE group chip for every group list (picker, Groups & Divisions) — see groupChipHtml(). */
-        .grp-chip { width:auto; min-height:0; margin:0; display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:999px; border:1px solid; font:inherit; font-size:12.5px; font-weight:700; cursor:pointer; white-space:nowrap; }
-        .grp-chip small { font-weight:600; opacity:.7; }
+        /* V102.60: liquid glass. --c = the group colour (set inline by groupChipHtml). Unselected =
+           frosted glass tinted with --c; selected = solid --c glass, lifted, with a glow; when a row
+           has a selection the other chips fade a little. No ✓ — the selected chip IS the mark. */
+        .grp-chip { --c:#64748b; width:auto; min-height:0; margin:0; display:inline-flex; align-items:center; gap:5px; padding:4px 11px; border-radius:999px; font:inherit; font-size:12.5px; font-weight:700; cursor:pointer; white-space:nowrap;
+            color:var(--c);
+            background:linear-gradient(180deg, rgba(255,255,255,.85) 0%, rgba(255,255,255,.35) 100%), color-mix(in srgb, var(--c) 16%, transparent);
+            border:1px solid color-mix(in srgb, var(--c) 28%, rgba(255,255,255,.7));
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.95), inset 0 -1px 0 color-mix(in srgb, var(--c) 14%, transparent), 0 1px 3px rgba(15,23,42,.08);
+            -webkit-backdrop-filter:blur(10px) saturate(160%); backdrop-filter:blur(10px) saturate(160%);
+            transition:transform .18s ease, opacity .18s ease, box-shadow .18s ease, background .18s ease; }
+        .grp-chip small { font-weight:600; opacity:.75; }
+        .grp-chip:hover { transform:translateY(-1px); opacity:1; }
         .grp-chip.grp-empty { border-style:dashed; }
-        .grp-chip.on, .grp-chip[aria-pressed="true"] { box-shadow:0 0 0 2px #4f46e5; }
-        .grp-chip[aria-pressed="true"]::before { content:'✓'; }
+        .grp-chip.on, .grp-chip[aria-pressed="true"] {
+            color:#fff;
+            background:linear-gradient(180deg, rgba(255,255,255,.42) 0%, rgba(255,255,255,.08) 48%, rgba(255,255,255,0) 52%), var(--c);
+            border-color:color-mix(in srgb, var(--c) 60%, #fff);
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.6), inset 0 -2px 4px color-mix(in srgb, var(--c) 60%, #000 10%), 0 6px 16px color-mix(in srgb, var(--c) 38%, transparent);
+            transform:translateY(-1px); opacity:1; }
+        .grp-chip.on small, .grp-chip[aria-pressed="true"] small { opacity:.9; }
+        :is(#user-group-tabs, #gs-list, #div-editor):has(.grp-chip.on, .grp-chip[aria-pressed="true"]) .grp-chip:not(.on):not([aria-pressed="true"]) { opacity:.6; }
+        body.dark-mode :is(#user-group-tabs, #gs-list, #div-editor):has(.grp-chip.on, .grp-chip[aria-pressed="true"]) .grp-chip:not(.on):not([aria-pressed="true"]) { opacity:.75; }
+        body.dark-mode .grp-chip:not(.on):not([aria-pressed="true"]) {
+            color:color-mix(in srgb, var(--c) 50%, #fff);
+            background:linear-gradient(180deg, rgba(255,255,255,.18) 0%, rgba(255,255,255,.06) 100%), color-mix(in srgb, var(--c) 30%, transparent);
+            border-color:color-mix(in srgb, var(--c) 40%, rgba(255,255,255,.15));
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.18), 0 1px 3px rgba(0,0,0,.3); }
         /* V102.59: the picker is sections by division (renderGsGroupList), no longer a 3-column grid. */
         #groupSelectModal #gs-list { max-height:360px; overflow-y:auto; margin-bottom:14px; }
         #groupSelectModal .gs-sec { margin-bottom:10px; }
@@ -6121,10 +6143,11 @@
         /* V102.36: User Hub group chips are icon + count; the name slides in on hover /
            keyboard focus and stays on the selected chip, so two groups sharing an icon
            can still be told apart without waiting for the native title tooltip. */
-        #user-group-tabs .ugt-name { display: none; margin-left: 2px; }
-        #user-group-tabs button:hover .ugt-name,
-        #user-group-tabs button:focus-visible .ugt-name,
-        #user-group-tabs button[aria-pressed="true"] .ugt-name { display: inline; }
+        #user-group-tabs .grp-name { display: none; }
+        #user-group-tabs .grp-chip:hover .grp-name,
+        #user-group-tabs .grp-chip:focus-visible .grp-name,
+        #user-group-tabs .grp-chip[aria-pressed="true"] .grp-name { display: inline; }
+        #user-group-tabs .grp-chip { flex-shrink: 0; }
         .u-row-menu button { width: 100%; min-height: 0; margin: 0; padding: 7px 10px; display: flex; align-items: center; gap: 10px; border: none; border-radius: 6px; background: transparent; color: var(--text-main); font: inherit; font-size: 0.82em; font-weight: 600; text-align: left; cursor: pointer; }
         .u-row-menu button:hover, .u-row-menu button:focus-visible { background: var(--bg-body); outline: none; }
         .u-row-menu button.danger { color: #dc2626; }
@@ -12572,9 +12595,6 @@
             #divisionsModal .dv-bucket-head small { color:#64748b; }
             #divisionsModal .dv-row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
             #divisionsModal .dv-empty { color:#94a3b8; font-size:0.85em; }
-            #divisionsModal .dv-chip { width:auto; min-height:0; margin:0; display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:999px; border:1px solid; font:inherit; font-size:12.5px; font-weight:700; cursor:pointer; }
-            #divisionsModal .dv-chip small { font-weight:600; opacity:.7; }
-            #divisionsModal .dv-chip.on { box-shadow:0 0 0 2px #4f46e5; }
             #divisionsModal .dv-menu { flex-basis:100%; display:flex; flex-wrap:wrap; gap:6px; padding:6px 0 2px; }
             #divisionsModal .dv-menu button, #divisionsModal .dv-foot button { width:auto; min-height:30px; margin:0; padding:0 12px; border-radius:8px; font:inherit; cursor:pointer; }
             #divisionsModal .dv-menu button { border:1px solid #c7d2fe; background:#eef2ff; color:#3730a3; font-weight:700; }
@@ -23090,10 +23110,15 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             return (usersData || []).filter(u => (u.group || 'Public').trim().toUpperCase() === key).length;
         }
         // The one group chip: icon + group colour + active count. o = { cls, on, attrs, hint }
+        // V102.60: also { icon, color, active, total } for chips that are not one group
+        // (the User Hub "All" / division chips sum their groups — still active people).
         function groupChipHtml(g, o = {}) {
-            const c = getGroupColor(g), a = groupActiveCount(g), t = groupTotalCount(g), empty = a === 0;
+            const c = o.color || getGroupColor(g);
+            const a = o.active !== undefined ? o.active : groupActiveCount(g);
+            const t = o.total !== undefined ? o.total : groupTotalCount(g);
+            const empty = a === 0;
             const tip = `${g} · ${a} active${t > a ? ` · ${t} total (${t - a} hidden)` : ''}${o.hint ? ' · ' + o.hint : ''}`;
-            return `<button type="button" class="grp-chip${empty ? ' grp-empty' : ''}${o.cls ? ' ' + o.cls : ''}${o.on ? ' on' : ''}" ${o.attrs || ''} title="${escapeHtml(tip)}" style="color:${empty ? '#94a3b8' : c}; background:${empty ? '#f8fafc' : c + '1f'}; border-color:${empty ? '#cbd5e1' : c + '55'};"><i class="fa-solid ${getGroupIcon(g)}"></i>${escapeHtml(g.trim() || 'ไม่ระบุชื่อ')}<small>${a}</small></button>`;
+            return `<button type="button" class="grp-chip${empty ? ' grp-empty' : ''}${o.cls ? ' ' + o.cls : ''}${o.on ? ' on' : ''}" ${o.attrs || ''} title="${escapeHtml(tip)}" style="--c:${empty ? '#94a3b8' : c};"><i class="fa-solid ${o.icon || getGroupIcon(g)}"></i><span class="grp-name">${escapeHtml(g.trim() || 'ไม่ระบุชื่อ')}</span><small>${a}</small></button>`;
         }
 
         function getGlobalGroups() {
@@ -35471,8 +35496,8 @@ They can connect again from LINE.
             list.innerHTML = sections.filter(([, , gs]) => gs.length).map(([title, note, gs]) => {
                 const live = gs.filter(g => groupActiveCount(g) > 0 || g.toUpperCase() === curUp);
                 const empty = gs.filter(g => !live.includes(g));
-                return `<div class="gs-sec"><div class="gs-sec-head">${title} <small>${note}</small></div><div class="gs-sec-row">${live.map(chip).join('')}${empty.length ? `<span class="gs-sec-empty" style="display:${gsEmptyOpen ? 'contents' : 'none'};">${empty.map(chip).join('')}</span>${gsEmptyOpen ? '' : `<button type="button" class="grp-chip grp-empty" onclick="gsEmptyOpen = true; renderGsGroupList();" style="color:#64748b; background:#fff; border-color:#cbd5e1;">+ ${empty.length} empty</button>`}` : ''}</div></div>`;
-            }).join('') + `<div class="gs-sec-row"><button type="button" class="grp-chip grp-empty gs-chip-new" onclick="gsNewGroup(this)" style="color:#475569; background:#fff; border-color:#cbd5e1;"><i class="fa-solid fa-plus"></i> New group</button></div>`;
+                return `<div class="gs-sec"><div class="gs-sec-head">${title} <small>${note}</small></div><div class="gs-sec-row">${live.map(chip).join('')}${empty.length ? `<span class="gs-sec-empty" style="display:${gsEmptyOpen ? 'contents' : 'none'};">${empty.map(chip).join('')}</span>${gsEmptyOpen ? '' : `<button type="button" class="grp-chip grp-empty" onclick="gsEmptyOpen = true; renderGsGroupList();" style="--c:#64748b;">+ ${empty.length} empty</button>`}` : ''}</div></div>`;
+            }).join('') + `<div class="gs-sec-row"><button type="button" class="grp-chip grp-empty gs-chip-new" onclick="gsNewGroup(this)" style="--c:#475569;"><i class="fa-solid fa-plus"></i> New group</button></div>`;
         }
 
         // V98.18 lean: chip-rail group picker for the User Hub modal.
@@ -35913,33 +35938,18 @@ They can connect again from LINE.
             const allOptions = ['All', ...divs, ...groups.filter(g => !divs.includes(g))];
 
             const campOn = !!window._userCampView;
+            // V102.60: the same chip + count rule as the picker and Groups & Divisions —
+            // ACTIVE users (not hidden, not pending). Pending requests keep their own section
+            // in the table; hidden (camp) users are the 🙈 chip.
+            const active = usersData.filter(u => !u.isIgnored);
+            const inGroups = (gs, list) => { const keys = new Set(gs.map(x => String(x).trim().toUpperCase())); return list.filter(u => keys.has((u.group || 'Public').trim().toUpperCase())).length; };
             container.innerHTML = allOptions.map(g => {
                 const isActive = !campOn && g === activeUserGroup;
-                const icon = g === 'All' ? 'fa-users' : getGroupIcon(g);
-                const color = g === 'All' ? '#333' : getGroupColor(g);
-                const safeGroup = String(g).replace(/'/g, "\\'");
-                
-                let count = 0;
-                if (g === 'All') count = allUsersAndPre.length;
-                else if (divisionConfig && divisionConfig[g]) {
-                    count = allUsersAndPre.filter(u => divisionConfig[g].includes(u.group || 'Public')).length;
-                } else {
-                    count = allUsersAndPre.filter(u => (u.group || 'Public') === g).length;
-                }
-
-                // V102.33 (lean B): icon + count only; the group name is the title / aria-label.
-                return `<button onclick="setUserGroupFilter('${safeGroup}')" style="
-                    width:auto; min-height:0; padding:5px 11px; border-radius:20px; border:2px solid ${isActive ? color : '#ddd'};
-                    background:${isActive ? color : '#fff'}; color:${isActive ? '#fff' : color};
-                    font-size:0.82em; font-weight:bold; cursor:pointer; white-space:nowrap;
-                    display:flex; align-items:center; gap:5px; transition:all 0.2s;
-" title="${escapeHtml(g)}" aria-label="${escapeHtml(g)} · ${count}" aria-pressed="${isActive}"><i class="fa-solid ${icon}"></i><span class="ugt-name lang-no-toggle">${escapeHtml(g)}</span> <span style="background:${isActive ? 'rgba(255,255,255,0.3)' : '#eee'}; padding:1px 7px; border-radius:10px; font-size:0.85em;">${count}</span></button>`;
-            }).join('') + (campCount ? `<button onclick="toggleUserCampView()" style="
-                    width:auto; min-height:0; padding:5px 11px; border-radius:20px; border:2px solid ${campOn ? '#64748b' : '#ddd'};
-                    background:${campOn ? '#64748b' : '#fff'}; color:${campOn ? '#fff' : '#64748b'};
-                    font-size:0.82em; font-weight:bold; cursor:pointer; white-space:nowrap;
-                    display:flex; align-items:center; gap:5px; transition:all 0.2s;
-" title="Camp · hidden from boards, not ranked" aria-label="Camp · ${campCount}" aria-pressed="${campOn}">🙈 <span style="background:${campOn ? 'rgba(255,255,255,0.3)' : '#eee'}; padding:1px 7px; border-radius:10px; font-size:0.85em;">${campCount}</span></button>` : '');
+                const attrs = `data-g="${escapeHtml(g)}" onclick="setUserGroupFilter(this.dataset.g)" aria-pressed="${isActive}"`;
+                if (g === 'All') return groupChipHtml('All', { attrs, icon: 'fa-users', color: '#334155', active: active.length, total: usersData.length, hint: 'show every group' });
+                if (divisionConfig && divisionConfig[g]) return groupChipHtml(g, { attrs, icon: 'fa-shield-halved', color: '#4f46e5', active: inGroups(divisionConfig[g], active), total: inGroups(divisionConfig[g], usersData), hint: 'division' });
+                return groupChipHtml(g, { attrs });
+            }).join('') + (campCount ? `<button type="button" class="grp-chip${campOn ? ' on' : ''}" onclick="toggleUserCampView()" aria-pressed="${campOn}" title="Camp · hidden from boards, not ranked · ${campCount}" style="--c:#64748b;">🙈<span class="grp-name">Camp</span><small>${campCount}</small></button>` : '');
         }
 
         // Chip rail (house style — chips over dropdowns). Was a <select> + Reset
