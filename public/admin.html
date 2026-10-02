@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.73)</title>
+    <title>Nika Admin (V102.74)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -7719,16 +7719,32 @@
                 <input type="hidden" id="rl-edit-id">
                 <div style="margin-bottom:14px;">
                     <label style="display:block; font-size:0.72em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Title <span style="color:#ef4444;">*</span></label>
-                    <input type="text" id="rl-title" placeholder="e.g. ร้านยา XYZ บน LINE MAN" style="width:100%; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em; box-sizing:border-box;">
+                    <input type="text" id="rl-title" oninput="rlPaintLogo()" placeholder="e.g. ร้านยา XYZ บน LINE MAN" style="width:100%; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em; box-sizing:border-box;">
                 </div>
                 <div style="margin-bottom:14px;">
                     <label style="display:block; font-size:0.72em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">URL <span style="color:#ef4444;">*</span></label>
                     <input type="url" id="rl-url" placeholder="https://..." style="width:100%; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em; box-sizing:border-box;">
                 </div>
+                <!-- V102.74: shop logo — shown round on the intern Explore card (V101.53). Upload / fetch from the
+                     link (server reads og:image, you approve) / remove. No logo = letter disc. -->
+                <div style="margin-bottom:14px;">
+                    <label style="display:block; font-size:0.72em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Logo</label>
+                    <input type="hidden" id="rl-logo-url">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <div id="rl-logo-preview" style="flex-shrink:0;"></div>
+                        <div style="display:flex; flex-wrap:wrap; gap:6px; min-width:0;">
+                            <button type="button" id="rl-logo-fetch" onclick="rlFetchLogo()" style="width:auto; min-height:0; padding:7px 12px; border-radius:9px; border:none; background:linear-gradient(135deg,#6366f1,#a855f7); color:#fff; font-weight:800; font-size:0.8em; cursor:pointer;">🔗 Fetch from link</button>
+                            <button type="button" id="rl-logo-upload" onclick="document.getElementById('rl-logo-file').click()" style="width:auto; min-height:0; padding:7px 12px; border-radius:9px; border:1px solid #cbd5e1; background:#fff; color:#334155; font-weight:800; font-size:0.8em; cursor:pointer;">⬆️ Upload</button>
+                            <button type="button" id="rl-logo-clear" onclick="rlClearLogo()" title="Remove logo" style="width:auto; min-height:0; padding:7px 10px; border-radius:9px; border:1px solid #fecaca; background:#fff; color:#b91c1c; font-weight:800; font-size:0.8em; cursor:pointer;">🗑</button>
+                            <input type="file" id="rl-logo-file" accept="image/png,image/jpeg,image/webp" hidden onchange="rlUploadLogoFile(this)" style="display:none;">
+                        </div>
+                    </div>
+                    <div id="rl-logo-msg" style="font-size:0.74em; color:#64748b; margin-top:6px; min-height:1.2em;"></div>
+                </div>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
                     <div>
                         <label style="display:block; font-size:0.72em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Type</label>
-                        <select id="rl-type" style="width:100%; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em; background:#fff;">
+                        <select id="rl-type" onchange="rlPaintLogo()" style="width:100%; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em; background:#fff;">
                             <option value="line_man">🛍️ LINE MAN</option>
                             <option value="youtube">▶️ YouTube</option>
                             <option value="other">🔗 Other</option>
@@ -35095,12 +35111,12 @@ RULES:
                 return;
             }
             list.innerHTML = reviewLinksCache.map(l => {
-                const icon = REVIEW_LINK_TYPE_ICON[l.type] || '🔗';
+                const icon = rlLogoDisc(l, 22);
                 const active = l.isActive !== false;
                 return `
                     <div style="display:flex; flex-direction:column; gap:6px; background:white; border:1px solid #f1f5f9; border-radius:12px; padding:12px 14px; ${active ? '' : 'opacity:0.55;'}">
                         <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
-                            <div style="font-weight:800; color:#334155; font-size:0.88em; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${icon} ${escapeHtml(l.title || 'Untitled')}</div>
+                            <div style="font-weight:800; color:#334155; font-size:0.88em; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:flex; align-items:center; gap:7px;">${icon}<span style="min-width:0; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(l.title || 'Untitled')}</span></div>
                             <div style="font-weight:900; color:#b45309; font-size:0.78em; white-space:nowrap; flex-shrink:0;">+${l.beriReward || 0} Beri</div>
                         </div>
                         <div style="font-size:0.72em; color:#94a3b8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(l.url || '')}</div>
@@ -35113,6 +35129,125 @@ RULES:
             }).join('');
         }
 
+        // V102.74: logo disc for the admin list and the modal preview — same look as the intern card
+        // (index.html explLogoHtml): the image when logoUrl is https, otherwise a tinted letter disc.
+        function rlLogoDisc(l, size) {
+            const title = String(l.title || '');
+            let h = 0;
+            for (const c of title) h = (h * 31 + c.codePointAt(0)) >>> 0;
+            h %= 360;
+            const base = 'width:' + size + 'px; height:' + size + 'px; flex-shrink:0; border-radius:50%; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; overflow:hidden;';
+            if (/^https:\/\//i.test(String(l.logoUrl || ''))) {
+                return '<span style="' + base + ' background:#fff; border:1px solid #e2e8f0;"><img src="' + escapeHtml(l.logoUrl) + '" alt="" referrerpolicy="no-referrer" style="width:100%; height:100%; object-fit:cover;"></span>';
+            }
+            const letter = (Array.from(title).find(c => /[A-Za-z0-9ก-ฮ]/.test(c)) || '?').toUpperCase();
+            const glyph = l.type && l.type !== 'line_man' ? (REVIEW_LINK_TYPE_ICON[l.type] || '🔗') : escapeHtml(letter);
+            return '<span style="' + base + ' font-size:' + Math.round(size * 0.46) + 'px; font-weight:800; color:hsl(' + h + ',55%,32%); background:hsl(' + h + ',70%,90%);">' + glyph + '</span>';
+        }
+        function rlPaintLogo() {
+            const url = document.getElementById('rl-logo-url').value;
+            document.getElementById('rl-logo-preview').innerHTML = rlLogoDisc({
+                title: document.getElementById('rl-title').value, type: document.getElementById('rl-type').value, logoUrl: url
+            }, 64);
+            document.getElementById('rl-logo-clear').style.display = url ? '' : 'none';
+        }
+        function rlLogoMsg(text, bad) {
+            const m = document.getElementById('rl-logo-msg');
+            m.style.color = bad ? '#b91c1c' : '#64748b';
+            m.textContent = text || '';
+        }
+        // Square 256 px WebP (centre-cropped — shop logos are shown in a circle), content-addressed in
+        // Storage (link-logos/<sha256>.webp) so the same picture is never stored twice.
+        async function rlStoreLogoBlob(blob) {
+            const bitmap = await createImageBitmap(blob);
+            const side = Math.min(bitmap.width, bitmap.height);
+            const canvas = document.createElement('canvas');
+            canvas.width = canvas.height = 256;
+            canvas.getContext('2d').drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, 256, 256);
+            bitmap.close();
+            const out = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', 0.85));
+            if (!out) throw new Error('Could not process the image');
+            const hash = await window._sha256Hex(out);
+            const ref = adminApp.storage().ref('link-logos/' + hash + '.webp');
+            try {
+                return await ref.getDownloadURL();   // same picture already stored — reuse
+            } catch (probe) {
+                if (probe && probe.code !== 'storage/object-not-found') throw probe;
+                const snap = await ref.put(out, { contentType: 'image/webp' });
+                return await snap.ref.getDownloadURL();
+            }
+        }
+        async function rlSetLogoFromBlob(blob, note) {
+            rlLogoMsg('Uploading…');
+            try {
+                document.getElementById('rl-logo-url').value = await rlStoreLogoBlob(blob);
+                rlPaintLogo();
+                rlLogoMsg((note ? note + ' · ' : '') + 'Logo ready — press Save to apply.');
+            } catch (e) {
+                console.error('Link logo upload:', e);
+                rlLogoMsg('Upload failed: ' + (e && e.message ? e.message : 'unknown error'), true);
+            }
+        }
+        async function rlUploadLogoFile(input) {
+            const file = input.files && input.files[0];
+            input.value = '';
+            if (!file) return;
+            if (!/^image\/(png|jpeg|webp)$/.test(file.type)) return rlLogoMsg('PNG, JPG or WebP only.', true);
+            if (file.size > 8 * 1024 * 1024) return rlLogoMsg('The image must be under 8 MB.', true);
+            await rlSetLogoFromBlob(file, '');
+        }
+        // Ask the server to read the page and pick its og:image / touch icon; show it for approval.
+        async function rlFetchLogo() {
+            const url = document.getElementById('rl-url').value.trim();
+            if (!/^https?:\/\//i.test(url)) return rlLogoMsg('Enter the link URL first.', true);
+            const btn = document.getElementById('rl-logo-fetch');
+            btn.disabled = true;
+            rlLogoMsg('Reading the page…');
+            try {
+                const r = (await adminApp.functions().httpsCallable('fetchLinkLogo')({ url })).data;
+                if (!r || !r.found) {
+                    rlLogoMsg('No usable image on that page' + (r && r.candidates ? ' (' + r.candidates + ' found, none a usable photo)' : '') + ' — use Upload instead.', true);
+                    return;
+                }
+                const ok = await rlConfirmFetchedLogo(r);
+                if (!ok) { rlLogoMsg('Not used.'); return; }
+                const blob = await (await fetch(r.dataUrl)).blob();
+                await rlSetLogoFromBlob(blob, 'from ' + r.source);
+            } catch (e) {
+                console.error('fetchLinkLogo:', e);
+                rlLogoMsg('Fetch failed: ' + (e && e.message ? e.message : 'unknown error'), true);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+        // Preview + approve. A plain fixed overlay ABOVE the force-shown modals (z-index 150000; see
+        // feedback_overlay_zindex_behind_force_show_modal) — not confirm(), which a browser can silently suppress.
+        function rlConfirmFetchedLogo(r) {
+            return new Promise(resolve => {
+                const el = document.createElement('div');
+                el.style.cssText = 'position:fixed; inset:0; z-index:150000; background:rgba(15,23,42,0.55); display:flex; align-items:center; justify-content:center; padding:16px;';
+                const finish = v => { el.remove(); resolve(v); };
+                el.innerHTML = '<div style="background:#fff; border-radius:16px; padding:18px; max-width:340px; width:100%; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,0.35);">' +
+                    '<div style="font-weight:900; color:#334155; margin-bottom:10px;">Use this logo?</div>' +
+                    '<div style="display:flex; justify-content:center; gap:14px; align-items:center; margin-bottom:10px;">' +
+                    '<img src="' + r.dataUrl + '" alt="" style="width:96px; height:96px; object-fit:cover; border-radius:50%; border:1px solid #e2e8f0;">' +
+                    '<img src="' + r.dataUrl + '" alt="" style="max-width:96px; max-height:96px; border-radius:8px; border:1px solid #e2e8f0; object-fit:contain;"></div>' +
+                    '<div style="font-size:0.74em; color:#64748b; margin-bottom:12px;">From the page\'s ' + escapeHtml(r.source) + ' · circle crop (left) / original (right). Shop logos belong to the shop — use only if it is fine to show here.</div>' +
+                    '<div style="display:flex; gap:8px; justify-content:center;">' +
+                    '<button type="button" data-no style="width:auto; min-height:0; padding:8px 16px; border-radius:10px; border:1px solid #e2e8f0; background:#fff; font-weight:800; color:#64748b; cursor:pointer;">Cancel</button>' +
+                    '<button type="button" data-yes style="width:auto; min-height:0; padding:8px 18px; border-radius:10px; border:none; background:linear-gradient(135deg,#6366f1,#a855f7); color:#fff; font-weight:900; cursor:pointer;">Use this logo</button></div></div>';
+                el.querySelector('[data-no]').onclick = () => finish(false);
+                el.querySelector('[data-yes]').onclick = () => finish(true);
+                el.addEventListener('click', e => { if (e.target === el) finish(false); });
+                document.body.appendChild(el);
+            });
+        }
+        function rlClearLogo() {
+            document.getElementById('rl-logo-url').value = '';
+            rlPaintLogo();
+            rlLogoMsg('Logo removed — press Save to apply.');
+        }
+
         function openReviewLinkModal(id = null) {
             const l = id ? reviewLinksCache.find(x => x.id === id) : null;
             document.getElementById('rl-edit-id').value = id || '';
@@ -35121,6 +35256,9 @@ RULES:
             document.getElementById('rl-type').value = l ? (l.type || 'line_man') : 'line_man';
             document.getElementById('rl-beri').value = l ? (l.beriReward || 10) : 10;
             document.getElementById('rl-active').checked = l ? (l.isActive !== false) : true;
+            document.getElementById('rl-logo-url').value = l ? (l.logoUrl || '') : '';
+            rlLogoMsg('');
+            rlPaintLogo();
             forceShowModal('reviewLinkModal');
         }
 
@@ -35137,6 +35275,10 @@ RULES:
                 beriReward,
                 isActive: document.getElementById('rl-active').checked
             };
+            // V102.74: logoUrl — set when a logo is chosen, removed when cleared (https only).
+            const logoUrl = document.getElementById('rl-logo-url').value;
+            if (/^https:\/\//i.test(logoUrl)) data.logoUrl = logoUrl;
+            else if (id) data.logoUrl = firebase.firestore.FieldValue.delete();
             try {
                 if (id) {
                     await db.collection('review_links').doc(id).update(data);
