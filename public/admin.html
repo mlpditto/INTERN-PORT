@@ -36381,13 +36381,15 @@ They can connect again from LINE.
 
         // ---- V102.57: badge PNG export (admin only) ---------------------------------
         // 1024 px wide, transparent. Layouts: the badge alone, + its name, + the person.
-        // A stamp's avatar can only be the 8-bit one (a data URL): a LINE photo is
-        // cross-origin and would taint the canvas. Blank = no person (from Badge Stats).
+        // A stamp's corner = the 8-bit avatar, the LINE photo, or nothing. The LINE CDN
+        // answers CORS for this origin (Access-Control-Allow-Origin echoed, checked
+        // 2026-10-02), so the photo is fetched once into a data URL — an SVG drawn as an
+        // image can't load anything external. Blank = no person (from Badge Stats).
         let badgeExportState = null;
 
         function badgeExportInner(st) {
             return st.kind === 'stamp'
-                ? eventBadgeSvgHtml(st.badge, st.avatarOn && st.avatar8 ? st.avatar8 : '', 100, evStampDateText(st.eventDate), true)
+                ? eventBadgeSvgHtml(st.badge, st.avatar === '8bit' ? st.avatar8 : st.avatar === 'photo' ? (st.photo64 || st.pictureUrl) : '', 100, evStampDateText(st.eventDate), st.avatar === '8bit')
                 : badgeSvgHtml(st.art, st.tierIdx, 100, true);
         }
 
@@ -36409,7 +36411,23 @@ They can connect again from LINE.
             return [slug(st.title) || 'badge', tier, st.layout === 'person' ? slug(st.person) : ''].filter(Boolean).join('-') + '.png';
         }
 
-        function badgeExportPng(st) {
+        async function badgeExportPhoto64(url) {
+            const r = await fetch(url, { mode: 'cors' });
+            if (!r.ok) throw new Error('LINE photo HTTP ' + r.status);
+            const blob = await r.blob();
+            return await new Promise((resolve, reject) => {
+                const fr = new FileReader();
+                fr.onload = () => resolve(fr.result);
+                fr.onerror = () => reject(new Error('LINE photo could not be read.'));
+                fr.readAsDataURL(blob);
+            });
+        }
+
+        async function badgeExportPng(st) {
+            if (st.kind === 'stamp' && st.avatar === 'photo' && !st.photo64) {
+                try { st.photo64 = await badgeExportPhoto64(st.pictureUrl); }
+                catch (e) { throw new Error('The LINE photo could not be loaded (' + e.message + ') — pick 👾 8-bit or None.'); }
+            }
             const W = 1024, H = st.layout === 'badge' ? 116 : st.layout === 'title' ? 138 : 156;
             const svg = badgeExportSvg(st, st.layout, W);
             return new Promise((resolve, reject) => {
@@ -36465,7 +36483,7 @@ They can connect again from LINE.
             const s = eventStampsCache.find(x => x.id === stampId);
             if (!s) return;
             const u = (usersData || []).find(x => x.id === s.userId) || {};
-            openBadgeExport({ kind: 'stamp', badge: s.badge, eventDate: s.eventDate, title: s.title || '', person: u.displayName || s.displayName || '', avatar8: u.avatar8 || '', avatarOn: !!u.avatar8, layout: 'person' });
+            openBadgeExport({ kind: 'stamp', badge: s.badge, eventDate: s.eventDate, title: s.title || '', person: u.displayName || s.displayName || '', avatar8: u.avatar8 || '', pictureUrl: u.pictureUrl || '', avatar: u.avatar8 ? '8bit' : (u.pictureUrl ? 'photo' : 'none'), layout: 'person' });
         }
 
         // No person: any tier the badge offers (Badge Stats).
@@ -36493,7 +36511,7 @@ They can connect again from LINE.
                     <div style="${checker} border-radius:12px; padding:8px; display:flex; justify-content:center; outline:${st.layout === k ? '3px solid #7c3aed' : '1px solid #e2e8f0'};">${badgeExportSvg(st, k, 104)}</div>
                     <div style="font-size:0.72em; font-weight:800; margin-top:5px; color:${st.layout === k ? '#6d28d9' : '#475569'};">${label}</div></button>`).join('');
             const tierChips = st.blank && st.tiers.length > 1 ? `<span style="color:#64748b; font-weight:700;">Tier</span>${st.tiers.map(t => chip(st.tierIdx === t, `badgeExportSet('tierIdx', ${t})`, BADGE_TIERS[t].name.charAt(0) + BADGE_TIERS[t].name.slice(1).toLowerCase())).join('')}` : '';
-            const avatarChips = st.kind === 'stamp' ? `<span style="color:#64748b; font-weight:700;">Avatar</span>${chip(st.avatarOn, 'badgeExportSet(\'avatarOn\', true)', '👾 8-bit', !st.avatar8)}${chip(!st.avatarOn, 'badgeExportSet(\'avatarOn\', false)', 'None')}${st.avatar8 ? '' : '<span style="color:#94a3b8;">no 8-bit avatar yet (User Hub ⋯)</span>'}` : '';
+            const avatarChips = st.kind === 'stamp' ? `<span style="color:#64748b; font-weight:700;">In the circle</span>${chip(st.avatar === '8bit', "badgeExportSet('avatar', '8bit')", '👾 8-bit manga', !st.avatar8)}${chip(st.avatar === 'photo', "badgeExportSet('avatar', 'photo')", '📷 LINE photo', !st.pictureUrl)}${chip(st.avatar === 'none', "badgeExportSet('avatar', 'none')", 'None')}${st.avatar8 ? '' : '<span style="color:#94a3b8;">no 8-bit yet (User Hub ⋯ → 👾)</span>'}` : '';
             box.innerHTML = `<div style="background:var(--bg-card, #fff); color:var(--text-main, #1e293b); border-radius:16px; padding:16px; width:min(600px, 100%); max-height:92vh; overflow:auto; box-shadow:0 20px 40px rgba(15, 23, 42, 0.25);">
                 <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;"><b>⬇ ${st.blank ? 'Blank badge — ' + escapeHtml(st.title) : 'Export badge — ' + escapeHtml(st.person || '')}</b>
                     <button type="button" onclick="closeBadgeExport()" aria-label="Close" style="margin-left:auto; width:32px; height:32px; min-height:0; padding:0; border:none; background:transparent; font-size:20px; cursor:pointer; color:#94a3b8;">×</button></div>
