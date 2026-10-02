@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.62)</title>
+    <title>Nika Admin (V102.63)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -57603,9 +57603,6 @@ Save it anyway?`;
             const asked = new Set(people.map(p => p.userId));
             const chips = people.map(p => chip(p.userId, p.displayName || p.userId))
                 .concat(stamps.filter(s => !asked.has(s.userId)).map(s => chip(s.userId, s.displayName || s.userId)));
-            const options = (usersData || []).filter(u => !byUser.has(u.id) && !asked.has(u.id))
-                .sort((a, b) => String(a.displayName || '').localeCompare(String(b.displayName || '')))
-                .map(u => `<option value="${escapeHtml(u.id)}">${escapeHtml(u.displayName || u.id)}${u.group ? ' · ' + escapeHtml(u.group) : ''}</option>`).join('');
             return `<div style="margin-top:6px; padding:6px 8px; border:1px dashed #f5e0a8; border-radius:8px; background:#fffdf5;">
                 <div style="display:flex; align-items:center; gap:8px; font-size:0.74em; color:#334155;">
                     ${eventBadgeSvgHtml(e.badge, '', 28)}
@@ -57613,7 +57610,7 @@ Save it anyway?`;
                     <span><b>${stamps.length}</b> stamped${code ? ` · Code <b style="font-family:ui-monospace, monospace; letter-spacing:2px; color:#7a5600;">${escapeHtml(code)}</b> <span style="color:#94a3b8;">(event day only)</span>` : ''}</span>
                 </div>
                 <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">${chips.join('')}
-                    <select onchange="evGiveStamp('${e.id}', this.value); this.value = '';" style="width:auto; max-width:200px; min-height:0; padding:2px 6px; font-size:0.72em; font-weight:700; border:1px solid #ddd6fe; border-radius:999px; background:#f5f3ff; color:#6d28d9;"><option value="">＋ Give to someone else…</option>${options}</select>
+                    <button type="button" onclick="evOpenGivePicker('${e.id}')" title="Give the stamp to any active user" style="width:auto; min-height:0; padding:2px 10px; font-size:0.72em; font-weight:700; cursor:pointer; border:1px solid #ddd6fe; border-radius:999px; background:#f5f3ff; color:#6d28d9;">🎁 Give to…</button>
                 </div>
                 <div style="font-size:0.66em; color:#94a3b8; margin-top:4px;">✓ = you gave it · 🎟️ = used the code · grey = asked to join, no stamp yet</div>
             </div>`;
@@ -57644,6 +57641,59 @@ Save it anyway?`;
                     await evStampDoc(e, uid);
                 }
             } catch (err) { alert('Could not update the stamp: ' + err.message); }
+        }
+
+        // V102.63: "Give to…" — a searchable list of active users (hwIsActiveUser) instead of a
+        // <select> of everyone. Built on demand and removed on close so no state leaks between events.
+        function evOpenGivePicker(eventId) {
+            const e = eventsCache.find(x => x.id === eventId);
+            if (!e || !e.badge) return;
+            document.getElementById('ev-give-picker')?.remove();
+            const ov = document.createElement('div');
+            ov.id = 'ev-give-picker';
+            ov.style.cssText = 'position:fixed; inset:0; z-index:100000; background:rgba(15,23,42,0.45); display:flex; align-items:center; justify-content:center; padding:16px;';
+            ov.innerHTML = `<div style="background:#fff; border-radius:14px; width:min(380px,100%); max-height:80vh; display:flex; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,0.3);">
+                <div style="display:flex; gap:6px; align-items:center; padding:10px;">
+                    <input id="ev-give-q" type="search" placeholder="Search name…" style="flex:1; min-width:0; padding:7px 10px; border:1px solid #e2e8f0; border-radius:8px; font-size:0.85em;">
+                    <label style="font-size:0.72em; color:#64748b; white-space:nowrap; display:flex; align-items:center; gap:3px;"><input type="checkbox" id="ev-give-all">All</label>
+                    <button type="button" id="ev-give-x" aria-label="Close" style="width:auto; min-height:0; padding:4px 9px; border:0; background:#f1f5f9; border-radius:8px; cursor:pointer;">✕</button>
+                </div>
+                <div id="ev-give-list" style="overflow:auto; padding:0 10px 10px; display:flex; flex-direction:column; gap:4px;"></div></div>`;
+            document.body.appendChild(ov);
+            const close = () => ov.remove();
+            const rowHtml = u => {
+                const pic = u.pictureUrl
+                    ? `<img src="${escapeHtml(u.pictureUrl)}" alt="" style="width:24px; height:24px; border-radius:50%; object-fit:cover;">`
+                    : '<span style="width:24px; text-align:center;">👤</span>';
+                return `<button type="button" data-uid="${escapeHtml(u.id)}" style="width:100%; min-height:0; display:flex; align-items:center; gap:8px; padding:5px 8px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; cursor:pointer; text-align:left; font-size:0.82em;">${pic}<span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(u.displayName || u.id)}</span><span style="font-size:0.85em; color:#94a3b8;">${escapeHtml(u.group || '')}</span></button>`;
+            };
+            const render = () => {
+                const q = ov.querySelector('#ev-give-q').value.trim().toLowerCase();
+                const all = ov.querySelector('#ev-give-all').checked;
+                const had = new Set(eventStampsCache.filter(s => s.eventId === eventId).map(s => s.userId));
+                const rows = (usersData || [])
+                    .filter(u => !had.has(u.id) && (all || window.hwIsActiveUser(u)))
+                    .filter(u => !q || String(u.displayName || '').toLowerCase().includes(q) || String(u.fullName || '').toLowerCase().includes(q))
+                    .sort((x, y) => String(x.displayName || '').localeCompare(String(y.displayName || '')));
+                ov.querySelector('#ev-give-list').innerHTML = rows.map(rowHtml).join('')
+                    || '<div style="padding:12px; text-align:center; font-size:0.8em; color:#94a3b8;">No one to show</div>';
+            };
+            ov.addEventListener('click', ev => {
+                if (ev.target === ov || ev.target.id === 'ev-give-x') return close();
+                const b = ev.target.closest('button[data-uid]');
+                if (b) { evGiveStamp(eventId, b.dataset.uid); b.remove(); }
+            });
+            ov.querySelector('#ev-give-q').addEventListener('input', render);
+            ov.querySelector('#ev-give-all').addEventListener('change', render);
+            render();
+            ov.querySelector('#ev-give-q').focus();
+        }
+
+        // V102.63: a typed place name opens Google Maps; a pasted URL stays plain text here.
+        function evMapsLinkHtml(loc) {
+            const t = String(loc || '').trim();
+            if (/^https?:\/\//i.test(t)) return escapeHtml(t);
+            return '<a href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(t) + '" target="_blank" rel="noopener" style="color:inherit; text-decoration:underline dotted;">' + escapeHtml(t) + '</a>';
         }
 
         async function evGiveStamp(eventId, uid) {
@@ -57957,7 +58007,7 @@ Save it anyway?`;
                         <span style="font-size:0.72em; color:#64748b; white-space:nowrap;">${escapeHtml(e.eventDate)}${e.timeText ? ' · ' + escapeHtml(e.timeText) : ''}</span>
                         <button onclick="editEventAudience('${e.id}')" title="Choose which groups see the event" data-th-title="เลือกกลุ่มที่เห็นกิจกรรม" style="width:auto;padding:4px 8px">👥 Audience</button><button onclick="deleteEvent('${e.id}')" title="Delete this event" aria-label="Delete this event" style="width:auto; min-height:0; flex:0 0 auto; padding:0; font-size:0.95em; line-height:1; border:none; border-radius:6px; background:transparent; color:#b91c1c; cursor:pointer;">🗑️</button>
                     </div>
-                    <div style="font-size:0.7em; color:#94a3b8; margin-top:3px;">${escapeHtml((e.targetGroups || []).join(' · ') || '🔒 Creator + Admin')}${e.location ? ' · 📍 ' + escapeHtml(e.location) : ''}</div>
+                    <div style="font-size:0.7em; color:#94a3b8; margin-top:3px;">${escapeHtml((e.targetGroups || []).join(' · ') || '🔒 Creator + Admin')}${e.location ? ' · 📍 ' + evMapsLinkHtml(e.location) : ''}</div>
                         <div>${evJoinHtml(e.joinVia, '#7c3aed')}</div>
                     <div style="font-size:0.74em; color:#334155; margin-top:4px;">
                         <b>${people.length}</b> want to join${people.length ? ': ' + people.map(p => escapeHtml(p.displayName || p.userId)).join(', ') : ''}
