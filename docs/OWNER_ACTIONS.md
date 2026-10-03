@@ -12,7 +12,7 @@
 | **PREPAY** | AI Studio Gemini API billing: switch Postpay → Prepay before **2026-10-12** | ⬜ open — 12 d left on 2026-09-30 | 1 |
 | **SMOKE-LIFF** | Try the new intern features in LINE on a phone | ⬜ open | 2 |
 | **SMOKE-ADMIN** | Try admin V102.46 → V102.48 (language button, feedback labels, issues) and check the ❌ quiz | ⬜ open | 2 |
-| **RIVER** | Deploy `functions:refreshRiverDischarge,functions:floodPointCheck` (V101.56 river flow C.2 / C.13 / C.29B), then check the 1st run's log line `[refreshRiverDischarge] C.2=… C.13=… C.29B=…` | ⬜ open — not deployed | 2 |
+| **RIVER** | River flow C.2 / C.13 / C.29B (V101.56): functions deployed 2026-10-03 and first run OK (`C.2=2186 C.13=2500 C.29B=2382`); remaining: merge #1565 so the card shows it, then look at it on a phone in LINE | ⬜ open — merge + phone check | 2 |
 | **CLOUD** | Finish the Claude Code on the web setup at claude.ai/code | ⬜ optional | 3 |
 | FN | Every exported Cloud Function is deployed and ACTIVE | ✅ *script* (25/25 on 2026-09-30) | — |
 | RULES | `firestore.rules` / `storage.rules` identical to live | ✅ *script* | — |
