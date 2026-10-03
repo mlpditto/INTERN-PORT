@@ -206,14 +206,14 @@
     }
 
     // The capsules sit on the water at 20 / 50 / 80 %, where the rail buttons (💰 🔥 …) can be. Walk right → left and
-    // slide each one clear of any button it overlaps (and of the capsule to its right), so none is covered.
+    // slide each one clear of any button (rail, check-in row, ⋯) or the pts · Beri · level row it overlaps (and of the capsule to its right), so none is covered.
     function placeCaps() {
         var wt = document.getElementById('fw-water'), card = document.getElementById('section-profile-combined');
         if (!wt || !card) return;
         var caps = wt.querySelectorAll('.fw-rc');
         if (!caps.length) return;
         var w = wt.getBoundingClientRect();
-        var blocks = [].map.call(card.querySelectorAll('#profile-quick-actions button'), function (b) { return b.getBoundingClientRect(); });
+        var blocks = [].map.call(card.querySelectorAll('#profile-quick-actions button, .profile-score-values > *, .unified-metrics-bar button, #daily-checkin-card > *'), function (b) { return b.getBoundingClientRect(); });
         var limit = Infinity;
         for (var k = caps.length - 1; k >= 0; k--) {
             var c = caps[k];
