@@ -195,18 +195,18 @@ async function refreshRiverDischarge(db, FieldValue, opts) {
         const keep = (prev.stations || []).find(s => s.code === st.code);
         const pick = c || (keep && keep.q != null ? { q: keep.q, at: keep.at, src: keep.src } : null);
         const h = (hist[st.code] || []).slice();
-        if (pick && pick.src !== 'est' && (!h.length || now - h[h.length - 1][0] >= HIST_SLOT_MS)) {
-            h.push([now, pick.q]); while (h.length > HIST_KEEP) h.shift();
+        if (pick && pick.src !== 'est' && (!h.length || now - h[h.length - 1].t >= HIST_SLOT_MS)) {
+            h.push({ t: now, q: pick.q }); while (h.length > HIST_KEEP) h.shift();
         }
         hist[st.code] = h;
         // 24 h change: vs the newest history point that is at least 20 h old.
-        const old = [...h].reverse().find(p => now - p[0] >= 20 * 3600e3);
+        const old = [...h].reverse().find(p => now - p.t >= 20 * 3600e3);
         stations.push({
             code: st.code, name: st.name, place: st.place, cap: st.cap,
             q: pick ? pick.q : null, pct: pick ? Math.round(pick.q / st.cap * 100) : null,
             at: pick ? pick.at : null, src: pick ? pick.src : null,
             level: t.level == null ? null : t.level,
-            d24: pick && old ? Math.round(pick.q - old[1]) : null
+            d24: pick && old ? Math.round(pick.q - old.q) : null
         });
     }
     await ref.set({ stations, rating, hist, ridYmd, ok, updatedAt: FieldValue.serverTimestamp() });
