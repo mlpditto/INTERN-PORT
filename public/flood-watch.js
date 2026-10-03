@@ -202,37 +202,67 @@
             out += '<span class="fw-rc" data-i="' + i + '" style="left:' + RV_X[i] * 100 + '%;top:calc(var(--fw-base, 100%) * ' + (1 - lvl / 100) + ' - 10px)">' +
                 '<i class="fw-rd" style="background:' + RV_COL[rvTier(r.q)] + '"></i><small>' + esc(r.code) + '</small>' + (r.q / 1000).toFixed(1) + 'k' + ar + '</span>';
         });
+        // Fallback for a card with no room for three capsules (phones): ONE pill, a dot per gauge + the highest flow.
+        var shown = st.filter(Boolean), top = Math.max.apply(null, shown.map(function (r) { return r.q; }));
+        out += '<span class="fw-rc fw-rc-sum" data-i="0" style="display:none;left:' + RV_X[0] * 100 + '%;top:calc(var(--fw-base, 100%) * ' + (1 - (LEVEL[L] + (LEVEL[R] - LEVEL[L]) * smooth(RV_X[0])) / 100) + ' - 10px)">' +
+            st.map(function (r) { return r ? '<i class="fw-rd" style="background:' + RV_COL[rvTier(r.q)] + '"></i>' : ''; }).join('') + (top / 1000).toFixed(1) + 'k</span>';
         return out;
     }
 
-    // The capsules sit on the water at 20 / 50 / 80 %, where the rail buttons (💰 🔥 …) can be. Walk right → left and
-    // slide each one clear of any button (rail, check-in row, ⋯) or the pts · Beri · level row it overlaps (and of the capsule to its right), so none is covered.
+    // The capsules sit on the water at 20 / 50 / 80 %, where the rail buttons (💰 🔥 …) and the pts row can be. Tiers, tried in
+    // order until one fits (so it follows the device, the card width and the button size):
+    //   full → compact (no gauge code / arrow) → the same two LIFTED into the free band between the pts row and the check-in
+    //   buttons → one summary pill → nothing (the popup has it all).
+    // Within a tier, walk right → left and slide each capsule clear of whatever it overlaps and of its right neighbour.
     function placeCaps() {
         var wt = document.getElementById('fw-water'), card = document.getElementById('section-profile-combined');
         if (!wt || !card) return;
-        var caps = wt.querySelectorAll('.fw-rc');
+        var caps = [].slice.call(wt.querySelectorAll('.fw-rc:not(.fw-rc-sum)')), sum = wt.querySelector('.fw-rc-sum');
         if (!caps.length) return;
         var w = wt.getBoundingClientRect();
-        var blocks = [].map.call(card.querySelectorAll('#profile-quick-actions button, .profile-score-values > *, .unified-metrics-bar button, #daily-checkin-card > *'), function (b) { return b.getBoundingClientRect(); });
-        var limit = Infinity;
-        for (var k = caps.length - 1; k >= 0; k--) {
-            var c = caps[k];
-            c.style.display = '';   // before measuring: a hidden capsule has no width
-            var cw = c.offsetWidth;
-            c.style.left = RV_X[c.getAttribute('data-i')] * w.width + 'px';
-            var r = c.getBoundingClientRect();
-            var right = Math.min(r.left - w.left + cw, limit), moved = true, guard = 0;
-            while (moved && guard++ < 8) {
-                moved = false;
-                blocks.forEach(function (b) {
-                    if (r.top < b.bottom && r.bottom > b.top && right - cw < b.right - w.left && right > b.left - w.left) { right = b.left - w.left - 6; moved = true; }
-                });
-            }
-            var left = right - cw;
-            if (left < 4) { c.style.display = 'none'; continue; }   // no room left of the buttons: the popup still has the number
-            c.style.left = left + cw / 2 + 'px';
-            limit = left - 6;
+        var rel = function (e) { var r = e.getBoundingClientRect(); return { l: r.left - w.left, r: r.right - w.left, t: r.top - w.top, b: r.bottom - w.top }; };
+        var blocks = [].map.call(card.querySelectorAll('#profile-quick-actions button, .profile-score-values > *, .unified-metrics-bar button, #daily-checkin-card > *'), rel);
+        var low = [].map.call(card.querySelectorAll('.unified-metrics-bar button, #daily-checkin-card > *'), rel).filter(function (b) { return b.r > b.l; });
+        var pts = [].map.call(card.querySelectorAll('.profile-score-values > *'), rel).filter(function (b) { return b.r > b.l; });
+        var lift = null;   // top (px, in the water box) of the lifted band, or null when there is no free band
+        if (low.length) {
+            var h = 18, y = Math.min.apply(null, low.map(function (b) { return b.t; })) - h - 6;
+            if (y >= Math.max.apply(null, pts.map(function (b) { return b.b; }).concat(0)) + 4) lift = y;
         }
+        caps.concat(sum || []).forEach(function (c) { if (!c.hasAttribute('data-top')) c.setAttribute('data-top', c.style.top); });
+        var fits = function (els, lifted) {
+            var limit = Infinity;
+            for (var k = els.length - 1; k >= 0; k--) {
+                var c = els[k];
+                c.style.display = '';   // before measuring: a hidden capsule has no width
+                c.style.top = lifted ? lift + 'px' : c.getAttribute('data-top');
+                var cw = c.offsetWidth;
+                c.style.left = RV_X[c.getAttribute('data-i')] * w.width + 'px';
+                var r = rel(c);
+                var right = Math.min(r.r, limit), moved = true, guard = 0;
+                while (moved && guard++ < 8) {
+                    moved = false;
+                    blocks.forEach(function (b) {
+                        if (r.t < b.b && r.b > b.t && right - cw < b.r && right > b.l) { right = b.l - 6; moved = true; }
+                    });
+                }
+                var left = right - cw;
+                if (left < 4) return false;
+                c.style.left = left + cw / 2 + 'px';
+                limit = left - 6;
+            }
+            return true;
+        };
+        var hide = function (els) { els.forEach(function (c) { c.style.display = 'none'; }); };
+        if (sum) sum.style.display = 'none';
+        var tiers = [[false, false], [true, false]].concat(lift == null ? [] : [[false, true], [true, true]]);
+        for (var t = 0; t < tiers.length; t++) {
+            wt.classList.toggle('fw-rc-compact', tiers[t][0]);
+            if (fits(caps, tiers[t][1])) return;
+        }
+        wt.classList.remove('fw-rc-compact');
+        hide(caps);
+        if (sum && !fits([sum], false) && !(lift != null && fits([sum], true))) hide([sum]);
     }
 
     function stats(d) {
