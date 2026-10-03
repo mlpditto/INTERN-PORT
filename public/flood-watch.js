@@ -124,7 +124,7 @@
             btn.setAttribute('aria-label', 'Flood watch: site ' + (site || '—') + (home ? ', home ' + home : ''));
         }
         var water = document.getElementById('fw-water');
-        if (water) water.innerHTML = skyHtml(places.site.wx) + slopeWater(home, site);
+        if (water) water.innerHTML = skyHtml(places.site.wx) + slopeWater(home, site) + riverWater(places.site.data && places.site.data.river, home, site);
     }
 
     // V101.32: the card water shows BOTH places — one surface sloping from home (left)
@@ -172,6 +172,36 @@
             ? marker('left', '🏠', LEVEL[L], L, '#60a5fa', 'Home') + marker('right', '🏥', LEVEL[R], R, '#2dd4bf', 'Training site')
             : '';
         return svg + icons;
+    }
+
+    // V101.56: river flow at C.2 → C.13 → C.29B on the card water — a compact capsule per gauge on the surface
+    // (dot = tier, ▲▼ = change vs ~24 h) and a soft tint of the same surface, amber / red, where the flow is high.
+    // Tiers (m³/s, same for all three): green < 1,500 · amber 1,500–2,400 · red > 2,400. No tint when all are green.
+    var RV_X = [0.2, 0.5, 0.8], RV_COL = { ok: '#22c55e', warn: '#f59e0b', red: '#ef4444' }, RV_TINT = { ok: ['#22c55e', 0], warn: ['#fbbf24', .16], red: ['#f87171', .22] };
+    function rvTier(q) { return q > 2400 ? 'red' : q >= 1500 ? 'warn' : 'ok'; }
+    function riverWater(rv, home, site) {
+        if (!rv || !rv.stations || (!home && !site)) return '';
+        var L = home || site, R = site || home;
+        var st = rv.stations.map(function (r) { return r && r.q != null && r.at && Date.now() - r.at < 36 * 3600e3 ? r : null; });
+        if (!st.some(Boolean)) return '';
+        var smooth = function (t) { return t * t * (3 - 2 * t); };
+        var stops = st.map(function (r, i) {
+            var t = RV_TINT[r ? rvTier(r.q) : 'ok'];
+            return '<stop offset="' + RV_X[i] + '" stop-color="' + t[0] + '" stop-opacity="' + t[1] + '"/>';
+        }).join('');
+        var out = '';
+        if (st.some(function (r) { return r && rvTier(r.q) !== 'ok'; })) {
+            out += '<svg class="fw-slope" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="fwgRiver" x1="0" x2="1">' + stops + '</linearGradient></defs>' +
+                layer(LEVEL[L], LEVEL[R], 0, 'url(#fwgRiver)') + '</svg>';
+        }
+        st.forEach(function (r, i) {
+            if (!r) return;
+            var lvl = LEVEL[L] + (LEVEL[R] - LEVEL[L]) * smooth(RV_X[i]);
+            var ar = r.d24 == null || Math.abs(r.d24) < 30 ? '' : '<i class="fw-ar ' + (r.d24 > 0 ? 'up' : 'down') + '">' + (r.d24 > 0 ? '▲' : '▼') + '</i>';
+            out += '<span class="fw-rc" style="left:' + RV_X[i] * 100 + '%;top:calc(var(--fw-base, 100%) * ' + (1 - lvl / 100) + ' - 10px)">' +
+                '<i class="fw-rd" style="background:' + RV_COL[rvTier(r.q)] + '"></i><small>' + esc(r.code) + '</small>' + (r.q / 1000).toFixed(1) + 'k' + ar + '</span>';
+        });
+        return out;
     }
 
     function stats(d) {
@@ -265,6 +295,24 @@
         return rows.length ? '<div class="fw-near">' + rows.join('') + '</div>' : '';
     }
 
+    // V101.56 · Chao Phraya discharge at C.2 → C.13 → C.29B (floodPointCheck → d.river, see river-discharge.js).
+    // Bar = share of the gauge's design capacity; ▲▼ = change vs ~24 h ago; src: TW ThaiWater · RID report · AI · est.
+    var RV_SRC = { thaiwater: 'ThaiWater (RID telemetry)', rid: 'RID daily report', ai: 'RID daily report, read by AI', est: 'estimated from the water level' };
+    function riverHtml(rv) {
+        if (!rv || !rv.stations || !rv.stations.length) return '';
+        var rows = rv.stations.filter(function (r) { return r.q != null; }).map(function (r) {
+            var cls = r.pct >= 90 ? 'crit' : r.pct >= 70 ? 'warn' : 'ok';
+            var t = r.at ? new Date(r.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }) : '';
+            var stale = r.at && Date.now() - r.at > 36 * 3600e3;
+            var ar = r.d24 == null || Math.abs(r.d24) < 30 ? '<i class="fw-ar"></i>' : '<i class="fw-ar ' + (r.d24 > 0 ? 'up' : 'down') + '" title="vs ~24 h ago: ' + (r.d24 > 0 ? '+' : '') + r.d24 + ' m³/s">' + (r.d24 > 0 ? '▲' : '▼') + '</i>';
+            return '<div class="fw-rv' + (stale ? ' stale' : '') + '" title="' + esc(r.name + ' · ' + r.place + ' · ' + t + ' · ' + (RV_SRC[r.src] || '') + ' · capacity ' + r.cap + ' m³/s') + '">' +
+                '<b>' + esc(r.code) + '</b><span>' + esc(r.place) + '</span>' +
+                '<i class="fw-rvb ' + cls + '"><u style="width:' + Math.min(100, r.pct) + '%"></u></i>' +
+                '<em class="fw-lv ' + cls + '">' + Math.round(r.q).toLocaleString('en-US') + (r.src === 'est' ? '~' : '') + '</em>' + ar + '</div>';
+        });
+        return rows.length ? '<div class="fw-river"><div class="fw-rv-h"><i class="fa-solid fa-water"></i>River flow <small>m³/s</small></div>' + rows.join('') + '</div>' : '';
+    }
+
     // D · which sources answered (a dot each); the POPNIX credit line is required by its terms.
     function srcDots(d) {
         if (!d.src) return '';
@@ -296,10 +344,10 @@
         else {
             var t = p.at ? new Date(p.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }) : '';
             var meta = [d.canal ? esc(d.canal.name) + (d.canal.km != null ? ' · ' + d.canal.km + ' km' : '') : '', t,
-                'BKK FloodWatch' + (d.road ? ' · Floodboard (CC BY 4.0)' : '') + (d.pop ? ' · ' + esc(d.pop.credit) : '') + (p.wx ? ' · Open-Meteo (CC BY 4.0)' : '')]
+                'BKK FloodWatch' + (d.road ? ' · Floodboard (CC BY 4.0)' : '') + (d.pop ? ' · ' + esc(d.pop.credit) : '') + (d.river ? ' · ThaiWater / กรมชลประทาน (river flow)' : '') + (p.wx ? ' · Open-Meteo (CC BY 4.0)' : '')]
                 .filter(Boolean).join(' · ');
             body = '<div class="fw-h"><span class="fw-dot' + (risk ? ' fw-' + risk : '') + '"></span>' + esc(d.title || '—') + '</div>' +
-                '<div class="fw-stats">' + stats(d) + '</div>' + trendHtml(d.pop) + rainHtml(d.pop) + nearHtml(d.pop) + wxRow(p.wx) + '<div class="fw-meta">' + srcDots(d) + meta + '</div>';
+                '<div class="fw-stats">' + stats(d) + '</div>' + trendHtml(d.pop) + rainHtml(d.pop) + nearHtml(d.pop) + riverHtml(d.river) + wxRow(p.wx) + '<div class="fw-meta">' + srcDots(d) + meta + '</div>';
         }
         // Flood data can fail on its own (FloodWatch is flaky); the weather row still shows.
         if (!d && p.wx && !p.loading) body += wxRow(p.wx);
