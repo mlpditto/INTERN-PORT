@@ -4359,6 +4359,21 @@ async function sendFloodMail(subject, text) {
     await tx.sendMail({ from: `"INTERN-PORT Flood" <${FLOOD_MAIL}>`, to: FLOOD_MAIL, subject, text });
 }
 
+// Chao Phraya discharge at C.2 / C.13 / C.29B (ThaiWater → RID PDF → AI → rating curve, see
+// river-discharge.js), refreshed hourly into flood_status/_discharge; floodPointCheck hands it out.
+const { refreshRiverDischarge, readRiverDischarge } = require('./river-discharge');
+exports.refreshRiverDischarge = onSchedule({
+    schedule: '20 * * * *',
+    timeZone: 'Asia/Bangkok',
+    region: 'us-central1',
+    timeoutSeconds: 180,
+    memory: '256MiB',
+    secrets: ['GEMINI_API_KEY']
+}, async () => {
+    const r = await refreshRiverDischarge(admin.firestore(), admin.firestore.FieldValue, { geminiKey: process.env.GEMINI_API_KEY });
+    console.log(`[refreshRiverDischarge] ${r.stations.map(s => `${s.code}=${s.q}(${s.src})`).join(' ')} ok=${JSON.stringify(r.ok)}${r.log.length ? ' ' + r.log.join(' | ') : ''}`);
+});
+
 // Intern "near me" / site / home check. Any signed-in user (the intern page
 // signs in anonymously); coordinates are not stored.
 exports.floodPointCheck = onCall({ timeoutSeconds: 30 }, async (request) => {
@@ -4367,7 +4382,8 @@ exports.floodPointCheck = onCall({ timeoutSeconds: 30 }, async (request) => {
     const lon = Number(request.data && request.data.lon);
     if (!validFloodCoord(lat, lon)) throw new HttpsError('invalid-argument', 'lat/lon outside Thailand');
     try {
-        return { ...(await fetchFloodPoint(lat, lon)), checkedAt: Date.now() };
+        const [point, river] = await Promise.all([fetchFloodPoint(lat, lon), readRiverDischarge(admin.firestore())]);
+        return { ...point, river, checkedAt: Date.now() };
     } catch (e) {
         console.warn('[floodPointCheck] upstream failed:', e && e.message);
         throw new HttpsError('unavailable', 'Flood data unavailable');
