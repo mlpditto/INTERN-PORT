@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.74)</title>
+    <title>Nika Admin (V102.75)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -7615,7 +7615,11 @@
                     <h3 style="margin:0; color:#c2410c; display:flex; align-items:center; gap:12px; font-weight:900; font-size:1.3em;">
                         🔗 Gourmet World <span style="font-size:0.55em; font-weight:700; color:#ea580c; text-transform:uppercase; letter-spacing:0.4px;">Beri Phase 1</span>
                     </h3>
-                    <button class="magic-btn" onclick="openReviewLinkModal()" style="background:linear-gradient(135deg, #ea580c, #c2410c); padding:10px 22px; border-radius:14px; font-weight:900;">➕ Add Link</button>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <!-- V102.75: reads every shop that has no logo yet, shows what it found, saves only the ones you tick -->
+                        <button id="rl-bulk-btn" class="magic-btn" onclick="rlOpenBulkLogos()" title="Look for a logo on each shop's page, then pick which to save" style="display:none; background:linear-gradient(135deg, #6366f1, #a855f7); padding:10px 18px; border-radius:14px; font-weight:900;">🖼️ Fetch missing logos <span id="rl-bulk-count"></span></button>
+                        <button class="magic-btn" onclick="openReviewLinkModal()" style="background:linear-gradient(135deg, #ea580c, #c2410c); padding:10px 22px; border-radius:14px; font-weight:900;">➕ Add Link</button>
+                    </div>
                 </div>
                 <p style="margin:0 0 18px 0; color:#78716c; font-size:0.85em; line-height:1.5;">
                     LINE MAN shops, YouTube, or any external link worth an intern's time. First open of each link earns the Beri set below (subject to each intern's daily cap) — no review queue, credited immediately.
@@ -35104,6 +35108,7 @@ RULES:
         const REVIEW_LINK_TYPE_ICON = { line_man: '🛍️', youtube: '▶️', other: '🔗' };
 
         function renderReviewLinksAdmin() {
+            rlUpdateBulkBtn();
             const list = document.getElementById('review-links-list');
             if (!list) return;
             if (!reviewLinksCache.length) {
@@ -35158,7 +35163,7 @@ RULES:
         }
         // Square 256 px WebP (centre-cropped — shop logos are shown in a circle), content-addressed in
         // Storage (link-logos/<sha256>.webp) so the same picture is never stored twice.
-        async function rlStoreLogoBlob(blob) {
+        async function rlPrepareLogo(blob) {
             const bitmap = await createImageBitmap(blob);
             const side = Math.min(bitmap.width, bitmap.height);
             const canvas = document.createElement('canvas');
@@ -35167,6 +35172,12 @@ RULES:
             bitmap.close();
             const out = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', 0.85));
             if (!out) throw new Error('Could not process the image');
+            return out;
+        }
+        async function rlStoreLogoBlob(blob) {
+            return rlUploadLogo(await rlPrepareLogo(blob));
+        }
+        async function rlUploadLogo(out) {
             const hash = await window._sha256Hex(out);
             const ref = adminApp.storage().ref('link-logos/' + hash + '.webp');
             try {
@@ -35242,6 +35253,135 @@ RULES:
                 document.body.appendChild(el);
             });
         }
+        // ── V102.75: Fetch missing logos — every shop without a logo, reviewed in one list ──────────────
+        // Nothing is stored until Apply: each page is read through fetchLinkLogo (3 at a time), the picture
+        // is prepared (256 px WebP) in memory, and only the rows you leave ticked are uploaded + written.
+        let rlBulk = null;
+        function rlMissingLogoLinks() {
+            return reviewLinksCache.filter(l => !/^https:\/\//i.test(String(l.logoUrl || '')) && /^https?:\/\//i.test(String(l.url || '')));
+        }
+        function rlUpdateBulkBtn() {
+            const b = document.getElementById('rl-bulk-btn');
+            if (!b) return;
+            const n = rlMissingLogoLinks().length;
+            b.style.display = n ? '' : 'none';
+            const c = document.getElementById('rl-bulk-count');
+            if (c) c.textContent = n ? '(' + n + ')' : '';
+        }
+        function rlBulkPaint() {
+            const st = rlBulk;
+            if (!st) return;
+            const found = st.rows.filter(r => r.status === 'found');
+            const picked = found.filter(r => r.checked).length;
+            const reading = st.rows.some(r => r.status === 'wait' || r.status === 'run');
+            const busy = reading || st.applying;
+            const rowHtml = st.rows.map((r, i) => {
+                const preview = r.previewUrl
+                    ? '<img src="' + r.previewUrl + '" alt="" style="width:48px; height:48px; border-radius:50%; object-fit:cover; border:1px solid #e2e8f0; flex-shrink:0;">'
+                    : rlLogoDisc(r.link, 48);
+                const label = {
+                    wait: 'In queue', run: 'Reading the page…', found: 'from ' + escapeHtml(r.source), saved: 'Saved ✓', none: escapeHtml(r.note), error: escapeHtml(r.note)
+                }[r.status];
+                const color = r.status === 'saved' ? '#15803d' : (r.status === 'error' || r.status === 'none') ? '#b91c1c' : '#64748b';
+                const note = r.status === 'found' && r.note ? ' · ' + escapeHtml(r.note) : '';
+                return '<label style="display:flex; align-items:center; gap:10px; padding:8px 4px; border-bottom:1px solid #f1f5f9;' + (r.status === 'found' ? ' cursor:pointer;' : '') + '">' +
+                    '<input type="checkbox" onchange="rlBulkToggle(' + i + ', this.checked)" ' + (r.checked ? 'checked ' : '') + (r.status !== 'found' || st.applying ? 'disabled ' : '') + 'style="width:16px; height:16px; margin:0; padding:0; flex-shrink:0;">' +
+                    preview + '<span style="min-width:0;"><span style="display:block; font-weight:800; color:#334155; font-size:0.88em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + escapeHtml(r.link.title || 'Untitled') + '</span>' +
+                    '<span style="display:block; font-size:0.74em; color:' + color + ';">' + label + note + '</span></span></label>';
+            }).join('');
+            const btnBase = 'width:auto; min-height:0; padding:8px 14px; border-radius:10px; font-weight:800; font-size:0.82em; cursor:pointer;';
+            st.el.innerHTML = '<div style="background:#fff; border-radius:16px; width:100%; max-width:520px; max-height:90vh; display:flex; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,0.35);">' +
+                '<div style="padding:16px 18px 8px;"><div style="font-weight:900; color:#334155;">🖼️ Fetch missing logos</div>' +
+                '<div style="font-size:0.74em; color:#64748b; margin-top:4px; line-height:1.5;">' + (reading ? 'Reading each shop\'s page… ' : '') + found.length + ' found of ' + st.rows.length + ' shops. Tick the ones to save. Shop logos belong to the shop — use only if it is fine to show them here.</div></div>' +
+                '<div style="overflow-y:auto; padding:0 14px; flex:1;">' + rowHtml + '</div>' +
+                '<div style="display:flex; align-items:center; gap:8px; padding:12px 18px; border-top:1px solid #f1f5f9; flex-wrap:wrap;">' +
+                '<button type="button" onclick="rlBulkSelect(true)" ' + (busy ? 'disabled ' : '') + 'style="' + btnBase + ' border:1px solid #e2e8f0; background:#fff; color:#475569;">All</button>' +
+                '<button type="button" onclick="rlBulkSelect(false)" ' + (busy ? 'disabled ' : '') + 'style="' + btnBase + ' border:1px solid #e2e8f0; background:#fff; color:#475569;">None</button>' +
+                '<span style="flex:1;"></span>' +
+                '<button type="button" onclick="rlBulkClose()" ' + (st.applying ? 'disabled ' : '') + 'style="' + btnBase + ' border:1px solid #e2e8f0; background:#fff; color:#64748b;">' + (reading ? 'Cancel' : 'Close') + '</button>' +
+                '<button type="button" onclick="rlBulkApply()" ' + (busy || !picked ? 'disabled ' : '') + 'style="' + btnBase + ' border:none; background:linear-gradient(135deg,#6366f1,#a855f7); color:#fff;' + (busy || !picked ? ' opacity:.5;' : '') + '">' + (st.applying ? 'Saving…' : 'Save ' + picked + ' logo' + (picked === 1 ? '' : 's')) + '</button></div></div>';
+        }
+        function rlBulkToggle(i, on) { if (rlBulk && rlBulk.rows[i]) { rlBulk.rows[i].checked = !!on; rlBulkPaint(); } }
+        function rlBulkSelect(on) { if (rlBulk) { rlBulk.rows.forEach(r => { if (r.status === 'found') r.checked = on; }); rlBulkPaint(); } }
+        function rlBulkClose() {
+            const st = rlBulk;
+            if (!st || st.applying) return;
+            st.cancelled = true;
+            st.rows.forEach(r => { if (r.previewUrl) URL.revokeObjectURL(r.previewUrl); });
+            st.el.remove();
+            rlBulk = null;
+        }
+        async function rlOpenBulkLogos() {
+            if (rlBulk) return;
+            const links = rlMissingLogoLinks();
+            if (!links.length) return;
+            const el = document.createElement('div');
+            el.id = 'rl-bulk-overlay';
+            el.style.cssText = 'position:fixed; inset:0; z-index:150000; background:rgba(15,23,42,0.55); display:flex; align-items:center; justify-content:center; padding:16px;';
+            document.body.appendChild(el);
+            const st = rlBulk = { el, cancelled: false, applying: false, rows: links.map(link => ({ link, status: 'wait', blob: null, previewUrl: '', source: '', note: '', checked: false })) };
+            rlBulkPaint();
+            const call = adminApp.functions().httpsCallable('fetchLinkLogo');
+            const queue = st.rows.map((r, i) => i);
+            const worker = async () => {
+                while (queue.length && !st.cancelled) {
+                    const row = st.rows[queue.shift()];
+                    row.status = 'run';
+                    rlBulkPaint();
+                    try {
+                        const r = (await call({ url: row.link.url })).data;
+                        if (st.cancelled) return;
+                        if (r && r.found) {
+                            row.blob = await rlPrepareLogo(await (await fetch(r.dataUrl)).blob());
+                            row.previewUrl = URL.createObjectURL(row.blob);
+                            row.source = r.source;
+                            row.status = 'found';
+                            row.checked = true;
+                        } else {
+                            row.status = 'none';
+                            row.note = 'No usable image on that page — use Upload';
+                        }
+                    } catch (e) {
+                        if (st.cancelled) return;
+                        row.status = 'error';
+                        row.note = (e && e.message) ? e.message : 'Could not read the page';
+                    }
+                    rlBulkPaint();
+                }
+            };
+            await Promise.all([worker(), worker(), worker()]);
+            rlBulkPaint();
+        }
+        async function rlBulkApply() {
+            const st = rlBulk;
+            if (!st || st.applying) return;
+            const picked = st.rows.filter(r => r.status === 'found' && r.checked);
+            if (!picked.length) return;
+            st.applying = true;
+            rlBulkPaint();
+            let ok = 0, fail = 0;
+            for (const row of picked) {
+                try {
+                    row.note = 'uploading…';
+                    rlBulkPaint();
+                    const url = await rlUploadLogo(row.blob);
+                    await db.collection('review_links').doc(row.link.id).update({ logoUrl: url });
+                    row.status = 'saved';
+                    row.checked = false;
+                    ok++;
+                } catch (e) {
+                    console.error('Bulk logo save:', row.link.id, e);
+                    row.status = 'error';
+                    row.note = 'Save failed: ' + ((e && e.message) ? e.message : 'unknown error');
+                    fail++;
+                }
+                rlBulkPaint();
+            }
+            st.applying = false;
+            showToast(ok + ' logo' + (ok === 1 ? '' : 's') + ' saved' + (fail ? ' · ' + fail + ' failed' : ''));
+            if (!fail) rlBulkClose(); else rlBulkPaint();
+        }
+
         function rlClearLogo() {
             document.getElementById('rl-logo-url').value = '';
             rlPaintLogo();
