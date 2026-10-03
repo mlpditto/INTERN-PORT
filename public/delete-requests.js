@@ -23,7 +23,7 @@
             const item = getUnifiedAllItems().find(s => s.id === card.dataset.deleteItem && s.submissionType === card.dataset.deleteType);
             if (!item) return;
             const menu = document.createElement('details'); menu.className = 'dr-menu';
-            menu.innerHTML = '<summary aria-label="Item actions">⋯</summary><div class="dr-body"><button type="button" class="dr-start">🗑 Request delete</button><div class="dr-form" hidden><label>Reason <select><option>Duplicate</option><option>Wrong entry</option><option>Other</option></select></label><input maxlength="240" aria-label="Delete reason details" placeholder="Short reason" hidden><button type="button" class="dr-send">↗ Send</button></div><span class="dr-state" role="status"></span><button type="button" class="dr-cancel" hidden>↩ Cancel request</button></div>';
+            menu.innerHTML = '<summary aria-label="Request delete" title="Request delete">🗑</summary><div class="dr-body"><button type="button" class="dr-start">🗑 Request delete</button><div class="dr-form" hidden><label>Reason <select><option>Duplicate</option><option>Wrong entry</option><option>Other</option></select></label><input maxlength="240" aria-label="Delete reason details" placeholder="Short reason" hidden><button type="button" class="dr-send">↗ Send</button></div><span class="dr-state" role="status"></span><button type="button" class="dr-cancel" hidden>↩ Cancel request</button></div>';
             menu.addEventListener('click', e => e.stopPropagation());
             menu.addEventListener('keydown', e => e.stopPropagation());
             menu.querySelector('.dr-start').onclick = () => { menu.querySelector('.dr-form').hidden = false; };
@@ -37,7 +37,7 @@
                 catch (error) { output.textContent = error.message || 'Could not send. Please retry.'; }
                 finally { e.target.disabled = false; }
             };
-            card.append(menu);
+            (card.querySelector('.hl-acts') || card).append(menu);   // V101.55: the 🗑 sits in the row's action bar
         });
         document.querySelectorAll('[data-delete-item]').forEach(card => {
             const menu = card.querySelector('.dr-menu'); if (!menu) return;

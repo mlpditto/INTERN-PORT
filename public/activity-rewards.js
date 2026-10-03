@@ -95,7 +95,7 @@ window.activityRewards = (() => {
             const detail=node('div');detail.id='history-adjustment-detail';header.after(detail);
             chip.onclick=()=>{start();show('other',detail);chip.setAttribute('aria-expanded',String(selected==='other'));};
         }
-        chip.textContent='Adjustments · '+summary('other')+' ↗';chip.setAttribute('aria-expanded',String(selected==='other'));
+        chip.textContent=rewardReady()?summary('other').replace(' · 0 Beri','').replace(' Beri',' 🪙'):'…';chip.setAttribute('aria-label','Adjustments · '+summary('other'));chip.setAttribute('aria-expanded',String(selected==='other'));
     }
     document.addEventListener('DOMContentLoaded',historyChip);
     function pending(tile,rows){const n=(rows||[]).filter(current).filter(r=>r.status==='pending').length;if(n){const note=node('small',`${labels[tile.dataset.rewardKey]} · ${n} pending review`);note.className='mp-pending';document.getElementById('monthly-progress').append(note);}}
@@ -105,8 +105,10 @@ window.activityRewards = (() => {
         const next=uid+'|'+authUid;if(identity===next)return;
         stops.forEach(off=>off());stops=[];identity=next;errors.clear();Object.keys(sources).forEach(k=>delete sources[k]);
         const queries=[['points','checkin_logs','userId',uid],['beri','beri_ledger','userId',uid],['explore','review_link_clicks','userId',uid],['event','event_interests','userId',uid],['drug','drug_codex_drafts','submittedBy',authUid],['disease','disease_codex_drafts','submittedBy',authUid],['product','product_listings','authUid',authUid]];
-        queries.forEach(([key,collection,field,value])=>{stops.push(db.collection(collection).where(field,'==',value).onSnapshot(s=>{if(identity!==next)return;sources[key]=s.docs.map(d=>({id:d.id,...d.data()}));errors.delete(key);window.monthlyProgress.refresh();},()=>{if(identity!==next)return;errors.add(key);window.monthlyProgress.refresh();}));});
+        queries.forEach(([key,collection,field,value])=>{stops.push(db.collection(collection).where(field,'==',value).onSnapshot(s=>{if(identity!==next)return;sources[key]=s.docs.map(d=>({id:d.id,...d.data()}));errors.delete(key);window.monthlyProgress.refresh();window.dispatchEvent(new Event('rewards-updated'));},()=>{if(identity!==next)return;errors.add(key);window.monthlyProgress.refresh();}));});
     }
     window.addEventListener('pagehide',()=>{stops.forEach(off=>off());stops=[];identity='';});
-    return {decorate,category};
+    // V101.55: Beri recorded for one History entry (beri_ledger rows whose refId is the entry id)
+    const beriFor=id=>(sources.beri||[]).filter(r=>r.refId===id).reduce((s,r)=>s+(Number(r.amount)||0),0);
+    return {decorate,category,start,beriFor};
 })();

@@ -1,4 +1,5 @@
-/* Compact History controls; retain timeline and review request data flow. */
+/* Work ▸ History structure (V101.55): header summary, chip rail with 🔍 and ⋯ (period + review), case sub-rail.
+   Rows / chips / summary are painted by history-lean.js; the review request data flow stays in history-review.js. */
 document.addEventListener('DOMContentLoaded', () => {
     const root = document.getElementById('work-pane-history');
     if (!root) return;
@@ -7,17 +8,39 @@ document.addEventListener('DOMContentLoaded', () => {
     const summary = document.createElement('span');
     summary.className = 'hc-summary';
     header.querySelector('h3').after(summary);
+
+    // the old stats card (Total / Points / Pending + 30-day trend) is folded into the header
+    document.getElementById('unified-stats-card')?.remove();
+
+    // rail tools: 🔍 reveals the search row; ⋯ holds the period filter and the learning review
+    const filters = document.getElementById('unified-filters-wrap');
     const search = document.getElementById('unified-search-wrap');
     const dates = root.querySelector('.lr-dates');
+    const review = document.getElementById('lr-toggle');
     const tools = document.createElement('div');
-    tools.className = 'hc-tools';
-    dates.before(tools);
-    const period = document.createElement('details');
-    period.className = 'hc-period';
-    period.innerHTML = '<summary>📅 All time</summary>';
-    period.append(dates);
-    tools.append(search, period);
-    document.getElementById('unified-search').placeholder = '🔍 Search…';
+    tools.className = 'hl-tools';
+    const magnifier = document.createElement('button');
+    magnifier.type = 'button'; magnifier.className = 'hl-ib'; magnifier.textContent = '🔍';
+    magnifier.title = 'Search'; magnifier.setAttribute('aria-label', 'Search');
+    const more = document.createElement('details');
+    more.className = 'hl-more';
+    more.innerHTML = '<summary class="hl-ib" title="Period · Review" aria-label="Period and review">⋯</summary><div class="hl-pop"><small id="hl-range">📅 All time</small></div>';
+    more.querySelector('.hl-pop').append(dates, review);
+    tools.append(magnifier, more);
+    filters.append(tools);
+    filters.after(search);
+    const systems = document.createElement('div');
+    systems.id = 'unified-case-systems'; systems.hidden = true; systems.setAttribute('aria-label', 'Disease system');
+    filters.after(systems);
+    const input = document.getElementById('unified-search');
+    input.placeholder = '🔍 Search…';
+    magnifier.onclick = () => {
+        const on = root.classList.toggle('hl-search-on');
+        if (on) input.focus();
+    };
+    input.addEventListener('input', () => { if (input.value) root.classList.add('hl-search-on'); });
+    review.textContent = '📈 Review ▾';
+
     // Visible DD/MM/YYYY text keeps the existing ISO fields as the data source.
     const format = value => value ? value.split('-').reverse().join('/') : '';
     ['lr-start', 'lr-end'].forEach(id => {
@@ -43,43 +66,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const invalid = dates.querySelector('[aria-invalid="true"]');
             document.getElementById('lr-date-error').textContent = invalid ? 'Use a valid date: DD/MM/YYYY' : document.getElementById('lr-date-error').textContent;
             document.getElementById('lr-send').disabled = !!invalid;
-            period.querySelector('summary').textContent = invalid ? '📅 Check dates' : (document.getElementById('lr-start').value || document.getElementById('lr-end').value) ? `📅 ${format(document.getElementById('lr-start').value) || '…'} → ${format(document.getElementById('lr-end').value) || '…'}` : '📅 All time';
+            const start = document.getElementById('lr-start').value, end = document.getElementById('lr-end').value;
+            document.getElementById('hl-range').textContent = invalid ? '📅 Check dates' : (start || end) ? `📅 ${format(start) || 'Any start'} → ${format(end) || 'Any end'}` : '📅 All time';
+            more.querySelector('summary').classList.toggle('on', !!(start || end));
         });
     });
-    const originalStats = window.renderStatsCard;
-    window.renderStatsCard = function () {
-        originalStats();
-        const stats = getUnifiedStats(), wrap = document.getElementById('unified-stats-card');
-        summary.textContent = `${stats.total} entries · ${stats.points.toFixed(1)} pts`;
-        const values = getPointsSparkline(), wasOpen = wrap.dataset.open === 'true';
-        wrap.innerHTML = values.some(v => v > 0) ? `<details${wasOpen ? ' open' : ''}><summary>📈 30-day trend</summary>${renderSparkline(values, 160, 36)}</details>` : '';
-        wrap.querySelector('details')?.addEventListener('toggle', e => { wrap.dataset.open = String(e.target.open); });
-    };
-    const originalTypes = window.renderTypeFilterPills;
-    window.renderTypeFilterPills = function () {
-        originalTypes();
-        const wrap = document.getElementById('unified-type-filters'), counts = getUnifiedTypeCounts();
-        const more = document.createElement('details');
-        more.className = 'hc-more'; more.innerHTML = '<summary>More ▾</summary><div></div>';
-        wrap.querySelectorAll('button').forEach(b => {
-            b.setAttribute('aria-pressed', String(b.dataset.filter === unifiedCurrentFilter));
-            if (b.dataset.filter === 'all') b.textContent = 'All';
-            else if (!counts[b.dataset.filter] && b.dataset.filter !== unifiedCurrentFilter) more.lastElementChild.append(b);
-        });
-        if (more.lastElementChild.children.length) wrap.append(more);
-    };
-    window.renderStatusFilterPills = function () {
-        const wrap = document.getElementById('unified-status-filters'), stats = getUnifiedStats(), oldest = getOldestPending();
-        wrap.replaceChildren();
-        [['pending', `⏳ Pending ${stats.pending}`], ['reviewed', '✅ Reviewed']].forEach(([key, label]) => {
-            const b = document.createElement('button');
-            b.className = 'hc-status'; b.textContent = label; b.setAttribute('aria-pressed', String(unifiedCurrentStatus === key));
-            if (key === 'pending' && oldest) b.title = `Oldest pending: ${oldest.ageDays} days`;
-            b.onclick = () => filterUnifiedStatus(unifiedCurrentStatus === key ? 'all' : key);
-            wrap.append(b);
-        });
-    };
-    const stats = document.getElementById('unified-stats-card');
-    document.getElementById('unified-timeline').after(stats);
-    renderStatsCard(); renderTypeFilterPills(); renderStatusFilterPills();
+    window.historyLean.renderChrome();
 });
