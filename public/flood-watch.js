@@ -125,6 +125,7 @@
         }
         var water = document.getElementById('fw-water');
         if (water) water.innerHTML = skyHtml(places.site.wx) + slopeWater(home, site) + riverWater(places.site.data && places.site.data.river, home, site);
+        placeCaps();
     }
 
     // V101.32: the card water shows BOTH places — one surface sloping from home (left)
@@ -198,10 +199,40 @@
             if (!r) return;
             var lvl = LEVEL[L] + (LEVEL[R] - LEVEL[L]) * smooth(RV_X[i]);
             var ar = r.d24 == null || Math.abs(r.d24) < 30 ? '' : '<i class="fw-ar ' + (r.d24 > 0 ? 'up' : 'down') + '">' + (r.d24 > 0 ? '▲' : '▼') + '</i>';
-            out += '<span class="fw-rc" style="left:' + RV_X[i] * 100 + '%;top:calc(var(--fw-base, 100%) * ' + (1 - lvl / 100) + ' - 10px)">' +
+            out += '<span class="fw-rc" data-i="' + i + '" style="left:' + RV_X[i] * 100 + '%;top:calc(var(--fw-base, 100%) * ' + (1 - lvl / 100) + ' - 10px)">' +
                 '<i class="fw-rd" style="background:' + RV_COL[rvTier(r.q)] + '"></i><small>' + esc(r.code) + '</small>' + (r.q / 1000).toFixed(1) + 'k' + ar + '</span>';
         });
         return out;
+    }
+
+    // The capsules sit on the water at 20 / 50 / 80 %, where the rail buttons (💰 🔥 …) can be. Walk right → left and
+    // slide each one clear of any button it overlaps (and of the capsule to its right), so none is covered.
+    function placeCaps() {
+        var wt = document.getElementById('fw-water'), card = document.getElementById('section-profile-combined');
+        if (!wt || !card) return;
+        var caps = wt.querySelectorAll('.fw-rc');
+        if (!caps.length) return;
+        var w = wt.getBoundingClientRect();
+        var blocks = [].map.call(card.querySelectorAll('#profile-quick-actions button'), function (b) { return b.getBoundingClientRect(); });
+        var limit = Infinity;
+        for (var k = caps.length - 1; k >= 0; k--) {
+            var c = caps[k];
+            c.style.display = '';   // before measuring: a hidden capsule has no width
+            var cw = c.offsetWidth;
+            c.style.left = RV_X[c.getAttribute('data-i')] * w.width + 'px';
+            var r = c.getBoundingClientRect();
+            var right = Math.min(r.left - w.left + cw, limit), moved = true, guard = 0;
+            while (moved && guard++ < 8) {
+                moved = false;
+                blocks.forEach(function (b) {
+                    if (r.top < b.bottom && r.bottom > b.top && right - cw < b.right - w.left && right > b.left - w.left) { right = b.left - w.left - 6; moved = true; }
+                });
+            }
+            var left = right - cw;
+            if (left < 4) { c.style.display = 'none'; continue; }   // no room left of the buttons: the popup still has the number
+            c.style.left = left + cw / 2 + 'px';
+            limit = left - 6;
+        }
     }
 
     function stats(d) {
@@ -397,6 +428,7 @@
         var wt = document.getElementById('fw-water');
         if (wt) wt.classList.toggle('fw-open', !!open);
         card.style.setProperty('--fw-base', (card.offsetHeight - (open ? det.offsetHeight + 8 : 0)) + 'px');
+        placeCaps();
     }
 
     window.fwInit = function () {
