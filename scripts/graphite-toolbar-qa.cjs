@@ -41,26 +41,24 @@ const { chromium } = require('playwright');
             assert.equal(await popup.locator('.text-ai-chips button:visible').count(), 4);
             // V101.65: provider tabs are logos named by aria-label; the chips next to them carry no logo.
             assert.deepEqual(await popup.locator('.audit-provider').evaluateAll(ns => ns.map(n => n.getAttribute('aria-label'))), ['Gemini', 'GPT', 'Claude', 'Qwen', 'DeepSeek', 'Grok', 'Ollama']);
-            assert.deepEqual(await popup.locator('.audit-provider .text-ai-logo').evaluateAll(ns => ns.map(n => n.dataset.owner)), ['gemini', 'openai', 'claude', 'qwen', 'deepseek', 'grok']);
+            assert.deepEqual(await popup.locator('.audit-provider .text-ai-logo').evaluateAll(ns => ns.map(n => n.dataset.owner)), ['gemini', 'openai', 'claude', 'qwen', 'deepseek', 'grok', 'ollama']);
             assert.equal(await popup.locator('.text-ai-chips .text-ai-logo').count(), 0);
-            assert.deepEqual(await popup.locator('.audit-provider').evaluateAll(ns => ns.map(n => getComputedStyle(n).color)), ['rgb(168, 180, 255)', 'rgb(125, 211, 176)', 'rgb(232, 180, 154)', 'rgb(201, 160, 240)', 'rgb(127, 200, 245)', 'rgb(212, 212, 216)', 'rgb(228, 228, 231)']);
+            assert.deepEqual(await popup.locator('.audit-provider').evaluateAll(ns => ns.slice(0, 6).map(n => getComputedStyle(n).color)), ['rgb(168, 180, 255)', 'rgb(125, 211, 176)', 'rgb(232, 180, 154)', 'rgb(201, 160, 240)', 'rgb(127, 200, 245)', 'rgb(212, 212, 216)']);
             assert.equal(await popup.locator('[data-value="gpt-6-astra"]').textContent(), 'Astra 6');
             assert.equal(await popup.locator('[data-value="gpt-6-astra"]').getAttribute('aria-label'), 'GPT 6 Astra');
             assert.equal(await popup.locator('.text-ai-chips [aria-pressed="true"]').count(), 1);
-            // V102.79: the Ollama tab is a NAME, not a logo — pressed, its label sat light grey on a near-white pill and vanished.
+            // V102.82: the Ollama tab is a logo like the others (it was a name in V102.76-V102.79, unreadable when pressed).
             {
                 const tab = popup.locator('.audit-provider[data-provider="Ollama"]');
                 await tab.click();
-                const c = await tab.evaluate(n => {
-                    const cs = getComputedStyle(n), rgba = s => (s.match(/[\d.]+/g) || []).map(Number);
-                    const fg = rgba(cs.color), bg = rgba(cs.backgroundColor), under = rgba(getComputedStyle(n.closest('.audit-toolbar')).backgroundColor);
-                    const base = under.length >= 3 && (under[3] === undefined || under[3] > 0) ? under : [255, 255, 255];
-                    const a = bg.length > 3 ? bg[3] : 1, mix = [0, 1, 2].map(i => bg[i] * a + base[i] * (1 - a));
-                    const lum = rgb => { const [r, g, b] = rgb.map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
-                    const L1 = lum(fg.slice(0, 3)), L2 = lum(mix);
-                    return (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
+                const o = await tab.evaluate(n => {
+                    const logo = n.querySelector('.text-ai-logo'), cs = getComputedStyle(logo), gpt = n.parentElement.querySelector('[data-provider="GPT"]');
+                    return { text: n.textContent.trim(), image: cs.backgroundImage, filter: cs.filter, w: n.getBoundingClientRect().width, gptW: gpt.getBoundingClientRect().width, lw: logo.getBoundingClientRect().width };
                 });
-                assert.ok(c >= 4.5, 'the pressed Ollama tab label is unreadable (contrast ' + c.toFixed(2) + ':1)');
+                assert.equal(o.text, '', 'no name text on the tab');
+                assert.ok(o.image.includes('assets/logos/ollama-white.svg'), 'ollama mark: ' + o.image);
+                assert.equal(o.filter, 'invert(1)', 'white mark inverted to dark on the light pressed pill');
+                assert.equal(o.w, o.gptW, 'same tab width as the other logo tabs'); assert.equal(o.lw, 17);
                 await popup.locator('.audit-provider[data-provider="GPT"]').click();   // leave the toolbar as it was
             }
             assert.equal(await popup.locator('.review-tab[aria-pressed="true"]').evaluate(b => getComputedStyle(b).backgroundColor), 'rgb(245, 184, 205)');
