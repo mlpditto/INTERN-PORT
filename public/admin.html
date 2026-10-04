@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.80)</title>
+    <title>Nika Admin (V102.81)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -1304,6 +1304,26 @@
             white-space: nowrap;
         }
         .dca-add-btn:hover { background: linear-gradient(135deg, #2563eb, #1e3a8a); }
+        /* V102.81: multi-select AI draft — checkboxes only while the AI Auto-Draft panel is open */
+        .dca-pick { display: none; }
+        .dca-picking .dca-row { position: relative; padding-left: 46px; }
+        .dca-picking .dca-pick { display: block; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; margin: 0; accent-color: #d97706; cursor: pointer; }
+        .dca-row.dca-on { background: #fffbeb; border-color: #fcd34d; }
+        .dca-st { font-size: 0.78em; font-weight: 800; padding: 3px 9px; border-radius: 999px; margin-right: 8px; white-space: nowrap; }
+        .dca-st.queued, .dca-st.skip { background: #f1f5f9; color: #64748b; }
+        .dca-st.run { background: #fef3c7; color: #b45309; }
+        .dca-st.ok { background: #dcfce7; color: #166534; cursor: pointer; }
+        .dca-st.bad { background: #fee2e2; color: #b91c1c; }
+        .dca-batch-hint { display: none; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; font-size: 0.8em; color: #92400e; font-weight: 700; }
+        .dca-batch-hint a { color: #b45309; text-decoration: underline; cursor: pointer; }
+        #dca-ai-input-row:not([style*="display: none"]):not([style*="display:none"]) .dca-batch-hint { display: flex; }
+        .dca-batch-bar { position: sticky; bottom: 0; z-index: 5; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; padding: 10px 14px; border-radius: 14px; background: #fff7ed; border: 1.5px solid #fdba74; box-shadow: 0 8px 24px rgba(180, 83, 9, 0.18); font-size: 0.88em; color: #7c2d12; font-weight: 700; }
+        .dca-batch-sub { font-weight: 600; color: #9a3412; }
+        .dca-batch-bar button { width: auto; min-height: 0; padding: 8px 14px; border-radius: 10px; border: 0; font-weight: 800; cursor: pointer; }
+        .dca-batch-bar button.go { background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; }
+        .dca-batch-bar button.ghost { background: #fff; color: #7c2d12; border: 1px solid #fdba74; }
+        .dca-batch-prog { flex: 1; min-width: 120px; height: 8px; border-radius: 99px; background: #fed7aa; overflow: hidden; }
+        .dca-batch-prog > div { height: 100%; background: #d97706; transition: width 0.3s ease; }
         /* V93.98 Phase 3: AI Auto-Draft button + input row */
         .dca-ai-draft-btn {
             padding: 7px 14px; border-radius: 8px; border: none;
@@ -14913,6 +14933,7 @@
                         <button type="button" id="dca-ai-go-btn" class="dca-ai-go-btn" onclick="dcaAutoDraftGo()">Generate</button>
                     </div>
                     <div id="dca-ai-error" class="dca-ai-error" style="display:none;"></div>
+                    <div id="dca-batch-hint" class="dca-batch-hint"></div>
                 </div>
 
                 <!-- V96.52: sort toggle — A-Z (default) vs least-complete-first.
@@ -14929,6 +14950,7 @@
                 <div id="dca-list" class="dca-list">
                     <div class="dca-empty-state">Loading…</div>
                 </div>
+                <div id="dca-batch-bar" class="dca-batch-bar" style="display:none;"></div>
             </div>
 
             <!-- Drafts list view -->
@@ -41664,7 +41686,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (drug.aiDrafted) chips.push('<span class="dca-ai-badge">🤖 AI</span>');
             const updatedAbs = dcaFormatAbsolute(drug.updatedAt || drug.createdAt);
             return `
-                        <div class="dca-row">
+                        <div class="dca-row${dcaBatch.sel.has(drug._id) ? ' dca-on' : ''}" data-id="${dcaEscapeHtml(drug._id)}">
+                            <input type="checkbox" class="dca-pick" title="Select for AI draft" ${dcaBatch.sel.has(drug._id) ? 'checked' : ''} ${dcaBatch.running ? 'disabled' : ''} onclick="dcaBatchToggle('${dcaEscapeHtml(drug._id)}', this)">
                             <div class="dca-row-main">
                                 <div class="dca-row-name">${dcaEscapeHtml(drug.genericName)}</div>
                                 <div class="dca-row-meta">${chips.join('')}</div>
@@ -41672,6 +41695,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             </div>
                             <div class="dca-row-side">
                                 <div class="dca-row-side-top">
+                                    ${dcaBatchChipHtml(drug._id)}
                                     ${dcaCompleteChipHtml(drug)}
                                     ${dcaListContribChipsHtml(drug)}
                                     ${updatedAbs ? `<div class="dca-row-updated-abs" title="Last updated">🕒 ${dcaEscapeHtml(updatedAbs)}</div>` : ''}
@@ -43385,6 +43409,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     (dcaState.helpers || []).forEach(h => pushUniq(dcaHelperContribStr(h)));
                     payload.contributors = next;
                     await db.collection('drug_codex').doc(dcaState.editingId).update(payload);
+                    dcaBatchDone(dcaState.editingId);
                     if (typeof showToast === 'function') showToast(`✅ Updated "${payload.genericName}"`);
                 } else {
                     // V94.46: brand-new drug — the creating admin plus any
@@ -44338,6 +44363,212 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             else { el.classList.add('added'); el.textContent = '✓ ' + brand; }
         }
 
+        // V102.81: multi-select AI draft. While the 🤖 AI Auto-Draft panel is open every row gets a checkbox; ticked drugs are filled by the AI
+        // one after another (2 at a time, same prompt as "AI fill empty fields": only the EMPTY fields are asked for).
+        // Nothing is written to Firestore by the batch: each result waits (kept in this browser) until the admin opens it with "Review",
+        // which shows the normal edit form with the AI text in the empty fields, and the usual Save publishes it.
+        const dcaBatch = { sel: new Set(), status: {}, results: {}, err: {}, running: false, stop: false, done: 0, total: 0, loaded: false };
+        const DCA_BATCH_LS = 'dca_batch_results_v1';
+        const DCA_BATCH_MAX = 20;
+        const DCA_BATCH_STATUS = { queued: '⌛ Queued', run: '⏳ Drafting…', ok: '✓ Ready — review', bad: '⚠ Failed', skip: '— Nothing to fill' };
+
+        function dcaBatchLoad() {
+            if (dcaBatch.loaded) return;
+            dcaBatch.loaded = true;
+            try {
+                const saved = JSON.parse(localStorage.getItem(DCA_BATCH_LS) || '{}');
+                Object.keys(saved).forEach(id => { dcaBatch.results[id] = saved[id]; dcaBatch.status[id] = 'ok'; });
+            } catch (_) { /* storage may be blocked — results then live only until reload */ }
+        }
+        function dcaBatchSave() {
+            try { localStorage.setItem(DCA_BATCH_LS, JSON.stringify(dcaBatch.results)); } catch (_) { /* ignore */ }
+        }
+        function dcaBatchChipHtml(id) {
+            const s = dcaBatch.status[id];
+            if (!s) return '';
+            const tip = s === 'bad' ? ` title="${dcaEscapeHtml(dcaBatch.err[id] || '')}"` : '';
+            const act = s === 'ok' ? ` role="button" onclick="dcaBatchReview('${dcaEscapeHtml(id)}')"` : '';
+            return `<span class="dca-st ${s}"${tip}${act}>${DCA_BATCH_STATUS[s]}</span>`;
+        }
+        // refresh one row in place (chip + highlight) without re-rendering the whole list
+        function dcaBatchPaint(id) {
+            const row = document.querySelector('#dca-list .dca-row[data-id="' + id + '"]');
+            if (!row) return;
+            row.classList.toggle('dca-on', dcaBatch.sel.has(id));
+            const old = row.querySelector('.dca-st');
+            if (old) old.remove();
+            const html = dcaBatchChipHtml(id);
+            const top = row.querySelector('.dca-row-side-top');
+            if (html && top) top.insertAdjacentHTML('afterbegin', html);
+            const box = row.querySelector('.dca-pick');
+            if (box) { box.checked = dcaBatch.sel.has(id); box.disabled = dcaBatch.running; }
+        }
+        function dcaBatchModelLabel() {
+            const on = document.querySelector('#dca-ai-chip-rail .active');
+            const hidden = document.getElementById('dca-ai-model-val');
+            return (on && on.textContent.trim()) || (hidden && hidden.value) || DCA_AI_FALLBACK_MODEL;
+        }
+        function dcaBatchRenderBar() {
+            const bar = document.getElementById('dca-batch-bar');
+            if (!bar) return;
+            const n = dcaBatch.sel.size;
+            const ready = Object.keys(dcaBatch.results).filter(id => dcaBatch.status[id] === 'ok').length;
+            if (dcaBatch.running) {
+                const bad = Object.keys(dcaBatch.status).filter(id => dcaBatch.status[id] === 'bad').length;
+                const pct = dcaBatch.total ? Math.round(100 * dcaBatch.done / dcaBatch.total) : 0;
+                bar.style.display = 'flex';
+                bar.innerHTML = `<span>⏳ ${dcaBatch.done} of ${dcaBatch.total} done${bad ? ` · ${bad} failed` : ''}</span>`
+                    + `<div class="dca-batch-prog"><div style="width:${pct}%"></div></div>`
+                    + `<button type="button" class="ghost" onclick="dcaBatchStop()">Stop</button>`
+                    + (ready ? `<button type="button" class="go" onclick="dcaBatchReviewNext()">Review next (${ready})</button>` : '');
+                return;
+            }
+            if (!n && !ready) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
+            bar.style.display = 'flex';
+            bar.innerHTML = (n ? `<span>☑ ${n} drug${n === 1 ? '' : 's'} selected</span><span class="dca-batch-sub">model: ${dcaEscapeHtml(dcaBatchModelLabel())} · ${n} AI call${n === 1 ? '' : 's'}</span>` : `<span>✓ ${ready} draft${ready === 1 ? '' : 's'} ready to review</span>`)
+                + '<span style="flex:1"></span>'
+                + (n ? '<button type="button" class="ghost" onclick="dcaBatchSelect(\'clear\')">Clear</button>' : '')
+                + (ready ? `<button type="button" class="${n ? 'ghost' : 'go'}" onclick="dcaBatchReviewNext()">Review next (${ready})</button>` : '')
+                + (n ? `<button type="button" class="go" onclick="dcaBatchRun()">🤖 Draft ${n} selected</button>` : '');
+        }
+        function dcaBatchRenderHint() {
+            const el = document.getElementById('dca-batch-hint');
+            if (!el) return;
+            const pcts = dcaState.codex.map(d => dcaCompletenessScore(d).pct);
+            const inc = pcts.filter(p => p < 90).length, low = pcts.filter(p => p < 30).length;
+            el.innerHTML = '<span>Or tick drugs in the list below:</span>'
+                + `<a onclick="dcaBatchSelect('incomplete')">All incomplete (${inc})</a><a onclick="dcaBatchSelect('low')">Below 30% (${low})</a><a onclick="dcaBatchSelect('clear')">Clear</a>`;
+        }
+        function dcaBatchPicking(on) {
+            const list = document.getElementById('dca-list');
+            if (list) list.classList.toggle('dca-picking', !!on);
+            if (on) { dcaBatchLoad(); dcaBatchRenderHint(); if (dcaState.codex.length) dcaRenderPublishedList(); }
+            dcaBatchRenderBar();
+        }
+        function dcaBatchToggle(id, el) {
+            if (dcaBatch.running) { if (el) el.checked = dcaBatch.sel.has(id); return; }
+            if (el && el.checked) {
+                if (dcaBatch.sel.size >= DCA_BATCH_MAX) { el.checked = false; if (typeof showToast === 'function') showToast(`Up to ${DCA_BATCH_MAX} drugs per run.`); return; }
+                dcaBatch.sel.add(id);
+            } else dcaBatch.sel.delete(id);
+            dcaBatchPaint(id);
+            dcaBatchRenderBar();
+        }
+        function dcaBatchSelect(kind) {
+            if (dcaBatch.running) return;
+            const was = Array.from(dcaBatch.sel);
+            dcaBatch.sel.clear();
+            if (kind !== 'clear') {
+                const limit = kind === 'low' ? 30 : 90;
+                const pick = dcaState.codex.map(d => ({ id: d._id, pct: dcaCompletenessScore(d).pct })).filter(x => x.pct < limit).sort((a, b) => a.pct - b.pct);
+                pick.slice(0, DCA_BATCH_MAX).forEach(x => dcaBatch.sel.add(x.id));
+                if (pick.length > DCA_BATCH_MAX && typeof showToast === 'function') showToast(`Selected the ${DCA_BATCH_MAX} least complete of ${pick.length} — run again for the rest.`);
+            }
+            was.concat(Array.from(dcaBatch.sel)).forEach(dcaBatchPaint);
+            dcaBatchRenderBar();
+        }
+        // one drug: ask only for its empty fields, keep the answer (not the whole doc) so it merges into whatever the doc is when reviewed
+        async function dcaBatchOne(id, model) {
+            const drug = dcaState.codex.find(d => d._id === id);
+            if (!drug) { delete dcaBatch.status[id]; return; }
+            const emptyKeys = DCA_FIELD_KEYS.filter(key => {
+                if (DCA_AI_FILL_SKIP.has(key)) return false;
+                const v = drug[key];
+                return DCA_ARRAY_FIELDS[key] ? !(Array.isArray(v) && v.length) : !String(v == null ? '' : v).trim();
+            });
+            if (!emptyKeys.length) { dcaBatch.status[id] = 'skip'; dcaBatchPaint(id); return; }
+            dcaBatch.status[id] = 'run'; dcaBatchPaint(id);
+            try {
+                const prompt = dcaBuildAiFillPrompt(drug, emptyKeys);
+                const ask = async () => {
+                    const resp = await window.callUniversalAI(model, prompt, true, null, '', { feature: 'drug_aifill' });
+                    const raw = (resp && resp.text) ? resp.text : (typeof resp === 'string' ? resp : '');
+                    return { resp, raw, parsed: dcaParseAutoDraftResponse(raw) };
+                };
+                let r = await ask();
+                if (!r.parsed) {
+                    r = await ask();
+                    if (!r.parsed) throw new Error('AI returned invalid JSON after retry. First 300 chars: ' + String(r.raw || '').slice(0, 300));
+                }
+                const fill = {}, edu = [];
+                emptyKeys.forEach(key => {
+                    const v = r.parsed[key];
+                    if (DCA_ARRAY_FIELDS[key]) { if (Array.isArray(v) && v.filter(Boolean).length) fill[key] = v.filter(Boolean); }
+                    else {
+                        const s = v == null ? '' : String(v).trim();
+                        if (s) { fill[key] = s; if (DCA_EDU_I18N_FIELDS.includes(key)) edu.push(key); }
+                    }
+                });
+                if (!Object.keys(fill).length) throw new Error('The model left every empty field blank (uncertain).');
+                dcaBatch.results[id] = { fill, edu, model: (r.resp && r.resp.model) || model, name: drug.genericName, at: Date.now() };
+                dcaBatch.status[id] = 'ok';
+                dcaBatchSave();
+            } catch (err) {
+                console.error('[drug-codex] batch draft failed:', id, err);
+                dcaBatch.status[id] = 'bad';
+                dcaBatch.err[id] = (err && err.message) ? err.message : 'unknown error';
+            }
+            dcaBatchPaint(id);
+        }
+        async function dcaBatchRun() {
+            if (dcaBatch.running) return;
+            if (typeof window.callUniversalAI !== 'function') { if (typeof showToast === 'function') showToast('AI core not loaded yet — try again in a moment.'); return; }
+            const ids = Array.from(dcaBatch.sel).filter(id => dcaState.codex.some(d => d._id === id));
+            if (!ids.length) return;
+            const hidden = document.getElementById('dca-ai-model-val');
+            const model = (hidden && hidden.value) || DCA_AI_FALLBACK_MODEL;
+            dcaBatch.running = true; dcaBatch.stop = false; dcaBatch.done = 0; dcaBatch.total = ids.length;
+            ids.forEach(id => { delete dcaBatch.err[id]; delete dcaBatch.results[id]; dcaBatch.status[id] = 'queued'; });
+            dcaBatch.sel.clear();
+            document.querySelectorAll('#dca-list .dca-pick').forEach(b => { b.disabled = true; });
+            ids.forEach(dcaBatchPaint);
+            dcaBatchRenderBar();
+            const queue = ids.slice();
+            const worker = async () => {
+                while (queue.length && !dcaBatch.stop) {
+                    await dcaBatchOne(queue.shift(), model);
+                    dcaBatch.done++;
+                    dcaBatchRenderBar();
+                }
+            };
+            await Promise.all([worker(), worker()]);
+            ids.forEach(id => { if (dcaBatch.status[id] === 'queued') { delete dcaBatch.status[id]; dcaBatchPaint(id); } });
+            dcaBatch.running = false;
+            document.querySelectorAll('#dca-list .dca-pick').forEach(b => { b.disabled = false; });
+            dcaBatchRenderBar();
+            const ok = ids.filter(id => dcaBatch.status[id] === 'ok').length, bad = ids.filter(id => dcaBatch.status[id] === 'bad').length;
+            if (typeof showToast === 'function') showToast(`🤖 ${ok} draft${ok === 1 ? '' : 's'} ready to review${bad ? ` · ${bad} failed` : ''}${dcaBatch.stop ? ' · stopped' : ''}.`);
+        }
+        function dcaBatchStop() { dcaBatch.stop = true; }
+        function dcaBatchReviewNext() {
+            const id = Object.keys(dcaBatch.results).find(k => dcaBatch.status[k] === 'ok' && dcaState.codex.some(d => d._id === k));
+            if (id) dcaBatchReview(id);
+        }
+        // Open the normal edit form with the AI text in the fields that are STILL empty; nothing is saved until the admin saves.
+        function dcaBatchReview(id) {
+            const r = dcaBatch.results[id], drug = dcaState.codex.find(d => d._id === id);
+            if (!r || !drug) { delete dcaBatch.results[id]; delete dcaBatch.status[id]; dcaBatchSave(); dcaBatchPaint(id); dcaBatchRenderBar(); return; }
+            dcaEdit(id);
+            const merged = Object.assign({}, drug, { _id: id });
+            const filled = [];
+            Object.keys(r.fill).forEach(key => {
+                const cur = drug[key];
+                const empty = DCA_ARRAY_FIELDS[key] ? !(Array.isArray(cur) && cur.length) : !String(cur == null ? '' : cur).trim();
+                if (empty) { merged[key] = r.fill[key]; filled.push(key); }
+            });
+            merged.aiDrafted = true;
+            merged.aiDraftedModel = r.model;
+            dcaFillForm(merged);
+            if (typeof showToast === 'function') showToast(`🤖 "${drug.genericName}": ${filled.length} empty field${filled.length === 1 ? '' : 's'} filled by ${r.model}. Verify, then Save.`);
+            const edu = (r.edu || []).filter(k => filled.includes(k));
+            if (edu.length) dcaTranslateEducationI18n({ fields: edu, silent: false }).catch(err => console.warn('[drug-codex] batch Edu i18n translate failed:', err && err.message));
+        }
+        // called after the reviewed drug is saved
+        function dcaBatchDone(id) {
+            if (!dcaBatch.results[id]) return;
+            delete dcaBatch.results[id]; delete dcaBatch.status[id]; dcaBatchSave(); dcaBatchRenderBar();
+        }
+
         function dcaAutoDraftToggle() {
             const row = document.getElementById('dca-ai-input-row');
             if (!row) return;
@@ -44348,6 +44579,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
             row.style.display = 'block';
             dcaSyncAutoDraftChipFromStorage();
+            dcaBatchPicking(true);
             const nameEl = document.getElementById('dca-ai-name');
             if (nameEl) setTimeout(() => nameEl.focus(), 40);
         }
@@ -44355,6 +44587,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function dcaAutoDraftCancel() {
             const row = document.getElementById('dca-ai-input-row');
             if (row) row.style.display = 'none';
+            if (!dcaBatch.running) dcaBatch.sel.clear();
+            dcaBatchPicking(false);
             const nameEl = document.getElementById('dca-ai-name');
             if (nameEl) nameEl.value = '';
             const errEl = document.getElementById('dca-ai-error');
@@ -44375,6 +44609,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 if (hidden) hidden.value = el.dataset.value;
             }
             try { localStorage.setItem(DCA_AI_LS_KEY, el.dataset.value); } catch (_) {}
+            dcaBatchRenderBar();
         }
 
         function dcaSyncAutoDraftChipFromStorage() {
