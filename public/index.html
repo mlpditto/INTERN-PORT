@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.58)</title>
+    <title>Internship Portfolio (V101.59)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1551,6 +1551,8 @@
             box-shadow: 0 5px 14px rgba(15, 23, 42, 0.04);
         }
 
+        .case-card.is-reviewed { background: #f0fdf4; border-color: #bbf7d0; }
+
         .case-card-top {
             display: flex;
             justify-content: space-between;
@@ -1558,6 +1560,9 @@
             align-items: flex-start;
             margin-bottom: 8px;
         }
+
+        /* V101.59: HN, patient and date on ONE line (wraps only when the card is narrow) */
+        .case-card-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; }
 
         .case-card-id {
             font-size: 0.9em;
@@ -1586,10 +1591,6 @@
             color: #b45309;
         }
 
-        .case-status-badge.reviewed {
-            background: #ecfdf3;
-            color: #15803d;
-        }
 
         /* ── Work Tabs (V90.98) ────────────────────────────────── */
         .work-tabs-bar {
@@ -2320,7 +2321,7 @@
 <script src="assigned-goals.js?v=V100.30"></script><link rel="stylesheet" href="assigned-goals.css?v=V100.30">
 <link rel="stylesheet" href="quiz-user-focus.css?v=V100.39">
 <link rel="stylesheet" href="quiz-cover.css?v=V100.57">
-<link rel="stylesheet" href="case-insight-rail.css?v=V100.54">
+<link rel="stylesheet" href="case-insight-rail.css?v=V101.59">
 <script src="quiz-cover.js?v=V101.09"></script>
 <script src="activity-rewards.js?v=V101.55"></script><link rel="stylesheet" href="activity-rewards.css?v=V101.43">
 <script src="flood-watch.js?v=V101.57"></script><link rel="stylesheet" href="flood-watch.css?v=V101.57">
@@ -4720,8 +4721,6 @@
                                 <div class="case-insight-list">
                                 <div class="case-stats-toolbar">
                                     <div id="case-stats-summary" class="case-filter-pills"></div>
-                                    <div id="case-summary-meta"
-                                        style="font-size:0.78em; color:#64748b; font-weight:700;"></div>
                                 </div>
                                 <div id="case-list-grouped"></div>
                                 </div>
@@ -24897,15 +24896,15 @@ async function archiveDoneCard(cardId) {
             container.innerHTML = `
                 <div class="case-rail-tools">
                     <button type="button" class="case-rail-mobile" aria-label="Show or hide stats" data-th-aria-label="แสดงหรือซ่อนสถิติ" aria-expanded="${expanded}" aria-controls="case-rail-extra" title="Show or hide stats" data-th-title="แสดงหรือซ่อนสถิติ" onclick="this.parentElement.parentElement.classList.toggle('is-expanded'); this.setAttribute('aria-expanded', this.parentElement.parentElement.classList.contains('is-expanded'))">📊 ▾</button>
+                    <div class="case-rail-metrics">
+                        <span title="Cases in the selected period" data-th-title="จำนวนเคสในช่วงเวลาที่เลือก" aria-label="${cases.length} cases" data-th-aria-label="จำนวนเคส ${cases.length}">📁 <b>${cases.length}</b></span>
+                        <span title="Points in the selected period" data-th-title="คะแนนในช่วงเวลาที่เลือก" aria-label="${points.toFixed(2)} points" data-th-aria-label="คะแนน ${points.toFixed(2)}">⭐ <b>${points.toFixed(2)}</b></span>
+                        <span title="Systems logged in the selected period (Other not counted)" data-th-title="จำนวนระบบที่บันทึกแล้วในช่วงเวลาที่เลือก ไม่นับ Other" aria-label="Coverage ${systems.length-missing.length} of ${systems.length} systems" data-th-aria-label="ความครอบคลุม ${systems.length-missing.length} จาก ${systems.length} ระบบ">🗺️ <b>${systems.length-missing.length}/${systems.length}</b></span>
+                    </div>
                     <select aria-label="Stats period" data-th-aria-label="ช่วงเวลาสถิติ" title="Stats period — does not change the case list" data-th-title="ช่วงเวลาของสถิติ ไม่เปลี่ยนรายการเคส" onchange="setCaseStatsWindow(this.value)">
                         ${[['all','All-time'],['30d','30 days'],['7d','7 days']].map(([v,label]) => `<option value="${v}" ${win === v ? 'selected' : ''}>${label}</option>`).join('')}
                     </select>
                     <button type="button" onclick="exportCaseStatsCsv()" aria-label="Export CSV" data-th-aria-label="ส่งออก CSV" title="Export the stats for the selected period as CSV" data-th-title="ส่งออกสถิติตามช่วงเวลาที่เลือกเป็น CSV">📥</button>
-                </div>
-                <div class="case-rail-metrics">
-                    <span title="Cases in the selected period" data-th-title="จำนวนเคสในช่วงเวลาที่เลือก" aria-label="${cases.length} cases" data-th-aria-label="จำนวนเคส ${cases.length}">📁 <b>${cases.length}</b></span>
-                    <span title="Points in the selected period" data-th-title="คะแนนในช่วงเวลาที่เลือก" aria-label="${points.toFixed(2)} points" data-th-aria-label="คะแนน ${points.toFixed(2)}">⭐ <b>${points.toFixed(2)}</b></span>
-                    <span title="Systems logged in the selected period (Other not counted)" data-th-title="จำนวนระบบที่บันทึกแล้วในช่วงเวลาที่เลือก ไม่นับ Other" aria-label="Coverage ${systems.length-missing.length} of ${systems.length} systems" data-th-aria-label="ความครอบคลุม ${systems.length-missing.length} จาก ${systems.length} ระบบ">🗺️ <b>${systems.length-missing.length}/${systems.length}</b></span>
                 </div>
                 <div class="case-rail-extra" id="case-rail-extra">
                     <div class="case-rail-row"><span title="Cases by system" data-th-title="จำนวนเคสแยกตามระบบ" aria-label="Systems" data-th-aria-label="ระบบ">🩺</span><div class="case-rail-values">${groupHtml || 'No cases'}</div></div>
@@ -25376,12 +25375,10 @@ async function archiveDoneCard(cardId) {
             renderCaseStats(cases);
             const statsContainer = document.getElementById('case-stats-summary');
             const listContainer = document.getElementById('case-list-grouped');
-            const summaryMeta = document.getElementById('case-summary-meta');
             if (!statsContainer || !listContainer) return;
 
             if (!cases.length) {
                 statsContainer.innerHTML = "";
-                if (summaryMeta) summaryMeta.innerText = "0 cases";
                 listContainer.innerHTML = "<p class='case-empty'>No case submissions yet<br>케이스 제출 이력이 없습니다</p>";
                 return;
             }
@@ -25396,13 +25393,12 @@ async function archiveDoneCard(cardId) {
             const orderedSystems = Object.keys(groups).sort((a, b) => groups[b].length - groups[a].length || a.localeCompare(b));
             const activeFilter = window.caseSystemFilter || 'all';
             const filteredSystems = activeFilter === 'all' ? orderedSystems : orderedSystems.filter(sys => sys === activeFilter);
-            const visibleCount = filteredSystems.reduce((sum, sys) => sum + groups[sys].length, 0);
 
+            // V101.59: a system is its emoji (+ count); the name stays in the tooltip / aria-label.
+            const sysEmoji = sys => { const c0 = groups[sys][0]; return CASE_SYSTEM_EMOJI[c0.diseaseSystemKey || c0.diseaseSystem || 'other'] || '📋'; };
             statsContainer.innerHTML =
                 `<button type="button" class="case-filter-pill ${activeFilter === 'all' ? 'active' : ''}" onclick="setCaseSystemFilter('all')">All (${cases.length})</button>` +
-                orderedSystems.map(sys => `<button type="button" class="case-filter-pill ${activeFilter === sys ? 'active' : ''}" onclick='setCaseSystemFilter(${JSON.stringify(sys)})'>${sys} (${groups[sys].length})</button>`).join('');
-
-            if (summaryMeta) summaryMeta.innerText = `${visibleCount} visible / ${cases.length} total`;
+                orderedSystems.map(sys => `<button type="button" class="case-filter-pill ${activeFilter === sys ? 'active' : ''}" title="${escapeHtml(sys)}" aria-label="${escapeHtml(sys)} (${groups[sys].length})" onclick='setCaseSystemFilter(${JSON.stringify(sys)})'>${sysEmoji(sys)} ${groups[sys].length}</button>`).join('');
 
             if (!filteredSystems.length) {
                 listContainer.innerHTML = `<div class="case-empty">No cases match the current system filter.<br>선택된 시스템에 해당하는 케이스가 없습니다.</div>`;
@@ -25412,28 +25408,26 @@ async function archiveDoneCard(cardId) {
             listContainer.innerHTML = filteredSystems.map(sys => `
                 <div class="case-group-block">
                     <div class="case-group-head">
-                        <div class="case-group-title"><i class="fa-solid fa-folder-open" style="color:#4361ee;"></i> ${sys}</div>
-                        <div style="font-size:0.75em; color:#64748b; font-weight:800;">${groups[sys].length} case(s)</div>
+                        <div class="case-group-title" title="${escapeHtml(sys)}" aria-label="${escapeHtml(sys)} (${groups[sys].length})"><span style="font-size:1.25em; line-height:1;">${sysEmoji(sys)}</span></div>
                     </div>
                     ${groups[sys].map(c => {
                 const status = (c.status || '').toLowerCase();
-                const statusLabel = status === 'pending' || c.status === 'รอตรวจ' ? 'Pending Review' : 'Reviewed';
-                const statusClass = statusLabel === 'Pending Review' ? 'pending' : 'reviewed';
+                const isPending = status === 'pending' || c.status === 'รอตรวจ';
                 const symptoms = Array.isArray(c.symptomTags) ? c.symptomTags : [];
                 const dateText = c.timestamp && typeof c.timestamp.toDate === 'function'
                     ? c.timestamp.toDate().toLocaleDateString('en-US')
                     : '';
                 return `
-                            <div class="case-card">
+                            <div class="case-card${isPending ? '' : ' is-reviewed'}">
                                 <div class="case-card-top">
-                                    <div>
+                                    <div class="case-card-line">
                                         <div class="case-card-id">HN / Ref: ${c.caseId}</div>
                                         <div class="case-card-meta">
                                             ${c.customer ? `<span class="lang-no-toggle"><i class="fa-solid fa-user"></i> ${c.customer}</span>` : '<span><i class="fa-solid fa-user"></i> Unnamed patient</span>'}
                                             ${dateText ? `<span><i class="fa-solid fa-calendar"></i> ${dateText}</span>` : ''}
                                         </div>
                                     </div>
-                                    <span class="case-status-badge ${statusClass}">${statusLabel}</span>
+                                    ${isPending ? '<span class="case-status-badge pending">Pending Review</span>' : ''}
                                 </div>
                                 ${symptoms.length ? `<div class="case-chip-group" style="margin:0 0 8px;">${symptoms.map(tag => `<span class="case-chip case-chip-neutral">${tag}</span>`).join('')}</div>` : ''}
                                 ${c.note ? `<div class="lang-no-toggle" style="font-size:0.82em; color:#6b7280; line-height:1.55; border-top:1px dashed #edf2f7; padding-top:8px;"><strong style="color:#475569;">Note:</strong> ${c.note}</div>` : ''}
