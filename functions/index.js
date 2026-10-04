@@ -4326,7 +4326,7 @@ function floodEarlyWarning(s) {
     return { c, leftCm };
 }
 
-function floodEarlyMail(w, s, lat, lon) {
+function floodEarlyMail(w, s, lat, lon, river) {
     const { c, leftCm } = w;
     const f = (v) => (Math.round(v * 100) / 100).toFixed(2);
     const state = leftCm > 0 ? `เหลืออีก ${leftCm} ซม. ถึงเกณฑ์เฝ้าระวัง` : leftCm === 0 ? 'ถึงเกณฑ์เฝ้าระวังแล้ว' : `เกินเกณฑ์เฝ้าระวังแล้ว ${-leftCm} ซม.`;
@@ -4338,11 +4338,22 @@ function floodEarlyMail(w, s, lat, lon) {
         `ขึ้น +${c.deltaCm} ซม. ใน 1 ชม. · ${state}`
     ];
     if (c.maxYday != null) lines.push(`เมื่อวานสูงสุด ${f(c.maxYday)} ม.`);
+    const arrow = (cm) => cm == null ? '' : cm > 0 ? '▲' : cm < 0 ? '▼' : '▬';
+    const others = (s.pop.canals || []).slice(1);
+    if (others.length) {
+        lines.push('', 'คลองใกล้เคียง:');
+        others.forEach(o => lines.push(`• ${o.name} (${o.km} กม.) ${o.wl == null ? '—' : f(o.wl) + ' ม.รทก.'}${o.deltaCm == null ? '' : ` ${arrow(o.deltaCm)} ${o.deltaCm > 0 ? '+' : ''}${o.deltaCm} ซม./ชม.`}${o.level === 'crit' ? ' · เกินวิกฤต' : o.level === 'warn' ? ' · เกินเฝ้าระวัง' : ''}`));
+    }
     const r = s.pop.rains && s.pop.rains[0];
     if (r) lines.push(`ฝนที่ตกจริง (${r.name} ${r.km} กม.): 1 ชม. ${r.r1h == null ? '—' : r.r1h} · 3 ชม. ${r.r3h == null ? '—' : r.r3h} · 24 ชม. ${r.r24h == null ? '—' : r.r24h} มม.`);
     if (s.pop.city && s.pop.city.raining) lines.push(`ทั่ว กทม. ฝนตกอยู่ ${s.pop.city.raining} สถานี`);
     const rd = s.road && s.road.nearest;
     lines.push(rd ? `ถนนใกล้สุดที่ท่วม: ${rd.name} ${rd.closed ? 'ปิดการจราจร' : rd.depthCm != null ? `ลึก ~${rd.depthCm} ซม.` : ''} (${rd.m} ม.)` : 'ถนนรอบจุดยังไม่มีรายงานน้ำท่วม');
+    const stations = river && Array.isArray(river.stations) ? river.stations.filter(x => x.q != null) : [];
+    if (stations.length) {
+        lines.push('', 'แม่น้ำเจ้าพระยา (ปริมาณน้ำ ม³/วิ):');
+        stations.forEach(x => lines.push(`• ${x.code} ${x.place}: ${Math.round(x.q).toLocaleString('en-US')}${x.pct != null ? ` (${x.pct}% ของความจุ ${x.cap.toLocaleString('en-US')})` : ''}${x.d24 == null ? '' : ` ${arrow(x.d24)} ${x.d24 > 0 ? '+' : ''}${x.d24} ใน 24 ชม.`}${x.src === 'est' ? ' · ประมาณจากระดับน้ำ' : ''}`));
+    }
     lines.push('', `แผนที่: ${floodMapUrl(lat, lon)}`, '', s.pop.credit + ' (ไม่ใช่ประกาศทางการ)',
         'เตือนล่วงหน้านี้ส่งวันละไม่เกิน 2 ครั้ง (08:00 / 16:00) · ข้อความ LINE ยังส่งเฉพาะเมื่อความเสี่ยงถึงระดับสูง');
     return {
@@ -4434,7 +4445,7 @@ exports.checkFloodAlerts = onSchedule({
             const w = floodEarlyWarning(s);
             if (w) {
                 try {
-                    const m = floodEarlyMail(w, s, lat, lon);
+                    const m = floodEarlyMail(w, s, lat, lon, await readRiverDischarge(db));
                     await sendFloodMail(m.subject, m.text);
                     update.lastEmailSlot = slot;
                 } catch (e) {
