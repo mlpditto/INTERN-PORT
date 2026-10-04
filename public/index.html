@@ -4726,8 +4726,6 @@
                                 <div class="case-insight-list">
                                 <div class="case-stats-toolbar">
                                     <div id="case-stats-summary" class="case-filter-pills"></div>
-                                    <div id="case-summary-meta"
-                                        style="font-size:0.78em; color:#64748b; font-weight:700;"></div>
                                 </div>
                                 <div id="case-list-grouped"></div>
                                 </div>
@@ -25399,12 +25397,10 @@ async function archiveDoneCard(cardId) {
             renderCaseStats(cases);
             const statsContainer = document.getElementById('case-stats-summary');
             const listContainer = document.getElementById('case-list-grouped');
-            const summaryMeta = document.getElementById('case-summary-meta');
             if (!statsContainer || !listContainer) return;
 
             if (!cases.length) {
                 statsContainer.innerHTML = "";
-                if (summaryMeta) summaryMeta.innerText = "0 cases";
                 listContainer.innerHTML = "<p class='case-empty'>No case submissions yet<br>케이스 제출 이력이 없습니다</p>";
                 return;
             }
@@ -25419,15 +25415,12 @@ async function archiveDoneCard(cardId) {
             const orderedSystems = Object.keys(groups).sort((a, b) => groups[b].length - groups[a].length || a.localeCompare(b));
             const activeFilter = window.caseSystemFilter || 'all';
             const filteredSystems = activeFilter === 'all' ? orderedSystems : orderedSystems.filter(sys => sys === activeFilter);
-            const visibleCount = filteredSystems.reduce((sum, sys) => sum + groups[sys].length, 0);
 
             // V101.59: a system is its emoji (+ count); the name stays in the tooltip / aria-label.
             const sysEmoji = sys => { const c0 = groups[sys][0]; return CASE_SYSTEM_EMOJI[c0.diseaseSystemKey || c0.diseaseSystem || 'other'] || '📋'; };
             statsContainer.innerHTML =
                 `<button type="button" class="case-filter-pill ${activeFilter === 'all' ? 'active' : ''}" onclick="setCaseSystemFilter('all')">All (${cases.length})</button>` +
                 orderedSystems.map(sys => `<button type="button" class="case-filter-pill ${activeFilter === sys ? 'active' : ''}" title="${escapeHtml(sys)}" aria-label="${escapeHtml(sys)} (${groups[sys].length})" onclick='setCaseSystemFilter(${JSON.stringify(sys)})'>${sysEmoji(sys)} ${groups[sys].length}</button>`).join('');
-
-            if (summaryMeta) summaryMeta.innerText = `${visibleCount} visible / ${cases.length} total`;
 
             if (!filteredSystems.length) {
                 listContainer.innerHTML = `<div class="case-empty">No cases match the current system filter.<br>선택된 시스템에 해당하는 케이스가 없습니다.</div>`;
@@ -25437,7 +25430,7 @@ async function archiveDoneCard(cardId) {
             listContainer.innerHTML = filteredSystems.map(sys => `
                 <div class="case-group-block">
                     <div class="case-group-head">
-                        <div class="case-group-title" title="${escapeHtml(sys)}" aria-label="${escapeHtml(sys)} (${groups[sys].length})"><span style="font-size:1.25em; line-height:1;">${sysEmoji(sys)}</span><small style="font-size:0.8em; color:#64748b;">${groups[sys].length}</small></div>
+                        <div class="case-group-title" title="${escapeHtml(sys)}" aria-label="${escapeHtml(sys)} (${groups[sys].length})"><span style="font-size:1.25em; line-height:1;">${sysEmoji(sys)}</span></div>
                     </div>
                     ${groups[sys].map(c => {
                 const status = (c.status || '').toLowerCase();
