@@ -4326,7 +4326,7 @@ function floodEarlyWarning(s) {
     return { c, leftCm };
 }
 
-function floodEarlyMail(w, s, lat, lon, river) {
+function floodEarlyMail(w, s, lat, lon, river, wx) {
     const { c, leftCm } = w;
     const f = (v) => (Math.round(v * 100) / 100).toFixed(2);
     const state = leftCm > 0 ? `เหลืออีก ${leftCm} ซม. ถึงเกณฑ์เฝ้าระวัง` : leftCm === 0 ? 'ถึงเกณฑ์เฝ้าระวังแล้ว' : `เกินเกณฑ์เฝ้าระวังแล้ว ${-leftCm} ซม.`;
@@ -4349,12 +4349,17 @@ function floodEarlyMail(w, s, lat, lon, river) {
     if (s.pop.city && s.pop.city.raining) lines.push(`ทั่ว กทม. ฝนตกอยู่ ${s.pop.city.raining} สถานี`);
     const rd = s.road && s.road.nearest;
     lines.push(rd ? `ถนนใกล้สุดที่ท่วม: ${rd.name} ${rd.closed ? 'ปิดการจราจร' : rd.depthCm != null ? `ลึก ~${rd.depthCm} ซม.` : ''} (${rd.m} ม.)` : 'ถนนรอบจุดยังไม่มีรายงานน้ำท่วม');
+    if (wx) {
+        const sky = wx.code >= 95 ? '⛈️ พายุฝนฟ้าคะนอง' : (wx.code >= 51 && wx.code <= 67) || (wx.code >= 80 && wx.code <= 82) ? '🌧️ ฝนตก'
+            : wx.code === 45 || wx.code === 48 ? '🌫️ หมอก' : wx.code >= 2 ? '☁️ มีเมฆ' : '☀️ แจ่มใส';
+        lines.push('', `สภาพอากาศ: ${sky} ${wx.temp}° (รู้สึก ${wx.feels}°) · โอกาสฝน ${wx.pop}%${wx.pop >= 30 && wx.popAt ? ` ช่วง ${wx.popAt} น.` : ''} ใน 6 ชม.${wx.aqi != null ? ` · AQI ${wx.aqi}` : ''}`);
+    }
     const stations = river && Array.isArray(river.stations) ? river.stations.filter(x => x.q != null) : [];
     if (stations.length) {
         lines.push('', 'แม่น้ำเจ้าพระยา (ปริมาณน้ำ ม³/วิ):');
         stations.forEach(x => lines.push(`• ${x.code} ${x.place}: ${Math.round(x.q).toLocaleString('en-US')}${x.pct != null ? ` (${x.pct}% ของความจุ ${x.cap.toLocaleString('en-US')})` : ''}${x.d24 == null ? '' : ` ${arrow(x.d24)} ${x.d24 > 0 ? '+' : ''}${x.d24} ใน 24 ชม.`}${x.src === 'est' ? ' · ประมาณจากระดับน้ำ' : ''}`));
     }
-    lines.push('', `แผนที่: ${floodMapUrl(lat, lon)}`, '', s.pop.credit + ' (ไม่ใช่ประกาศทางการ)',
+    lines.push('', `แผนที่: ${floodMapUrl(lat, lon)}`, '', s.pop.credit + (wx ? ' · Open-Meteo (CC BY 4.0)' : '') + ' (ไม่ใช่ประกาศทางการ)',
         'เตือนล่วงหน้านี้ส่งวันละไม่เกิน 2 ครั้ง (08:00 / 16:00) · ข้อความ LINE ยังส่งเฉพาะเมื่อความเสี่ยงถึงระดับสูง');
     return {
         subject: `🌊 น้ำใกล้เกณฑ์เฝ้าระวัง: ${c.name} ${f(c.wl)} ม. (+${c.deltaCm} ซม./ชม.)`,
@@ -4368,6 +4373,24 @@ async function sendFloodMail(subject, text) {
     const nodemailer = require('nodemailer');   // lazy: only the hourly job needs it
     const tx = nodemailer.createTransport({ host: 'smtp.gmail.com', port: 465, secure: true, auth: { user: FLOOD_MAIL, pass } });
     await tx.sendMail({ from: `"INTERN-PORT Flood" <${FLOOD_MAIL}>`, to: FLOOD_MAIL, subject, text });
+}
+
+// Weather + air quality at the point (Open-Meteo, keyless, CC BY 4.0), same fields as the popup card. Never throws.
+async function fetchFloodWeather(lat, lon) {
+    const ll = `latitude=${lat.toFixed(2)}&longitude=${lon.toFixed(2)}&timezone=Asia%2FBangkok`;
+    const get = (u) => axios.get(u, { timeout: 10000 }).then(r => r.data).catch(() => null);
+    const [w, q] = await Promise.all([
+        get(`https://api.open-meteo.com/v1/forecast?${ll}&current=temperature_2m,apparent_temperature,weather_code&hourly=precipitation_probability&forecast_hours=7`),
+        get(`https://air-quality-api.open-meteo.com/v1/air-quality?${ll}&current=us_aqi`)
+    ]);
+    if (!w || !w.current) return null;
+    const h = w.hourly || {};
+    let pop = 0, popAt = '';
+    (h.precipitation_probability || []).forEach((v, i) => { if (v > pop) { pop = v; popAt = String((h.time || [])[i] || '').slice(11, 16); } });
+    return {
+        code: w.current.weather_code, temp: Math.round(w.current.temperature_2m), feels: Math.round(w.current.apparent_temperature), pop, popAt,
+        aqi: q && q.current && q.current.us_aqi != null ? Math.round(q.current.us_aqi) : null
+    };
 }
 
 // Chao Phraya discharge at C.2 / C.13 / C.29B (ThaiWater → RID PDF → AI → rating curve, see
@@ -4445,7 +4468,7 @@ exports.checkFloodAlerts = onSchedule({
             const w = floodEarlyWarning(s);
             if (w) {
                 try {
-                    const m = floodEarlyMail(w, s, lat, lon, await readRiverDischarge(db));
+                    const m = floodEarlyMail(w, s, lat, lon, await readRiverDischarge(db), await fetchFloodWeather(lat, lon));
                     await sendFloodMail(m.subject, m.text);
                     update.lastEmailSlot = slot;
                 } catch (e) {
