@@ -19,10 +19,10 @@ const near = (a, b, tol = 0.01) => assert.ok(Math.abs(a - b) <= tol, `${a} ≉ $
 
 // ---- 1. data shape ----
 const forms = P.DATA.flatMap(d => d.forms.map(f => ({ d, f })));
-assert.equal(P.DATA.length, 48); assert.equal(forms.length, 50);
+assert.equal(P.DATA.length, 76); assert.equal(forms.length, 78);
 const nMode = m => forms.filter(x => x.f.mode === m).length;
-assert.deepEqual([nMode('weight'), nMode('age'), nMode('mgkg'), nMode('bands')], [19, 5, 19, 7]);
-assert.equal(new Set(P.DATA.map(d => d.key)).size, 48, 'unique keys');
+assert.deepEqual([nMode('weight'), nMode('age'), nMode('mgkg'), nMode('bands')], [19, 5, 37, 17]);
+assert.equal(new Set(P.DATA.map(d => d.key)).size, 76, 'unique keys');
 for (const { d, f } of forms) {
     assert.ok(d.genericName && d.aliases.length, d.key);
     if (f.mode === 'weight') {
@@ -35,7 +35,7 @@ for (const { d, f } of forms) {
     } else if (f.mode === 'mgkg') {
         assert.ok(f.lines.length >= 1, d.key);
         for (const l of f.lines) {
-            assert.ok(l.basis.min > 0 && l.basis.max >= l.basis.min && ['day', 'dose'].includes(l.basis.per) && ['mg/kg', 'ml/kg'].includes(l.basis.unit), d.key + ' mg/kg basis');
+            assert.ok(l.basis.min > 0 && l.basis.max >= l.basis.min && ['day', 'dose'].includes(l.basis.per) && ['mg/kg', 'ml/kg', 'g/kg', 'mcg/kg'].includes(l.basis.unit), d.key + ' mg/kg basis');
             if (l.interval) assert.ok(l.interval.min >= 1 && l.interval.max >= l.interval.min && l.interval.text, d.key + ' interval');
             if (l.usual) assert.ok(l.usual >= l.basis.min && l.usual <= l.basis.max, d.key + ' usual dose inside the range');
         }
@@ -43,7 +43,7 @@ for (const { d, f } of forms) {
         assert.equal(f.mode, 'bands', d.key);
         for (const b of f.bands) {
             assert.ok(['age', 'weight', 'any'].includes(b.by) && b.text, d.key + ' band');
-            assert.equal([b.mg, b.ml, b.basis].filter(Boolean).length, 1, d.key + ' band has exactly one amount');
+            assert.ok([b.mg, b.ml, b.basis].filter(Boolean).length <= 1, d.key + ' band has at most one amount (none = tablet / sachet kept as printed text)');
             if (b.by === 'age') assert.ok(Array.isArray(b.ages) && b.ages.every(a => a >= 0 && a <= 12), d.key + ' band ages inside 0-12');
             if (b.by === 'weight') assert.ok(b.kg && (b.kg.lo != null || b.kg.hi != null), d.key + ' weight bounds');
         }
@@ -144,12 +144,53 @@ assert.equal(P.findSeed('Amoxicillin').key, 'amoxicillin'); assert.equal(P.findS
 assert.equal(P.findSeed('GLYCERYL GUAIACOLATE (Guaifenesin)').key, 'glyceryl-guaiacolate'); assert.equal(P.findSeed('Metformin'), null);
 assert.deepEqual(['Rifampin', 'Aciclovir', 'Sodium valproate', 'Aluminum hydroxide', 'Phenobarbitone', 'Carbocisteine', 'INH'].map(n => P.findSeed(n).key), ['rifampicin', 'acyclovir', 'valproic-acid', 'alum-milk', 'phenobarbital', 'carbocysteine', 'isoniazid']);
 assert.match(P.dosingText(P.DATA[0]), /Amoxicillin 125 mg\/5 ml — วันละ 3 ครั้ง \(20–50 mg\/kg\/day\)\nAmoxicillin 250/);
-assert.deepEqual(Object.keys(P.forDoc(P.DATA[0])), ['v', 'source', 'refs', 'checks', 'alt', 'forms']);
+assert.deepEqual(Object.keys(P.forDoc(P.DATA[0])), ['v', 'source', 'refs', 'checks', 'alt', 'alts', 'forms']);
+
+// ---- 5a. third source (Toxic Version) ----
+const dd = k => P.DATA.find(d => d.key === k);
+assert.equal(Object.keys(P.ALT3).length, 42 + 28, 'ALT3: 42 shared drugs + 28 new');
+assert.deepEqual(P.forDoc(dd('amoxicillin')).alts.map(a => a.label), ['Toxic Version (Mar 2020)']);
+assert.equal(P.forDoc(dd('salbutamol')).alts.length, 0, 'salbutamol is a nebuliser in the Toxic Version → no third-source line');
+assert.ok(P.forDoc(dd('amoxicillin')).alt && P.forDoc(dd('amoxicillin')).alts.length === 1, 'both second and third source kept');
+{   // each source is its own dashed line
+    const h = P.formsHtml(P.forDoc(dd('amoxicillin')), { kg: 12, age: null });
+    assert.equal((h.match(/class="dc-peds-alt"/g) || []).length, 2); assert.ok(h.includes('Ped-in-a-page') && h.includes('Toxic Version (Mar 2020)') && h.includes('MAX 4 g/day'));
+    // a doc imported before this source existed has no `alts` — still renders
+    const old = P.forDoc(dd('amoxicillin')); delete old.alts;
+    assert.equal((P.formsHtml(old, { kg: 12, age: null }).match(/class="dc-peds-alt"/g) || []).length, 1);
+}
+// "MAX 60 mg/dose" (levodropropizine) caps each administration, not the day
+{
+    const ln0 = dd('levodropropizine').forms[0].lines[0];
+    const c = P.calcMgkg(ln0, 20, null); near(c.doseLo, 20); near(c.doseHi, 20); assert.equal(c.capped, false);
+    const big = P.calcMgkg(ln0, 70, null); near(big.doseHi, 60); assert.equal(big.capped, true); near(big.dayHi, 60 * 3);
+}
+// g/kg (PEG) and mcg/kg (ivermectin) keep their unit, never ask for mg/5 ml; a per-dose basis with no printed interval must render (no crash)
+{
+    const peg = P.calcMgkg(dd('peg').forms[0].lines[0], 10, null); assert.equal(peg.unit, 'g'); near(peg.dayLo, 10); near(peg.doseLo, 10 / 3); near(peg.doseHi, 5);
+    const iv = P.calcMgkg(dd('ivermectin').forms[0].lines[0], 15, null); assert.equal(iv.unit, 'mcg'); near(iv.doseLo, 3000); assert.equal(iv.dayLo, null);
+    for (const k of ['peg', 'ivermectin']) assert.ok(!P.sectionBodyHtml('x', P.forDoc(dd(k)), { kg: 15, age: null }).includes('dc-peds-conc'), k + ': no mg/5 ml box');
+    const h = P.sectionBodyHtml('x', P.forDoc(dd('ivermectin')), { kg: 15, age: null });
+    assert.ok(h.includes('3000 mcg') && h.includes('× 2 (Day 0 + Day 7'), 'ivermectin renders per dose + schedule');
+    const d = P.sectionBodyHtml('x', P.forDoc(dd('diazepam')), { kg: 10, age: null }); assert.ok(d.includes('3 mg'), 'diazepam 0.3 mg/kg × 10 kg');
+}
+// every drug (old and new) renders for kg / age combinations without throwing and without printing "undefined" / "NaN"
+for (const d of P.DATA) for (const st of [{ kg: null, age: null }, { kg: 12, age: 3 }, { kg: 0.8, age: 0 }, { kg: 70, age: 12 }]) {
+    const h = P.sectionBodyHtml(d.key, P.forDoc(d), st); assert.ok(!/undefined|NaN|\[object/.test(h), d.key + ' ' + JSON.stringify(st));
+}
+// the new age / weight bands
+{
+    const m = (k, kg, age) => P.matchBands(dd(k).forms[0], kg, age);
+    assert.deepEqual(m('racecadotril', 30, null).weight.bands.map(b => b.text), ['3 mo-30 kg: ½ sachet', '30 kg-16 yr: 1 sachet'], '30 kg is on both printed edges');
+    assert.deepEqual(m('racecadotril', 10, null).weight.bands.map(b => b.text), ['3 mo-30 kg: ½ sachet']);
+    assert.deepEqual(m('montelukast', null, 3).age.bands.map(b => b.text), ['6 mo-5 yr: 4 mg']); assert.equal(m('montelukast', null, 0).age.ambiguous, false); assert.equal(m('montelukast', null, 0).age.bands.length, 1);
+    assert.deepEqual(m('diosmectite', null, 0).age.bands.map(b => b.text), ['< 1 yr: ½ sachet']); assert.deepEqual(m('folic-acid', null, 4).age.bands.map(b => b.text), ['> 1 yr: 1 tab']);
+}
 
 // ---- 5b. international references (Medscape) ----
-const NO_MEDSCAPE = ['bromhexine', 'carbocysteine', 'hyoscine', 'ketotifen', 'multivitamin', 'phenobarbital', 'procaterol'];   // no Medscape page: not US-marketed / a vitamin mix / only an IV product
+const NO_MEDSCAPE = ['acetylcysteine', 'bromhexine', 'carbocysteine', 'chloral-hydrate', 'ciprofloxacin', 'cloxacillin', 'diosmectite', 'folic-acid', 'griseofulvin', 'hyoscine', 'ketotifen', 'lactobacillus-bifidobacterium', 'lactobacillus-reuteri', 'levodropropizine', 'multivitamin', 'norfloxacin', 'phenobarbital', 'phenylephrine', 'procaterol', 'racecadotril', 'saccharomyces-boulardii'];   // no Medscape page: not US-marketed / a vitamin mix / only an IV product
 assert.deepEqual(P.DATA.filter(d => !P.MEDSCAPE[d.key]).map(d => d.key).sort(), NO_MEDSCAPE, 'which drugs have no Medscape page');
-assert.equal(Object.keys(P.MEDSCAPE).length, 41);
+assert.equal(Object.keys(P.MEDSCAPE).length, 55);
 for (const [k, u] of Object.entries(P.MEDSCAPE)) {
     assert.ok(P.DATA.some(d => d.key === k), 'MEDSCAPE key ' + k);
     assert.match(u, /^https:\/\/(reference|emedicine)\.medscape\.com\/(drug\/[a-z0-9-]+-\d+|article\/\d+-overview)$/, 'Medscape URL shape: ' + k);
@@ -291,7 +332,7 @@ assert.match(adminHtml, /onclick="dcaPedsImportOpen\(\)"/);
     const reorder = o => Array.isArray(o) ? o.map(reorder) : (o && typeof o === 'object' ? Object.fromEntries(Object.keys(o).reverse().map(k => [k, reorder(o[k])])) : o);
 
     // empty codex: every drug is created
-    assert.equal(Object.values(planOf([])).filter(x => x === 'create').length, 48);
+    assert.equal(Object.values(planOf([])).filter(x => x === 'create').length, 76);
 
     // matching: no peds yet → add; identical peds (keys shuffled) → same; different → replace; alias → add; unrelated drug untouched
     const codex = [
@@ -306,27 +347,27 @@ assert.match(adminHtml, /onclick="dcaPedsImportOpen\(\)"/);
     // confirm: existing docs get ONLY pedsDosing + updatedAt; new docs are complete; 'same' and unrelated docs are not written
     const t = makeCtx(codex);
     t.ctx.dcaPedsImportOpen();
-    assert.match(t.overlay.innerHTML, /Import 47/);
-    assert.match(t.overlay.innerHTML, /44 new · 2 add to existing · 1 replace · 1 already imported/);
+    assert.match(t.overlay.innerHTML, /Import 75/);
+    assert.match(t.overlay.innerHTML, /72 new · 2 add to existing · 1 replace · 1 already imported/);
     writes.length = 0;
     t.click('go'); await flush();
-    assert.equal(writes.length, 47);
+    assert.equal(writes.length, 75);
     const upd = writes.filter(w => w.op === 'update'), set = writes.filter(w => w.op === 'set');
     assert.deepEqual(upd.map(w => w.ref).sort(), ['drug_codex/A', 'drug_codex/C', 'drug_codex/P']);
     for (const u of upd) assert.deepEqual(Object.keys(u.data).sort(), ['pedsDosing', 'updatedAt'], 'existing docs: nothing but pedsDosing + updatedAt');
-    assert.equal(set.length, 44);
+    assert.equal(set.length, 72);
     assert.deepEqual(set.find(w => w.data.genericName === 'Ketotifen').data.references, [], 'no Medscape page → no reference invented');
     const s0 = set.find(w => w.data.genericName === 'Salbutamol').data;
     assert.equal(JSON.stringify([s0.aiDrafted, s0.contributors, s0.references, s0.indication, s0.createdAt]), JSON.stringify([false, ['admin:owner@example.com'], [P.MEDSCAPE.salbutamol], '', 'TS'])); // JSON: arrays built inside the vm have another prototype
     assert.ok(s0.dosing.includes('Salbutamol 2 mg/5 ml') && s0.pedsDosing.forms.length === 1, 'new doc: dosing line + peds data');
     assert.ok(!('reviewedBy' in s0) && !('lastReviewedAt' in s0), 'a new doc is not marked as reviewed by the admin');
-    assert.ok(t.toast().includes('44 new, 3 updated') && t.overlay.removed, 'toast + dialog closed');
+    assert.ok(t.toast().includes('72 new, 3 updated') && t.overlay.removed, 'toast + dialog closed');
 
     // a failing commit leaves the dialog open, the button usable, and says why
     const f = makeCtx(codex, true);
     f.ctx.dcaPedsImportOpen(); f.click('go'); await flush();
     assert.ok(/Peds import failed: permission-denied/.test(f.toast()));
-    assert.ok(!f.overlay.removed && f.goBtn.disabled === false && f.goBtn.textContent === 'Import 47');
+    assert.ok(!f.overlay.removed && f.goBtn.disabled === false && f.goBtn.textContent === 'Import 75');
 
     // cancel writes nothing; everything already imported → nothing to do, button disabled
     writes.length = 0;
@@ -336,5 +377,5 @@ assert.match(adminHtml, /onclick="dcaPedsImportOpen\(\)"/);
     const c3 = makeCtx(all); c3.ctx.dcaPedsImportOpen();
     assert.ok(/data-act="go" disabled/.test(c3.overlay.innerHTML) && /Import 0/.test(c3.overlay.innerHTML));
 
-    console.log('PASS: peds-dosing — 48 drugs / 50 forms (19 by weight, 5 by age, 19 mg/kg, 7 bands); formula matches the printed table except the 6 listed source quirks; calculator spot checks (mg/kg/day split over the doses, per dose, mcg, MKD at age 0); the 4 half-cut age boundaries return both candidates; intern markup + dcPedsInput; admin import plan (create / add / replace / same, alias match) writes only pedsDosing+updatedAt to existing docs and survives failure / cancel / nothing-to-do');
+    console.log('PASS: peds-dosing — 76 drugs / 78 forms (19 by weight, 5 by age, 37 mg/kg, 17 bands); formula matches the printed table except the 6 listed source quirks; calculator spot checks (mg/kg/day split over the doses, per dose, mcg, MKD at age 0); the 4 half-cut age boundaries return both candidates; intern markup + dcPedsInput; admin import plan (create / add / replace / same, alias match) writes only pedsDosing+updatedAt to existing docs and survives failure / cancel / nothing-to-do');
 })().catch(e => { console.error(e); process.exit(1); });
