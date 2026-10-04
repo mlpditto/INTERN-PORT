@@ -32,7 +32,8 @@ const modelB = cut('        window._compareModelB = function', '        window.g
             assert.equal(byLabel[label].owner, owner, label + ' carries its logo');
             assert.match(byLabel[label].bg, new RegExp(owner + '-'), label + ' logo file resolves');
         }
-        assert.deepEqual(chips.filter(c => !c.owner).map(c => c.label), [], 'every chip has a logo');
+        // V102.76: local Ollama has no brand mark in assets/logos — its chip carries the name (like the old Qwen / DeepSeek text chips).
+        assert.deepEqual(chips.filter(c => !c.owner && c.label !== 'Ollama local').map(c => c.label), [], 'every chip has a logo');
         assert.equal(await page.locator('#b .text-ai-logo[data-owner="grok"]').evaluate(e => getComputedStyle(e).filter), 'invert(1)', 'white Grok mark is dark on the light rail');
 
         // V102.12: OpenRouter theme — grape tint + grape border + Grape→Volt bar + corner glyph.

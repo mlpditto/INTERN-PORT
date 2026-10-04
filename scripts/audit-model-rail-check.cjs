@@ -25,7 +25,7 @@ const checks = [];
 const check = (name, got, want) => checks.push([name, got, want]);
 const html = window.auditModelControlsHtml(false, 'audit');
 const tabs = [...html.matchAll(/class="audit-provider" data-provider="([^"]+)" aria-pressed="([^"]+)"/g)].map(m => [m[1], m[2] === 'true']);
-check('one tab per provider, in model-list order', tabs.map(t => t[0]).join('|'), 'Gemini|GPT|Claude|Qwen|DeepSeek|Grok'); // V101.52: Grok trial tab
+check('one tab per provider, in model-list order', tabs.map(t => t[0]).join('|'), 'Gemini|GPT|Claude|Qwen|DeepSeek|Grok|Ollama'); // V101.52: Grok trial tab; V102.76: + local Ollama
 check('GPT tab pressed for the default gpt-6-luna', tabs.find(t => t[0] === 'GPT')[1] && tabs.filter(t => t[1]).length === 1, true);
 const chips = [...html.matchAll(/<button (hidden )?[^>]*data-value="([^"]+)"[^>]*aria-label="([^"]+)"/g)].map(m => ({ hidden: !!m[1], id: m[2], label: m[3] }));
 check('Qwen + DeepSeek chips are rendered', chips.filter(c => c.id.startsWith('or/')).map(c => c.label).join('|'), 'Qwen 3.8 Flash|Qwen 3.8 Max|DeepSeek V4.1 Flash|DeepSeek V4 Pro|Grok 4.7');
@@ -39,7 +39,7 @@ const tabEls = tabs.map(t => ({ dataset: { provider: t[0] }, pressed: null, setA
 const row = { querySelectorAll: sel => sel === '.audit-provider' ? tabEls : chipEls };
 const deepseek = tabEls.find(t => t.dataset.provider === 'DeepSeek'); deepseek.closest = () => row;
 window.browseAuditProvider(deepseek);
-check('browse: DeepSeek tab pressed, others not', tabEls.map(t => t.pressed).join('|'), 'false|false|false|false|true|false');
+check('browse: DeepSeek tab pressed, others not', tabEls.map(t => t.pressed).join('|'), 'false|false|false|false|true|false|false');
 check('browse: exactly the DeepSeek chips visible', chipEls.filter(c => !c.hidden).map(c => c.label).join('|'), 'DeepSeek V4.1 Flash|DeepSeek V4 Pro');
 
 check('css: Qwen + DeepSeek tab colours match the chip-rail headings', /\.audit-provider\[data-provider="Qwen"\]\{color:#c9a0f0\}/.test(css) && /\.audit-provider\[data-provider="DeepSeek"\]\{color:#7fc8f5\}/.test(css), true);
@@ -47,6 +47,8 @@ const grokTab = tabEls.find(t => t.dataset.provider === 'Grok'); grokTab.closest
 window.browseAuditProvider(grokTab);
 check('browse: Grok tab shows only the Grok trial chip', chipEls.filter(c => !c.hidden).map(c => c.label).join('|'), 'Grok 4.7');
 check('css: Grok tab colour', css.includes('.audit-provider[data-provider="Grok"]{color:#d4d4d8}'), true);
+check('css: Ollama tab colour (V102.76)', css.includes('.audit-provider[data-provider="Ollama"]{color:#e4e4e7}'), true);
+check('browse: Ollama is a trial-only text tab after Grok', tabs.map(t => t[0]).slice(-2).join('|'), 'Grok|Ollama');
 check('css: OpenRouter grape border survives the toolbar button rule (V102.14)', css.includes('.audit-toolbar .text-ai-chips>button[data-value^="or/"]:not([aria-pressed="true"]){border-color:var(--or-grape)}'), true);
 check('admin cache-busts audit-toolbar.css', /audit-toolbar\.css\?v=V\d+\.\d+/.test(admin) && !/audit-toolbar\.css\?v=V100\.12/.test(admin), true);
 

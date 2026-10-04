@@ -129,7 +129,7 @@ const ok = (content, finish = 'stop', usage = { prompt_tokens: 100, completion_t
     new Function('window', 'document', 'localStorage', fs.readFileSync(path.join(root, 'public', 'ai-model-ui.js'), 'utf8'))(win, doc, { getItem: () => null, setItem() {} });
     const grok = 'or/x-ai/grok-4.7';
     check('T8 Grok is NOT in TEXT_AI_MODELS (no other rail / select / QFP / Settings)', win.TEXT_AI_MODELS.some(m => m.id === grok), false);
-    check('T8 Grok is the one trial model', JSON.stringify(win.TEXT_AI_TRIAL_MODELS.map(m => [m.id, m.short])), '[["or/x-ai/grok-4.7","Grok 4.7"]]');
+    check('T8 trial models are Grok, then local Ollama (V102.76)', JSON.stringify(win.TEXT_AI_TRIAL_MODELS.map(m => [m.id, m.short])), '[["or/x-ai/grok-4.7","Grok 4.7"],["ol/local","Ollama"]]');
     check('T8 normaliser still maps Grok to the default (a saved default can never become Grok)', win.normalizeTextAIModel(grok), 'gpt-6-luna');
     // V101.72: a proxy that ANSWERED with an error must surface that error, not "proxy is unreachable".
     const uaStart = admin.indexOf('let proxyAnsweredError = \'\';');
