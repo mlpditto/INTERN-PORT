@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.82)</title>
+    <title>Nika Admin (V102.83)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6910,7 +6910,7 @@
     <script src="codex-vision.js?v=V101.20"></script>
     <!-- V91.98 fix: walker skips user-content subtrees (q-text-preview / md-render / lang-no-toggle) -->
     <script src="lang-toggle.js?v=V102.46"></script>
-<link rel="stylesheet" href="audit-toolbar.css?v=V102.82">
+<link rel="stylesheet" href="audit-toolbar.css?v=V102.83">
 <link rel="stylesheet" href="quiz-curate.css?v=V101.95">
 <script src="quiz-revision.js?v=V100.07"></script>
 <script src="ai-usage-overview.js?v=V102.20"></script>
@@ -12179,20 +12179,15 @@
                 </div>
 
                 <!-- AI Path Strip -->
-                <div id="lp-path-strip" style="background:linear-gradient(135deg,#1e1b4b 0%,#312e81 100%); border-radius:16px; padding:14px 18px; margin-bottom:16px; color:#fff;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <span style="font-size:1.4em;">🧭</span>
-                            <div>
-                                <div style="font-size:0.92em; font-weight:800; letter-spacing:0.5px;">AI Learning Path</div>
-                                <div id="lp-path-subtitle" style="font-size:0.78em; opacity:0.75; margin-top:1px;">Generate a personalized roadmap from your quiz feedback &amp; reflective logs</div>
-                            </div>
-                        </div>
-                        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                            <input type="hidden" id="lp-ai-model" value="gpt-6-luna">
-                            <button onclick="generateLearningPath()" id="lp-gen-btn" style="background:rgba(255,255,255,0.18); color:#fff; border:1px solid rgba(255,255,255,0.3); border-radius:10px; padding:8px 14px; font-size:0.84em; font-weight:700; cursor:pointer;">🤖 Generate My Path</button>
-                            <button onclick="generateWeeklySummary()" style="background:rgba(255,255,255,0.12); color:#fff; border:1px solid rgba(255,255,255,0.25); border-radius:10px; padding:8px 14px; font-size:0.84em; font-weight:700; cursor:pointer;">📊 Weekly Summary</button>
-                            <button onclick="lpTogglePathDetail()" id="lp-path-toggle-btn" style="background:transparent; color:rgba(255,255,255,0.7); border:none; font-size:1.1em; cursor:pointer; padding:4px 8px;">▼</button>
+                <div id="lp-path-strip" class="lp-strip">
+                    <div class="lp-strip-bar">
+                        <div class="lp-strip-title" title="Generate a personalized roadmap from your quiz feedback &amp; reflective logs" data-th-title="สร้างแผนการเรียนส่วนตัวจาก feedback ของควิซและ reflective logs">🧭 AI Learning Path<span id="lp-path-subtitle" class="lp-strip-sub"></span></div>
+                        <!-- V102.83: provider logo tabs + only that provider's chips (same as the Audit toolbar); ai-model-ui.js puts the chip rail after the hidden input, lpInitModelRow() fills the tabs and adds the trial chips (Grok, Ollama) -->
+                        <div class="audit-model-row lp-model-row" id="lp-model-row"><div class="audit-providers" id="lp-providers" role="group" aria-label="Browse model providers"></div><input type="hidden" id="lp-ai-model" value="gpt-6-luna"></div>
+                        <div class="lp-strip-actions">
+                            <button type="button" class="lp-act" onclick="generateLearningPath()" id="lp-gen-btn" title="Generate My Path" data-th-title="สร้างแผนการเรียน" aria-label="Generate My Path">🤖</button>
+                            <button type="button" class="lp-act sec" onclick="generateWeeklySummary()" title="Weekly Summary" data-th-title="สรุปรายสัปดาห์" aria-label="Weekly Summary">📊</button>
+                            <button type="button" class="lp-fold" onclick="lpTogglePathDetail()" id="lp-path-toggle-btn" title="Show / hide the path" data-th-title="แสดง / ซ่อนแผน" aria-label="Show / hide the path">▼</button>
                         </div>
                     </div>
                     <div id="lp-path-detail" style="display:none; margin-top:12px; border-top:1px solid rgba(255,255,255,0.15); padding-top:12px;">
@@ -59360,6 +59355,35 @@ Save it anyway?`;
             window.ltSyncProviderTab();
         };
         document.addEventListener('DOMContentLoaded', () => setTimeout(window.ltInitModelBar, 0)); // after ai-model-ui.js builds the rail
+        // V102.83: Learning Path strip — provider logo tabs + that provider's chips on one row. The chip rail itself is the registry's
+        // (data-model-input="lp-ai-model"); here: tabs from the Audit toolbar's renderer, the trial chips (Grok, Ollama) appended,
+        // and a saved trial pick restored (the registry only restores catalogue models).
+        window.lpInitModelRow = function() {
+            const input = document.getElementById('lp-ai-model'), tabs = document.getElementById('lp-providers');
+            const host = input && input.parentElement && input.parentElement.querySelector('.text-ai-chips');
+            if (!input || !tabs || !host || tabs.childElementCount) return;
+            const trial = window.TEXT_AI_TRIAL_MODELS || [];
+            const mark = () => host.querySelectorAll('button').forEach(b => { const on = b.dataset.value === input.value; b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on)); });
+            if (!host.querySelector('[data-value="' + (trial[0] || {}).id + '"]')) host.insertAdjacentHTML('beforeend', window.textAIChipContents(input.value, '', () => false, trial));
+            host.querySelectorAll('button').forEach(button => {
+                if (!trial.some(m => m.id === button.dataset.value)) return;   // catalogue chips already have the registry's handler
+                // not syncRegistryModelSelect(): it normalises the value back to a catalogue model, which would drop the trial pick
+                button.onclick = () => { input.value = button.dataset.value; mark(); };
+            });
+            // a trial pick is kept under its own key (the registry saves a normalised value under ai_text_lp-ai-model and would overwrite it at load)
+            host.addEventListener('click', e => {
+                if (!e.target.closest('button')) return;
+                try { if (trial.some(m => m.id === input.value)) localStorage.setItem('ai_lp_trial_model', input.value); else localStorage.removeItem('ai_lp_trial_model'); } catch (_) { /* storage may be blocked */ }
+            });
+            let saved = null; try { saved = localStorage.getItem('ai_lp_trial_model'); } catch (_) { /* storage may be blocked */ }
+            if (saved && trial.some(m => m.id === saved)) input.value = saved;
+            mark();
+            const tmp = document.createElement('div');
+            tmp.innerHTML = window.providerModelRailHtml('lp-ai-model-tabs', input.value, '', trial);
+            tabs.innerHTML = tmp.querySelector('.audit-providers').innerHTML;
+            window.browseAuditProvider(tabs.querySelector('[aria-pressed="true"]') || tabs.firstElementChild);
+        };
+        document.addEventListener('DOMContentLoaded', () => setTimeout(window.lpInitModelRow, 0));
 
         window.selectLaughTaleAi = function(el, val) {
             const parent = el.parentNode;
@@ -59950,7 +59974,7 @@ Save it anyway?`;
             const uid = window._lp.ownerId;
             if (!uid) return;
             const btn = document.getElementById('lp-gen-btn');
-            if (btn) { btn.textContent = '⏳ Generating...'; btn.disabled = true; }
+            if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
             try {
                 const [fbSnap, rlSnap] = await Promise.all([
                     db.collection('quiz_feedback').where('userId', '==', uid).orderBy('timestamp', 'desc').limit(50).get(),
@@ -59965,7 +59989,7 @@ Reflective Logs (recent): ${JSON.stringify(logs.slice(0, 8))}
 
 Return a JSON object (no markdown, no code blocks):
 {"summary":"2-3 sentence overview","weeks":[{"week":1,"theme":"Theme","topics":["t1","t2","t3"],"goal":"weekly goal"},{"week":2,...},{"week":3,...},{"week":4,...}]}`;
-                const { text: rawJson } = await callUniversalAI(textAIModel('lp-ai-model'), prompt, true, null, '', { maxOutputTokens: 900, feature: 'learning_path' });
+                const { text: rawJson } = await callUniversalAI(resolveTrialTextAIModel(document.getElementById('lp-ai-model').value), prompt, true, null, '', { maxOutputTokens: 900, feature: 'learning_path' });
                 let pathData;
                 try { pathData = JSON.parse(rawJson.trim()); } catch(e) { const m = rawJson.match(/\{[\s\S]*\}/); if (m) pathData = JSON.parse(m[0]); }
                 if (pathData) {
@@ -59982,7 +60006,7 @@ Return a JSON object (no markdown, no code blocks):
                     if (toggleBtn) toggleBtn.textContent = '▲';
                 } else { alert('Could not parse AI response. Try again.'); }
             } catch(e) { console.error('generateLearningPath', e); alert('Failed to generate path: ' + e.message); }
-            if (btn) { btn.textContent = '🤖 Generate My Path'; btn.disabled = false; }
+            if (btn) { btn.textContent = '🤖'; btn.disabled = false; }
         };
 
         window.generateWeeklySummary = async function() {
@@ -60001,7 +60025,7 @@ Return a JSON object (no markdown, no code blocks):
 
 Entries:
 ${weekEntries.map(e => `[${e.date}] ${e.title}: ${(e.contentMarkdown || '').slice(0, 300)}`).join('\n')}`;
-            const { text: summary } = await callUniversalAI(textAIModel('lp-ai-model'), prompt, false, null, '', { maxOutputTokens: 400, feature: 'learning_summary' });
+            const { text: summary } = await callUniversalAI(resolveTrialTextAIModel(document.getElementById('lp-ai-model').value), prompt, false, null, '', { maxOutputTokens: 400, feature: 'learning_summary' });
             if (output) output.value = summary;
         };
 
@@ -60022,7 +60046,7 @@ Knowledge Gaps:
 • ...
 
 Recommended Review: X days`;
-            const { text: result } = await callUniversalAI(textAIModel('lp-ai-model'), prompt, false, null, '', { maxOutputTokens: 400, feature: 'learning_entry' });
+            const { text: result } = await callUniversalAI(resolveTrialTextAIModel(document.getElementById('lp-ai-model').value), prompt, false, null, '', { maxOutputTokens: 400, feature: 'learning_entry' });
             if (output) output.value = result;
         };
 
