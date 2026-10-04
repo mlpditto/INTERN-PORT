@@ -30,14 +30,16 @@
     // TEXT_AI_MODELS, so no other rail, select, Settings default or normaliser sees them.
     // Grok 4.7 trial (GROK_OPENROUTER_INTEGRATION_PLAN.md step C, 2026-09-24): Audit + Analyze.
     const trialModels = window.TEXT_AI_TRIAL_MODELS = [
-        { id: 'or/x-ai/grok-4.7', label: 'Grok 4.7', short: 'Grok 4.7', hint: 'Grok 4.7 (SpaceXAI) รุ่นทดลอง สำหรับ Audit / Analyze ผ่าน OpenRouter' }
+        { id: 'or/x-ai/grok-4.7', label: 'Grok 4.7', short: 'Grok 4.7', hint: 'Grok 4.7 (SpaceXAI) รุ่นทดลอง สำหรับ Audit / Analyze ผ่าน OpenRouter' },
+        // V102.76: Ollama on the admin's own computer (ollama-local.js; the browser calls localhost:11434 directly).
+        { id: 'ol/local', label: 'Ollama local', short: 'Ollama', hint: 'Ollama บนเครื่องนี้ (localhost:11434) รุ่นทดลอง ใช้ได้เมื่อ Ollama เปิดอยู่และอนุญาตเว็บนี้ใน OLLAMA_ORIGINS — ไม่คิดค่าใช้จ่าย ช้ากว่าโมเดลออนไลน์' }
     ];
     // V101.57: Gemini called directly (Vertex, or AI Studio `as/`) is billed to the Google Cloud
     // billing account; `or/google/…` is billed by OpenRouter. The chip shows it (text-ai-chips.css).
     window.isGoogleBilledModel = id => /^(gemini-|as\/)/.test(String(id || ''));
     // V101.70: DeepSeek V4 Pro takes text only (OpenRouter input_modalities ["text"]), so image features hide it.
     // V4.1 Flash lists ["text","image"] and read Thai 2/3 in the 2026-09-25 smoke — it stays.
-    window.isTextOnlyAIModel = id => /^or\/deepseek\/deepseek-v4-pro/.test(String(id || ''));
+    window.isTextOnlyAIModel = id => /^(or\/deepseek\/deepseek-v4-pro|ol\/)/.test(String(id || ''));   // V102.76: + local Ollama (text only here)
     // V101.64: GPT-6 Luna/Sol replace 5.6, DeepSeek V4 Pro moves to its 0813 GA snapshot — saved picks move to their successor, not to the default.
     // V102.61: Claude Sonnet 5 → Sonnet 5.5.
     const RETIRED_TEXT_AI_MODELS = { 'gpt-5.6-luna': 'gpt-6-luna', 'gpt-5.6-sol': 'gpt-6-sol', 'or/deepseek/deepseek-v4-pro': 'or/deepseek/deepseek-v4-pro-0813', 'claude-sonnet-5': 'claude-sonnet-5-5' };
