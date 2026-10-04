@@ -47,6 +47,22 @@ const { chromium } = require('playwright');
             assert.equal(await popup.locator('[data-value="gpt-6-astra"]').textContent(), 'Astra 6');
             assert.equal(await popup.locator('[data-value="gpt-6-astra"]').getAttribute('aria-label'), 'GPT 6 Astra');
             assert.equal(await popup.locator('.text-ai-chips [aria-pressed="true"]').count(), 1);
+            // V102.79: the Ollama tab is a NAME, not a logo — pressed, its label sat light grey on a near-white pill and vanished.
+            {
+                const tab = popup.locator('.audit-provider[data-provider="Ollama"]');
+                await tab.click();
+                const c = await tab.evaluate(n => {
+                    const cs = getComputedStyle(n), rgba = s => (s.match(/[\d.]+/g) || []).map(Number);
+                    const fg = rgba(cs.color), bg = rgba(cs.backgroundColor), under = rgba(getComputedStyle(n.closest('.audit-toolbar')).backgroundColor);
+                    const base = under.length >= 3 && (under[3] === undefined || under[3] > 0) ? under : [255, 255, 255];
+                    const a = bg.length > 3 ? bg[3] : 1, mix = [0, 1, 2].map(i => bg[i] * a + base[i] * (1 - a));
+                    const lum = rgb => { const [r, g, b] = rgb.map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+                    const L1 = lum(fg.slice(0, 3)), L2 = lum(mix);
+                    return (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
+                });
+                assert.ok(c >= 4.5, 'the pressed Ollama tab label is unreadable (contrast ' + c.toFixed(2) + ':1)');
+                await popup.locator('.audit-provider[data-provider="GPT"]').click();   // leave the toolbar as it was
+            }
             assert.equal(await popup.locator('.review-tab[aria-pressed="true"]').evaluate(b => getComputedStyle(b).backgroundColor), 'rgb(245, 184, 205)');
             assert.equal(await popup.locator('.review-tab[aria-pressed="false"]').evaluate(b => getComputedStyle(b).backgroundColor), 'rgb(255, 240, 245)');
             for (const width of [320, 390, 736, 1024]) {
