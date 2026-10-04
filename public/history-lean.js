@@ -172,7 +172,10 @@ window.historyLean = (() => {
         const summary = root.querySelector('.hc-summary');
         if (summary) {
             const values = getPointsSparkline();
-            summary.innerHTML = '<span class="hl-tp" title="Points">' + pts.toFixed(1) + '<small>pt</small></span>' +
+            // V101.58: the streak is a 🔥 N pill right after "History" (was a banner with two lines of text)
+            const st = typeof getReflectiveStreak === 'function' ? getReflectiveStreak() : { current: 0, longest: 0 };
+            summary.innerHTML = (st.current > 0 ? '<span class="hl-ts" title="' + st.current + '-day streak · best ' + st.longest + '">🔥 <b>' + st.current + '</b></span>' : '') +
+                '<span class="hl-tp" title="Points">' + pts.toFixed(1) + '<small>pt</small></span>' +
                 '<span class="hl-tb" title="Beri earned on these entries">🪙 <b>' + b + '</b></span>' +
                 (values.some(v => v > 0) ? '<span class="hl-spark" title="30-day trend">' + renderSparkline(values, 40, 16) + '</span>' : '');
         }
