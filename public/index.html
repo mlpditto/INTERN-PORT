@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.59)</title>
+    <title>Internship Portfolio (V101.60)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -2324,7 +2324,7 @@
 <link rel="stylesheet" href="case-insight-rail.css?v=V101.59">
 <script src="quiz-cover.js?v=V101.09"></script>
 <script src="activity-rewards.js?v=V101.55"></script><link rel="stylesheet" href="activity-rewards.css?v=V101.43">
-<script src="flood-watch.js?v=V101.57"></script><link rel="stylesheet" href="flood-watch.css?v=V101.57">
+<script src="peds-dosing.js?v=V101.60"></script><script src="flood-watch.js?v=V101.57"></script><link rel="stylesheet" href="flood-watch.css?v=V101.57">
 </head>
 
 <body>
@@ -3166,6 +3166,22 @@
                 .dc-row-name-line {
                     display: flex; align-items: center; gap: 7px;
                 }
+                /* V101.60: 👶 = this drug has a paediatric dose calculator (peds-dosing.js) */
+                .dc-row-peds { flex-shrink: 0; font-size: 0.85em; line-height: 1; }
+                .dc-peds-inputs { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
+                .dc-peds-inputs label { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: #334155; }
+                .dc-peds-inputs input, .dc-peds-inputs select { width: auto; min-height: 0; padding: 6px 8px; border: 1px solid #bae6fd; border-radius: 10px; background: #f0f9ff; font: inherit; font-weight: 700; color: #0c4a6e; }
+                .dc-peds-inputs input { width: 5.5em; }
+                .dc-peds-form { padding: 9px 11px; margin-bottom: 8px; border-radius: 12px; background: #f0f9ff; border: 1px solid #e0f2fe; }
+                .dc-peds-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 8px; font-size: 0.85em; color: #475569; }
+                .dc-peds-head b { color: #0c4a6e; }
+                .dc-peds-res { margin-top: 4px; font-size: 1.05em; color: #0f172a; }
+                .dc-peds-res b { font-size: 1.15em; color: #0369a1; }
+                .dc-peds-res small { margin-left: 6px; color: #64748b; font-size: 0.78em; }
+                .dc-peds-hint { color: #94a3b8; font-weight: 700; }
+                .dc-peds-ref { margin-top: 3px; font-size: 0.74em; color: #64748b; }
+                .dc-peds-note { margin-top: 4px; font-size: 0.74em; color: #92400e; line-height: 1.45; }
+                .dc-peds-foot { margin-top: 6px; font-size: 0.72em; color: #64748b; line-height: 1.5; }
                 .dc-row-name {
                     font-weight: 800; color: #1e293b; font-size: 0.95em;
                     line-height: 1.3;
@@ -18786,6 +18802,7 @@
                             <div class="dc-row-main">
                                 <div class="dc-row-name-line">
                                     <div class="dc-row-name">${escapeHtml(drug.genericName || '(unnamed)')}</div>
+                                    ${window.PedsDosing && PedsDosing.hasPeds(drug) ? '<span class="dc-row-peds" title="Pediatric dose calculator" data-th-title="คำนวณขนาดยาเด็ก" aria-label="Pediatric dose calculator">👶</span>' : ''}
                                     ${credAvatar}
                                 </div>
                                 ${brands}
@@ -18863,6 +18880,17 @@
             dcDiscussionTeardown();
         }
 
+        // V101.60: weight / age typed into the 👶 section — remembered across drugs, results repainted in place.
+        window.dcPedsInput = function (el) {
+            const box = el.closest('.dc-peds');
+            const drug = box && dcState.codex.find(d => d._id === box.dataset.drugId);
+            if (!drug || !window.PedsDosing) return;
+            const kg = box.querySelector('.dc-peds-kg'), age = box.querySelector('.dc-peds-age');
+            if (kg) { const v = parseFloat(kg.value); PedsDosing.state.kg = v > 0 && v <= 150 ? v : null; }
+            if (age) PedsDosing.state.age = age.value === '' ? null : parseInt(age.value, 10);
+            box.querySelector('.dc-peds-forms').innerHTML = PedsDosing.formsHtml(drug.pedsDosing, PedsDosing.state);
+        };
+
         function dcRenderDetail(drug) {
             // V94.99: i18n — pick effective drug for current language. Cache hit
             // returns translated overrides; miss returns original + kicks off
@@ -18908,7 +18936,10 @@
             const pkVisualSection = (eff.pkVisual && eff.pkVisual.downloadUrl)
                 ? { key: 'pkvisual', title: '🎨 ADMET Visual', open: false, visual: eff.pkVisual }
                 : null;
+            // V101.60: 👶 paediatric dose calculator (peds-dosing.js) — first, so the rail opens it. Built from the ORIGINAL doc: the numbers are not translated.
+            const pedsSection = (window.PedsDosing && PedsDosing.hasPeds(drug)) ? { key: 'peds', title: '👶 Pediatric dose', open: false, peds: drug.pedsDosing } : null;
             const sections = [
+                pedsSection,
                 {
                     key: 'clinical',
                     title: '🩺 Clinical Use',
@@ -18949,6 +18980,13 @@
                 }
             ];
             const html = sections.filter(Boolean).map(sec => {
+                if (sec.peds) {
+                    return `
+                        <details class="dc-detail-section" data-section-key="peds" ${sec.open ? 'open' : ''}>
+                            <summary>${sec.title}</summary>
+                            <div class="dc-detail-section-body">${PedsDosing.sectionBodyHtml(drug._id, sec.peds, PedsDosing.state)}</div>
+                        </details>`;
+                }
                 // V95.06 PK Visual Phase 2: image-only section. Tokenized
                 // Storage download URL bypasses isAdmin() rules so interns
                 // can render without read permission. lazy-load the <img> so

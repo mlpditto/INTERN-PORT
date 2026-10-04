@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.76)</title>
+    <title>Nika Admin (V102.77)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6871,6 +6871,7 @@
     <script src="ai-model-registry.js?v=V102.61"></script>
     <script src="ai-model-ui.js?v=V102.76"></script>
     <script src="ollama-local.js?v=V102.76"></script>
+    <script src="peds-dosing.js?v=V102.77"></script>
     <link rel="stylesheet" href="text-ai-chips.css?v=V102.13">
     <link rel="stylesheet" href="quiz-resource-cards.css?v=V102.09">
     <link rel="stylesheet" href="case-split-studio.css?v=V100.38">
@@ -14883,6 +14884,7 @@
                 <div class="dca-toolbar">
                     <input type="text" id="dca-search" placeholder="Search by name, brand, or ATC code…" oninput="dcaSearch()">
                     <button type="button" class="dca-ai-draft-btn" onclick="dcaAutoDraftToggle()" title="Generate a starting draft with AI · admin verifies before save">🤖 AI Auto-Draft</button>
+                    <button type="button" class="dca-ai-draft-btn" onclick="dcaPedsImportOpen()" title="Import the paediatric liquid dosing list (23 drugs) — shows a preview first, nothing is written until you confirm">👶 Peds import</button>
                     <button type="button" class="dca-add-btn" onclick="dcaAddNew()">+ Add Drug</button>
                 </div>
 
@@ -42860,6 +42862,77 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // the payload that's about to be written.
             payload.educationI18n = JSON.parse(JSON.stringify(dcaEduI18nState.data || {}));
             return payload;
+        }
+
+        // V102.77: 👶 import the paediatric liquid-dosing list (peds-dosing.js, 23 drugs) into drug_codex.
+        // Preview first, then one batch. Drugs already in the Codex (matched by generic name / alias) only get the
+        // `pedsDosing` field — nothing else on them is touched; the rest are created with just a name, a dosing line and
+        // the source. Idempotent: a doc whose pedsDosing already equals the list is skipped. Interns read pedsDosing in
+        // the Drug Codex detail as the 👶 calculator.
+        function dcaPedsCanon(v) {
+            if (Array.isArray(v)) return '[' + v.map(dcaPedsCanon).join(',') + ']';
+            if (v && typeof v === 'object') return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + dcaPedsCanon(v[k])).join(',') + '}';
+            return JSON.stringify(v === undefined ? null : v);
+        }
+        function dcaPedsPlan() {
+            const P = window.PedsDosing;
+            const byKey = {};
+            (dcaState.codex || []).forEach(d => { const seed = P.findSeed(d.genericName); if (seed && !byKey[seed.key]) byKey[seed.key] = d; });
+            return P.DATA.map(seed => {
+                const doc = byKey[seed.key] || null;
+                const next = P.forDoc(seed);
+                const action = !doc ? 'create' : !doc.pedsDosing ? 'add' : dcaPedsCanon(doc.pedsDosing) === dcaPedsCanon(next) ? 'same' : 'replace';
+                return { seed, doc, next, action };
+            });
+        }
+        function dcaPedsNewDoc(seed, next, nowTs, email) {
+            const P = window.PedsDosing;
+            const doc = { genericName: seed.genericName, brandNames: [], dosing: P.dosingText(seed), references: P.refUrls(seed), aiDrafted: false,
+                pedsDosing: next, contributors: ['admin:' + email], createdAt: nowTs, updatedAt: nowTs };
+            DCA_FIELD_KEYS.forEach(k => { if (!(k in doc)) doc[k] = ''; });   // the other text fields exist but are empty, like a form save
+            return doc;
+        }
+        function dcaPedsImportOpen() {
+            if (!window.PedsDosing) { showToast('peds-dosing.js did not load — refresh the page'); return; }
+            const plan = dcaPedsPlan();
+            const n = a => plan.filter(x => x.action === a).length;
+            const label = { create: '➕ New drug', add: '🔗 Add to existing', replace: '♻️ Replace peds data', same: '✓ Already imported' };
+            const rows = plan.map(x => `<tr><td style="padding:4px 8px;white-space:nowrap;">${label[x.action]}</td><td style="padding:4px 8px;"><b>${escapeHtml(x.seed.genericName)}</b>${x.doc && x.doc.genericName !== x.seed.genericName ? ` <span style="color:#64748b;">(${escapeHtml(x.doc.genericName)})</span>` : ''}</td><td style="padding:4px 8px;color:#64748b;">${x.seed.forms.map(f => escapeHtml(f.label)).join(' · ')}</td></tr>`).join('');
+            const todo = plan.length - n('same');
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:100050;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
+            overlay.innerHTML = `<div class="lang-no-toggle" style="background:white;width:94vw;max-width:760px;max-height:88vh;display:flex;flex-direction:column;border-radius:18px;overflow:hidden;box-shadow:0 25px 50px rgba(0,0,0,0.3);font-family:Inter,sans-serif;">
+                <div style="padding:16px 20px 8px;"><h3 style="margin:0 0 4px;color:#0369a1;font-size:1.05em;">👶 Import paediatric dosing</h3>
+                    <div style="font-size:0.82em;color:#64748b;line-height:1.5;">${n('create')} new · ${n('add')} add to existing · ${n('replace')} replace · ${n('same')} already imported. Existing drugs only get the <code>pedsDosing</code> field. Numbers typed from the Pharmtutors infographic; references = Medscape monographs found by search (${plan.filter(x => window.PedsDosing.MEDSCAPE[x.seed.key]).length} of ${plan.length}; the pages were not opened) — check the numbers with a pharmacist before interns rely on them.</div></div>
+                <div style="padding:0 12px;overflow:auto;"><table style="border-collapse:collapse;font-size:0.85em;width:100%;">${rows}</table></div>
+                <div style="padding:12px 20px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid #e2e8f0;">
+                    <button type="button" data-act="cancel" style="width:auto;min-height:0;padding:8px 16px;background:#f1f5f9;color:#334155;border:0;border-radius:10px;font-weight:700;cursor:pointer;">Cancel</button>
+                    <button type="button" data-act="go" ${todo ? '' : 'disabled'} style="width:auto;min-height:0;padding:8px 16px;background:#0369a1;color:white;border:0;border-radius:10px;font-weight:700;cursor:pointer;">Import ${todo}</button>
+                </div></div>`;
+            document.body.appendChild(overlay);
+            const close = () => overlay.remove();
+            overlay.addEventListener('click', async e => {
+                if (e.target === overlay || e.target.closest('[data-act="cancel"]')) return close();
+                const go = e.target.closest('[data-act="go"]');
+                if (!go || go.disabled) return;
+                go.disabled = true; go.textContent = '⏳ Importing…';
+                try {
+                    const nowTs = firebase.firestore.FieldValue.serverTimestamp();
+                    const email = (auth.currentUser && auth.currentUser.email) || 'admin-ui';
+                    const batch = db.batch();
+                    plan.filter(x => x.action !== 'same').forEach(x => {
+                        if (x.doc) batch.update(db.collection('drug_codex').doc(x.doc._id), { pedsDosing: x.next, updatedAt: nowTs });
+                        else batch.set(db.collection('drug_codex').doc(), dcaPedsNewDoc(x.seed, x.next, nowTs, email));
+                    });
+                    await batch.commit();
+                    showToast(`👶 Imported paediatric dosing: ${n('create')} new, ${n('add') + n('replace')} updated`);
+                    close();
+                } catch (err) {
+                    console.error('[drug-codex] peds import failed:', err);
+                    go.disabled = false; go.textContent = 'Import ' + todo;
+                    showToast('Peds import failed: ' + (err && err.message ? err.message : 'unknown error'));
+                }
+            });
         }
 
         function dcaAddNew() {
