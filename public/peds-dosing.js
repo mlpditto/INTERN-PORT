@@ -1,4 +1,4 @@
-// Paediatric liquid-medicine dosing: the data (24 formulations, 23 drugs) and the calculator.
+// Paediatric liquid-medicine dosing: the data (76 drugs) and the calculator.
 // Source: the Pharmtutors infographics "ขนาดยาที่ใช้ในเด็กตามน้ำหนัก / ตามอายุ" (3 pages). The numbers were typed twice
 // independently and compared (scripts/peds-dosing-qa.cjs keeps the formula-vs-table check). It is shared by the intern page
 // (calculator in the Drug Codex detail), the admin page (import into drug_codex) and the QA script (Node: module.exports).
@@ -15,7 +15,7 @@
     else root.PedsDosing = api;
 })(typeof self !== 'undefined' ? self : this, function () {
     // Where the NUMBERS come from (shown to admins on import); interns see the reference links (MEDSCAPE) instead.
-    const SOURCE = 'ตัวเลขจากอินโฟกราฟิก Pharmtutors "ขนาดยาที่ใช้ในเด็ก" และ Ped-in-a-page "Common drug use in pediatrics"; ลิงก์อ้างอิง: Medscape Drug Reference';
+    const SOURCE = 'ตัวเลขจากอินโฟกราฟิก Pharmtutors "ขนาดยาที่ใช้ในเด็ก" และ Ped-in-a-page "Common drug use in pediatrics" และ "ขนาดยาในเด็กที่ใช้บ่อยบ่อย — Toxic Version (Mar 2020)"; ลิงก์อ้างอิง: Medscape Drug Reference';
     const W = (a, b, c, d, e) => ({ 5: a, 10: b, 15: c, 20: d, 25: e });
     const weight = (label, amount, unit, times, timing, basis, printed, table, notes) =>
         ({ mode: 'weight', label, strength: { amount, unit }, timesPerDay: { min: times[0], max: times[times.length - 1] }, timing, basis, printed, table, notes: notes || [] });
@@ -26,7 +26,8 @@
     // It gives mg/kg and an interval but no strength (mg/5 ml): those drugs get a "mgkg" / "bands" form and the reader may type the
     // strength to get ml. Doses per day from the printed interval:
     const IV = { 'OD': [1, 1], 'BID': [2, 2], 'TID': [3, 3], 'QID': [4, 4], 'HS': [1, 1], 'OD-BID': [1, 2], 'BID-TID': [2, 3], 'TID-QID': [3, 4],
-        'q 6 hr': [4, 4], 'q 8 hr': [3, 3], 'q 12 hr': [2, 2], 'q 4-6 hr': [4, 6], 'q 4-8 hr': [3, 6], 'q 6-8 hr': [3, 4], 'q 12-24 hr': [1, 2], 'BID / q 6-8 hr': [2, 4] };
+        'q 6 hr': [4, 4], 'q 8 hr': [3, 3], 'q 12 hr': [2, 2], 'q 4-6 hr': [4, 6], 'q 4-8 hr': [3, 6], 'q 6-8 hr': [3, 4], 'q 12-24 hr': [1, 2], 'BID / q 6-8 hr': [2, 4],
+        'BID-QID': [2, 4], 'q 8-12 hr': [2, 3], 'q 8-24 hr': [1, 3] };
     const itv = t => (t ? { text: t, min: IV[t][0], max: IV[t][1] } : null);
     const R = (a, b) => ({ min: a, max: b == null ? a : b });
     const seq = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
@@ -142,7 +143,7 @@
         { key: 'alum-milk', genericName: 'Aluminium hydroxide (alum milk)', aliases: ['aluminium hydroxide', 'aluminum hydroxide', 'alum milk', 'aluminium hydroxide (alum milk)'], forms: [bandForm('oral', 'q 6-8 hr', null, [anyBand('5-15 ml/dose', { ml: R(5, 15) })])] },
         { key: 'simethicone', genericName: 'Simethicone', aliases: ['simethicone', 'simeticone'], forms: [bandForm('oral', 'QID', null, [
             ageBand('< 1 yr', [0], [], { mg: R(20) }), ageBand('1-12 yr', seq(1, 12), [], { mg: R(40) }), ageBand('> 12 yr', [], [], { mg: R(40, 1200) })],
-            ['ต้นฉบับพิมพ์ "> 12 yr: 40-1200 mg" — สูงผิดปกติ น่าจะพิมพ์ผิด (อาจเป็น 40-120); แสดงตามที่พิมพ์ ตรวจสอบกับเภสัชกร'])] },
+            ['ต้นฉบับพิมพ์ "> 12 yr: 40-1200 mg" — สูงผิดปกติ น่าจะพิมพ์ผิด (อาจเป็น 40-120; เอกสาร Toxic Version พิมพ์ 40-80 mg); แสดงตามที่พิมพ์ ตรวจสอบกับเภสัชกร'])] },
         { key: 'carbocysteine', genericName: 'Carbocysteine', aliases: ['carbocysteine', 'carbocisteine'], forms: [
             mgkg('> 1 month', [ln('> 1 mo', 20, 30, 'day', 'mg/kg', 'OD-BID')]),
             bandForm('2-12 yr', 'TID', null, [ageBand('2-5 yr', seq(2, 5), [], { mg: R(62.5, 125) }), ageBand('6-12 yr', seq(6, 12), [], { mg: R(100, 250) })])] },
@@ -155,7 +156,53 @@
             ageBand('6-12 yr', seq(6, 12), [], { basis: R(4, 6) }), ageBand('> 12 yr', [], [], { basis: R(1, 3) })],
             ['ต้นฉบับไม่ระบุความถี่ของขนาดบำรุงรักษา — แสดงเป็น mg/วัน'])] },
         { key: 'valproic-acid', genericName: 'Valproic acid', aliases: ['valproic acid', 'valproate', 'sodium valproate'], forms: [mgkg('maintenance', [ln('maintenance', 20, 60, 'day', 'mg/kg', 'BID-TID')])] },
-        { key: 'levetiracetam', genericName: 'Levetiracetam', aliases: ['levetiracetam'], forms: [mgkg('maintenance', [ln('maintenance', 20, 80, 'day', 'mg/kg', null)], ['ต้นฉบับไม่ระบุความถี่ — แสดงเป็น mg/วัน'])] }
+        { key: 'levetiracetam', genericName: 'Levetiracetam', aliases: ['levetiracetam'], forms: [mgkg('maintenance', [ln('maintenance', 20, 80, 'day', 'mg/kg', null)], ['ต้นฉบับไม่ระบุความถี่ — แสดงเป็น mg/วัน'])] },
+        // ---- third source: "ขนาดยาในเด็กที่ใช้บ่อยบ่อย — Toxic Version (Mar 2020)" — oral rows not already above ----
+        // Preparations, maximum doses and notes of these rows are in ALT3 (shown as the "Toxic Version" line). Tablet / sachet rows
+        // have no mg/5 ml, so they are kept as printed text (no ml is computed for them).
+        { key: 'acetylcysteine', genericName: 'Acetylcysteine', aliases: ['acetylcysteine', 'nac', 'fluimucil'], forms: [bandForm('oral', 'BID-QID', null, [anyBand('50-100 mg/dose', { mg: R(50, 100) })])] },
+        { key: 'levodropropizine', genericName: 'Levodropropizine', aliases: ['levodropropizine', 'levopront'], forms: [mgkg('oral', [ln('', 1, 1, 'dose', 'mg/kg', 'q 8-12 hr', { cap: { amount: 60, unit: 'mg', per: 'dose' } })])] },
+        { key: 'phenylephrine', genericName: 'Phenylephrine', aliases: ['phenylephrine', 'phenylephrine elixir', 'dimetapp'], forms: [mgkg('oral', [ln('', 0.25, 0.25, 'dose', 'mg/kg', 'q 6-8 hr')],
+            ['ต้นฉบับพิมพ์ “0.25 mg” ไม่มี /kg — ตีความเป็น mg/kg ต่อครั้ง จากตัวอย่าง 10 kg = ½ ช้อนชา (≈ 2.5 mg ของ phenylephrine 5 mg/5 ml) ตรวจสอบกับเภสัชกร'])] },
+        { key: 'montelukast', genericName: 'Montelukast', aliases: ['montelukast', 'singulair', 'montek'], forms: [bandForm('oral', 'OD', null, [
+            ageBand('6 mo-5 yr: 4 mg', seq(1, 5), [0], {}), ageBand('6-14 yr: 5 mg', seq(6, 12), [], {}), ageBand('> 15 yr: 10 mg', [], [], {})],
+            ['ต้นฉบับ “6 mo-5 yr” — อายุ 0 ปี ใช้ได้เฉพาะตั้งแต่ 6 เดือน'])] },
+        { key: 'ondansetron', genericName: 'Ondansetron', aliases: ['ondansetron'], forms: [mgkg('oral', [ln('', 0.15, 0.3, 'dose', 'mg/kg', 'q 8 hr')])] },
+        { key: 'metoclopramide', genericName: 'Metoclopramide', aliases: ['metoclopramide', 'plasil'], forms: [mgkg('oral', [ln('', 0.1, 0.1, 'dose', 'mg/kg', 'q 6-8 hr')])] },
+        { key: 'famotidine', genericName: 'Famotidine', aliases: ['famotidine'], forms: [mgkg('oral', [ln('', 0.5, 0.5, 'dose', 'mg/kg', 'q 12-24 hr')])] },
+        { key: 'peg', genericName: 'Polyethylene glycol (PEG)', aliases: ['polyethylene glycol', 'polyethylene glycol (peg)', 'peg', 'macrogol', 'forlax'], forms: [mgkg('oral', [
+            ln('disimpaction (3-5 days)', 1, 1, 'day', 'g/kg', 'q 8-12 hr'), ln('maintenance', 0.5, 1, 'day', 'g/kg', 'q 8-24 hr')])] },
+        { key: 'racecadotril', genericName: 'Racecadotril', aliases: ['racecadotril', 'hidrasec'], forms: [bandForm('oral', 'TID', null, [
+            kgBand('3 mo-30 kg: ½ sachet', { hi: 30 }, {}), kgBand('30 kg-16 yr: 1 sachet', { lo: 30 }, {}), anyBand('≥ 16 yr: 1 cap', {})],
+            ['ต้นฉบับมี “[0.15 mkDose tid]” สีเทา ซึ่งไม่ตรงกับ ½ sachet ต่อครั้ง (ขนาดมาตรฐานคือ 1.5 mg/kg ต่อครั้ง) น่าจะพิมพ์ผิด — ไม่นำไปคำนวณ'])] },
+        { key: 'diosmectite', genericName: 'Diosmectite', aliases: ['diosmectite', 'smecta'], forms: [bandForm('oral', 'BID-TID', null, [
+            ageBand('< 1 yr: ½ sachet', [0], [], {}), ageBand('> 1 yr: 1 sachet', seq(1, 12), [], {})])] },
+        { key: 'saccharomyces-boulardii', genericName: 'Saccharomyces boulardii', aliases: ['saccharomyces boulardii', 'bioflor'], forms: [bandForm('oral', 'BID', '5-7 days', [anyBand('1 sachet / cap pc', {})])] },
+        { key: 'lactobacillus-reuteri', genericName: 'Lactobacillus reuteri', aliases: ['lactobacillus reuteri', 'biogaia'], forms: [bandForm('oral', 'OD', '5-7 days', [anyBand('5 drops or 1 chewable tab', {})])] },
+        { key: 'lactobacillus-bifidobacterium', genericName: 'Lactobacillus acidophilus + Bifidobacterium bifidum', aliases: ['lactobacillus acidophilus + bifidobacterium bifidum', 'lactobacillus acidophilus bifidobacterium bifidum', 'infloran'], forms: [bandForm('oral', 'BID-TID', '5-7 days', [anyBand('1 cap pc', {})])] },
+        { key: 'prednisolone', genericName: 'Prednisolone', aliases: ['prednisolone'], forms: [mgkg('oral', [ln('', 1, 2, 'day', 'mg/kg', null, { cap: { amount: 60, unit: 'mg' } })], ['ต้นฉบับ “Depend on indication” — ขนาดขึ้นกับข้อบ่งใช้ ดูข้อบ่งใช้อื่นจากหนังสืออ้างอิง'])] },
+        { key: 'diazepam', genericName: 'Diazepam', aliases: ['diazepam'], forms: [mgkg('oral', [ln('PO / IV', 0.3, 0.3, 'dose', 'mg/kg', null)])] },
+        { key: 'chloral-hydrate', genericName: 'Chloral hydrate', aliases: ['chloral hydrate'], forms: [mgkg('oral', [ln('', 25, 75, 'dose', 'mg/kg', null, { cap: { amount: 2000, unit: 'mg', per: 'dose' } })],
+            ['ต้นฉบับ “MAX 0.5-2 g/dose” (เป็นช่วง) — ใช้ 2 g เป็นเพดานในการคำนวณ ตรวจสอบกับเภสัชกร'])] },
+        { key: 'iron', genericName: 'Iron (elemental)', aliases: ['iron', 'iron supplement', 'elemental iron', 'ferrous', 'ferrous fumarate', 'ferrous sulfate', 'ferrous gluconate'], forms: [mgkg('oral', [
+            ln('initial', 4, 6, 'day', 'mg/kg', null), ln('then', 2, 3, 'day', 'mg/kg', null)],
+            ['เป็นขนาดของธาตุเหล็ก (elemental iron) — ถ้าพิมพ์ความเข้มข้นเพื่อดู ml ให้ใช้ mg ของ elemental iron ต่อ 5 ml (syrup 10 mg/ml = 50)'])] },
+        { key: 'folic-acid', genericName: 'Folic acid', aliases: ['folic acid', 'folate'], forms: [bandForm('oral', 'OD', null, [ageBand('< 1 yr: ½ tab', [0], [], {}), ageBand('> 1 yr: 1 tab', seq(1, 12), [], {})])] },
+        { key: 'calcium', genericName: 'Calcium supplement', aliases: ['calcium', 'calcium supplement', 'calcium carbonate'], forms: [bandForm('oral', null, null, [anyBand('usually CaCO₃ 350 / 600 / 1250 mg', {})])] },
+        { key: 'ivermectin', genericName: 'Ivermectin', aliases: ['ivermectin'], forms: [mgkg('oral', [
+            ln('scabies', 200, 200, 'dose', 'mcg/kg', null, { duration: '× 2 (Day 0 + Day 7 or 14)' }), ln('lice', 400, 400, 'dose', 'mcg/kg', null, { duration: '× 2 (Day 0 + Day 7)' })])] },
+        { key: 'itraconazole', genericName: 'Itraconazole', aliases: ['itraconazole'], forms: [mgkg('oral', [ln('', 3, 5, 'day', 'mg/kg', 'OD-BID', { cap: { amount: 400, unit: 'mg' } })])] },
+        { key: 'griseofulvin', genericName: 'Griseofulvin', aliases: ['griseofulvin'], forms: [mgkg('oral', [
+            ln('microsize', 10, 25, 'day', 'mg/kg', 'q 12-24 hr', { cap: { amount: 1000, unit: 'mg' } }), ln('ultramicrosize', 5, 15, 'day', 'mg/kg', 'q 12-24 hr', { cap: { amount: 375, unit: 'mg' } })])] },
+        { key: 'nystatin', genericName: 'Nystatin', aliases: ['nystatin'], forms: [bandForm('oral', 'QID', null, [
+            anyBand('newborn < 2 kg: 100,000 u/dose', {}), anyBand('newborn > 2 kg: 200,000 u/dose', {}), anyBand('children: 400,000-600,000 u/dose', {})])] },
+        { key: 'cloxacillin', genericName: 'Cloxacillin', aliases: ['cloxacillin'], forms: [mgkg('oral', [
+            ln('mild-moderate', 50, 100, 'day', 'mg/kg', 'q 6 hr', { cap: { amount: 12000, unit: 'mg' } }), ln('severe', 150, 200, 'day', 'mg/kg', 'q 4-6 hr', { cap: { amount: 12000, unit: 'mg' } })])] },
+        { key: 'cephalexin', genericName: 'Cephalexin', aliases: ['cephalexin', 'cefalexin'], forms: [mgkg('oral', [
+            ln('mild-moderate', 25, 100, 'day', 'mg/kg', 'q 6-8 hr', { cap: { amount: 4000, unit: 'mg' } }), ln('severe', 75, 100, 'day', 'mg/kg', 'q 6-8 hr', { cap: { amount: 4000, unit: 'mg' } })])] },
+        { key: 'ciprofloxacin', genericName: 'Ciprofloxacin', aliases: ['ciprofloxacin'], forms: [mgkg('oral', [ln('', 20, 40, 'day', 'mg/kg', 'q 8-12 hr', { cap: { amount: 1500, unit: 'mg' } })])] },
+        { key: 'norfloxacin', genericName: 'Norfloxacin', aliases: ['norfloxacin'], forms: [mgkg('oral', [ln('', 15, 20, 'day', 'mg/kg', 'q 12 hr', { cap: { amount: 400, unit: 'mg' } })])] },
+        { key: 'clindamycin', genericName: 'Clindamycin', aliases: ['clindamycin'], forms: [mgkg('oral', [ln('PO', 20, 40, 'day', 'mg/kg', 'q 6-8 hr', { cap: { amount: 1800, unit: 'mg' } })])] }
     ];
 
     // The same drug in the second infographic where our first source already has it — printed as is, shown beside the result.
@@ -175,6 +222,87 @@
         'hydroxyzine': ['2 mkday TID-QID'],
         'pseudoephedrine': ['4 mkday QID'],
         'bromhexine': ['2-4 mkday TID']
+    };
+
+    // Third source: "ขนาดยาในเด็กที่ใช้บ่อยบ่อย — Toxic Version (Mar 2020)". Printed as is (dose · preparation · maximum · note), shown beside the result.
+    // Drugs new in this source have their numbers in DATA; here are their preparations and notes. Its own warning: "check the Preparation of your hospital".
+    const ALT3_LABEL = 'Toxic Version (Mar 2020)';
+    const ALT3 = {
+        'paracetamol': ['10-15 mkdose q 4-6 hr prn (MAX 90 mkday)', 'syr 120 or 250 mg/5 ml · kit 60 mg/0.6 ml · tab 325, 500 mg'],
+        'ibuprofen': ['5-10 mkdose q 6-8 hr (MAX 40 mkday)', 'syr 100 mg/5 ml · tab 200, 400 mg · caution: allergy, dengue'],
+        'cetirizine': ['2-6 yr 5 mg q 12-24 hr · > 6 yr 10 mg q 24 hr', 'syr 5 mg/5 ml · tab 10 mg · chronic urticaria: up to 2-4× the dose'],
+        'cpm': ['0.35 mkday q 6-8 hr', 'syr 2 mg/5 ml · tab 4 mg'],
+        'hydroxyzine': ['1-2 mkday q 6-8 hr', 'syr 10 mg/5 ml · tab 10, 25 mg'],
+        'bromhexine': ['< 2 yr 1 mg · 2-5 yr 2 mg · 5-10 yr 4 mg · > 10 yr 8 mg (bid/tid)', 'syr 4 mg/5 ml · tab 8 mg'],
+        'carbocysteine': ['< 5 yr 125 mg · 5-12 yr 250 mg · > 12 yr 500 mg (tid)', 'Flemex 250 mg/5 ml · Flemex kids 100 mg/5 ml',
+            'lysine salt (Fluifort) 90 mg/ml: 2-5 yr 2.5 ml bid · 5-12 yr 5 ml bid · > 12 yr 20 ml OD'],
+        'glyceryl-guaiacolate': ['50-100 mg q 6-8 hr', 'syr 100 mg/5 ml'],
+        'pseudoephedrine': ['1 mg/kg/dose q 6-8 hr', 'syr 30 mg/5 ml · tab 60 mg'],
+        'domperidone': ['0.2-0.3 mkdose q 6-8 hr', 'syr 5 mg/5 ml · tab 10 mg · QT prolongation'],
+        'dimenhydrinate': ['1 mkdose PO/IV q 6-8 hr', 'tab 50 mg · avoid in < 2 yr (anticholinergic effects)'],
+        'omeprazole': ['0.5-2 mkday PO (ac) q 12-24 hr · approx. 1 mkdose OD (or bid) ac', 'tab 20 mg (no syrup)'],
+        'ranitidine': ['2-4 mkday PO q 12 hr (MAX 300 mg/day)', 'tab 150 mg'],
+        'alum-milk': ['0.5-1 ml/kg/dose q 6-8 hr (MAX 30 ml/dose)', '240 ml/bottle · caution: renal disease, impairs absorption of other drugs'],
+        'simethicone': ['< 2 yr 20 mg tid · 2-12 yr 40 mg tid · > 12 yr 40-80 mg tid', 'drop 40 mg/0.6 ml · tab 80 mg'],
+        'lactulose': ['1-3 (printed mg/kg/day; approx. dose says ml/kg) q 12-24 hr · 1-3 ml/kg hs (Max 60 ml)', '10 g/5 ml · for age > 1 month'],
+        'mom': ['< 2 yr 0.5 ml/kg/dose OD · 2-5 yr 5-15 ml OD · 6-11 yr 15-30 ml OD · > 12 yr 30-60 ml OD', 'suspension · may be split bid · caution: Mg + renal'],
+        'phenobarbital': ['loading 20 mkdose (repeat 10 mkdose) · maintenance 4-6 mkday q 12 hr', 'tab 30, 60 mg · IV 200 mg/ml (MAX 1000 mg)'],
+        'phenytoin': ['loading 20 mkdose (repeat 10 mkdose) · maintenance 5-8 mkday q 8-12 hr', 'cap 100 mg · IV 250 mg/5 ml (MAX 1500 mg/day) · IV with NSS only'],
+        'valproic-acid': ['loading 20-40 mkdose (repeat 10 mkdose) · maintenance 15-60 mkday q 8-12 hr', 'sol 200 mg/ml · tab 200 mg · caution: fulminant hepatitis in < 2 yr (MAX 60 mkday)'],
+        'levetiracetam': ['loading 20-40 mkdose · maintenance 20-80 mkday q 12 hr (printed MAX 60 mkday)', 'sol 100 mg/ml · tab 250, 500 mg · renal elimination'],
+        'acyclovir': ['PO varicella 80 mkday × 4 (MAX 800 mg/dose or 3200 mg/day) 5 days', 'PO zoster 80 mkday × 5 (MAX 800 mg/dose or 4000 mg/day) 5-7 days', 'tab 200, 400, 800 mg · IV herpes simplex 30-60 mkday q 8 hr'],
+        'oseltamivir': ['term-9 mo 3 mkdose bid · 9-11 mo 3.5 mkdose bid', '1-12 yr: ≤ 15 kg 30 mg · 15-23 kg 45 mg · 23-40 kg 60 mg · > 40 kg 75 mg (bid)',
+            '≥ 13 yr-adult 75 mg bid · preterm PMA < 38 wk 1 · 38-40 wk 1.5 · > 40 wk 3 mkdose bid', 'renal adjustment needed'],
+        'albendazole': ['400 mg PO OD: Strongyloides × 3 days · Ascaris / Enterobius / hookworm × 1 day', 'syr 200 mg/5 ml · tab 200 mg · age > 2 yr'],
+        'penicillin-v': ['25-75 mkday PO q 6-8 hr (MAX 2 g/day)', 'syr 125 mg/5 ml · tab 250 mg'],
+        'dicloxacillin': ['12.5-50 mkday PO q 6 hr ac (50-100 mkday in osteomyelitis; MAX 2 g/day)', 'syr 62.5 mg/5 ml · cap 250, 500 mg'],
+        'amoxicillin': ['40-90 mkday PO q 8-12 hr (MAX 4 g/day) · 50 mkday tid × 10 days for GAS', 'IE prophylaxis 50 mkdose 30-60 min before procedure', 'syr 125, 250 mg/5 ml · cap 250, 500 mg'],
+        'augmentin': ['30-90 mkday of amoxicillin q 8-12 hr (MAX 4 g amoxicillin/day)', 'syr 228 (200/28), 457 (400/57), ES 642.9 (600/42.9) mg/5 ml · tab 625, 1000 mg', 'antistaph: needs ratio 1:7'],
+        'cefaclor': ['20-40 mkday PO q 8-12 hr (MAX 1 g/day)', 'syr 125, 250 mg/5 ml · tab 375 mg'],
+        'cefdinir': ['14 mkday PO q 12-24 hr (MAX 600 mg/day)', 'syr 125 mg/5 ml · cap 300 mg'],
+        'cefixime': ['8 mkday PO q 12-24 hr (MAX 400 mg/day)', 'syr 100 mg/5 ml · cap 100 mg'],
+        'erythromycin': ['30-50 mkday PO q 6 (-8) hr (MAX 4 g)', 'syr 200 mg/5 ml · cap 250 mg'],
+        'azithromycin': ['10-15 mkday PO ac q 24 hr (MAX 500-1000 mg/day)', 'syr 200 mg/5 ml · cap 250 mg'],
+        'clarithromycin': ['15 mkday PO q 12 hr (MAX 1 g/day)', 'syr 125 mg/5 ml · tab 250, 500 mg'],
+        'cotrimoxazole': ['8-12 mkday of TMP PO q 12 hr (MAX 160 mg TMP)', 'syr 40/200 per 5 ml · tab 80/400 (TMP/SMX)'],
+        'metronidazole': ['30-50 mkday PO q 8 hr (MAX 2.25 g PO)', 'syr 200 mg/5 ml · tab 200, 500 mg'],
+        'doxycycline': ['2-5 mkday PO q 12-24 hr (MAX 200 mg/day)', 'cap/tab 100 mg · teeth staining, liver injury'],
+        'isoniazid': ['10 (10-15) mkday PO HS (Max 300 mg)', 'tab 100 mg'],
+        'rifampicin': ['15 (10-20) mkday PO HS (Max 600 mg)', 'tab/cap 150, 300, 450, 600 mg'],
+        'pyrazinamide': ['35 (30-40) mkday PO HS (Max 2000 mg)', 'tab 500 mg'],
+        'ethambutol': ['20 (15-25) mkday PO HS (Max < 25 mkday, < 1200 mg)', 'tab 250, 400, 500 mg'],
+        'multivitamin': ['drop 1 ml PO OD (by vitamin A: drop 1 ml = 2000 u · syrup 5 ml = 1990 u · tab = 5000 u)'],
+        // new in this source
+        'acetylcysteine': ['sachet 100, 200 mg · tab 600 mg', '½-1 sachet bid/tid/qid pc · via ETT: 1-2 ml of 10-20% solution q 1-4 hr'],
+        'levodropropizine': ['syr 30 mg/5 ml · MAX 60 mg/dose', 'approx. 10 kg = ½ tsp bid pc · caution: CNS depression'],
+        'phenylephrine': ['elixir (Dimetapp): phenylephrine 5 mg + brompheniramine 2 mg per 5 ml · q 6-8 hr', 'approx. 10 kg = ½ tsp tid pc · also count the brompheniramine dose (0.5 mkday)'],
+        'montelukast': ['6 mo-5 yr 4 mg · 6-14 yr 5 mg · > 15 yr 10 mg q 24 hr', 'granule 4 mg/sachet · chewable 4-5 mg/tab · tab 10 mg', 'approx. ½ tab OD/HS for school-age children'],
+        'ondansetron': ['0.15-0.3 mkdose IV/PO (q 8 hr) · printed: a single dose is usually enough', 'IV 4 mg/amp · tab 8 mg · dose differs in chemotherapy · for age > 6 months'],
+        'metoclopramide': ['0.1 mkdose IV/PO q 6-8 hr (ac)', 'IV 10 mg/amp · syr 5 mg/5 ml · tab 10 mg · EPS risk: mostly a single IV dose'],
+        'famotidine': ['0.5 mkdose PO q 12-24 hr', 'tab 20 mg · used when ranitidine is unavailable'],
+        'peg': ['1 g/kg/day q 8-12 hr (disimpaction 3-5 days), then 0.5-1 g/kg/day q 8-24 hr (maintenance)', 'Forlax sachet 10 g in 200-250 ml water · approx. 10 kg = ½-1 sachet OD/bid/tid', 'depends on the phase of treatment · age > 6 months'],
+        'racecadotril': ['sachet 30 (printed "g", likely mg; some hospitals 10 g/sachet) · cap 100 (printed "g", likely mg)', '3 mo-30 kg ½ sachet q 8 hr · 30 kg-16 yr 1 sachet q 8 hr · ≥ 16 yr 1 cap q 8 hr', 'approx. ½-1 sachet pc for 3-5 days · do not use longer than 7 days'],
+        'diosmectite': ['sachet 3 g in about 50 ml water · 6-9 g/day bid-tid', '< 1 yr ½ sachet · > 1 yr 1 sachet (bid-tid pc)', 'printed note: "** ในเด็กอายุมากกว่า 2 ปี"'],
+        'saccharomyces-boulardii': ['250 mg/sachet or cap · 1 sachet/cap bid pc for 5-7 days', 'avoid in immunocompromised · stop when the diarrhoea stops'],
+        'lactobacillus-reuteri': ['chewable tab / drop · 5 drops or 1 chewable tab OD for 5-7 days', 'avoid in immunocompromised · stop when the diarrhoea stops'],
+        'lactobacillus-bifidobacterium': ['capsule · 1 cap bid/tid pc for 5-7 days', 'avoid in immunocompromised · stop when the diarrhoea stops'],
+        'prednisolone': ['tab 5 mg · MAX 60 mg/day', 'dose depends on the indication'],
+        'diazepam': ['0.3 mkdose IV/PO · rectal suppository 0.5-1 mkdose', 'tab 2, 5 mg · IV 10 mg/2 ml', 'may repeat after 15 min; if 2 doses do not stop the seizure think of a loading dose · caution: respiratory depression · alternative midazolam 0.2 mkdose IM'],
+        'chloral-hydrate': ['250 mg/5 ml (in VJR) · 500 mg/5 ml', 'approx. ~1 ml/kg PO 30 min before the procedure (MAX 0.5-2 g/dose)', 'works better in age < 2 yr · may repeat every 30 min'],
+        'iron': ['elemental iron 4-6 mkday, then 2-3 mkday', 'drop 15 mg elemental iron/0.6 ml (Fer-in-sol, Ferdex) · syrup 10 mg/ml (Eurofer) · tab ~60 mg elemental iron',
+            'ferrous fumarate 200 mg = 66.6 mg · gluconate 300 mg = 35 mg · sulfate 170 mg = 25 mg elemental iron'],
+        'folic-acid': ['< 1 yr ½ tab PO OD · > 1 yr 1 tab PO OD', 'tab 5 mg'],
+        'calcium': ['usually CaCO₃ 350 / 600 / 1250 mg', 'elemental calcium: CaCO₃ 1000 mg = 400 mg · acetate 1000 mg = 253 mg · lactate 1000 mg = 130 mg · gluconate 1000 mg = 93 mg'],
+        'ivermectin': ['200 mcg/kg PO × 2 (Day 0 + Day 7 or 14) for scabies · 400 mcg/kg × 2 (Day 0 + Day 7) for lice', 'tab 6 mg · do not use: pregnant / breast-feeding, age < 5 yr or < 15 kg · S/E CNS toxicity'],
+        'itraconazole': ['3-5 mkday PO OD/bid (MAX 400 mg/day)', 'tab 100 mg · solution 10 mg/ml · with food (tablet); solution on an empty stomach',
+            'pulse = 1 week on, 3 weeks off (1 pulse): fingernails 1-3 pulses · toenails 3-5 pulses'],
+        'griseofulvin': ['microsize 10-25 mkday PO q 12-24 hr (MAX 1 g/day) · ultramicrosize 5-15 mkday q 12-24 hr (MAX 375 mg/day)', 'tab 125 mg · take with a fatty meal · scalp ringworm 4-6 weeks'],
+        'nystatin': ['oral suspension 100,000 u/ml · for oral candidiasis', 'newborn < 2 kg 100,000 u/dose · > 2 kg 200,000 u/dose · children 400,000-600,000 u/dose (qid)'],
+        'cloxacillin': ['50-100 mkday PO/IM/IV q 6 hr · severe 150-200 mkday q 4-6 hr (MAX 12 g/day)', 'syr 125 mg/5 ml · cap 250, 500 mg · antistaph'],
+        'cephalexin': ['25-100 mkday PO q 6-8 hr · severe 75-100 mkday (MAX 4 g/day)', 'syr 125 mg/5 ml · cap 250, 500 mg · 1st generation'],
+        'ciprofloxacin': ['20-40 mkday PO q 8-12 hr (MAX 1.5 g/day)', 'tab 250, 500 mg'],
+        'norfloxacin': ['15-20 mkday PO q 12 hr (MAX 400 mg/day)', 'tab 100, 200, 400 mg'],
+        'clindamycin': ['20-40 mkday IV/PO q 6-8 hr (MAX 2.7 g/day IV · 1.8 g/day PO)', 'cap 150, 300 mg · IV 600 mg/vial']
     };
 
     // International references: the Medscape monograph of each drug, taken from web-search results on 2026-10-04.
@@ -222,7 +350,21 @@
         'cetirizine': 'https://reference.medscape.com/drug/quzyttir-zyrtec-cetirizine-343384',
         'phenytoin': 'https://reference.medscape.com/drug/dilantin-phenytek-phenytoin-343019',
         'valproic-acid': 'https://reference.medscape.com/drug/valproic-acid-343024',
-        'levetiracetam': 'https://reference.medscape.com/drug/keppra-spritam-levetiracetam-343013'
+        'levetiracetam': 'https://reference.medscape.com/drug/keppra-spritam-levetiracetam-343013',
+        'montelukast': 'https://reference.medscape.com/drug/singulair-montelukast-343440',
+        'ondansetron': 'https://reference.medscape.com/drug/ondansetron-342052',
+        'metoclopramide': 'https://reference.medscape.com/drug/reglan-metozolv-odt-metoclopramide-342051',
+        'famotidine': 'https://reference.medscape.com/drug/pepcid-ac-zantac-360-famotidine-341989',
+        'peg': 'https://reference.medscape.com/drug/golytely-miralax-polyethylene-glycol-342026',
+        'prednisolone': 'https://reference.medscape.com/drug/pediapred-orapred-prednisolone-342745',
+        'diazepam': 'https://reference.medscape.com/drug/valium-valtoco-diazepam-342902',
+        'iron': 'https://reference.medscape.com/drug/slow-fe-fer-in-sol-ferrous-sulfate-342161',
+        'calcium': 'https://reference.medscape.com/drug/tums-calcium-carbonate-341983',
+        'ivermectin': 'https://reference.medscape.com/drug/stromectol-ivermectin-342657',
+        'itraconazole': 'https://reference.medscape.com/drug/sporanox-omnel-itraconazole-342591',
+        'nystatin': 'https://reference.medscape.com/drug/mycostatin-nilstat-nystatin-342594',
+        'cephalexin': 'https://reference.medscape.com/drug/keflex-cephalexin-342490',
+        'clindamycin': 'https://reference.medscape.com/drug/cleocin-clindamycin-342558'
     };
     // Where Medscape's search text disagreed with the table (indicative; shown under the calculator). Others: no claim is made.
     const CHECK = {
@@ -233,9 +375,9 @@
         'ethambutol': 'Medscape: สูงสุด 1 g/วัน — ตารางนี้สูงสุด 1.2 g (ช่วง 15–25 mg/kg/day ตรงกัน)',
         'omeprazole': 'Medscape: ขนาดคงที่วันละครั้งตามช่วงน้ำหนัก (ประมาณ 0.5–1 mg/kg) — ตารางนี้ 1–2 mg/kg/day',
         'ranitidine': 'Medscape: 2–4 mg/kg ต่อครั้ง ทุก 12 ชม. (4–8 mg/kg/day) — ตารางนี้ 2–4 mg/kg/day',
-        'simethicone': 'Medscape: > 12 ปี 40–360 mg ต่อครั้ง สูงสุด 500 mg/วัน — "40-1200 mg" ในตารางนี้น่าจะพิมพ์ผิด',
+        'simethicone': 'Medscape: > 12 ปี 40–360 mg ต่อครั้ง สูงสุด 500 mg/วัน — "40-1200 mg" ในตารางนี้น่าจะพิมพ์ผิด (Toxic Version พิมพ์ 40–80 mg)',
         'cetirizine': 'Medscape: ยากินเริ่มที่อายุ 2 ปีขึ้นไป — ช่วง 6 เดือน–2 ปีในตารางนี้ไม่มีใน Medscape (ช่วงอื่นตรงกัน)',
-        'levetiracetam': 'Medscape: เป้าหมาย 60 mg/kg/day (สูงสุด 3,000 mg/วัน) — ตารางนี้สูงถึง 80 mg/kg/day',
+        'levetiracetam': 'Medscape: เป้าหมาย 60 mg/kg/day (สูงสุด 3,000 mg/วัน) — ตารางนี้สูงถึง 80 mg/kg/day (Toxic Version ก็พิมพ์ช่วง 20–80 แต่ระบุ [MAX 60 mkDay])',
         'oseltamivir': 'Medscape: ทารกให้ 3 mg/kg ต่อครั้ง และแบ่งช่วงน้ำหนัก 23–40 / > 40 kg — ตารางนี้ใช้ขนาดคงที่ตามเดือนอายุและช่วง 24–44 / > 45 kg',
         'acyclovir': 'Medscape (อีสุกอีใส): 80 mg/kg/day แบ่งทุก 6 ชม. — ตารางนี้ 30 mg/kg/day (ขึ้นกับข้อบ่งใช้)',
         'mom': 'Medscape: ยังไม่ยืนยันความปลอดภัยต่ำกว่า 2 ปี — ช่วง 0–1 ปีในตารางไม่มีใน Medscape (ช่วง 2–5 และ 6–12 ปีตรงกัน)'
@@ -298,13 +440,18 @@
     function calcMgkg(line, kg, conc) {
         if (!line || !(kg > 0)) return null;
         const b = line.basis, t = line.interval;
-        const unit = b.unit.indexOf('ml') === 0 ? 'ml' : 'mg';
+        const unit = b.unit.split('/')[0];   // 'mg' | 'mcg' | 'g' | 'ml'
         let dayLo = b.per === 'day' ? b.min * kg : (t ? b.min * kg * t.min : null);
         let dayHi = b.per === 'day' ? b.max * kg : (t ? b.max * kg * t.max : null);
         let doseLo = b.per === 'dose' ? b.min * kg : (t ? b.min * kg / t.max : null);
         let doseHi = b.per === 'dose' ? b.max * kg : (t ? b.max * kg / t.min : null);
         let capped = false;
-        if (line.cap && unit === 'mg') {
+        if (line.cap && line.cap.per === 'dose' && unit === 'mg') {   // "MAX 60 mg/dose": limits each administration, not the day
+            const c = line.cap.amount;
+            if (doseHi != null && doseHi > c) { doseHi = c; capped = true; }
+            if (doseLo != null && doseLo > doseHi) doseLo = doseHi;
+            if (capped && dayHi != null && t) dayHi = Math.min(dayHi, c * t.max);
+        } else if (line.cap && unit === 'mg') {
             const c = line.cap.amount;
             if (dayHi != null && dayHi > c) { dayHi = c; capped = true; }
             if (dayLo != null && dayLo > c) dayLo = c;
@@ -362,7 +509,7 @@
             ? `${d.genericName} ${f.label} — วันละ ${f.printed.replace(/\s*\(.*$/, '')} ครั้ง (${f.basis.min === f.basis.max ? f.basis.min : f.basis.min + '–' + f.basis.max} ${f.basis.unit}/${f.basis.per})`
             : `${d.genericName} ${f.label} — ตามอายุ: ` + f.segments.map(s => `${s.from === s.to ? s.from : s.from + '–' + s.to} ปี ${s.text}`).join(', ')).join('\n');
     }
-    const forDoc = d => ({ v: 1, source: SOURCE, refs: refsFor(d), checks: CHECK[d.key] ? [CHECK[d.key]] : [], alt: ALT[d.key] ? { label: ALT_LABEL, lines: ALT[d.key] } : null, forms: d.forms });
+    const forDoc = d => ({ v: 1, source: SOURCE, refs: refsFor(d), checks: CHECK[d.key] ? [CHECK[d.key]] : [], alt: ALT[d.key] ? { label: ALT_LABEL, lines: ALT[d.key] } : null, alts: ALT3[d.key] ? [{ label: ALT3_LABEL, lines: ALT3[d.key] }] : [], forms: d.forms });
 
 
     // ---- intern UI: the "👶 Pediatric dose" section of the Drug Codex detail (markup only; handlers live in index.html) ----
@@ -413,14 +560,14 @@
     function mgkgFormHtml(f, kg, conc) {
         const notes = f.notes.map(note).join('');
         const rows = f.lines.map(l => {
-            const head = `<div class="dc-peds-head"><b>${esc(l.label || f.label)}</b><span>${esc(basisText(l))}${l.usual ? ` · usual ${fmt(l.usual)}` : ''}${l.cap ? ` · max ${fmt(l.cap.amount)} ${esc(l.cap.unit)}` : ''}${l.interval ? ' · ' + esc(intervalText(l.interval)) : ''}</span></div>`;
+            const head = `<div class="dc-peds-head"><b>${esc(l.label || f.label)}</b><span>${esc(basisText(l))}${l.usual ? ` · usual ${fmt(l.usual)}` : ''}${l.cap ? ` · max ${fmt(l.cap.amount)} ${esc(l.cap.unit)}${l.cap.per === 'dose' ? '/dose' : ''}` : ''}${l.interval ? ' · ' + esc(intervalText(l.interval)) : ''}</span></div>`;
             if (!(kg > 0)) return `<div class="dc-peds-form">${head}<div class="dc-peds-res dc-peds-hint">⚖️ kg</div></div>`;
             const c = calcMgkg(l, kg, conc);
             const u = c.unit;
-            const dose = c.doseLo != null ? `<div class="dc-peds-res">👶 <b>${range(c.doseLo, c.doseHi, 1)} ${u}</b><small>/dose · ${l.interval.min === l.interval.max ? l.interval.min : l.interval.min + '-' + l.interval.max}×/day${l.duration ? ' ' + esc(l.duration) : ''}</small></div>` : '';
+            const dose = c.doseLo != null ? `<div class="dc-peds-res">👶 <b>${range(c.doseLo, c.doseHi, 1)} ${u}</b><small>/dose${l.interval ? ' · ' + (l.interval.min === l.interval.max ? l.interval.min : l.interval.min + '-' + l.interval.max) + '×/day' : ''}${l.duration ? ' ' + esc(l.duration) : ''}</small></div>` : '';
             const day = c.dayLo != null ? `<div class="${c.doseLo != null ? 'dc-peds-ref' : 'dc-peds-res'}">${c.doseLo != null ? '📋 ' : '👶 '}${c.doseLo != null ? '' : '<b>'}${range(c.dayLo, c.dayHi, 1)} ${u}/day${c.doseLo != null ? '' : '</b>'}</div>` : '';
             const ml = c.mlLo != null ? `<div class="dc-peds-res">🧪 <b>${range(c.mlLo, c.mlHi)} ml</b><small>/dose · ${fmt(conc)} mg/5 ml</small></div>` : '';
-            const cap = c.capped ? `<div class="dc-peds-note">⚠️ ถึงขนาดสูงสุดที่ต้นฉบับกำหนด (${fmt(l.cap.amount)} ${esc(l.cap.unit)}) — ใช้ค่าสูงสุดแทน</div>` : '';
+            const cap = c.capped ? `<div class="dc-peds-note">⚠️ ถึงขนาดสูงสุดที่ต้นฉบับกำหนด (${fmt(l.cap.amount)} ${esc(l.cap.unit)}${l.cap.per === 'dose' ? '/dose' : ''}) — ใช้ค่าสูงสุดแทน</div>` : '';
             return `<div class="dc-peds-form">${head}${dose}${day}${ml}${cap}</div>`;
         });
         return rows.join('') + (notes ? `<div class="dc-peds-formnotes">${notes}</div>` : '');
@@ -453,8 +600,8 @@
             : f.mode === 'age' ? ageFormHtml(f, st.age, st.kg)
             : f.mode === 'mgkg' ? mgkgFormHtml(f, st.kg, conc)
             : f.mode === 'bands' ? bandsFormHtml(f, st, conc) : '').join('');
-        const alt = doc.alt && doc.alt.lines && doc.alt.lines.length
-            ? `<div class="dc-peds-alt" title="The same drug in a second source, printed as is">📋 ${esc(doc.alt.label || 'Other source')}: ${doc.alt.lines.map(esc).join(' · ')}</div>` : '';
+        const alt = [doc.alt].concat(doc.alts || []).filter(a => a && a.lines && a.lines.length)
+            .map(a => `<div class="dc-peds-alt" title="The same drug in another source, printed as is">📋 ${esc(a.label || 'Other source')}: ${a.lines.map(esc).join(' · ')}</div>`).join('');
         return body + alt;
     }
     // Inputs depend on the forms: kg for weight forms (and for age cells in "MKD"), a 0-12 age pick for age forms.
@@ -462,7 +609,7 @@
         const forms = doc.forms || [];
         const needKg = forms.some(f => f.mode === 'weight' || f.mode === 'mgkg' || (f.bands || []).some(b => b.by === 'weight' || b.basis) || (f.segments || []).some(s => s.amount.kind === 'mkd' && !s.amount.uncomputable));
         const needAge = forms.some(f => f.mode === 'age' || (f.bands || []).some(b => b.by === 'age'));
-        const needConc = forms.some(f => (f.mode === 'mgkg' && f.lines.some(l => l.basis.unit.indexOf('ml') !== 0)) || (f.mode === 'bands' && f.bands.some(b => b.mg)));
+        const needConc = forms.some(f => (f.mode === 'mgkg' && f.lines.some(l => l.basis.unit.split('/')[0] === 'mg')) || (f.mode === 'bands' && f.bands.some(b => b.mg)));
         const conc = needConc ? getConc(drugId) : null;
         const ages = Array.from({ length: 13 }, (_, i) => `<option value="${i}"${st.age === i ? ' selected' : ''}>${i}</option>`).join('');
         const inputs = '<div class="dc-peds-inputs lang-no-toggle">' +
@@ -477,5 +624,5 @@
     }
     const hasPeds = d => !!(d && d.pedsDosing && Array.isArray(d.pedsDosing.forms) && d.pedsDosing.forms.length);
 
-    return { DATA, SOURCE, TSP_ML, calcWeight, tableNear, calcAge, ageSegmentMl, parseTable, fmt, round, timesText, findSeed, dosingText, forDoc, norm, state, formsHtml, sectionBodyHtml, hasPeds, MEDSCAPE, CHECK, ALT, refsFor, refUrls, calcMgkg, matchBands, bandAmount, getConc, setConc };
+    return { DATA, SOURCE, TSP_ML, calcWeight, tableNear, calcAge, ageSegmentMl, parseTable, fmt, round, timesText, findSeed, dosingText, forDoc, norm, state, formsHtml, sectionBodyHtml, hasPeds, MEDSCAPE, CHECK, ALT, ALT3, refsFor, refUrls, calcMgkg, matchBands, bandAmount, getConc, setConc };
 });
