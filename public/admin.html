@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.87)</title>
+    <title>Nika Admin (V102.88)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -37468,7 +37468,11 @@ They can connect again from LINE.
                 );
             });
 
-            container.innerHTML = pills.join('');
+            // Alabasta lean: "All" alone is not a choice — hide the rail until there are 2+ systems to pick from
+            // (an active system filter always keeps it, so the filter can still be cleared).
+            const hideRail = active === 'all' && pills.length <= 2;
+            container.style.display = hideRail ? 'none' : '';
+            container.innerHTML = hideRail ? '' : pills.join('');
         }
 
         // Alabasta lean (Phase 2): patient shown as initials ("สมชาย มีสุข" -> "ส.ม."); leading Thai vowels are
@@ -37585,11 +37589,16 @@ They can connect again from LINE.
                     ? 'No case submissions found · 케이스가 없습니다'
                     : `No cases for the selected system · 선택된 시스템에 해당하는 케이스가 없습니다`;
                 tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#94a3b8; padding:14px;">${emptyMsg}</td></tr>`;
+                // Alabasta lean: column titles over an empty table are just chrome — hide them until there is a row.
+                const emptyHead = document.querySelector('#alabastaCaseTable thead');
+                if (emptyHead) emptyHead.style.display = 'none';
                 renderAlabastaBulkToolbar();
                 syncAlabastaSelectAllCheckbox();
                 return;
             }
 
+            const caseHead = document.querySelector('#alabastaCaseTable thead');
+            if (caseHead) caseHead.style.display = '';
             tbody.innerHTML = filtered.map(c => {
                 const isArchived = !!c.isArchived;
                 const isReviewed = isArchived || (c.status || '') === 'reviewed';
@@ -37840,7 +37849,10 @@ They can connect again from LINE.
                 if (!n && active !== c.key) return;
                 pills.push(`<button type="button" class="alabasta-filter-pill ${active === c.key ? 'active' : ''}" onclick="setAlabastaProductCategoryFilter('${c.key}')">${c.emoji} ${c.label} <span class="pill-count">${n}</span></button>`);
             });
-            row.innerHTML = pills.join('');
+            // Alabasta lean: same rule as the case system pills — one category is not a choice.
+            const hideRail = active === 'all' && pills.length <= 2;
+            row.style.display = hideRail ? 'none' : '';
+            row.innerHTML = hideRail ? '' : pills.join('');
         }
 
         // V97.59: single source of truth for "which products are on screen right
@@ -37909,8 +37921,12 @@ They can connect again from LINE.
                     ? 'No product submissions found · 상품이 없습니다'
                     : 'No products in the selected category · 선택된 카테고리에 해당하는 상품이 없습니다';
                 tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:#94a3b8; padding:14px;">${emptyMsg}</td></tr>`;
+                const emptyHead = document.querySelector('#alabastaProductTable thead');
+                if (emptyHead) emptyHead.style.display = 'none';
                 return;
             }
+            const productHead = document.querySelector('#alabastaProductTable thead');
+            if (productHead) productHead.style.display = '';
 
             tbody.innerHTML = filtered.map(p => {
                 const isReviewed = isAlabastaProductReviewed(p);

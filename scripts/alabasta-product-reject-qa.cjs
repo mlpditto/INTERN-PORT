@@ -98,6 +98,15 @@ function grabConst(name) {
     await page.evaluate(() => { productListingsData.forEach(p => p.status = 'reviewed'); renderAlabastaProducts(); });
     assert.match(await page.locator('#alabastaProductTable tbody').innerText(), /No products waiting for review/);
 
+    // ---- empty chrome: category rail hidden for one category, header hidden when empty
+    await page.evaluate(() => { productListingsData.forEach(p => { p.categoryKey = 'otc'; }); window.alabastaProductStatusFilter = 'all'; renderAlabastaProducts(); });
+    assert.equal(await page.locator('#alabasta-product-category-pills').evaluate(n => getComputedStyle(n).display === 'none'), true, 'single category → rail hidden');
+    await page.evaluate(() => { productListingsData[0].categoryKey = 'supplement'; renderAlabastaProducts(); });
+    assert.equal(await page.locator('#alabasta-product-category-pills').evaluate(n => getComputedStyle(n).display !== 'none' && n.children.length > 1), true, 'two categories → rail shown');
+    assert.equal(await page.locator('#alabastaProductTable thead').evaluate(n => getComputedStyle(n).display !== 'none'), true);
+    await page.evaluate(() => { productListingsData.length = 0; renderAlabastaProducts(); });
+    assert.equal(await page.locator('#alabastaProductTable thead').evaluate(n => getComputedStyle(n).display === 'none'), true, 'no products → no column titles');
+
     // ---- Reject modal: chip rail, same stored reasons
     await page.evaluate(() => openAlabastaRejectModal('a'));
     assert.equal(await page.locator('#alabastaRejectModal').isVisible(), true);
