@@ -110,6 +110,43 @@ function grabDiv(id) {
     const r = await page.locator('#alabasta-date-popover').evaluate(n => { const b = n.getBoundingClientRect(); return [b.left, b.right, innerWidth]; });
     assert(r[0] >= 0 && r[1] <= r[2], 'date popover inside viewport ' + r);
 
+    // Real-shaped data: reviewing/rejecting ARCHIVES a case (isArchived:true). Reviewed / Rejected chips must still find them
+    await page.evaluate(() => {
+      const t = (h) => ({ toDate: () => new Date(Date.now() - h * 3600e3), toMillis: () => Date.now() - h * 3600e3 });
+      casesData = [
+        { id: 'a', status: 'pending', displayName: 'P1', caseId: 'HN1', disease: 'Pneumonia', diseaseSystemKey: 'resp', timestamp: t(1) },
+        { id: 'b', status: 'pending', displayName: 'P2', caseId: 'HN2', disease: 'DM', diseaseSystemKey: 'other', timestamp: t(2) },
+        { id: 'c', status: 'reviewed', isArchived: true, adminBonus: 1.5, displayName: 'R1', caseId: 'HN3', disease: 'UTI', diseaseSystemKey: 'resp', timestamp: t(30) },
+        { id: 'd', status: 'rejected', isArchived: true, rejectedReason: 'เคสซ้ำ · Duplicate', displayName: 'X1', caseId: 'HN4', disease: 'Headache', diseaseSystemKey: 'resp', timestamp: t(40) },
+      ];
+      window.alabastaStatusFilter = 'all'; window.alabastaSystemFilter = 'all'; renderAlabastaCases();
+    });
+    const counts = async () => [await txt('alabasta-case-total'), await txt('alabasta-case-pending'), await txt('alabasta-case-reviewed'), await txt('alabasta-case-rejected')];
+    assert.deepEqual(await counts(), ['2', '2', '1', '1']);
+    assert.equal(await rows(), 2, 'All (archive toggle off) shows only the live queue');
+    await page.locator('#alabasta-status-reviewed').click();
+    assert.equal(await rows(), 1);
+    assert.match(await page.locator('#alabastaCaseTable tbody').innerText(), /✓ 1\.50 pts/);
+    assert.doesNotMatch(await page.locator('#alabastaCaseTable tbody').innerText(), /Archived/);
+    assert.deepEqual(await counts(), ['2', '2', '1', '1']);
+    await page.locator('#alabasta-status-rejected').click();
+    assert.equal(await rows(), 1);
+    assert.match(await page.locator('#alabastaCaseTable tbody').innerText(), /Rejected/);
+    assert.equal(await page.locator('#alabastaCaseTable .is-reopen').count(), 1);
+    assert(await page.locator('#alabasta-status-rejected').evaluate(n => n.classList.contains('active')));
+    // system pills count inside the chosen status; system filter narrows chip counts but not the chosen status
+    await page.evaluate(() => setAlabastaSystemFilter('resp'));
+    assert.equal(await rows(), 1);
+    assert.deepEqual(await counts(), ['1', '1', '1', '1']);
+    await page.evaluate(() => { setAlabastaSystemFilter('all'); setAlabastaStatusFilter('all'); });
+    // 🗄 toggle widens All only
+    await page.evaluate(() => { document.getElementById('alabasta-case-show-archived').checked = true; renderAlabastaCases(); });
+    assert.equal(await rows(), 4);
+    assert.equal((await counts())[0], '4');
+    await page.evaluate(() => { document.getElementById('alabasta-case-show-archived').checked = false; setAlabastaStatusFilter('rejected'); casesData.splice(3, 1); renderAlabastaCases(); });
+    assert.match(await page.locator('#alabastaCaseTable tbody').innerText(), /No rejected cases/);
+    await page.evaluate(() => setAlabastaStatusFilter('all'));
+
     // phone width: nothing spills sideways
     await page.setViewportSize({ width: 390, height: 800 });
     assert(await page.locator('#alabasta-status-rail').evaluate(n => n.scrollWidth <= n.clientWidth + 1));

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.86)</title>
+    <title>Nika Admin (V102.87)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -12033,6 +12033,7 @@
                     <button type="button" id="alabasta-status-all" class="alabasta-filter-pill active" onclick="setAlabastaStatusFilter('all')">All <span class="pill-count" id="alabasta-case-total">0</span></button>
                     <button type="button" id="alabasta-status-pending" class="alabasta-filter-pill" onclick="setAlabastaStatusFilter('pending')">📥 Pending <span class="pill-count" id="alabasta-case-pending">0</span></button>
                     <button type="button" id="alabasta-status-reviewed" class="alabasta-filter-pill" onclick="setAlabastaStatusFilter('reviewed')">✅ Reviewed <span class="pill-count" id="alabasta-case-reviewed">0</span></button>
+                    <button type="button" id="alabasta-status-rejected" class="alabasta-filter-pill" onclick="setAlabastaStatusFilter('rejected')">❌ Rejected <span class="pill-count" id="alabasta-case-rejected">0</span></button>
                 <div class="alabasta-date-popover-wrap" style="margin-left:auto; margin-bottom:0;">
                     <button type="button"
                             id="alabasta-date-trigger"
@@ -37248,7 +37249,7 @@ They can connect again from LINE.
         // V91.90: System filter state — 'all' or any key from CASE_SYSTEMS
         window.alabastaSystemFilter = window.alabastaSystemFilter || 'all';
 
-        // Alabasta lean: status rail — 'all' | 'pending' | 'reviewed' (counts live in the chips)
+        // Alabasta lean: status rail — 'all' | 'pending' | 'reviewed' | 'rejected' (counts live in the chips)
         window.alabastaStatusFilter = window.alabastaStatusFilter || 'all';
 
         function setAlabastaStatusFilter(key) {
@@ -37501,6 +37502,7 @@ They can connect again from LINE.
             const totalEl = document.getElementById('alabasta-case-total');
             const pendingEl = document.getElementById('alabasta-case-pending');
             const reviewedEl = document.getElementById('alabasta-case-reviewed');
+            const rejectedEl = document.getElementById('alabasta-case-rejected');
             const showArchived = !!document.getElementById('alabasta-case-show-archived')?.checked;
             const keyword = ((document.getElementById('alabasta-case-search') || {}).value || '').toLowerCase().trim();
 
@@ -37515,7 +37517,9 @@ They can connect again from LINE.
             // V91.90: split filtering — `baseFiltered` is what the system-filter pills count against
             // (so picking one pill doesn't zero out the others). `filtered` is what actually renders.
             // V91.92: date range filter folded into baseFiltered so pill counts respect the date scope.
-            const baseFiltered = casesData.filter(c => showArchived || !c.isArchived).filter(c => {
+            // Archive visibility is applied per status below (not here): reviewing a case sets isArchived:true, so
+            // Reviewed / Rejected must not depend on the 🗄 toggle.
+            const scoped = casesData.filter(c => {
                 if (activeBoardGroup !== 'All') {
                     const user = usersData.find(u => u.id === c.userId);
                     if ((user?.group || 'Public') !== activeBoardGroup) return false;
@@ -37545,32 +37549,38 @@ They can connect again from LINE.
             });
 
             const systemFilter = window.alabastaSystemFilter || 'all';
-            const systemFiltered = systemFilter === 'all'
-                ? baseFiltered
-                : baseFiltered.filter(c => (c.diseaseSystemKey || 'other') === systemFilter);
-            const isCasePending = (c) => !c.isArchived && (c.status || 'pending') !== 'reviewed';
-            const isCaseReviewed = (c) => c.isArchived || (c.status || '') === 'reviewed';
             const statusFilter = window.alabastaStatusFilter || 'all';
-            // Chip counts stay on the pre-status set so picking one chip doesn't zero the others;
-            // `filtered` is what the table renders.
-            const filtered = statusFilter === 'pending' ? systemFiltered.filter(isCasePending)
-                : statusFilter === 'reviewed' ? systemFiltered.filter(isCaseReviewed)
-                : systemFiltered;
+            const isCaseRejected = (c) => (c.status || '') === 'rejected';
+            const isCasePending = (c) => !c.isArchived && (c.status || 'pending') !== 'reviewed';
+            // Reviewing archives the case (isArchived:true), so "reviewed" = status or archived-but-not-rejected.
+            const isCaseReviewed = (c) => !isCaseRejected(c) && (c.isArchived || (c.status || '') === 'reviewed');
+            // The 🗄 toggle only widens "All"; Pending / Reviewed / Rejected are matched by status alone.
+            const inStatus = (c, st) => st === 'pending' ? isCasePending(c)
+                : st === 'reviewed' ? isCaseReviewed(c)
+                : st === 'rejected' ? isCaseRejected(c)
+                : (showArchived || !c.isArchived);
+            const systemOf = (c) => (c.diseaseSystemKey || 'other');
+            // `baseFiltered` is what the system pills count against; `filtered` is what renders.
+            const baseFiltered = scoped.filter(c => inStatus(c, statusFilter));
+            const filtered = systemFilter === 'all' ? baseFiltered : baseFiltered.filter(c => systemOf(c) === systemFilter);
 
             renderAlabastaSystemFilterPills(baseFiltered);
 
-            const pendingCount = systemFiltered.filter(isCasePending).length;
-            const reviewedCount = systemFiltered.filter(isCaseReviewed).length;
-            ['all', 'pending', 'reviewed'].forEach(k => {
+            // Chip counts ignore the chosen status (picking one chip must not zero the others) but follow the system filter.
+            const chipScope = systemFilter === 'all' ? scoped : scoped.filter(c => systemOf(c) === systemFilter);
+            ['all', 'pending', 'reviewed', 'rejected'].forEach(k => {
                 const chip = document.getElementById('alabasta-status-' + k);
                 if (chip) chip.classList.toggle('active', statusFilter === k);
             });
-            if (totalEl) totalEl.textContent = systemFiltered.length;
-            if (pendingEl) pendingEl.textContent = pendingCount;
-            if (reviewedEl) reviewedEl.textContent = reviewedCount;
+            if (totalEl) totalEl.textContent = chipScope.filter(c => inStatus(c, 'all')).length;
+            if (pendingEl) pendingEl.textContent = chipScope.filter(isCasePending).length;
+            if (reviewedEl) reviewedEl.textContent = chipScope.filter(isCaseReviewed).length;
+            if (rejectedEl) rejectedEl.textContent = chipScope.filter(isCaseRejected).length;
 
             if (filtered.length === 0) {
                 const emptyMsg = statusFilter === 'pending' ? '🎉 No cases waiting for review'
+                    : statusFilter === 'rejected' ? 'No rejected cases'
+                    : statusFilter === 'reviewed' ? 'No reviewed cases yet'
                     : systemFilter === 'all'
                     ? 'No case submissions found · 케이스가 없습니다'
                     : `No cases for the selected system · 선택된 시스템에 해당하는 케이스가 없습니다`;
@@ -37586,11 +37596,13 @@ They can connect again from LINE.
                 const isPending = !isReviewed;
                 const tsFull = c.timestamp && c.timestamp.toDate ? c.timestamp.toDate().toLocaleString('th-TH') : '';
                 const bonus = Number(c.adminBonus || 0);
-                const statusHtml = isArchived
-                    ? `<span class="badge" title="${safe(c.rejectedReason || '')}" style="background:#f1f5f9; color:#334155; border:1px solid #33415533;">${c.status === 'rejected' ? '✕ Rejected' : 'Archived'}</span>`
-                    : (isReviewed
+                const statusHtml = c.status === 'rejected'
+                    ? `<span class="badge" title="${safe(c.rejectedReason || '')}" style="background:#fef2f2; color:#b91c1c; border:1px solid #b91c1c33;">✕ Rejected</span>`
+                    : (c.status === 'reviewed'
                         ? `<span class="badge" style="background:#ecfdf5; color:#166534; border:1px solid #16a34a33;">✓ ${bonus.toFixed(2)} pts</span>`
-                        : `<span class="badge" style="background:#fffbeb; color:#d97706; border:1px solid #d9770633;">Pending</span>`);
+                        : (isArchived
+                            ? `<span class="badge" style="background:#f1f5f9; color:#334155; border:1px solid #33415533;">Archived</span>`
+                            : `<span class="badge" style="background:#fffbeb; color:#d97706; border:1px solid #d9770633;">Pending</span>`));
                 const hasPoneglyphLink = !!c.poneglyphNoteId;
                 // Alabasta lean (Phase 2): the visible actions are the primary one only — Review + Reject while
                 // pending, Reopen once reviewed. Edit / Delete and the AI tools all live behind ⋯.
