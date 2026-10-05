@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.83)</title>
+    <title>Nika Admin (V102.84)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -980,6 +980,8 @@
             flex-direction: column;
             gap: 8px;
         }
+        /* Alabasta lean: the date trigger now ends the status rail, so open the popover leftwards. */
+        #alabasta-status-rail .alabasta-date-popover { left: auto; right: 0; }
         .alabasta-date-popover[hidden] {
             display: none;
         }
@@ -11967,15 +11969,20 @@
                             <i class="fa-solid fa-box-archive" aria-hidden="true"></i>
                         </button>
                         <input type="checkbox" id="alabasta-case-show-archived" onchange="renderAlabastaCases()" hidden>
-                        <!-- V95.97: one-shot backfill — sync reviewed cases whose intern submissions mirror is stuck on 'pending' -->
-                        <button type="button" id="alabasta-reconcile-btn" onclick="reconcileSubmissionMirrors()" title="Sync reviewed cases/work/reflective to intern view" aria-label="Sync intern view" style="margin:0; padding:4px 11px; font-size:0.72em; font-weight:800; color:#92400e; background:#fff; border:1px solid #fcd34d; border-radius:999px; cursor:pointer;">🔧 Sync intern</button>
-                        <!-- V97.27: sibling to 🔧 Sync intern — that one repairs mirrors whose
-                             SOURCE still exists; this one finds mirrors whose source is GONE. -->
-                        <button type="button" id="alabasta-orphan-btn" onclick="scanOrphanMirrors()" title="Find leftover history entries for deleted work (scan only — nothing is deleted)" data-th-title="หา history ค้างของงานที่ถูกลบไปแล้ว (scan อย่างเดียว ยังไม่ลบ)" style="margin:0; padding:4px 11px; font-size:0.72em; font-weight:800; color:#b91c1c; background:#fff; border:1px solid #fecaca; border-radius:999px; cursor:pointer;">🔎 Scan orphans</button>
-                        <span style="font-size:0.72em; color:#92400e; font-weight:700; background:#fff; border:1px solid #fcd34d; border-radius:999px; padding:3px 10px;">Total · 전체 <b id="alabasta-case-total">0</b></span>
-                        <span style="font-size:0.72em; color:#92400e; font-weight:700; background:#fff; border:1px solid #fcd34d; border-radius:999px; padding:3px 10px;">Pending · 대기 <b id="alabasta-case-pending">0</b></span>
-                        <span style="font-size:0.72em; color:#166534; font-weight:700; background:#fff; border:1px solid #86efac; border-radius:999px; padding:3px 10px;">Reviewed · 검토 완료 <b id="alabasta-case-reviewed">0</b></span>
-                    </div>
+                        <!-- Alabasta lean (Phase 1): maintenance tools folded into one ⋯ menu; Total/Pending/Reviewed
+                             counts moved to the clickable status rail inside the Case pane. Button ids kept —
+                             reconcileSubmissionMirrors()/scanOrphanMirrors() swap their innerHTML while running. -->
+                        <details class="alabasta-more-menu" id="alabasta-tools-menu">
+                            <summary class="alabasta-icon-toggle" title="Tools" aria-label="Tools"><span aria-hidden="true">⋯</span></summary>
+                            <div class="alabasta-more-menu-body" role="menu">
+                                <!-- V95.97: one-shot backfill — sync reviewed cases whose intern submissions mirror is stuck on 'pending' -->
+                                <button type="button" id="alabasta-reconcile-btn" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); reconcileSubmissionMirrors();" title="Sync reviewed cases/work/reflective to intern view" aria-label="Sync intern view">🔧 Sync intern view</button>
+                                <!-- V97.27: sibling to 🔧 Sync intern — that one repairs mirrors whose
+                                     SOURCE still exists; this one finds mirrors whose source is GONE. -->
+                                <button type="button" id="alabasta-orphan-btn" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); scanOrphanMirrors();" title="Find leftover history entries for deleted work (scan only — nothing is deleted)" data-th-title="หา history ค้างของงานที่ถูกลบไปแล้ว (scan อย่างเดียว ยังไม่ลบ)">🔎 Scan orphan history</button>
+                            </div>
+                        </details>
+</div>
                 </div>
                 <!-- V97.58 Product Listing Phase 2: sub-tab rail. The card now hosts two
                      review queues — Cases and the LINE MAN product submissions. -->
@@ -11987,7 +11994,13 @@
                 </div>
                 <div id="alabasta-case-pane">
                 <!-- V91.93: Date range filter as popover — single trigger button replaces inline 4-chip row -->
-                <div class="alabasta-date-popover-wrap">
+                <!-- Alabasta lean (Phase 1): clickable status rail + date trigger share one row. The counts
+                     keep the old ids (alabasta-case-total/pending/reviewed) so renderAlabastaCases() still fills them. -->
+                <div class="alabasta-filter-pills-row" id="alabasta-status-rail" aria-label="Filter by status">
+                    <button type="button" id="alabasta-status-all" class="alabasta-filter-pill active" onclick="setAlabastaStatusFilter('all')">All <span class="pill-count" id="alabasta-case-total">0</span></button>
+                    <button type="button" id="alabasta-status-pending" class="alabasta-filter-pill" onclick="setAlabastaStatusFilter('pending')">📥 Pending <span class="pill-count" id="alabasta-case-pending">0</span></button>
+                    <button type="button" id="alabasta-status-reviewed" class="alabasta-filter-pill" onclick="setAlabastaStatusFilter('reviewed')">✅ Reviewed <span class="pill-count" id="alabasta-case-reviewed">0</span></button>
+                <div class="alabasta-date-popover-wrap" style="margin-left:auto; margin-bottom:0;">
                     <button type="button"
                             id="alabasta-date-trigger"
                             class="alabasta-date-trigger"
@@ -12026,6 +12039,7 @@
                             <button type="button" class="alabasta-date-cancel" onclick="closeAlabastaDatePopover()">Close · 닫기</button>
                         </div>
                     </div>
+                </div>
                 </div>
                 <!-- V91.90: System filter pills · 시스템 필터 — populated by renderAlabastaSystemFilterPills() -->
                 <div id="alabasta-system-filter-pills" class="alabasta-filter-pills-row" aria-label="Filter by disease system"></div>
@@ -37201,6 +37215,14 @@ They can connect again from LINE.
         // V91.90: System filter state — 'all' or any key from CASE_SYSTEMS
         window.alabastaSystemFilter = window.alabastaSystemFilter || 'all';
 
+        // Alabasta lean: status rail — 'all' | 'pending' | 'reviewed' (counts live in the chips)
+        window.alabastaStatusFilter = window.alabastaStatusFilter || 'all';
+
+        function setAlabastaStatusFilter(key) {
+            window.alabastaStatusFilter = key || 'all';
+            renderAlabastaCases();
+        }
+
         function setAlabastaSystemFilter(key) {
             window.alabastaSystemFilter = key || 'all';
             renderAlabastaCases();
@@ -37468,20 +37490,33 @@ They can connect again from LINE.
             });
 
             const systemFilter = window.alabastaSystemFilter || 'all';
-            const filtered = systemFilter === 'all'
+            const systemFiltered = systemFilter === 'all'
                 ? baseFiltered
                 : baseFiltered.filter(c => (c.diseaseSystemKey || 'other') === systemFilter);
+            const isCasePending = (c) => !c.isArchived && (c.status || 'pending') !== 'reviewed';
+            const isCaseReviewed = (c) => c.isArchived || (c.status || '') === 'reviewed';
+            const statusFilter = window.alabastaStatusFilter || 'all';
+            // Chip counts stay on the pre-status set so picking one chip doesn't zero the others;
+            // `filtered` is what the table renders.
+            const filtered = statusFilter === 'pending' ? systemFiltered.filter(isCasePending)
+                : statusFilter === 'reviewed' ? systemFiltered.filter(isCaseReviewed)
+                : systemFiltered;
 
             renderAlabastaSystemFilterPills(baseFiltered);
 
-            const pendingCount = filtered.filter(c => !c.isArchived && (c.status || 'pending') !== 'reviewed').length;
-            const reviewedCount = filtered.filter(c => c.isArchived || (c.status || '') === 'reviewed').length;
-            if (totalEl) totalEl.textContent = filtered.length;
+            const pendingCount = systemFiltered.filter(isCasePending).length;
+            const reviewedCount = systemFiltered.filter(isCaseReviewed).length;
+            ['all', 'pending', 'reviewed'].forEach(k => {
+                const chip = document.getElementById('alabasta-status-' + k);
+                if (chip) chip.classList.toggle('active', statusFilter === k);
+            });
+            if (totalEl) totalEl.textContent = systemFiltered.length;
             if (pendingEl) pendingEl.textContent = pendingCount;
             if (reviewedEl) reviewedEl.textContent = reviewedCount;
 
             if (filtered.length === 0) {
-                const emptyMsg = systemFilter === 'all'
+                const emptyMsg = statusFilter === 'pending' ? '🎉 No cases waiting for review'
+                    : systemFilter === 'all'
                     ? 'No case submissions found · 케이스가 없습니다'
                     : `No cases for the selected system · 선택된 시스템에 해당하는 케이스가 없습니다`;
                 tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:#94a3b8; padding:14px;">${emptyMsg}</td></tr>`;
