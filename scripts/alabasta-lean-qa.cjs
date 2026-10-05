@@ -147,6 +147,22 @@ function grabDiv(id) {
     assert.match(await page.locator('#alabastaCaseTable tbody').innerText(), /No rejected cases/);
     await page.evaluate(() => setAlabastaStatusFilter('all'));
 
+    // Empty chrome: a single system is not a choice → rail hidden; header hidden while the table is empty
+    const railShown = () => page.locator('#alabasta-system-filter-pills').evaluate(n => getComputedStyle(n).display !== 'none' && n.children.length > 0);
+    const headShown = () => page.locator('#alabastaCaseTable thead').evaluate(n => getComputedStyle(n).display !== 'none');
+    await page.evaluate(() => { window.alabastaStatusFilter = 'all'; window.alabastaSystemFilter = 'all'; renderAlabastaCases(); });
+    assert.equal(await railShown(), false, 'one system only → no system rail');
+    assert.equal(await headShown(), true);
+    await page.evaluate(() => { CASE_SYSTEMS.push({ key: 'other', emoji: '🩸', label: { en: 'Other', ko: '' } }); renderAlabastaCases(); });
+    assert.equal(await railShown(), true, 'two systems → rail shown');
+    await page.evaluate(() => { CASE_SYSTEMS.pop(); setAlabastaSystemFilter('resp'); });
+    assert.equal(await railShown(), true, 'an active system filter keeps the rail so it can be cleared');
+    await page.evaluate(() => { setAlabastaSystemFilter('all'); casesData = []; renderAlabastaCases(); });
+    assert.equal(await headShown(), false, 'no rows → no column titles');
+    assert.match(await page.locator('#alabastaCaseTable tbody').innerText(), /No case submissions found/);
+    await page.evaluate(() => { casesData = [{ id: 'z', status: 'pending', displayName: 'Z', caseId: 'H', disease: 'D', timestamp: null }]; renderAlabastaCases(); });
+    assert.equal(await headShown(), true, 'header returns with the first row');
+
     // phone width: nothing spills sideways
     await page.setViewportSize({ width: 390, height: 800 });
     assert(await page.locator('#alabasta-status-rail').evaluate(n => n.scrollWidth <= n.clientWidth + 1));
