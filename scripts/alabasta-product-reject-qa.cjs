@@ -60,6 +60,7 @@ function grabConst(name) {
       function renderAlabastaCases() {}
       ${fns}
       document.getElementById('alabasta-product-pane').style.display = '';
+      document.getElementById('alabasta-product-status-rail').style.display = '';
       renderAlabastaProducts();`
     });
     const prow = () => page.locator('#alabastaProductTable tbody tr').count();
@@ -76,6 +77,11 @@ function grabConst(name) {
     assert.deepEqual(names, ['P1', 'U1', 'U2', 'P2']);
 
     // ---- Product table: 8 columns, status rail with stable counts
+    // V3: lands on Pending when something waits; no archive toggle (All = every product)
+    assert(await page.locator('#alabasta-product-status-pending').evaluate(n => n.classList.contains('active')), 'default chip = Pending');
+    assert.equal(await prow(), 2);
+    assert.equal(await page.locator('#alabasta-product-archived-toggle, #alabasta-product-show-archived').count(), 0);
+    await page.evaluate(() => setAlabastaProductStatusFilter('all'));
     assert.equal(await page.locator('#alabastaProductTable thead th').count(), 8);
     assert.equal(await prow(), 3);
     assert.deepEqual([await txt('alabasta-product-total'), await txt('alabasta-product-pending'), await txt('alabasta-product-reviewed')], ['3', '2', '1']);
