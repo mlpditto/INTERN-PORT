@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.94)</title>
+    <title>Nika Admin (V102.95)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -12010,9 +12010,10 @@
                      of each line was invisible. -->
                 <div class="modal-content lang-no-toggle" style="max-width:460px; padding:18px; border-radius:16px;">
                     <span class="close-modal" onclick="closeAlabastaRejectModal()" style="position:absolute; top:12px; right:14px; cursor:pointer; font-size:1.4em; color:#64748b;">&times;</span>
-                    <h3 style="margin:0 0 4px 0; color:#991b1b;"><i class="fa-solid fa-circle-xmark"></i> Reject Case</h3>
+                    <h3 style="margin:0 0 4px 0; color:#991b1b;"><i class="fa-solid fa-circle-xmark"></i> <span id="alabasta-reject-title">Reject Case</span></h3>
                     <div id="alabasta-reject-context" style="color:#64748b; font-size:0.84em; margin-bottom:12px;">เลือกเหตุผล — user จะเห็นเหตุผลนี้ผ่าน history</div>
                     <input type="hidden" id="alabasta-reject-case-id">
+                    <input type="hidden" id="alabasta-reject-kind" value="case">
                     <!-- Alabasta lean (Phase 3): presets are a horizontal chip rail. data-reason strings are what gets
                          stored in cases.rejectedReason, so they stay exactly as before. A preset chip still rejects at once. -->
                     <div id="alabasta-reject-presets" class="alabasta-filter-pills-row" style="margin-bottom:6px;">
@@ -12109,6 +12110,7 @@
                         <button type="button" id="alabasta-product-status-all" class="alabasta-filter-pill active" onclick="setAlabastaProductStatusFilter('all')">All <span class="pill-count" id="alabasta-product-total">0</span></button>
                         <button type="button" id="alabasta-product-status-pending" class="alabasta-filter-pill" title="Pending" aria-label="Pending" onclick="setAlabastaProductStatusFilter('pending')">📥 <span class="alabasta-pill-label">Pending</span> <span class="pill-count" id="alabasta-product-pending">0</span></button>
                         <button type="button" id="alabasta-product-status-reviewed" class="alabasta-filter-pill" title="Reviewed" aria-label="Reviewed" onclick="setAlabastaProductStatusFilter('reviewed')">✅ <span class="alabasta-pill-label">Reviewed</span> <span class="pill-count" id="alabasta-product-reviewed">0</span></button>
+                        <button type="button" id="alabasta-product-status-rejected" class="alabasta-filter-pill" title="Rejected" aria-label="Rejected" onclick="setAlabastaProductStatusFilter('rejected')">❌ <span class="alabasta-pill-label">Rejected</span> <span class="pill-count" id="alabasta-product-rejected">0</span></button>
                         <span class="alabasta-rail-break"></span><span class="alabasta-rail-break b2"></span>
                         <div id="alabasta-product-category-pills" class="alabasta-rail-group" aria-label="Filter by product category"></div>
                         <span class="alabasta-rail-tail">
@@ -37718,8 +37720,16 @@ They can connect again from LINE.
         window.alabastaSubtab = 'case';
         window.alabastaProductCategoryFilter = 'all';
 
+        // Product moderation has three end states. Rejecting archives the listing (isArchived:true) like reviewing does,
+        // so "reviewed" must exclude rejected, and "pending" is neither.
+        function isAlabastaProductRejected(p) {
+            return (p.status || '') === 'rejected';
+        }
         function isAlabastaProductReviewed(p) {
-            return !!p.isArchived || (p.status || '') === 'reviewed';
+            return !isAlabastaProductRejected(p) && (!!p.isArchived || (p.status || '') === 'reviewed');
+        }
+        function isAlabastaProductPending(p) {
+            return !isAlabastaProductRejected(p) && !isAlabastaProductReviewed(p);
         }
 
         // V97.62: name-level duplicate detection across the whole product queue.
@@ -37789,7 +37799,7 @@ They can connect again from LINE.
             if (!thisMonth.length) { panel.style.display = 'none'; return; }
 
             const reviewed = thisMonth.filter(isAlabastaProductReviewed).length;
-            const pending = thisMonth.length - reviewed;
+            const pending = thisMonth.filter(isAlabastaProductPending).length;
             const withPhoto = thisMonth.filter(p => !!p.photoUrl).length;
 
             const counts = {};
@@ -37815,7 +37825,7 @@ They can connect again from LINE.
             const caseEl = document.getElementById('alabasta-subtab-case-count');
             const prodEl = document.getElementById('alabasta-subtab-product-count');
             const caseWaiting = (casesData || []).filter(c => !c.isArchived && (c.status || 'pending') !== 'reviewed').length;
-            const prodWaiting = (productListingsData || []).filter(p => !isAlabastaProductReviewed(p)).length;
+            const prodWaiting = (productListingsData || []).filter(isAlabastaProductPending).length;
             // Alabasta lean (V3): a red dot, not a number — the status rail already carries the counts.
             if (caseEl) { caseEl.hidden = caseWaiting === 0; caseEl.title = caseWaiting + ' waiting'; }
             if (prodEl) { prodEl.hidden = prodWaiting === 0; prodEl.title = prodWaiting + ' waiting'; }
@@ -37911,11 +37921,12 @@ They can connect again from LINE.
             // First time data is on screen: land on Pending when something waits, otherwise All.
             if (!window._alabastaProductStatusDefaulted && (productListingsData || []).length) {
                 window._alabastaProductStatusDefaulted = true;
-                window.alabastaProductStatusFilter = productListingsData.some(p => !isAlabastaProductReviewed(p)) ? 'pending' : 'all';
+                window.alabastaProductStatusFilter = productListingsData.some(isAlabastaProductPending) ? 'pending' : 'all';
             }
             const statusFilter = window.alabastaProductStatusFilter || 'all';
-            const visible = statusFilter === 'pending' ? preStatus.filter(p => !isAlabastaProductReviewed(p))
+            const visible = statusFilter === 'pending' ? preStatus.filter(isAlabastaProductPending)
                 : statusFilter === 'reviewed' ? preStatus.filter(isAlabastaProductReviewed)
+                : statusFilter === 'rejected' ? preStatus.filter(isAlabastaProductRejected)
                 : preStatus;
 
             return { base, visible, preStatus, catFilter, statusFilter };
@@ -37942,9 +37953,11 @@ They can connect again from LINE.
             const pendingEl = document.getElementById('alabasta-product-pending');
             const reviewedEl = document.getElementById('alabasta-product-reviewed');
             if (totalEl) totalEl.textContent = preStatus.length;
-            if (pendingEl) pendingEl.textContent = preStatus.filter(p => !isAlabastaProductReviewed(p)).length;
+            if (pendingEl) pendingEl.textContent = preStatus.filter(isAlabastaProductPending).length;
             if (reviewedEl) reviewedEl.textContent = preStatus.filter(p => isAlabastaProductReviewed(p)).length;
-            ['all', 'pending', 'reviewed'].forEach(k => {
+            const rejectedEl = document.getElementById('alabasta-product-rejected');
+            if (rejectedEl) rejectedEl.textContent = preStatus.filter(isAlabastaProductRejected).length;
+            ['all', 'pending', 'reviewed', 'rejected'].forEach(k => {
                 const chip = document.getElementById('alabasta-product-status-' + k);
                 if (chip) chip.classList.toggle('active', statusFilter === k);
             });
@@ -37964,11 +37977,14 @@ They can connect again from LINE.
 
             tbody.innerHTML = filtered.map(p => {
                 const isReviewed = isAlabastaProductReviewed(p);
+                const isPending = isAlabastaProductPending(p);
                 const tsFull = p.timestamp && p.timestamp.toDate ? p.timestamp.toDate().toLocaleString('th-TH') : '';
                 const bonus = Number(p.adminBonus || 0);
-                const statusHtml = isReviewed
-                    ? `<span class="badge" style="background:#ecfdf5; color:#166534; border:1px solid #16a34a33;">✓ ${bonus.toFixed(2)} pts</span>`
-                    : `<span class="badge" style="background:#fffbeb; color:#d97706; border:1px solid #d9770633;">Pending</span>`;
+                const statusHtml = isAlabastaProductRejected(p)
+                    ? `<span class="badge" title="${safe(p.rejectedReason || '')}" style="background:#fef2f2; color:#b91c1c; border:1px solid #b91c1c33;">✕ Rejected</span>`
+                    : (isReviewed
+                        ? `<span class="badge" style="background:#ecfdf5; color:#166534; border:1px solid #16a34a33;">✓ ${bonus.toFixed(2)} pts</span>`
+                        : `<span class="badge" style="background:#fffbeb; color:#d97706; border:1px solid #d9770633;">Pending</span>`);
                 const cat = getAlabastaProductCategory(p.categoryKey);
                 const catHtml = cat ? `${cat.emoji} ${safe(cat.label)}` : safe(p.categoryLabel || '');
                 const hasPromo = p.promoPrice !== null && p.promoPrice !== undefined && p.promoPrice !== '';
@@ -37978,9 +37994,9 @@ They can connect again from LINE.
                 const platforms = Array.isArray(p.platforms) && p.platforms.length ? safe(p.platforms.join(', ')) : '';
                 // Alabasta lean (Phase 3): same shape as the Case rows — one primary action, Delete behind ⋯.
                 // V97.62: safe() on the id — these land inside onclick attributes.
-                const mainAction = isReviewed
+                const mainAction = !isPending
                     ? `<button type="button" class="btn-sm alabasta-action-btn is-reopen" title="Reopen product" aria-label="Reopen product" onclick="updateProductListingStatus('${safe(p.id)}', 'pending')"><span class="alabasta-emoji">↩️</span></button>`
-                    : `<button type="button" class="alabasta-go-btn" title="Mark reviewed" onclick="updateProductListingStatus('${safe(p.id)}', 'reviewed')">✅ Review</button>`;
+                    : `<button type="button" class="alabasta-go-btn" title="Mark reviewed" onclick="updateProductListingStatus('${safe(p.id)}', 'reviewed')">✅ Review</button><button type="button" class="btn-sm alabasta-action-btn is-reject" title="Reject" aria-label="Reject product" onclick="openAlabastaRejectModal('${safe(p.id)}', 'product')"><span class="alabasta-emoji">❌</span></button>`;
                 const moreBtn = `<details class="alabasta-more-menu">
                     <summary class="btn-sm alabasta-action-btn is-more" title="More actions"><span class="alabasta-emoji">⋯</span></summary>
                     <div class="alabasta-more-menu-body" role="menu">
@@ -38000,7 +38016,7 @@ They can connect again from LINE.
                 const subLine = [catHtml, platforms].filter(Boolean).join(' · ');
 
                 return `
-                    <tr data-product-id="${safe(p.id)}" class="${isReviewed ? '' : 'alabasta-row-pending'}">
+                    <tr data-product-id="${safe(p.id)}" class="${isPending ? 'alabasta-row-pending' : ''}">
                         <td style="white-space:nowrap; font-weight:700;" title="${safe(tsFull)}">${safe(alabastaAgo(p.timestamp) || '-')}</td>
                         <!-- V99.17: lang-no-toggle on the cells that print intern-typed text.
                              The walker hid Thai names and the ฿ sign (U+0E3F sits in the Thai
@@ -38435,7 +38451,7 @@ They can connect again from LINE.
             ['Photo URL', p => p.photoUrl || ''],
             ['Submitted By', p => p.displayName || p.userId || ''],
             ['Submitted At', p => (p.timestamp && p.timestamp.toDate) ? p.timestamp.toDate().toISOString() : ''],
-            ['Status', p => isAlabastaProductReviewed(p) ? 'reviewed' : 'pending'],
+            ['Status', p => isAlabastaProductRejected(p) ? 'rejected' : (isAlabastaProductReviewed(p) ? 'reviewed' : 'pending')],
             ['Admin Score', p => isAlabastaProductReviewed(p) ? Number(p.adminBonus || 0).toFixed(2) : ''],
             ['Intern Note', p => p.note || '']
         ];
@@ -48579,7 +48595,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 (c.status || 'pending') === 'pending'
             );
             // Alabasta lean (Phase 3): intern-submitted products waiting for review sit in the same Inbox.
-            const pendingProducts = (productListingsData || []).filter(p => !p.isArchived && !isAlabastaProductReviewed(p));
+            const pendingProducts = (productListingsData || []).filter(p => !p.isArchived && isAlabastaProductPending(p));
             const pending = pendingCases.map(c => ({ kind: 'case', item: c }))
                 .concat(pendingProducts.map(p => ({ kind: 'product', item: p })))
                 .sort((a, b) => (b.item.timestamp?.toMillis?.() || 0) - (a.item.timestamp?.toMillis?.() || 0));
@@ -48632,6 +48648,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         <div class="ib-note" title="${safe(c.description || '')}">${safe(c.description || '')}</div>
                         <div class="ib-actions">
                             <button type="button" class="alabasta-go-btn" onclick="updateProductListingStatus('${safe(c.id)}', 'reviewed')" title="Mark reviewed">✅ Review</button>
+                            <button type="button" class="btn-sm alabasta-action-btn is-reject" onclick="openAlabastaRejectModal('${safe(c.id)}', 'product')" title="Reject" aria-label="Reject product"><span class="alabasta-emoji">❌</span></button>
                             <button type="button" class="btn-sm alabasta-action-btn is-edit" onclick="setAlabastaSubtab('product')" title="Open the Product queue" aria-label="Open the Product queue"><span class="alabasta-emoji">👁</span></button>
                         </div>
                     </div>`;
@@ -48663,16 +48680,25 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             renderAlabastaInbox();
         }
 
-        function openAlabastaRejectModal(caseDocId) {
+        // `kind` = 'case' (default) or 'product': the same modal and reason chips serve both queues.
+        function openAlabastaRejectModal(caseDocId, kind) {
+            kind = kind === 'product' ? 'product' : 'case';
             document.getElementById('alabasta-reject-case-id').value = caseDocId;
+            document.getElementById('alabasta-reject-kind').value = kind;
+            const rejTitle = document.getElementById('alabasta-reject-title');
+            if (rejTitle) rejTitle.textContent = kind === 'product' ? 'Reject Product' : 'Reject Case';
             document.getElementById('alabasta-reject-custom').value = '';
             document.getElementById('alabasta-reject-custom-wrap').style.display = 'none';
             document.getElementById('alabasta-reject-custom-toggle').style.display = '';
             const rejCtx = document.getElementById('alabasta-reject-context');
-            const rejCase = (typeof casesData !== 'undefined' ? casesData : []).find(c => c.id === caseDocId);
-            if (rejCtx) rejCtx.textContent = rejCase
-                ? [rejCase.displayName, rejCase.caseId, rejCase.disease].filter(Boolean).join(' · ') + ' — user จะเห็นเหตุผลนี้ผ่าน history'
-                : 'เลือกเหตุผล — user จะเห็นเหตุผลนี้ผ่าน history';
+            const rejCase = kind === 'product'
+                ? (typeof productListingsData !== 'undefined' ? productListingsData : []).find(c => c.id === caseDocId)
+                : (typeof casesData !== 'undefined' ? casesData : []).find(c => c.id === caseDocId);
+            if (rejCtx) rejCtx.textContent = kind === 'product'
+                ? (rejCase ? [rejCase.name, rejCase.displayName].filter(Boolean).join(' · ') + ' — เลือกเหตุผล' : 'เลือกเหตุผล')
+                : (rejCase
+                    ? [rejCase.displayName, rejCase.caseId, rejCase.disease].filter(Boolean).join(' · ') + ' — user จะเห็นเหตุผลนี้ผ่าน history'
+                    : 'เลือกเหตุผล — user จะเห็นเหตุผลนี้ผ่าน history');
             // V97.02: was 'flex' — with no .force-show class + no align-items:center on
             // .modal, that stretched .modal-content to full viewport height (see comment
             // on the modal markup). 'block' lets .modal-content's own margin:5%-auto center
@@ -48738,7 +48764,37 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
         async function _persistAlabastaReject(reason) {
             const caseDocId = document.getElementById('alabasta-reject-case-id').value;
+            const rejectKind = (document.getElementById('alabasta-reject-kind') || {}).value || 'case';
             if (!caseDocId) return;
+            if (rejectKind === 'product') {
+                try {
+                    const batch = db.batch();
+                    batch.update(db.collection('product_listings').doc(caseDocId), {
+                        status: 'rejected',
+                        rejectedReason: reason,
+                        rejectedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        rejectedBy: ALLOWED_EMAIL || 'admin',
+                        isArchived: true,
+                        archivedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        adminBonus: 0,
+                        adminUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        adminReviewedBy: ALLOWED_EMAIL || 'admin'
+                    });
+                    // Clear the intern's pending state (same contract as the review path). The intern app reads any non-pending
+                    // mirror status as "reviewed", so it shows a reviewed card with 0 pts — it has no separate rejected look yet.
+                    await stageSubmissionMirror(batch, caseDocId, {
+                        status: 'rejected', score: 0, adminBonus: 0, pointsAwarded: false, pointsAmount: 0,
+                        rejectedReason: reason, reviewedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    await batch.commit();
+                    closeAlabastaRejectModal();
+                    if (typeof showToast === 'function') showToast(`Rejected: ${reason}`, 'success');
+                } catch (e) {
+                    console.error('Failed to reject product:', e);
+                    alert('Failed to reject product: ' + e.message);
+                }
+                return;
+            }
             try {
                 await db.collection('cases').doc(caseDocId).update({
                     status: 'rejected',

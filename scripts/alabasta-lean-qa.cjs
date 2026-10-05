@@ -46,7 +46,7 @@ function grabDiv(id) {
         { id: 'c', status: 'reviewed', displayName: 'R1', diseaseSystemKey: 'resp', timestamp: (${ts.toString()})(3) },
       ];
       function renderAlabastaProducts() {} function renderAlabastaBulkToolbar() {} function syncAlabastaSelectAllCheckbox() {}
-      function isAlabastaProductReviewed() { return false; }
+      function isAlabastaProductReviewed() { return false; } function isAlabastaProductPending() { return true; }
       ${fns}
       renderAlabastaCases();`
     });

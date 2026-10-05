@@ -37,9 +37,9 @@ function grabConst(name) {
     const page = await browser.newPage({ viewport: { width: 1280, height: 900 } }); const pageErrors = []; page.on('pageerror', e => pageErrors.push(e.message));
     const styles = [...html.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/gi)].map(m => m[0]).join('');
     await page.setContent('<meta charset="utf-8">' + styles + '<div id="tab-alabasta">' + grabDiv('alabasta-inbox-section') + grabDiv('alabastaRejectModal') + grabDiv('alabasta-case-section') + '</div>');
-    const fns = ['alabastaInitials', 'alabastaAgo', 'renderAlabastaInbox', 'toggleAlabastaInbox', 'isAlabastaProductReviewed', 'getAlabastaProductCategory', 'renderAlabastaProductCategoryPills',
+    const fns = ['alabastaInitials', 'alabastaAgo', 'renderAlabastaInbox', 'toggleAlabastaInbox', 'isAlabastaProductRejected', 'isAlabastaProductReviewed', 'isAlabastaProductPending', 'getAlabastaProductCategory', 'renderAlabastaProductCategoryPills',
       'getFilteredAlabastaProducts', 'renderAlabastaProducts', 'syncProductExportButton', 'syncAlabastaSubtabCounts', 'setAlabastaProductStatusFilter', 'setAlabastaProductCategoryFilter',
-      'openAlabastaRejectModal', 'closeAlabastaRejectModal', 'toggleAlabastaRejectCustom', 'rejectWithPreset', 'confirmAlabastaRejectCustom'].map(grabFn).join('\n');
+      'openAlabastaRejectModal', 'closeAlabastaRejectModal', 'toggleAlabastaRejectCustom', 'rejectWithPreset', 'confirmAlabastaRejectCustom', '_persistAlabastaReject'].map(grabFn).join('\n');
     const ts = (n) => `{ toDate: () => new Date(Date.now() - ${n} * 3600e3), toMillis: () => Date.now() - ${n} * 3600e3 }`;
     await page.addScriptTag({
       content: `
@@ -56,7 +56,16 @@ function grabConst(name) {
         { id: 'p3', status: 'reviewed', adminBonus: 1.25, displayName: 'U3', name: 'Face wash', categoryKey: 'cosmeceutical', price: 200, description: 'gentle', timestamp: ${ts(30)} },
       ];
       window.computeProductDuplicates = () => new Map(); window.renderProductStatsCard = () => {};
-      window.rejectedWith = null; window._persistAlabastaReject = async (r) => { window.rejectedWith = r; };
+      // Fake Firestore: records every write so the REAL _persistAlabastaReject can be checked end to end.
+      window.writes = [];
+      var db = {
+        collection: (c) => ({ doc: (id) => ({ _c: c, _id: id, update: async (d) => { writes.push({ kind: 'update', col: c, id, d }); } }) }),
+        batch: () => ({ update: (ref, d) => writes.push({ kind: 'batchUpdate', col: ref._c, id: ref._id, d }), commit: async () => { writes.push({ kind: 'commit' }); } }),
+      };
+      var firebase = { firestore: { FieldValue: { serverTimestamp: () => 'TS' } } };
+      var ALLOWED_EMAIL = 'admin@test';
+      var stageSubmissionMirror = async (batch, id, fields) => { writes.push({ kind: 'mirror', id, fields }); return 1; };
+      function showToast() {}
       function renderAlabastaCases() {}
       ${fns}
       document.getElementById('alabasta-product-pane').style.display = '';
@@ -104,6 +113,43 @@ function grabConst(name) {
     await page.evaluate(() => { productListingsData.forEach(p => p.status = 'reviewed'); renderAlabastaProducts(); });
     assert.match(await page.locator('#alabastaProductTable tbody').innerText(), /No products waiting for review/);
 
+    // ---- Product reject: its own state, chip, row actions, modal kind and writes
+    await page.evaluate(() => {
+      productListingsData.forEach((p, i) => { p.status = i < 2 ? 'pending' : 'reviewed'; });
+      productListingsData.push({ id: 'p4', status: 'rejected', isArchived: true, rejectedReason: 'ซ้ำ', displayName: 'U4', name: 'Duplicate item', categoryKey: 'otc', price: 10, description: 'dup', timestamp: { toDate: () => new Date(), toMillis: () => Date.now() - 3600e3 } });
+      setAlabastaProductStatusFilter('all');
+    });
+    assert.deepEqual([await txt('alabasta-product-total'), await txt('alabasta-product-pending'), await txt('alabasta-product-reviewed'), await txt('alabasta-product-rejected')], ['4', '2', '1', '1']);
+    assert.match(await page.locator('#alabasta-inbox-section').innerText(), /4\s+waiting for review/, 'a rejected product is not "waiting"');
+    await page.locator('#alabasta-product-status-rejected').click();
+    assert.equal(await prow(), 1);
+    assert.match(await page.locator('#alabastaProductTable tbody').innerText(), /Rejected/);
+    assert.equal(await page.locator('#alabastaProductTable .is-reopen').count(), 1);
+    assert.equal(await page.locator('#alabastaProductTable .alabasta-go-btn').count(), 0);
+    assert(await page.locator('#alabasta-product-status-rejected').evaluate(n => n.classList.contains('active')));
+    await page.locator('#alabasta-product-status-all').click();
+    assert.equal(await prow(), 4);
+    assert.equal(await page.locator('#alabastaProductTable tr.alabasta-row-pending .is-reject').count(), 2, 'pending rows offer Reject');
+    assert.equal(await page.locator('#alabastaProductTable tr:not(.alabasta-row-pending) .is-reject').count(), 0);
+    assert.equal(await page.evaluate(() => [isAlabastaProductPending(productListingsData[3]), isAlabastaProductReviewed(productListingsData[3]), isAlabastaProductRejected(productListingsData[3])].join()), 'false,false,true');
+    await page.evaluate(() => { writes.length = 0; openAlabastaRejectModal('p1', 'product'); });
+    assert.equal(await txt('alabasta-reject-title'), 'Reject Product');
+    assert.match(await txt('alabasta-reject-context'), /Paracetamol 500 · U1/);
+    await page.locator('.alabasta-reject-preset').nth(0).click();
+    const w = await page.evaluate(() => writes);
+    assert.deepEqual(w.map(x => x.kind + ':' + (x.col || '') + ':' + x.id), ['batchUpdate:product_listings:p1', 'mirror::p1', 'commit::undefined']);
+    assert.equal(w[0].d.status, 'rejected');
+    assert.equal(w[0].d.isArchived, true);
+    assert.equal(w[0].d.adminBonus, 0);
+    assert.equal(w[0].d.rejectedReason, 'ข้อมูลไม่ครบ · Incomplete info');
+    assert.equal(w[1].fields.status, 'rejected', 'the intern mirror leaves "pending"');
+    assert.equal(w[1].fields.score, 0);
+    assert.equal(await page.evaluate(() => writes.some(x => x.col === 'cases')), false, 'no case is touched');
+    // the modal goes back to "Case" next time
+    await page.evaluate(() => openAlabastaRejectModal('a'));
+    assert.equal(await txt('alabasta-reject-title'), 'Reject Case');
+    await page.evaluate(() => { closeAlabastaRejectModal(); productListingsData.pop(); writes.length = 0; setAlabastaProductStatusFilter('all'); });
+
     // ---- empty chrome: category rail hidden for one category, header hidden when empty
     await page.evaluate(() => { productListingsData.forEach(p => { p.categoryKey = 'otc'; }); window.alabastaProductStatusFilter = 'all'; renderAlabastaProducts(); });
     assert.equal(await page.locator('#alabasta-product-category-pills').evaluate(n => getComputedStyle(n).display === 'none'), true, 'single category → rail hidden');
@@ -130,13 +176,16 @@ function grabConst(name) {
     assert.deepEqual(await page.locator('.alabasta-reject-preset').evaluateAll(els => els.map(e => e.dataset.reason)),
       ['ข้อมูลไม่ครบ · Incomplete info', 'เคสซ้ำ · Duplicate', 'ไม่เกี่ยวข้อง · Not relevant']);
     await page.locator('.alabasta-reject-preset').nth(1).click();
-    assert.equal(await page.evaluate(() => window.rejectedWith), 'เคสซ้ำ · Duplicate');
+    // the CASE path is unchanged: one update on cases/a, nothing on product_listings or the mirror
+    assert.deepEqual(await page.evaluate(() => writes.map(w => w.kind + ':' + w.col + ':' + w.id)), ['update:cases:a']);
+    assert.equal(await page.evaluate(() => writes[0].d.rejectedReason), 'เคสซ้ำ · Duplicate');
+    assert.equal(await page.evaluate(() => writes[0].d.isArchived), true);
     // "Other" opens the textarea and rejects nothing by itself
-    await page.evaluate(() => { window.rejectedWith = null; openAlabastaRejectModal('a'); });
+    await page.evaluate(() => { writes.length = 0; openAlabastaRejectModal('a'); });
     await page.locator('#alabasta-reject-custom-toggle').click();
     assert.equal(await page.locator('#alabasta-reject-custom').isVisible(), true);
     assert.equal(await page.locator('#alabasta-reject-custom-toggle').isVisible(), false);
-    assert.equal(await page.evaluate(() => window.rejectedWith), null);
+    assert.equal(await page.evaluate(() => writes.length), 0);
     // re-opening resets the custom state
     await page.evaluate(() => openAlabastaRejectModal('b'));
     assert.equal(await page.locator('#alabasta-reject-custom-toggle').isVisible(), true);
