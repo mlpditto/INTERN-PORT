@@ -31,27 +31,45 @@ function grabDiv(id) {
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
     const styles = [...html.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/gi)].map(m => m[0]).join('');
-    await page.setContent('<meta charset="utf-8">' + styles + '<div id="tab-alabasta">' + grabDiv('alabasta-case-section') + '</div>');
-    const fns = ['renderAlabastaSystemFilterPills', 'renderAlabastaCases', 'setAlabastaStatusFilter', 'setAlabastaSystemFilter', 'closeAlabastaMoreMenus', 'syncAlabastaSubtabCounts']
+    await page.setContent('<meta charset="utf-8">' + styles + '<div id="tab-alabasta">' + grabDiv('alabasta-inbox-section') + grabDiv('alabasta-case-section') + '</div>');
+    const fns = ['alabastaInitials', 'alabastaAgo', 'renderAlabastaInbox', 'toggleAlabastaInbox', 'renderAlabastaSystemFilterPills', 'renderAlabastaCases', 'setAlabastaStatusFilter', 'setAlabastaSystemFilter', 'closeAlabastaMoreMenus', 'syncAlabastaSubtabCounts']
       .map(grabFn).join('\n');
-    const ts = (n) => ({ toDate: () => new Date(Date.now() - n * 3600e3) });
+    const ts = (n) => ({ toDate: () => new Date(Date.now() - n * 3600e3), toMillis: () => Date.now() - n * 3600e3 });
     await page.addScriptTag({
       content: `
       window.alabastaSelectedIds = new Set(); window.alabastaSystemFilter = 'all'; window.alabastaStatusFilter = 'all';
       window.CASE_SYSTEMS = [{ key: 'resp', emoji: '🫁', label: { en: 'Respiratory', ko: '' } }];
       var activeBoardGroup = 'All', usersData = [], productListingsData = [];
       var casesData = [
-        { id: 'a', status: 'pending', displayName: 'P1', diseaseSystemKey: 'resp', timestamp: (${ts.toString()})(1) },
-        { id: 'b', status: 'pending', displayName: 'P2', diseaseSystemKey: 'resp', timestamp: (${ts.toString()})(2) },
+        { id: 'a', status: 'pending', displayName: 'P1', customer: 'สมชาย มีสุข', caseId: 'HN1', disease: 'Pneumonia', note: 'long note A', diseaseSystemKey: 'resp', timestamp: (${ts.toString()})(1) },
+        { id: 'b', status: 'pending', displayName: 'P2', customer: 'เอ็ม ใจดี', caseId: 'HN2', disease: 'DM', note: 'long note B', diseaseSystemKey: 'resp', timestamp: (${ts.toString()})(2) },
         { id: 'c', status: 'reviewed', displayName: 'R1', diseaseSystemKey: 'resp', timestamp: (${ts.toString()})(3) },
       ];
-      function renderAlabastaInbox() {} function renderAlabastaBulkToolbar() {} function syncAlabastaSelectAllCheckbox() {}
+      function renderAlabastaBulkToolbar() {} function syncAlabastaSelectAllCheckbox() {}
       function isAlabastaProductReviewed() { return false; }
       ${fns}
       renderAlabastaCases();`
     });
     const rows = () => page.locator('#alabastaCaseTable tbody tr').count();
     const txt = (id) => page.locator('#' + id).innerText();
+
+    // Phase 2: Inbox is a folded banner; table has 7 columns (☐ + 6), initials not full names
+    assert.equal(await page.locator('#alabasta-inbox-section').evaluate(n => n.classList.contains('is-empty')), false);
+    assert.match(await page.locator('#alabasta-inbox-section').innerText(), /2\s+waiting for review/);
+    assert.equal(await page.locator('#alabasta-inbox-body').isVisible(), false);
+    await page.locator('#alabasta-inbox-toggle').click();
+    assert.equal(await page.locator('#alabasta-inbox-body').isVisible(), true);
+    assert.equal(await page.locator('#alabasta-inbox-container .alabasta-inbox-card').count(), 2);
+    assert.equal(await page.locator('#alabasta-inbox-toggle').getAttribute('aria-expanded'), 'true');
+    await page.locator('#alabasta-inbox-toggle').click();
+    assert.equal(await page.locator('#alabasta-inbox-body').isVisible(), false);
+    assert.equal(await page.locator('#alabastaCaseTable thead th').count(), 7);
+    assert.deepEqual(await page.evaluate(() => [alabastaInitials('สมชาย มีสุข'), alabastaInitials('เอ็ม ใจดี'), alabastaInitials('')]), ['ส.ม.', 'อ.จ.', '']);
+    const bodyText = await page.locator('#alabastaCaseTable').innerText();
+    assert(!bodyText.includes('สมชาย') && bodyText.includes('ส.ม.'), 'patient shown as initials only');
+    assert.equal(await page.locator('#alabastaCaseTable tr.alabasta-row-pending .alabasta-go-btn').count(), 2);
+    assert.equal(await page.locator('#alabastaCaseTable tr:not(.alabasta-row-pending) .is-reopen').count(), 1);
+    assert.equal(await page.locator('#alabastaCaseTable details.alabasta-more-menu .alabasta-more-menu-item', { hasText: 'Delete case' }).count(), 3);
 
     // header: maintenance buttons are inside the tools menu only
     assert.equal(await page.locator('#alabasta-tools-menu #alabasta-reconcile-btn').count(), 1);
@@ -81,6 +99,10 @@ function grabDiv(id) {
     // pending chip + nothing pending → friendly empty row
     await page.evaluate(() => { casesData.forEach(c => c.status = 'reviewed'); setAlabastaStatusFilter('pending'); });
     assert.match(await page.locator('#alabastaCaseTable tbody').innerText(), /No cases waiting for review/);
+
+    // all reviewed → Inbox banner shows the green "none waiting" state and cannot open
+    assert.equal(await page.locator('#alabasta-inbox-section').evaluate(n => n.classList.contains('is-empty')), true);
+    assert.equal(await page.locator('#alabasta-inbox-empty').isVisible(), true);
 
     // date popover opens leftwards from the rail's right end — stays inside the viewport
     await page.evaluate(() => setAlabastaStatusFilter('all'));
