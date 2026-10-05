@@ -32,7 +32,7 @@ function grabDiv(id) {
     const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
     const styles = [...html.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/gi)].map(m => m[0]).join('');
     await page.setContent('<meta charset="utf-8">' + styles + '<div id="tab-alabasta">' + grabDiv('alabasta-inbox-section') + grabDiv('alabasta-case-section') + '</div>');
-    const fns = ['alabastaInitials', 'alabastaAgo', 'renderAlabastaInbox', 'toggleAlabastaInbox', 'renderAlabastaSystemFilterPills', 'renderAlabastaCases', 'setAlabastaStatusFilter', 'setAlabastaSystemFilter', 'closeAlabastaMoreMenus', 'syncAlabastaSubtabCounts']
+    const fns = ['alabastaInitials', 'alabastaAgo', 'renderAlabastaInbox', 'toggleAlabastaInbox', 'renderAlabastaSystemFilterPills', 'renderAlabastaCases', 'syncAlabastaDateTriggerLabel', 'setAlabastaStatusFilter', 'setAlabastaSystemFilter', 'closeAlabastaMoreMenus', 'syncAlabastaSubtabCounts']
       .map(grabFn).join('\n');
     const ts = (n) => ({ toDate: () => new Date(Date.now() - n * 3600e3), toMillis: () => Date.now() - n * 3600e3 });
     await page.addScriptTag({
@@ -162,6 +162,37 @@ function grabDiv(id) {
     assert.match(await page.locator('#alabastaCaseTable tbody').innerText(), /No case submissions found/);
     await page.evaluate(() => { casesData = [{ id: 'z', status: 'pending', displayName: 'Z', caseId: 'H', disease: 'D', timestamp: null }]; renderAlabastaCases(); });
     assert.equal(await headShown(), true, 'header returns with the first row');
+
+    // One rail: status │ system (icon + count, no second "All"), tap the active system again to clear; date is 📅 ▾ until a range is set
+    await page.evaluate(() => {
+      const t = (h) => ({ toDate: () => new Date(Date.now() - h * 3600e3), toMillis: () => Date.now() - h * 3600e3 });
+      CASE_SYSTEMS.push({ key: 'other', emoji: '🩸', label: { en: 'Other', ko: '' } });
+      casesData = [
+        { id: 'a', status: 'pending', displayName: 'P1', caseId: 'H1', disease: 'A', diseaseSystemKey: 'resp', timestamp: t(1) },
+        { id: 'b', status: 'pending', displayName: 'P2', caseId: 'H2', disease: 'B', diseaseSystemKey: 'other', timestamp: t(2) },
+        { id: 'c', status: 'pending', displayName: 'P3', caseId: 'H3', disease: 'C', diseaseSystemKey: 'other', timestamp: t(3) },
+      ];
+      window.alabastaStatusFilter = 'all'; window.alabastaSystemFilter = 'all'; renderAlabastaCases();
+    });
+    const sysBtns = page.locator('#alabasta-status-rail #alabasta-system-filter-pills > button');
+    assert.equal(await sysBtns.count(), 2, 'system pills live inside the status rail, no "All" among them');
+    assert.deepEqual(await sysBtns.evaluateAll(els => els.map(e => e.title)), ['Respiratory', 'Other']);
+    assert.deepEqual(await sysBtns.evaluateAll(els => els.map(e => e.querySelector('.pill-count').textContent)), ['1', '2']);
+    assert.equal(await page.locator('#alabasta-system-filter-pills').evaluate(n => /All/.test(n.textContent)), false);
+    const railTops = await page.locator('#alabasta-status-rail > button, #alabasta-system-filter-pills > button').evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().top)));
+    assert(Math.max(...railTops) - Math.min(...railTops) <= 4, 'status and system chips share one row at 1280px: ' + railTops);
+    await sysBtns.nth(1).click();
+    assert.equal(await rows(), 2);
+    assert.equal(await page.evaluate(() => window.alabastaSystemFilter), 'other');
+    assert.equal(await page.locator('#alabasta-system-filter-pills > button.active').count(), 1);
+    await page.locator('#alabasta-system-filter-pills > button.active').click();
+    assert.equal(await page.evaluate(() => window.alabastaSystemFilter), 'all', 'tapping the active system again clears it');
+    assert.equal(await rows(), 3);
+    assert.equal(await page.locator('#alabasta-date-trigger-label').isVisible(), false, 'date trigger is icon-only by default');
+    await page.evaluate(() => { document.getElementById('alabasta-date-from').value = '2026-10-01'; document.getElementById('alabasta-date-to').value = '2026-10-05'; syncAlabastaDateTriggerLabel(); });
+    assert.match(await txt('alabasta-date-trigger-label'), /2026-10-01 → 2026-10-05/);
+    await page.evaluate(() => { document.getElementById('alabasta-date-from').value = ''; document.getElementById('alabasta-date-to').value = ''; syncAlabastaDateTriggerLabel(); CASE_SYSTEMS.pop(); });
+    assert.equal(await page.locator('#alabasta-date-trigger-label').isVisible(), false);
 
     // phone width: nothing spills sideways
     await page.setViewportSize({ width: 390, height: 800 });

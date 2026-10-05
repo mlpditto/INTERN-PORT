@@ -104,6 +104,12 @@ function grabConst(name) {
     await page.evaluate(() => { productListingsData[0].categoryKey = 'supplement'; renderAlabastaProducts(); });
     assert.equal(await page.locator('#alabasta-product-category-pills').evaluate(n => getComputedStyle(n).display !== 'none' && n.children.length > 1), true, 'two categories → rail shown');
     assert.equal(await page.locator('#alabastaProductTable thead').evaluate(n => getComputedStyle(n).display !== 'none'), true);
+    assert.equal(await page.locator('#alabasta-product-status-rail #alabasta-product-category-pills > button').count(), 2, 'category pills sit inside the status rail');
+    assert.equal(await page.locator('#alabasta-product-category-pills').evaluate(n => /All/.test(n.textContent)), false, 'no second All');
+    await page.locator('#alabasta-product-category-pills > button').nth(1).click();
+    assert.equal(await page.evaluate(() => window.alabastaProductCategoryFilter), 'supplement');
+    await page.locator('#alabasta-product-category-pills > button.active').click();
+    assert.equal(await page.evaluate(() => window.alabastaProductCategoryFilter), 'all', 'tapping the active category again clears it');
     await page.evaluate(() => { productListingsData.length = 0; renderAlabastaProducts(); });
     assert.equal(await page.locator('#alabastaProductTable thead').evaluate(n => getComputedStyle(n).display === 'none'), true, 'no products → no column titles');
 
