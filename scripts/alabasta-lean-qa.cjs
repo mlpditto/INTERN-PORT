@@ -32,7 +32,7 @@ function grabDiv(id) {
     const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
     const styles = [...html.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/gi)].map(m => m[0]).join('');
     await page.setContent('<meta charset="utf-8">' + styles + '<div id="tab-alabasta">' + grabDiv('alabasta-inbox-section') + grabDiv('alabasta-case-section') + '</div>');
-    const fns = ['alabastaInitials', 'alabastaAgo', 'renderAlabastaInbox', 'toggleAlabastaInbox', 'renderAlabastaSystemFilterPills', 'renderAlabastaCases', 'syncAlabastaDateTriggerLabel', 'setAlabastaStatusFilter', 'setAlabastaSystemFilter', 'closeAlabastaMoreMenus', 'syncAlabastaSubtabCounts']
+    const fns = ['alabastaInitials', 'alabastaAgo', 'renderAlabastaInbox', 'toggleAlabastaInbox', 'renderAlabastaSystemFilterPills', 'renderAlabastaCases', 'toggleAlabastaSearch', 'setAlabastaSubtab', 'syncAlabastaDateTriggerLabel', 'setAlabastaStatusFilter', 'setAlabastaSystemFilter', 'closeAlabastaMoreMenus', 'syncAlabastaSubtabCounts']
       .map(grabFn).join('\n');
     const ts = (n) => ({ toDate: () => new Date(Date.now() - n * 3600e3), toMillis: () => Date.now() - n * 3600e3 });
     await page.addScriptTag({
@@ -45,7 +45,7 @@ function grabDiv(id) {
         { id: 'b', status: 'pending', displayName: 'P2', customer: 'เอ็ม ใจดี', caseId: 'HN2', disease: 'DM', note: 'long note B', diseaseSystemKey: 'resp', timestamp: (${ts.toString()})(2) },
         { id: 'c', status: 'reviewed', displayName: 'R1', diseaseSystemKey: 'resp', timestamp: (${ts.toString()})(3) },
       ];
-      function renderAlabastaBulkToolbar() {} function syncAlabastaSelectAllCheckbox() {}
+      function renderAlabastaProducts() {} function renderAlabastaBulkToolbar() {} function syncAlabastaSelectAllCheckbox() {}
       function isAlabastaProductReviewed() { return false; }
       ${fns}
       renderAlabastaCases();`
@@ -63,6 +63,11 @@ function grabDiv(id) {
     assert.equal(await page.locator('#alabasta-inbox-toggle').getAttribute('aria-expanded'), 'true');
     await page.locator('#alabasta-inbox-toggle').click();
     assert.equal(await page.locator('#alabasta-inbox-body').isVisible(), false);
+    // V3: lands on Pending when something waits; the archive toggle is gone (All = every case)
+    assert(await page.locator('#alabasta-status-pending').evaluate(n => n.classList.contains('active')), 'default chip = Pending when cases wait');
+    assert.equal(await rows(), 2);
+    assert.equal(await page.locator('#alabasta-archived-toggle, #alabasta-case-show-archived').count(), 0);
+    await page.evaluate(() => setAlabastaStatusFilter('all'));
     assert.equal(await page.locator('#alabastaCaseTable thead th').count(), 7);
     assert.deepEqual(await page.evaluate(() => [alabastaInitials('สมชาย มีสุข'), alabastaInitials('เอ็ม ใจดี'), alabastaInitials('')]), ['ส.ม.', 'อ.จ.', '']);
     const bodyText = await page.locator('#alabastaCaseTable').innerText();
@@ -100,9 +105,9 @@ function grabDiv(id) {
     await page.evaluate(() => { casesData.forEach(c => c.status = 'reviewed'); setAlabastaStatusFilter('pending'); });
     assert.match(await page.locator('#alabastaCaseTable tbody').innerText(), /No cases waiting for review/);
 
-    // all reviewed → Inbox banner shows the green "none waiting" state and cannot open
+    // all reviewed → nothing waiting: the Inbox banner is not shown at all
     assert.equal(await page.locator('#alabasta-inbox-section').evaluate(n => n.classList.contains('is-empty')), true);
-    assert.equal(await page.locator('#alabasta-inbox-empty').isVisible(), true);
+    assert.equal(await page.locator('#alabasta-inbox-section').isVisible(), false);
 
     // date popover opens leftwards from the rail's right end — stays inside the viewport
     await page.evaluate(() => setAlabastaStatusFilter('all'));
@@ -122,13 +127,13 @@ function grabDiv(id) {
       window.alabastaStatusFilter = 'all'; window.alabastaSystemFilter = 'all'; renderAlabastaCases();
     });
     const counts = async () => [await txt('alabasta-case-total'), await txt('alabasta-case-pending'), await txt('alabasta-case-reviewed'), await txt('alabasta-case-rejected')];
-    assert.deepEqual(await counts(), ['2', '2', '1', '1']);
-    assert.equal(await rows(), 2, 'All (archive toggle off) shows only the live queue');
+    assert.deepEqual(await counts(), ['4', '2', '1', '1']);
+    assert.equal(await rows(), 4, 'All = every case, archived or not');
     await page.locator('#alabasta-status-reviewed').click();
     assert.equal(await rows(), 1);
     assert.match(await page.locator('#alabastaCaseTable tbody').innerText(), /✓ 1\.50 pts/);
     assert.doesNotMatch(await page.locator('#alabastaCaseTable tbody').innerText(), /Archived/);
-    assert.deepEqual(await counts(), ['2', '2', '1', '1']);
+    assert.deepEqual(await counts(), ['4', '2', '1', '1']);
     await page.locator('#alabasta-status-rejected').click();
     assert.equal(await rows(), 1);
     assert.match(await page.locator('#alabastaCaseTable tbody').innerText(), /Rejected/);
@@ -137,13 +142,11 @@ function grabDiv(id) {
     // system pills count inside the chosen status; system filter narrows chip counts but not the chosen status
     await page.evaluate(() => setAlabastaSystemFilter('resp'));
     assert.equal(await rows(), 1);
-    assert.deepEqual(await counts(), ['1', '1', '1', '1']);
+    assert.deepEqual(await counts(), ['3', '1', '1', '1']);
     await page.evaluate(() => { setAlabastaSystemFilter('all'); setAlabastaStatusFilter('all'); });
-    // 🗄 toggle widens All only
-    await page.evaluate(() => { document.getElementById('alabasta-case-show-archived').checked = true; renderAlabastaCases(); });
     assert.equal(await rows(), 4);
-    assert.equal((await counts())[0], '4');
-    await page.evaluate(() => { document.getElementById('alabasta-case-show-archived').checked = false; setAlabastaStatusFilter('rejected'); casesData.splice(3, 1); renderAlabastaCases(); });
+    assert.equal((await counts())[0], '4', 'chip counts add up: 4 = 2 + 1 + 1');
+    await page.evaluate(() => { setAlabastaStatusFilter('rejected'); casesData.splice(3, 1); renderAlabastaCases(); });
     assert.match(await page.locator('#alabastaCaseTable tbody').innerText(), /No rejected cases/);
     await page.evaluate(() => setAlabastaStatusFilter('all'));
 
@@ -193,6 +196,42 @@ function grabDiv(id) {
     assert.match(await txt('alabasta-date-trigger-label'), /2026-10-01 → 2026-10-05/);
     await page.evaluate(() => { document.getElementById('alabasta-date-from').value = ''; document.getElementById('alabasta-date-to').value = ''; syncAlabastaDateTriggerLabel(); CASE_SYSTEMS.pop(); });
     assert.equal(await page.locator('#alabasta-date-trigger-label').isVisible(), false);
+
+    // Smart default: no pending -> All
+    await page.evaluate(() => { window._alabastaStatusDefaulted = false; casesData = [{ id: 'r', status: 'reviewed', isArchived: true, adminBonus: 1, displayName: 'R', caseId: 'H', disease: 'D', timestamp: null }]; renderAlabastaCases(); });
+    assert.equal(await page.evaluate(() => window.alabastaStatusFilter), 'all');
+    assert.equal(await rows(), 1);
+
+    // One toolbar row: title, tabs | status | system, date, search, tools - all inside #alabasta-toolbar
+    await page.evaluate(() => { casesData = [{ id: 'p', status: 'pending', displayName: 'P', caseId: 'H', disease: 'D', timestamp: null }]; productListingsData = []; syncAlabastaSubtabCounts(); });
+    for (const sel of ['#alabasta-subtab-case', '#alabasta-status-rail', '#alabasta-case-toolbar', '#alabasta-tools-menu', '#alabasta-case-search']) {
+      assert.equal(await page.locator('#alabasta-toolbar ' + sel).count(), 1, sel + ' lives in the one toolbar');
+    }
+    assert.equal(await page.locator('#alabasta-case-pane #alabasta-status-rail').count(), 0, 'rail is no longer inside the pane');
+    const tbTops = await page.locator('#alabasta-toolbar h4, #alabasta-toolbar .alabasta-subtab, #alabasta-status-rail > button, #alabasta-case-toolbar > *').evaluateAll(els => els.filter(e => e.getBoundingClientRect().width > 0).map(e => Math.round(e.getBoundingClientRect().top)));
+    assert(Math.max(...tbTops) - Math.min(...tbTops) <= 12, 'toolbar is one row at 1280px: ' + tbTops);
+    assert.equal(await page.locator('#alabasta-subtab-case-count').isVisible(), true, 'red dot on the Case tab while something waits');
+    assert.equal(await page.locator('#alabasta-subtab-product-count').isVisible(), false);
+    assert.equal((await page.locator('#alabasta-subtab-case').innerText()).trim(), '🩺 Case', 'no number on the tab');
+    // search is an icon that opens the input; it stays open while it holds text
+    assert.equal(await page.locator('#alabasta-case-search').isVisible(), false);
+    await page.locator('#alabasta-case-toolbar .alabasta-search-wrap > button').click();
+    assert.equal(await page.locator('#alabasta-case-search').isVisible(), true);
+    await page.locator('#alabasta-case-search').fill('zzz');
+    await page.locator('#alabasta-subtab-case').click({ force: true });
+    assert.equal(await page.locator('#alabasta-case-search').isVisible(), true, 'open while it has text');
+    await page.locator('#alabasta-case-search').fill('');
+    await page.locator('#alabasta-subtab-case').click({ force: true });
+    assert.equal(await page.locator('#alabasta-case-search').isVisible(), false, 'closes on blur when empty');
+    // tabs swap the rails
+    assert.equal(await page.locator('#alabasta-status-rail').isVisible(), true);
+    assert.equal(await page.locator('#alabasta-product-status-rail').isVisible(), false);
+    await page.evaluate(() => setAlabastaSubtab('product'));
+    assert.equal(await page.locator('#alabasta-status-rail').isVisible(), false);
+    assert.equal(await page.locator('#alabasta-product-status-rail').isVisible(), true);
+    assert.equal(await page.locator('#alabasta-case-toolbar').isVisible(), false);
+    await page.evaluate(() => setAlabastaSubtab('case'));
+    assert.equal(await page.locator('#alabasta-status-rail').isVisible(), true);
 
     // phone width: nothing spills sideways
     await page.setViewportSize({ width: 390, height: 800 });

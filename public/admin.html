@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.89)</title>
+    <title>Nika Admin (V102.90)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -2193,6 +2193,16 @@
         /* Alabasta lean: a filter group living inside the status rail, set off by a thin divider */
         .alabasta-rail-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: 4px; padding-left: 10px; border-left: 1px solid #fcd34d; }
         @media (max-width: 640px) { .alabasta-rail-group { margin-left: 0; padding-left: 0; border-left: 0; width: 100%; } }
+        /* Alabasta lean (V3): the one-row toolbar */
+        .alabasta-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid #fde68a; padding-bottom: 10px; margin-bottom: 10px; }
+        .alabasta-toolbar .alabasta-subtab-row { margin: 0; }
+        .alabasta-toolbar .alabasta-subtab { padding: 5px 12px; }
+        .alabasta-tab-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; }
+        .alabasta-tab-dot[hidden] { display: none; }
+        .alabasta-search-wrap { display: inline-flex; align-items: center; gap: 6px; }
+        .alabasta-search-input { margin: 0; width: 200px; max-width: 100%; padding: 5px 12px; font-size: 0.8em; border-radius: 20px; border: 1px solid #fcd34d; }
+        .alabasta-rail-tail { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
+        .alabasta-inbox-bar.is-empty { display: none; }
         .alabasta-filter-pill .pill-count {
             font-size: 0.85em;
             font-weight: 900;
@@ -11980,9 +11990,12 @@
             </div>
 
             <div id="alabasta-case-section" class="review-card" style="margin-top:18px; border-color:#fcd34d; background:linear-gradient(180deg, #fffbeb 0%, #fff 100%); border-radius:14px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; border-bottom:1px solid #fde68a; padding-bottom:10px; margin-bottom:12px;">
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <h4 style="margin:0; color:#92400e;"><i class="fa-solid fa-dungeon"></i> Alabasta</h4>
+                <!-- Alabasta lean (V3): ONE toolbar row — title · tabs │ status │ system · date · search · tools.
+                     The rails live here (not inside the panes) and setAlabastaSubtab() swaps which one shows. Filters
+                     apply to everything: "All" = every case/product, so there is no archive toggle any more. -->
+                <div id="alabasta-toolbar" class="alabasta-toolbar">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <h4 style="margin:0; color:#92400e;" title="Alabasta" aria-label="Alabasta"><i class="fa-solid fa-dungeon"></i></h4>
                         <!-- V93.05 Phase 2: Case Taxonomy admin editor entry point. Clicking opens
                              the modal whose state is seeded from window.CASE_SYSTEMS (Firestore via
                              V94.53 overlay, or static fallback). First Save also serves as the seed
@@ -11992,47 +12005,15 @@
                                 aria-label="Edit Case Taxonomy"
                                 class="case-taxonomy-gear">⚙️</button>
                     </div>
-                    <div id="alabasta-case-toolbar" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                        <input type="text" id="alabasta-case-search" placeholder="🔎 Search case, user, disease" onkeyup="renderAlabastaCases()" style="margin:0; width:280px; max-width:100%; padding:5px 12px; font-size:0.8em; border-radius:20px; border:1px solid #fcd34d;">
-                        <!-- V91.93: Show Archived collapsed to icon toggle (tooltip retains bilingual label) -->
-                        <button type="button"
-                                id="alabasta-archived-toggle"
-                                class="alabasta-icon-toggle"
-                                onclick="toggleAlabastaArchived()"
-                                title="Show Archived"
-                                aria-pressed="false"
-                                aria-label="Show Archived">
-                            <i class="fa-solid fa-box-archive" aria-hidden="true"></i>
-                        </button>
-                        <input type="checkbox" id="alabasta-case-show-archived" onchange="renderAlabastaCases()" hidden>
-                        <!-- Alabasta lean (Phase 1): maintenance tools folded into one ⋯ menu; Total/Pending/Reviewed
-                             counts moved to the clickable status rail inside the Case pane. Button ids kept —
-                             reconcileSubmissionMirrors()/scanOrphanMirrors() swap their innerHTML while running. -->
-                        <details class="alabasta-more-menu" id="alabasta-tools-menu">
-                            <summary class="alabasta-icon-toggle" title="Tools" aria-label="Tools"><span aria-hidden="true">⋯</span></summary>
-                            <div class="alabasta-more-menu-body" role="menu">
-                                <!-- V95.97: one-shot backfill — sync reviewed cases whose intern submissions mirror is stuck on 'pending' -->
-                                <button type="button" id="alabasta-reconcile-btn" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); reconcileSubmissionMirrors();" title="Sync reviewed cases/work/reflective to intern view" aria-label="Sync intern view">🔧 Sync intern view</button>
-                                <!-- V97.27: sibling to 🔧 Sync intern — that one repairs mirrors whose
-                                     SOURCE still exists; this one finds mirrors whose source is GONE. -->
-                                <button type="button" id="alabasta-orphan-btn" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); scanOrphanMirrors();" title="Find leftover history entries for deleted work (scan only — nothing is deleted)" data-th-title="หา history ค้างของงานที่ถูกลบไปแล้ว (scan อย่างเดียว ยังไม่ลบ)">🔎 Scan orphan history</button>
-                            </div>
-                        </details>
-</div>
-                </div>
-                <!-- V97.58 Product Listing Phase 2: sub-tab rail. The card now hosts two
-                     review queues — Cases and the LINE MAN product submissions. -->
-                <div class="alabasta-subtab-row" role="tablist" aria-label="Alabasta review queue">
-                    <button type="button" id="alabasta-subtab-case" class="alabasta-subtab active" role="tab"
-                            aria-selected="true" onclick="setAlabastaSubtab('case')">🩺 Case · 케이스 <span class="subtab-count" id="alabasta-subtab-case-count">0</span></button>
-                    <button type="button" id="alabasta-subtab-product" class="alabasta-subtab" role="tab"
-                            aria-selected="false" onclick="setAlabastaSubtab('product')">🛒 Product · 상품 <span class="subtab-count" id="alabasta-subtab-product-count">0</span></button>
-                </div>
-                <div id="alabasta-case-pane">
-                <!-- V91.93: Date range filter as popover — single trigger button replaces inline 4-chip row -->
-                <!-- Alabasta lean (Phase 1): clickable status rail + date trigger share one row. The counts
-                     keep the old ids (alabasta-case-total/pending/reviewed) so renderAlabastaCases() still fills them. -->
-                <div class="alabasta-filter-pills-row" id="alabasta-status-rail" aria-label="Filter by status">
+                    <!-- V97.58 Product Listing Phase 2: sub-tabs. The card hosts two review queues — Cases and the
+                         LINE MAN product submissions. The red dot = something is waiting in that queue. -->
+                    <div class="alabasta-subtab-row" role="tablist" aria-label="Alabasta review queue">
+                        <button type="button" id="alabasta-subtab-case" class="alabasta-subtab active" role="tab"
+                                aria-selected="true" onclick="setAlabastaSubtab('case')">🩺 Case <span class="alabasta-tab-dot" id="alabasta-subtab-case-count" hidden></span></button>
+                        <button type="button" id="alabasta-subtab-product" class="alabasta-subtab" role="tab"
+                                aria-selected="false" onclick="setAlabastaSubtab('product')">🛒 Product <span class="alabasta-tab-dot" id="alabasta-subtab-product-count" hidden></span></button>
+                    </div>
+                    <div class="alabasta-filter-pills-row" id="alabasta-status-rail" style="flex:1 1 auto; margin-bottom:0;" aria-label="Filter by status">
                     <button type="button" id="alabasta-status-all" class="alabasta-filter-pill active" onclick="setAlabastaStatusFilter('all')">All <span class="pill-count" id="alabasta-case-total">0</span></button>
                     <button type="button" id="alabasta-status-pending" class="alabasta-filter-pill" onclick="setAlabastaStatusFilter('pending')">📥 Pending <span class="pill-count" id="alabasta-case-pending">0</span></button>
                     <button type="button" id="alabasta-status-reviewed" class="alabasta-filter-pill" onclick="setAlabastaStatusFilter('reviewed')">✅ Reviewed <span class="pill-count" id="alabasta-case-reviewed">0</span></button>
@@ -12081,6 +12062,36 @@
                 </div>
                 </div>
                 <!-- V91.90: System filter pills · 시스템 필터 — populated by renderAlabastaSystemFilterPills() -->
+                    <div class="alabasta-filter-pills-row" id="alabasta-product-status-rail" aria-label="Filter by status" style="display:none; flex:1 1 auto; margin-bottom:0;">
+                        <button type="button" id="alabasta-product-status-all" class="alabasta-filter-pill active" onclick="setAlabastaProductStatusFilter('all')">All <span class="pill-count" id="alabasta-product-total">0</span></button>
+                        <button type="button" id="alabasta-product-status-pending" class="alabasta-filter-pill" onclick="setAlabastaProductStatusFilter('pending')">📥 Pending <span class="pill-count" id="alabasta-product-pending">0</span></button>
+                        <button type="button" id="alabasta-product-status-reviewed" class="alabasta-filter-pill" onclick="setAlabastaProductStatusFilter('reviewed')">✅ Reviewed <span class="pill-count" id="alabasta-product-reviewed">0</span></button>
+                        <div id="alabasta-product-category-pills" class="alabasta-rail-group" aria-label="Filter by product category"></div>
+                        <span class="alabasta-rail-tail">
+                            <span class="alabasta-search-wrap"><button type="button" class="alabasta-icon-toggle" onmousedown="event.preventDefault()" onclick="toggleAlabastaSearch('alabasta-product-search')" title="Search" aria-label="Search products"><span aria-hidden="true">🔎</span></button><input type="text" id="alabasta-product-search" class="alabasta-search-input" placeholder="Search product, user, category" onkeyup="renderAlabastaProducts()" onblur="if(!this.value) this.hidden=true" hidden></span>
+                            <!-- V97.59 Phase 3: exports whatever the current filters show. -->
+                            <button type="button" id="alabasta-product-export-btn" onclick="exportProductListingsCsv()"
+                                    title="Export the products currently shown as CSV"
+                                    style="margin:0; padding:4px 11px; font-size:0.72em; font-weight:800; color:#166534; background:#fff; border:1px solid #86efac; border-radius:999px; cursor:pointer;">⬇️ CSV (0)</button>
+                        </span>
+                    </div>
+                    <div id="alabasta-case-toolbar" style="display:flex; align-items:center; gap:8px;">
+                        <span class="alabasta-search-wrap"><button type="button" class="alabasta-icon-toggle" onmousedown="event.preventDefault()" onclick="toggleAlabastaSearch('alabasta-case-search')" title="Search" aria-label="Search cases"><span aria-hidden="true">🔎</span></button><input type="text" id="alabasta-case-search" class="alabasta-search-input" placeholder="Search case, user, disease" onkeyup="renderAlabastaCases()" onblur="if(!this.value) this.hidden=true" hidden></span>
+                        <!-- Alabasta lean (Phase 1): maintenance tools folded into one ⋯ menu. Button ids kept —
+                             reconcileSubmissionMirrors()/scanOrphanMirrors() swap their innerHTML while running. -->
+                        <details class="alabasta-more-menu" id="alabasta-tools-menu">
+                            <summary class="alabasta-icon-toggle" title="Tools" aria-label="Tools"><span aria-hidden="true">⋯</span></summary>
+                            <div class="alabasta-more-menu-body" role="menu">
+                                <!-- V95.97: one-shot backfill — sync reviewed cases whose intern submissions mirror is stuck on 'pending' -->
+                                <button type="button" id="alabasta-reconcile-btn" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); reconcileSubmissionMirrors();" title="Sync reviewed cases/work/reflective to intern view" aria-label="Sync intern view">🔧 Sync intern view</button>
+                                <!-- V97.27: sibling to 🔧 Sync intern — that one repairs mirrors whose
+                                     SOURCE still exists; this one finds mirrors whose source is GONE. -->
+                                <button type="button" id="alabasta-orphan-btn" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); scanOrphanMirrors();" title="Find leftover history entries for deleted work (scan only — nothing is deleted)" data-th-title="หา history ค้างของงานที่ถูกลบไปแล้ว (scan อย่างเดียว ยังไม่ลบ)">🔎 Scan orphan history</button>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+                <div id="alabasta-case-pane">
                 <!-- V91.91: Bulk action toolbar — visible only when ≥1 case is selected via row checkboxes -->
                 <div id="alabasta-bulk-toolbar" class="alabasta-bulk-toolbar" style="display:none;" aria-label="Bulk actions for selected cases">
                     <span class="alabasta-bulk-count">
@@ -12136,25 +12147,6 @@
                         <div id="product-stats-note" style="margin-top:6px; font-size:0.72em; color:#94a3b8;"></div>
                     </div>
 
-                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
-                        <input type="text" id="alabasta-product-search" placeholder="🔎 Search product, user, category" onkeyup="renderAlabastaProducts()" style="margin:0; width:280px; max-width:100%; padding:5px 12px; font-size:0.8em; border-radius:20px; border:1px solid #fcd34d;">
-                        <button type="button" id="alabasta-product-archived-toggle" class="alabasta-icon-toggle" onclick="toggleAlabastaProductArchived()" title="Show Reviewed" aria-pressed="false" aria-label="Show Reviewed">
-                            <i class="fa-solid fa-box-archive" aria-hidden="true"></i>
-                        </button>
-                        <input type="checkbox" id="alabasta-product-show-archived" onchange="renderAlabastaProducts()" hidden>
-                        <!-- V97.59 Phase 3: exports whatever the current filters show. -->
-                        <button type="button" id="alabasta-product-export-btn" onclick="exportProductListingsCsv()"
-                                title="Export the products currently shown as CSV"
-                                style="margin:0 0 0 auto; padding:4px 11px; font-size:0.72em; font-weight:800; color:#166534; background:#fff; border:1px solid #86efac; border-radius:999px; cursor:pointer;">⬇️ Export CSV (0)</button>
-                    </div>
-                    <!-- Alabasta lean (Phase 3): same clickable status rail as the Case pane. The old count ids
-                         (alabasta-product-total/pending/reviewed) live inside the chips so renderAlabastaProducts() still fills them. -->
-                    <div class="alabasta-filter-pills-row" id="alabasta-product-status-rail" aria-label="Filter by status">
-                        <button type="button" id="alabasta-product-status-all" class="alabasta-filter-pill active" onclick="setAlabastaProductStatusFilter('all')">All <span class="pill-count" id="alabasta-product-total">0</span></button>
-                        <button type="button" id="alabasta-product-status-pending" class="alabasta-filter-pill" onclick="setAlabastaProductStatusFilter('pending')">📥 Pending <span class="pill-count" id="alabasta-product-pending">0</span></button>
-                        <button type="button" id="alabasta-product-status-reviewed" class="alabasta-filter-pill" onclick="setAlabastaProductStatusFilter('reviewed')">✅ Reviewed <span class="pill-count" id="alabasta-product-reviewed">0</span></button>
-                        <div id="alabasta-product-category-pills" class="alabasta-rail-group" aria-label="Filter by product category"></div>
-                    </div>
                     <div style="overflow-x:auto;">
                         <table id="alabastaProductTable" class="admin-table">
                             <thead>
@@ -37318,14 +37310,12 @@ They can connect again from LINE.
             }
         }
 
-        // V91.93: Icon-toggle wrapper for Show Archived (delegates to existing checkbox semantics)
-        function toggleAlabastaArchived() {
-            const cb = document.getElementById('alabasta-case-show-archived');
-            const btn = document.getElementById('alabasta-archived-toggle');
-            if (!cb || !btn) return;
-            cb.checked = !cb.checked;
-            btn.setAttribute('aria-pressed', cb.checked ? 'true' : 'false');
-            cb.dispatchEvent(new Event('change'));
+        // Alabasta lean (V3): collapsed search — the 🔎 icon opens the input; it stays open while it holds text.
+        function toggleAlabastaSearch(id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (el.hidden) { el.hidden = false; el.focus(); }
+            else if (!el.value) { el.hidden = true; }
         }
 
         // V91.92: Date filter — date range comes from the two <input type="date"> fields
@@ -37511,7 +37501,6 @@ They can connect again from LINE.
             const pendingEl = document.getElementById('alabasta-case-pending');
             const reviewedEl = document.getElementById('alabasta-case-reviewed');
             const rejectedEl = document.getElementById('alabasta-case-rejected');
-            const showArchived = !!document.getElementById('alabasta-case-show-archived')?.checked;
             const keyword = ((document.getElementById('alabasta-case-search') || {}).value || '').toLowerCase().trim();
 
             const safe = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -37525,8 +37514,7 @@ They can connect again from LINE.
             // V91.90: split filtering — `baseFiltered` is what the system-filter pills count against
             // (so picking one pill doesn't zero out the others). `filtered` is what actually renders.
             // V91.92: date range filter folded into baseFiltered so pill counts respect the date scope.
-            // Archive visibility is applied per status below (not here): reviewing a case sets isArchived:true, so
-            // Reviewed / Rejected must not depend on the 🗄 toggle.
+            // Archive state is not a filter: reviewing / rejecting a case sets isArchived:true, and "All" means every case.
             const scoped = casesData.filter(c => {
                 if (activeBoardGroup !== 'All') {
                     const user = usersData.find(u => u.id === c.userId);
@@ -37557,16 +37545,21 @@ They can connect again from LINE.
             });
 
             const systemFilter = window.alabastaSystemFilter || 'all';
+            // First time data is on screen: land on Pending when something waits, otherwise All. Any chip stays pickable.
+            if (!window._alabastaStatusDefaulted && (casesData || []).length) {
+                window._alabastaStatusDefaulted = true;
+                window.alabastaStatusFilter = casesData.some(c => !c.isArchived && (c.status || 'pending') !== 'reviewed') ? 'pending' : 'all';
+            }
             const statusFilter = window.alabastaStatusFilter || 'all';
             const isCaseRejected = (c) => (c.status || '') === 'rejected';
             const isCasePending = (c) => !c.isArchived && (c.status || 'pending') !== 'reviewed';
             // Reviewing archives the case (isArchived:true), so "reviewed" = status or archived-but-not-rejected.
             const isCaseReviewed = (c) => !isCaseRejected(c) && (c.isArchived || (c.status || '') === 'reviewed');
-            // The 🗄 toggle only widens "All"; Pending / Reviewed / Rejected are matched by status alone.
+            // "All" is every case; Pending / Reviewed / Rejected are matched by status alone.
             const inStatus = (c, st) => st === 'pending' ? isCasePending(c)
                 : st === 'reviewed' ? isCaseReviewed(c)
                 : st === 'rejected' ? isCaseRejected(c)
-                : (showArchived || !c.isArchived);
+                : true;
             const systemOf = (c) => (c.diseaseSystemKey || 'other');
             // `baseFiltered` is what the system pills count against; `filtered` is what renders.
             const baseFiltered = scoped.filter(c => inStatus(c, statusFilter));
@@ -37785,8 +37778,11 @@ They can connect again from LINE.
         function syncAlabastaSubtabCounts() {
             const caseEl = document.getElementById('alabasta-subtab-case-count');
             const prodEl = document.getElementById('alabasta-subtab-product-count');
-            if (caseEl) caseEl.textContent = (casesData || []).filter(c => !c.isArchived && (c.status || 'pending') !== 'reviewed').length;
-            if (prodEl) prodEl.textContent = (productListingsData || []).filter(p => !isAlabastaProductReviewed(p)).length;
+            const caseWaiting = (casesData || []).filter(c => !c.isArchived && (c.status || 'pending') !== 'reviewed').length;
+            const prodWaiting = (productListingsData || []).filter(p => !isAlabastaProductReviewed(p)).length;
+            // Alabasta lean (V3): a red dot, not a number — the status rail already carries the counts.
+            if (caseEl) { caseEl.hidden = caseWaiting === 0; caseEl.title = caseWaiting + ' waiting'; }
+            if (prodEl) { prodEl.hidden = prodWaiting === 0; prodEl.title = prodWaiting + ' waiting'; }
         }
 
         function setAlabastaSubtab(tab) {
@@ -37807,16 +37803,12 @@ They can connect again from LINE.
             if (casePane) casePane.style.display = isCase ? '' : 'none';
             if (productPane) productPane.style.display = isCase ? 'none' : '';
             if (caseToolbar) caseToolbar.style.display = isCase ? 'flex' : 'none';
+            // The rails live in the shared toolbar row: show the one that belongs to the active tab.
+            const caseRail = document.getElementById('alabasta-status-rail');
+            const productRail = document.getElementById('alabasta-product-status-rail');
+            if (caseRail) caseRail.style.display = isCase ? '' : 'none';
+            if (productRail) productRail.style.display = isCase ? 'none' : '';
             if (!isCase) renderAlabastaProducts();
-        }
-
-        function toggleAlabastaProductArchived() {
-            const cb = document.getElementById('alabasta-product-show-archived');
-            const btn = document.getElementById('alabasta-product-archived-toggle');
-            if (!cb || !btn) return;
-            cb.checked = !cb.checked;
-            btn.setAttribute('aria-pressed', cb.checked ? 'true' : 'false');
-            cb.dispatchEvent(new Event('change'));
         }
 
         window.alabastaProductStatusFilter = window.alabastaProductStatusFilter || 'all';
@@ -37861,10 +37853,9 @@ They can connect again from LINE.
         // now". The table, the counters and the CSV export all read from here, so
         // an export can never disagree with what the admin is looking at.
         function getFilteredAlabastaProducts() {
-            const showArchived = !!document.getElementById('alabasta-product-show-archived')?.checked;
             const keyword = ((document.getElementById('alabasta-product-search') || {}).value || '').toLowerCase().trim();
 
-            const base = (productListingsData || []).filter(p => showArchived || !p.isArchived).filter(p => {
+            const base = (productListingsData || []).filter(p => {
                 if (activeBoardGroup !== 'All') {
                     const user = usersData.find(u => u.id === p.userId);
                     if ((user?.group || 'Public') !== activeBoardGroup) return false;
@@ -37881,6 +37872,11 @@ They can connect again from LINE.
                 : base.filter(p => (p.categoryKey || 'other') === catFilter);
 
             // Alabasta lean (Phase 3): status rail. Chip counts use `preStatus` so picking a chip doesn't zero the others.
+            // First time data is on screen: land on Pending when something waits, otherwise All.
+            if (!window._alabastaProductStatusDefaulted && (productListingsData || []).length) {
+                window._alabastaProductStatusDefaulted = true;
+                window.alabastaProductStatusFilter = productListingsData.some(p => !isAlabastaProductReviewed(p)) ? 'pending' : 'all';
+            }
             const statusFilter = window.alabastaProductStatusFilter || 'all';
             const visible = statusFilter === 'pending' ? preStatus.filter(p => !isAlabastaProductReviewed(p))
                 : statusFilter === 'reviewed' ? preStatus.filter(isAlabastaProductReviewed)
@@ -38419,7 +38415,7 @@ They can connect again from LINE.
         function syncProductExportButton(count) {
             const btn = document.getElementById('alabasta-product-export-btn');
             if (!btn) return;
-            btn.textContent = `⬇️ Export CSV (${count})`;
+            btn.textContent = `⬇️ CSV (${count})`;
             btn.disabled = count === 0;
             btn.style.opacity = count === 0 ? '0.5' : '1';
             btn.style.cursor = count === 0 ? 'not-allowed' : 'pointer';
