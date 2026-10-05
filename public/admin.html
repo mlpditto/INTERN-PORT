@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.88)</title>
+    <title>Nika Admin (V102.89)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -2190,6 +2190,9 @@
             border-color: transparent;
         }
 
+        /* Alabasta lean: a filter group living inside the status rail, set off by a thin divider */
+        .alabasta-rail-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: 4px; padding-left: 10px; border-left: 1px solid #fcd34d; }
+        @media (max-width: 640px) { .alabasta-rail-group { margin-left: 0; padding-left: 0; border-left: 0; width: 100%; } }
         .alabasta-filter-pill .pill-count {
             font-size: 0.85em;
             font-weight: 900;
@@ -12034,7 +12037,9 @@
                     <button type="button" id="alabasta-status-pending" class="alabasta-filter-pill" onclick="setAlabastaStatusFilter('pending')">📥 Pending <span class="pill-count" id="alabasta-case-pending">0</span></button>
                     <button type="button" id="alabasta-status-reviewed" class="alabasta-filter-pill" onclick="setAlabastaStatusFilter('reviewed')">✅ Reviewed <span class="pill-count" id="alabasta-case-reviewed">0</span></button>
                     <button type="button" id="alabasta-status-rejected" class="alabasta-filter-pill" onclick="setAlabastaStatusFilter('rejected')">❌ Rejected <span class="pill-count" id="alabasta-case-rejected">0</span></button>
-                <div class="alabasta-date-popover-wrap" style="margin-left:auto; margin-bottom:0;">
+                <!-- Alabasta lean: one rail — status │ system (icon + count; name in the tooltip). Filled by renderAlabastaSystemFilterPills(). -->
+                    <div id="alabasta-system-filter-pills" class="alabasta-rail-group" aria-label="Filter by disease system"></div>
+                    <div class="alabasta-date-popover-wrap" style="margin-left:auto; margin-bottom:0;">
                     <button type="button"
                             id="alabasta-date-trigger"
                             class="alabasta-date-trigger"
@@ -12042,7 +12047,7 @@
                             aria-haspopup="dialog"
                             aria-expanded="false">
                         <span aria-hidden="true">📅</span>
-                        <span id="alabasta-date-trigger-label">All · 전체</span>
+                        <span id="alabasta-date-trigger-label" hidden>All · 전체</span>
                         <span aria-hidden="true" class="alabasta-date-trigger-caret">▾</span>
                     </button>
                     <div id="alabasta-date-popover"
@@ -12076,7 +12081,6 @@
                 </div>
                 </div>
                 <!-- V91.90: System filter pills · 시스템 필터 — populated by renderAlabastaSystemFilterPills() -->
-                <div id="alabasta-system-filter-pills" class="alabasta-filter-pills-row" aria-label="Filter by disease system"></div>
                 <!-- V91.91: Bulk action toolbar — visible only when ≥1 case is selected via row checkboxes -->
                 <div id="alabasta-bulk-toolbar" class="alabasta-bulk-toolbar" style="display:none;" aria-label="Bulk actions for selected cases">
                     <span class="alabasta-bulk-count">
@@ -12149,8 +12153,8 @@
                         <button type="button" id="alabasta-product-status-all" class="alabasta-filter-pill active" onclick="setAlabastaProductStatusFilter('all')">All <span class="pill-count" id="alabasta-product-total">0</span></button>
                         <button type="button" id="alabasta-product-status-pending" class="alabasta-filter-pill" onclick="setAlabastaProductStatusFilter('pending')">📥 Pending <span class="pill-count" id="alabasta-product-pending">0</span></button>
                         <button type="button" id="alabasta-product-status-reviewed" class="alabasta-filter-pill" onclick="setAlabastaProductStatusFilter('reviewed')">✅ Reviewed <span class="pill-count" id="alabasta-product-reviewed">0</span></button>
+                        <div id="alabasta-product-category-pills" class="alabasta-rail-group" aria-label="Filter by product category"></div>
                     </div>
-                    <div id="alabasta-product-category-pills" class="alabasta-filter-pills-row" aria-label="Filter by product category"></div>
                     <div style="overflow-x:auto;">
                         <table id="alabastaProductTable" class="admin-table">
                             <thead>
@@ -37293,8 +37297,10 @@ They can connect again from LINE.
         function syncAlabastaDateTriggerLabel() {
             const labelEl = document.getElementById('alabasta-date-trigger-label');
             if (!labelEl) return;
+            // Alabasta lean: the trigger is just 📅 ▾ until a range is chosen, then it names the range.
+            labelEl.hidden = false;
             const activeBtn = document.querySelector('.alabasta-date-preset.active');
-            if (activeBtn) {
+            if (activeBtn && activeBtn.dataset.preset !== 'all') {
                 labelEl.textContent = activeBtn.textContent.trim();
                 return;
             }
@@ -37308,6 +37314,7 @@ They can connect again from LINE.
                 labelEl.textContent = `Until ${toVal}`;
             } else {
                 labelEl.textContent = 'All · 전체';
+                labelEl.hidden = true;
             }
         }
 
@@ -37454,23 +37461,20 @@ They can connect again from LINE.
             const active = window.alabastaSystemFilter || 'all';
             const catalog = window.CASE_SYSTEMS || [];
 
-            // "All" pill always first
-            const pills = [
-                `<button type="button" class="alabasta-filter-pill ${active === 'all' ? 'active' : ''}" onclick="setAlabastaSystemFilter('all')">All · 전체 <span class="pill-count">${baseFiltered.length}</span></button>`
-            ];
-
-            // Then one pill per system that has ≥1 case (skip empty systems to keep UI clean)
+            // Alabasta lean: no "All" pill (the status rail already has one) — tap the active system again to clear it.
+            // Icon + count only; the name is in title/aria-label. Empty systems are skipped unless active.
+            const pills = [];
             catalog.forEach(sys => {
                 const n = counts[sys.key] || 0;
-                if (n === 0) return;
+                if (n === 0 && active !== sys.key) return;
+                const name = `${sys.label.en} · ${sys.label.ko}`.replace(/ · $/, '');
                 pills.push(
-                    `<button type="button" class="alabasta-filter-pill ${active === sys.key ? 'active' : ''}" onclick="setAlabastaSystemFilter('${sys.key}')" title="${sys.label.en} · ${sys.label.ko}">${sys.emoji} ${sys.label.en} <span class="pill-count">${n}</span></button>`
+                    `<button type="button" class="alabasta-filter-pill ${active === sys.key ? 'active' : ''}" onclick="setAlabastaSystemFilter('${active === sys.key ? 'all' : sys.key}')" title="${name}" aria-label="${name}" aria-pressed="${active === sys.key ? 'true' : 'false'}"><span aria-hidden="true">${sys.emoji}</span> <span class="pill-count">${n}</span></button>`
                 );
             });
 
-            // Alabasta lean: "All" alone is not a choice — hide the rail until there are 2+ systems to pick from
-            // (an active system filter always keeps it, so the filter can still be cleared).
-            const hideRail = active === 'all' && pills.length <= 2;
+            // One system is not a choice — hide until there are 2+ (an active filter always keeps the rail so it can be cleared).
+            const hideRail = active === 'all' && pills.length <= 1;
             container.style.display = hideRail ? 'none' : '';
             container.innerHTML = hideRail ? '' : pills.join('');
         }
@@ -37839,18 +37843,16 @@ They can connect again from LINE.
                 const k = p.categoryKey || 'other';
                 counts[k] = (counts[k] || 0) + 1;
             });
-            const pills = [
-                `<button type="button" class="alabasta-filter-pill ${active === 'all' ? 'active' : ''}" onclick="setAlabastaProductCategoryFilter('all')">All · 전체 <span class="pill-count">${baseFiltered.length}</span></button>`
-            ];
+            // Alabasta lean: same shape as the case system rail — no "All" pill, icon + count, tap the active one again to clear.
+            const pills = [];
             ALABASTA_PRODUCT_CATEGORIES.forEach(c => {
                 const n = counts[c.key] || 0;
-                // Hide empty categories unless one is the active filter, so the rail
-                // doesn't carry seven dead chips on a queue of three products.
+                // Hide empty categories unless one is the active filter.
                 if (!n && active !== c.key) return;
-                pills.push(`<button type="button" class="alabasta-filter-pill ${active === c.key ? 'active' : ''}" onclick="setAlabastaProductCategoryFilter('${c.key}')">${c.emoji} ${c.label} <span class="pill-count">${n}</span></button>`);
+                pills.push(`<button type="button" class="alabasta-filter-pill ${active === c.key ? 'active' : ''}" onclick="setAlabastaProductCategoryFilter('${active === c.key ? 'all' : c.key}')" title="${c.label}" aria-label="${c.label}" aria-pressed="${active === c.key ? 'true' : 'false'}"><span aria-hidden="true">${c.emoji}</span> <span class="pill-count">${n}</span></button>`);
             });
-            // Alabasta lean: same rule as the case system pills — one category is not a choice.
-            const hideRail = active === 'all' && pills.length <= 2;
+            // One category is not a choice — hide until there are 2+ (an active filter keeps the rail).
+            const hideRail = active === 'all' && pills.length <= 1;
             row.style.display = hideRail ? 'none' : '';
             row.innerHTML = hideRail ? '' : pills.join('');
         }
