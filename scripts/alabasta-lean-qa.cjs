@@ -212,7 +212,7 @@ function grabDiv(id) {
     assert(Math.max(...tbTops) - Math.min(...tbTops) <= 12, 'toolbar is one row at 1280px: ' + tbTops);
     assert.equal(await page.locator('#alabasta-subtab-case-count').isVisible(), true, 'red dot on the Case tab while something waits');
     assert.equal(await page.locator('#alabasta-subtab-product-count').isVisible(), false);
-    assert.equal((await page.locator('#alabasta-subtab-case').innerText()).trim(), '🩺 Case', 'no number on the tab');
+    assert.equal((await page.locator('#alabasta-subtab-case').innerText()).replace(/\s+/g, ' ').trim(), '🩺 Case', 'no number on the tab');
     // search is an icon that opens the input; it stays open while it holds text
     assert.equal(await page.locator('#alabasta-case-search').isVisible(), false);
     await page.locator('#alabasta-case-toolbar .alabasta-search-wrap > button').click();
@@ -232,6 +232,48 @@ function grabDiv(id) {
     assert.equal(await page.locator('#alabasta-case-toolbar').isVisible(), false);
     await page.evaluate(() => setAlabastaSubtab('case'));
     assert.equal(await page.locator('#alabasta-status-rail').isVisible(), true);
+
+    // Phone (360px) layout B: row 1 = gear, tabs, date, search, tools | row 2 = status as icon + count | row 3 = systems; nothing wraps mid-row
+    await page.evaluate(() => {
+      const t = (h) => ({ toDate: () => new Date(Date.now() - h * 3600e3), toMillis: () => Date.now() - h * 3600e3 });
+      CASE_SYSTEMS.push({ key: 'other', emoji: '🩸', label: { en: 'Other', ko: '' } });
+      casesData = [
+        { id: 'a', status: 'pending', displayName: 'P1', caseId: 'H1', disease: 'A', diseaseSystemKey: 'resp', timestamp: t(1) },
+        { id: 'b', status: 'pending', displayName: 'P2', caseId: 'H2', disease: 'B', diseaseSystemKey: 'other', timestamp: t(2) },
+      ];
+      window.alabastaStatusFilter = 'all'; window.alabastaSystemFilter = 'all'; renderAlabastaCases();
+    });
+    await page.setViewportSize({ width: 360, height: 800 }); await page.waitForTimeout(150); // narrowest common phone; the card itself eats 28px of it
+    const top = (sel) => page.locator(sel).first().evaluate(n => Math.round(n.getBoundingClientRect().top));
+    const row1 = [await top('#alabasta-subtab-case'), await top('#alabasta-subtab-product'), await top('#alabasta-date-trigger'), await top('#alabasta-case-toolbar .alabasta-search-wrap > button'), await top('#alabasta-tools-menu > summary')];
+    assert(Math.max(...row1) - Math.min(...row1) <= 8, 'phone row 1 holds tabs, date, search, tools: ' + row1);
+    const statusTop = await top('#alabasta-status-all');
+    const statusTops = await page.locator('#alabasta-status-rail > .alabasta-filter-pill').evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().top)));
+    assert(Math.max(...statusTops) - Math.min(...statusTops) <= 4, 'status chips share one row: ' + statusTops);
+    assert(statusTop > Math.max(...row1) + 10, 'status row sits below row 1');
+    const sysTops = await page.locator('#alabasta-system-filter-pills > button').evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().top)));
+    assert(sysTops.length === 2 && Math.max(...sysTops) - Math.min(...sysTops) <= 4 && Math.min(...sysTops) > statusTop + 10, 'systems on their own row below status: ' + sysTops);
+    assert.equal(await page.locator('#alabasta-status-pending .alabasta-pill-label').isVisible(), false, 'pill names are hidden on the phone');
+    assert.equal(await page.locator('#alabasta-status-pending').getAttribute('title'), 'Pending');
+    assert.equal(await page.locator('#alabasta-toolbar').evaluate(n => n.scrollWidth <= n.clientWidth + 1), true, 'toolbar does not scroll sideways');
+    assert.equal(await page.locator('#alabasta-toolbar h4').isVisible(), false);
+    assert.equal(await page.locator('#alabasta-toolbar .case-taxonomy-gear').isVisible(), false, 'gear leaves row 1 on the phone');
+    await page.locator('#alabasta-tools-menu > summary').click();
+    assert.equal(await page.locator('.alabasta-tools-taxonomy').isVisible(), true, 'and lives in the tools menu');
+    await page.locator('#alabasta-tools-menu > summary').click();
+    // opening the search drops a full-width input between row 1 and the status row
+    await page.locator('#alabasta-case-toolbar .alabasta-search-wrap > button').click();
+    const sb = await page.locator('#alabasta-case-search').evaluate(n => { const b = n.getBoundingClientRect(); return [Math.round(b.top), Math.round(b.width)]; });
+    assert(sb[0] > Math.max(...row1) + 10 && sb[1] > 300, 'search input is a full-width row under row 1: ' + sb);
+    assert((await top('#alabasta-status-all')) > sb[0], 'status row moves below the open search');
+    await page.locator('#alabasta-case-search').fill('');
+    await page.locator('#alabasta-subtab-case').click({ force: true });
+    // desktop is untouched: labels are back, search is not full width
+    await page.setViewportSize({ width: 1280, height: 900 });
+    assert.equal(await page.locator('#alabasta-status-pending .alabasta-pill-label').isVisible(), true, 'desktop keeps the pill names');
+    assert.equal(await page.locator('#alabasta-toolbar .case-taxonomy-gear').isVisible(), true, 'desktop keeps the gear');
+    assert.equal(await page.locator('.alabasta-tools-taxonomy').isVisible(), false, 'taxonomy menu item is phone-only');
+    await page.evaluate(() => CASE_SYSTEMS.pop());
 
     // phone width: nothing spills sideways
     await page.setViewportSize({ width: 390, height: 800 });

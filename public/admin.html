@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.90)</title>
+    <title>Nika Admin (V102.91)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -2202,7 +2202,32 @@
         .alabasta-search-wrap { display: inline-flex; align-items: center; gap: 6px; }
         .alabasta-search-input { margin: 0; width: 200px; max-width: 100%; padding: 5px 12px; font-size: 0.8em; border-radius: 20px; border: 1px solid #fcd34d; }
         .alabasta-rail-tail { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
+        .alabasta-case-toolbar { display: flex; align-items: center; gap: 8px; }
+        .alabasta-rail-break { display: none; }
+        .alabasta-tools-taxonomy { display: none; }
         .alabasta-inbox-bar.is-empty { display: none; }
+        /* Alabasta lean (phone, <=640px): flatten the rails into the toolbar and place the pieces with `order`, so
+           nothing scrolls and nothing wraps mid-chip: 1 = ⚙️ tabs ··· 📅 🔎 ⋯   2 = status (icon + count)   3 = systems.
+           Opening the search drops a full-width input between rows 1 and 2. Pill names stay in title/aria-label. */
+        @media (max-width: 640px) {
+            .alabasta-toolbar { gap: 5px; }
+            .alabasta-toolbar .alabasta-subtab { padding: 4px 9px; font-size: 0.78em; gap: 4px; }
+            .alabasta-toolbar .alabasta-icon-toggle { width: 28px; height: 28px; }
+            .alabasta-toolbar .alabasta-date-trigger { padding: 4px 9px; gap: 3px; }
+            .alabasta-toolbar h4, .alabasta-toolbar .case-taxonomy-gear { display: none; }
+            .alabasta-tools-taxonomy { display: flex; }
+            #alabasta-status-rail, #alabasta-product-status-rail, #alabasta-case-toolbar, .alabasta-rail-tail, .alabasta-search-wrap { display: contents; }
+            .alabasta-date-popover-wrap { order: 2; }
+            #alabasta-case-toolbar > .alabasta-search-wrap > button, #alabasta-case-toolbar > details,
+            .alabasta-rail-tail > .alabasta-search-wrap > button, #alabasta-product-export-btn { order: 2; }
+            .alabasta-search-input { order: 3; flex: 1 1 100%; width: 100%; }
+            .alabasta-rail-break { display: block; flex: 0 0 100%; height: 0; order: 4; }
+            .alabasta-rail-break.b2 { order: 6; }
+            #alabasta-status-rail > .alabasta-filter-pill, #alabasta-product-status-rail > .alabasta-filter-pill { order: 5; }
+            #alabasta-system-filter-pills, #alabasta-product-category-pills { order: 7; flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 5px; margin: 0; padding: 0; border: 0; width: 100%; }
+            .alabasta-pill-label { display: none; }
+            .alabasta-subtab:not(.active) .alabasta-tab-label { display: none; }  /* the idle tab shrinks to its icon so row 1 fits */
+        }
         .alabasta-filter-pill .pill-count {
             font-size: 0.85em;
             font-weight: 900;
@@ -12009,16 +12034,17 @@
                          LINE MAN product submissions. The red dot = something is waiting in that queue. -->
                     <div class="alabasta-subtab-row" role="tablist" aria-label="Alabasta review queue">
                         <button type="button" id="alabasta-subtab-case" class="alabasta-subtab active" role="tab"
-                                aria-selected="true" onclick="setAlabastaSubtab('case')">🩺 Case <span class="alabasta-tab-dot" id="alabasta-subtab-case-count" hidden></span></button>
+                                aria-selected="true" title="Case" aria-label="Case" onclick="setAlabastaSubtab('case')">🩺 <span class="alabasta-tab-label">Case</span> <span class="alabasta-tab-dot" id="alabasta-subtab-case-count" hidden></span></button>
                         <button type="button" id="alabasta-subtab-product" class="alabasta-subtab" role="tab"
-                                aria-selected="false" onclick="setAlabastaSubtab('product')">🛒 Product <span class="alabasta-tab-dot" id="alabasta-subtab-product-count" hidden></span></button>
+                                aria-selected="false" title="Product" aria-label="Product" onclick="setAlabastaSubtab('product')">🛒 <span class="alabasta-tab-label">Product</span> <span class="alabasta-tab-dot" id="alabasta-subtab-product-count" hidden></span></button>
                     </div>
                     <div class="alabasta-filter-pills-row" id="alabasta-status-rail" style="flex:1 1 auto; margin-bottom:0;" aria-label="Filter by status">
                     <button type="button" id="alabasta-status-all" class="alabasta-filter-pill active" onclick="setAlabastaStatusFilter('all')">All <span class="pill-count" id="alabasta-case-total">0</span></button>
-                    <button type="button" id="alabasta-status-pending" class="alabasta-filter-pill" onclick="setAlabastaStatusFilter('pending')">📥 Pending <span class="pill-count" id="alabasta-case-pending">0</span></button>
-                    <button type="button" id="alabasta-status-reviewed" class="alabasta-filter-pill" onclick="setAlabastaStatusFilter('reviewed')">✅ Reviewed <span class="pill-count" id="alabasta-case-reviewed">0</span></button>
-                    <button type="button" id="alabasta-status-rejected" class="alabasta-filter-pill" onclick="setAlabastaStatusFilter('rejected')">❌ Rejected <span class="pill-count" id="alabasta-case-rejected">0</span></button>
+                    <button type="button" id="alabasta-status-pending" class="alabasta-filter-pill" title="Pending" aria-label="Pending" onclick="setAlabastaStatusFilter('pending')">📥 <span class="alabasta-pill-label">Pending</span> <span class="pill-count" id="alabasta-case-pending">0</span></button>
+                    <button type="button" id="alabasta-status-reviewed" class="alabasta-filter-pill" title="Reviewed" aria-label="Reviewed" onclick="setAlabastaStatusFilter('reviewed')">✅ <span class="alabasta-pill-label">Reviewed</span> <span class="pill-count" id="alabasta-case-reviewed">0</span></button>
+                    <button type="button" id="alabasta-status-rejected" class="alabasta-filter-pill" title="Rejected" aria-label="Rejected" onclick="setAlabastaStatusFilter('rejected')">❌ <span class="alabasta-pill-label">Rejected</span> <span class="pill-count" id="alabasta-case-rejected">0</span></button>
                 <!-- Alabasta lean: one rail — status │ system (icon + count; name in the tooltip). Filled by renderAlabastaSystemFilterPills(). -->
+                    <span class="alabasta-rail-break"></span><span class="alabasta-rail-break b2"></span>
                     <div id="alabasta-system-filter-pills" class="alabasta-rail-group" aria-label="Filter by disease system"></div>
                     <div class="alabasta-date-popover-wrap" style="margin-left:auto; margin-bottom:0;">
                     <button type="button"
@@ -12064,8 +12090,9 @@
                 <!-- V91.90: System filter pills · 시스템 필터 — populated by renderAlabastaSystemFilterPills() -->
                     <div class="alabasta-filter-pills-row" id="alabasta-product-status-rail" aria-label="Filter by status" style="display:none; flex:1 1 auto; margin-bottom:0;">
                         <button type="button" id="alabasta-product-status-all" class="alabasta-filter-pill active" onclick="setAlabastaProductStatusFilter('all')">All <span class="pill-count" id="alabasta-product-total">0</span></button>
-                        <button type="button" id="alabasta-product-status-pending" class="alabasta-filter-pill" onclick="setAlabastaProductStatusFilter('pending')">📥 Pending <span class="pill-count" id="alabasta-product-pending">0</span></button>
-                        <button type="button" id="alabasta-product-status-reviewed" class="alabasta-filter-pill" onclick="setAlabastaProductStatusFilter('reviewed')">✅ Reviewed <span class="pill-count" id="alabasta-product-reviewed">0</span></button>
+                        <button type="button" id="alabasta-product-status-pending" class="alabasta-filter-pill" title="Pending" aria-label="Pending" onclick="setAlabastaProductStatusFilter('pending')">📥 <span class="alabasta-pill-label">Pending</span> <span class="pill-count" id="alabasta-product-pending">0</span></button>
+                        <button type="button" id="alabasta-product-status-reviewed" class="alabasta-filter-pill" title="Reviewed" aria-label="Reviewed" onclick="setAlabastaProductStatusFilter('reviewed')">✅ <span class="alabasta-pill-label">Reviewed</span> <span class="pill-count" id="alabasta-product-reviewed">0</span></button>
+                        <span class="alabasta-rail-break"></span><span class="alabasta-rail-break b2"></span>
                         <div id="alabasta-product-category-pills" class="alabasta-rail-group" aria-label="Filter by product category"></div>
                         <span class="alabasta-rail-tail">
                             <span class="alabasta-search-wrap"><button type="button" class="alabasta-icon-toggle" onmousedown="event.preventDefault()" onclick="toggleAlabastaSearch('alabasta-product-search')" title="Search" aria-label="Search products"><span aria-hidden="true">🔎</span></button><input type="text" id="alabasta-product-search" class="alabasta-search-input" placeholder="Search product, user, category" onkeyup="renderAlabastaProducts()" onblur="if(!this.value) this.hidden=true" hidden></span>
@@ -12075,13 +12102,15 @@
                                     style="margin:0; padding:4px 11px; font-size:0.72em; font-weight:800; color:#166534; background:#fff; border:1px solid #86efac; border-radius:999px; cursor:pointer;">⬇️ CSV (0)</button>
                         </span>
                     </div>
-                    <div id="alabasta-case-toolbar" style="display:flex; align-items:center; gap:8px;">
+                    <div id="alabasta-case-toolbar" class="alabasta-case-toolbar">
                         <span class="alabasta-search-wrap"><button type="button" class="alabasta-icon-toggle" onmousedown="event.preventDefault()" onclick="toggleAlabastaSearch('alabasta-case-search')" title="Search" aria-label="Search cases"><span aria-hidden="true">🔎</span></button><input type="text" id="alabasta-case-search" class="alabasta-search-input" placeholder="Search case, user, disease" onkeyup="renderAlabastaCases()" onblur="if(!this.value) this.hidden=true" hidden></span>
                         <!-- Alabasta lean (Phase 1): maintenance tools folded into one ⋯ menu. Button ids kept —
                              reconcileSubmissionMirrors()/scanOrphanMirrors() swap their innerHTML while running. -->
                         <details class="alabasta-more-menu" id="alabasta-tools-menu">
                             <summary class="alabasta-icon-toggle" title="Tools" aria-label="Tools"><span aria-hidden="true">⋯</span></summary>
                             <div class="alabasta-more-menu-body" role="menu">
+                                <!-- Phone only: the gear leaves row 1 to make room and lives here instead. -->
+                                <button type="button" class="alabasta-more-menu-item alabasta-tools-taxonomy" onclick="closeAlabastaMoreMenus(); openCaseTaxonomyEditor();">⚙️ Edit Case Taxonomy</button>
                                 <!-- V95.97: one-shot backfill — sync reviewed cases whose intern submissions mirror is stuck on 'pending' -->
                                 <button type="button" id="alabasta-reconcile-btn" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); reconcileSubmissionMirrors();" title="Sync reviewed cases/work/reflective to intern view" aria-label="Sync intern view">🔧 Sync intern view</button>
                                 <!-- V97.27: sibling to 🔧 Sync intern — that one repairs mirrors whose
@@ -37802,7 +37831,7 @@ They can connect again from LINE.
             const caseToolbar = document.getElementById('alabasta-case-toolbar');
             if (casePane) casePane.style.display = isCase ? '' : 'none';
             if (productPane) productPane.style.display = isCase ? 'none' : '';
-            if (caseToolbar) caseToolbar.style.display = isCase ? 'flex' : 'none';
+            if (caseToolbar) caseToolbar.style.display = isCase ? '' : 'none';
             // The rails live in the shared toolbar row: show the one that belongs to the active tab.
             const caseRail = document.getElementById('alabasta-status-rail');
             const productRail = document.getElementById('alabasta-product-status-rail');
