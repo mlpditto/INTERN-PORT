@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.84)</title>
+    <title>Nika Admin (V102.85)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -2288,6 +2288,38 @@
             background: #ef4444;
         }
         /* V92.66 Phase 3-D: ⋯ More dropdown for case-row secondary actions (Laboon / Case Card / Poneglyph). */
+        .alabasta-action-btn.is-reject { background: #ef4444; }
+        /* Alabasta lean (Phase 2): primary text action + pending-row accent + folding Inbox banner */
+        .alabasta-go-btn {
+            display: inline-flex; align-items: center; gap: 4px;
+            width: auto; min-height: 34px; padding: 0 12px; margin: 0;
+            border: none; border-radius: 9px; background: #16a34a; color: #fff;
+            font-size: 0.82em; font-weight: 800; white-space: nowrap; cursor: pointer; font-family: inherit;
+        }
+        #alabastaCaseTable tr.alabasta-row-pending td { background: #fffdf5; }
+        #alabastaCaseTable tr.alabasta-row-pending td:first-child { box-shadow: inset 3px 0 0 #f59e0b; }
+        .alabasta-case-note { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #475569; }
+        .alabasta-case-sub { font-size: 0.78em; color: #64748b; }
+        .alabasta-inbox-head {
+            display: flex; align-items: center; gap: 10px; width: 100%; margin: 0; padding: 9px 14px;
+            border-radius: 12px; border: 1px solid #7dd3fc; background: linear-gradient(90deg, #e0f2fe, #f0f9ff);
+            color: #075985; font-weight: 800; font-size: 0.92em; text-align: left; cursor: pointer; font-family: inherit;
+        }
+        .alabasta-inbox-latest { font-weight: 600; opacity: 0.8; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .alabasta-inbox-cta { margin-left: auto; background: #0ea5e9; color: #fff; border-radius: 999px; padding: 3px 14px; font-size: 0.84em; white-space: nowrap; }
+        .alabasta-inbox-none { display: none; }
+        .alabasta-inbox-bar.is-empty .alabasta-inbox-head { background: #f0fdf4; border-color: #86efac; color: #166534; cursor: default; }
+        .alabasta-inbox-bar.is-empty .alabasta-inbox-some,
+        .alabasta-inbox-bar.is-empty .alabasta-inbox-latest,
+        .alabasta-inbox-bar.is-empty .alabasta-inbox-cta { display: none; }
+        .alabasta-inbox-bar.is-empty .alabasta-inbox-none { display: inline; }
+        .alabasta-inbox-body { display: none; border: 1px solid #7dd3fc; border-top: 0; border-radius: 0 0 12px 12px; padding: 10px; background: #f8fdff; }
+        .alabasta-inbox-bar.is-open:not(.is-empty) .alabasta-inbox-body { display: block; }
+        .alabasta-inbox-bar.is-open:not(.is-empty) .alabasta-inbox-head { border-radius: 12px 12px 0 0; }
+        .alabasta-inbox-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 10px; }
+        .alabasta-inbox-card { background: #fff; border: 1.5px solid #bae6fd; border-radius: 12px; padding: 10px 12px; min-width: 0; }
+        .alabasta-inbox-card .ib-note { font-size: 0.82em; color: #334155; margin: 6px 0 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .alabasta-inbox-card .ib-actions { display: flex; gap: 6px; align-items: center; }
         .alabasta-action-btn.is-more { background: #64748b; }
         .alabasta-more-menu {
             position: relative;
@@ -11891,22 +11923,20 @@
              casesData listeners / action handlers all keep working. -->
         <div id="tab-alabasta" class="tab-content">
             <!-- V92.64 Phase 2a: Inbox section — surfaces pending cases (LIFF submissions awaiting admin review) above the existing Cases repository. Same casesData global, just filtered to status==='pending' && !isArchived. -->
-            <div id="alabasta-inbox-section" class="review-card" style="margin-top:18px; border-color:#7dd3fc; background:linear-gradient(180deg, #f0f9ff 0%, #fff 100%); border-radius:14px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; border-bottom:1px solid #bae6fd; padding-bottom:10px; margin-bottom:12px;">
-                    <h4 style="margin:0; color:#075985; display:flex; align-items:center; gap:8px;">
-                        <span style="font-size:1.1em;">📥</span> Inbox · เคสจาก LIFF
-                    </h4>
-                    <span style="font-size:0.78em; color:#075985; font-weight:700; background:#fff; border:1px solid #7dd3fc; border-radius:999px; padding:4px 14px;">
-                        Pending · 대기 <b id="alabasta-inbox-count">0</b>
-                    </span>
-                </div>
-                <div id="alabasta-inbox-container" style="display:flex; flex-direction:column; gap:14px;">
-                    <!-- cards rendered by renderAlabastaInbox() -->
-                </div>
-                <div id="alabasta-inbox-empty" style="display:none; text-align:center; padding:32px 16px; color:#64748b;">
-                    <div style="font-size:2.4em; margin-bottom:8px; opacity:0.55;">📭</div>
-                    <div style="font-weight:700; color:#475569;">No pending submissions · ไม่มีเคสที่รอ</div>
-                    <div style="font-size:0.86em; margin-top:6px; color:#94a3b8;"><span class="lang-th">เคสที่ user ส่งมาทาง LIFF จะปรากฏตรงนี้ก่อนถูก mark reviewed</span></div>
+            <!-- Alabasta lean (Phase 2): the Inbox card folds into one banner. Collapsed by default; the compact
+                 cards open under it. Ids kept (alabasta-inbox-container/-empty/-count) for renderAlabastaInbox(). -->
+            <div id="alabasta-inbox-section" class="alabasta-inbox-bar is-empty" style="margin-top:18px;">
+                <button type="button" id="alabasta-inbox-toggle" class="alabasta-inbox-head" onclick="toggleAlabastaInbox()" aria-expanded="false" aria-controls="alabasta-inbox-body">
+                    <span aria-hidden="true">📥</span>
+                    <span class="alabasta-inbox-some"><b id="alabasta-inbox-count">0</b> waiting for review</span>
+                    <span id="alabasta-inbox-latest" class="alabasta-inbox-latest lang-no-toggle"></span>
+                    <span id="alabasta-inbox-empty" class="alabasta-inbox-none">✓ No cases waiting</span>
+                    <span id="alabasta-inbox-cta" class="alabasta-inbox-cta">Open ▾</span>
+                </button>
+                <div id="alabasta-inbox-body" class="alabasta-inbox-body">
+                    <div id="alabasta-inbox-container" class="alabasta-inbox-grid">
+                        <!-- cards rendered by renderAlabastaInbox() -->
+                    </div>
                 </div>
             </div>
 
@@ -12059,15 +12089,12 @@
                         <thead>
                             <tr style="background:#fef3c7;">
                                 <th style="width:36px; text-align:center;"><input type="checkbox" id="alabasta-select-all" class="alabasta-row-checkbox" onchange="setAlabastaSelectAll(this.checked)" aria-label="Select all visible cases"></th>
-                                <th>Time · 시간</th>
-                                <th>User · 사용자</th>
-                                <th>HN / Ref · 참조</th>
-                                <th>Disease · 질병</th>
-                                <th>Customer · 환자</th>
-                                <th>Note · 메모</th>
-                                <th>Score · 점수</th>
-                                <th>Status · 상태</th>
-                                <th>Action · 작업</th>
+                                <th>Time</th>
+                                <th>User</th>
+                                <th>Case</th>
+                                <th>Note</th>
+                                <th>Status</th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -23626,7 +23653,9 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         // Inbox section (pending cases) already sits at the top — mirrors the same
         // try/catch switchTab pattern used elsewhere for cross-tab chip navigation.
         function openAlabastaInbox() {
+            window.alabastaInboxOpen = true;
             try { switchTab('tab-alabasta'); } catch (_) {}
+            try { renderAlabastaInbox(); } catch (_) {}
         }
 
         var quizzesData = [];
@@ -37437,6 +37466,28 @@ They can connect again from LINE.
             container.innerHTML = pills.join('');
         }
 
+        // Alabasta lean (Phase 2): patient shown as initials ("สมชาย มีสุข" -> "ส.ม."); leading Thai vowels are
+        // skipped so "เอ็ม" gives "อ." not "เ.". Relative age keeps the Time column narrow (full date in title).
+        function alabastaInitials(name) {
+            const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+            return parts.slice(0, 2).map(w => {
+                const core = w.replace(/^[เแโใไ]+/, '') || w;
+                return Array.from(core)[0] + '.';
+            }).join('');
+        }
+        function alabastaAgo(ts) {
+            const ms = ts && ts.toMillis ? ts.toMillis() : (ts && ts.toDate ? ts.toDate().getTime() : 0);
+            if (!ms) return '';
+            const min = Math.floor((Date.now() - ms) / 60000);
+            if (min < 1) return 'now';
+            if (min < 60) return `${min} min`;
+            const hr = Math.floor(min / 60);
+            if (hr < 24) return `${hr} hr`;
+            const day = Math.floor(hr / 24);
+            if (day <= 14) return `${day} d`;
+            return new Date(ms).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+        }
+
         function renderAlabastaCases() {
             // V92.64 Phase 2a: Inbox shares the same casesData global; refresh both on every snapshot.
             renderAlabastaInbox();
@@ -37519,7 +37570,7 @@ They can connect again from LINE.
                     : systemFilter === 'all'
                     ? 'No case submissions found · 케이스가 없습니다'
                     : `No cases for the selected system · 선택된 시스템에 해당하는 케이스가 없습니다`;
-                tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:#94a3b8; padding:14px;">${emptyMsg}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#94a3b8; padding:14px;">${emptyMsg}</td></tr>`;
                 renderAlabastaBulkToolbar();
                 syncAlabastaSelectAllCheckbox();
                 return;
@@ -37528,37 +37579,39 @@ They can connect again from LINE.
             tbody.innerHTML = filtered.map(c => {
                 const isArchived = !!c.isArchived;
                 const isReviewed = isArchived || (c.status || '') === 'reviewed';
-                const ts = c.timestamp && c.timestamp.toDate ? c.timestamp.toDate().toLocaleString('th-TH') : '-';
-                const statusColor = isArchived ? '#334155' : (isReviewed ? '#16a34a' : '#d97706');
-                const statusBg = isArchived ? '#f1f5f9' : (isReviewed ? '#ecfdf5' : '#fffbeb');
+                const isPending = !isReviewed;
+                const tsFull = c.timestamp && c.timestamp.toDate ? c.timestamp.toDate().toLocaleString('th-TH') : '';
                 const bonus = Number(c.adminBonus || 0);
-                const scoreHtml = isReviewed
-                    ? `<span class="badge" style="background:#ecfdf5; color:#166534; border:1px solid rgba(22,101,52,0.18); font-weight:800;">${bonus.toFixed(2)} pts</span>`
-                    : `<span style="color:#94a3b8; font-size:0.82em;">-</span>`;
-                const statusBtn = isReviewed
-                    ? `<button class="btn-sm alabasta-action-btn is-reopen" title="Reopen case" onclick="updateCaseStatus('${c.id}', 'pending')"><span class="alabasta-emoji">↩️</span></button>`
-                    : `<button class="btn-sm alabasta-action-btn is-review" title="Mark reviewed" onclick="updateCaseStatus('${c.id}', 'reviewed')"><span class="alabasta-emoji">✅</span></button>`;
-                const editBtn = `<button class="btn-sm alabasta-action-btn is-edit" title="Edit case note" onclick="editCaseNote('${c.id}')"><span class="alabasta-emoji">✏️</span></button>`;
-                const deleteBtn = `<button class="btn-sm alabasta-action-btn is-delete" title="Delete case" onclick="deleteCaseSubmission('${c.id}')"><span class="alabasta-emoji">🗑️</span></button>`;
+                const statusHtml = isArchived
+                    ? `<span class="badge" title="${safe(c.rejectedReason || '')}" style="background:#f1f5f9; color:#334155; border:1px solid #33415533;">${c.status === 'rejected' ? '✕ Rejected' : 'Archived'}</span>`
+                    : (isReviewed
+                        ? `<span class="badge" style="background:#ecfdf5; color:#166534; border:1px solid #16a34a33;">✓ ${bonus.toFixed(2)} pts</span>`
+                        : `<span class="badge" style="background:#fffbeb; color:#d97706; border:1px solid #d9770633;">Pending</span>`);
                 const hasPoneglyphLink = !!c.poneglyphNoteId;
-                // V92.66 Phase 3-D: secondary actions (Laboon / Case Card / Poneglyph) collapsed
-                // behind ⋯ More to keep the row to 4 visible buttons (Edit · Review/Reopen · Delete · More).
+                // Alabasta lean (Phase 2): the visible actions are the primary one only — Review + Reject while
+                // pending, Reopen once reviewed. Edit / Delete and the AI tools all live behind ⋯.
+                const mainActions = isPending
+                    ? `<button type="button" class="alabasta-go-btn" title="Mark reviewed" onclick="updateCaseStatus('${c.id}', 'reviewed')">✅ Review</button><button type="button" class="btn-sm alabasta-action-btn is-reject" title="Reject" aria-label="Reject case" onclick="openAlabastaRejectModal('${c.id}')"><span class="alabasta-emoji">❌</span></button>`
+                    : `<button type="button" class="btn-sm alabasta-action-btn is-reopen" title="Reopen case" aria-label="Reopen case" onclick="updateCaseStatus('${c.id}', 'pending')"><span class="alabasta-emoji">↩️</span></button>`;
                 const moreBtn = `<details class="alabasta-more-menu">
                     <summary class="btn-sm alabasta-action-btn is-more" title="More actions"><span class="alabasta-emoji">⋯</span></summary>
                     <div class="alabasta-more-menu-body" role="menu">
-                        <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); openAlabastaLaboon('${c.id}');"><span class="alabasta-emoji">🐳</span> Ask Laboon · Laboon에게 묻기</button>
-                        <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); openAlabastaCaseCard('${c.id}');"><span class="alabasta-emoji">🖼️</span> Generate Case Card · 카드 생성</button>
-                        <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); openAlabastaPoneglyph('${c.id}');"><span class="alabasta-emoji">🪨</span> ${hasPoneglyphLink ? 'Open Poneglyph draft · 초안 열기' : 'Promote to Poneglyph · 승격'}</button>
-                        <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); generateQuizFromCase('${c.id}');"><span class="alabasta-emoji">📝</span> Generate Quiz from Case · 케이스에서 퀴즈 생성</button>
+                        <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); editCaseNote('${c.id}');"><span class="alabasta-emoji">✏️</span> Edit case</button>
+                        <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); openAlabastaLaboon('${c.id}');"><span class="alabasta-emoji">🐳</span> Ask Laboon</button>
+                        <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); openAlabastaCaseCard('${c.id}');"><span class="alabasta-emoji">🖼️</span> Generate Case Card</button>
+                        <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); openAlabastaPoneglyph('${c.id}');"><span class="alabasta-emoji">🪨</span> ${hasPoneglyphLink ? 'Open Poneglyph draft' : 'Promote to Poneglyph'}</button>
+                        <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); generateQuizFromCase('${c.id}');"><span class="alabasta-emoji">📝</span> Generate Quiz from Case</button>
+                        <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); deleteCaseSubmission('${c.id}');"><span class="alabasta-emoji">🗑️</span> Delete case</button>
                     </div>
                 </details>`;
-                const actionBtn = `<div class="alabasta-action-row">${editBtn}${statusBtn}${deleteBtn}${moreBtn}</div>`;
+                const actionBtn = `<div class="alabasta-action-row">${mainActions}${moreBtn}</div>`;
 
                 const isSelected = window.alabastaSelectedIds.has(c.id);
+                const initials = alabastaInitials(c.customer);
                 return `
-                    <tr>
+                    <tr class="${isPending ? 'alabasta-row-pending' : ''}">
                         <td style="text-align:center;"><input type="checkbox" class="alabasta-row-checkbox" data-id="${c.id}" ${isSelected ? 'checked' : ''} onchange="toggleAlabastaSelection('${c.id}', this.checked)" aria-label="Select case ${safe(c.caseId || c.id)}"></td>
-                        <td style="font-size:0.8em; white-space:nowrap;">${safe(ts)}</td>
+                        <td style="white-space:nowrap; font-weight:700;" title="${safe(tsFull)}">${safe(alabastaAgo(c.timestamp) || '-')}</td>
                         <!-- V99.19: lang-no-toggle on the cells that print intern-typed text. Notes
                              and patient names are usually all Thai, and in EN mode the walker hid
                              them, leaving only the Latin drug names. Disease stays toggled. -->
@@ -37568,12 +37621,13 @@ They can connect again from LINE.
                                 <div style="font-weight:700;">${safe(c.displayName || c.userId || '-')}</div>
                             </div>
                         </td>
-                        <td class="lang-no-toggle" style="font-family:monospace; font-size:0.85em;">${safe(c.caseId || '-')}</td>
-                        <td>${safe(c.disease || '-')}</td>
-                        <td class="lang-no-toggle">${safe(c.customer || '-')}</td>
-                        <td class="lang-no-toggle" style="max-width:260px; white-space:normal;">${safe(c.note || '-')}</td>
-                        <td>${scoreHtml}</td>
-                        <td><span class="badge" style="background:${statusBg}; color:${statusColor}; border:1px solid ${statusColor}33;">${isArchived ? 'archived · 보관' : (isReviewed ? 'reviewed · 검토 완료' : 'pending · 대기')}</span></td>
+                        <!-- Patient shown as initials only; the full name is on the case itself (✏️ Edit case). -->
+                        <td>
+                            <div style="font-weight:700; color:#7c2d12;">${safe(c.disease || '-')}</div>
+                            <div class="alabasta-case-sub lang-no-toggle"><span style="font-family:monospace;">${safe(c.caseId || '-')}</span>${c.diseaseSystemLabel ? ' · 🏥 ' + safe(c.diseaseSystemLabel) : ''}${initials ? ' · ' + safe(initials) : ''}</div>
+                        </td>
+                        <td class="lang-no-toggle alabasta-case-note" title="${safe(c.note || '')}">${safe(c.note || '-')}</td>
+                        <td>${statusHtml}</td>
                         <td>${actionBtn}</td>
                     </tr>
                 `;
@@ -48434,9 +48488,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
         function renderAlabastaInbox() {
             const container = document.getElementById('alabasta-inbox-container');
-            const emptyEl = document.getElementById('alabasta-inbox-empty');
+            const section = document.getElementById('alabasta-inbox-section');
             const countEl = document.getElementById('alabasta-inbox-count');
-            if (!container || !emptyEl || !countEl) return;
+            if (!container || !section || !countEl) return;
 
             const pending = (casesData || []).filter(c =>
                 !c.isArchived &&
@@ -48451,67 +48505,56 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (chipCountEl) chipCountEl.textContent = pending.length;
             if (chipEl) chipEl.style.display = pending.length > 0 ? 'flex' : 'none';
 
-            if (pending.length === 0) {
+            const isEmpty = pending.length === 0;
+            const isOpen = !!window.alabastaInboxOpen && !isEmpty;
+            section.classList.toggle('is-empty', isEmpty);
+            section.classList.toggle('is-open', isOpen);
+            const toggleBtn = document.getElementById('alabasta-inbox-toggle');
+            if (toggleBtn) {
+                toggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                toggleBtn.style.cursor = isEmpty ? 'default' : 'pointer';
+            }
+            const ctaEl = document.getElementById('alabasta-inbox-cta');
+            if (ctaEl) ctaEl.textContent = isOpen ? 'Close ▴' : 'Open ▾';
+            const latestEl = document.getElementById('alabasta-inbox-latest');
+            if (isEmpty) {
                 container.innerHTML = '';
-                container.style.display = 'none';
-                emptyEl.style.display = 'block';
+                if (latestEl) latestEl.textContent = '';
                 return;
             }
-            container.style.display = 'flex';
-            emptyEl.style.display = 'none';
 
             const safe = (v) => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-            const fmtAgo = (ts) => {
-                if (!ts || !ts.toMillis) return '';
-                const ms = Date.now() - ts.toMillis();
-                const min = Math.floor(ms / 60000);
-                if (min < 1) return 'just now';
-                if (min < 60) return `${min} min ago`;
-                const hr = Math.floor(min / 60);
-                if (hr < 24) return `${hr} hr ago`;
-                const day = Math.floor(hr / 24);
-                return `${day} day${day === 1 ? '' : 's'} ago`;
-            };
-            const truncate = (s, n) => {
-                s = String(s || '');
-                return s.length > n ? s.slice(0, n - 1) + '…' : s;
-            };
+            if (latestEl) latestEl.textContent = '· latest ' + (pending[0].displayName || 'Anonymous') + ' · ' + alabastaAgo(pending[0].timestamp);
 
             container.innerHTML = pending.map(c => {
-                const tagsHtml = Array.isArray(c.symptomTags) && c.symptomTags.length
-                    ? c.symptomTags.slice(0, 6).map(t => `<span style="display:inline-block; padding:2px 8px; background:#e0f2fe; color:#075985; border-radius:6px; font-size:0.78em; font-weight:600; margin-right:4px;">${safe(t)}</span>`).join('')
-                    : '';
-                const noteText = truncate(c.note || '', 220);
+                const initials = alabastaInitials(c.customer);
                 const avatar = c.pictureUrl
-                    ? `<img src="${safe(c.pictureUrl)}" alt="" style="width:36px; height:36px; border-radius:50%; object-fit:cover; border:1.5px solid #bae6fd;">`
-                    : `<div style="width:36px; height:36px; border-radius:50%; background:#bae6fd; color:#075985; display:flex; align-items:center; justify-content:center; font-weight:800;">?</div>`;
+                    ? `<img src="${safe(c.pictureUrl)}" alt="" style="width:30px; height:30px; border-radius:50%; object-fit:cover; border:1.5px solid #bae6fd; flex:none;">`
+                    : `<div style="width:30px; height:30px; border-radius:50%; background:#bae6fd; color:#075985; display:flex; align-items:center; justify-content:center; font-weight:800; flex:none;">?</div>`;
                 return `
-                    <div class="alabasta-inbox-card" style="background:#fff; border:1.5px solid #bae6fd; border-radius:14px; padding:14px 16px; box-shadow:0 2px 6px rgba(7,89,133,0.06);">
-                        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;">
-                            <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
-                                ${avatar}
-                                <div style="min-width:0;">
-                                    <div style="font-weight:800; color:#0f172a; font-size:0.95em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${safe(c.displayName || 'Anonymous')}</div>
-                                    <div style="font-size:0.75em; color:#64748b;">${fmtAgo(c.timestamp)}</div>
-                                </div>
-                            </div>
+                    <div class="alabasta-inbox-card lang-no-toggle">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            ${avatar}
+                            <div style="min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><b>${safe(c.displayName || 'Anonymous')}</b> <span style="font-size:0.78em; color:#64748b;">· ${safe(alabastaAgo(c.timestamp))}</span></div>
+                            <span style="font-family:monospace; font-size:0.78em; color:#64748b;">${safe(c.caseId || '—')}</span>
                         </div>
-                        <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; font-size:0.82em; color:#475569; align-items:center;">
-                            <span style="font-weight:700;">HN:</span> <code style="background:#f1f5f9; padding:1px 6px; border-radius:4px;">${safe(c.caseId || '—')}</code>
-                            ${c.customer ? `<span>·</span><span class="lang-no-toggle"><b>Patient:</b> ${safe(c.customer)}</span>` : ''}
-                            ${c.diseaseSystemLabel ? `<span>·</span><span style="color:#7c2d12;">🏥 ${safe(c.diseaseSystemLabel)}</span>` : ''}
-                        </div>
-                        ${c.disease ? `<div style="font-weight:700; color:#7c2d12; margin-bottom:6px;">${safe(c.disease)}</div>` : ''}
-                        ${tagsHtml ? `<div style="margin-bottom:8px;">${tagsHtml}</div>` : ''}
-                        ${noteText ? `<div class="lang-no-toggle" style="background:#f8fafc; border-left:3px solid #7dd3fc; padding:8px 12px; border-radius:6px; font-size:0.88em; color:#334155; line-height:1.55; margin-bottom:12px; white-space:pre-wrap;">${safe(noteText)}</div>` : ''}
-                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                            <button type="button" onclick="updateCaseStatus('${c.id}', 'reviewed')" style="flex:1; min-width:130px; padding:8px 14px; background:#16a34a; color:#fff; border:none; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.86em;">✅ Mark Reviewed</button>
-                            <button type="button" onclick="openAlabastaRejectModal('${c.id}')" style="flex:1; min-width:120px; padding:8px 14px; background:#fff; color:#dc2626; border:1.5px solid #fecaca; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.86em;">❌ Reject</button>
-                            <button type="button" onclick="editCaseNote('${c.id}')" style="flex:1; min-width:120px; padding:8px 14px; background:#fff; color:#334155; border:1.5px solid #e2e8f0; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.86em;">👁 Open Case</button>
-                            <button type="button" onclick="openAlabastaCaseCard('${c.id}')" style="flex:1; min-width:140px; padding:8px 14px; background:#fff; color:#7c3aed; border:1.5px solid #ddd6fe; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.86em;">🖼️ Generate Card</button>
+                        <div style="font-weight:700; color:#7c2d12; margin-top:6px;">${safe(c.disease || '—')}</div>
+                        <div class="alabasta-case-sub">${c.diseaseSystemLabel ? '🏥 ' + safe(c.diseaseSystemLabel) : ''}${initials ? (c.diseaseSystemLabel ? ' · ' : '') + safe(initials) : ''}</div>
+                        <div class="ib-note" title="${safe(c.note || '')}">${safe(c.note || '')}</div>
+                        <div class="ib-actions">
+                            <button type="button" class="alabasta-go-btn" onclick="updateCaseStatus('${c.id}', 'reviewed')" title="Mark reviewed">✅ Review</button>
+                            <button type="button" class="btn-sm alabasta-action-btn is-reject" onclick="openAlabastaRejectModal('${c.id}')" title="Reject" aria-label="Reject case"><span class="alabasta-emoji">❌</span></button>
+                            <button type="button" class="btn-sm alabasta-action-btn is-edit" onclick="editCaseNote('${c.id}')" title="Open case" aria-label="Open case"><span class="alabasta-emoji">👁</span></button>
+                            <button type="button" class="btn-sm alabasta-action-btn is-case-card" onclick="openAlabastaCaseCard('${c.id}')" title="Generate case card" aria-label="Generate case card"><span class="alabasta-emoji">🖼️</span></button>
                         </div>
                     </div>`;
             }).join('');
+        }
+
+        // Alabasta lean (Phase 2): fold / unfold the Inbox banner. Folded by default.
+        function toggleAlabastaInbox() {
+            window.alabastaInboxOpen = !window.alabastaInboxOpen;
+            renderAlabastaInbox();
         }
 
         function openAlabastaRejectModal(caseDocId) {
