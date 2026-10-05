@@ -270,7 +270,8 @@ function grabDiv(id) {
     await page.locator('#alabasta-subtab-case').click({ force: true });
     // desktop is untouched: labels are back, search is not full width
     await page.setViewportSize({ width: 1280, height: 900 });
-    assert.equal(await page.locator('#alabasta-status-pending .alabasta-pill-label').isVisible(), true, 'desktop keeps the pill names');
+    assert.equal(await page.locator('#alabasta-status-pending .alabasta-pill-label').isVisible(), false, 'desktop pills drop the names');
+    assert.equal(await page.locator('#alabasta-status-pending').getAttribute('aria-label'), 'Pending', 'pill name stays in aria-label');
     assert.equal(await page.locator('#alabasta-toolbar .case-taxonomy-gear').isVisible(), true, 'desktop keeps the gear');
     assert.equal(await page.locator('.alabasta-tools-taxonomy').isVisible(), false, 'taxonomy menu item is phone-only');
     await page.evaluate(() => CASE_SYSTEMS.pop());
