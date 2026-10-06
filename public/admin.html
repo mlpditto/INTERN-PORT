@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.95)</title>
+    <title>Nika Admin (V102.96)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -48796,7 +48796,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 return;
             }
             try {
-                await db.collection('cases').doc(caseDocId).update({
+                const batch = db.batch();
+                batch.update(db.collection('cases').doc(caseDocId), {
                     status: 'rejected',
                     rejectedReason: reason,
                     rejectedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -48805,6 +48806,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     archivedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     adminUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
+                // Clear the intern's pending state too — the review path (updateCaseStatus) always did; reject did not, so a
+                // rejected case stayed "pending" in the intern's submissions mirror. The intern app reads any non-pending mirror
+                // status as "reviewed", so it shows a reviewed card with 0 pts (no separate rejected look there yet).
+                await stageSubmissionMirror(batch, caseDocId, {
+                    status: 'rejected', score: 0, adminBonus: 0, pointsAwarded: false, pointsAmount: 0,
+                    rejectedReason: reason, reviewedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                await batch.commit();
                 closeAlabastaRejectModal();
                 if (typeof showToast === 'function') showToast(`Rejected: ${reason}`, 'success');
             } catch (e) {
