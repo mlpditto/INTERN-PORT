@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.96)</title>
+    <title>Nika Admin (V102.97)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -28493,7 +28493,7 @@ ${JSON.stringify(sourceObj)}`;
                 } else {
                     // Standard quiz questions
                     (quiz.questions || []).forEach((q, i) => {
-                        const studentAns = (att.answers || att.practiceAnswers || [])[i];
+                        const studentAns = quizAttemptAnswers(att)[i];
                         const isChoice = (q.type || 'choice') === 'choice';
                         const isManuallyCorrect = !!(att.manualCorrect && att.manualCorrect[i] === true);
                         let isCorrect = false;
@@ -28890,7 +28890,7 @@ ${JSON.stringify(sourceObj)}`;
 
                 const incorrectBlocks = [];
                 (quiz.questions || []).forEach((q, i) => {
-                    const studentAns = (att.answers || att.practiceAnswers || [])[i];
+                    const studentAns = quizAttemptAnswers(att)[i];
                     const isChoice = (q.type || 'choice') === 'choice';
                     const isManuallyCorrect = !!(att.manualCorrect && att.manualCorrect[i] === true);
 
@@ -31212,6 +31212,16 @@ ${JSON.stringify(sourceObj)}`;
         window.choiceAnswerMatches = choiceAnswerMatches;
         window.parseStoredChoiceAnswer = parseStoredChoiceAnswer;
 
+        // A ONE-TIME practice run keeps its answers in `practiceAnswers`, but the attempt doc was created with an all-null
+        // `answers` array when the run started — so `att.answers || att.practiceAnswers` always picked the empty array and the
+        // review showed "(no answer)" and 0 pts next to a "26/30 (P)" score. Use the practice answers when there are no real ones.
+        function quizAttemptAnswers(att) {
+            const real = Array.isArray(att && att.answers) ? att.answers : [];
+            const hasReal = real.some(a => a !== null && a !== undefined && a !== '');
+            if (!hasReal && Array.isArray(att && att.practiceAnswers) && att.practiceAnswers.length) return att.practiceAnswers;
+            return real;
+        }
+
         function calculateAttemptScoring(att, quiz) {
             const qList = quiz.questions || [];
             const qCount = Math.max(1, qList.length);
@@ -31223,7 +31233,7 @@ ${JSON.stringify(sourceObj)}`;
             let totalScore = 0;
 
             qList.forEach((q, i) => {
-                const userAns = (att.answers || [])[i];
+                const userAns = quizAttemptAnswers(att)[i];
                 const isChoice = (q.type || 'choice') === 'choice';
                 const manuallyCorrect = manualCorrect[i] === true;
                 // autoFraction is 0..1; binary 0/1 for everything except partial-credit
@@ -31355,7 +31365,7 @@ ${JSON.stringify(sourceObj)}`;
                 const att = attDoc.data();
                 const quiz = quizForAttempt(quizzesData.find(x => x.id === att.quizId), att, quizzesData);
                 const q = quiz.questions[qIndex];
-                const studentAns = (att.answers || [])[qIndex];
+                const studentAns = quizAttemptAnswers(att)[qIndex];
                 const guideline = (q.options || [])[0] || 'No specific guideline provided. Use general medical/technical knowledge.';
 
                 const prompt = `You are an expert examiner. Evaluate this student's short answer for a quiz.
