@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.103)</title>
+    <title>Nika Admin (V102.104)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -28052,8 +28052,9 @@ ${JSON.stringify(sourceObj)}`;
                 let totalScorePct = 0;
                 let scoredCount = 0;
                 activeAttempts.forEach(a => {
-                    if (a.status === 'approved' && a.totalQuestions > 0) {
-                        totalScorePct += (a.correctCount / a.totalQuestions);
+                    const cnt = quizAttemptCounts(a, quiz);
+                    if (a.status === 'approved' && cnt.total > 0) {
+                        totalScorePct += (cnt.correct / cnt.total);
                         scoredCount++;
                     }
                 });
@@ -28097,7 +28098,8 @@ ${JSON.stringify(sourceObj)}`;
                     const fmtScore = (n) => { const r = Math.round(Number(n) * 1e4) / 1e4; return Number.isFinite(r) ? String(r) : String(n); };
                     let score = "-";
                     if (att.status === 'approved') {
-                        score = (fmtScore(att.correctCount) + "/" + (att.totalQuestions || "-"));
+                        const cnt = quizAttemptCounts(att, quiz);
+                        score = (fmtScore(cnt.correct) + "/" + (cnt.total || "-"));
                     } else if (att.status === 'practice_done') {
                         score = `<span style="color:#f57f17;">${fmtScore(att.practiceScore || 0)}/${att.practiceTotalQ || "-"} (P)</span>`;
                     }
@@ -31260,6 +31262,16 @@ ${JSON.stringify(sourceObj)}`;
             return real;
         }
 
+        // "correct / total" for an attempt row. A practice run only has practiceScore / practiceTotalQ, and approving it from
+        // the Review modal used to leave correctCount / totalQuestions unset → "undefined/-" and no place in the class average.
+        function quizAttemptCounts(att, quiz) {
+            const a = att || {};
+            const total = Number(a.totalQuestions) > 0 ? Number(a.totalQuestions)
+                : (Number(a.practiceTotalQ) > 0 ? Number(a.practiceTotalQ) : ((quiz && quiz.questions && quiz.questions.length) || 0));
+            const c = a.correctCount !== undefined && a.correctCount !== null ? a.correctCount : a.practiceScore;
+            return { correct: Number.isFinite(Number(c)) ? Number(c) : 0, total };
+        }
+
         function calculateAttemptScoring(att, quiz) {
             const qList = quiz.questions || [];
             const qCount = Math.max(1, qList.length);
@@ -31590,6 +31602,7 @@ ${JSON.stringify(sourceObj)}`;
                 b.update(docRef, {
                     gradedAnswers: gradedAnswers,
                     correctCount: quiz.questions.length,
+                    totalQuestions: att.totalQuestions || quiz.questions.length,
                     score: 1.0,
                     isApproved: true,
                     status: 'approved',
@@ -31668,12 +31681,16 @@ ${JSON.stringify(sourceObj)}`;
                 if (!confirmed) return;
                 
                 const b = db.batch();
-                b.update(docRef, {
+                const approveUpdate = {
                     score: parseFloat(scoreRatio.toFixed(4)),
                     isApproved: true,
                     status: 'approved',
                     approvedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                };
+                // a practice attempt has no correctCount / totalQuestions yet — give the row (and the class average) their numbers
+                if (att.correctCount === undefined || att.correctCount === null) approveUpdate.correctCount = curCorrect;
+                if (!(Number(att.totalQuestions) > 0)) approveUpdate.totalQuestions = totalQ;
+                b.update(docRef, approveUpdate);
                 
                 if (att.userId && pointsToAdd > 0) {
                     b.update(db.collection("users").doc(att.userId), { score: firebase.firestore.FieldValue.increment(pointsToAdd) });
