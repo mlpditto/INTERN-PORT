@@ -108,6 +108,21 @@ async function open(browser, { quiz, attempt, cheat }) {
       assert.equal(await page.locator('#reviewQuizOverlay >> text=/^Correct:$/').count(), 1);
       await ctx.close();
     }
+    // ---- 1c. the card title already carries ✔/✖: a single pick repeats no mark, a multi-pick keeps per-option marks
+    {
+      const { page, ctx } = await open(browser, { quiz: baseQuiz(), attempt: baseAttempt({ answers: [0, 1, 1, 1, 1, 1], correctCount: 5 }) });
+      const html = await page.locator('#reviewQuizOverlay').innerHTML();
+      const marks = (html.match(/✔|✖/g) || []).length;
+      assert.equal(marks, 6, 'only the six card titles carry a ✔/✖, the answer rows add none: ' + marks);
+      await ctx.close();
+    }
+    {
+      const quiz = baseQuiz(); quiz.questions = [{ type: 'choice', q: 'Pick all', options: ['A', 'B', 'C'], correct: [0, 2] }];
+      const { page, ctx } = await open(browser, { quiz, attempt: baseAttempt({ answers: [[0, 1]], totalQuestions: 1, correctCount: 0 }) });
+      const html = await page.locator('#reviewQuizOverlay').innerHTML();
+      assert(/✔/.test(html) && /✖/.test(html), 'multi-pick keeps ✔ on the right option and ✖ on the wrong one');
+      await ctx.close();
+    }
     // ---- 2. Moderate cheat reading opens its own card; High timing too
     {
       const cheat = { summary: { totalEvents: 3, riskLabel: 'Moderate', tabSwitchCount: 2, blurCount: 1 }, events: [{ type: 'tab_hidden', timestamp: Date.now(), details: { hiddenDurationSec: 14 } }] };
