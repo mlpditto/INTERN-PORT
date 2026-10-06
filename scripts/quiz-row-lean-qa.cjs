@@ -57,9 +57,13 @@ function grabTable(id) {
     }
     assert.equal(await row(0).locator('td').count(), 3, 'row has 3 cells');
 
-    // line 1: title + (short) + feedback + audit; no third "(short)" line
+    // line 1: title + (short); the feedback / audit badges share line 2 with the flags (V102.101)
     const l1 = (await row(0).locator('.qa-l1').innerText()).replace(/\s+/g, ' ');
-    assert(l1.includes('Retail Pharmacy-2') && l1.includes('(Retail-2)') && l1.includes('⭐') && l1.includes('3.3'), 'line 1: ' + l1);
+    assert(l1.includes('Retail Pharmacy-2') && l1.includes('(Retail-2)') && !l1.includes('⭐') && !l1.includes('3.3'), 'line 1: ' + l1);
+    const l2txt = (await row(0).locator('.qa-l2').innerText()).replace(/\s+/g, ' ');
+    assert(l2txt.includes('⭐') && l2txt.includes('3.3'), 'line 2 carries feedback + audit: ' + l2txt);
+    const l2tops = await row(0).locator('.qa-l2 > *').evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().top)));
+    assert(Math.max(...l2tops) - Math.min(...l2tops) < 12, 'badges and flags sit on ONE line: ' + l2tops);
     assert.equal(await row(1).locator('.qa-sh').count(), 0, 'no "(-)" when there is no short title');
 
     // line 2: every flag is an icon-only chip
