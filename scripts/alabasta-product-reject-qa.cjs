@@ -176,10 +176,15 @@ function grabConst(name) {
     assert.deepEqual(await page.locator('.alabasta-reject-preset').evaluateAll(els => els.map(e => e.dataset.reason)),
       ['ข้อมูลไม่ครบ · Incomplete info', 'เคสซ้ำ · Duplicate', 'ไม่เกี่ยวข้อง · Not relevant']);
     await page.locator('.alabasta-reject-preset').nth(1).click();
-    // the CASE path is unchanged: one update on cases/a, nothing on product_listings or the mirror
-    assert.deepEqual(await page.evaluate(() => writes.map(w => w.kind + ':' + w.col + ':' + w.id)), ['update:cases:a']);
+    // the CASE path: cases/a is updated AND the intern's submissions mirror leaves "pending" — one batch, nothing on product_listings
+    assert.deepEqual(await page.evaluate(() => writes.map(w => w.kind + ':' + (w.col || '') + ':' + w.id)), ['batchUpdate:cases:a', 'mirror::a', 'commit::undefined']);
     assert.equal(await page.evaluate(() => writes[0].d.rejectedReason), 'เคสซ้ำ · Duplicate');
     assert.equal(await page.evaluate(() => writes[0].d.isArchived), true);
+    assert.equal(await page.evaluate(() => writes[1].fields.status), 'rejected', 'case mirror leaves pending');
+    assert.equal(await page.evaluate(() => writes[1].fields.score), 0);
+    assert.equal(await page.evaluate(() => writes[1].fields.pointsAwarded), false);
+    assert.equal(await page.evaluate(() => writes[1].fields.rejectedReason), 'เคสซ้ำ · Duplicate');
+    assert.equal(await page.evaluate(() => writes.some(x => x.col === 'product_listings')), false);
     // "Other" opens the textarea and rejects nothing by itself
     await page.evaluate(() => { writes.length = 0; openAlabastaRejectModal('a'); });
     await page.locator('#alabasta-reject-custom-toggle').click();
