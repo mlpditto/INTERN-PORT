@@ -125,7 +125,13 @@
         }
         var water = document.getElementById('fw-water');
         if (water) water.innerHTML = skyHtml(places.site.wx) + slopeWater(home, site) + riverWater(places.site.data && places.site.data.river, home, site);
-        placeCaps();
+        var strip = document.getElementById('fw-river-strip');
+        if (strip) {
+            var sh = riverStrip(places.site.data && places.site.data.river);
+            strip.innerHTML = sh.html;
+            strip.setAttribute('aria-label', sh.label);
+            strip.hidden = !sh.html;
+        }
     }
 
     // V101.32: the card water shows BOTH places — one surface sloping from home (left)
@@ -195,74 +201,24 @@
             out += '<svg class="fw-slope" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="fwgRiver" x1="0" x2="1">' + stops + '</linearGradient></defs>' +
                 layer(LEVEL[L], LEVEL[R], 0, 'url(#fwgRiver)') + '</svg>';
         }
-        st.forEach(function (r, i) {
-            if (!r) return;
-            var lvl = LEVEL[L] + (LEVEL[R] - LEVEL[L]) * smooth(RV_X[i]);
-            var ar = r.d24 == null || Math.abs(r.d24) < 30 ? '' : '<i class="fw-ar ' + (r.d24 > 0 ? 'up' : 'down') + '">' + (r.d24 > 0 ? '▲' : '▼') + '</i>';
-            out += '<span class="fw-rc" data-i="' + i + '" style="left:' + RV_X[i] * 100 + '%;top:calc(var(--fw-base, 100%) * ' + (1 - lvl / 100) + ' - 10px)">' +
-                '<i class="fw-rd" style="background:' + RV_COL[rvTier(r.q)] + '"></i><small>' + esc(r.code) + '</small>' + (r.q / 1000).toFixed(1) + 'k' + ar + '</span>';
-        });
-        // Fallback for a card with no room for three capsules (phones): ONE pill, a dot per gauge + the highest flow.
-        var shown = st.filter(Boolean), top = Math.max.apply(null, shown.map(function (r) { return r.q; }));
-        out += '<span class="fw-rc fw-rc-sum" data-i="0" style="display:none;left:' + RV_X[0] * 100 + '%;top:calc(var(--fw-base, 100%) * ' + (1 - (LEVEL[L] + (LEVEL[R] - LEVEL[L]) * smooth(RV_X[0])) / 100) + ' - 10px)">' +
-            st.map(function (r) { return r ? '<i class="fw-rd" style="background:' + RV_COL[rvTier(r.q)] + '"></i>' : ''; }).join('') + (top / 1000).toFixed(1) + 'k</span>';
         return out;
     }
 
-    // The capsules sit on the water at 20 / 50 / 80 %, where the rail buttons (💰 🔥 …) and the pts row can be. Tiers, tried in
-    // order until one fits (so it follows the device, the card width and the button size):
-    //   full → compact (no gauge code / arrow) → the same two LIFTED into the free band between the pts row and the check-in
-    //   buttons → one summary pill → nothing (the popup has it all).
-    // Within a tier, walk right → left and slide each capsule clear of whatever it overlaps and of its right neighbour.
-    function placeCaps() {
-        var wt = document.getElementById('fw-water'), card = document.getElementById('section-profile-combined');
-        if (!wt || !card) return;
-        var caps = [].slice.call(wt.querySelectorAll('.fw-rc:not(.fw-rc-sum)')), sum = wt.querySelector('.fw-rc-sum');
-        if (!caps.length) return;
-        var w = wt.getBoundingClientRect();
-        var rel = function (e) { var r = e.getBoundingClientRect(); return { l: r.left - w.left, r: r.right - w.left, t: r.top - w.top, b: r.bottom - w.top }; };
-        var blocks = [].map.call(card.querySelectorAll('#profile-quick-actions button, .profile-score-values > *, .unified-metrics-bar button, #daily-checkin-card > *'), rel);
-        var low = [].map.call(card.querySelectorAll('.unified-metrics-bar button, #daily-checkin-card > *'), rel).filter(function (b) { return b.r > b.l; });
-        var pts = [].map.call(card.querySelectorAll('.profile-score-values > *'), rel).filter(function (b) { return b.r > b.l; });
-        var lift = null;   // top (px, in the water box) of the lifted band, or null when there is no free band
-        if (low.length) {
-            var h = 18, y = Math.min.apply(null, low.map(function (b) { return b.t; })) - h - 6;
-            if (y >= Math.max.apply(null, pts.map(function (b) { return b.b; }).concat(0)) + 4) lift = y;
-        }
-        caps.concat(sum || []).forEach(function (c) { if (!c.hasAttribute('data-top')) c.setAttribute('data-top', c.style.top); });
-        var fits = function (els, lifted) {
-            var limit = Infinity;
-            for (var k = els.length - 1; k >= 0; k--) {
-                var c = els[k];
-                c.style.display = '';   // before measuring: a hidden capsule has no width
-                c.style.top = lifted ? lift + 'px' : c.getAttribute('data-top');
-                var cw = c.offsetWidth;
-                c.style.left = RV_X[c.getAttribute('data-i')] * w.width + 'px';
-                var r = rel(c);
-                var right = Math.min(r.r, limit), moved = true, guard = 0;
-                while (moved && guard++ < 8) {
-                    moved = false;
-                    blocks.forEach(function (b) {
-                        if (r.t < b.b && r.b > b.t && right - cw < b.r && right > b.l) { right = b.l - 6; moved = true; }
-                    });
-                }
-                var left = right - cw;
-                if (left < 4) return false;
-                c.style.left = left + cw / 2 + 'px';
-                limit = left - 6;
-            }
-            return true;
-        };
-        var hide = function (els) { els.forEach(function (c) { c.style.display = 'none'; }); };
-        if (sum) sum.style.display = 'none';
-        var tiers = [[false, false], [true, false]].concat(lift == null ? [] : [[false, true], [true, true]]);
-        for (var t = 0; t < tiers.length; t++) {
-            wt.classList.toggle('fw-rc-compact', tiers[t][0]);
-            if (fits(caps, tiers[t][1])) return;
-        }
-        wt.classList.remove('fw-rc-compact');
-        hide(caps);
-        if (sum && !fits([sum], false) && !(lift != null && fits([sum], true))) hide([sum]);
+    // V101.63: river flow as ONE in-flow strip under the pts row (#fw-river-strip) instead of capsules floating on the card water — those were
+    // positioned once from a snapshot of the layout, so they landed on the buttons / the date nudge whenever a row shifted. The water keeps its tint.
+    function riverStrip(rv) {
+        var none = { html: '', label: '' };
+        if (!rv || !rv.stations) return none;
+        var parts = [], labels = [];
+        rv.stations.forEach(function (r) {
+            if (!r || r.q == null || !r.at || Date.now() - r.at >= 36 * 3600e3) return;
+            var ar = r.d24 == null || Math.abs(r.d24) < 30 ? '' : '<i class="fw-ar ' + (r.d24 > 0 ? 'up' : 'down') + '">' + (r.d24 > 0 ? '▲' : '▼') + '</i>';
+            var k = (r.q / 1000).toFixed(1) + 'k';
+            parts.push('<span class="fw-rs" title="' + esc(r.code) + ' · ' + Math.round(r.q).toLocaleString('en-US') + ' m³/s"><i class="fw-rd" style="background:' + RV_COL[rvTier(r.q)] + '"></i>' + k + ar + '</span>');
+            labels.push(r.code + ' ' + k);
+        });
+        if (!parts.length) return none;
+        return { html: '<i class="fa-solid fa-water fw-rs-ic" aria-hidden="true"></i>' + parts.join(''), label: 'River flow ' + labels.join(', ') + ' — open flood watch' };
     }
 
     function stats(d) {
@@ -458,7 +414,6 @@
         var wt = document.getElementById('fw-water');
         if (wt) wt.classList.toggle('fw-open', !!open);
         card.style.setProperty('--fw-base', (card.offsetHeight - (open ? det.offsetHeight + 8 : 0)) + 'px');
-        placeCaps();
     }
 
     window.fwInit = function () {
