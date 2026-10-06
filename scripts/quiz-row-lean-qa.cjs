@@ -65,6 +65,9 @@ function grabTable(id) {
     const l2tops = await row(0).locator('.qa-l2 > *').evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().top)));
     assert(Math.max(...l2tops) - Math.min(...l2tops) < 12, 'badges and flags sit on ONE line: ' + l2tops);
     assert.equal(await row(1).locator('.qa-sh').count(), 0, 'no "(-)" when there is no short title');
+    // the short title is a repeat of the full one (any case, template suffix ignored) → shown once
+    const dup = await page.evaluate(() => [generateRow({ id: 'q3', title: 'CPA0910-2025-E4/DRSP', shortTitle: 'cpa0910-2025-e4/drsp ', quizType: 'graded', questions: [] }), generateRow({ id: 'q4', title: 'Abx (Template)', shortTitle: 'Abx', isTemplate: true, quizType: 'graded', questions: [] })]);
+    assert(dup.every(h => !h.includes('qa-sh')), 'same short title is not repeated');
 
     // line 2: every flag is an icon-only chip
     const chips1 = row(0).locator('.qa-l2 .qa-fi');
