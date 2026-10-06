@@ -108,6 +108,16 @@ async function open(browser, { quiz, attempt, cheat }) {
       assert.equal(await page.locator('#reviewQuizOverlay >> text=/^Correct:$/').count(), 1);
       await ctx.close();
     }
+    // ---- 1d. per-question footer is icon-only: the words live in title / aria-label
+    {
+      const { page, ctx } = await open(browser, { quiz: baseQuiz(), attempt: baseAttempt({ answers: [0, 1, 1, 1, 1, 1], correctCount: 5 }) });
+      const txt = await page.locator('#reviewQuizOverlay').innerText();
+      for (const w of ['Mark as Correct', 'Q Score', 'See Full Question']) assert(!txt.includes(w), 'no visible "' + w + '"');
+      assert(!/^Save$|^Copy$/m.test(txt), 'no visible Save / Copy');
+      for (const t of ['Mark as Correct / Graded', 'Q Score', 'Save Q Score', 'See Full Question']) assert((await page.locator('#reviewQuizOverlay [title="' + t + '"]').count()) >= 6, 'title ' + t);
+      assert((await page.locator('#reviewQuizOverlay [aria-label^="Copy question"]').count()) >= 6, 'copy label');
+      await ctx.close();
+    }
     // ---- 1c. the card title already carries ✔/✖: a single pick repeats no mark, a multi-pick keeps per-option marks
     {
       const { page, ctx } = await open(browser, { quiz: baseQuiz(), attempt: baseAttempt({ answers: [0, 1, 1, 1, 1, 1], correctCount: 5 }) });
