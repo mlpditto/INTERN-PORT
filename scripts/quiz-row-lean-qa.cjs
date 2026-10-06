@@ -48,6 +48,18 @@ function grabTable(id) {
       };
       document.querySelector('#quizzesTableActive tbody').innerHTML = window.__rows.q1 + window.__rows.q2;`
     });
+    // the REAL Live pill (V102.103): a dot + the countdown, no "Live" word; the words stay in title / aria-label
+    const pillSrc = html.slice(html.indexOf('window.quizLivePillHtml = function (q) {'), html.indexOf('async function toggleQuizStatus')).replace('window.quizLivePillHtml', 'window.__realPill');
+    assert(pillSrc.length > 200, 'quizLivePillHtml not found');
+    await page.addScriptTag({ content: `var QUIZ_TIMER_HOURS = [1]; var quizTimerLabel = (h) => h + 'h';
+      window.quizLiveState = (q) => ({ kind: 'live', dead: q.dead ? new Date(q.dead) : null });
+      ${pillSrc}` });
+    const pill = await page.evaluate(() => [window.__realPill({ id: 'q1', dead: '2030-01-01T00:00:00Z' }), window.__realPill({ id: 'q1' })]);
+    for (const h of pill) {
+      const t = await page.evaluate(x => { const d = document.createElement('div'); d.innerHTML = x; return { text: d.querySelector('summary').textContent.replace(/\s+/g, ' ').trim(), title: d.querySelector('summary').title, dot: !!d.querySelector('.qa-dot') }; }, h);
+      assert(!/Live/.test(t.text), 'no "Live" word on the pill: ' + t.text);
+      assert(t.dot && /Live/.test(t.title), 'dot stays, words in the title: ' + JSON.stringify(t));
+    }
     const tbody = page.locator('#quizzesTableActive tbody');
     const row = (n) => tbody.locator('tr').nth(n);
 
