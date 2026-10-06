@@ -80,6 +80,18 @@ const cardHtml = (id, withStart) => `<div class="assignment-card" id="${id}"><di
         assert.equal(pl.bottom, '-12px');
         assert.equal(await page.locator('#plain .quiz-mat-ribbon').evaluate(a => getComputedStyle(a).backgroundColor), 'rgb(30, 142, 62)', 'Drive = green');
 
+        // V101.64: an open card has the 🔗 share button — the download tile sits in a column directly under it
+        await page.evaluate(() => {
+            document.querySelector('main').insertAdjacentHTML('beforeend', '<div class="assignment-card" id="side"><div class="assign-header"><div class="assign-icon">i</div><div class="assign-info"><h4>T</h4></div><button onclick="event.stopPropagation(); qzShareLink(&quot;q9&quot;)" style="width:32px;height:32px;padding:0">&#128279;</button></div></div>');
+            const card = document.getElementById('side');
+            attachQuizMaterialRibbon(card, quizMaterialActionsHtml({ id: 'q9', materials: [{ url: 'https://example.com/files/slides.pdf', name: 'Slides' }] }));
+        });
+        assert.equal(await page.locator('#side .quiz-mat-anchor').count(), 0, 'no cover anchor when the share button is there');
+        const sh = await page.locator('#side .quiz-side > button').boundingBox(), dl = await page.locator('#side .quiz-side .quiz-mat-ribbon').boundingBox();
+        assert.ok(dl.y >= sh.y + sh.height && dl.y - (sh.y + sh.height) < 12, 'download tile is right under the share button');
+        assert.ok(Math.abs((dl.x + dl.width / 2) - (sh.x + sh.width / 2)) < 2, 'and centred on it');
+        assert.equal(Math.round(dl.width), 32, '32px tile like the share button');
+
         // no materials / unsafe URL → nothing
         assert.equal(await page.evaluate(() => quizMaterialActionsHtml({ materials: [{ url: 'javascript:alert(1)' }] })), '');
 
