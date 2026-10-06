@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.104)</title>
+    <title>Nika Admin (V102.105)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -3984,6 +3984,19 @@
         .tkf-user img { width:20px; height:20px; border-radius:50%; object-fit:cover; display:block; }
         #sq-user-list { max-height:150px; overflow-y:auto; }
         /* V102.70: PONEGLYPH ▸ Memories timeline */
+        /* Participants modal header (V102.105): one row, icon buttons, soft chip instead of the yellow banner */
+        .ppl-head { display:flex; align-items:center; gap:10px; min-width:0; padding-bottom:12px; margin-bottom:12px; border-bottom:1px solid #f1f5f9; }
+        .ppl-head h3 { margin:0; color:var(--primary); font-weight:900; font-size:1.15em; display:flex; align-items:center; gap:10px; min-width:0; flex:1; }
+        .ppl-head h3 span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .ppl-avg { background:rgba(67,97,238,.08); color:var(--primary); font-size:.85em; font-weight:900; padding:5px 12px; border-radius:20px; border:1px solid rgba(67,97,238,.15); white-space:nowrap; }
+        .ppl-ib { width:32px; height:32px; min-height:0; padding:0; border-radius:10px; border:1px solid #edf2f7; background:#f8fafc; color:#475569; display:inline-flex; align-items:center; justify-content:center; flex:none; cursor:pointer; font-size:.95em; transition:.2s; }
+        .ppl-ib:hover { background:#f1f5f9; }
+        #quiz-stats-chip { display:flex; align-items:center; }
+        .ppl-chip { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:20px; background:#fef9c3; color:#854d0e; font-size:.72em; box-shadow:0 2px 6px rgba(133,77,14,.2); cursor:help; }
+        .ppl-bars { display:inline-flex; gap:2px; align-items:center; }
+        .ppl-bars i { width:4px; height:10px; border-radius:2px; background:#facc15; }
+        .ppl-bars i.o { background:rgba(133,77,14,.15); }
+        @media (max-width:600px) { .ppl-head { flex-wrap:wrap; } .ppl-head h3 { flex:1 1 100%; } }
         .pm-tl { position:relative; margin:10px 0 0 10px; padding-left:20px; border-left:2px dashed rgba(148,163,184,.55); }
         .pm-mo { margin:14px 0 0 -10px; font-weight:800; color:#64748b; font-size:.78em; letter-spacing:.06em; }
         .pm-card { position:relative; display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px; padding:10px 12px; border-radius:16px; background:linear-gradient(180deg, rgba(255,255,255,.85), rgba(255,255,255,.55)); border:1px solid rgba(255,255,255,.9); box-shadow:0 2px 8px rgba(15,23,42,.07); }
@@ -14190,23 +14203,15 @@
 
         <div id="quizParticipantsModal" class="modal" style="z-index:30000;">
             <div class="modal-content" style="max-width: 1000px;">
-                <span class="close-modal"
-                    onclick="forceHideModal('quizParticipantsModal')">&times;</span>
-                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #f1f5f9; padding-bottom:15px; margin-bottom:15px;">
-                    <h3 style="color:var(--primary); margin:0; font-weight:900; display:flex; align-items:center; gap:12px;">👥 Analytics: Quiz Participants</h3>
-                    <div style="display:flex; align-items:center; gap:12px;">
-                        <span id="quiz-avg-score-badge"
-                            style="background:rgba(67, 97, 238, 0.08); color:var(--primary); font-size:0.85em; font-weight:900; padding:6px 14px; border-radius:20px; border:1px solid rgba(67, 97, 238, 0.15); backdrop-filter:blur(10px);">📊 Avg Score: -</span>
-                        <input type="checkbox" id="hideScoresToggle" onchange="toggleQuizScores()"
-                            style="display:none;">
-                        <label for="hideScoresToggle"
-                            style="cursor:pointer; font-size:1.3em; background:#f8fafc; width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; border:1px solid #edf2f7; transition:0.2s;" id="hideScoresIcon"
-                            title="Show/Hide Scores" onmouseover="this.style.background='#f1f5f9'">
-                            👁️
-                        </label>
-                    </div>
+                <!-- Lean header (V102.105): title + quiz name, Avg, the "need 10+ attempts" chip, eye and X on ONE row; words live in the tooltips. -->
+                <div class="ppl-head">
+                    <h3 title="Analytics: Quiz Participants">&#128101; <span id="quiz-participants-info"></span></h3>
+                    <span id="quiz-avg-score-badge" class="ppl-avg" title="Average score of the graded attempts">&#128202; &mdash;</span>
+                    <span id="quiz-stats-chip"></span>
+                    <input type="checkbox" id="hideScoresToggle" onchange="toggleQuizScores()" style="display:none;">
+                    <label for="hideScoresToggle" id="hideScoresIcon" class="ppl-ib" title="Show/Hide Scores"><i class="fa-solid fa-eye" style="color:#666;"></i></label>
+                    <button type="button" class="ppl-ib" title="Close" aria-label="Close" onclick="forceHideModal('quizParticipantsModal')"><i class="fa-solid fa-xmark"></i></button>
                 </div>
-                <div id="quiz-participants-info" style="margin:10px 0 15px; font-size:0.9em; color:#666;"></div>
                 <!-- V93.91 Quiz Quality Q6: per-question stats injected by renderQuizPerQuestionStatsHtml -->
                 <div id="quiz-question-stats"></div>
                 <!-- V93.92 Quiz Quality Q7: security summary injected by renderQuizSecuritySummaryHtml -->
@@ -27866,14 +27871,18 @@ ${JSON.stringify(sourceObj)}`;
             return { tooEasy, tooHard, totalAttempts: attempts.length };
         }
 
+        // V102.105: "need 10+ attempts" as a small chip in the Participants header (info icon + n of 10 bars); the sentence is the tooltip.
+        function quizStatsLowNChipHtml(n) {
+            if (!(n > 0 && n < 10)) return '';
+            const tip = `Per-question stats hidden — need 10+ attempts for reliable analytics (current: ${n})`;
+            return `<span class="ppl-chip" role="img" title="${tip}" aria-label="${tip}"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><span class="ppl-bars">${'<i></i>'.repeat(n)}${'<i class="o"></i>'.repeat(10 - n)}</span></span>`;
+        }
+
         function renderQuizPerQuestionStatsHtml(quiz, attempts) {
             const n = (attempts || []).length;
             if (!quiz || n === 0) return '';
-            if (n < 10) {
-                return `<div style="background:#fef9c3; border:1px solid #fde047; border-radius:12px; padding:12px; margin:14px 0; font-size:0.85em; color:#854d0e;">
-                    <i class="fa-solid fa-info-circle"></i> <b>Per-question stats hidden — need 10+ attempts for reliable analytics (current: ${n}).</b>
-                </div>`;
-            }
+            if (n < 10) return '';   // the header chip (quizStatsLowNChipHtml) says why
+
             const stats = computeQuizPerQuestionStats(quiz, attempts);
             if (!stats || stats.length === 0) return '';
 
@@ -27989,7 +27998,7 @@ ${JSON.stringify(sourceObj)}`;
             const avgBadge = document.getElementById('quiz-avg-score-badge');
             
             container.innerHTML = "<div style='text-align:center; padding:20px;'><i class='fa-solid fa-circle-notch fa-spin'></i> Loading participants...</div>";
-            info.innerText = `Quiz ID: ${quizId}`; // Temporary fallback
+            info.innerText = quizId; // Temporary fallback
 
             let quiz = (typeof quizzesData !== 'undefined' && Array.isArray(quizzesData)) ? quizzesData.find(x => x.id === quizId) : null;
 
@@ -28010,7 +28019,7 @@ ${JSON.stringify(sourceObj)}`;
                 return;
             }
 
-            info.innerText = `Quiz: ${quiz.title}`;
+            info.innerText = quiz.title || quizId;
 
             try {
                 // 🔥 [Version: V88.50] Try fetching from local cache FIRST for immediate display
@@ -28029,7 +28038,10 @@ ${JSON.stringify(sourceObj)}`;
 
                 if (attempts.length === 0) {
                     container.innerHTML = "<p style='text-align:center; padding:20px; color:#999;'>No one has taken this quiz yet.</p>";
-                    avgBadge.innerText = "Avg: -";
+                    avgBadge.innerText = "📊 —";
+                    avgBadge.title = "No attempts yet";
+                    const chipEmpty = document.getElementById('quiz-stats-chip');
+                    if (chipEmpty) chipEmpty.innerHTML = '';
                     const statsEmpty = document.getElementById('quiz-question-stats');
                     if (statsEmpty) statsEmpty.innerHTML = '';
                     const secEmpty = document.getElementById('quiz-security-summary');
@@ -28061,12 +28073,15 @@ ${JSON.stringify(sourceObj)}`;
                 // The count now reads "graded / total attempts", so the badge explains
                 // its own denominator instead of implying every attempt was graded.
                 avgBadge.innerText = scoredCount > 0
-                    ? `Avg: ${(totalScorePct / scoredCount * 100).toFixed(1)}% (${scoredCount}/${attempts.length})`
-                    : `Avg: — (0/${attempts.length})`;
+                    ? `📊 ${(totalScorePct / scoredCount * 100).toFixed(1)}% · ${scoredCount}/${attempts.length}`
+                    : `📊 — · 0/${attempts.length}`;
+                avgBadge.title = `Average of the ${scoredCount} graded attempt(s) out of ${attempts.length} total`;
 
                 // V93.91 Quiz Quality Q6: per-question stats panel (10+ attempt low-N gate inside)
                 const statsContainer = document.getElementById('quiz-question-stats');
                 if (statsContainer) statsContainer.innerHTML = renderQuizPerQuestionStatsHtml(quiz, activeAttempts);
+                const chipSlot = document.getElementById('quiz-stats-chip');
+                if (chipSlot) chipSlot.innerHTML = quizStatsLowNChipHtml(activeAttempts.length);
 
                 // V93.92 Quiz Quality Q7: cheat-detector aggregate (skips silently if no monitoring data)
                 const secContainer = document.getElementById('quiz-security-summary');
