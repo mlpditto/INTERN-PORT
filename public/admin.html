@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.111)</title>
+    <title>Nika Admin (V102.112)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -37344,7 +37344,10 @@ They can connect again from LINE.
             const users = (usersData || [])
                 .filter(u => group === 'All' || ((u.group || 'Public') === group && !u.isIgnored && !u.isPreReg))
                 .slice()
-                .sort((a, b) => (a.fullName || a.displayName || '').localeCompare(b.fullName || b.displayName || '', 'th'));
+                .sort((a, b) => {
+                    const ls = u => (u.lastSeen && u.lastSeen.toMillis ? u.lastSeen.toMillis() : 0);
+                    return (ls(b) - ls(a)) || (a.fullName || a.displayName || '').localeCompare(b.fullName || b.displayName || '', 'th');
+                });
 
             title.textContent = group === 'All' ? `Users (${users.length})` : `Users · ${group} (${users.length})`;
 
@@ -37363,9 +37366,10 @@ They can connect again from LINE.
                 const points = parseFloat((u.score || 0).toFixed(2));
                 const beri = Math.round(u.beri || 0);
                 const initials = name.trim().split(/\s+/).slice(0, 2).map(p => p[0] || '').join('');
-                // V102.111: users.lastSeen is stamped by index.html on every open.
+                // V102.112: list is sorted by it (latest first). users.lastSeen is stamped by index.html on every open.
                 const lastSeenMs = u.lastSeen && u.lastSeen.toMillis ? u.lastSeen.toMillis() : 0;
-                const lastSeenText = lastSeenMs ? `${alabastaAgo(u.lastSeen)}${alabastaAgo(u.lastSeen) === 'now' ? '' : ' ago'}` : 'never';
+                const lastSeenAgo = lastSeenMs ? alabastaAgo(u.lastSeen) : '';
+                const lastSeenText = !lastSeenMs ? 'never' : (/^\d+ (min|hr|d)$/.test(lastSeenAgo) ? `${lastSeenAgo} ago` : lastSeenAgo);
                 const lastSeenTitle = lastSeenMs ? `Last seen ${new Date(lastSeenMs).toLocaleString('th-TH')}` : 'Never opened the app';
 
                 const row = document.createElement('div');
