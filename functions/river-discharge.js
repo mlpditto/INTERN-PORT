@@ -106,7 +106,7 @@ async function aiReadPdf(buf, apiKey, missing) {
             { text: 'This is the Thai Royal Irrigation Department Chao Phraya basin situation infographic. Each river gauge is labelled with its code and a figure written current(percent)/capacity in m3/s. ' +
                 `For these gauges: ${want} — return the CURRENT value (the number before the parenthesis, m3/s) exactly as printed. Use null if you cannot read it. Do not guess.` }
         ] }],
-        generationConfig: { temperature: 0, responseMimeType: 'application/json' },
+        generationConfig: { responseMimeType: 'application/json' },
         systemInstruction: { parts: [{ text: 'Answer ONLY with JSON of the form {"stations":[{"code":"C.2","q":123}]}.' }] }
     }, { timeout: 60000 });
     const txt = (((res.data.candidates || [])[0] || {}).content || {}).parts;
