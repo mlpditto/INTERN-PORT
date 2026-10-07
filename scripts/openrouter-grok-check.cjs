@@ -163,8 +163,9 @@ const ok = (content, finish = 'stop', usage = { prompt_tokens: 100, completion_t
     // V101.74: the rail builder is shared (providerModelRailHtml); trial models reach it only through the
     // audit toolbar's call — the Expand Quiz modal passes no `extra`, so Grok stays audit-only.
     const trialUses = admin.match(/TEXT_AI_TRIAL_MODELS/g) || [];
-    // V102.11: + the Compare modal's Model B rail (user asked for Grok there); V102.83: + the Learning Path strip (user asked for Ollama there); still no Settings default.
-    check('T8 admin.html offers trial models only in the audit toolbar + Model B + Learning Path strip (three call sites)', `${trialUses.length}|${/return window\.providerModelRailHtml\(inputId, selected, action, TEXT_AI_TRIAL_MODELS\);/.test(admin)}|${/textAIChipsHtml\('', window\._compareModelB\(\), 'window\.setCompareModelB\(this\)', TEXT_AI_TRIAL_MODELS\)/.test(admin)}`, '3|true|true');
+    // V102.11: + the Compare modal's Model B rail (user asked for Grok there); V102.83: + the Learning Path strip (user asked for Ollama there);
+    // V102.118: + Reflective Review's Model + Writing Analysis rows (rrInitModelRow / rrSyncModelRow, user asked for both logos there); still no Settings default.
+    check('T8 admin.html offers trial models only in the audit toolbar + Model B + Learning Path strip + Reflective Review rows (five references)', `${trialUses.length}|${/return window\.providerModelRailHtml\(inputId, selected, action, TEXT_AI_TRIAL_MODELS\);/.test(admin)}|${/textAIChipsHtml\('', window\._compareModelB\(\), 'window\.setCompareModelB\(this\)', TEXT_AI_TRIAL_MODELS\)/.test(admin)}`, '5|true|true');
     check('T8 shared rail adds trial chips + tabs only from `extra`', /textAIChipContents\(selected, action, null, extra\)[\s\S]{0,900}\[\.\.\.TEXT_AI_MODELS, \.\.\.extra\]\.map/.test(admin), true);
     check('T8 Expand Quiz rail passes no trial models', /providerModelRailHtml\('suggest-more-model', sqmModel, sqmAction\)/.test(admin), true);
     check('T8 Analyze tab does not save a trial pick as the Settings default', /;if\(!isTrialTextAIModel\(this\.dataset\.value\)\)syncModelDefault\('ai-analyzer-model-val',this\.dataset\.value\)/.test(admin), true);
