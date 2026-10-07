@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.118)</title>
+    <title>Nika Admin (V102.119)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6539,6 +6539,46 @@
             margin-top: 15px;
         }
 
+        /* V102.119: Archive modal — tabs with counts, Quest history pane (chips · search · date · clamped text · stacked avatars · icon actions). */
+        .ar-modal .ar-tabs { display:flex; gap:6px; margin:10px 0 12px; padding-bottom:8px; border-bottom:1px solid #e2e8f0; }
+        .ar-modal .ar-tab { width:auto; min-height:0; padding:5px 12px; border-radius:999px; border:1px solid #e2e8f0; background:#fff; font-family:inherit; font-size:0.8em; font-weight:800; color:#64748b; cursor:pointer; }
+        .ar-modal .ar-tab.on { background:#fff7ed; border-color:#fdba74; color:#9a3412; }
+        .ar-modal .ar-tab b { margin-left:4px; font-weight:900; }
+        .ar-modal .ar-pane[hidden] { display:none; }
+        .ar-modal .ar-pane-bar { display:flex; justify-content:flex-end; min-height:0; }
+        .ar-modal .ar-pane-bar .btn-sm { width:auto; }
+        .ar-modal .ar-filters { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+        .ar-modal .ar-chip { width:auto; min-height:0; padding:4px 10px; border-radius:999px; border:1px solid #e2e8f0; background:#fff; font-family:inherit; font-size:0.75em; font-weight:800; color:#475569; cursor:pointer; }
+        .ar-modal .ar-chip.on { background:#f59e0b; border-color:#f59e0b; color:#20130a; }
+        .ar-modal .ar-chip b { margin-left:3px; }
+        .ar-modal .ar-chip[hidden] { display:none; }
+        .ar-modal .ar-search { margin-left:auto; width:160px; min-height:0; padding:5px 10px; border:1px solid #e2e8f0; border-radius:999px; font-family:inherit; font-size:0.78em; }
+        .ar-modal .ar-card { background:#fff; border:1px solid #f1f5f9; border-radius:14px; padding:6px 12px; overflow-x:auto; }
+        .ar-modal .ar-table { width:100%; border-collapse:collapse; }
+        .ar-modal .ar-table th { font-size:0.72em; text-transform:uppercase; letter-spacing:0.05em; color:#64748b; text-align:left; padding:8px 6px; border-bottom:1px solid #f1f5f9; }
+        .ar-modal .ar-table td { padding:8px 6px; border-bottom:1px solid #f1f5f9; vertical-align:middle; font-size:0.92em; }
+        .ar-modal .ar-table tr:last-child td { border-bottom:0; }
+        .ar-modal .ar-table tr.is-draft td:first-child { box-shadow:inset 3px 0 #fcd34d; }
+        .ar-modal .ar-table tr.is-scheduled td:first-child { box-shadow:inset 3px 0 #93c5fd; }
+        .ar-modal .ar-date { white-space:nowrap; color:#64748b; font-size:0.8em !important; font-weight:700; }
+        .ar-modal .ar-q { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.4; max-width:620px; overflow-wrap:anywhere; }
+        .ar-modal .ar-pts { font-weight:800; color:#334155; white-space:nowrap; text-align:center; }
+        .ar-modal .ar-who { white-space:nowrap; }
+        .ar-modal .ar-avs { display:inline-flex; vertical-align:middle; }
+        .ar-modal .ar-av { position:relative; width:26px; height:26px; border-radius:50%; background:#94a3b8; color:#fff; font-size:0.7em; font-weight:800; display:inline-flex; align-items:center; justify-content:center; border:2px solid #fff; box-shadow:0 0 0 1px #e2e8f0; box-sizing:border-box; object-fit:cover; }
+        .ar-modal .ar-av + .ar-av { margin-left:-8px; }
+        .ar-modal .ar-av.ok::after { content:''; position:absolute; right:-1px; bottom:-1px; width:8px; height:8px; border-radius:50%; background:#22c55e; border:1.5px solid #fff; }
+        .ar-modal .ar-n { margin-left:6px; font-size:0.78em; font-weight:900; color:#1d4ed8; vertical-align:middle; }
+        .ar-modal .ar-none { color:#cbd5e1; }
+        .ar-modal .ar-act { display:flex; gap:4px; justify-content:flex-end; }
+        .ar-modal .ar-ic { width:30px; height:30px; min-height:0; padding:0; border-radius:8px; border:1px solid #e2e8f0; background:#fff; cursor:pointer; font-size:0.95em; line-height:1; }
+        .ar-modal .ar-ic:hover { border-color:#f59e0b; }
+        .ar-modal .ar-ic.del:disabled { opacity:0.4; cursor:not-allowed; }
+        .ar-modal .ar-empty { text-align:center; color:#94a3b8; padding:18px 6px; }
+        .ar-modal .ar-more-row { text-align:center; padding:8px 0 4px; }
+        .ar-modal .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+        @media (pointer:coarse) { .ar-modal .ar-ic { width:44px; height:44px; } }
+
         @keyframes modalPop {
             0% { transform: scale(0.95); opacity: 0; }
             100% { transform: scale(1); opacity: 1; }
@@ -12818,31 +12858,45 @@
                 </div>
             </div>
         </div>
+        <!-- V102.119: Archive modal — two panes behind tabs with counts (Kanban cards = archived side_quests, Quest history =
+             quests that are not live). Clear All lives in the Kanban pane and hides when it is empty. Quest history: status chips
+             + search, date column, 2-line clamped text, stacked avatars (dot = acknowledged), icon actions (delete disabled when
+             the quest has submissions), load more. Every handler target (recallQuest, delQ, confirmClearArchive, restoreSQ,
+             delArchiveDoc, #archive-list, #questHistoryTable) is unchanged. -->
         <div id="archiveModal" class="modal">
-            <div class="modal-content"><span class="close-modal"
+            <div class="modal-content ar-modal"><span class="close-modal"
                     onclick="document.getElementById('archiveModal').style.display='none'">&times;</span>
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <h2 style="margin:0;">🗄️ ar·chive</h2><button class="btn-sm btn-danger"
-                        onclick="confirmClearArchive()">🧨 Clear All</button>
+                <h2 style="margin:0;">🗄️ Archive</h2>
+                <div class="ar-tabs lang-no-toggle" role="tablist">
+                    <button type="button" class="ar-tab" role="tab" data-pane="kanban" aria-selected="false" onclick="arShowPane('kanban')">🗂️ Kanban cards <b id="ar-count-kanban">0</b></button>
+                    <button type="button" class="ar-tab on" role="tab" data-pane="quests" aria-selected="true" onclick="arShowPane('quests')">🕘 Quest history <b id="ar-count-quests">0</b></button>
                 </div>
-                <div class="lang-no-toggle" id="archive-list" style="margin-top:10px;"></div>
-                <div style="margin-top:14px; border-top:1px dashed #ddd; padding-top:14px;">
-                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
-                        <i class="fa-solid fa-clock-rotate-left" style="color:#d35400;"></i>
-                        <h4 style="margin:0; color:#d35400; font-size:1em; font-weight:800;">QUEST HISTORY & ARCHIVE</h4>
+                <div id="ar-pane-kanban" class="ar-pane" hidden>
+                    <div class="ar-pane-bar"><button type="button" id="ar-clear-all" class="btn-sm btn-danger" onclick="confirmClearArchive()" hidden>🧨 Clear All</button></div>
+                    <div class="lang-no-toggle" id="archive-list"></div>
+                </div>
+                <div id="ar-pane-quests" class="ar-pane">
+                    <div class="ar-filters lang-no-toggle" id="ar-filters">
+                        <button type="button" class="ar-chip on" data-state="all" onclick="arSetQuestFilter(this)">All <b>0</b></button>
+                        <button type="button" class="ar-chip" data-state="draft" onclick="arSetQuestFilter(this)">Draft <b>0</b></button>
+                        <button type="button" class="ar-chip" data-state="scheduled" onclick="arSetQuestFilter(this)">Scheduled <b>0</b></button>
+                        <button type="button" class="ar-chip" data-state="archived" onclick="arSetQuestFilter(this)">Archived <b>0</b></button>
+                        <input type="search" class="ar-search" id="ar-search" placeholder="Search…" aria-label="Search quests" oninput="arSearchQuests(this.value)">
                     </div>
-                    <div id="questHistoryTable_wrapper" style="margin-top:5px; overflow-x:auto; background:white; padding:15px; border-radius:15px; border:1px solid #f1f5f9;">
-                        <table id="questHistoryTable" class="admin-table lang-no-toggle">
+                    <div class="ar-card">
+                        <table id="questHistoryTable" class="admin-table ar-table lang-no-toggle">
                             <thead>
                                 <tr>
+                                    <th>Date</th>
                                     <th>Quest</th>
-                                    <th>Base Score</th>
-                                    <th>Participants</th>
-                                    <th>Action</th>
+                                    <th>Pts</th>
+                                    <th title="Green dot = acknowledged · none = waiting for review">Who</th>
+                                    <th><span class="sr-only">Actions</span></th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
                         </table>
+                        <div class="ar-more-row"><button type="button" id="ar-load-more" class="ar-chip" onclick="arLoadMore()" hidden>Load 20 more</button></div>
                     </div>
                 </div>
             </div>
@@ -55398,6 +55452,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function renderArchivePage() {
             const l = document.getElementById("archive-list");
             l.innerHTML = "";
+            // V102.119: tab count + Clear All only when there is something to clear.
+            const kanbanCount = document.getElementById('ar-count-kanban'); if (kanbanCount) kanbanCount.textContent = archiveCache.length;
+            const clearAll = document.getElementById('ar-clear-all'); if (clearAll) clearAll.hidden = archiveCache.length === 0;
             const start = (archivePage - 1) * ARCHIVE_PER_PAGE;
             const paged = archiveCache.slice(start, start + ARCHIVE_PER_PAGE);
             const totalPages = Math.ceil(archiveCache.length / ARCHIVE_PER_PAGE);
@@ -56693,48 +56750,62 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 if (section) section.style.display = hasActive ? "block" : "none"; 
             }); 
         }
-        function loadQuestHistory() { db.collection("quests").orderBy("createdAt", "desc").limit(20).onSnapshot(s => { const t = document.querySelector("#questHistoryTable tbody"); t.innerHTML = ""; s.forEach(d => { const q = d.data(); if (q.deadline && q.deadline.toDate() > new Date()) return; t.innerHTML += `<tr><td>${q.question}</td><td>${q.baseScore}</td><td><div style="display:flex;gap:5px;"><button class="btn-sm btn-success" onclick="recallQuest('${d.id}')">♻️ Recall</button><button class="btn-delete-icon" onclick="delQ('${d.id}')">✕</button></div></td></tr>`; }) }); }
-        function loadQuestHistory() {
-            db.collection("quests").orderBy("createdAt", "desc").limit(20).onSnapshot(s => {
-                const t = document.querySelector("#questHistoryTable tbody");
-                if (!t) return;
-                t.innerHTML = "";
-                s.forEach(d => {
-                    const q = d.data();
-                    const qStatus = String(q.status || 'active').toLowerCase();
-                    const qStart = q.startTime?.toDate ? q.startTime.toDate() : (q.scheduledStart?.toDate ? q.scheduledStart.toDate() : null);
-                    const isLiveNow = q.deadline && q.deadline.toDate() > new Date() && qStatus !== 'draft' && (!qStart || qStart <= new Date());
-                    if (isLiveNow) return;
-                    const stateLabel = qStatus === 'draft' ? 'Draft' : (qStart && qStart > new Date() ? 'Scheduled' : 'Archived');
-
-                    const subs = (questsSubList || []).filter(s => s.questId === d.id && s.status !== 'none');
-                    let participantsHtml;
-                    if (subs.length === 0) {
-                        participantsHtml = `<span style="color:#94a3b8;font-size:0.78em;">—</span>`;
-                    } else {
-                        const avatarItems = subs.map(s => {
-                            const u = (usersData || []).find(u => u.id === s.userId);
-                            const name = u?.displayName || '?';
-                            const pic = u?.pictureUrl || '';
-                            const border = s.adminAcknowledged ? '2px solid #86efac' : '2px solid #fde047';
-                            const avatar = pic
-                                ? `<img src="${pic}" title="${name}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:${border};flex-shrink:0;">`
-                                : `<span title="${name}" style="width:28px;height:28px;border-radius:50%;border:${border};background:#94a3b8;display:inline-flex;align-items:center;justify-content:center;font-size:0.65em;color:white;font-weight:800;flex-shrink:0;">${name.charAt(0)}</span>`;
-                            return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:36px;">
-                                ${avatar}
-                                <span style="font-size:0.62em;font-weight:700;color:#475569;text-align:center;max-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</span>
-                            </div>`;
-                        }).join('');
-                        participantsHtml = `<div style="display:flex;flex-direction:column;gap:6px;">
-                            <span style="font-size:0.72em;font-weight:900;color:#1d4ed8;">👥 ${subs.length} ${subs.length === 1 ? 'person' : 'people'} คน</span>
-                            <div style="display:flex;flex-wrap:wrap;gap:6px;">${avatarItems}</div>
-                        </div>`;
-                    }
-
-                    t.innerHTML += `<tr><td><span style="font-size:0.75em; font-weight:900; color:#64748b; text-transform:uppercase;">${stateLabel}</span><br>${q.question}</td><td>${q.baseScore}</td><td>${participantsHtml}</td><td><div style="display:flex;gap:5px;"><button class="btn-sm btn-success" onclick="recallQuest('${d.id}')">Recall</button><button class="btn-delete-icon" onclick="delQ('${d.id}')">X</button></div></td></tr>`;
-                });
-            });
+        // V102.119: Archive modal → Quest history pane. Renders from questsCache — the quests listener that calls
+        // loadQuestHistory() already holds every quest, and the old inner onSnapshot(limit 20) opened one more listener per
+        // refresh. Live quests are skipped (they are on the board); the rest get a state: draft / scheduled / archived.
+        // Chips, search and "load more" are view state only. Text is escaped (it used to be injected raw) and clamped by CSS;
+        // delete is disabled once a quest has submissions. Handlers kept: recallQuest, delQ.
+        let arQuestLimit = 20, arQuestFilter = 'all', arQuestSearch = '';
+        function arQuestState(q, now) {
+            const status = String(q.status || 'active').toLowerCase();
+            const start = q.startTime?.toDate ? q.startTime.toDate() : (q.scheduledStart?.toDate ? q.scheduledStart.toDate() : null);
+            if (status === 'draft') return 'draft';
+            if (start && start > now) return 'scheduled';
+            if (q.deadline?.toDate && q.deadline.toDate() > now) return 'live';
+            return 'archived';
         }
+        function loadQuestHistory() { renderQuestHistory(); }
+        function renderQuestHistory() {
+            const t = document.querySelector("#questHistoryTable tbody");
+            if (!t) return;
+            const now = new Date();
+            const rows = (questsCache || []).map(q => ({ q, state: arQuestState(q, now) })).filter(r => r.state !== 'live')
+                .sort((a, b) => (b.q.createdAt?.toMillis?.() || 0) - (a.q.createdAt?.toMillis?.() || 0));
+            const counts = { all: rows.length, draft: 0, scheduled: 0, archived: 0 };
+            rows.forEach(r => { counts[r.state]++; });
+            document.querySelectorAll('#ar-filters .ar-chip[data-state]').forEach(chip => { const b = chip.querySelector('b'); if (b) b.textContent = counts[chip.dataset.state] || 0; });
+            const total = document.getElementById('ar-count-quests'); if (total) total.textContent = rows.length;
+            const term = arQuestSearch.toLowerCase();
+            const shown = rows.filter(r => (arQuestFilter === 'all' || r.state === arQuestFilter) && (!term || String(r.q.question || '').toLowerCase().includes(term)));
+            const more = document.getElementById('ar-load-more'); if (more) more.hidden = shown.length <= arQuestLimit;
+            t.innerHTML = shown.slice(0, arQuestLimit).map(({ q, state }) => {
+                const subs = (questsSubList || []).filter(s => s.questId === q.id && s.status !== 'none');
+                const created = q.createdAt?.toDate ? q.createdAt.toDate() : null;
+                const date = created ? created.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—';
+                const who = subs.length === 0 ? '<span class="ar-none">—</span>' : `<span class="ar-avs">${subs.map(s => {
+                    const u = (usersData || []).find(u => u.id === s.userId);
+                    const name = u?.displayName || '?', pic = u?.pictureUrl || '';
+                    const cls = `ar-av${s.adminAcknowledged ? ' ok' : ''}`, title = escapeHtml(`${name} · ${s.adminAcknowledged ? 'acknowledged' : 'waiting for review'}`);
+                    return pic ? `<img class="${cls}" src="${escapeHtml(pic)}" alt="" title="${title}">` : `<span class="${cls}" title="${title}">${escapeHtml(name.charAt(0))}</span>`;
+                }).join('')}</span><span class="ar-n">${subs.length}</span>`;
+                const text = escapeHtml(q.question || '');
+                const del = subs.length
+                    ? `<button type="button" class="ar-ic del" disabled title="Has ${subs.length} submission${subs.length === 1 ? '' : 's'} — cannot delete" aria-label="Cannot delete: has submissions">🗑</button>`
+                    : `<button type="button" class="ar-ic del" onclick="delQ('${q.id}')" title="Delete quest" aria-label="Delete quest">🗑</button>`;
+                return `<tr class="is-${state}"><td class="ar-date" title="${state}">${date}</td><td><div class="ar-q" title="${text}">${text}</div></td><td class="ar-pts">${q.baseScore ?? ''}</td><td class="ar-who">${who}</td><td><div class="ar-act"><button type="button" class="ar-ic" onclick="recallQuest('${q.id}')" title="Recall to form" aria-label="Recall to form">↩</button>${del}</div></td></tr>`;
+            }).join('') || '<tr><td colspan="5" class="ar-empty">No quests here</td></tr>';
+        }
+        window.arSetQuestFilter = function(btn) {
+            arQuestFilter = btn.dataset.state || 'all'; arQuestLimit = 20;
+            document.querySelectorAll('#ar-filters .ar-chip[data-state]').forEach(c => c.classList.toggle('on', c === btn));
+            renderQuestHistory();
+        };
+        window.arSearchQuests = function(value) { arQuestSearch = String(value || '').trim(); arQuestLimit = 20; renderQuestHistory(); };
+        window.arLoadMore = function() { arQuestLimit += 20; renderQuestHistory(); };
+        window.arShowPane = function(name) {
+            document.querySelectorAll('#archiveModal .ar-tab').forEach(tab => { const on = tab.dataset.pane === name; tab.classList.toggle('on', on); tab.setAttribute('aria-selected', String(on)); });
+            document.querySelectorAll('#archiveModal .ar-pane').forEach(pane => { pane.hidden = pane.id !== 'ar-pane-' + name; });
+        };
         function updateQuestTimers() { document.querySelectorAll('.quest-deadline').forEach(el => { const d = parseInt(el.dataset.deadline); const now = Date.now(); if (d - now <= 0) el.innerText = "Expired"; else { const h = Math.floor((d - now) / 3600000); const m = Math.floor(((d - now) % 3600000) / 60000); el.innerText = `${h}h ${m}m left`; } }); }
         function recallQuest(id) {
             db.collection("quests").doc(id).get().then(doc => {
