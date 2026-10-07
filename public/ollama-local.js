@@ -8,11 +8,14 @@
     const base = () => (localStorage.getItem('OLLAMA_LOCAL_URL') || DEFAULT_URL).replace(/\/+$/, '');
     const blocked = (url, why) => new Error(`Ollama ${why} at ${url}. Start Ollama, and allow this site once: set the environment variable OLLAMA_ORIGINS=${location.origin} and restart Ollama.`);
 
-    async function request(url, init, ms) {
+    // `outer` (optional) is the caller's AbortSignal — the admin's Stop button; Ollama stops generating when the connection closes.
+    async function request(url, init, ms, outer) {
         const abort = new AbortController();
         const timer = setTimeout(() => abort.abort(), ms);
+        const relay = () => abort.abort();
+        if (outer) { if (outer.aborted) abort.abort(); else outer.addEventListener('abort', relay); }
         try { return await fetch(url, { ...init, signal: abort.signal }); }
-        finally { clearTimeout(timer); }
+        finally { clearTimeout(timer); }   // the relay stays: a Stop after the headers must still cut the body read
     }
 
     // `ol/local` → the stored / first installed model; `ol/<name>` → that model.
@@ -36,6 +39,7 @@
     window.callOllamaLocal = async function (modelId, prompt, isJson, visionData, generationOptions) {
         if (visionData) throw new Error("Ollama local is text-only here — pick another model for images.");
         const root = base();
+        const outer = generationOptions && generationOptions.signal;
         const model = await pickModel(root, String(modelId).replace(/^ol\//, ''));
         const options = { temperature: generationOptions && generationOptions.temperature != null ? generationOptions.temperature : 0.4,
             num_predict: (generationOptions && generationOptions.maxTokens) || 4096 };
@@ -44,8 +48,11 @@
             res = await request(root + '/api/chat', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], stream: false, think: false, options, ...(isJson ? { format: 'json' } : {}) })
-            }, 10 * 60 * 1000);   // a 9B model on CPU/GPU split runs ~4 tokens/s
-        } catch (e) { throw e && e.name === 'AbortError' ? new Error('Ollama took longer than 10 minutes.') : blocked(root, 'is not reachable'); }
+            }, 10 * 60 * 1000, outer);   // a 9B model on CPU/GPU split runs ~4 tokens/s
+        } catch (e) {
+            if (outer && outer.aborted) throw Object.assign(new Error('Stopped'), { reviewCancelled: true });
+            throw e && e.name === 'AbortError' ? new Error('Ollama took longer than 10 minutes.') : blocked(root, 'is not reachable');
+        }
         const data = await res.json().catch(() => ({}));
         if (res.status === 403) throw blocked(root, 'refused this site (403)');
         if (!res.ok || data.error) throw new Error(`Ollama: ${data.error || 'request failed (' + res.status + ')'}`);

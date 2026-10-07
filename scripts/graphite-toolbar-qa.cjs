@@ -26,6 +26,7 @@ const { chromium } = require('playwright');
             await page.addScriptTag({ content: html.slice(a, b + (end === '\n        };' ? end.length : 0)) });
         }
         await page.evaluate(() => {
+            window.reviewRunStop = () => false; // V102.109: the entry points ask whether a run is in flight first
             window.auditQuizAI = (button, options) => window.auditRequest = options;
             // V101.52: the toolbar passes the picked model (a trial model is kept, not normalised).
             window.analyzeQuizAI = (button, options) => window.rewriteRequest = options && options.model ? resolveTrialTextAIModel(options.model) : textAIModel('ai-analyzer-model-val');
