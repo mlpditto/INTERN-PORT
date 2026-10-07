@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.117)</title>
+    <title>Nika Admin (V102.118)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -161,16 +161,6 @@
             document.querySelectorAll(`[onclick*="'${targetId}'"]`).forEach(el => {
                 el.classList.toggle('active', el.dataset.value === value);
             });
-            // Sync review chips
-            if (targetId === 'ai-model-review') {
-                document.querySelectorAll('.reflective-review-model-chip').forEach(chip => {
-                    chip.classList.toggle('active', chip.dataset.value === value);
-                });
-                // V95.46: keep the dropdown trigger label in sync on programmatic restore.
-                const lbl = document.getElementById('rr-model-label');
-                const activeChip = document.querySelector('.reflective-review-model-chip.active');
-                if (lbl) lbl.textContent = window.AI_MODEL_REGISTRY?.models.find(m => m.id === value)?.label || activeChip?.textContent.trim() || value;
-            }
             // Persist
             const keyMap = {
                 'toolbar-ai-translate-model': 'ai_default_translate_model',
@@ -319,9 +309,6 @@
         .reflective-review-toolbar { display:grid; gap:10px; margin-bottom:10px; }
         .reflective-review-tabs { display:flex; align-items:center; gap:8px; overflow-x:auto; padding:6px; border-radius:18px; background:linear-gradient(180deg, rgba(255,255,255,0.68) 0%, rgba(241,245,249,0.55) 100%); border:1px solid rgba(226,232,240,0.92); box-shadow:inset 0 1px 0 rgba(255,255,255,0.7); scrollbar-width:none; }
         .reflective-review-tabs::-webkit-scrollbar { display:none; }
-        .reflective-review-model-chip { border:0; background:transparent; color:#64748b; padding:10px 14px; min-width:max-content; border-radius:14px; font-size:0.76em; font-weight:900; letter-spacing:0.02em; cursor:pointer; transition:transform 0.18s ease, background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease; }
-        .reflective-review-model-chip:hover { color:#1e293b; transform:translateY(-1px); }
-        .reflective-review-model-chip.active { background:linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,247,237,0.9) 100%); color:#9a3412; box-shadow:0 10px 24px rgba(245,158,11,0.18), inset 0 1px 0 rgba(255,255,255,0.85); }
         /* V92.15: TH/EN/KR segmented pill replacement for the lang dropdown */
         .reflective-review-lang-pills { display:inline-flex; align-items:center; gap:2px; padding:3px; border-radius:12px; background:linear-gradient(180deg, rgba(255,255,255,0.68) 0%, rgba(241,245,249,0.55) 100%); border:1px solid rgba(226,232,240,0.92); box-shadow:inset 0 1px 0 rgba(255,255,255,0.7); }
         .reflective-review-lang-chip { border:0; background:transparent; color:#64748b; padding:4px 9px; border-radius:9px; font-size:0.7em; font-weight:900; letter-spacing:0.02em; cursor:pointer; transition:transform 0.18s ease, background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease; }
@@ -348,13 +335,6 @@
         .reflective-review-save-btn { flex:1.5; min-height:48px; border-radius:18px; border:0; background:linear-gradient(135deg, #ea580c 0%, #f59e0b 100%); color:white; font-size:0.92em; font-weight:900; box-shadow:0 16px 32px rgba(234,88,12,0.25); }
         .reflective-review-cancel-btn { flex:1; min-height:48px; border-radius:18px !important; background:rgba(15,23,42,0.92) !important; }
         /* V95.46: compact model picker dropdown (replaces full-width chip rail), grammar switch, pinned-footer overflow button, capped editor height */
-        .reflective-model-dd { position:relative; display:inline-block; }
-        .reflective-model-dd > summary { list-style:none; cursor:pointer; display:inline-flex; align-items:center; gap:6px; padding:7px 11px; border-radius:12px; background:rgba(255,255,255,0.7); border:1px solid rgba(226,232,240,0.95); color:#475569; font-size:0.72em; font-weight:900; white-space:nowrap; }
-        .reflective-model-dd > summary::-webkit-details-marker { display:none; }
-        .reflective-model-dd > summary:hover { background:#fff; color:#1e293b; }
-        .reflective-model-dd[open] > summary { border-color:rgba(124,58,237,0.45); color:#5b21b6; }
-        .reflective-model-dd-menu { position:absolute; top:calc(100% + 6px); right:0; z-index:50; display:flex; flex-direction:column; gap:2px; min-width:160px; padding:6px; border-radius:14px; background:#fff; border:1px solid rgba(226,232,240,0.95); box-shadow:0 18px 40px rgba(15,23,42,0.16); }
-        .reflective-model-dd-menu .reflective-review-model-chip { width:100%; text-align:left; border-radius:10px; padding:8px 12px; }
         .reflective-grammar-switch { display:inline-flex; align-items:center; gap:7px; cursor:pointer; border:0; background:transparent; padding:4px; font-size:0.7em; font-weight:800; color:#475569; white-space:nowrap; }
         .reflective-grammar-switch .gs-track { position:relative; width:34px; height:18px; border-radius:999px; background:#22c55e; transition:background 0.18s ease; flex:0 0 auto; }
         .reflective-grammar-switch.is-off .gs-track { background:#cbd5e1; }
@@ -4737,13 +4717,24 @@
         #reflectiveReviewModal .reflective-focus-pill { border:1px solid #e2e8f0; border-radius:999px; padding:2px 8px; font-size:0.7em; }
         #reflectiveReviewModal .reflective-focus-pill.active { border-color:#fdba74; }
         #reflectiveReviewModal #reflective-focus-pills:not(.rr-expanded) .rr-focus-more:not(.active) { display:none; }
-        #reflectiveReviewModal .rr-focus-more-toggle, #reflectiveReviewModal .rr-rail-toggle { width:auto; min-height:0; flex:0 0 auto; cursor:pointer; font-weight:800; white-space:nowrap; }
+        #reflectiveReviewModal .rr-focus-more-toggle { width:auto; min-height:0; flex:0 0 auto; cursor:pointer; font-weight:800; white-space:nowrap; }
         #reflectiveReviewModal .rr-focus-more-toggle { border:1px dashed #cbd5e1; border-radius:999px; background:transparent; color:#64748b; padding:2px 9px; font-size:0.7em; }
-        #reflectiveReviewModal .rr-focus-more-toggle:hover, #reflectiveReviewModal .rr-rail-toggle:hover { border-color:#f59e0b; color:#9a3412; }
-        #reflectiveReviewModal .rr-rail-toggle { display:inline-flex; align-items:center; gap:6px; border:1px solid #fdba74; border-radius:999px; background:#fff7ed; color:#9a3412; padding:3px 10px; font-size:11px; }
-        #reflectiveReviewModal .rr-rail-toggle .fa-chevron-down { font-size:0.8em; transition:transform 0.15s ease; }
-        #reflectiveReviewModal .rr-rail-toggle.open .fa-chevron-down { transform:rotate(180deg); }
-        #reflectiveReviewModal .text-ai-chips.rr-rail-collapsed { display:none !important; } /* text-ai-chips.css forces display:flex !important */
+        #reflectiveReviewModal .rr-focus-more-toggle:hover { border-color:#f59e0b; color:#9a3412; }
+        /* V102.118: vendor-first MODEL row (Model + Writing Analysis) — light provider logo tabs, picked tab = grey well, then only
+           that provider's chips as names (the tab carries the logo and, for OpenRouter, the corner glyph is dropped: its grape tint +
+           bar stay on the chip). audit-toolbar.css gives .audit-model-row a top border/padding meant for the Audit toolbar — reset here. */
+        #reflectiveReviewModal .rr-model-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex:1 1 auto; min-width:0; margin:0; padding:0; border:0; }
+        #reflectiveReviewModal .rr-model-row .audit-providers { gap:3px; flex-wrap:nowrap; }
+        #reflectiveReviewModal .rr-model-row .audit-provider { width:30px; height:28px; min-height:0; padding:0; border-radius:7px; background:transparent; border:1px solid transparent; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+        #reflectiveReviewModal .rr-model-row .audit-provider:hover { background:rgba(15,23,42,0.05); }
+        #reflectiveReviewModal .rr-model-row .audit-provider[aria-pressed="true"] { background:#e2e8f0; border-color:#cbd5e1; }
+        #reflectiveReviewModal .rr-model-row .audit-provider .text-ai-logo { width:16px; height:16px; margin:0; vertical-align:middle; }
+        #reflectiveReviewModal .rr-model-row .audit-provider .text-ai-logo[data-owner="openai"] { width:19px; height:19px; background-image:url(assets/logos/openai-blossom-black.svg); }
+        #reflectiveReviewModal .rr-model-row .audit-provider .text-ai-logo:is([data-owner="grok"], [data-owner="ollama"]) { filter:invert(1); }
+        #reflectiveReviewModal .rr-model-row .text-ai-chips { flex:0 1 auto; }
+        #reflectiveReviewModal .rr-model-row .text-ai-chips > button[hidden] { display:none !important; }
+        #reflectiveReviewModal .rr-model-row .text-ai-chips .text-ai-logo, #reflectiveReviewModal .rr-model-row .text-ai-chips > button::before { display:none; }
+        @media (pointer:coarse) { #reflectiveReviewModal .rr-model-row .audit-provider { width:44px; height:44px; } }
         #reflectiveReviewModal :is(.reflective-review-feedback, #reflective-grammar-card) .text-ai-chips { flex:1 1 auto; padding:0 !important; gap:3px !important; background:transparent; border:0; }
         #reflectiveReviewModal :is(.reflective-review-feedback, #reflective-grammar-card) .text-ai-chips > button.glass-toggle-item { min-height:24px; padding:2px 7px; font-size:10.5px; font-weight:800; border-radius:8px; background:#f8fafc; border-color:#e2e8f0; color:#334155; }
         #reflectiveReviewModal :is(.reflective-review-feedback, #reflective-grammar-card) .text-ai-chips > button.glass-toggle-item:hover { border-color:#f59e0b; }
@@ -4811,7 +4802,7 @@
         #reflectiveReviewModal .reflective-bonus-chip.ai-pick::after { content:'AI'; margin-left:4px; padding:0 4px; border-radius:5px; background:#7c3aed; color:#fff; font-size:0.78em; vertical-align:1px; }
         #reflectiveReviewModal .reflective-bonus-suggestion.applied .suggestion-apply { display:none; }
         #reflectiveReviewModal .reflective-review-actions { flex:1 1 300px; align-items:center; justify-content:flex-end; border:0; padding:0; margin:0; }
-        #reflective-grammar-card:has(.rr-grammar-optout) :is([data-model-input="ai-model-grammar"], .rr-rail-toggle) { display:none !important; } /* text-ai-chips.css forces display:flex !important */
+        #reflective-grammar-card:has(.rr-grammar-optout) #rr-grammar-model-row { display:none !important; } /* V102.118: whole row (tabs + rail); text-ai-chips.css forces display:flex !important */
         #reflectiveReviewModal .reflective-review-save-btn { flex:0 1 auto; padding:12px 20px; box-shadow:none; }
         #reflectiveReviewModal .reflective-review-cancel-btn { flex:0 0 auto; padding:12px 16px; background:transparent !important; color:#475569; border:1px solid #cbd5e1; }
         @media (max-width: 900px) {
@@ -6998,7 +6989,7 @@
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <!-- V93.08: cache-bust on taxonomy.js for the LP Firestore overlay rollout -->
     <script src="ai-model-registry.js?v=V102.61"></script>
-    <script src="ai-model-ui.js?v=V102.76"></script>
+    <script src="ai-model-ui.js?v=V102.118"></script>
     <script src="ollama-local.js?v=V102.109"></script>
     <script src="peds-dosing.js?v=V102.80"></script>
     <link rel="stylesheet" href="text-ai-chips.css?v=V102.13">
@@ -13827,12 +13818,12 @@
                     <div class="reflective-review-label-row" style="margin-bottom:8px;">
                         <label class="reflective-review-label">✍️ Writing Analysis</label>
                         <div style="display:flex; align-items:center; gap:8px;">
-                            <!-- V94.18: Phase 3 model picker (Gemini Flash/Pro). Applies to the next grammar call (AI Suggest or Retry). -->
-                            <div class="reflective-grammar-model-rail lang-no-toggle" role="group" aria-label="Grammar Model">
+                            <!-- V94.18: Phase 3 model picker. Applies to the next grammar call (AI Suggest or Retry).
+                                 V102.118: same vendor-first row as the Model row above (tabs + the registry rail, which replaces the two chips below). -->
+                            <div class="audit-model-row rr-model-row" id="rr-grammar-model-row"><div class="audit-providers" id="rr-grammar-providers" role="group" aria-label="Browse model providers"></div><div class="reflective-grammar-model-rail lang-no-toggle" role="group" aria-label="Grammar Model">
                                 <button type="button" class="reflective-grammar-model-chip active" data-value="gemini-3.5-flash" onclick="selectGrammarModel(this)" title="Faster, lower cost">Flash</button>
                                 <button type="button" class="reflective-grammar-model-chip" data-value="gemini-3.6-flash" onclick="selectGrammarModel(this)" title="Deeper analysis, slower">Pro</button>
-                            </div>
-                            <input type="hidden" id="ai-model-grammar" value="gemini-3.5-flash">
+                            </div><input type="hidden" id="ai-model-grammar" value="gemini-3.5-flash"></div>
                             <span id="reflective-grammar-score" style="font-size:0.72em; font-weight:900; padding:3px 10px; border-radius:999px; border:1px solid transparent;"></span>
                         </div>
                     </div>
@@ -13865,27 +13856,13 @@
                     </div>
                     <div class="rr-row">
                         <span class="rr-mini-label">Model</span>
-                        <!-- V95.46 dropdown shell; ai-model-ui.js replaces it with the shared chip rail on load (light variant here via CSS). -->
-                            <details class="reflective-model-dd lang-no-toggle">
-                                <summary title="AI model"><i class="fa-solid fa-microchip"></i> <span id="rr-model-label">GPT Frontier</span> <i class="fa-solid fa-chevron-down" style="font-size:0.85em;"></i></summary>
-                                <div class="reflective-model-dd-menu">
-                                    <button type="button" class="reflective-review-model-chip active" data-value="gpt-4o" onclick="selectReflectiveReviewModel(this)">GPT Frontier</button>
-                                    <button type="button" class="reflective-review-model-chip" data-value="gpt-4o-mini" onclick="selectReflectiveReviewModel(this)">Mini</button>
-                                    <button type="button" class="reflective-review-model-chip" data-value="gemini-3.5-flash" onclick="selectReflectiveReviewModel(this)">Flash</button>
-                                    <button type="button" class="reflective-review-model-chip" data-value="claude-3-5-sonnet-latest" onclick="selectReflectiveReviewModel(this)">Claude 3.5</button>
-                                    <button type="button" class="reflective-review-model-chip" data-value="meta-llama/Llama-3.3-70B-Instruct-Turbo" onclick="selectReflectiveReviewModel(this)">Llama 70B</button>
-                                </div>
-                            </details>
+                        <!-- V102.118: vendor-first picker on one row — provider logo tabs, then only that provider's chips
+                             (the Learning Path strip's parts, V102.83). ai-model-ui.js builds the chip rail after the hidden
+                             select; rrInitModelRow() fills the tabs and appends the trial chips (Grok, Ollama). The V101.25
+                             fold toggle is gone: one row has nothing to fold. -->
+                        <div class="audit-model-row rr-model-row" id="rr-model-row"><div class="audit-providers" id="rr-providers" role="group" aria-label="Browse model providers"></div><select id="ai-model-review" style="display:none;"><option value="gpt-6-luna" selected>GPT 6 Luna</option></select></div>
                         <input type="hidden" id="ai-lang-review" value="Thai">
                     </div>
-
-                    <select id="ai-model-review" style="display:none;">
-                        <option value="gpt-4o" selected>GPT-4o</option>
-                        <option value="gpt-4o-mini">Mini</option>
-                        <option value="gemini-3.5-flash">Flash</option>
-                        <option value="claude-3-5-sonnet-latest">Claude 3.5</option>
-                        <option value="meta-llama/Llama-3.3-70B-Instruct-Turbo">Llama 70B</option>
-                    </select>
 
                     <div class="rr-editor-shell">
                         <!-- V100.97: initReflectiveQuill() moves this group into the Quill toolbar; it stays here only if Quill failed to load. -->
@@ -20586,29 +20563,6 @@ RULES:
         };
 
         // --- 🤖 Web AI Integration ([Version: V86.14] Updated for Multi-Model) ---
-        window.selectReflectiveReviewModel = function(btn) {
-            const hiddenInput = document.getElementById('ai-model-review');
-            document.querySelectorAll('.reflective-review-model-chip').forEach(chip => {
-                chip.classList.remove('active');
-            });
-            if (!btn) return;
-            btn.classList.add('active');
-            if (hiddenInput) hiddenInput.value = btn.dataset.value || 'gpt-4o';
-            // V95.46: model rail is now a dropdown — mirror the picked model onto the
-            // trigger label and close the menu.
-            const lbl = document.getElementById('rr-model-label');
-            if (lbl) lbl.textContent = (btn.textContent || '').trim();
-            const dd = btn.closest('.reflective-model-dd');
-            if (dd) dd.open = false;
-        };
-
-        // V95.46: close any open model dropdown when clicking outside it.
-        document.addEventListener('click', function(e) {
-            document.querySelectorAll('.reflective-model-dd[open]').forEach(function(dd) {
-                if (!dd.contains(e.target)) dd.open = false;
-            });
-        });
-
         // V94.18: Phase 3 model picker for grammar (Flash / Pro). Persists per-admin via localStorage
         // so the next modal open + next AI Suggest call uses the chosen model.
         window.selectGrammarModel = function(btn) {
@@ -20758,34 +20712,48 @@ RULES:
             btn.textContent = open ? 'Less' : '+' + wrap.querySelectorAll('.rr-focus-more').length;
         };
 
-        // V101.25: a model rail collapses to one chip naming the chosen model; clicking it opens
-        // the full rail, and picking a model closes it again. The rail itself is ai-model-ui.js's.
-        window.collapseReflectiveModelRail = function(inputId) {
-            const rail = document.querySelector(`#reflectiveReviewModal [data-model-input="${inputId}"]`);
-            if (!rail) return;
-            let btn = rail.previousElementSibling;
-            if (!btn || !btn.classList.contains('rr-rail-toggle')) {
-                btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'rr-rail-toggle lang-no-toggle';
-                btn.title = 'Change AI model';
-                btn.innerHTML = '<i class="fa-solid fa-microchip"></i><span></span><i class="fa-solid fa-chevron-down"></i>';
-                btn.onclick = () => {
-                    const open = !rail.classList.toggle('rr-rail-collapsed');
-                    btn.classList.toggle('open', open);
-                    btn.setAttribute('aria-expanded', String(open));
-                };
-                rail.before(btn);
-                rail.addEventListener('click', e => {
-                    if (e.target.closest('button[data-value]')) window.collapseReflectiveModelRail(inputId);
-                });
-            }
-            const on = rail.querySelector('button[aria-pressed="true"]');
-            btn.querySelector('span').textContent = on ? (on.getAttribute('aria-label') || on.textContent) : 'Choose model';
-            rail.classList.add('rr-rail-collapsed');
-            btn.classList.remove('open');
-            btn.setAttribute('aria-expanded', 'false');
+        // V102.118: vendor-first MODEL row (replaces the V101.25 fold toggle): provider logo tabs + only that provider's
+        // chips, like the Learning Path strip (lpInitModelRow). The chip rail is the registry's (built after the hidden
+        // input), the tabs come from providerModelRailHtml's renderer, the trial chips (Grok, Ollama) are appended and a
+        // trial pick is kept under its own key — syncRegistryModelSelect() normalises it back to a catalogue model and
+        // overwrites the registry's saved key at load (see lpInitModelRow). The review input is a <select>, so a trial
+        // id needs an <option> before `value` can hold it.
+        window.rrInitModelRow = function(inputId, tabsId) {
+            const input = document.getElementById(inputId), tabs = document.getElementById(tabsId);
+            const host = input && input.parentElement && input.parentElement.querySelector('.text-ai-chips');
+            if (!input || !tabs || !host || tabs.childElementCount) return;
+            const trial = window.TEXT_AI_TRIAL_MODELS || [], key = 'ai_rr_trial_' + inputId;
+            if (input.tagName === 'SELECT') trial.forEach(m => { if (!input.querySelector(`option[value="${m.id}"]`)) input.add(new Option(m.label, m.id)); });
+            const mark = () => host.querySelectorAll('button').forEach(b => { const on = b.dataset.value === input.value; b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on)); });
+            if (!host.querySelector('[data-value="' + (trial[0] || {}).id + '"]')) host.insertAdjacentHTML('beforeend', window.textAIChipContents(input.value, '', () => false, trial));
+            host.querySelectorAll('button').forEach(button => {
+                if (!trial.some(m => m.id === button.dataset.value)) return;   // catalogue chips keep the registry's handler
+                button.onclick = () => { input.value = button.dataset.value; mark(); };
+            });
+            host.addEventListener('click', e => {
+                if (!e.target.closest('button')) return;
+                try { if (trial.some(m => m.id === input.value)) localStorage.setItem(key, input.value); else localStorage.removeItem(key); } catch (_) { /* storage may be blocked */ }
+            });
+            const tmp = document.createElement('div');
+            tmp.innerHTML = window.providerModelRailHtml(inputId + '-tabs', input.value, '', trial);
+            tabs.innerHTML = tmp.querySelector('.audit-providers').innerHTML;
+            window.rrSyncModelRow(inputId, tabsId);
         };
+        // Restore a saved trial pick (the registry restores catalogue picks only), mark its chip and open its provider tab.
+        window.rrSyncModelRow = function(inputId, tabsId) {
+            const input = document.getElementById(inputId), tabs = document.getElementById(tabsId);
+            const host = input && input.parentElement && input.parentElement.querySelector('.text-ai-chips');
+            if (!input || !tabs || !host || !tabs.childElementCount) return;
+            const trial = window.TEXT_AI_TRIAL_MODELS || [];
+            let saved = null; try { saved = localStorage.getItem('ai_rr_trial_' + inputId); } catch (_) { /* storage may be blocked */ }
+            if (saved && trial.some(m => m.id === saved)) input.value = saved;
+            host.querySelectorAll('button').forEach(b => { const on = b.dataset.value === input.value; b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on)); });
+            const m = [...(window.TEXT_AI_MODELS || []), ...trial].find(x => x.id === input.value) || window.TEXT_AI_MODELS[0];
+            const tab = tabs.querySelector(`.audit-provider[data-provider="${m.label.split(' ')[0]}"]`);
+            if (tab) window.browseAuditProvider(tab);
+        };
+        window.rrInitModelRows = () => { window.rrInitModelRow('ai-model-review', 'rr-providers'); window.rrInitModelRow('ai-model-grammar', 'rr-grammar-providers'); };
+        document.addEventListener('DOMContentLoaded', () => setTimeout(window.rrInitModelRows, 0)); // after ai-model-ui.js builds the rails
 
         window.selectReflectiveBonusChip = function(btn) {
             if (!btn) return;
@@ -62895,8 +62863,10 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 document.querySelectorAll('.reflective-grammar-model-chip').forEach(chip => {
                     chip.classList.toggle('active', chip.dataset.value === grammarPref);
                 });
-                // V101.25: open with both model rails folded and the secondary focus pills hidden.
-                ['ai-model-review', 'ai-model-grammar'].forEach(inputId => collapseReflectiveModelRail(inputId));
+                // V102.118: show each model row on the tab of its current model (a saved trial pick is restored here too).
+                window.rrInitModelRows();
+                [['ai-model-review', 'rr-providers'], ['ai-model-grammar', 'rr-grammar-providers']].forEach(([inputId, tabsId]) => rrSyncModelRow(inputId, tabsId));
+                // V101.25: open with the secondary focus pills hidden.
                 toggleReflectiveFocusMore(false);
                 // V94.25: Phase 4 grammar on/off toggle — sync UI from localStorage.
                 if (typeof syncGrammarToggleUI === 'function') syncGrammarToggleUI();
