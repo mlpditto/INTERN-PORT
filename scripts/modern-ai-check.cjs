@@ -74,7 +74,7 @@ const origErr = console.error; console.error = m => logged.push(String(m));
     check('timeout chain: axios 500s', /timeout: 500000, \.\.\.config/.test(src), true);
     check('timeout chain: function 540s', /timeoutSeconds: 540, memory: "512MiB"/.test(src), true);
     const admin = require('fs').readFileSync(path.join(__dirname, '..', 'public', 'admin.html'), 'utf8');
-    check('timeout chain: analyzer client 520s', /feature: 'quiz_analyzer' \}\), 520000\)/.test(admin), true);
+    check('timeout chain: analyzer client 520s', /feature: 'quiz_analyzer', signal: run \? run\.ctl\.signal : undefined \}\), 520000\)\)/.test(admin), true);
 
     console.error = origErr;
     let fail = 0;
