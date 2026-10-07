@@ -4055,7 +4055,8 @@ exports.syncInternHours = onSchedule({
 // Admin "⏱ Internship hours" — runs right after a goal or a name is saved.
 exports.syncInternHoursNow = onCall({ timeoutSeconds: 120 }, async (request) => {
     requireAdminCallable(request);
-    return await syncInternHours(admin.firestore(), timeClockDb(), admin.firestore.FieldValue);
+    const uid = request.data && typeof request.data.uid === 'string' ? request.data.uid.slice(0, 128) : '';
+    return await syncInternHours(admin.firestore(), timeClockDb(), admin.firestore.FieldValue, uid || undefined);
 });
 
 // ============================================================

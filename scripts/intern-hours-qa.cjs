@@ -14,9 +14,26 @@ const logs = [
     { type: 'เข้างาน', timestamp: t('2026-09-01T00:30:00') }, // Bangkok 09-01 = UTC 08-31
     { type: 'ออกงาน', timestamp: t('2026-09-01T02:30:00') }
 ];
-assert.deepEqual(sumInternHours(logs, '', ''), { total: 11.65, days: 2 });
-assert.deepEqual(sumInternHours(logs, '2026-09-02', '2026-09-30'), { total: 9.65, days: 1 });
-assert.deepEqual(sumInternHours(logs, '2026-09-01', '2026-09-01'), { total: 2, days: 1 });
+const totals = (...a) => { const { total, days } = sumInternHours(logs, ...a); return { total, days }; };
+assert.deepEqual(totals('', ''), { total: 11.65, days: 2 });
+assert.deepEqual(totals('2026-09-02', '2026-09-30'), { total: 9.65, days: 1 });
+assert.deepEqual(totals('2026-09-01', '2026-09-01'), { total: 2, days: 1 });
+
+// V102.117: the day-by-day list behind the admin popup — newest first, Bangkok clock times,
+// an unclosed clock-in shows as a null clock-out (0 h), a lone clock-out leaves no row.
+assert.deepEqual(sumInternHours(logs, '', '').daily, [
+    { d: '2026-09-30', h: 9.65, s: [['08:59', '18:38']] },
+    { d: '2026-09-29', h: 0, s: [['09:00', null]] },
+    { d: '2026-09-01', h: 2, s: [['00:30', '02:30']] }
+]);
+assert.deepEqual(sumInternHours([
+    { type: 'เข้างาน', timestamp: t('2026-10-01T09:10:00') }, { type: 'ออกงาน', timestamp: t('2026-10-01T12:00:00') },
+    { type: 'เข้างาน', timestamp: t('2026-10-01T13:00:00') }, { type: 'ออกงาน', timestamp: t('2026-10-01T17:05:00') },
+    { type: 'เข้างาน', timestamp: t('2026-10-02T08:00:00') }, { type: 'เข้างาน', timestamp: t('2026-10-02T09:00:00') }
+], '', '').daily, [
+    { d: '2026-10-02', h: 0, s: [['08:00', null], ['09:00', null]] },
+    { d: '2026-10-01', h: 6.92, s: [['09:10', '12:00'], ['13:00', '17:05']] }
+], 'lunch break = two segments; a repeated clock-in leaves the first one open');
 
 const doc = (id, d) => ({ id, data: () => d });
 const ids = timeIdsByName([doc('a', { name: 'ณัชชา  โคตรบุปผา', lineUserId: 'U1' }), doc('b', { name: 'X' }), doc('c', { name: 'X' })]);
@@ -43,9 +60,21 @@ const timeDb = mkDb({
 (async () => {
     const res = await syncInternHours(db, timeDb, { serverTimestamp: () => 'NOW' });
     assert.equal(res.synced, 1);
-    assert.deepEqual(writes.bua, { internHours: { status: 'ok', total: 9.65, days: 1, timeUserId: 'U1', syncedAt: 'NOW' } }, 'only days inside the period count');
+    assert.deepEqual(writes.bua, { internHours: { status: 'ok', total: 9.65, days: 1, daily: [
+        { d: '2026-09-30', h: 9.65, s: [['08:59', '18:38']] }, { d: '2026-09-29', h: 0, s: [['09:00', null]] }
+    ], timeUserId: 'U1', syncedAt: 'NOW' } }, 'only days inside the period count; the list rides along');
+
     assert.deepEqual(writes.nt, { 'internHours.status': 'no-match', 'internHours.syncedAt': 'NOW' });
     assert.equal(writes.joey, undefined, 'no goal → not synced');
+
+    // 🔄 in the popup: one user only, and the reply carries that user's day list.
+    Object.keys(writes).forEach(k => delete writes[k]);
+    const one = await syncInternHours(db, timeDb, { serverTimestamp: () => 'NOW' }, 'bua');
+    assert.equal(one.results.length, 1);
+    assert.equal(one.results[0].id, 'bua');
+    assert.equal(one.results[0].daily.length, 2);
+    assert.equal(writes.nt, undefined, 'other interns untouched by a single-user sync');
+    assert.equal(res.results.find(r => r.id === 'bua').daily, undefined, 'full sync replies stay small');
 
     const html = fs.readFileSync('public/admin.html', 'utf8');
     assert.match(html, /\['⏱', 'Internship hours…', \(\) => setInternHours\(uid\)\]/, '⋯ menu item');
@@ -59,6 +88,21 @@ const timeDb = mkDb({
     const broken = bar({ id: 'nt', internHoursTarget: 280, internHours: { status: 'no-match', total: 50 } });
     assert.match(broken, /title="Name not found in the time clock/);
     assert.match(broken, /⚠ <b[^>]*>0\.0<\/b>/, 'stale total hidden when the link breaks');
+
+    // V102.117: the day-by-day popup renders from internHours.daily.
+    const pfn = html.slice(html.indexOf('        function closeInternHoursPopup()'), html.indexOf('        function openInternHoursDetail('));
+    const pop = { innerHTML: '', remove() {}, querySelector: () => ({}) };
+    const pc = { usersData: [{ id: 'bua', internHoursTarget: 280, internHours: { status: 'ok', total: 9.65, days: 1,
+        daily: [{ d: '2026-09-30', h: 9.65, s: [['08:59', '18:38']] }, { d: '2026-09-29', h: 0, s: [['09:00', null]] }] } }],
+        document: { getElementById: () => pop }, window: {}, escapeHtml: x => String(x) };
+    vm.createContext(pc); vm.runInContext(pfn, pc); pc.renderInternHoursPopup('bua');
+    assert.match(pop.innerHTML, /9\.7 \/ 280 h · 1 days/);
+    assert.match(pop.innerHTML, /08:59 – 18:38/);
+    assert.match(pop.innerHTML, /09:00 – ⚠/, 'unclosed clock-in is flagged');
+    assert.match(pop.innerHTML, /no clock-out = 0 h/);
+    pc.usersData[0].internHours.daily = undefined;
+    pc.renderInternHoursPopup('bua');
+    assert.match(pop.innerHTML, /No day-by-day list yet/, 'before the first new-style sync');
 
     // ⏱ setter: goal + name; the name is only stored when it differs from fullName.
     const fn = html.slice(html.indexOf('        async function setInternHours('), html.indexOf('        // V98.57: log a Work submission'));
