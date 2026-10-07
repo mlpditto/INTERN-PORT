@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.112)</title>
+    <title>Nika Admin (V102.113)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -4850,7 +4850,7 @@
         #dashboard-summary #quiz-coverage-panel { margin-top:0!important; }
         #dashboard-summary #line-usage-breakdown { margin-left:0!important; overflow-wrap:anywhere; }
         #board-group-tabs { flex-wrap:wrap; align-items:center; overflow-x:visible!important; }
-        #board-group-tabs button { min-height:44px; padding:8px 14px; border:1px solid #c7d2fe; border-radius:10px; background:#eef2ff; color:#4338ca; cursor:pointer; }
+        #board-group-tabs button { min-height:32px; padding:4px 10px; border:1px solid #c7d2fe; border-radius:10px; background:#eef2ff; color:#4338ca; cursor:pointer; }
         #board-group-tabs button:focus-visible { outline:2px solid #6366f1; outline-offset:2px; }
         #dashboard-work .kanban-board { grid-template-columns:repeat(2,minmax(0,1fr)); min-height:0!important; }
         #dashboard-work .kanban-board.cols-1 { grid-template-columns:minmax(0,1fr); }
@@ -7229,8 +7229,8 @@
                 <div style="display:flex; flex-direction:column; gap:10px; flex:1;">
                     <div id="kanban-toolbar" style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
                         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                            <h4 style="margin:0; color:var(--primary);"><i class="fa-solid fa-layer-group"></i> Kanban Board</h4>
-                            <input type="text" id="board-search" placeholder="🔍 Search tasks..." onkeyup="filterBoard()" style="margin:0; width:180px; padding:5px 12px; font-size:0.85em; border-radius:30px;">
+                            <h4 style="margin:0; color:var(--primary);" title="Kanban Board">🗂️</h4>
+                            <input type="text" id="board-search" placeholder="🔍" title="Search tasks" onkeyup="filterBoard()" style="margin:0; width:110px; padding:5px 12px; font-size:0.85em; border-radius:30px;">
                             <!-- γ.4d: opens the Escalated Learning Notes review queue. Hidden by
                                  refreshEscalatedNotesCount() until at least one note is escalated. -->
                             <button type="button" id="escalated-notes-btn" onclick="openEscalatedNotesView()" title="Learning notes you flagged with 🚀 Escalate — focused review queue" style="display:none; margin:0; padding:5px 14px; font-size:0.85em; border-radius:30px; border:1.5px solid #fecaca; background:#fff5f5; color:#b91c1c; font-weight:800; cursor:pointer; white-space:nowrap;">🚀 Escalated <span id="escalated-notes-count">0</span></button>
@@ -36593,6 +36593,7 @@ They can connect again from LINE.
         // Chip rail (house style — chips over dropdowns). Was a <select> + Reset
         // button; the "All" chip now serves as the reset, so Reset is gone.
         function renderBoardGroupTabs() {
+            const BOARD_GROUP_EMOJI = { All: '🌐', Public: '🌍', Pharmacists: '💊', Intern: '🧑‍⚕️', Extern: '🎓', Junior: '🌱' };
             const container = document.getElementById('board-group-tabs');
             if (!container) return;
             const groups = [...new Set(usersData.map(u => u.group || 'Public'))].sort();
@@ -36602,7 +36603,8 @@ They can connect again from LINE.
             container.classList.add('lang-no-toggle');
 
             const label = document.createElement('span');
-            label.textContent = 'Group:';
+            label.textContent = '👥';
+            label.title = 'Group';
             label.style.cssText = 'font-size:0.78em; font-weight:700; color:#64748b; margin-right:2px;';
             container.append(label);
 
@@ -36615,12 +36617,13 @@ They can connect again from LINE.
                     ? usersData.length
                     : usersData.filter(u => (u.group || 'Public') === g && !u.isIgnored && !u.isPreReg).length;
                 const isActive = g === activeBoardGroup;
+                if (count === 0 && g !== 'All' && !isActive) return; // empty groups stay hidden (kept if currently selected)
                 const color = g === 'All' ? '#64748b' : (groupColorMap[g] || '#64748b');
                 const chip = document.createElement('button');
                 chip.type = 'button';
                 chip.setAttribute('aria-pressed', String(isActive));
                 chip.title = 'Filter by user group — the number counts users, not pending work';
-                chip.textContent = `${g} · ${count}`;
+                chip.textContent = `${BOARD_GROUP_EMOJI[g] || ''} ${g} ${count}`.trim();
                 chip.style.cssText = isActive
                     ? `border:1px solid ${color}; border-radius:14px; padding:5px 12px; font-size:0.78em; font-weight:700; background:${color}; color:#fff; cursor:pointer; white-space:nowrap;`
                     : `border:1px solid #e2e8f0; border-radius:14px; padding:5px 12px; font-size:0.78em; font-weight:600; background:#f8fafc; color:#475569; cursor:pointer; white-space:nowrap;`;
