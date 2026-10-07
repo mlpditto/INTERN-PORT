@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.114)</title>
+    <title>Nika Admin (V102.115)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -8060,7 +8060,7 @@
                     <thead>
                         <tr>
                             <th style="width:40px;" title="Rank">#</th>
-                            <th>User <button type="button" id="user-badge-sort" onclick="toggleUserBadgeSort()" aria-pressed="false" title="Sort by badges" style="width:auto; min-height:0; margin:0 0 0 6px; padding:0 4px; background:none; border:none; font:inherit; font-weight:inherit; color:inherit; cursor:pointer;">🏅↕</button></th>
+                            <th>User <span id="user-sec-count" style="margin-left:4px; font-size:0.72em; font-weight:800; color:var(--text-sub); white-space:nowrap;"></span><button type="button" id="user-badge-sort" onclick="toggleUserBadgeSort()" aria-pressed="false" title="Sort by badges" style="width:auto; min-height:0; margin:0 0 0 6px; padding:0 4px; background:none; border:none; font:inherit; font-weight:inherit; color:inherit; cursor:pointer;">🏅↕</button></th>
                             <th style="width:70px;" title="Score">⭐</th>
                             <th style="width:60px;" title="Beri">🪙</th>
                             <th title="Internship period">⏳</th>
@@ -49139,7 +49139,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const secLabel = (label, n, color) => `<span style="display:inline-flex; align-items:center; gap:6px; padding:7px 12px; font-size:0.78em; font-weight:800; color:${color};">${label} <span style="background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-sub); padding:0 8px; border-radius:10px; font-size:0.92em;">${n}</span></span>`;
                 usersHeads = new Map();
                 if (secPend.length) usersHeads.set(secPend[0], secHead(secLabel('<i class="fa-solid fa-hourglass-half"></i> Pending requests', secPend.length, '#b45309')));
-                if (secAct.length) usersHeads.set(secAct[0], secHead(secLabel('<i class="fa-solid fa-circle-check"></i> Active · ranked', secAct.length, 'var(--text-main)')));
+                // V102.115: the Active label lives in the table header ("Active 7"), not in its own row.
+                const secCount = document.getElementById('user-sec-count');
+                if (secCount) secCount.textContent = campView ? `Hidden ${secIgn.length}` : `Active ${secAct.length}`;
                 if (secIgn.length) usersHeads.set(secIgn[0], secHead(`${secLabel('🙈 Camp', secIgn.length, 'var(--text-sub)')}<span style="font-size:0.72em; color:var(--text-sub);">not ranked · ⋯ → Show on boards</span>`));
             }
 
@@ -49280,7 +49282,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     // English name / code / nickname behind a chevron (per row).
                     const _instShort = d.institute || '';
                     const _certSummary = `${d.fullName || '-'}${_instShort ? ` · ${_instShort}` : ''}`;
-                    const _certHasMore = d.fullNameEn || codeDisplay || (d.nickname && d.nickname !== '-') || userFloodInfo(d);
+                    const _certHasMore = d.fullNameEn || codeDisplay || userFloodInfo(d);
                     // V99.44 — Elite Board Phase 3: no dashed box; the summary is one grey
                     // line under the display name (still click-to-edit via setUserGroup).
                     const certNameDisplay = `
@@ -49293,7 +49295,6 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 ${d.fullNameEn ? `<div style="font-size:0.75em; color:var(--primary); font-style:italic; margin-bottom:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:170px;" title="${d.fullNameEn.replace(/"/g, '&quot;')}">${d.fullNameEn}</div>` : ''}
                                 ${codeDisplay}
                                 ${userFloodDetailHtml(d)}
-                                <div style="font-size:0.7em; color:#888;" title="${(d.nickname || '-').replace(/"/g, '&quot;')}">${d.nickname || '-'}</div>
                             </div>
                         </div>
                     `;
@@ -49320,7 +49321,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 <div style="display:flex; align-items:center; gap:10px;">
                                     ${avatarWithDot(d.id, d.pictureUrl, group)}
                                     <div style="min-width:0;">
-                                        <div style="font-weight:bold; line-height:1.25;">${d.displayName}${d.googleLink && d.googleLink.uid ? ` <span title="Google connected · ${escapeHtml(d.googleLink.email || '')}" aria-label="Google connected" style="font-size:0.85em;">🌐</span>` : ''}${ignored ? ' <span title="Hidden from boards (⋯ to show)" aria-label="Hidden from boards">🙈</span>' : ''}${userFloodMarkHtml(d)}</div>
+                                        <div style="font-weight:bold; line-height:1.25;">${d.displayName}${(() => { const n = String(d.nickname || '').trim(); return n && n !== '-' && n.toLowerCase() !== String(d.displayName || '').trim().toLowerCase() ? ` <span style="font-weight:600; font-size:0.85em; color:var(--text-sub);">· ${escapeHtml(n)}</span>` : ''; })()}${d.googleLink && d.googleLink.uid ? ` <span title="Google connected · ${escapeHtml(d.googleLink.email || '')}" aria-label="Google connected" style="font-size:0.85em;">🌐</span>` : ''}${ignored ? ' <span title="Hidden from boards (⋯ to show)" aria-label="Hidden from boards">🙈</span>' : ''}${userFloodMarkHtml(d)}</div>
                                         ${certNameDisplay}
                                         <div style="display:flex; align-items:center; gap:6px; margin-top:2px; font-size:0.78em; color:var(--text-sub);">
                                             ${userBadgesCellHtml(d)}
