@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.108)</title>
+    <title>Nika Admin (V102.109)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -5470,7 +5470,11 @@
         @media (pointer:coarse) { .bp-model-chip { height:44px; } }
         /* V102.19: a fresh Scorecard / Rewrites run keeps the previous result readable; controls lock; a thin bar runs on top. */
         .review-running :is(button, input, select, textarea, a, summary, [onclick]):not(.audit-run) { pointer-events:none !important; opacity:.45; }
-        .review-running .audit-run { pointer-events:none; }
+        .review-running .audit-run { pointer-events:auto; }
+        /* V102.109: the running ↻ button is also the Stop button — the spinner turns into a square on hover / focus. */
+        .audit-run .run-stop { display:none; }
+        .audit-run.is-running:is(:hover, :focus-visible) i.fa-spinner { display:none; }
+        .audit-run.is-running:is(:hover, :focus-visible) .run-stop { display:inline; }
         .review-run-bar { position:sticky; z-index:6; height:3px; overflow:hidden; background:#e0f2fe; }
         #ai-audit-popup > .review-run-bar { top:-24px; margin:-24px -24px 21px; }
         #ai-analysis-popup > .review-run-bar { top:-30px; margin:-30px -30px 27px; }
@@ -6995,7 +6999,7 @@
     <!-- V93.08: cache-bust on taxonomy.js for the LP Firestore overlay rollout -->
     <script src="ai-model-registry.js?v=V102.61"></script>
     <script src="ai-model-ui.js?v=V102.76"></script>
-    <script src="ollama-local.js?v=V102.76"></script>
+    <script src="ollama-local.js?v=V102.109"></script>
     <script src="peds-dosing.js?v=V102.80"></script>
     <link rel="stylesheet" href="text-ai-chips.css?v=V102.13">
     <link rel="stylesheet" href="quiz-resource-cards.css?v=V102.09">
@@ -17000,6 +17004,7 @@
                 proxyProvider = "ollama";
             }
             // V99.24: the Audit trial uses one authenticated server request, with no local-key fallback.
+            if (generationOptions && generationOptions.signal) { generationOptions = { ...generationOptions }; delete generationOptions.signal; } // V102.109: an AbortSignal is only for Ollama; keep it out of every cloud request body
             if (modelName === 'gemini-3.8-flash' && (proxyProvider === 'gemini' || proxyProvider === 'gemini-aistudio')) {
                 const response = await fetch(PROXY_URL, {
                     method: 'POST',
@@ -18228,6 +18233,8 @@
                 new Promise((_, reject) => setTimeout(() => reject(new Error(`Timed out after ${Math.round(ms / 1000)}s waiting for the AI proxy. Try again or switch model.`)), ms))
             ]);
 
+            const run = (btn && btn.classList.contains('audit-run') && !(opts && opts.cachedResult)) ? window.reviewRunStart(btn) : null; // V102.109
+
             try {
                 // V97.44: skip the spinner for a cachedResult replay — that path is now the
                 // DEFAULT flow (Specialist opens a saved analysis first when one exists), and
@@ -18249,11 +18256,11 @@
                             return;
                         }
                         // V102.19: spinner · model · mm:ss (the estimated % is in the hover)
-                        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${escapeHtml(window.aiModelShortName(selectedModel))} · ${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
-                        btn.title = `Rewriting ~${pct}%`;
+                        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i><span class="run-stop" aria-hidden="true">■</span> ${escapeHtml(window.aiModelShortName(selectedModel))} · ${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
+                        btn.title = run ? `Rewriting ~${pct}% · click to stop` : `Rewriting ~${pct}%`;
                     };
                     paint();
-                    btn.disabled = true;
+                    btn.disabled = !run;
                     analyzeProgressTimer = setInterval(() => {
                         pct = Math.min(95, pct + Math.max(1, Math.round((95 - pct) * 0.08)));
                         paint();
@@ -18285,7 +18292,7 @@
                         // can exceed the proxy's default 8192-token cap and truncate mid-JSON,
                         // surfacing as a false "prose instead of JSON" banner. Request a larger
                         // output budget (proxy caps it server-side).
-                        const aiResp = await withTimeout(callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768, feature: 'quiz_analyzer' }), 520000); // V101.09: 280s -> 520s, chain axios 500 < client 520 < function 540
+                        const aiResp = await window.reviewRunAwait(run, withTimeout(callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768, feature: 'quiz_analyzer', signal: run ? run.ctl.signal : undefined }), 520000)); // V101.09: 280s -> 520s, chain axios 500 < client 520 < function 540
                         resultRaw = aiResp.text;
                         aiTokens = aiResp.tokens;
                         aiModel = aiResp.model;
@@ -18504,9 +18511,10 @@
                 document.body.appendChild(resultDiv);
                 
             } catch (e) {
-                alert("Analysis error: " + e.message);
-                console.error(e);
+                if (e && e.reviewCancelled) showToast('Rewrites stopped'); // V102.109
+                else { alert("Analysis error: " + e.message); console.error(e); }
             } finally {
+                window.reviewRunEnd(run);
                 window.reviewRunLock(runHost, false); // V102.19: an error keeps the previous result, unlocked
                 if (analyzeProgressTimer) clearInterval(analyzeProgressTimer); // V95.50: stop the progress ticker
                 if (btn) {
@@ -18756,6 +18764,7 @@
         };
 
         window.runSelectedQualityAudit = function(btn) {
+            if (window.reviewRunStop()) return; // V102.109: a click while running = Stop
             const model = document.getElementById('quality-audit-model').value;
             if (!window.textAIModelInfo(model)) return;
             return auditQuizAI(btn, { forceNew: true, model });
@@ -18764,6 +18773,7 @@
         // V101.52: Analyze runs the model picked in this toolbar (a trial model is kept for this run
         // only); the value is the Settings analyzer default unless a trial chip was picked.
         window.runSelectedAnalyze = function(btn) {
+            if (window.reviewRunStop()) return; // V102.109: a click while running = Stop
             return analyzeQuizAI(btn, { forceNew: true, model: (document.getElementById('rewrite-ai-model') || {}).value });
         };
 
@@ -18853,12 +18863,13 @@
             const auditRunShort = window.aiModelShortName ? window.aiModelShortName(opts.model || (document.getElementById('ai-analyzer-model-val') || {}).value || '') : '';
 
             const bp = formData.blueprint || {};
+            const run = (btn && btn.classList.contains('audit-run') && !(opts && opts.cachedResult)) ? window.reviewRunStart(btn) : null; // V102.109
 
             try {
                 if (btn && !(opts && opts.cachedResult)) {
-                    const paintRun = () => { btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${escapeHtml(auditRunShort)} · ${auditElapsed()}`; };
+                    const paintRun = () => { btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i><span class="run-stop" aria-hidden="true">■</span> ${escapeHtml(auditRunShort)} · ${auditElapsed()}`; };
                     paintRun();
-                    btn.disabled = true;
+                    btn.disabled = !run;
                     auditProgressTimer = setInterval(paintRun, 1000);
                 }
 
@@ -18921,7 +18932,7 @@ RULES:
                     for (let attempt = 1; attempt <= 2; attempt++) {
                         // V95.16: same truncation guard as analyze — a full-quiz audit
                         // (per-question scorecard) can overrun the 8192 default and truncate.
-                        const aiResp = await callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768, feature: 'quiz_audit' });
+                        const aiResp = await window.reviewRunAwait(run, callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768, feature: 'quiz_audit', signal: run ? run.ctl.signal : undefined }));
                         resultRaw = aiResp.text;
                         aiTokens = aiResp.tokens;
                         aiModel = aiResp.model;
@@ -19006,9 +19017,10 @@ RULES:
                 }
 
             } catch (e) {
-                console.error('Audit error:', e);
-                alert('Audit error: ' + e.message);
+                if (e && e.reviewCancelled) showToast('Review stopped'); // V102.109
+                else { console.error('Audit error:', e); alert('Audit error: ' + e.message); }
             } finally {
+                window.reviewRunEnd(run);
                 if (auditProgressTimer) clearInterval(auditProgressTimer); // V96.45: stop the progress ticker
                 window.reviewRunLock(runHost, false); // V102.19: on a throw the previous scorecard stays, unlocked
                 if (btn) { btn.innerHTML = oldText; btn.disabled = false; }
@@ -19031,6 +19043,24 @@ RULES:
         // the scorecard never pays for a Specialist run it will not read.
         // V102.19: while a fresh Scorecard / Rewrites run is in flight the popup keeps its current result:
         // .review-running locks every control except ↻ (which shows the run), and a thin bar runs along the top.
+        // V102.109: Stop a running Review / Rewrites from the same ↻ button. One run at a time (the popup locks everything else).
+        // The AbortController really cancels an Ollama call (ollama-local.js); a cloud call cannot be recalled, so the screen
+        // stops waiting for it and its answer is dropped.
+        window.reviewRunStart = function(btn) {
+            const run = { ctl: new AbortController(), btn: btn || null };
+            run.stop = new Promise((_, reject) => { run.cancel = () => { run.ctl.abort(); const e = new Error('Stopped'); e.reviewCancelled = true; reject(e); }; });
+            run.stop.catch(() => {});
+            window._reviewRun = run;
+            if (btn) { btn.classList.add('is-running'); btn.disabled = false; btn.title = 'Click to stop'; }
+            return run;
+        };
+        window.reviewRunEnd = function(run) {
+            if (!run) return;
+            if (window._reviewRun === run) window._reviewRun = null;
+            if (run.btn) run.btn.classList.remove('is-running');
+        };
+        window.reviewRunAwait = function(run, promise) { return run ? Promise.race([promise, run.stop]) : promise; };
+        window.reviewRunStop = function() { const run = window._reviewRun; if (!run) return false; run.cancel(); return true; };
         window.reviewRunLock = function(host, on) {
             if (!host) return;
             host.classList.toggle('review-running', !!on);

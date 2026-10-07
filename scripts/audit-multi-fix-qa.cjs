@@ -151,7 +151,7 @@ const remap = cut('                if (onlyQNumbers && onlyQNumbers.length && Ar
         await page.evaluate(() => { const r = document.createElement('button'); r.className = 'audit-run'; r.textContent = 'Grok 4.7 · 00:16'; document.querySelector('#ai-audit-popup').prepend(r); reviewRunLock(document.getElementById('ai-audit-popup'), true); });
         const lk = await page.evaluate(() => { const p = document.getElementById('ai-audit-popup'), cs = s => getComputedStyle(p.querySelector(s)); return { pick: [cs('.audit-pick').pointerEvents, cs('.audit-pick').opacity], run: [cs('.audit-run').pointerEvents, cs('.audit-run').opacity], bar: cs('.review-run-bar').position, busy: p.getAttribute('aria-busy') }; });
         assert.deepEqual(lk.pick, ['none', '0.45'], 'checkboxes lock');
-        assert.deepEqual(lk.run, ['none', '1'], '↻ Review shows the run, not faded');
+        assert.deepEqual(lk.run, ['auto', '1'], '↻ Review shows the run, not faded, and stays clickable (it is the Stop button)');
         assert.equal(lk.bar, 'sticky');
         assert.equal(lk.busy, 'true');
         await page.evaluate(() => { reviewRunLock(document.getElementById('ai-audit-popup'), false); document.querySelector('#ai-audit-popup > .audit-run').remove(); });

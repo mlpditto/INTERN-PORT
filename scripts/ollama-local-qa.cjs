@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const src = fs.readFileSync('public/ollama-local.js', 'utf8');
 let mode = {};           // per-test behaviour of the mock
 let seen = [];           // requests the mock received
+let closed = 0;           // connections the client dropped while the mock was hanging
 
 const server = http.createServer((req, res) => {
     let body = '';
@@ -17,6 +18,7 @@ const server = http.createServer((req, res) => {
         if (mode.status403) return send(403, null);
         if (req.url === '/api/tags') return send(200, { models: mode.models || [{ name: 'nimble:latest' }, { name: 'other:1b' }] });
         if (req.url === '/api/ps') return send(200, { models: [{ name: 'nimble:latest', context_length: mode.ctx || 8194 }, { name: 'other:1b', context_length: mode.ctx || 8194 }] });
+        if (req.url === '/api/chat' && mode.hang) { res.on('close', () => { closed += 1; }); return; }   // never answers; counts a dropped connection
         if (req.url === '/api/chat') {
             if (mode.chatError) return send(500, { error: mode.chatError });
             return send(200, { model: body && JSON.parse(body).model, message: { role: 'assistant', content: mode.text ?? 'ok' }, done: true, done_reason: mode.doneReason || 'stop', prompt_eval_count: mode.promptTokens ?? 120, eval_count: mode.evalTokens ?? 30 });
@@ -84,6 +86,19 @@ const chatBody = () => seen.filter(r => r.url === '/api/chat').pop().body;
     mode = {};
     const dead = load('http://127.0.0.1:9');
     await assert.rejects(() => dead.callOllamaLocal('ol/local', 'p', false, null, null), /is not reachable.*OLLAMA_ORIGINS=https:\/\/mlpditto\.github\.io/);
+
+    // Stop button: an AbortSignal in generationOptions cuts the in-flight request (Ollama stops generating when the connection closes)
+    mode = { hang: true }; closed = 0;
+    const ctl = new AbortController();
+    const hung = w.callOllamaLocal('ol/local', 'p', false, null, { signal: ctl.signal });
+    await new Promise(r => setTimeout(r, 150));
+    ctl.abort();
+    await assert.rejects(() => hung, e => e.reviewCancelled === true && e.message === 'Stopped');
+    await new Promise(r => setTimeout(r, 150));
+    assert.equal(closed, 1, 'the connection to Ollama was closed');
+    const pre = new AbortController(); pre.abort();
+    await assert.rejects(() => w.callOllamaLocal('ol/local', 'p', false, null, { signal: pre.signal }), e => e.reviewCancelled === true);
+    mode = {};
 
     // wiring: catalog (after Grok, trial only), text-only, admin routes ol/ before any provider, script included
     const ui = fs.readFileSync('public/ai-model-ui.js', 'utf8'), admin = fs.readFileSync('public/admin.html', 'utf8');
