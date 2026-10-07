@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.105)</title>
+    <title>Nika Admin (V102.106)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -32270,7 +32270,7 @@ ${JSON.stringify(sourceObj)}`;
                 const orderingLabel = hasOrdering ? '<span class="badge" style="background:#ab47bc; color:white;">🔢 SEQUENCE</span>' : '';
                 const flashcardLabel = hasFlashcard ? '<span class="badge" style="background:#26a69a; color:white;">⚡ FLASHCARD</span>' : '';
 
-                const oneTimeLabel = q.oneTimeMode ? '<span class="badge" style="background:#f57f17; color:white;">🔄 ONE-TIME</span>' : '';
+                const oneTimeLabel = q.oneTimeMode ? `<span class="badge" title="ONE-TIME — click to turn off (affects every intern on this quiz)" data-th-title="คลิกเพื่อปิด ONE-TIME (กระทบทุกคนที่ทำ Quiz นี้)" style="background:#f57f17; color:white; cursor:pointer;" onclick="event.stopPropagation(); turnOffQuizOneTime('${q.id}')">🔄 ONE-TIME</span>` : '';
                 // V95.43: badge is now a one-click un-template toggle (mirrors the V95.32
                 // clickable 📎 badge pattern). The quizzes onSnapshot re-render clears it.
                 // Marking AS template stays in the "..." menu — only removal is one-click.
@@ -33442,6 +33442,17 @@ RULES:
             }
         }
 
+        // V102.106: one-click ONE-TIME off from the list row (the badge). Confirm first: it changes the flow for every intern on the quiz.
+        async function turnOffQuizOneTime(id) {
+            if (!confirm('Turn off ONE-TIME for this quiz?'+String.fromCharCode(10,10)+'Every intern can then attempt it normally. Existing attempts are kept.')) return;
+            try {
+                await db.collection("quizzes").doc(id).update({ oneTimeMode: false });
+                showToast('ONE-TIME: OFF');
+            } catch (e) {
+                alert("Error: " + e.message);
+            }
+        }
+
         async function toggleTemplateStatus(id, current) {
             try {
                 await db.collection("quizzes").doc(id).update({ isTemplate: !current });
@@ -33573,6 +33584,7 @@ RULES:
         window.duplicateQuiz = duplicateQuiz;
         window.toggleQuizStatus = toggleQuizStatus;
         window.toggleTemplateStatus = toggleTemplateStatus;
+        window.turnOffQuizOneTime = turnOffQuizOneTime;
         window.deleteQuiz = deleteQuiz;
         window.openHomeworkAssignModal = openHomeworkAssignModal;
         window.diagnoseUserQuizVisibility = diagnoseUserQuizVisibility;
