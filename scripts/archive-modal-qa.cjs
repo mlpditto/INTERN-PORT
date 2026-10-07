@@ -32,7 +32,9 @@ const QUESTS = [
     { id: 'q4', question: 'ส่ง Prompt ที่ใช้ในแต่ละวัน', baseScore: 0.1, status: 'active', createdAt: day(3), deadline: day(5), subs: [['may', true], ['kaen', true]] },
     { id: 'q5', question: LONG, baseScore: 1, status: 'active', createdAt: day(2), deadline: day(4), subs: [['may', true], ['kaen', false]] },
     { id: 'q6', question: 'Scheduled for next week', baseScore: 2, status: 'active', createdAt: day(1), scheduledStart: day(20), deadline: day(21), subs: [] },
-    { id: 'q7', question: 'LIVE NOW — must not appear', baseScore: 1, status: 'active', createdAt: day(1), deadline: day(30), subs: [] }
+    { id: 'q7', question: 'LIVE NOW — must not appear', baseScore: 1, status: 'active', createdAt: day(1), deadline: day(30), subs: [] },
+    // V102.120: a third, older run of q2/q4's text (extra spaces + case differ → same group), with no submissions
+    { id: 'q8', question: '  ส่ง  Prompt ที่ใช้ในแต่ละวัน ', baseScore: 0.1, status: 'active', createdAt: day(1) - 86400000 * 6, deadline: day(1) - 86400000 * 6 + 3600000, subs: [] }
 ];
 for (let i = 0; i < 30; i++) QUESTS.push({ id: 'old' + i, question: 'Old quest ' + i, baseScore: 1, status: 'active', createdAt: day(1) - i * 86400000, deadline: day(1) - i * 86400000 + 3600000, subs: [] });
 
@@ -68,36 +70,55 @@ for (let i = 0; i < 30; i++) QUESTS.push({ id: 'old' + i, question: 'Old quest '
         // ---- empty Kanban archive, 36 non-live quests ----
         let p = await open(1100, []);
         assert.equal(await p.locator('#ar-count-kanban').textContent(), '0');
-        assert.equal(await p.locator('#ar-count-quests').textContent(), '36', '37 quests minus the live one');
+        assert.equal(await p.locator('#ar-count-quests').textContent(), '37', '38 quests minus the live one');
+        assert.equal(await p.locator('#ar-count-unique').textContent(), '· 35 unique', 'q2 + q4 + q8 share one text'); assert.equal(await p.locator('#ar-count-unique').isVisible(), true);
         assert.equal(await p.locator('#ar-clear-all').isVisible(), false, 'Clear All hidden when nothing to clear');
         assert.equal(await p.locator('#ar-pane-quests').isVisible(), true); assert.equal(await p.locator('#ar-pane-kanban').isVisible(), false, 'opens on Quest history');
-        assert.deepEqual(await p.locator('#ar-filters .ar-chip[data-state] b').allTextContents(), ['36', '3', '1', '32'], 'all / draft / scheduled / archived counts');
+        assert.deepEqual(await p.locator('#ar-filters .ar-chip[data-state] b').allTextContents(), ['37', '3', '1', '33'], 'chips count runs: all / draft / scheduled / archived');
         const first = await rows(p);
-        assert.equal(first.length, 20, 'first page is 20'); assert.equal(await p.locator('#ar-load-more').isVisible(), true);
-        assert.deepEqual(first.slice(0, 6), ['draft', 'draft', 'draft', 'archived', 'archived', 'scheduled'], 'newest first, live quest skipped');
+        assert.equal(first.length, 20, 'first page is 20 groups'); assert.equal(await p.locator('#ar-load-more').isVisible(), true);
+        assert.deepEqual(first.slice(0, 5), ['draft', 'draft ar-group', 'draft', 'archived', 'scheduled'], 'newest first, live skipped, q4 folded under q2');
         assert.ok(!(await texts(p)).some(t => t.includes('LIVE NOW')), 'live quest is not listed');
         assert.equal((await texts(p))[2], 'ลองฝึกใช้ <b>images</b> & more', 'question text is escaped, shown literally');
         assert.deepEqual(await p.locator('#questHistoryTable tbody tr:nth-child(1) .ar-date').allTextContents(), ['7 Oct']);
-        // clamp: the long row is at most ~2 lines tall
-        const h = await p.evaluate(() => document.querySelector('#questHistoryTable tbody tr:nth-child(5) .ar-q').getBoundingClientRect().height);
+        // clamp: the long row (q5, now row 4) is at most ~2 lines tall
+        const h = await p.evaluate(() => document.querySelector('#questHistoryTable tbody tr:nth-child(4) .ar-q').getBoundingClientRect().height);
         assert.ok(h < 48, 'long question clamps to 2 lines: ' + h + ' px');
         // avatars + ack dot; delete disabled when there are submissions, enabled otherwise
         assert.equal(await p.locator('#questHistoryTable tbody tr:nth-child(4) .ar-av').count(), 2);
-        assert.equal(await p.locator('#questHistoryTable tbody tr:nth-child(4) .ar-av.ok').count(), 2);
-        assert.equal(await p.locator('#questHistoryTable tbody tr:nth-child(5) .ar-av.ok').count(), 1, 'kaen not acknowledged on q5');
+        assert.equal(await p.locator('#questHistoryTable tbody tr:nth-child(4) .ar-av.ok').count(), 1, 'kaen not acknowledged on q5');
         assert.equal(await p.locator('#questHistoryTable tbody tr:nth-child(4) .ar-av').first().getAttribute('title'), 'MAY ღ · acknowledged');
         assert.equal(await p.locator('#questHistoryTable tbody tr:nth-child(1) .ar-ic.del').isDisabled(), true, 'q1 has a submission → no delete');
         assert.equal(await p.locator('#questHistoryTable tbody tr:nth-child(3) .ar-ic.del').isDisabled(), false, 'q3 has none → delete allowed');
         await p.locator('#questHistoryTable tbody tr:nth-child(3) .ar-ic.del').click();
         assert.equal(await p.evaluate(() => window._deleted), 'q3');
         await p.locator('#questHistoryTable tbody tr:nth-child(2) .ar-ic:not(.del)').click();
-        assert.equal(await p.evaluate(() => window._recalled), 'q2', 'recall still reaches recallQuest');
+        assert.equal(await p.evaluate(() => window._recalled), 'q2', 'recall still reaches recallQuest (group head = newest run)');
+        // V102.120 duplicate runs: ×3 chip on the group head, one dot per run, expands to child rows with their own actions
+        const dup = p.locator('#questHistoryTable tbody tr:nth-child(2) .ar-dup');
+        assert.equal((await dup.textContent()).replace(/\s+/g, ' ').trim(), '×3 ▸'); assert.equal(await dup.getAttribute('aria-expanded'), 'false');
+        assert.deepEqual(await p.locator('#questHistoryTable tbody tr:nth-child(2) .ar-run').evaluateAll(ns => ns.map(n => n.className.replace('ar-run is-', ''))), ['draft', 'archived', 'archived']);
+        const hint = await p.locator('#questHistoryTable tbody tr:nth-child(2) .ar-dup-hint').textContent();
+        assert.ok(hint.includes('3 Oct') && hint.includes('25 Sep'), 'earlier run dates: ' + hint);
+        assert.equal(await p.locator('#questHistoryTable tbody tr.ar-child').count(), 0, 'folded by default');
+        await dup.click();
+        assert.equal(await p.locator('#questHistoryTable tbody tr:nth-child(2) .ar-dup').getAttribute('aria-expanded'), 'true');
+        assert.deepEqual((await rows(p)).slice(1, 4), ['draft ar-group', 'archived ar-child', 'archived ar-child'], 'q4 then q8 unfold under q2');
+        assert.equal((await rows(p)).length, 22, '20 groups + 2 children');
+        assert.equal(await p.locator('#questHistoryTable tbody tr:nth-child(3) .ar-av.ok').count(), 2, 'child q4 keeps its own participants');
+        assert.equal(await p.locator('#questHistoryTable tbody tr:nth-child(3) .ar-ic.del').isDisabled(), true, 'child with submissions: no delete');
+        assert.equal(await p.locator('#questHistoryTable tbody tr:nth-child(4) .ar-ic.del').isDisabled(), false, 'child q8 without submissions: delete allowed');
+        await p.locator('#questHistoryTable tbody tr:nth-child(4) .ar-ic.del').click();
+        assert.equal(await p.evaluate(() => window._deleted), 'q8', 'the child row deletes ITS run, not the head');
+        await p.locator('#questHistoryTable tbody tr:nth-child(2) .ar-dup').click();
+        assert.equal((await rows(p)).length, 20, 'folds again');
         // chips + search + load more
         await p.locator('#ar-filters .ar-chip[data-state="draft"]').click();
         assert.deepEqual(await rows(p), ['draft', 'draft', 'draft']); assert.equal(await p.locator('#ar-load-more').isVisible(), false);
+        assert.equal(await p.locator('#questHistoryTable tbody .ar-dup').count(), 0, 'in the Draft view q2 has no draft siblings → no ×N');
         await p.locator('#ar-filters .ar-chip[data-state="all"]').click();
         await p.locator('#ar-load-more').click();
-        assert.equal((await rows(p)).length, 36); assert.equal(await p.locator('#ar-load-more').isVisible(), false, 'all loaded');
+        assert.equal((await rows(p)).length, 35, 'all 35 groups loaded'); assert.equal(await p.locator('#ar-load-more').isVisible(), false, 'all loaded');
         await p.locator('#ar-search').fill('fluvox');
         assert.deepEqual(await texts(p), ['FLUVOXAMINE / NEXTSTELLIS', 'ลองใช้กับยา FLUVOXAMINE และ NEXTSTELLIS SUBJECT: ' + 'Create a visually rich infographic about the SUBJECT. '.repeat(14)]);
         await p.locator('#ar-search').fill('zzz');
@@ -123,7 +144,7 @@ for (let i = 0; i < 30; i++) QUESTS.push({ id: 'old' + i, question: 'Old quest '
         await p.close();
 
         assert.deepEqual(errors, []);
-        console.log('PASS: archive modal — tabs with counts (opens on Quest history), Clear All only with Kanban cards, chips/search/load-more over questsCache (live skipped, newest first), date column, escaped + 2-line clamped text, stacked avatars with ack dot + title, ↩ recall / 🗑 disabled when submissions exist, no sideways scroll at 400 px');
+        console.log('PASS: archive modal — tabs with counts (opens on Quest history), Clear All only with Kanban cards, chips/search/load-more over questsCache (live skipped, newest first), date column, escaped + 2-line clamped text, stacked avatars with ack dot + title, ↩ recall / 🗑 disabled when submissions exist, same-text runs fold under the newest with a ×N chip (expand → child rows with own participants/actions; Draft view shows no chip), no sideways scroll at 400 px');
     } finally {
         await browser.close();
     }
