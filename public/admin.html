@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.106)</title>
+    <title>Nika Admin (V102.107)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -14792,7 +14792,8 @@
         <div class="modal-content" style="max-width:1100px;">
             <span class="close-modal" onclick="closeQuizAiTagReview()">&times;</span>
             <h3 style="margin:0 0 4px 0; color:#3730a3; display:flex; align-items:center; gap:8px;">🏷️ AI tags <small id="qat-scope" style="font-weight:600; color:#64748b; font-size:0.6em;"></small></h3>
-            <div id="qat-status" style="font-size:0.8em; color:#475569; margin-bottom:10px;"></div>
+            <div id="qat-status" style="font-size:0.8em; color:#475569; margin-bottom:6px;"></div>
+            <div id="qat-rail" class="audit-toolbar lang-no-toggle" style="margin-bottom:10px;" title="Pick a model — it re-runs the list (Stop first if running) · เลือกโมเดลเพื่อรันใหม่"></div>
             <div id="qat-table" class="qat-table"></div>
             <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:12px; flex-wrap:wrap;">
                 <small style="color:#94a3b8;">Existing tags are kept · new tags come only from the approved list · แท็กเดิมไม่ถูกลบ</small>
@@ -65328,7 +65329,24 @@ ${JSON.stringify(items)}`;
             document.getElementById('qat-scope').textContent = Array.isArray(ids) ? `${pool.length} selected` : `${pool.length} incomplete`;
             forceShowModal('quizAiTagModal', 'block');
             renderQuizAiTagReview();
+            window._qatPool = pool;
+            window.qatRun();
+        };
+        // V102.107: the model is picked in the modal (chip rail) — picking one re-runs the whole list with it.
+        window.qatPickModel = function (btn) {
+            if (window._qatRunning) { showToast('Press Stop first, then pick a model'); return; }
+            const input = document.getElementById('ai-tagging-model-val');
+            if (input) input.value = btn.dataset.value;
+            window._qatRows.forEach(r => { r.system = r.curSystem; r.aiSystem = ''; r.add = { topic: [], skill: [], population: [] }; r.state = 'wait'; r.accept = false; r.error = ''; });
+            window._qatCancel = false;
+            window.qatRun();
+        };
+        window.qatRun = async function () {
+            const pool = window._qatPool || [];
             const model = document.getElementById('ai-tagging-model-val')?.value || 'gemini-3.5-flash';
+            const rail = document.getElementById('qat-rail');
+            if (rail) rail.innerHTML = window.providerModelRailHtml('qat-model-pick', model, 'qatPickModel(this)');
+            window._qatRunning = true;
             const batches = Math.ceil(pool.length / QAT_BATCH);
             for (let b = 0; b < batches; b++) {
                 if (window._qatCancel) break;
@@ -65359,6 +65377,7 @@ ${JSON.stringify(items)}`;
                 }
                 renderQuizAiTagReview();
             }
+            window._qatRunning = false;
             renderQuizAiTagReview(window._qatCancel ? 'Stopped' : 'Done — review, untick rows you do not want, then Save');
         };
 
