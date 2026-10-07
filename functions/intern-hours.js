@@ -11,10 +11,14 @@ const OUT = 'ออกงาน';
 
 const bkkDay = (d) => d.toLocaleDateString('sv', { timeZone: 'Asia/Bangkok' });
 const normName = (s) => String(s || '').replace(/\s+/g, ' ').trim();
+const bkkClock = (d) => d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', hour12: false });
 
 // Same pairing as the time dashboard's calcHoursFromLogs (admin.js): per Bangkok
 // day, a clock-in is closed by the next clock-out, and a clock-in left open counts
 // nothing. startDate / endDate are 'YYYY-MM-DD', inclusive, either may be empty.
+// V102.117: also returns `daily`, newest first, for the admin "who worked when" popup:
+// { d: 'YYYY-MM-DD', h: hours, s: [['HH:mm', 'HH:mm' | null], ...] } - a null clock-out is
+// a clock-in that was never closed (counts 0 h). A day with only a lone clock-out is left out.
 function sumInternHours(logs, startDate, endDate) {
     const byDay = {};
     logs.forEach((x) => {
@@ -25,21 +29,30 @@ function sumInternHours(logs, startDate, endDate) {
     });
     let total = 0;
     let days = 0;
-    Object.values(byDay).forEach((list) => {
+    const daily = [];
+    Object.keys(byDay).forEach((k) => {
+        const list = byDay[k];
         list.sort((a, b) => a.timestamp - b.timestamp);
         let inTime = null;
         let dayHours = 0;
+        const segs = [];
         list.forEach((r) => {
-            if (r.type === IN) inTime = r.timestamp;
-            else if (r.type === OUT && inTime) {
+            if (r.type === IN) {
+                if (inTime) segs.push([bkkClock(inTime), null]);   // a second clock-in leaves the first one open
+                inTime = r.timestamp;
+            } else if (r.type === OUT && inTime) {
                 dayHours += (r.timestamp - inTime) / 3600000;
+                segs.push([bkkClock(inTime), bkkClock(r.timestamp)]);
                 inTime = null;
             }
         });
+        if (inTime) segs.push([bkkClock(inTime), null]);
         if (dayHours > 0) days++;
         total += dayHours;
+        if (segs.length) daily.push({ d: k, h: Math.round(dayHours * 100) / 100, s: segs });
     });
-    return { total: Math.round(total * 100) / 100, days };
+    daily.sort((a, b) => (a.d < b.d ? 1 : -1));
+    return { total: Math.round(total * 100) / 100, days, daily };
 }
 
 // name -> time-clock user id. A name two people share maps to null: guessing
@@ -55,7 +68,8 @@ function timeIdsByName(timeUserDocs) {
     return map;
 }
 
-async function syncInternHours(db, timeDb, FieldValue) {
+// onlyUid (optional): sync just that user - the admin popup's 🔄 - and hand the daily list back.
+async function syncInternHours(db, timeDb, FieldValue, onlyUid) {
     const [interns, timeUsers] = await Promise.all([
         db.collection('users').where('internHoursTarget', '>', 0).get(),
         timeDb.collection('users').get()
@@ -63,6 +77,7 @@ async function syncInternHours(db, timeDb, FieldValue) {
     const ids = timeIdsByName(timeUsers.docs);
     const results = [];
     for (const doc of interns.docs) {
+        if (onlyUid && doc.id !== onlyUid) continue;
         const u = doc.data();
         const name = normName(u.timeName || u.fullName);
         const timeUserId = ids.get(name);
@@ -77,11 +92,11 @@ async function syncInternHours(db, timeDb, FieldValue) {
             .map((a) => a.data())
             .filter((a) => a.timestamp && a.timestamp.toDate)
             .map((a) => ({ type: a.type, timestamp: a.timestamp.toDate() }));
-        const { total, days } = sumInternHours(logs, String(u.startDate || '').slice(0, 10), String(u.endDate || '').slice(0, 10));
+        const { total, days, daily } = sumInternHours(logs, String(u.startDate || '').slice(0, 10), String(u.endDate || '').slice(0, 10));
         await doc.ref.update({
-            internHours: { status: 'ok', total, days, timeUserId, syncedAt: FieldValue.serverTimestamp() }
+            internHours: { status: 'ok', total, days, daily, timeUserId, syncedAt: FieldValue.serverTimestamp() }
         });
-        results.push({ id: doc.id, name, status: 'ok', total, days });
+        results.push(onlyUid ? { id: doc.id, name, status: 'ok', total, days, daily } : { id: doc.id, name, status: 'ok', total, days });
     }
     return { synced: results.filter((r) => r.status === 'ok').length, results };
 }

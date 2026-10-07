@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.116)</title>
+    <title>Nika Admin (V102.117)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -49267,11 +49267,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         const _h = _ih.status === 'ok' ? (_ih.total || 0) : 0;
                         const _hPct = Math.min(100, Math.round(_h / d.internHoursTarget * 100));
                         const _hColor = _h >= d.internHoursTarget ? '#16a34a' : '#2563eb';
-                        const _hTip = _ih.status === 'ok' ? `${_ih.days || 0} days in the time clock` + (_ih.syncedAt && _ih.syncedAt.toDate ? ` · synced ${_ih.syncedAt.toDate().toLocaleString('en-GB')}` : '')
+                        const _hTip = _ih.status === 'ok' ? `${_ih.days || 0} days in the time clock — tap for the day-by-day list` + (_ih.syncedAt && _ih.syncedAt.toDate ? ` · synced ${_ih.syncedAt.toDate().toLocaleString('en-GB')}` : '')
                             : _ih.status === 'no-match' ? 'Name not found in the time clock — tap to fix'
                             : _ih.status === 'ambiguous' ? 'Two people share this name in the time clock — tap to fix'
-                            : 'Not synced yet';
-                        hoursHtml = `<button type="button" onclick="setInternHours('${d.id}')" title="${escapeHtml(_hTip)}" style="display:inline-flex; flex-direction:column; gap:3px; min-width:96px; width:auto; min-height:0; margin:3px 0 0; padding:0; background:none; border:none; font:inherit; cursor:pointer; text-align:left;"><span style="display:block; height:5px; border-radius:3px; background:var(--border-color); overflow:hidden;"><span style="display:block; height:100%; width:${_hPct}%; background:${_hColor};"></span></span><span style="font-size:0.8em; color:var(--text-sub); white-space:nowrap; font-weight:600;">${_ih.status === 'ok' ? '' : '⚠ '}<b style="color:${_hColor};">${_h.toFixed(1)}</b> / ${d.internHoursTarget} h</span></button>`;
+                            : 'Not synced yet — tap for details';
+                        hoursHtml = `<button type="button" onclick="openInternHoursDetail(event, '${d.id}')" title="${escapeHtml(_hTip)}" style="display:inline-flex; flex-direction:column; gap:3px; min-width:96px; width:auto; min-height:0; margin:3px 0 0; padding:0; background:none; border:none; font:inherit; cursor:pointer; text-align:left;"><span style="display:block; height:5px; border-radius:3px; background:var(--border-color); overflow:hidden;"><span style="display:block; height:100%; width:${_hPct}%; background:${_hColor};"></span></span><span style="font-size:0.8em; color:var(--text-sub); white-space:nowrap; font-weight:600;">${_ih.status === 'ok' ? '' : '⚠ '}<b style="color:${_hColor};">${_h.toFixed(1)}</b> / ${d.internHoursTarget} h</span></button>`;
                     }
 
                     const userCode = d.enrollmentCode || preRegData.find(p => p.claimedBy === d.id)?.code || preRegData.find(p => p.sourceUserId === d.id)?.code || '';
@@ -49576,6 +49576,78 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // V102.49: internship hours goal + the name that links this intern to the time
         // clock (time.mlp-int.work). The LINE ids differ between the two apps, so the
         // link is the name: timeName, or fullName when they already match.
+        // V102.117: tap the hours bar → who-worked-when popup. The list is internHours.daily from the
+        // time-clock sync; 🔄 syncs just this intern (syncInternHoursNow {uid}) and redraws from the reply.
+        // A broken name link (no-match / ambiguous) still goes straight to the fix prompt.
+        function closeInternHoursPopup() {
+            const pop = document.getElementById('ih-popup');
+            if (pop) pop.remove();
+            window._ihPopupUid = null;
+        }
+        function renderInternHoursPopup(uid, live) {
+            const pop = document.getElementById('ih-popup');
+            if (!pop) return;
+            const u = (usersData || []).find(x => x.id === uid) || {};
+            const ih = live || u.internHours || {};
+            const daily = Array.isArray(ih.daily) ? ih.daily : null;
+            const syncedAt = live ? 'just now' : (ih.syncedAt && ih.syncedAt.toDate ? ih.syncedAt.toDate().toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'never');
+            const target = u.internHoursTarget || 0;
+            const dayLabel = k => new Date(k + 'T00:00:00+07:00').toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Bangkok' });
+            const segText = s => s.map(x => x[1] ? `${x[0]} – ${x[1]}` : `${x[0]} – ⚠`).join(' · ');
+            let anyOpen = false;
+            const rows = !daily ? '<div style="padding:10px 2px; color:#64748b; font-size:0.86em;">No day-by-day list yet — tap 🔄 to fetch it from the time clock.</div>'
+                : daily.length === 0 ? '<div style="padding:10px 2px; color:#64748b; font-size:0.86em;">No clock-ins inside the internship period.</div>'
+                : daily.map(r => {
+                    const open = (r.s || []).some(x => !x[1]);
+                    if (open) anyOpen = true;
+                    return `<div style="display:grid; grid-template-columns:84px 1fr 44px; gap:6px; padding:3px 4px; border-top:1px solid #f1f5f9; font-size:0.84em; align-items:center;${open ? ' background:#fff7ed; border-radius:6px;' : ''}"><span style="color:#475569;">${escapeHtml(dayLabel(r.d))}</span><span style="color:#64748b; font-variant-numeric:tabular-nums;">${escapeHtml(segText(r.s || []))}</span><span style="text-align:right; font-weight:700; color:${open ? '#c2410c' : '#2563eb'};">${Number(r.h || 0).toFixed(1)}</span></div>`;
+                }).join('');
+            const head = ih.status === 'ok' ? `${Number(ih.total || 0).toFixed(1)}${target ? ` / ${target}` : ''} h · ${ih.days || 0} days` : 'Hours';
+            const btn = 'width:auto; min-height:0; margin:0; padding:2px 6px; background:none; border:none; font:inherit; cursor:pointer; color:#64748b;';
+            pop.innerHTML = `<div style="display:flex; align-items:center; gap:4px; font-weight:800; margin-bottom:4px;"><span style="flex:1;">⏱ ${escapeHtml(head)}</span><button type="button" id="ih-refresh" title="Sync from the time clock" aria-label="Sync from the time clock" style="${btn}">🔄</button><button type="button" id="ih-edit" title="Goal and time-clock name" aria-label="Edit goal and name" style="${btn}">✎</button><button type="button" id="ih-close" title="Close" aria-label="Close" style="${btn}">✕</button></div><div style="max-height:260px; overflow:auto;">${rows}</div><div style="display:flex; justify-content:space-between; gap:8px; margin-top:6px; font-size:0.72em; color:#94a3b8;"><span>${anyOpen ? '⚠ no clock-out = 0 h' : ''}</span><span>synced ${escapeHtml(syncedAt)}</span></div>`;
+            pop.querySelector('#ih-close').onclick = closeInternHoursPopup;
+            pop.querySelector('#ih-edit').onclick = () => { closeInternHoursPopup(); setInternHours(uid); };
+            pop.querySelector('#ih-refresh').onclick = async e => {
+                const b = e.currentTarget;
+                b.disabled = true; b.textContent = '…';
+                try {
+                    const res = await adminApp.functions().httpsCallable('syncInternHoursNow')({ uid });
+                    const r = ((res.data && res.data.results) || []).find(x => x.id === uid);
+                    if (!document.getElementById('ih-popup') || window._ihPopupUid !== uid) return;
+                    if (r && r.status === 'ok') renderInternHoursPopup(uid, r);
+                    else { closeInternHoursPopup(); setInternHours(uid); }
+                } catch (err) {
+                    b.disabled = false; b.textContent = '🔄';
+                    showToast('Sync failed: ' + (err.message || err.code || 'unknown'));
+                }
+            };
+        }
+        function openInternHoursDetail(ev, uid) {
+            ev.stopPropagation();
+            const u = (usersData || []).find(x => x.id === uid) || {};
+            const st = (u.internHours || {}).status;
+            if (st === 'no-match' || st === 'ambiguous') { closeInternHoursPopup(); return setInternHours(uid); }
+            const trig = ev.currentTarget;
+            if (window._ihPopupUid === uid) { closeInternHoursPopup(); return; }
+            closeInternHoursPopup();
+            const pop = document.createElement('div');
+            pop.id = 'ih-popup';
+            pop.className = 'lang-no-toggle';
+            pop.setAttribute('role', 'dialog');
+            pop.setAttribute('aria-label', 'Internship hours by day');
+            const r = trig.getBoundingClientRect();
+            const w = Math.min(340, window.innerWidth - 16);
+            pop.style.cssText = `position:absolute; z-index:9000; width:${w}px; box-sizing:border-box; background:#fff; color:#1f2937; border:1px solid #cbd5e1; border-radius:12px; box-shadow:0 10px 30px rgba(15,23,42,.18); padding:10px 12px; font-size:0.9em; top:${Math.round(r.bottom + window.scrollY + 6)}px; left:${Math.round(Math.max(8, Math.min(r.left + window.scrollX, window.innerWidth + window.scrollX - w - 8)))}px;`;
+            document.body.appendChild(pop);
+            window._ihPopupUid = uid;
+            renderInternHoursPopup(uid);
+            if (!window._ihPopupWired) {
+                window._ihPopupWired = true;
+                document.addEventListener('click', e => { const p = document.getElementById('ih-popup'); if (p && !p.contains(e.target)) closeInternHoursPopup(); });
+                document.addEventListener('keydown', e => { if (e.key === 'Escape') closeInternHoursPopup(); });
+                window.addEventListener('resize', closeInternHoursPopup);
+            }
+        }
         async function setInternHours(uid) {
             const u = (usersData || []).find(x => x.id === uid) || {};
             const t = prompt(`Internship hours goal for ${u.displayName || uid} (0 = stop):`, u.internHoursTarget || '');
