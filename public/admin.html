@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.113)</title>
+    <title>Nika Admin (V102.114)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -23238,6 +23238,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e => console.warn('[admin auth] setPersistence failed', e));
         const GOOGLE_POPUP_TIMEOUT_MS = 7000;
 
+        var floodStatusData = {};   // V102.114: flood_status/{userId} (written hourly by checkFloodAlerts; admin-read)
         var usersData = [], worksData = [], casesData = [], productListingsData = [], quizApprovedData = [], sideQuestsCache = {}, questsCache = [], questsSubCache = {}, questsSubList = [];
         var knowledgeBaseCache = []; // Required by PDF-to-Quiz and Research grounding
         var reflectiveLogsCache = [];
@@ -34541,6 +34542,13 @@ RULES:
                 renderBadgeStatsIfOpen();
             }, e => console.error("🔥 [Firestore Error] users:", e));
 
+            db.collection("flood_status").onSnapshot(s => {
+                floodStatusData = {};
+                s.docs.forEach(d => { if (!d.id.startsWith('_')) floodStatusData[d.id] = d.data(); });
+                renderUserGroupTabs();
+                renderTable('users');
+            }, e => console.error("🔥 [Firestore Error] flood_status:", e));
+
             db.collection("side_quests").orderBy("createdAt", "desc").onSnapshot(renderKanban, e => console.error("🔥 [Firestore Error] side_quests:", e));
 
             db.collection("quests").onSnapshot(s => {
@@ -36576,6 +36584,7 @@ They can connect again from LINE.
             const allOptions = ['All', ...divs, ...groups.filter(g => !divs.includes(g))];
 
             const campOn = !!window._userCampView;
+            const floodCount = usersData.filter(u => !u.isIgnored && u.floodWatch && u.floodWatch.optIn === true).length;
             // V102.60: the same chip + count rule as the picker and Groups & Divisions —
             // ACTIVE users (not hidden, not pending). Pending requests keep their own section
             // in the table; hidden (camp) users are the 🙈 chip.
@@ -36587,7 +36596,7 @@ They can connect again from LINE.
                 if (g === 'All') return groupChipHtml('All', { attrs, icon: 'fa-users', color: '#334155', active: active.length, total: usersData.length, hint: 'show every group' });
                 if (divisionConfig && divisionConfig[g]) return groupChipHtml(g, { attrs, icon: 'fa-shield-halved', color: '#4f46e5', active: inGroups(divisionConfig[g], active), total: inGroups(divisionConfig[g], usersData), hint: 'division' });
                 return groupChipHtml(g, { attrs });
-            }).join('') + (campCount ? `<button type="button" class="grp-chip${campOn ? ' on' : ''}" onclick="toggleUserCampView()" aria-pressed="${campOn}" title="Camp · hidden from boards, not ranked · ${campCount}" style="--c:#64748b;">🙈<span class="grp-name">Camp</span><small>${campCount}</small></button>` : '');
+            }).join('') + (floodCount ? `<button type="button" class="grp-chip${window._userFloodOnly ? ' on' : ''}" onclick="toggleUserFloodView()" aria-pressed="${!!window._userFloodOnly}" title="Flood alerts on · ${floodCount}" style="--c:#2563eb;">🌊<small>${floodCount}</small></button>` : '') + (campCount ? `<button type="button" class="grp-chip${campOn ? ' on' : ''}" onclick="toggleUserCampView()" aria-pressed="${campOn}" title="Camp · hidden from boards, not ranked · ${campCount}" style="--c:#64748b;">🙈<span class="grp-name">Camp</span><small>${campCount}</small></button>` : '');
         }
 
         // Chip rail (house style — chips over dropdowns). Was a <select> + Reset
@@ -49072,6 +49081,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     }
                 }
 
+                if (window._userFloodOnly) data = data.filter(u => u.floodWatch && u.floodWatch.optIn === true);
+
                 // V98.49 — Know Yourself rail. Built from the rows the group/search
                 // filters left, then applied. Read-only slice of a self-report: it
                 // reorders nothing and feeds no score.
@@ -49269,7 +49280,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     // English name / code / nickname behind a chevron (per row).
                     const _instShort = d.institute || '';
                     const _certSummary = `${d.fullName || '-'}${_instShort ? ` · ${_instShort}` : ''}`;
-                    const _certHasMore = d.fullNameEn || codeDisplay || (d.nickname && d.nickname !== '-');
+                    const _certHasMore = d.fullNameEn || codeDisplay || (d.nickname && d.nickname !== '-') || userFloodInfo(d);
                     // V99.44 — Elite Board Phase 3: no dashed box; the summary is one grey
                     // line under the display name (still click-to-edit via setUserGroup).
                     const certNameDisplay = `
@@ -49281,6 +49292,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             <div class="row-detail" style="display:none; margin-top:3px;">
                                 ${d.fullNameEn ? `<div style="font-size:0.75em; color:var(--primary); font-style:italic; margin-bottom:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:170px;" title="${d.fullNameEn.replace(/"/g, '&quot;')}">${d.fullNameEn}</div>` : ''}
                                 ${codeDisplay}
+                                ${userFloodDetailHtml(d)}
                                 <div style="font-size:0.7em; color:#888;" title="${(d.nickname || '-').replace(/"/g, '&quot;')}">${d.nickname || '-'}</div>
                             </div>
                         </div>
@@ -49308,7 +49320,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 <div style="display:flex; align-items:center; gap:10px;">
                                     ${avatarWithDot(d.id, d.pictureUrl, group)}
                                     <div style="min-width:0;">
-                                        <div style="font-weight:bold; line-height:1.25;">${d.displayName}${d.googleLink && d.googleLink.uid ? ` <span title="Google connected · ${escapeHtml(d.googleLink.email || '')}" aria-label="Google connected" style="font-size:0.85em;">🌐</span>` : ''}${ignored ? ' <span title="Hidden from boards (⋯ to show)" aria-label="Hidden from boards">🙈</span>' : ''}</div>
+                                        <div style="font-weight:bold; line-height:1.25;">${d.displayName}${d.googleLink && d.googleLink.uid ? ` <span title="Google connected · ${escapeHtml(d.googleLink.email || '')}" aria-label="Google connected" style="font-size:0.85em;">🌐</span>` : ''}${ignored ? ' <span title="Hidden from boards (⋯ to show)" aria-label="Hidden from boards">🙈</span>' : ''}${userFloodMarkHtml(d)}</div>
                                         ${certNameDisplay}
                                         <div style="display:flex; align-items:center; gap:6px; margin-top:2px; font-size:0.78em; color:var(--text-sub);">
                                             ${userBadgesCellHtml(d)}
@@ -49336,6 +49348,49 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 }
             });
         }
+        // V102.114: per-user flood watch in the Users table. Only users who opted in (users.floodWatch.optIn)
+        // get a 🌊 mark: coloured by risk, dashed when no home is set yet, grey before the first hourly check.
+        // Detail lines come from flood_status/{id}.summary and never print the home coordinates.
+        function userFloodInfo(d) {
+            const fw = d && d.floodWatch;
+            if (!fw || fw.optIn !== true) return null;
+            const home = fw.home || {};
+            const hasHome = home.lat != null && home.lon != null && Number.isFinite(Number(home.lat)) && Number.isFinite(Number(home.lon));
+            const st = floodStatusData[d.id];
+            const label = { high: 'HIGH', moderate: 'Moderate', low: 'Low', info: 'No gauge nearby' };
+            const color = { high: '#dc2626', moderate: '#2563eb', low: '#16a34a' };
+            const at = st && st.checkedAt && st.checkedAt.toDate ? st.checkedAt.toDate().toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+            if (!hasHome) return { cls: 'nohome', tip: 'Flood alerts on · no home set yet', detail: '<b>🌊 Alerts on, no home set yet</b><span style="color:#64748b;">no flood data for this home</span>' };
+            if (!st || !st.risk) return { cls: 'wait', tip: 'Flood alerts on · waiting for the first hourly check', detail: '<b>🌊 Home set</b><span style="color:#64748b;">waiting for the first hourly check</span>' };
+            const s = st.summary || {};
+            const parts = [`<b>🌊 Home: <span style="color:${color[st.risk] || '#64748b'};">${label[st.risk] || escapeHtml(st.risk)}</span></b>`];
+            const r = s.road && s.road.nearest;
+            if (r) parts.push(`<span>🛣️ ${r.closed ? 'closed' : r.depthCm != null ? `<b>${Math.round(r.depthCm)} cm</b>` : 'flooded'} · ${escapeHtml(r.name || 'road')} (${Math.round(r.m)} m)</span>`);
+            const c = s.canal;
+            if (c && c.name) {
+                const bank = c.freeboardM == null ? '' : c.freeboardM >= 0 ? ` · <b>${Math.round(c.freeboardM * 100)} cm</b> below bank` : ` · <b>${Math.round(-c.freeboardM * 100)} cm</b> over bank`;
+                parts.push(`<span>🏞️ ${escapeHtml(c.name)}${bank}${c.change24cm != null ? ` · 24h ${c.change24cm > 0 ? '+' : ''}${c.change24cm} cm` : ''}</span>`);
+            }
+            const rain = s.pop && s.pop.rains && s.pop.rains[0];
+            if (rain && rain.r1h != null) parts.push(`<span>🌧️ 1h <b>${rain.r1h} mm</b></span>`);
+            if (s.traffy6h) parts.push(`<span>📣 Traffy ${s.traffy6h} (6h)</span>`);
+            if (st.lastAlertDay) parts.push(`<span>🔔 LINE sent ${escapeHtml(st.lastAlertDay)}</span>`);
+            if (at) parts.push(`<span style="color:#64748b;">⏱ ${escapeHtml(at)}</span>`);
+            return { cls: st.risk, tip: `Flood: ${label[st.risk] || st.risk}${s.title ? ' · ' + s.title : ''}${at ? ' · checked ' + at : ''}`, detail: parts.join('') };
+        }
+        function userFloodMarkHtml(d) {
+            const f = userFloodInfo(d);
+            if (!f) return '';
+            const bg = { high: 'background:#dc2626; box-shadow:0 0 0 3px #fecaca;', moderate: 'background:#2563eb;', low: 'background:#16a34a;', wait: 'background:#94a3b8;', nohome: 'background:#fff; border:1.5px dashed #94a3b8; opacity:0.85;' }[f.cls] || 'background:#94a3b8;';
+            return ` <span title="${escapeHtml(f.tip)}" aria-label="${escapeHtml(f.tip)}" style="display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; font-size:0.62em; vertical-align:middle; cursor:help; ${bg}">🌊</span>`;
+        }
+        function userFloodDetailHtml(d) {
+            const f = userFloodInfo(d);
+            if (!f) return '';
+            const warm = f.cls === 'nohome' || f.cls === 'wait';
+            return `<div style="margin:3px 0 2px; max-width:420px; display:flex; flex-wrap:wrap; gap:4px 12px; align-items:center; font-size:0.74em; padding:6px 10px; border-radius:10px; border:1px solid ${warm ? '#e2e8f0' : '#bae6fd'}; background:${warm ? '#f8fafc' : '#f0f9ff'}; color:${warm ? '#475569' : '#0c4a6e'};">${f.detail}</div>`;
+        }
+        function toggleUserFloodView() { window._userFloodOnly = !window._userFloodOnly; renderUserGroupTabs(); renderTable('users'); }
         function toggleWorkArchive() { hideCompletedWorks = !hideCompletedWorks; document.getElementById('btn-toggle-work-archive').classList.toggle('active'); renderTable('works'); }
         // V99.42: open/close the folded "Hidden (ignored)" section of the Users table.
         // A window flag, not DOM state — every users onSnapshot re-renders the table.
