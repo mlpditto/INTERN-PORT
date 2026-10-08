@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.74)</title>
+    <title>Internship Portfolio (V101.75)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -3169,7 +3169,17 @@
                 /* V101.60: 👶 = this drug has a paediatric dose calculator (peds-dosing.js) */
                 .dc-row-peds { flex-shrink: 0; font-size: 0.85em; line-height: 1; }
                 /* V101.73: 📎 n = this drug has download files (admin-added, drug_codex.materials); the files sit in the detail header */
-                .dc-row-mat { flex-shrink: 0; font-size: 0.72em; font-weight: 800; line-height: 1; color: #6d28d9; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 999px; padding: 3px 7px; white-space: nowrap; }
+                .dc-row-mat { flex-shrink: 0; font-size: 0.72em; font-weight: 800; line-height: 1; color: #6d28d9; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 999px; padding: 3px 7px; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; text-decoration: none; cursor: pointer; }
+                .dc-row-mat:hover { background: #ede9fe; border-color: #c4b5fd; }
+                a.dc-row-mat { color: var(--mk, #6d28d9); background: #fff; border-color: var(--mk, #ddd6fe); }
+                .dc-row-mat .dc-mat-chev { font-size: 0.8em; opacity: .7; }
+                .dc-row-mat:focus-visible { outline: 2px solid #7c3aed; outline-offset: 2px; }
+                /* V101.75: small list under the 📎 n chip (several files) — floats above the section, closes on outside tap / scroll / Esc */
+                .dc-mat-pop { position: fixed; z-index: 9000; min-width: 190px; max-width: min(320px, calc(100vw - 16px)); display: flex; flex-direction: column; gap: 4px; padding: 6px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 10px 30px rgba(15,23,42,0.22); }
+                .dc-mat-pop-item { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border: 1px solid var(--mk, #6d28d9); border-radius: 9px; color: var(--mk, #6d28d9); background: #fff; font-size: 0.85rem; font-weight: 700; text-decoration: none; }
+                .dc-mat-pop-item span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .dc-mat-pop-item:hover, .dc-mat-pop-item:focus-visible { background: #f8fafc; }
+                @media (pointer: coarse) { .dc-row-mat { padding: 8px 11px; } .dc-mat-pop-item { padding: 13px 12px; } }
                 .dc-detail-file { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; text-decoration: none; color: var(--mk, #6d28d9); background: #fff; border: 1px solid var(--mk, #6d28d9); }
                 .dc-detail-file span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
                 .dc-peds-inputs { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
@@ -17592,7 +17602,7 @@
                             <div class="dc-row-main">
                                 <div class="dc-row-name-line">
                                     <div class="dc-row-name">${escapeHtml(disease.diseaseName || '(unnamed)')}</div>
-                                    ${dcMaterialsOf(disease).length ? `<span class="dc-row-mat lang-no-toggle" title="${dcMaterialsOf(disease).length} download file(s)" data-th-title="ไฟล์ดาวน์โหลด ${dcMaterialsOf(disease).length} ไฟล์" aria-label="${dcMaterialsOf(disease).length} download files"><i class="fa-solid fa-paperclip" aria-hidden="true"></i> ${dcMaterialsOf(disease).length}</span>` : ''}
+                                    ${dcRowMatHtml(disease, 'dx')}
                                     ${credAvatar}
                                 </div>
                                 ${thai}
@@ -18810,6 +18820,58 @@
             });
         }
 
+        // V101.75: ONE-CLICK download from the Codex lists. One file → the 📎 chip IS the link (new tab, the row does not open);
+        // several → one tap opens a small list under the chip, one more tap on a file. Same helper for Drug ('dc') and Disease ('dx').
+        function dcRowMatHtml(doc, source) {
+            const mats = dcMaterialsOf(doc), n = mats.length;
+            if (!n) return '';
+            if (n === 1) {
+                const m = mats[0], k = materialKind(m.url), name = escapeHtml(materialDisplayName(m, 0)), url = escapeHtml(String(m.url).trim());
+                return `<a class="dc-row-mat lang-no-toggle" style="--mk:${k.color}" href="${url}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="Download (${k.label}): ${name}" data-th-title="ดาวน์โหลด (${k.label}): ${name}" aria-label="Download ${k.label}: ${name}"><i class="${k.icon}" aria-hidden="true"></i><i class="fa-solid fa-arrow-down" aria-hidden="true"></i></a>`;
+            }
+            const id = escapeHtml(String(doc._id || ''));
+            return `<span class="dc-row-mat lang-no-toggle" role="button" tabindex="0" onclick="dcMatPop(event,'${source}','${id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();dcMatPop(event,'${source}','${id}')}" aria-haspopup="true" aria-expanded="false" title="${n} download files — tap to pick" data-th-title="ไฟล์ดาวน์โหลด ${n} ไฟล์ — แตะเพื่อเลือก" aria-label="${n} download files"><i class="fa-solid fa-paperclip" aria-hidden="true"></i> ${n} <i class="fa-solid fa-chevron-down dc-mat-chev" aria-hidden="true"></i></span>`;
+        }
+        var dcMatPopKey_ = null;
+        function dcMatPopClose() {
+            const p = document.getElementById('dc-mat-pop');
+            if (p) p.remove();
+            dcMatPopKey_ = null;
+            document.querySelectorAll('.dc-row-mat[aria-expanded="true"]').forEach(e => e.setAttribute('aria-expanded', 'false'));
+            document.removeEventListener('pointerdown', dcMatPopOutside, true);
+            document.removeEventListener('keydown', dcMatPopEsc, true);
+            window.removeEventListener('scroll', dcMatPopClose, true);
+            window.removeEventListener('resize', dcMatPopClose);
+        }
+        function dcMatPopOutside(e) { if (!e.target.closest('#dc-mat-pop, .dc-row-mat')) dcMatPopClose(); }
+        function dcMatPopEsc(e) { if (e.key === 'Escape') dcMatPopClose(); }
+        function dcMatPop(ev, source, id) {
+            ev.stopPropagation();
+            const key = source + ':' + id, anchor = ev.currentTarget;
+            const wasOpen = dcMatPopKey_ === key;
+            dcMatPopClose();
+            if (wasOpen) return;   // second tap on the same chip = close
+            const doc = (source === 'dx' ? dxState : dcState).codex.find(d => d._id === id);
+            const mats = dcMaterialsOf(doc);
+            if (!mats.length) return;
+            const pop = document.createElement('div');
+            pop.id = 'dc-mat-pop'; pop.className = 'dc-mat-pop lang-no-toggle'; pop.setAttribute('role', 'menu');
+            pop.innerHTML = mats.map((m, i) => {
+                const k = materialKind(m.url), name = escapeHtml(materialDisplayName(m, i)), url = escapeHtml(String(m.url).trim());
+                return `<a role="menuitem" class="dc-mat-pop-item" style="--mk:${k.color}" href="${url}" target="_blank" rel="noopener noreferrer" onclick="setTimeout(dcMatPopClose,0)" title="Download (${k.label}): ${name}"><i class="${k.icon}" aria-hidden="true"></i><span>${name}</span><i class="fa-solid fa-arrow-down" aria-hidden="true"></i></a>`;
+            }).join('');
+            document.body.appendChild(pop);
+            const r = anchor.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+            pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
+            pop.style.top = (r.bottom + 6 + h > window.innerHeight ? Math.max(8, r.top - 6 - h) : r.bottom + 6) + 'px';
+            anchor.setAttribute('aria-expanded', 'true');
+            dcMatPopKey_ = key;
+            document.addEventListener('pointerdown', dcMatPopOutside, true);
+            document.addEventListener('keydown', dcMatPopEsc, true);
+            window.addEventListener('scroll', dcMatPopClose, true);
+            window.addEventListener('resize', dcMatPopClose);
+        }
+
         function dcRenderList() {
             const searchEl = document.getElementById('dc-search-input');
             dcState.searchTerm = searchEl ? String(searchEl.value || '').trim() : '';
@@ -18868,7 +18930,7 @@
                                 <div class="dc-row-name-line">
                                     <div class="dc-row-name">${escapeHtml(drug.genericName || '(unnamed)')}</div>
                                     ${window.PedsDosing && PedsDosing.hasPeds(drug) ? '<span class="dc-row-peds" title="Pediatric dose calculator" data-th-title="คำนวณขนาดยาเด็ก" aria-label="Pediatric dose calculator">👶</span>' : ''}
-                                    ${dcMaterialsOf(drug).length ? `<span class="dc-row-mat lang-no-toggle" title="${dcMaterialsOf(drug).length} download file(s)" data-th-title="ไฟล์ดาวน์โหลด ${dcMaterialsOf(drug).length} ไฟล์" aria-label="${dcMaterialsOf(drug).length} download files"><i class="fa-solid fa-paperclip" aria-hidden="true"></i> ${dcMaterialsOf(drug).length}</span>` : ''}
+                                    ${dcRowMatHtml(drug, 'dc')}
                                     ${credAvatar}
                                 </div>
                                 ${brands}

@@ -11,6 +11,7 @@ const cut = (src, from, to) => {
     assert.ok(a >= 0 && b > a, 'anchor: ' + from);
     return src.slice(a, b);
 };
+const internCss = cut(intern, '                .dc-row-mat {', '                .dc-peds-inputs {');
 const adminFns = cut(admin, '        // V102.129: 📎 n on the row', '        function dcaPublishedRowHtml(drug)');
 const diseaseFns = cut(admin, '        // V102.130: Disease Codex download files', '        function dxaRenderPublishedList() {');
 const internFns = [
@@ -30,8 +31,8 @@ assert.match(admin, /payload\.materials = drugMaterials\.read\(document\.getElem
 assert.match(admin, /\$\{dxaMatBtnHtml\(disease\)\}/);
 assert.match(admin, /drugMaterials\.paint\(document\.getElementById\('dxa-mat-list'\), data && data\.materials\)/);
 assert.match(intern, /chips\.push\(\.\.\.dcFileChipsHtml\(disease\)\)/);
-assert.match(intern, /\$\{dcMaterialsOf\(disease\)\.length \? `<span class="dc-row-mat/);
-assert.match(intern, /\$\{dcMaterialsOf\(drug\)\.length \? `<span class="dc-row-mat/);
+assert.match(intern, /\$\{dcRowMatHtml\(disease, 'dx'\)\}/);
+assert.match(intern, /\$\{dcRowMatHtml\(drug, 'dc'\)\}/);
 
 const globalStyles = Array.from(admin.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/gi), m => m[0]).join('\n');
 (async () => {
@@ -54,6 +55,8 @@ const globalStyles = Array.from(admin.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/
             window.dxaState = { codex: [{ _id: 'x1', diseaseName: 'Influenza', materials: [{ name: 'Guideline', url: 'https://example.test/flu.pdf' }] }, { _id: 'x2', diseaseName: 'Gout' }] };
             window.dxaEdit = id => calls.push(['dxedit', id]); window.dxaSwitchSection = s => calls.push(['dxsection', s]);
             window.dxaEscapeHtml = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+            window.dcState = { codex: [{ _id: 'one', materials: [{ name: 'Leaflet', url: 'https://files.example.test/leaflet.pdf' }] }, { _id: 'many', materials: [{ name: 'Brief', url: 'https://drive.google.com/file/d/abc/view' }, { name: '', url: 'https://files.example.test/slides.pdf' }] }, { _id: 'none' }] };
+            window.dxState = { codex: [{ _id: 'dxmany', materials: [{ name: 'Guideline', url: 'https://files.example.test/flu.pdf' }, { name: 'Algorithm', url: 'https://1drv.ms/p/x' }] }] };
             window.calls = [];
             window.dcaEdit = id => calls.push(['edit', id]); window.dcaSwitchSection = s => calls.push(['section', s]);
             window.dcaEscapeHtml = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
@@ -139,7 +142,56 @@ const globalStyles = Array.from(admin.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/
         await dpop.locator('[data-act="edit"]').click();
         assert.deepEqual(await page.evaluate(() => calls), [['dxedit', 'x1'], ['dxsection', 'refs']]);
         assert.equal((await page.evaluate(() => dcFileChipsHtml(dxaState.codex[0]))).length, 1);
+        // ---- intern one-click download from the list ----
+        await page.addStyleTag({ content: internCss });
+        await page.context().route(/files.example.test|drive.google.com/, r => r.fulfill({ body: 'ok', contentType: 'text/plain' }));   // the new tabs open for real; serve them locally
+        assert.equal(await page.evaluate(() => dcRowMatHtml(dcState.codex[2], 'dc')), '', 'no files → nothing');
+        await page.evaluate(() => {
+            window.__rowClicks = 0;
+            const host = document.createElement('div'); host.id = 'dc-mock'; host.style.cssText = 'position:fixed;top:60px;left:20px;width:520px;background:#fff;z-index:1';
+            host.innerHTML = ['one', 'many'].map(id => '<div class="dc-row" id="row-' + id + '" onclick="window.__rowClicks++" style="display:flex;gap:7px;padding:10px"><b>' + id + '</b>' + dcRowMatHtml(dcState.codex.find(d => d._id === id), 'dc') + '</div>').join('') +
+                '<div class="dc-row" id="row-dx" onclick="window.__rowClicks++" style="display:flex;gap:7px;padding:10px"><b>dx</b>' + dcRowMatHtml(dxState.codex[0], 'dx') + '</div>';
+            document.body.appendChild(host);
+        });
+        // one file: the chip is the link — ONE click opens it in a new tab and the row stays shut
+        const one = page.locator('#row-one a.dc-row-mat');
+        assert.equal(await one.getAttribute('href'), 'https://files.example.test/leaflet.pdf');
+        assert.equal(await one.getAttribute('target'), '_blank');
+        assert.match(await one.getAttribute('rel'), /noopener/);
+        const [tab] = await Promise.all([page.context().waitForEvent('page'), one.click()]);
+        assert.equal(tab.url().startsWith('https://files.example.test/leaflet.pdf'), true, 'new tab: ' + tab.url());
+        await tab.close();
+        assert.equal(await page.evaluate(() => window.__rowClicks), 0, 'the row did not open');
+        // several files: one tap opens the list (row stays shut), one more tap on a file opens it and closes the list
+        const many = page.locator('#row-many .dc-row-mat');
+        assert.equal(await many.getAttribute('role'), 'button');
+        await many.click();
+        assert.equal(await page.locator('#dc-mat-pop').isVisible(), true);
+        assert.equal(await many.getAttribute('aria-expanded'), 'true');
+        assert.deepEqual(await page.locator('#dc-mat-pop a').evaluateAll(es => es.map(e => [e.getAttribute('href'), e.target, e.innerText.trim()])), [
+            ['https://drive.google.com/file/d/abc/view', '_blank', 'Brief'],
+            ['https://files.example.test/slides.pdf', '_blank', 'slides.pdf'],
+        ]);
+        const inView = await page.evaluate(() => { const r = document.getElementById('dc-mat-pop').getBoundingClientRect(); return r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight; });
+        assert.equal(inView, true, 'list stays inside the screen');
+        assert.equal(await page.evaluate(() => window.__rowClicks), 0);
+        await many.click();                                                  // same chip again = close
+        assert.equal(await page.locator('#dc-mat-pop').count(), 0);
+        await many.click();
+        const [tab2] = await Promise.all([page.context().waitForEvent('page'), page.locator('#dc-mat-pop a').nth(1).click()]);
+        assert.equal(tab2.url().startsWith('https://files.example.test/slides.pdf'), true);
+        await tab2.close();
+        await page.waitForFunction(() => !document.getElementById('dc-mat-pop'));
+        // outside tap / Esc / the Disease list use the same list
+        await many.click(); await page.mouse.click(700, 500);
+        assert.equal(await page.locator('#dc-mat-pop').count(), 0, 'outside tap closes');
+        await many.click(); await page.keyboard.press('Escape');
+        assert.equal(await page.locator('#dc-mat-pop').count(), 0, 'Esc closes');
+        await page.locator('#row-dx .dc-row-mat').click();
+        assert.deepEqual(await page.locator('#dc-mat-pop a').allInnerTexts(), ['Guideline', 'Algorithm']);
+        await page.keyboard.press('Escape');
+        assert.equal(await page.evaluate(() => window.__rowClicks), 0, 'no row ever opened');
         assert.deepEqual(errors, []);
-        console.log('PASS: Drug + Disease Codex download files — admin editor (valid https only, width trap), 📎 chip + pop-up, intern list icon rule + coloured file chips, escaping');
+        console.log('PASS: Drug + Disease Codex download files (one-click from the list) — admin editor (valid https only, width trap), 📎 chip + pop-up, intern list icon rule + coloured file chips, escaping');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
