@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.121)</title>
+    <title>Nika Admin (V102.122)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6552,6 +6552,8 @@
         .br-ic { width:32px; height:32px; min-height:0; padding:0; border-radius:9px; border:1px solid #e2e8f0; background:#fff; color:#475569; cursor:pointer; font-size:0.9em; box-shadow:none; flex-shrink:0; }
         .br-ic:hover { border-color:#a21caf; }
         .br-ic-del { color:#dc2626; }
+        .br-pic-ai { position:absolute; right:-7px; bottom:-7px; width:24px; height:24px; min-height:0; padding:0; border-radius:50%; border:1px solid #e9d5ff; background:#faf5ff; color:#7e22ce; font-size:13px; line-height:1; cursor:pointer; box-shadow:0 1px 3px rgba(15,23,42,.15); }
+        .br-pic-ai:hover { background:#f3e8ff; } .br-pic-ai:disabled { cursor:progress; }
         @media (pointer:coarse) { .br-ic { width:44px; height:44px; } }
 
         /* V102.119: Archive modal — tabs with counts, Quest history pane (chips · search · date · clamped text · stacked avatars · icon actions). */
@@ -7978,7 +7980,7 @@
                      beside Name / Description; Beri Cost = what is debited, Full price (optional) = struck through with −N% in the shop. -->
                 <div style="display:grid; grid-template-columns:112px 1fr; gap:14px; margin-bottom:14px; align-items:start;">
                     <div>
-                        <div id="br-pic" class="br-pic" role="button" tabindex="0" title="Reward image · tap to choose (4:3 looks best, ≤ 2 MB)" aria-label="Reward image" onclick="document.getElementById('br-file').click()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('br-file').click()}"><button type="button" id="br-pic-x" class="br-pic-x" title="Remove image" aria-label="Remove image" onclick="event.stopPropagation(); brRemoveImage()" hidden>&times;</button></div>
+                        <div id="br-pic" class="br-pic" role="button" tabindex="0" title="Reward image · tap to choose (4:3 looks best, ≤ 2 MB)" aria-label="Reward image" onclick="document.getElementById('br-file').click()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('br-file').click()}"><button type="button" id="br-pic-x" class="br-pic-x" title="Remove image" aria-label="Remove image" onclick="event.stopPropagation(); brRemoveImage()" hidden>&times;</button><button type="button" id="br-pic-ai" class="br-pic-ai" title="Generate a picture with Grok Imagine from the name + description ($0.04)" aria-label="Generate with Grok Imagine" onclick="event.stopPropagation(); brGenImage()">✨</button></div>
                         <input type="file" id="br-file" accept="image/jpeg,image/png,image/webp" hidden onchange="brPickImage(this.files[0]); this.value='';">
                     </div>
                     <div>
@@ -35972,6 +35974,28 @@ RULES:
             brShowImage(URL.createObjectURL(file));
         }
         function brRemoveImage() { brPendingFile = null; brImageUrl = ''; brShowImage(''); }
+        // V102.122: ✨ Grok Imagine (xAI, via OpenRouter's Image API — the Seedream / Muse path, V101.53) draws the reward from
+        // Name + Description; the result lands in the well as the pending file and is uploaded on Save like a picked photo.
+        const BR_IMAGE_MODEL = 'or/x-ai/grok-imagine-image-2.0';
+        async function brGenImage() {
+            const btn = document.getElementById('br-pic-ai');
+            if (!btn || btn.disabled) return;
+            const name = document.getElementById('br-name').value.trim();
+            const description = document.getElementById('br-desc').value.trim();
+            if (!name) { alert('Type the reward name first — Grok draws from it.'); return; }
+            const prompt = `Product photo of a reward for an app shop: "${name}"${description ? ` — ${description}` : ''}. Clean studio e-commerce shot, soft light, the item centred on a plain pastel background, no text, no watermark, no people.`;
+            btn.disabled = true; btn.textContent = '⏳';
+            try {
+                const resp = await window.callUniversalAI(BR_IMAGE_MODEL, prompt, false, null, '', { feature: 'beri_reward_image', imageApi: true, aspectRatio: '4:3', maxOutputTokens: 1024 });
+                // imageDataUrl first: the proxy also returns text, and callUniversalAI puts text first (same as avatar8Generate).
+                const raw = (resp && ((resp.raw && resp.raw.imageDataUrl) || resp.imageDataUrl || resp.text)) || '';
+                if (!/^data:image\//.test(raw)) throw new Error('Grok answered without an image. Try again.');
+                const blob = await (await fetch(raw)).blob();
+                brPendingFile = new File([blob], 'grok-imagine.png', { type: blob.type || 'image/png' });
+                brShowImage(URL.createObjectURL(blob));
+            } catch (e) { alert('Could not draw: ' + ((e && e.message) || e)); }
+            btn.disabled = false; btn.textContent = '✨';
+        }
         function brPreviewOff() {
             const el = document.getElementById('br-off');
             if (!el) return;

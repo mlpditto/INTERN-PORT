@@ -22,7 +22,16 @@ assert.ok(open.includes("document.getElementById('br-list').value = (r && r.list
 // redeem path untouched: the intern transaction still debits beriCost
 assert.ok(index.includes('async function redeemBeriReward(rewardId)') && !/redeemBeriReward[\s\S]{0,3000}listCost/.test(index.slice(index.indexOf('async function redeemBeriReward'))), 'redeem never reads listCost');
 
-// ---- admin: row template on sample data ----
+// ---- admin: ✨ Grok Imagine in the image well (V102.122) ----
+assert.ok(admin.includes('id="br-pic-ai"') && admin.includes('onclick="event.stopPropagation(); brGenImage()"'), 'sparkle button in the well, does not open the file picker');
+const gen = slice(admin, 'async function brGenImage() {', '\n        }\n');
+assert.ok(admin.includes("const BR_IMAGE_MODEL = 'or/x-ai/grok-imagine-image-2.0';"), 'xAI Grok Imagine Image 2.0 via OpenRouter');
+assert.ok(gen.includes("{ feature: 'beri_reward_image', imageApi: true, aspectRatio: '4:3', maxOutputTokens: 1024 }"), 'Image API path (Seedream/Muse), 4:3, its own ai_usage feature');
+assert.ok(gen.includes("if (!name) { alert('Type the reward name first") && gen.includes('no text, no watermark, no people'), 'prompt from name + description');
+assert.ok(gen.includes("brPendingFile = new File([blob], 'grok-imagine.png'") && gen.includes('brShowImage(URL.createObjectURL(blob))'), 'result becomes the pending file → uploaded on Save like a picked photo');
+assert.ok(gen.includes("btn.textContent = '⏳'") && gen.includes("btn.textContent = '✨'"), 'busy state on the button only');
+
+
 const rowBody = slice(admin, 'list.innerHTML = beriRewardsCache.map(r => {', "}).join('');");
 const offFn = new Function('r', slice(admin, 'function beriRewardOff(r) {', '\n        }') );
 const rows = new Function('beriRewardsCache', 'escapeHtml', 'beriRewardOff', 'JSON', 'return beriRewardsCache.map(r => {' + rowBody + "}).join('')");
@@ -57,4 +66,4 @@ assert.ok(html.includes('Beri ไม่พอ'), '600 Beri cannot afford 2,450')
 assert.ok(html.includes('หมดแล้ว') && html.includes('disabled'), 'sold out disabled');
 assert.ok(!html.includes('🎁 SUPER BEAR'), 'name no longer prefixed with 🎁 (the image / tile carries it)');
 
-console.log('PASS: beri reward image + full price — modal fields (image well, Beri Cost / Full price / Stock), save validates + uploads via the Product photo helpers to product-images/, redeem untouched, admin rows (thumb, 🪙 cost over struck −N%, 📦, icon-only eye/pen/trash), intern cards (image / 🎁, 🪙 2,450 ~~3,000~~ −18%, 📦 N, แลกเลย), escaping');
+console.log('PASS: beri reward image + full price — modal fields (image well, Beri Cost / Full price / Stock), save validates + uploads via the Product photo helpers to product-images/, redeem untouched, admin rows (thumb, 🪙 cost over struck −N%, 📦, icon-only eye/pen/trash, ✨ Grok Imagine in the well), intern cards (image / 🎁, 🪙 2,450 ~~3,000~~ −18%, 📦 N, แลกเลย), escaping');
