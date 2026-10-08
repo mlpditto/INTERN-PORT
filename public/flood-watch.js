@@ -1,5 +1,5 @@
 /* V101.27 Flood watch — nearby flood risk for the training site, the intern's
- * home and "near me".
+ * home and "near me". V101.65: lean popup (status · คลอง/ถนน tiles · ฝน 7 วัน · เขต 2554/2569 · details).
  *
  * Data: BKK FloodWatch 2026 (canals) + Floodboard (roads, CC BY 4.0, V101.30) via floodPointCheck.
  * FloodWatch: (https://flood.autobahn.bot, github.com/bejranonda/flood2026,
@@ -44,7 +44,7 @@
         var ll = 'latitude=' + lat.toFixed(2) + '&longitude=' + lon.toFixed(2) + '&timezone=Asia%2FBangkok';
         var get = function (u) { return fetch(u).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }); };
         Promise.all([
-            get('https://api.open-meteo.com/v1/forecast?' + ll + '&current=temperature_2m,apparent_temperature,weather_code,is_day,precipitation&hourly=precipitation_probability&forecast_hours=7'),
+            get('https://api.open-meteo.com/v1/forecast?' + ll + '&current=temperature_2m,apparent_temperature,weather_code,is_day,precipitation&hourly=precipitation_probability&forecast_hours=7&daily=precipitation_sum,precipitation_probability_max&past_days=3&forecast_days=4'),
             get('https://air-quality-api.open-meteo.com/v1/air-quality?' + ll + '&current=pm2_5,us_aqi')
         ]).then(function (res) {
             var w = res[0], q = res[1];
@@ -53,7 +53,13 @@
             (h.precipitation_probability || []).forEach(function (v, i) {
                 if (v > peak.pop) peak = { pop: v, at: String((h.time || [])[i] || '').slice(11, 16) };
             });
+            // V101.65: 7 days of rain — 3 back (measured), today, 3 ahead (with the day's max chance).
+            var dl = w.daily || {}, today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }), days = [];
+            (dl.time || []).forEach(function (dstr, i) {
+                days.push({ d: dstr, mm: (dl.precipitation_sum || [])[i], pop: (dl.precipitation_probability_max || [])[i], past: dstr < today, today: dstr === today });
+            });
             p.wx = {
+                days: days,
                 code: c.weather_code, day: c.is_day === 1, temp: Math.round(c.temperature_2m), feels: Math.round(c.apparent_temperature),
                 rainMm: c.precipitation || 0, pop: peak.pop, popAt: peak.at,
                 aqi: q && q.current && q.current.us_aqi != null ? Math.round(q.current.us_aqi) : null,
@@ -77,7 +83,7 @@
     }
     function aqiClass(v) { return v <= 50 ? 'good' : v <= 100 ? 'mod' : v <= 150 ? 'usg' : 'bad'; }
 
-    // A · the sky above the card water: mood only, no text. Site weather.
+    // The sky above the card water: mood only, no text. Site weather. (V101.65: the popup's weather is one line under รายละเอียด.)
     function skyHtml(wx) {
         if (!wx) return '';
         var k = wxKind(wx), out = '<div class="fw-sky' + (wx.day ? '' : ' night') + (k === 'rain' || k === 'storm' ? ' wet' : '') + '" aria-hidden="true">';
@@ -93,16 +99,6 @@
         }
         return out + '</div>';
     }
-    // C + D · one row in the popup: now, rain chance in the next 6 h, air quality.
-    function wxRow(wx) {
-        if (!wx) return '';
-        return '<div class="fw-wx" title="Weather · Open-Meteo">' +
-            '<span title="Now · feels like ' + wx.feels + '°">' + wxIcon(wx) + ' <b>' + wx.temp + '°</b><small>/' + wx.feels + '°</small></span>' +
-            '<span title="Chance of rain, next 6 h (peak)"><i class="fa-solid fa-umbrella" style="color:#3b82f6"></i><b>' + wx.pop + '%</b>' + (wx.pop >= 30 && wx.popAt ? ' ' + wx.popAt : '') + '</span>' +
-            (wx.aqi != null ? '<span title="PM2.5 ' + (wx.pm25 != null ? wx.pm25 : '?') + ' µg/m³ · US AQI ' + wx.aqi + '">😷 <span class="fw-aqi ' + aqiClass(wx.aqi) + '">' + wx.aqi + '</span></span>' : '') +
-            '</div>';
-    }
-
     function load(key, lat, lon) {
         var p = places[key];
         p.lat = lat; p.lon = lon; p.loading = true; p.err = null;
@@ -183,9 +179,9 @@
 
     // V101.56: river flow at C.2 → C.13 → C.29B on the card water — a compact capsule per gauge on the surface
     // (dot = tier, ▲▼ = change vs ~24 h) and a soft tint of the same surface, amber / red, where the flow is high.
-    // Tiers (m³/s, same for all three): green < 1,500 · amber 1,500–2,400 · red > 2,400. No tint when all are green.
+    // Tiers (m³/s, same for all three): green < 1,500 · amber 1,500–2,500 · red > 2,500. No tint when all are green.
     var RV_X = [0.2, 0.5, 0.8], RV_COL = { ok: '#22c55e', warn: '#f59e0b', red: '#ef4444' }, RV_TINT = { ok: ['#22c55e', 0], warn: ['#fbbf24', .16], red: ['#f87171', .22] };
-    function rvTier(q) { return q > 2400 ? 'red' : q >= 1500 ? 'warn' : 'ok'; }
+    function rvTier(q) { return q > 2500 ? 'red' : q >= 1500 ? 'warn' : 'ok'; }   // V101.65: red = over the 2,500 line the popup alerts on
     function riverWater(rv, home, site) {
         if (!rv || !rv.stations || (!home && !site)) return '';
         var L = home || site, R = site || home;
@@ -221,120 +217,127 @@
         return { html: '<i class="fa-solid fa-water fw-rs-ic" aria-hidden="true"></i>' + parts.join(''), label: 'River flow ' + labels.join(', ') + ' — open flood watch' };
     }
 
-    function stats(d) {
-        var out = [];
+    // V101.65 · the popup body, rebuilt around what a person actually asks — ตอนนี้ปลอดภัยไหม · ถนนแถวบ้านท่วมไหม ·
+    // ฝนจะมาไหม — plus the district's 2554 / 2569 record. Every number appears once; the gauges, river, weather and
+    // sources fold under "รายละเอียด". Replaces stats / trendHtml / rainHtml / nearHtml / riverHtml / wxRow / srcDots.
+    var LV = { ok: 'ok', warn: 'warn', crit: 'crit' };
+    var RISK_TH = { low: 'ปกติ', moderate: 'เฝ้าระวัง', high: 'เสี่ยงสูง', info: 'ไม่มีข้อมูล' };
+    var RV_LIMIT = 2500;   // m³/s — the owner's line for "say so on the front" (2026-10-08)
+    var RV_PLACE = { 'C.2': 'นครสวรรค์', 'C.13': 'ชัยนาท', 'C.29B': 'อยุธยา' };
+    var RV_SRC = { thaiwater: 'ThaiWater (RID telemetry)', rid: 'RID daily report', ai: 'RID daily report, read by AI', est: 'estimated from the water level' };
+    function m2(v) { return v == null ? '—' : (Math.round(v * 100) / 100).toFixed(2); }
+    function fresh(r) { return r && r.q != null && r.at && Date.now() - r.at < 36 * 3600e3; }
+    function fmtQ(q) { return Math.round(q).toLocaleString('en-US'); }
+
+    // The Chao Phraya station over the limit (highest first), or null.
+    function riverAlert(rv) {
+        if (!rv || !rv.stations) return null;
+        var over = rv.stations.filter(function (r) { return fresh(r) && r.q > RV_LIMIT; }).sort(function (a, b) { return b.q - a.q; });
+        return over[0] || null;
+    }
+
+    function statusHtml(d, alert) {
+        var risk = RANK[d.risk] ? d.risk : 'info';
+        var shown = alert && risk === 'low' ? 'moderate' : risk;
+        var parts = [];
         var c = d.canal;
-        var r = RANK[d.risk] ? d.risk : 'low';
-        var col = { low: '#0284c7', moderate: '#ea580c', high: '#dc2626' }[r];
         if (c && c.freeboardM != null) {
             var cm = Math.round(Math.abs(c.freeboardM) * 100);
-            out.push('<span title="Canal vs bank" style="color:' + col + '"><i class="fa-solid fa-water"></i><b>' +
-                (c.freeboardM >= 0 ? '−' : '+') + cm + ' cm</b></span>');
+            parts.push(c.freeboardM >= 0 ? 'น้ำในคลองต่ำกว่าตลิ่ง ' + cm + ' ซม.' : 'น้ำในคลองเกินตลิ่ง ' + cm + ' ซม.');
         }
-        if (c && c.change24cm != null) {
-            var up = c.change24cm > 0;
-            out.push('<span title="Last 24 h"><i class="fa-solid fa-arrow-' + (up ? 'up' : 'down') +
-                '" style="color:' + (up ? '#dc2626' : '#16a34a') + '"></i>' + Math.abs(c.change24cm) + ' cm</span>');
+        var r = d.road && d.road.nearest;
+        if (r) parts.push('ถนน' + (r.name ? ' ' + r.name : '') + (r.closed ? ' ปิดการจราจร' : ' มีน้ำท่วม') + ' ห่าง ' + r.m + ' ม.');
+        else if (d.road) parts.push('ไม่มีถนนท่วมในรัศมี 500 ม.');
+        if (alert) parts.push('แม่น้ำเจ้าพระยาที่' + (RV_PLACE[alert.code] || alert.code) + 'สูงกว่าเกณฑ์');
+        var text = parts.length ? parts.join(' · ') : (d.title || '');
+        return '<div class="fw-st"><span class="fw-badge fw-' + shown + '"><span class="fw-dot fw-' + shown + '"></span>' + RISK_TH[shown] + '</span><span class="fw-sub">' + esc(text) + '</span></div>';
+    }
+
+    function riverAlertHtml(alert) {
+        if (!alert) return '';
+        return '<div class="fw-rv-alert" role="alert"><i class="fa-solid fa-triangle-exclamation"></i><span class="fw-rt">แม่น้ำเจ้าพระยาสูงกว่าเกณฑ์ ' + fmtQ(RV_LIMIT) + ' m³/s<small>' +
+            esc(alert.code) + ' ' + esc(RV_PLACE[alert.code] || alert.place || '') + ' · น้ำเหนือกำลังลงมา</small></span><b>' + fmtQ(alert.q) + '</b></div>';
+    }
+
+    function tilesHtml(d) {
+        var c = d.canal, out = '';
+        if (c && c.freeboardM != null) {
+            var cm = Math.round(Math.abs(c.freeboardM) * 100), over = c.freeboardM < 0;
+            var ch = c.change24cm == null ? '' : ' · ' + (c.change24cm > 0 ? 'เพิ่มขึ้น' : 'ลดลง') + ' ' + Math.abs(c.change24cm) + ' cm ใน 24 ชม.';
+            var cls = over ? 'crit' : d.canalRisk === 'high' ? 'crit' : d.canalRisk === 'moderate' ? 'warn' : 'ok';
+            out += '<div class="fw-tile ' + cls + '" title="' + esc(c.name || '') + (c.km != null ? ' · ' + c.km + ' km' : '') + '"><div class="fw-k"><i class="fa-solid fa-water"></i>คลอง</div><div class="fw-v">' + cm + '<small>cm</small></div><div class="fw-n">' + (over ? 'เกินตลิ่ง' : 'ต่ำกว่าตลิ่ง') + esc(ch) + '</div></div>';
+        } else {
+            out += '<div class="fw-tile"><div class="fw-k"><i class="fa-solid fa-water"></i>คลอง</div><div class="fw-v">—</div><div class="fw-n">ไม่มีข้อมูลสถานี</div></div>';
         }
-        // V101.30: nearest flooded road within 500 m (Floodboard), coloured by the
-        // motorbike verdict; name, distance and verdicts are in the title.
         var r = d.road && d.road.nearest;
         if (r) {
-            var rc = r.closed || r.motorbike === 'blocked' ? '#dc2626' : r.motorbike === 'risky' ? '#ea580c' : '#ca8a04';
-            out.push('<span title="Flooded road: ' + esc(r.name || '—') + ' · ' + r.m + ' m · motorbike ' + esc(r.motorbike || '?') +
-                ', sedan ' + esc(r.sedan || '?') + (r.sensor ? ' · BMA sensor' : '') + '" style="color:' + rc + '"><i class="fa-solid fa-road"></i><b>' +
-                (r.closed ? 'closed' : r.depthCm != null ? r.depthCm + ' cm' : 'wet') + '</b> ' + r.m + ' m</span>');
+            var cls2 = r.closed || r.motorbike === 'blocked' ? 'crit' : 'warn';
+            var v = r.closed ? 'ปิดถนน' : r.depthCm != null ? r.depthCm + '<small>cm</small>' : 'มีน้ำ';
+            out += '<div class="fw-tile ' + cls2 + '" title="' + esc(r.name || '—') + ' · motorbike ' + esc(r.motorbike || '?') + ', sedan ' + esc(r.sedan || '?') + (r.sensor ? ' · BMA sensor' : '') + '"><div class="fw-k"><i class="fa-solid fa-road"></i>ถนน</div><div class="fw-v">' + v + '</div><div class="fw-n">' + esc(r.name || 'ถนนใกล้เคียง') + ' · ' + r.m + ' ม.</div></div>';
         } else if (d.road) {
-            out.push('<span title="No flooded road within 500 m" style="color:#16a34a"><i class="fa-solid fa-road"></i>0</span>');
+            out += '<div class="fw-tile ok"><div class="fw-k"><i class="fa-solid fa-road"></i>ถนน</div><div class="fw-v">ไม่ท่วม</div><div class="fw-n">ในรัศมี 500 ม.</div></div>';
+        } else {
+            out += '<div class="fw-tile"><div class="fw-k"><i class="fa-solid fa-road"></i>ถนน</div><div class="fw-v">—</div><div class="fw-n">ไม่มีข้อมูลถนน</div></div>';
         }
-        if (d.rain24mm != null) {
-            out.push('<span title="Rain next 24 h"><i class="fa-solid fa-cloud-rain" style="color:#64748b"></i>' + d.rain24mm + ' mm</span>');
-        }
-        if (d.traffy6h) {
-            out.push('<span title="Traffy flood reports ≤ 1 km, 6 h"><i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b"></i>' + d.traffy6h + '</span>');
-        }
-        return out.join('');
+        return '<div class="fw-tiles">' + out + '</div>';
     }
 
-    // V101.51 · POPNIX Flood (BMA drainage gauges, via floodPointCheck → d.pop).
-    var LV = { ok: 'ok', warn: 'warn', crit: 'crit' };
-    function m2(v) { return v == null ? '—' : (Math.round(v * 100) / 100).toFixed(2); }
-
-    // A · the nearest canal gauge: level, cm/h, 24 h line against its watch / critical marks.
-    function trendHtml(pop) {
-        var c = pop && pop.canals && pop.canals[0];
-        if (!c || c.wl == null) return '';
-        var arrow = c.trend === 'up' ? '▲' : c.trend === 'down' ? '▼' : '▶';
-        var rate = c.deltaCm == null ? '' : '<span class="fw-rate ' + c.trend + '" title="Change in the last hour">' + arrow + ' ' + (c.deltaCm > 0 ? '+' : '') + c.deltaCm + ' cm/h</span>';
-        var left = c.warn != null && c.wl < c.warn ? Math.round((c.warn - c.wl) * 100) : null;
-        var svg = '';
-        var sp = c.spark;
-        if (sp && sp.length > 2) {
-            var lo = Math.min.apply(null, sp), hi = Math.max.apply(null, sp);
-            [c.warn, c.crit].forEach(function (t) { if (t != null && t >= lo - 0.12 && t <= hi + 0.12) { lo = Math.min(lo, t); hi = Math.max(hi, t); } });
-            var span = (hi - lo) || 0.1, W = 240, H = 40;
-            var y = function (v) { return (H - 3 - (v - lo) / span * (H - 6)).toFixed(1); };
-            var line = function (t, col) { return t != null && t >= lo && t <= hi ? '<line x1="0" x2="' + W + '" y1="' + y(t) + '" y2="' + y(t) + '" stroke="' + col + '" stroke-dasharray="4 3" stroke-width="1"/>' : ''; };
-            var pts = sp.map(function (v, i) { return (i * W / (sp.length - 1)).toFixed(1) + ',' + y(v); }).join(' ');
-            svg = '<svg class="fw-spark" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true">' + line(c.warn, '#f59e0b') + line(c.crit, '#ef4444') +
-                '<polyline points="' + pts + '" fill="none" stroke="#0284c7" stroke-width="2" stroke-linejoin="round"/></svg>';
-        }
-        var marks = (c.warn != null ? 'watch ' + m2(c.warn) : '') + (c.crit != null ? ' · critical ' + m2(c.crit) : '');
-        return '<div class="fw-tr" title="' + esc(c.name) + ' · ' + c.km + ' km · ' + esc(marks) + (c.maxYday != null ? ' · yesterday max ' + m2(c.maxYday) : '') + '">' +
-            '<div class="fw-tr-h"><i class="fa-solid fa-water"></i><b>' + m2(c.wl) + '</b><small>m</small><span class="fw-lv ' + (LV[c.level] || 'unk') + '">' +
-            (c.level === 'crit' ? 'critical' : c.level === 'warn' ? 'watch' : c.level === 'ok' ? 'ok' : '?') + '</span>' + rate +
-            (left != null && left <= 15 ? '<span class="fw-left" title="Until the watch level">' + left + ' cm to watch</span>' : '') + '</div>' + svg + '</div>';
+    // 7 days of rain: 3 back (measured), today, 3 ahead (forecast with its chance) — Open-Meteo daily, see loadWeather.
+    var DOW = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+    function rain7Html(wx) {
+        var days = wx && wx.days;
+        if (!days || !days.length) return '';
+        var max = Math.max(10, Math.max.apply(null, days.map(function (x) { return x.mm || 0; })));
+        var cells = days.map(function (x) {
+            var dt = new Date(x.d + 'T12:00:00+07:00');
+            var h = Math.max(4, Math.round((x.mm || 0) / max * 100));
+            var under = x.today ? String(dt.getDate()) : x.past ? String(dt.getDate()) : (x.pop != null ? x.pop + '%' : '');
+            return '<div class="fw-day' + (x.today ? ' today' : x.past ? '' : ' fc') + '" title="' + x.d + ' · ' + (x.mm == null ? '—' : x.mm + ' mm') + (x.past || x.today ? '' : ' · โอกาสฝน ' + (x.pop == null ? '—' : x.pop + '%')) + '"><b>' +
+                (x.mm == null ? '—' : (Math.round(x.mm * 10) / 10)) + '</b><div class="fw-bar"><i style="height:' + h + '%"></i></div><span>' + (x.today ? 'วันนี้' : DOW[dt.getDay()]) + '</span><small>' + under + '</small></div>';
+        }).join('');
+        return '<div class="fw-rain7"><div class="fw-k"><i class="fa-solid fa-cloud-rain"></i>ฝน 7 วัน<small>mm · 3 วันก่อน → 3 วันหน้า</small></div><div class="fw-days">' + cells + '</div></div>';
     }
 
-    // B · rain that actually fell (nearest gauge) + how many gauges are raining city-wide.
-    function rainHtml(pop) {
-        var r = pop && pop.rains && pop.rains[0];
-        if (!r) return '';
-        var v = function (x) { return x == null ? '—' : x; };
-        var city = pop.city && pop.city.raining ? '<span class="fw-city" title="Rain gauges reporting rain, Bangkok-wide' +
-            (pop.city.max1h ? ' · max ' + pop.city.max1h.v + ' mm/h at ' + esc(pop.city.max1h.name) : '') + '"><i class="fa-solid fa-cloud-showers-heavy"></i>' + pop.city.raining + '</span>' : '';
-        return '<div class="fw-rain" title="Rain that fell: last 1 h / 3 h / 24 h · ' + esc(r.name) + ' · ' + r.km + ' km">' +
-            '<i class="fa-solid fa-cloud-rain" style="color:#3b82f6"></i><b>' + v(r.r1h) + '</b><small>1h</small><b>' + v(r.r3h) + '</b><small>3h</small><b>' + v(r.r24h) + '</b><small>24h mm</small>' + city + '</div>';
+    // เขต… · 2554 · 2569 (floodPointCheck → d.district / d.history; sources in the titles and the details line).
+    var HIST = { high: ['crit', 'สูง'], moderate: ['warn', 'ปานกลาง'], none: ['unk', 'ไม่กระทบ'] };
+    function histHtml(d) {
+        var h = d.history;
+        if (!d.district || !h) return '';
+        var pill = function (lv, yr) { var p = HIST[lv] || HIST.none; var label = yr === 2569 && lv === 'none' ? 'สิ้นสุด' : p[1]; return '<span class="fw-lv ' + p[0] + '">' + label + '</span>'; };
+        return '<div class="fw-hist"><i class="fa-solid fa-clock-rotate-left"></i><span class="fw-dn">เขต' + esc(d.district) + '</span>' +
+            '<span class="fw-yr" title="น้ำท่วมปี 2554 · จากรายงานข่าว (Rocket Media Lab)"><b>2554</b>' + pill(h.y2554, 2554) + '</span>' +
+            '<span class="fw-yr" title="น้ำท่วมปี 2569 · ประกาศ กทม. 29 ก.ย. 2569 (สิ้นสุด = สิ้นสุดสถานะภัยพิบัติ)"><b>2569</b>' + pill(h.y2569, 2569) + '</span></div>';
     }
 
-    // C · the other gauges around: next two canals and the nearest road sensors.
-    function nearHtml(pop) {
-        if (!pop) return '';
+    function line(icon, label, value, small) {
+        return '<div class="fw-dl"><i class="fa-solid ' + icon + '"></i><span>' + label + '</span><b>' + value + '</b>' + (small ? '<small>' + small + '</small>' : '') + '</div>';
+    }
+    function moreHtml(d, p, alert) {
         var rows = [];
-        (pop.canals || []).slice(1).forEach(function (c) {
-            rows.push('<div class="fw-nr"><i class="fa-solid fa-water"></i><span>' + esc(c.name) + '</span><small>' + c.km + ' km</small><span class="fw-lv ' + (LV[c.level] || 'unk') + '">' + m2(c.wl) +
-                '</span><i class="fw-ar ' + c.trend + '">' + (c.trend === 'up' ? '▲' : c.trend === 'down' ? '▼' : '') + '</i></div>');
+        var pop = d.pop;
+        (pop && pop.canals || []).forEach(function (c, i) {
+            var rate = i === 0 && c.deltaCm != null ? ' · ' + (c.deltaCm > 0 ? '▲ +' : '▼ ') + c.deltaCm + ' cm/ชม.' : '';
+            rows.push(line('fa-water', esc(c.name), m2(c.wl) + ' m <span class="fw-lv ' + (LV[c.level] || 'unk') + '">' + (c.level === 'crit' ? 'วิกฤต' : c.level === 'warn' ? 'เฝ้าระวัง' : c.level === 'ok' ? 'ปกติ' : '?') + '</span>', c.km + ' km' + esc(rate)));
         });
-        (pop.roads || []).forEach(function (r) {
-            rows.push('<div class="fw-nr"><i class="fa-solid fa-road"></i><span>' + esc(r.name) + '</span><small>' + r.km + ' km</small><span class="fw-lv ' + (r.level === 'dry' ? 'ok' : r.level === 'flood' ? 'crit' : 'warn') + '">' +
-                (r.depthCm == null ? '—' : r.depthCm + ' cm') + '</span></div>');
-        });
-        return rows.length ? '<div class="fw-near">' + rows.join('') + '</div>' : '';
-    }
-
-    // V101.56 · Chao Phraya discharge at C.2 → C.13 → C.29B (floodPointCheck → d.river, see river-discharge.js).
-    // Bar = share of the gauge's design capacity; ▲▼ = change vs ~24 h ago; src: TW ThaiWater · RID report · AI · est.
-    var RV_SRC = { thaiwater: 'ThaiWater (RID telemetry)', rid: 'RID daily report', ai: 'RID daily report, read by AI', est: 'estimated from the water level' };
-    function riverHtml(rv) {
-        if (!rv || !rv.stations || !rv.stations.length) return '';
-        var rows = rv.stations.filter(function (r) { return r.q != null; }).map(function (r) {
-            var cls = r.pct >= 90 ? 'crit' : r.pct >= 70 ? 'warn' : 'ok';
-            var t = r.at ? new Date(r.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }) : '';
-            var stale = r.at && Date.now() - r.at > 36 * 3600e3;
-            var ar = r.d24 == null || Math.abs(r.d24) < 30 ? '<i class="fw-ar"></i>' : '<i class="fw-ar ' + (r.d24 > 0 ? 'up' : 'down') + '" title="vs ~24 h ago: ' + (r.d24 > 0 ? '+' : '') + r.d24 + ' m³/s">' + (r.d24 > 0 ? '▲' : '▼') + '</i>';
-            return '<div class="fw-rv' + (stale ? ' stale' : '') + '" title="' + esc(r.name + ' · ' + r.place + ' · ' + t + ' · ' + (RV_SRC[r.src] || '') + ' · capacity ' + r.cap + ' m³/s') + '">' +
-                '<b>' + esc(r.code) + '</b><span>' + esc(r.place) + '</span>' +
-                '<i class="fw-rvb ' + cls + '"><u style="width:' + Math.min(100, r.pct) + '%"></u></i>' +
-                '<em class="fw-lv ' + cls + '">' + Math.round(r.q).toLocaleString('en-US') + (r.src === 'est' ? '~' : '') + '</em>' + ar + '</div>';
-        });
-        return rows.length ? '<div class="fw-river"><div class="fw-rv-h"><i class="fa-solid fa-water"></i>River flow <small>m³/s</small></div>' + rows.join('') + '</div>' : '';
-    }
-
-    // D · which sources answered (a dot each); the POPNIX credit line is required by its terms.
-    function srcDots(d) {
-        if (!d.src) return '';
-        var one = function (ok, label) { return '<i class="fw-sd ' + (ok ? 'on' : 'off') + '" title="' + label + (ok ? '' : ' — not answering') + '"></i>'; };
-        return '<span class="fw-src" title="FloodWatch · Floodboard · POPNIX Flood">' + one(d.src.fw, 'FloodWatch') + one(d.src.fb, 'Floodboard') + one(d.src.pop, 'POPNIX Flood') + '</span>';
+        var roads = pop && pop.roads || [];
+        if (roads.length) {
+            var wet = roads.filter(function (r) { return r.level !== 'dry'; });
+            rows.push(line('fa-road', roads.map(function (r) { return esc(r.name); }).join(' · '), wet.length ? wet.map(function (r) { return (r.depthCm == null ? 'มีน้ำ' : r.depthCm + ' cm'); }).join(', ') : 'แห้ง', roads.map(function (r) { return r.km; }).sort().filter(function (v, i, a) { return i === 0 || i === a.length - 1; }).join('–') + ' km'));
+        }
+        if (d.traffy6h) rows.push(line('fa-triangle-exclamation', 'รายงานน้ำท่วมจากประชาชน (Traffy)', d.traffy6h, '≤1 km · 6 ชม.'));
+        var rv = d.river && d.river.stations ? d.river.stations.filter(fresh) : [];
+        if (rv.length) {
+            var qs = rv.map(function (r) { return r.q; });
+            var val = alert ? '<span style="color:#b91c1c">' + esc(alert.code) + ' ' + fmtQ(alert.q) + '</span>' : 'ปกติ';
+            var title = rv.map(function (r) { return r.code + ' ' + esc(r.place || RV_PLACE[r.code] || '') + ' ' + fmtQ(r.q) + (r.src === 'est' ? '~' : '') + ' m³/s' + (r.d24 != null ? ' (' + (r.d24 > 0 ? '+' : '') + r.d24 + ' / 24 ชม.)' : '') + ' · ' + (RV_SRC[r.src] || ''); }).join(' · ');
+            rows.push('<div class="fw-dl" title="' + title + '"><i class="fa-solid fa-water"></i><span>แม่น้ำเจ้าพระยา (นครสวรรค์→อยุธยา)</span><b>' + val + '</b><small>' + fmtQ(Math.min.apply(null, qs)) + '–' + fmtQ(Math.max.apply(null, qs)) + ' m³/s</small></div>');
+        }
+        var wx = p.wx;
+        if (wx) rows.push(line('fa-cloud-sun', wxIcon(wx) + ' ' + wx.temp + '° (รู้สึก ' + wx.feels + '°) · ฝน 6 ชม. ' + wx.pop + '%', wx.aqi != null ? 'AQI <span class="fw-aqi ' + aqiClass(wx.aqi) + '">' + wx.aqi + '</span>' : '', wx.pm25 != null ? 'PM2.5 ' + wx.pm25 : ''));
+        var t = p.at ? new Date(p.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }) : '';
+        var src = [t, d.canal ? esc(d.canal.name) + (d.canal.km != null ? ' · ' + d.canal.km + ' km' : '') : '', 'BKK FloodWatch' + (d.road ? ' · Floodboard (CC BY 4.0)' : '') + (pop ? ' · ' + esc(pop.credit) : '') + (d.river ? ' · ThaiWater / กรมชลประทาน (river flow)' : '') + (wx ? ' · Open-Meteo (CC BY 4.0)' : ''),
+            d.district && d.history ? '2554 รายงานข่าว (Rocket Media Lab) · 2569 ประกาศ กทม. 29 ก.ย. 69 · เขตจาก OpenStreetMap (Nominatim)' : ''].filter(Boolean).join(' · ');
+        return '<details class="fw-more"><summary><i class="fa-solid fa-list"></i>รายละเอียด · สถานีใกล้เคียง · แม่น้ำ · อากาศ</summary><div class="fw-dls">' + rows.join('') + '<div class="fw-meta">' + src + '</div></div></details>';
     }
 
     function render() {
@@ -359,15 +362,11 @@
         else if (p.err) body = '<div class="fw-h"><span class="fw-dot"></span>—</div><div class="fw-meta">' + esc(p.err) + '</div>';
         else if (!d) body = '<div class="fw-h"><span class="fw-dot"></span>—</div>';
         else {
-            var t = p.at ? new Date(p.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }) : '';
-            var meta = [d.canal ? esc(d.canal.name) + (d.canal.km != null ? ' · ' + d.canal.km + ' km' : '') : '', t,
-                'BKK FloodWatch' + (d.road ? ' · Floodboard (CC BY 4.0)' : '') + (d.pop ? ' · ' + esc(d.pop.credit) : '') + (d.river ? ' · ThaiWater / กรมชลประทาน (river flow)' : '') + (p.wx ? ' · Open-Meteo (CC BY 4.0)' : '')]
-                .filter(Boolean).join(' · ');
-            body = '<div class="fw-h"><span class="fw-dot' + (risk ? ' fw-' + risk : '') + '"></span>' + esc(d.title || '—') + '</div>' +
-                '<div class="fw-stats">' + stats(d) + '</div>' + trendHtml(d.pop) + rainHtml(d.pop) + nearHtml(d.pop) + riverHtml(d.river) + wxRow(p.wx) + '<div class="fw-meta">' + srcDots(d) + meta + '</div>';
+            var alert = riverAlert(d.river);
+            body = statusHtml(d, alert) + riverAlertHtml(alert) + tilesHtml(d) + rain7Html(p.wx) + histHtml(d) + moreHtml(d, p, alert);
         }
-        // Flood data can fail on its own (FloodWatch is flaky); the weather row still shows.
-        if (!d && p.wx && !p.loading) body += wxRow(p.wx);
+        // Flood data can fail on its own (FloodWatch is flaky); the 7-day rain still shows.
+        if (!d && p.wx && !p.loading) body += rain7Html(p.wx);
         sheet.innerHTML = '<div class="fw-water' + (risk ? ' fw-' + risk : '') + '" aria-hidden="true"></div>' +
             '<div class="fw-top">' + top + '</div>' + body;
     }
