@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.72)</title>
+    <title>Internship Portfolio (V101.73)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -3168,6 +3168,10 @@
                 }
                 /* V101.60: 👶 = this drug has a paediatric dose calculator (peds-dosing.js) */
                 .dc-row-peds { flex-shrink: 0; font-size: 0.85em; line-height: 1; }
+                /* V101.73: 📎 n = this drug has download files (admin-added, drug_codex.materials); the files sit in the detail header */
+                .dc-row-mat { flex-shrink: 0; font-size: 0.72em; font-weight: 800; line-height: 1; color: #6d28d9; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 999px; padding: 3px 7px; white-space: nowrap; }
+                .dc-detail-file { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; text-decoration: none; color: var(--mk, #6d28d9); background: #fff; border: 1px solid var(--mk, #6d28d9); }
+                .dc-detail-file span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
                 .dc-peds-inputs { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
                 .dc-peds-inputs label { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: #334155; }
                 .dc-peds-inputs input, .dc-peds-inputs select { width: auto; min-height: 0; padding: 6px 8px; border: 1px solid #bae6fd; border-radius: 10px; background: #f0f9ff; font: inherit; font-weight: 700; color: #0c4a6e; }
@@ -18791,6 +18795,19 @@
             return false;
         }
 
+        // V101.73: admin-added download files of a drug — [{name,url}] kept only when the link is http(s).
+        function dcMaterialsOf(drug) {
+            return (Array.isArray(drug && drug.materials) ? drug.materials : []).filter(m => m && /^https?:\/\//i.test(String(m.url || '').trim()));
+        }
+
+        // V101.73: one chip per download file, coloured by type; built from the ORIGINAL doc (file names are not translated).
+        function dcFileChipsHtml(drug) {
+            return dcMaterialsOf(drug).map((m, i) => {
+                const k = materialKind(m.url), name = escapeHtml(materialDisplayName(m, i)), url = escapeHtml(String(m.url).trim());
+                return `<a class="dc-detail-chip dc-detail-file lang-no-toggle" style="--mk:${k.color}" href="${url}" target="_blank" rel="noopener noreferrer" title="Download (${k.label}): ${name}" data-th-title="ดาวน์โหลด (${k.label}): ${name}" aria-label="Download ${k.label}: ${name}"><i class="${k.icon}" aria-hidden="true"></i><span>${name}</span><i class="fa-solid fa-arrow-down" aria-hidden="true"></i></a>`;
+            });
+        }
+
         function dcRenderList() {
             const searchEl = document.getElementById('dc-search-input');
             dcState.searchTerm = searchEl ? String(searchEl.value || '').trim() : '';
@@ -18849,6 +18866,7 @@
                                 <div class="dc-row-name-line">
                                     <div class="dc-row-name">${escapeHtml(drug.genericName || '(unnamed)')}</div>
                                     ${window.PedsDosing && PedsDosing.hasPeds(drug) ? '<span class="dc-row-peds" title="Pediatric dose calculator" data-th-title="คำนวณขนาดยาเด็ก" aria-label="Pediatric dose calculator">👶</span>' : ''}
+                                    ${dcMaterialsOf(drug).length ? `<span class="dc-row-mat lang-no-toggle" title="${dcMaterialsOf(drug).length} download file(s)" data-th-title="ไฟล์ดาวน์โหลด ${dcMaterialsOf(drug).length} ไฟล์" aria-label="${dcMaterialsOf(drug).length} download files"><i class="fa-solid fa-paperclip" aria-hidden="true"></i> ${dcMaterialsOf(drug).length}</span>` : ''}
                                     ${credAvatar}
                                 </div>
                                 ${brands}
@@ -18956,6 +18974,7 @@
                     chips.push(`<span class="dc-detail-chip" title="Brand names">© ${escapeHtml(eff.brandNames.slice(0, 3).join(', '))}${eff.brandNames.length > 3 ? ` +${eff.brandNames.length - 3}` : ''}</span>`);
                 }
                 if (eff.aiDrafted) chips.push('<span class="dc-detail-chip dc-detail-chip-ai" title="AI-drafted entry — admin still curates">🤖 AI draft</span>');
+                chips.push(...dcFileChipsHtml(drug));   // V101.73: admin-added download files
                 chipsEl.innerHTML = chips.join('');
             }
             // Body: 6 sections (V94.94: 5 → 6 after splitting Pharmacology into MoA + ADMET-PK).

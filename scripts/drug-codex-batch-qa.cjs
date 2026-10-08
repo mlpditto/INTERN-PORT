@@ -43,6 +43,7 @@ const page = `<style>${css}.dca-row{display:grid;grid-template-columns:1fr auto;
             function dcaSyncAutoDraftChipFromStorage() {}
             function dcaEscapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
             function dcaCompletenessScore(d) { return { pct: d.__pct }; }
+            function dcaMatBtnHtml() { return ''; }   // V102.129: the row template now asks for the 📎 chip
             function dcaCompleteChipHtml(d) { return '<span class="dca-row-complete">' + d.__pct + '%</span>'; }
             function dcaListContribChipsHtml() { return ''; }
             function dcaFormatAbsolute() { return ''; }
