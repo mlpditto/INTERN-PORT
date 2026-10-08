@@ -4397,6 +4397,8 @@ async function fetchFloodWeather(lat, lon) {
 // Chao Phraya discharge at C.2 / C.13 / C.29B (ThaiWater → RID PDF → AI → rating curve, see
 // river-discharge.js), refreshed hourly into flood_status/_discharge; floodPointCheck hands it out.
 const { refreshRiverDischarge, readRiverDischarge } = require('./river-discharge');
+// District + its 2554 / 2569 flood level for the popup line "เขต… · 2554 · 2569" (flood-district.js, Nominatim, cached).
+const { resolveDistrict, districtHistory } = require('./flood-district');
 exports.refreshRiverDischarge = onSchedule({
     schedule: '20 * * * *',
     timeZone: 'Asia/Bangkok',
@@ -4417,8 +4419,8 @@ exports.floodPointCheck = onCall({ timeoutSeconds: 30 }, async (request) => {
     const lon = Number(request.data && request.data.lon);
     if (!validFloodCoord(lat, lon)) throw new HttpsError('invalid-argument', 'lat/lon outside Thailand');
     try {
-        const [point, river] = await Promise.all([fetchFloodPoint(lat, lon), readRiverDischarge(admin.firestore())]);
-        return { ...point, river, checkedAt: Date.now() };
+        const [point, river, district] = await Promise.all([fetchFloodPoint(lat, lon), readRiverDischarge(admin.firestore()), resolveDistrict(lat, lon)]);
+        return { ...point, river, district, history: district ? districtHistory(district) : null, checkedAt: Date.now() };
     } catch (e) {
         console.warn('[floodPointCheck] upstream failed:', e && e.message);
         throw new HttpsError('unavailable', 'Flood data unavailable');
