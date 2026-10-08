@@ -104,7 +104,13 @@ function logoCandidates(html, pageUrl) {
 }
 
 async function findLinkLogo(rawUrl) {
-    const page = await getBytes(String(rawUrl || ''), MAX_HTML);
+    // V102.127: the link may itself be a picture (a Facebook / CDN image address) — then that picture is the candidate.
+    const page = await getBytes(String(rawUrl || ''), MAX_IMAGE);
+    if (OK_IMAGE.test(page.type)) {
+        if (page.buf.length < 200) return { found: false, candidates: 1, tried: ['image link: too small'] };
+        return { found: true, source: 'image link', from: page.url, contentType: page.type, bytes: page.buf.length, dataUrl: 'data:' + page.type + ';base64,' + page.buf.toString('base64') };
+    }
+    if (page.buf.length > MAX_HTML) throw new Error('The page is too large');
     const html = page.buf.toString('utf8');
     const candidates = logoCandidates(html, page.url);
     const tried = [];
