@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.130)</title>
-    <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
+    <title>Nika Admin (V102.131)</title>
+    <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -15191,26 +15191,24 @@
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                     <div style="font-weight:800; color:#1e40af; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                         <span id="dca-form-mode-label">Add Drug</span>
+                        <!-- V102.131: status chip (📚 Published / 📥 Draft), set by dcaSetStatusChip — mirrors the Disease form -->
+                        <span id="dca-form-status-chip" class="dxa-status-chip" style="display:none;"></span>
                         <span id="dca-form-ai-badge" class="dca-ai-badge" style="display:none;">🤖 AI-drafted · verify before save</span>
                         <!-- V93.99 Phase 5.1: AI fill empty fields button. Visible only in draft-review mode.
                              Uses intern's data as seed + Phase 3 saved model chip. -->
                         <button type="button" id="dca-form-ai-fill-btn" class="dca-ai-fill-btn" style="display:none;"
-                                onclick="dcaAiFillEmptyFields()" title="Use AI to fill the fields intern left empty, using their data as seed">
-                            🤖 AI fill empty fields
-                        </button>
+                                onclick="dcaAiFillEmptyFields()" title="AI fill empty fields — use AI to fill what is still empty, using the form as its source" aria-label="AI fill empty fields">🤖</button>
                         <!-- V95.66: AI Review — the complement to AI fill. Checks the fields
                              that ARE filled (intern/AI) for factual / safety / consistency
                              issues. Advisory only: never edits fields, never auto-verifies. -->
                         <button type="button" id="dca-form-ai-review-btn" class="dca-ai-review-btn" style="display:none;"
                                 onclick="dcaAiReviewDraft()" title="Have AI review the entered data for factual / safety / consistency issues (suggestions only — the admin decides; based on the model's knowledge, no live sources)" data-th-title="ให้ AI ตรวจข้อมูลที่กรอกแล้ว — หาจุด factual / safety / consistency (เสนอเท่านั้น admin ตัดสินเอง · อ้างความรู้โมเดล ไม่ได้เปิดแหล่งจริง)">
-                            🔍 AI Review
+                            🔍
                         </button>
                         <!-- V94.41: Copy whole drug entry as Markdown to clipboard. Uses current form
                              values (dcaCollectForm) so admin can copy WIP state before saving. -->
                         <button type="button" id="dca-form-copy-btn" class="dca-form-copy-btn"
-                                onclick="dcaCopyDrugAsMarkdown('all', this)" title="Copy this drug entry as Markdown to clipboard (current form state)">
-                            📋 Copy
-                        </button>
+                                onclick="dcaCopyDrugAsMarkdown('all', this)" title="Copy this drug entry as Markdown to clipboard (current form state)" aria-label="Copy as Markdown">📋</button>
                     </div>
                     <div style="font-size:0.78em; color:#94a3b8;" id="dca-form-doc-id"></div>
                 </div>
@@ -43592,6 +43590,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dcaState.isDraftEdit = false;
             const modeLabel = document.getElementById('dca-form-mode-label');
             if (modeLabel) modeLabel.textContent = 'Add Drug';
+            dcaSetStatusChip('');
             dcaHideInternNotesBanner();
             dcaHideAiFillButton();
             dcaFillForm({});
@@ -43606,6 +43605,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dcaState.isDraftEdit = false;
             const modeLabel = document.getElementById('dca-form-mode-label');
             if (modeLabel) modeLabel.textContent = 'Edit · ' + (drug.genericName || drugId);
+            dcaSetStatusChip('📚 Published', 'published');
             dcaHideInternNotesBanner();
             // V94.44: AI fill is now also offered when editing a published drug —
             // admin commonly opens an entry to top up missing ADMET or pharmacology
@@ -43641,6 +43641,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dcaState.isDraftEdit = true;
             const modeLabel = document.getElementById('dca-form-mode-label');
             if (modeLabel) modeLabel.textContent = 'Review Draft · ' + (draft.genericName || draftId);
+            dcaSetStatusChip('📥 Draft', 'draft');
             // V94.35 Phase 5: surface intern's full internNotes + targetDrugId context
             // as a banner above the form so admin reviews with full context.
             dcaShowInternNotesBanner(draft);
@@ -43842,17 +43843,25 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // (feedback_static_modal_state_leak).
         function dcaShowAiFillButton() {
             const btn = document.getElementById('dca-form-ai-fill-btn');
-            if (btn) { btn.style.display = 'inline-flex'; btn.disabled = false; btn.textContent = '🤖 AI fill empty fields'; }
+            if (btn) { btn.style.display = 'inline-flex'; btn.disabled = false; btn.textContent = '🤖'; }
             // V95.66: AI Review rides alongside AI fill (Edit + Review-draft) so the
             // two stay in sync without touching each call site.
             const rbtn = document.getElementById('dca-form-ai-review-btn');
-            if (rbtn) { rbtn.style.display = 'inline-flex'; rbtn.disabled = false; rbtn.textContent = '🔍 AI Review'; }
+            if (rbtn) { rbtn.style.display = 'inline-flex'; rbtn.disabled = false; rbtn.textContent = '🔍'; }
+        }
+        // V102.131: status chip beside the name — '📚 Published' on edit, '📥 Draft' on review, hidden on Add.
+        function dcaSetStatusChip(text, kind) {
+            const chip = document.getElementById('dca-form-status-chip');
+            if (!chip) return;
+            chip.textContent = text || '';
+            chip.className = 'dxa-status-chip' + (kind ? ' is-' + kind : '');
+            chip.style.display = text ? 'inline-flex' : 'none';
         }
         function dcaHideAiFillButton() {
             const btn = document.getElementById('dca-form-ai-fill-btn');
-            if (btn) { btn.style.display = 'none'; btn.disabled = false; btn.textContent = '🤖 AI fill empty fields'; }
+            if (btn) { btn.style.display = 'none'; btn.disabled = false; btn.textContent = '🤖'; }
             const rbtn = document.getElementById('dca-form-ai-review-btn');
-            if (rbtn) { rbtn.style.display = 'none'; rbtn.disabled = false; rbtn.textContent = '🔍 AI Review'; }
+            if (rbtn) { rbtn.style.display = 'none'; rbtn.disabled = false; rbtn.textContent = '🔍'; }
         }
 
         // ── V95.87: per-field authorship tint (diff vs the intern's submitted draft) ──
@@ -45348,6 +45357,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 dcaState.isDraftEdit = false;
                 const modeLabel = document.getElementById('dca-form-mode-label');
                 if (modeLabel) modeLabel.textContent = 'Add Drug · 🤖 AI draft';
+                dcaSetStatusChip('');
                 dcaFillForm(draftData);
                 dcaSwitchView('form');
                 if (typeof showToast === 'function') {
@@ -45494,7 +45504,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const selectedModel = window.dcaSelectedToolbarModel?.() || DCA_AI_FALLBACK_MODEL;
 
             if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
-            if (btn) { btn.disabled = true; btn.textContent = '⏳ Filling ' + emptyKeys.length + ' field' + (emptyKeys.length === 1 ? '' : 's') + '…'; }
+            if (btn) { btn.disabled = true; btn.textContent = '⏳'; btn.title = 'Filling ' + emptyKeys.length + ' field' + (emptyKeys.length === 1 ? '' : 's') + '…'; }
 
             const prompt = dcaBuildAiFillPrompt(current, emptyKeys);
 
@@ -45571,7 +45581,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     errEl.textContent = 'AI fill failed: ' + (err && err.message ? err.message : 'unknown error');
                 }
             } finally {
-                if (btn) { btn.disabled = false; btn.textContent = '🤖 AI fill empty fields'; }
+                if (btn) { btn.disabled = false; btn.textContent = '🤖'; }
             }
         }
 
@@ -45709,7 +45719,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const selectedModel = window.dcaSelectedToolbarModel?.() || DCA_AI_FALLBACK_MODEL;
 
             if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
-            if (btn) { btn.disabled = true; btn.textContent = '⏳ Reviewing…'; }
+            if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
 
             // V96.95: field-completeness context for the score rubric (deterministic,
             // same field set the prompt reviews — excludes the genericName anchor).
@@ -45806,7 +45816,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 console.error('[drug-codex] AI review failed:', err);
                 if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'AI Review failed: ' + (err && err.message ? err.message : 'unknown error'); }
             } finally {
-                if (btn) { btn.disabled = false; btn.textContent = '🔍 AI Review'; }
+                if (btn) { btn.disabled = false; btn.textContent = '🔍'; }
             }
         }
 
@@ -68946,7 +68956,7 @@ Summarize in English in 3–5 concise lines:
     })();
     </script>
 <script src="history-review.js?v=V99.88"></script>
-<script src="drug-toolbar.js?v=V101.64"></script>
+<script src="drug-toolbar.js?v=V102.131"></script>
 <script src="journal-feedback-admin.js?v=V99.88"></script>
 <script src="delete-requests.js?v=V100.40"></script>
 </body>

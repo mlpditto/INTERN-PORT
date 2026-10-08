@@ -22,6 +22,9 @@ const { chromium } = require('playwright');
         });
         await page.addScriptTag({ path: 'public/ai-model-ui.js' });
         await page.addStyleTag({ path: 'public/text-ai-chips.css' });
+        // V102.131: the Drug form's model picker is the provider-logo rail (shared helpers in admin.html)
+        const railFrom = html.indexOf('        window.browseAuditProvider =');
+        await page.addScriptTag({ content: html.slice(railFrom, html.indexOf('        window.auditModelControlsHtml', railFrom)) });
         await page.addScriptTag({ path: 'public/drug-toolbar.js' });
         await page.evaluate(() => document.dispatchEvent(new Event('DOMContentLoaded')));
         // Exercise the real editor-open initialization, which previously overwrote registry click handlers.
@@ -82,9 +85,9 @@ const { chromium } = require('playwright');
         for (const pref of ['translate', 'analyzer', 'review', 'qfp']) {
             assert.deepEqual(await page.locator(`#default-${pref}-model option`).evaluateAll(os => os.map(o => o.value)), ids);
         }
-        for (const railId of ['dt-models', 'dca-ai-chip-rail']) {
-            assert.equal(await page.locator(`#${railId} button`).count(), ids.length);
-            await page.locator(`#${railId} button[data-value="claude-haiku-4-5"]`).evaluate(b => b.click());
+        for (const chips of ['#dt-models .text-ai-chips > button', '#dca-ai-chip-rail button']) {
+            assert.equal(await page.locator(chips).count(), ids.length);
+            await page.locator(`${chips}[data-value="claude-haiku-4-5"]`).evaluate(b => b.click());
             assert.equal(await page.locator('#dca-ai-model-val').inputValue(), 'claude-haiku-4-5');
         }
         await page.evaluate(() => initRegistryModelSelectors());
