@@ -64,7 +64,19 @@ const text = (page, sel) => page.locator(sel).evaluateAll(ns => ns.map(n => n.te
         assert.equal(await page.locator('.fw-sheet .fw-pill.ok').count(), 1);
         for (const gone of ['.fw-scene', '.fw-key', '.fw-badge', '.fw-sub', '.fw-tile', '.fw-rv-alert', '.fw-hist']) assert.equal(await page.locator('.fw-sheet ' + gone).count(), 0, gone + ': no scene / sentence / old rows when ok');
         assert.deepEqual(await text(page, '.fw-sheet .fw-r2 .fw-v2'), ['93cm', 'ไม่ท่วม']);
-        assert.deepEqual(await text(page, '.fw-sheet .fw-r2 .fw-n2'), ['▼46/24ชม.', '500 ม.'], 'arrow + number replace the Thai sentence');
+        assert.deepEqual(await text(page, '.fw-sheet .fw-r2 .fw-n2'), ['▼46'], 'arrow + number only: the wording moved to hover');
+        // descriptions: hover (title) on desktop, tap (data-tip bubble) on touch — same text
+        const tips = await page.locator('.fw-sheet .fw-r2').evaluateAll(ns => ns.map(n => [n.dataset.tip, n.title]));
+        assert.ok(tips[0][0].includes('ต่ำกว่าตลิ่ง 93 ซม.') && tips[0][0].includes('ลดลง 46 ซม. ใน 24 ชม.') && tips[0][1].startsWith(tips[0][0]), 'canal wording in hover + tap text: ' + tips[0][0]);
+        assert.equal(tips[1][0], 'ไม่มีถนนท่วมในรัศมี 500 ม.'); assert.ok(tips[1][1].startsWith(tips[1][0]));
+        assert.ok(!(await text(page, '.fw-sheet .fw-rows2'))[0].includes('ชม') && !(await text(page, '.fw-sheet .fw-rows2'))[0].includes('ม.'), 'no explanatory wording left in the rows');
+        assert.equal(await page.locator('.fw-sheet .fw-tip').count(), 0);
+        await page.locator('.fw-sheet .fw-r2').first().click();
+        assert.deepEqual(await text(page, '.fw-sheet .fw-tip'), [tips[0][0]], 'a tap shows the description bubble');
+        assert.ok(await page.evaluate(() => { const b = document.querySelector('.fw-sheet .fw-tip').getBoundingClientRect(), s = document.querySelector('.fw-sheet').getBoundingClientRect(); return b.left >= s.left && b.right <= s.right && b.bottom <= s.bottom + 1; }), 'bubble stays inside the sheet');
+        await page.locator('.fw-sheet .fw-pill').click();
+        assert.equal(await page.locator('.fw-sheet .fw-tip').count(), 0, 'a tap elsewhere hides it');
+        assert.ok((await page.locator('.fw-sheet .fw-river-row .fw-rs').first().getAttribute('data-tip')).includes('C.2 นครสวรรค์'), 'chips explain themselves too');
         assert.deepEqual(await page.locator('.fw-sheet .fw-r2 .fw-e').evaluateAll(ns => ns.map(n => n.className.replace('fw-e', '').trim() + ':' + n.getBoundingClientRect().width)), ['ok:26', 'ok:26'], 'ok = small emoji');
         const pe0 = await page.locator('.fw-sheet .fw-pill .fw-pe').evaluate(n => n.offsetWidth);
         assert.equal(await page.locator('.fw-sheet .fw-river-row .fw-rs').count(), 3, 'C.2 · C.13 · C.29B chips');
@@ -121,6 +133,11 @@ const text = (page, sel) => page.locator(sel).evaluateAll(ns => ns.map(n => n.te
         assert.ok(key.includes('C.13 ชัยนาท') && key.includes('2,610') && key.includes('m³/s'), 'river number in the scene: ' + key);
         assert.equal(await page.locator('.fw-sheet .fw-scene .fw-key .fw-e.crit').count(), 1, '2,610 > 2,500 → crit emoji');
         assert.ok(!(await text(page, '.fw-sheet'))[0].includes('น้ำเหนือกำลังลงมา'), 'the fixed "water coming down" claim is gone');
+        assert.ok(!key.includes('เกินเกณฑ์'), 'the threshold wording is not printed in the scene');
+        assert.ok((await page.locator('.fw-sheet .fw-scene .fw-key').getAttribute('data-tip')).includes('สูงกว่าเกณฑ์ 2,200 m³/s'), 'threshold in the river card hover text');
+        assert.ok((await page.locator('.fw-sheet .fw-sc-lvl').getAttribute('data-tip')).includes('ต่ำกว่าตลิ่ง 93 ซม.'));
+        const rt = await page.locator('.fw-sheet .fw-sc-road').getAttribute('data-tip'); assert.ok(rt.includes('ถ.นาคนิวาส') && rt.includes('ห่าง 320 ม.'), rt);
+        assert.ok((await page.locator('.fw-sheet .fw-scene').getAttribute('title')).includes('เฝ้าระวัง'), 'scene has a hover text');
         const lbl = await page.locator('.fw-sheet .fw-scene').getAttribute('aria-label');
         assert.ok(lbl.includes('เฝ้าระวัง') && lbl.includes('ต่ำกว่าตลิ่ง 93 ซม.') && lbl.includes('ถนนท่วม 15 ซม.'), lbl);
         assert.ok((await text(page, '.fw-sheet .fw-sc-lvl'))[0].includes('93cm'), 'canal level in the water');
