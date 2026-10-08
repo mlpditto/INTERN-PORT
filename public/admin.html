@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.127)</title>
+    <title>Nika Admin (V102.128)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -7884,6 +7884,19 @@
                 <!-- V96.5x fix: admin-entered Thai link titles (e.g. "หอมมันข้าวมันไก่") were
                      rendering blank — same lang-toggle.js EN-default Thai-hiding trap this file
                      already has 20+ prior fix-comments for, missed on this specific container. -->
+                <!-- V102.128: `all:unset` on these buttons sidesteps the global `button{width:100%}` rule (known trap in this file). -->
+                <style>
+                    #review-links-list .rl-open { all:unset; cursor:pointer; display:inline-flex; flex-shrink:0; border-radius:50%; }
+                    #review-links-list .rl-name { all:unset; cursor:pointer; display:block; min-width:0; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:800; color:#334155; font-size:0.9em; }
+                    #review-links-list .rl-name:hover, #review-links-list .rl-open:hover + div .rl-name { color:#c2410c; text-decoration:underline; }
+                    #review-links-list .rl-ic { all:unset; box-sizing:border-box; width:28px; height:28px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; font-size:12px; }
+                    #review-links-list .rl-ic.on { background:#dcfce7; color:#15803d; }
+                    #review-links-list .rl-ic.off { background:#f1f5f9; color:#94a3b8; }
+                    #review-links-list .rl-ic.del { color:#cbd5e1; }
+                    #review-links-list .rl-ic.del:hover { background:#fef2f2; color:#dc2626; }
+                    #review-links-list :is(.rl-open, .rl-name, .rl-ic):focus-visible { outline:2px solid #ea580c; outline-offset:2px; }
+                    @media (pointer:coarse) { #review-links-list .rl-ic { width:44px; height:44px; font-size:15px; } }
+                </style>
                 <div id="review-links-list" class="lang-no-toggle" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px;">
                     <div style="grid-column:1/-1; padding:30px; text-align:center; color:#94a3b8; font-size:0.86em;">Loading...</div>
                 </div>
@@ -35456,19 +35469,23 @@ RULES:
                 return;
             }
             list.innerHTML = reviewLinksCache.map(l => {
-                const icon = rlLogoDisc(l, 22);
+                // V102.128: lean card — 48 px logo, name/logo open Edit, icon-only pause + delete (styles: .rl-* in the <style> above the list)
+                const icon = rlLogoDisc(l, 48);
                 const active = l.isActive !== false;
+                const idJs = JSON.stringify(l.id);
                 return `
-                    <div style="display:flex; flex-direction:column; gap:6px; background:white; border:1px solid #f1f5f9; border-radius:12px; padding:12px 14px; ${active ? '' : 'opacity:0.55;'}">
-                        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
-                            <div style="font-weight:800; color:#334155; font-size:0.88em; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:flex; align-items:center; gap:7px;">${icon}<span style="min-width:0; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(l.title || 'Untitled')}</span></div>
-                            <div style="font-weight:900; color:#b45309; font-size:0.78em; white-space:nowrap; flex-shrink:0;">+${l.beriReward || 0} Beri</div>
+                    <div style="min-width:0; display:flex; align-items:center; gap:12px; background:white; border:1px solid #f1f5f9; border-radius:14px; padding:12px 14px; ${active ? '' : 'opacity:0.55;'}">
+                        <button type="button" class="rl-open" onclick='openReviewLinkModal(${idJs})' title="Edit this link" aria-label="Edit ${escapeHtml(l.title || 'link')}">${icon}</button>
+                        <div style="min-width:0; flex:1;">
+                            <button type="button" class="rl-name" onclick='openReviewLinkModal(${idJs})' title="Edit this link">${escapeHtml(l.title || 'Untitled')}</button>
+                            <div style="font-size:0.72em; color:#94a3b8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px;">${escapeHtml(String(l.url || '').replace(/^https?:\/\//i, ''))}</div>
                         </div>
-                        <div style="font-size:0.72em; color:#94a3b8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(l.url || '')}</div>
-                        <div style="display:flex; gap:6px; margin-top:4px;">
-                            <button class="btn-sm" onclick='toggleReviewLinkActive(${JSON.stringify(l.id)}, ${active})' style="flex:1; background:${active ? '#dcfce7' : '#f1f5f9'}; color:${active ? '#15803d' : '#64748b'}; border:none; border-radius:10px; padding:6px 8px; font-weight:700; cursor:pointer;">${active ? 'Active' : 'Paused'}</button>
-                            <button class="btn-sm btn-info" onclick='openReviewLinkModal(${JSON.stringify(l.id)})' style="flex:1;">Edit</button>
-                            <button class="btn-sm btn-danger" onclick='deleteReviewLink(${JSON.stringify(l.id)})' style="flex:1;">Delete</button>
+                        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex-shrink:0;">
+                            <span style="font-weight:900; color:#b45309; font-size:0.78em; white-space:nowrap;">+${l.beriReward || 0} Beri</span>
+                            <div style="display:flex; gap:4px;">
+                                <button type="button" class="rl-ic ${active ? 'on' : 'off'}" onclick='toggleReviewLinkActive(${idJs}, ${active})' title="${active ? 'Active — click to pause' : 'Paused — click to activate'}" aria-label="${active ? 'Pause link' : 'Activate link'}"><i class="fa-solid ${active ? 'fa-eye' : 'fa-eye-slash'}"></i></button>
+                                <button type="button" class="rl-ic del" onclick='deleteReviewLink(${idJs})' title="Delete this link (asks to confirm)" aria-label="Delete link"><i class="fa-solid fa-trash"></i></button>
+                            </div>
                         </div>
                     </div>`;
             }).join('');
