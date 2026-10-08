@@ -81,6 +81,7 @@ const text = (page, sel) => page.locator(sel).evaluateAll(ns => ns.map(n => n.te
         const pe0 = await page.locator('.fw-sheet .fw-pill .fw-pe').evaluate(n => n.offsetWidth);
         assert.equal(await page.locator('.fw-sheet .fw-river-row .fw-rs').count(), 3, 'C.2 · C.13 · C.29B chips');
         assert.ok((await text(page, '.fw-sheet .fw-river-row'))[0].includes('2.0k'), 'values in k m³/s');
+        assert.deepEqual(await text(page, '.fw-sheet .fw-river-row .fw-rl'), ['C.2', 'C.13', 'C.29B'], 'each chip names its station');
         assert.equal(await page.locator('.fw-sheet .fw-river-row').getAttribute('data-src'), 'rid');
         assert.equal(await page.locator('.fw-sheet .fw-river-row .fw-ar.down').count(), 1, 'C.13 −80 → ▼'); assert.equal(await page.locator('.fw-sheet .fw-river-row .fw-ar.up').count(), 0, '+10 is under the 30 m³/s arrow threshold');
         assert.equal(await page.locator('.fw-sheet .fw-river-row .fw-rw').count(), 0, 'no ⚠️ under the line'); assert.equal(await page.locator('.fw-sheet .fw-river-row > .fw-e.ok').count(), 1);
@@ -143,7 +144,7 @@ const text = (page, sel) => page.locator(sel).evaluateAll(ns => ns.map(n => n.te
         assert.ok((await text(page, '.fw-sheet .fw-sc-lvl'))[0].includes('93cm'), 'canal level in the water');
         assert.deepEqual(await text(page, '.fw-sheet .fw-sc-road'), ['🛣️15cm']); assert.equal(await page.locator('.fw-sheet .fw-sc-road .fw-e.warn').count(), 1);
         for (const gone of ['.fw-r2', '.fw-key.fw-sb', '.fw-sc-spill']) assert.equal(await page.locator('.fw-sheet ' + gone).count(), 0, gone + ': rows are folded into the scene');
-        assert.equal(await page.locator('.fw-sheet .fw-river-row .fw-rs.over').count(), 1); assert.ok((await text(page, '.fw-sheet .fw-river-row .fw-rs.over'))[0].includes('2.6k'));
+        assert.equal(await page.locator('.fw-sheet .fw-river-row .fw-rs.over').count(), 1); assert.ok((await text(page, '.fw-sheet .fw-river-row .fw-rs.over'))[0].includes('2.6k') && (await text(page, '.fw-sheet .fw-river-row .fw-rs.over'))[0].includes('C.13'), 'the chip over the line is C.13');
         assert.equal(await page.locator('.fw-sheet .fw-river-row .fw-rs.over .fw-rw').count(), 1, '⚠️ replaces the dot on the chip over the line');
         assert.equal(await page.locator('.fw-sheet .fw-river-row > .fw-e.crit').count(), 1);
         assert.equal(await page.locator('.fw-sheet .fw-foot .fw-yr').count(), 0, 'no district → no years'); assert.equal(await page.locator('.fw-sheet .fw-foot .fw-tg').count(), 1, 'the toggle stays');

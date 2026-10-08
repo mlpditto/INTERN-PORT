@@ -206,8 +206,8 @@
             var k = (r.q / 1000).toFixed(1) + 'k', over = r.q > RV_LIMIT;
             if (r.q > 2500) worst = 'crit'; else if (over && worst === 'ok') worst = 'warn';
             // V101.72: over the line = a ⚠️ in place of the tier dot (the dot colour stays for the other tiers).
-            parts.push('<span class="fw-rs' + (over ? ' over' : '') + '" data-tip="' + esc(r.code + ' ' + (RV_PLACE[r.code] || r.place || '') + ' · ' + Math.round(r.q).toLocaleString('en-US') + ' m³/s' + (over ? ' · สูงกว่าเกณฑ์ ' + fmtQ(RV_LIMIT) : '')) + '" title="' + esc(r.code) + ' · ' + Math.round(r.q).toLocaleString('en-US') + ' m³/s">' +
-                (over ? '<span class="fw-rw">⚠️</span>' : '<i class="fw-rd" style="background:' + RV_COL[rvTier(r.q)] + '"></i>') + k + ar + '</span>');
+            parts.push('<span class="fw-rs' + (over ? ' over' : '') + '" data-tip="' + esc(r.code + ' ' + (RV_PLACE[r.code] || r.place || '') + ' · ' + Math.round(r.q).toLocaleString('en-US') + ' m³/s' + (over ? ' · สูงกว่าเกณฑ์ ' + fmtQ(RV_LIMIT) : '')) + '" title="' + esc(r.code) + ' · ' + Math.round(r.q).toLocaleString('en-US') + ' m³/s"><small class="fw-rl">' + esc(r.code) + '</small><span class="fw-rv">' +
+                (over ? '<span class="fw-rw">⚠️</span>' : '<i class="fw-rd" style="background:' + RV_COL[rvTier(r.q)] + '"></i>') + k + ar + '</span></span>');
             labels.push(r.code + ' ' + k);
         });
         if (!parts.length) return none;
