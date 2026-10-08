@@ -22,6 +22,18 @@ assert.ok(open.includes("document.getElementById('br-list').value = (r && r.list
 // redeem path untouched: the intern transaction still debits beriCost
 assert.ok(index.includes('async function redeemBeriReward(rewardId)') && !/redeemBeriReward[\s\S]{0,3000}listCost/.test(index.slice(index.indexOf('async function redeemBeriReward'))), 'redeem never reads listCost');
 
+// ---- admin: lean + inline modal (V102.122, owner pick "B") ----
+const modal = slice(admin, '<div id="beriRewardModal" class="modal"', '\n            </div>\n        </div>\n');
+assert.ok(!/<label/.test(modal), 'no labels — icons + placeholders + titles');
+assert.ok(!/Cancel|Active \(visible/.test(modal), 'no Cancel button, no checkbox text');
+assert.ok(modal.includes('class="br-hb br-save" onclick="saveBeriReward()"') && modal.indexOf('br-save') < modal.indexOf('forceHideModal(\'beriRewardModal\')'), '💾 in the header, left of ×');
+assert.ok(modal.includes('placeholder="Name"') && modal.includes('placeholder="Description (optional)"'), 'placeholders carry the field names');
+for (const ico of ['<i>🪙</i>', '<i>🏷️</i>', '<i>📦</i>']) assert.ok(modal.includes(ico), ico + ' is the label');
+assert.ok(modal.includes('id="br-active" checked hidden onchange="brPaintActive()"') && modal.includes('id="br-eye"'), '👁 drives the hidden checkbox saveBeriReward reads');
+assert.ok(modal.includes('id="br-off" class="br-off" hidden'), '−N% pill, hidden until a full price above the cost');
+assert.ok(admin.includes("el.textContent = off ? `−${off}%` : '';") && admin.includes('el.hidden = !off;'), 'brPreviewOff drives the pill');
+assert.ok(/e\.key === 'Enter' && \(e\.ctrlKey \|\| e\.metaKey\)[^\n]*saveBeriReward\(\)/.test(admin), 'Ctrl+Enter saves');
+
 // ---- admin: ✨ Grok Imagine in the image well (V102.122) ----
 assert.ok(admin.includes('id="br-pic-ai"') && admin.includes('onclick="event.stopPropagation(); brGenImage()"'), 'sparkle button in the well, does not open the file picker');
 const gen = slice(admin, 'async function brGenImage() {', '\n        }\n');
@@ -66,4 +78,4 @@ assert.ok(html.includes('Beri ไม่พอ'), '600 Beri cannot afford 2,450')
 assert.ok(html.includes('หมดแล้ว') && html.includes('disabled'), 'sold out disabled');
 assert.ok(!html.includes('🎁 SUPER BEAR'), 'name no longer prefixed with 🎁 (the image / tile carries it)');
 
-console.log('PASS: beri reward image + full price — modal fields (image well, Beri Cost / Full price / Stock), save validates + uploads via the Product photo helpers to product-images/, redeem untouched, admin rows (thumb, 🪙 cost over struck −N%, 📦, icon-only eye/pen/trash, ✨ Grok Imagine in the well), intern cards (image / 🎁, 🪙 2,450 ~~3,000~~ −18%, 📦 N, แลกเลย), escaping');
+console.log('PASS: beri reward image + full price — modal fields (image well, Beri Cost / Full price / Stock), save validates + uploads via the Product photo helpers to product-images/, redeem untouched, admin rows (thumb, 🪙 cost over struck −N%, 📦, icon-only eye/pen/trash, ✨ Grok Imagine in the well; lean modal: icons as labels, 💾/× header, 👁 toggle, −N% pill, Ctrl+Enter), intern cards (image / 🎁, 🪙 2,450 ~~3,000~~ −18%, 📦 N, แลกเลย), escaping');
