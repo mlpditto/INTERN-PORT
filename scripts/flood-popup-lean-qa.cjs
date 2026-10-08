@@ -12,7 +12,8 @@ for (const gone of ['function stats(', 'function trendHtml', 'function rainHtml'
 assert.ok(src.includes("q > RV_LIMIT ? 'red'") && src.includes('var RV_LIMIT = 2200;'), 'card river tier and the popup alert share the 2,200 line');
 assert.ok(src.includes('&daily=precipitation_sum,precipitation_probability_max&past_days=3&forecast_days=4'), 'Open-Meteo daily rain in the same request');
 const idx = fs.readFileSync('public/index.html', 'utf8');
-assert.ok(idx.includes('flood-watch.js?v=V101.69') && idx.includes('flood-watch.css?v=V101.69'), 'cache-bust bumped');
+assert.ok(idx.includes('flood-watch.js?v=V101.71') && idx.includes('flood-watch.css?v=V101.71'), 'cache-bust bumped');
+assert.ok(!idx.includes('fw-river-strip') && !src.includes('fw-river-strip'), 'V101.71: the card strip is gone');
 
 async function open(browser, width, opts) {
     const ctx = await browser.newContext({ viewport: { width, height: 900 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
@@ -77,17 +78,22 @@ const text = (page, sel) => page.locator(sel).evaluateAll(ns => ns.map(n => n.te
         // details: one line per station, roads one line, Traffy, river one word, weather, sources once (incl. the history sources)
         await page.locator('.fw-sheet .fw-more summary').click();
         const lines = await text(page, '.fw-sheet .fw-dl');
-        assert.equal(lines.length, 6, 'canal ×2 · roads · Traffy · river · weather: ' + JSON.stringify(lines));
+        assert.equal(lines.length, 5, 'canal ×2 · roads · Traffy · weather (river moved to the front): ' + JSON.stringify(lines));
         assert.ok(lines[0].includes('ค.ทรงกระเทียม ปตร') && lines[0].includes('-0.03 m') && lines[0].includes('▲ +5 cm/ชม.'));
         assert.ok(lines[2].startsWith('ถ.นาคนิวาส (ซ. 38) · ถ.สุคนธสวัสดิ์ (ซ. 15)') && lines[2].includes('แห้ง'), lines[2]);
         assert.ok(lines[3].includes('Traffy') && lines[3].includes('2'));
-        assert.ok(lines[4].includes('แม่น้ำเจ้าพระยา') && lines[4].includes('ปกติ') && lines[4].includes('2,009–2,150'));
-        assert.ok(lines[5].includes('26°') && lines[5].includes('76'), lines[5]);
+        assert.ok(lines[4].includes('26°') && lines[4].includes('76'), lines[4]);
+        // V101.71: the river strip sits on the front under คลอง/ถนน — three chips, dot per tier, ▲▼ vs 24 h, ThaiWater bar
+        assert.equal(await page.locator('.fw-sheet .fw-river-row .fw-rs').count(), 3, 'C.2 · C.13 · C.29B chips');
+        assert.ok((await text(page, '.fw-sheet .fw-river-row'))[0].includes('2.0k'), 'values in k m³/s');
+        assert.equal(await page.locator('.fw-sheet .fw-river-row').getAttribute('data-src'), 'rid');
+        assert.equal(await page.locator('.fw-sheet .fw-river-row .fw-ar.down').count(), 1, 'C.13 −80 → ▼'); assert.equal(await page.locator('.fw-sheet .fw-river-row .fw-ar.up').count(), 0, '+10 is under the 30 m³/s arrow threshold');
+        assert.ok(!(await text(page, '.fw-sheet .fw-dl')).some(t => t.includes('แม่น้ำเจ้าพระยา')), 'no duplicate river line under รายละเอียด');
         const meta = (await text(page, '.fw-sheet .fw-meta'))[0];
         assert.ok(!/POPNIX|Open-Meteo|Rocket|Nominatim/.test(meta) && /^\d\d:\d\d · ค\.ทรงกระเทียม/.test(meta), 'V101.69: meta is time · gauge only: ' + meta);
         // V101.69 source colours: every row carries a bar with its source(s); the legend lists each used source once
         const bars = await page.locator('.fw-sheet .fw-sb').evaluateAll(ns => ns.map(n => n.dataset.src));
-        assert.deepEqual(bars, ['fw+fb', 'fw', 'fb', 'om', 'hist+osm', 'pop', 'pop', 'pop+fb', 'fw', 'rid', 'om'], 'row → source: ' + JSON.stringify(bars));
+        assert.deepEqual(bars, ['fw+fb', 'fw', 'fb', 'rid', 'om', 'hist+osm', 'pop', 'pop', 'pop+fb', 'fw', 'om'], 'row → source: ' + JSON.stringify(bars));
         assert.ok(await page.locator('.fw-sheet .fw-sb').evaluateAll(ns => ns.every(n => getComputedStyle(n, '::before').width === '3px')), '3 px bars drawn');
         const legend = await text(page, '.fw-sheet .fw-lg span');
         assert.deepEqual(legend, ['BKK FloodWatch', 'ข้อมูล: สำนักการระบายน้ำ กรุงเทพมหานคร ผ่าน POPNIX Flood', 'Floodboard (CC BY 4.0)', 'ThaiWater · กรมชลประทาน', 'Open-Meteo (CC BY 4.0)', '2569 ประกาศ กทม. 29 ก.ย. · 2554 รายงานข่าว (Rocket Media Lab)', 'เขตจาก OpenStreetMap (Nominatim)'], 'legend = attributions once');
@@ -106,7 +112,7 @@ const text = (page, sel) => page.locator(sel).evaluateAll(ns => ns.map(n => n.te
         assert.ok((await text(page, '.fw-sheet .fw-tile .fw-n'))[1].includes('ถ.นาคนิวาส · 320 ม.'));
         assert.equal(await page.locator('.fw-sheet .fw-hist').count(), 0, 'no district → no history line');
         await page.locator('.fw-sheet .fw-more summary').click();
-        assert.ok((await text(page, '.fw-sheet .fw-dl'))[4].includes('C.13 2,610'));
+        assert.ok(await page.locator('.fw-sheet .fw-river-row .fw-rd').evaluateAll(ns => ns.some(n => n.style.background.includes('239, 68, 68') || n.style.background === '#ef4444' || n.getAttribute('style').includes('#ef4444'))), 'the 2,610 chip has the red dot');
         if (process.env.SHOT) { await page.locator('.fw-sheet .fw-more summary').click(); await page.locator('.fw-sheet').screenshot({ path: path.resolve('output/flood-popup-lean-alert.png') }); }
         await ctx.close();
 
@@ -117,7 +123,7 @@ const text = (page, sel) => page.locator(sel).evaluateAll(ns => ns.map(n => n.te
         await ctx.close();
 
         assert.deepEqual(errors.filter(e => !/firebase./.test(e)), [], 'no page errors beyond the un-stubbed Firebase boot');
-        console.log('PASS: flood popup lean — badge + sentence, คลอง/ถนน tiles, 7-day rain from the same Open-Meteo call (3 back · today · 3 ahead with %), เขต 2554/2569 line with sources in titles, details folded (6 lines + sources once), river > 2,500 → red line + เฝ้าระวัง, wet road tile, no history without a district, source bars per row (two-colour when two agree) + dot legend instead of the paragraph, river line 2,200, fits 320 px');
+        console.log('PASS: flood popup lean — badge + sentence, คลอง/ถนน tiles, 7-day rain from the same Open-Meteo call (3 back · today · 3 ahead with %), เขต 2554/2569 line with sources in titles, details folded (6 lines + sources once), river > 2,500 → red line + เฝ้าระวัง, wet road tile, no history without a district, source bars per row (two-colour when two agree) + dot legend instead of the paragraph, river line 2,200, river strip on the front (3 chips, ThaiWater bar) and not under รายละเอียด, fits 320 px');
     } finally {
         await browser.close();
     }

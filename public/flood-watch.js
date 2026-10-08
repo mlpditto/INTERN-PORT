@@ -121,13 +121,6 @@
         }
         var water = document.getElementById('fw-water');
         if (water) water.innerHTML = skyHtml(places.site.wx) + slopeWater(home, site) + riverWater(places.site.data && places.site.data.river, home, site);
-        var strip = document.getElementById('fw-river-strip');
-        if (strip) {
-            var sh = riverStrip(places.site.data && places.site.data.river);
-            strip.innerHTML = sh.html;
-            strip.setAttribute('aria-label', sh.label);
-            strip.hidden = !sh.html;
-        }
     }
 
     // V101.32: the card water shows BOTH places — one surface sloping from home (left)
@@ -201,7 +194,7 @@
         return out;
     }
 
-    // V101.63: river flow as ONE in-flow strip under the pts row (#fw-river-strip) instead of capsules floating on the card water — those were
+    // V101.63: river flow as ONE strip (was under the pts row on the card; V101.71: moved into the popup, under คลอง/ถนน) instead of capsules floating on the card water — those were
     // positioned once from a snapshot of the layout, so they landed on the buttons / the date nudge whenever a row shifted. The water keeps its tint.
     function riverStrip(rv) {
         var none = { html: '', label: '' };
@@ -301,6 +294,13 @@
 
     // 7 days of rain: 3 back (measured), today, 3 ahead (forecast with its chance) — Open-Meteo daily, see loadWeather.
     var DOW = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+    // V101.71: the C.2 → C.13 → C.29B strip on the popup's front (the owner: "River flow ย้ายไปแสดงใน Flood watch").
+    function riverRowHtml(rv) {
+        var sh = riverStrip(rv);
+        if (!sh.html) return '';
+        return '<div class="fw-river-row' + srcBar(['rid']) + ' · ' + esc(sh.label) + '">' + sh.html + '</div>';
+    }
+
     function rain7Html(wx) {
         var days = wx && wx.days;
         if (!days || !days.length) return '';
@@ -343,13 +343,7 @@
             rows.push(line('fa-road', roads.map(function (r) { return esc(r.name); }).join(' · '), wet.length ? wet.map(function (r) { return (r.depthCm == null ? 'มีน้ำ' : r.depthCm + ' cm'); }).join(', ') : 'แห้ง', roads.map(function (r) { return r.km; }).sort().filter(function (v, i, a) { return i === 0 || i === a.length - 1; }).join('–') + ' km', d.road ? ['pop', 'fb'] : ['pop']));
         }
         if (d.traffy6h) rows.push(line('fa-triangle-exclamation', 'รายงานน้ำท่วมจากประชาชน (Traffy)', d.traffy6h, '≤1 km · 6 ชม.', ['fw']));
-        var rv = d.river && d.river.stations ? d.river.stations.filter(fresh) : [];
-        if (rv.length) {
-            var qs = rv.map(function (r) { return r.q; });
-            var val = alert ? '<span style="color:#b91c1c">' + esc(alert.code) + ' ' + fmtQ(alert.q) + '</span>' : 'ปกติ';
-            var title = rv.map(function (r) { return r.code + ' ' + esc(r.place || RV_PLACE[r.code] || '') + ' ' + fmtQ(r.q) + (r.src === 'est' ? '~' : '') + ' m³/s' + (r.d24 != null ? ' (' + (r.d24 > 0 ? '+' : '') + r.d24 + ' / 24 ชม.)' : '') + ' · ' + (RV_SRC[r.src] || ''); }).join(' · ');
-            rows.push('<div class="fw-dl' + srcBar(['rid']) + ' · ' + title + '"><i class="fa-solid fa-water"></i><span>แม่น้ำเจ้าพระยา (นครสวรรค์→อยุธยา)</span><b>' + val + '</b><small>' + fmtQ(Math.min.apply(null, qs)) + '–' + fmtQ(Math.max.apply(null, qs)) + ' m³/s</small></div>');
-        }
+        var rv = d.river && d.river.stations ? d.river.stations.filter(fresh) : [];   // V101.71: shown on the front (riverRowHtml); kept here for the legend
         var wx = p.wx;
         if (wx) rows.push(line('fa-cloud-sun', wxIcon(wx) + ' ' + wx.temp + '° (รู้สึก ' + wx.feels + '°) · ฝน 6 ชม. ' + wx.pop + '%', wx.aqi != null ? 'AQI <span class="fw-aqi ' + aqiClass(wx.aqi) + '">' + wx.aqi + '</span>' : '', wx.pm25 != null ? 'PM2.5 ' + wx.pm25 : '', ['om']));
         var t = p.at ? new Date(p.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }) : '';
@@ -388,7 +382,7 @@
         else if (!d) body = '<div class="fw-h"><span class="fw-dot"></span>—</div>';
         else {
             var alert = riverAlert(d.river);
-            body = statusHtml(d, alert) + riverAlertHtml(alert) + tilesHtml(d) + rain7Html(p.wx) + histHtml(d) + moreHtml(d, p, alert);
+            body = statusHtml(d, alert) + riverAlertHtml(alert) + tilesHtml(d) + riverRowHtml(d.river) + rain7Html(p.wx) + histHtml(d) + moreHtml(d, p, alert);
         }
         // Flood data can fail on its own (FloodWatch is flaky); the 7-day rain still shows.
         if (!d && p.wx && !p.loading) body += rain7Html(p.wx);

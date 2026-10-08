@@ -43,22 +43,11 @@ const overlaps = (a, b) => a.l < b.r - 0.5 && a.r > b.l + 0.5 && a.t < b.b - 0.5
     for (const width of [320, 363, 412]) {
       const { page, ctx, errors } = await open(browser, width, true);
       const tag = ' @' + width + 'px';
-      // river: one in-flow strip, no floating capsules
+      // V101.71: river flow lives in the popup now — nothing of it on the card
       assert.equal(await page.locator('.fw-rc').count(), 0, 'no floating capsules' + tag);
-      const strip = page.locator('#fw-river-strip');
-      assert.equal(await strip.isVisible(), true, 'strip visible' + tag);
-      assert.equal(await strip.locator('.fw-rs').count(), 3);
-      assert.match(await strip.getAttribute('aria-label'), /C\.2 2\.0k, C\.13 2\.5k, C\.29B 2\.5k/);
-      assert.equal(await strip.locator('.fw-ar.up').count(), 1, 'rising gauge has ▲');
-      assert.equal(await strip.locator('.fw-ar.down').count(), 1, 'falling gauge has ▼');
-      // nothing overlaps the strip
-      const s = (await rect(page, '#fw-river-strip'))[0];
-      const others = await rect(page, '#section-profile-combined #profile-quick-actions button, #section-profile-combined #u-name, #section-profile-combined .profile-score-values > *, #section-profile-combined #daily-checkin-card > *, #section-profile-combined #daily-checkin-card button');
-      const hit = others.filter(o => overlaps(s, o));
-      assert.deepEqual(hit, [], 'strip overlaps nothing' + tag);
-      // the strip stays inside the card
+      assert.equal(await page.locator('#fw-river-strip').count(), 0, 'no river strip on the card' + tag);
       const card = (await rect(page, '#section-profile-combined'))[0];
-      assert(s.l >= card.l && s.r <= card.r, 'strip inside the card' + tag);
+      assert(card && card.r > card.l, 'card renders' + tag);
       // tool rail: one row, no 🔄
       const rail = await rect(page, '#profile-quick-actions > button');
       assert.equal(rail.length, 5, 'five rail buttons' + tag);
@@ -77,17 +66,18 @@ const overlaps = (a, b) => a.l < b.r - 0.5 && a.r > b.l + 0.5 && a.t < b.b - 0.5
       await page.evaluate(() => paintDateAlert(false));
       assert.equal(await page.locator('#u-info-dot').isVisible(), false);
       assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('date-alert')).display), 'none');
-      // the strip opens the flood sheet
-      await strip.click();
-      assert.equal(await page.locator('.fw-sheet').count(), 1, 'tapping the strip opens flood watch' + tag);
+      // the 🌊 rail button opens the flood sheet, which now carries the river strip
+      await page.locator('#fw-btn').click();
+      assert.equal(await page.locator('.fw-sheet').count(), 1, 'tapping 🌊 opens flood watch' + tag);
+      assert.equal(await page.locator('.fw-sheet .fw-river-row .fw-rs').count(), 3, 'river strip is in the popup' + tag);
       assert(errors.every(e => /firebase\./.test(e)), 'only the known Firebase-stub errors' + tag + ': ' + errors.join(' | '));
       await ctx.close();
     }
-    // no river data -> no strip
+    // no river data -> no strip in the popup either
     const { page, ctx } = await open(browser, 363, false);
-    assert.equal(await page.locator('#fw-river-strip').isVisible(), false, 'strip hidden without river data');
-    assert.equal(await page.locator('#fw-river-strip').innerHTML(), '');
+    await page.locator('#fw-btn').click();
+    assert.equal(await page.locator('.fw-sheet .fw-river-row').count(), 0, 'no river row without river data');
     await ctx.close();
-    console.log('PASS: profile card — river strip in flow, rail on one row, date nudge in Info (320 / 363 / 412 px)');
+    console.log('PASS: profile card — no river strip on the card (it is a row in the 🌊 popup), rail on one row, date nudge in Info (320 / 363 / 412 px)');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
