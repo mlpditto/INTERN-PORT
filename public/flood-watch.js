@@ -1,5 +1,5 @@
 /* V101.27 Flood watch — nearby flood risk for the training site, the intern's
- * home and "near me". V101.65: lean popup (status · คลอง/ถนน tiles · ฝน 7 วัน · เขต 2554/2569 · details).
+ * home and "near me". V101.65: lean popup (status · คลอง/ถนน lines · ฝน 7 วัน · เขต 2554/2569 · details).
  *
  * Data: BKK FloodWatch 2026 (canals) + Floodboard (roads, CC BY 4.0, V101.30) via floodPointCheck.
  * FloodWatch: (https://flood.autobahn.bot, github.com/bejranonda/flood2026,
@@ -259,6 +259,7 @@
             esc(alert.code) + ' ' + esc(RV_PLACE[alert.code] || alert.place || '') + ' · น้ำเหนือกำลังลงมา</small></span><b>' + fmtQ(alert.q) + '</b></div>';
     }
 
+    // V101.67: one inline line per item (icon · label · value · note) instead of two boxes.
     function tilesHtml(d) {
         var c = d.canal, out = '';
         if (c && c.freeboardM != null) {
@@ -295,7 +296,8 @@
             return '<div class="fw-day' + (x.today ? ' today' : x.past ? '' : ' fc') + '" title="' + x.d + ' · ' + (x.mm == null ? '—' : x.mm + ' mm') + (x.past || x.today ? '' : ' · โอกาสฝน ' + (x.pop == null ? '—' : x.pop + '%')) + '"><b>' +
                 (x.mm == null ? '—' : (Math.round(x.mm * 10) / 10)) + '</b><div class="fw-bar"><i style="height:' + h + '%"></i></div><span>' + (x.today ? 'วันนี้' : DOW[dt.getDay()]) + '</span><small>' + under + '</small></div>';
         }).join('');
-        return '<div class="fw-rain7"><div class="fw-k"><i class="fa-solid fa-cloud-rain"></i>ฝน 7 วัน<small>mm · 3 วันก่อน → 3 วันหน้า</small></div><div class="fw-days">' + cells + '</div></div>';
+        // V101.67: header is the icon + unit only (the owner cut "ฝน 7 วัน · 3 วันก่อน → 3 วันหน้า"); the title still explains.
+        return '<div class="fw-rain7" title="ฝน 7 วัน · 3 วันก่อน → วันนี้ → 3 วันหน้า (mm)"><div class="fw-k"><i class="fa-solid fa-cloud-rain"></i><small>mm</small></div><div class="fw-days">' + cells + '</div></div>';
     }
 
     // เขต… · 2554 · 2569 (floodPointCheck → d.district / d.history; sources in the titles and the details line).

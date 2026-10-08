@@ -12,7 +12,7 @@ for (const gone of ['function stats(', 'function trendHtml', 'function rainHtml'
 assert.ok(src.includes("q > 2500 ? 'red'"), 'card river tier red above 2,500');
 assert.ok(src.includes('&daily=precipitation_sum,precipitation_probability_max&past_days=3&forecast_days=4'), 'Open-Meteo daily rain in the same request');
 const idx = fs.readFileSync('public/index.html', 'utf8');
-assert.ok(idx.includes('flood-watch.js?v=V101.65') && idx.includes('flood-watch.css?v=V101.65'), 'cache-bust bumped');
+assert.ok(idx.includes('flood-watch.js?v=V101.67') && idx.includes('flood-watch.css?v=V101.67'), 'cache-bust bumped');
 
 async function open(browser, width, opts) {
     const ctx = await browser.newContext({ viewport: { width, height: 900 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
@@ -61,6 +61,8 @@ const text = (page, sel) => page.locator(sel).evaluateAll(ns => ns.map(n => n.te
         assert.equal(await page.locator('.fw-sheet .fw-rv-alert').count(), 0, 'no river alert at 2,350');
         assert.deepEqual(await text(page, '.fw-sheet .fw-tile .fw-v'), ['93cm', 'ไม่ท่วม']);
         assert.deepEqual(await text(page, '.fw-sheet .fw-tile .fw-n'), ['ต่ำกว่าตลิ่ง · ลดลง 46 cm ใน 24 ชม.', 'ในรัศมี 500 ม.']);
+        assert.deepEqual(await text(page, '.fw-sheet .fw-rain7 .fw-k'), ['mm'], 'V101.67: rain header = icon + unit only');
+        assert.ok(await page.locator('.fw-sheet .fw-tile').evaluateAll(ns => ns.every(n => { const r = n.getBoundingClientRect(); return r.height < 30; })), 'V101.67: คลอง / ถนน are one-line rows');
         assert.equal(await page.locator('.fw-sheet .fw-day').count(), 7, '7 rain days');
         assert.deepEqual(await page.locator('.fw-sheet .fw-day').evaluateAll(ns => ns.map(n => n.className.replace('fw-day', '').trim())), ['', '', '', 'today', 'fc', 'fc', 'fc']);
         assert.deepEqual(await text(page, '.fw-sheet .fw-day b'), ['12', '31', '4', '5.8', '9', '18', '2']);

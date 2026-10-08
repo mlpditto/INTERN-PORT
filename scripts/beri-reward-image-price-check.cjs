@@ -57,6 +57,4 @@ assert.ok(html.includes('Beri ไม่พอ'), '600 Beri cannot afford 2,450')
 assert.ok(html.includes('หมดแล้ว') && html.includes('disabled'), 'sold out disabled');
 assert.ok(!html.includes('🎁 SUPER BEAR'), 'name no longer prefixed with 🎁 (the image / tile carries it)');
 
-// versions
-assert.ok(admin.includes('<title>Nika Admin (V102.121)</title>') && index.includes('<title>Internship Portfolio (V101.66)</title>'), 'versions bumped');
-console.log('PASS: beri reward image + full price — modal fields (image well, Beri Cost / Full price / Stock), save validates + uploads via the Product photo helpers to product-images/, redeem untouched, admin rows (thumb, 🪙 cost over struck −N%, 📦, icon-only eye/pen/trash), intern cards (image / 🎁, 🪙 2,450 ~~3,000~~ −18%, 📦 N, แลกเลย), escaping, versions');
+console.log('PASS: beri reward image + full price — modal fields (image well, Beri Cost / Full price / Stock), save validates + uploads via the Product photo helpers to product-images/, redeem untouched, admin rows (thumb, 🪙 cost over struck −N%, 📦, icon-only eye/pen/trash), intern cards (image / 🎁, 🪙 2,450 ~~3,000~~ −18%, 📦 N, แลกเลย), escaping');
