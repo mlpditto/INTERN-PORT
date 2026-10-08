@@ -4312,42 +4312,42 @@ function floodAlertText(where, s, lat, lon) {
     return lines.filter(Boolean).join('\n');
 }
 
-// ---- Early warning by email (training site only) ----
-// Before a place reaches High (LINE) the nearest canal gauge can already be climbing at the
-// watch mark: rising >= 3 cm/h with <= 10 cm left to the watch level (or already over it).
-// At most two emails a day (08:00 and 16:00 Bangkok) to the owner; no LINE quota used. Gmail SMTP with an App Password kept in
-// the GMAIL_APP_PASSWORD secret (the account is also the sender).
+// ---- Tiered early warning for the training site (functions/flood-tier.js) ----
+// Four steps planned around a ~6 h lead time: 1 heads-up (gauge reaches its watch mark in <= 12 h at the current rate) ->
+// 2 prepare (<= 6 h) -> 3 watch (at the watch mark) -> 4 act (critical mark / road cut / FloodWatch High). The hourly job
+// emails the owner when the tier goes UP (once per tier per day) and also LINEs the admin group from tier 3. Gmail SMTP with
+// an App Password kept in the GMAIL_APP_PASSWORD secret (the account is also the sender).
 const FLOOD_MAIL = 'medlifeplus@gmail.com';
-
-function floodEarlyWarning(s) {
-    const c = s && s.pop && s.pop.canals && s.pop.canals[0];
-    if (!c || c.km > 3 || c.wl == null || c.warn == null || c.deltaCm == null || c.level === 'unk') return null;
-    const leftCm = Math.round((c.warn - c.wl) * 100);
-    if (c.deltaCm < 3 || leftCm > 10) return null;
-    return { c, leftCm };
-}
+const { floodTier, pushReading } = require('./flood-tier');
+const FLOOD_TIER_ICON = { 1: '🟡', 2: '🟠', 3: '🔴', 4: '🚨' };
+const FLOOD_TIER_HEAD = {
+    1: 'ระดับ 1 แจ้งเตือน — น้ำอาจถึงเกณฑ์เฝ้าระวังภายใน ~12 ชม. ติดตามต่อ',
+    2: 'ระดับ 2 เตรียมตัว — น้ำอาจถึงเกณฑ์เฝ้าระวังภายใน ~6 ชม. ย้ายของขึ้นที่สูง เช็กเส้นทางออก',
+    3: 'ระดับ 3 เฝ้าระวัง — น้ำถึงเกณฑ์เฝ้าระวังแล้ว เตรียมพร้อมเคลื่อนย้าย',
+    4: 'ระดับ 4 ตัดสินใจ — ถึงเกณฑ์วิกฤต / ถนนรอบจุดท่วม / ความเสี่ยงสูง พิจารณาอพยพ'
+};
 
 function floodEarlyMail(w, s, lat, lon, river, wx) {
-    const { c, leftCm } = w;
+    const { c, leftCm, tier, rate, basis, etaH } = w;
     const f = (v) => (Math.round(v * 100) / 100).toFixed(2);
-    const state = leftCm > 0 ? `เหลืออีก ${leftCm} ซม. ถึงเกณฑ์เฝ้าระวัง` : leftCm === 0 ? 'ถึงเกณฑ์เฝ้าระวังแล้ว' : `เกินเกณฑ์เฝ้าระวังแล้ว ${-leftCm} ซม.`;
-    const lines = [
-        `ที่ฝึกงาน (${FLOOD_SITE.label}): คลองใกล้สุดกำลังขึ้น`,
-        '',
-        `${c.name} (${c.km} กม.)`,
-        `ระดับน้ำ ${f(c.wl)} ม.รทก. · เกณฑ์เฝ้าระวัง ${f(c.warn)}${c.crit != null ? ` · วิกฤต ${f(c.crit)}` : ''}`,
-        `ขึ้น +${c.deltaCm} ซม. ใน 1 ชม. · ${state}`
-    ];
-    if (c.maxYday != null) lines.push(`เมื่อวานสูงสุด ${f(c.maxYday)} ม.`);
+    const lines = [`${FLOOD_TIER_ICON[tier]} ที่ฝึกงาน (${FLOOD_SITE.label}): ${FLOOD_TIER_HEAD[tier]}`, ''];
+    if (c) {
+        const state = leftCm > 0 ? `เหลืออีก ${leftCm} ซม. ถึงเกณฑ์เฝ้าระวัง` : leftCm === 0 ? 'ถึงเกณฑ์เฝ้าระวังแล้ว' : `เกินเกณฑ์เฝ้าระวังแล้ว ${-leftCm} ซม.`;
+        lines.push(`${c.name} (${c.km} กม.)`,
+            `ระดับน้ำ ${f(c.wl)} ม.รทก. · เกณฑ์เฝ้าระวัง ${f(c.warn)}${c.crit != null ? ` · วิกฤต ${f(c.crit)}` : ''}`,
+            `${rate == null ? 'อัตราการขึ้นยังไม่ทราบ' : `${rate > 0 ? 'ขึ้น +' : 'ระดับ '}${rate} ซม./ชม. (เฉลี่ย ${basis})`} · ${state}`);
+        if (etaH != null) lines.push(`ถ้าขึ้นในอัตรานี้ต่อไป จะถึงเกณฑ์เฝ้าระวังในอีก ~${etaH} ชม.`);
+    }
+    if (c && c.maxYday != null) lines.push(`เมื่อวานสูงสุด ${f(c.maxYday)} ม.`);
     const arrow = (cm) => cm == null ? '' : cm > 0 ? '▲' : cm < 0 ? '▼' : '▬';
-    const others = (s.pop.canals || []).slice(1);
+    const others = ((s.pop && s.pop.canals) || []).slice(1);
     if (others.length) {
         lines.push('', 'คลองใกล้เคียง:');
         others.forEach(o => lines.push(`• ${o.name} (${o.km} กม.) ${o.wl == null ? '—' : f(o.wl) + ' ม.รทก.'}${o.deltaCm == null ? '' : ` ${arrow(o.deltaCm)} ${o.deltaCm > 0 ? '+' : ''}${o.deltaCm} ซม./ชม.`}${o.level === 'crit' ? ' · เกินวิกฤต' : o.level === 'warn' ? ' · เกินเฝ้าระวัง' : ''}`));
     }
-    const r = s.pop.rains && s.pop.rains[0];
+    const r = s.pop && s.pop.rains && s.pop.rains[0];
     if (r) lines.push(`ฝนที่ตกจริง (${r.name} ${r.km} กม.): 1 ชม. ${r.r1h == null ? '—' : r.r1h} · 3 ชม. ${r.r3h == null ? '—' : r.r3h} · 24 ชม. ${r.r24h == null ? '—' : r.r24h} มม.`);
-    if (s.pop.city && s.pop.city.raining) lines.push(`ทั่ว กทม. ฝนตกอยู่ ${s.pop.city.raining} สถานี`);
+    if (s.pop && s.pop.city && s.pop.city.raining) lines.push(`ทั่ว กทม. ฝนตกอยู่ ${s.pop.city.raining} สถานี`);
     const rd = s.road && s.road.nearest;
     lines.push(rd ? `ถนนใกล้สุดที่ท่วม: ${rd.name} ${rd.closed ? 'ปิดการจราจร' : rd.depthCm != null ? `ลึก ~${rd.depthCm} ซม.` : ''} (${rd.m} ม.)` : 'ถนนรอบจุดยังไม่มีรายงานน้ำท่วม');
     if (wx) {
@@ -4360,10 +4360,10 @@ function floodEarlyMail(w, s, lat, lon, river, wx) {
         lines.push('', 'แม่น้ำเจ้าพระยา (ปริมาณน้ำ ม³/วิ):');
         stations.forEach(x => lines.push(`• ${x.code} ${x.place}: ${Math.round(x.q).toLocaleString('en-US')}${x.pct != null ? ` (${x.pct}% ของความจุ ${x.cap.toLocaleString('en-US')})` : ''}${x.d24 == null ? '' : ` ${arrow(x.d24)} ${x.d24 > 0 ? '+' : ''}${x.d24} ใน 24 ชม.`}${x.src === 'est' ? ' · ประมาณจากระดับน้ำ' : ''}`));
     }
-    lines.push('', `แผนที่: ${floodMapUrl(lat, lon)}`, '', s.pop.credit + (wx ? ' · Open-Meteo (CC BY 4.0)' : '') + ' (ไม่ใช่ประกาศทางการ)',
-        'เตือนล่วงหน้านี้ส่งวันละไม่เกิน 2 ครั้ง (08:00 / 16:00) · ข้อความ LINE ยังส่งเฉพาะเมื่อความเสี่ยงถึงระดับสูง');
+    lines.push('', `แผนที่: ${floodMapUrl(lat, lon)}`, '', ((s.pop && s.pop.credit) || POPNIX_CREDIT) + (wx ? ' · Open-Meteo (CC BY 4.0)' : '') + ' (ไม่ใช่ประกาศทางการ)',
+        'ส่งเมื่อระดับเตือนเพิ่มขึ้น (วันละครั้งต่อระดับ) · LINE กลุ่มแอดมินส่งตั้งแต่ระดับ 3');
     return {
-        subject: `🌊 น้ำใกล้เกณฑ์เฝ้าระวัง: ${c.name} ${f(c.wl)} ม. (+${c.deltaCm} ซม./ชม.)`,
+        subject: `${FLOOD_TIER_ICON[tier]} น้ำระดับ ${tier}${c ? `: ${c.name} ${f(c.wl)} ม.` : ''}${etaH != null ? ` · ถึงเฝ้าระวังใน ~${etaH} ชม.` : ''}`,
         text: lines.join('\n')
     };
 }
@@ -4458,26 +4458,42 @@ exports.checkFloodAlerts = onSchedule({
             await ref.set({ error: String((e && e.message) || e).slice(0, 200), errorAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
             return 'error';
         }
-        const update = { risk: s.risk, summary: s, checkedAt: admin.firestore.FieldValue.serverTimestamp(), error: null };
+        const now = Date.now();
+        const c0 = s.pop && s.pop.canals && s.pop.canals[0];
+        const gauge = pushReading(prev.gauge, now, c0 && c0.km <= 3 ? c0.wl : null);   // hourly readings -> rate of rise over ~3 h
+        const w = floodTier(s, prev.gauge, now);
+        const update = { risk: s.risk, summary: s, checkedAt: admin.firestore.FieldValue.serverTimestamp(), error: null, gauge, tier: w.tier };
+        let rosePushed = false;   // the High message already went out this run: skip the tier LINE below, it would say the same thing
         const rose = s.risk === 'high' && prev.risk !== 'high' && prev.lastAlertDay !== today;
         if (rose && target && target.to) {
             const [r] = await pushLineFlex('floodAlert', [target],
                 () => ({ type: 'text', text: floodAlertText(where, s, lat, lon) }), `doc=${docId}`);
-            if (r && r.ok) update.lastAlertDay = today;
+            if (r && r.ok) { update.lastAlertDay = today; rosePushed = true; }
         }
-        // Early warning email: the training site only, at the 08:00 and 16:00 runs (Bangkok), once per slot.
-        const slot = `${today} ${hourBkk}`;
-        if (docId === '_site' && (hourBkk === 8 || hourBkk === 16) && prev.lastEmailSlot !== slot) {
-            const w = floodEarlyWarning(s);
-            if (w) {
+        // Tiered early warning: the training site only. Fires when the tier goes UP, once per tier per day (a dip and re-climb
+        // the same day stays quiet). Email from tier 1; LINE to the admin group from tier 3 (300 messages / month quota).
+        if (docId === '_site') {
+            const base = prev.tierDay === today ? (prev.tierSent || 0) : 0;
+            if (w.tier > base) {
+                let sent = false;
                 try {
                     const m = floodEarlyMail(w, s, lat, lon, await readRiverDischarge(db), await fetchFloodWeather(lat, lon));
                     await sendFloodMail(m.subject, m.text);
-                    update.lastEmailSlot = slot;
+                    sent = true;
+                    if (w.tier >= 3 && !rosePushed && target && target.to) {
+                        await pushLineFlex('floodTier', [target], () => ({ type: 'text', text: m.subject + '\n' + floodAlertText(where, s, lat, lon) }), `tier=${w.tier}`);
+                    }
                 } catch (e) {
-                    console.warn('[checkFloodAlerts] early-warning email failed:', e && e.message);   // retried next hour
+                    console.warn('[checkFloodAlerts] tier alert failed:', e && e.message);   // retried next hour
                 }
+                if (sent) { update.tierSent = w.tier; update.tierDay = today; }
             }
+            // Calibration log (admin SDK only, no client rule): one doc a day, one field an hour, so the real lead time can be checked after a flood.
+            const hh = String(hourBkk).padStart(2, '0');
+            await db.collection('flood_gauge_log').doc(today).set({ ['h' + hh]: {
+                tier: w.tier, wl: w.c ? w.c.wl : null, warn: w.c ? w.c.warn : null, rate: w.rate, etaH: w.etaH,
+                road: s.road && s.road.nearest ? { depthCm: s.road.nearest.depthCm == null ? null : s.road.nearest.depthCm, m: s.road.nearest.m } : null, risk: s.risk
+            } }, { merge: true }).catch(e => console.warn('[checkFloodAlerts] gauge log failed:', e && e.message));
         }
         await ref.set(update, { merge: true });
         return s.risk;
