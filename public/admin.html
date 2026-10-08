@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.119)</title>
+    <title>Nika Admin (V102.120)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6576,6 +6576,21 @@
         .ar-modal .ar-ic.del:disabled { opacity:0.4; cursor:not-allowed; }
         .ar-modal .ar-empty { text-align:center; color:#94a3b8; padding:18px 6px; }
         .ar-modal .ar-more-row { text-align:center; padding:8px 0 4px; }
+        /* V102.120: runs of the same quest text fold under the newest one — ×N chip (click = expand), one dot per run coloured by state. */
+        .ar-modal .ar-tab small { margin-left:4px; font-size:0.85em; font-weight:700; opacity:0.75; }
+        .ar-modal .ar-tab small[hidden] { display:none; }
+        .ar-modal .ar-dup-line { display:flex; align-items:center; gap:8px; margin-top:4px; flex-wrap:wrap; }
+        .ar-modal .ar-dup { width:auto; min-height:0; padding:1px 8px; border-radius:999px; border:1px solid #c7d2fe; background:#eef2ff; color:#4338ca; font-family:inherit; font-size:0.7em; font-weight:900; cursor:pointer; line-height:1.5; white-space:nowrap; }
+        .ar-modal .ar-dup[aria-expanded="true"] { background:#4338ca; color:#fff; border-color:#4338ca; }
+        .ar-modal .ar-dup-caret { font-size:0.9em; margin-left:2px; }
+        .ar-modal .ar-runs { display:inline-flex; gap:3px; }
+        .ar-modal .ar-run { width:8px; height:8px; border-radius:50%; background:#cbd5e1; }
+        .ar-modal .ar-run.is-draft { background:#fcd34d; }
+        .ar-modal .ar-run.is-scheduled { background:#93c5fd; }
+        .ar-modal .ar-dup-hint { font-size:0.7em; color:#94a3b8; font-weight:600; white-space:nowrap; }
+        .ar-modal tr.ar-child td { background:#fafbfd; font-size:0.86em; }
+        .ar-modal tr.ar-child td:first-child { padding-left:18px; box-shadow:inset 3px 0 #e2e8f0; }
+        .ar-modal tr.ar-child .ar-q { color:#64748b; -webkit-line-clamp:1; max-width:520px; }
         .ar-modal .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
         @media (pointer:coarse) { .ar-modal .ar-ic { width:44px; height:44px; } }
 
@@ -12869,7 +12884,7 @@
                 <h2 style="margin:0;">🗄️ Archive</h2>
                 <div class="ar-tabs lang-no-toggle" role="tablist">
                     <button type="button" class="ar-tab" role="tab" data-pane="kanban" aria-selected="false" onclick="arShowPane('kanban')">🗂️ Kanban cards <b id="ar-count-kanban">0</b></button>
-                    <button type="button" class="ar-tab on" role="tab" data-pane="quests" aria-selected="true" onclick="arShowPane('quests')">🕘 Quest history <b id="ar-count-quests">0</b></button>
+                    <button type="button" class="ar-tab on" role="tab" data-pane="quests" aria-selected="true" onclick="arShowPane('quests')">🕘 Quest history <b id="ar-count-quests">0</b><small id="ar-count-unique" hidden></small></button>
                 </div>
                 <div id="ar-pane-kanban" class="ar-pane" hidden>
                     <div class="ar-pane-bar"><button type="button" id="ar-clear-all" class="btn-sm btn-danger" onclick="confirmClearArchive()" hidden>🧨 Clear All</button></div>
@@ -56777,11 +56792,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const total = document.getElementById('ar-count-quests'); if (total) total.textContent = rows.length;
             const term = arQuestSearch.toLowerCase();
             const shown = rows.filter(r => (arQuestFilter === 'all' || r.state === arQuestFilter) && (!term || String(r.q.question || '').toLowerCase().includes(term)));
-            const more = document.getElementById('ar-load-more'); if (more) more.hidden = shown.length <= arQuestLimit;
-            t.innerHTML = shown.slice(0, arQuestLimit).map(({ q, state }) => {
+            // V102.120: Recall saves a new draft of the same text, so one quest showed as several rows. Runs with the same
+            // text (whitespace collapsed, case-insensitive) fold under the NEWEST run: a ×N chip expands the earlier ones as
+            // child rows, each with its own participants and ↩ / 🗑. Paging and "load more" count groups, the chips count runs.
+            const fmtDate = q => q.createdAt?.toDate ? q.createdAt.toDate().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—';
+            const groups = [], byKey = new Map();
+            shown.forEach(r => { const key = arQuestKey(r.q.question); if (!byKey.has(key)) { byKey.set(key, { key, items: [] }); groups.push(byKey.get(key)); } byKey.get(key).items.push(r); });
+            const uniqueAll = new Set(rows.map(r => arQuestKey(r.q.question))).size;
+            const unique = document.getElementById('ar-count-unique'); if (unique) { unique.hidden = uniqueAll === rows.length; unique.textContent = `· ${uniqueAll} unique`; }
+            const more = document.getElementById('ar-load-more'); if (more) more.hidden = groups.length <= arQuestLimit;
+            const row = ({ q, state }, extra = '', cls = '') => {
                 const subs = (questsSubList || []).filter(s => s.questId === q.id && s.status !== 'none');
-                const created = q.createdAt?.toDate ? q.createdAt.toDate() : null;
-                const date = created ? created.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—';
                 const who = subs.length === 0 ? '<span class="ar-none">—</span>' : `<span class="ar-avs">${subs.map(s => {
                     const u = (usersData || []).find(u => u.id === s.userId);
                     const name = u?.displayName || '?', pic = u?.pictureUrl || '';
@@ -56792,9 +56813,20 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const del = subs.length
                     ? `<button type="button" class="ar-ic del" disabled title="Has ${subs.length} submission${subs.length === 1 ? '' : 's'} — cannot delete" aria-label="Cannot delete: has submissions">🗑</button>`
                     : `<button type="button" class="ar-ic del" onclick="delQ('${q.id}')" title="Delete quest" aria-label="Delete quest">🗑</button>`;
-                return `<tr class="is-${state}"><td class="ar-date" title="${state}">${date}</td><td><div class="ar-q" title="${text}">${text}</div></td><td class="ar-pts">${q.baseScore ?? ''}</td><td class="ar-who">${who}</td><td><div class="ar-act"><button type="button" class="ar-ic" onclick="recallQuest('${q.id}')" title="Recall to form" aria-label="Recall to form">↩</button>${del}</div></td></tr>`;
+                return `<tr class="is-${state}${cls ? ' ' + cls : ''}"><td class="ar-date" title="${state}">${fmtDate(q)}</td><td><div class="ar-q" title="${text}">${text}</div>${extra}</td><td class="ar-pts">${q.baseScore ?? ''}</td><td class="ar-who">${who}</td><td><div class="ar-act"><button type="button" class="ar-ic" onclick="recallQuest('${q.id}')" title="Recall to form" aria-label="Recall to form">↩</button>${del}</div></td></tr>`;
+            };
+            t.innerHTML = groups.slice(0, arQuestLimit).map(g => {
+                const [head, ...rest] = g.items;
+                if (!rest.length) return row(head);
+                const open = arOpenGroups.has(g.key);
+                const dups = `<div class="ar-dup-line"><button type="button" class="ar-dup" onclick="arToggleGroup('${g.key}')" aria-expanded="${open}" title="${g.items.length} runs of this quest — ${open ? 'hide' : 'show'} the earlier ones">×${g.items.length} <span class="ar-dup-caret">${open ? '▾' : '▸'}</span></button><span class="ar-runs">${g.items.map(r => `<span class="ar-run is-${r.state}" title="${r.state} · ${fmtDate(r.q)}"></span>`).join('')}</span><span class="ar-dup-hint">${rest.map(r => fmtDate(r.q)).join(' · ')}</span></div>`;
+                return row(head, dups, 'ar-group') + (open ? rest.map(r => row(r, '', 'ar-child')).join('') : '');
             }).join('') || '<tr><td colspan="5" class="ar-empty">No quests here</td></tr>';
         }
+        const arOpenGroups = new Set();
+        // group key = normalised text hashed (djb2) so it is safe inside an onclick attribute
+        function arQuestKey(text) { const s = String(text || '').replace(/\s+/g, ' ').trim().toLowerCase(); let h = 5381; for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0; return 'g' + h.toString(36) + s.length; }
+        window.arToggleGroup = function(key) { if (arOpenGroups.has(key)) arOpenGroups.delete(key); else arOpenGroups.add(key); renderQuestHistory(); };
         window.arSetQuestFilter = function(btn) {
             arQuestFilter = btn.dataset.state || 'all'; arQuestLimit = 20;
             document.querySelectorAll('#ar-filters .ar-chip[data-state]').forEach(c => c.classList.toggle('on', c === btn));
