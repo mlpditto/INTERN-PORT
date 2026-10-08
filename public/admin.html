@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.129)</title>
+    <title>Nika Admin (V102.130)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -7138,8 +7138,8 @@
     <script src="storyteller-insights.js?v=V99.68"></script>
     <link rel="stylesheet" href="storyteller-insights.css?v=V99.68">
     <script src="quiz-resource-cards.js?v=V102.09"></script>
-    <link rel="stylesheet" href="drug-materials.css?v=V102.129">
-    <script src="drug-materials.js?v=V102.129"></script>
+    <link rel="stylesheet" href="drug-materials.css?v=V102.130">
+    <script src="drug-materials.js?v=V102.130"></script>
     <script src="quiz-generation-rules.js?v=V99.40"></script>
     <script src="quiz-compact-toolbar.js?v=V99.41"></script>
     <link rel="stylesheet" href="quiz-compact-toolbar.css?v=V101.67">
@@ -15798,6 +15798,13 @@
                         <div class="dca-form-grid">
                             <label for="dxa-f-references">References</label>
                             <textarea id="dxa-f-references" rows="3" placeholder="One per line · source hints (e.g. &quot;Harrison's 21e: <topic>&quot;, &quot;UpToDate: <topic>&quot;, &quot;PubMed: <terms>&quot;)"></textarea>
+                        </div>
+                        <!-- V102.130: download files — disease_codex.materials [{name,url}] (same editor as the Drug form) -->
+                        <div class="lang-no-toggle" style="margin-top:14px;">
+                            <label style="display:block; font-weight:600; color:#4338ca; margin-bottom:6px;">📎 Download files <span id="dxa-mat-count" style="font-weight:800; opacity:.7;"></span></label>
+                            <div id="dxa-mat-list" data-count="dxa-mat-count"></div>
+                            <button type="button" id="dxa-mat-add" class="dm-add" onclick="drugMaterials.add(document.getElementById('dxa-mat-list'))">➕ Add link</button>
+                            <div style="font-size:0.78em; color:#94a3b8; margin-top:4px;">A link to a PDF / Google Drive / OneDrive file. Interns open it from the disease's 📎 chip; rows without a valid https link are not saved.</div>
                         </div>
                     </div>
                 </div>
@@ -42291,25 +42298,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
         function dcaOpenMaterials(drugId) {
             const drug = dcaState.codex.find(d => d._id === drugId);
-            const mats = dcaMaterialsOf(drug);
-            if (!drug || !mats.length) return;
-            const overlay = document.createElement('div');
-            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:100050;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
-            const rows = mats.map(m => {
-                const k = drugMaterials.kind(drugMaterials.parse(m.url));
-                const name = String(m.name || '').trim() || drugMaterials.parse(m.url).hostname.replace(/^www\./, '');
-                return `<a href="${dcaEscapeHtml(m.url)}" target="_blank" rel="noopener noreferrer" title="${dcaEscapeHtml(m.url)}" style="flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid #bfdbfe;border-radius:10px;background:#eff6ff;color:#1d4ed8;font-weight:800;text-decoration:none;"><i class="${k.icon}" style="color:${k.color};" aria-hidden="true"></i><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${dcaEscapeHtml(name)}</span></a>`;
-            }).join('');
-            overlay.innerHTML = `<div class="lang-no-toggle" style="background:#fff;width:100%;max-width:440px;max-height:86vh;overflow:auto;border-radius:18px;padding:18px 18px 16px;box-shadow:0 25px 50px rgba(0,0,0,0.3);">
-                <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;"><h3 style="flex:1;margin:0;font-size:1.02em;color:#0f172a;word-break:break-word;">📎 ${dcaEscapeHtml(drug.genericName || '')} (${mats.length})</h3>
-                    <button type="button" data-act="close" aria-label="Close" style="width:auto;min-height:0;padding:0 6px;border:0;background:transparent;font-size:1.4em;color:#64748b;cursor:pointer;">&times;</button></div>
-                <div style="display:flex;flex-direction:column;gap:8px;">${rows}</div>
-                <div style="display:flex;justify-content:flex-end;margin-top:12px;"><button type="button" data-act="edit" style="width:auto;min-height:0;padding:7px 14px;border:1px solid #fed7aa;border-radius:10px;background:#fff7ed;color:#c2410c;font-weight:800;cursor:pointer;">✎ Edit files</button></div></div>`;
-            document.body.appendChild(overlay);
-            overlay.addEventListener('click', e => {
-                if (e.target === overlay || e.target.closest('[data-act="close"]')) return overlay.remove();
-                if (e.target.closest('[data-act="edit"]')) { overlay.remove(); dcaEdit(drugId); dcaSwitchSection('refs'); }
-            });
+            if (!drug) return;
+            drugMaterials.openPopup({ title: drug.genericName || '', materials: drug.materials, onEdit: () => { dcaEdit(drugId); dcaSwitchSection('refs'); } });
         }
 
         function dcaPublishedRowHtml(drug) {
@@ -46633,6 +46623,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (heading && heading.scrollIntoView) heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
+        // V102.130: Disease Codex download files — same as the Drug list (📎 n chip → pop-up; ✎ → Edit → References).
+        function dxaMatBtnHtml(disease) {
+            const n = (Array.isArray(disease && disease.materials) ? disease.materials : []).filter(m => m && drugMaterials.parse(m.url)).length;
+            return n ? `<button type="button" class="dca-row-mat-btn" onclick="dxaOpenMaterials('${dxaEscapeHtml(disease._id)}')" title="Download files (${n}) — open the list" aria-label="Download files (${n})">📎 ${n}</button>` : '';
+        }
+        function dxaOpenMaterials(diseaseId) {
+            const disease = dxaState.codex.find(d => d._id === diseaseId);
+            if (!disease) return;
+            drugMaterials.openPopup({ title: disease.diseaseName || '', materials: disease.materials, onEdit: () => { dxaEdit(diseaseId); dxaSwitchSection('refs'); } });
+        }
+
         function dxaRenderPublishedList() {
             dxaRenderAzRail();
             const list = document.getElementById('dxa-list');
@@ -46675,6 +46676,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             <div class="dca-row-side">
                                 ${updatedAbs ? `<div class="dca-row-updated-abs" title="Last updated">🕒 ${dxaEscapeHtml(updatedAbs)}</div>` : ''}
                                 <div class="dca-row-actions">
+                                    ${dxaMatBtnHtml(disease)}
                                     <button type="button" class="dca-row-edit-btn" onclick="dxaEdit('${dxaEscapeHtml(disease._id)}')">Edit</button>
                                     <button type="button" class="dca-row-copy-btn" onclick="dxaCopyRow('${dxaEscapeHtml(disease._id)}', this)" title="Copy as Markdown">📋</button>
                                     <button type="button" class="dca-row-del-btn" onclick="dxaDelete('${dxaEscapeHtml(disease._id)}', this)" title="Delete">🗑️</button>
@@ -47555,6 +47557,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dxaState.pathoVisual = (data && data.pathoVisual && data.pathoVisual.downloadUrl)
                 ? data.pathoVisual : null;
             dxaRenderCurrentPathoVisual(dxaState.pathoVisual);
+            // V102.130: download files — repainted on every fill (static DOM; a draft / Add form has none).
+            drugMaterials.paint(document.getElementById('dxa-mat-list'), data && data.materials);
             dxaRenderMeta(data);
             const idEl = document.getElementById('dxa-form-doc-id');
             if (idEl) { // V101.36: last 6 chars; full id in the tooltip; click copies
@@ -47786,6 +47790,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             payload.lastReviewedAt = nowTs;
             payload.reviewedBy = reviewerEmail;
             payload.updatedAt = nowTs;
+            payload.materials = drugMaterials.read(document.getElementById('dxa-mat-list'));   // V102.130: download files [{name,url}]
 
             try {
                 if (dxaState.isDraftEdit) {
