@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.69)</title>
+    <title>Internship Portfolio (V101.70)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8238,6 +8238,13 @@
                         lastDate: da.checkinLastDate || ''
                     };
                     renderDailyCheckinCard();
+                    // V101.68: opening the app IS the check-in — once per page load, only when today's is not
+                    // done yet (the transaction in tryDailyCheckin is the real once-a-day guard), never in the
+                    // admin Preview (that would stamp the previewed user). Source 'open' in checkin_logs.
+                    if (!isPreview && !window._autoCheckinTried && myCheckin.lastDate !== getBangkokDateTimeParts().dateKey) {
+                        window._autoCheckinTried = true;
+                        tryDailyCheckin('open');
+                    }
                     // V95.46: total check-in counter in the metrics strip
                     const checkinCountEl = document.getElementById('unified-checkin');
                     if (checkinCountEl) checkinCountEl.textContent = da.checkinTotalCount || 0;
@@ -20783,7 +20790,8 @@
             const isManual = source !== 'activity';
             // Auto calls have no button press behind them; grabbing the chip would
             // flip it to "Checking in…" while the intern is looking at a save toast.
-            const btn = isManual ? document.getElementById('daily-checkin-btn') : null;
+            // V101.68: 'open' (auto on app open) is "manual" for the streak rules but has no tap either.
+            const btn = (source == null || source === 'manual') ? document.getElementById('daily-checkin-btn') : null;
             if (btn) { btn.disabled = true; btn.textContent = 'Checking in…'; }
 
             const authUser = await ensureFirebaseAuthReady(10000);
@@ -20821,7 +20829,7 @@
                         type: 'daily_checkin',
                         dateKey: todayKey,
                         streak: newStreak,
-                        source: isManual ? 'manual' : 'activity', // V96.41: tapped the chip vs. auto-credited by a submission
+                        source: source === 'open' ? 'open' : (isManual ? 'manual' : 'activity'), // V96.41: tapped the chip vs. auto-credited by a submission; V101.68: 'open' = app opened
                         amount,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     });
@@ -20844,6 +20852,7 @@
                     // feeds the streak or its +0.05 bonus; the 'activity' callers pay that
                     // themselves right after their own submit.
                     if (!isManual && schActivityDays) schActivityDays.add(todayKey);
+                    if (source === 'open') showToast(`🔥 ${result.streak} · เช็คอินแล้ว`);   // V101.68: the only sign the auto check-in happened
                 }
             } catch (err) {
                 console.warn('Daily check-in transaction failed:', err);
