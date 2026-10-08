@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.123)</title>
+    <title>Nika Admin (V102.124)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6587,6 +6587,9 @@
         .br-modal .br-off[hidden] { display:none; }
         .br-modal .br-eye { margin-left:auto; width:34px; height:34px; min-height:0; padding:0; border-radius:10px; border:1px solid #bbf7d0; background:#f0fdf4; color:#15803d; cursor:pointer; font-size:0.95em; box-shadow:none; flex:0 0 auto; }
         .br-modal .br-eye.off { background:#f1f5f9; border-color:#e2e8f0; color:#94a3b8; }
+        /* V102.124: ≈ baht — quiet grey, hover (title) carries the ¥ rate */
+        .br-baht { font-size:0.82em; font-weight:700; color:#94a3b8; margin-left:5px; white-space:nowrap; cursor:help; }
+        .br-modal .br-baht-cap { margin:5px 0 0 6px; font-size:0.74em; } .br-modal .br-baht-cap[hidden] { display:none; }
         @media (pointer:coarse) { .br-modal .br-hb, .br-modal .br-eye { width:44px; height:44px; } }
         @media (pointer:coarse) { .br-ic { width:44px; height:44px; } }
 
@@ -8032,6 +8035,7 @@
                     <input type="checkbox" id="br-active" checked hidden onchange="brPaintActive()">
                     <button type="button" id="br-eye" class="br-eye" onclick="brToggleActive()" aria-pressed="true" title="Active — visible in the shop · tap to pause"><i class="fa-solid fa-eye"></i></button>
                 </div>
+                <div id="br-baht" class="br-baht br-baht-cap" hidden></div>
             </div>
         </div>
 
@@ -35199,6 +35203,7 @@ RULES:
             db.collection("beri_rewards").orderBy("createdAt", "desc").onSnapshot(s => {
                 beriRewardsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderBeriRewardsAdmin();
+                if (!beriRateTried) { beriRateTried = true; beriLoadRate(); }   // V102.124: ≈ baht beside the cost
             }, e => console.error("🔥 [Firestore Error] beri_rewards:", e));
             db.collection("beri_redemptions").where("status", "==", "requesting").onSnapshot(s => {
                 beriRedemptionsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -35954,7 +35959,7 @@ RULES:
                             ${r.description ? `<div style="font-size:0.76em; color:#94a3b8; margin-top:2px;">${escapeHtml(r.description)}</div>` : ''}
                         </div>
                         <div style="white-space:nowrap; text-align:right;" title="Beri debited${off ? ` · full price ${r.listCost} (−${off}%)` : ''}">
-                            <div style="font-weight:900; color:#b45309; font-size:0.85em;">🪙 ${Number(r.beriCost || 0).toLocaleString('en-US')}</div>
+                            <div style="font-weight:900; color:#b45309; font-size:0.85em;">🪙 ${Number(r.beriCost || 0).toLocaleString('en-US')}<span class="br-baht" title="${beriBahtTitle()}">≈${beriBaht(r.beriCost)}</span></div>
                             ${off ? `<div style="font-size:0.72em; color:#94a3b8;"><s>${Number(r.listCost).toLocaleString('en-US')}</s> <b style="color:#dc2626;">−${off}%</b></div>` : ''}
                         </div>
                         <div style="font-size:0.78em; color:#64748b; font-weight:700; white-space:nowrap;" title="Stock"><i class="fa-solid fa-box" style="color:#94a3b8; margin-right:4px;"></i>${stockText}</div>
@@ -35969,6 +35974,41 @@ RULES:
             const cost = Number(r.beriCost) || 0, list = Number(r.listCost) || 0;
             return list > cost && cost > 0 ? Math.round((1 - cost / list) * 100) : 0;
         }
+        // V102.124: ≈ baht beside the Beri cost (Beri = yen) — ADMIN ONLY, interns see Beri. The rate is fetched in the browser once
+        // per 12 h and cached in localStorage; sources in order (all keyless, CORS *, agreeing within 0.2 % on 2026-10-08): ECB via
+        // Frankfurter → open.er-api.com → currency-api on jsDelivr → its Cloudflare mirror → the last cached rate → ¥1 ≈ ฿0.21.
+        // The ¥ rate itself is only in a hover title, never printed.
+        let beriRate = { r: 0.21, src: 'approx.', day: '' }, beriRateTried = false;
+        const BERI_RATE_KEY = 'beri_jpy_thb', BERI_RATE_TTL = 12 * 3600e3;
+        const BERI_RATE_SOURCES = [
+            { name: 'ECB · Frankfurter', url: 'https://api.frankfurter.dev/v1/latest?base=JPY&symbols=THB', pick: d => ({ r: d.rates && d.rates.THB, day: d.date }) },
+            { name: 'open.er-api.com', url: 'https://open.er-api.com/v6/latest/JPY', pick: d => ({ r: d.rates && d.rates.THB, day: String(d.time_last_update_utc || '').slice(5, 16) }) },
+            { name: 'currency-api · jsDelivr', url: 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/jpy.json', pick: d => ({ r: d.jpy && d.jpy.thb, day: d.date }) },
+            { name: 'currency-api · Cloudflare', url: 'https://latest.currency-api.pages.dev/v1/currencies/jpy.json', pick: d => ({ r: d.jpy && d.jpy.thb, day: d.date }) }
+        ];
+        const beriRateOk = r => typeof r === 'number' && r > 0.05 && r < 1;   // a yen is a fraction of a baht; anything else is a bad payload
+        async function beriLoadRate() {
+            let cached = null;
+            try { cached = JSON.parse(localStorage.getItem(BERI_RATE_KEY) || 'null'); } catch (_) { /* storage may be blocked */ }
+            if (cached && beriRateOk(cached.r) && Date.now() - cached.at < BERI_RATE_TTL) { beriRate = cached; return; }
+            for (const src of BERI_RATE_SOURCES) {
+                try {
+                    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 6000);
+                    const res = await fetch(src.url, { signal: ctl.signal }); clearTimeout(timer);
+                    if (!res.ok) continue;
+                    const { r, day } = src.pick(await res.json());
+                    if (!beriRateOk(r)) continue;
+                    beriRate = { r, day: day || '', src: src.name, at: Date.now() };
+                    try { localStorage.setItem(BERI_RATE_KEY, JSON.stringify(beriRate)); } catch (_) { /* non-fatal */ }
+                    beriPaintBaht();
+                    return;
+                } catch (_) { /* next source */ }
+            }
+            if (cached && beriRateOk(cached.r)) { beriRate = { ...cached, src: cached.src + ' (cached)' }; beriPaintBaht(); }   // every source down: the last good rate
+        }
+        function beriBaht(n) { return '฿' + Math.round((Number(n) || 0) * beriRate.r).toLocaleString('en-US'); }
+        function beriBahtTitle() { return `¥1 ≈ ฿${beriRate.r.toFixed(3)} · ${beriRate.src}${beriRate.day ? ' · ' + beriRate.day : ''}`; }
+        function beriPaintBaht() { if (typeof renderBeriRewardsAdmin === 'function') renderBeriRewardsAdmin(); brPreviewOff(); }
         // V102.121: reward image — the chosen file is resized + uploaded on Save (same helpers as the Product photo editor:
         // <=1280 px JPEG, SHA-256 name under product-images/, probe before put). Until then only a local preview.
         let brPendingFile = null, brImageUrl = '', brSaving = false;
@@ -36020,6 +36060,8 @@ RULES:
             const off = beriRewardOff({ beriCost: document.getElementById('br-cost').value, listCost: document.getElementById('br-list').value });
             el.textContent = off ? `−${off}%` : '';
             el.hidden = !off;
+            const bt = document.getElementById('br-baht'), cost = parseInt(document.getElementById('br-cost').value, 10) || 0;   // V102.124
+            if (bt) { bt.textContent = cost > 0 ? '≈ ' + beriBaht(cost) : ''; bt.title = beriBahtTitle(); bt.hidden = cost < 1; }
         }
         // V102.122: 👁 = Active (visible in the shop); the hidden checkbox stays the value saveBeriReward reads.
         function brPaintActive() {

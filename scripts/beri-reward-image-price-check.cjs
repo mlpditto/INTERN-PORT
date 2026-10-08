@@ -49,7 +49,8 @@ assert.ok(admin.includes('.br-pic.gen::after { content:attr(data-sec)') && admin
 
 const rowBody = slice(admin, 'list.innerHTML = beriRewardsCache.map(r => {', "}).join('');");
 const offFn = new Function('r', slice(admin, 'function beriRewardOff(r) {', '\n        }') );
-const rows = new Function('beriRewardsCache', 'escapeHtml', 'beriRewardOff', 'JSON', 'return beriRewardsCache.map(r => {' + rowBody + "}).join('')");
+const rows0 = new Function('beriRewardsCache', 'escapeHtml', 'beriRewardOff', 'JSON', 'beriBaht', 'beriBahtTitle', 'return beriRewardsCache.map(r => {' + rowBody + "}).join('')");
+const rows = (cache, esc, off, json) => rows0(cache, esc, off, json, n => '฿' + Math.round(n * 0.21295).toLocaleString('en-US'), () => '¥1 ≈ ฿0.213 · test');
 const R = [
     { id: 'a', name: 'SUPER BEAR', description: 'Bear House', beriCost: 2450, listCost: 3000, stock: 2, isActive: true, imageUrl: 'https://x/y.jpg' },
     { id: 'b', name: 'Money 100.00', description: 'CLICX or DIME', beriCost: 500, listCost: null, stock: 5, isActive: false, imageUrl: '' },
@@ -57,6 +58,9 @@ const R = [
 ];
 const rowHtml = rows(R, esc, offFn, JSON);
 assert.equal(offFn(R[0]), 18); assert.equal(offFn(R[1]), 0); assert.equal(offFn({ beriCost: 100, listCost: 100 }), 0, 'equal price → no discount'); assert.equal(offFn({ beriCost: 100, listCost: 50 }), 0);
+assert.ok(rowHtml.includes('>≈฿522</span>') && rowHtml.includes('>≈฿106</span>') && rowHtml.includes('title="¥1 ≈ ฿0.213 · test"'), 'V102.124: admin rows show ≈฿ after the cost, the ¥ rate only in the hover title');
+assert.ok(!/¥/.test(rowHtml.replace(/title="[^"]*"/g, '')), 'no ¥ printed on a row');
+assert.ok(admin.includes('id="br-baht" class="br-baht br-baht-cap" hidden') && admin.includes("bt.textContent = cost > 0 ? '≈ ' + beriBaht(cost) : ''"), 'modal caption is live');
 assert.ok(rowHtml.includes('<img src="https://x/y.jpg" alt="" class="br-thumb">') && (rowHtml.match(/br-thumb-none/g) || []).length === 2, 'thumb or 🎁 tile per row');
 assert.ok(rowHtml.includes('🪙 2,450') && rowHtml.includes('<s>3,000</s> <b style="color:#dc2626;">−18%</b>'), 'cost over struck full price');
 assert.ok(!/<s>.*Money/.test(rowHtml) && rowHtml.split('<s>').length === 2, 'no strike without a full price');
@@ -67,6 +71,7 @@ assert.ok(rowHtml.includes('title="Edit"') && rowHtml.includes('aria-label="Dele
 
 // ---- intern: card template on sample data ----
 const cardBody = slice(index, 'grid.innerHTML = beriRewardsCache.map(r => {', "}).join('');");
+assert.ok(!/beriBaht|฿/.test(cardBody), 'V102.124: interns see Beri only — no baht on the shop card');
 const cards = new Function('beriRewardsCache', 'myBeri', 'escapeHtml', 'return beriRewardsCache.map(r => {' + cardBody + "}).join('')");
 const html = cards(R.concat([{ id: 'd', name: 'Sold out', beriCost: 5, listCost: 10, stock: 0 }]), 600, esc);
 assert.ok(html.includes('<img src="https://x/y.jpg" alt="" loading="lazy"'), 'image on top');
