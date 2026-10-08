@@ -12,6 +12,7 @@ const cut = (src, from, to) => {
     return src.slice(a, b);
 };
 const adminFns = cut(admin, '        // V102.129: 📎 n on the row', '        function dcaPublishedRowHtml(drug)');
+const diseaseFns = cut(admin, '        // V102.130: Disease Codex download files', '        function dxaRenderPublishedList() {');
 const internFns = [
     cut(intern, '        function looksLikeOpaqueMaterialName(', '        // V102.21: file type from the link'),
     cut(intern, '        // V102.21: file type from the link', '        // Compact pre-quiz access'),
@@ -23,6 +24,13 @@ assert.match(admin, /payload\.materials = drugMaterials\.read\(document\.getElem
 assert.match(admin, /\$\{dcaMatBtnHtml\(drug\)\}/);
 assert.match(admin, /drugMaterials\.paint\(document\.getElementById\('dca-mat-list'\), data && data\.materials\)/);
 assert.match(intern, /chips\.push\(\.\.\.dcFileChipsHtml\(drug\)\)/);
+// Disease Codex mirrors it
+assert.match(admin, /id="dxa-mat-list" data-count="dxa-mat-count"/);
+assert.match(admin, /payload\.materials = drugMaterials\.read\(document\.getElementById\('dxa-mat-list'\)\)/);
+assert.match(admin, /\$\{dxaMatBtnHtml\(disease\)\}/);
+assert.match(admin, /drugMaterials\.paint\(document\.getElementById\('dxa-mat-list'\), data && data\.materials\)/);
+assert.match(intern, /chips\.push\(\.\.\.dcFileChipsHtml\(disease\)\)/);
+assert.match(intern, /\$\{dcMaterialsOf\(disease\)\.length \? `<span class="dc-row-mat/);
 assert.match(intern, /\$\{dcMaterialsOf\(drug\)\.length \? `<span class="dc-row-mat/);
 
 const globalStyles = Array.from(admin.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/gi), m => m[0]).join('\n');
@@ -31,10 +39,10 @@ const globalStyles = Array.from(admin.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/
     try {
         const page = await browser.newPage({ viewport: { width: 760, height: 800 } });
         const errors = []; page.on('pageerror', e => errors.push(e.message));
-        await page.setContent(globalStyles + '<div style="padding:12px;width:600px"><label>📎 <span id="dca-mat-count"></span></label><div id="dca-mat-list"></div><button type="button" id="dca-mat-add" onclick="drugMaterials.add(document.getElementById(\'dca-mat-list\'))">➕ Add link</button></div>');
+        await page.setContent(globalStyles + '<div style="padding:12px;width:600px"><label>📎 <span id="dca-mat-count"></span></label><div id="dca-mat-list"></div><button type="button" id="dca-mat-add" onclick="drugMaterials.add(document.getElementById(\'dca-mat-list\'))">➕ Add link</button></div><div style="padding:12px;width:600px"><label>📎 <span id="dxa-mat-count"></span></label><div id="dxa-mat-list" data-count="dxa-mat-count"></div><button type="button" class="dm-add" onclick="drugMaterials.add(document.getElementById(\'dxa-mat-list\'))">➕ Add link</button></div>');
         await page.addStyleTag({ path: 'public/drug-materials.css' });
         await page.addScriptTag({ path: 'public/drug-materials.js' });
-        await page.evaluate(({ aFns, iFns }) => {
+        await page.evaluate(({ aFns, dFns, iFns }) => {
             window.dcaState = { codex: [
                 { _id: 'd1', genericName: 'Baloxavir marboxil', materials: [
                     { name: 'Pharmacy brief', url: 'https://drive.google.com/file/d/abc/view' },
@@ -43,12 +51,15 @@ const globalStyles = Array.from(admin.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/
                 { _id: 'd2', genericName: 'Warfarin' },
                 { _id: 'd3', genericName: 'Odd <b>"name"</b>', materials: [{ name: 'a"b<i>', url: 'https://x.test/a?b="c"' }] },
             ] };
+            window.dxaState = { codex: [{ _id: 'x1', diseaseName: 'Influenza', materials: [{ name: 'Guideline', url: 'https://example.test/flu.pdf' }] }, { _id: 'x2', diseaseName: 'Gout' }] };
+            window.dxaEdit = id => calls.push(['dxedit', id]); window.dxaSwitchSection = s => calls.push(['dxsection', s]);
+            window.dxaEscapeHtml = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
             window.calls = [];
             window.dcaEdit = id => calls.push(['edit', id]); window.dcaSwitchSection = s => calls.push(['section', s]);
             window.dcaEscapeHtml = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
             window.escapeHtml = window.dcaEscapeHtml;
-            const s = document.createElement('script'); s.textContent = aFns + '\n' + iFns + '\nObject.assign(window,{dcaMaterialsOf,dcaMatBtnHtml,dcaOpenMaterials,dcMaterialsOf,dcFileChipsHtml});'; document.head.appendChild(s);
-        }, { aFns: adminFns, iFns: internFns });
+            const s = document.createElement('script'); s.textContent = aFns + '\n' + dFns + '\n' + iFns + '\nObject.assign(window,{dcaMaterialsOf,dcaMatBtnHtml,dcaOpenMaterials,dxaMatBtnHtml,dxaOpenMaterials,dcMaterialsOf,dcFileChipsHtml});'; document.head.appendChild(s);
+        }, { aFns: adminFns, dFns: diseaseFns, iFns: internFns });
 
         // ---- admin form editor ----
         const list = '#dca-mat-list';
@@ -111,7 +122,24 @@ const globalStyles = Array.from(admin.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/
         assert.deepEqual(await page.evaluate(() => [dcMaterialsOf(dcaState.codex[1]).length, dcMaterialsOf(null).length, dcMaterialsOf({ materials: 'x' }).length]), [0, 0, 0]);
         const evil = await page.evaluate(() => dcFileChipsHtml(dcaState.codex[2]).join(''));
         assert.ok(!/<i>|"c"/.test(evil.replace(/<i class="[^"]*" aria-hidden="true"><\/i>/g, '')), 'escaped: ' + evil);
+        // ---- Disease Codex: same editor (own list id + count label), chip, pop-up, intern chips ----
+        await page.evaluate(() => drugMaterials.paint(document.getElementById('dxa-mat-list'), dxaState.codex[0].materials));
+        assert.equal(await page.locator('#dxa-mat-list .dm-row').count(), 1);
+        assert.equal(await page.locator('#dxa-mat-count').innerText(), '1');
+        await page.locator('#dxa-mat-list + .dm-add').click();
+        assert.equal(await page.locator('#dxa-mat-count').innerText(), '2');
+        const dg = await page.evaluate(() => { const r = document.querySelector('#dxa-mat-list .dm-row'); const [n, u] = r.querySelectorAll('input'); return { same: Math.abs(n.getBoundingClientRect().top - r.querySelector('.dm-del').getBoundingClientRect().top) < 14, n: Math.round(n.getBoundingClientRect().width), u: Math.round(u.getBoundingClientRect().width) }; });
+        assert.ok(dg.same && dg.n > 80 && dg.u > 80, 'disease row layout ' + JSON.stringify(dg));
+        assert.deepEqual(await page.evaluate(() => drugMaterials.read(document.getElementById('dxa-mat-list'))), [{ name: 'Guideline', url: 'https://example.test/flu.pdf' }]);
+        assert.match(await page.evaluate(() => dxaMatBtnHtml(dxaState.codex[0])), /📎 1/);
+        assert.equal(await page.evaluate(() => dxaMatBtnHtml(dxaState.codex[1])), '');
+        await page.evaluate(() => { calls.length = 0; dxaOpenMaterials('x1'); });
+        const dpop = page.locator('body > div').last();
+        assert.match(await dpop.innerText(), /Influenza \(1\)/);
+        await dpop.locator('[data-act="edit"]').click();
+        assert.deepEqual(await page.evaluate(() => calls), [['dxedit', 'x1'], ['dxsection', 'refs']]);
+        assert.equal((await page.evaluate(() => dcFileChipsHtml(dxaState.codex[0]))).length, 1);
         assert.deepEqual(errors, []);
-        console.log('PASS: Drug Codex download files — admin editor (valid https only, width trap), 📎 chip + pop-up, intern list icon rule + coloured file chips, escaping');
+        console.log('PASS: Drug + Disease Codex download files — admin editor (valid https only, width trap), 📎 chip + pop-up, intern list icon rule + coloured file chips, escaping');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
