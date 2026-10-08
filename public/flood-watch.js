@@ -179,9 +179,10 @@
 
     // V101.56: river flow at C.2 → C.13 → C.29B on the card water — a compact capsule per gauge on the surface
     // (dot = tier, ▲▼ = change vs ~24 h) and a soft tint of the same surface, amber / red, where the flow is high.
-    // Tiers (m³/s, same for all three): green < 1,500 · amber 1,500–2,500 · red > 2,500. No tint when all are green.
+    // Tiers (m³/s, same for all three): green < 1,500 · amber 1,500–2,200 · red > 2,200. No tint when all are green.
+    var RV_LIMIT = 2200;   // m³/s — the owner's line for "say so on the front" (2,500 on 2026-10-08, 2,200 the next morning)
     var RV_X = [0.2, 0.5, 0.8], RV_COL = { ok: '#22c55e', warn: '#f59e0b', red: '#ef4444' }, RV_TINT = { ok: ['#22c55e', 0], warn: ['#fbbf24', .16], red: ['#f87171', .22] };
-    function rvTier(q) { return q > 2500 ? 'red' : q >= 1500 ? 'warn' : 'ok'; }   // V101.65: red = over the 2,500 line the popup alerts on
+    function rvTier(q) { return q > RV_LIMIT ? 'red' : q >= 1500 ? 'warn' : 'ok'; }   // V101.65: red = over the line the popup alerts on (V101.69: 2,200)
     function riverWater(rv, home, site) {
         if (!rv || !rv.stations || (!home && !site)) return '';
         var L = home || site, R = site || home;
@@ -222,8 +223,22 @@
     // sources fold under "รายละเอียด". Replaces stats / trendHtml / rainHtml / nearHtml / riverHtml / wxRow / srcDots.
     var LV = { ok: 'ok', warn: 'warn', crit: 'crit' };
     var RISK_TH = { low: 'ปกติ', moderate: 'เฝ้าระวัง', high: 'เสี่ยงสูง', info: 'ไม่มีข้อมูล' };
-    var RV_LIMIT = 2500;   // m³/s — the owner's line for "say so on the front" (2026-10-08)
     var RV_PLACE = { 'C.2': 'นครสวรรค์', 'C.13': 'ชัยนาท', 'C.29B': 'อยุธยา' };
+    // V101.69: colour = data source (the owner's pick "B": a 3 px bar on each row's left edge, two colours when two
+    // sources agree, a dot legend instead of the source paragraph). Kept away from the state colours green/orange/red.
+    // The POPNIX / Floodboard / Open-Meteo labels are their required attributions.
+    var SRC = {
+        fw: ['#0284c7', 'BKK FloodWatch'], pop: ['#0d9488', 'ข้อมูล: สำนักการระบายน้ำ กรุงเทพมหานคร ผ่าน POPNIX Flood'], fb: ['#d97706', 'Floodboard (CC BY 4.0)'],
+        rid: ['#4f46e5', 'ThaiWater · กรมชลประทาน'], om: ['#a21caf', 'Open-Meteo (CC BY 4.0)'], hist: ['#e11d48', '2569 ประกาศ กทม. 29 ก.ย. · 2554 รายงานข่าว (Rocket Media Lab)'], osm: ['#64748b', 'เขตจาก OpenStreetMap (Nominatim)']
+    };
+    // Appends to a class attribute: `class="fw-tile ok` + srcBar(['fb']) + `"` → fw-sb + the bar colour + a title naming the source(s).
+    function srcBar(keys) {
+        var col = keys.length === 1 ? SRC[keys[0]][0] : 'linear-gradient(' + SRC[keys[0]][0] + ' 50%,' + SRC[keys[1]][0] + ' 50%)';
+        return ' fw-sb" style="--sb:' + col + '" data-src="' + keys.join('+') + '" title="' + keys.map(function (k) { return esc(SRC[k][1]); }).join(' + ');
+    }
+    function srcLegend(keys) {
+        return '<div class="fw-lg" title="สีแถบ = แหล่งข้อมูล · สองสี = สองแหล่งที่สอดคล้องกัน">' + keys.map(function (k) { return '<span><i style="background:' + SRC[k][0] + '"></i>' + esc(SRC[k][1]) + '</span>'; }).join('') + '</div>';
+    }
     var RV_SRC = { thaiwater: 'ThaiWater (RID telemetry)', rid: 'RID daily report', ai: 'RID daily report, read by AI', est: 'estimated from the water level' };
     function m2(v) { return v == null ? '—' : (Math.round(v * 100) / 100).toFixed(2); }
     function fresh(r) { return r && r.q != null && r.at && Date.now() - r.at < 36 * 3600e3; }
@@ -250,7 +265,8 @@
         else if (d.road) parts.push('ไม่มีถนนท่วมในรัศมี 500 ม.');
         if (alert) parts.push('แม่น้ำเจ้าพระยาที่' + (RV_PLACE[alert.code] || alert.code) + 'สูงกว่าเกณฑ์');
         var text = parts.length ? parts.join(' · ') : (d.title || '');
-        return '<div class="fw-st"><span class="fw-badge fw-' + shown + '"><span class="fw-dot fw-' + shown + '"></span>' + RISK_TH[shown] + '</span><span class="fw-sub">' + esc(text) + '</span></div>';
+        var keys = d.src && !d.src.fw && d.src.pop ? ['pop'] : (d.road ? ['fw', 'fb'] : ['fw']);
+        return '<div class="fw-st' + srcBar(keys) + '"><span class="fw-badge fw-' + shown + '"><span class="fw-dot fw-' + shown + '"></span>' + RISK_TH[shown] + '</span><span class="fw-sub">' + esc(text) + '</span></div>';
     }
 
     function riverAlertHtml(alert) {
@@ -266,19 +282,19 @@
             var cm = Math.round(Math.abs(c.freeboardM) * 100), over = c.freeboardM < 0;
             var ch = c.change24cm == null ? '' : ' · ' + (c.change24cm > 0 ? 'เพิ่มขึ้น' : 'ลดลง') + ' ' + Math.abs(c.change24cm) + ' cm ใน 24 ชม.';
             var cls = over ? 'crit' : d.canalRisk === 'high' ? 'crit' : d.canalRisk === 'moderate' ? 'warn' : 'ok';
-            out += '<div class="fw-tile ' + cls + '" title="' + esc(c.name || '') + (c.km != null ? ' · ' + c.km + ' km' : '') + '"><div class="fw-k"><i class="fa-solid fa-water"></i>คลอง</div><div class="fw-v">' + cm + '<small>cm</small></div><div class="fw-n">' + (over ? 'เกินตลิ่ง' : 'ต่ำกว่าตลิ่ง') + esc(ch) + '</div></div>';
+            out += '<div class="fw-tile ' + cls + srcBar(['fw']) + ' · ' + esc(c.name || '') + (c.km != null ? ' · ' + c.km + ' km' : '') + '"><div class="fw-k"><i class="fa-solid fa-water"></i>คลอง</div><div class="fw-v">' + cm + '<small>cm</small></div><div class="fw-n">' + (over ? 'เกินตลิ่ง' : 'ต่ำกว่าตลิ่ง') + esc(ch) + '</div></div>';
         } else {
-            out += '<div class="fw-tile"><div class="fw-k"><i class="fa-solid fa-water"></i>คลอง</div><div class="fw-v">—</div><div class="fw-n">ไม่มีข้อมูลสถานี</div></div>';
+            out += '<div class="fw-tile' + srcBar(['fw']) + '"><div class="fw-k"><i class="fa-solid fa-water"></i>คลอง</div><div class="fw-v">—</div><div class="fw-n">ไม่มีข้อมูลสถานี</div></div>';
         }
         var r = d.road && d.road.nearest;
         if (r) {
             var cls2 = r.closed || r.motorbike === 'blocked' ? 'crit' : 'warn';
             var v = r.closed ? 'ปิดถนน' : r.depthCm != null ? r.depthCm + '<small>cm</small>' : 'มีน้ำ';
-            out += '<div class="fw-tile ' + cls2 + '" title="' + esc(r.name || '—') + ' · motorbike ' + esc(r.motorbike || '?') + ', sedan ' + esc(r.sedan || '?') + (r.sensor ? ' · BMA sensor' : '') + '"><div class="fw-k"><i class="fa-solid fa-road"></i>ถนน</div><div class="fw-v">' + v + '</div><div class="fw-n">' + esc(r.name || 'ถนนใกล้เคียง') + ' · ' + r.m + ' ม.</div></div>';
+            out += '<div class="fw-tile ' + cls2 + srcBar(['fb']) + ' · ' + esc(r.name || '—') + ' · motorbike ' + esc(r.motorbike || '?') + ', sedan ' + esc(r.sedan || '?') + (r.sensor ? ' · BMA sensor' : '') + '"><div class="fw-k"><i class="fa-solid fa-road"></i>ถนน</div><div class="fw-v">' + v + '</div><div class="fw-n">' + esc(r.name || 'ถนนใกล้เคียง') + ' · ' + r.m + ' ม.</div></div>';
         } else if (d.road) {
-            out += '<div class="fw-tile ok"><div class="fw-k"><i class="fa-solid fa-road"></i>ถนน</div><div class="fw-v">ไม่ท่วม</div><div class="fw-n">ในรัศมี 500 ม.</div></div>';
+            out += '<div class="fw-tile ok' + srcBar(['fb']) + '"><div class="fw-k"><i class="fa-solid fa-road"></i>ถนน</div><div class="fw-v">ไม่ท่วม</div><div class="fw-n">ในรัศมี 500 ม.</div></div>';
         } else {
-            out += '<div class="fw-tile"><div class="fw-k"><i class="fa-solid fa-road"></i>ถนน</div><div class="fw-v">—</div><div class="fw-n">ไม่มีข้อมูลถนน</div></div>';
+            out += '<div class="fw-tile' + srcBar(['fb']) + '"><div class="fw-k"><i class="fa-solid fa-road"></i>ถนน</div><div class="fw-v">—</div><div class="fw-n">ไม่มีข้อมูลถนน</div></div>';
         }
         return '<div class="fw-tiles">' + out + '</div>';
     }
@@ -297,7 +313,7 @@
                 (x.mm == null ? '—' : (Math.round(x.mm * 10) / 10)) + '</b><div class="fw-bar"><i style="height:' + h + '%"></i></div><span>' + (x.today ? 'วันนี้' : DOW[dt.getDay()]) + '</span><small>' + under + '</small></div>';
         }).join('');
         // V101.67: header is the icon + unit only (the owner cut "ฝน 7 วัน · 3 วันก่อน → 3 วันหน้า"); the title still explains.
-        return '<div class="fw-rain7" title="ฝน 7 วัน · 3 วันก่อน → วันนี้ → 3 วันหน้า (mm)"><div class="fw-k"><i class="fa-solid fa-cloud-rain"></i><small>mm</small></div><div class="fw-days">' + cells + '</div></div>';
+        return '<div class="fw-rain7' + srcBar(['om']) + ' · ฝน 7 วัน · 3 วันก่อน → วันนี้ → 3 วันหน้า (mm)"><div class="fw-k"><i class="fa-solid fa-cloud-rain"></i><small>mm</small></div><div class="fw-days">' + cells + '</div></div>';
     }
 
     // เขต… · 2554 · 2569 (floodPointCheck → d.district / d.history; sources in the titles and the details line).
@@ -306,40 +322,47 @@
         var h = d.history;
         if (!d.district || !h) return '';
         var pill = function (lv, yr) { var p = HIST[lv] || HIST.none; var label = yr === 2569 && lv === 'none' ? 'สิ้นสุด' : p[1]; return '<span class="fw-lv ' + p[0] + '">' + label + '</span>'; };
-        return '<div class="fw-hist"><i class="fa-solid fa-clock-rotate-left"></i><span class="fw-dn">เขต' + esc(d.district) + '</span>' +
+        return '<div class="fw-hist' + srcBar(['hist', 'osm']) + '"><i class="fa-solid fa-clock-rotate-left"></i><span class="fw-dn">เขต' + esc(d.district) + '</span>' +
             '<span class="fw-yr" title="น้ำท่วมปี 2554 · จากรายงานข่าว (Rocket Media Lab)"><b>2554</b>' + pill(h.y2554, 2554) + '</span>' +
             '<span class="fw-yr" title="น้ำท่วมปี 2569 · ประกาศ กทม. 29 ก.ย. 2569 (สิ้นสุด = สิ้นสุดสถานะภัยพิบัติ)"><b>2569</b>' + pill(h.y2569, 2569) + '</span></div>';
     }
 
-    function line(icon, label, value, small) {
-        return '<div class="fw-dl"><i class="fa-solid ' + icon + '"></i><span>' + label + '</span><b>' + value + '</b>' + (small ? '<small>' + small + '</small>' : '') + '</div>';
+    function line(icon, label, value, small, keys) {
+        return '<div class="fw-dl' + srcBar(keys || ['fw']) + '"><i class="fa-solid ' + icon + '"></i><span>' + label + '</span><b>' + value + '</b>' + (small ? '<small>' + small + '</small>' : '') + '</div>';
     }
     function moreHtml(d, p, alert) {
         var rows = [];
         var pop = d.pop;
         (pop && pop.canals || []).forEach(function (c, i) {
             var rate = i === 0 && c.deltaCm != null ? ' · ' + (c.deltaCm > 0 ? '▲ +' : '▼ ') + c.deltaCm + ' cm/ชม.' : '';
-            rows.push(line('fa-water', esc(c.name), m2(c.wl) + ' m <span class="fw-lv ' + (LV[c.level] || 'unk') + '">' + (c.level === 'crit' ? 'วิกฤต' : c.level === 'warn' ? 'เฝ้าระวัง' : c.level === 'ok' ? 'ปกติ' : '?') + '</span>', c.km + ' km' + esc(rate)));
+            rows.push(line('fa-water', esc(c.name), m2(c.wl) + ' m <span class="fw-lv ' + (LV[c.level] || 'unk') + '">' + (c.level === 'crit' ? 'วิกฤต' : c.level === 'warn' ? 'เฝ้าระวัง' : c.level === 'ok' ? 'ปกติ' : '?') + '</span>', c.km + ' km' + esc(rate), ['pop']));
         });
         var roads = pop && pop.roads || [];
         if (roads.length) {
             var wet = roads.filter(function (r) { return r.level !== 'dry'; });
-            rows.push(line('fa-road', roads.map(function (r) { return esc(r.name); }).join(' · '), wet.length ? wet.map(function (r) { return (r.depthCm == null ? 'มีน้ำ' : r.depthCm + ' cm'); }).join(', ') : 'แห้ง', roads.map(function (r) { return r.km; }).sort().filter(function (v, i, a) { return i === 0 || i === a.length - 1; }).join('–') + ' km'));
+            rows.push(line('fa-road', roads.map(function (r) { return esc(r.name); }).join(' · '), wet.length ? wet.map(function (r) { return (r.depthCm == null ? 'มีน้ำ' : r.depthCm + ' cm'); }).join(', ') : 'แห้ง', roads.map(function (r) { return r.km; }).sort().filter(function (v, i, a) { return i === 0 || i === a.length - 1; }).join('–') + ' km', d.road ? ['pop', 'fb'] : ['pop']));
         }
-        if (d.traffy6h) rows.push(line('fa-triangle-exclamation', 'รายงานน้ำท่วมจากประชาชน (Traffy)', d.traffy6h, '≤1 km · 6 ชม.'));
+        if (d.traffy6h) rows.push(line('fa-triangle-exclamation', 'รายงานน้ำท่วมจากประชาชน (Traffy)', d.traffy6h, '≤1 km · 6 ชม.', ['fw']));
         var rv = d.river && d.river.stations ? d.river.stations.filter(fresh) : [];
         if (rv.length) {
             var qs = rv.map(function (r) { return r.q; });
             var val = alert ? '<span style="color:#b91c1c">' + esc(alert.code) + ' ' + fmtQ(alert.q) + '</span>' : 'ปกติ';
             var title = rv.map(function (r) { return r.code + ' ' + esc(r.place || RV_PLACE[r.code] || '') + ' ' + fmtQ(r.q) + (r.src === 'est' ? '~' : '') + ' m³/s' + (r.d24 != null ? ' (' + (r.d24 > 0 ? '+' : '') + r.d24 + ' / 24 ชม.)' : '') + ' · ' + (RV_SRC[r.src] || ''); }).join(' · ');
-            rows.push('<div class="fw-dl" title="' + title + '"><i class="fa-solid fa-water"></i><span>แม่น้ำเจ้าพระยา (นครสวรรค์→อยุธยา)</span><b>' + val + '</b><small>' + fmtQ(Math.min.apply(null, qs)) + '–' + fmtQ(Math.max.apply(null, qs)) + ' m³/s</small></div>');
+            rows.push('<div class="fw-dl' + srcBar(['rid']) + ' · ' + title + '"><i class="fa-solid fa-water"></i><span>แม่น้ำเจ้าพระยา (นครสวรรค์→อยุธยา)</span><b>' + val + '</b><small>' + fmtQ(Math.min.apply(null, qs)) + '–' + fmtQ(Math.max.apply(null, qs)) + ' m³/s</small></div>');
         }
         var wx = p.wx;
-        if (wx) rows.push(line('fa-cloud-sun', wxIcon(wx) + ' ' + wx.temp + '° (รู้สึก ' + wx.feels + '°) · ฝน 6 ชม. ' + wx.pop + '%', wx.aqi != null ? 'AQI <span class="fw-aqi ' + aqiClass(wx.aqi) + '">' + wx.aqi + '</span>' : '', wx.pm25 != null ? 'PM2.5 ' + wx.pm25 : ''));
+        if (wx) rows.push(line('fa-cloud-sun', wxIcon(wx) + ' ' + wx.temp + '° (รู้สึก ' + wx.feels + '°) · ฝน 6 ชม. ' + wx.pop + '%', wx.aqi != null ? 'AQI <span class="fw-aqi ' + aqiClass(wx.aqi) + '">' + wx.aqi + '</span>' : '', wx.pm25 != null ? 'PM2.5 ' + wx.pm25 : '', ['om']));
         var t = p.at ? new Date(p.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }) : '';
-        var src = [t, d.canal ? esc(d.canal.name) + (d.canal.km != null ? ' · ' + d.canal.km + ' km' : '') : '', 'BKK FloodWatch' + (d.road ? ' · Floodboard (CC BY 4.0)' : '') + (pop ? ' · ' + esc(pop.credit) : '') + (d.river ? ' · ThaiWater / กรมชลประทาน (river flow)' : '') + (wx ? ' · Open-Meteo (CC BY 4.0)' : ''),
-            d.district && d.history ? '2554 รายงานข่าว (Rocket Media Lab) · 2569 ประกาศ กทม. 29 ก.ย. 69 · เขตจาก OpenStreetMap (Nominatim)' : ''].filter(Boolean).join(' · ');
-        return '<details class="fw-more"><summary><i class="fa-solid fa-list"></i>รายละเอียด · สถานีใกล้เคียง · แม่น้ำ · อากาศ</summary><div class="fw-dls">' + rows.join('') + '<div class="fw-meta">' + src + '</div></div></details>';
+        // V101.69: the sources are the bar colours — list them once as a dot legend, then only time · nearest gauge.
+        var used = [];
+        if (d.src ? d.src.fw : d.canal) used.push('fw');
+        if (pop) used.push('pop');
+        if (d.road) used.push('fb');
+        if (rv.length) used.push('rid');
+        if (wx) used.push('om');
+        if (d.district && d.history) used.push('hist', 'osm');
+        var src = [t, d.canal ? esc(d.canal.name) + (d.canal.km != null ? ' · ' + d.canal.km + ' km' : '') : ''].filter(Boolean).join(' · ');
+        return '<details class="fw-more"><summary><i class="fa-solid fa-list"></i>รายละเอียด · สถานีใกล้เคียง · แม่น้ำ · อากาศ</summary><div class="fw-dls">' + rows.join('') + srcLegend(used) + '<div class="fw-meta">' + src + '</div></div></details>';
     }
 
     function render() {
