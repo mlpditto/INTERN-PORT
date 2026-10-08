@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.124)</title>
+    <title>Nika Admin (V102.125)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V99.87">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -6555,6 +6555,29 @@
         .br-ic { width:32px; height:32px; min-height:0; padding:0; border-radius:9px; border:1px solid #e2e8f0; background:#fff; color:#475569; cursor:pointer; font-size:0.9em; box-shadow:none; flex-shrink:0; }
         .br-ic:hover { border-color:#a21caf; }
         .br-ic-del { color:#dc2626; }
+        /* V102.125: lean Beri Shop panel */
+        .bs2 { background:#fdf4ff; padding:14px 16px; border-radius:12px; margin-bottom:30px; border:1px solid #f0abfc; display:flex; flex-direction:column; gap:10px; }
+        .bs2-head { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+        .bs2-head h3 { margin:0; color:#86198f; font-weight:900; font-size:1.15em; cursor:help; }
+        .bs2-acts { display:flex; align-items:center; gap:8px; }
+        .bs2 .br-ic.on { background:#fef3c7; border-color:#f59e0b; color:#b45309; }
+        .bs2-add { background:linear-gradient(135deg,#a21caf,#86198f); border-color:#86198f; color:#fff; }
+        .bs2-badge { display:inline-flex; align-items:center; gap:5px; background:#fef3c7; color:#b45309; border:1px solid #fcd34d; border-radius:999px; padding:4px 10px; font-weight:900; font-size:0.8em; }
+        .bs2-badge[hidden], .bs2-give[hidden] { display:none; }
+        .bs2-give { display:flex; align-items:center; gap:8px; background:#fff; border:1px solid #f0abfc; border-radius:12px; padding:6px 8px 6px 12px; }
+        .bs2-give input[type=text] { width:100%; box-sizing:border-box; border:0; outline:0; background:transparent; font-size:0.9em; min-width:0; box-shadow:none; padding:4px 4px 4px 22px; }
+        .bs2-mag { position:absolute; left:2px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:0.8em; pointer-events:none; }
+        .bs2-amt { width:70px; border:1px solid #e2e8f0; border-radius:8px; padding:5px 8px; font-weight:800; color:#b45309; -moz-appearance:textfield; }
+        .bs2-amt::-webkit-outer-spin-button, .bs2-amt::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+        .bs2-ok { background:#b45309; border-color:#b45309; color:#fff; }
+        .bs2-pends { display:flex; flex-direction:column; gap:8px; }
+        .bs2-pends:empty { display:none; }
+        .bs2-pend { display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #fcd34d; border-left:4px solid #f59e0b; border-radius:12px; padding:7px 12px; }
+        .bs2-pend .user-pic { width:30px; height:30px; border-radius:50%; flex-shrink:0; }
+        .bs2-pend b { color:#334155; font-size:0.9em; }
+        .bs2-pm { color:#86198f; font-weight:700; font-size:0.8em; }
+        .bs2-ful { color:#15803d; } .bs2-deny { color:#94a3b8; } .bs2-deny:hover { color:#dc2626; border-color:#fca5a5; }
+        .bs2 .br-ic-del { color:#94a3b8; } .bs2 .br-ic-del:hover { color:#dc2626; border-color:#fca5a5; }
         .br-pic-ai { position:absolute; right:-7px; bottom:-7px; width:24px; height:24px; min-height:0; padding:0; border-radius:50%; border:1px solid #e9d5ff; background:#faf5ff; color:#7e22ce; font-size:13px; line-height:1; cursor:pointer; box-shadow:0 1px 3px rgba(15,23,42,.15); }
         .br-pic-ai:hover { background:#f3e8ff; } .br-pic-ai:disabled { cursor:progress; }
         /* V102.123: Grok is drawing — shimmer sweep over the well, spinning ✨, seconds counter in the middle. */
@@ -7898,45 +7921,36 @@
                  below (admin-entered Thai reward names/descriptions + intern display names) —
                  same fix as #review-links-list above, applied proactively before real Thai
                  reward data hits it. -->
-            <div class="lang-no-toggle" style="background:#fdf4ff; padding:20px; border-radius:12px; margin-bottom:30px; border:1px solid #f0abfc;">
-                <div class="flex-between" style="border-bottom:1px solid #e9d5ff; padding-bottom:15px; margin-bottom:20px;">
-                    <h3 style="margin:0; color:#86198f; display:flex; align-items:center; gap:12px; font-weight:900; font-size:1.3em;">
-                        🏪 A Shop for Killers <span style="font-size:0.55em; font-weight:700; color:#a21caf; text-transform:uppercase; letter-spacing:0.4px;">Beri Phase 2</span>
-                    </h3>
-                    <button class="magic-btn" onclick="openBeriRewardModal()" style="background:linear-gradient(135deg, #a21caf, #86198f); padding:10px 22px; border-radius:14px; font-weight:900;">➕ Add Reward</button>
-                </div>
-                <p style="margin:0 0 18px 0; color:#78716c; font-size:0.85em; line-height:1.5;">
-                    Interns spend Beri here. Stock is optional (blank = unlimited) — leaving it blank skips the stock counter entirely.
-                </p>
-
-                <!-- V98.03: manual Beri gift — type-to-search picker (same suggest-box pattern
-                     as the Drug Codex contributor picker at #dca-helper-input) + amount + reason.
-                     Writes through adjBeriCore, the same Firestore logic the per-row Users-table
-                     Beri Adj control already uses — no duplicated increment/audit-doc code. -->
-                <div class="lang-no-toggle" style="background:white; border:1px solid #f0abfc; border-radius:12px; padding:14px; margin-bottom:20px;">
-                    <label style="display:block; font-size:0.72em; font-weight:700; color:#86198f; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:8px;">🎁 Give Beri to a User</label>
-                    <div id="beri-gift-chip" style="margin-bottom:8px;"></div>
-                    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start;">
-                        <div style="position:relative; flex:1; min-width:180px;">
-                            <input type="text" id="beri-gift-input" placeholder="🔍 Type a user name…" data-th-placeholder="🔍 พิมพ์ชื่อ user…" autocomplete="off"
-                                   oninput="beriGiftInputHandler()" onblur="setTimeout(beriGiftHideSuggest, 150)"
-                                   style="width:100%; box-sizing:border-box;">
-                            <div id="beri-gift-suggest" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:10; background:#fff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.1); max-height:220px; overflow-y:auto;"></div>
-                        </div>
-                        <input type="number" step="1" id="beri-gift-amount" placeholder="🪙  Beri" style="width:100px;">
-                        <button class="btn-sm" onclick="giveBeriToUser()" style="background:#b45309; color:white; padding:8px 16px; border-radius:10px; font-weight:800;">Give</button>
+            <!-- V102.125: lean panel. Header = name + icons (🛎 pending count · 🎁 give · ➕ add); the stock rule lives in the name's tooltip;
+                 Give Beri is one row that opens from 🎁; pending redemptions sit above the catalog and vanish when there are none. -->
+            <div class="lang-no-toggle bs2" id="beri-shop-panel">
+                <div class="bs2-head">
+                    <h3 title="Interns spend Beri here. Stock is optional: blank = unlimited (no stock counter).">🏪 A Shop for Killers</h3>
+                    <div class="bs2-acts">
+                        <span id="beri-pend-badge" class="bs2-badge" hidden><i class="fa-solid fa-bell-concierge"></i> <span id="beri-pend-n">0</span></span>
+                        <button type="button" id="beri-gift-toggle" class="br-ic" onclick="beriGiftToggle()" title="Give Beri to a user" aria-label="Give Beri to a user" aria-expanded="false"><i class="fa-solid fa-gift"></i></button>
+                        <button type="button" class="br-ic bs2-add" onclick="openBeriRewardModal()" title="Add reward" aria-label="Add reward"><i class="fa-solid fa-plus"></i></button>
                     </div>
                 </div>
 
-                <div id="beri-rewards-list" style="display:flex; flex-direction:column; gap:10px; margin-bottom:26px;">
-                    <div style="padding:30px; text-align:center; color:#94a3b8; font-size:0.86em;">Loading...</div>
+                <!-- V98.03 manual gift (V102.125: one inline row). Writes through adjBeriCore, same as the per-row Users-table Beri Adj. -->
+                <div id="beri-give-row" class="bs2-give" hidden>
+                    <span id="beri-gift-chip"></span>
+                    <div style="position:relative; flex:1; min-width:120px;">
+                        <i class="fa-solid fa-magnifying-glass bs2-mag"></i>
+                        <input type="text" id="beri-gift-input" placeholder="User name…" data-th-placeholder="ชื่อ user…" autocomplete="off"
+                               oninput="beriGiftInputHandler()" onblur="setTimeout(beriGiftHideSuggest, 150)">
+                        <div id="beri-gift-suggest" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:10; background:#fff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.1); max-height:220px; overflow-y:auto;"></div>
+                    </div>
+                    <span class="bs2-coin">🪙</span>
+                    <input type="number" step="1" id="beri-gift-amount" class="bs2-amt" aria-label="Beri amount">
+                    <button type="button" class="br-ic bs2-ok" onclick="giveBeriToUser()" title="Give" aria-label="Give"><i class="fa-solid fa-check"></i></button>
                 </div>
 
-                <h4 style="color:#86198f; margin:0 0 10px 0; font-size:0.95em; font-weight:800;">
-                    <i class="fa-solid fa-hand-holding-dollar" style="color:#a21caf;"></i> Pending Redemptions
-                </h4>
-                <div id="beri-redemptions-list" style="display:flex; flex-direction:column; gap:10px; background:white; padding:15px; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.05); min-height:60px;">
-                    <div style="padding:20px; text-align:center; color:#94a3b8; font-size:0.86em;">No pending redemptions.</div>
+                <div id="beri-redemptions-list" class="bs2-pends"></div>
+
+                <div id="beri-rewards-list" style="display:flex; flex-direction:column; gap:8px;">
+                    <div style="padding:30px; text-align:center; color:#94a3b8; font-size:0.86em;">Loading...</div>
                 </div>
             </div>
             </div><!-- /subtab-beri-shop -->
@@ -35943,7 +35957,7 @@ RULES:
             const list = document.getElementById('beri-rewards-list');
             if (!list) return;
             if (!beriRewardsCache.length) {
-                list.innerHTML = '<div style="padding:30px; text-align:center; color:#94a3b8; font-size:0.86em;">No rewards yet — click ➕ Add Reward to create the first one.</div>';
+                list.innerHTML = '<div style="padding:30px; text-align:center; color:#94a3b8; font-size:0.86em;">No rewards yet — tap ➕ to create the first one.</div>';
                 return;
             }
             // V102.121: thumbnail, cost over the struck full price (−N%), icon-only actions (names in title / aria-label).
@@ -36152,10 +36166,10 @@ RULES:
         function renderBeriRedemptionsAdmin() {
             const list = document.getElementById('beri-redemptions-list');
             if (!list) return;
-            if (!beriRedemptionsCache.length) {
-                list.innerHTML = '<div style="padding:20px; text-align:center; color:#94a3b8; font-size:0.86em;">No pending redemptions.</div>';
-                return;
-            }
+            // V102.125: nothing when the queue is empty (the :empty rule hides the box); the 🛎 badge in the header carries the count.
+            const n = beriRedemptionsCache.length, badge = document.getElementById('beri-pend-badge');
+            if (badge) { badge.hidden = !n; document.getElementById('beri-pend-n').textContent = n; badge.title = n + ' pending redemption' + (n === 1 ? '' : 's'); }
+            if (!n) { list.innerHTML = ''; return; }
             list.innerHTML = beriRedemptionsCache.map(r => {
                 let uImg = r.pictureUrl || '';
                 let uName = r.displayName || 'Unknown';
@@ -36167,14 +36181,11 @@ RULES:
                     }
                 }
                 return `
-                    <div style="display:flex; align-items:center; gap:10px; background:#fdf4ff; border:1px solid #f0abfc; border-radius:10px; padding:10px 12px;">
-                        <img src="${uImg}" class="user-pic">
-                        <div style="flex:1; min-width:0;">
-                            <div style="font-weight:800; color:#334155; font-size:0.9em;">${escapeHtml(uName)}</div>
-                            <div style="font-size:0.8em; color:#86198f; font-weight:700;">🎁 ${escapeHtml(r.rewardName || '')} — 🪙 ${r.beriCost || 0}</div>
-                        </div>
-                        <button class="btn-sm btn-success" onclick="fulfillBeriRedemption('${r.id}')">Fulfill</button>
-                        <button class="btn-sm btn-danger" onclick="denyBeriRedemption('${r.id}')">Deny &amp; Refund</button>
+                    <div class="bs2-pend">
+                        <img src="${escapeHtml(uImg)}" class="user-pic" alt="">
+                        <div style="flex:1; min-width:0;"><b>${escapeHtml(uName)}</b> <span class="bs2-pm">· 🎁 ${escapeHtml(r.rewardName || '')} · 🪙 ${Number(r.beriCost || 0).toLocaleString('en-US')}</span></div>
+                        <button class="br-ic bs2-ful" onclick="fulfillBeriRedemption('${r.id}')" title="Fulfill (handed over)" aria-label="Fulfill"><i class="fa-solid fa-check"></i></button>
+                        <button class="br-ic bs2-deny" onclick="denyBeriRedemption('${r.id}')" title="Deny and refund" aria-label="Deny and refund"><i class="fa-solid fa-rotate-left"></i></button>
                     </div>`;
             }).join('');
         }
@@ -50059,6 +50070,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             box.style.display = 'block';
         }
 
+        // V102.125: 🎁 in the header opens / closes the one-row form.
+        function beriGiftToggle(force) {
+            const row = document.getElementById('beri-give-row'), btn = document.getElementById('beri-gift-toggle');
+            if (!row) return;
+            const open = typeof force === 'boolean' ? force : row.hidden;
+            row.hidden = !open;
+            if (btn) { btn.classList.toggle('on', open); btn.setAttribute('aria-expanded', String(open)); }
+            if (open) { const i = document.getElementById('beri-gift-input'); if (i && !beriGiftUser) i.focus(); }
+        }
+
         function beriGiftHideSuggest() {
             const box = document.getElementById('beri-gift-suggest');
             if (box) { box.style.display = 'none'; box.innerHTML = ''; }
@@ -50082,6 +50103,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function renderBeriGiftChip() {
             const chip = document.getElementById('beri-gift-chip');
             if (!chip) return;
+            const si = document.getElementById('beri-gift-input');
+            if (si) si.parentElement.style.display = beriGiftUser ? 'none' : '';   // V102.125: the chip replaces the search box
             if (!beriGiftUser) { chip.innerHTML = ''; return; }
             const pic = beriGiftUser.pictureUrl
                 ? `<img src="${escapeHtml(beriGiftUser.pictureUrl)}" alt="" style="width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;">`
@@ -50104,6 +50127,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 showToast("Beri given!");
                 amtInput.value = "";
                 beriGiftClearUser();
+                beriGiftToggle(false);   // V102.125: done, fold the row away
             } catch (e) { alert("Error giving Beri: " + e.message); }
         }
 
