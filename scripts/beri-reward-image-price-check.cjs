@@ -14,8 +14,10 @@ assert.ok(admin.includes('accept="image/jpeg,image/png,image/webp"'), 'file inpu
 const save = slice(admin, 'async function saveBeriReward() {', 'async function toggleBeriRewardActive');
 assert.ok(save.includes("const listCost = listRaw === '' ? null : (parseInt(listRaw, 10) || 0);"), 'blank full price → null');
 assert.ok(save.includes('if (listCost != null && listCost < beriCost)'), 'full price below the cost is refused');
-assert.ok(save.includes('resizeAdminProductPhoto(brPendingFile)') && save.includes('uploadAdminProductPhoto(blob)'), 'image goes through the Product photo resize (<=1280 px JPEG) + product-images/<sha256>.jpg upload');
-assert.ok(save.includes('name, description, beriCost, listCost, stock, imageUrl,'), 'doc carries listCost + imageUrl');
+assert.ok(save.includes('resizeAdminProductPhoto(file)') && save.includes('uploadAdminProductPhoto(blob)'), 'image goes through the Product photo resize (<=1280 px JPEG) + product-images/<sha256>.jpg upload');
+assert.ok(save.includes('{ name, description, beriCost, listCost, stock, imageUrl, isActive: active }'), 'doc carries listCost + imageUrl');
+assert.ok(save.indexOf("forceHideModal('beriRewardModal')") < save.indexOf('resizeAdminProductPhoto(file)') && save.includes("showToast('⏳ Saving…')"), 'V102.123: the modal closes BEFORE the upload / write, behind a Saving… toast');
+assert.ok(save.includes("forceShowModal('beriRewardModal');") && save.includes('brSaving'), 'a failure reopens the form with its values; double-save guarded');
 assert.ok(/const path = `product-images\/\$\{hash\}\.jpg`;/.test(admin), 'upload helper still targets product-images/ (admin may write there — no Storage rules deploy)');
 const open = slice(admin, 'function openBeriRewardModal(id = null) {', 'async function saveBeriReward');
 assert.ok(open.includes("document.getElementById('br-list').value = (r && r.listCost != null) ? r.listCost : '';") && open.includes('brShowImage(brImageUrl)'), 'edit restores full price + image');
@@ -41,7 +43,8 @@ assert.ok(admin.includes("const BR_IMAGE_MODEL = 'or/x-ai/grok-imagine-image-2.0
 assert.ok(gen.includes("{ feature: 'beri_reward_image', imageApi: true, aspectRatio: '4:3', maxOutputTokens: 1024 }"), 'Image API path (Seedream/Muse), 4:3, its own ai_usage feature');
 assert.ok(gen.includes("if (!name) { alert('Type the reward name first") && gen.includes('no text, no watermark, no people'), 'prompt from name + description');
 assert.ok(gen.includes("brPendingFile = new File([blob], 'grok-imagine.png'") && gen.includes('brShowImage(URL.createObjectURL(blob))'), 'result becomes the pending file → uploaded on Save like a picked photo');
-assert.ok(gen.includes("btn.textContent = '⏳'") && gen.includes("btn.textContent = '✨'"), 'busy state on the button only');
+assert.ok(gen.includes("pic.classList.add('gen')") && gen.includes("btn.classList.add('spin')") && gen.includes('pic.dataset.sec') && gen.includes('clearInterval(tick)'), 'V102.123: shimmer + spinning ✨ + seconds counter while Grok draws, cleaned up after');
+assert.ok(admin.includes('.br-pic.gen::after { content:attr(data-sec)') && admin.includes('@keyframes brShimmer') && admin.includes('prefers-reduced-motion'), 'animation CSS, with a reduced-motion opt-out');
 
 
 const rowBody = slice(admin, 'list.innerHTML = beriRewardsCache.map(r => {', "}).join('');");
