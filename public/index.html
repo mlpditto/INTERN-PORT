@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.65)</title>
+    <title>Internship Portfolio (V101.66)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10472,22 +10472,30 @@
                 if (empty) empty.style.display = 'block';
             } else {
                 if (empty) empty.style.display = 'none';
+                // V101.66: image on top (🎁 tile when none), 🪙 cost with the full price struck through and −N% when the admin set
+                // one (listCost, display only — the debit is beriCost), stock as 📦 N (one language, title says the rest).
                 grid.innerHTML = beriRewardsCache.map(r => {
                     const outOfStock = r.stock != null && r.stock <= 0;
                     const canAfford = myBeri >= (r.beriCost || 0);
                     const disabled = outOfStock || !canAfford;
-                    const stockBadge = r.stock != null ? `<span style="font-size:0.72em; color:#94a3b8; font-weight:700;">${outOfStock ? 'หมดแล้ว · Out of stock' : `เหลือ ${r.stock} · ${r.stock} left`}</span>` : '';
+                    const cost = Number(r.beriCost) || 0, list = Number(r.listCost) || 0;
+                    const off = list > cost && cost > 0 ? Math.round((1 - cost / list) * 100) : 0;
+                    const stockBadge = r.stock != null ? `<span style="margin-left:auto; font-size:0.72em; color:${outOfStock ? '#dc2626' : '#94a3b8'}; font-weight:700; white-space:nowrap;" title="${outOfStock ? 'Out of stock' : r.stock + ' left'}">📦 ${outOfStock ? 'หมด' : r.stock}</span>` : '';
                     return `
-                        <div style="background:#fff; border:1px solid #f1f5f9; border-radius:12px; padding:12px 14px; ${disabled ? 'opacity:0.6;' : ''}">
-                            <div style="font-weight:800; color:#334155; font-size:0.92em;">🎁 ${escapeHtml(r.name || 'Untitled')}</div>
-                            ${r.description ? `<div style="font-size:0.78em; color:#64748b; margin-top:2px;">${escapeHtml(r.description)}</div>` : ''}
-                            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:8px;">
-                                <div style="font-weight:900; color:#b45309; font-size:0.85em;">🪙 ${r.beriCost || 0}</div>
-                                ${stockBadge}
+                        <div style="background:#fff; border:1px solid #f1f5f9; border-radius:14px; overflow:hidden; display:flex; flex-direction:column; ${disabled ? 'opacity:0.6;' : ''}">
+                            ${r.imageUrl ? `<img src="${escapeHtml(r.imageUrl)}" alt="" loading="lazy" style="width:100%; aspect-ratio:4/3; object-fit:cover; display:block; background:#f8fafc;">` : '<div style="width:100%; aspect-ratio:4/3; display:flex; align-items:center; justify-content:center; font-size:34px; color:#cbd5e1; background:#f8fafc;">🎁</div>'}
+                            <div style="padding:10px 12px 12px;">
+                                <div style="font-weight:800; color:#334155; font-size:0.92em;">${escapeHtml(r.name || 'Untitled')}</div>
+                                ${r.description ? `<div style="font-size:0.78em; color:#64748b; margin-top:2px;">${escapeHtml(r.description)}</div>` : ''}
+                                <div style="display:flex; align-items:baseline; gap:6px; margin-top:8px; flex-wrap:wrap;">
+                                    <b style="font-weight:900; color:#b45309; font-size:0.95em;" title="Beri">🪙 ${cost.toLocaleString('en-US')}</b>
+                                    ${off ? `<s style="color:#94a3b8; font-size:0.78em;" title="Full price">${list.toLocaleString('en-US')}</s><em style="font-style:normal; font-size:0.68em; font-weight:900; color:#dc2626; background:#fee2e2; padding:1px 6px; border-radius:999px;">−${off}%</em>` : ''}
+                                    ${stockBadge}
+                                </div>
+                                <button onclick="redeemBeriReward('${r.id}')" ${disabled ? 'disabled' : ''} title="Redeem" style="width:100%; margin-top:8px; padding:8px 12px; background:${disabled ? '#e2e8f0' : 'linear-gradient(135deg,#f59e0b,#ea580c)'}; border:none; border-radius:10px; color:${disabled ? '#94a3b8' : 'white'}; font-weight:800; font-size:0.85em; cursor:${disabled ? 'not-allowed' : 'pointer'};">
+                                    ${outOfStock ? 'หมดแล้ว' : (!canAfford ? 'Beri ไม่พอ' : 'แลกเลย')}
+                                </button>
                             </div>
-                            <button onclick="redeemBeriReward('${r.id}')" ${disabled ? 'disabled' : ''} style="width:100%; margin-top:8px; padding:8px 12px; background:${disabled ? '#e2e8f0' : 'linear-gradient(135deg,#f59e0b,#ea580c)'}; border:none; border-radius:10px; color:${disabled ? '#94a3b8' : 'white'}; font-weight:800; font-size:0.85em; cursor:${disabled ? 'not-allowed' : 'pointer'};">
-                                ${outOfStock ? 'หมดแล้ว' : (!canAfford ? 'Beri ไม่พอ' : 'แลกเลย · Redeem')}
-                            </button>
                         </div>`;
                 }).join('');
             }
