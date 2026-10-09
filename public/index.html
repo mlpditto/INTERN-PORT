@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.77)</title>
+    <title>Internship Portfolio (V101.78)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -3627,6 +3627,35 @@
                 #sch-tabs .sch-tab.active {
                     color: #7c3aed; background: #fff; border-bottom-color: #7c3aed;
                 }
+                /* V101.78: Agenda week strip. Own classes (.sch-wd / .sch-wk-nv), width/min-height
+                   negate the global `button` rule; 44px tall = touch target on a phone. */
+                #sch-week { margin: 0 0 4px; }
+                #sch-week .sch-wk-row { display: flex; align-items: center; gap: 2px; }
+                #sch-week .sch-wk-nv {
+                    width: 24px; min-height: 44px; padding: 0; flex: 0 0 auto;
+                    border: none; background: transparent; color: #7c3aed;
+                    font-size: 20px; font-weight: 800; cursor: pointer; font-family: inherit;
+                }
+                #sch-week .sch-wk-nv:disabled { color: #e2e8f0; cursor: default; }
+                #sch-week .sch-wd {
+                    flex: 1 1 0; min-width: 0; width: auto; min-height: 44px; padding: 4px 0 5px;
+                    border: 1.5px solid transparent; border-radius: 12px; background: transparent;
+                    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+                    cursor: pointer; font-family: inherit; color: #334155;
+                }
+                #sch-week .sch-wd small { font-size: 0.62em; font-weight: 700; color: #94a3b8; line-height: 1.2; }
+                #sch-week .sch-wd b { font-size: 0.92em; line-height: 1.25; }
+                #sch-week .sch-wd.today { border-color: #7c3aed; background: #f5f3ff; }
+                #sch-week .sch-wd.today b { color: #6d28d9; }
+                #sch-week .sch-wd[aria-pressed="true"] { background: #ede9fe; border-color: #7c3aed; }
+                #sch-week .sch-wd[aria-pressed="true"] b { color: #5b21b6; }
+                #sch-week .sch-dots { display: flex; justify-content: center; gap: 2px; height: 7px; margin-top: 2px; }
+                #sch-week .sch-dt { width: 6px; height: 6px; border-radius: 50%; box-sizing: border-box; background: currentColor; }
+                #sch-week .sch-dt.o { background: transparent; border: 1.5px solid currentColor; }
+                #sch-week .sch-dt.q { color: #6366f1; } #sch-week .sch-dt.j { color: #f59e0b; }
+                #sch-week .sch-dt.c { color: #14b8a6; } #sch-week .sch-dt.e { color: #ec4899; } #sch-week .sch-dt.x { color: #94a3b8; }
+                #sch-week .sch-wk-cap { display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 0.68em; color: #94a3b8; font-weight: 700; margin: 2px 0 0; }
+                #sch-week .sch-wk-cap button { width: auto; min-height: 0; padding: 2px 8px; border: none; background: transparent; color: #7c3aed; font-weight: 800; font-size: 1em; cursor: pointer; font-family: inherit; }
                 .dc-view-tab-badge {
                     font-size: 0.72em; background: #1d4ed8; color: #fff;
                     padding: 1px 7px; border-radius: 999px;
@@ -5937,6 +5966,7 @@
             </div>
             <p style="margin:5px 0 0; font-size:0.64em; color:#a78bfa; line-height:1.4;">Your name is shown on the invite, and only you (or an admin) can delete it.</p>
         </div>
+                <div id="sch-week" class="lang-no-toggle"></div>
                 <div id="sch-agenda"></div>
             </div>
             <div id="sch-pane-goals" style="display:none; padding:14px 16px 18px;"><div class="ip-goal-actions lang-no-toggle"><button type="button" onclick="monthlyProgress.edit()" title="Set monthly goals for Quiz / Journal / Case" data-th-title="ตั้งเป้ารายเดือนสำหรับ Quiz / Journal / Case">📅 Monthly</button><button id="ip-period-action" type="button" onclick="internshipProgress.editGoal()" title="Set Quiz goals per month / quarter / year" data-th-title="ตั้งเป้า Quiz รายเดือน / ไตรมาส / ปี" hidden>🎯 Period</button></div><div id="assigned-goals" class="lang-no-toggle"></div><div id="internship-quiz-progress" class="lang-no-toggle"></div></div>
@@ -14866,6 +14896,8 @@
         const SCH_PAGE_WEEKS = 12;
         let schWeekPage = null;      // page index; null = open on the most recent
         let schEditingDates = false; // true while the date form is open over an existing window
+        let schWeekOffset = 0;       // V101.78: Agenda week strip — weeks away from this one (openScheduleModal resets it)
+        let schWeekSel = null;       // V101.78: the day tapped in the strip ('YYYY-MM-DD'), null = none
         // V97.18: 26 weeks — double the ~12-week ceiling a real intern/extern/junior
         // placement runs to, so it only ever catches a mistyped year.
         const SCH_MAX_SPAN_DAYS = 182;
@@ -15745,13 +15777,13 @@
             // the two surfaces can never disagree about what "done today" means.
             const todayKey = getBangkokDateTimeParts().dateKey;
             if ((typeof myCheckin !== 'undefined' ? (myCheckin || {}) : {}).lastDate !== todayKey) {
-                out.push({ bucket: 'today', icon: '✅', title: 'Daily check-in เช็คอินประจำวัน', act: 'tryDailyCheckin()' });
+                out.push({ bucket: 'today', kind: 'x', icon: '✅', title: 'Daily check-in เช็คอินประจำวัน', act: 'tryDailyCheckin()' });
             }
             if (typeof _activityDoneToday === 'function' && !_activityDoneToday(_combinedLogCache())) {
-                out.push({ bucket: 'today', icon: '📝', title: 'Journal', hint: 'ปิดหน้าต่างนี้และไปเขียนบันทึกประจำวัน', tag: '+0.1', act: 'closeScheduleModal(); gotoLog()' });
+                out.push({ bucket: 'today', kind: 'j', icon: '📝', title: 'Journal', hint: 'ปิดหน้าต่างนี้และไปเขียนบันทึกประจำวัน', tag: '+0.1', act: 'closeScheduleModal(); gotoLog()' });
             }
             if (typeof _activityDoneToday === 'function' && !_activityDoneToday(window.myCasesCache)) {
-                out.push({ bucket: 'today', icon: '🩺', title: 'Case', hint: 'ปิดหน้าต่างนี้และไปบันทึกเคส รับ +0.1 คะแนนเมื่อส่งสำเร็จ', tag: '+0.1', act: 'closeScheduleModal(); gotoCaseSubmit()' });
+                out.push({ bucket: 'today', kind: 'c', icon: '🩺', title: 'Case', hint: 'ปิดหน้าต่างนี้และไปบันทึกเคส รับ +0.1 คะแนนเมื่อส่งสำเร็จ', tag: '+0.1', act: 'closeScheduleModal(); gotoCaseSubmit()' });
             }
 
             const openMission = "openJourneySection('section-kanban','toggleKanban')";
@@ -15763,7 +15795,7 @@
                 const due = asDate(q.deadline), opens = asDate(q.startTime);
                 if (!due && !(opens && opens > now)) return;   // undated: the Mission list already carries it
                 if (closedBeforeMe(due)) return;               // closed before this intern arrived
-                out.push({ icon: '🎯', title: q.title || 'Quest ภารกิจ', due: due, opens: opens, act: openMission });
+                out.push({ kind: 'x', icon: '🎯', title: q.title || 'Quest ภารกิจ', due: due, opens: opens, act: openMission });
             });
 
             (typeof quizzesCache !== 'undefined' ? (quizzesCache || []) : []).forEach(q => {
@@ -15782,7 +15814,7 @@
                 // (an alert at its startTime gate), but a button that can only say no is
                 // worse than no button.
                 out.push({
-                    icon: '📝', title: q.title || 'Quiz แบบทดสอบ', due: due, opens: opens, act: 'schLaunchQuiz(' + JSON.stringify(q.id) + ')',
+                    kind: 'q', icon: '📝', title: q.title || 'Quiz แบบทดสอบ', due: due, opens: opens, act: 'schLaunchQuiz(' + JSON.stringify(q.id) + ')',
                     quizId: (opens && opens > now) ? '' : q.id
                 });
             });
@@ -15797,6 +15829,7 @@
                 const due = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate(), 23, 59, 59, 999);
                 if (due < now) return;                          // finished; it lives in the calendar now
                 out.push({
+                    kind: 'e',
                     icon: '📣',
                     title: (ev.title || 'Event') + (schMyEventInterests[ev.id] ? ' · ✓ requested' : ''),
                     due: due,
@@ -15811,7 +15844,7 @@
             const me = myOwnRow();
             const endD = schParseDay(me.endDate);
             if (endD && endD >= new Date(now.getFullYear(), now.getMonth(), now.getDate())) {
-                out.push({ icon: '🎓', title: 'Internship ends วันสุดท้ายของการฝึกงาน', due: endD });
+                out.push({ kind: 'x', icon: '🎓', title: 'Internship ends วันสุดท้ายของการฝึกงาน', due: endD });
             }
             return out;
         }
@@ -15890,6 +15923,7 @@
             schApplyInvitePermission();
             const now = new Date();
             const items = schAgendaItems();
+            schRenderWeek(items);
 
             if (!items.length) {
                 box.innerHTML = '<div style="text-align:center; color:#94a3b8; font-size:0.8em; padding:22px 0;">Nothing scheduled ไม่มีรายการที่มีกำหนดเวลา</div>';
@@ -16013,6 +16047,121 @@
             schRenderAgenda();
         }
 
+        // ---- V101.78: Agenda week strip ---------------------------------------
+        // Mon–Sun with one dot per kind: Quiz / Journal / Case / Event / other. A SOLID dot is
+        // something done (schBuildDayMap — the Activity heatmap's own source, so the two can
+        // never disagree), a HOLLOW dot is something still to do (schAgendaItems — the list
+        // right below). Missed items draw nothing: they are the list's appendix, not a day's.
+        const SCH_KIND_ORDER = ['q', 'j', 'c', 'e', 'x'];
+        const SCH_KIND_NAME = { q: 'Quiz', j: 'Journal', c: 'Case', e: 'Event', x: 'Other' };
+        const SCH_DONE_KIND = { quiz: 'q', reflective: 'j', learning_note: 'j', case: 'c' };
+
+        // The day an open item belongs to: the day it opens when it has not opened yet, else
+        // its deadline; the daily rows belong to today. '' = no day (undated / missed).
+        function schItemDayKey(it, now) {
+            if (schBucketOf(it, now) === 'missed') return '';
+            if (it.bucket === 'today') return schDateKey(now);
+            const at = (it.opens && it.opens > now) ? it.opens : it.due;
+            return at ? schDateKey(at) : '';
+        }
+
+        function schWeekMarks(items) {
+            const now = new Date(), todayKey = schDateKey(now), marks = {};
+            const add = (key, kind, state) => { (marks[key] = marks[key] || {})[kind + state] = true; };
+            const dayMap = schBuildDayMap();
+            Object.keys(dayMap).forEach(key => dayMap[key].forEach(it => add(key, SCH_DONE_KIND[it.submissionType] || 'x', 'd')));
+            (schEventsCache || []).forEach(ev => { if (ev.eventDate && ev.eventDate < todayKey) add(ev.eventDate, 'e', 'd'); });
+            items.forEach(it => { const key = schItemDayKey(it, now); if (key) add(key, it.kind || 'x', 'o'); });
+            return marks;
+        }
+
+        // How far the arrows may walk: the weeks that have a dot, and always next week.
+        function schWeekRange(marks) {
+            const base = schMonday(new Date());
+            let lo = 0, hi = 1;
+            Object.keys(marks).forEach(key => {
+                const d = schParseDay(key);
+                if (!d) return;
+                const w = Math.round((schMonday(d) - base) / (7 * 86400000));
+                if (w < lo) lo = w;
+                if (w > hi) hi = w;
+            });
+            return [Math.max(lo, -52), Math.min(hi, 26)];
+        }
+
+        function schWeekDayHtml(key, items) {
+            const d = schParseDay(key);
+            if (!d) return '';
+            const now = new Date();
+            const done = schBuildDayMap()[key] || [];
+            const events = schEventsOn(key);
+            const todo = items.filter(it => it.kind !== 'e' && schItemDayKey(it, now) === key);
+            const row = (bg, border, icon, title, extra) => '<div style="display:flex; align-items:center; gap:7px; padding:5px 8px; background:' + bg
+                + '; border:1px solid ' + border + '; border-radius:7px; margin-bottom:5px; font-size:0.75em;">'
+                + '<span style="flex:0 0 auto;">' + icon + '</span>'
+                + '<span class="lang-no-toggle" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + escapeHtml(title) + '</span>'
+                + (extra ? '<span style="flex:0 0 auto; color:#64748b; white-space:nowrap;">' + extra + '</span>' : '') + '</div>';
+            const n = done.length + events.length + todo.length;
+            return '<div id="sch-week-day" style="margin:8px 0 2px; padding-top:8px; border-top:1px solid #f1f5f9;">'
+                + '<div style="font-size:0.74em; font-weight:800; color:#7c3aed; margin-bottom:6px;">'
+                + d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) + '</div>'
+                + (n ? '' : '<div style="font-size:0.74em; color:#94a3b8; padding:2px 0 4px;">Nothing on this day</div>')
+                + events.map(ev => schEventRowHtml(ev)).join('')
+                + todo.map(it => row('#fff7ed', '#fed7aa', it.icon, it.title, schWhen(it, now))).join('')
+                + done.map(it => row('#f0fdf4', '#bbf7d0', schTypeIcon(it.submissionType), it.title || 'Untitled ไม่มีชื่อ', 'done')).join('')
+                + '</div>';
+        }
+
+        function schRenderWeek(items) {
+            const box = document.getElementById('sch-week');
+            if (!box) return;
+            // The Agenda never needed the check-in days, the strip does (a day you only checked
+            // in on is not blank). Asked ONCE per open: the loader leaves the cache null when
+            // there is no user yet, and a re-render per answer would spin on that.
+            if (schCheckinDays === null && !window._schWeekReq) {
+                window._schWeekReq = true;
+                schLoadCheckinDays().then(() => { if (schModalOpen() && (window._schPane || 'agenda') === 'agenda') schRenderAgenda(); });
+            }
+            const marks = schWeekMarks(items);
+            const [lo, hi] = schWeekRange(marks);
+            schWeekOffset = Math.min(hi, Math.max(lo, schWeekOffset));
+            const mon = schMonday(new Date());
+            mon.setDate(mon.getDate() + schWeekOffset * 7);
+            const todayKey = schDateKey(new Date());
+            let html = '<div class="sch-wk-row"><button type="button" class="sch-wk-nv" onclick="schWeekShift(-1)" aria-label="Previous week"'
+                + (schWeekOffset <= lo ? ' disabled' : '') + '>‹</button>';
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i);
+                const key = schDateKey(d), m = marks[key] || {};
+                const dots = [], names = [];
+                SCH_KIND_ORDER.forEach(k => {
+                    if (m[k + 'd']) dots.push('<span class="sch-dt ' + k + '"></span>');
+                    if (m[k + 'o']) dots.push('<span class="sch-dt o ' + k + '"></span>');
+                    if (m[k + 'd'] || m[k + 'o']) names.push(SCH_KIND_NAME[k] + (m[k + 'o'] ? (m[k + 'd'] ? ' done + to do' : ' to do') : ' done'));
+                });
+                const label = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) + ' — ' + (names.length ? names.join(', ') : 'nothing');
+                html += '<button type="button" class="sch-wd' + (key === todayKey ? ' today' : '') + '" data-schday="' + key + '" aria-pressed="' + (schWeekSel === key)
+                    + '" aria-label="' + label + '" onclick="schWeekPick(\'' + key + '\')"><small>' + 'MTWTFSS'[i] + '</small><b>' + d.getDate()
+                    + '</b><span class="sch-dots">' + dots.slice(0, 5).join('') + '</span></button>';
+            }
+            html += '<button type="button" class="sch-wk-nv" onclick="schWeekShift(1)" aria-label="Next week"' + (schWeekOffset >= hi ? ' disabled' : '') + '>›</button></div>';
+            const end = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 6);
+            const fmt = x => x.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            html += '<div class="sch-wk-cap"><span>' + fmt(mon) + ' – ' + fmt(end) + '</span>'
+                + (schWeekOffset !== 0 ? '<button type="button" onclick="schWeekToday()">Today ›</button>' : '') + '</div>';
+            if (schWeekSel) html += schWeekDayHtml(schWeekSel, items);
+            box.innerHTML = html;
+        }
+
+        function schWeekShift(delta) { schWeekOffset += delta; schWeekSel = null; schRenderAgenda(); }
+        function schWeekToday() { schWeekOffset = 0; schWeekSel = null; schRenderAgenda(); }
+        function schWeekPick(key) {
+            schWeekSel = (schWeekSel === key) ? null : key;
+            schRenderAgenda();
+            const btn = document.querySelector('#sch-week [data-schday="' + key + '"]');
+            if (btn) btn.focus();
+        }
+
         function schSwitchPane(pane) {
             const selected = ['agenda','activity','goals'].includes(pane) ? pane : 'agenda';
             window._schPane = selected;
@@ -16083,6 +16232,9 @@
             schCalMonth = null;   // V97.17: else the doorway reopens on whatever month was paged to
             schWeekPage = null;   // V97.19: same for the week pager, and for edit mode
             schEditingDates = false;
+            schWeekOffset = 0;    // V101.78: the strip opens on this week with no day picked, every time
+            schWeekSel = null;
+            window._schWeekReq = false;
             schLoadEvents();      // V97.22: lazy, once — no-op after the first open
             const det = document.getElementById('sch-day-detail');
             if (det) { det.style.display = 'none'; det.innerHTML = ''; }
