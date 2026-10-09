@@ -4,11 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.140)</title>
+    <title>Nika Admin (V102.141)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
-    <link rel="stylesheet" href="mypath-ui.css?v=V102.140">
+    <link rel="stylesheet" href="mypath-ui.css?v=V102.141">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -140,7 +140,8 @@
             if (!body) return;
             const isOpen = body.style.display !== 'none';
             body.style.display = isOpen ? 'none' : 'block';
-            if (arrow) arrow.textContent = isOpen ? '▶' : '▼';
+            if (arrow && !arrow.dataset.ico) arrow.textContent = isOpen ? '▶' : '▼';
+            body.closest('.ais-acc')?.classList.toggle('open', !isOpen);
             // V95.96: lazy-load the server-backed 7-day usage when the panel opens
             if (!isOpen && id === 'acc-usage' && typeof loadAiUsage7d === 'function') loadAiUsage7d();
             // V96.05: lazy-load the 7-day AI quality panel alongside usage.
@@ -7147,6 +7148,7 @@
     <script src="ollama-local.js?v=V102.109"></script>
     <script src="peds-dosing.js?v=V102.80"></script>
     <link rel="stylesheet" href="text-ai-chips.css?v=V102.13">
+    <link rel="stylesheet" href="ai-settings-ui.css?v=V102.141">
     <link rel="stylesheet" href="quiz-resource-cards.css?v=V102.09">
     <link rel="stylesheet" href="case-split-studio.css?v=V100.38">
     <script src="case-studio-steps.js?v=V100.38" defer></script>
@@ -16677,113 +16679,45 @@
     <div id="toast" class="lang-no-toggle">Saved!</div>
 
     <!-- AI Keys Management Modal ([Version: V88.14]) -->
+    <!-- V102.141: lean rows — styles in ai-settings-ui.css, Model Default row open/close in ai-settings-ui.js. Every id and handler is unchanged;
+         the four Model Default <select>s stay (ai-model-ui.js hides each one and draws its chip rail beside it). -->
     <div id="aiKeysModal" class="modal" style="z-index:5000;">
-        <div class="modal-content" style="max-width:760px; width:95vw; max-height:90vh; overflow-y:auto; text-align:left;">
-            <span class="close-modal" onclick="document.getElementById('aiKeysModal').style.display='none'">&times;</span>
-            <h3 style="margin-top:0;"><i class="fa-solid fa-gears"></i> AI API Settings</h3>
-            <p style="font-size:0.85em; color:#666; margin-bottom:12px;">
-                Enter your API keys here. They will be saved <b>locally in your browser</b>.
-            </p>
+        <div class="modal-content ais-set" role="dialog" aria-label="AI API Settings">
+            <div class="ais-scroll">
+                <div class="ais-head">
+                    <h3><i class="fa-solid fa-gears"></i> AI API Settings</h3>
+                    <span class="ais-lock" title="Keys are saved only in this browser" aria-label="Keys are saved only in this browser"><i class="fa-solid fa-lock"></i></span>
+                    <button type="button" class="ais-x" onclick="document.getElementById('aiKeysModal').style.display='none'" aria-label="Close">&times;</button>
+                </div>
 
-            <!-- Quick Paste (always visible) -->
-            <div style="margin-bottom:10px; padding:12px; background:#f8f9fa; border-radius:8px; border:1px solid #dee2e6;">
-                <h4 style="margin:0 0 8px 0; color:#495057; font-size:0.85em;"><i class="fa-solid fa-paste"></i> Quick Paste All Keys</h4>
-                <textarea id="bulk-paste-keys" placeholder="Paste all API keys here (one per line):&#10;Gemini: AIza...&#10;OpenAI: sk-...&#10;Typhoon: ...&#10;Anthropic: sk-ant-...&#10;Llama: xxx&#10;OpenRouter: sk-or-v1-..." style="width:100%; height:72px; padding:8px; border:1px solid #ced4da; border-radius:6px; font-family:monospace; font-size:0.8em; resize:vertical; box-sizing:border-box;"></textarea>
-                <button onclick="parseAndFillKeys()" class="btn-sm btn-primary" style="margin-top:8px; width:100%; background:#28a745;"><i class="fa-solid fa-magic"></i> Auto-Fill All Keys</button>
-            </div>
+                <!-- Quick Paste (always visible) -->
+                <div class="ais-paste">
+                    <textarea id="bulk-paste-keys" placeholder="Paste keys here — one per line&#10;Gemini: AIza...&#10;OpenAI: sk-...&#10;Anthropic: sk-ant-...&#10;OpenRouter: sk-or-v1-..."></textarea>
+                    <button type="button" class="ais-go" onclick="parseAndFillKeys()" title="Auto-fill all keys" aria-label="Auto-fill all keys"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+                </div>
 
-            <!-- ▼ Accordion 1: API Keys (open) -->
-            <div style="margin-bottom:6px; border:1px solid #ffcc02; border-radius:10px; overflow:hidden;">
-                <button type="button" onclick="toggleAiAccordion('acc-keys')" style="width:100%; display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#fff3e0; border:none; cursor:pointer; text-align:left;">
-                    <span style="font-size:0.85em; font-weight:800; color:#e65100;"><i class="fa-solid fa-key"></i> API Keys</span>
-                    <span id="acc-keys-arrow" style="font-size:0.75em; color:#e65100; transition:0.2s;">▼</span>
-                </button>
-                <div id="acc-keys" style="padding:12px; background:#fffbf0;">
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                        <div>
-                            <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
-                                <label style="font-size:0.75em; font-weight:bold; color:#555; margin:0;">Gemini</label>
-                                <button type="button" onclick="togglePasswordVisibility('local-gemini-key')" style="background:none; border:none; color:#666; cursor:pointer; padding:1px 4px; border-radius:3px; font-size:0.7em;" title="Show/Hide Key"><i class="fa-solid fa-eye" id="local-gemini-key-toggle"></i></button>
-                            </div>
-                            <input type="password" id="local-gemini-key" placeholder="AIza..." style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em; box-sizing:border-box;">
-                        </div>
-                        <div>
-                            <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
-                                <label style="font-size:0.75em; font-weight:bold; color:#555; margin:0;">OpenAI</label>
-                                <button type="button" onclick="togglePasswordVisibility('local-openai-key')" style="background:none; border:none; color:#666; cursor:pointer; padding:1px 4px; border-radius:3px; font-size:0.7em;" title="Show/Hide Key"><i class="fa-solid fa-eye" id="local-openai-key-toggle"></i></button>
-                            </div>
-                            <input type="password" id="local-openai-key" placeholder="sk-..." style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em; box-sizing:border-box;">
-                        </div>
-                        <div>
-                            <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
-                                <label style="font-size:0.75em; font-weight:bold; color:#555; margin:0;">Anthropic</label>
-                                <button type="button" onclick="togglePasswordVisibility('local-anthropic-key')" style="background:none; border:none; color:#666; cursor:pointer; padding:1px 4px; border-radius:3px; font-size:0.7em;" title="Show/Hide Key"><i class="fa-solid fa-eye" id="local-anthropic-key-toggle"></i></button>
-                            </div>
-                            <input type="password" id="local-anthropic-key" placeholder="sk-ant-..." style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em; box-sizing:border-box;">
-                        </div>
-                        <div>
-                            <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
-                                <label style="font-size:0.75em; font-weight:bold; color:#555; margin:0;">Typhoon</label>
-                                <button type="button" onclick="togglePasswordVisibility('local-typhoon-key')" style="background:none; border:none; color:#666; cursor:pointer; padding:1px 4px; border-radius:3px; font-size:0.7em;" title="Show/Hide Key"><i class="fa-solid fa-eye" id="local-typhoon-key-toggle"></i></button>
-                            </div>
-                            <input type="password" id="local-typhoon-key" placeholder="Typhoon..." style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em; box-sizing:border-box;">
-                        </div>
-                        <div style="grid-column:1/-1;">
-                            <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
-                                <label style="font-size:0.75em; font-weight:bold; color:#555; margin:0;">Llama (Together.ai fallback)</label>
-                                <button type="button" onclick="togglePasswordVisibility('local-llama-key')" style="background:none; border:none; color:#666; cursor:pointer; padding:1px 4px; border-radius:3px; font-size:0.7em;" title="Show/Hide Key"><i class="fa-solid fa-eye" id="local-llama-key-toggle"></i></button>
-                            </div>
-                            <input type="password" id="local-llama-key" placeholder="Together.ai key (fallback only)" style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em; box-sizing:border-box;">
-                        </div>
-                        <!-- V101.46: OpenRouter brand theme (Grape) — tokens in text-ai-chips.css.
-                             V101.50: one inline row — logo, 🔑 key, eye; the help text opens from ⓘ (click/keyboard, not hover). -->
-                        <div class="or-key-card" style="grid-column:1/-1; background:#f6f1ff; border:1px solid #cdb6fb; border-radius:8px; padding:8px 10px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                            <label for="local-openrouter-key" style="font-size:0.75em; font-weight:bold; color:var(--or-grape); margin:0; display:inline-flex; align-items:center; gap:4px; flex:0 0 auto;"><img src="assets/openrouter/glyph-grape.svg" alt="" width="17" height="12" style="display:block;">OpenRouter</label>
-                            <span aria-hidden="true" style="font-size:0.85em; flex:0 0 auto;">🔑</span>
-                            <input type="password" id="local-openrouter-key" placeholder="sk-or-v1-..." aria-describedby="local-openrouter-key-help" style="flex:1 1 90px; min-width:0; width:auto; margin:0; padding:6px; border:1px solid #8b5cf6; border-radius:4px; font-size:0.8em; box-sizing:border-box;">
-                            <button type="button" class="or-key-eye" onclick="togglePasswordVisibility('local-openrouter-key')" style="flex:0 0 auto; width:auto; background:none; border:none; color:#5b1bc2; cursor:pointer; padding:1px 4px; border-radius:3px; font-size:0.8em;" title="Show/Hide Key" aria-label="Show/Hide OpenRouter key"><i class="fa-solid fa-eye" id="local-openrouter-key-toggle"></i></button>
-                            <details class="or-key-help"><summary aria-label="About the OpenRouter key">ⓘ</summary><div id="local-openrouter-key-help">Routes Llama + or/ models. Get a key at <b>openrouter.ai/keys</b> — free tier available. Firebase secret: <code>firebase functions:secrets:set OPENROUTER_API_KEY</code></div></details>
-                        </div>
-                        <div style="grid-column:1/-1; background:rgba(0,0,0,0.02); padding:10px; border-radius:8px; border:1px solid #eee; margin-top:2px;">
-                            <label style="font-size:0.75em; font-weight:bold; color:#2c3e50; display:block; margin-bottom:8px;">🧪 Qwen / Local OpenAI API (v1)</label>
-                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                                <div>
-                                    <label style="font-size:0.65em; display:block; margin-bottom:2px; color:#666;">Endpoint URL</label>
-                                    <input type="text" id="local-qwen-url" placeholder="http://localhost:8880/v1" style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em; box-sizing:border-box;">
-                                </div>
-                                <div>
-                                    <label style="font-size:0.65em; display:block; margin-bottom:2px; color:#666;">API Key (Optional)</label>
-                                    <input type="password" id="local-qwen-key" placeholder="key-if-needed" style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em; box-sizing:border-box;">
-                                </div>
-                            </div>
-                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px;">
-                                <div>
-                                    <label style="font-size:0.65em; display:block; margin-bottom:2px; color:#666;">Voice Design Model Override (Optional)</label>
-                                    <input type="text" id="local-qwen-vd-model" placeholder="qwen3-tts-vd or custom runtime model id" style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em; box-sizing:border-box;">
-                                </div>
-                                <div style="font-size:0.68em; color:#64748b; line-height:1.45; background:#f8fbff; border:1px solid #dbeafe; border-radius:8px; padding:8px;">Optional speaker catalog JSON lets Laboon render runtime-specific Qwen speakers dynamically. Leave empty to use the built-in Qwen speaker list.</div>
-                            </div>
-                            <div style="margin-top:8px;">
-                                <label style="font-size:0.65em; display:block; margin-bottom:2px; color:#666;">Speaker Catalog JSON (Optional)</label>
-                                <textarea id="local-qwen-speaker-catalog" rows="3" placeholder='[{"id":"Vivian","label":"Vivian","lang":["zh-CN","en-US"],"desc":"Bright female"}]' style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.78em; resize:vertical; box-sizing:border-box;"></textarea>
-                            </div>
+                <div class="ais-sec"><i class="fa-solid fa-key"></i> Keys</div>
+                <div class="ais-row"><span class="ais-logo"><img src="assets/logos/gemini-spark-color.svg" alt=""></span><label class="ais-name" for="local-gemini-key">Gemini</label><input type="password" id="local-gemini-key" class="ais-in" placeholder="AIza..."><button type="button" class="ais-eye" onclick="togglePasswordVisibility('local-gemini-key')" title="Show/Hide Key" aria-label="Show/Hide Gemini key"><i class="fa-solid fa-eye" id="local-gemini-key-toggle"></i></button></div>
+                <div class="ais-row"><span class="ais-logo"><img src="assets/logos/openai-blossom-black.svg" alt=""></span><label class="ais-name" for="local-openai-key">OpenAI</label><input type="password" id="local-openai-key" class="ais-in" placeholder="sk-..."><button type="button" class="ais-eye" onclick="togglePasswordVisibility('local-openai-key')" title="Show/Hide Key" aria-label="Show/Hide OpenAI key"><i class="fa-solid fa-eye" id="local-openai-key-toggle"></i></button></div>
+                <div class="ais-row"><span class="ais-logo"><img src="assets/logos/claude-spark-clay.svg" alt=""></span><label class="ais-name" for="local-anthropic-key">Anthropic</label><input type="password" id="local-anthropic-key" class="ais-in" placeholder="sk-ant-..."><button type="button" class="ais-eye" onclick="togglePasswordVisibility('local-anthropic-key')" title="Show/Hide Key" aria-label="Show/Hide Anthropic key"><i class="fa-solid fa-eye" id="local-anthropic-key-toggle"></i></button></div>
+                <div class="ais-row"><span class="ais-logo">🌀</span><label class="ais-name" for="local-typhoon-key">Typhoon</label><input type="password" id="local-typhoon-key" class="ais-in" placeholder="Typhoon..."><button type="button" class="ais-eye" onclick="togglePasswordVisibility('local-typhoon-key')" title="Show/Hide Key" aria-label="Show/Hide Typhoon key"><i class="fa-solid fa-eye" id="local-typhoon-key-toggle"></i></button></div>
+                <div class="ais-row"><span class="ais-logo">🦙</span><label class="ais-name" for="local-llama-key" title="Together.ai — fallback only">Llama</label><input type="password" id="local-llama-key" class="ais-in" placeholder="Together.ai key"><button type="button" class="ais-eye" onclick="togglePasswordVisibility('local-llama-key')" title="Show/Hide Key" aria-label="Show/Hide Llama key"><i class="fa-solid fa-eye" id="local-llama-key-toggle"></i></button></div>
+                <div class="ais-row ais-or"><span class="ais-logo"><img src="assets/openrouter/glyph-grape.svg" alt=""></span><label class="ais-name" for="local-openrouter-key">OpenRouter</label><input type="password" id="local-openrouter-key" class="ais-in" aria-describedby="local-openrouter-key-help" placeholder="sk-or-v1-..."><button type="button" class="ais-eye" onclick="togglePasswordVisibility('local-openrouter-key')" title="Show/Hide Key" aria-label="Show/Hide OpenRouter key"><i class="fa-solid fa-eye" id="local-openrouter-key-toggle"></i></button><details class="or-key-help ais-help"><summary aria-label="About the OpenRouter key">ⓘ</summary><div id="local-openrouter-key-help">Routes Llama + or/ models. Get a key at <b>openrouter.ai/keys</b> — free tier available. Firebase secret: <code>firebase functions:secrets:set OPENROUTER_API_KEY</code></div></details></div>
+
+                <div class="ais-acc">
+                <button type="button" class="ais-drow" onclick="toggleAiAccordion('acc-local')" aria-controls="acc-local"><span class="ais-logo"><img src="assets/logos/qwen-color.svg" alt=""></span><span class="ais-t" title="Qwen / any OpenAI-compatible endpoint">Local endpoint</span><span id="acc-local-arrow" class="ais-chev" data-ico="1"><i class="fa-solid fa-chevron-down"></i></span></button>
+                    <div id="acc-local" style="display:none;">
+                        <div class="ais-grid">
+                            <div><label for="local-qwen-url">Endpoint URL</label><input type="text" id="local-qwen-url" placeholder="http://localhost:8880/v1"></div>
+                            <div><label for="local-qwen-key">API key (optional)</label><input type="password" id="local-qwen-key" placeholder="key-if-needed"></div>
+                            <div class="ais-wide"><label for="local-qwen-vd-model" style="display:inline-block;">Voice model override</label> <details class="or-key-help ais-help" style="display:inline-block;"><summary aria-label="About the speaker catalog">ⓘ</summary><div>Optional speaker catalog JSON lets Laboon render runtime-specific Qwen speakers dynamically. Leave empty to use the built-in Qwen speaker list.</div></details><input type="text" id="local-qwen-vd-model" placeholder="qwen3-tts-vd or custom runtime model id"></div>
+                            <div class="ais-wide"><label for="local-qwen-speaker-catalog">Speaker catalog JSON</label><textarea id="local-qwen-speaker-catalog" rows="3" placeholder='[{"id":"Vivian","label":"Vivian","lang":["zh-CN","en-US"],"desc":"Bright female"}]'></textarea></div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- ▼ Accordion 2: Model Defaults (open) -->
-            <div style="margin-bottom:6px; border:1px solid #c7d2fe; border-radius:10px; overflow:hidden;">
-                <button type="button" onclick="toggleAiAccordion('acc-models')" style="width:100%; display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#eef2ff; border:none; cursor:pointer; text-align:left;">
-                    <span style="font-size:0.85em; font-weight:800; color:#4338ca;"><i class="fa-solid fa-sliders"></i> Model Defaults</span>
-                    <span id="acc-models-arrow" style="font-size:0.75em; color:#4338ca; transition:0.2s;">▼</span>
-                </button>
-                <div id="acc-models" style="padding:12px; background:#f5f7ff;">
-                    <p style="font-size:0.72em; color:#64748b; margin:0 0 10px 0;">Default model for each feature. Toolbar selectors still override per session.</p>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                        <div style="background:white; border:1px solid #e2e8f0; border-radius:8px; padding:10px;">
-                            <div style="font-size:0.72em; font-weight:700; color:#0369a1; margin-bottom:6px;">🌐 Translate</div>
-                            <select id="default-translate-model" onchange="syncModelDefault('toolbar-ai-translate-model',this.value)" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:6px; font-size:0.8em; box-sizing:border-box;">
+                <div class="ais-sec" style="margin-top:12px;"><i class="fa-solid fa-sliders"></i> Model defaults <details class="or-key-help ais-help"><summary aria-label="About model defaults">ⓘ</summary><div>Default model for each feature. Toolbar selectors still override per session. Tap the chosen chip to change it.</div></details></div>
+                <div class="ais-mrow"><span class="ais-mi" aria-hidden="true">🌐</span><span class="ais-mn">Translate</span><span class="ais-rail"><select id="default-translate-model" onchange="syncModelDefault('toolbar-ai-translate-model',this.value)" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:6px; font-size:0.8em; box-sizing:border-box;">
                                 <option value="gpt-4o">GPT-4o</option>
                                 <option value="gemini-3.5-flash">Gemini Flash</option>
                                 <option value="gemini-3.6-flash">Gemini 3.6</option>
@@ -16792,11 +16726,8 @@
                                 <option value="thaillm-openthaigpt">ThaiLLM</option>
                                 <option value="meta-llama/Llama-3.3-70B-Instruct-Turbo">Llama 3.3 🦙</option>
                                 <option value="glm-5.1:cloud">GLM-5.1</option>
-                            </select>
-                        </div>
-                        <div style="background:white; border:1px solid #e2e8f0; border-radius:8px; padding:10px;">
-                            <div style="font-size:0.72em; font-weight:700; color:#0369a1; margin-bottom:6px;">🔍 AI Analyzer</div>
-                            <select id="default-analyzer-model" onchange="syncModelDefault('ai-analyzer-model-val',this.value)" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:6px; font-size:0.8em; box-sizing:border-box;">
+                            </select></span><button type="button" class="ais-more" aria-label="Change Translate model"><i class="fa-solid fa-chevron-down"></i></button></div>
+                <div class="ais-mrow"><span class="ais-mi" aria-hidden="true">🔍</span><span class="ais-mn">AI Analyzer</span><span class="ais-rail"><select id="default-analyzer-model" onchange="syncModelDefault('ai-analyzer-model-val',this.value)" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:6px; font-size:0.8em; box-sizing:border-box;">
                                 <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
                                 <option value="gemini-3.5-flash">Gemini Flash</option>
                                 <option value="gemini-3.6-flash">Gemini 3.6</option>
@@ -16804,21 +16735,15 @@
                                 <option value="claude-4-sonnet-latest">Claude Sonnet</option>
                                 <option value="typhoon-v2.5-30b-a3b-instruct">Typhoon 🌀</option>
                                 <option value="meta-llama/Llama-3.3-70B-Instruct-Turbo">Llama 3.3 🦙</option>
-                            </select>
-                        </div>
-                        <div style="background:white; border:1px solid #e2e8f0; border-radius:8px; padding:10px;">
-                            <div style="font-size:0.72em; font-weight:700; color:#0369a1; margin-bottom:6px;">📝 Reflective Review</div>
-                            <select id="default-review-model" onchange="syncModelDefault('ai-model-review',this.value)" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:6px; font-size:0.8em; box-sizing:border-box;">
+                            </select></span><button type="button" class="ais-more" aria-label="Change AI Analyzer model"><i class="fa-solid fa-chevron-down"></i></button></div>
+                <div class="ais-mrow"><span class="ais-mi" aria-hidden="true">📝</span><span class="ais-mn">Reflective Review</span><span class="ais-rail"><select id="default-review-model" onchange="syncModelDefault('ai-model-review',this.value)" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:6px; font-size:0.8em; box-sizing:border-box;">
                                 <option value="gpt-4o">GPT-4o (Frontier)</option>
                                 <option value="gpt-4o-mini">GPT-4o mini</option>
                                 <option value="gemini-3.5-flash">Gemini Flash</option>
                                 <option value="claude-3-5-sonnet-latest">Claude 3.5</option>
                                 <option value="meta-llama/Llama-3.3-70B-Instruct-Turbo">Llama 3.3 🦙</option>
-                            </select>
-                        </div>
-                        <div style="background:white; border:1px solid #e2e8f0; border-radius:8px; padding:10px;">
-                            <div style="font-size:0.72em; font-weight:700; color:#0369a1; margin-bottom:6px;">🗡️ Quiz Feedback</div>
-                            <select id="default-qfp-model" onchange="syncModelDefault('ai-model-selector',this.value)" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:6px; font-size:0.8em; box-sizing:border-box;">
+                            </select></span><button type="button" class="ais-more" aria-label="Change Reflective Review model"><i class="fa-solid fa-chevron-down"></i></button></div>
+                <div class="ais-mrow"><span class="ais-mi" aria-hidden="true">🗡️</span><span class="ais-mn">Quiz Feedback</span><span class="ais-rail"><select id="default-qfp-model" onchange="syncModelDefault('ai-model-selector',this.value)" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:6px; font-size:0.8em; box-sizing:border-box;">
                                 <option value="gpt-6-luna">GPT 6 Luna</option>
                                 <option value="gpt-5.6-terra">GPT 5.6 Terra</option>
                                 <option value="gpt-6-sol">GPT 6 Sol</option>
@@ -16829,19 +16754,12 @@
                                 <option value="claude-sonnet-5-5">Claude Sonnet 5.5</option>
                                 <option value="claude-opus-5-5">Claude Opus 5.5</option>
                                 <option value="claude-fable-5-1">Claude Fable 5.1</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            </div>
+                            </select></span><button type="button" class="ais-more" aria-label="Change Quiz Feedback model"><i class="fa-solid fa-chevron-down"></i></button></div>
 
-            <!-- ▶ Accordion 3: Vertex AI (closed) -->
-            <div style="margin-bottom:6px; border:1px solid #bfdbfe; border-radius:10px; overflow:hidden;">
-                <button type="button" onclick="toggleAiAccordion('acc-vertex')" style="width:100%; display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#eff6ff; border:none; cursor:pointer; text-align:left;">
-                    <span style="font-size:0.85em; font-weight:800; color:#1d4ed8;"><i class="fa-solid fa-cloud"></i> Google Vertex AI (Imagen)</span>
-                    <span id="acc-vertex-arrow" style="font-size:0.75em; color:#1d4ed8; transition:0.2s;">▶</span>
-                </button>
-                <div id="acc-vertex" style="display:none; padding:12px; background:#f0f7ff;">
+                <!-- Google Vertex AI (closed) -->
+                <div class="ais-acc" style="margin-top:8px;">
+                <button type="button" class="ais-drow" onclick="toggleAiAccordion('acc-vertex')" aria-controls="acc-vertex"><span class="ais-logo">☁️</span><span class="ais-t">Vertex AI</span><span id="ais-vertex-pill" class="ais-pill" title="Auth mode">Auto</span><span id="acc-vertex-arrow" class="ais-chev" data-ico="1"><i class="fa-solid fa-chevron-down"></i></span></button>
+                    <div id="acc-vertex" style="display:none; padding:2px 0 12px 38px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                         <label style="font-size:0.8em; font-weight:bold; color:var(--primary); margin:0;">Auth Mode</label>
                         <div class="glass-toggle-container" style="background:rgba(0,0,0,0.05); transform:scale(0.85); transform-origin:right center;">
@@ -16865,16 +16783,13 @@
                         <i class="fa-solid fa-wand-magic-sparkles"></i>
                         <span><b>Keyless Mode Active:</b> Cloud functions handle auth automatically. No token maintenance needed!</span>
                     </div>
+                    </div>
                 </div>
-            </div>
 
-            <!-- ▶ Accordion 4: Usage & Quota (closed) -->
-            <div style="margin-bottom:10px; border:1px solid #e9d5ff; border-radius:10px; overflow:hidden;">
-                <button type="button" onclick="toggleAiAccordion('acc-usage')" style="width:100%; display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#faf5ff; border:none; cursor:pointer; text-align:left;">
-                    <span style="font-size:0.85em; font-weight:800; color:#7c3aed;"><i class="fa-solid fa-chart-line"></i> Usage & Quota</span>
-                    <span id="acc-usage-arrow" style="font-size:0.75em; color:#7c3aed; transition:0.2s;">▶</span>
-                </button>
-                <div id="acc-usage" style="display:none; padding:12px; background:#fdf9ff;">
+                <!-- Usage & Quota (closed) -->
+                <div class="ais-acc">
+                <button type="button" class="ais-drow" onclick="toggleAiAccordion('acc-usage')" aria-controls="acc-usage"><span class="ais-logo">📈</span><span class="ais-t">Usage &amp; quota</span><span id="acc-usage-arrow" class="ais-chev" data-ico="1"><i class="fa-solid fa-chevron-down"></i></span></button>
+                    <div id="acc-usage" style="display:none; padding:2px 0 12px 38px;">
                     <div id="ai-usage-details" style="font-size:0.75em; color:#555;">
                         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
                             <div style="font-weight:bold; color:#8e44ad;"><i class="fa-solid fa-chart-line"></i> Today's AI Usage (Tokens)</div>
@@ -16910,24 +16825,19 @@
                             <button onclick="checkAllQuota()" style="width:100%; margin-top:8px; background:linear-gradient(135deg,#667eea,#764ba2); color:white; border:none; font-size:0.9em; padding:6px; border-radius:6px; cursor:pointer;"><i class="fa-solid fa-rotate"></i> Check Quota</button>
                         </div>
                     </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Save / Close -->
-            <div style="display:flex; gap:10px; margin-bottom:10px;">
-                <button class="btn-primary" onclick="saveAIKeys()" style="flex:1; font-weight:700; padding:10px; border-radius:8px;"><i class="fa-solid fa-save"></i> Save All Settings</button>
-                <button class="btn-secondary" onclick="document.getElementById('aiKeysModal').style.display='none'" style="flex:1; font-weight:700; padding:10px; border-radius:8px; background:#6c757d;"><i class="fa-solid fa-times"></i> Close</button>
-            </div>
-
-            <!-- Backup & Restore -->
-            <div style="padding:10px; background:#e3f2fd; border-radius:8px; border:1px solid #bbdefb;">
-                <h4 style="margin:0 0 8px 0; color:#1565c0; font-size:0.8em;"><i class="fa-solid fa-download"></i> Backup & Restore</h4>
-                <div style="display:flex; gap:8px; margin-bottom:6px;">
-                    <button onclick="exportAIKeys()" class="btn-sm" style="flex:1; background:#1976d2; color:white; font-size:0.75em;"><i class="fa-solid fa-download"></i> Export</button>
-                    <button onclick="document.getElementById('import-file-input').click()" class="btn-sm" style="flex:1; background:#388e3c; color:white; font-size:0.75em;"><i class="fa-solid fa-upload"></i> Import</button>
+            <!-- Save / Close / Backup — sticky -->
+            <div class="ais-foot">
+                <button type="button" class="ais-save" onclick="saveAIKeys()"><i class="fa-solid fa-floppy-disk"></i> Save</button>
+                <button type="button" class="ais-close" onclick="document.getElementById('aiKeysModal').style.display='none'">Close</button>
+                <span class="ais-bk">
+                    <button type="button" onclick="exportAIKeys()" title="Export keys to a backup file" aria-label="Export keys"><i class="fa-solid fa-download"></i></button>
+                    <button type="button" onclick="document.getElementById('import-file-input').click()" title="Import keys from a backup file" aria-label="Import keys"><i class="fa-solid fa-upload"></i></button>
                     <input type="file" id="import-file-input" accept=".json" style="display:none;" onchange="importAIKeys(event)">
-                </div>
-                <div style="font-size:0.7em; color:#666; font-style:italic;">Export saves keys to file for backup. Import restores from backup file.</div>
+                </span>
             </div>
         </div>
     </div>
@@ -17908,6 +17818,8 @@
                 
                 const modeValue = mode.value;
                 manualFields.style.display = modeValue === 'manual' ? 'block' : 'none';
+                const pill = document.getElementById('ais-vertex-pill');
+                if (pill) pill.textContent = modeValue === 'manual' ? 'Manual' : 'Auto';
                 autoStatus.style.display = modeValue === 'auto' ? 'flex' : 'none';
             } catch (error) {
                 console.error("Error in toggleVertexManualFields:", error);
@@ -69004,7 +68916,8 @@ Summarize in English in 3–5 concise lines:
 <script src="drug-toolbar.js?v=V102.131"></script>
 <script src="drug-form-ui.js?v=V102.135"></script>
 <script src="drug-list-ui.js?v=V102.136"></script>
-<script src="mypath-ui.js?v=V102.140"></script>
+<script src="mypath-ui.js?v=V102.141"></script>
+<script src="ai-settings-ui.js?v=V102.141" defer></script>
 <script src="journal-feedback-admin.js?v=V99.88"></script>
 <script src="delete-requests.js?v=V100.40"></script>
 </body>
