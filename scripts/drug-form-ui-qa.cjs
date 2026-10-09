@@ -135,9 +135,40 @@ const rgb = async (page, sel, prop, want) => { await page.waitForFunction(([s, p
         assert.equal(await page.locator('#dca-form-mode-label').innerText(), '✏️ Baloxavir marboxil');
         await page.evaluate(() => { const b = document.getElementById('dca-form-ai-badge'); b.style.display = 'inline-flex'; b.textContent = '🤖 AI-drafted by claude-opus-5-5 · verify before save'; });
         await page.waitForTimeout(30);
-        assert.match(await page.locator('#dca-form-ai-badge .dfu-ai-n').innerText(), /Opus/);
-        assert.match(await page.locator('#dca-form-ai-badge').getAttribute('title'), /verify before save/);
-        assert.ok((await page.locator('#dca-form-ai-badge').innerText()).length < 14, 'the badge is a logo + short name');
+        // the drafter is a logo + ✍️ avatar — its NAME is not printed (the model chip carries a name), and the full text is the tooltip
+        assert.equal(await page.locator('#dca-form-ai-badge .dfu-ai').count(), 1);
+        assert.equal((await page.locator('#dca-form-ai-badge').innerText()).trim(), '', 'no model name text in the badge');
+        assert.match(await page.locator('#dca-form-ai-badge').getAttribute('title'), /claude-opus-5-5 · verify before save/);
+        assert.equal((await page.locator('#dca-form-ai-badge .dfu-ai').boundingBox()).width, 30);
+        await page.evaluate(() => { const b = document.getElementById('dca-form-ai-badge'); b.textContent = '🤖 AI-drafted · verify before save'; });
+        await page.waitForTimeout(30);
+        assert.equal((await page.locator('#dca-form-ai-badge').innerText()).trim(), '🤖', 'a draft with no recorded model shows 🤖');
+
+        // ---- the head is TWO lines: ① ← name · status · drafter ······ × ② tabs ······ actions ----
+        const rows = await page.evaluate(() => {
+            const top = s => { const e = document.querySelector(s); const r = e.getBoundingClientRect(); return { t: Math.round(r.top), b: Math.round(r.bottom), l: Math.round(r.left), r: Math.round(r.right), c: Math.round((r.top + r.bottom) / 2) }; };
+            const vis = s => { const e = document.querySelector(s); return !!e && e.getClientRects().length > 0; };
+            return { header: vis('#drugCodexAdminModal .dt-header'), form: getComputedStyle(document.getElementById('dca-view-form')).display,
+                back: top('.dfu-back'), name: top('#dca-form-mode-label'), chip: top('#dca-form-status-chip'), tabs: top('#dca-form-tabs'), actions: top('.dt-actions'), close: top('#drugCodexAdminModal .close-modal'), firstField: top('#dca-f-genericName') };
+        });
+        assert.equal(rows.header, false, 'the modal title row is gone inside the form');
+        assert.equal(rows.form, 'flex');
+        const same = (a, b) => Math.abs(a.c - b.c) <= 14;
+        assert.ok(same(rows.back, rows.name) && same(rows.name, rows.chip), 'line 1: ← · name · status chip share a row: ' + JSON.stringify(rows));
+        assert.ok(same(rows.tabs, rows.actions), 'line 2: tabs and the actions share a row: ' + JSON.stringify(rows));
+        assert.ok(rows.tabs.t >= rows.name.b - 2, 'line 2 sits under line 1');
+        assert.ok(rows.close.c <= rows.name.b && rows.close.l >= rows.chip.r, '× stays on line 1, clear of the chips');
+        assert.ok(rows.actions.l > rows.tabs.r - 2, 'the actions are to the right of the tabs');
+        assert.ok(rows.firstField.t - rows.tabs.b < 60, 'the first field follows line 2 directly');
+        // the model rail opens under line 2, not between the lines
+        await page.locator('#dt-model-toggle').click();
+        const railTop = await page.evaluate(() => Math.round(document.getElementById('dt-models').getBoundingClientRect().top)), tabsBottom = Math.round(rows.tabs.b);
+        assert.ok(railTop >= tabsBottom - 2, 'the provider rail opens below the tabs row: ' + railTop + ' vs ' + tabsBottom);
+        await page.locator('#dt-model-toggle').click();
+        // a narrow modal wraps instead of overflowing
+        await page.evaluate(() => { document.querySelector('#drugCodexAdminModal .modal-content').style.width = '560px'; document.querySelector('#drugCodexAdminModal .modal-content').style.maxWidth = '560px'; });
+        assert.equal(await page.evaluate(() => { const m = document.querySelector('#drugCodexAdminModal .modal-content'); return m.scrollWidth <= m.clientWidth + 1; }), true, 'no horizontal overflow at 560 px');
+        await page.evaluate(() => { document.querySelector('#drugCodexAdminModal .modal-content').style.width = '900px'; document.querySelector('#drugCodexAdminModal .modal-content').style.maxWidth = '900px'; });
         await page.evaluate(() => { document.getElementById('dca-view-form').style.display = 'none'; });
         await page.waitForTimeout(30);
         assert.equal(await page.locator('#drugCodexAdminModal .dca-view-tabs').isVisible(), true, 'the tabs return with the list view');
