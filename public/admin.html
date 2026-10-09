@@ -4,9 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.135)</title>
+    <title>Nika Admin (V102.136)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
+    <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -15176,11 +15177,13 @@
                 <!-- V96.52: sort toggle — A-Z (default) vs least-complete-first.
                      lang-no-toggle: Thai label + chip text must not be hidden by lang-toggle.js EN-default body. -->
                 <div class="dca-sort-row">
-                    <span class="dca-sort-label">Sort: เรียง</span>
+                    <span class="dca-sort-label">Sort</span>
                     <div class="glass-toggle-container">
-                        <div class="glass-toggle-item active" data-sort="az" onclick="dcaSetSort('az', this)">A–Z</div>
-                        <div class="glass-toggle-item" data-sort="completeness" onclick="dcaSetSort('completeness', this)" title="Least complete first" data-th-title="ยาที่ข้อมูลไม่ครบขึ้นก่อน">📊 Completeness ความสมบูรณ์</div>
+                        <div class="glass-toggle-item active" data-sort="completeness" onclick="dcaSetSort('completeness', this)" title="Least complete first" data-th-title="ยาที่ข้อมูลไม่ครบขึ้นก่อน">▲ Incomplete first</div>
+                        <div class="glass-toggle-item" data-sort="az" onclick="dcaSetSort('az', this)" title="A–Z, grouped by letter">A–Z</div>
+                        <div class="glass-toggle-item" data-sort="recent" onclick="dcaSetSort('recent', this)" title="Latest update first">Recent</div>
                     </div>
+                </div>
                 </div>
 
                 <div class="dca-az-rail" id="dca-az-rail"></div>
@@ -41873,11 +41876,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // English-only: this feeds a title= attribute, which the lang walker cannot reach.
         const DCA_SECTION_LABELS = { core: 'Core', clinical: 'Clinical', moa: 'MoA', pk: 'PK', edu: 'Education', refs: 'References' };
 
-        // V96.52: colour band for a completeness pct. ≥90 green · 60–89 amber · <60 red.
+        // V102.136: ONE colour scale for completeness — the same 5 steps as the form's tab pills (drug-form-ui.js).
+        // 0 grey · <40 orange · <75 yellow · <90 light green · ≥90 dark green. Red is kept for "required field missing".
         function dcaCompletenessColor(pct) {
-            if (pct >= 90) return { bg: '#dcfce7', fg: '#15803d', bd: '#86efac' };
-            if (pct >= 60) return { bg: '#fef3c7', fg: '#b45309', bd: '#fcd34d' };
-            return { bg: '#fee2e2', fg: '#b91c1c', bd: '#fca5a5' };
+            if (pct <= 0) return { bg: '#eef2f7', fg: '#64748b', bd: '#cbd5e1' };
+            if (pct < 40) return { bg: '#ffedd5', fg: '#9a3412', bd: '#fdba74' };
+            if (pct < 75) return { bg: '#fef08a', fg: '#713f12', bd: '#facc15' };
+            if (pct < 90) return { bg: '#bbf7d0', fg: '#14532d', bd: '#4ade80' };
+            return { bg: '#15803d', fg: '#ffffff', bd: '#15803d' };
         }
 
         function dcaSwitchSection(sectionKey) {
@@ -42091,7 +42097,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             _reviewSuggestedScore: null, // V96.95: {value,rationale} from AI Review, pre-fills dcaPromptContributorBonus; cleared on drug switch
             helpers: [],           // V95.93: admin-curated contributor picker state [{userId(lineId),name,pictureUrl}]; persisted as helper:<lineId> in contributors[]
             searchTerm: '',
-            sortMode: 'az'         // V96.52: 'az' (A-Z grouped, default) | 'completeness' (flat, least-complete first)
+            sortMode: 'completeness' // V102.136: 'completeness' (default — least complete first, flat) | 'az' (grouped by letter) | 'recent' (latest update first, flat)
         };
 
         function openDrugCodexAdmin() {
@@ -42321,34 +42327,43 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         function dcaPublishedRowHtml(drug) {
-            const brands = Array.isArray(drug.brandNames) && drug.brandNames.length > 0
-                ? `<div class="dca-row-brands">${dcaEscapeHtml(drug.brandNames.join(', '))}</div>` : '';
-            const chips = [];
-            if (drug.atcCode) chips.push(`<span class="dca-row-meta-chip">${dcaEscapeHtml(drug.atcCode)}</span>`);
-            if (drug.class) chips.push(`<span style="color:#475569;">${dcaEscapeHtml(drug.class)}</span>`);
-            if (drug.aiDrafted) chips.push('<span class="dca-ai-badge">🤖 AI</span>');
+            // V102.136: three FIXED tiers so every row is the same height — ① name + completeness ② ATC + class ③ up to two brands (+N) · actions.
+            // A missing value shows a faint placeholder instead of vanishing; Edit + ⋯ replace the four buttons (the rest live in the ⋯ menu).
+            const id = dcaEscapeHtml(drug._id), name = dcaEscapeHtml(drug.genericName);
+            const brands = (Array.isArray(drug.brandNames) ? drug.brandNames : []).filter(Boolean);
+            const brandChips = brands.slice(0, 2).map(b => `<span class="dca-br">${dcaEscapeHtml(b)}</span>`).join('')
+                + (brands.length > 2 ? `<span class="dca-br dca-br-more" title="${dcaEscapeHtml(brands.slice(2).join(', '))}">+${brands.length - 2}</span>` : '');
             const updatedAbs = dcaFormatAbsolute(drug.updatedAt || drug.createdAt);
             return `
-                        <div class="dca-row${dcaBatch.sel.has(drug._id) ? ' dca-on' : ''}" data-id="${dcaEscapeHtml(drug._id)}">
+                        <div class="dca-row${dcaBatch.sel.has(drug._id) ? ' dca-on' : ''}" data-id="${id}">
                             <input type="checkbox" class="dca-pick" title="Select for AI draft" ${dcaBatch.sel.has(drug._id) ? 'checked' : ''} ${dcaBatch.running ? 'disabled' : ''} onclick="dcaBatchToggle('${dcaEscapeHtml(drug._id)}', this)">
                             <div class="dca-row-main">
-                                <div class="dca-row-name">${dcaEscapeHtml(drug.genericName)}</div>
-                                <div class="dca-row-meta">${chips.join('')}</div>
-                                ${brands}
-                            </div>
-                            <div class="dca-row-side">
-                                <div class="dca-row-side-top">
-                                    ${dcaBatchChipHtml(drug._id)}
-                                    ${dcaCompleteChipHtml(drug)}
-                                    ${dcaListContribChipsHtml(drug)}
-                                    ${updatedAbs ? `<div class="dca-row-updated-abs" title="Last updated">🕒 ${dcaEscapeHtml(updatedAbs)}</div>` : ''}
+                                <div class="dca-t1">
+                                    <div class="dca-row-name">${name}</div>
+                                    ${drug.aiDrafted ? '<span class="dca-ai-badge" title="AI-drafted · verify before relying on it">🤖</span>' : ''}
+                                    <div class="dca-row-side-top">${dcaBatchChipHtml(drug._id)}${dcaCompleteChipHtml(drug)}</div>
                                 </div>
-                                <div class="dca-row-actions">
-                                    ${dcaMatBtnHtml(drug)}
-                                    <button type="button" class="dca-row-edit-btn" onclick="dcaEdit('${dcaEscapeHtml(drug._id)}')">Edit</button>
-                                    <button type="button" class="dca-row-visual-btn" onclick="dcaQuickVisual('${dcaEscapeHtml(drug._id)}')" title="🎨 Create/edit PK Visual — opens edit view and the modal in one step">🎨</button>
-                                    <button type="button" class="dca-row-copy-btn" onclick="dcaCopyRow('${dcaEscapeHtml(drug._id)}', this)" title="Copy as Markdown">📋</button>
-                                    <button type="button" class="dca-row-del-btn" onclick="dcaDelete('${dcaEscapeHtml(drug._id)}', this)" title="Delete">🗑️</button>
+                                <div class="dca-row-meta dca-t2">
+                                    ${drug.atcCode ? `<span class="dca-row-meta-chip">${dcaEscapeHtml(drug.atcCode)}</span>` : '<span class="dca-row-meta-chip dca-ph">ATC —</span>'}
+                                    ${drug.class ? `<span class="dca-cls">${dcaEscapeHtml(drug.class)}</span>` : '<span class="dca-cls dca-ph">class not set</span>'}
+                                </div>
+                                <div class="dca-t3">
+                                    <div class="dca-row-brands">${brandChips || '<span class="dca-br dca-ph">brands —</span>'}</div>
+                                    <div class="dca-row-side">
+                                        ${dcaListContribChipsHtml(drug)}
+                                        ${updatedAbs ? `<span class="dca-row-updated-abs" title="Last updated">🕒 ${dcaEscapeHtml(updatedAbs)}</span>` : ''}
+                                        <div class="dca-row-actions">
+                                            ${dcaMatBtnHtml(drug)}
+                                            <button type="button" class="dca-row-edit-btn" onclick="dcaEdit('${id}')" title="Edit" aria-label="Edit">✏️</button>
+                                            <details class="dca-more"><summary title="More" aria-label="More actions">⋯</summary>
+                                                <div class="dca-more-menu">
+                                                    <button type="button" class="dca-row-visual-btn" onclick="dcaQuickVisual('${id}')" title="Create / edit the PK visual — opens the edit view">🎨 PK visual</button>
+                                                    <button type="button" class="dca-row-copy-btn" onclick="dcaCopyRow('${id}', this)" title="Copy as Markdown">📋 Copy as Markdown</button>
+                                                    <button type="button" class="dca-row-del-btn" onclick="dcaDelete('${id}', this)" title="Delete">🗑️ Delete</button>
+                                                </div>
+                                            </details>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>`;
@@ -42360,18 +42375,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (!list) return;
             // V96.52: A-Z rail only makes sense in grouped mode (no letter headings to jump to in completeness mode).
             const azRail = document.getElementById('dca-az-rail');
-            if (azRail) azRail.style.display = dcaState.sortMode === 'completeness' ? 'none' : '';
+            if (azRail) azRail.style.display = dcaState.sortMode === 'az' ? '' : 'none';
             const filtered = dcaState.codex.filter(d => dcaMatchesSearch(d, dcaState.searchTerm));
             if (filtered.length === 0) {
                 list.innerHTML = `<div class="dca-empty-state">${dcaState.searchTerm ? 'No drugs match the search.' : 'No drugs published yet. Click + Add Drug to begin building the codex.'}</div>`;
                 return;
             }
-            // V96.52: completeness mode — flat list, least-complete first.
-            if (dcaState.sortMode === 'completeness') {
-                const sorted = filtered.slice().sort((a, b) => {
-                    const d = dcaCompletenessScore(a).pct - dcaCompletenessScore(b).pct;
-                    return d !== 0 ? d : String(a.genericName || '').localeCompare(String(b.genericName || ''));
-                });
+            // V96.52: completeness mode — flat list, least-complete first (V102.136: the default; "recent" = latest update first).
+            if (dcaState.sortMode === 'completeness' || dcaState.sortMode === 'recent') {
+                const when = d => { const t = d.updatedAt || d.createdAt; return t && t.toMillis ? t.toMillis() : (t && t.seconds ? t.seconds * 1000 : 0); };
+                const byName = (a, b) => String(a.genericName || '').localeCompare(String(b.genericName || ''));
+                const sorted = filtered.slice().sort(dcaState.sortMode === 'recent'
+                    ? (a, b) => (when(b) - when(a)) || byName(a, b)
+                    : (a, b) => (dcaCompletenessScore(a).pct - dcaCompletenessScore(b).pct) || byName(a, b));
                 list.innerHTML = sorted.map(dcaPublishedRowHtml).join('');
                 return;
             }
@@ -69002,6 +69018,7 @@ Summarize in English in 3–5 concise lines:
 <script src="history-review.js?v=V99.88"></script>
 <script src="drug-toolbar.js?v=V102.131"></script>
 <script src="drug-form-ui.js?v=V102.135"></script>
+<script src="drug-list-ui.js?v=V102.136"></script>
 <script src="journal-feedback-admin.js?v=V99.88"></script>
 <script src="delete-requests.js?v=V100.40"></script>
 </body>
