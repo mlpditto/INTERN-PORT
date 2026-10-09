@@ -56,6 +56,19 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Nika Admin (V9.9)</
             const first = await body();
             assert.ok(/Send Login Link/.test(first) && !/Alabasta/.test(first), 'section 0 is login only');
 
+            // Chips are short, icon-led and never empty; the whole box shields the Thai from lang-toggle; prev/next walk the sections.
+            assert.ok(chips.every(c => /^\p{Extended_Pictographic}\S*\s\S+/u.test(c.t) && c.t.length <= 16), 'every chip is icon + short name: ' + JSON.stringify(chips.map(c => c.t)));
+            assert.ok(/class="ag-box lang-no-toggle"/.test(js), 'the whole box carries lang-no-toggle (title + chips are Thai)');
+            assert.equal(await page.locator('#adminGuideOverlay .ag-go:not(.next)').count(), 0, 'no prev button on the first section');
+            await page.click('#adminGuideOverlay .ag-go.next');
+            assert.equal(await page.$eval('#adminGuideOverlay .ag-chip[aria-pressed="true"]', e => e.dataset.i), '1', 'next › moves to section 1 @' + vw);
+            assert.equal(await page.locator('#adminGuideOverlay .ag-go:not(.next)').count(), 1, 'prev ‹ shows from section 1');
+            await page.click('#adminGuideOverlay .ag-chip[data-i="' + (chips.length - 1) + '"]');
+            assert.equal(await page.locator('#adminGuideOverlay .ag-go.next').count(), 0, 'no next › on the last section');
+            await page.click('#adminGuideOverlay .ag-go');
+            assert.equal(await page.$eval('#adminGuideOverlay .ag-chip[aria-pressed="true"]', e => e.dataset.i), String(chips.length - 2), '‹ goes back one @' + vw);
+            await page.click('#adminGuideOverlay .ag-chip[data-i="0"]');
+
             // Box fits the viewport and sits above a 100000-level editor overlay.
             const box = await page.$eval('#adminGuideOverlay .ag-box', e => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, b: r.bottom }; });
             assert.ok(box.l >= 0 && box.r <= vw && box.b <= 700, 'dialog inside the viewport @' + vw + ' ' + JSON.stringify(box));
