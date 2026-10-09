@@ -121,12 +121,12 @@ index.html inline <script>s: 516 string literals with Thai and no Korean · 5 wi
 | Companion file | Thai-only source lines (gap) | Thai + Korean |
 |---|---:|---:|
 | `peds-dosing.js` | 57 | 0 |
-| `flood-watch.js` | 30 | 0 |
 | `quiz-cover.js` | 29 | 0 |
 | `quiz-curate.js` | 28 | 0 |
 | `ai-model-ui.js` | 17 | 0 |
 | `case-studio-steps.js` | 17 | 0 |
 | `quiz-merge.js` | 8 | 0 |
 | `internship-progress.js` | 5 | 0 |
+| `flood-watch.js` | 3 | 29 |
 | `case-taxonomy.js` | 0 | 13 |
 | `taxonomy.js` | 0 | 20 |

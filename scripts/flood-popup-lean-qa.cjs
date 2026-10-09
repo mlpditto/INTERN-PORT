@@ -13,7 +13,7 @@ for (const gone of ['function statusHtml(', 'function riverAlertHtml(', 'functio
 assert.ok(src.includes("q > RV_LIMIT ? 'red'") && src.includes('var RV_LIMIT = 2200;'), 'card river tier and the popup alert share the 2,200 line');
 assert.ok(src.includes('&daily=precipitation_sum,precipitation_probability_max&past_days=3&forecast_days=4'), 'Open-Meteo daily rain in the same request');
 const idx = fs.readFileSync('public/index.html', 'utf8');
-assert.ok(idx.includes('flood-watch.js?v=V101.76') && idx.includes('flood-watch.css?v=V101.76'), 'cache-bust bumped');
+assert.ok(idx.includes('flood-watch.js?v=V101.77') && idx.includes('flood-watch.css?v=V101.77'), 'cache-bust bumped');
 assert.ok(!idx.includes('fw-river-strip') && !src.includes('fw-river-strip'), 'V101.71: the card strip is gone');
 
 async function open(browser, width, opts) {
@@ -186,6 +186,51 @@ const text = (page, sel) => page.locator(sel).evaluateAll(ns => ns.map(n => n.te
             return { sw: s.scrollWidth, cw: s.clientWidth, right: r.right, vw: document.documentElement.clientWidth, gap: Math.round(k.left - a.right), wrap: Math.round(a.height) }; });
         assert.ok(m.sw <= m.cw + 1 && m.right <= m.vw + 1, 'no sideways overflow at 320 px: ' + JSON.stringify(m));
         assert.ok(m.gap >= 4 && m.wrap < 60, 'pill and river card side by side, pill on one line: ' + JSON.stringify(m));
+        await ctx.close();
+
+        // ---- 6. Korean (V101.77): KR on + TH off → the popup speaks Korean; TH on wins; flipping repaints the OPEN popup ----
+        ({ page, ctx, errors } = await open(browser, 412, { c13: 2300, district: 'บึงกุ่ม', wetRoad: true, risk: 'moderate', canalRisk: 'moderate' }));
+        const ui = () => page.evaluate(() => { const s = document.querySelector('.fw-sheet'); return s.textContent + ' ' + [...s.querySelectorAll('[title],[data-tip],[aria-label]')].map(e => (e.title || '') + ' ' + (e.dataset.tip || '') + ' ' + (e.getAttribute('aria-label') || '')).join(' '); });
+        const UI_THAI = ['เฝ้าระวัง', 'ปกติ', 'โอกาสฝน', 'วันนี้', 'รู้สึก', 'ซม.', 'ของความจุ', 'แม่น้ำเจ้าพระยา', 'น้ำในคลอง', 'ถนนท่วม', 'สูงกว่าเกณฑ์', 'รายละเอียด', 'น้ำท่วมปี', 'จากรายงานข่าว'];
+        await page.evaluate(() => { document.querySelector('.fw-sheet .fw-more').open = true; });
+        let all = await ui();
+        assert.ok(UI_THAI.some(w => all.includes(w)) && !all.includes('주의'), 'default (EN) mode keeps the Thai wording');
+        assert.equal(await page.locator('.fw-sheet .fw-rp').getAttribute('lang'), 'ja'); assert.ok((await text(page, '.fw-sheet .fw-rs.over'))[0].includes('容量比'));
+        await page.evaluate(() => { document.body.classList.add('lang-kr-on'); document.body.classList.remove('lang-th-on'); });
+        await page.waitForFunction(() => document.querySelector('.fw-sheet .fw-pill').textContent.includes('주의'), null, { timeout: 3000 });   // repainted while open
+        await page.evaluate(() => { document.querySelector('.fw-sheet .fw-more').open = true; });
+        all = await ui();
+        for (const w of UI_THAI) assert.ok(!all.includes(w), 'KR mode: no Thai UI wording left — "' + w + '" in: ' + all.slice(0, 400));
+        const chip = (await text(page, '.fw-sheet .fw-rs.over'))[0];
+        assert.ok(chip.includes('85%') && chip.includes('용량비') && !chip.includes('容量比'), 'river chip: 85% 용량비 — ' + chip);
+        assert.equal(await page.locator('.fw-sheet .fw-rp').getAttribute('lang'), 'ko');
+        const tip = await page.locator('.fw-sheet .fw-rs.over').getAttribute('data-tip');
+        assert.ok(tip.includes('용량 대비 85% 2,720') && tip.includes('기준치 2,200 초과') && tip.includes('차이낫'), tip);
+        assert.ok((await page.locator('.fw-sheet .fw-key').getAttribute('data-tip')).includes('짜오프라야강 C.13 차이낫'), 'river card hover');
+        const scene = await page.locator('.fw-sheet .fw-scene').getAttribute('aria-label');
+        assert.ok(scene.includes('주의') && scene.includes('수로 수위') && scene.includes('도로 침수'), scene);
+        const dows = await text(page, '.fw-sheet .fw-day > span');
+        assert.equal(dows.length, 7); assert.ok(dows.includes('오늘') && dows.filter(d => '일월화수목금토'.includes(d)).length === 6, 'rain days in Korean: ' + dows);
+        assert.ok((await page.locator('.fw-sheet .fw-day.fc').first().getAttribute('title')).includes('강수 확률'));
+        assert.ok((await page.locator('.fw-sheet .fw-yr').first().getAttribute('data-tip')).includes('불기 2554년 홍수'));
+        const rows = (await text(page, '.fw-sheet .fw-dls')).join(' ');
+        assert.ok(rows.includes('시민 침수 제보') && rows.includes('체감') && rows.includes('6시간 내 비') && rows.includes('ThaiWater · 왕립관개국(RID)') && rows.includes('POPNIX Flood'), 'details fold: ' + rows.slice(0, 500));
+        assert.ok((await page.locator('.fw-sheet .fw-lg').getAttribute('title')).includes('막대 색'));
+        assert.equal(await page.locator('.fw-sheet .fw-yr').count(), 2, 'district years still drawn');
+        // TH on as well → Thai wins (same order as users.preferredLanguage)
+        await page.evaluate(() => document.body.classList.add('lang-th-on'));
+        await page.waitForFunction(() => document.querySelector('.fw-sheet .fw-pill').textContent.includes('เฝ้าระวัง'), null, { timeout: 3000 });
+        assert.ok((await text(page, '.fw-sheet .fw-rs.over'))[0].includes('容量比'));
+        await page.evaluate(() => { document.body.classList.remove('lang-th-on'); });
+        await page.waitForFunction(() => document.querySelector('.fw-sheet .fw-pill').textContent.includes('주의'), null, { timeout: 3000 });
+        await page.evaluate(() => { document.body.classList.remove('lang-kr-on'); });
+        await page.waitForFunction(() => document.querySelector('.fw-sheet .fw-pill').textContent.includes('เฝ้าระวัง'), null, { timeout: 3000 });
+        if (process.env.SHOT) {
+            await page.evaluate(() => { document.body.classList.add('lang-kr-on'); document.querySelector('.fw-sheet .fw-more').open = false; });
+            await page.waitForFunction(() => document.querySelector('.fw-sheet .fw-pill').textContent.includes('주의'));
+            await page.waitForTimeout(400);
+            await page.locator('.fw-sheet').screenshot({ path: path.resolve('output/flood-popup-kr.png') });
+        }
         await ctx.close();
 
         assert.deepEqual(errors.filter(e => !/firebase./.test(e)), [], 'no page errors beyond the un-stubbed Firebase boot');
