@@ -209,7 +209,7 @@
             if (r.q > 2500) worst = 'crit'; else if (over && worst === 'ok') worst = 'warn';
             // V101.72: over the line = a ⚠️ in place of the tier dot (the dot colour stays for the other tiers).
             parts.push('<span class="fw-rs' + (over ? ' over' : '') + '" data-tip="' + esc(r.code + ' ' + (RV_PLACE[r.code] || r.place || '') + ' · ' + Math.round(r.q).toLocaleString('en-US') + ' m³/s' + (over ? ' · สูงกว่าเกณฑ์ ' + fmtQ(RV_LIMIT) : '') + (share ? ' · ' + pct + '% ของความจุ' + (r.cap ? ' ' + fmtQ(r.cap) : '') : '')) + '" title="' + esc(r.code) + ' · ' + Math.round(r.q).toLocaleString('en-US') + ' m³/s"><small class="fw-rl">' + esc(r.code) + '</small><span class="fw-rv">' +
-                (over ? '<span class="fw-rw">⚠️</span>' : '<i class="fw-rd" style="background:' + RV_COL[rvTier(r.q)] + '"></i>') + (share ? pct + '%<small class="fw-rp">ของความจุ</small>' : k) + ar + '</span></span>');
+                (over ? '<span class="fw-rw">⚠️</span>' : '<i class="fw-rd" style="background:' + RV_COL[rvTier(r.q)] + '"></i>') + (share ? pct + '%<small class="fw-rp" lang="ja">容量比</small>' : k) + ar + '</span></span>');
             labels.push(r.code + ' ' + (share ? pct + '% ของความจุ' : k));
         });
         if (!parts.length) return none;

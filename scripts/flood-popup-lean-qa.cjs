@@ -147,7 +147,8 @@ const text = (page, sel) => page.locator(sel).evaluateAll(ns => ns.map(n => n.te
         assert.equal(await page.locator('.fw-sheet .fw-river-row .fw-rs.over').count(), 1); assert.ok((await text(page, '.fw-sheet .fw-river-row .fw-rs.over'))[0].includes('C.13'), 'the chip over the line is C.13');
         // V101.76: the card above already says C.13 = 2,610 m³/s, so the strip shows that gauge as a share of capacity (2,610 / 2,720 = 96%) and keeps the flow numbers of the others.
         const dup = (await text(page, '.fw-sheet .fw-river-row .fw-rs.over'))[0];
-        assert.ok(dup.includes('96%') && dup.includes('ของความจุ') && !dup.includes('2.6k'), 'C.13 chip = % of capacity, not the repeated flow: ' + dup);
+        assert.ok(dup.includes('96%') && dup.includes('容量比') && !dup.includes('2.6k'), 'C.13 chip = % + 容量比 (capacity ratio), not the repeated flow: ' + dup);
+        assert.ok(await page.locator('.fw-sheet .fw-river-row .fw-rp').evaluate(n => n.getBoundingClientRect().width < 40), 'the suffix stays short (a 3-character 容量比, ~29 px)');
         assert.ok((await page.locator('.fw-sheet .fw-river-row .fw-rs.over').getAttribute('data-tip')).includes('96% ของความจุ 2,720') && (await page.locator('.fw-sheet .fw-river-row .fw-rs.over').getAttribute('data-tip')).includes('2,610 m³/s'), 'the hover text keeps both the flow and the capacity');
         const others = await text(page, '.fw-sheet .fw-river-row .fw-rs:not(.over)');
         assert.ok(others.length === 2 && others[0].includes('2.0k') && others[1].includes('2.1k') && !others.join('').includes('%'), 'the other gauges keep their flow numbers: ' + others);
