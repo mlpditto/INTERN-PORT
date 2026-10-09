@@ -1,4 +1,4 @@
-// V102.137: Poneglyph → My Path. The four zero-counters become a QUEUE of what to do today; "＋ New" gets "from a drug / disease / memory" chips that
+// V102.137 / V102.138: Poneglyph → My Path (V102.138: the queue is one slim line, "New from" is three icon chips). The four zero-counters become a QUEUE of what to do today; "＋ New" gets "from a drug / disease / memory" chips that
 // prefill the entry; the empty editor invites a first note; the AI model rail folds behind one chip. Read-only over existing data
 // (window._lp.entries, dcaState.codex / drug_codex, disease_codex, casesData, eventsCache) — the only write is the normal "Save entry".
 (function () {
@@ -39,27 +39,29 @@
     }
     var daysLate = function (d) { return Math.round((new Date(today()) - new Date(d)) / 86400000); };
 
-    // ---------- the queue ----------
-    function card(cls, label, big, sub, btn, act) {
-        return '<div class="lpq-c ' + cls + '"><small>' + label + '</small><b>' + big + '</b>' + (sub ? '<span>' + sub + '</span>' : '') + (btn ? '<button type="button" class="lpq-b" data-act="' + act + '">' + btn + '</button>' : '') + '</div>';
+    // ---------- the queue: ONE slim line — the stats on the left, only what needs you as chips on the right ----------
+    // Something to do = a coloured chip button (data-act); nothing to do = a tiny green-framed pill, never a "0".
+    function pill(cls, html, act, title) {
+        var t = title ? ' title="' + esc(title) + '"' : '';
+        return act ? '<button type="button" class="lpq-p ' + cls + '" data-act="' + act + '"' + t + '>' + html + '</button>' : '<span class="lpq-ok"' + t + '>' + html + '</span>';
     }
     function renderQueue() {
         var strip = $('lp-stats-strip'); if (!strip) return;
         var q = $('lp-queue'); if (!q) { q = document.createElement('div'); q.id = 'lp-queue'; strip.insertBefore(q, strip.firstChild); }
-        var cards = [], due = dueList(), dl = drugList(), cases = pendingCases(), mem = memories()[0];
-        if (due.length) { var late = daysLate(due[0].nextReviewDate); cards.push(card('hot', '📖 Review today', due.length + ' due', 'oldest: ' + esc((due[0].title || '(untitled)').slice(0, 38)) + (late > 0 ? ' · ' + late + ' d late' : ''), 'Start review', 'review')); }
-        else cards.push('<div class="lpq-ok" title="No entry is due for review today">📖 Review today · ✓ nothing due</div>');
-        if (dl === null) cards.push(card('', '💊 Fill the gaps', '…', '', '', ''));
+        var chips = [], due = dueList(), dl = drugList(), cases = pendingCases(), mem = memories()[0];
+        if (due.length) { var late = daysLate(due[0].nextReviewDate); chips.push(pill('hot', '📖 <b>' + due.length + ' due</b> <small>' + esc((due[0].title || '(untitled)').slice(0, 30)) + (late > 0 ? ' · ' + late + ' d late' : '') + '</small> ›', 'review', 'Start the oldest review')); }
+        else chips.push(pill('', '📖 ✓ nothing due', '', 'No entry is due for review today'));
+        if (dl === null) chips.push('<span class="lpq-p lpq-wait">💊 …</span>');
         else {
             var inc = dl.map(function (d) { return { d: d, p: pctOf(d) }; }).filter(function (x) { return x.p < 90; }).sort(function (a, b) { return a.p - b.p; });
-            if (inc.length) cards.push(card('', '💊 Fill the gaps', inc.length + ' incomplete', 'lowest: ' + esc(inc[0].d.genericName || '') + ' ' + inc[0].p + '%', 'Open list', 'drugs'));
-            else if (dl.length) cards.push('<div class="lpq-ok">💊 Drug Codex · ✓ every drug ≥ 90%</div>');
+            if (inc.length) chips.push(pill('', '💊 <b>' + inc.length + ' incomplete</b> <small>lowest: ' + esc(inc[0].d.genericName || '') + ' ' + inc[0].p + '%</small> ›', 'drugs', 'Open the Drug Codex'));
+            else if (dl.length) chips.push(pill('', '💊 ✓ every drug ≥ 90%', '', ''));
         }
-        if (cases.length) cards.push(card('', '📥 New cases', cases.length + ' waiting', 'for review in Alabasta', 'Open inbox', 'cases'));
-        else cards.push('<div class="lpq-ok">📥 Cases · ✓ none waiting</div>');
-        if (mem) cards.push(card('', '🎟️ Latest memory', esc(String(mem.title || '').slice(0, 26)) || '—', esc(mem.eventDate || ''), 'View', 'memories'));
+        if (cases.length) chips.push(pill('', '📥 <b>' + cases.length + ' waiting</b> ›', 'cases', 'New cases for review in Alabasta'));
+        else chips.push(pill('', '📥 ✓ none waiting', '', 'No new cases'));
+        if (mem) chips.push(pill('', '🎟️ <small>' + esc(String(mem.title || '').slice(0, 26)) + '</small> ›', 'memories', 'Latest memory · ' + (mem.eventDate || '')));
         var g = function (id) { var e = $(id); return e ? e.textContent : '0'; };
-        q.innerHTML = '<div class="lpq-top"><span>🔥 ' + g('lp-stat-streak') + ' day streak</span><span>' + g('lp-stat-total') + ' entries</span><span>' + g('lp-stat-weeks') + ' weeks active</span></div><div class="lpq-row">' + cards.join('') + '</div>';
+        q.innerHTML = '<div class="lpq-line"><div class="lpq-top"><span>🔥 ' + g('lp-stat-streak') + ' day streak</span><span>' + g('lp-stat-total') + ' entries</span><span>' + g('lp-stat-weeks') + ' weeks active</span></div><div class="lpq-chips">' + chips.join('') + '</div></div>';
     }
     document.addEventListener('click', function (e) {
         var b = e.target.closest('#lp-queue [data-act]'); if (!b) return;
@@ -72,11 +74,11 @@
 
     // ---------- "＋ New" → from a drug / disease / memory ----------
     var SOURCES = {
-        drug: { label: '💊 Drug', list: drugList, name: function (x) { return x.genericName || ''; }, sub: function (x) { return [x.atcCode, x.class].filter(Boolean).join(' · '); }, pct: pctOf,
+        drug: { icon: '💊', list: drugList, name: function (x) { return x.genericName || ''; }, sub: function (x) { return [x.atcCode, x.class].filter(Boolean).join(' · '); }, pct: pctOf,
             entry: function (x) { return { title: (x.genericName || '') + ' — ', tags: 'drug, ' + (x.genericName || ''), body: '## ' + (x.genericName || '') + '\n- ATC: ' + (x.atcCode || '—') + '\n- Class: ' + (x.class || '—') + '\n- Brands: ' + ((x.brandNames || []).join(', ') || '—') + '\n\n' }; } },
-        disease: { label: '🩺 Disease', list: diseaseList, name: function (x) { return x.diseaseName || ''; }, sub: function (x) { return [x.icd10, x.category].filter(Boolean).join(' · '); },
+        disease: { icon: '🩺', list: diseaseList, name: function (x) { return x.diseaseName || ''; }, sub: function (x) { return [x.icd10, x.category].filter(Boolean).join(' · '); },
             entry: function (x) { return { title: (x.diseaseName || '') + ' — ', tags: 'disease, ' + (x.diseaseName || ''), body: '## ' + (x.diseaseName || '') + (x.thaiName ? ' (' + x.thaiName + ')' : '') + '\n- ICD-10: ' + (x.icd10 || '—') + '\n- Category: ' + (x.category || '—') + '\n\n' }; } },
-        memory: { label: '🎟️ Memory', list: function () { return memories(); }, name: function (x) { return x.title || ''; }, sub: function (x) { return x.eventDate || ''; },
+        memory: { icon: '🎟️', list: function () { return memories(); }, name: function (x) { return x.title || ''; }, sub: function (x) { return x.eventDate || ''; },
             entry: function (x) { return { title: (x.title || 'Event') + ' — what I took away', tags: 'memory', body: '## ' + (x.title || '') + '\n- Date: ' + (x.eventDate || '—') + '\n\n' }; } }
     };
     function startEntry(kind, x) {
@@ -91,7 +93,7 @@
     function ensureNewRow() {
         var col = $('lp-feed-col'); if (!col || $('lp-newrow')) return;
         var row = document.createElement('div'); row.id = 'lp-newrow';
-        row.innerHTML = '<small>＋ New from</small>' + Object.keys(SOURCES).map(function (k) { return '<button type="button" class="lpn-chip" data-from="' + k + '">' + SOURCES[k].label + '</button>'; }).join('') + '<div id="lp-pick" hidden><input type="text" placeholder="Search…" autocomplete="off"><div class="lpn-list"></div></div>';
+        row.innerHTML = '<small>New from</small>' + Object.keys(SOURCES).map(function (k) { return '<button type="button" class="lpn-chip" data-from="' + k + '" title="New entry from a ' + k + '" aria-label="New entry from a ' + k + '">' + SOURCES[k].icon + '</button>'; }).join('') + '<div id="lp-pick" hidden><input type="text" placeholder="Search…" autocomplete="off"><div class="lpn-list"></div></div>';
         var head = col.firstElementChild; head.after(row);
     }
     var pickKind = null;
