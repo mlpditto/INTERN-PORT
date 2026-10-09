@@ -1,4 +1,5 @@
-// V101.78: Schedule (intern) — Agenda week strip, the REAL public/index.html on a touch phone (file://, network blocked, Firebase stubbed).
+// V101.79 (strip V101.78): Schedule (intern) is ONE page, no tabs — "Day N / M ✎ Dates", week strip, three monthly bars with Goals › / 🔥 Heatmap › expanders
+// (one open at a time; schSwitchPane still works for old callers), then the Agenda list. The REAL public/index.html on a touch phone (file://, network blocked, Firebase stubbed).
 // Mon–Sun strip above the Agenda list: solid dot = done (schBuildDayMap), hollow dot = still to do (schAgendaItems), one colour per kind
 // (Quiz / Journal / Case / Event / other); a MISSED item draws nothing; tap a day = that day's rows, tap again = closed; the arrows only walk
 // weeks that carry a dot (+ next week); Today › returns; every open starts on this week with nothing picked; touch targets ≥ 44 px, no sideways
@@ -9,7 +10,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
 
 const idx = fs.readFileSync('public/index.html', 'utf8');
-assert.ok(/<title>Internship Portfolio \(V101\.78\)<\/title>/.test(idx), 'intern version bumped');
+assert.ok(/<title>Internship Portfolio \(V101\.79\)<\/title>/.test(idx), 'intern version bumped');
 for (const fn of ['function schRenderWeek(', 'function schWeekMarks(', 'function schItemDayKey(', 'function schWeekDayHtml(', 'function schWeekShift(', 'function schWeekPick(']) assert.ok(idx.includes(fn), fn + ' exists');
 assert.ok(idx.includes('<div id="sch-week"'), 'strip host sits above #sch-agenda');
 assert.ok(idx.indexOf('<div id="sch-week"') < idx.indexOf('<div id="sch-agenda"'), 'strip is above the list');
@@ -35,6 +36,7 @@ async function open(browser) {
         window.__key = key;
         window.userId = 'U1';
         usersData = [{ id: 'U1', displayName: 'Sample', startDate: key(-60), endDate: key(394) }];
+        window.myUserDoc = { id: 'U1', startDate: key(-60), endDate: key(394) };
         window.myCheckin = { lastDate: key(-1) };               // not checked in today -> a hollow "other" dot today
         window.myCasesCache = []; window.myReflectiveLogsCache = [];
         // two quests whose deadlines are long gone (MISSED, must draw nothing) + one quiz due in 2 days
@@ -47,6 +49,13 @@ async function open(browser) {
         const items = [T(-1, 'quiz', 'Pharmacology quiz'), T(-2, 'reflective', 'Daily reflection'), T(-3, 'case', 'Keratitis case')];
         getUnifiedAllItems = () => items;
         schCheckinDays = new Set();
+        const ts = n => ({ toDate: () => D(n) });
+        const row = (i, extra) => Object.assign({ id: 'r' + i, timestamp: ts(0), status: 'approved' }, extra);
+        monthlyProgress.update({ logs: [0, 1, 2, 3].map(i => row(i)), cases: [0, 1].map(i => row(i)), targets: { quiz: 30, log: 12, case: 8 }, save: () => Promise.resolve() });
+        monthlyProgress.setQuizzes(Array.from({ length: 12 }, (_, i) => row(i, { quizId: 'qz' + i, isPractice: false })));
+        internshipProgress.setPeriod({ personal: true, goal: { kind: 'monthly', target: 30 }, monthlyTarget: 30, history: {}, saveGoal: () => Promise.resolve() });
+        internshipProgress.setAttempts(Array.from({ length: 12 }, (_, i) => ({ quizId: 'qz' + i, status: 'approved', isPractice: false, timestamp: ts(0) })));
+        if (window.assignedGoals) assignedGoals.userOpen = () => {};
     });
     return { page, errors, ctx };
 }
@@ -104,9 +113,11 @@ const dots = (page, n) => page.evaluate(n => [...document.querySelectorAll('#sch
     const lo = await page.evaluate(() => schWeekOffset);
     assert.ok(lo >= -1 && lo <= 0, 'cannot walk back past the first week with a dot (offset ' + lo + ')');
     assert.ok(await page.locator('#sch-week .sch-wk-nv').nth(0).isDisabled(), '‹ disabled at the first week');
-    for (let i = 0; i < 9; i++) await page.evaluate(() => schWeekShift(1));
+    for (let i = 0; i < 16; i++) await page.evaluate(() => schWeekShift(1));
     const hi = await page.evaluate(() => schWeekOffset);
-    assert.ok(hi >= 1 && hi <= 2, 'forward stops after the last dot / next week (offset ' + hi + ')');
+    const wantHi = await page.evaluate(() => { const base = schMonday(new Date()); let h = 1; Object.keys(schWeekMarks(schAgendaItems())).forEach(k => { h = Math.max(h, Math.round((schMonday(schParseDay(k)) - base) / 6048e5)); }); return Math.min(h, 12); });
+    assert.equal(hi, wantHi, 'forward stops after the last dot (max 12 weeks) / next week: ' + hi);
+    assert.equal(wantHi, 12, 'fixture: the Internship-ends row is far away, so the cap is what stops the arrows');
     assert.ok(await page.locator('#sch-week .sch-wk-nv').nth(1).isDisabled(), '› disabled at the end');
     assert.equal(await page.locator('#sch-week .sch-wk-cap button').count(), 1, 'Today › link off this week');
     await page.locator('#sch-week .sch-wk-cap button').click();
@@ -152,10 +163,45 @@ const dots = (page, n) => page.evaluate(n => [...document.querySelectorAll('#sch
     const list = await page.textContent('#sch-agenda');
     assert.ok(/Today/.test(list) && /Journal/.test(list) && /Case/.test(list) && /Vitamin B quiz/.test(list) && /Journal club/.test(list), 'Agenda list still there: ' + list.slice(0, 160));
     assert.ok(/Show 2 missed/.test(list), 'Missed still collapsed behind its link');
-    await page.evaluate(() => schSwitchPane('activity'));
-    assert.equal(await page.evaluate(() => document.getElementById('sch-pane-agenda').style.display), 'none', 'Activity tab still switches');
-    await page.evaluate(() => schSwitchPane('agenda'));
-    assert.equal(await page.locator('#sch-week .sch-wd').count(), 7, 'strip is back with the Agenda');
+
+    // ---- 7b. V101.79: ONE page — no tabs, a short header, "Day N / M ✎ Dates", three bars, two expanders
+    assert.equal(await page.locator('#sch-tabs, .sch-tab').count(), 0, 'the three tabs are gone');
+    assert.equal(await page.locator('#sch-pane-agenda').isVisible(), true, 'the page is visible');
+    assert.deepEqual(await page.locator('#scheduleModal .sch-modal-header button').evaluateAll(b => b.map(x => x.id || x.getAttribute('aria-label'))), ['sch-invite-btn', 'Close Schedule'], 'header = ＋ event and × only');
+    const sub = (await page.textContent('#sch-sub')).replace(/\s+/g, ' ').trim();
+    assert.match(sub, /^Day \d+ \/ \d+\s*✎ Dates$/, 'Day N / M line with the one ✎: ' + sub);
+    await page.locator('#sch-sub button').click();
+    assert.equal(await page.locator('#training-dates-dialog').count(), 1, '✎ Dates opens the dates dialog');
+    await page.evaluate(() => document.getElementById('training-dates-dialog').close());
+    const bars = await page.locator('#sch-goalbars .sch-bar').evaluateAll(b => b.map(x => x.className.replace('sch-bar', '').trim() + ':' + x.querySelector('em').textContent + ':' + Math.round(parseFloat(x.querySelector('i').style.width))));
+    assert.deepEqual(bars, ['q:12/30:40', 'j:4/12:33', 'c:2/8:25'], 'three monthly bars from monthlyProgress');
+    const barColours = await page.locator('#sch-goalbars .sch-bar i').evaluateAll(e => e.map(x => getComputedStyle(x).backgroundColor));
+    assert.equal(new Set(barColours).size, 3, 'a colour per bar (same as the strip dots): ' + barColours.join(' '));
+    const shown = id => page.evaluate(id => getComputedStyle(document.getElementById(id)).display !== 'none', id);
+    assert.equal(await shown('sch-pane-goals'), false); assert.equal(await shown('sch-pane-activity'), false);
+    await page.locator('#sch-goals-btn').click();
+    assert.equal(await shown('sch-pane-goals'), true, 'Goals › opens the goals in place');
+    assert.equal(await page.getAttribute('#sch-goals-btn', 'aria-expanded'), 'true');
+    assert.ok(await page.locator('#sch-pane-goals .ip-goal-actions button').count() >= 1, 'Monthly / Period buttons moved in');
+    assert.match(await page.textContent('#internship-quiz-progress'), /12 \/ 30 quizzes · 40%/, 'the period goal card moved in');
+    await page.locator('#sch-heat-btn').click();
+    assert.equal(await shown('sch-pane-activity'), true, 'Heatmap › opens the heatmap');
+    assert.equal(await shown('sch-pane-goals'), false, 'one section at a time');
+    assert.ok(await page.locator('#sch-heatmap [data-sch-day]').count() >= 7, 'the real heatmap cells are drawn');
+    await page.locator('#sch-heat-btn').click();
+    assert.equal(await shown('sch-pane-activity'), false, 'tapping again folds it');
+    await page.evaluate(() => schSwitchPane('goals'));
+    assert.equal(await shown('sch-pane-goals'), true, 'old callers (home 🎯 ↗) still land on Goals');
+    await page.evaluate(() => { closeScheduleModal(); openScheduleModal(); });
+    assert.equal(await shown('sch-pane-goals'), false, 'reopen = both folded');
+    await page.evaluate(() => monthlyProgress.update({ logs: [], cases: [], targets: { quiz: 30 }, save: () => Promise.resolve() }));
+    assert.equal(await page.locator('#sch-goalbars .sch-bar.j em').textContent(), '0', 'no target = count only');
+    assert.equal(await page.evaluate(() => document.querySelectorAll('#sch-goalbars .sch-bar.q i')[0].style.width), '40%', 'bars follow monthlyProgress updates');
+    await page.locator('#sch-pane-agenda .sch-foot button').click();
+    const help = await page.textContent('#ip-help-dialog');
+    assert.ok(help.includes('Goals') && !/Agenda ·|Activity ·|SMART GOALS ·/.test(help), 'help no longer names the tabs');
+    await page.evaluate(() => document.getElementById('ip-help-dialog').close());
+    assert.equal(await page.locator('#sch-week .sch-wd').count(), 7, 'strip is still there');
 
     // ---- 8. nothing scheduled at all: the strip still draws, the list says so
     await page.evaluate(() => { questsCache = []; quizzesCache = []; schEventsCache = []; getUnifiedAllItems = () => []; myCheckin = { lastDate: schDateKey(new Date()) }; window.myCasesCache = [{ timestamp: new Date(), status: 'approved' }]; schRenderAgenda(); });
@@ -165,7 +211,11 @@ const dots = (page, n) => page.evaluate(n => [...document.querySelectorAll('#sch
         await page.evaluate(() => { schWeekSel = null; });
         fs.mkdirSync('output', { recursive: true });
         await page.evaluate(() => { questsCache = [{ id: 'q1', title: 'Old quest A', isActive: true, deadline: new Date(Date.now() - 5 * 864e5) }]; quizzesCache = [{ id: 'z1', title: 'Vitamin B quiz', isActive: true, deadline: new Date(Date.now() + 2 * 864e5) }]; schEventsCache = [{ id: 'e1', title: 'Journal club', eventDate: __key(3), timeText: '09:00' }]; myCheckin = { lastDate: __key(-1) }; window.myCasesCache = []; const T = (n, type, title) => ({ submissionType: type, title, status: 'done', timestamp: new Date(Date.now() + n * 864e5), id: type + n }); getUnifiedAllItems = () => [T(-1, 'quiz', 'Pharmacology quiz'), T(-2, 'reflective', 'Daily reflection'), T(-3, 'case', 'Keratitis case')]; schWeekPick(__key(-1)); });
-        await page.locator('#scheduleModal .modal-content').screenshot({ path: 'output/schedule-weekstrip.png' });
+        await page.evaluate(() => { schWeekPick(__key(-1)); schWeekPick(__key(-1)); schSwitchPane('agenda'); });
+        const snap = async n => { await page.waitForTimeout(250); await page.locator('#scheduleModal .modal-content').screenshot({ path: 'output/schedule-' + n + '.png' }); };
+        await snap('onepage');
+        await page.evaluate(() => schSwitchPane('goals')); await snap('goals');
+        await page.evaluate(() => schSwitchPane('activity')); await snap('heatmap');
     }
     assert.deepEqual(errors, [], 'no page errors: ' + errors.join(' | '));
     await browser.close();
