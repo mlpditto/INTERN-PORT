@@ -52,16 +52,17 @@ document.addEventListener('DOMContentLoaded', () => {
     function compactBadge() {
         if (!badge || badge.querySelector('.dfu-ai')) return;
         const raw = badge.textContent.trim(); if (!raw) return;
+        // the drafter = logo + ✍️ only; its NAME is already in the model chip beside the actions, so it is never printed twice
         const m = /AI-drafted(?: by ([^·]+?))?\s*·/.exec(raw), id = m && m[1] ? m[1].trim() : '';
-        const model = id && (window.TEXT_AI_MODELS || []).find(x => x.id === id);
         const logo = id && window.aiModelLogoHtml ? window.aiModelLogoHtml(id) : '';
-        badge.title = raw;
-        badge.innerHTML = '<span class="dfu-ai">' + (logo || '🤖') + '<span class="dfu-ai-n"></span></span>';
-        badge.querySelector('.dfu-ai-n').textContent = model ? (model.short || model.label) : (id || 'AI');
+        badge.title = raw; badge.setAttribute('aria-label', raw);
+        badge.innerHTML = '<span class="dfu-ai">' + (logo || '🤖') + '</span>';
     }
     if (label) new MutationObserver(compactTitle).observe(label, { childList: true, characterData: true, subtree: true });
     if (badge) new MutationObserver(compactBadge).observe(badge, { childList: true, characterData: true, subtree: true });
     compactTitle(); compactBadge();
+    // two-line head: the flex ordering lives in the CSS; this only adds the line break between "who" (line 1) and "where / what" (line 2)
+    if (head) { form.classList.add('dfu-flex'); const br = document.createElement('span'); br.className = 'dfu-br'; br.setAttribute('aria-hidden', 'true'); head.after(br); }
     const save = byId('dca-form-save-btn');
     if (save) { save.parentElement.classList.add('dfu-foot'); save.title = 'Save drug'; save.setAttribute('aria-label', 'Save drug'); }
 
