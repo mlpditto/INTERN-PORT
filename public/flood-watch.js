@@ -196,7 +196,7 @@
 
     // V101.63: river flow as ONE strip (was under the pts row on the card; V101.71: moved into the popup, under คลอง/ถนน) instead of capsules floating on the card water — those were
     // positioned once from a snapshot of the layout, so they landed on the buttons / the date nudge whenever a row shifted. The water keeps its tint.
-    function riverStrip(rv) {
+    function riverStrip(rv, dup) {
         var none = { html: '', label: '' };
         if (!rv || !rv.stations) return none;
         var parts = [], labels = [], worst = 'ok';
@@ -204,11 +204,13 @@
             if (!r || r.q == null || !r.at || Date.now() - r.at >= 36 * 3600e3) return;
             var ar = r.d24 == null || Math.abs(r.d24) < 30 ? '' : '<i class="fw-ar ' + (r.d24 > 0 ? 'up' : 'down') + '">' + (r.d24 > 0 ? '▲' : '▼') + '</i>';
             var k = (r.q / 1000).toFixed(1) + 'k', over = r.q > RV_LIMIT;
+            // V101.76: the gauge the card above already names (the one over the line) shows its share of capacity here instead of repeating the same flow number.
+            var pct = r.pct != null ? r.pct : r.cap ? Math.round(r.q / r.cap * 100) : null, share = !!dup && r.code === dup && pct != null;
             if (r.q > 2500) worst = 'crit'; else if (over && worst === 'ok') worst = 'warn';
             // V101.72: over the line = a ⚠️ in place of the tier dot (the dot colour stays for the other tiers).
-            parts.push('<span class="fw-rs' + (over ? ' over' : '') + '" data-tip="' + esc(r.code + ' ' + (RV_PLACE[r.code] || r.place || '') + ' · ' + Math.round(r.q).toLocaleString('en-US') + ' m³/s' + (over ? ' · สูงกว่าเกณฑ์ ' + fmtQ(RV_LIMIT) : '')) + '" title="' + esc(r.code) + ' · ' + Math.round(r.q).toLocaleString('en-US') + ' m³/s"><small class="fw-rl">' + esc(r.code) + '</small><span class="fw-rv">' +
-                (over ? '<span class="fw-rw">⚠️</span>' : '<i class="fw-rd" style="background:' + RV_COL[rvTier(r.q)] + '"></i>') + k + ar + '</span></span>');
-            labels.push(r.code + ' ' + k);
+            parts.push('<span class="fw-rs' + (over ? ' over' : '') + '" data-tip="' + esc(r.code + ' ' + (RV_PLACE[r.code] || r.place || '') + ' · ' + Math.round(r.q).toLocaleString('en-US') + ' m³/s' + (over ? ' · สูงกว่าเกณฑ์ ' + fmtQ(RV_LIMIT) : '') + (share ? ' · ' + pct + '% ของความจุ' + (r.cap ? ' ' + fmtQ(r.cap) : '') : '')) + '" title="' + esc(r.code) + ' · ' + Math.round(r.q).toLocaleString('en-US') + ' m³/s"><small class="fw-rl">' + esc(r.code) + '</small><span class="fw-rv">' +
+                (over ? '<span class="fw-rw">⚠️</span>' : '<i class="fw-rd" style="background:' + RV_COL[rvTier(r.q)] + '"></i>') + (share ? pct + '%<small class="fw-rp">ของความจุ</small>' : k) + ar + '</span></span>');
+            labels.push(r.code + ' ' + (share ? pct + '% ของความจุ' : k));
         });
         if (!parts.length) return none;
         return { html: emo('🌊', worst) + parts.join(''), label: 'River flow ' + labels.join(', ') + ' — open flood watch' };
@@ -323,8 +325,8 @@
     // 7 days of rain: 3 back (measured), today, 3 ahead (forecast with its chance) — Open-Meteo daily, see loadWeather.
     var DOW = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
     // V101.71: the C.2 → C.13 → C.29B strip on the popup's front (the owner: "River flow ย้ายไปแสดงใน Flood watch").
-    function riverRowHtml(rv) {
-        var sh = riverStrip(rv);
+    function riverRowHtml(rv, dup) {
+        var sh = riverStrip(rv, dup);
         if (!sh.html) return '';
         return '<div class="fw-river-row' + srcBar(['rid']) + ' · ' + esc(sh.label) + '">' + sh.html + '</div>';
     }
@@ -416,7 +418,7 @@
         else if (!d) body = '<div class="fw-h"><span class="fw-dot"></span>—</div>';
         else {
             var alert = riverAlert(d.river);
-            body = statusBlock(d, alert) + riverRowHtml(d.river) + rain7Html(p.wx) + moreHtml(d, p, alert);
+            body = statusBlock(d, alert) + riverRowHtml(d.river, alert && alert.code) + rain7Html(p.wx) + moreHtml(d, p, alert);
         }
         // Flood data can fail on its own (FloodWatch is flaky); the 7-day rain still shows.
         if (!d && p.wx && !p.loading) body += rain7Html(p.wx);

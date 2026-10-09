@@ -13,7 +13,7 @@ for (const gone of ['function statusHtml(', 'function riverAlertHtml(', 'functio
 assert.ok(src.includes("q > RV_LIMIT ? 'red'") && src.includes('var RV_LIMIT = 2200;'), 'card river tier and the popup alert share the 2,200 line');
 assert.ok(src.includes('&daily=precipitation_sum,precipitation_probability_max&past_days=3&forecast_days=4'), 'Open-Meteo daily rain in the same request');
 const idx = fs.readFileSync('public/index.html', 'utf8');
-assert.ok(idx.includes('flood-watch.js?v=V101.72') && idx.includes('flood-watch.css?v=V101.72'), 'cache-bust bumped');
+assert.ok(idx.includes('flood-watch.js?v=V101.76') && idx.includes('flood-watch.css?v=V101.76'), 'cache-bust bumped');
 assert.ok(!idx.includes('fw-river-strip') && !src.includes('fw-river-strip'), 'V101.71: the card strip is gone');
 
 async function open(browser, width, opts) {
@@ -25,7 +25,7 @@ async function open(browser, width, opts) {
         const DATA = { risk: opts.risk || 'low', canalRisk: opts.canalRisk || 'low', title: 'สถานีใกล้เคียงยังไม่มีสัญญาณน้ำเพิ่มผิดปกติ',
             canal: { name: 'ค.ทรงกระเทียม ปตร คลองทรงกระเทียม', km: 1.1, freeboardM: opts.fb != null ? opts.fb : 0.93, change24cm: opts.fb != null && opts.fb < 0 ? 48 : -46 }, road: {}, rain24mm: 5.8, traffy6h: 2,
             pop: { credit: 'ข้อมูล: สำนักการระบายน้ำ กรุงเทพมหานคร ผ่าน POPNIX Flood', canals: [{ name: 'ค.ทรงกระเทียม ปตร', km: 1.1, wl: -0.03, level: 'ok', trend: 'up', deltaCm: 5 }, { name: 'ค.ทรงกระเทียม ถ.นาคนิวาส', km: 2, wl: -0.67, level: 'ok', trend: '' }], roads: [{ name: 'ถ.นาคนิวาส (ซ. 38)', km: 1.3, level: 'dry', depthCm: 0 }, { name: 'ถ.สุคนธสวัสดิ์ (ซ. 15)', km: 2.1, level: 'dry', depthCm: 0 }] },
-            river: { stations: [{ code: 'C.2', place: 'นครสวรรค์', q: 2009, at: now, d24: 10, src: 'thaiwater' }, { code: 'C.13', place: 'ชัยนาท', q: opts.c13, at: now, d24: -80, src: 'thaiwater' }, { code: 'C.29B', place: 'อยุธยา', q: 2078, at: now, d24: 0, src: 'rid' }] },
+            river: { stations: [{ code: 'C.2', place: 'นครสวรรค์', cap: 3735, pct: 54, q: 2009, at: now, d24: 10, src: 'thaiwater' }, { code: 'C.13', place: 'ชัยนาท', cap: 2720, pct: Math.round(opts.c13 / 2720 * 100), q: opts.c13, at: now, d24: -80, src: 'thaiwater' }, { code: 'C.29B', place: 'อยุธยา', cap: 3600, pct: 58, q: 2078, at: now, d24: 0, src: 'rid' }] },
             district: opts.district, history: opts.district ? { y2554: 'moderate', y2569: 'high' } : null, checkedAt: now };
         if (opts.nodata) { DATA.canal = null; DATA.road = undefined; DATA.risk = 'info'; DATA.river = { stations: [] }; DATA.pop = null; DATA.traffy6h = 0; }
         if (opts.closedRoad) DATA.road = { risk: 'high', n: 1, nearest: { name: 'ถ.นาคนิวาส', m: 220, depthCm: 35, closed: true, motorbike: 'blocked', sedan: 'risky', sensor: true } };
@@ -144,7 +144,14 @@ const text = (page, sel) => page.locator(sel).evaluateAll(ns => ns.map(n => n.te
         assert.ok((await text(page, '.fw-sheet .fw-sc-lvl'))[0].includes('93cm'), 'canal level in the water');
         assert.deepEqual(await text(page, '.fw-sheet .fw-sc-road'), ['🛣️15cm']); assert.equal(await page.locator('.fw-sheet .fw-sc-road .fw-e.warn').count(), 1);
         for (const gone of ['.fw-r2', '.fw-key.fw-sb', '.fw-sc-spill']) assert.equal(await page.locator('.fw-sheet ' + gone).count(), 0, gone + ': rows are folded into the scene');
-        assert.equal(await page.locator('.fw-sheet .fw-river-row .fw-rs.over').count(), 1); assert.ok((await text(page, '.fw-sheet .fw-river-row .fw-rs.over'))[0].includes('2.6k') && (await text(page, '.fw-sheet .fw-river-row .fw-rs.over'))[0].includes('C.13'), 'the chip over the line is C.13');
+        assert.equal(await page.locator('.fw-sheet .fw-river-row .fw-rs.over').count(), 1); assert.ok((await text(page, '.fw-sheet .fw-river-row .fw-rs.over'))[0].includes('C.13'), 'the chip over the line is C.13');
+        // V101.76: the card above already says C.13 = 2,610 m³/s, so the strip shows that gauge as a share of capacity (2,610 / 2,720 = 96%) and keeps the flow numbers of the others.
+        const dup = (await text(page, '.fw-sheet .fw-river-row .fw-rs.over'))[0];
+        assert.ok(dup.includes('96%') && dup.includes('ของความจุ') && !dup.includes('2.6k'), 'C.13 chip = % of capacity, not the repeated flow: ' + dup);
+        assert.ok((await page.locator('.fw-sheet .fw-river-row .fw-rs.over').getAttribute('data-tip')).includes('96% ของความจุ 2,720') && (await page.locator('.fw-sheet .fw-river-row .fw-rs.over').getAttribute('data-tip')).includes('2,610 m³/s'), 'the hover text keeps both the flow and the capacity');
+        const others = await text(page, '.fw-sheet .fw-river-row .fw-rs:not(.over)');
+        assert.ok(others.length === 2 && others[0].includes('2.0k') && others[1].includes('2.1k') && !others.join('').includes('%'), 'the other gauges keep their flow numbers: ' + others);
+        assert.ok((await page.locator('.fw-sheet .fw-river-row').getAttribute('title')).includes('C.13 96% ของความจุ'), 'row label says the same');
         assert.equal(await page.locator('.fw-sheet .fw-river-row .fw-rs.over .fw-rw').count(), 1, '⚠️ replaces the dot on the chip over the line');
         assert.equal(await page.locator('.fw-sheet .fw-river-row > .fw-e.crit').count(), 1);
         assert.equal(await page.locator('.fw-sheet .fw-foot .fw-yr').count(), 0, 'no district → no years'); assert.equal(await page.locator('.fw-sheet .fw-foot .fw-tg').count(), 1, 'the toggle stays');
