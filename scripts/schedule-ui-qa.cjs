@@ -10,7 +10,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
 
 const idx = fs.readFileSync('public/index.html', 'utf8');
-assert.ok(/<title>Internship Portfolio \(V101\.79\)<\/title>/.test(idx), 'intern version bumped');
+assert.ok(/<title>Internship Portfolio \(V101\.80\)<\/title>/.test(idx), 'intern version bumped');
 for (const fn of ['function schRenderWeek(', 'function schWeekMarks(', 'function schItemDayKey(', 'function schWeekDayHtml(', 'function schWeekShift(', 'function schWeekPick(']) assert.ok(idx.includes(fn), fn + ' exists');
 assert.ok(idx.includes('<div id="sch-week"'), 'strip host sits above #sch-agenda');
 assert.ok(idx.indexOf('<div id="sch-week"') < idx.indexOf('<div id="sch-agenda"'), 'strip is above the list');
@@ -167,7 +167,7 @@ const dots = (page, n) => page.evaluate(n => [...document.querySelectorAll('#sch
     // ---- 7b. V101.79: ONE page — no tabs, a short header, "Day N / M ✎ Dates", three bars, two expanders
     assert.equal(await page.locator('#sch-tabs, .sch-tab').count(), 0, 'the three tabs are gone');
     assert.equal(await page.locator('#sch-pane-agenda').isVisible(), true, 'the page is visible');
-    assert.deepEqual(await page.locator('#scheduleModal .sch-modal-header button').evaluateAll(b => b.map(x => x.id || x.getAttribute('aria-label'))), ['sch-invite-btn', 'Close Schedule'], 'header = ＋ event and × only');
+    assert.deepEqual(await page.locator('#scheduleModal .sch-modal-header button').evaluateAll(b => b.map(x => x.id || x.getAttribute('aria-label'))), ['How to use Schedule', 'sch-invite-btn', 'Close Schedule'], 'header = title + ⓘ, ＋ event and ×');
     const sub = (await page.textContent('#sch-sub')).replace(/\s+/g, ' ').trim();
     assert.match(sub, /^Day \d+ \/ \d+\s*✎ Dates$/, 'Day N / M line with the one ✎: ' + sub);
     await page.locator('#sch-sub button').click();
@@ -197,9 +197,22 @@ const dots = (page, n) => page.evaluate(n => [...document.querySelectorAll('#sch
     await page.evaluate(() => monthlyProgress.update({ logs: [], cases: [], targets: { quiz: 30 }, save: () => Promise.resolve() }));
     assert.equal(await page.locator('#sch-goalbars .sch-bar.j em').textContent(), '0', 'no target = count only');
     assert.equal(await page.evaluate(() => document.querySelectorAll('#sch-goalbars .sch-bar.q i')[0].style.width), '40%', 'bars follow monthlyProgress updates');
-    await page.locator('#sch-pane-agenda .sch-foot button').click();
+    // V101.80: ⓘ sits inline right after the title as an icon only — no footer link, no "How Schedule works" text
+    assert.equal(await page.locator('.sch-foot').count(), 0, 'no footer link');
+    assert.ok(!(await page.textContent('#scheduleModal')).includes('How Schedule works'), 'no long help label');
+    const ib = await page.evaluate(() => { const t = document.querySelector('#scheduleModal .sch-modal-header h3').getBoundingClientRect(), b = document.querySelector('#scheduleModal .sch-modal-header .ip-help-button'), r = b.getBoundingClientRect(); return { text: b.textContent.trim(), gap: r.left - t.right, sameRow: Math.abs((r.top + r.height / 2) - (t.top + t.height / 2)) < 8, h: r.height }; });
+    assert.equal(ib.text, 'ⓘ', 'icon only'); assert.ok(ib.gap >= 0 && ib.gap < 24 && ib.sameRow, 'inline with the title: ' + JSON.stringify(ib)); assert.ok(ib.h >= 32, 'tappable ≥ 32 px: ' + ib.h);
+    await page.locator('#scheduleModal .sch-modal-header .ip-help-button').click();
     const help = await page.textContent('#ip-help-dialog');
-    assert.ok(help.includes('Goals') && !/Agenda ·|Activity ·|SMART GOALS ·/.test(help), 'help no longer names the tabs');
+    assert.ok(!/Agenda ·|Activity ·|SMART GOALS ·/.test(help), 'help no longer names the tabs');
+    for (const w of ['Quiz', 'Journal', 'Case', 'Event', 'ทำแล้ว', 'ยังต้องทำ', 'Dates', 'Goals', 'Heatmap', 'Missed']) assert.ok(help.includes(w), 'help mentions ' + w);
+    const legend = await page.locator('#ip-help-dialog .ip-help-dots .ip-hdot').evaluateAll(d => d.map(x => getComputedStyle(x).backgroundColor));
+    assert.equal(new Set(legend).size, 5, 'the legend carries the five dot colours: ' + legend.join(' '));
+    assert.ok(await page.evaluate(() => getComputedStyle(document.querySelector('#ip-help-dialog .ip-hollow')).borderTopWidth) === '2px', 'hollow sample is a ring');
+    const hb = await page.locator('#ip-help-dialog').boundingBox();
+    assert.ok(hb.height < 620 && hb.width <= 412, 'short card that fits a phone: ' + JSON.stringify(hb));
+    assert.ok(help.length < 600, 'about half the old text: ' + help.length);
+    if (process.env.SHOT) { fs.mkdirSync('output', { recursive: true }); await page.screenshot({ path: 'output/schedule-help.png' }); }
     await page.evaluate(() => document.getElementById('ip-help-dialog').close());
     assert.equal(await page.locator('#sch-week .sch-wd').count(), 7, 'strip is still there');
 
