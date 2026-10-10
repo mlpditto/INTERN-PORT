@@ -26,6 +26,12 @@ assert.ok(/match \/works\/\{workId\} \{[\s\S]*?allow update, delete: if isAdmin\
 assert.ok(/match \/product-images\//.test(storage), 'storage: product-images path exists for photo uploads');
 assert.ok(/match \/admin_notifications\/\{docId\} \{[\s\S]*?allow create: if isSignedIn\(\) && \(request\.resource\.data\.get\('type', ''\) != 'journal_feedback'/.test(rules), 'a signed-in reviewer may file a content_review (no rules deploy needed)');
 assert.ok(js.includes("type: 'content_review'") && fs.readFileSync('public/cafe-content-admin.js', 'utf8').includes("'type', '==', 'content_review'"), 'reviewer and admin share the content_review type');
+const crAt = rules.indexOf('match /content_reviews/{reviewId}'); assert.ok(crAt > 0, 'content_reviews rules exist');
+const cr = rules.slice(crAt, rules.indexOf('match /admin_notifications/', crAt));
+assert.ok(cr.includes("allow read: if isAdmin() || (isSignedIn() && (resource.data.ownerAuthUid == request.auth.uid || resource.data.authUid == request.auth.uid));"), 'content_reviews: only the post owner, the reviewer and admin read');
+assert.ok(cr.includes("reviewId == d.workId + '_' + request.auth.uid") && cr.includes('d.at == request.time') && cr.includes("d.verdict in ['approve', 'changes']") && cr.includes('d.authUid == request.auth.uid'), 'content_reviews: own doc id, server time, bounded verdict');
+assert.ok(/allow update: if isSignedIn\(\) && resource\.data\.authUid == request\.auth\.uid/.test(cr) && /allow delete: if isAdmin\(\);/.test(cr), 'content_reviews: only the reviewer edits, only admin deletes');
+assert.ok(!/allow (read|write|create|update)[^;]*: if (true|isSignedIn\(\));/.test(cr), 'content_reviews: no open rule');
 assert.ok(/match \/users\/\{userId\} \{[\s\S]*?allow create, update: if isAdmin\(\) \|\| request\.auth\.uid == userId/.test(rules), 'users: owner can update their doc (socialDrafts)');
 // No badge system for the division: every entry point of the achievement / badge code asks window.isContentCreator() first.
 const fn = name => { const i = index.indexOf(name); assert.ok(i >= 0, name); return index.slice(i, i + 700); };
@@ -59,9 +65,9 @@ function pushWorks() { usersWorksCache = Object.keys(store.works).map(id => ({ i
 const db = { collection(n) { return {
   doc(id) { return {
     onSnapshot(cb) { if (n === 'users') { userCbs.push(cb); cb({ exists: true, data: () => store.users[id] }); } return () => {}; },
-    set(d) { Object.assign(store.users[id], d); window.__lastUserSet = d; userCbs.forEach(cb => cb({ exists: true, data: () => store.users[id] })); return Promise.resolve(); },
+    set(d) { if (n === 'content_reviews') { (window.__crDocs = window.__crDocs || {})[id] = d; return Promise.resolve(); } Object.assign(store.users[id], d); window.__lastUserSet = d; userCbs.forEach(cb => cb({ exists: true, data: () => store.users[id] })); return Promise.resolve(); },
     update(d) { window.__upd.push([n, id, d]); if (n === 'users') { Object.keys(d).forEach(k => { const [a, b] = k.split('.'); if (b) { store.users[id][a] = store.users[id][a] || {}; store.users[id][a][b] = d[k]; } else store.users[id][k] = d[k]; }); userCbs.forEach(cb => cb({ exists: true, data: () => store.users[id] })); return Promise.resolve(); } Object.assign(store.works[id], d); pushWorks(); return Promise.resolve(); } }; },
-  where() { return { onSnapshot(cb) { allCbs.push(cb); cb({ docs: Object.keys(store.works).map(id => ({ id, data: () => store.works[id] })) }); return () => {}; } }; },
+  where(f, op, v) { if (n === 'content_reviews') { window.__crQuery = [f, op, v]; return { onSnapshot(cb) { window.__crCb = cb; cb({ docs: [] }); return () => {}; } }; } return { onSnapshot(cb) { allCbs.push(cb); cb({ docs: Object.keys(store.works).map(id => ({ id, data: () => store.works[id] })) }); return () => {}; } }; },
   add(d) { if (n === 'works') { const id = 'W' + (++wn); store.works[id] = d; pushWorks(); return Promise.resolve({ id }); } if (n === 'admin_notifications') { (window.__notif = window.__notif || []).push(d); return Promise.resolve({ id: 'N' + window.__notif.length }); } window.__subs.push(d); return Promise.resolve({ id: 'S1' }); } }; } };
 window.__review = (id, score) => { store.works[id].status = 'ตรวจแล้ว'; store.works[id].score = score; pushWorks(); };
 </script>
@@ -270,7 +276,7 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         await page.click('#section-cafe-content .cc-view [data-view="board"]');
         assert.equal(await page.evaluate(() => localStorage.getItem('cafeContentView')), 'board', 'board is remembered');
         const cols = () => page.$$eval('.cc-colh', els => els.map(e => e.innerText.replace(/\s+/g, ' ').trim()));
-        assert.deepEqual(await cols(), ['Idea 1', 'Script 1', 'Filming 0', 'Editing 0', 'Scheduled 1', 'Posted 1']);
+        assert.deepEqual(await cols(), ['Idea 1', 'Script 1', 'Filming 0', 'Editing 0', 'Scheduled 1', 'Review 0', 'Posted 1']);
         assert.equal(await page.locator('.cc-kc[data-id="A"] .cc-due.late').count(), 1, 'overdue is red');
         assert.equal(await page.locator('.cc-kc[data-id="B"] .cc-due.now').count(), 1, 'due today is amber');
         assert.equal(await page.locator('.cc-kc[data-id="C"] .cc-due').count(), 0, 'no date, no chip');
@@ -278,11 +284,11 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.ok((await page.$eval('.cc-col:last-child', e => e.innerText)).includes('Reviewed'), 'Posted column shows the review state');
         await page.click('.cc-kc[data-id="A"] [data-d="1"]');
         await page.waitForFunction(() => window.__lastUserSet.socialDrafts.find(d => d.id === 'A').stage === 'draft');
-        assert.deepEqual(await cols(), ['Idea 0', 'Script 2', 'Filming 0', 'Editing 0', 'Scheduled 1', 'Posted 1'], 'A moved to Script');
+        assert.deepEqual(await cols(), ['Idea 0', 'Script 2', 'Filming 0', 'Editing 0', 'Scheduled 1', 'Review 0', 'Posted 1'], 'A moved to Script');
         assert.equal((await page.evaluate(() => window.__lastUserSet.socialDrafts)).length, 3, 'a move keeps every other card');
         await page.click('.cc-kc[data-id="B"] [data-d="-1"]');
         await page.waitForFunction(() => window.__lastUserSet.socialDrafts.find(d => d.id === 'B').stage === 'idea');
-        assert.deepEqual(await cols(), ['Idea 1', 'Script 1', 'Filming 0', 'Editing 0', 'Scheduled 1', 'Posted 1'], 'B moved back to Idea');
+        assert.deepEqual(await cols(), ['Idea 1', 'Script 1', 'Filming 0', 'Editing 0', 'Scheduled 1', 'Review 0', 'Posted 1'], 'B moved back to Idea');
         await page.click('.cc-kc[data-id="C"] [data-d="1"]');
         await page.waitForSelector('#ccOverlay.open');
         assert.equal(await page.$eval('#ccOverlay .cc-chip[data-v="posted"]', e => e.getAttribute('aria-pressed')), 'true', 'past Scheduled opens the Posted form');
@@ -353,7 +359,7 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.equal(await page.locator('#section-cafe-content [data-view="review"]').count(), 0, 'no Review view for a member who is not a reviewer');
         await page.evaluate(() => {
             myGroup = 'Audit';
-            const mk = (o) => ({ kind: 'social', status: 'รอตรวจ', score: 0, title: 't', link: 'https://x.test/p', postDate: '2026-10-08', ctype: 'reel', platform: 'ig', metrics: null, images: ['https://img.test/9.jpg'], ...o });
+            const mk = (o) => ({ authUid: 'AU2', kind: 'social', status: 'รอตรวจ', score: 0, title: 't', link: 'https://x.test/p', postDate: '2026-10-08', ctype: 'reel', platform: 'ig', metrics: null, images: ['https://img.test/9.jpg'], ...o });
             store.works.W9 = mk({ userId: 'U2', displayName: 'Mint', caption: 'Latte art reel' });
             store.works.W10 = mk({ userId: 'U3', displayName: 'Ploy', caption: 'Already scored', status: 'ตรวจแล้ว', score: 0.2 });
             pushWorks(); window.cafeContentSync();
@@ -385,6 +391,8 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         await page.waitForFunction(() => !document.getElementById('ccOverlay').classList.contains('open'));
         const n1 = await page.evaluate(() => window.__notif[0]);
         assert.deepEqual({ ...n1, timestamp: 'TS', authUid: 'A', workTitle: '' }, { type: 'content_review', authUid: 'A', workId: 'W9', workTitle: '', ownerId: 'U2', ownerName: 'Mint', reviewerId: 'U1', reviewerName: 'Jo', verdict: 'approve', suggestedScore: 0.2, comment: 'Clear hook, good captions', read: false, timestamp: 'TS' }, 'the recommendation filed for the admin');
+        const cd1 = await page.evaluate(() => window.__crDocs.W9_A1);
+        assert.deepEqual({ ...cd1, at: 'TS' }, { authUid: 'A1', workId: 'W9', ownerAuthUid: 'AU2', ownerId: 'U2', reviewerId: 'U1', reviewerName: 'Jo', verdict: 'approve', suggestedScore: 0.2, comment: 'Clear hook, good captions', at: 'TS' }, 'the owner can read the review: doc id workId_reviewerAuthUid, filed for the post owner');
         assert.equal(await page.evaluate(() => store.works.W9.score), 0, 'a reviewer never writes a score'); assert.equal(await page.evaluate(() => store.works.W9.status), 'รอตรวจ');
         assert.equal(await page.evaluate(() => store.users.U1.contentReviews.W9.verdict + store.users.U1.contentReviews.W9.score), 'approve0.2', 'remembered on the own user doc of the reviewer');
         rv = await page.$eval('#section-cafe-content', e => e.innerText.replace(/\s+/g, ' '));
@@ -401,6 +409,29 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         await page.waitForFunction(() => !document.getElementById('ccOverlay').classList.contains('open'));
         assert.equal(await page.evaluate(() => window.__notif.length), 2); assert.equal(await page.evaluate(() => window.__notif[1].verdict + '|' + window.__notif[1].suggestedScore), 'changes|0');
         assert.ok(/You suggested ↩ Needs changes/.test(await page.$eval('#section-cafe-content', e => e.innerText)));
+        assert.deepEqual(await page.evaluate(() => [Object.keys(window.__crDocs), window.__crDocs.W9_A1.verdict, window.__crDocs.W9_A1.comment]), [['W9_A1'], 'changes', 'Fix the link'], 'a second review edits the same doc');
+        // The OTHER side: reviews filed on MY posts (queried by my auth uid) show on the board's Review column, the list and the numbers sheet.
+        assert.deepEqual(await page.evaluate(() => window.__crQuery), ['ownerAuthUid', '==', 'A1'], 'my posts are found by my own auth uid (what the rule allows)');
+        await page.evaluate(() => { store.works.W1.status = 'รอตรวจ'; store.works.W1.score = 0; pushWorks();
+            window.__crCb({ docs: [
+                { data: () => ({ workId: 'W1', verdict: 'approve', suggestedScore: 0.2, comment: 'Nice', reviewerName: 'Ploy', at: { toMillis: () => 1 } }) },
+                { data: () => ({ workId: 'W1', verdict: 'changes', suggestedScore: 0, comment: 'Tighten the first line', reviewerName: 'Mint', at: { toMillis: () => 5 } }) }] }); });
+        await page.click('#section-cafe-content [data-view="board"]');
+        assert.deepEqual(await cols(), ['Idea 0', 'Script 0', 'Filming 0', 'Editing 0', 'Scheduled 0', 'Review 2', 'Posted 1'], 'posts waiting for the admin are in Review (the harness feeds every work as mine: W1 + W9 wait, W10 is scored)');
+        let rvc = await page.$eval('.cc-col:nth-last-child(2) .cc-kc[data-id="W1"]', e => e.innerText.replace(/\s+/g, ' '));
+        assert.ok(rvc.includes('↩ Changes requested') && rvc.includes('Mint') && rvc.includes('Tighten the first line'), 'the newest feedback shows on the card: ' + rvc);
+        assert.ok(!rvc.includes('Nice'), 'the card shows one note; the sheet shows all');
+        assert.equal(await page.locator('.cc-col:nth-last-child(2) .cc-pill.fix').count(), 1, 'needs-changes pill (only the post with a changes review)');
+        await page.click('.cc-col:nth-last-child(2) .cc-kc[data-id="W1"]');
+        await page.waitForSelector('#ccOverlay.open');
+        const sheetTxt = await page.$eval('#ccOverlay', e => e.innerText.replace(/\s+/g, ' '));
+        assert.ok(sheetTxt.includes('Reviewer feedback') && sheetTxt.includes('Tighten the first line') && sheetTxt.includes('Nice') && sheetTxt.includes('+0.2'), 'the numbers sheet lists every review: ' + sheetTxt);
+        await page.click('#ccOverlay [data-act="close"]');
+        await page.click('#section-cafe-content [data-view="list"]'); await page.click('#section-cafe-content [data-filter="posted"]');
+        assert.ok((await page.$eval('#section-cafe-content', e => e.innerText)).includes('Tighten the first line'), 'the list row shows the feedback');
+        await page.evaluate(() => { store.works.W1.status = 'ตรวจแล้ว'; store.works.W1.score = 0.3; pushWorks(); });
+        await page.click('#section-cafe-content [data-view="board"]');
+        assert.deepEqual(await cols(), ['Idea 0', 'Script 0', 'Filming 0', 'Editing 0', 'Scheduled 0', 'Review 1', 'Posted 2'], 'once the admin scores it, it moves to Posted');
         await page.click('#section-cafe-content [data-view="list"]');
         await page.evaluate(() => { localStorage.clear(); myGroup = 'G1'; division = 'General Division'; window.myExtraGroups = []; window.cafeContentSync(); });
 
