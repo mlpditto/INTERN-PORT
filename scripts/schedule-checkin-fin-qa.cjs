@@ -9,7 +9,9 @@ const idx = fs.readFileSync('public/index.html', 'utf8');
 assert.ok(idx.includes('function checkinPillHtml()') && idx.includes('function schTodayHeadHtml('), 'pill builder + TODAY header builder exist');
 
 async function open(browser) {
-    const ctx = await browser.newContext({ viewport: { width: 412, height: 900 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+    // timezoneId: the app keys check-in / agenda days in Asia/Bangkok (getBangkokDateTimeParts), while the harness builds its keys from the page clock —
+    // on a UTC runner the two dates differ between 17:00 and 24:00 UTC and the "checked in today" pill never turned green. Pin the page to Bangkok.
+    const ctx = await browser.newContext({ viewport: { width: 412, height: 900 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, timezoneId: 'Asia/Bangkok' });
     const page = await ctx.newPage();
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.addInitScript(() => {
