@@ -1,5 +1,7 @@
 /* Admin ▸ Dashboard ▸ "📸 Content Creator": the Social media content the Content Creator division posted (intern cafe-content.js writes works with kind:'social').
    Read-only: List (month filter, totals (posts · likes · reach · engagement), by platform, by member, and the posts newest first with their numbers) or Calendar (a month grid, a dot per post by platform; tap a day for its posts).
+   Audit reviewers' recommendations (admin_notifications type 'content_review', sent from the intern Review view) show under each post: verdict, suggested
+   bonus, comment. They are advice only — a recommendation never changes a score.
    Scoring stays in the existing Work queue (the intern card shows the score back). Same panel shape as guide-feedback-admin.js. */
 document.addEventListener('DOMContentLoaded', () => {
     const host = document.getElementById('dashboard-work');
@@ -11,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     section.innerHTML = '<summary>📸 Content Creator</summary><div class="cca-body"></div><p role="status"></p>';
     host.prepend(section);
     const body = section.querySelector('.cca-body'), status = section.querySelector('p'), summary = section.querySelector('summary');
-    let unsubscribe, posts = [], range = 'month', view = 'list', calMonth = '', selDay = '';
+    let unsubscribe, unsubscribeRecs, posts = [], recs = {}, range = 'month', view = 'list', calMonth = '', selDay = '';
     const COLOR = { ig: '#e1306c', fb: '#1877f2', tt: '#111827', yt: '#ef4444', line: '#06c755' };
 
     const num = v => (v == null || v === '' || isNaN(Number(v))) ? null : Number(v);
@@ -47,7 +49,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const nums = el('div', null, 'color:#475569;font-size:12px');
         const l = num(w.metrics?.likes), r = num(w.metrics?.reach);
         nums.textContent = '❤ ' + fmt(l) + ' · 👁 ' + fmt(r) + ' · ' + (reviewed(w) ? '✅ Reviewed' + (Number(w.score) ? ' +' + (Math.round(Number(w.score) * 100) / 100) : '') : '⏳ Pending (score it in the Work queue)');
-        row.append(head, cap, nums);
+        const rec = recs[w.id];
+        if (rec) {
+            const r = el('div', null, 'margin-top:4px;padding:6px 8px;border-radius:8px;font-size:12px;background:' + (rec.verdict === 'approve' ? '#f0fdf4' : '#fff7ed') + ';color:' + (rec.verdict === 'approve' ? '#166534' : '#9a3412'));
+            r.textContent = '🔍 ' + (rec.reviewerName || 'Reviewer') + ': ' + (rec.verdict === 'approve' ? '✅ suggests +' + (Math.round(Number(rec.suggestedScore || 0) * 100) / 100) : '↩ needs changes') + (rec.comment ? ' — ' + rec.comment : '');
+            row.append(head, cap, nums, r);
+        } else row.append(head, cap, nums);
         return row;
     }
 
@@ -88,7 +95,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function render() {
         body.replaceChildren();
         const list = posts.filter(inRange);
-        summary.textContent = '📸 Content Creator' + (posts.length ? ' · ' + posts.length : '');
+        const suggested = posts.filter(w => !reviewed(w) && recs[w.id]).length;
+        summary.textContent = '📸 Content Creator' + (posts.length ? ' · ' + posts.length : '') + (suggested ? ' · ' + suggested + ' suggested' : '');
         const bar = el('div', null, 'display:flex;gap:6px;margin:6px 0 10px;flex-wrap:wrap');
         (view === 'list' ? [['month', 'This month'], ['last', 'Last month'], ['all', 'All']] : []).forEach(([k, label]) => {
             const b = el('button', label, 'min-height:0;padding:4px 12px;font-size:12px;' + (range === k ? 'background:#fef3c7;border-color:#f59e0b;color:#92400e;font-weight:700' : ''));
@@ -142,10 +150,16 @@ document.addEventListener('DOMContentLoaded', () => {
             status.textContent = '';
             render();
         }, () => { unsubscribe = null; status.textContent = 'Could not load. Close and reopen to retry.'; });
+        unsubscribeRecs = db.collection('admin_notifications').where('type', '==', 'content_review').onSnapshot(snap => {
+            const latest = {};
+            snap.docs.forEach(d => { const o = d.data(); const t = o.timestamp?.toMillis?.() || 0; if (o.workId && (!latest[o.workId] || t >= latest[o.workId]._t)) latest[o.workId] = { ...o, _t: t }; });
+            recs = latest;
+            render();
+        }, () => { unsubscribeRecs = null; });
     }
     section.addEventListener('toggle', () => { if (section.open) listen(); });
     db.app.auth().onAuthStateChanged(user => {
-        unsubscribe?.(); unsubscribe = null;
+        unsubscribe?.(); unsubscribe = null; unsubscribeRecs?.(); unsubscribeRecs = null;
         if (user) listen();
     });
     render();

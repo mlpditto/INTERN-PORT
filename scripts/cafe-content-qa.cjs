@@ -1,7 +1,7 @@
 // V101.100 / V101.101: Content Creator division (first called CAFE) — Social media content. The REAL public/cafe-content.js + cafe-content.css against a fake Firestore.
 // Other users see nothing new (and the ＋ still opens Submit New); a CAFE member gets the Content card instead of Mission + DD Codex,
 // ideas/drafts live on users/{uid}.socialDrafts, posting writes works (kind:'social') + the unified mirror, numbers update the works doc,
-// admin's review (status/score on works) shows back on the card. Also pins the wiring in index.html and the rules this feature relies on.
+// admin's review (status/score on works) shows back on the card; Audit reviewers get a Review view whose recommendations go to admin_notifications. Also pins the wiring in index.html and the rules this feature relies on.
 const fs = require('node:fs');
 const assert = require('node:assert/strict');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -24,6 +24,8 @@ assert.ok(/body\.cafe-mode #section-kanban, body\.cafe-mode #section-dd-codex \{
 // Rules this relies on: owner may update their own works doc; any signed-in user may write product-images (photos); users doc is owner-writable.
 assert.ok(/match \/works\/\{workId\} \{[\s\S]*?allow update, delete: if isAdmin\(\) \|\| \(isSignedIn\(\) && resource\.data\.authUid == request\.auth\.uid\)/.test(rules), 'works: owner can update');
 assert.ok(/match \/product-images\//.test(storage), 'storage: product-images path exists for photo uploads');
+assert.ok(/match \/admin_notifications\/\{docId\} \{[\s\S]*?allow create: if isSignedIn\(\) && \(request\.resource\.data\.get\('type', ''\) != 'journal_feedback'/.test(rules), 'a signed-in reviewer may file a content_review (no rules deploy needed)');
+assert.ok(js.includes("type: 'content_review'") && fs.readFileSync('public/cafe-content-admin.js', 'utf8').includes("'type', '==', 'content_review'"), 'reviewer and admin share the content_review type');
 assert.ok(/match \/users\/\{userId\} \{[\s\S]*?allow create, update: if isAdmin\(\) \|\| request\.auth\.uid == userId/.test(rules), 'users: owner can update their doc (socialDrafts)');
 // No badge system for the division: every entry point of the achievement / badge code asks window.isContentCreator() first.
 const fn = name => { const i = index.indexOf(name); assert.ok(i >= 0, name); return index.slice(i, i + 700); };
@@ -52,13 +54,15 @@ function openUnifiedModal() { window.__unified++; }
 function resizeProductPhoto() { return Promise.resolve({ blob: new Blob(['x']) }); }
 function uploadProductPhoto() { return Promise.resolve({ url: 'https://img.test/' + (++un) + '.jpg' }); }
 window.firebase = { firestore: { FieldValue: { serverTimestamp: () => ({ ts: 1 }) } } };
-function pushWorks() { usersWorksCache = Object.keys(store.works).map(id => ({ id, ...store.works[id] })); window.cafeContentRender && window.cafeContentRender(); }
+const allCbs = [];
+function pushWorks() { usersWorksCache = Object.keys(store.works).map(id => ({ id, ...store.works[id] })); allCbs.forEach(cb => cb({ docs: Object.keys(store.works).map(id => ({ id, data: () => store.works[id] })) })); window.cafeContentRender && window.cafeContentRender(); }
 const db = { collection(n) { return {
   doc(id) { return {
     onSnapshot(cb) { if (n === 'users') { userCbs.push(cb); cb({ exists: true, data: () => store.users[id] }); } return () => {}; },
     set(d) { Object.assign(store.users[id], d); window.__lastUserSet = d; userCbs.forEach(cb => cb({ exists: true, data: () => store.users[id] })); return Promise.resolve(); },
-    update(d) { window.__upd.push([n, id, d]); Object.assign(store.works[id], d); pushWorks(); return Promise.resolve(); } }; },
-  add(d) { if (n === 'works') { const id = 'W' + (++wn); store.works[id] = d; pushWorks(); return Promise.resolve({ id }); } window.__subs.push(d); return Promise.resolve({ id: 'S1' }); } }; } };
+    update(d) { window.__upd.push([n, id, d]); if (n === 'users') { Object.keys(d).forEach(k => { const [a, b] = k.split('.'); if (b) { store.users[id][a] = store.users[id][a] || {}; store.users[id][a][b] = d[k]; } else store.users[id][k] = d[k]; }); userCbs.forEach(cb => cb({ exists: true, data: () => store.users[id] })); return Promise.resolve(); } Object.assign(store.works[id], d); pushWorks(); return Promise.resolve(); } }; },
+  where() { return { onSnapshot(cb) { allCbs.push(cb); cb({ docs: Object.keys(store.works).map(id => ({ id, data: () => store.works[id] })) }); return () => {}; } }; },
+  add(d) { if (n === 'works') { const id = 'W' + (++wn); store.works[id] = d; pushWorks(); return Promise.resolve({ id }); } if (n === 'admin_notifications') { (window.__notif = window.__notif || []).push(d); return Promise.resolve({ id: 'N' + window.__notif.length }); } window.__subs.push(d); return Promise.resolve({ id: 'S1' }); } }; } };
 window.__review = (id, score) => { store.works[id].status = 'ตรวจแล้ว'; store.works[id].score = score; pushWorks(); };
 </script>
 <script src="/cafe-content.js" defer></script>`;
@@ -239,6 +243,62 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.equal(await vis('#u-earned-badges'), true, 'badge row is back');
         await page.click('#unified-fab-btn');
         assert.equal(await page.evaluate(() => window.__unified), 3, 'back to Submit New');
+
+        // Audit review view: others' posts waiting for review; a review is a RECOMMENDATION filed for the admin (no score is written).
+        await page.evaluate(() => { localStorage.clear(); division = 'Content Creator'; myGroup = 'G1'; window.myExtraGroups = []; window.cafeContentSync(); });
+        assert.equal(await page.locator('#section-cafe-content [data-view="review"]').count(), 0, 'no Review view for a member who is not a reviewer');
+        await page.evaluate(() => {
+            myGroup = 'Audit';
+            const mk = (o) => ({ kind: 'social', status: 'รอตรวจ', score: 0, title: 't', link: 'https://x.test/p', postDate: '2026-10-08', ctype: 'reel', platform: 'ig', metrics: null, images: ['https://img.test/9.jpg'], ...o });
+            store.works.W9 = mk({ userId: 'U2', displayName: 'Mint', caption: 'Latte art reel' });
+            store.works.W10 = mk({ userId: 'U3', displayName: 'Ploy', caption: 'Already scored', status: 'ตรวจแล้ว', score: 0.2 });
+            pushWorks(); window.cafeContentSync();
+        });
+        assert.equal(await page.locator('#section-cafe-content [data-view="review"]').count(), 1, 'Audit gets the Review view');
+        await page.click('#section-cafe-content [data-view="review"]');
+        assert.equal(await page.locator('#section-cafe-content .cc-stats').count(), 0, 'no month stats in the Review view');
+        let rv = await page.$eval('#section-cafe-content', e => e.innerText.replace(/\s+/g, ' '));
+        assert.ok(/To review 1/.test(rv) && /Reviewed by me 0/.test(rv), 'counts: ' + rv);
+        assert.ok(rv.includes('Mint') && rv.includes('Latte art reel'), 'another member post is listed');
+        assert.ok(!rv.includes('Ploy') && !rv.includes('Already scored'), 'a post the admin already scored is not');
+        assert.ok(!rv.includes('Cold brew') , 'my own posts are not');
+        assert.notEqual(await page.evaluate(() => localStorage.getItem('cafeContentView')), 'review', 'Review is never the remembered view');
+        await page.click('.cc-rv[data-id="W9"]');
+        await page.waitForSelector('#ccOverlay.open #rvComment');
+        assert.equal(await vis('#rvScoreBox'), false, 'no bonus picker until the verdict is approve');
+        await page.click('#ccGo');
+        assert.ok(/verdict/i.test(await page.$eval('#ccErr', e => e.textContent)), 'a verdict is required');
+        await page.click('#ccOverlay .cc-chip[data-v="changes"]');
+        await page.click('#ccGo');
+        assert.ok(/what needs to change/i.test(await page.$eval('#ccErr', e => e.textContent)), 'changes need a comment');
+        await page.click('#ccOverlay .cc-chip[data-v="approve"]');
+        assert.equal(await vis('#rvScoreBox'), true, 'bonus picker for approve');
+        await page.click('#ccGo');
+        assert.ok(/suggested bonus/i.test(await page.$eval('#ccErr', e => e.textContent)), 'approve needs a suggested bonus');
+        await page.click('#ccOverlay .cc-chip[data-v="0.2"]');
+        await page.fill('#rvComment', 'Clear hook, good captions');
+        await page.click('#ccGo');
+        await page.waitForFunction(() => !document.getElementById('ccOverlay').classList.contains('open'));
+        const n1 = await page.evaluate(() => window.__notif[0]);
+        assert.deepEqual({ ...n1, timestamp: 'TS', authUid: 'A', workTitle: '' }, { type: 'content_review', authUid: 'A', workId: 'W9', workTitle: '', ownerId: 'U2', ownerName: 'Mint', reviewerId: 'U1', reviewerName: 'Jo', verdict: 'approve', suggestedScore: 0.2, comment: 'Clear hook, good captions', read: false, timestamp: 'TS' }, 'the recommendation filed for the admin');
+        assert.equal(await page.evaluate(() => store.works.W9.score), 0, 'a reviewer never writes a score'); assert.equal(await page.evaluate(() => store.works.W9.status), 'รอตรวจ');
+        assert.equal(await page.evaluate(() => store.users.U1.contentReviews.W9.verdict + store.users.U1.contentReviews.W9.score), 'approve0.2', 'remembered on the own user doc of the reviewer');
+        rv = await page.$eval('#section-cafe-content', e => e.innerText.replace(/\s+/g, ' '));
+        assert.ok(/To review 0/.test(rv) && /Reviewed by me 1/.test(rv), 'it moved to Reviewed by me: ' + rv);
+        await page.click('#section-cafe-content [data-rvf="mine"]');
+        assert.ok(/You suggested ✅ \+0\.2/.test(await page.$eval('#section-cafe-content', e => e.innerText)), 'the row shows what I suggested');
+        // change my mind: re-open, send "needs changes" → a second notification
+        await page.click('.cc-rv[data-id="W9"]');
+        await page.waitForSelector('#rvComment');
+        assert.equal(await page.$eval('#ccOverlay .cc-chip[data-v="approve"]', e => e.getAttribute('aria-pressed')), 'true', 'the sheet remembers my last verdict');
+        await page.click('#ccOverlay .cc-chip[data-v="changes"]');
+        await page.fill('#rvComment', 'Fix the link');
+        await page.click('#ccGo');
+        await page.waitForFunction(() => !document.getElementById('ccOverlay').classList.contains('open'));
+        assert.equal(await page.evaluate(() => window.__notif.length), 2); assert.equal(await page.evaluate(() => window.__notif[1].verdict + '|' + window.__notif[1].suggestedScore), 'changes|0');
+        assert.ok(/You suggested ↩ Needs changes/.test(await page.$eval('#section-cafe-content', e => e.innerText)));
+        await page.click('#section-cafe-content [data-view="list"]');
+        await page.evaluate(() => { localStorage.clear(); myGroup = 'G1'; division = 'General Division'; window.myExtraGroups = []; window.cafeContentSync(); });
 
         // Extra groups (admin-set users.extraGroups) decide only which UI(s) a user may open; the primary group stays what everything else follows.
         const mode = () => page.evaluate(() => localStorage.getItem('contentViewMode:U1'));

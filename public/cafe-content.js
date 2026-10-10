@@ -5,6 +5,9 @@
    · Ideas / Drafts  → users/{uid}.socialDrafts  (array, max 30, owner-writable like the rest of the user doc)
    · Posted          → works/{id} with kind:'social' (+ a unified `submissions` mirror, same dual write as submitWork). The admin reviews it in the
                        existing Work queue and sets the score; this card reads status/score back. Likes / reach live on the works doc (owner may update it).
+   Audit (a reviewer group) also gets a Review view: the others' posts waiting for review, each answered with a RECOMMENDATION (verdict, suggested
+   bonus, comment) filed in admin_notifications {type:'content_review'} — the admin still gives the final score in the Work queue. Reviewers cannot
+   write scores: users/{uid} is owner-writable, so who counts as a reviewer is a UI choice, never a permission.
    Images reuse the product photo path (resizeProductPhoto → uploadProductPhoto, JPEG ≤2 MB, content-addressed).
    Globals used from index.html: db, userId, userProfile, usersWorksCache, getMyDivision, ensureFirebaseAuthReady, showToast,
    resizeProductPhoto, uploadProductPhoto, openUnifiedModal, getBangkokDateTimeParts. */
@@ -14,14 +17,14 @@
     var PLATFORMS = [['ig', 'IG', 'fa-brands fa-instagram'], ['fb', 'FB', 'fa-brands fa-facebook'], ['tt', 'TikTok', 'fa-brands fa-tiktok'], ['yt', 'YouTube', 'fa-brands fa-youtube'], ['line', 'LINE', 'fa-brands fa-line']];
     var TYPES = { post: ['Post', 'โพสต์'], reel: ['Reel', 'รีล'], story: ['Story', 'สตอรี่'], video: ['Video', 'วิดีโอ'] };
     var T = {
-        en: { title: 'Content', viewAs: 'View as', modeIntern: 'Intern', modeContent: 'Content', viewList: 'List view', viewMonth: 'Month view', planDay: 'Plan', emptyDay: 'Nothing on this day yet.', pickDay: 'Tap a day to see or plan content.', plan: 'Plan date (optional)', ideas: 'Ideas', drafts: 'Drafts', posted: 'Posted', platforms: 'Platforms', reviewed: 'Reviewed', pending: 'Pending review', add: 'New content', addNum: 'Add numbers',
+        en: { review: 'Review', revTodo: 'To review', revMine: 'Reviewed by me', revEmpty: 'Nothing is waiting for review.', revMineEmpty: 'You have not reviewed anything yet.', revOpen: 'Review', revTitle: 'Review content', revVerdict: 'Verdict', revOk: 'Looks good', revFix: 'Needs changes', revScore: 'Suggested bonus (pts)', revComment: 'Comment', revCommentPh: 'What did you check? What should change?', revSend: 'Send to admin', revHint: 'Your review is a recommendation — the admin gives the final score.', revNeedVerdict: 'Choose a verdict first.', revNeedScore: 'Pick a suggested bonus.', revNeedComment: 'Say what needs to change.', revSent: 'Review sent', revYou: 'You suggested', title: 'Content', viewAs: 'View as', modeIntern: 'Intern', modeContent: 'Content', viewList: 'List view', viewMonth: 'Month view', planDay: 'Plan', emptyDay: 'Nothing on this day yet.', pickDay: 'Tap a day to see or plan content.', plan: 'Plan date (optional)', ideas: 'Ideas', drafts: 'Drafts', posted: 'Posted', platforms: 'Platforms', reviewed: 'Reviewed', pending: 'Pending review', add: 'New content', addNum: 'Add numbers',
             emptyIdeas: 'No ideas yet. Jot one down before you forget it.', emptyDrafts: 'No drafts yet.', emptyPosted: 'Nothing posted yet. Share your first piece.',
             sheet: 'Submit content', edit: 'Edit content', stage: 'Stage', idea: 'Idea', draft: 'Draft', platform: 'Platform', type: 'Type', caption: 'Caption or idea', capPh: 'What is this content about?',
             images: 'Images', addImg: 'Add', link: 'Post link', date: 'Post date', send: 'Send for review', save: 'Save', saving: 'Saving…', other: 'Case, Work, Event… (other submissions)', del: 'Delete this draft', delAsk: 'Delete this draft?',
             hintPosted: 'Posted content is reviewed by the admin. Add numbers later from the card.', hintLocal: 'Saved for you only until you mark it Posted.',
             needCap: 'Write a caption or idea first.', needLink: 'Paste the post link (starting with http).', needDate: 'Pick the post date.', full: 'You already have 30 saved. Delete one first.', fail: 'Could not save. Please try again.', noimg: 'That image could not be read.',
             numTitle: 'Add numbers', likes: 'Likes', reach: 'Reach', numHint: 'Update any time — the latest numbers are what the admin sees.', saveNum: 'Save numbers', badNum: 'Enter whole numbers, zero or more.', likeReach: 'Likes cannot be higher than reach.', savedNum: 'Saved.', sentToast: 'Sent for review', savedToast: 'Saved' },
-        th: { title: 'คอนเทนต์', viewAs: 'มุมมอง', modeIntern: 'Intern', modeContent: 'คอนเทนต์', viewList: 'มุมมองรายการ', viewMonth: 'มุมมองปฏิทิน', planDay: 'วางแผน', emptyDay: 'วันนี้ยังไม่มีอะไร', pickDay: 'แตะวันที่เพื่อดูหรือวางแผนคอนเทนต์', plan: 'วันที่วางแผน (ไม่บังคับ)', ideas: 'ไอเดีย', drafts: 'ฉบับร่าง', posted: 'โพสต์แล้ว', platforms: 'แพลตฟอร์ม', reviewed: 'ตรวจแล้ว', pending: 'รอตรวจ', add: 'เพิ่มคอนเทนต์', addNum: 'เพิ่มตัวเลข',
+        th: { review: 'ตรวจงาน', revTodo: 'รอตรวจ', revMine: 'ที่ฉันตรวจแล้ว', revEmpty: 'ยังไม่มีงานรอตรวจ', revMineEmpty: 'ยังไม่ได้ตรวจงานชิ้นไหน', revOpen: 'ตรวจ', revTitle: 'ตรวจคอนเทนต์', revVerdict: 'ผลตรวจ', revOk: 'ผ่าน', revFix: 'ต้องแก้', revScore: 'โบนัสที่แนะนำ (pts)', revComment: 'ความเห็น', revCommentPh: 'ตรวจอะไรไปบ้าง ต้องแก้ตรงไหน', revSend: 'ส่งให้แอดมิน', revHint: 'ผลตรวจของคุณเป็นข้อเสนอ แอดมินเป็นคนให้คะแนนจริง', revNeedVerdict: 'เลือกผลตรวจก่อน', revNeedScore: 'เลือกโบนัสที่แนะนำ', revNeedComment: 'บอกหน่อยว่าต้องแก้อะไร', revSent: 'ส่งผลตรวจแล้ว', revYou: 'คุณแนะนำ', title: 'คอนเทนต์', viewAs: 'มุมมอง', modeIntern: 'Intern', modeContent: 'คอนเทนต์', viewList: 'มุมมองรายการ', viewMonth: 'มุมมองปฏิทิน', planDay: 'วางแผน', emptyDay: 'วันนี้ยังไม่มีอะไร', pickDay: 'แตะวันที่เพื่อดูหรือวางแผนคอนเทนต์', plan: 'วันที่วางแผน (ไม่บังคับ)', ideas: 'ไอเดีย', drafts: 'ฉบับร่าง', posted: 'โพสต์แล้ว', platforms: 'แพลตฟอร์ม', reviewed: 'ตรวจแล้ว', pending: 'รอตรวจ', add: 'เพิ่มคอนเทนต์', addNum: 'เพิ่มตัวเลข',
             emptyIdeas: 'ยังไม่มีไอเดีย จดไว้ก่อนลืมนะ', emptyDrafts: 'ยังไม่มีฉบับร่าง', emptyPosted: 'ยังไม่มีงานที่โพสต์ ลองส่งชิ้นแรกดู',
             sheet: 'ส่งคอนเทนต์', edit: 'แก้คอนเทนต์', stage: 'ขั้นตอน', idea: 'ไอเดีย', draft: 'ร่าง', platform: 'แพลตฟอร์ม', type: 'ประเภท', caption: 'แคปชั่นหรือไอเดีย', capPh: 'คอนเทนต์นี้เกี่ยวกับอะไร',
             images: 'รูปภาพ', addImg: 'เพิ่ม', link: 'ลิงก์โพสต์', date: 'วันที่โพสต์', send: 'ส่งให้ตรวจ', save: 'บันทึก', saving: 'กำลังบันทึก…', other: 'Case, Work, Event… (งานประเภทอื่น)', del: 'ลบฉบับร่างนี้', delAsk: 'ลบฉบับร่างนี้ใช่ไหม',
@@ -90,8 +93,22 @@
     var WEEK = { en: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'], th: ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'] };
     var view = (function () { try { return localStorage.getItem('cafeContentView') === 'month' ? 'month' : 'list'; } catch (_) { return 'list'; } })();
     var viewMonth = '', selDay = '';
+    var allPosts = [], unsubAll = null, myReviews = {}, revFilter = 'todo';
+    var REVIEWER_GROUPS = ['audit'];   // a group (primary or extra) named like this gets the Review view — a UI choice, not a permission
+    function isReviewer() {
+        try {
+            var gs = [typeof myGroup !== 'undefined' ? myGroup : ''].concat(Array.isArray(window.myExtraGroups) ? window.myExtraGroups : []);
+            return gs.some(function (g) { return REVIEWER_GROUPS.indexOf(String(g || '').trim().toLowerCase()) >= 0; });
+        } catch (_) { return false; }
+    }
     function monthShift(key, delta) { var y = +key.slice(0, 4), m = +key.slice(5, 7) - 1 + delta; var d = new Date(Date.UTC(y, m, 1)); return d.toISOString().slice(0, 7); }
-    function setView(v) { view = v; try { localStorage.setItem('cafeContentView', v); } catch (_) { /* storage may be blocked */ } if (v === 'month' && !viewMonth) viewMonth = todayKey().slice(0, 7); render(); }
+    function setView(v) {
+        view = v;
+        if (v !== 'review') { try { localStorage.setItem('cafeContentView', v); } catch (_) { /* storage may be blocked */ } }   // Review is never the remembered view
+        if (v === 'month' && !viewMonth) viewMonth = todayKey().slice(0, 7);
+        if (v === 'review') listenAll();
+        render();
+    }
 
     function thumb(p, img) { return '<div class="cc-th">' + (img ? '<img src="' + esc(img) + '" alt="">' : '<i class="' + p[2] + '"></i>') + '</div>'; }
     function postedRow(w, t) {
@@ -108,6 +125,28 @@
         return '<div class="cc-row" data-act="draft" data-id="' + esc(d.id) + '">' + thumb(p, d.images && d.images[0]) + '<div class="cc-main">' +
             '<div class="cc-meta"><span class="cc-pill">' + esc(typeLabel(d.ctype)) + '</span><span>' + esc(p[1]) + (d.plannedDate ? ' · ' + esc(dayLabel(d.plannedDate)) : '') + '</span><span class="cc-pill plan">' + (d.stage === 'idea' ? t.idea : t.draft) + '</span></div>' +
             '<div class="cc-cap">' + esc(d.caption) + '</div></div></div>';
+    }
+
+    function sentLine(w, t) {
+        var r = myReviews[w.id];
+        return r ? '<div class="cc-sent">' + esc(t.revYou) + ' ' + (r.verdict === 'approve' ? '✅ +' + esc(fmtScore(r.score)) : '↩ ' + esc(t.revFix)) + '</div>' : '';
+    }
+    function reviewRow(w, t) {
+        var p = plat(w.platform), m = w.metrics && (w.metrics.likes != null || w.metrics.reach != null) ? w.metrics : null;
+        var imgs = (w.images || []).slice(0, 3).map(function (u) { return '<img src="' + esc(u) + '" alt="">'; }).join('');
+        return '<div class="cc-row cc-rv" data-act="review" data-id="' + esc(w.id) + '">' + thumb(p, w.images && w.images[0]) + '<div class="cc-main">' +
+            '<div class="cc-meta"><b>' + esc(w.displayName || '') + '</b><span class="cc-pill">' + esc(typeLabel(w.ctype)) + '</span><span>' + esc(p[1]) + ' · ' + esc(dayLabel(w.postDate)) + '</span></div>' +
+            '<div class="cc-cap">' + esc(w.caption || w.title) + '</div>' + (imgs ? '<div class="cc-mini">' + imgs + '</div>' : '') +
+            '<div class="cc-foot">' + (m ? '<span><i class="fa-solid fa-heart"></i> ' + esc(fmtNum(m.likes || 0)) + '</span><span><i class="fa-solid fa-eye"></i> ' + esc(fmtNum(m.reach || 0)) + '</span>' : '') +
+            '<span class="cc-pill pending" style="margin-left:auto">' + esc(t.revOpen) + ' ›</span></div>' + sentLine(w, t) + '</div></div>';
+    }
+    function reviewHtml(t) {
+        var others = allPosts.filter(function (w) { return w.userId !== userId; });
+        var todo = others.filter(function (w) { return !isReviewed(w) && !myReviews[w.id]; }), mine = others.filter(function (w) { return myReviews[w.id]; });
+        var list = revFilter === 'mine' ? mine : todo;
+        return '<div class="cc-rail" role="group">' + [['todo', t.revTodo, todo.length], ['mine', t.revMine, mine.length]].map(function (c) {
+            return '<button type="button" class="cc-chip" data-rvf="' + c[0] + '" aria-pressed="' + (revFilter === c[0]) + '">' + c[1] + ' ' + c[2] + '</button>';
+        }).join('') + '</div>' + (list.length ? list.map(function (w) { return reviewRow(w, t); }).join('') : '<div class="cc-empty">' + (revFilter === 'mine' ? t.revMineEmpty : t.revEmpty) + '</div>');
     }
 
     function monthHtml(t, posted) {
@@ -138,12 +177,14 @@
 
     function render() {
         if (!host || !on) return;
+        if (view === 'review' && !isReviewer()) view = 'list';
         var t = L(), posted = postedList(), ideas = drafts.filter(function (d) { return d.stage === 'idea'; }), dr = drafts.filter(function (d) { return d.stage === 'draft'; });
         if (!viewMonth) viewMonth = todayKey().slice(0, 7);
         var month = view === 'month' ? viewMonth : todayKey().slice(0, 7), mp = posted.filter(function (w) { return String(w.postDate || '').slice(0, 7) === month; });
         var plats = {}; mp.forEach(function (w) { plats[w.platform] = 1; });
         var rev = mp.filter(isReviewed).length, body = '';
-        if (view === 'month') body = monthHtml(t, posted);
+        if (view === 'review') body = reviewHtml(t);
+        else if (view === 'month') body = monthHtml(t, posted);
         else {
             var rows = filter === 'posted' ? posted.map(function (w) { return postedRow(w, t); }).join('') : (filter === 'ideas' ? ideas : dr).map(function (d) { return draftRow(d, t); }).join('');
             if (!rows) rows = '<div class="cc-empty">' + (filter === 'ideas' ? t.emptyIdeas : filter === 'drafts' ? t.emptyDrafts : t.emptyPosted) + '</div>';
@@ -153,8 +194,9 @@
         }
         var monthName = new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7) - 1, 15)).toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' });
         host.innerHTML = '<div class="cc-card"><div class="cc-head"><i class="fa-solid fa-camera"></i> ' + t.title + '<span class="cc-month">' + esc(monthName) + '</span>' +
-            '<span class="cc-view" role="group" aria-label="View"><button type="button" data-view="list" aria-pressed="' + (view === 'list') + '" aria-label="' + t.viewList + '"><i class="fa-solid fa-list"></i></button><button type="button" data-view="month" aria-pressed="' + (view === 'month') + '" aria-label="' + t.viewMonth + '"><i class="fa-solid fa-calendar-days"></i></button></span></div>' +
-            '<div class="cc-stats"><div class="cc-stat"><span>' + t.posted + '</span><b>' + mp.length + '</b></div><div class="cc-stat"><span>' + t.platforms + '</span><b>' + Object.keys(plats).length + '</b></div><div class="cc-stat"><span>' + t.reviewed + '</span><b>' + rev + '/' + mp.length + '</b></div></div>' +
+            '<span class="cc-view" role="group" aria-label="View"><button type="button" data-view="list" aria-pressed="' + (view === 'list') + '" aria-label="' + t.viewList + '"><i class="fa-solid fa-list"></i></button><button type="button" data-view="month" aria-pressed="' + (view === 'month') + '" aria-label="' + t.viewMonth + '"><i class="fa-solid fa-calendar-days"></i></button>' +
+            (isReviewer() ? '<button type="button" data-view="review" aria-pressed="' + (view === 'review') + '" aria-label="' + t.review + '" title="' + t.review + '"><i class="fa-solid fa-clipboard-check"></i></button>' : '') + '</span></div>' +
+            (view === 'review' ? '' : '<div class="cc-stats"><div class="cc-stat"><span>' + t.posted + '</span><b>' + mp.length + '</b></div><div class="cc-stat"><span>' + t.platforms + '</span><b>' + Object.keys(plats).length + '</b></div><div class="cc-stat"><span>' + t.reviewed + '</span><b>' + rev + '/' + mp.length + '</b></div></div>') +
             body + '<div class="cc-add"><button type="button" class="cc-chip" data-act="new"><i class="fa-solid fa-plus"></i> ' + t.add + '</button></div></div>';
     }
 
@@ -167,9 +209,21 @@
             if (!u || !on || listenUid !== userId) return;
             unsub = db.collection('users').doc(userId).onSnapshot(function (s) {
                 var a = s.exists ? (s.data() || {}).socialDrafts : null;
+                myReviews = (s.exists && (s.data() || {}).contentReviews) || {};
                 drafts = Array.isArray(a) ? a.filter(function (d) { return d && d.id && (d.stage === 'idea' || d.stage === 'draft'); }) : [];
                 render();
             }, function (e) { console.warn('[cafe] drafts listener', e); });
+        });
+    }
+    // Reviewers see every member's posts (works are readable by any signed-in user, as before).
+    function listenAll() {
+        if (unsubAll || !isReviewer() || !on || !userId) return;
+        ensureFirebaseAuthReady(10000).then(function (u) {
+            if (!u || unsubAll) return;
+            unsubAll = db.collection('works').where('kind', '==', 'social').onSnapshot(function (snap) {
+                allPosts = snap.docs.map(function (d) { var o = d.data() || {}; o.id = d.id; return o; }).sort(function (a, b) { return String(b.postDate || '').localeCompare(String(a.postDate || '')); });
+                render();
+            }, function (e) { unsubAll = null; console.warn('[cafe] review listener', e); });
         });
     }
     function saveDrafts(arr) {
@@ -239,6 +293,7 @@
             sheet[chip.dataset.group] = chip.dataset.v;
             overlay.querySelectorAll('.cc-chip[data-group="' + chip.dataset.group + '"]').forEach(function (c) { c.setAttribute('aria-pressed', String(c === chip)); });
             if (chip.dataset.group === 'stage') paintStage();
+            if (chip.dataset.group === 'rvverdict') paintReview();
             return;
         }
         var a = e.target.closest('[data-act]'); if (!a) return;
@@ -249,6 +304,7 @@
         else if (act === 'save') save();
         else if (act === 'del') del();
         else if (act === 'savenum') saveNumbers(a.dataset.id);
+        else if (act === 'rvsend') sendReview();
     }
 
     function newId() { return 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
@@ -305,6 +361,53 @@
         saveDrafts(drafts.filter(function (d) { return d.id !== id; })).then(function () { closeSheet(); render(); }).catch(function () { setErr(L().fail); });
     }
 
+    // ---------- review (Audit) ----------
+    function openReview(id) {
+        var w = allPosts.filter(function (x) { return x.id === id; })[0]; if (!w || w.userId === userId) return;
+        ensureOverlay(); var t = L(), p = plat(w.platform), m = w.metrics || {}, prev = myReviews[id] || null;
+        sheet = { review: id, rvverdict: prev ? prev.verdict : '', rvscore: prev && prev.verdict === 'approve' ? String(prev.score) : '' };
+        var imgs = (w.images || []).map(function (u) { return '<a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" alt=""></a>'; }).join('');
+        overlay.innerHTML = '<div class="cc-box"><div class="cc-bh"><i class="fa-solid fa-clipboard-check"></i> ' + t.revTitle + '<button type="button" class="cc-x" data-act="close" aria-label="Close">&times;</button></div>' +
+            '<div class="cc-row" style="padding:12px 0;cursor:default">' + thumb(p, null) + '<div class="cc-main"><div class="cc-meta"><b>' + esc(w.displayName || '') + '</b><span class="cc-pill">' + esc(typeLabel(w.ctype)) + '</span><span>' + esc(p[1]) + ' · ' + esc(dayLabel(w.postDate)) + '</span></div>' +
+            '<div class="cc-cap" style="-webkit-line-clamp:unset">' + esc(w.caption || w.title) + '</div>' +
+            (/^https?:\/\//i.test(w.link || '') ? '<a href="' + esc(w.link) + '" target="_blank" rel="noopener" style="font-size:.78em;word-break:break-all">' + esc(w.link) + '</a>' : '') +
+            (m.likes != null || m.reach != null ? '<div class="cc-foot"><span><i class="fa-solid fa-heart"></i> ' + esc(fmtNum(m.likes || 0)) + '</span><span><i class="fa-solid fa-eye"></i> ' + esc(fmtNum(m.reach || 0)) + '</span></div>' : '') +
+            (imgs ? '<div class="cc-mini">' + imgs + '</div>' : '') + '</div></div>' +
+            '<span class="cc-lbl">' + t.revVerdict + '</span>' + chips('rvverdict', [['approve', t.revOk], ['changes', t.revFix]], sheet.rvverdict) +
+            '<div id="rvScoreBox"><span class="cc-lbl">' + t.revScore + '</span>' + chips('rvscore', [['0', '0'], ['0.1', '0.1'], ['0.2', '0.2'], ['0.3', '0.3']], sheet.rvscore) + '</div>' +
+            '<span class="cc-lbl">' + t.revComment + '</span><textarea id="rvComment" rows="3" maxlength="500" placeholder="' + esc(t.revCommentPh) + '">' + esc(prev && prev.comment ? prev.comment : '') + '</textarea>' +
+            '<div class="cc-err" id="ccErr" role="status"></div><button type="button" class="cc-go" id="ccGo" data-act="rvsend">' + t.revSend + '</button>' +
+            '<div class="cc-err" style="color:#64748b;text-align:center">' + t.revHint + '</div></div>';
+        paintReview();
+        overlay.classList.add('open');
+    }
+    function paintReview() { overlay.querySelector('#rvScoreBox').style.display = sheet.rvverdict === 'approve' ? 'block' : 'none'; }
+    async function sendReview() {
+        if (busy || !sheet || !sheet.review) return;
+        var t = L(), id = sheet.review, w = allPosts.filter(function (x) { return x.id === id; })[0], verdict = sheet.rvverdict, comment = overlay.querySelector('#rvComment').value.trim();
+        if (!w) return;
+        if (!verdict) return setErr(t.revNeedVerdict);
+        if (verdict === 'approve' && sheet.rvscore === '') return setErr(t.revNeedScore);
+        if (verdict === 'changes' && comment.length < 3) return setErr(t.revNeedComment);
+        var score = verdict === 'approve' ? Number(sheet.rvscore) : 0;
+        busy = true; var go = overlay.querySelector('#ccGo'); go.disabled = true; setErr(t.saving, true);
+        try {
+            var auth = await ensureFirebaseAuthReady(10000);
+            if (!auth) throw new Error('Sign in required');
+            await db.collection('admin_notifications').add({
+                type: 'content_review', authUid: auth.uid, workId: id, workTitle: String(w.title || '').slice(0, 200), ownerId: w.userId || '', ownerName: w.displayName || '',
+                reviewerId: userId, reviewerName: (typeof userProfile !== 'undefined' && userProfile && userProfile.displayName) || '',
+                verdict: verdict, suggestedScore: score, comment: comment.slice(0, 500), read: false, timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            var upd = {}; upd['contentReviews.' + id] = { verdict: verdict, score: score, comment: comment.slice(0, 500), at: Date.now() };
+            await db.collection('users').doc(userId).update(upd);   // update, not set-merge: must never re-create a deleted user's doc
+            myReviews[id] = upd['contentReviews.' + id];
+            if (typeof showToast === 'function') showToast(t.revSent);
+            closeSheet(); render();
+        } catch (e) { console.error('[cafe] review failed', e); if (overlay.classList.contains('open')) setErr(t.fail); }
+        finally { busy = false; var g = overlay && overlay.querySelector('#ccGo'); if (g) g.disabled = false; }
+    }
+
     // ---------- numbers ----------
     function openNumbers(id) {
         var w = postedList().filter(function (x) { return x.id === id; })[0]; if (!w) return;
@@ -339,6 +442,7 @@
     function onHostClick(e) {
         var f = e.target.closest('[data-filter]'); if (f) { filter = f.dataset.filter; return render(); }
         var vw = e.target.closest('[data-view]'); if (vw) return setView(vw.dataset.view);
+        var rf = e.target.closest('[data-rvf]'); if (rf) { revFilter = rf.dataset.rvf; return render(); }
         var cal = e.target.closest('[data-cal]'); if (cal) { viewMonth = monthShift(viewMonth, +cal.dataset.cal); selDay = ''; return render(); }
         var dy = e.target.closest('[data-day]'); if (dy && !dy.dataset.act) { selDay = selDay === dy.dataset.day ? '' : dy.dataset.day; return render(); }
         var a = e.target.closest('[data-act]'); if (!a) return;
@@ -347,6 +451,7 @@
         else if (a.dataset.act === 'plan') openSheet(null, { plannedDate: a.dataset.day });
         else if (a.dataset.act === 'draft') openSheet(drafts.filter(function (d) { return d.id === a.dataset.id; })[0] || null);
         else if (a.dataset.act === 'metrics') openNumbers(a.dataset.id);
+        else if (a.dataset.act === 'review') openReview(a.dataset.id);
     }
     function sync() {
         try {

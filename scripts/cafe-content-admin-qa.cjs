@@ -29,8 +29,14 @@ const docs = [
   mk('c', { userId: 'u1', displayName: 'Mint', platform: 'ig', ctype: 'post', caption: 'Weekend special', link: 'https://ig.test/3', postDate: thisM + '-05', metrics: { likes: 42, reach: 610 } }),
   mk('d', { userId: 'u2', displayName: 'Ploy', platform: 'fb', ctype: 'story', caption: 'Last month one', link: 'https://fb.test/4', postDate: lastD, status: 'ตรวจแล้ว', score: 0.1, metrics: { likes: 10, reach: 100 } })
 ];
+const rec = (id, o) => ({ id, data: () => ({ type: 'content_review', ...o }) });
+const recDocs = [
+  rec('r1', { workId: 'b', verdict: 'approve', suggestedScore: 0.2, reviewerName: 'YUI', comment: 'good hook', timestamp: { toMillis: () => 1000 } }),
+  rec('r2', { workId: 'b', verdict: 'changes', suggestedScore: 0, reviewerName: 'YUI', comment: 'fix the CTA', timestamp: { toMillis: () => 2000 } }),
+  rec('r3', { workId: 'a', verdict: 'approve', suggestedScore: 0.3, reviewerName: 'Nok', comment: '', timestamp: { toMillis: () => 1500 } })
+];
 const db = { app: { auth: () => ({ currentUser: {}, onAuthStateChanged: cb => cb({}) }) },
-  collection: n => ({ where: (f, op, v) => ({ onSnapshot: ok => { window.__q.push([n, f, op, v]); ok({ docs: docs, size: docs.length }); } }) }) };
+  collection: n => ({ where: (f, op, v) => ({ onSnapshot: ok => { window.__q.push([n, f, op, v]); const list = n === 'admin_notifications' ? recDocs : docs; ok({ docs: list, size: list.length }); } }) }) };
 </script>
 <script>${js}</script>`;
 
@@ -42,7 +48,8 @@ const db = { app: { auth: () => ({ currentUser: {}, onAuthStateChanged: cb => cb
         await page.setContent(harness);
         await page.waitForSelector('#dashboard-work details.lr-admin');
         assert.deepEqual(await page.evaluate(() => window.__q[0]), ['works', 'kind', '==', 'social'], 'queries kind == social');
-        assert.equal(await page.$eval('details.lr-admin > summary', e => e.textContent), '📸 Content Creator · 4', 'count on the closed panel');
+        assert.deepEqual(await page.evaluate(() => window.__q.map(q => q[0] + ':' + q[3])), ['works:social', 'admin_notifications:content_review'], 'reads the posts and the Audit recommendations');
+        assert.equal(await page.$eval('details.lr-admin > summary', e => e.textContent), '📸 Content Creator · 4 · 1 suggested', 'count on the closed panel: 1 pending post carries a suggestion');
         await page.evaluate(() => { document.querySelector('details.lr-admin').open = true; });
         const txt = () => page.$eval('.cca-body', e => e.innerText.replace(/\s+/g, ' '));
 
@@ -57,6 +64,9 @@ const db = { app: { auth: () => ({ currentUser: {}, onAuthStateChanged: cb => cb
         // newest first
         assert.ok(t.indexOf('Iced latte pour') < t.indexOf('Weekend special'), 'newest first');
 
+        // Audit recommendations: the latest one per post, under the post; advice only.
+        assert.ok(/🔍 YUI: ↩ needs changes — fix the CTA/.test(t) && !/good hook/.test(t), 'latest recommendation wins: ' + t);
+        assert.ok(/🔍 Nok: ✅ suggests \+0\.3/.test(t), 'a recommendation on an already-scored post is still shown');
         // Safe rendering: caption text is not HTML, a javascript: link is not clickable.
         assert.equal(await page.evaluate(() => window.__xss), undefined, 'no HTML injection from a caption');
         assert.equal(await page.locator('.cca-body a[href^="javascript"]').count(), 0, 'javascript: link not rendered as a link');
