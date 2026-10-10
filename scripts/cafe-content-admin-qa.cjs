@@ -1,0 +1,76 @@
+// V102.145: admin ▸ Dashboard ▸ "📸 CAFE content" — the REAL public/cafe-content-admin.js against a stubbed Firestore.
+// Queries works where kind == 'social'; month filter (this / last / all), totals (posts, with numbers, likes, reach, likes/reach),
+// by platform, by member, newest-first post list with numbers + review state; captions are text, never HTML; wired into admin.html.
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const js = fs.readFileSync('public/cafe-content-admin.js', 'utf8');
+const adminHtml = fs.readFileSync('public/admin.html', 'utf8');
+const internJs = fs.readFileSync('public/cafe-content.js', 'utf8');
+
+assert.ok(/<script src="cafe-content-admin\.js\?v=V\d+\.\d+"><\/script>/.test(adminHtml), 'admin.html loads cafe-content-admin.js');
+assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(adminHtml));
+// the admin reads exactly what the intern side writes
+assert.ok(js.includes("where('kind', '==', 'social')") && /kind: 'social'/.test(internJs), 'same kind on both sides');
+for (const f of ['platform', 'ctype', 'postDate', 'caption', 'metrics', 'link']) assert.ok(js.includes(f) && internJs.includes(f), 'both sides use ' + f);
+assert.ok(/match \/works\/\{workId\} \{\s*allow read, create: if isSignedIn\(\)/.test(fs.readFileSync('firestore.rules', 'utf8')), 'works are readable by the admin');
+
+const harness = `<!doctype html><meta charset="utf-8"><title>Nika Admin (V9.9)</title>
+<style>.lr-admin button{min-height:44px}</style>
+<div id="dashboard-work"></div>
+<script>
+window.__q = [];
+const day = d => new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+const now = new Date(), thisM = day(now).slice(0, 7), lastD = day(new Date(now.getFullYear(), now.getMonth() - 1, 15));
+const mk = (id, o) => ({ id, data: () => ({ kind: 'social', status: 'รอตรวจ', score: 0, title: 't', ...o }) });
+const docs = [
+  mk('a', { userId: 'u1', displayName: 'Mint', platform: 'ig', ctype: 'reel', caption: 'Iced latte pour', link: 'https://ig.test/1', postDate: thisM + '-09', status: 'ตรวจแล้ว', score: 0.3, metrics: { likes: 128, reach: 1400 } }),
+  mk('b', { userId: 'u2', displayName: 'Ploy', platform: 'tt', ctype: 'video', caption: '<img src=x onerror="window.__xss=1"> batch', link: 'javascript:alert(1)', postDate: thisM + '-07', metrics: null }),
+  mk('c', { userId: 'u1', displayName: 'Mint', platform: 'ig', ctype: 'post', caption: 'Weekend special', link: 'https://ig.test/3', postDate: thisM + '-05', metrics: { likes: 42, reach: 610 } }),
+  mk('d', { userId: 'u2', displayName: 'Ploy', platform: 'fb', ctype: 'story', caption: 'Last month one', link: 'https://fb.test/4', postDate: lastD, status: 'ตรวจแล้ว', score: 0.1, metrics: { likes: 10, reach: 100 } })
+];
+const db = { app: { auth: () => ({ currentUser: {}, onAuthStateChanged: cb => cb({}) }) },
+  collection: n => ({ where: (f, op, v) => ({ onSnapshot: ok => { window.__q.push([n, f, op, v]); ok({ docs: docs, size: docs.length }); } }) }) };
+</script>
+<script>${js}</script>`;
+
+(async () => {
+    const browser = await chromium.launch();
+    try {
+        const page = await browser.newPage({ viewport: { width: 700, height: 900 } });
+        const errs = []; page.on('pageerror', e => errs.push(e.message));
+        await page.setContent(harness);
+        await page.waitForSelector('#dashboard-work details.lr-admin');
+        assert.deepEqual(await page.evaluate(() => window.__q[0]), ['works', 'kind', '==', 'social'], 'queries kind == social');
+        assert.equal(await page.$eval('details.lr-admin > summary', e => e.textContent), '📸 CAFE content · 4', 'count on the closed panel');
+        await page.evaluate(() => { document.querySelector('details.lr-admin').open = true; });
+        const txt = () => page.$eval('.cca-body', e => e.innerText.replace(/\s+/g, ' '));
+
+        // This month (default): 3 posts, 2 with numbers; likes 170, reach 2.0k, 170/2010 = 8.5%.
+        let t = await txt();
+        assert.ok(/Posts 3/.test(t) && /With numbers 2\/3/.test(t) && /Likes 170/.test(t) && /Reach 2k/.test(t) && /Likes \/ reach 8\.5%/.test(t), 'this month totals: ' + t);
+        assert.ok(/IG 2 170 2k/.test(t) && /TikTok 1 0 0/.test(t), 'by platform: ' + t);
+        assert.ok(/Mint 2 170 2k 1\/2/.test(t) && /Ploy 1 0 0 0\/1/.test(t), 'by member: ' + t);
+        assert.ok(!/Last month one/.test(t), 'last month excluded');
+        assert.ok(/Iced latte pour/.test(t) && /❤ 128 · 👁 1\.4k · ✅ Reviewed \+0\.3/.test(t), 'reviewed post row');
+        assert.ok(/❤ — · 👁 — · ⏳ Pending/.test(t), 'post without numbers shows dashes + pending');
+        // newest first
+        assert.ok(t.indexOf('Iced latte pour') < t.indexOf('Weekend special'), 'newest first');
+
+        // Safe rendering: caption text is not HTML, a javascript: link is not clickable.
+        assert.equal(await page.evaluate(() => window.__xss), undefined, 'no HTML injection from a caption');
+        assert.equal(await page.locator('.cca-body a[href^="javascript"]').count(), 0, 'javascript: link not rendered as a link');
+        assert.equal(await page.locator('.cca-body a[href^="https://ig.test"]').count(), 2, 'http(s) links are links');
+
+        // Range chips.
+        await page.click('.cca-body button[data-range="last"]');
+        t = await txt();
+        assert.ok(/Posts 1/.test(t) && /Last month one/.test(t) && /Facebook 1 10 100/.test(t), 'last month: ' + t);
+        await page.click('.cca-body button[data-range="all"]');
+        t = await txt();
+        assert.ok(/Posts 4/.test(t) && /Likes 180/.test(t), 'all: ' + t);
+        assert.equal(await page.$eval('.cca-body button[data-range="all"]', e => e.getAttribute('aria-pressed')), 'true');
+        assert.deepEqual(errs, [], 'no page errors');
+        console.log('PASS: admin CAFE content panel — reads works kind:social, month filter, totals / by platform / by member / posts with numbers and review state, text-only rendering');
+    } finally { await browser.close(); }
+})().catch(e => { console.error(e); process.exit(1); });
