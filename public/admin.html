@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.147)</title>
+    <title>Nika Admin (V102.148)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -4074,6 +4074,13 @@
         #groupSelectModal .gs-empty-note { font-size:11px; color:var(--text-sub); padding:0 12px 8px; }
         #groupSelectModal .gs-profile-card.gs-editing .gs-empty-note { display:none; }
         #groupSelectModal .gs-inline-group { margin:8px 0; }
+        /* V102.148: "Also in" — extra groups that only decide which UI(s) the user may open */
+        #groupSelectModal .gs-extra { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 6px; font-size:12px; color:var(--text-sub); }
+        #groupSelectModal .gs-extra .gs-extra-chips { display:contents; }
+        #groupSelectModal .gs-extra .grp-chip::after { content:' ×'; opacity:.6; }
+        #groupSelectModal .gs-extra-add { width:auto; min-height:0; padding:3px 10px; border:1px dashed #94a3b8; border-radius:999px; background:none; color:#64748b; font-size:12px; cursor:pointer; margin:0; }
+        #groupSelectModal #gs-extra-pick { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 8px; }
+        #groupSelectModal #gs-extra-pick[hidden] { display:none; }
         #groupSelectModal .gs-inline-group h3 { font-size:13px; margin:0 0 6px; }
         #groupSelectModal .gs-group-summary { padding:6px 8px 6px 12px; margin-bottom:8px; }
         #groupSelectModal #gs-group-toggle { min-height:32px; padding:4px 12px; }
@@ -14561,6 +14568,11 @@
                     <div><strong id="gs-current-group"></strong><div class="gs-group-help" data-gs-en="Select one group" data-gs-th="เลือกได้ 1 กลุ่ม">Select one group</div></div>
                     <button type="button" id="gs-group-toggle" aria-expanded="false" aria-controls="gs-pane-group" onclick="toggleGsGroups()">เปลี่ยนกลุ่ม</button>
                 </div>
+                <div class="gs-extra" id="gs-extra" title="Extra groups only decide which UI the user can open (e.g. Content Creator). Points, rank, quizzes and events follow the main group above.">
+                    <span data-gs-en="Also in" data-gs-th="อยู่ร่วมกับ">Also in</span><span class="gs-extra-chips" id="gs-extra-chips"></span>
+                    <button type="button" class="gs-extra-add" id="gs-extra-add" aria-expanded="false" aria-controls="gs-extra-pick" onclick="gsExtraToggle()" aria-label="Add an extra group"><i class="fa-solid fa-plus"></i></button>
+                </div>
+                <div id="gs-extra-pick" hidden></div>
             <div id="gs-pane-group" hidden>
             <!-- V98.30 lean: the chip rail below IS the group picker (since #954), so
                  the text field is hidden — it stays only because confirmSetGroup reads
@@ -36349,8 +36361,37 @@ They can connect again from LINE.
             }).join('') + `<div class="gs-sec-row"><button type="button" class="grp-chip grp-empty gs-chip-new" onclick="gsNewGroup(this)" style="--c:#475569;"><i class="fa-solid fa-plus"></i> New group</button></div>`;
         }
 
+        // V102.148: extra groups (users.extraGroups, admin-set only). They never touch points / rank / quizzes / events — those follow users.group —
+        // they only tell the intern app which UI(s) this user may open (Intern | Content Creator).
+        let gsExtra = [];
+        function gsExtraPaint() {
+            const box = document.getElementById('gs-extra-chips');
+            if (!box) return;
+            box.innerHTML = gsExtra.map(g => groupChipHtml(g, { cls: 'gs-chip', hint: 'tap to remove', attrs: `data-g="${escapeHtml(g)}" onclick="gsExtraRemove(this.dataset.g)"` })).join('');
+        }
+        function gsExtraRemove(g) { gsExtra = gsExtra.filter(x => x.toUpperCase() !== String(g).toUpperCase()); gsExtraPaint(); gsExtraRenderPick(); }
+        function gsExtraAdd(g) {
+            const main = (document.getElementById('gs-input').value || '').trim().toUpperCase();
+            if (!g || g.toUpperCase() === main || gsExtra.some(x => x.toUpperCase() === g.toUpperCase())) return;
+            gsExtra.push(g); gsExtraPaint(); gsExtraRenderPick();
+        }
+        function gsExtraRenderPick() {
+            const pick = document.getElementById('gs-extra-pick');
+            if (!pick || pick.hidden) return;
+            const main = (document.getElementById('gs-input').value || '').trim().toUpperCase();
+            const left = getGlobalGroups().filter(g => g.toUpperCase() !== main && !gsExtra.some(x => x.toUpperCase() === g.toUpperCase()));
+            pick.innerHTML = left.length ? left.map(g => groupChipHtml(g, { cls: 'gs-chip', attrs: `data-g="${escapeHtml(g)}" onclick="gsExtraAdd(this.dataset.g)"` })).join('') : '<small style="color:var(--text-sub);">No other groups.</small>';
+        }
+        function gsExtraToggle() {
+            const pick = document.getElementById('gs-extra-pick'), btn = document.getElementById('gs-extra-add');
+            pick.hidden = !pick.hidden;
+            btn.setAttribute('aria-expanded', String(!pick.hidden));
+            gsExtraRenderPick();
+        }
+
         // V98.18 lean: chip-rail group picker for the User Hub modal.
         function gsPickGroup(el, g) {
+            gsExtra = gsExtra.filter(x => x.toUpperCase() !== String(g).trim().toUpperCase()); gsExtraPaint();   // the main group is never also an extra
             const list = document.getElementById('gs-list');
             document.getElementById('gs-input').value = g;
             document.getElementById('gs-current-group').textContent = g.trim() || 'ไม่ระบุชื่อ';
@@ -36406,10 +36447,10 @@ They can connect again from LINE.
             const uses = new Map(); // exact name -> { users, pre, quizzes, events, divisions, settings }
             const bump = (name, k) => {
                 if (!name) return;
-                if (!uses.has(name)) uses.set(name, { users: 0, pre: 0, quizzes: 0, quests: 0, events: 0, divisions: 0, settings: 0 });
+                if (!uses.has(name)) uses.set(name, { users: 0, extra: 0, pre: 0, quizzes: 0, quests: 0, events: 0, divisions: 0, settings: 0 });
                 uses.get(name)[k]++;
             };
-            usersData.forEach(u => bump(u.group || 'Public', 'users'));
+            usersData.forEach(u => { bump(u.group || 'Public', 'users'); (Array.isArray(u.extraGroups) ? u.extraGroups : []).forEach(g => bump(g, 'extra')); });   // V102.148: extras count as uses too
             preRegData.forEach(p => { if (!p.claimed) bump(p.group, 'pre'); });
             const parts = raw => String(raw || '').split(',').map(x => x.trim()).filter(Boolean);
             quizzesData.forEach(q => { if (q && !String(q.id).startsWith('--')) parts(q.targetGroup).forEach(g => bump(g, 'quizzes')); });
@@ -36425,14 +36466,14 @@ They can connect again from LINE.
         function renderGroupMerge() {
             const uses = groupNameUses();
             const names = [...uses.keys()].sort((a, b) => a.localeCompare(b));
-            const total = u => u.users + u.pre + u.quizzes + u.quests + u.events + u.divisions + u.settings;
+            const total = u => u.users + u.extra + u.pre + u.quizzes + u.quests + u.events + u.divisions + u.settings;
             document.getElementById('gs-merge-from').innerHTML = names.filter(n => n !== 'Public').map(n => _gsMergeChip(n, uses.get(n).users, n === gsMerge.from, 'gsMergePickFrom')).join('');
             document.getElementById('gs-merge-into').innerHTML = names.filter(n => n !== gsMerge.from).map(n => _gsMergeChip(n, uses.get(n).users, n === gsMerge.into, 'gsMergePickInto')).join('');
             const prev = document.getElementById('gs-merge-preview');
             const go = document.getElementById('gs-merge-go');
             if (!gsMerge.from || !gsMerge.into) { prev.textContent = 'Pick the name to retire (From), then the one to keep (Into).'; go.disabled = true; return; }
-            const u = uses.get(gsMerge.from) || { users: 0, pre: 0, quizzes: 0, quests: 0, events: 0, divisions: 0, settings: 0 };
-            const parts = [[u.users, 'users'], [u.pre, 'pre-reg'], [u.quizzes, 'quizzes'], [u.quests, 'quests'], [u.events, 'events'], [u.divisions, 'division slots'], [u.settings, 'visibility setting']].filter(x => x[0]).map(x => `${x[0]} ${x[1]}`);
+            const u = uses.get(gsMerge.from) || { users: 0, extra: 0, pre: 0, quizzes: 0, quests: 0, events: 0, divisions: 0, settings: 0 };
+            const parts = [[u.users, 'users'], [u.extra, 'extra-group memberships'], [u.pre, 'pre-reg'], [u.quizzes, 'quizzes'], [u.quests, 'quests'], [u.events, 'events'], [u.divisions, 'division slots'], [u.settings, 'visibility setting']].filter(x => x[0]).map(x => `${x[0]} ${x[1]}`);
             prev.innerHTML = `“<b>${escapeHtml(gsMerge.from)}</b>” → “<b>${escapeHtml(gsMerge.into)}</b>”: ${parts.join(' · ') || 'nothing references it'}`;
             go.disabled = !total(u);
         }
@@ -36455,6 +36496,12 @@ They can connect again from LINE.
             // Firestore batches cap at 500 writes, so collect the ops and commit in chunks.
             const ops = [];
             usersData.filter(u => (u.group || 'Public') === from).forEach(u => ops.push(b => b.update(db.collection('users').doc(u.id), { group: into })));
+            // V102.148: extra groups follow the rename; a user whose main group is now the same name just drops it
+            usersData.filter(u => (Array.isArray(u.extraGroups) ? u.extraGroups : []).includes(from)).forEach(u => {
+                const main = String((u.group || 'Public') === from ? into : (u.group || 'Public')).toUpperCase();
+                const next = [...new Set(u.extraGroups.map(g => g === from ? into : g))].filter(g => String(g).toUpperCase() !== main);
+                ops.push(b => b.update(db.collection('users').doc(u.id), { extraGroups: next }));
+            });
             preRegData.filter(p => !p.claimed && p.group === from).forEach(p => ops.push(b => b.update(db.collection('pre_users').doc(p.id), { group: into })));
             // V102.39: audiences can be comma lists ("Junior,Extern") — swap the one part.
             const swapList = raw => {
@@ -36521,6 +36568,9 @@ They can connect again from LINE.
             const userName = user ? user.displayName : "Unknown User";
             const enrollmentCode = user?.enrollmentCode || preRegData.find(p => p.claimedBy === uid)?.code || preRegData.find(p => p.sourceUserId === uid)?.code || preRegData.find(p => p.id === uid)?.code || '-';
 
+            gsExtra = Array.isArray(user?.extraGroups) ? user.extraGroups.filter(Boolean) : [];
+            gsExtraPaint();
+            document.getElementById('gs-extra-pick').hidden = true; document.getElementById('gs-extra-add').setAttribute('aria-expanded', 'false');
             document.getElementById('gs-uid').value = uid;
             document.getElementById('gs-title-name').innerText = userName;
             // V98.21: LINE profile picture in the modal header
@@ -36689,6 +36739,7 @@ They can connect again from LINE.
             try {
                 await db.collection("users").doc(uid).update({
                     group: newGroup,
+                    extraGroups: [...new Set(gsExtra.map(g => canonicalGroupName(g)).filter(g => g && g.toUpperCase() !== newGroup.toUpperCase()))],   // V102.148
                     fullName: fnameTh,
                     firstNameEn: fnameEn,
                     middleNameEn: mnameEn,
@@ -36727,6 +36778,10 @@ They can connect again from LINE.
                 const usersToUpdate = usersData.filter(u => u.group === groupName);
                 usersToUpdate.forEach(u => {
                     batch.update(db.collection("users").doc(u.id), { group: "Public" });
+                });
+                // V102.148: and out of everyone's extra groups
+                usersData.filter(u => (Array.isArray(u.extraGroups) ? u.extraGroups : []).includes(groupName)).forEach(u => {
+                    batch.update(db.collection("users").doc(u.id), { extraGroups: u.extraGroups.filter(g => g !== groupName) });
                 });
 
                 // 2. ลบออกจาก Division Config
