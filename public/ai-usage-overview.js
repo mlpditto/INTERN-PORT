@@ -31,8 +31,9 @@
         if (pending) return pending;
         pending = db.collection('ai_usage').where('date','>=',dates(30)[0]).orderBy('date','desc').get().then(s => {
             cached = s.docs.map(d=>d.data());
-            const summary=document.querySelector('#dashboard-ai-usage > summary');
-            if(summary){const a=aggregate(cached,1);summary.textContent='AI usage · Today · '+number(a.calls)+' calls · '+number(a.tokens)+' tokens';}
+            // V102.147: today's total sits on the AI API Settings ▸ Usage & quota row (the Dashboard strip moved there)
+            const today=document.getElementById('acc-usage-today');
+            if(today){const a=aggregate(cached,1);today.textContent='Today · '+number(a.calls)+' calls · '+number(a.tokens)+' tokens';}
             loadedAt=Date.now(); return cached;
         }).finally(()=>pending=null);
         return pending;
@@ -200,9 +201,5 @@
             range.onchange=metric.onchange=view.onchange=render;render();
         }catch(e){host.textContent='Could not load AI usage. ';const retry=node('button','Retry');retry.type='button';retry.onclick=()=>mount(host,compact,true);host.append(retry);}
     }
-    window.aiUsageOverview={mount,aggregate};
-    document.addEventListener('DOMContentLoaded',()=>{
-        const section=document.getElementById('dashboard-ai-usage');
-        if(section)section.addEventListener('toggle',()=>{if(section.open)mount('dashboard-ai-usage-body',true);});
-    });
+    window.aiUsageOverview={mount,aggregate,refreshToday:()=>load().catch(()=>{})};
 })();
