@@ -16,17 +16,20 @@
     var MAX_DRAFTS = 30, MAX_IMAGES = 3;
     var PLATFORMS = [['ig', 'IG', 'fa-brands fa-instagram'], ['fb', 'FB', 'fa-brands fa-facebook'], ['tt', 'TikTok', 'fa-brands fa-tiktok'], ['yt', 'YouTube', 'fa-brands fa-youtube'], ['line', 'LINE', 'fa-brands fa-line']];
     var TYPES = { post: ['Post', 'โพสต์'], reel: ['Reel', 'รีล'], story: ['Story', 'สตอรี่'], video: ['Video', 'วิดีโอ'] };
+    // Pipeline for ideas / drafts kept on users/{uid}.socialDrafts. 'draft' is the id that already existed (now the Script step); Posted is a works doc, not a stage here.
+    var STAGES = [['idea', 'Idea', 'ไอเดีย'], ['draft', 'Script', 'สคริปต์'], ['film', 'Filming', 'ถ่ายทำ'], ['edit', 'Editing', 'ตัดต่อ'], ['sched', 'Scheduled', 'ตั้งโพสต์']];
+    var STAGE_IDS = STAGES.map(function (s) { return s[0]; });
     var T = {
-        en: { review: 'Review', revTodo: 'To review', revMine: 'Reviewed by me', revEmpty: 'Nothing is waiting for review.', revMineEmpty: 'You have not reviewed anything yet.', revOpen: 'Review', revTitle: 'Review content', revVerdict: 'Verdict', revOk: 'Looks good', revFix: 'Needs changes', revScore: 'Suggested bonus (pts)', revComment: 'Comment', revCommentPh: 'What did you check? What should change?', revSend: 'Send to admin', revHint: 'Your review is a recommendation — the admin gives the final score.', revNeedVerdict: 'Choose a verdict first.', revNeedScore: 'Pick a suggested bonus.', revNeedComment: 'Say what needs to change.', revSent: 'Review sent', revYou: 'You suggested', title: 'Content', viewAs: 'View as', modeIntern: 'Intern', modeContent: 'Content', viewList: 'List view', viewMonth: 'Month view', planDay: 'Plan', emptyDay: 'Nothing on this day yet.', pickDay: 'Tap a day to see or plan content.', plan: 'Plan date (optional)', ideas: 'Ideas', drafts: 'Drafts', posted: 'Posted', platforms: 'Platforms', reviewed: 'Reviewed', pending: 'Pending review', add: 'New content', addNum: 'Add numbers',
+        en: { review: 'Review', revTodo: 'To review', revMine: 'Reviewed by me', revEmpty: 'Nothing is waiting for review.', revMineEmpty: 'You have not reviewed anything yet.', revOpen: 'Review', revTitle: 'Review content', revVerdict: 'Verdict', revOk: 'Looks good', revFix: 'Needs changes', revScore: 'Suggested bonus (pts)', revComment: 'Comment', revCommentPh: 'What did you check? What should change?', revSend: 'Send to admin', revHint: 'Your review is a recommendation — the admin gives the final score.', revNeedVerdict: 'Choose a verdict first.', revNeedScore: 'Pick a suggested bonus.', revNeedComment: 'Say what needs to change.', revSent: 'Review sent', revYou: 'You suggested', title: 'Content', viewAs: 'View as', modeIntern: 'Intern', modeContent: 'Content', viewList: 'List view', viewMonth: 'Month view', viewBoard: 'Board view', movePrev: 'Move back a step', moveNext: 'Move to the next step', planDay: 'Plan', emptyDay: 'Nothing on this day yet.', pickDay: 'Tap a day to see or plan content.', plan: 'Due date (optional)', ideas: 'Ideas', drafts: 'Drafts', posted: 'Posted', platforms: 'Platforms', reviewed: 'Reviewed', pending: 'Pending review', add: 'New content', addNum: 'Add numbers',
             emptyIdeas: 'No ideas yet. Jot one down before you forget it.', emptyDrafts: 'No drafts yet.', emptyPosted: 'Nothing posted yet. Share your first piece.',
-            sheet: 'Submit content', edit: 'Edit content', stage: 'Stage', idea: 'Idea', draft: 'Draft', platform: 'Platform', type: 'Type', caption: 'Caption or idea', capPh: 'What is this content about?',
+            sheet: 'Submit content', edit: 'Edit content', stage: 'Stage', platform: 'Platform', type: 'Type', caption: 'Caption or idea', capPh: 'What is this content about?',
             images: 'Images', addImg: 'Add', link: 'Post link', date: 'Post date', send: 'Send for review', save: 'Save', saving: 'Saving…', other: 'Case, Work, Event… (other submissions)', del: 'Delete this draft', delAsk: 'Delete this draft?',
             hintPosted: 'Posted content is reviewed by the admin. Add numbers later from the card.', hintLocal: 'Saved for you only until you mark it Posted.',
             needCap: 'Write a caption or idea first.', needLink: 'Paste the post link (starting with http).', needDate: 'Pick the post date.', full: 'You already have 30 saved. Delete one first.', fail: 'Could not save. Please try again.', noimg: 'That image could not be read.',
             numTitle: 'Add numbers', likes: 'Likes', reach: 'Reach', numHint: 'Update any time — the latest numbers are what the admin sees.', saveNum: 'Save numbers', badNum: 'Enter whole numbers, zero or more.', likeReach: 'Likes cannot be higher than reach.', savedNum: 'Saved.', sentToast: 'Sent for review', savedToast: 'Saved' },
-        th: { review: 'ตรวจงาน', revTodo: 'รอตรวจ', revMine: 'ที่ฉันตรวจแล้ว', revEmpty: 'ยังไม่มีงานรอตรวจ', revMineEmpty: 'ยังไม่ได้ตรวจงานชิ้นไหน', revOpen: 'ตรวจ', revTitle: 'ตรวจคอนเทนต์', revVerdict: 'ผลตรวจ', revOk: 'ผ่าน', revFix: 'ต้องแก้', revScore: 'โบนัสที่แนะนำ (pts)', revComment: 'ความเห็น', revCommentPh: 'ตรวจอะไรไปบ้าง ต้องแก้ตรงไหน', revSend: 'ส่งให้แอดมิน', revHint: 'ผลตรวจของคุณเป็นข้อเสนอ แอดมินเป็นคนให้คะแนนจริง', revNeedVerdict: 'เลือกผลตรวจก่อน', revNeedScore: 'เลือกโบนัสที่แนะนำ', revNeedComment: 'บอกหน่อยว่าต้องแก้อะไร', revSent: 'ส่งผลตรวจแล้ว', revYou: 'คุณแนะนำ', title: 'คอนเทนต์', viewAs: 'มุมมอง', modeIntern: 'Intern', modeContent: 'คอนเทนต์', viewList: 'มุมมองรายการ', viewMonth: 'มุมมองปฏิทิน', planDay: 'วางแผน', emptyDay: 'วันนี้ยังไม่มีอะไร', pickDay: 'แตะวันที่เพื่อดูหรือวางแผนคอนเทนต์', plan: 'วันที่วางแผน (ไม่บังคับ)', ideas: 'ไอเดีย', drafts: 'ฉบับร่าง', posted: 'โพสต์แล้ว', platforms: 'แพลตฟอร์ม', reviewed: 'ตรวจแล้ว', pending: 'รอตรวจ', add: 'เพิ่มคอนเทนต์', addNum: 'เพิ่มตัวเลข',
+        th: { review: 'ตรวจงาน', revTodo: 'รอตรวจ', revMine: 'ที่ฉันตรวจแล้ว', revEmpty: 'ยังไม่มีงานรอตรวจ', revMineEmpty: 'ยังไม่ได้ตรวจงานชิ้นไหน', revOpen: 'ตรวจ', revTitle: 'ตรวจคอนเทนต์', revVerdict: 'ผลตรวจ', revOk: 'ผ่าน', revFix: 'ต้องแก้', revScore: 'โบนัสที่แนะนำ (pts)', revComment: 'ความเห็น', revCommentPh: 'ตรวจอะไรไปบ้าง ต้องแก้ตรงไหน', revSend: 'ส่งให้แอดมิน', revHint: 'ผลตรวจของคุณเป็นข้อเสนอ แอดมินเป็นคนให้คะแนนจริง', revNeedVerdict: 'เลือกผลตรวจก่อน', revNeedScore: 'เลือกโบนัสที่แนะนำ', revNeedComment: 'บอกหน่อยว่าต้องแก้อะไร', revSent: 'ส่งผลตรวจแล้ว', revYou: 'คุณแนะนำ', title: 'คอนเทนต์', viewAs: 'มุมมอง', modeIntern: 'Intern', modeContent: 'คอนเทนต์', viewList: 'มุมมองรายการ', viewMonth: 'มุมมองปฏิทิน', viewBoard: 'มุมมองบอร์ด', movePrev: 'ย้อนกลับหนึ่งขั้น', moveNext: 'ไปขั้นถัดไป', planDay: 'วางแผน', emptyDay: 'วันนี้ยังไม่มีอะไร', pickDay: 'แตะวันที่เพื่อดูหรือวางแผนคอนเทนต์', plan: 'กำหนดส่ง (ไม่บังคับ)', ideas: 'ไอเดีย', drafts: 'ฉบับร่าง', posted: 'โพสต์แล้ว', platforms: 'แพลตฟอร์ม', reviewed: 'ตรวจแล้ว', pending: 'รอตรวจ', add: 'เพิ่มคอนเทนต์', addNum: 'เพิ่มตัวเลข',
             emptyIdeas: 'ยังไม่มีไอเดีย จดไว้ก่อนลืมนะ', emptyDrafts: 'ยังไม่มีฉบับร่าง', emptyPosted: 'ยังไม่มีงานที่โพสต์ ลองส่งชิ้นแรกดู',
-            sheet: 'ส่งคอนเทนต์', edit: 'แก้คอนเทนต์', stage: 'ขั้นตอน', idea: 'ไอเดีย', draft: 'ร่าง', platform: 'แพลตฟอร์ม', type: 'ประเภท', caption: 'แคปชั่นหรือไอเดีย', capPh: 'คอนเทนต์นี้เกี่ยวกับอะไร',
+            sheet: 'ส่งคอนเทนต์', edit: 'แก้คอนเทนต์', stage: 'ขั้นตอน', platform: 'แพลตฟอร์ม', type: 'ประเภท', caption: 'แคปชั่นหรือไอเดีย', capPh: 'คอนเทนต์นี้เกี่ยวกับอะไร',
             images: 'รูปภาพ', addImg: 'เพิ่ม', link: 'ลิงก์โพสต์', date: 'วันที่โพสต์', send: 'ส่งให้ตรวจ', save: 'บันทึก', saving: 'กำลังบันทึก…', other: 'Case, Work, Event… (งานประเภทอื่น)', del: 'ลบฉบับร่างนี้', delAsk: 'ลบฉบับร่างนี้ใช่ไหม',
             hintPosted: 'งานที่โพสต์แล้วแอดมินจะตรวจ ใส่ตัวเลขทีหลังได้จากการ์ด', hintLocal: 'เห็นเฉพาะคุณ จนกว่าจะเลือก โพสต์แล้ว',
             needCap: 'เขียนแคปชั่นหรือไอเดียก่อน', needLink: 'วางลิงก์โพสต์ (ขึ้นต้นด้วย http)', needDate: 'เลือกวันที่โพสต์', full: 'บันทึกครบ 30 รายการแล้ว ลบอันเก่าก่อน', fail: 'บันทึกไม่สำเร็จ ลองอีกครั้ง', noimg: 'อ่านรูปนี้ไม่ได้',
@@ -39,6 +42,7 @@
     function L() { return T[lang()]; }
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
     function plat(k) { for (var i = 0; i < PLATFORMS.length; i++) if (PLATFORMS[i][0] === k) return PLATFORMS[i]; return PLATFORMS[0]; }
+    function stageLabel(id) { var s = STAGES[STAGE_IDS.indexOf(id)] || STAGES[0]; return s[lang() === 'th' ? 2 : 1]; }
     function typeLabel(k) { return (TYPES[k] || TYPES.post)[lang() === 'th' ? 1 : 0]; }
     function todayKey() { try { return getBangkokDateTimeParts().dateKey; } catch (_) { return new Date().toISOString().slice(0, 10); } }
     function dayLabel(key) { var d = new Date(String(key) + 'T12:00:00'); return isNaN(d) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }
@@ -91,7 +95,7 @@
     // ---------- home card ----------
     var PLAT_COLOR = { ig: '#e1306c', fb: '#1877f2', tt: '#111827', yt: '#ef4444', line: '#06c755' };
     var WEEK = { en: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'], th: ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'] };
-    var view = (function () { try { return localStorage.getItem('cafeContentView') === 'month' ? 'month' : 'list'; } catch (_) { return 'list'; } })();
+    var view = (function () { try { var v = localStorage.getItem('cafeContentView'); return v === 'month' || v === 'board' ? v : 'list'; } catch (_) { return 'list'; } })();
     var viewMonth = '', selDay = '';
     var allPosts = [], unsubAll = null, myReviews = {}, revFilter = 'todo';
     var REVIEWER_GROUPS = ['audit'];   // a group (primary or extra) named like this gets the Review view — a UI choice, not a permission
@@ -123,8 +127,44 @@
     function draftRow(d, t) {
         var p = plat(d.platform);
         return '<div class="cc-row" data-act="draft" data-id="' + esc(d.id) + '">' + thumb(p, d.images && d.images[0]) + '<div class="cc-main">' +
-            '<div class="cc-meta"><span class="cc-pill">' + esc(typeLabel(d.ctype)) + '</span><span>' + esc(p[1]) + (d.plannedDate ? ' · ' + esc(dayLabel(d.plannedDate)) : '') + '</span><span class="cc-pill plan">' + (d.stage === 'idea' ? t.idea : t.draft) + '</span></div>' +
+            '<div class="cc-meta"><span class="cc-pill">' + esc(typeLabel(d.ctype)) + '</span><span>' + esc(p[1]) + (d.plannedDate ? ' · ' + esc(dayLabel(d.plannedDate)) : '') + '</span><span class="cc-pill plan">' + esc(stageLabel(d.stage)) + '</span></div>' +
             '<div class="cc-cap">' + esc(d.caption) + '</div></div></div>';
+    }
+
+    // ---------- board (one column per stage; Posted is read-only, from works) ----------
+    function dueChip(d) {
+        if (!d.plannedDate) return '';
+        var today = todayKey(), cls = d.plannedDate < today ? ' late' : d.plannedDate === today ? ' now' : '';
+        return '<span class="cc-due' + cls + '"><i class="fa-regular fa-clock"></i> ' + esc(dayLabel(d.plannedDate)) + '</span>';
+    }
+    function boardCard(d, i, t) {
+        var p = plat(d.platform);
+        return '<div class="cc-kc" data-act="draft" data-id="' + esc(d.id) + '"><div class="cc-meta"><i class="' + p[2] + '" style="color:' + (PLAT_COLOR[d.platform] || '#64748b') + '"></i><span class="cc-pill">' + esc(typeLabel(d.ctype)) + '</span>' + dueChip(d) + '</div>' +
+            '<div class="cc-cap">' + esc(d.caption) + '</div><div class="cc-kmv">' +
+            (i > 0 ? '<button type="button" data-act="mv" data-d="-1" data-id="' + esc(d.id) + '" aria-label="' + t.movePrev + '">&lsaquo;</button>' : '<span></span>') +
+            '<button type="button" data-act="mv" data-d="1" data-id="' + esc(d.id) + '" aria-label="' + t.moveNext + '">&rsaquo;</button></div></div>';
+    }
+    function boardHtml(t, posted) {
+        var cols = STAGES.map(function (s, i) {
+            var items = drafts.filter(function (d) { return d.stage === s[0]; }).sort(function (a, b) { return String(a.plannedDate || '9999').localeCompare(String(b.plannedDate || '9999')) || (b.updatedAt || 0) - (a.updatedAt || 0); });
+            return '<section class="cc-col"><div class="cc-colh"><b>' + esc(s[lang() === 'th' ? 2 : 1]) + '</b><span>' + items.length + '</span></div>' + items.map(function (d) { return boardCard(d, i, t); }).join('') +
+                '<button type="button" class="cc-chip cc-colbtn" data-act="newin" data-stage="' + s[0] + '" aria-label="' + esc(t.add) + '"><i class="fa-solid fa-plus"></i></button></section>';
+        }).join('');
+        var last = posted.slice(0, 10).map(function (w) {
+            var p = plat(w.platform);
+            return '<div class="cc-kc" data-act="metrics" data-id="' + esc(w.id) + '"><div class="cc-meta"><i class="' + p[2] + '" style="color:' + (PLAT_COLOR[w.platform] || '#64748b') + '"></i><span class="cc-pill">' + esc(typeLabel(w.ctype)) + '</span><span>' + esc(dayLabel(w.postDate)) + '</span></div>' +
+                '<div class="cc-cap">' + esc(w.caption || w.title) + '</div><div class="cc-foot">' + (isReviewed(w) ? '<span class="cc-pill done">' + t.reviewed + (Number(w.score) ? ' +' + esc(fmtScore(w.score)) : '') + '</span>' : '<span class="cc-pill pending">' + t.pending + '</span>') + '</div></div>';
+        }).join('');
+        return '<div class="cc-board">' + cols + '<section class="cc-col"><div class="cc-colh"><b>' + t.posted + '</b><span>' + posted.length + '</span></div>' + last + '</section></div>';
+    }
+    function moveStage(id, dir) {
+        var d = drafts.filter(function (x) { return x.id === id; })[0], j = d ? STAGE_IDS.indexOf(d.stage) + dir : -1;
+        if (!d || busy || j < 0) return;
+        if (j >= STAGE_IDS.length) return openSheet(d, { stage: 'posted' });   // past Scheduled = Posted, which needs the link + date
+        busy = true;
+        saveDrafts(drafts.map(function (x) { return x.id === id ? Object.assign({}, x, { stage: STAGE_IDS[j], updatedAt: Date.now() }) : x; }))
+            .then(render).catch(function (e) { console.warn('[cafe] move failed', e); if (typeof showToast === 'function') showToast(L().fail); })
+            .then(function () { busy = false; });
     }
 
     function sentLine(w, t) {
@@ -178,13 +218,14 @@
     function render() {
         if (!host || !on) return;
         if (view === 'review' && !isReviewer()) view = 'list';
-        var t = L(), posted = postedList(), ideas = drafts.filter(function (d) { return d.stage === 'idea'; }), dr = drafts.filter(function (d) { return d.stage === 'draft'; });
+        var t = L(), posted = postedList(), ideas = drafts.filter(function (d) { return d.stage === 'idea'; }), dr = drafts.filter(function (d) { return d.stage !== 'idea'; });
         if (!viewMonth) viewMonth = todayKey().slice(0, 7);
         var month = view === 'month' ? viewMonth : todayKey().slice(0, 7), mp = posted.filter(function (w) { return String(w.postDate || '').slice(0, 7) === month; });
         var plats = {}; mp.forEach(function (w) { plats[w.platform] = 1; });
         var rev = mp.filter(isReviewed).length, body = '';
         if (view === 'review') body = reviewHtml(t);
         else if (view === 'month') body = monthHtml(t, posted);
+        else if (view === 'board') body = boardHtml(t, posted);
         else {
             var rows = filter === 'posted' ? posted.map(function (w) { return postedRow(w, t); }).join('') : (filter === 'ideas' ? ideas : dr).map(function (d) { return draftRow(d, t); }).join('');
             if (!rows) rows = '<div class="cc-empty">' + (filter === 'ideas' ? t.emptyIdeas : filter === 'drafts' ? t.emptyDrafts : t.emptyPosted) + '</div>';
@@ -194,7 +235,7 @@
         }
         var monthName = new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7) - 1, 15)).toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' });
         host.innerHTML = '<div class="cc-card"><div class="cc-head"><i class="fa-solid fa-camera"></i> ' + t.title + '<span class="cc-month">' + esc(monthName) + '</span>' +
-            '<span class="cc-view" role="group" aria-label="View"><button type="button" data-view="list" aria-pressed="' + (view === 'list') + '" aria-label="' + t.viewList + '"><i class="fa-solid fa-list"></i></button><button type="button" data-view="month" aria-pressed="' + (view === 'month') + '" aria-label="' + t.viewMonth + '"><i class="fa-solid fa-calendar-days"></i></button>' +
+            '<span class="cc-view" role="group" aria-label="View"><button type="button" data-view="list" aria-pressed="' + (view === 'list') + '" aria-label="' + t.viewList + '"><i class="fa-solid fa-list"></i></button><button type="button" data-view="month" aria-pressed="' + (view === 'month') + '" aria-label="' + t.viewMonth + '"><i class="fa-solid fa-calendar-days"></i></button><button type="button" data-view="board" aria-pressed="' + (view === 'board') + '" aria-label="' + t.viewBoard + '"><i class="fa-solid fa-table-columns"></i></button>' +
             (isReviewer() ? '<button type="button" data-view="review" aria-pressed="' + (view === 'review') + '" aria-label="' + t.review + '" title="' + t.review + '"><i class="fa-solid fa-clipboard-check"></i></button>' : '') + '</span></div>' +
             (view === 'review' ? '' : '<div class="cc-stats"><div class="cc-stat"><span>' + t.posted + '</span><b>' + mp.length + '</b></div><div class="cc-stat"><span>' + t.platforms + '</span><b>' + Object.keys(plats).length + '</b></div><div class="cc-stat"><span>' + t.reviewed + '</span><b>' + rev + '/' + mp.length + '</b></div></div>') +
             body + '<div class="cc-add"><button type="button" class="cc-chip" data-act="new"><i class="fa-solid fa-plus"></i> ' + t.add + '</button></div></div>';
@@ -210,7 +251,7 @@
             unsub = db.collection('users').doc(userId).onSnapshot(function (s) {
                 var a = s.exists ? (s.data() || {}).socialDrafts : null;
                 myReviews = (s.exists && (s.data() || {}).contentReviews) || {};
-                drafts = Array.isArray(a) ? a.filter(function (d) { return d && d.id && (d.stage === 'idea' || d.stage === 'draft'); }) : [];
+                drafts = Array.isArray(a) ? a.filter(function (d) { return d && d.id && STAGE_IDS.indexOf(d.stage) >= 0; }) : [];
                 render();
             }, function (e) { console.warn('[cafe] drafts listener', e); });
         });
@@ -249,9 +290,9 @@
     function openSheet(d, preset) {
         ensureOverlay();
         var t = L();
-        sheet = { id: d ? d.id : '', stage: d ? d.stage : preset ? 'idea' : 'posted', platform: d ? d.platform : 'ig', ctype: d ? d.ctype : 'post', images: (d && d.images ? d.images : []).map(function (u) { return { url: u }; }) };
+        sheet = { id: d ? d.id : '', stage: (preset && preset.stage) || (d ? d.stage : preset ? 'idea' : 'posted'), platform: d ? d.platform : 'ig', ctype: d ? d.ctype : 'post', images: (d && d.images ? d.images : []).map(function (u) { return { url: u }; }) };
         overlay.innerHTML = '<div class="cc-box"><div class="cc-bh"><i class="fa-solid fa-camera"></i> ' + (d ? t.edit : t.sheet) + '<button type="button" class="cc-x" data-act="close" aria-label="Close">&times;</button></div>' +
-            '<span class="cc-lbl">' + t.stage + '</span>' + chips('stage', [['idea', t.idea], ['draft', t.draft], ['posted', t.posted]], sheet.stage) +
+            '<span class="cc-lbl">' + t.stage + '</span>' + chips('stage', STAGES.map(function (s) { return [s[0], s[lang() === 'th' ? 2 : 1]]; }).concat([['posted', t.posted]]), sheet.stage) +
             '<span class="cc-lbl">' + t.platform + '</span>' + chips('platform', PLATFORMS, sheet.platform) +
             '<span class="cc-lbl">' + t.type + '</span>' + chips('ctype', Object.keys(TYPES).map(function (k) { return [k, TYPES[k][lang() === 'th' ? 1 : 0]]; }), sheet.ctype) +
             '<span class="cc-lbl">' + t.caption + '</span><textarea id="ccCap" rows="3" maxlength="1000" placeholder="' + esc(t.capPh) + '">' + esc(d ? d.caption : '') + '</textarea>' +
@@ -449,6 +490,8 @@
         e.stopPropagation();
         if (a.dataset.act === 'new') openSheet(null);
         else if (a.dataset.act === 'plan') openSheet(null, { plannedDate: a.dataset.day });
+        else if (a.dataset.act === 'newin') openSheet(null, { stage: a.dataset.stage });
+        else if (a.dataset.act === 'mv') moveStage(a.dataset.id, +a.dataset.d);
         else if (a.dataset.act === 'draft') openSheet(drafts.filter(function (d) { return d.id === a.dataset.id; })[0] || null);
         else if (a.dataset.act === 'metrics') openNumbers(a.dataset.id);
         else if (a.dataset.act === 'review') openReview(a.dataset.id);

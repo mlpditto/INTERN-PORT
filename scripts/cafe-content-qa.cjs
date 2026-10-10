@@ -225,6 +225,47 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         // remove the planned idea so later steps see the same drafts as before
         await page.evaluate(() => { store.users.U1.socialDrafts = []; userCbs.forEach(cb => cb({ exists: true, data: () => store.users.U1 })); });
 
+        // Board view: one column per stage (Idea → Script → Filming → Editing → Scheduled) + Posted; ‹ › move a card; Scheduled › goes to Posted (needs link + date).
+        await page.evaluate(() => {
+            store.users.U1.socialDrafts = [
+                { id: 'A', stage: 'idea', platform: 'ig', ctype: 'reel', caption: 'Idea A', images: [], plannedDate: '2026-10-08', updatedAt: 1 },
+                { id: 'B', stage: 'draft', platform: 'tt', ctype: 'video', caption: 'Script B', images: [], plannedDate: '2026-10-09', updatedAt: 2 },
+                { id: 'C', stage: 'sched', platform: 'yt', ctype: 'video', caption: 'Ready C', images: [], updatedAt: 3 },
+                { id: 'D', stage: 'bogus', platform: 'yt', ctype: 'video', caption: 'Unknown stage', images: [], updatedAt: 4 }
+            ];
+            userCbs.forEach(cb => cb({ exists: true, data: () => store.users.U1 }));
+        });
+        assert.ok(/Drafts\s*2/.test((await page.$eval('#section-cafe-content', e => e.innerText)).replace(/\n/g, ' ')), 'list "Drafts" counts every in-progress stage; an unknown stage is ignored');
+        await page.click('#section-cafe-content .cc-view [data-view="board"]');
+        assert.equal(await page.evaluate(() => localStorage.getItem('cafeContentView')), 'board', 'board is remembered');
+        const cols = () => page.$$eval('.cc-colh', els => els.map(e => e.innerText.replace(/\s+/g, ' ').trim()));
+        assert.deepEqual(await cols(), ['Idea 1', 'Script 1', 'Filming 0', 'Editing 0', 'Scheduled 1', 'Posted 1']);
+        assert.equal(await page.locator('.cc-kc[data-id="A"] .cc-due.late').count(), 1, 'overdue is red');
+        assert.equal(await page.locator('.cc-kc[data-id="B"] .cc-due.now').count(), 1, 'due today is amber');
+        assert.equal(await page.locator('.cc-kc[data-id="C"] .cc-due').count(), 0, 'no date, no chip');
+        assert.equal(await page.locator('.cc-kc[data-id="A"] [data-d="-1"]').count(), 0, 'first column has no ‹');
+        assert.ok((await page.$eval('.cc-col:last-child', e => e.innerText)).includes('Reviewed'), 'Posted column shows the review state');
+        await page.click('.cc-kc[data-id="A"] [data-d="1"]');
+        await page.waitForFunction(() => window.__lastUserSet.socialDrafts.find(d => d.id === 'A').stage === 'draft');
+        assert.deepEqual(await cols(), ['Idea 0', 'Script 2', 'Filming 0', 'Editing 0', 'Scheduled 1', 'Posted 1'], 'A moved to Script');
+        assert.equal((await page.evaluate(() => window.__lastUserSet.socialDrafts)).length, 3, 'a move keeps every other card');
+        await page.click('.cc-kc[data-id="B"] [data-d="-1"]');
+        await page.waitForFunction(() => window.__lastUserSet.socialDrafts.find(d => d.id === 'B').stage === 'idea');
+        assert.deepEqual(await cols(), ['Idea 1', 'Script 1', 'Filming 0', 'Editing 0', 'Scheduled 1', 'Posted 1'], 'B moved back to Idea');
+        await page.click('.cc-kc[data-id="C"] [data-d="1"]');
+        await page.waitForSelector('#ccOverlay.open');
+        assert.equal(await page.$eval('#ccOverlay .cc-chip[data-v="posted"]', e => e.getAttribute('aria-pressed')), 'true', 'past Scheduled opens the Posted form');
+        assert.equal(await page.$eval('#ccCap', e => e.value), 'Ready C'); assert.equal(await vis('#ccPosted'), true);
+        assert.equal(await page.locator('#ccOverlay .cc-chip[data-group="stage"]').count(), 6, 'five stages + Posted');
+        await page.click('#ccOverlay [data-act="close"]');
+        await page.click('.cc-col:nth-child(3) [data-act="newin"]');
+        await page.waitForSelector('#ccOverlay.open');
+        assert.equal(await page.$eval('#ccOverlay .cc-chip[data-v="film"]', e => e.getAttribute('aria-pressed')), 'true', 'the column + starts a card in that stage');
+        assert.equal(await vis('#ccPlan'), true); assert.equal(await vis('#ccPosted'), false);
+        await page.click('#ccOverlay [data-act="close"]');
+        await page.click('#section-cafe-content .cc-view [data-view="list"]');
+        await page.evaluate(() => { store.users.U1.socialDrafts = []; userCbs.forEach(cb => cb({ exists: true, data: () => store.users.U1 })); });
+
         // Other submission types are still one tap away; Thai follows the app's TH toggle.
         await page.click('#unified-fab-btn');
         await page.click('#ccOverlay .cc-link[data-act="other"]');
