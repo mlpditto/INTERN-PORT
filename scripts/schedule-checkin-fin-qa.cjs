@@ -1,4 +1,4 @@
-// V101.82: the 🔥 check-in pill and 💰 FIN moved from the home activity row into Schedule — the pill sits inline in the TODAY header (kept even when
+// V101.82 / V101.83: the 🔥 check-in pill and 💰 FIN moved from the home activity row into Schedule — the pill sits inline in the TODAY header (kept even when
 // nothing is due today; orange button = check in now, green = done), 💰 is an icon beside Goals. The REAL public/index.html on a touch phone
 // (file://, network blocked, Firebase stubbed). FIN opens ABOVE Schedule (z-index). SHOT=<dir> also writes a PNG.
 const path = require('node:path'), fs = require('node:fs'), assert = require('node:assert/strict');
@@ -93,11 +93,21 @@ async function open(browser) {
         assert.equal(await page.locator('#sch-agenda .act-streak').count(), 1, 'pill stays when only later items exist (no TODAY bucket)');
         await page.evaluate(() => { schAgendaItems = window.__realItems; });
 
-        // not checked in yet → orange button, tappable (≥ 44 px on touch), calls tryDailyCheckin
+        // not checked in yet → orange button: 24px to look at, 44px to tap on touch (invisible ::after), calls tryDailyCheckin
         await page.evaluate(() => { myCheckin = { lastDate: __key(-1) }; window.__ci = 0; window.tryDailyCheckin = () => { window.__ci++; }; schRenderAgenda(); });
         const todo = page.locator('#sch-agenda #daily-checkin-btn.act-streak.todo');
         assert.equal(await todo.count(), 1, 'orange check-in button');
-        assert.ok((await todo.boundingBox()).height >= 44, 'touch target ≥ 44 px');
+        const bb = await todo.boundingBox();
+        assert.ok(bb.height <= 28, 'visually small: ' + bb.height);
+        const hit = await page.evaluate(() => {
+            const b = document.getElementById('daily-checkin-btn'), r = b.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+            const on = dy => document.elementFromPoint(cx, cy + dy) === b;
+            const tile = document.querySelector('#sch-agenda .sch-tile'), t = tile && tile.getBoundingClientRect();
+            return { up: on(-24), down: on(16), farUp: on(-34), farDown: on(30), coverTile: !!t && document.elementFromPoint(t.left + 6, t.top + 3) === b, ok: on(0) };
+        });
+        assert.ok(hit.ok && hit.up && hit.down, 'tap area reaches ±22px around the pill (≈44px): ' + JSON.stringify(hit));
+        assert.ok(!hit.farUp && !hit.farDown, 'and no further: ' + JSON.stringify(hit));
+        assert.equal(hit.coverTile, false, 'the invisible area never covers the tiles below');
         await todo.click();
         assert.equal(await page.evaluate(() => window.__ci), 1, 'tapping it checks in');
         await page.evaluate(() => { myCheckin = { lastDate: __key(0) }; schRenderAgenda(); });
