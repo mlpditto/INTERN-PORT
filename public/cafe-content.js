@@ -14,14 +14,14 @@
     var PLATFORMS = [['ig', 'IG', 'fa-brands fa-instagram'], ['fb', 'FB', 'fa-brands fa-facebook'], ['tt', 'TikTok', 'fa-brands fa-tiktok'], ['yt', 'YouTube', 'fa-brands fa-youtube'], ['line', 'LINE', 'fa-brands fa-line']];
     var TYPES = { post: ['Post', 'โพสต์'], reel: ['Reel', 'รีล'], story: ['Story', 'สตอรี่'], video: ['Video', 'วิดีโอ'] };
     var T = {
-        en: { title: 'Content', viewList: 'List view', viewMonth: 'Month view', planDay: 'Plan', emptyDay: 'Nothing on this day yet.', pickDay: 'Tap a day to see or plan content.', plan: 'Plan date (optional)', ideas: 'Ideas', drafts: 'Drafts', posted: 'Posted', platforms: 'Platforms', reviewed: 'Reviewed', pending: 'Pending review', add: 'New content', addNum: 'Add numbers',
+        en: { title: 'Content', viewAs: 'View as', modeIntern: 'Intern', modeContent: 'Content', viewList: 'List view', viewMonth: 'Month view', planDay: 'Plan', emptyDay: 'Nothing on this day yet.', pickDay: 'Tap a day to see or plan content.', plan: 'Plan date (optional)', ideas: 'Ideas', drafts: 'Drafts', posted: 'Posted', platforms: 'Platforms', reviewed: 'Reviewed', pending: 'Pending review', add: 'New content', addNum: 'Add numbers',
             emptyIdeas: 'No ideas yet. Jot one down before you forget it.', emptyDrafts: 'No drafts yet.', emptyPosted: 'Nothing posted yet. Share your first piece.',
             sheet: 'Submit content', edit: 'Edit content', stage: 'Stage', idea: 'Idea', draft: 'Draft', platform: 'Platform', type: 'Type', caption: 'Caption or idea', capPh: 'What is this content about?',
             images: 'Images', addImg: 'Add', link: 'Post link', date: 'Post date', send: 'Send for review', save: 'Save', saving: 'Saving…', other: 'Case, Work, Event… (other submissions)', del: 'Delete this draft', delAsk: 'Delete this draft?',
             hintPosted: 'Posted content is reviewed by the admin. Add numbers later from the card.', hintLocal: 'Saved for you only until you mark it Posted.',
             needCap: 'Write a caption or idea first.', needLink: 'Paste the post link (starting with http).', needDate: 'Pick the post date.', full: 'You already have 30 saved. Delete one first.', fail: 'Could not save. Please try again.', noimg: 'That image could not be read.',
             numTitle: 'Add numbers', likes: 'Likes', reach: 'Reach', numHint: 'Update any time — the latest numbers are what the admin sees.', saveNum: 'Save numbers', badNum: 'Enter whole numbers, zero or more.', likeReach: 'Likes cannot be higher than reach.', savedNum: 'Saved.', sentToast: 'Sent for review', savedToast: 'Saved' },
-        th: { title: 'คอนเทนต์', viewList: 'มุมมองรายการ', viewMonth: 'มุมมองปฏิทิน', planDay: 'วางแผน', emptyDay: 'วันนี้ยังไม่มีอะไร', pickDay: 'แตะวันที่เพื่อดูหรือวางแผนคอนเทนต์', plan: 'วันที่วางแผน (ไม่บังคับ)', ideas: 'ไอเดีย', drafts: 'ฉบับร่าง', posted: 'โพสต์แล้ว', platforms: 'แพลตฟอร์ม', reviewed: 'ตรวจแล้ว', pending: 'รอตรวจ', add: 'เพิ่มคอนเทนต์', addNum: 'เพิ่มตัวเลข',
+        th: { title: 'คอนเทนต์', viewAs: 'มุมมอง', modeIntern: 'Intern', modeContent: 'คอนเทนต์', viewList: 'มุมมองรายการ', viewMonth: 'มุมมองปฏิทิน', planDay: 'วางแผน', emptyDay: 'วันนี้ยังไม่มีอะไร', pickDay: 'แตะวันที่เพื่อดูหรือวางแผนคอนเทนต์', plan: 'วันที่วางแผน (ไม่บังคับ)', ideas: 'ไอเดีย', drafts: 'ฉบับร่าง', posted: 'โพสต์แล้ว', platforms: 'แพลตฟอร์ม', reviewed: 'ตรวจแล้ว', pending: 'รอตรวจ', add: 'เพิ่มคอนเทนต์', addNum: 'เพิ่มตัวเลข',
             emptyIdeas: 'ยังไม่มีไอเดีย จดไว้ก่อนลืมนะ', emptyDrafts: 'ยังไม่มีฉบับร่าง', emptyPosted: 'ยังไม่มีงานที่โพสต์ ลองส่งชิ้นแรกดู',
             sheet: 'ส่งคอนเทนต์', edit: 'แก้คอนเทนต์', stage: 'ขั้นตอน', idea: 'ไอเดีย', draft: 'ร่าง', platform: 'แพลตฟอร์ม', type: 'ประเภท', caption: 'แคปชั่นหรือไอเดีย', capPh: 'คอนเทนต์นี้เกี่ยวกับอะไร',
             images: 'รูปภาพ', addImg: 'เพิ่ม', link: 'ลิงก์โพสต์', date: 'วันที่โพสต์', send: 'ส่งให้ตรวจ', save: 'บันทึก', saving: 'กำลังบันทึก…', other: 'Case, Work, Event… (งานประเภทอื่น)', del: 'ลบฉบับร่างนี้', delAsk: 'ลบฉบับร่างนี้ใช่ไหม',
@@ -39,7 +39,40 @@
     function typeLabel(k) { return (TYPES[k] || TYPES.post)[lang() === 'th' ? 1 : 0]; }
     function todayKey() { try { return getBangkokDateTimeParts().dateKey; } catch (_) { return new Date().toISOString().slice(0, 10); } }
     function dayLabel(key) { var d = new Date(String(key) + 'T12:00:00'); return isNaN(d) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }
-    function isCafe() { try { return typeof getMyDivision === 'function' && DIVISIONS.indexOf(String(getMyDivision() || '').replace(/\s+/g, ' ').trim().toLowerCase()) >= 0; } catch (_) { return false; } }
+    // ---------- who sees which UI ----------
+    // A user has ONE primary group (users.group — rules, leaderboard, quizzes and events all follow it) and, set by an admin only, optional
+    // extra groups (users.extraGroups) that decide nothing but which UI(s) they may open. A group inside the Content Creator division opens the
+    // Content UI; a user who also has a group outside it can flip between the two (Intern | Content), remembered per user in this browser.
+    function divisionOfGroup(g) {
+        try {
+            var cfg = typeof divisionConfig !== 'undefined' && divisionConfig ? divisionConfig : {}, key = String(g || '').trim().toLowerCase();
+            for (var d in cfg) if ((cfg[d] || []).some(function (x) { return String(x).trim().toLowerCase() === key; })) return d;
+        } catch (_) { /* config not loaded yet */ }
+        return '';
+    }
+    function isCreatorDivision(name) { return DIVISIONS.indexOf(String(name || '').replace(/\s+/g, ' ').trim().toLowerCase()) >= 0; }
+    function memberships() {
+        var primary = typeof myGroup !== 'undefined' ? myGroup : '', extras = Array.isArray(window.myExtraGroups) ? window.myExtraGroups : [];
+        var pc = isCreatorDivision(divisionOfGroup(primary)), ec = extras.some(function (g) { return isCreatorDivision(divisionOfGroup(g)); });
+        var internSide = !pc || extras.some(function (g) { return g && !isCreatorDivision(divisionOfGroup(g)); });
+        return { creator: pc || ec, both: (pc || ec) && internSide, primaryCreator: pc };
+    }
+    function modeKey() { return 'contentViewMode:' + (typeof userId !== 'undefined' ? userId : ''); }
+    function getMode(m) { try { var v = localStorage.getItem(modeKey()); if (v === 'content' || v === 'intern') return v; } catch (_) { /* storage may be blocked */ } return m.primaryCreator ? 'content' : 'intern'; }
+    function isCafe() { try { var m = memberships(); return m.creator && (!m.both || getMode(m) === 'content'); } catch (_) { return false; } }
+    var switchSig = '';
+    function paintSwitch() {
+        var el = document.getElementById('cafe-view-switch'); if (!el) return;
+        var m = memberships(), mode = m.both ? getMode(m) : '', sig = m.both + '|' + mode + '|' + lang();
+        if (sig === switchSig) return;
+        switchSig = sig;
+        if (!m.both) { el.hidden = true; el.innerHTML = ''; return; }
+        var t = L();
+        el.innerHTML = '<div class="cc-switch" role="group" aria-label="' + esc(t.viewAs) + '"><span>' + esc(t.viewAs) + '</span>' +
+            '<button type="button" data-mode="intern" aria-pressed="' + (mode === 'intern') + '">' + esc(t.modeIntern) + '</button><button type="button" data-mode="content" aria-pressed="' + (mode === 'content') + '">' + esc(t.modeContent) + '</button></div>';
+        el.hidden = false;
+        if (!el.dataset.wired) { el.dataset.wired = '1'; el.addEventListener('click', function (e) { var b = e.target.closest('[data-mode]'); if (!b) return; try { localStorage.setItem(modeKey(), b.dataset.mode); } catch (_) { /* storage may be blocked */ } sync(); }); }
+    }
     function myWorks() { try { return (typeof usersWorksCache !== 'undefined' && usersWorksCache) || []; } catch (_) { return []; } }
     function postedList() {
         return myWorks().filter(function (w) { return w && w.kind === 'social'; }).sort(function (a, b) {
@@ -318,7 +351,9 @@
     function sync() {
         try {
             var now = isCafe();
+            paintSwitch();
             if (now === on && (host || !now)) { if (now) listen(); return; }
+            var was = on;
             on = now;
             document.body.classList.toggle('cafe-mode', on);
             if (on) ['achievementUnlockModal', 'achievementsModal'].forEach(function (id) { var m = document.getElementById(id); if (m) m.style.display = 'none'; });   // a badge popup that opened before the division loaded
@@ -330,6 +365,7 @@
                 if (host) host.hidden = false;
                 listen(); render();
             } else if (host) { host.hidden = true; host.innerHTML = ''; }
+            if (was && !on && typeof updateEarnedBadgesBar === 'function') updateEarnedBadgesBar();   // flipped back to the Intern UI: the badge row returns
         } catch (e) { console.warn('[cafe] sync failed', e); }
     }
     // The Content Creator division has no badge system: index.html's achievement / badge code asks this (live, not via body.cafe-mode, so it is right
