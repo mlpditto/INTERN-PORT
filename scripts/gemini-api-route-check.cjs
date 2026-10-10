@@ -28,7 +28,7 @@ async function call(body) {
     return res;
 }
 (async () => {
-    for (const [model, want] of [['gemini-3.5-flash', 'gemini-3.5-flash'], ['gemini-3.6-flash', 'gemini-3.6-flash'], ['gemini-pro', 'gemini-3.6-flash'], ['multimodal', 'gemini-3.5-flash'], ['', 'gemini-3.5-flash']]) {
+    for (const [model, want] of [['gemini-3.5-flash', 'gemini-3.6-flash'], ['gemini-2.5-flash', 'gemini-3.6-flash'], ['gemini-3.6-flash', 'gemini-3.6-flash'], ['gemini-pro', 'gemini-3.6-flash'], ['multimodal', 'gemini-3.6-flash'], ['', 'gemini-3.6-flash']]) {
         const r = await call({ provider: 'gemini', model });
         assert.equal(r.code, 200, model + ' served');
         assert.equal(request.url, `https://generativelanguage.googleapis.com/v1beta/models/${want}:generateContent?key=test-only`, model + ' → Gemini API');
