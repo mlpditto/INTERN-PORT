@@ -27,7 +27,7 @@ const ctx = {
 vm.createContext(ctx);
 function load(start, end) { vm.runInContext(html.slice(html.indexOf(start), html.indexOf(end, html.indexOf(start))), ctx); }
 load('        const profileActivityState', '        // V95.88:');
-load('        function renderDailyCheckinCard()', '        // V96.41:');
+load('        function checkinPillHtml()', '        // V96.41:');   // V101.82: the pill builder sits just above renderDailyCheckinCard
 load('        function updateTimelineBar(', '        // V97.05: the single Schedule entry');
 load('        function gotoLog()', '        function renderDailyCheckinCard()');
 const caption = ctx._activityChipCaption;
@@ -42,10 +42,15 @@ assert.match(elements['daily-checkin-card'].innerHTML, /กำลังโหล
 vm.runInContext("Object.keys(profileActivityState).forEach(k => profileActivityState[k] = 'ready')", ctx);
 ctx.renderDailyCheckinCard();
 assert.match(elements['daily-checkin-card'].innerHTML, /ยังไม่เคยส่ง/);
-// V101.29: the bonus countdown is a 🎁 tag in the green streak pill; the wording is in aria-label.
-assert.match(elements['daily-checkin-card'].innerHTML, /class="act-streak done"[^>]*aria-label="Checked in today · 3-day streak · Bonus \+0.05 in 4 days"/);
-assert.match(elements['daily-checkin-card'].innerHTML, /🔥3 <span class="act-gift">🎁 4d<\/span>/);
-assert.doesNotMatch(elements['daily-checkin-card'].innerHTML, /[☑✓]/);
+// V101.82: the 🔥 check-in pill and 💰 FIN left the home row (they live in Schedule now) — only the Log / Case circles remain.
+assert.doesNotMatch(elements['daily-checkin-card'].innerHTML, /act-streak|finOpen|💰|🔥/);
+// The pill builder: green + bonus wording in aria-label (no 🎁 text on the pill), orange button when not checked in yet.
+const pill = ctx.checkinPillHtml();
+assert.match(pill, /class="act-streak done"[^>]*aria-label="Checked in today · 3-day streak · Bonus \+0.05 in 4 days"[^>]*>🔥3<\/span>/);
+assert.doesNotMatch(pill, /act-gift|🎁|[☑✓]/);
+ctx.myCheckin = { lastDate: '2026-09-09' };
+assert.match(ctx.checkinPillHtml(), /<button type="button" id="daily-checkin-btn" class="act-streak todo" onclick="tryDailyCheckin\(\)"[^>]*>🔥3<\/button>/);
+ctx.myCheckin = { lastDate: '2026-09-10' };
 logToday = true; ctx.renderDailyCheckinCard();
 assert.match(elements['daily-checkin-card'].innerHTML, /Log เพิ่มเติม · ส่งแล้ววันนี้/);
 assert.match(elements['daily-checkin-card'].innerHTML, /class="act-ic done"[^>]*onclick="gotoLog\(\)"/);
