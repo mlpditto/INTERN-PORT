@@ -62,10 +62,10 @@ async function open(browser) {
             try { renderDailyCheckinCard(); } catch (e) { if (!/firebase\./.test(e.message)) throw e; }
         });
 
-        // ---- home row: only Log remains (V101.86: Case lives in the + button)
+        // ---- home row: empty (V101.82 pill + FIN, V101.86 Case, V101.87 Log all moved out)
         const home = await page.evaluate(() => ({ html: document.getElementById('daily-checkin-card').innerHTML, n: document.querySelectorAll('#daily-checkin-card .activity-actions > *').length }));
-        assert.equal(home.n, 1, 'home row = Log only');
-        assert.ok(!/gotoCaseSubmit|🩺/.test(home.html), 'no Case circle on the home row');
+        assert.equal(home.n, 0, 'nothing in the home row');
+        assert.equal(home.html, '', 'the host is empty');
         assert.ok(!/act-streak|finOpen|💰|🔥/.test(home.html), 'no pill / FIN on the home row');
         assert.equal(await page.locator('#badge-streak').textContent(), '12 days', 'the metrics-rail streak chip is still written by renderDailyCheckinCard');
 
@@ -155,6 +155,6 @@ async function open(browser) {
         }
         assert.deepEqual(errors.filter(e => !/firebase\./.test(e)), [], 'no page errors');
         await ctx.close();
-        console.log('PASS: check-in pill inline with TODAY (green/orange, kept when nothing is due, 44px tap), 💰 icon beside Goals, FIN opens above Schedule, home row = Log + Case');
+        console.log('PASS: check-in pill inline with TODAY (green/orange, kept when nothing is due, 44px tap), 💰 icon beside Goals, FIN opens above Schedule, home row empty');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
