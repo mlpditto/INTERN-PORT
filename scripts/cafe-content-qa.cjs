@@ -220,6 +220,37 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.ok(/Posted\s*0/.test((await page.$eval('.cc-stats', e => e.innerText)).replace(/\n/g, ' ')), 'stats follow the viewed month');
         await page.click('.cc-calnav [data-cal="1"]');
         assert.equal(await page.$eval('.cc-calnav b', e => e.textContent), 'October 2026');
+        // Week and Day modes of the calendar (Sun–Sat, around today = Fri 9 Oct): every day a header + Plan, posts and planned cards under their day.
+        assert.deepEqual(await page.$$eval('.cc-rail [data-cm]', els => els.map(e => e.textContent + ':' + e.getAttribute('aria-pressed'))), ['Month:true', 'Week:false', 'Day:false']);
+        await page.click('[data-cm="week"]');
+        assert.equal(await page.$eval('.cc-calnav b', e => e.textContent), '4 Oct – 10 Oct', 'week title');
+        assert.equal(await page.evaluate(() => localStorage.getItem('cafeContentCal')), 'week', 'mode is remembered');
+        assert.equal(await page.locator('.cc-dayhead').count(), 7, 'seven days');
+        assert.equal(await page.locator('.cc-dayhead.today').count(), 1, 'today is marked');
+        assert.ok(/Fri.*9 Oct/.test(await page.$eval('.cc-dayhead.today b', e => e.textContent)));
+        txt = await page.$eval('#section-cafe-content', e => e.innerText);
+        assert.ok(txt.includes('Cold brew batch') && txt.includes('Plan: pumpkin latte teaser'), 'the week lists the post (Fri) and the planned idea (Sat): ' + txt);
+        assert.equal(await page.locator('.cc-grid').count(), 0, 'no month grid in week mode');
+        await page.click('[data-wk="1"]');
+        assert.equal(await page.$eval('.cc-calnav b', e => e.textContent), '11 Oct – 17 Oct', 'next week');
+        assert.equal(await page.locator('.cc-row').count(), 0, 'nothing next week');
+        assert.equal(await page.$eval('.cc-month', e => e.textContent), 'October', 'month label follows');
+        await page.click('[data-wk="-1"]');
+        await page.click('[data-cm="day"]');
+        assert.ok(/Sat.*10 Oct/.test(await page.$eval('.cc-calnav b', e => e.textContent)), 'day title (the day a card was last planned for)');
+        assert.equal(await page.locator('.cc-dayhead').count(), 1);
+        assert.ok((await page.$eval('#section-cafe-content', e => e.innerText)).includes('Plan: pumpkin latte teaser'), 'the day lists its planned idea');
+        await page.click('[data-wk="-1"]');
+        assert.ok((await page.$eval('#section-cafe-content', e => e.innerText)).includes('Cold brew batch'), 'the day before lists the post');
+        await page.click('[data-wk="1"]'); await page.click('[data-wk="1"]');
+        assert.ok(/Nothing on this day yet/.test(await page.$eval('#section-cafe-content', e => e.innerText)), 'empty day');
+        await page.click('#section-cafe-content [data-act="plan"]');
+        await page.waitForSelector('#ccOverlay.open');
+        assert.equal(await page.$eval('#ccPlanDate', e => e.value), '2026-10-11', 'Plan on the shown day presets its date');
+        await page.click('#ccOverlay [data-act="close"]');
+        await page.click('[data-cm="month"]');
+        assert.equal(await page.$eval('.cc-calnav b', e => e.textContent), 'October 2026', 'back to the month grid');
+        assert.equal(await page.evaluate(() => localStorage.getItem('cafeContentCal')), 'month');
         await page.click('#section-cafe-content .cc-view [data-view="list"]');
         assert.equal(await page.locator('.cc-grid').count(), 0, 'back to the list');
         // remove the planned idea so later steps see the same drafts as before
