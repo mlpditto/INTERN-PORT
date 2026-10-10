@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.149)</title>
+    <title>Nika Admin (V102.150)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -4853,16 +4853,12 @@
         }
         #dashboard-workspace { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:20px; align-items:start; }
         #dashboard-work, #dashboard-summary { min-width:0; }
-        #dashboard-summary #qcov-grid { grid-template-columns:minmax(0,1fr)!important; }
-        #dashboard-summary #quiz-coverage-panel { margin-top:0!important; }
         #dashboard-summary #line-usage-breakdown { margin-left:0!important; overflow-wrap:anywhere; }
         #board-group-tabs { flex-wrap:wrap; align-items:center; overflow-x:visible!important; }
         #board-group-tabs button { min-height:32px; padding:4px 10px; border:1px solid #c7d2fe; border-radius:10px; background:#eef2ff; color:#4338ca; cursor:pointer; }
         #board-group-tabs button:focus-visible { outline:2px solid #6366f1; outline-offset:2px; }
         #dashboard-work .kanban-board { grid-template-columns:repeat(2,minmax(0,1fr)); min-height:0!important; }
         #dashboard-work .kanban-board.cols-1 { grid-template-columns:minmax(0,1fr); }
-        #dashboard-summary .qcov-extra { display:none!important; }
-        #dashboard-summary.qcov-expanded .qcov-extra { display:flex!important; }
         @media(max-width:900px) {
             #dashboard-workspace { grid-template-columns:minmax(0,1fr); }
             #dashboard-work .kanban-board { grid-template-columns:minmax(0,1fr); }
@@ -7551,21 +7547,7 @@
                 </div>
             </div>
                 </div>
-                <aside id="dashboard-summary" aria-label="Quiz coverage and LINE usage">
-
-                    <!-- V95.22: Quiz coverage by disease system (CASE_SYSTEMS). Display-only —
-                         counts quizzesData tags matched against the 12 systems + Uncategorized,
-                         and highlights coverage gaps (systems with 0 quizzes). lang-no-toggle so
-                         the Thai gap labels survive admin's EN-default lang toggle. -->
-                    <details id="quiz-coverage-panel" class="lang-no-toggle" open style="margin-top:10px; border:1px solid #e2e8f0; border-radius:12px; background:#fff;">
-                        <summary style="padding:10px 14px; cursor:pointer; font-weight:700; color:var(--primary); list-style:none; display:flex; align-items:center; gap:8px;">
-                            <i class="fa-solid fa-notes-medical"></i> Quiz Coverage by System
-                            <span id="qcov-summary" style="font-size:0.78em; font-weight:600; color:#64748b; margin-left:auto;"></span>
-                        </summary>
-                        <button type="button" id="qcov-expand" onclick="toggleQuizCoverageSummary()" aria-expanded="false" style="margin:8px 14px; width:auto; padding:6px 10px;">Show all systems</button>
-                        <div id="qcov-grid" style="padding:12px 14px; border-top:1px solid #eef2ff; display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:8px;"></div>
-                    </details>
-
+                <aside id="dashboard-summary" aria-label="LINE usage">
 
                     <!-- V97.53: LINE push quota for the current Bangkok month, read from
                          line_usage/{YYYY-MM} (written by pushLineFlex via the Admin SDK).
@@ -7688,6 +7670,17 @@
                     </div>
 
                 </div>
+
+                <!-- V102.150: Quiz Coverage by System moved here from the Dashboard sidebar (same ids, same renderQuizCoverage).
+                     Counts quizzesData tags matched against the disease systems + Uncategorized and highlights gaps (0 quizzes);
+                     tap a card to list its quizzes, tap Uncategorized to assign. lang-no-toggle so the Thai gap labels survive the EN-default toggle. -->
+                <details id="quiz-coverage-panel" class="lang-no-toggle" open style="margin-bottom:18px; border:1px solid #bbdefb; border-radius:14px; background:#fff; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                    <summary style="padding:12px 16px; cursor:pointer; font-weight:700; color:var(--primary); list-style:none; display:flex; align-items:center; gap:8px;">
+                        <i class="fa-solid fa-notes-medical"></i> Quiz Coverage by System
+                        <span id="qcov-summary" style="font-size:0.78em; font-weight:600; color:#64748b; margin-left:auto;"></span>
+                    </summary>
+                    <div id="qcov-grid" style="padding:12px 16px 14px; border-top:1px solid #eef2ff; display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:8px;"></div>
+                </details>
 
                 <!-- V93.27 PR #13 Phase 4A+4B+4C: global toolbar above both Active+Inactive lists.
                      Search box was moved here from the inactive wrapper so it filters BOTH lists.
@@ -35016,14 +35009,6 @@ RULES:
                 }
             };
 
-            window.toggleQuizCoverageSummary = function () {
-                const panel = document.getElementById('dashboard-summary');
-                const expanded = panel.classList.toggle('qcov-expanded');
-                const button = document.getElementById('qcov-expand');
-                button.setAttribute('aria-expanded', String(expanded));
-                button.textContent = expanded ? 'Show fewer systems' : 'Show all systems';
-            };
-
             window.renderQuizCoverage = function () {
                 const grid = document.getElementById('qcov-grid');
                 if (!grid) return;
@@ -35038,7 +35023,7 @@ RULES:
                     const n = counts[s.key];
                     const isGap = n === 0;
                     const clickable = n > 0;
-                    return `<div class="${index >= 3 ? 'qcov-extra' : ''}" ${clickable ? `onclick="window.openQuizCoverageList('${s.key}')"` : ''} style="display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid ${isGap ? '#fecaca' : '#e2e8f0'}; border-radius:10px; background:${isGap ? '#fef2f2' : '#f8fafc'}; ${clickable ? 'cursor:pointer;' : ''}" ${clickable ? `onmouseover="this.style.background='#eef2ff'" onmouseout="this.style.background='#f8fafc'"` : ''}>
+                    return `<div ${clickable ? `onclick="window.openQuizCoverageList('${s.key}')"` : ''} style="display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid ${isGap ? '#fecaca' : '#e2e8f0'}; border-radius:10px; background:${isGap ? '#fef2f2' : '#f8fafc'}; ${clickable ? 'cursor:pointer;' : ''}" ${clickable ? `onmouseover="this.style.background='#eef2ff'" onmouseout="this.style.background='#f8fafc'"` : ''}>
                         <span style="font-size:1.1em;">${s.emoji}</span>
                         <div style="flex:1; min-width:0;">
                             <div style="font-size:0.8em; font-weight:700; color:#334155; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(s.label.en)}</div>
