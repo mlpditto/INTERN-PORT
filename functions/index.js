@@ -321,7 +321,7 @@ const REGION = "us-central1"; // Primary for Imagen
 // V101.60: the model a `gemini` provider request resolves to — moved out of the Vertex branch so
 // callAIProxy can decide the route before reaching it. Legacy aliases map to current Flash ids.
 function resolveGoogleGeminiModel(model) {
-    let actualModelName = model || "gemini-3.5-flash";
+    let actualModelName = model || "gemini-3.6-flash";
 
     // V93.95: Normalize only legacy/alias model names; pass current ids straight
     //   through. The previous block (V89.90) rewrote EVERY `gemini-*` request to a
@@ -345,7 +345,7 @@ function resolveGoogleGeminiModel(model) {
         || reqModel.includes('1.5')
         || reqModel.includes('2.0');
     if (isLegacyAlias) {
-        actualModelName = reqModel.includes('pro') ? "gemini-3.6-flash" : "gemini-3.5-flash";
+        actualModelName = "gemini-3.6-flash";   // V102.151: Flash and Pro aliases both land on 3.6 (Google retired 3.5 Flash and redirects it to 3.6 Flash, 2026-10-10)
     }
     // V94.16 HOTFIX: Vertex AI in this project's region does not currently
     //   host the Gemini 3.x family — proxy calls just hang because axios has
@@ -774,8 +774,9 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
         // V100.51: accept stale clients without calling retired Google models.
         if (provider === "gemini" || provider === "gemini-aistudio") {
             const googleModelAliases = {
-                'gemini-2.5-flash': 'gemini-3.5-flash',
-                'gemini-2.5-flash-lite': 'gemini-3.5-flash',
+                'gemini-2.5-flash': 'gemini-3.6-flash',
+                'gemini-3.5-flash': 'gemini-3.6-flash',
+                'gemini-2.5-flash-lite': 'gemini-3.6-flash',
                 'gemini-2.5-flash-image': 'gemini-3.1-flash-image',
                 'gemini-2.5-flash-image-preview': 'gemini-3.1-flash-image',
                 'gemini-3.1-flash-image-preview': 'gemini-3.1-flash-image'
