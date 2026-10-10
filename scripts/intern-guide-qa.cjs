@@ -35,6 +35,14 @@ const gfAdmin = fs.readFileSync('public/guide-feedback-admin.js', 'utf8');
 assert.ok(/match \/admin_notifications\/\{docId\}[\s\S]*?allow create: if isSignedIn\(\) && \(request\.resource\.data\.get\('type', ''\) != 'journal_feedback'/.test(rules), 'rules let a signed-in intern create a non-journal admin_notifications doc (guide_feedback needs no rules deploy)');
 assert.ok(js.includes("type: 'guide_feedback'") && gfAdmin.includes("'type', '==', 'guide_feedback'"), 'intern writes and admin reads the same type');
 assert.ok(/<script src="guide-feedback-admin\.js\?v=V\d+\.\d+"><\/script>/.test(adminHtml), 'admin.html loads guide-feedback-admin.js');
+// The Points / Beri numbers the guide prints are the ones the code really uses (a changed constant must fail here, not silently mislead interns).
+for (const t of ['CHECKIN_DAILY_AMOUNT = 0.01', 'CHECKIN_STREAK_BONUS_AMOUNT = 0.05', 'CHECKIN_STREAK_BONUS_EVERY = 7', 'MORNING_QUIZ_BONUS_AMOUNT = 0.1', 'CASE_SUBMIT_AUTO_BONUS = 0.1', 'BERI_SHOP_UNLOCK_THRESHOLD = 500', "tryDailyCheckin('open')", 'minutes >= (8 * 60) && minutes < (12 * 60)', "if (score >= 10) return 'LV.2", "if (score >= 90) return 'LV.10"])
+    assert.ok(admin.includes(t), 'index.html still has: ' + t);
+for (const t of ['QUIZ_EARLYBIRD_BERI_DEFAULT = 10', 'QUIZ_DEADLINE_BERI_DEFAULT = 5', '[1, 0.6, 0.4]', 'hoursEarly >= 48', 'hoursEarly >= 24', 'hoursEarly >= 6', 'dbMax * 0.6', 'dbMax * 0.2'])
+    assert.ok(adminHtml.includes(t), 'admin.html still has: ' + t);
+for (const t of ['+0.01', '+0.05', '+0.1', '08:00–12:00', 'LV.2 at 10', 'LV.10 at 90', '10 · 6 · 4', '5 · 3 · 1', '500 Beri', 'automatic', 'Murthehelp']) assert.ok(mdEn.includes(t), 'EN guide says: ' + t);
+for (const t of ['+0.01', '+0.05', '+0.1', '08:00–12:00', 'LV.2 ที่ 10', 'LV.10 ที่ 90', '10 · 6 · 4', '5 · 3 · 1', 'เกิน 500', 'อัตโนมัติ', 'Murthehelp']) assert.ok(md.includes(t), 'TH guide says: ' + t);
+assert.ok(!/Tap the \*\*Daily check-in\*\* card/.test(mdEn), 'guide no longer tells interns to tap the check-in card');
 const sections = md.split(/\r?\n/).filter(l => /^## /.test(l));
 assert.ok(sections.length >= 5, 'guide has sections: ' + sections.length);
 const sectionsEn = mdEn.split(/\r?\n/).filter(l => /^## /.test(l));
