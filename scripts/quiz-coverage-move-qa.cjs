@@ -42,6 +42,7 @@ const panel = html.slice(panelAt, html.indexOf('</details>', panelAt) + '</detai
             'window._qcovSystems = [{ key: "heme", emoji: "🩸", label: { en: "Heme/Immune" } }, { key: "renal", emoji: "💧", label: { en: "Renal/Urinary" } }, { key: "ent", emoji: "👂", label: { en: "ENT" } }, { key: "gi", emoji: "🍽️", label: { en: "GI" } }, { key: "other", emoji: "📦", label: { en: "Other" } }];',
             'window.computeQuizCoverageBuckets = function () { return { heme: [1], renal: [1, 2], ent: [1, 2, 3], gi: [], other: [], __uncat: [1] }; };',
             'window.openQuizCoverageList = function (k) { window.__opened = k; };',
+            'window.setQuizSystemFilter = function (k) { window.__filtered = k; };',   // V102.152: a system card filters the list (quiz-engine-pager-filter-qa.cjs covers that)
             render
         ].join(String.fromCharCode(10)) });
         await page.evaluate(() => window.renderQuizCoverage());
@@ -55,15 +56,15 @@ const panel = html.slice(panelAt, html.indexOf('</details>', panelAt) + '</detai
         const gap = await page.$eval('#qcov-grid > div', e => getComputedStyle(e).borderTopColor);
         assert.notEqual(gap, await page.$eval('#qcov-grid > div:nth-child(5)', e => getComputedStyle(e).borderTopColor), 'a gap card is coloured differently');
         await page.click('#qcov-grid > div:nth-child(5)');
-        assert.equal(await page.evaluate(() => window.__opened), 'ent', 'a card with quizzes still opens its list');
+        assert.equal(await page.evaluate(() => window.__filtered), 'ent', 'a card with quizzes filters the list (V102.152; it used to open the modal)');
         await page.click('#qcov-grid > div:nth-child(1)');
-        assert.equal(await page.evaluate(() => window.__opened), 'ent', 'a gap card (0 quizzes) is not clickable');
+        assert.equal(await page.evaluate(() => window.__filtered), 'ent', 'a gap card (0 quizzes) is not clickable');
         await page.click('#qcov-grid > div:last-child');
         assert.equal(await page.evaluate(() => window.__opened), '__uncat', 'Uncategorized opens its list to assign');
         // columns adapt to the width (it used to be a fixed 4)
         const cols = w => page.setViewportSize({ width: w, height: 700 }).then(() => page.$eval('#qcov-grid', g => getComputedStyle(g).gridTemplateColumns.split(' ').length));
         assert.ok((await cols(1000)) >= 4 && (await cols(360)) <= 2, 'responsive columns');
         assert.deepEqual(errs, [], 'no page errors');
-        console.log('PASS: Quiz Coverage lives in Assignments ▸ Quiz Engine — all systems visible, gaps first, Uncategorized + summary, cards open their list; gone from the Dashboard sidebar');
+        console.log('PASS: Quiz Coverage lives in Assignments ▸ Quiz Engine — all systems visible, gaps first, Uncategorized + summary, cards filter the list; gone from the Dashboard sidebar');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.151)</title>
+    <title>Nika Admin (V102.152)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -7752,6 +7752,8 @@
                     </div>
                 </div>
 
+                <!-- V102.152: the Coverage-by-System chip that is filtering the lists below (display:none when none) -->
+                <div id="quiz-system-filter-bar" style="display:none; align-items:center; gap:10px; margin:0 0 12px; padding:8px 14px; border-radius:10px; background:#eef2ff; border:1px solid #c7d2fe; font-size:0.88em;"></div>
                 <!-- Active Quizzes -->
                 <h4 id="section-active-quizzes" style="color:#0d47a1; margin-bottom:10px;">🟢 Active Quizzes</h4>
                 <div
@@ -32200,6 +32202,8 @@ ${JSON.stringify(sourceObj)}`;
             const searchVal = (document.getElementById('quiz-search-global') ? document.getElementById('quiz-search-global').value : "").toLowerCase();
             const allTags = new Set();
             const styleCounts = { __none: 0 }; // V101.76: over ALL quizzes, like the tag chips
+            // V102.152: a Coverage-by-System chip filters both lists to that system's quizzes (the same buckets the chip counts come from).
+            const sysIds = window.quizSystemIds();
 
             const matchesSearch = (q) => {
                 if (!searchVal) return true;
@@ -32223,6 +32227,7 @@ ${JSON.stringify(sourceObj)}`;
                 if (!quizMatchesFilter(q)) return;
                 if (!matchesSearch(q)) return;
                 if (window.currentQuizStyle && (q.examStyle || '__none') !== window.currentQuizStyle) return; // V101.76
+                if (sysIds && !sysIds.has(q.id)) return; // V102.152
 
                 if (isActuallyActive) {
                     activeList.push(q);
@@ -32504,6 +32509,7 @@ ${JSON.stringify(sourceObj)}`;
 
             const activeCount = activeList.length;
             const inactiveCount = sortedInactive.length;
+            if (window.renderQuizSystemFilterBar) window.renderQuizSystemFilterBar(activeCount + inactiveCount);
             const templateCount = quizzesData.filter(q => q.isTemplate).length;
             
             if(document.getElementById('stat-active-count')) document.getElementById('stat-active-count').innerText = activeCount;
@@ -32559,11 +32565,7 @@ ${JSON.stringify(sourceObj)}`;
             // Update Pagination Controls
             const paginContainer = document.querySelector("#inactive-quiz-pagination");
             if (paginContainer) {
-                paginContainer.innerHTML = `
-                    <button class="btn-sm btn-dark" ${inactiveQuizPage === 1 ? 'disabled' : ''} onclick="changeInactiveQuizPage(-1)">Prev</button>
-                    <span style="font-weight:bold; font-size:0.9em; margin:0 10px;">Page ${inactiveQuizPage} / ${totalInactivePages || 1}</span>
-                    <button class="btn-sm btn-dark" ${inactiveQuizPage >= totalInactivePages ? 'disabled' : ''} onclick="changeInactiveQuizPage(1)">Next</button>
-                `;
+                paginContainer.innerHTML = quizPagerHtml(inactiveQuizPage, totalInactivePages, sortedInactive.length, INACTIVE_QUIZ_PER_PAGE); // V102.152: numbered pages + "from–to of N"
             }
             if (typeof loadQuizFeedbackBadges === 'function') loadQuizFeedbackBadges();
         }
@@ -32571,6 +32573,23 @@ ${JSON.stringify(sourceObj)}`;
         function changeInactiveQuizPage(dir) {
             inactiveQuizPage += dir;
             renderQuizzes();
+        }
+        function goInactiveQuizPage(n) {
+            inactiveQuizPage = n;
+            renderQuizzes();
+        }
+        // V102.152: 1 … 6 7 8 … 16 — first, last and the page you are on with its neighbours; the counter says where you are in the whole list.
+        function quizPagerHtml(page, total, count, size) {
+            const nums = [];
+            for (let n = 1; n <= total; n++) if (n === 1 || n === total || Math.abs(n - page) <= 1) nums.push(n);
+            const items = [];
+            nums.forEach((n, i) => { if (i && n - nums[i - 1] > 1) items.push('…'); items.push(n); });
+            const btn = (label, cur, dis, go) => `<button class="btn-sm ${cur ? 'btn-primary' : 'btn-dark'}" ${dis ? 'disabled' : ''} ${cur ? 'aria-current="page"' : ''} style="min-width:34px; justify-content:center;" onclick="${go}">${label}</button>`;
+            const from = count ? (page - 1) * size + 1 : 0, to = Math.min(count, page * size);
+            return `<span style="font-size:0.8em; color:#64748b; margin-right:8px;">${from}–${to} of ${count}</span>`
+                + btn('‹', false, page <= 1, 'changeInactiveQuizPage(-1)')
+                + items.map(n => n === '…' ? '<span style="color:#94a3b8;">…</span>' : btn(n, n === page, false, `goInactiveQuizPage(${n})`)).join('')
+                + btn('›', false, page >= total, 'changeInactiveQuizPage(1)');
         }
 
         // V97.72: Quality Audit badge for the quiz rows. Reads quizzes/{id}.lastAiAudit,
@@ -32705,6 +32724,32 @@ ${JSON.stringify(sourceObj)}`;
         }
 
         // V101.76: exam style filter — '' = all, '__none' = unlabelled, else a style key.
+        // V102.152: Coverage-by-System chip filter — '' = none, a system key. Tapping the same chip again clears it.
+        window.currentQuizSystem = window.currentQuizSystem || '';
+        window.setQuizSystemFilter = function (key) {
+            window.currentQuizSystem = (!key || window.currentQuizSystem === key) ? '' : key;
+            inactiveQuizPage = 1;
+            renderQuizzes();
+            if (window.renderQuizCoverage) window.renderQuizCoverage();
+        };
+        // The ids of the quizzes in the chosen system, or null when no system is chosen (renderQuizzesNow skips every quiz outside the set).
+        window.quizSystemIds = function () {
+            const key = window.currentQuizSystem;
+            if (!key) return null;
+            const buckets = (window.computeQuizCoverageBuckets && window.computeQuizCoverageBuckets()) || {};
+            return new Set((buckets[key] || []).map(x => x.id));
+        };
+        window.renderQuizSystemFilterBar = function (count) {
+            const bar = document.getElementById('quiz-system-filter-bar');
+            if (!bar) return;
+            const key = window.currentQuizSystem;
+            if (!key) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
+            const sys = (window._qcovSystems || []).find(x => x.key === key);
+            bar.innerHTML = `<b style="color:var(--primary);">${sys ? escapeHtml(sys.emoji + ' ' + sys.label.en) : escapeHtml(key)}</b><span style="color:#64748b;">${count} ${count === 1 ? 'quiz' : 'quizzes'}</span>`
+                + `<span style="margin-left:auto; display:flex; gap:14px; align-items:center;"><a href="#" onclick="window.openQuizCoverageList('${key}'); return false;" style="color:var(--primary); font-weight:700; text-decoration:none;">Manage categories…</a>`
+                + `<button type="button" onclick="window.setQuizSystemFilter('')" aria-label="Clear filter" style="border:none; background:transparent; color:#64748b; font-size:1.3em; line-height:1; cursor:pointer; padding:0 2px;">&times;</button></span>`;
+            bar.style.display = 'flex';
+        };
         window.currentQuizStyle = window.currentQuizStyle || '';
         window.setQuizStyleFilter = function (key) {
             window.currentQuizStyle = key || '';
@@ -35024,7 +35069,8 @@ RULES:
                     const n = counts[s.key];
                     const isGap = n === 0;
                     const clickable = n > 0;
-                    return `<div ${clickable ? `onclick="window.openQuizCoverageList('${s.key}')"` : ''} style="display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid ${isGap ? '#fecaca' : '#e2e8f0'}; border-radius:10px; background:${isGap ? '#fef2f2' : '#f8fafc'}; ${clickable ? 'cursor:pointer;' : ''}" ${clickable ? `onmouseover="this.style.background='#eef2ff'" onmouseout="this.style.background='#f8fafc'"` : ''}>
+                    const sel = window.currentQuizSystem === s.key; // V102.152: the chip that filters the lists below
+                    return `<div ${clickable ? `onclick="window.setQuizSystemFilter('${s.key}')"` : ''} style="display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid ${sel ? 'var(--primary)' : (isGap ? '#fecaca' : '#e2e8f0')}; ${sel ? 'box-shadow:0 0 0 1px var(--primary);' : ''} border-radius:10px; background:${sel ? '#eef2ff' : (isGap ? '#fef2f2' : '#f8fafc')}; ${clickable ? 'cursor:pointer;' : ''}" ${clickable ? `onmouseover="this.style.background='#eef2ff'" onmouseout="this.style.background='${sel ? '#eef2ff' : '#f8fafc'}'"` : ''}>
                         <span style="font-size:1.1em;">${s.emoji}</span>
                         <div style="flex:1; min-width:0;">
                             <div style="font-size:0.8em; font-weight:700; color:#334155; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(s.label.en)}</div>
