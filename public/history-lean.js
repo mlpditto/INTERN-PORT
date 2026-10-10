@@ -44,6 +44,12 @@ window.historyLean = (() => {
             default: return s.title || 'Untitled';
         }
     }
+    // V101.84: a quiz that has a short title (admin Quiz editor → Short title) shows it; the full title is the hover / tapped-row text
+    function shortOf(s, ctx) {
+        if (s.submissionType !== 'quiz') return '';
+        const q = ctx.quizzes.get(s.quizId), st = q && String(q.shortTitle || '').trim();
+        return st && st !== titleOf(s) ? st : '';
+    }
     function leadHtml(s, ctx) {
         const type = s.submissionType, t = T[type] || { e: '📄' };
         if (type === 'quiz') {
@@ -134,10 +140,11 @@ window.historyLean = (() => {
         const extra = s.submissionType === 'quiz' && m.correctCount != null && m.totalQuestions ? ' · ' + (typeof formatQuizCount === 'function' ? formatQuizCount(m.correctCount) : m.correctCount) + '/' + m.totalQuestions : '';
         const mat = s.submissionType === 'quiz' ? matHtml(ctx, s, false) : '';
         const fresh = isRecentlyReviewed(s) ? '<i class="hl-new" title="New"></i>' : '';
+        const short = shortOf(s, ctx);
         return '<div class="unified-history-card hl-row" data-delete-item="' + esc(s.id) + '" data-delete-type="' + esc(s.submissionType) + '" onclick="toggleUnifiedCard(this, event)" ' +
             'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault(); toggleUnifiedCard(this, event);}" role="listitem" tabindex="0" aria-expanded="false">' +
             '<div class="hl-main">' + leadHtml(s, ctx) +
-            '<div class="hl-tx lang-no-toggle"><div class="hl-tt" title="' + esc(titleOf(s)) + '">' + esc(titleOf(s)) + fresh + '</div>' +
+            '<div class="hl-tx lang-no-toggle"><div class="hl-tt" title="' + esc(titleOf(s)) + '">' + (short ? '<span class="hl-st">' + esc(short) + '</span><span class="hl-ft">' + esc(titleOf(s)) + '</span>' : esc(titleOf(s))) + fresh + '</div>' +
             '<div class="hl-mt"><span>' + date + '</span><span class="hl-more-t"> · ' + time + extra + '</span>' + pillHtml(s) + '</div></div>' +
             mat + valuesHtml(s) + '</div>' +
             '<div class="card-detail" style="display:none">' + detailHtml(s, ctx) + '</div></div>';

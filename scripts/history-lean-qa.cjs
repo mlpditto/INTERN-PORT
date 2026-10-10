@@ -28,7 +28,7 @@ const UNIFIED_PAGE_SIZE = 10; let unifiedRenderedCount = 10, userId = 'u1';
 const day = 86400000, ago = d => ({ toMillis: () => Date.now() - d * day, toDate: () => new Date(Date.now() - d * day) });
 let reviewLinksCache = [{ id: 'L1', title: 'Khao Don', url: 'https://shop.example/khao', logoUrl: 'https://dl.example/khao.webp' }];
 let quizzesCache = [
-  { id: 'q1', title: 'Vitamin B', coverUrl: 'https://dl.example/c.webp', quizType: 'standard', materials: [{ name: 'Slides', url: 'https://example.com/a.pdf' }, { name: 'Bad', url: 'javascript:alert(1)' }] },
+  { id: 'q1', title: 'Vitamin B', shortTitle: 'Vit B', coverUrl: 'https://dl.example/c.webp', quizType: 'standard', materials: [{ name: 'Slides', url: 'https://example.com/a.pdf' }, { name: 'Bad', url: 'javascript:alert(1)' }] },
   { id: 'q2', title: 'Allergen', coverUrl: 'http://insecure.example/c.webp', quizType: 'standard', materials: [{ name: 'A', url: 'https://1drv.ms/x' }, { name: 'B', url: 'https://drive.google.com/y' }] },
   { id: 'q3', title: 'Practice', quizType: 'standard' }];
 let quizAttemptsCache = {
@@ -97,4 +97,12 @@ assert.doesNotMatch(out, /hl-loadmore/);
 run('for (let i = 0; i < 6; i++) unifiedSubmissionsCache.push({ id: "x" + i, submissionType: "work", title: "Extra " + i, score: 0, adminBonus: 0, status: "approved", timestamp: ago(90 + i), metadata: {} }); unifiedRenderedCount = 10;');
 run('window.historyLean.render(getUnifiedAllItems().sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()))');
 assert.match(ctx.__box.innerHTML, /class="hl-loadmore" onclick="loadMoreUnifiedHistory\(\)">6 more</);
-console.log('PASS: history-lean rows — case picture + nth, quiz cover/pt/Beri, files, link logo, pending only, escaping, more');
+// V101.84: a quiz with a short title shows it; the full title is the hover text and the tapped-row text. No short title (q2) = the full title only.
+run('window.historyLean.render(getUnifiedAllItems().sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()))');
+assert.match(row('q1_u1'), /<div class="hl-tt" title="Vitamin B"><span class="hl-st">Vit B<\/span><span class="hl-ft">Vitamin B<\/span>/);
+assert.match(row('q2_u1'), /<div class="hl-tt" title="Allergen">Allergen<\/div>/);
+assert.doesNotMatch(row('q2_u1'), /hl-st|hl-ft/);
+run("quizzesCache[0].shortTitle = 'Vitamin B'");   // same as the full title → no duplicate spans
+run('window.historyLean.render(getUnifiedAllItems().sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()))');
+assert.doesNotMatch(ctx.__box.innerHTML.split('data-delete-item="q1_u1"')[1].split('data-delete-item=')[0], /hl-st/);   // row() reads the first render, so slice the fresh one
+console.log('PASS: history-lean rows — case picture + nth, quiz cover/pt/Beri, files, link logo, pending only, escaping, more, quiz short title');
