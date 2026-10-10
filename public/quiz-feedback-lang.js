@@ -14,7 +14,7 @@
             chars: function (n) { return n + ' chars'; },
             skip: 'Skip', skipTitle: 'Skip feedback', submit: 'Submit →', submitTitle: 'Send feedback',
             rewardTitle: 'Thanks for your feedback!', rewardStreak: function (n) { return '🔥 You\'ve shared feedback ' + n + (n === 1 ? ' time' : ' times'); }, rewardKeep: 'Keep shaping the curriculum 🌱',
-            errPrefix: 'Feedback Error: ', already: 'You already gave feedback for this quiz — thank you 🙏', thanks: '🙏 Thanks for your feedback!'
+            aiHint: 'Suggested for you', errPrefix: 'Feedback Error: ', already: 'You already gave feedback for this quiz — thank you 🙏', thanks: '🙏 Thanks for your feedback!'
         },
         ko: {
             title: '이 퀴즈 어땠나요?', close: '닫기', lang: '언어', rateGroup: '0~10점 평가',
@@ -25,7 +25,7 @@
             chars: function (n) { return n + '자'; },
             skip: '건너뛰기', skipTitle: '피드백 건너뛰기', submit: '제출 →', submitTitle: '피드백 보내기',
             rewardTitle: '의견 감사합니다!', rewardStreak: function (n) { return '🔥 피드백을 ' + n + '회 남기셨어요'; }, rewardKeep: '커리큘럼 개선에 큰 힘이 됩니다 🌱',
-            errPrefix: '피드백 오류: ', already: '이미 이 퀴즈에 피드백을 남기셨어요 — 감사합니다 🙏', thanks: '🙏 의견 감사합니다!'
+            aiHint: '추천 주제', errPrefix: '피드백 오류: ', already: '이미 이 퀴즈에 피드백을 남기셨어요 — 감사합니다 🙏', thanks: '🙏 의견 감사합니다!'
         },
         th: {
             title: 'แบบทดสอบนี้ดีไหม?', close: 'ปิด', lang: 'ภาษา', rateGroup: 'ให้คะแนน 0 ถึง 10',
@@ -36,7 +36,7 @@
             chars: function (n) { return n + ' ตัวอักษร'; },
             skip: 'ข้าม', skipTitle: 'ข้ามการให้ข้อเสนอแนะ', submit: 'ส่ง →', submitTitle: 'ส่งข้อเสนอแนะ',
             rewardTitle: 'ขอบคุณสำหรับความเห็น!', rewardStreak: function (n) { return '🔥 ส่งความเห็นแล้ว ' + n + ' ครั้ง'; }, rewardKeep: 'ช่วยปรับหลักสูตรต่อไป 🌱',
-            errPrefix: 'ข้อผิดพลาด: ', already: 'คุณส่งความเห็นสำหรับแบบทดสอบนี้แล้ว ขอบคุณ 🙏', thanks: '🙏 ขอบคุณสำหรับความเห็น!'
+            aiHint: 'แนะนำสำหรับคุณ', errPrefix: 'ข้อผิดพลาด: ', already: 'คุณส่งความเห็นสำหรับแบบทดสอบนี้แล้ว ขอบคุณ 🙏', thanks: '🙏 ขอบคุณสำหรับความเห็น!'
         }
     };
     var chosen = null;   // null = follow the app language
@@ -85,8 +85,10 @@
     document.addEventListener('click', function (e) {
         var b = e.target.closest && e.target.closest('#quizFeedbackModal .fb-lang button');
         if (!b) return;
+        var before = current();
         chosen = b.dataset.l;
         apply();
+        if (current() !== before && window.fbAi) window.fbAi.start();   // V101.96: the AI topics follow the sheet's language
     });
     // Each open follows the app language again (the capsule is a one-off for that sheet).
     function reset() { chosen = null; apply(); }
