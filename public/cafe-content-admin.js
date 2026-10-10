@@ -1,5 +1,5 @@
 /* Admin ▸ Dashboard ▸ "📸 Content Creator": the Social media content the Content Creator division posted (intern cafe-content.js writes works with kind:'social').
-   Read-only: month filter, totals (posts · likes · reach · engagement), by platform, by member, and the posts newest first with their numbers.
+   Read-only: List (month filter, totals (posts · likes · reach · engagement), by platform, by member, and the posts newest first with their numbers) or Calendar (a month grid, a dot per post by platform; tap a day for its posts).
    Scoring stays in the existing Work queue (the intern card shows the score back). Same panel shape as guide-feedback-admin.js. */
 document.addEventListener('DOMContentLoaded', () => {
     const host = document.getElementById('dashboard-work');
@@ -11,7 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
     section.innerHTML = '<summary>📸 Content Creator</summary><div class="cca-body"></div><p role="status"></p>';
     host.prepend(section);
     const body = section.querySelector('.cca-body'), status = section.querySelector('p'), summary = section.querySelector('summary');
-    let unsubscribe, posts = [], range = 'month';
+    let unsubscribe, posts = [], range = 'month', view = 'list', calMonth = '', selDay = '';
+    const COLOR = { ig: '#e1306c', fb: '#1877f2', tt: '#111827', yt: '#ef4444', line: '#06c755' };
 
     const num = v => (v == null || v === '' || isNaN(Number(v))) ? null : Number(v);
     const fmt = n => n == null ? '—' : n >= 1000 ? (Math.round(n / 100) / 10) + 'k' : String(n);
@@ -37,18 +38,74 @@ document.addEventListener('DOMContentLoaded', () => {
         return t;
     }
 
+    function postRow(w) {
+        const row = el('div', null, 'padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:13px');
+        const head = el('div', null, 'color:#64748b;font-size:12px');
+        head.textContent = [PLAT[w.platform] || w.platform, TYPE[w.ctype] || w.ctype, w.postDate ? new Date(w.postDate + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '', w.displayName].filter(Boolean).join(' · ');
+        const cap = el('div', null, 'margin:2px 0;word-break:break-word');
+        if (/^https?:\/\//i.test(w.link || '')) { const a = el('a', w.caption || w.title || w.link); a.href = w.link; a.target = '_blank'; a.rel = 'noopener'; cap.append(a); } else cap.textContent = w.caption || w.title || '';
+        const nums = el('div', null, 'color:#475569;font-size:12px');
+        const l = num(w.metrics?.likes), r = num(w.metrics?.reach);
+        nums.textContent = '❤ ' + fmt(l) + ' · 👁 ' + fmt(r) + ' · ' + (reviewed(w) ? '✅ Reviewed' + (Number(w.score) ? ' +' + (Math.round(Number(w.score) * 100) / 100) : '') : '⏳ Pending (score it in the Work queue)');
+        row.append(head, cap, nums);
+        return row;
+    }
+
+    function monthShift(key, d) { return new Date(Date.UTC(+key.slice(0, 4), +key.slice(5, 7) - 1 + d, 1)).toISOString().slice(0, 7); }
+
+    function renderCal() {
+        if (!calMonth) calMonth = dayKey(new Date()).slice(0, 7);
+        const y = +calMonth.slice(0, 4), m = +calMonth.slice(5, 7), first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay(), days = new Date(Date.UTC(y, m, 0)).getUTCDate(), today = dayKey(new Date());
+        const byDay = {}; posts.forEach(w => { if (String(w.postDate || '').slice(0, 7) === calMonth) (byDay[w.postDate] = byDay[w.postDate] || []).push(w); });
+        const total = Object.values(byDay).reduce((a, l) => a + l.length, 0);
+        const nav = el('div', null, 'display:flex;align-items:center;justify-content:space-between;margin:4px 0 6px');
+        const mk = (label, d) => { const b = el('button', label, 'min-height:0;width:34px;padding:2px 0;font-size:16px'); b.type = 'button'; b.dataset.cal = String(d); b.onclick = () => { calMonth = monthShift(calMonth, d); selDay = ''; render(); }; return b; };
+        nav.append(mk('‹', -1), el('b', new Date(Date.UTC(y, m - 1, 15)).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' }) + ' · ' + total + (total === 1 ? ' post' : ' posts'), 'font-size:14px'), mk('›', 1));
+        body.append(nav);
+        const grid = el('div', null, 'display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin-bottom:8px');
+        ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].forEach(d => grid.append(el('span', d, 'text-align:center;font-size:11px;font-weight:700;color:#94a3b8')));
+        for (let i = 0; i < first; i++) grid.append(el('span'));
+        for (let d = 1; d <= days; d++) {
+            const key = calMonth + '-' + String(d).padStart(2, '0'), list = byDay[key] || [];
+            const b = el('button', null, 'min-height:0;height:48px;padding:3px 0 2px;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;background:' + (key === selDay ? '#fef3c7' : '#f8fafc') + ';border:1px solid ' + (key === selDay ? '#b45309' : key === today ? '#f59e0b' : 'transparent'));
+            b.type = 'button'; b.dataset.day = key; b.setAttribute('aria-label', key + (list.length ? ', ' + list.length + ' posts' : ''));
+            b.append(el('span', String(d), 'font-size:12px;font-weight:700;line-height:1.2'));
+            const dots = el('span', null, 'display:flex;gap:2px;align-items:center;min-height:10px');
+            list.slice(0, 3).forEach(w => dots.append(el('i', null, 'width:7px;height:7px;border-radius:50%;display:block;background:' + (COLOR[w.platform] || '#64748b'))));
+            if (list.length > 3) dots.append(el('small', '+' + (list.length - 3), 'font-size:10px;font-weight:700;color:#64748b'));
+            b.append(dots);
+            b.onclick = () => { selDay = selDay === key ? '' : key; render(); };
+            grid.append(b);
+        }
+        body.append(grid);
+        if (selDay && selDay.slice(0, 7) === calMonth) {
+            body.append(el('b', new Date(selDay + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }), 'font-size:12px;color:#64748b'));
+            const list = byDay[selDay] || [];
+            if (list.length) list.forEach(w => body.append(postRow(w))); else body.append(el('p', 'No posts on this day.'));
+        } else body.append(el('p', 'Tap a day to see its posts.', 'font-size:12px;color:#64748b'));
+    }
+
     function render() {
         body.replaceChildren();
         const list = posts.filter(inRange);
         summary.textContent = '📸 Content Creator' + (posts.length ? ' · ' + posts.length : '');
         const bar = el('div', null, 'display:flex;gap:6px;margin:6px 0 10px;flex-wrap:wrap');
-        [['month', 'This month'], ['last', 'Last month'], ['all', 'All']].forEach(([k, label]) => {
+        (view === 'list' ? [['month', 'This month'], ['last', 'Last month'], ['all', 'All']] : []).forEach(([k, label]) => {
             const b = el('button', label, 'min-height:0;padding:4px 12px;font-size:12px;' + (range === k ? 'background:#fef3c7;border-color:#f59e0b;color:#92400e;font-weight:700' : ''));
             b.type = 'button'; b.dataset.range = k; b.setAttribute('aria-pressed', String(range === k));
             b.onclick = () => { range = k; render(); };
             bar.append(b);
         });
+        const vbar = el('span', null, 'margin-left:auto;display:inline-flex;gap:6px');
+        [['list', 'List'], ['cal', 'Calendar']].forEach(([k, label]) => {
+            const b = el('button', label, 'min-height:0;padding:4px 12px;font-size:12px;' + (view === k ? 'background:#1e293b;border-color:#1e293b;color:#fff;font-weight:700' : ''));
+            b.type = 'button'; b.dataset.view = k; b.setAttribute('aria-pressed', String(view === k));
+            b.onclick = () => { view = k; render(); };
+            vbar.append(b);
+        });
+        bar.append(vbar);
         body.append(bar);
+        if (view === 'cal') { renderCal(); return; }
         if (!list.length) { body.append(el('p', posts.length ? 'No posts in this range.' : 'No content yet.')); return; }
 
         const likes = sum(list, 'likes'), reach = sum(list, 'reach');
@@ -74,18 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
         body.append(table(['Member', 'Posts', 'Likes', 'Reach', 'Reviewed'], by(w => w.userId, (k, ws) => ws[0].displayName || k).map(g => [g.label, g.ws.length, fmt(sum(g.ws, 'likes')), fmt(sum(g.ws, 'reach')), g.ws.filter(reviewed).length + '/' + g.ws.length])));
 
         body.append(el('b', 'Posts', 'font-size:12px;color:#64748b'));
-        list.slice(0, 100).forEach(w => {
-            const row = el('div', null, 'padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:13px');
-            const head = el('div', null, 'color:#64748b;font-size:12px');
-            head.textContent = [PLAT[w.platform] || w.platform, TYPE[w.ctype] || w.ctype, w.postDate ? new Date(w.postDate + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '', w.displayName].filter(Boolean).join(' · ');
-            const cap = el('div', null, 'margin:2px 0;word-break:break-word');
-            if (/^https?:\/\//i.test(w.link || '')) { const a = el('a', w.caption || w.title || w.link); a.href = w.link; a.target = '_blank'; a.rel = 'noopener'; cap.append(a); } else cap.textContent = w.caption || w.title || '';
-            const nums = el('div', null, 'color:#475569;font-size:12px');
-            const l = num(w.metrics?.likes), r = num(w.metrics?.reach);
-            nums.textContent = '❤ ' + fmt(l) + ' · 👁 ' + fmt(r) + ' · ' + (reviewed(w) ? '✅ Reviewed' + (Number(w.score) ? ' +' + (Math.round(Number(w.score) * 100) / 100) : '') : '⏳ Pending (score it in the Work queue)');
-            row.append(head, cap, nums);
-            body.append(row);
-        });
+        list.slice(0, 100).forEach(w => body.append(postRow(w)));
         if (list.length > 100) body.append(el('p', 'Showing the newest 100 of ' + list.length + '.', 'font-size:12px;color:#64748b'));
     }
 
