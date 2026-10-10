@@ -20,14 +20,14 @@
     var STAGES = [['idea', 'Idea', 'ไอเดีย'], ['draft', 'Script', 'สคริปต์'], ['film', 'Filming', 'ถ่ายทำ'], ['edit', 'Editing', 'ตัดต่อ'], ['sched', 'Scheduled', 'ตั้งโพสต์']];
     var STAGE_IDS = STAGES.map(function (s) { return s[0]; });
     var T = {
-        en: { review: 'Review', revTodo: 'To review', revMine: 'Reviewed by me', revEmpty: 'Nothing is waiting for review.', revMineEmpty: 'You have not reviewed anything yet.', revOpen: 'Review', revTitle: 'Review content', revVerdict: 'Verdict', revOk: 'Looks good', revFix: 'Needs changes', revScore: 'Suggested bonus (pts)', revComment: 'Comment', revCommentPh: 'What did you check? What should change?', revSend: 'Send to admin', revHint: 'Your review is a recommendation — the admin gives the final score.', revNeedVerdict: 'Choose a verdict first.', revNeedScore: 'Pick a suggested bonus.', revNeedComment: 'Say what needs to change.', revSent: 'Review sent', revYou: 'You suggested', title: 'Content', viewAs: 'View as', modeIntern: 'Intern', modeContent: 'Content', viewList: 'List view', viewMonth: 'Month view', viewBoard: 'Board view', brief: 'Brief / script', briefPh: 'Outline, hook, script, shot list…', steps: 'Checklist', stepPh: 'Add a step', stepAdd: 'Add', stepTpl: 'Use standard steps', links: 'Links (Drive, footage, thumbnail…)', badLink: 'Links must start with http:// or https://', tooMany: 'Up to 15 steps and 5 links.', movePrev: 'Move back a step', moveNext: 'Move to the next step', planDay: 'Plan', emptyDay: 'Nothing on this day yet.', pickDay: 'Tap a day to see or plan content.', plan: 'Due date (optional)', ideas: 'Ideas', drafts: 'Drafts', posted: 'Posted', platforms: 'Platforms', reviewed: 'Reviewed', pending: 'Pending review', add: 'New content', addNum: 'Add numbers',
+        en: { review: 'Review', revTodo: 'To review', revMine: 'Reviewed by me', revEmpty: 'Nothing is waiting for review.', revMineEmpty: 'You have not reviewed anything yet.', revOpen: 'Review', revTitle: 'Review content', revVerdict: 'Verdict', revOk: 'Looks good', revFix: 'Needs changes', revScore: 'Suggested bonus (pts)', revComment: 'Comment', revCommentPh: 'What did you check? What should change?', revSend: 'Send to admin', revHint: 'Your review is a recommendation — the admin gives the final score.', revNeedVerdict: 'Choose a verdict first.', revNeedScore: 'Pick a suggested bonus.', revNeedComment: 'Say what needs to change.', revSent: 'Review sent', revYou: 'You suggested', title: 'Content', viewAs: 'View as', modeIntern: 'Intern', modeContent: 'Content', viewList: 'List view', viewMonth: 'Calendar view', calMonth: 'Month', calWeek: 'Week', calDay: 'Day', viewBoard: 'Board view', brief: 'Brief / script', briefPh: 'Outline, hook, script, shot list…', steps: 'Checklist', stepPh: 'Add a step', stepAdd: 'Add', stepTpl: 'Use standard steps', links: 'Links (Drive, footage, thumbnail…)', badLink: 'Links must start with http:// or https://', tooMany: 'Up to 15 steps and 5 links.', movePrev: 'Move back a step', moveNext: 'Move to the next step', planDay: 'Plan', emptyDay: 'Nothing on this day yet.', pickDay: 'Tap a day to see or plan content.', plan: 'Due date (optional)', ideas: 'Ideas', drafts: 'Drafts', posted: 'Posted', platforms: 'Platforms', reviewed: 'Reviewed', pending: 'Pending review', add: 'New content', addNum: 'Add numbers',
             emptyIdeas: 'No ideas yet. Jot one down before you forget it.', emptyDrafts: 'No drafts yet.', emptyPosted: 'Nothing posted yet. Share your first piece.',
             sheet: 'Submit content', edit: 'Edit content', stage: 'Stage', platform: 'Platform', type: 'Type', caption: 'Caption or idea', capPh: 'What is this content about?',
             images: 'Images', addImg: 'Add', link: 'Post link', date: 'Post date', send: 'Send for review', save: 'Save', saving: 'Saving…', other: 'Case, Work, Event… (other submissions)', del: 'Delete this draft', delAsk: 'Delete this draft?',
             hintPosted: 'Posted content is reviewed by the admin. Add numbers later from the card.', hintLocal: 'Saved for you only until you mark it Posted.',
             needCap: 'Write a caption or idea first.', needLink: 'Paste the post link (starting with http).', needDate: 'Pick the post date.', full: 'You already have 30 saved. Delete one first.', fail: 'Could not save. Please try again.', noimg: 'That image could not be read.',
             numTitle: 'Add numbers', likes: 'Likes', reach: 'Reach', numHint: 'Update any time — the latest numbers are what the admin sees.', saveNum: 'Save numbers', badNum: 'Enter whole numbers, zero or more.', likeReach: 'Likes cannot be higher than reach.', savedNum: 'Saved.', sentToast: 'Sent for review', savedToast: 'Saved' },
-        th: { review: 'ตรวจงาน', revTodo: 'รอตรวจ', revMine: 'ที่ฉันตรวจแล้ว', revEmpty: 'ยังไม่มีงานรอตรวจ', revMineEmpty: 'ยังไม่ได้ตรวจงานชิ้นไหน', revOpen: 'ตรวจ', revTitle: 'ตรวจคอนเทนต์', revVerdict: 'ผลตรวจ', revOk: 'ผ่าน', revFix: 'ต้องแก้', revScore: 'โบนัสที่แนะนำ (pts)', revComment: 'ความเห็น', revCommentPh: 'ตรวจอะไรไปบ้าง ต้องแก้ตรงไหน', revSend: 'ส่งให้แอดมิน', revHint: 'ผลตรวจของคุณเป็นข้อเสนอ แอดมินเป็นคนให้คะแนนจริง', revNeedVerdict: 'เลือกผลตรวจก่อน', revNeedScore: 'เลือกโบนัสที่แนะนำ', revNeedComment: 'บอกหน่อยว่าต้องแก้อะไร', revSent: 'ส่งผลตรวจแล้ว', revYou: 'คุณแนะนำ', title: 'คอนเทนต์', viewAs: 'มุมมอง', modeIntern: 'Intern', modeContent: 'คอนเทนต์', viewList: 'มุมมองรายการ', viewMonth: 'มุมมองปฏิทิน', viewBoard: 'มุมมองบอร์ด', brief: 'บรีฟ / สคริปต์', briefPh: 'โครงเรื่อง ฮุค สคริปต์ รายการช็อต…', steps: 'เช็กลิสต์', stepPh: 'เพิ่มขั้นตอน', stepAdd: 'เพิ่ม', stepTpl: 'ใช้ขั้นตอนมาตรฐาน', links: 'ลิงก์ (Drive ฟุตเทจ ภาพปก…)', badLink: 'ลิงก์ต้องขึ้นต้นด้วย http:// หรือ https://', tooMany: 'ได้สูงสุด 15 ขั้นตอนและ 5 ลิงก์', movePrev: 'ย้อนกลับหนึ่งขั้น', moveNext: 'ไปขั้นถัดไป', planDay: 'วางแผน', emptyDay: 'วันนี้ยังไม่มีอะไร', pickDay: 'แตะวันที่เพื่อดูหรือวางแผนคอนเทนต์', plan: 'กำหนดส่ง (ไม่บังคับ)', ideas: 'ไอเดีย', drafts: 'ฉบับร่าง', posted: 'โพสต์แล้ว', platforms: 'แพลตฟอร์ม', reviewed: 'ตรวจแล้ว', pending: 'รอตรวจ', add: 'เพิ่มคอนเทนต์', addNum: 'เพิ่มตัวเลข',
+        th: { review: 'ตรวจงาน', revTodo: 'รอตรวจ', revMine: 'ที่ฉันตรวจแล้ว', revEmpty: 'ยังไม่มีงานรอตรวจ', revMineEmpty: 'ยังไม่ได้ตรวจงานชิ้นไหน', revOpen: 'ตรวจ', revTitle: 'ตรวจคอนเทนต์', revVerdict: 'ผลตรวจ', revOk: 'ผ่าน', revFix: 'ต้องแก้', revScore: 'โบนัสที่แนะนำ (pts)', revComment: 'ความเห็น', revCommentPh: 'ตรวจอะไรไปบ้าง ต้องแก้ตรงไหน', revSend: 'ส่งให้แอดมิน', revHint: 'ผลตรวจของคุณเป็นข้อเสนอ แอดมินเป็นคนให้คะแนนจริง', revNeedVerdict: 'เลือกผลตรวจก่อน', revNeedScore: 'เลือกโบนัสที่แนะนำ', revNeedComment: 'บอกหน่อยว่าต้องแก้อะไร', revSent: 'ส่งผลตรวจแล้ว', revYou: 'คุณแนะนำ', title: 'คอนเทนต์', viewAs: 'มุมมอง', modeIntern: 'Intern', modeContent: 'คอนเทนต์', viewList: 'มุมมองรายการ', viewMonth: 'มุมมองปฏิทิน', calMonth: 'เดือน', calWeek: 'สัปดาห์', calDay: 'วัน', viewBoard: 'มุมมองบอร์ด', brief: 'บรีฟ / สคริปต์', briefPh: 'โครงเรื่อง ฮุค สคริปต์ รายการช็อต…', steps: 'เช็กลิสต์', stepPh: 'เพิ่มขั้นตอน', stepAdd: 'เพิ่ม', stepTpl: 'ใช้ขั้นตอนมาตรฐาน', links: 'ลิงก์ (Drive ฟุตเทจ ภาพปก…)', badLink: 'ลิงก์ต้องขึ้นต้นด้วย http:// หรือ https://', tooMany: 'ได้สูงสุด 15 ขั้นตอนและ 5 ลิงก์', movePrev: 'ย้อนกลับหนึ่งขั้น', moveNext: 'ไปขั้นถัดไป', planDay: 'วางแผน', emptyDay: 'วันนี้ยังไม่มีอะไร', pickDay: 'แตะวันที่เพื่อดูหรือวางแผนคอนเทนต์', plan: 'กำหนดส่ง (ไม่บังคับ)', ideas: 'ไอเดีย', drafts: 'ฉบับร่าง', posted: 'โพสต์แล้ว', platforms: 'แพลตฟอร์ม', reviewed: 'ตรวจแล้ว', pending: 'รอตรวจ', add: 'เพิ่มคอนเทนต์', addNum: 'เพิ่มตัวเลข',
             emptyIdeas: 'ยังไม่มีไอเดีย จดไว้ก่อนลืมนะ', emptyDrafts: 'ยังไม่มีฉบับร่าง', emptyPosted: 'ยังไม่มีงานที่โพสต์ ลองส่งชิ้นแรกดู',
             sheet: 'ส่งคอนเทนต์', edit: 'แก้คอนเทนต์', stage: 'ขั้นตอน', platform: 'แพลตฟอร์ม', type: 'ประเภท', caption: 'แคปชั่นหรือไอเดีย', capPh: 'คอนเทนต์นี้เกี่ยวกับอะไร',
             images: 'รูปภาพ', addImg: 'เพิ่ม', link: 'ลิงก์โพสต์', date: 'วันที่โพสต์', send: 'ส่งให้ตรวจ', save: 'บันทึก', saving: 'กำลังบันทึก…', other: 'Case, Work, Event… (งานประเภทอื่น)', del: 'ลบฉบับร่างนี้', delAsk: 'ลบฉบับร่างนี้ใช่ไหม',
@@ -96,7 +96,9 @@
     var PLAT_COLOR = { ig: '#e1306c', fb: '#1877f2', tt: '#111827', yt: '#ef4444', line: '#06c755' };
     var WEEK = { en: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'], th: ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'] };
     var view = (function () { try { var v = localStorage.getItem('cafeContentView'); return v === 'month' || v === 'board' ? v : 'list'; } catch (_) { return 'list'; } })();
-    var viewMonth = '', selDay = '';
+    var viewMonth = '', selDay = '', anchor = '';
+    // The calendar view has three modes (Month grid, Week, Day); Week and Day are read around `anchor`.
+    var calMode = (function () { try { var v = localStorage.getItem('cafeContentCal'); return v === 'week' || v === 'day' ? v : 'month'; } catch (_) { return 'month'; } })();
     var allPosts = [], unsubAll = null, myReviews = {}, revFilter = 'todo';
     var REVIEWER_GROUPS = ['audit'];   // a group (primary or extra) named like this gets the Review view — a UI choice, not a permission
     function isReviewer() {
@@ -196,6 +198,28 @@
         }).join('') + '</div>' + (list.length ? list.map(function (w) { return reviewRow(w, t); }).join('') : '<div class="cc-empty">' + (revFilter === 'mine' ? t.revMineEmpty : t.revEmpty) + '</div>');
     }
 
+    function dateAdd(key, n) { var d = new Date(key + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+    function dayFull(key) { return new Date(key + 'T12:00:00Z').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }); }
+    function calRail(t) {
+        return '<div class="cc-rail" role="group">' + [['month', t.calMonth], ['week', t.calWeek], ['day', t.calDay]].map(function (c) {
+            return '<button type="button" class="cc-chip" data-cm="' + c[0] + '" aria-pressed="' + (calMode === c[0]) + '">' + c[1] + '</button>';
+        }).join('') + '</div>';
+    }
+    // Week (Sun–Sat, like the month grid) or a single Day: each day is a header with its own Plan button, then that day's posts and planned cards.
+    function rangeHtml(t, posted) {
+        if (!anchor) anchor = selDay || todayKey();
+        var one = calMode === 'day', start = one ? anchor : dateAdd(anchor, -new Date(anchor + 'T12:00:00Z').getUTCDay()), today = todayKey();
+        var h = '<div class="cc-calnav"><button type="button" class="cc-chip" data-wk="-1" aria-label="' + (one ? 'Previous day' : 'Previous week') + '">&lsaquo;</button><b>' + esc(one ? dayFull(start) : dayLabel(start) + ' – ' + dayLabel(dateAdd(start, 6))) +
+            '</b><button type="button" class="cc-chip" data-wk="1" aria-label="' + (one ? 'Next day' : 'Next week') + '">&rsaquo;</button></div>';
+        for (var i = 0; i < (one ? 1 : 7); i++) {
+            var key = dateAdd(start, i);
+            var rows = posted.filter(function (w) { return w.postDate === key; }).map(function (w) { return postedRow(w, t); }).join('') +
+                drafts.filter(function (d) { return d.plannedDate === key; }).map(function (d) { return draftRow(d, t); }).join('');
+            h += '<div class="cc-dayhead' + (key === today ? ' today' : '') + '"><b>' + esc(dayFull(key)) + '</b><button type="button" class="cc-chip" data-act="plan" data-day="' + key + '"><i class="fa-solid fa-plus"></i> ' + t.planDay + '</button></div>' +
+                (rows || (one ? '<div class="cc-empty">' + t.emptyDay + '</div>' : ''));
+        }
+        return h;
+    }
     function monthHtml(t, posted) {
         var y = +viewMonth.slice(0, 4), m = +viewMonth.slice(5, 7), first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay(), days = new Date(Date.UTC(y, m, 0)).getUTCDate(), today = todayKey();
         var byDay = {};
@@ -231,7 +255,7 @@
         var plats = {}; mp.forEach(function (w) { plats[w.platform] = 1; });
         var rev = mp.filter(isReviewed).length, body = '';
         if (view === 'review') body = reviewHtml(t);
-        else if (view === 'month') body = monthHtml(t, posted);
+        else if (view === 'month') body = calRail(t) + (calMode === 'month' ? monthHtml(t, posted) : rangeHtml(t, posted));
         else if (view === 'board') body = boardHtml(t, posted);
         else {
             var rows = filter === 'posted' ? posted.map(function (w) { return postedRow(w, t); }).join('') : (filter === 'ideas' ? ideas : dr).map(function (d) { return draftRow(d, t); }).join('');
@@ -413,7 +437,7 @@
                 if (brief) item.brief = brief.slice(0, MAX_BRIEF);
                 if (sheet.checklist.length) item.checklist = sheet.checklist;
                 if (sheet.links.length) item.links = sheet.links;
-                if (/^\d{4}-\d{2}-\d{2}$/.test(plan)) { item.plannedDate = plan; viewMonth = plan.slice(0, 7); selDay = plan; }
+                if (/^\d{4}-\d{2}-\d{2}$/.test(plan)) { item.plannedDate = plan; viewMonth = plan.slice(0, 7); selDay = plan; anchor = plan; }
                 rest.unshift(item);
                 await saveDrafts(rest);
                 filter = sheet.stage === 'idea' ? 'ideas' : 'drafts';
@@ -525,6 +549,14 @@
         var f = e.target.closest('[data-filter]'); if (f) { filter = f.dataset.filter; return render(); }
         var vw = e.target.closest('[data-view]'); if (vw) return setView(vw.dataset.view);
         var rf = e.target.closest('[data-rvf]'); if (rf) { revFilter = rf.dataset.rvf; return render(); }
+        var cm = e.target.closest('[data-cm]');
+        if (cm) {
+            calMode = cm.dataset.cm; anchor = selDay || anchor || todayKey();
+            if (calMode === 'month') { viewMonth = anchor.slice(0, 7); selDay = anchor; }
+            try { localStorage.setItem('cafeContentCal', calMode); } catch (_) { /* storage may be blocked */ }
+            return render();
+        }
+        var wk = e.target.closest('[data-wk]'); if (wk) { anchor = dateAdd(anchor || todayKey(), +wk.dataset.wk * (calMode === 'day' ? 1 : 7)); viewMonth = anchor.slice(0, 7); return render(); }
         var cal = e.target.closest('[data-cal]'); if (cal) { viewMonth = monthShift(viewMonth, +cal.dataset.cal); selDay = ''; return render(); }
         var dy = e.target.closest('[data-day]'); if (dy && !dy.dataset.act) { selDay = selDay === dy.dataset.day ? '' : dy.dataset.day; return render(); }
         var a = e.target.closest('[data-act]'); if (!a) return;
