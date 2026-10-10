@@ -25,11 +25,16 @@ assert.ok(/body\.cafe-mode #section-kanban, body\.cafe-mode #section-dd-codex \{
 assert.ok(/match \/works\/\{workId\} \{[\s\S]*?allow update, delete: if isAdmin\(\) \|\| \(isSignedIn\(\) && resource\.data\.authUid == request\.auth\.uid\)/.test(rules), 'works: owner can update');
 assert.ok(/match \/product-images\//.test(storage), 'storage: product-images path exists for photo uploads');
 assert.ok(/match \/users\/\{userId\} \{[\s\S]*?allow create, update: if isAdmin\(\) \|\| request\.auth\.uid == userId/.test(rules), 'users: owner can update their doc (socialDrafts)');
+// No badge system for the division: every entry point of the achievement / badge code asks window.isContentCreator() first.
+const fn = name => { const i = index.indexOf(name); assert.ok(i >= 0, name); return index.slice(i, i + 700); };
+for (const name of ['function updateEarnedBadgesBar(', 'function openAchievementsModal(', 'async function checkAchievementUnlocks(', 'function showNextAchievementUnlock(', 'function notifyNewReflectiveBadges('])
+    assert.ok(fn(name).includes('window.isContentCreator?.()'), name + ' is guarded');
+assert.ok(/body\.cafe-mode #u-earned-badges \{ display: none !important; \}/.test(css), 'earned-badges row hidden in cafe-mode');
 assert.ok(/getMyDivision\(\)/.test(index) && /return "General Division"/.test(index), 'getMyDivision defaults to General Division');
 
 const harness = `<!doctype html><meta charset="utf-8"><title>Internship Portfolio (V9.9)</title>
 <link rel="stylesheet" href="/cafe-content.css">
-<div id="section-cafe-content" hidden></div><div id="section-kanban" style="display:block">Mission</div><div id="section-dd-codex" style="display:block">Codex</div>
+<div id="section-cafe-content" hidden></div><div id="section-kanban" style="display:block">Mission</div><div id="section-dd-codex" style="display:block">Codex</div><div id="achievementUnlockModal" style="display:flex">badge</div><div id="achievementsModal" style="display:flex">list</div><div id="u-earned-badges" style="display:flex">row</div>
 <button id="unified-fab-btn" onclick="${FAB}">+</button><button id="lang-toggle-cycle">EN</button>
 <script>
 window.__unified = 0; window.__toasts = []; window.__upd = []; window.__subs = [];
@@ -78,12 +83,19 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.equal(await page.evaluate(() => window.__unified), 1, 'non-CAFE: ＋ opens Submit New');
         assert.equal(await page.locator('#ccOverlay.open').count(), 0);
 
+        // Badge system: on for everyone else, off for the division (and a popup already open is closed).
+        assert.equal(await page.evaluate(() => window.isContentCreator()), false, 'isContentCreator false for others');
+        assert.equal(await vis('#u-earned-badges'), true, 'badge row visible for others');
         // CAFE division.
         await page.evaluate(() => { division = 'Content Creator'; window.cafeContentSync(); });
         assert.equal(await vis('#section-cafe-content'), true, 'CAFE sees the Content card');
         assert.equal(await vis('#section-kanban'), false, 'Mission hidden');
         assert.equal(await vis('#section-dd-codex'), false, 'DD Codex hidden');
         assert.equal(await page.evaluate(() => document.body.classList.contains('cafe-mode')), true);
+        assert.equal(await page.evaluate(() => window.isContentCreator()), true, 'isContentCreator true for the division');
+        assert.equal(await vis('#achievementUnlockModal'), false, 'an open badge popup is closed');
+        assert.equal(await vis('#achievementsModal'), false, 'the achievements list is closed');
+        assert.equal(await vis('#u-earned-badges'), false, 'badge row hidden');
         assert.ok((await page.$eval('#section-cafe-content', e => e.innerText)).includes('Nothing posted yet'), 'empty Posted state');
         const chipTxt = () => page.$$eval('#section-cafe-content .cc-rail .cc-chip', els => els.map(e => e.textContent.trim() + ':' + e.getAttribute('aria-pressed')));
         assert.deepEqual(await chipTxt(), ['Ideas 0:false', 'Drafts 0:false', 'Posted 0:true']);
@@ -175,6 +187,8 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.equal(await vis('#section-cafe-content'), false);
         assert.equal(await page.evaluate(() => document.body.classList.contains('cafe-mode')), false);
         assert.equal(await vis('#section-kanban'), true, 'Mission is back');
+        assert.equal(await page.evaluate(() => window.isContentCreator()), false, 'badge guard off again outside the division');
+        assert.equal(await vis('#u-earned-badges'), true, 'badge row is back');
         await page.click('#unified-fab-btn');
         assert.equal(await page.evaluate(() => window.__unified), 3, 'back to Submit New');
 

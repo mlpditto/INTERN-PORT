@@ -276,6 +276,7 @@
             if (now === on && (host || !now)) { if (now) listen(); return; }
             on = now;
             document.body.classList.toggle('cafe-mode', on);
+            if (on) ['achievementUnlockModal', 'achievementsModal'].forEach(function (id) { var m = document.getElementById(id); if (m) m.style.display = 'none'; });   // a badge popup that opened before the division loaded
             if (on) {
                 if (!host) {
                     host = document.getElementById('section-cafe-content');
@@ -286,6 +287,9 @@
             } else if (host) { host.hidden = true; host.innerHTML = ''; }
         } catch (e) { console.warn('[cafe] sync failed', e); }
     }
+    // The Content Creator division has no badge system: index.html's achievement / badge code asks this (live, not via body.cafe-mode, so it is right
+    // even before the first sync) and does nothing when it is true.
+    window.isContentCreator = isCafe;
     window.cafeContentSync = sync;
     window.cafeContentRender = render;
     // The round ＋ opens the content sheet for CAFE members and the usual Submit New for everyone else.
