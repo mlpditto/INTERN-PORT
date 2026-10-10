@@ -20,14 +20,14 @@
     var STAGES = [['idea', 'Idea', 'ไอเดีย'], ['draft', 'Script', 'สคริปต์'], ['film', 'Filming', 'ถ่ายทำ'], ['edit', 'Editing', 'ตัดต่อ'], ['sched', 'Scheduled', 'ตั้งโพสต์']];
     var STAGE_IDS = STAGES.map(function (s) { return s[0]; });
     var T = {
-        en: { review: 'Review', revTodo: 'To review', revMine: 'Reviewed by me', revEmpty: 'Nothing is waiting for review.', revMineEmpty: 'You have not reviewed anything yet.', revOpen: 'Review', revTitle: 'Review content', revVerdict: 'Verdict', revOk: 'Looks good', revFix: 'Needs changes', revScore: 'Suggested bonus (pts)', revComment: 'Comment', revCommentPh: 'What did you check? What should change?', revSend: 'Send to admin', revHint: 'Your review is a recommendation — the admin gives the final score.', revNeedVerdict: 'Choose a verdict first.', revNeedScore: 'Pick a suggested bonus.', revNeedComment: 'Say what needs to change.', revSent: 'Review sent', revYou: 'You suggested', title: 'Content', viewAs: 'View as', modeIntern: 'Intern', modeContent: 'Content', viewList: 'List view', viewMonth: 'Calendar view', calMonth: 'Month', calWeek: 'Week', calDay: 'Day', viewBoard: 'Board view', brief: 'Brief / script', briefPh: 'Outline, hook, script, shot list…', steps: 'Checklist', stepPh: 'Add a step', stepAdd: 'Add', stepTpl: 'Use standard steps', links: 'Links (Drive, footage, thumbnail…)', badLink: 'Links must start with http:// or https://', tooMany: 'Up to 15 steps and 5 links.', movePrev: 'Move back a step', moveNext: 'Move to the next step', planDay: 'Plan', emptyDay: 'Nothing on this day yet.', pickDay: 'Tap a day to see or plan content.', plan: 'Due date (optional)', ideas: 'Ideas', drafts: 'Drafts', posted: 'Posted', platforms: 'Platforms', reviewed: 'Reviewed', pending: 'Pending review', add: 'New content', addNum: 'Add numbers',
+        en: { review: 'Review', revTodo: 'To review', revMine: 'Reviewed by me', revEmpty: 'Nothing is waiting for review.', revMineEmpty: 'You have not reviewed anything yet.', revOpen: 'Review', revTitle: 'Review content', revVerdict: 'Verdict', revOk: 'Looks good', revFix: 'Needs changes', revScore: 'Suggested bonus (pts)', revComment: 'Comment', revCommentPh: 'What did you check? What should change?', revSend: 'Send to admin', revHint: 'Your review is a recommendation — the admin gives the final score.', revNeedVerdict: 'Choose a verdict first.', revNeedScore: 'Pick a suggested bonus.', revNeedComment: 'Say what needs to change.', revSent: 'Review sent', revYou: 'You suggested', boardReview: 'Review', revFb: 'Reviewer feedback', revChanges: 'Changes requested', revApproved: 'Looks good', title: 'Content', viewAs: 'View as', modeIntern: 'Intern', modeContent: 'Content', viewList: 'List view', viewMonth: 'Calendar view', calMonth: 'Month', calWeek: 'Week', calDay: 'Day', viewBoard: 'Board view', brief: 'Brief / script', briefPh: 'Outline, hook, script, shot list…', steps: 'Checklist', stepPh: 'Add a step', stepAdd: 'Add', stepTpl: 'Use standard steps', links: 'Links (Drive, footage, thumbnail…)', badLink: 'Links must start with http:// or https://', tooMany: 'Up to 15 steps and 5 links.', movePrev: 'Move back a step', moveNext: 'Move to the next step', planDay: 'Plan', emptyDay: 'Nothing on this day yet.', pickDay: 'Tap a day to see or plan content.', plan: 'Due date (optional)', ideas: 'Ideas', drafts: 'Drafts', posted: 'Posted', platforms: 'Platforms', reviewed: 'Reviewed', pending: 'Pending review', add: 'New content', addNum: 'Add numbers',
             emptyIdeas: 'No ideas yet. Jot one down before you forget it.', emptyDrafts: 'No drafts yet.', emptyPosted: 'Nothing posted yet. Share your first piece.',
             sheet: 'Submit content', edit: 'Edit content', stage: 'Stage', platform: 'Platform', type: 'Type', caption: 'Caption or idea', capPh: 'What is this content about?',
             images: 'Images', addImg: 'Add', link: 'Post link', date: 'Post date', send: 'Send for review', save: 'Save', saving: 'Saving…', other: 'Case, Work, Event… (other submissions)', del: 'Delete this draft', delAsk: 'Delete this draft?',
             hintPosted: 'Posted content is reviewed by the admin. Add numbers later from the card.', hintLocal: 'Saved for you only until you mark it Posted.',
             needCap: 'Write a caption or idea first.', needLink: 'Paste the post link (starting with http).', needDate: 'Pick the post date.', full: 'You already have 30 saved. Delete one first.', fail: 'Could not save. Please try again.', noimg: 'That image could not be read.',
             numTitle: 'Add numbers', likes: 'Likes', reach: 'Reach', numHint: 'Update any time — the latest numbers are what the admin sees.', saveNum: 'Save numbers', badNum: 'Enter whole numbers, zero or more.', likeReach: 'Likes cannot be higher than reach.', savedNum: 'Saved.', sentToast: 'Sent for review', savedToast: 'Saved' },
-        th: { review: 'ตรวจงาน', revTodo: 'รอตรวจ', revMine: 'ที่ฉันตรวจแล้ว', revEmpty: 'ยังไม่มีงานรอตรวจ', revMineEmpty: 'ยังไม่ได้ตรวจงานชิ้นไหน', revOpen: 'ตรวจ', revTitle: 'ตรวจคอนเทนต์', revVerdict: 'ผลตรวจ', revOk: 'ผ่าน', revFix: 'ต้องแก้', revScore: 'โบนัสที่แนะนำ (pts)', revComment: 'ความเห็น', revCommentPh: 'ตรวจอะไรไปบ้าง ต้องแก้ตรงไหน', revSend: 'ส่งให้แอดมิน', revHint: 'ผลตรวจของคุณเป็นข้อเสนอ แอดมินเป็นคนให้คะแนนจริง', revNeedVerdict: 'เลือกผลตรวจก่อน', revNeedScore: 'เลือกโบนัสที่แนะนำ', revNeedComment: 'บอกหน่อยว่าต้องแก้อะไร', revSent: 'ส่งผลตรวจแล้ว', revYou: 'คุณแนะนำ', title: 'คอนเทนต์', viewAs: 'มุมมอง', modeIntern: 'Intern', modeContent: 'คอนเทนต์', viewList: 'มุมมองรายการ', viewMonth: 'มุมมองปฏิทิน', calMonth: 'เดือน', calWeek: 'สัปดาห์', calDay: 'วัน', viewBoard: 'มุมมองบอร์ด', brief: 'บรีฟ / สคริปต์', briefPh: 'โครงเรื่อง ฮุค สคริปต์ รายการช็อต…', steps: 'เช็กลิสต์', stepPh: 'เพิ่มขั้นตอน', stepAdd: 'เพิ่ม', stepTpl: 'ใช้ขั้นตอนมาตรฐาน', links: 'ลิงก์ (Drive ฟุตเทจ ภาพปก…)', badLink: 'ลิงก์ต้องขึ้นต้นด้วย http:// หรือ https://', tooMany: 'ได้สูงสุด 15 ขั้นตอนและ 5 ลิงก์', movePrev: 'ย้อนกลับหนึ่งขั้น', moveNext: 'ไปขั้นถัดไป', planDay: 'วางแผน', emptyDay: 'วันนี้ยังไม่มีอะไร', pickDay: 'แตะวันที่เพื่อดูหรือวางแผนคอนเทนต์', plan: 'กำหนดส่ง (ไม่บังคับ)', ideas: 'ไอเดีย', drafts: 'ฉบับร่าง', posted: 'โพสต์แล้ว', platforms: 'แพลตฟอร์ม', reviewed: 'ตรวจแล้ว', pending: 'รอตรวจ', add: 'เพิ่มคอนเทนต์', addNum: 'เพิ่มตัวเลข',
+        th: { review: 'ตรวจงาน', revTodo: 'รอตรวจ', revMine: 'ที่ฉันตรวจแล้ว', revEmpty: 'ยังไม่มีงานรอตรวจ', revMineEmpty: 'ยังไม่ได้ตรวจงานชิ้นไหน', revOpen: 'ตรวจ', revTitle: 'ตรวจคอนเทนต์', revVerdict: 'ผลตรวจ', revOk: 'ผ่าน', revFix: 'ต้องแก้', revScore: 'โบนัสที่แนะนำ (pts)', revComment: 'ความเห็น', revCommentPh: 'ตรวจอะไรไปบ้าง ต้องแก้ตรงไหน', revSend: 'ส่งให้แอดมิน', revHint: 'ผลตรวจของคุณเป็นข้อเสนอ แอดมินเป็นคนให้คะแนนจริง', revNeedVerdict: 'เลือกผลตรวจก่อน', revNeedScore: 'เลือกโบนัสที่แนะนำ', revNeedComment: 'บอกหน่อยว่าต้องแก้อะไร', revSent: 'ส่งผลตรวจแล้ว', revYou: 'คุณแนะนำ', boardReview: 'ตรวจ', revFb: 'ความเห็นผู้ตรวจ', revChanges: 'ต้องแก้ไข', revApproved: 'ผ่าน', title: 'คอนเทนต์', viewAs: 'มุมมอง', modeIntern: 'Intern', modeContent: 'คอนเทนต์', viewList: 'มุมมองรายการ', viewMonth: 'มุมมองปฏิทิน', calMonth: 'เดือน', calWeek: 'สัปดาห์', calDay: 'วัน', viewBoard: 'มุมมองบอร์ด', brief: 'บรีฟ / สคริปต์', briefPh: 'โครงเรื่อง ฮุค สคริปต์ รายการช็อต…', steps: 'เช็กลิสต์', stepPh: 'เพิ่มขั้นตอน', stepAdd: 'เพิ่ม', stepTpl: 'ใช้ขั้นตอนมาตรฐาน', links: 'ลิงก์ (Drive ฟุตเทจ ภาพปก…)', badLink: 'ลิงก์ต้องขึ้นต้นด้วย http:// หรือ https://', tooMany: 'ได้สูงสุด 15 ขั้นตอนและ 5 ลิงก์', movePrev: 'ย้อนกลับหนึ่งขั้น', moveNext: 'ไปขั้นถัดไป', planDay: 'วางแผน', emptyDay: 'วันนี้ยังไม่มีอะไร', pickDay: 'แตะวันที่เพื่อดูหรือวางแผนคอนเทนต์', plan: 'กำหนดส่ง (ไม่บังคับ)', ideas: 'ไอเดีย', drafts: 'ฉบับร่าง', posted: 'โพสต์แล้ว', platforms: 'แพลตฟอร์ม', reviewed: 'ตรวจแล้ว', pending: 'รอตรวจ', add: 'เพิ่มคอนเทนต์', addNum: 'เพิ่มตัวเลข',
             emptyIdeas: 'ยังไม่มีไอเดีย จดไว้ก่อนลืมนะ', emptyDrafts: 'ยังไม่มีฉบับร่าง', emptyPosted: 'ยังไม่มีงานที่โพสต์ ลองส่งชิ้นแรกดู',
             sheet: 'ส่งคอนเทนต์', edit: 'แก้คอนเทนต์', stage: 'ขั้นตอน', platform: 'แพลตฟอร์ม', type: 'ประเภท', caption: 'แคปชั่นหรือไอเดีย', capPh: 'คอนเทนต์นี้เกี่ยวกับอะไร',
             images: 'รูปภาพ', addImg: 'เพิ่ม', link: 'ลิงก์โพสต์', date: 'วันที่โพสต์', send: 'ส่งให้ตรวจ', save: 'บันทึก', saving: 'กำลังบันทึก…', other: 'Case, Work, Event… (งานประเภทอื่น)', del: 'ลบฉบับร่างนี้', delAsk: 'ลบฉบับร่างนี้ใช่ไหม',
@@ -100,6 +100,7 @@
     // The calendar view has three modes (Month grid, Week, Day); Week and Day are read around `anchor`.
     var calMode = (function () { try { var v = localStorage.getItem('cafeContentCal'); return v === 'week' || v === 'day' ? v : 'month'; } catch (_) { return 'month'; } })();
     var allPosts = [], unsubAll = null, myReviews = {}, revFilter = 'todo';
+    var ownReviews = {}, unsubRev = null;   // reviews OTHERS filed on MY posts (content_reviews, read by ownerAuthUid), newest first per work
     var REVIEWER_GROUPS = ['audit'];   // a group (primary or extra) named like this gets the Review view — a UI choice, not a permission
     function isReviewer() {
         try {
@@ -117,6 +118,16 @@
     }
 
     function thumb(p, img) { return '<div class="cc-th">' + (img ? '<img src="' + esc(img) + '" alt="">' : '<i class="' + p[2] + '"></i>') + '</div>'; }
+    // Reviewer feedback on my own post (recommendations only — the admin still scores). Latest per reviewer, newest first.
+    function fbList(w) { return ownReviews[w.id] || []; }
+    function needsChanges(w) { return !isReviewed(w) && fbList(w).some(function (r) { return r.verdict === 'changes'; }); }
+    function fbHtml(w, t, full) {
+        var l = fbList(w); if (!l.length) return '';
+        return l.slice(0, full ? 5 : 1).map(function (r) {
+            return '<div class="cc-fb ' + (r.verdict === 'changes' ? 'fix' : 'ok') + '"><b>' + (r.verdict === 'changes' ? '↩ ' + t.revChanges : '✅ ' + t.revApproved + (Number(r.suggestedScore) ? ' +' + esc(fmtScore(r.suggestedScore)) : '')) + '</b>' +
+                (r.reviewerName ? ' · ' + esc(r.reviewerName) : '') + (r.comment ? '<div>' + esc(r.comment) + '</div>' : '') + '</div>';
+        }).join('');
+    }
     function postedRow(w, t) {
         var p = plat(w.platform), m = w.metrics && (w.metrics.likes != null || w.metrics.reach != null) ? w.metrics : null;
         var metric = m ? '<span><i class="fa-solid fa-heart"></i> ' + esc(fmtNum(m.likes || 0)) + '</span><span><i class="fa-solid fa-eye"></i> ' + esc(fmtNum(m.reach || 0)) + '</span>'
@@ -124,7 +135,7 @@
         var st = isReviewed(w) ? '<span class="cc-pill done">' + t.reviewed + (Number(w.score) ? ' +' + esc(fmtScore(w.score)) : '') + '</span>' : '<span class="cc-pill pending">' + t.pending + '</span>';
         return '<div class="cc-row" data-act="metrics" data-id="' + esc(w.id) + '">' + thumb(p, w.images && w.images[0]) + '<div class="cc-main">' +
             '<div class="cc-meta"><span class="cc-pill">' + esc(typeLabel(w.ctype)) + '</span><span>' + esc(p[1]) + ' · ' + esc(dayLabel(w.postDate)) + '</span></div>' +
-            '<div class="cc-cap">' + esc(w.caption || w.title) + '</div><div class="cc-foot">' + metric + st + '</div></div></div>';
+            '<div class="cc-cap">' + esc(w.caption || w.title) + '</div><div class="cc-foot">' + metric + st + '</div>' + fbHtml(w, t) + '</div></div>';
     }
     function draftRow(d, t) {
         var p = plat(d.platform);
@@ -159,12 +170,14 @@
             return '<section class="cc-col"><div class="cc-colh"><b>' + esc(s[lang() === 'th' ? 2 : 1]) + '</b><span>' + items.length + '</span></div>' + items.map(function (d) { return boardCard(d, i, t); }).join('') +
                 '<button type="button" class="cc-chip cc-colbtn" data-act="newin" data-stage="' + s[0] + '" aria-label="' + esc(t.add) + '"><i class="fa-solid fa-plus"></i></button></section>';
         }).join('');
-        var last = posted.slice(0, 10).map(function (w) {
+        var card = function (w) {
             var p = plat(w.platform);
             return '<div class="cc-kc" data-act="metrics" data-id="' + esc(w.id) + '"><div class="cc-meta"><i class="' + p[2] + '" style="color:' + (PLAT_COLOR[w.platform] || '#64748b') + '"></i><span class="cc-pill">' + esc(typeLabel(w.ctype)) + '</span><span>' + esc(dayLabel(w.postDate)) + '</span></div>' +
-                '<div class="cc-cap">' + esc(w.caption || w.title) + '</div><div class="cc-foot">' + (isReviewed(w) ? '<span class="cc-pill done">' + t.reviewed + (Number(w.score) ? ' +' + esc(fmtScore(w.score)) : '') + '</span>' : '<span class="cc-pill pending">' + t.pending + '</span>') + '</div></div>';
-        }).join('');
-        return '<div class="cc-board">' + cols + '<section class="cc-col"><div class="cc-colh"><b>' + t.posted + '</b><span>' + posted.length + '</span></div>' + last + '</section></div>';
+                '<div class="cc-cap">' + esc(w.caption || w.title) + '</div><div class="cc-foot">' + (isReviewed(w) ? '<span class="cc-pill done">' + t.reviewed + (Number(w.score) ? ' +' + esc(fmtScore(w.score)) : '') + '</span>' : needsChanges(w) ? '<span class="cc-pill fix">↩ ' + t.revChanges + '</span>' : '<span class="cc-pill pending">' + t.pending + '</span>') + '</div>' + fbHtml(w, t) + '</div>';
+        };
+        var inReview = posted.filter(function (w) { return !isReviewed(w); }), done = posted.filter(isReviewed);
+        return '<div class="cc-board">' + cols + '<section class="cc-col"><div class="cc-colh"><b>' + t.boardReview + '</b><span>' + inReview.length + '</span></div>' + inReview.map(card).join('') + '</section>' +
+            '<section class="cc-col"><div class="cc-colh"><b>' + t.posted + '</b><span>' + done.length + '</span></div>' + done.slice(0, 10).map(card).join('') + '</section></div>';
     }
     function moveStage(id, dir) {
         var d = drafts.filter(function (x) { return x.id === id; })[0], j = d ? STAGE_IDS.indexOf(d.stage) + dir : -1;
@@ -285,7 +298,19 @@
                 drafts = Array.isArray(a) ? a.filter(function (d) { return d && d.id && STAGE_IDS.indexOf(d.stage) >= 0; }) : [];
                 render();
             }, function (e) { console.warn('[cafe] drafts listener', e); });
+            listenReviews(u);
         });
+    }
+    // Reviews on MY posts. Non-critical: until the content_reviews rules are deployed this is denied and the card just shows no feedback.
+    function listenReviews(auth) {
+        if (unsubRev || !auth || !auth.uid) return;
+        var ms = function (t) { return t && t.toMillis ? t.toMillis() : (Number(t) || 0); };
+        unsubRev = db.collection('content_reviews').where('ownerAuthUid', '==', auth.uid).onSnapshot(function (snap) {
+            var m = {};
+            snap.docs.forEach(function (d) { var o = d.data() || {}; if (o.workId) (m[o.workId] = m[o.workId] || []).push(o); });
+            Object.keys(m).forEach(function (k) { m[k].sort(function (a, b) { return ms(b.at) - ms(a.at); }); });
+            ownReviews = m; render();
+        }, function (e) { unsubRev = null; console.warn('[cafe] reviews listener', e); });
     }
     // Reviewers see every member's posts (works are readable by any signed-in user, as before).
     function listenAll() {
@@ -505,6 +530,14 @@
                 reviewerId: userId, reviewerName: (typeof userProfile !== 'undefined' && userProfile && userProfile.displayName) || '',
                 verdict: verdict, suggestedScore: score, comment: comment.slice(0, 500), read: false, timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
+            if (w.authUid) {   // the owner reads this (content_reviews rules); a failure must not undo the recommendation already sent to admin
+                try {
+                    await db.collection('content_reviews').doc(id + '_' + auth.uid).set({
+                        authUid: auth.uid, workId: id, ownerAuthUid: w.authUid, ownerId: w.userId || '', reviewerId: userId, reviewerName: (typeof userProfile !== 'undefined' && userProfile && userProfile.displayName) || '',
+                        verdict: verdict, suggestedScore: score, comment: comment.slice(0, 500), at: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                } catch (e2) { console.warn('[cafe] owner copy of the review failed (non-critical)', e2); }
+            }
             var upd = {}; upd['contentReviews.' + id] = { verdict: verdict, score: score, comment: comment.slice(0, 500), at: Date.now() };
             await db.collection('users').doc(userId).update(upd);   // update, not set-merge: must never re-create a deleted user's doc
             myReviews[id] = upd['contentReviews.' + id];
@@ -522,6 +555,7 @@
         overlay.innerHTML = '<div class="cc-box"><div class="cc-bh"><i class="fa-solid fa-chart-simple"></i> ' + t.numTitle + '<button type="button" class="cc-x" data-act="close" aria-label="Close">&times;</button></div>' +
             '<div class="cc-row" style="padding:12px 0;cursor:default"><div class="cc-th"><i class="' + p[2] + '"></i></div><div class="cc-main"><div class="cc-cap">' + esc(w.caption || w.title) + '</div><div class="cc-meta">' + esc(p[1]) + ' · ' + esc(typeLabel(w.ctype)) + ' · ' + esc(dayLabel(w.postDate)) + '</div>' +
             (/^https?:\/\//i.test(w.link || '') ? '<a href="' + esc(w.link) + '" target="_blank" rel="noopener" style="font-size:.78em">' + esc(w.link.replace(/^https?:\/\//, '').slice(0, 40)) + '</a>' : '') + '</div></div>' +
+            (fbList(w).length ? '<span class="cc-lbl" style="margin-top:0">' + t.revFb + '</span>' + fbHtml(w, t, true) : '') +
             '<div style="display:flex;gap:10px"><div style="flex:1"><span class="cc-lbl" style="margin-top:0">' + t.likes + '</span><input type="number" id="ccLikes" min="0" step="1" value="' + (m.likes != null ? esc(m.likes) : '') + '"></div>' +
             '<div style="flex:1"><span class="cc-lbl" style="margin-top:0">' + t.reach + '</span><input type="number" id="ccReach" min="0" step="1" value="' + (m.reach != null ? esc(m.reach) : '') + '"></div></div>' +
             '<div class="cc-err" style="color:#64748b">' + t.numHint + '</div><div class="cc-err" id="ccErr" role="status"></div><button type="button" class="cc-go" id="ccGo" data-act="savenum" data-id="' + esc(id) + '">' + t.saveNum + '</button></div>';
