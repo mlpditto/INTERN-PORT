@@ -38,12 +38,13 @@ assert.match(caption([{key:'2026-06-16'}], ['ready']), /1 รายการ · 
 assert.match(caption([{key:'2026-09-10'}], ['ready']), /ล่าสุด วันนี้/);
 assert.match(caption([{}], ['ready']), /ไม่ทราบวันที่/);
 ctx.renderDailyCheckinCard();
-assert.match(elements['daily-checkin-card'].innerHTML, /กำลังโหลดประวัติ/);
+assert.match(elements['activity-history'].innerHTML, /กำลังโหลดประวัติ/);   // V101.87: the captions live in the details list now (the home row has no chips)
 vm.runInContext("Object.keys(profileActivityState).forEach(k => profileActivityState[k] = 'ready')", ctx);
 ctx.renderDailyCheckinCard();
-assert.match(elements['daily-checkin-card'].innerHTML, /ยังไม่เคยส่ง/);
-// V101.82: the 🔥 check-in pill and 💰 FIN left the home row (they live in Schedule now) — only the Log / Case circles remain.
-assert.doesNotMatch(elements['daily-checkin-card'].innerHTML, /act-streak|finOpen|💰|🔥/);
+assert.match(elements['activity-history'].innerHTML, /ยังไม่เคยส่ง/);
+// V101.82 / V101.86 / V101.87: the 🔥 pill, 💰 FIN, 🩺 Case and 📝 Log all left the home row — nothing is rendered in it any more.
+assert.equal(elements['daily-checkin-card'].innerHTML, '');
+assert.equal(elements['daily-checkin-card'].children, undefined);
 // The pill builder: green + bonus wording in aria-label (no 🎁 text on the pill), orange button when not checked in yet.
 const pill = ctx.checkinPillHtml();
 assert.match(pill, /class="act-streak done"[^>]*aria-label="Checked in today · 3-day streak · Bonus \+0.05 in 4 days"[^>]*>🔥3<\/span>/);
@@ -52,8 +53,7 @@ ctx.myCheckin = { lastDate: '2026-09-09' };
 assert.match(ctx.checkinPillHtml(), /<button type="button" id="daily-checkin-btn" class="act-streak todo" onclick="tryDailyCheckin\(\)"[^>]*>🔥3<\/button>/);
 ctx.myCheckin = { lastDate: '2026-09-10' };
 logToday = true; ctx.renderDailyCheckinCard();
-assert.match(elements['daily-checkin-card'].innerHTML, /Log เพิ่มเติม · ส่งแล้ววันนี้/);
-assert.match(elements['daily-checkin-card'].innerHTML, /class="act-ic done"[^>]*onclick="gotoLog\(\)"/);
+assert.match(elements['activity-history'].innerHTML, /Log: .*ส่งแล้ววันนี้ ✓/);
 const timeline = ctx.updateTimelineBar;
 for (const [start,end,profile,word] of [
     ['1988-11-08','2088-11-08',{notAnInternship:true},'ส่วนตัว'],
