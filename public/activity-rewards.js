@@ -95,7 +95,7 @@ window.activityRewards = (() => {
             const detail=node('div');detail.id='history-adjustment-detail';header.after(detail);
             chip.onclick=()=>{start();show('other',detail);chip.setAttribute('aria-expanded',String(selected==='other'));};
         }
-        chip.textContent=rewardReady()?summary('other').replace(' · 0 Beri','').replace(' Beri',' 🪙'):'…';chip.setAttribute('aria-label','Adjustments · '+summary('other'));chip.setAttribute('aria-expanded',String(selected==='other'));
+        chip.textContent=rewardReady()?'⚖️ '+summary('other').replace(' · 0 Beri','').replace(' Beri',' 🪙'):'…';   // V101.84: ⚖️ = the visible cue that this is an adjustments list (the title is hover-only)chip.setAttribute('aria-label','Adjustments · '+summary('other'));chip.setAttribute('aria-expanded',String(selected==='other'));
     }
     document.addEventListener('DOMContentLoaded',historyChip);
     function pending(tile,rows){const n=(rows||[]).filter(current).filter(r=>r.status==='pending').length;if(n){const note=node('small',`${labels[tile.dataset.rewardKey]} · ${n} pending review`);note.className='mp-pending';document.getElementById('monthly-progress').append(note);}}

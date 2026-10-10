@@ -30,6 +30,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
   assert.match(await page.locator('[data-reward-key=drug]').innerText(),/0.50 pt/);
   assert.match(await page.locator('[data-reward-key=event]').textContent(),/requests/);
   assert.equal(await page.locator('#monthly-progress [data-reward-key=other]').count(),0);
+  assert.match(await page.locator('#history-adjustments').innerText(),/^⚖️ /);   // V101.84: a visible cue that this chip is the adjustments list
   await page.locator('#history-adjustments').click();
   assert.match(await page.locator('#history-adjustment-records').innerText(),/Manual adjustment/);
   await page.locator('#history-adjustment-records').getByRole('button',{name:'Close',exact:true}).click();
