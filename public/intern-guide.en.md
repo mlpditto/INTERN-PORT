@@ -16,7 +16,7 @@ The top card is **you**: photo, name, points (**pts**), 🪙 Beri, level, and a 
 
 **Do this first**
 1. Open ✏️ **Personal Info** and set your **internship start / end dates** — the days-left bar and Schedule depend on them
-2. Tap the **Daily check-in** card under your profile once a day — it gives daily points and keeps your streak going
+2. Just open the app each day — **check-in is automatic** (the **Daily check-in** card under your profile shows it) and keeps your streak going
 3. Tap **⋯** under the check-in card for monthly progress, certificate progress 🏅, your next level ✨ and the 🏆 **Leaderboard**
 
 The page scrolls top to bottom: **Mission** (Quiz · Journal · Explore) → **DD Codex** → **History**. Tap a section's title bar to open or close it. The round **＋** button (bottom right) is **Submit New**.
@@ -67,15 +67,42 @@ Everything you submit shows up in **History** with its status. Cases are also in
 
 ## 5. 🏆 Points
 
-- **Schedule** (📅 in the tool rail) — calendar, agenda and your internship goals. Tap the **ⓘ** next to its title for how goals work
-- **Points** come from scored quizzes, check-ins, and bonuses the admin gives to Journal logs and Cases
-- **Level** (LV) and **rank** grow with points — the next level is shown under **⋯**
-- 🏅 **Certificate** progress is under **⋯** too — it tells you what is still missing
-- 🏆 **Leaderboard** is under **⋯**
+**pts = learning points.** They set your level and your Leaderboard rank.
+
+| You get | pts |
+|---|---|
+| ✅ Open the app once a day (automatic check-in) | +0.01 |
+| 🔥 Every 7th day in a row | +0.05 |
+| 📓 Submit a Journal | +0.1 |
+| 🩺 Submit a Case | +0.1 |
+| 🌅 Morning Quiz Bonus — first person each day to submit a regular quiz, 08:00–12:00 | +0.1 |
+| 📝 Scored quizzes | depends on the quiz (some need admin approval) |
+| ⭐ Admin bonus (good Journals / Cases) | admin's call |
+
+- **Level** goes up every 10 pts: LV.2 at 10 · LV.3 at 20 … LV.10 at 90. The next level is under **⋯**
+- 🏅 Certificate progress and the 🏆 Leaderboard are under **⋯** too
 
 ---
 
-## 6. 💊 Codex
+## 6. 🪙 Beri
+
+**Beri = collectible coins.** Separate from pts (they do **not** count towards level or Leaderboard); you spend them in the shop.
+
+| You get | Beri |
+|---|---|
+| 🧭 Open a link in **Explore** for the first time | the earlier you open it, the more (drops by 1 for each person) |
+| ✍️ A link review the admin approves | +1 |
+| 🥇🥈🥉 First 3 to submit a quiz | 10 · 6 · 4 |
+| ⏱️ Submit a quiz ≥48 / ≥24 / ≥6 h before the deadline | 5 · 3 · 1 |
+| ⭐ Special gift from the admin | admin's call |
+
+- Quiz numbers are defaults; the admin can change or switch them off per quiz, and you get them when the admin approves the quiz
+- Once you hold **more than 500 Beri**, the **Murthehelp** shop opens (and stays open even if your Beri drops)
+- Your balance is the 🪙 under your name on the profile card
+
+---
+
+## 7. 💊 Codex
 
 **DD Codex** — a shared library of **💊 Drugs** and **🩺 Diseases** written by interns and approved by the admin.
 - Search and open an entry; some entries have files you can download in one tap

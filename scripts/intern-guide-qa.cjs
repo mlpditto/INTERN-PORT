@@ -1,3 +1,4 @@
+// V101.99: every section ends with a feedback box that files admin_notifications {type:'guide_feedback'} (Settings ▸ Guide, admin ▸ 📖 Guide feedback).
 // V101.98: the intern guide — the REAL public/intern-guide.js + intern-guide.md / .en.md behind the 📖 Guide button in Settings.
 // Opens by itself once, the first time #main-app shows; chip rail = one section at a time; EN | TH switch (follows the app's TH toggle when nothing was chosen);
 // Esc / × close; fits 412 / 1100 px; works with storage blocked; every name the guide uses exists in the real index.html.
@@ -28,6 +29,20 @@ assert.ok(/Daily check-in/i.test(admin) && /My Cases/.test(admin), 'check-in and
 const fnSrc = fs.readFileSync('functions/index.js', 'utf8');
 assert.ok(fnSrc.includes('Daily Quiz Digest') && fnSrc.includes('Open quizzes') && fnSrc.includes("'0 16 * * *'"), 'digest name, button and 16:00 match functions/index.js');
 assert.ok(mdEn.includes('Daily Quiz Digest') && mdEn.includes('Open quizzes') && mdEn.includes('16:00'), 'EN guide describes the digest');
+const rules = fs.readFileSync('firestore.rules', 'utf8');
+const adminHtml = fs.readFileSync('public/admin.html', 'utf8');
+const gfAdmin = fs.readFileSync('public/guide-feedback-admin.js', 'utf8');
+assert.ok(/match \/admin_notifications\/\{docId\}[\s\S]*?allow create: if isSignedIn\(\) && \(request\.resource\.data\.get\('type', ''\) != 'journal_feedback'/.test(rules), 'rules let a signed-in intern create a non-journal admin_notifications doc (guide_feedback needs no rules deploy)');
+assert.ok(js.includes("type: 'guide_feedback'") && gfAdmin.includes("'type', '==', 'guide_feedback'"), 'intern writes and admin reads the same type');
+assert.ok(/<script src="guide-feedback-admin\.js\?v=V\d+\.\d+"><\/script>/.test(adminHtml), 'admin.html loads guide-feedback-admin.js');
+// The Points / Beri numbers the guide prints are the ones the code really uses (a changed constant must fail here, not silently mislead interns).
+for (const t of ['CHECKIN_DAILY_AMOUNT = 0.01', 'CHECKIN_STREAK_BONUS_AMOUNT = 0.05', 'CHECKIN_STREAK_BONUS_EVERY = 7', 'MORNING_QUIZ_BONUS_AMOUNT = 0.1', 'CASE_SUBMIT_AUTO_BONUS = 0.1', 'BERI_SHOP_UNLOCK_THRESHOLD = 500', "tryDailyCheckin('open')", 'minutes >= (8 * 60) && minutes < (12 * 60)', "if (score >= 10) return 'LV.2", "if (score >= 90) return 'LV.10"])
+    assert.ok(admin.includes(t), 'index.html still has: ' + t);
+for (const t of ['QUIZ_EARLYBIRD_BERI_DEFAULT = 10', 'QUIZ_DEADLINE_BERI_DEFAULT = 5', '[1, 0.6, 0.4]', 'hoursEarly >= 48', 'hoursEarly >= 24', 'hoursEarly >= 6', 'dbMax * 0.6', 'dbMax * 0.2'])
+    assert.ok(adminHtml.includes(t), 'admin.html still has: ' + t);
+for (const t of ['+0.01', '+0.05', '+0.1', '08:00–12:00', 'LV.2 at 10', 'LV.10 at 90', '10 · 6 · 4', '5 · 3 · 1', '500 Beri', 'automatic', 'Murthehelp']) assert.ok(mdEn.includes(t), 'EN guide says: ' + t);
+for (const t of ['+0.01', '+0.05', '+0.1', '08:00–12:00', 'LV.2 ที่ 10', 'LV.10 ที่ 90', '10 · 6 · 4', '5 · 3 · 1', 'เกิน 500', 'อัตโนมัติ', 'Murthehelp']) assert.ok(md.includes(t), 'TH guide says: ' + t);
+assert.ok(!/Tap the \*\*Daily check-in\*\* card/.test(mdEn), 'guide no longer tells interns to tap the check-in card');
 const sections = md.split(/\r?\n/).filter(l => /^## /.test(l));
 assert.ok(sections.length >= 5, 'guide has sections: ' + sections.length);
 const sectionsEn = mdEn.split(/\r?\n/).filter(l => /^## /.test(l));
@@ -38,6 +53,7 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Internship Portfoli
 <style>:root{--bg-card:#fff;--text-main:#1e293b;--text-sub:#64748b;--border-color:#e2e8f0;--col-bg:#f1f5f9;--primary:#4361ee}body{margin:0;font-family:sans-serif}</style>
 <div id="main-app" class="hidden"><button id="btn-intern-guide" onclick="openInternGuide()">📖</button></div>
 <script>window.marked={parse:function(t){return t.split('\\n').map(function(l){var m=/^### (.+)/.exec(l);return m?'<h3>'+m[1]+'</h3>':'<p>'+l+'</p>';}).join('')}};window.DOMPurify={sanitize:function(h){return h}};</script>
+<script>window.__fb=[];const db={collection:function(n){return{add:function(d){window.__fb.push({n:n,d:d});return Promise.resolve();}}}};let userId='U1';let userProfile={displayName:'Jo'};function ensureFirebaseAuthReady(){return Promise.resolve({uid:'A1'});}window.firebase={firestore:{FieldValue:{serverTimestamp:function(){return 'TS';}}}};</script>
 <script src="/intern-guide.js" defer></script>`;
 
 (async () => {
@@ -102,6 +118,41 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Internship Portfoli
             await page.waitForFunction(() => document.querySelector('#internGuideOverlay .ig-title').textContent === '📖 Guide');
             await page.waitForFunction(() => /^[^ก-๙]+$/.test(document.querySelector('#internGuideOverlay .ig-chip').textContent));
             assert.equal(await page.evaluate(() => localStorage.getItem('internGuideLang')), 'en');
+            await page.click('#internGuideOverlay .ig-chip[data-i="0"]');
+
+            // Feedback box: closed by default, empty is refused, a send files the right doc, TH keeps the EN section name, no user → says so.
+            assert.equal(await page.locator('#internGuideOverlay .ig-fb-form:not([hidden])').count(), 0, 'feedback form is closed at first @' + vw);
+            await page.click('#internGuideOverlay .ig-fb-open');
+            assert.equal(await page.locator('#internGuideOverlay .ig-fb-form:not([hidden])').count(), 1, 'feedback opens @' + vw);
+            await page.click('#internGuideOverlay .ig-fb-send');
+            assert.ok(/few words/.test(await page.$eval('#internGuideOverlay .ig-fb-status', e => e.textContent)), 'empty note is refused');
+            assert.equal(await page.evaluate(() => window.__fb.length), 0, 'nothing written for an empty note');
+            await page.fill('#internGuideOverlay .ig-fb-form textarea', '  I could not find the Guide button  ');
+            await page.click('#internGuideOverlay .ig-fb-send');
+            await page.waitForFunction(() => /Sent/.test(document.querySelector('#internGuideOverlay .ig-fb-status').textContent));
+            let fb = await page.evaluate(() => window.__fb);
+            assert.equal(fb.length, 1, 'one doc written @' + vw);
+            assert.equal(fb[0].n, 'admin_notifications');
+            assert.deepEqual({ ...fb[0].d, section: undefined }, { type: 'guide_feedback', authUid: 'A1', userId: 'U1', userName: 'Jo', section: undefined, lang: 'en', message: 'I could not find the Guide button', read: false, timestamp: 'TS' });
+            assert.ok(/Start here/.test(fb[0].d.section), 'section is recorded: ' + fb[0].d.section);
+            assert.equal(await page.$eval('#internGuideOverlay .ig-fb-form textarea', e => e.value), '', 'box is cleared after sending');
+            await page.click('#internGuideOverlay .ig-chip[data-i="4"]');
+            await page.click('#internGuideOverlay .ig-l[data-l="th"]');
+            await page.waitForFunction(() => /[ก-๙]/.test(document.querySelector('#internGuideOverlay .ig-fb-open').textContent));
+            await page.click('#internGuideOverlay .ig-fb-open');
+            await page.fill('#internGuideOverlay .ig-fb-form textarea', 'ไม่เข้าใจเรื่องคะแนน');
+            await page.click('#internGuideOverlay .ig-fb-send');
+            await page.waitForFunction(() => window.__fb.length === 2);
+            fb = await page.evaluate(() => window.__fb);
+            assert.ok(fb[1].d.lang === 'th' && /Points/.test(fb[1].d.section), 'TH note keeps the English section name: ' + JSON.stringify(fb[1].d.section));
+            await page.evaluate(() => { userId = ''; });
+            await page.fill('#internGuideOverlay .ig-fb-form textarea', 'x');
+            await page.click('#internGuideOverlay .ig-fb-send');
+            assert.ok(/ในแอป/.test(await page.$eval('#internGuideOverlay .ig-fb-status', e => e.textContent)), 'no signed-in user → tells the intern, writes nothing');
+            assert.equal(await page.evaluate(() => window.__fb.length), 2);
+            await page.evaluate(() => { userId = 'U1'; });
+            await page.click('#internGuideOverlay .ig-l[data-l="en"]');
+            await page.waitForFunction(() => /Not clear/.test(document.querySelector('#internGuideOverlay .ig-fb-open').textContent));
             await page.click('#internGuideOverlay .ig-chip[data-i="0"]');
 
             // Box fits the viewport and sits above a 100000-level editor overlay.
