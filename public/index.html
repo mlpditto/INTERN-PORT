@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.96)</title>
+    <title>Internship Portfolio (V101.97)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -3080,7 +3080,7 @@
 
                 /* --- V94.91 Phase 4: Drug Codex intern read-only view --- */
                 .dc-toolbar {
-                    padding: 12px 16px 8px;
+                    padding: 6px 12px 0;   /* V101.97 */
                 }
                 .dc-toolbar input[type="text"] {
                     width: 100%; padding: 9px 14px; border: 1.5px solid #bfdbfe;
@@ -3143,6 +3143,16 @@
                     margin-left: 2px; vertical-align: super;
                     line-height: 1;
                 }
+                /* V101.97: on a phone the rail is ONE line you swipe (it was 4 wrapped rows) and the numbers give way to the blue getting stronger with the count
+                   (--n, capped at 13); the number stays in the tooltip. Wide screens keep the wrapped rail with its numbers. */
+                .dc-az-rail { position: relative; }
+                @media (max-width: 599px) {
+                    .dc-az-rail { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; padding: 4px 12px 6px; -webkit-mask-image: linear-gradient(90deg, #000 92%, transparent); mask-image: linear-gradient(90deg, #000 92%, transparent); }
+                    .dc-az-rail::-webkit-scrollbar { display: none; }
+                    .dc-az-letter { min-width: 34px; height: 34px; padding: 0 8px; font-size: 14px; }
+                    .dc-az-letter-count { display: none; }
+                    .dc-az-letter.has-content:not(.active) { background: hsl(218 100% calc(97% - var(--n, 0) * 1.1%)); border-color: hsl(218 80% calc(92% - var(--n, 0) * 1%)); }
+                }
                 .dc-list {
                     max-height: 60vh; overflow-y: auto;
                     padding: 0 12px 12px;
@@ -3153,6 +3163,7 @@
                     margin-top: 8px;
                     position: sticky; top: 0; background: #fff; z-index: 2;
                 }
+                .dc-list.dd-one-letter .dc-letter-heading { display: none; }   /* V101.97: the active chip already says which letter */
                 .dc-row {
                     display: flex; justify-content: space-between; align-items: center;
                     gap: 10px; padding: 10px 12px;
@@ -3607,6 +3618,17 @@
                 #dd-type-tabs .dd-type-tab[data-ddtype="disease"].active {
                     color: #0f766e; border-bottom-color: #0f766e;
                 }
+                /* V101.97 lean: ONE row — the Drugs / Diseases chips + a My Drafts icon (it used to be its own row). width/min-height negate the global `button` rule. */
+                #dd-type-tabs { align-items: center; gap: 4px; padding: 8px 10px; }
+                #dd-type-tabs .dd-type-tab { position: relative; flex: 0 0 auto; width: auto; min-height: 36px; margin: 0; padding: 6px 8px; border: 1px solid transparent; border-radius: 999px; background: #f1f5f9; color: #475569; font-size: 13px; white-space: nowrap; }
+                #dd-type-tabs .dd-type-tab:hover { background: #e2e8f0; color: #1e40af; }
+                #dd-type-tabs .dd-type-tab.active { background: #dbeafe; color: #1d4ed8; border-color: #bfdbfe; }
+                #dd-type-tabs .dd-type-tab[data-ddtype="disease"].active { background: #ccfbf1; color: #0f766e; border-color: #99f6e4; }
+                #dd-type-tabs .dd-type-tab::after, #dd-type-tabs .dd-drafts-btn::after { content: ""; position: absolute; inset: -4px 0; }   /* 44px tap height */
+                #dc-count-badge, #dx-count-badge { margin-left: 3px !important; padding: 1px 5px !important; font-size: 11px !important; }
+                #dd-type-tabs .dd-drafts-btn { position: relative; display: none; width: auto; min-height: 36px; margin: 0 0 0 auto; padding: 4px 8px; align-items: center; gap: 3px; font-size: 15px; line-height: 1; color: #475569; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 999px; cursor: pointer; font-family: inherit; }
+                #dd-type-tabs[data-type="drug"] #dx-drafts-toggle, #dd-type-tabs[data-type="disease"] #dc-drafts-toggle { display: none !important; }   /* only the open codex's drafts */
+                @media (max-width: 380px) { #dd-type-tabs { padding: 8px 6px; } #dd-type-tabs .dd-type-tab { padding: 6px 6px; font-size: 12px; } #dc-count-badge, #dx-count-badge { margin-left: 2px !important; padding: 1px 4px !important; } #dd-type-tabs .dd-drafts-btn { padding: 4px 6px; } }
                 /* V101.81: Schedule one page — range title row, ringed day circles, grey month card, Today as upright tiles. Own classes;
                    width/min-height negate the global `button` rule (line 361). */
                 #sch-week { margin: 0 0 2px; }
@@ -4435,7 +4457,7 @@
                         <i id="dd-section-icon" class="fa-solid fa-chevron-down" style="color:#1d4ed8; transition:0.3s; font-size:0.9em;"></i>
                     </div>
                     <div id="dd-section-content" style="display:none; border-top:1px solid #f0f0f0; background:#fff;">
-                        <div class="dc-view-tabs" id="dd-type-tabs">
+                        <div class="dc-view-tabs" id="dd-type-tabs" data-type="drug">
                             <button type="button" class="dd-type-tab active" data-ddtype="drug" onclick="ddSwitchType('drug')">
                                 💊 Drugs
                                 <span id="dc-count-badge" style="font-size:0.7em; background:#dbeafe; color:#1e40af; padding:2px 8px; border-radius:10px; margin-left:6px; display:none;">0</span>
@@ -4444,6 +4466,8 @@
                                 🩺 Diseases
                                 <span id="dx-count-badge" style="font-size:0.7em; background:#ccfbf1; color:#0f766e; padding:2px 8px; border-radius:10px; margin-left:6px; display:none;">0</span>
                             </button>
+                            <button id="dc-drafts-toggle" class="dd-drafts-btn" type="button" onclick="dcToggleDrafts()" title="My Drafts" aria-label="My Drafts">📝</button>
+                            <button id="dx-drafts-toggle" class="dd-drafts-btn" type="button" onclick="dxToggleDrafts()" title="My Drafts" aria-label="My Drafts">📝</button>
                         </div>
                     <div id="dc-section-content">
                         <!-- V94.92 Phase 5: tab bar split — Browse (Phase 4) vs My Drafts (Phase 5).
@@ -4453,15 +4477,10 @@
                              the default view and My Drafts is a compact right-aligned button
                              (hidden until the intern has ≥1 draft; becomes "← Browse" while in
                              the drafts view). See dcToggleDrafts / dcRefreshDraftsToggle. -->
-                        <div style="display:flex; justify-content:flex-end; padding:8px 16px 0;">
-                            <button id="dc-drafts-toggle" type="button" onclick="dcToggleDrafts()"
-                                style="display:none; width:auto; min-height:0; align-items:center; gap:5px; font-size:0.8em; font-weight:700; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; padding:5px 10px; cursor:pointer;">📝 My Drafts</button>
-                        </div>
-
                         <!-- Browse panel (Phase 4 content) -->
                         <div id="dc-view-browse">
                             <div class="dc-toolbar">
-                                <input type="text" id="dc-search-input" placeholder="Search · generic / brand / ATC / class / indication" data-th-placeholder="ค้นหาชื่อยา" oninput="dcRenderList()">
+                                <input type="text" id="dc-search-input" placeholder="🔍 Name, brand, ATC…" data-th-placeholder="ค้นหาชื่อยา" oninput="dcRenderList()">
                             </div>
                             <div class="dc-az-rail" id="dc-az-rail"></div>
                             <div id="dc-list" class="dc-list">
@@ -4488,15 +4507,10 @@
                              reuses the .dc-view-* / .dc-footer / .dc-submit-btn CSS. -->
                         <!-- V96.76: compact right-aligned My Drafts button (was a tab bar) —
                              see dxToggleDrafts / dxRefreshDraftsToggle. -->
-                        <div style="display:flex; justify-content:flex-end; padding:8px 16px 0;">
-                            <button id="dx-drafts-toggle" type="button" onclick="dxToggleDrafts()"
-                                style="display:none; width:auto; min-height:0; align-items:center; gap:5px; font-size:0.8em; font-weight:700; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; padding:5px 10px; cursor:pointer;">📝 My Drafts</button>
-                        </div>
-
                         <!-- Browse panel (Phase 2b content) -->
                         <div id="dx-view-browse">
                             <div class="dc-toolbar">
-                                <input type="text" id="dx-search-input" placeholder="Search · disease / Thai name / ICD-10 / category" data-th-placeholder="ค้นหาชื่อโรค" oninput="dxRenderList()">
+                                <input type="text" id="dx-search-input" placeholder="🔍 Disease, Thai name, ICD-10…" data-th-placeholder="ค้นหาชื่อโรค" oninput="dxRenderList()">
                             </div>
                             <div class="dc-az-rail" id="dx-az-rail"></div>
                             <div id="dx-list" class="dc-list">
@@ -17635,6 +17649,8 @@
             const isDrug = type !== 'disease';
             type = isDrug ? 'drug' : 'disease';
             window._ddCodexType = type;
+            const tabsEl = document.getElementById('dd-type-tabs');
+            if (tabsEl) tabsEl.dataset.type = type;   // V101.97: shows only this codex's My Drafts icon
 
             const drugPane = document.getElementById('dc-section-content');
             const disPane = document.getElementById('dx-section-content');
@@ -17773,6 +17789,7 @@
                 return /[A-Z]/.test(first) ? first : '#';
             };
             const filtered = effLetter === 'all' ? searched : searched.filter(d => dxFirstKey(d) === effLetter);
+            list.classList.toggle('dd-one-letter', effLetter !== 'all');   // V101.97
             const groups = {};
             filtered.forEach(d => {
                 const first = String((d.diseaseName || '').trim()).charAt(0).toUpperCase();
@@ -17819,28 +17836,32 @@
         function dxRenderAzRail() {
             const rail = document.getElementById('dx-az-rail');
             if (!rail) return;
-            const counts = new Map();
+            // V95.08: count per first letter, filter-aware (typing in the search box updates the badges).
+            // V101.97: a letter nothing in the WHOLE codex starts with is not drawn at all; a letter that only
+            // misses the current search stays (disabled) so the rail does not jump while typing.
+            const counts = new Map(), present = new Set();
             const term = (dxState.searchTerm || '').toLowerCase();
             dxState.codex.forEach(d => {
-                if (term && !dxMatchesSearch(d, term)) return;
                 const first = String((d.diseaseName || '').trim()).charAt(0).toUpperCase();
+                if (first) present.add(first);
+                if (term && !dxMatchesSearch(d, term)) return;
                 if (first) counts.set(first, (counts.get(first) || 0) + 1);
             });
-            // V95.69: letter chips act as a page filter. While searching, the
-            // filter is suspended so the 'All' chip shows as active.
-            let total = 0;
-            counts.forEach(v => { total += v; });
+            // V95.67: letter chips act as a page filter. While searching, the filter is suspended so 'All' shows as active.
             const railActive = term ? 'all' : (dxState.activeLetter || 'all');
-            const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-            const allChip = `<button type="button" class="dc-az-letter has-content lang-no-toggle${railActive === 'all' ? ' active' : ''}" onclick="dxSelectLetter('all')" title="Show all diseases" data-th-title="แสดงโรคทั้งหมด">All<span class="dc-az-letter-count">${total}</span></button>`;
+            const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').filter(L => present.has(L));
+            const allChip = `<button type="button" class="dc-az-letter has-content lang-no-toggle${railActive === 'all' ? ' active' : ''}" onclick="dxSelectLetter('all')" title="Show all diseases" data-th-title="แสดงโรคทั้งหมด">All</button>`;   // V101.97: no count on All — the tab badge already says it
             rail.innerHTML = allChip + letters.map(L => {
                 const n = counts.get(L) || 0;
                 const has = n > 0;
                 const active = has && railActive === L;
                 const countBadge = has ? `<span class="dc-az-letter-count">${n}</span>` : '';
                 const title = has ? ` title="${n} disease${n === 1 ? '' : 's'} starting with ${L}"` : '';
-                return `<button type="button" class="dc-az-letter${has ? ' has-content' : ''}${active ? ' active' : ''}" ${has ? `onclick="dxSelectLetter('${L}')"` : 'disabled'}${title}>${L}${countBadge}</button>`;
+                return `<button type="button" class="dc-az-letter${has ? ' has-content' : ''}${active ? ' active' : ''}" ${has ? `onclick="dxSelectLetter('${L}')" style="--n:${Math.min(n, 13)}"` : 'disabled'}${title}>${L}${countBadge}</button>`;
             }).join('');
+            // phone: the rail is one swipeable line — bring the chosen letter into the middle of it
+            const on = rail.querySelector('.dc-az-letter.active');
+            if (on && rail.scrollWidth > rail.clientWidth) rail.scrollLeft = on.offsetLeft - (rail.clientWidth - on.offsetWidth) / 2;
         }
 
         // V95.69: select a letter "page" (or 'all'). Browsing by letter overrides
@@ -18300,11 +18321,14 @@
             const md = document.getElementById('dx-view-mydrafts');
             const inDrafts = md && md.style.display !== 'none';
             const n = (dxMyDraftsState && dxMyDraftsState.drafts) ? dxMyDraftsState.drafts.length : 0;
+            // V101.97: icon-only (it sits in the Drugs / Diseases row) — the words live in title + aria-label
+            const label = inDrafts ? 'Back to Browse' : 'My Drafts';
+            tgl.title = label; tgl.setAttribute('aria-label', n && !inDrafts ? label + ' (' + n + ')' : label);
             if (inDrafts) {
-                tgl.innerHTML = '<i class="fa-solid fa-arrow-left"></i> Browse';
+                tgl.innerHTML = '<i class="fa-solid fa-arrow-left"></i>';
                 tgl.style.display = 'inline-flex';
             } else {
-                tgl.innerHTML = n ? `📝 My Drafts <span class="dc-view-tab-badge">${n}</span>` : '📝 My Drafts';
+                tgl.innerHTML = n ? `📝<span class="dc-view-tab-badge">${n}</span>` : '📝';
                 tgl.style.display = n ? 'inline-flex' : 'none';
             }
         }
@@ -19096,6 +19120,7 @@
                 return /[A-Z]/.test(first) ? first : '#';
             };
             const filtered = effLetter === 'all' ? searched : searched.filter(d => dcFirstKey(d) === effLetter);
+            list.classList.toggle('dd-one-letter', effLetter !== 'all');   // V101.97
             // Group by first letter (A-Z) with non-A-Z bucketed under '#'.
             const groups = {};
             filtered.forEach(d => {
@@ -19147,31 +19172,32 @@
         function dcRenderAzRail() {
             const rail = document.getElementById('dc-az-rail');
             if (!rail) return;
-            // V95.08: count drugs per first letter (was present/absent Set).
-            // Counter is filter-aware — typing in the search box updates the
-            // rail badges to reflect post-filter counts, not the whole codex.
-            const counts = new Map();
+            // V95.08: count per first letter, filter-aware (typing in the search box updates the badges).
+            // V101.97: a letter nothing in the WHOLE codex starts with is not drawn at all; a letter that only
+            // misses the current search stays (disabled) so the rail does not jump while typing.
+            const counts = new Map(), present = new Set();
             const term = (dcState.searchTerm || '').toLowerCase();
             dcState.codex.forEach(d => {
-                if (term && !dcMatchesSearch(d, term)) return;
                 const first = String((d.genericName || '').trim()).charAt(0).toUpperCase();
+                if (first) present.add(first);
+                if (term && !dcMatchesSearch(d, term)) return;
                 if (first) counts.set(first, (counts.get(first) || 0) + 1);
             });
-            // V95.67: letter chips act as a page filter. While searching, the
-            // filter is suspended so the 'All' chip shows as active.
-            let total = 0;
-            counts.forEach(v => { total += v; });
+            // V95.67: letter chips act as a page filter. While searching, the filter is suspended so 'All' shows as active.
             const railActive = term ? 'all' : (dcState.activeLetter || 'all');
-            const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-            const allChip = `<button type="button" class="dc-az-letter has-content lang-no-toggle${railActive === 'all' ? ' active' : ''}" onclick="dcSelectLetter('all')" title="Show all drugs" data-th-title="แสดงยาทั้งหมด">All<span class="dc-az-letter-count">${total}</span></button>`;
+            const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').filter(L => present.has(L));
+            const allChip = `<button type="button" class="dc-az-letter has-content lang-no-toggle${railActive === 'all' ? ' active' : ''}" onclick="dcSelectLetter('all')" title="Show all drugs" data-th-title="แสดงยาทั้งหมด">All</button>`;   // V101.97: no count on All — the tab badge already says it
             rail.innerHTML = allChip + letters.map(L => {
                 const n = counts.get(L) || 0;
                 const has = n > 0;
                 const active = has && railActive === L;
                 const countBadge = has ? `<span class="dc-az-letter-count">${n}</span>` : '';
                 const title = has ? ` title="${n} drug${n === 1 ? '' : 's'} starting with ${L}"` : '';
-                return `<button type="button" class="dc-az-letter${has ? ' has-content' : ''}${active ? ' active' : ''}" ${has ? `onclick="dcSelectLetter('${L}')"` : 'disabled'}${title}>${L}${countBadge}</button>`;
+                return `<button type="button" class="dc-az-letter${has ? ' has-content' : ''}${active ? ' active' : ''}" ${has ? `onclick="dcSelectLetter('${L}')" style="--n:${Math.min(n, 13)}"` : 'disabled'}${title}>${L}${countBadge}</button>`;
             }).join('');
+            // phone: the rail is one swipeable line — bring the chosen letter into the middle of it
+            const on = rail.querySelector('.dc-az-letter.active');
+            if (on && rail.scrollWidth > rail.clientWidth) rail.scrollLeft = on.offsetLeft - (rail.clientWidth - on.offsetWidth) / 2;
         }
 
         // V95.67: select a letter "page" (or 'all'). Browsing by letter overrides
@@ -19590,11 +19616,14 @@
             const md = document.getElementById('dc-view-mydrafts');
             const inDrafts = md && md.style.display !== 'none';
             const n = (dcMyDraftsState && dcMyDraftsState.drafts) ? dcMyDraftsState.drafts.length : 0;
+            // V101.97: icon-only (it sits in the Drugs / Diseases row) — the words live in title + aria-label
+            const label = inDrafts ? 'Back to Browse' : 'My Drafts';
+            tgl.title = label; tgl.setAttribute('aria-label', n && !inDrafts ? label + ' (' + n + ')' : label);
             if (inDrafts) {
-                tgl.innerHTML = '<i class="fa-solid fa-arrow-left"></i> Browse';
+                tgl.innerHTML = '<i class="fa-solid fa-arrow-left"></i>';
                 tgl.style.display = 'inline-flex';
             } else {
-                tgl.innerHTML = n ? `📝 My Drafts <span class="dc-view-tab-badge">${n}</span>` : '📝 My Drafts';
+                tgl.innerHTML = n ? `📝<span class="dc-view-tab-badge">${n}</span>` : '📝';
                 tgl.style.display = n ? 'inline-flex' : 'none';
             }
         }
