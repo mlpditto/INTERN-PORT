@@ -10,7 +10,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
 
 const idx = fs.readFileSync('public/index.html', 'utf8');
-assert.ok(/<title>Internship Portfolio \(V101\.90\)<\/title>/.test(idx), 'intern version bumped');
+assert.ok(/<title>Internship Portfolio \(V101\.91\)<\/title>/.test(idx), 'intern version bumped');
 for (const fn of ['function schRenderWeek(', 'function schWeekMarks(', 'function schItemDayKey(', 'function schWeekDayHtml(', 'function schWeekShift(', 'function schWeekPick(']) assert.ok(idx.includes(fn), fn + ' exists');
 assert.ok(idx.includes('<div id="sch-week"'), 'strip host sits above #sch-agenda');
 assert.ok(idx.indexOf('<div id="sch-week"') < idx.indexOf('<div id="sch-agenda"'), 'strip is above the list');

@@ -9,7 +9,7 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
 const idx = fs.readFileSync('public/index.html', 'utf8');
 assert.ok(!/Select Type \/ /.test(idx), 'the "Select Type" label is gone');
 assert.ok(!/Cancel \/ 취소/.test(idx), 'the footer Cancel button is gone');
-assert.ok(idx.includes('class="u-x" onclick="closeUnifiedModal()"'), '✕ lives in the launchers row');
+assert.ok(idx.includes('class="u-x" onclick="closeUnifiedModal()"'), '✕ ends the one-line rail');
 
 async function open(browser) {
     const ctx = await browser.newContext({ viewport: { width: 412, height: 900 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
@@ -77,18 +77,70 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         });
         await page.waitForTimeout(500);
 
-        // ---- no header above the chips; ✕ ends the launchers row
+        // ---- no header above the chips; the whole type rail is ONE line ending in ⋯ and ✕
         const top = await page.evaluate(() => {
             const card = document.getElementById('unified-submit-modal').firstElementChild.getBoundingClientRect();
-            const chip = document.querySelector('.submit-type-grid .type-btn').getBoundingClientRect();
+            const chip = document.querySelector('.type-btn').getBoundingClientRect();
             return { gap: Math.round(chip.top - card.top), text: document.getElementById('unified-submit-modal').innerText };
         });
         assert.ok(top.gap <= 24, 'first type chip sits within 24px of the card top: ' + top.gap);
         assert.ok(!/Submit New|Select Type/.test(top.text), 'no title / label text above the chips');
-        const x = await page.evaluate(() => { const b = document.querySelector('.submit-launchers .u-x'), r = b.getBoundingClientRect(), l = document.getElementById('u-product-launcher').getBoundingClientRect(); return { h: Math.round(r.height), w: Math.round(r.width), sameRow: Math.abs(r.top - l.top) < 4, right: r.left >= l.right - 1 }; });
-        assert.ok(x.h >= 44 && x.sameRow && x.right, '✕ is a 44px cell at the end of the launchers row: ' + JSON.stringify(x));
-        const fit = await page.evaluate(() => { const row = document.querySelector('.submit-launchers').getBoundingClientRect(), b = document.querySelector('.submit-launchers .u-x').getBoundingClientRect(); return b.right <= row.right + 0.5; });
-        assert.ok(fit, '✕ stays inside the row (no overflow at 390px)');
+        const rail = async () => page.evaluate(() => {
+            const cells = [...document.querySelectorAll('.type-btn, #u-more-btn, .u-line > .u-x')].map(e => e.getBoundingClientRect());
+            const line = document.querySelector('.u-line');
+            return { n: cells.length, oneRow: Math.max(...cells.map(r => r.top)) - Math.min(...cells.map(r => r.top)) <= 2, minH: Math.round(Math.min(...cells.map(r => r.height))), minW: Math.round(Math.min(...cells.map(r => r.width))),
+                overflow: line.scrollWidth - line.clientWidth, h: Math.round(line.getBoundingClientRect().height) };
+        });
+        const r390 = await rail();
+        assert.equal(r390.n, 6, 'Case · Work · Explore · Event · ⋯ · ✕');
+        assert.ok(r390.oneRow, 'all six on ONE row @390');
+        assert.ok(r390.minH >= 44 && r390.minW >= 36 && r390.overflow <= 0 && r390.h <= 48, 'cells ≥44 tall, ≥36 wide, no overflow, rail ~44px: ' + JSON.stringify(r390));
+        for (const w of [363, 340]) {
+            await page.setViewportSize({ width: w, height: 800 });
+            await page.waitForTimeout(250);
+            const r = await rail();
+            assert.ok(r.oneRow && r.overflow <= 0 && r.minW >= 36, 'one row, no overflow @' + w + ': ' + JSON.stringify(r));
+        }
+        await page.setViewportSize({ width: 390, height: 800 });
+        await page.waitForTimeout(250);
+        // only the picked type shows its name; the others are icons with an aria-label
+        const names = async () => page.evaluate(() => [...document.querySelectorAll('.type-btn')].map(b => ({ t: b.dataset.type, label: !!b.querySelector('div') && getComputedStyle(b.querySelector('div')).display !== 'none', aria: b.getAttribute('aria-label'), pressed: b.getAttribute('aria-pressed') })));
+        let nm = await names();
+        assert.deepEqual(nm.filter(n => n.label).map(n => n.t), ['case'], 'only Case shows its name');
+        assert.ok(nm.every(n => n.aria), 'every chip has an aria-label');
+        await page.evaluate(() => selectSubmissionType('work'));
+        nm = await names();
+        assert.deepEqual(nm.filter(n => n.label).map(n => n.t), ['work'], 'picking Work moves the name to Work');
+        assert.equal(nm.find(n => n.t === 'work').pressed, 'true');
+        assert.equal(nm.find(n => n.t === 'case').pressed, 'false');
+        await page.evaluate(() => selectSubmissionType('case'));
+
+        // ⋯ menu: Drug · Disease · Product (44px rows), closes on Esc / outside click / pick
+        assert.ok(await page.evaluate(() => document.getElementById('u-more-pop').hidden), 'menu starts closed');
+        await page.locator('#u-more-btn').click();
+        const menu = await page.evaluate(() => {
+            const p = document.getElementById('u-more-pop');
+            return { open: !p.hidden, expanded: document.getElementById('u-more-btn').getAttribute('aria-expanded'),
+                items: [...p.querySelectorAll('button')].map(b => ({ t: b.textContent.replace(/[^A-Za-z]/g, ''), h: Math.round(b.getBoundingClientRect().height) })),
+                inside: p.getBoundingClientRect().right <= document.getElementById('unified-submit-modal').firstElementChild.getBoundingClientRect().right + 1 };
+        });
+        assert.ok(menu.open && menu.expanded === 'true' && menu.inside, 'opens, inside the card: ' + JSON.stringify(menu));
+        assert.deepEqual(menu.items.map(i => i.t), ['Drug', 'Disease', 'Product']);
+        assert.ok(menu.items.every(i => i.h >= 44), 'rows ≥ 44px');
+        await page.keyboard.press('Escape');
+        assert.ok(await page.evaluate(() => document.getElementById('u-more-pop').hidden), 'Esc closes it');
+        await page.locator('#u-more-btn').click();
+        await page.locator('.type-btn[data-type="work"]').click();
+        assert.ok(await page.evaluate(() => document.getElementById('u-more-pop').hidden), 'picking a type (outside click) closes it');
+        await page.evaluate(() => selectSubmissionType('case'));
+        await page.locator('#u-more-btn').click();
+        await page.locator('#u-product-launcher').click();
+        const prod = await page.evaluate(() => ({ closed: document.getElementById('u-more-pop').hidden, more: document.getElementById('u-more-btn').textContent.trim(), on: document.getElementById('u-more-btn').classList.contains('on'),
+            pane: document.getElementById('case-pane-product').style.display, footer: document.getElementById('u-submit-btn').parentElement.style.display }));
+        assert.ok(prod.closed && prod.on && /Product/.test(prod.more) && prod.pane === 'block' && prod.footer === 'none', 'Product: pane opens, ⋯ cell reads Product, footer row hides: ' + JSON.stringify(prod));
+        await page.evaluate(() => selectSubmissionType('case'));
+        assert.ok(!(await page.evaluate(() => document.getElementById('u-more-btn').classList.contains('on'))), '⋯ is off again');
+        assert.ok(await page.evaluate(() => document.getElementById('u-more-btn').querySelector('i') !== null), '⋯ is back to the icon');
 
         // ---- Case form: HN + patient on ONE row, required star on HN, one-line note
         const form = await page.evaluate(() => {
@@ -147,7 +199,7 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
             const card = await page.evaluate(() => { const r = document.getElementById('unified-submit-modal').firstElementChild.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
             await page.screenshot({ path: path.join(process.env.SHOT, 'submit_new_real.png'), clip: { x: card.x, y: card.y, width: card.w, height: card.h } });
         }
-        await page.locator('.submit-launchers .u-x').click();
+        await page.locator('.u-line .u-x').click();
         assert.equal(await page.evaluate(() => document.getElementById('unified-submit-modal').style.display), 'none', '✕ closes the dialog');
         assert.deepEqual(errors.filter(e => !/firebase\./.test(e)), [], 'no page errors');
         await ctx.close();
