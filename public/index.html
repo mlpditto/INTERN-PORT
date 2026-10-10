@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.101)</title>
+    <title>Internship Portfolio (V101.102)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <link rel="stylesheet" href="cafe-content.css?v=V101.101">
     <meta charset="UTF-8">
@@ -6985,7 +6985,8 @@
             if (!Object.keys(updates).length) return;
             achWriting = true;
             try {
-                await db.collection('users').doc(userId).set({ badges: updates }, { merge: true });
+                const badgeUpdate = {}; Object.keys(updates).forEach(k => { badgeUpdate['badges.' + k] = updates[k]; });
+                await db.collection('users').doc(userId).update(badgeUpdate);   // update, not set-merge: must never re-create a deleted user's doc
                 // The users snapshot echoes this; patch the local copy now so a re-check before it lands is a no-op.
                 if (window.myUserDoc) window.myUserDoc.badges = { ...(window.myUserDoc.badges || {}), ...updates };
                 ups.forEach(a => achUnlockQueue.push(a));
@@ -8079,7 +8080,7 @@
         function syncPreferredLanguage() {
             if (!userId || !db) return;
             const lang = computePreferredLanguage();
-            db.collection('users').doc(userId).set({ preferredLanguage: lang }, { merge: true })
+            db.collection('users').doc(userId).update({ preferredLanguage: lang })   // update, not set-merge: must never re-create a deleted user's doc
                 .catch(e => console.warn('[i18n] preferredLanguage write failed:', e.message));
         }
         // Wrap window.toggleLang (set by lang-toggle.js) so each toggle also syncs.
@@ -8156,6 +8157,13 @@
                 ? (allUsersData.find(u => u.id === userId) || {}) : {};
         }
 
+        // V101.102: a users doc counts as REGISTERED only if enrollment (or an admin pre-registration) ever wrote one of these.
+        // Background writers (language, reflective stats, badges) used to `set(..., {merge:true})` and so re-created a deleted
+        // user's doc as a ghost with none of them; checkUser then saw `exists` and skipped the Register step.
+        function isRegisteredUserDoc(data) {
+            return !!data && ['score', 'group', 'enrollmentCode', 'createdAt'].some(k => data[k] !== undefined && data[k] !== null);
+        }
+
         function checkUser() {
             const r = db.collection("users").doc(userId);
 
@@ -8187,7 +8195,7 @@
             }
 
             r.onSnapshot(d => {
-                if (d.exists) {
+                if (d.exists && isRegisteredUserDoc(d.data())) {
                     const da = d.data();
                     const score = parseFloat(da.score || 0);
                     myGroup = da.group || "Public"; // 🔥 Sync group V77.7
@@ -21363,7 +21371,7 @@
             };
 
             try {
-                await db.collection('users').doc(userId).set(payload, { merge: true });
+                await db.collection('users').doc(userId).update(payload);   // update, not set-merge: must never re-create a deleted user's doc
                 const meIndex = allUsersData.findIndex(u => u.id === userId);
                 if (meIndex >= 0) allUsersData[meIndex] = { ...allUsersData[meIndex], ...payload };
                 renderReflectiveMiniLeaderboard();
