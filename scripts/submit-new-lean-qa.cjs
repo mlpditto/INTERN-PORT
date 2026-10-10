@@ -99,6 +99,7 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.ok(form.sameRow && form.h >= 44, 'HN + patient name share a row, 44px tall: ' + JSON.stringify(form));
         assert.ok(form.star.includes('*') && form.starColor === 'rgb(220, 38, 38)', 'red required star on HN');
         assert.ok(form.noteH <= 48 && form.labelHidden, 'note is one line, labels are screen-reader only');
+        assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('u-case-note')).resize), 'none', 'no resize grip on the one-line note (inline resize:vertical must not win)');
 
         // ---- heat grid
         const lv = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('#u-case-system-grid button')].map(b => [b.dataset.system, { lv: b.dataset.lv, n: (b.querySelector('.sg-n') || {}).textContent || '', title: b.title }])));
