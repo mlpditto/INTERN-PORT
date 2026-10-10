@@ -1,4 +1,4 @@
-/* Admin ▸ Dashboard ▸ "📸 CAFE content": the Social media content the CAFE division posted (intern cafe-content.js writes works with kind:'social').
+/* Admin ▸ Dashboard ▸ "📸 Content Creator": the Social media content the Content Creator division posted (intern cafe-content.js writes works with kind:'social').
    Read-only: month filter, totals (posts · likes · reach · engagement), by platform, by member, and the posts newest first with their numbers.
    Scoring stays in the existing Work queue (the intern card shows the score back). Same panel shape as guide-feedback-admin.js. */
 document.addEventListener('DOMContentLoaded', () => {
@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const TYPE = { post: 'Post', reel: 'Reel', story: 'Story', video: 'Video' };
     const section = document.createElement('details');
     section.className = 'lr-admin lang-no-toggle';
-    section.innerHTML = '<summary>📸 CAFE content</summary><div class="cca-body"></div><p role="status"></p>';
+    section.innerHTML = '<summary>📸 Content Creator</summary><div class="cca-body"></div><p role="status"></p>';
     host.prepend(section);
     const body = section.querySelector('.cca-body'), status = section.querySelector('p'), summary = section.querySelector('summary');
     let unsubscribe, posts = [], range = 'month';
@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function render() {
         body.replaceChildren();
         const list = posts.filter(inRange);
-        summary.textContent = '📸 CAFE content' + (posts.length ? ' · ' + posts.length : '');
+        summary.textContent = '📸 Content Creator' + (posts.length ? ' · ' + posts.length : '');
         const bar = el('div', null, 'display:flex;gap:6px;margin:6px 0 10px;flex-wrap:wrap');
         [['month', 'This month'], ['last', 'Last month'], ['all', 'All']].forEach(([k, label]) => {
             const b = el('button', label, 'min-height:0;padding:4px 12px;font-size:12px;' + (range === k ? 'background:#fef3c7;border-color:#f59e0b;color:#92400e;font-weight:700' : ''));
@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
             bar.append(b);
         });
         body.append(bar);
-        if (!list.length) { body.append(el('p', posts.length ? 'No posts in this range.' : 'No CAFE content yet.')); return; }
+        if (!list.length) { body.append(el('p', posts.length ? 'No posts in this range.' : 'No content yet.')); return; }
 
         const likes = sum(list, 'likes'), reach = sum(list, 'reach');
         const both = list.filter(w => num(w.metrics?.likes) != null && num(w.metrics?.reach) > 0);

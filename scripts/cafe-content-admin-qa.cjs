@@ -1,4 +1,4 @@
-// V102.145: admin ▸ Dashboard ▸ "📸 CAFE content" — the REAL public/cafe-content-admin.js against a stubbed Firestore.
+// V102.145: admin ▸ Dashboard ▸ "📸 Content Creator" — the REAL public/cafe-content-admin.js against a stubbed Firestore.
 // Queries works where kind == 'social'; month filter (this / last / all), totals (posts, with numbers, likes, reach, likes/reach),
 // by platform, by member, newest-first post list with numbers + review state; captions are text, never HTML; wired into admin.html.
 const fs = require('node:fs');
@@ -42,7 +42,7 @@ const db = { app: { auth: () => ({ currentUser: {}, onAuthStateChanged: cb => cb
         await page.setContent(harness);
         await page.waitForSelector('#dashboard-work details.lr-admin');
         assert.deepEqual(await page.evaluate(() => window.__q[0]), ['works', 'kind', '==', 'social'], 'queries kind == social');
-        assert.equal(await page.$eval('details.lr-admin > summary', e => e.textContent), '📸 CAFE content · 4', 'count on the closed panel');
+        assert.equal(await page.$eval('details.lr-admin > summary', e => e.textContent), '📸 Content Creator · 4', 'count on the closed panel');
         await page.evaluate(() => { document.querySelector('details.lr-admin').open = true; });
         const txt = () => page.$eval('.cca-body', e => e.innerText.replace(/\s+/g, ' '));
 
@@ -71,6 +71,6 @@ const db = { app: { auth: () => ({ currentUser: {}, onAuthStateChanged: cb => cb
         assert.ok(/Posts 4/.test(t) && /Likes 180/.test(t), 'all: ' + t);
         assert.equal(await page.$eval('.cca-body button[data-range="all"]', e => e.getAttribute('aria-pressed')), 'true');
         assert.deepEqual(errs, [], 'no page errors');
-        console.log('PASS: admin CAFE content panel — reads works kind:social, month filter, totals / by platform / by member / posts with numbers and review state, text-only rendering');
+        console.log('PASS: admin Content Creator panel — reads works kind:social, month filter, totals / by platform / by member / posts with numbers and review state, text-only rendering');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
