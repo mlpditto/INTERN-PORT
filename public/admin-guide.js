@@ -1,11 +1,14 @@
-/* Admin guide modal — renders admin-guide.md (single source) one section at a time behind a chip rail.
-   Opened by the ❓ header button (openAdminGuide) and once automatically after the first admin login.
+/* Admin guide modal — renders admin-guide.en.md / admin-guide.md (TH) one section at a time behind a chip rail; EN is the default,
+   the EN | TH chips in the header switch language (remembered per browser). Both files keep the same ## sections in the same order.
+   Opened by the 📖 header button (openAdminGuide) and once automatically after the first admin login.
    Standalone overlay (z-index 150000) so it stays above any open editor modal. */
 (function () {
     'use strict';
-    var SEEN_KEY = 'adminGuideSeen', MD_URL = 'admin-guide.md';
-    var sections = [], cur = 0, opened = false, loading = null, overlay = null;
+    var SEEN_KEY = 'adminGuideSeen', LANG_KEY = 'adminGuideLang', MD_URL = { en: 'admin-guide.en.md', th: 'admin-guide.md' };
+    var T = { en: { title: '📖 Admin guide', fail: 'Could not load the guide' }, th: { title: '📖 คู่มือ Admin', fail: 'โหลดคู่มือไม่สำเร็จ' } };
+    var docs = { en: null, th: null }, sections = [], lang = getLang(), cur = 0, opened = false, loading = {}, overlay = null;
 
+    function getLang() { try { return localStorage.getItem(LANG_KEY) === 'th' ? 'th' : 'en'; } catch (_) { return 'en'; } }
     function seen() { try { return localStorage.getItem(SEEN_KEY) === '1'; } catch (_) { return false; } }
     function markSeen() { try { localStorage.setItem(SEEN_KEY, '1'); } catch (_) { /* storage may be blocked */ } }
     function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -17,6 +20,9 @@
         '#adminGuideOverlay .ag-title{flex:1;margin:0;font-size:1.1em;font-weight:900}' +
         '#adminGuideOverlay .ag-close{width:auto;min-height:0;border:none;background:transparent;color:var(--text-sub,#64748b);font-size:20px;line-height:1;cursor:pointer;padding:0 4px}' +
         '#adminGuideOverlay .ag-head,#adminGuideOverlay .ag-rail{flex:0 0 auto}' +
+        '#adminGuideOverlay .ag-lang{display:flex;gap:4px}' +
+        '#adminGuideOverlay .ag-l{width:auto;min-height:0;border:1px solid var(--border-color,#e2e8f0);border-color:color-mix(in srgb,var(--text-sub,#64748b) 45%,transparent);background:transparent;color:var(--text-sub,#64748b);border-radius:999px;padding:2px 9px;font-size:.72em;line-height:1.4;font-weight:800;cursor:pointer}' +
+        '#adminGuideOverlay .ag-l[aria-pressed="true"]{background:var(--text-main,#1e293b);border-color:var(--text-main,#1e293b);color:var(--bg-card,#fff)}' +
         '#adminGuideOverlay .ag-rail.ag-scrolled{box-shadow:0 1px 0 var(--border-color,#e2e8f0)}' +
         '#adminGuideOverlay .ag-rail{display:flex;gap:6px;overflow-x:auto;padding:2px 18px 8px}' +
         '#adminGuideOverlay .ag-chip{width:auto;min-height:0;flex:0 0 auto;white-space:nowrap;border:1px solid var(--border-color,#e2e8f0);border-color:color-mix(in srgb,var(--text-sub,#64748b) 45%,transparent);background:transparent;color:var(--text-sub,#64748b);border-radius:999px;padding:5px 12px;font-size:.8em;line-height:1.4;font-weight:800;cursor:pointer}' +
@@ -51,15 +57,15 @@
         return '<pre style="white-space:pre-wrap">' + esc(md) + '</pre>';
     }
 
-    function load() {
-        if (sections.length) return Promise.resolve();
-        if (loading) return loading;
+    function load(l) {
+        if (docs[l]) return Promise.resolve();
+        if (loading[l]) return loading[l];
         var v = (document.title.match(/V\d+\.\d+/) || [''])[0];
-        loading = fetch(MD_URL + (v ? '?v=' + v : '')).then(function (r) {
+        loading[l] = fetch(MD_URL[l] + (v ? '?v=' + v : '')).then(function (r) {
             if (!r.ok) throw new Error('HTTP ' + r.status);
             return r.text();
-        }).then(function (t) { sections = parse(t); }).finally(function () { loading = null; });
-        return loading;
+        }).then(function (t) { docs[l] = parse(t); }).finally(function () { loading[l] = null; });
+        return loading[l];
     }
 
     function build() {
@@ -68,11 +74,16 @@
         overlay = document.createElement('div');
         overlay.id = 'adminGuideOverlay';
         overlay.setAttribute('role', 'dialog'); overlay.setAttribute('aria-modal', 'true'); overlay.setAttribute('aria-label', 'Admin guide');
-        overlay.innerHTML = '<div class="ag-box lang-no-toggle"><div class="ag-head"><h2 class="ag-title">❓ คู่มือ Admin</h2>' +
+        overlay.innerHTML = '<div class="ag-box lang-no-toggle"><div class="ag-head"><h2 class="ag-title"></h2>' +
+            '<div class="ag-lang" role="group" aria-label="Language"><button type="button" class="ag-l" data-l="en">EN</button><button type="button" class="ag-l" data-l="th">TH</button></div>' +
             '<button type="button" class="ag-close" aria-label="Close">&times;</button></div>' +
             '<div class="ag-rail"></div><div class="ag-body lang-no-toggle"></div></div>';
         document.body.appendChild(overlay);
-        overlay.addEventListener('click', function (e) { if (e.target === overlay || e.target.closest('.ag-close')) close(); });
+        paintLang();
+        overlay.addEventListener('click', function (e) {
+            if (e.target === overlay || e.target.closest('.ag-close')) return close();
+            var l = e.target.closest('.ag-l'); if (l) setLang(l.dataset.l);
+        });
         document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && overlay.classList.contains('open')) close(); });
         overlay.querySelector('.ag-rail').addEventListener('click', function (e) {
             var b = e.target.closest('.ag-chip'); if (b) show(+b.dataset.i);
@@ -85,6 +96,22 @@
         bodyEl.addEventListener('scroll', function () {
             overlay.querySelector('.ag-rail').classList.toggle('ag-scrolled', bodyEl.scrollTop > 0);
         });
+    }
+
+    function paintLang() {
+        overlay.querySelector('.ag-title').textContent = T[lang].title;
+        overlay.setAttribute('aria-label', lang === 'th' ? 'คู่มือ Admin' : 'Admin guide');
+        overlay.querySelectorAll('.ag-l').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.l === lang)); });
+    }
+
+    function fail(e) { overlay.querySelector('.ag-body').textContent = T[lang].fail + ' (' + e.message + ').'; }
+
+    function setLang(l) {
+        if (l === lang) return;
+        lang = l;
+        try { localStorage.setItem(LANG_KEY, l); } catch (_) { /* storage may be blocked */ }
+        paintLang();
+        load(l).then(function () { sections = docs[l]; show(Math.min(cur, sections.length - 1)); }).catch(fail);
     }
 
     function show(i) {
@@ -107,13 +134,11 @@
         build();
         overlay.classList.add('open');
         overlay.querySelector('.ag-body').textContent = '…';
-        load().then(function () {
-            var map = sections.findIndex(function (s) { return /แผนที่แท็บ/.test(s.chip); });
-            show(opened ? cur : (map > -1 ? map : 0));
+        load(lang).then(function () {
+            sections = docs[lang];
+            show(opened ? cur : (sections.length > 2 ? 2 : 0));   // first open lands on section 2 = the tab map
             opened = true;
-        }).catch(function (e) {
-            overlay.querySelector('.ag-body').textContent = 'Could not load the guide (' + e.message + ').';
-        });
+        }).catch(fail);
     }
 
     function close() { if (overlay) overlay.classList.remove('open'); markSeen(); }
