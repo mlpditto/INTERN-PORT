@@ -263,6 +263,38 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.equal(await page.$eval('#ccOverlay .cc-chip[data-v="film"]', e => e.getAttribute('aria-pressed')), 'true', 'the column + starts a card in that stage');
         assert.equal(await vis('#ccPlan'), true); assert.equal(await vis('#ccPosted'), false);
         await page.click('#ccOverlay [data-act="close"]');
+        // Task detail (opened by tapping a card): brief, checklist, links — kept on the same socialDrafts item; empty detail is not stored.
+        await page.click('.cc-kc[data-id="B"]');
+        await page.waitForSelector('#ccOverlay.open');
+        assert.equal(await vis('#ccDetail'), true, 'detail shows for a stage card');
+        await page.click('#ccOverlay [data-act="cktpl"]');
+        assert.equal(await page.locator('#ccSteps .cc-step').count(), 5, 'standard steps');
+        await page.click('#ccSteps .cc-step:nth-child(1) input'); await page.click('#ccSteps .cc-step:nth-child(2) input');
+        await page.click('#ccSteps .cc-step:nth-child(5) [data-act="ckdel"]');
+        await page.fill('#ccCkNew', 'Book the studio'); await page.press('#ccCkNew', 'Enter');
+        assert.equal(await page.locator('#ccSteps .cc-step').count(), 5, 'Enter adds a step');
+        await page.fill('#ccLnNew', 'drive.google.com/x'); await page.click('#ccOverlay [data-act="lnadd"]');
+        assert.ok(/http/.test(await page.$eval('#ccErr', e => e.textContent)), 'a link must be http(s)');
+        await page.fill('#ccLnNew', 'https://drive.google.com/x'); await page.click('#ccOverlay [data-act="lnadd"]');
+        assert.equal(await page.locator('#ccLinks .cc-step a').count(), 1);
+        await page.fill('#ccBrief', 'Hook: 3-second pour');
+        await page.fill('#ccCkNew', 'Typed but never added');   // Save must not lose it
+        await page.click('#ccGo');
+        await page.waitForFunction(() => !document.getElementById('ccOverlay').classList.contains('open'));
+        const B = await page.evaluate(() => window.__lastUserSet.socialDrafts.find(d => d.id === 'B'));
+        assert.equal(B.brief, 'Hook: 3-second pour'); assert.deepEqual(B.links, ['https://drive.google.com/x']);
+        assert.deepEqual(B.checklist.map(c => [c.t, c.d]), [['Script', true], ['Shoot', true], ['Edit', false], ['Thumbnail', false], ['Book the studio', false], ['Typed but never added', false]]);
+        assert.equal((await page.$eval('.cc-kc[data-id="B"]', e => e.innerText.replace(/\s+/g, ' '))).includes('2/6'), true, 'card shows progress');
+        assert.equal(await page.locator('.cc-kc[data-id="B"] .fa-link').count(), 1, 'card shows the link count');
+        assert.equal(await page.evaluate(() => Object.keys(window.__lastUserSet.socialDrafts.find(d => d.id === 'C')).includes('checklist')), false, 'a card with no detail stores none');
+        await page.click('.cc-kc[data-id="B"] [data-d="1"]');   // moving keeps the detail
+        await page.waitForFunction(() => window.__lastUserSet.socialDrafts.find(d => d.id === 'B').stage === 'draft');
+        assert.equal(await page.evaluate(() => window.__lastUserSet.socialDrafts.find(d => d.id === 'B').checklist.length), 6, 'a move keeps the checklist');
+        await page.click('.cc-kc[data-id="C"]');
+        await page.waitForSelector('#ccOverlay.open');
+        await page.click('#ccOverlay .cc-chip[data-v="posted"]');
+        assert.equal(await vis('#ccDetail'), false, 'Posted has no detail section');
+        await page.click('#ccOverlay [data-act="close"]');
         await page.click('#section-cafe-content .cc-view [data-view="list"]');
         await page.evaluate(() => { store.users.U1.socialDrafts = []; userCbs.forEach(cb => cb({ exists: true, data: () => store.users.U1 })); });
 

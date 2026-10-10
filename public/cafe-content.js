@@ -13,21 +13,21 @@
    resizeProductPhoto, uploadProductPhoto, openUnifiedModal, getBangkokDateTimeParts. */
 (function () {
     'use strict';
-    var MAX_DRAFTS = 30, MAX_IMAGES = 3;
+    var MAX_DRAFTS = 30, MAX_IMAGES = 3, MAX_BRIEF = 1500, MAX_STEPS = 15, MAX_LINKS = 5;
     var PLATFORMS = [['ig', 'IG', 'fa-brands fa-instagram'], ['fb', 'FB', 'fa-brands fa-facebook'], ['tt', 'TikTok', 'fa-brands fa-tiktok'], ['yt', 'YouTube', 'fa-brands fa-youtube'], ['line', 'LINE', 'fa-brands fa-line']];
     var TYPES = { post: ['Post', 'โพสต์'], reel: ['Reel', 'รีล'], story: ['Story', 'สตอรี่'], video: ['Video', 'วิดีโอ'] };
     // Pipeline for ideas / drafts kept on users/{uid}.socialDrafts. 'draft' is the id that already existed (now the Script step); Posted is a works doc, not a stage here.
     var STAGES = [['idea', 'Idea', 'ไอเดีย'], ['draft', 'Script', 'สคริปต์'], ['film', 'Filming', 'ถ่ายทำ'], ['edit', 'Editing', 'ตัดต่อ'], ['sched', 'Scheduled', 'ตั้งโพสต์']];
     var STAGE_IDS = STAGES.map(function (s) { return s[0]; });
     var T = {
-        en: { review: 'Review', revTodo: 'To review', revMine: 'Reviewed by me', revEmpty: 'Nothing is waiting for review.', revMineEmpty: 'You have not reviewed anything yet.', revOpen: 'Review', revTitle: 'Review content', revVerdict: 'Verdict', revOk: 'Looks good', revFix: 'Needs changes', revScore: 'Suggested bonus (pts)', revComment: 'Comment', revCommentPh: 'What did you check? What should change?', revSend: 'Send to admin', revHint: 'Your review is a recommendation — the admin gives the final score.', revNeedVerdict: 'Choose a verdict first.', revNeedScore: 'Pick a suggested bonus.', revNeedComment: 'Say what needs to change.', revSent: 'Review sent', revYou: 'You suggested', title: 'Content', viewAs: 'View as', modeIntern: 'Intern', modeContent: 'Content', viewList: 'List view', viewMonth: 'Month view', viewBoard: 'Board view', movePrev: 'Move back a step', moveNext: 'Move to the next step', planDay: 'Plan', emptyDay: 'Nothing on this day yet.', pickDay: 'Tap a day to see or plan content.', plan: 'Due date (optional)', ideas: 'Ideas', drafts: 'Drafts', posted: 'Posted', platforms: 'Platforms', reviewed: 'Reviewed', pending: 'Pending review', add: 'New content', addNum: 'Add numbers',
+        en: { review: 'Review', revTodo: 'To review', revMine: 'Reviewed by me', revEmpty: 'Nothing is waiting for review.', revMineEmpty: 'You have not reviewed anything yet.', revOpen: 'Review', revTitle: 'Review content', revVerdict: 'Verdict', revOk: 'Looks good', revFix: 'Needs changes', revScore: 'Suggested bonus (pts)', revComment: 'Comment', revCommentPh: 'What did you check? What should change?', revSend: 'Send to admin', revHint: 'Your review is a recommendation — the admin gives the final score.', revNeedVerdict: 'Choose a verdict first.', revNeedScore: 'Pick a suggested bonus.', revNeedComment: 'Say what needs to change.', revSent: 'Review sent', revYou: 'You suggested', title: 'Content', viewAs: 'View as', modeIntern: 'Intern', modeContent: 'Content', viewList: 'List view', viewMonth: 'Month view', viewBoard: 'Board view', brief: 'Brief / script', briefPh: 'Outline, hook, script, shot list…', steps: 'Checklist', stepPh: 'Add a step', stepAdd: 'Add', stepTpl: 'Use standard steps', links: 'Links (Drive, footage, thumbnail…)', badLink: 'Links must start with http:// or https://', tooMany: 'Up to 15 steps and 5 links.', movePrev: 'Move back a step', moveNext: 'Move to the next step', planDay: 'Plan', emptyDay: 'Nothing on this day yet.', pickDay: 'Tap a day to see or plan content.', plan: 'Due date (optional)', ideas: 'Ideas', drafts: 'Drafts', posted: 'Posted', platforms: 'Platforms', reviewed: 'Reviewed', pending: 'Pending review', add: 'New content', addNum: 'Add numbers',
             emptyIdeas: 'No ideas yet. Jot one down before you forget it.', emptyDrafts: 'No drafts yet.', emptyPosted: 'Nothing posted yet. Share your first piece.',
             sheet: 'Submit content', edit: 'Edit content', stage: 'Stage', platform: 'Platform', type: 'Type', caption: 'Caption or idea', capPh: 'What is this content about?',
             images: 'Images', addImg: 'Add', link: 'Post link', date: 'Post date', send: 'Send for review', save: 'Save', saving: 'Saving…', other: 'Case, Work, Event… (other submissions)', del: 'Delete this draft', delAsk: 'Delete this draft?',
             hintPosted: 'Posted content is reviewed by the admin. Add numbers later from the card.', hintLocal: 'Saved for you only until you mark it Posted.',
             needCap: 'Write a caption or idea first.', needLink: 'Paste the post link (starting with http).', needDate: 'Pick the post date.', full: 'You already have 30 saved. Delete one first.', fail: 'Could not save. Please try again.', noimg: 'That image could not be read.',
             numTitle: 'Add numbers', likes: 'Likes', reach: 'Reach', numHint: 'Update any time — the latest numbers are what the admin sees.', saveNum: 'Save numbers', badNum: 'Enter whole numbers, zero or more.', likeReach: 'Likes cannot be higher than reach.', savedNum: 'Saved.', sentToast: 'Sent for review', savedToast: 'Saved' },
-        th: { review: 'ตรวจงาน', revTodo: 'รอตรวจ', revMine: 'ที่ฉันตรวจแล้ว', revEmpty: 'ยังไม่มีงานรอตรวจ', revMineEmpty: 'ยังไม่ได้ตรวจงานชิ้นไหน', revOpen: 'ตรวจ', revTitle: 'ตรวจคอนเทนต์', revVerdict: 'ผลตรวจ', revOk: 'ผ่าน', revFix: 'ต้องแก้', revScore: 'โบนัสที่แนะนำ (pts)', revComment: 'ความเห็น', revCommentPh: 'ตรวจอะไรไปบ้าง ต้องแก้ตรงไหน', revSend: 'ส่งให้แอดมิน', revHint: 'ผลตรวจของคุณเป็นข้อเสนอ แอดมินเป็นคนให้คะแนนจริง', revNeedVerdict: 'เลือกผลตรวจก่อน', revNeedScore: 'เลือกโบนัสที่แนะนำ', revNeedComment: 'บอกหน่อยว่าต้องแก้อะไร', revSent: 'ส่งผลตรวจแล้ว', revYou: 'คุณแนะนำ', title: 'คอนเทนต์', viewAs: 'มุมมอง', modeIntern: 'Intern', modeContent: 'คอนเทนต์', viewList: 'มุมมองรายการ', viewMonth: 'มุมมองปฏิทิน', viewBoard: 'มุมมองบอร์ด', movePrev: 'ย้อนกลับหนึ่งขั้น', moveNext: 'ไปขั้นถัดไป', planDay: 'วางแผน', emptyDay: 'วันนี้ยังไม่มีอะไร', pickDay: 'แตะวันที่เพื่อดูหรือวางแผนคอนเทนต์', plan: 'กำหนดส่ง (ไม่บังคับ)', ideas: 'ไอเดีย', drafts: 'ฉบับร่าง', posted: 'โพสต์แล้ว', platforms: 'แพลตฟอร์ม', reviewed: 'ตรวจแล้ว', pending: 'รอตรวจ', add: 'เพิ่มคอนเทนต์', addNum: 'เพิ่มตัวเลข',
+        th: { review: 'ตรวจงาน', revTodo: 'รอตรวจ', revMine: 'ที่ฉันตรวจแล้ว', revEmpty: 'ยังไม่มีงานรอตรวจ', revMineEmpty: 'ยังไม่ได้ตรวจงานชิ้นไหน', revOpen: 'ตรวจ', revTitle: 'ตรวจคอนเทนต์', revVerdict: 'ผลตรวจ', revOk: 'ผ่าน', revFix: 'ต้องแก้', revScore: 'โบนัสที่แนะนำ (pts)', revComment: 'ความเห็น', revCommentPh: 'ตรวจอะไรไปบ้าง ต้องแก้ตรงไหน', revSend: 'ส่งให้แอดมิน', revHint: 'ผลตรวจของคุณเป็นข้อเสนอ แอดมินเป็นคนให้คะแนนจริง', revNeedVerdict: 'เลือกผลตรวจก่อน', revNeedScore: 'เลือกโบนัสที่แนะนำ', revNeedComment: 'บอกหน่อยว่าต้องแก้อะไร', revSent: 'ส่งผลตรวจแล้ว', revYou: 'คุณแนะนำ', title: 'คอนเทนต์', viewAs: 'มุมมอง', modeIntern: 'Intern', modeContent: 'คอนเทนต์', viewList: 'มุมมองรายการ', viewMonth: 'มุมมองปฏิทิน', viewBoard: 'มุมมองบอร์ด', brief: 'บรีฟ / สคริปต์', briefPh: 'โครงเรื่อง ฮุค สคริปต์ รายการช็อต…', steps: 'เช็กลิสต์', stepPh: 'เพิ่มขั้นตอน', stepAdd: 'เพิ่ม', stepTpl: 'ใช้ขั้นตอนมาตรฐาน', links: 'ลิงก์ (Drive ฟุตเทจ ภาพปก…)', badLink: 'ลิงก์ต้องขึ้นต้นด้วย http:// หรือ https://', tooMany: 'ได้สูงสุด 15 ขั้นตอนและ 5 ลิงก์', movePrev: 'ย้อนกลับหนึ่งขั้น', moveNext: 'ไปขั้นถัดไป', planDay: 'วางแผน', emptyDay: 'วันนี้ยังไม่มีอะไร', pickDay: 'แตะวันที่เพื่อดูหรือวางแผนคอนเทนต์', plan: 'กำหนดส่ง (ไม่บังคับ)', ideas: 'ไอเดีย', drafts: 'ฉบับร่าง', posted: 'โพสต์แล้ว', platforms: 'แพลตฟอร์ม', reviewed: 'ตรวจแล้ว', pending: 'รอตรวจ', add: 'เพิ่มคอนเทนต์', addNum: 'เพิ่มตัวเลข',
             emptyIdeas: 'ยังไม่มีไอเดีย จดไว้ก่อนลืมนะ', emptyDrafts: 'ยังไม่มีฉบับร่าง', emptyPosted: 'ยังไม่มีงานที่โพสต์ ลองส่งชิ้นแรกดู',
             sheet: 'ส่งคอนเทนต์', edit: 'แก้คอนเทนต์', stage: 'ขั้นตอน', platform: 'แพลตฟอร์ม', type: 'ประเภท', caption: 'แคปชั่นหรือไอเดีย', capPh: 'คอนเทนต์นี้เกี่ยวกับอะไร',
             images: 'รูปภาพ', addImg: 'เพิ่ม', link: 'ลิงก์โพสต์', date: 'วันที่โพสต์', send: 'ส่งให้ตรวจ', save: 'บันทึก', saving: 'กำลังบันทึก…', other: 'Case, Work, Event… (งานประเภทอื่น)', del: 'ลบฉบับร่างนี้', delAsk: 'ลบฉบับร่างนี้ใช่ไหม',
@@ -128,7 +128,7 @@
         var p = plat(d.platform);
         return '<div class="cc-row" data-act="draft" data-id="' + esc(d.id) + '">' + thumb(p, d.images && d.images[0]) + '<div class="cc-main">' +
             '<div class="cc-meta"><span class="cc-pill">' + esc(typeLabel(d.ctype)) + '</span><span>' + esc(p[1]) + (d.plannedDate ? ' · ' + esc(dayLabel(d.plannedDate)) : '') + '</span><span class="cc-pill plan">' + esc(stageLabel(d.stage)) + '</span></div>' +
-            '<div class="cc-cap">' + esc(d.caption) + '</div></div></div>';
+            '<div class="cc-cap">' + esc(d.caption) + '</div>' + detailBits(d) + '</div></div>';
     }
 
     // ---------- board (one column per stage; Posted is read-only, from works) ----------
@@ -137,10 +137,17 @@
         var today = todayKey(), cls = d.plannedDate < today ? ' late' : d.plannedDate === today ? ' now' : '';
         return '<span class="cc-due' + cls + '"><i class="fa-regular fa-clock"></i> ' + esc(dayLabel(d.plannedDate)) + '</span>';
     }
+    function detailBits(d) {
+        var ck = d.checklist || [], done = ck.filter(function (c) { return c.d; }).length, h = '';
+        if (ck.length) h += '<span class="cc-bit' + (done === ck.length ? ' full' : '') + '"><i class="fa-solid fa-list-check"></i> ' + done + '/' + ck.length + '</span>';
+        if (d.links && d.links.length) h += '<span class="cc-bit"><i class="fa-solid fa-link"></i> ' + d.links.length + '</span>';
+        if (d.brief) h += '<span class="cc-bit"><i class="fa-solid fa-align-left"></i></span>';
+        return h ? '<div class="cc-foot">' + h + '</div>' : '';
+    }
     function boardCard(d, i, t) {
         var p = plat(d.platform);
         return '<div class="cc-kc" data-act="draft" data-id="' + esc(d.id) + '"><div class="cc-meta"><i class="' + p[2] + '" style="color:' + (PLAT_COLOR[d.platform] || '#64748b') + '"></i><span class="cc-pill">' + esc(typeLabel(d.ctype)) + '</span>' + dueChip(d) + '</div>' +
-            '<div class="cc-cap">' + esc(d.caption) + '</div><div class="cc-kmv">' +
+            '<div class="cc-cap">' + esc(d.caption) + '</div>' + detailBits(d) + '<div class="cc-kmv">' +
             (i > 0 ? '<button type="button" data-act="mv" data-d="-1" data-id="' + esc(d.id) + '" aria-label="' + t.movePrev + '">&lsaquo;</button>' : '<span></span>') +
             '<button type="button" data-act="mv" data-d="1" data-id="' + esc(d.id) + '" aria-label="' + t.moveNext + '">&rsaquo;</button></div></div>';
     }
@@ -280,6 +287,7 @@
         document.body.appendChild(overlay);
         overlay.addEventListener('click', onSheetClick);
         document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && overlay.classList.contains('open')) closeSheet(); });
+        overlay.addEventListener('keydown', function (e) { if (e.key === 'Enter' && sheet && e.target && (e.target.id === 'ccCkNew' || e.target.id === 'ccLnNew')) { e.preventDefault(); setErr(takePending()); } });
     }
     function closeSheet() { if (overlay) overlay.classList.remove('open'); sheet = null; }
     function chips(group, items, cur) {
@@ -290,23 +298,46 @@
     function openSheet(d, preset) {
         ensureOverlay();
         var t = L();
-        sheet = { id: d ? d.id : '', stage: (preset && preset.stage) || (d ? d.stage : preset ? 'idea' : 'posted'), platform: d ? d.platform : 'ig', ctype: d ? d.ctype : 'post', images: (d && d.images ? d.images : []).map(function (u) { return { url: u }; }) };
+        sheet = { id: d ? d.id : '', stage: (preset && preset.stage) || (d ? d.stage : preset ? 'idea' : 'posted'), platform: d ? d.platform : 'ig', ctype: d ? d.ctype : 'post', images: (d && d.images ? d.images : []).map(function (u) { return { url: u }; }),
+            checklist: (d && d.checklist ? d.checklist : []).map(function (c) { return { t: c.t, d: !!c.d }; }), links: (d && d.links ? d.links : []).slice() };
         overlay.innerHTML = '<div class="cc-box"><div class="cc-bh"><i class="fa-solid fa-camera"></i> ' + (d ? t.edit : t.sheet) + '<button type="button" class="cc-x" data-act="close" aria-label="Close">&times;</button></div>' +
             '<span class="cc-lbl">' + t.stage + '</span>' + chips('stage', STAGES.map(function (s) { return [s[0], s[lang() === 'th' ? 2 : 1]]; }).concat([['posted', t.posted]]), sheet.stage) +
             '<span class="cc-lbl">' + t.platform + '</span>' + chips('platform', PLATFORMS, sheet.platform) +
             '<span class="cc-lbl">' + t.type + '</span>' + chips('ctype', Object.keys(TYPES).map(function (k) { return [k, TYPES[k][lang() === 'th' ? 1 : 0]]; }), sheet.ctype) +
             '<span class="cc-lbl">' + t.caption + '</span><textarea id="ccCap" rows="3" maxlength="1000" placeholder="' + esc(t.capPh) + '">' + esc(d ? d.caption : '') + '</textarea>' +
             '<span class="cc-lbl">' + t.images + '</span><div class="cc-imgs" id="ccImgs"></div>' +
+            '<div id="ccDetail"><span class="cc-lbl">' + t.brief + '</span><textarea id="ccBrief" rows="3" maxlength="' + MAX_BRIEF + '" placeholder="' + esc(t.briefPh) + '">' + esc((d && d.brief) || '') + '</textarea>' +
+            '<span class="cc-lbl">' + t.steps + '</span><div id="ccSteps"></div><div class="cc-add2"><input type="text" id="ccCkNew" maxlength="80" placeholder="' + esc(t.stepPh) + '"><button type="button" class="cc-chip" data-act="ckadd">' + t.stepAdd + '</button></div>' +
+            '<span class="cc-lbl">' + t.links + '</span><div id="ccLinks"></div><div class="cc-add2"><input type="text" id="ccLnNew" maxlength="300" placeholder="https://…"><button type="button" class="cc-chip" data-act="lnadd">' + t.stepAdd + '</button></div></div>' +
             '<div id="ccPlan"><span class="cc-lbl">' + t.plan + '</span><input type="date" id="ccPlanDate" value="' + esc((d && d.plannedDate) || (preset && preset.plannedDate) || '') + '"></div>' +
             '<div id="ccPosted"><span class="cc-lbl">' + t.link + '</span><input type="text" id="ccLink" maxlength="500" placeholder="https://…"><span class="cc-lbl">' + t.date + '</span><input type="date" id="ccDate" value="' + esc(todayKey()) + '" max="' + esc(todayKey()) + '"></div>' +
             '<div class="cc-err" id="ccErr" role="status"></div><button type="button" class="cc-go" id="ccGo" data-act="save"></button>' +
             '<div class="cc-err" style="color:#64748b;text-align:center" id="ccHint"></div>' +
             (d ? '<button type="button" class="cc-link danger" data-act="del">' + t.del + '</button>' : '<button type="button" class="cc-link" data-act="other">' + t.other + '</button>') + '</div>';
-        paintImages(); paintStage();
+        paintImages(); paintDetail(); paintStage();
         overlay.classList.add('open');
+    }
+    function paintDetail() {
+        var t = L(), steps = sheet.checklist.map(function (c, i) {
+            return '<label class="cc-step' + (c.d ? ' done' : '') + '"><input type="checkbox" data-act="ckdone" data-i="' + i + '"' + (c.d ? ' checked' : '') + '><span>' + esc(c.t) + '</span><button type="button" data-act="ckdel" data-i="' + i + '" aria-label="Remove">&times;</button></label>';
+        }).join('');
+        if (!sheet.checklist.length) steps = '<button type="button" class="cc-chip" data-act="cktpl">' + t.stepTpl + '</button>';
+        overlay.querySelector('#ccSteps').innerHTML = steps;
+        overlay.querySelector('#ccLinks').innerHTML = sheet.links.map(function (u, i) {
+            return '<div class="cc-step"><a href="' + esc(u) + '" target="_blank" rel="noopener">' + esc(u.replace(/^https?:\/\//i, '').slice(0, 48)) + '</a><button type="button" data-act="lndel" data-i="' + i + '" aria-label="Remove">&times;</button></div>';
+        }).join('');
+    }
+    // Typed but not yet added: Save must not lose it. Returns an error message, or '' when everything pending was taken in.
+    function takePending() {
+        var t = L(), ck = overlay.querySelector('#ccCkNew'), ln = overlay.querySelector('#ccLnNew'), s = ck.value.trim(), u = ln.value.trim();
+        if (s) { if (sheet.checklist.length >= MAX_STEPS) return t.tooMany; sheet.checklist.push({ t: s.slice(0, 80), d: false }); ck.value = ''; }
+        if (u) { if (!/^https?:\/\/\S+$/i.test(u)) return t.badLink; if (sheet.links.length >= MAX_LINKS) return t.tooMany; sheet.links.push(u.slice(0, 300)); ln.value = ''; }
+        paintDetail();
+        return '';
     }
     function paintStage() {
         var t = L(), posted = sheet.stage === 'posted';
+        overlay.querySelector('#ccDetail').style.display = posted ? 'none' : 'block';
         overlay.querySelector('#ccPosted').style.display = posted ? 'block' : 'none';
         overlay.querySelector('#ccPlan').style.display = posted ? 'none' : 'block';
         overlay.querySelector('#ccGo').textContent = posted ? t.send : t.save;
@@ -342,6 +373,11 @@
         if (act === 'close') closeSheet();
         else if (act === 'rmimg') { sheet.images.splice(+a.dataset.i, 1); paintImages(); }
         else if (act === 'other') { closeSheet(); if (typeof openUnifiedModal === 'function') openUnifiedModal(); }
+        else if (act === 'ckadd' || act === 'lnadd') setErr(takePending());
+        else if (act === 'ckdel') { sheet.checklist.splice(+a.dataset.i, 1); paintDetail(); }
+        else if (act === 'lndel') { sheet.links.splice(+a.dataset.i, 1); paintDetail(); }
+        else if (act === 'ckdone') { var c = sheet.checklist[+a.dataset.i]; if (c) { c.d = a.checked; a.closest('.cc-step').classList.toggle('done', c.d); } }
+        else if (act === 'cktpl') { sheet.checklist = (lang() === 'th' ? ['สคริปต์', 'ถ่ายทำ', 'ตัดต่อ', 'ภาพปก', 'แคปชั่นและแฮชแท็ก'] : ['Script', 'Shoot', 'Edit', 'Thumbnail', 'Caption & hashtags']).map(function (s) { return { t: s, d: false }; }); paintDetail(); }
         else if (act === 'save') save();
         else if (act === 'del') del();
         else if (act === 'savenum') saveNumbers(a.dataset.id);
@@ -353,6 +389,7 @@
         if (busy || !sheet) return;
         var t = L(), cap = overlay.querySelector('#ccCap').value.trim(), posted = sheet.stage === 'posted', link = '', date = '';
         if (!cap) return setErr(t.needCap);
+        if (!posted) { var pend = takePending(); if (pend) return setErr(pend); }
         if (posted) {
             link = overlay.querySelector('#ccLink').value.trim(); date = overlay.querySelector('#ccDate').value;
             if (!/^https?:\/\/\S+$/i.test(link)) return setErr(t.needLink);
@@ -372,6 +409,10 @@
                 if (typeof showToast === 'function') showToast(t.sentToast);
             } else {
                 var plan = overlay.querySelector('#ccPlanDate').value, item = { id: sheet.id || newId(), stage: sheet.stage, platform: sheet.platform, ctype: sheet.ctype, caption: cap, images: urls, updatedAt: Date.now() };
+                var brief = overlay.querySelector('#ccBrief').value.trim();   // empty detail is left off so a plain card stays as small as before
+                if (brief) item.brief = brief.slice(0, MAX_BRIEF);
+                if (sheet.checklist.length) item.checklist = sheet.checklist;
+                if (sheet.links.length) item.links = sheet.links;
                 if (/^\d{4}-\d{2}-\d{2}$/.test(plan)) { item.plannedDate = plan; viewMonth = plan.slice(0, 7); selDay = plan; }
                 rest.unshift(item);
                 await saveDrafts(rest);
