@@ -20,14 +20,14 @@
     var STAGES = [['idea', 'Idea', 'ไอเดีย'], ['draft', 'Script', 'สคริปต์'], ['film', 'Filming', 'ถ่ายทำ'], ['edit', 'Editing', 'ตัดต่อ'], ['sched', 'Scheduled', 'ตั้งโพสต์']];
     var STAGE_IDS = STAGES.map(function (s) { return s[0]; });
     var T = {
-        en: { review: 'Review', revTodo: 'To review', revMine: 'Reviewed by me', revEmpty: 'Nothing is waiting for review.', revMineEmpty: 'You have not reviewed anything yet.', revOpen: 'Review', revTitle: 'Review content', revVerdict: 'Verdict', revOk: 'Looks good', revFix: 'Needs changes', revScore: 'Suggested bonus (pts)', revComment: 'Comment', revCommentPh: 'What did you check? What should change?', revSend: 'Send to admin', revHint: 'Your review is a recommendation — the admin gives the final score.', revNeedVerdict: 'Choose a verdict first.', revNeedScore: 'Pick a suggested bonus.', revNeedComment: 'Say what needs to change.', revSent: 'Review sent', revYou: 'You suggested', boardReview: 'Review', revFb: 'Reviewer feedback', revChanges: 'Changes requested', revApproved: 'Looks good', title: 'Content', viewAs: 'View as', modeIntern: 'Intern', modeContent: 'Content', viewList: 'List view', viewMonth: 'Calendar view', calMonth: 'Month', calWeek: 'Week', calDay: 'Day', viewBoard: 'Board view', brief: 'Brief / script', briefPh: 'Outline, hook, script, shot list…', steps: 'Checklist', stepPh: 'Add a step', stepAdd: 'Add', stepTpl: 'Use standard steps', links: 'Links (Drive, footage, thumbnail…)', badLink: 'Links must start with http:// or https://', tooMany: 'Up to 15 steps and 5 links.', movePrev: 'Move back a step', moveNext: 'Move to the next step', planDay: 'Plan', emptyDay: 'Nothing on this day yet.', pickDay: 'Tap a day to see or plan content.', plan: 'Due date (optional)', ideas: 'Ideas', drafts: 'Drafts', posted: 'Posted', platforms: 'Platforms', reviewed: 'Reviewed', pending: 'Pending review', add: 'New content', addNum: 'Add numbers',
+        en: { review: 'Review', revTodo: 'To review', revMine: 'Reviewed by me', revEmpty: 'Nothing is waiting for review.', revMineEmpty: 'You have not reviewed anything yet.', revOpen: 'Review', revTitle: 'Review content', revVerdict: 'Verdict', revOk: 'Looks good', revFix: 'Needs changes', revScore: 'Suggested bonus (pts)', revComment: 'Comment', revCommentPh: 'What did you check? What should change?', revSend: 'Send to admin', revHint: 'Your review is a recommendation — the admin gives the final score.', revNeedVerdict: 'Choose a verdict first.', revNeedScore: 'Pick a suggested bonus.', revNeedComment: 'Say what needs to change.', revSent: 'Review sent', revYou: 'You suggested', boardReview: 'Review', revFb: 'Reviewer feedback', revChanges: 'Changes requested', revApproved: 'Looks good', resub: 'Edit & resubmit', resubBtn: 'Resubmit for review', resubDone: 'Resubmitted', resubHint: 'The reviewer and the admin see the new version; your numbers stay.', resubbed: 'Resubmitted', resubSince: 'resubmitted since your review', title: 'Content', viewAs: 'View as', modeIntern: 'Intern', modeContent: 'Content', viewList: 'List view', viewMonth: 'Calendar view', calMonth: 'Month', calWeek: 'Week', calDay: 'Day', viewBoard: 'Board view', brief: 'Brief / script', briefPh: 'Outline, hook, script, shot list…', steps: 'Checklist', stepPh: 'Add a step', stepAdd: 'Add', stepTpl: 'Use standard steps', links: 'Links (Drive, footage, thumbnail…)', badLink: 'Links must start with http:// or https://', tooMany: 'Up to 15 steps and 5 links.', movePrev: 'Move back a step', moveNext: 'Move to the next step', planDay: 'Plan', emptyDay: 'Nothing on this day yet.', pickDay: 'Tap a day to see or plan content.', plan: 'Due date (optional)', ideas: 'Ideas', drafts: 'Drafts', posted: 'Posted', platforms: 'Platforms', reviewed: 'Reviewed', pending: 'Pending review', add: 'New content', addNum: 'Add numbers',
             emptyIdeas: 'No ideas yet. Jot one down before you forget it.', emptyDrafts: 'No drafts yet.', emptyPosted: 'Nothing posted yet. Share your first piece.',
             sheet: 'Submit content', edit: 'Edit content', stage: 'Stage', platform: 'Platform', type: 'Type', caption: 'Caption or idea', capPh: 'What is this content about?',
             images: 'Images', addImg: 'Add', link: 'Post link', date: 'Post date', send: 'Send for review', save: 'Save', saving: 'Saving…', other: 'Case, Work, Event… (other submissions)', del: 'Delete this draft', delAsk: 'Delete this draft?',
             hintPosted: 'Posted content is reviewed by the admin. Add numbers later from the card.', hintLocal: 'Saved for you only until you mark it Posted.',
             needCap: 'Write a caption or idea first.', needLink: 'Paste the post link (starting with http).', needDate: 'Pick the post date.', full: 'You already have 30 saved. Delete one first.', fail: 'Could not save. Please try again.', noimg: 'That image could not be read.',
             numTitle: 'Add numbers', likes: 'Likes', reach: 'Reach', numHint: 'Update any time — the latest numbers are what the admin sees.', saveNum: 'Save numbers', badNum: 'Enter whole numbers, zero or more.', likeReach: 'Likes cannot be higher than reach.', savedNum: 'Saved.', sentToast: 'Sent for review', savedToast: 'Saved' },
-        th: { review: 'ตรวจงาน', revTodo: 'รอตรวจ', revMine: 'ที่ฉันตรวจแล้ว', revEmpty: 'ยังไม่มีงานรอตรวจ', revMineEmpty: 'ยังไม่ได้ตรวจงานชิ้นไหน', revOpen: 'ตรวจ', revTitle: 'ตรวจคอนเทนต์', revVerdict: 'ผลตรวจ', revOk: 'ผ่าน', revFix: 'ต้องแก้', revScore: 'โบนัสที่แนะนำ (pts)', revComment: 'ความเห็น', revCommentPh: 'ตรวจอะไรไปบ้าง ต้องแก้ตรงไหน', revSend: 'ส่งให้แอดมิน', revHint: 'ผลตรวจของคุณเป็นข้อเสนอ แอดมินเป็นคนให้คะแนนจริง', revNeedVerdict: 'เลือกผลตรวจก่อน', revNeedScore: 'เลือกโบนัสที่แนะนำ', revNeedComment: 'บอกหน่อยว่าต้องแก้อะไร', revSent: 'ส่งผลตรวจแล้ว', revYou: 'คุณแนะนำ', boardReview: 'ตรวจ', revFb: 'ความเห็นผู้ตรวจ', revChanges: 'ต้องแก้ไข', revApproved: 'ผ่าน', title: 'คอนเทนต์', viewAs: 'มุมมอง', modeIntern: 'Intern', modeContent: 'คอนเทนต์', viewList: 'มุมมองรายการ', viewMonth: 'มุมมองปฏิทิน', calMonth: 'เดือน', calWeek: 'สัปดาห์', calDay: 'วัน', viewBoard: 'มุมมองบอร์ด', brief: 'บรีฟ / สคริปต์', briefPh: 'โครงเรื่อง ฮุค สคริปต์ รายการช็อต…', steps: 'เช็กลิสต์', stepPh: 'เพิ่มขั้นตอน', stepAdd: 'เพิ่ม', stepTpl: 'ใช้ขั้นตอนมาตรฐาน', links: 'ลิงก์ (Drive ฟุตเทจ ภาพปก…)', badLink: 'ลิงก์ต้องขึ้นต้นด้วย http:// หรือ https://', tooMany: 'ได้สูงสุด 15 ขั้นตอนและ 5 ลิงก์', movePrev: 'ย้อนกลับหนึ่งขั้น', moveNext: 'ไปขั้นถัดไป', planDay: 'วางแผน', emptyDay: 'วันนี้ยังไม่มีอะไร', pickDay: 'แตะวันที่เพื่อดูหรือวางแผนคอนเทนต์', plan: 'กำหนดส่ง (ไม่บังคับ)', ideas: 'ไอเดีย', drafts: 'ฉบับร่าง', posted: 'โพสต์แล้ว', platforms: 'แพลตฟอร์ม', reviewed: 'ตรวจแล้ว', pending: 'รอตรวจ', add: 'เพิ่มคอนเทนต์', addNum: 'เพิ่มตัวเลข',
+        th: { review: 'ตรวจงาน', revTodo: 'รอตรวจ', revMine: 'ที่ฉันตรวจแล้ว', revEmpty: 'ยังไม่มีงานรอตรวจ', revMineEmpty: 'ยังไม่ได้ตรวจงานชิ้นไหน', revOpen: 'ตรวจ', revTitle: 'ตรวจคอนเทนต์', revVerdict: 'ผลตรวจ', revOk: 'ผ่าน', revFix: 'ต้องแก้', revScore: 'โบนัสที่แนะนำ (pts)', revComment: 'ความเห็น', revCommentPh: 'ตรวจอะไรไปบ้าง ต้องแก้ตรงไหน', revSend: 'ส่งให้แอดมิน', revHint: 'ผลตรวจของคุณเป็นข้อเสนอ แอดมินเป็นคนให้คะแนนจริง', revNeedVerdict: 'เลือกผลตรวจก่อน', revNeedScore: 'เลือกโบนัสที่แนะนำ', revNeedComment: 'บอกหน่อยว่าต้องแก้อะไร', revSent: 'ส่งผลตรวจแล้ว', revYou: 'คุณแนะนำ', boardReview: 'ตรวจ', revFb: 'ความเห็นผู้ตรวจ', revChanges: 'ต้องแก้ไข', revApproved: 'ผ่าน', resub: 'แก้แล้วส่งใหม่', resubBtn: 'ส่งให้ตรวจอีกครั้ง', resubDone: 'ส่งใหม่แล้ว', resubHint: 'ผู้ตรวจและแอดมินจะเห็นเวอร์ชันใหม่ ตัวเลขเดิมยังอยู่', resubbed: 'ส่งใหม่แล้ว', resubSince: 'ส่งใหม่หลังคุณตรวจ', title: 'คอนเทนต์', viewAs: 'มุมมอง', modeIntern: 'Intern', modeContent: 'คอนเทนต์', viewList: 'มุมมองรายการ', viewMonth: 'มุมมองปฏิทิน', calMonth: 'เดือน', calWeek: 'สัปดาห์', calDay: 'วัน', viewBoard: 'มุมมองบอร์ด', brief: 'บรีฟ / สคริปต์', briefPh: 'โครงเรื่อง ฮุค สคริปต์ รายการช็อต…', steps: 'เช็กลิสต์', stepPh: 'เพิ่มขั้นตอน', stepAdd: 'เพิ่ม', stepTpl: 'ใช้ขั้นตอนมาตรฐาน', links: 'ลิงก์ (Drive ฟุตเทจ ภาพปก…)', badLink: 'ลิงก์ต้องขึ้นต้นด้วย http:// หรือ https://', tooMany: 'ได้สูงสุด 15 ขั้นตอนและ 5 ลิงก์', movePrev: 'ย้อนกลับหนึ่งขั้น', moveNext: 'ไปขั้นถัดไป', planDay: 'วางแผน', emptyDay: 'วันนี้ยังไม่มีอะไร', pickDay: 'แตะวันที่เพื่อดูหรือวางแผนคอนเทนต์', plan: 'กำหนดส่ง (ไม่บังคับ)', ideas: 'ไอเดีย', drafts: 'ฉบับร่าง', posted: 'โพสต์แล้ว', platforms: 'แพลตฟอร์ม', reviewed: 'ตรวจแล้ว', pending: 'รอตรวจ', add: 'เพิ่มคอนเทนต์', addNum: 'เพิ่มตัวเลข',
             emptyIdeas: 'ยังไม่มีไอเดีย จดไว้ก่อนลืมนะ', emptyDrafts: 'ยังไม่มีฉบับร่าง', emptyPosted: 'ยังไม่มีงานที่โพสต์ ลองส่งชิ้นแรกดู',
             sheet: 'ส่งคอนเทนต์', edit: 'แก้คอนเทนต์', stage: 'ขั้นตอน', platform: 'แพลตฟอร์ม', type: 'ประเภท', caption: 'แคปชั่นหรือไอเดีย', capPh: 'คอนเทนต์นี้เกี่ยวกับอะไร',
             images: 'รูปภาพ', addImg: 'เพิ่ม', link: 'ลิงก์โพสต์', date: 'วันที่โพสต์', send: 'ส่งให้ตรวจ', save: 'บันทึก', saving: 'กำลังบันทึก…', other: 'Case, Work, Event… (งานประเภทอื่น)', del: 'ลบฉบับร่างนี้', delAsk: 'ลบฉบับร่างนี้ใช่ไหม',
@@ -89,6 +89,7 @@
         });
     }
     function isReviewed(w) { return w.status && w.status !== 'รอตรวจ'; }
+    function tms(t) { return t && t.toMillis ? t.toMillis() : (Number(t) || 0); }   // Firestore Timestamp or Date.now() millis → millis
     function fmtScore(n) { n = Number(n) || 0; return (Math.round(n * 100) / 100).toString(); }
     function fmtNum(n) { n = Number(n); return n >= 1000 ? (Math.round(n / 100) / 10) + 'k' : String(n); }
 
@@ -120,7 +121,14 @@
     function thumb(p, img) { return '<div class="cc-th">' + (img ? '<img src="' + esc(img) + '" alt="">' : '<i class="' + p[2] + '"></i>') + '</div>'; }
     // Reviewer feedback on my own post (recommendations only — the admin still scores). Latest per reviewer, newest first.
     function fbList(w) { return ownReviews[w.id] || []; }
-    function needsChanges(w) { return !isReviewed(w) && fbList(w).some(function (r) { return r.verdict === 'changes'; }); }
+    function needsChanges(w) { return !isReviewed(w) && fbList(w).some(function (r) { return r.verdict === 'changes' && tms(r.at) > tms(w.resubmittedAt); }); }
+    function isResubmitted(w) { return !isReviewed(w) && tms(w.resubmittedAt) > 0 && !needsChanges(w); }
+    function statePill(w, t) {
+        if (isReviewed(w)) return '<span class="cc-pill done">' + t.reviewed + (Number(w.score) ? ' +' + esc(fmtScore(w.score)) : '') + '</span>';
+        if (needsChanges(w)) return '<span class="cc-pill fix">↩ ' + t.revChanges + '</span>';
+        if (isResubmitted(w)) return '<span class="cc-pill plan">↻ ' + t.resubbed + '</span>';
+        return '<span class="cc-pill pending">' + t.pending + '</span>';
+    }
     function fbHtml(w, t, full) {
         var l = fbList(w); if (!l.length) return '';
         return l.slice(0, full ? 5 : 1).map(function (r) {
@@ -132,7 +140,7 @@
         var p = plat(w.platform), m = w.metrics && (w.metrics.likes != null || w.metrics.reach != null) ? w.metrics : null;
         var metric = m ? '<span><i class="fa-solid fa-heart"></i> ' + esc(fmtNum(m.likes || 0)) + '</span><span><i class="fa-solid fa-eye"></i> ' + esc(fmtNum(m.reach || 0)) + '</span>'
             : '<button type="button" class="cc-chip" data-act="metrics" data-id="' + esc(w.id) + '"><i class="fa-solid fa-plus"></i> ' + t.addNum + '</button>';
-        var st = isReviewed(w) ? '<span class="cc-pill done">' + t.reviewed + (Number(w.score) ? ' +' + esc(fmtScore(w.score)) : '') + '</span>' : '<span class="cc-pill pending">' + t.pending + '</span>';
+        var st = statePill(w, t);
         return '<div class="cc-row" data-act="metrics" data-id="' + esc(w.id) + '">' + thumb(p, w.images && w.images[0]) + '<div class="cc-main">' +
             '<div class="cc-meta"><span class="cc-pill">' + esc(typeLabel(w.ctype)) + '</span><span>' + esc(p[1]) + ' · ' + esc(dayLabel(w.postDate)) + '</span></div>' +
             '<div class="cc-cap">' + esc(w.caption || w.title) + '</div><div class="cc-foot">' + metric + st + '</div>' + fbHtml(w, t) + '</div></div>';
@@ -173,7 +181,7 @@
         var card = function (w) {
             var p = plat(w.platform);
             return '<div class="cc-kc" data-act="metrics" data-id="' + esc(w.id) + '"><div class="cc-meta"><i class="' + p[2] + '" style="color:' + (PLAT_COLOR[w.platform] || '#64748b') + '"></i><span class="cc-pill">' + esc(typeLabel(w.ctype)) + '</span><span>' + esc(dayLabel(w.postDate)) + '</span></div>' +
-                '<div class="cc-cap">' + esc(w.caption || w.title) + '</div><div class="cc-foot">' + (isReviewed(w) ? '<span class="cc-pill done">' + t.reviewed + (Number(w.score) ? ' +' + esc(fmtScore(w.score)) : '') + '</span>' : needsChanges(w) ? '<span class="cc-pill fix">↩ ' + t.revChanges + '</span>' : '<span class="cc-pill pending">' + t.pending + '</span>') + '</div>' + fbHtml(w, t) + '</div>';
+                '<div class="cc-cap">' + esc(w.caption || w.title) + '</div><div class="cc-foot">' + statePill(w, t) + '</div>' + fbHtml(w, t) + '</div>';
         };
         var inReview = posted.filter(function (w) { return !isReviewed(w); }), done = posted.filter(isReviewed);
         return '<div class="cc-board">' + cols + '<section class="cc-col"><div class="cc-colh"><b>' + t.boardReview + '</b><span>' + inReview.length + '</span></div>' + inReview.map(card).join('') + '</section>' +
@@ -191,7 +199,9 @@
 
     function sentLine(w, t) {
         var r = myReviews[w.id];
-        return r ? '<div class="cc-sent">' + esc(t.revYou) + ' ' + (r.verdict === 'approve' ? '✅ +' + esc(fmtScore(r.score)) : '↩ ' + esc(t.revFix)) + '</div>' : '';
+        if (!r) return '';
+        return '<div class="cc-sent">' + esc(t.revYou) + ' ' + (r.verdict === 'approve' ? '✅ +' + esc(fmtScore(r.score)) : '↩ ' + esc(t.revFix)) + '</div>' +
+            (tms(w.resubmittedAt) > tms(r.at) ? '<div class="cc-sent fix">↻ ' + esc(t.resubSince) + '</div>' : '');
     }
     function reviewRow(w, t) {
         var p = plat(w.platform), m = w.metrics && (w.metrics.likes != null || w.metrics.reach != null) ? w.metrics : null;
@@ -204,7 +214,8 @@
     }
     function reviewHtml(t) {
         var others = allPosts.filter(function (w) { return w.userId !== userId; });
-        var todo = others.filter(function (w) { return !isReviewed(w) && !myReviews[w.id]; }), mine = others.filter(function (w) { return myReviews[w.id]; });
+        var todo = others.filter(function (w) { return !isReviewed(w) && (!myReviews[w.id] || tms(w.resubmittedAt) > tms(myReviews[w.id].at)); });   // resubmitted after my review = look again
+        var mine = others.filter(function (w) { return myReviews[w.id] && todo.indexOf(w) < 0; });
         var list = revFilter === 'mine' ? mine : todo;
         return '<div class="cc-rail" role="group">' + [['todo', t.revTodo, todo.length], ['mine', t.revMine, mine.length]].map(function (c) {
             return '<button type="button" class="cc-chip" data-rvf="' + c[0] + '" aria-pressed="' + (revFilter === c[0]) + '">' + c[1] + ' ' + c[2] + '</button>';
@@ -430,6 +441,7 @@
         else if (act === 'save') save();
         else if (act === 'del') del();
         else if (act === 'savenum') saveNumbers(a.dataset.id);
+        else if (act === 'resubmit') resubmit(a.dataset.id);
         else if (act === 'rvsend') sendReview();
     }
 
@@ -556,6 +568,9 @@
             '<div class="cc-row" style="padding:12px 0;cursor:default"><div class="cc-th"><i class="' + p[2] + '"></i></div><div class="cc-main"><div class="cc-cap">' + esc(w.caption || w.title) + '</div><div class="cc-meta">' + esc(p[1]) + ' · ' + esc(typeLabel(w.ctype)) + ' · ' + esc(dayLabel(w.postDate)) + '</div>' +
             (/^https?:\/\//i.test(w.link || '') ? '<a href="' + esc(w.link) + '" target="_blank" rel="noopener" style="font-size:.78em">' + esc(w.link.replace(/^https?:\/\//, '').slice(0, 40)) + '</a>' : '') + '</div></div>' +
             (fbList(w).length ? '<span class="cc-lbl" style="margin-top:0">' + t.revFb + '</span>' + fbHtml(w, t, true) : '') +
+            (isReviewed(w) ? '' : '<details class="cc-resub"' + (needsChanges(w) ? ' open' : '') + '><summary class="cc-lbl">' + t.resub + '</summary><textarea id="ccRsCap" rows="3" maxlength="1000">' + esc(w.caption || '') + '</textarea>' +
+                '<input type="text" id="ccRsLink" maxlength="500" placeholder="https://…" value="' + esc(w.link || '') + '" style="margin-top:6px"><button type="button" class="cc-chip" data-act="resubmit" data-id="' + esc(id) + '" style="margin-top:8px"><i class="fa-solid fa-rotate-right"></i> ' + t.resubBtn + '</button>' +
+                '<div class="cc-err" style="color:#64748b">' + t.resubHint + '</div></details>') +
             '<div style="display:flex;gap:10px"><div style="flex:1"><span class="cc-lbl" style="margin-top:0">' + t.likes + '</span><input type="number" id="ccLikes" min="0" step="1" value="' + (m.likes != null ? esc(m.likes) : '') + '"></div>' +
             '<div style="flex:1"><span class="cc-lbl" style="margin-top:0">' + t.reach + '</span><input type="number" id="ccReach" min="0" step="1" value="' + (m.reach != null ? esc(m.reach) : '') + '"></div></div>' +
             '<div class="cc-err" style="color:#64748b">' + t.numHint + '</div><div class="cc-err" id="ccErr" role="status"></div><button type="button" class="cc-go" id="ccGo" data-act="savenum" data-id="' + esc(id) + '">' + t.saveNum + '</button></div>';
@@ -578,6 +593,25 @@
         finally { busy = false; go.disabled = false; }
     }
 
+    // The owner edits caption / link of an unscored post and sends it again: same works doc (owner-updatable already), stamped resubmittedAt so the
+    // reviewer's queue picks it up again and the owner's pill flips from "Changes requested" to "Resubmitted". Numbers and images stay.
+    async function resubmit(id) {
+        if (busy) return;
+        var t = L(), w = postedList().filter(function (x) { return x.id === id; })[0]; if (!w || isReviewed(w)) return;
+        var cap = overlay.querySelector('#ccRsCap').value.trim(), link = overlay.querySelector('#ccRsLink').value.trim();
+        if (!cap) return setErr(t.needCap);
+        if (!/^https?:\/\/\S+$/i.test(link)) return setErr(t.needLink);
+        busy = true; var go = overlay.querySelector('[data-act="resubmit"]'); if (go) go.disabled = true; setErr(t.saving, true);
+        try {
+            var auth = await ensureFirebaseAuthReady(10000);
+            if (!auth) throw new Error('Sign in required');
+            var p = plat(w.platform), title = '[' + p[1] + ' · ' + (TYPES[w.ctype] || TYPES.post)[0] + '] ' + cap.replace(/\s+/g, ' ').slice(0, 80);
+            await db.collection('works').doc(id).update({ caption: cap, link: link, title: title, resubmittedAt: firebase.firestore.FieldValue.serverTimestamp() });
+            if (typeof showToast === 'function') showToast(t.resubDone);
+            closeSheet(); render();
+        } catch (e) { console.error('[cafe] resubmit failed', e); if (overlay.classList.contains('open')) setErr(t.fail); }
+        finally { busy = false; if (go) go.disabled = false; }
+    }
     // ---------- wiring ----------
     function onHostClick(e) {
         var f = e.target.closest('[data-filter]'); if (f) { filter = f.dataset.filter; return render(); }

@@ -59,7 +59,7 @@ function showToast(m) { window.__toasts.push(m); }
 function openUnifiedModal() { window.__unified++; }
 function resizeProductPhoto() { return Promise.resolve({ blob: new Blob(['x']) }); }
 function uploadProductPhoto() { return Promise.resolve({ url: 'https://img.test/' + (++un) + '.jpg' }); }
-window.firebase = { firestore: { FieldValue: { serverTimestamp: () => ({ ts: 1 }) } } };
+window.firebase = { firestore: { FieldValue: { serverTimestamp: () => ({ ts: 1, toMillis: () => Date.now() }) } } };
 const allCbs = [];
 function pushWorks() { usersWorksCache = Object.keys(store.works).map(id => ({ id, ...store.works[id] })); allCbs.forEach(cb => cb({ docs: Object.keys(store.works).map(id => ({ id, data: () => store.works[id] })) })); window.cafeContentRender && window.cafeContentRender(); }
 const db = { collection(n) { return {
@@ -429,6 +429,36 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         await page.click('#ccOverlay [data-act="close"]');
         await page.click('#section-cafe-content [data-view="list"]'); await page.click('#section-cafe-content [data-filter="posted"]');
         assert.ok((await page.$eval('#section-cafe-content', e => e.innerText)).includes('Tighten the first line'), 'the list row shows the feedback');
+        // Owner: edit + resubmit an unscored post from its sheet (caption + link validated, same works doc, resubmittedAt stamped) → the pill flips to Resubmitted.
+        await page.click('#section-cafe-content .cc-row[data-act="metrics"][data-id="W1"]');
+        await page.waitForSelector('#ccOverlay.open #ccRsCap');
+        assert.equal(await page.$eval('#ccOverlay .cc-resub', e => e.open), true, 'the edit section is open when changes were requested');
+        assert.equal(await page.$eval('#ccRsCap', e => e.value), 'Cold brew batch — behind the bar', 'prefilled caption');
+        assert.equal(await page.$eval('#ccRsLink', e => e.value), 'https://www.tiktok.com/@cafe/video/1', 'prefilled link');
+        await page.fill('#ccRsCap', ''); await page.click('#ccOverlay [data-act="resubmit"]');
+        assert.ok(/caption or idea/.test(await page.$eval('#ccErr', e => e.textContent)), 'empty caption refused');
+        await page.fill('#ccRsCap', 'Cold brew v2 — tighter first line'); await page.fill('#ccRsLink', 'nope'); await page.click('#ccOverlay [data-act="resubmit"]');
+        assert.ok(/post link/i.test(await page.$eval('#ccErr', e => e.textContent)), 'bad link refused');
+        const updBefore = await page.evaluate(() => window.__upd.length);
+        await page.fill('#ccRsLink', 'https://www.tiktok.com/@cafe/video/2'); await page.click('#ccOverlay [data-act="resubmit"]');
+        await page.waitForFunction(() => !document.getElementById('ccOverlay').classList.contains('open'));
+        const rs = await page.evaluate(() => window.__upd[window.__upd.length - 1]);
+        assert.equal(rs[0] + '/' + rs[1], 'works/W1'); assert.deepEqual({ ...rs[2], resubmittedAt: typeof rs[2].resubmittedAt }, { caption: 'Cold brew v2 — tighter first line', link: 'https://www.tiktok.com/@cafe/video/2', title: '[TikTok · Reel] Cold brew v2 — tighter first line', resubmittedAt: 'object' }, 'one update on the own works doc, no score/status touched');
+        assert.equal(await page.evaluate(() => window.__upd.length), updBefore + 1);
+        assert.ok((await page.evaluate(() => window.__toasts)).includes('Resubmitted'));
+        assert.ok((await page.$eval('#section-cafe-content', e => e.innerText)).includes('↻ Resubmitted'), 'the list row says Resubmitted');
+        await page.click('#section-cafe-content [data-view="board"]');
+        assert.equal(await page.locator('.cc-col:nth-last-child(2) .cc-kc[data-id="W1"] .cc-pill.fix').count(), 0, 'no Changes-requested pill any more');
+        assert.ok((await page.$eval('.cc-col:nth-last-child(2) .cc-kc[data-id="W1"]', e => e.innerText)).includes('↻ Resubmitted'), 'the board card says Resubmitted and stays in Review');
+        // Reviewer: a post resubmitted AFTER my review goes back to To review with a marker; my older review is still remembered.
+        await page.evaluate(() => { store.works.W9.resubmittedAt = { toMillis: () => Date.now() + 60000 }; pushWorks(); });
+        await page.click('#section-cafe-content [data-view="review"]');
+        rv = await page.$eval('#section-cafe-content', e => e.innerText.replace(/\s+/g, ' '));
+        assert.ok(/To review 1/.test(rv) && /Reviewed by me 0/.test(rv), 'back in To review: ' + rv);
+        await page.click('#section-cafe-content [data-rvf="todo"]');   // the view still shows my earlier "Reviewed by me" pick
+        rv = await page.$eval('#section-cafe-content', e => e.innerText.replace(/\s+/g, ' '));
+        assert.ok(rv.includes('resubmitted since your review') && rv.includes('You suggested ↩ Needs changes'), 'row carries the marker and my last verdict: ' + rv);
+        await page.click('#section-cafe-content [data-view="list"]'); await page.click('#section-cafe-content [data-filter="posted"]');
         await page.evaluate(() => { store.works.W1.status = 'ตรวจแล้ว'; store.works.W1.score = 0.3; pushWorks(); });
         await page.click('#section-cafe-content [data-view="board"]');
         assert.deepEqual(await cols(), ['Idea 0', 'Script 0', 'Filming 0', 'Editing 0', 'Scheduled 0', 'Review 1', 'Posted 2'], 'once the admin scores it, it moves to Posted');
