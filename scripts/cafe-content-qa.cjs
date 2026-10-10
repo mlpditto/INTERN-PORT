@@ -1,5 +1,5 @@
-// V101.100: CAFE division — Social media content. The REAL public/cafe-content.js + cafe-content.css against a fake Firestore.
-// Non-CAFE users see nothing new (and the ＋ still opens Submit New); a CAFE member gets the Content card instead of Mission + DD Codex,
+// V101.100 / V101.101: Content Creator division (first called CAFE) — Social media content. The REAL public/cafe-content.js + cafe-content.css against a fake Firestore.
+// Other users see nothing new (and the ＋ still opens Submit New); a CAFE member gets the Content card instead of Mission + DD Codex,
 // ideas/drafts live on users/{uid}.socialDrafts, posting writes works (kind:'social') + the unified mirror, numbers update the works doc,
 // admin's review (status/score on works) shows back on the card. Also pins the wiring in index.html and the rules this feature relies on.
 const fs = require('node:fs');
@@ -79,7 +79,7 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.equal(await page.locator('#ccOverlay.open').count(), 0);
 
         // CAFE division.
-        await page.evaluate(() => { division = 'CAFE'; window.cafeContentSync(); });
+        await page.evaluate(() => { division = 'Content Creator'; window.cafeContentSync(); });
         assert.equal(await vis('#section-cafe-content'), true, 'CAFE sees the Content card');
         assert.equal(await vis('#section-kanban'), false, 'Mission hidden');
         assert.equal(await vis('#section-dd-codex'), false, 'DD Codex hidden');
@@ -178,12 +178,17 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         await page.click('#unified-fab-btn');
         assert.equal(await page.evaluate(() => window.__unified), 3, 'back to Submit New');
 
-        // Fits a phone.
-        await page.evaluate(() => { division = 'cafe'; localStorage.removeItem('uiLangTH'); window.cafeContentSync(); });
-        assert.equal(await vis('#section-cafe-content'), true, 'division match is case-insensitive');
+        // Names and a phone fit.
+        await page.evaluate(() => { division = '  content   CREATOR '; localStorage.removeItem('uiLangTH'); window.cafeContentSync(); });
+        assert.equal(await vis('#section-cafe-content'), true, 'division match ignores case and extra spaces');
+        await page.evaluate(() => { division = 'CAFE'; window.cafeContentSync(); });
+        assert.equal(await vis('#section-cafe-content'), true, 'the old name CAFE still works');
+        await page.evaluate(() => { division = 'Content Creators'; window.cafeContentSync(); });
+        assert.equal(await vis('#section-cafe-content'), false, 'a different division name does not match');
+        await page.evaluate(() => { division = 'Content Creator'; window.cafeContentSync(); });
         const w412 = await page.$eval('#section-cafe-content .cc-card', e => e.getBoundingClientRect().right);
         assert.ok(w412 <= 412, 'card fits 412 px: ' + w412);
         assert.deepEqual(errs, [], 'no page errors');
-        console.log('PASS: CAFE content — only the CAFE division gets the Content card (Mission + DD Codex hidden, ＋ opens the content sheet), ideas/drafts on users.socialDrafts, posting writes works(kind:social) + mirror, numbers + admin review show on the card, Thai toggle, moves back out of CAFE cleanly');
+        console.log('PASS: CAFE content — only the Content Creator division (and the old name CAFE) gets the Content card (Mission + DD Codex hidden, ＋ opens the content sheet), ideas/drafts on users.socialDrafts, posting writes works(kind:social) + mirror, numbers + admin review show on the card, Thai toggle, moves back out of CAFE cleanly');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

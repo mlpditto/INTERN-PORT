@@ -1,6 +1,6 @@
-/* CAFE division — Social media content.
-   Members of the CAFE division (getMyDivision() === 'CAFE') get a Content card instead of Mission + DD Codex, and the round ＋ button opens a
-   content sheet instead of the generic Submit New. Admin moves a group into the CAFE division (Groups & Divisions) and the UI follows.
+/* Content Creator division (called CAFE until it was renamed) — Social media content.
+   Members of that division (getMyDivision() is 'Content Creator', or the old 'CAFE') get a Content card instead of Mission + DD Codex, and the round ＋ button opens a
+   content sheet instead of the generic Submit New. Admin moves a group into the division (Groups & Divisions) and the UI follows.
    Data (no new collection, no rules change):
    · Ideas / Drafts  → users/{uid}.socialDrafts  (array, max 30, owner-writable like the rest of the user doc)
    · Posted          → works/{id} with kind:'social' (+ a unified `submissions` mirror, same dual write as submitWork). The admin reviews it in the
@@ -29,6 +29,7 @@
             needCap: 'เขียนแคปชั่นหรือไอเดียก่อน', needLink: 'วางลิงก์โพสต์ (ขึ้นต้นด้วย http)', needDate: 'เลือกวันที่โพสต์', full: 'บันทึกครบ 30 รายการแล้ว ลบอันเก่าก่อน', fail: 'บันทึกไม่สำเร็จ ลองอีกครั้ง', noimg: 'อ่านรูปนี้ไม่ได้',
             numTitle: 'เพิ่มตัวเลข', likes: 'ถูกใจ', reach: 'เข้าถึง', numHint: 'อัปเดตได้ทุกเมื่อ แอดมินจะเห็นตัวเลขล่าสุด', saveNum: 'บันทึกตัวเลข', badNum: 'ใส่จำนวนเต็ม 0 ขึ้นไป', likeReach: 'ถูกใจต้องไม่เกินจำนวนเข้าถึง', savedNum: 'บันทึกแล้ว', sentToast: 'ส่งให้ตรวจแล้ว', savedToast: 'บันทึกแล้ว' }
     };
+    var DIVISIONS = ['content creator', 'cafe'];   // the division's name, lower-cased; 'cafe' = what it was called first
     var on = false, host = null, overlay = null, drafts = [], filter = 'posted', unsub = null, listenUid = '', sheet = null, busy = false;
 
     function lang() { try { return localStorage.getItem('uiLangTH') === '1' ? 'th' : 'en'; } catch (_) { return 'en'; } }
@@ -38,7 +39,7 @@
     function typeLabel(k) { return (TYPES[k] || TYPES.post)[lang() === 'th' ? 1 : 0]; }
     function todayKey() { try { return getBangkokDateTimeParts().dateKey; } catch (_) { return new Date().toISOString().slice(0, 10); } }
     function dayLabel(key) { var d = new Date(String(key) + 'T12:00:00'); return isNaN(d) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }
-    function isCafe() { try { return typeof getMyDivision === 'function' && String(getMyDivision() || '').trim().toLowerCase() === 'cafe'; } catch (_) { return false; } }
+    function isCafe() { try { return typeof getMyDivision === 'function' && DIVISIONS.indexOf(String(getMyDivision() || '').replace(/\s+/g, ' ').trim().toLowerCase()) >= 0; } catch (_) { return false; } }
     function myWorks() { try { return (typeof usersWorksCache !== 'undefined' && usersWorksCache) || []; } catch (_) { return []; } }
     function postedList() {
         return myWorks().filter(function (w) { return w && w.kind === 'social'; }).sort(function (a, b) {
