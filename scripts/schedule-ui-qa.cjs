@@ -10,7 +10,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
 
 const idx = fs.readFileSync('public/index.html', 'utf8');
-assert.ok(/<title>Internship Portfolio \(V101\.92\)<\/title>/.test(idx), 'intern version bumped');
+assert.ok(/<title>Internship Portfolio \(V101\.93\)<\/title>/.test(idx), 'intern version bumped');
 for (const fn of ['function schRenderWeek(', 'function schWeekMarks(', 'function schItemDayKey(', 'function schWeekDayHtml(', 'function schWeekShift(', 'function schWeekPick(']) assert.ok(idx.includes(fn), fn + ' exists');
 assert.ok(idx.includes('<div id="sch-week"'), 'strip host sits above #sch-agenda');
 assert.ok(idx.indexOf('<div id="sch-week"') < idx.indexOf('<div id="sch-agenda"'), 'strip is above the list');
@@ -174,7 +174,7 @@ assert.match((await page.textContent('#sch-week .sch-rg h4')).trim(), /^\d{1,2}[
     assert.equal(tiles.length, 3, 'three Today tiles (check-in, Journal, Case): ' + JSON.stringify(tiles));
     assert.ok(tiles.every(t => Math.abs(t.t - tiles[0].t) < 2), 'one row');
     assert.ok(tiles[0].l < tiles[1].l && tiles[1].l < tiles[2].l, 'left → right');
-    assert.ok(tiles.every(t => t.h >= 100 && t.w >= 100), 'upright cards, not thin rows: ' + tiles.map(t => t.w + 'x' + t.h).join(' '));
+    assert.ok(tiles.every(t => t.h >= 56 && t.h <= 90 && t.w >= 100), 'cards (V101.93: as tall as their content, ~64px), not thin rows: ' + tiles.map(t => t.w + 'x' + t.h).join(' '));
     assert.match(tiles.map(t => t.txt).join('|'), /Check-in.*\|.*Journal.*\+0\.1.*\|.*Case.*\+0\.1/, 'check-in · Journal +0.1 · Case +0.1');
     assert.equal(await page.locator('#sch-agenda .sch-tile .ti').first().evaluate(e => getComputedStyle(e).fontSize), '23.712px'.replace('23.712px', await page.locator('#sch-agenda .sch-tile .ti').first().evaluate(e => getComputedStyle(e).fontSize)), 'icon sized');
     assert.equal(await page.evaluate(() => /schLaunchQuiz/.test(schTileHtml({ icon: '📝', title: 'x', quizId: 'z1', act: 'noop()' }, '#000', '#fff', '#ccc', [], new Date()))), true, 'a quiz tile keeps its ▶');

@@ -87,6 +87,24 @@ async function open(browser) {
         assert.ok(/Bonus \+/.test(head.aria), 'bonus wording is in aria-label: ' + head.aria);
         assert.equal(head.inHome, false);
 
+        // ---- V101.93 lean TODAY: no count badge, tiles ~64px with the reward as a corner pill, no "🔥0"
+        const lean = await page.evaluate(() => {
+            const head = document.querySelector('#sch-agenda > div'), kids = [...head.children].map(e => e.className.includes('act-streak') ? 'pill' : 'label');
+            const tile = document.querySelector('#sch-agenda .sch-tile'), tr = tile.getBoundingClientRect(), g = tile.querySelector('.tg').getBoundingClientRect();
+            return { kids, headText: head.textContent.replace(/\s+/g, ' ').trim(), tileH: Math.round(tr.height), rewardInside: g.left >= tr.left && g.right <= tr.right + 0.5 && g.top >= tr.top && g.top - tr.top < 14, rewardRight: tr.right - g.right < 14, rewardText: tile.querySelector('.tg').textContent.trim() };
+        });
+        assert.deepEqual(lean.kids, ['label', 'pill'], 'TODAY header = label + pill, no count badge: ' + JSON.stringify(lean));
+        assert.ok(lean.tileH >= 56 && lean.tileH <= 90, 'tile as tall as its content (was 116): ' + lean.tileH);
+        assert.ok(lean.rewardInside && lean.rewardRight && /^\+0\./.test(lean.rewardText), 'reward is a pill in the tile\'s top-right corner: ' + JSON.stringify(lean));
+        // streak 0 + checked in → no pill (and no lonely TODAY label when nothing else is due)
+        await page.evaluate(() => { window.computeEngagementStreak = () => ({ streak: 0, doneToday: true }); schRenderAgenda(); });
+        assert.equal(await page.locator('#sch-agenda .act-streak').count(), 0, 'no "🔥0" pill');
+        assert.deepEqual(await page.evaluate(() => [...document.querySelector('#sch-agenda > div').children].map(e => e.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean)), ['Today วันนี้'], 'TODAY header is just its label (no badge): ');
+        await page.evaluate(() => { const real = schAgendaItems; window.__realItems0 = real; schAgendaItems = () => [{ id: 'x', title: 'Only later', due: new Date(Date.now() + 5 * 864e5), icon: '📌', type: 'other' }]; schRenderAgenda(); });
+        assert.ok(!/Today/.test(await page.textContent('#sch-agenda')), 'nothing due + no pill → no lonely TODAY label');
+        await page.evaluate(() => { schAgendaItems = window.__realItems0; window.computeEngagementStreak = () => ({ streak: 12, doneToday: true }); schRenderAgenda(); });
+        assert.equal(await page.locator('#sch-agenda .act-streak.done').count(), 1, 'streak ≥ 1: the pill is back');
+
         // nothing due today → the header (and the pill) is still there
         const realItems = await page.evaluate(() => { window.__realItems = schAgendaItems; schAgendaItems = () => []; schRenderAgenda(); return true; });
         assert.equal(await page.locator('#sch-agenda .act-streak').count(), 1, 'pill stays when the agenda is empty');
@@ -155,6 +173,6 @@ async function open(browser) {
         }
         assert.deepEqual(errors.filter(e => !/firebase\./.test(e)), [], 'no page errors');
         await ctx.close();
-        console.log('PASS: check-in pill inline with TODAY (green/orange, kept when nothing is due, 44px tap), 💰 icon beside Goals, FIN opens above Schedule, home row empty');
+        console.log('PASS: check-in pill inline with TODAY (green/orange, kept when nothing is due, 44px tap, hidden at streak 0), no count badge, ~64px tiles with a corner reward pill, 💰 icon beside Goals, FIN opens above Schedule, home row empty');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
