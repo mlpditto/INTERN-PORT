@@ -17,7 +17,9 @@ assert.ok(idx.indexOf('<div id="sch-week"') < idx.indexOf('<div id="sch-agenda"'
 assert.ok(/\.sch-wd/.test(idx) && !/\.dc-view-tab[^{]*\.sch-wd/.test(idx), 'own classes, not .dc-view-tab');
 
 async function open(browser) {
-    const ctx = await browser.newContext({ viewport: { width: 412, height: 900 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+    // timezoneId: the app keys check-in / agenda days in Asia/Bangkok (getBangkokDateTimeParts), while the harness builds its keys from the page clock —
+    // on a UTC runner the two dates differ between 17:00 and 24:00 UTC and the "checked in today" pill never turned green. Pin the page to Bangkok.
+    const ctx = await browser.newContext({ viewport: { width: 412, height: 900 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, timezoneId: 'Asia/Bangkok' });
     const page = await ctx.newPage();
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.addInitScript(() => {
@@ -110,6 +112,7 @@ assert.match((await page.textContent('#sch-week .sch-rg h4')).trim(), /^\d{1,2}[
     await goTo(page, -1); const rYest = await ring(-1);
     assert.ok(rYest.includes('rgb(99, 102, 241)') && !rYest.includes('rgba(99'), 'yesterday: ONE full dark quiz ring: ' + rYest);
     await goTo(page, 1); assert.equal(await ring(1), 'none', 'a day with nothing has no ring');
+    await goTo(page, 0);   // on a Sunday, day +1 is next week's Monday — come back to the week that holds today before reading today's ring
     assert.equal(await page.evaluate(() => /-?\d+deg/.test(getComputedStyle(document.querySelector('#sch-week [data-schday="' + __key(0) + '"] .sch-n')).backgroundImage)), true, 'today ring is a conic gradient with gaps');
     assert.equal(await page.locator('#sch-week .sch-dt').count(), 0, 'no dots any more');
 
