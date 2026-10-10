@@ -29,6 +29,7 @@ const fbMarkup = html.slice(fbStart,fbEnd);
    window.db={collection:()=>({add:async data=>{writes.push(data);await new Promise(r=>setTimeout(r,30));},doc:()=>({set:async()=>{}}),where:()=>({get:async()=>({size:1})})})};
    window.showFeedbackReward=()=>{};window.closeFeedbackModal=()=>closed++;
   });
+  await page.addScriptTag({path:path.join(dir,'quiz-feedback-lang.js')}); // V101.95: fbT() for the feedback sheet
   for(const [a,b] of [
    ['        function quizTagList(', '        let qbTagFilter'], // V100.85 shared tag reader, used by renderFeedbackTopicChips
    ['        function quizStepIsAnswered(', '        function renderQuizStep(useExistingTime'],
@@ -42,7 +43,7 @@ const fbMarkup = html.slice(fbStart,fbEnd);
    renderFeedbackTopicChips();setFbRating(null);
   });
   assert.equal(await page.locator('#fb-rating').inputValue(),'');
-  assert.equal(await page.locator('#fb-topic-chip-rail option').count(),3);
+  assert.equal(await page.locator('#fb-topic-chip-rail .fb-tchip').count(),2);  // V101.95: chips (was 3 <option>s = the placeholder + these 2 deduplicated tags)
   await page.evaluate(()=>document.getElementById('quizModal').style.display='flex');
   // V100.71: the language <select> became a chip rail (qtRenderBar).
   await page.locator('.quiz-focus-language button[aria-label="Thai"]').click();
