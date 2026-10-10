@@ -185,6 +185,8 @@ window.historyLean = (() => {
                 '<span class="hl-tp" title="Points">' + pts.toFixed(1) + '<small>pt</small></span>' +
                 '<span class="hl-tb" title="Beri earned on these entries">🪙 <b>' + b + '</b></span>' +
                 (values.some(v => v > 0) ? '<span class="hl-spark" title="30-day trend">' + renderSparkline(values, 40, 16) + '</span>' : '');
+            const head = document.getElementById('work-section-sum');   // V101.92: the home accordion header shows the same totals, also while it is folded
+            if (head) head.innerHTML = summary.innerHTML;
         }
         const counts = getUnifiedTypeCounts(), rail = document.getElementById('unified-type-filters');
         if (rail) {
