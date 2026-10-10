@@ -3769,8 +3769,14 @@ async function runQuizDigest(kind, options) {
     // guard above. Since V98.09 the digest goes to the group only, so skip it
     // entirely on such a day rather than push a bubble reading nothing but
     // "✅ Done today · 0 / No submissions today".
+    //
+    // The 16:00 schedule also stays quiet when nobody submitted anything
+    // ("Done today · 0"): a bubble that only repeats the pending list is noise
+    // in the intern chat and spends a push of the monthly quota. The manual
+    // "Send digest now" button is an explicit ask, so it still goes out.
     const groupHasContent = newlyLive.length > 0 || doneQuizzes.length > 0 || pendingBlocks.length > 0;
-    const sendTargets = groupHasContent ? targets : [];
+    const quietDay = kind !== 'manual' && doneQuizzes.length === 0;
+    const sendTargets = groupHasContent && !quietDay ? targets : [];
     if (!sendTargets.length) {
         console.log('[notifyQuizDigest] nothing for the group today — no push');
         return { sent: false, reason: 'nothing-for-group' };
