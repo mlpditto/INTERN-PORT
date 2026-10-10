@@ -173,6 +173,50 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         txt = await page.$eval('#section-cafe-content', e => e.innerText);
         assert.ok(/Reviewed\s*\+0\.3/.test(txt.replace(/\n/g, ' ')) && /1\/1/.test(txt), 'reviewed pill + stats: ' + txt);
 
+        // Month view: a calendar of the month with a dot per post (filled = posted, hollow = planned idea/draft), tap a day for its items.
+        await page.click('#section-cafe-content .cc-view [data-view="month"]');
+        assert.ok((await page.$eval('#section-cafe-content .cc-calnav b', e => e.textContent)) === 'October 2026', 'month title');
+        assert.equal(await page.evaluate(() => localStorage.getItem('cafeContentView')), 'month', 'view is remembered');
+        assert.equal(await page.$eval('.cc-grid', g => [...g.children].indexOf(g.querySelector('.cc-day'))), 7 + 4, '1 Oct 2026 is a Thursday: 7 weekday labels + 4 blanks');
+        assert.equal(await page.locator('.cc-day').count(), 31, '31 days');
+        assert.equal(await page.$eval('.cc-day.today span', e => e.textContent), '9', 'today is marked');
+        assert.equal(await page.locator('.cc-day[data-day="2026-10-09"] i b:not(.hol)').count(), 1, 'a filled dot on the posted day');
+        assert.equal(await page.$eval('.cc-day[data-day="2026-10-09"] i b', e => getComputedStyle(e).backgroundColor), 'rgb(17, 24, 39)', 'dot is TikTok-coloured');
+        assert.ok(/Pick|Tap a day/.test(await page.$eval('#section-cafe-content', e => e.innerText)), 'hint before a day is picked');
+        await page.click('.cc-day[data-day="2026-10-09"]');
+        txt = await page.$eval('#section-cafe-content', e => e.innerText);
+        assert.ok(txt.includes('Cold brew batch') && txt.includes('9 Oct'), 'the day lists its post: ' + txt);
+        await page.click('.cc-day[data-day="2026-10-10"]');
+        assert.ok(/Nothing on this day yet/.test(await page.$eval('#section-cafe-content', e => e.innerText)), 'empty day');
+        // plan an idea for that day
+        await page.click('#section-cafe-content [data-act="plan"]');
+        await page.waitForSelector('#ccOverlay.open');
+        assert.equal(await page.$eval('#ccOverlay .cc-chip[data-v="idea"]', e => e.getAttribute('aria-pressed')), 'true', 'planning starts as an Idea');
+        assert.equal(await page.$eval('#ccPlanDate', e => e.value), '2026-10-10', 'plan date preset to the tapped day');
+        assert.equal(await vis('#ccPlan'), true); assert.equal(await vis('#ccPosted'), false);
+        await page.click('#ccOverlay .cc-chip[data-v="posted"]');
+        assert.equal(await vis('#ccPlan'), false, 'Posted has no plan date'); assert.equal(await vis('#ccPosted'), true);
+        await page.click('#ccOverlay .cc-chip[data-v="idea"]');
+        await page.fill('#ccCap', 'Plan: pumpkin latte teaser');
+        await page.click('#ccGo');
+        await page.waitForFunction(() => !document.getElementById('ccOverlay').classList.contains('open'));
+        const planned = await page.evaluate(() => window.__lastUserSet.socialDrafts);
+        assert.equal(planned.length, 1); assert.equal(planned[0].plannedDate, '2026-10-10'); assert.equal(planned[0].stage, 'idea');
+        assert.equal(await page.locator('.cc-day[data-day="2026-10-10"] i b.hol').count(), 1, 'a hollow dot on the planned day');
+        txt = await page.$eval('#section-cafe-content', e => e.innerText);
+        assert.ok(txt.includes('Plan: pumpkin latte teaser') && /Idea/.test(txt), 'the planned idea is listed under its day (stays selected)');
+        // month navigation + month-scoped stats
+        await page.click('.cc-calnav [data-cal="-1"]');
+        assert.equal(await page.$eval('.cc-calnav b', e => e.textContent), 'September 2026');
+        assert.equal(await page.locator('.cc-day i b').count(), 0, 'no dots last month');
+        assert.ok(/Posted\s*0/.test((await page.$eval('.cc-stats', e => e.innerText)).replace(/\n/g, ' ')), 'stats follow the viewed month');
+        await page.click('.cc-calnav [data-cal="1"]');
+        assert.equal(await page.$eval('.cc-calnav b', e => e.textContent), 'October 2026');
+        await page.click('#section-cafe-content .cc-view [data-view="list"]');
+        assert.equal(await page.locator('.cc-grid').count(), 0, 'back to the list');
+        // remove the planned idea so later steps see the same drafts as before
+        await page.evaluate(() => { store.users.U1.socialDrafts = []; userCbs.forEach(cb => cb({ exists: true, data: () => store.users.U1 })); });
+
         // Other submission types are still one tap away; Thai follows the app's TH toggle.
         await page.click('#unified-fab-btn');
         await page.click('#ccOverlay .cc-link[data-act="other"]');

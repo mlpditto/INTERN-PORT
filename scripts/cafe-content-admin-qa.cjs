@@ -70,6 +70,32 @@ const db = { app: { auth: () => ({ currentUser: {}, onAuthStateChanged: cb => cb
         t = await txt();
         assert.ok(/Posts 4/.test(t) && /Likes 180/.test(t), 'all: ' + t);
         assert.equal(await page.$eval('.cca-body button[data-range="all"]', e => e.getAttribute('aria-pressed')), 'true');
+        // Calendar: a month grid with a dot per post (platform-coloured), a post count in the title, tap a day for its posts.
+        await page.click('.cca-body button[data-view="cal"]');
+        assert.equal(await page.locator('.cca-body button[data-range]').count(), 0, 'range chips are for the list view only');
+        const monthName = await page.evaluate(() => new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' }));
+        t = await txt();
+        assert.ok(t.includes('3 posts'), 'this month has 3 posts: ' + t);
+        const thisM = await page.evaluate(() => thisM);
+        assert.equal(await page.locator('.cca-body button[data-day]').count() >= 28, true, 'a full month of days');
+        assert.equal(await page.locator('.cca-body button[data-day="' + thisM + '-09"] i').count(), 1, 'one dot on the 9th');
+        assert.equal(await page.$eval('.cca-body button[data-day="' + thisM + '-09"] i', e => getComputedStyle(e).backgroundColor), 'rgb(225, 48, 108)', 'IG colour');
+        assert.equal(await page.locator('.cca-body button[data-day="' + thisM + '-08"] i').count(), 0, 'no dot on an empty day');
+        assert.ok(/Tap a day/.test(await txt()));
+        await page.click('.cca-body button[data-day="' + thisM + '-09"]');
+        t = await txt();
+        assert.ok(/Iced latte pour/.test(t) && /✅ Reviewed \+0\.3/.test(t) && !/Weekend special/.test(t), 'the day lists only its posts: ' + t);
+        await page.click('.cca-body button[data-day="' + thisM + '-08"]');
+        assert.ok(/No posts on this day/.test(await txt()));
+        await page.click('.cca-body button[data-cal="-1"]');
+        t = await txt();
+        assert.ok(t.includes('1 post') && !t.includes('3 posts'), 'previous month: ' + t);
+        const lastKey = await page.evaluate(() => lastD);
+        assert.equal(await page.locator('.cca-body button[data-day="' + lastKey + '"] i').count(), 1, 'last month post has its dot');
+        await page.click('.cca-body button[data-day="' + lastKey + '"]');
+        assert.ok(/Last month one/.test(await txt()), 'its post is listed');
+        await page.click('.cca-body button[data-view="list"]');
+        assert.equal(await page.locator('.cca-body button[data-range]').count(), 3, 'back to the list');
         assert.deepEqual(errs, [], 'no page errors');
         console.log('PASS: admin Content Creator panel — reads works kind:social, month filter, totals / by platform / by member / posts with numbers and review state, text-only rendering');
     } finally { await browser.close(); }

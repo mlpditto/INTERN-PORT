@@ -14,14 +14,14 @@
     var PLATFORMS = [['ig', 'IG', 'fa-brands fa-instagram'], ['fb', 'FB', 'fa-brands fa-facebook'], ['tt', 'TikTok', 'fa-brands fa-tiktok'], ['yt', 'YouTube', 'fa-brands fa-youtube'], ['line', 'LINE', 'fa-brands fa-line']];
     var TYPES = { post: ['Post', 'โพสต์'], reel: ['Reel', 'รีล'], story: ['Story', 'สตอรี่'], video: ['Video', 'วิดีโอ'] };
     var T = {
-        en: { title: 'Content', ideas: 'Ideas', drafts: 'Drafts', posted: 'Posted', platforms: 'Platforms', reviewed: 'Reviewed', pending: 'Pending review', add: 'New content', addNum: 'Add numbers',
+        en: { title: 'Content', viewList: 'List view', viewMonth: 'Month view', planDay: 'Plan', emptyDay: 'Nothing on this day yet.', pickDay: 'Tap a day to see or plan content.', plan: 'Plan date (optional)', ideas: 'Ideas', drafts: 'Drafts', posted: 'Posted', platforms: 'Platforms', reviewed: 'Reviewed', pending: 'Pending review', add: 'New content', addNum: 'Add numbers',
             emptyIdeas: 'No ideas yet. Jot one down before you forget it.', emptyDrafts: 'No drafts yet.', emptyPosted: 'Nothing posted yet. Share your first piece.',
             sheet: 'Submit content', edit: 'Edit content', stage: 'Stage', idea: 'Idea', draft: 'Draft', platform: 'Platform', type: 'Type', caption: 'Caption or idea', capPh: 'What is this content about?',
             images: 'Images', addImg: 'Add', link: 'Post link', date: 'Post date', send: 'Send for review', save: 'Save', saving: 'Saving…', other: 'Case, Work, Event… (other submissions)', del: 'Delete this draft', delAsk: 'Delete this draft?',
             hintPosted: 'Posted content is reviewed by the admin. Add numbers later from the card.', hintLocal: 'Saved for you only until you mark it Posted.',
             needCap: 'Write a caption or idea first.', needLink: 'Paste the post link (starting with http).', needDate: 'Pick the post date.', full: 'You already have 30 saved. Delete one first.', fail: 'Could not save. Please try again.', noimg: 'That image could not be read.',
             numTitle: 'Add numbers', likes: 'Likes', reach: 'Reach', numHint: 'Update any time — the latest numbers are what the admin sees.', saveNum: 'Save numbers', badNum: 'Enter whole numbers, zero or more.', likeReach: 'Likes cannot be higher than reach.', savedNum: 'Saved.', sentToast: 'Sent for review', savedToast: 'Saved' },
-        th: { title: 'คอนเทนต์', ideas: 'ไอเดีย', drafts: 'ฉบับร่าง', posted: 'โพสต์แล้ว', platforms: 'แพลตฟอร์ม', reviewed: 'ตรวจแล้ว', pending: 'รอตรวจ', add: 'เพิ่มคอนเทนต์', addNum: 'เพิ่มตัวเลข',
+        th: { title: 'คอนเทนต์', viewList: 'มุมมองรายการ', viewMonth: 'มุมมองปฏิทิน', planDay: 'วางแผน', emptyDay: 'วันนี้ยังไม่มีอะไร', pickDay: 'แตะวันที่เพื่อดูหรือวางแผนคอนเทนต์', plan: 'วันที่วางแผน (ไม่บังคับ)', ideas: 'ไอเดีย', drafts: 'ฉบับร่าง', posted: 'โพสต์แล้ว', platforms: 'แพลตฟอร์ม', reviewed: 'ตรวจแล้ว', pending: 'รอตรวจ', add: 'เพิ่มคอนเทนต์', addNum: 'เพิ่มตัวเลข',
             emptyIdeas: 'ยังไม่มีไอเดีย จดไว้ก่อนลืมนะ', emptyDrafts: 'ยังไม่มีฉบับร่าง', emptyPosted: 'ยังไม่มีงานที่โพสต์ ลองส่งชิ้นแรกดู',
             sheet: 'ส่งคอนเทนต์', edit: 'แก้คอนเทนต์', stage: 'ขั้นตอน', idea: 'ไอเดีย', draft: 'ร่าง', platform: 'แพลตฟอร์ม', type: 'ประเภท', caption: 'แคปชั่นหรือไอเดีย', capPh: 'คอนเทนต์นี้เกี่ยวกับอะไร',
             images: 'รูปภาพ', addImg: 'เพิ่ม', link: 'ลิงก์โพสต์', date: 'วันที่โพสต์', send: 'ส่งให้ตรวจ', save: 'บันทึก', saving: 'กำลังบันทึก…', other: 'Case, Work, Event… (งานประเภทอื่น)', del: 'ลบฉบับร่างนี้', delAsk: 'ลบฉบับร่างนี้ใช่ไหม',
@@ -53,39 +53,76 @@
     function fmtNum(n) { n = Number(n); return n >= 1000 ? (Math.round(n / 100) / 10) + 'k' : String(n); }
 
     // ---------- home card ----------
+    var PLAT_COLOR = { ig: '#e1306c', fb: '#1877f2', tt: '#111827', yt: '#ef4444', line: '#06c755' };
+    var WEEK = { en: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'], th: ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'] };
+    var view = (function () { try { return localStorage.getItem('cafeContentView') === 'month' ? 'month' : 'list'; } catch (_) { return 'list'; } })();
+    var viewMonth = '', selDay = '';
+    function monthShift(key, delta) { var y = +key.slice(0, 4), m = +key.slice(5, 7) - 1 + delta; var d = new Date(Date.UTC(y, m, 1)); return d.toISOString().slice(0, 7); }
+    function setView(v) { view = v; try { localStorage.setItem('cafeContentView', v); } catch (_) { /* storage may be blocked */ } if (v === 'month' && !viewMonth) viewMonth = todayKey().slice(0, 7); render(); }
+
+    function thumb(p, img) { return '<div class="cc-th">' + (img ? '<img src="' + esc(img) + '" alt="">' : '<i class="' + p[2] + '"></i>') + '</div>'; }
+    function postedRow(w, t) {
+        var p = plat(w.platform), m = w.metrics && (w.metrics.likes != null || w.metrics.reach != null) ? w.metrics : null;
+        var metric = m ? '<span><i class="fa-solid fa-heart"></i> ' + esc(fmtNum(m.likes || 0)) + '</span><span><i class="fa-solid fa-eye"></i> ' + esc(fmtNum(m.reach || 0)) + '</span>'
+            : '<button type="button" class="cc-chip" data-act="metrics" data-id="' + esc(w.id) + '"><i class="fa-solid fa-plus"></i> ' + t.addNum + '</button>';
+        var st = isReviewed(w) ? '<span class="cc-pill done">' + t.reviewed + (Number(w.score) ? ' +' + esc(fmtScore(w.score)) : '') + '</span>' : '<span class="cc-pill pending">' + t.pending + '</span>';
+        return '<div class="cc-row" data-act="metrics" data-id="' + esc(w.id) + '">' + thumb(p, w.images && w.images[0]) + '<div class="cc-main">' +
+            '<div class="cc-meta"><span class="cc-pill">' + esc(typeLabel(w.ctype)) + '</span><span>' + esc(p[1]) + ' · ' + esc(dayLabel(w.postDate)) + '</span></div>' +
+            '<div class="cc-cap">' + esc(w.caption || w.title) + '</div><div class="cc-foot">' + metric + st + '</div></div></div>';
+    }
+    function draftRow(d, t) {
+        var p = plat(d.platform);
+        return '<div class="cc-row" data-act="draft" data-id="' + esc(d.id) + '">' + thumb(p, d.images && d.images[0]) + '<div class="cc-main">' +
+            '<div class="cc-meta"><span class="cc-pill">' + esc(typeLabel(d.ctype)) + '</span><span>' + esc(p[1]) + (d.plannedDate ? ' · ' + esc(dayLabel(d.plannedDate)) : '') + '</span><span class="cc-pill plan">' + (d.stage === 'idea' ? t.idea : t.draft) + '</span></div>' +
+            '<div class="cc-cap">' + esc(d.caption) + '</div></div></div>';
+    }
+
+    function monthHtml(t, posted) {
+        var y = +viewMonth.slice(0, 4), m = +viewMonth.slice(5, 7), first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay(), days = new Date(Date.UTC(y, m, 0)).getUTCDate(), today = todayKey();
+        var byDay = {};
+        posted.forEach(function (w) { if (String(w.postDate || '').slice(0, 7) === viewMonth) (byDay[w.postDate] = byDay[w.postDate] || { p: [], d: [] }).p.push(w); });
+        drafts.forEach(function (d) { if (d.plannedDate && String(d.plannedDate).slice(0, 7) === viewMonth) (byDay[d.plannedDate] = byDay[d.plannedDate] || { p: [], d: [] }).d.push(d); });
+        var monthName = new Date(Date.UTC(y, m - 1, 15)).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+        var h = '<div class="cc-calnav"><button type="button" class="cc-chip" data-cal="-1" aria-label="Previous month">&lsaquo;</button><b>' + esc(monthName) + '</b><button type="button" class="cc-chip" data-cal="1" aria-label="Next month">&rsaquo;</button></div>';
+        h += '<div class="cc-grid">' + WEEK[lang()].map(function (w) { return '<span class="cc-wd">' + w + '</span>'; }).join('');
+        for (var i = 0; i < first; i++) h += '<span></span>';
+        for (var d = 1; d <= days; d++) {
+            var key = viewMonth + '-' + String(d).padStart(2, '0'), it = byDay[key], dots = '';
+            if (it) {
+                var all = it.p.map(function (w) { return ['f', w.platform]; }).concat(it.d.map(function (x) { return ['h', x.platform]; }));
+                dots = all.slice(0, 3).map(function (x) { var c = PLAT_COLOR[x[1]] || '#64748b'; return x[0] === 'f' ? '<b style="background:' + c + '"></b>' : '<b class="hol" style="border-color:' + c + '"></b>'; }).join('') + (all.length > 3 ? '<small>+' + (all.length - 3) + '</small>' : '');
+            }
+            h += '<button type="button" class="cc-day' + (key === today ? ' today' : '') + (key === selDay ? ' sel' : '') + '" data-day="' + key + '" aria-label="' + esc(dayLabel(key)) + (it ? ', ' + (it.p.length + it.d.length) : '') + '"><span>' + d + '</span><i>' + dots + '</i></button>';
+        }
+        h += '</div>';
+        if (selDay && selDay.slice(0, 7) === viewMonth) {
+            var s = byDay[selDay] || { p: [], d: [] };
+            h += '<div class="cc-dayhead"><b>' + esc(dayLabel(selDay)) + '</b><button type="button" class="cc-chip" data-act="plan" data-day="' + selDay + '"><i class="fa-solid fa-plus"></i> ' + t.planDay + '</button></div>' +
+                (s.p.length + s.d.length ? s.p.map(function (w) { return postedRow(w, t); }).join('') + s.d.map(function (x) { return draftRow(x, t); }).join('') : '<div class="cc-empty">' + t.emptyDay + '</div>');
+        } else h += '<div class="cc-empty">' + t.pickDay + '</div>';
+        return h;
+    }
+
     function render() {
         if (!host || !on) return;
         var t = L(), posted = postedList(), ideas = drafts.filter(function (d) { return d.stage === 'idea'; }), dr = drafts.filter(function (d) { return d.stage === 'draft'; });
-        var month = todayKey().slice(0, 7), mp = posted.filter(function (w) { return String(w.postDate || '').slice(0, 7) === month; });
+        if (!viewMonth) viewMonth = todayKey().slice(0, 7);
+        var month = view === 'month' ? viewMonth : todayKey().slice(0, 7), mp = posted.filter(function (w) { return String(w.postDate || '').slice(0, 7) === month; });
         var plats = {}; mp.forEach(function (w) { plats[w.platform] = 1; });
-        var rev = mp.filter(isReviewed).length;
-        var rows = '';
-        if (filter === 'posted') {
-            rows = posted.map(function (w) {
-                var p = plat(w.platform), img = w.images && w.images[0];
-                var m = w.metrics && (w.metrics.likes != null || w.metrics.reach != null) ? w.metrics : null;
-                var metric = m ? '<span><i class="fa-solid fa-heart"></i> ' + esc(fmtNum(m.likes || 0)) + '</span><span><i class="fa-solid fa-eye"></i> ' + esc(fmtNum(m.reach || 0)) + '</span>'
-                    : '<button type="button" class="cc-chip" data-act="metrics" data-id="' + esc(w.id) + '"><i class="fa-solid fa-plus"></i> ' + t.addNum + '</button>';
-                var st = isReviewed(w) ? '<span class="cc-pill done">' + t.reviewed + (Number(w.score) ? ' +' + esc(fmtScore(w.score)) : '') + '</span>' : '<span class="cc-pill pending">' + t.pending + '</span>';
-                return '<div class="cc-row" data-act="metrics" data-id="' + esc(w.id) + '"><div class="cc-th">' + (img ? '<img src="' + esc(img) + '" alt="">' : '<i class="' + p[2] + '"></i>') + '</div><div class="cc-main">' +
-                    '<div class="cc-meta"><span class="cc-pill">' + esc(typeLabel(w.ctype)) + '</span><span>' + esc(p[1]) + ' · ' + esc(dayLabel(w.postDate)) + '</span></div>' +
-                    '<div class="cc-cap">' + esc(w.caption || w.title) + '</div><div class="cc-foot">' + metric + st + '</div></div></div>';
-            }).join('');
-        } else {
-            rows = (filter === 'ideas' ? ideas : dr).map(function (d) {
-                var p = plat(d.platform), img = d.images && d.images[0];
-                return '<div class="cc-row" data-act="draft" data-id="' + esc(d.id) + '"><div class="cc-th">' + (img ? '<img src="' + esc(img) + '" alt="">' : '<i class="' + p[2] + '"></i>') + '</div><div class="cc-main">' +
-                    '<div class="cc-meta"><span class="cc-pill">' + esc(typeLabel(d.ctype)) + '</span><span>' + esc(p[1]) + '</span></div><div class="cc-cap">' + esc(d.caption) + '</div></div></div>';
-            }).join('');
-        }
-        if (!rows) rows = '<div class="cc-empty">' + (filter === 'ideas' ? t.emptyIdeas : filter === 'drafts' ? t.emptyDrafts : t.emptyPosted) + '</div>';
-        var monthName = new Date().toLocaleDateString('en-GB', { month: 'long', timeZone: 'Asia/Bangkok' });
-        host.innerHTML = '<div class="cc-card"><div class="cc-head"><i class="fa-solid fa-camera"></i> ' + t.title + '<span class="cc-month">' + esc(monthName) + '</span></div>' +
-            '<div class="cc-stats"><div class="cc-stat"><span>' + t.posted + '</span><b>' + mp.length + '</b></div><div class="cc-stat"><span>' + t.platforms + '</span><b>' + Object.keys(plats).length + '</b></div><div class="cc-stat"><span>' + t.reviewed + '</span><b>' + rev + '/' + mp.length + '</b></div></div>' +
-            '<div class="cc-rail" role="group">' + [['ideas', t.ideas, ideas.length], ['drafts', t.drafts, dr.length], ['posted', t.posted, posted.length]].map(function (c) {
+        var rev = mp.filter(isReviewed).length, body = '';
+        if (view === 'month') body = monthHtml(t, posted);
+        else {
+            var rows = filter === 'posted' ? posted.map(function (w) { return postedRow(w, t); }).join('') : (filter === 'ideas' ? ideas : dr).map(function (d) { return draftRow(d, t); }).join('');
+            if (!rows) rows = '<div class="cc-empty">' + (filter === 'ideas' ? t.emptyIdeas : filter === 'drafts' ? t.emptyDrafts : t.emptyPosted) + '</div>';
+            body = '<div class="cc-rail" role="group">' + [['ideas', t.ideas, ideas.length], ['drafts', t.drafts, dr.length], ['posted', t.posted, posted.length]].map(function (c) {
                 return '<button type="button" class="cc-chip" data-filter="' + c[0] + '" aria-pressed="' + (filter === c[0]) + '">' + c[1] + ' ' + c[2] + '</button>';
-            }).join('') + '</div>' + rows +
-            '<div class="cc-add"><button type="button" class="cc-chip" data-act="new"><i class="fa-solid fa-plus"></i> ' + t.add + '</button></div></div>';
+            }).join('') + '</div>' + rows;
+        }
+        var monthName = new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7) - 1, 15)).toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' });
+        host.innerHTML = '<div class="cc-card"><div class="cc-head"><i class="fa-solid fa-camera"></i> ' + t.title + '<span class="cc-month">' + esc(monthName) + '</span>' +
+            '<span class="cc-view" role="group" aria-label="View"><button type="button" data-view="list" aria-pressed="' + (view === 'list') + '" aria-label="' + t.viewList + '"><i class="fa-solid fa-list"></i></button><button type="button" data-view="month" aria-pressed="' + (view === 'month') + '" aria-label="' + t.viewMonth + '"><i class="fa-solid fa-calendar-days"></i></button></span></div>' +
+            '<div class="cc-stats"><div class="cc-stat"><span>' + t.posted + '</span><b>' + mp.length + '</b></div><div class="cc-stat"><span>' + t.platforms + '</span><b>' + Object.keys(plats).length + '</b></div><div class="cc-stat"><span>' + t.reviewed + '</span><b>' + rev + '/' + mp.length + '</b></div></div>' +
+            body + '<div class="cc-add"><button type="button" class="cc-chip" data-act="new"><i class="fa-solid fa-plus"></i> ' + t.add + '</button></div></div>';
     }
 
     // ---------- drafts (users/{uid}.socialDrafts) ----------
@@ -122,16 +159,17 @@
             return '<button type="button" class="cc-chip" data-group="' + group + '" data-v="' + i[0] + '" aria-pressed="' + (cur === i[0]) + '">' + (i[2] ? '<i class="' + i[2] + '"></i>' : '') + esc(i[1]) + '</button>';
         }).join('') + '</div>';
     }
-    function openSheet(d) {
+    function openSheet(d, preset) {
         ensureOverlay();
         var t = L();
-        sheet = { id: d ? d.id : '', stage: d ? d.stage : 'posted', platform: d ? d.platform : 'ig', ctype: d ? d.ctype : 'post', images: (d && d.images ? d.images : []).map(function (u) { return { url: u }; }) };
+        sheet = { id: d ? d.id : '', stage: d ? d.stage : preset ? 'idea' : 'posted', platform: d ? d.platform : 'ig', ctype: d ? d.ctype : 'post', images: (d && d.images ? d.images : []).map(function (u) { return { url: u }; }) };
         overlay.innerHTML = '<div class="cc-box"><div class="cc-bh"><i class="fa-solid fa-camera"></i> ' + (d ? t.edit : t.sheet) + '<button type="button" class="cc-x" data-act="close" aria-label="Close">&times;</button></div>' +
             '<span class="cc-lbl">' + t.stage + '</span>' + chips('stage', [['idea', t.idea], ['draft', t.draft], ['posted', t.posted]], sheet.stage) +
             '<span class="cc-lbl">' + t.platform + '</span>' + chips('platform', PLATFORMS, sheet.platform) +
             '<span class="cc-lbl">' + t.type + '</span>' + chips('ctype', Object.keys(TYPES).map(function (k) { return [k, TYPES[k][lang() === 'th' ? 1 : 0]]; }), sheet.ctype) +
             '<span class="cc-lbl">' + t.caption + '</span><textarea id="ccCap" rows="3" maxlength="1000" placeholder="' + esc(t.capPh) + '">' + esc(d ? d.caption : '') + '</textarea>' +
             '<span class="cc-lbl">' + t.images + '</span><div class="cc-imgs" id="ccImgs"></div>' +
+            '<div id="ccPlan"><span class="cc-lbl">' + t.plan + '</span><input type="date" id="ccPlanDate" value="' + esc((d && d.plannedDate) || (preset && preset.plannedDate) || '') + '"></div>' +
             '<div id="ccPosted"><span class="cc-lbl">' + t.link + '</span><input type="text" id="ccLink" maxlength="500" placeholder="https://…"><span class="cc-lbl">' + t.date + '</span><input type="date" id="ccDate" value="' + esc(todayKey()) + '" max="' + esc(todayKey()) + '"></div>' +
             '<div class="cc-err" id="ccErr" role="status"></div><button type="button" class="cc-go" id="ccGo" data-act="save"></button>' +
             '<div class="cc-err" style="color:#64748b;text-align:center" id="ccHint"></div>' +
@@ -142,6 +180,7 @@
     function paintStage() {
         var t = L(), posted = sheet.stage === 'posted';
         overlay.querySelector('#ccPosted').style.display = posted ? 'block' : 'none';
+        overlay.querySelector('#ccPlan').style.display = posted ? 'none' : 'block';
         overlay.querySelector('#ccGo').textContent = posted ? t.send : t.save;
         overlay.querySelector('#ccHint').textContent = posted ? t.hintPosted : t.hintLocal;
     }
@@ -202,7 +241,9 @@
                 filter = 'posted';
                 if (typeof showToast === 'function') showToast(t.sentToast);
             } else {
-                rest.unshift({ id: sheet.id || newId(), stage: sheet.stage, platform: sheet.platform, ctype: sheet.ctype, caption: cap, images: urls, updatedAt: Date.now() });
+                var plan = overlay.querySelector('#ccPlanDate').value, item = { id: sheet.id || newId(), stage: sheet.stage, platform: sheet.platform, ctype: sheet.ctype, caption: cap, images: urls, updatedAt: Date.now() };
+                if (/^\d{4}-\d{2}-\d{2}$/.test(plan)) { item.plannedDate = plan; viewMonth = plan.slice(0, 7); selDay = plan; }
+                rest.unshift(item);
                 await saveDrafts(rest);
                 filter = sheet.stage === 'idea' ? 'ideas' : 'drafts';
                 if (typeof showToast === 'function') showToast(t.savedToast);
@@ -264,9 +305,13 @@
     // ---------- wiring ----------
     function onHostClick(e) {
         var f = e.target.closest('[data-filter]'); if (f) { filter = f.dataset.filter; return render(); }
+        var vw = e.target.closest('[data-view]'); if (vw) return setView(vw.dataset.view);
+        var cal = e.target.closest('[data-cal]'); if (cal) { viewMonth = monthShift(viewMonth, +cal.dataset.cal); selDay = ''; return render(); }
+        var dy = e.target.closest('[data-day]'); if (dy && !dy.dataset.act) { selDay = selDay === dy.dataset.day ? '' : dy.dataset.day; return render(); }
         var a = e.target.closest('[data-act]'); if (!a) return;
         e.stopPropagation();
         if (a.dataset.act === 'new') openSheet(null);
+        else if (a.dataset.act === 'plan') openSheet(null, { plannedDate: a.dataset.day });
         else if (a.dataset.act === 'draft') openSheet(drafts.filter(function (d) { return d.id === a.dataset.id; })[0] || null);
         else if (a.dataset.act === 'metrics') openNumbers(a.dataset.id);
     }
