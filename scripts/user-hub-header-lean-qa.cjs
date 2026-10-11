@@ -16,7 +16,11 @@ for (const gone of ['data-gs-en="Profile"', '>LINE ID<', '>Enrollment CODE<', '<
 assert.ok(!header.includes('class="gs-id"') && !html.includes('gsCopyLineId'), 'V102.174: no LINE ID chip in the header any more');
 const social = html.slice(html.indexOf('<section class="gs-profile-card gs-card-social">'), html.indexOf('</section>', html.indexOf('<section class="gs-profile-card gs-card-social">')));
 assert.ok(/id="gs-social-line" hidden><\/div>\n<div class="gs-card-field gs-line-uid"><label for="gs-line-uid">LINE ID<\/label>[\s\S]*?onclick="gsCopyProfile\(this, false\)">Copy<\/button>[\s\S]*?<input type="text" id="gs-line-uid" readonly hidden>/.test(social), 'V102.174: the LINE ID is a read-only field with Copy, right after LINE in the Social card');
-assert.ok(/<button type="button" class="gs-code" id="gs-enrollment-chip" onclick="gsCopyEnrollmentCode\(\)"[^>]*><i class="fa-solid fa-key"[^>]*><\/i><code id="gs-enrollment-code">-<\/code><i class="fa-regular fa-copy"/.test(header), 'enrollment chip copies (⧉)');
+// V102.176: the enrollment CODE chip lives inline in the Personal details card header (not in the modal header); same chip: icon · code · ⧉
+const basicStart = html.indexOf('<section class="gs-profile-card gs-card-basic"><header>');
+const basicHeader = html.slice(basicStart, html.indexOf('</header>', basicStart));
+assert.ok(/Personal details<\/h3><button type="button" class="gs-code" id="gs-enrollment-chip" onclick="gsCopyEnrollmentCode\(\)"[^>]*><i class="fa-solid fa-key"[^>]*><\/i><code id="gs-enrollment-code">-<\/code><i class="fa-regular fa-copy"/.test(basicHeader), 'enrollment chip sits right after the Personal details title and copies');
+assert.ok(!header.includes('gs-enrollment-chip'), 'and is gone from the modal header');
 for (const id of ['gs-hub-pic', 'gs-title-name', 'gs-google-chip', 'gs-google-email', 'gs-user-score', 'gs-user-beri']) assert.ok(header.includes('id="' + id + '"'), 'header keeps #' + id);
 const order = ['gs-header-person', 'class="gs-ident"', 'class="gs-spacer"', 'class="gs-lang-switch"', 'gs-bal-pts', 'gs-bal-beri', 'gs-header-close'].map(m => header.indexOf(m));
 assert.ok(order.every((v, i) => v >= 0 && (i === 0 || v > order[i - 1])), 'order: person · identity · spacer · EN/TH · points · Beri · ×');
@@ -67,9 +71,8 @@ const markup = '<div id="groupSelectModal" style="width:100%"><div class="modal-
         const top = sel => page.$eval(sel, e => Math.round(e.getBoundingClientRect().top + e.getBoundingClientRect().height / 2));   // vertical centre: items differ in height on one line
         const vis = sel => page.$eval(sel, e => !e.hidden && e.getClientRects().length > 0);
         // header: one line on a desktop width
-        const tops = await Promise.all(['.gs-header-person', '#gs-enrollment-chip', '.gs-lang-switch', '.gs-bal-pts', '.gs-bal-beri', '.gs-header-close'].map(top));
+        const tops = await Promise.all(['.gs-header-person', '.gs-lang-switch', '.gs-bal-pts', '.gs-bal-beri', '.gs-header-close'].map(top));
         assert.ok(Math.max(...tops) - Math.min(...tops) <= 6, 'everything on one line at 900px: ' + tops.join(','));
-        assert.equal(await page.$eval('#gs-enrollment-chip', e => e.querySelectorAll('.fa-copy').length), 1, 'enrollment code has ⧉');
         // group block
         assert.equal(await page.$eval('#gs-current-group .grp-chip', e => e.id + '|' + e.className + '|' + e.querySelector('.grp-name').textContent + '|' + e.getAttribute('aria-expanded')), 'gs-group-toggle|grp-chip gs-main on|EXTERN|false', 'main group = rail chip, selected look, carries the toggle');
         // V102.171: the division this group is ranked in sits beside the main chip; one tap opens Divisions & Groups
