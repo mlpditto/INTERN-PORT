@@ -94,6 +94,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function render() {
         body.replaceChildren();
+        // V102.162: nothing posted yet → the card stays out of the Dashboard altogether (it reappears with the first post).
+        section.hidden = !posts.length;
         const list = posts.filter(inRange);
         const suggested = posts.filter(w => !reviewed(w) && recs[w.id]).length;
         summary.textContent = '📸 Content Creator' + (posts.length ? ' · ' + posts.length : '') + (suggested ? ' · ' + suggested + ' suggested' : '');
