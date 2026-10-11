@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.170)</title>
+    <title>Nika Admin (V102.171)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -4083,6 +4083,7 @@
         #groupSelectModal .gs-grp-row .gs-main[aria-expanded="true"]::after { content:'\25B4'; }
         #groupSelectModal .gs-also { font-size:11px; color:#94a3b8; margin-left:4px; }
         #groupSelectModal .gs-also[hidden] { display:none; }
+        #groupSelectModal .gs-divchip { font-size:12px; }
         #groupSelectModal .gs-extra-chips { display:contents; }
         #groupSelectModal .gs-extra-chips .grp-chip { opacity:.6; }
         #groupSelectModal .gs-extra-chips .grp-chip::after { content:' ×'; opacity:.6; }
@@ -14622,10 +14623,6 @@
                  static "Group Organization" callout that used to sit here just repeated
                  the hint line above the chip rail; its wording survives as the tooltip. -->
             <!-- V102.59: rename / merge / visibility / delete / divisions all live in ONE window now. -->
-            <div style="display:flex; align-items:center; gap:16px; margin:0 0 14px;">
-                <button type="button" onclick="openDivisionsModal()" title="Rename, merge, delete groups · visibility · divisions"
-                    style="background:none; border:none; color:#94a3b8; font-size:0.78em; cursor:pointer; margin:0; padding:2px 0;"><i class="fa-solid fa-gear"></i> <span data-gs-en="Divisions &amp; Groups" data-gs-th="Division และกลุ่ม">Divisions &amp; Groups</span></button>
-            </div>
 
             </div>
             </section>
@@ -36507,7 +36504,16 @@ They can connect again from LINE.
                 const live = gs.filter(g => groupActiveCount(g) > 0 || g.toUpperCase() === curUp);
                 const empty = gs.filter(g => !live.includes(g));
                 return `<div class="gs-sec"><div class="gs-sec-head">${title} <small>${note}</small></div><div class="gs-sec-row">${live.map(chip).join('')}${empty.length ? `<span class="gs-sec-empty" style="display:${gsEmptyOpen ? 'contents' : 'none'};">${empty.map(chip).join('')}</span>${gsEmptyOpen ? '' : `<button type="button" class="grp-chip grp-empty" onclick="gsEmptyOpen = true; renderGsGroupList();" style="--c:#64748b;">+ ${empty.length} empty</button>`}` : ''}</div></div>`;
-            }).join('') + `<div class="gs-sec-row"><button type="button" class="grp-chip grp-empty gs-chip-new" onclick="gsNewGroup(this)" style="--c:#475569;"><i class="fa-solid fa-plus"></i> New group</button></div>`;
+            }).join('') + `<div class="gs-sec-row"><button type="button" class="grp-chip grp-empty gs-chip-new" onclick="gsNewGroup(this)" style="--c:#475569;"><i class="fa-solid fa-plus"></i> New group</button><button type="button" class="grp-chip gs-chip-div" onclick="openDivisionsModal()" title="Rename, merge, delete groups · visibility · divisions" style="--c:#4f46e5;"><i class="fa-solid fa-shield-halved"></i> Divisions &amp; Groups</button></div>`;
+        }
+
+        // V102.171: "🛡️ RSU 2" beside the main group chip = the division this group is ranked in ("Only I" when none). One tap opens Divisions & Groups.
+        function gsDivisionChipHtml(group) {
+            const key = String(group || '').trim().toUpperCase();
+            const cfg = divisionConfig || {};
+            const home = Object.keys(cfg).find(n => (cfg[n] || []).some(x => String(x).trim().toUpperCase() === key)) || '';
+            const n = home ? (cfg[home] || []).reduce((t, x) => t + groupActiveCount(x), 0) : groupActiveCount(group);
+            return groupChipHtml(home || 'Only I', { cls: 'gs-divchip', color: home ? divColor(home) : '#64748b', icon: home ? 'fa-shield-halved' : 'fa-user', active: n, total: n, hint: 'open Divisions & Groups', attrs: 'onclick="openDivisionsModal()"' });
         }
 
         // V102.164: the main group is painted as the rail chip; tapping it opens / folds the picker (it carries #gs-group-toggle).
@@ -36517,7 +36523,7 @@ They can connect again from LINE.
             const g = String(name || '').trim() || 'ไม่ระบุชื่อ';
             const pane = document.getElementById('gs-pane-group');
             const open = !!(pane && !pane.hidden);
-            box.innerHTML = groupChipHtml(g, { on: true, cls: 'gs-main', hint: 'tap to change group', attrs: `id="gs-group-toggle" aria-expanded="${open}" aria-controls="gs-pane-group" onclick="toggleGsGroups()"` });
+            box.innerHTML = groupChipHtml(g, { on: true, cls: 'gs-main', hint: 'tap to change group', attrs: `id="gs-group-toggle" aria-expanded="${open}" aria-controls="gs-pane-group" onclick="toggleGsGroups()"` }) + gsDivisionChipHtml(g);
             gsDirtyPaint();
         }
 
@@ -51116,7 +51122,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 setDivDirty(false);
                 showToast("Divisions Saved!");
                 document.getElementById('divisionsModal').style.display = 'none';
-                if (document.getElementById('groupSelectModal').style.display !== 'none') renderGsGroupList(); // V102.59
+                if (document.getElementById('groupSelectModal').style.display !== 'none') { renderGsGroupList(); gsPaintMainGroup(document.getElementById('gs-input').value); } // V102.59 (+V102.171: the division chip)
             } catch (e) { alert(e.message); }
         }
 
