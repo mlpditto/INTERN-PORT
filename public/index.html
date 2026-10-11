@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.114)</title>
+    <title>Internship Portfolio (V101.115)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <link rel="stylesheet" href="cafe-content.css?v=V101.114">
     <meta charset="UTF-8">
@@ -6364,15 +6364,11 @@
 
                     <div>
                         <label
-                            style="font-size:0.75em; font-weight:800; color:#444; text-transform:uppercase;">Group / Track กลุ่ม/สายงาน</label>
-                        <select id="req-group"
+                            style="font-size:0.75em; font-weight:800; color:#444; text-transform:uppercase;">Division (optional) ไม่บังคับ</label>
+                        <!-- V101.115: the request asks for a DIVISION (optional) instead of a group; the admin picks the group when handling it. Options come from the divisions config (showRequestView). -->
+                        <select id="req-division"
                             style="width:100%; padding:10px; border-radius:8px; border:1px solid #ddd; margin-top:4px; font-family:'Kanit'; font-size:0.95em; background:white;">
-                            <option value="Intern">Intern นศ.ฝึกงานทั่วไป</option>
-                            <option value="Extern">Extern นศภ. ผลัดปฏิบัติงาน</option>
-                            <option value="Junior">Junior น้องใหม่/ฝึกงานระยะสั้น</option>
-                            <option value="Pharmacists">Pharmacists</option>
-                            <option value="IT">IT / Dev</option>
-                            <option value="Public">Other Public อื่นๆ</option>
+                            <option value="">Not sure — admin will assign ยังไม่แน่ใจ ให้ผู้ดูแลจัดให้</option>
                         </select>
                     </div>
 
@@ -8614,6 +8610,19 @@
             document.getElementById('enroll-initial-view').style.display = 'none';
             document.getElementById('enroll-request-view').style.display = 'block';
             document.getElementById('enroll-pending-view').style.display = 'none';
+            fillRequestDivisions();
+        }
+
+        // V101.115: the Request Access form offers the divisions the admin has set up (optional; blank = admin assigns). Best-effort — with no config it is just the blank option.
+        async function fillRequestDivisions() {
+            const sel = document.getElementById('req-division');
+            if (!sel || sel.dataset.filled) return;
+            try {
+                let cfg = (divisionConfig && Object.keys(divisionConfig).length) ? divisionConfig : null;
+                if (!cfg) { const d = await db.collection('quizzes').doc('--divisions-config--').get(); cfg = d.exists ? d.data() : {}; }
+                Object.keys(cfg).sort((a, b) => a.localeCompare(b)).forEach(name => { const o = document.createElement('option'); o.value = name; o.textContent = name; sel.appendChild(o); });
+                sel.dataset.filled = '1';
+            } catch (e) { console.warn('[request] divisions unavailable:', e.message); }
         }
 
         async function checkPendingAccessRequest() {
@@ -8640,7 +8649,7 @@
             const name = document.getElementById('req-name').value.trim();
             const nick = document.getElementById('req-nickname').value.trim();
             const institute = document.getElementById('req-institute').value.trim();
-            const group = document.getElementById('req-group').value;
+            const division = document.getElementById('req-division').value;   // V101.115: optional; the admin assigns the group on approval
             const start = document.getElementById('req-start').value;
             const end = document.getElementById('req-end').value;
             const statusEl = document.getElementById('req-status');
@@ -8659,12 +8668,13 @@
                     pictureUrl: userProfile.pictureUrl || "",
                     nickName: nick,
                     institute: institute,
-                    group: group,
+                    division: division,
+                    group: "",
                     startDate: start,
                     endDate: end,
                     type: "access_request",
-                    subject: `🚩 ขอสิทธิ์เข้าใช้งานใหม่ (${group})`,
-                    message: `ขอลงทะเบียน: ${name} (${nick})\nกลุ่ม: ${group}\nวันที่: ${start} ถึง ${end}`,
+                    subject: `🚩 ขอสิทธิ์เข้าใช้งานใหม่${division ? ' (' + division + ')' : ''}`,
+                    message: `ขอลงทะเบียน: ${name} (${nick})\nDivision: ${division || 'ไม่ระบุ'}\nวันที่: ${start} ถึง ${end}`,
                     status: "รอตรวจ",
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 };
