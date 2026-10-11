@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.172)</title>
+    <title>Nika Admin (V102.173)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -12954,6 +12954,13 @@
             #divisionsModal .dv-more { width:auto; min-height:0; margin:0; padding:5px 12px; border-radius:999px; border:1px dashed #94a3b8; background:rgba(255,255,255,.6); color:#64748b; font:inherit; font-size:12.5px; font-weight:700; cursor:pointer; }
             #divisionsModal .dv-bar { display:flex; align-items:center; gap:5px; flex-wrap:wrap; margin:9px 0 0; padding:6px 8px; border-radius:10px; background:rgba(255,255,255,.85); border:1px solid #e2e8f0; }
             #divisionsModal .dv-bar-n { font-size:11.5px; font-weight:800; color:#475569; margin-right:2px; }
+            #divisionsModal .dv-people { flex-basis:100%; display:flex; flex-wrap:wrap; gap:5px; padding-top:6px; border-top:1px dashed #e2e8f0; }
+            #divisionsModal .dv-person { width:auto; min-height:0; margin:0; padding:3px 10px; border-radius:999px; border:1px solid #cbd5e1; background:#fff; color:#334155; font:inherit; font-size:12px; font-weight:700; cursor:pointer; }
+            #divisionsModal .dv-person[aria-pressed="true"] { background:#4361ee; border-color:#4361ee; color:#fff; }
+            #divisionsModal .dv-person.dv-all { border-style:dashed; color:#64748b; }
+            #divisionsModal .dv-moverow { flex-basis:100%; display:flex; flex-wrap:wrap; align-items:center; gap:5px; padding-top:6px; border-top:1px dashed #e2e8f0; font-size:12px; font-weight:800; color:#475569; }
+            #divisionsModal .dv-mv:disabled { opacity:.45; cursor:not-allowed; }
+            #divisionsModal .dv-addgrp { border-style:solid; border-color:var(--dc); color:var(--dc); background:#fff; }
             #divisionsModal .dv-ib { width:30px; height:30px; min-height:0; margin:0; padding:0; border-radius:9px; border:1px solid #e2e8f0; background:#fff; font-size:13px; cursor:pointer; display:inline-grid; place-items:center; }
             #divisionsModal .dv-ib-del { border-color:#fecaca; background:#fff5f5; }
             #divisionsModal .dv-live { font-size:11px; opacity:.55; cursor:help; }
@@ -12976,7 +12983,7 @@
                     <span class="dv-help" aria-label="Group = the user's real unit (one per person). Division = a ranking board that joins several groups. Groups in no division are ranked on their own."
                         title="Group = หน่วยจริงของผู้ใช้ (1 คน 1 กลุ่ม) · Division = กระดานจัดอันดับที่รวมหลายกลุ่ม เช่น รวม IT + Dev เป็น &quot;Technical&quot; · กลุ่มที่ไม่อยู่ใน Division ใด (Only I) จัดอันดับเฉพาะในกลุ่มตัวเอง · แตะชิปกลุ่มเพื่อย้าย">i</span>
                 </div>
-                <div class="dv-filter lang-no-toggle"><input type="search" id="dv-filter" placeholder="Search groups across all divisions…" data-th-placeholder="ค้นหากลุ่มในทุก Division…" aria-label="Search groups" oninput="divFilter = this.value; renderDivisionAdminList()"></div>
+                <div class="dv-filter lang-no-toggle"><input type="search" id="dv-filter" placeholder="Search groups in every division — or type a name to add one…" data-th-placeholder="ค้นหากลุ่มในทุก Division — หรือพิมพ์ชื่อเพื่อเพิ่ม…" aria-label="Search groups" oninput="divFilter = this.value; renderDivisionAdminList()"></div>
                 <div id="div-editor" class="lang-no-toggle" onclick="onDivEditorClick(event)"></div>
                 <!-- V102.59: Merge (exact spellings, e.g. Extern → EXTERN) moved here from the per-user picker. -->
                 <div style="margin:4px 0 8px;"><button type="button" id="gs-merge-btn" onclick="toggleGroupMerge()" aria-expanded="false" title="Merge one group name into another — e.g. Extern → EXTERN" style="width:auto; min-height:0; margin:0; padding:2px 0; background:none; border:none; color:#64748b; font-size:0.8em; cursor:pointer;">⇄ Merge / fix spellings</button></div>
@@ -50945,9 +50952,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         let divPick = '';
         // V102.168: A2 view state. divSel = the rail entry shown ('' = first division, or Only I when there is none; '__only' = Only I).
         let divSel = '', divFilter = '', divShowEmpty = false;
+        // V102.173: people, not groups, move between divisions. divPickDiv = the division the picked group is read in ('' = Only I); divPeople = the selected user ids.
+        let divPickDiv = '', divPeople = new Set();
         function openDivisionsModal() {
             divDraft = JSON.parse(JSON.stringify(divisionConfig || {}));
-            divPick = ''; divSel = ''; divFilter = ''; divShowEmpty = false;
+            divPick = ''; divPickDiv = ''; divPeople = new Set(); divSel = ''; divFilter = ''; divShowEmpty = false;
             document.getElementById('dv-filter').value = '';
             document.getElementById('dv-newrow').hidden = true;
             document.getElementById('new-div-name').value = '';
@@ -51003,19 +51012,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         // V102.168: the Save bar shows only while the draft differs from what is saved, and says what changed ("Audit → CAFE · + RSU").
-        function divHomeIn(cfg, group) {
-            const key = String(group).toUpperCase();
-            return Object.keys(cfg || {}).find(n => (cfg[n] || []).some(g => String(g).toUpperCase() === key)) || '__only';
-        }
         function divDiff() {
-            const saved = divisionConfig || {}, items = [];
+            const saved = divisionConfig || {}, items = [], up = x => String(x).trim().toUpperCase();
             Object.keys(divDraft).forEach(n => { if (!(n in saved)) items.push('+ ' + n); });
             Object.keys(saved).forEach(n => { if (!(n in divDraft)) items.push('− ' + n); });
-            const all = new Set([...Object.values(saved).flat(), ...Object.values(divDraft).flat()]);
-            [...all].sort((a, b) => String(a).localeCompare(String(b))).forEach(g => {
-                const from = divHomeIn(saved, g), to = divHomeIn(divDraft, g);
-                if (from === to || (from !== '__only' && !(from in divDraft))) return;   // a removed division's groups just fall back to Only I
-                items.push(g + ' → ' + (to === '__only' ? 'Only I' : to));
+            Object.keys(divDraft).forEach(n => {
+                if (!(n in saved)) return;
+                const was = new Set((saved[n] || []).map(up)), now = new Set((divDraft[n] || []).map(up));
+                (divDraft[n] || []).forEach(g => { if (!was.has(up(g))) items.push('+ ' + g + ' in ' + n); });
+                (saved[n] || []).forEach(g => { if (!now.has(up(g))) items.push('− ' + g + ' from ' + n); });
             });
             return { count: items.length, text: items.length + (items.length === 1 ? ' change · ' : ' changes · ') + items.slice(0, 3).join(' · ') + (items.length > 3 ? ' …' : '') };
         }
@@ -51056,43 +51061,72 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return palette[h % palette.length];
         }
 
+        // V102.173: a division = the PEOPLE whose users.division it is. Its group chips = its list + the groups of those people, so the same group name can sit under
+        // several divisions. Only I = people with no division; its groups = groups no list offers + groups of those people.
+        const divUp = x => String(x).trim().toUpperCase();
+        function divMembersOf(n) { const dv = n === '__only' ? '' : n; return (usersData || []).filter(u => !u.isPreReg && userDivisionOf(u) === dv); }
+        function divGroupsOf(n) {
+            const mem = divMembersOf(n), out = [], add = g => { if (g && !out.some(x => divUp(x) === divUp(g))) out.push(g); };
+            if (n === '__only') {
+                const listed = new Set(Object.values(divDraft).flat().map(divUp)), has = new Set(mem.map(u => divUp(u.group || 'Public')));
+                getGlobalGroups().forEach(g => { if (!listed.has(divUp(g)) || has.has(divUp(g))) add(g); });
+            } else {
+                (divDraft[n] || []).forEach(add);
+                mem.forEach(u => add(u.group || 'Public'));
+            }
+            return out;
+        }
         function renderDivisionAdminList() {
             const box = document.getElementById('div-editor');
             if (!box) return;
             const names = Object.keys(divDraft);
-            const used = new Set(Object.values(divDraft).flat().map(g => String(g).toUpperCase()));
-            const onlyI = getGlobalGroups().filter(g => !used.has(g.toUpperCase()));
-            const groupsOf = n => n === '__only' ? onlyI : (divDraft[n] || []);
             if (divSel !== '__only' && !divDraft[divSel]) divSel = names[0] || '__only';
             const q = String(divFilter || '').trim().toLowerCase();
-            const total = n => groupsOf(n).reduce((s, g) => s + divGroupCount(g), 0);
-            const label = n => n === '__only' ? 'Only I' : n;
-            const railChip = n => groupChipHtml(label(n), { cls: 'dv-rail', on: !q && divSel === n, color: divColor(n), icon: n === '__only' ? 'fa-user' : 'fa-shield-halved', active: total(n), total: total(n), attrs: `data-sel="${escapeHtml(n)}"`, hint: n === '__only' ? 'groups in no division — each ranked on its own' : 'ranked together as one board' });
-            const chip = g => groupChipHtml(g, { cls: 'dv-chip', on: divPick === g, attrs: `data-g="${escapeHtml(g)}"`, hint: 'tap for actions' });
-
-            // a search looks in EVERY division and Only I; otherwise just the selected one
-            const scope = q ? [...new Set([...names.flatMap(groupsOf), ...onlyI])].filter(g => String(g).toLowerCase().includes(q)) : groupsOf(divSel);
-            const full = scope.filter(g => divGroupCount(g) > 0), empties = scope.filter(g => divGroupCount(g) === 0);
-            const fold = !q && divSel === '__only' && empties.length > 0 && !divShowEmpty && !empties.includes(divPick);
+            const all = [...names, '__only'], label = n => n === '__only' ? 'Only I' : n, dvOf = n => n === '__only' ? '' : n;
+            const mem = {}; all.forEach(n => { mem[n] = divMembersOf(n); });
+            const inPair = (n, g) => mem[n].filter(u => divUp(u.group || 'Public') === divUp(g));
+            const cnt = (n, g) => inPair(n, g).filter(u => !u.isIgnored).length;
+            const total = n => mem[n].filter(u => !u.isIgnored).length;
+            const railChip = n => groupChipHtml(label(n), { cls: 'dv-rail', on: !q && divSel === n, color: divColor(n), icon: n === '__only' ? 'fa-user' : 'fa-shield-halved', active: total(n), total: mem[n].length, attrs: `data-sel="${escapeHtml(n)}"`, hint: n === '__only' ? 'people in no division — each group ranked on its own' : 'people ranked together as one board' });
+            // a search looks in EVERY division and Only I (chips then wear their division's colour); otherwise just the selected one
+            const pairs = q ? all.flatMap(n => divGroupsOf(n).filter(g => g.toLowerCase().includes(q)).map(g => ({ g, n }))) : divGroupsOf(divSel).map(g => ({ g, n: divSel }));
+            const chip = ({ g, n }) => groupChipHtml(g, { cls: 'dv-chip', on: divPick === g && divPickDiv === dvOf(n), attrs: `data-g="${escapeHtml(g)}" data-d="${escapeHtml(dvOf(n))}"`, active: cnt(n, g), total: inPair(n, g).length, hint: (q ? label(n) + ' · ' : '') + 'tap for actions', ...(q ? { color: divColor(n) } : {}) });
+            const full = pairs.filter(x => cnt(x.n, x.g) > 0), empties = pairs.filter(x => cnt(x.n, x.g) === 0);
+            const pk = pairs.find(x => x.g === divPick && dvOf(x.n) === divPickDiv);
+            const fold = !q && divSel === '__only' && empties.length > 0 && !divShowEmpty && !(pk && cnt(pk.n, pk.g) === 0);
             let chips = full.map(chip).join('');
             chips += fold ? `<button type="button" class="dv-more" data-more="1" title="Groups with nobody in them">+ ${empties.length} empty</button>` : empties.map(chip).join('');
             if (!q && divSel === '__only' && empties.length && !fold) chips += '<button type="button" class="dv-more" data-more="0">hide empty</button>';
-            if (!scope.length) chips = '<small class="dv-empty">' + (q ? 'No group matches' : '—') + '</small>';
+            // typing: groups that exist but this division does not offer yet → one tap offers them here; a name that exists nowhere → one tap creates it here (an empty group, stored in the division's list)
+            if (q && divSel !== '__only') {
+                const here = divGroupsOf(divSel), typed = String(divFilter).trim(), allG = getGlobalGroups();
+                allG.filter(g => g.toLowerCase().includes(q) && !here.some(x => divUp(x) === divUp(g))).forEach(g => { chips += `<button type="button" class="dv-more dv-addgrp" data-addgrp="${escapeHtml(g)}" title="Offer this group in ${escapeHtml(divSel)}">＋ Add “${escapeHtml(g)}” to ${escapeHtml(divSel)}</button>`; });
+                if (typed && !allG.some(g => divUp(g) === divUp(typed))) chips += `<button type="button" class="dv-more dv-addgrp" data-addgrp="${escapeHtml(typed)}" title="Create this group in ${escapeHtml(divSel)}">＋ New group “${escapeHtml(typed)}” in ${escapeHtml(divSel)}</button>`;
+            }
+            if (!pairs.length && !chips) chips = '<small class="dv-empty">' + (q ? 'No group matches' : '—') + '</small>';
+            if (!chips) chips = '<small class="dv-empty">—</small>';
 
-            const caption = q ? 'matches in all divisions' : divSel === '__only' ? 'ranked on their own' : (groupsOf(divSel).length ? 'ranked together as one board' : 'no groups yet — pick one in Only I and move it here');
-            const delDiv = (!q && divSel !== '__only') ? `<button type="button" class="dv-del" data-del="${escapeHtml(divSel)}" title="Delete division — its groups go back to Only I" aria-label="Delete division ${escapeHtml(divSel)}">✕</button>` : '';
+            const people = mem[divSel].filter(u => !u.isIgnored).length;
+            const caption = q ? 'matches in all divisions' : divSel === '__only' ? `ranked on their own · ${people} ${people === 1 ? 'person' : 'people'}` : (pairs.length ? `ranked together as one board · ${people} ${people === 1 ? 'person' : 'people'}` : 'no groups yet — type a name below to add one');
+            const delDiv = (!q && divSel !== '__only') ? `<button type="button" class="dv-del" data-del="${escapeHtml(divSel)}" title="Delete division — its people go back to Only I" aria-label="Delete division ${escapeHtml(divSel)}">✕</button>` : '';
 
-            // the picked group's actions, inline: rename / merge / visibility / delete act on the database at once; the → chips only edit the draft
+            // the picked group (in its division): rename / merge / visibility / delete act on the database at once; the people below can be moved between divisions (also at once)
             let bar = '';
-            if (divPick && scope.includes(divPick)) {
-                const a = groupActiveCount(divPick), t = groupTotalCount(divPick);
-                const home = divHomeIn(divDraft, divPick);
-                const targets = [...names.filter(n => n !== home), ...(home === '__only' ? [] : ['__only'])];
-                const mv = targets.map(n => `<button type="button" class="dv-mv" data-to="${n === '__only' ? '' : escapeHtml(n)}" style="--c:${divColor(n)}" title="Rank ${escapeHtml(divPick)} in ${escapeHtml(label(n))}">${escapeHtml(label(n))}</button>`).join('');
+            if (divPick && pk) {
+                const ppl = inPair(pk.n, pk.g), a = ppl.filter(u => !u.isIgnored).length, t = ppl.length;
+                const sel = ppl.filter(u => divPeople.has(u.id));
+                const isSaved = n => n === '__only' || !!(divisionConfig && divisionConfig[n]);
+                const targets = [...names.filter(n => n !== pk.n), ...(pk.n === '__only' ? [] : ['__only'])];
+                const nm = u => (u.isIgnored ? '🙈 ' : '') + (u.displayName || u.fullName || String(u.id).slice(0, 6));
+                const canRemove = pk.n !== '__only' && !ppl.length && (divDraft[pk.n] || []).some(x => divUp(x) === divUp(divPick));
                 bar = `<div class="dv-bar" title="${escapeHtml(divPick)} · ${a} active${t > a ? ` · ${t} total (${t - a} hidden from boards)` : ''}"><span class="dv-bar-n">${escapeHtml(divPick)}</span>`
                     + `<button type="button" class="dv-ib" data-act="rename" title="Rename" aria-label="Rename">✏️</button><button type="button" class="dv-ib" data-act="merge" title="Merge into…" aria-label="Merge into">⇄</button><button type="button" class="dv-ib" data-act="visibility" title="Visibility" aria-label="Visibility">👁</button>`
                     + (String(divPick).toUpperCase() === 'PUBLIC' ? '' : '<button type="button" class="dv-ib dv-ib-del" data-act="delete" title="Delete group" aria-label="Delete group">🗑</button>')
-                    + `<span class="dv-live" title="Rename / Merge / Delete change the database right away">⚡</span>${mv ? `<span class="dv-mvs">→${mv}</span>` : ''}</div>`;
+                    + `<span class="dv-live" title="Rename / Merge / Delete / moving people change the database right away">⚡</span>`
+                    + (canRemove ? `<button type="button" class="dv-ib" data-rmlist="${escapeHtml(pk.n)}" title="Take this group out of ${escapeHtml(pk.n)}'s list (nobody is in it)" aria-label="Remove from list">⊖</button>` : '')
+                    + (ppl.length ? `<div class="dv-people"><button type="button" class="dv-person dv-all" data-allpeople="1" title="Select everyone here">All ${ppl.length}</button>${ppl.map(u => `<button type="button" class="dv-person" data-person="${escapeHtml(u.id)}" aria-pressed="${divPeople.has(u.id)}">${escapeHtml(nm(u))}</button>`).join('')}</div>` : '')
+                    + (sel.length ? `<div class="dv-moverow">Move ${sel.length} →${targets.map(n => `<button type="button" class="dv-mv" data-to="${n === '__only' ? '' : escapeHtml(n)}" style="--c:${divColor(n)}" ${isSaved(n) ? '' : 'disabled'} title="${isSaved(n) ? 'Move the selected people to ' + escapeHtml(label(n)) : 'Save the new division first'}">${escapeHtml(label(n))}</button>`).join('')}</div>` : '')
+                    + '</div>';
             }
             box.innerHTML = `<div class="dv-rail-row">${names.map(railChip).join('')}${railChip('__only')}<button type="button" class="dv-newbtn" data-newdiv="1" title="New division" aria-label="New division">＋</button></div>`
                 + `<div class="dv-panel" style="--dc:${divColor(divSel)}"><div class="dv-cap"><span>${caption}</span>${delDiv}</div><div class="dv-chips">${chips}</div>${bar}</div>`;
@@ -51102,28 +51136,64 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const act = e.target.closest('[data-act]');
             if (act) { grpAction(act.dataset.act, divPick); return; }
             const to = e.target.closest('[data-to]');
-            if (to) { moveGroupToDivision(divPick, to.dataset.to); return; }
+            if (to) { if (!to.disabled) divMovePeople(to.dataset.to); return; }
             const del = e.target.closest('[data-del]');
             if (del) { removeDivision(del.dataset.del); return; }
+            const rm = e.target.closest('[data-rmlist]');
+            if (rm) { const d = rm.dataset.rmlist; divDraft[d] = (divDraft[d] || []).filter(g => divUp(g) !== divUp(divPick)); divPick = ''; setDivDirty(true); renderDivisionAdminList(); return; }
+            const add = e.target.closest('[data-addgrp]');
+            if (add) { divAddGroup(add.dataset.addgrp); return; }
+            const person = e.target.closest('[data-person]');
+            if (person) { const id = person.dataset.person; if (divPeople.has(id)) divPeople.delete(id); else divPeople.add(id); renderDivisionAdminList(); return; }
+            if (e.target.closest('[data-allpeople]')) {
+                const ids = (usersData || []).filter(u => !u.isPreReg && userDivisionOf(u) === divPickDiv && divUp(u.group || 'Public') === divUp(divPick)).map(u => u.id);
+                if (ids.every(id => divPeople.has(id))) ids.forEach(id => divPeople.delete(id)); else ids.forEach(id => divPeople.add(id));
+                renderDivisionAdminList(); return;
+            }
             const sel = e.target.closest('[data-sel]');
-            if (sel) { divSel = sel.dataset.sel; divPick = ''; divFilter = ''; document.getElementById('dv-filter').value = ''; divShowEmpty = false; renderDivisionAdminList(); return; }
+            if (sel) { divSel = sel.dataset.sel; divPick = ''; divPickDiv = ''; divPeople = new Set(); divFilter = ''; document.getElementById('dv-filter').value = ''; divShowEmpty = false; renderDivisionAdminList(); return; }
             const more = e.target.closest('[data-more]');
             if (more) { divShowEmpty = more.dataset.more === '1'; renderDivisionAdminList(); return; }
             if (e.target.closest('[data-newdiv]')) { const row = document.getElementById('dv-newrow'); row.hidden = !row.hidden; if (!row.hidden) document.getElementById('new-div-name').focus(); return; }
             const c = e.target.closest('.dv-chip');
-            if (c) { divPick = divPick === c.dataset.g ? '' : c.dataset.g; renderDivisionAdminList(); return; }
-            if (divPick) { divPick = ''; renderDivisionAdminList(); }
+            if (c) { const same = divPick === c.dataset.g && divPickDiv === c.dataset.d; divPick = same ? '' : c.dataset.g; divPickDiv = same ? '' : c.dataset.d; divPeople = new Set(); renderDivisionAdminList(); return; }
+            if (divPick) { divPick = ''; divPickDiv = ''; divPeople = new Set(); renderDivisionAdminList(); }
         }
 
-        // One group lives in one division: take it out of every bucket, then drop it in the target ('' = Only I, the pool; called Solo until V102.161).
-        function moveGroupToDivision(group, name) {
-            if (!group) return;
-            const key = group.toUpperCase();
-            Object.keys(divDraft).forEach(k => { divDraft[k] = (divDraft[k] || []).filter(g => String(g).toUpperCase() !== key); });
-            if (name && divDraft[name]) divDraft[name].push(group);
-            divPick = '';
+        // Offer a group in the selected division's list (a draft edit — Save writes it). The group may already exist elsewhere: the same name can be in several divisions.
+        function divAddGroup(name) {
+            const d = divSel;
+            if (!d || d === '__only' || !divDraft[d] || !name) return;
+            if (!divDraft[d].some(g => divUp(g) === divUp(name))) divDraft[d].push(name);
+            divFilter = ''; document.getElementById('dv-filter').value = '';
+            divPick = name; divPickDiv = d; divPeople = new Set();
             setDivDirty(true);
             renderDivisionAdminList();
+        }
+
+        // Move the selected people to another division (target '' = Only I). Writes users.division at once — the group name stays — and offers the group in the target's list.
+        async function divMovePeople(target) {
+            const ids = [...divPeople];
+            if (!ids.length) return;
+            if (target && !(divisionConfig && divisionConfig[target])) { showToast('Save the new division first'); return; }
+            const label = target || 'Only I';
+            if (!confirm(`Move ${ids.length} ${ids.length === 1 ? 'person' : 'people'} to ${label}?\nTheir group stays the same; this is saved right away.`)) return;
+            try {
+                const batch = db.batch();
+                ids.forEach(id => batch.update(db.collection('users').doc(id), { division: target }));
+                await batch.commit();
+                const moved = (usersData || []).filter(u => ids.includes(u.id));
+                moved.forEach(u => { u.division = target; });   // the users snapshot echoes it; this keeps the window right in between
+                if (target) {
+                    let listed = false;
+                    [...new Set(moved.map(u => u.group || 'Public'))].forEach(g => { if (!(divDraft[target] || []).some(x => divUp(x) === divUp(g))) { divDraft[target].push(g); listed = true; } });
+                    if (listed) setDivDirty(true);
+                }
+                divPeople = new Set(); divPick = ''; divPickDiv = '';
+                showToast(`Moved ${ids.length} → ${label}`);
+                renderDivisionAdminList();
+                if (typeof renderUserGroupTabs === 'function') renderUserGroupTabs();
+            } catch (e) { alert('Could not move: ' + e.message); }
         }
 
         function addDivision() {
