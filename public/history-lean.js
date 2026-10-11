@@ -73,7 +73,7 @@ window.historyLean = (() => {
         const pts = (parseFloat(s.score) || 0) + (parseFloat(s.adminBonus) || 0);
         const showPt = s.submissionType === 'quiz' ? Number.isFinite(pts) : pts !== 0;
         const b = beri(s.id);
-        if (!showPt && !b) return '';
+        if (!showPt && !b) return '<span class="hl-val" aria-hidden="true"></span>';   // V101.113: keeps the column
         const sign = n => (n < 0 ? '−' : '+') + Math.abs(n).toFixed(2);
         return '<span class="hl-val">' +
             (showPt ? '<span class="hl-pt" title="Points">' + sign(pts) + '<small>pt</small></span>' : '') +
@@ -134,11 +134,14 @@ window.historyLean = (() => {
         return body + actionsHtml(s, ctx);
     }
     function rowHtml(s, ctx) {
-        const date = formatThaiDate(s.timestamp, {}), full = formatThaiDate(s.timestamp, { time: true });
+        // V101.113: the year shows only on rows outside the current year ("20 มิ.ย. 68"); this year's rows stay short.
+        const _d = s.timestamp && s.timestamp.toDate ? s.timestamp.toDate() : null, _sameYear = !_d || _d.getFullYear() === new Date().getFullYear();
+        const date = formatThaiDate(s.timestamp, _sameYear ? {} : { year: '2-digit' }), full = formatThaiDate(s.timestamp, { time: true });
         const time = full.split(' ').pop();
         const m = s.metadata || {};
         const extra = s.submissionType === 'quiz' && m.correctCount != null && m.totalQuestions ? ' · ' + (typeof formatQuizCount === 'function' ? formatQuizCount(m.correctCount) : m.correctCount) + '/' + m.totalQuestions : '';
-        const mat = s.submissionType === 'quiz' ? matHtml(ctx, s, false) : '';
+        // V101.113: the 📎 slot and the value column exist on every row (empty when there is nothing), so pt lines up down the list.
+        const mat = (s.submissionType === 'quiz' ? matHtml(ctx, s, false) : '') || '<span class="hl-mat-x" aria-hidden="true"></span>';
         const fresh = isRecentlyReviewed(s) ? '<i class="hl-new" title="New"></i>' : '';
         const short = shortOf(s, ctx);
         return '<div class="unified-history-card hl-row" data-delete-item="' + esc(s.id) + '" data-delete-type="' + esc(s.submissionType) + '" onclick="toggleUnifiedCard(this, event)" ' +

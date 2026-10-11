@@ -47,7 +47,11 @@
             const cancel = menu.querySelector('.dr-cancel'); cancel.hidden = !pending;
             if (req) menu.querySelector('.dr-state').textContent = ({pending:'⏳ Delete requested',rejected:'↩ Request declined',cancelled:'Request cancelled',deleted:'Deleted'})[req.status];
             let badge = card.querySelector('.dr-badge');
-            if (pending && !badge) { badge = document.createElement('small'); badge.className='dr-badge'; badge.textContent='⏳ Delete requested'; card.append(badge); }
+            if (pending && !badge) {
+                badge = document.createElement('small'); badge.className='dr-badge'; badge.textContent='⏳ Delete requested';
+                const meta = card.querySelector('.hl-mt');   // V101.113: a History lean row has a date line — the badge sits there as a chip (history-compact.css); other cards keep it under the card
+                if (meta) meta.append(badge); else card.append(badge);
+            }
             if (!pending) badge?.remove();
             cancel.onclick = async () => {
                 cancel.disabled = true;
