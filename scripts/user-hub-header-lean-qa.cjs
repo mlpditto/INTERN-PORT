@@ -13,7 +13,9 @@ assert.ok(!html.includes('<i class="fa-solid fa-gear"></i> <span data-gs-en="Div
 const header = html.slice(html.indexOf('<div class="gs-header lang-no-toggle">'), html.indexOf('<input type="hidden" id="gs-uid">'));
 assert.ok(!html.includes('class="gs-identity"'), 'the second identity row is gone');
 for (const gone of ['data-gs-en="Profile"', '>LINE ID<', '>Enrollment CODE<', '</span> pts<']) assert.ok(!header.includes(gone), 'no label text: ' + gone);
-assert.ok(/<button type="button" class="gs-id" onclick="gsCopyLineId\(\)"[^>]*><i class="fa-solid fa-id-card"[^>]*><\/i><code id="gs-line-id">/.test(header), 'LINE ID chip = icon · value · ⧉, one frame');
+assert.ok(!header.includes('class="gs-id"') && !html.includes('gsCopyLineId'), 'V102.174: no LINE ID chip in the header any more');
+const social = html.slice(html.indexOf('<section class="gs-profile-card gs-card-social">'), html.indexOf('</section>', html.indexOf('<section class="gs-profile-card gs-card-social">')));
+assert.ok(/id="gs-social-line" hidden><\/div>\n<div class="gs-card-field gs-line-uid"><label for="gs-line-uid">LINE ID<\/label>[\s\S]*?onclick="gsCopyProfile\(this, false\)">Copy<\/button>[\s\S]*?<input type="text" id="gs-line-uid" readonly hidden>/.test(social), 'V102.174: the LINE ID is a read-only field with Copy, right after LINE in the Social card');
 assert.ok(/<button type="button" class="gs-code" id="gs-enrollment-chip" onclick="gsCopyEnrollmentCode\(\)"[^>]*><i class="fa-solid fa-key"[^>]*><\/i><code id="gs-enrollment-code">-<\/code><i class="fa-regular fa-copy"/.test(header), 'enrollment chip copies (⧉)');
 for (const id of ['gs-hub-pic', 'gs-title-name', 'gs-google-chip', 'gs-google-email', 'gs-user-score', 'gs-user-beri']) assert.ok(header.includes('id="' + id + '"'), 'header keeps #' + id);
 const order = ['gs-header-person', 'class="gs-ident"', 'class="gs-spacer"', 'class="gs-lang-switch"', 'gs-bal-pts', 'gs-bal-beri', 'gs-header-close'].map(m => header.indexOf(m));
@@ -65,9 +67,8 @@ const markup = '<div id="groupSelectModal" style="width:100%"><div class="modal-
         const top = sel => page.$eval(sel, e => Math.round(e.getBoundingClientRect().top + e.getBoundingClientRect().height / 2));   // vertical centre: items differ in height on one line
         const vis = sel => page.$eval(sel, e => !e.hidden && e.getClientRects().length > 0);
         // header: one line on a desktop width
-        const tops = await Promise.all(['.gs-header-person', '.gs-id', '#gs-enrollment-chip', '.gs-lang-switch', '.gs-bal-pts', '.gs-bal-beri', '.gs-header-close'].map(top));
+        const tops = await Promise.all(['.gs-header-person', '#gs-enrollment-chip', '.gs-lang-switch', '.gs-bal-pts', '.gs-bal-beri', '.gs-header-close'].map(top));
         assert.ok(Math.max(...tops) - Math.min(...tops) <= 6, 'everything on one line at 900px: ' + tops.join(','));
-        assert.equal(await page.$eval('.gs-id', e => e.querySelectorAll('.fa-copy').length), 1, 'LINE ID has ⧉');
         assert.equal(await page.$eval('#gs-enrollment-chip', e => e.querySelectorAll('.fa-copy').length), 1, 'enrollment code has ⧉');
         // group block
         assert.equal(await page.$eval('#gs-current-group .grp-chip', e => e.id + '|' + e.className + '|' + e.querySelector('.grp-name').textContent + '|' + e.getAttribute('aria-expanded')), 'gs-group-toggle|grp-chip gs-main on|EXTERN|false', 'main group = rail chip, selected look, carries the toggle');
