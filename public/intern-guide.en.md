@@ -1,6 +1,6 @@
 # Intern guide — how to use the app
 
-> Short guide — every button name comes from the real screen (open it again any time: ⚙️ **Settings ▸ 📖 Guide**)
+> Short guide — every button name comes from the real screen (open it again any time: ✏️ **Personal Info ▸ ⚙️ ▸ 📖 Guide**)
 
 ## 1. 🏁 Start here
 
@@ -9,10 +9,9 @@ The top card is **you**: photo, name, points (**pts**), 🪙 Beri, level, and a 
 | Button (top tool rail) | What it does |
 |---|---|
 | 📅 **Schedule** | Your training calendar and goals. The number on the corner = items due **today** |
-| ✏️ **Personal Info** | Your profile, internship dates, social handles |
+| ✏️ **Personal Info** | Your profile, internship dates, social handles · ⚙️ **Settings** top-right = privacy preferences, reload, and **📖 Guide** (this page) |
 | **EN** | Language — each tap cycles EN → KR → TH → K·T |
 | 🌊 **Flood watch** | River / flood risk near your training site |
-| ⚙️ **Settings** | Privacy preferences, reload, and **📖 Guide** (this page) |
 
 **Do this first**
 1. Open ✏️ **Personal Info** and set your **internship start / end dates** — the days-left bar and Schedule depend on them
