@@ -63,6 +63,12 @@ const css = html.slice(html.indexOf('.grp-chip { --c:#64748b'), html.indexOf(':i
         await page.click('.gs-chip[data-group="Pharmacists"][data-div=""]');
         assert.equal(await page.evaluate(() => [gsDivision, document.getElementById('gs-input').value].join('/')), '/Pharmacists');
         assert.equal(await page.evaluate(() => gsDirtyCount()), 1, 'group + division picked together = one change');
+        // V102.175: every division offers THIS user's current group — even an empty division — so moving the user into it is one tap
+        await page.evaluate(() => { document.getElementById('gs-input').value = 'EXTERN'; gsDivision = ''; divisionConfig.LAB = []; renderGsGroupList(); });
+        const lab = (await sec()).find(x => x.includes('LAB'));
+        assert.ok(lab && lab.endsWith('= EXTERN'), 'the empty LAB division still offers EXTERN: ' + lab);
+        await page.click('.gs-chip[data-group="EXTERN"][data-div="LAB"]');
+        assert.equal(await page.evaluate(() => gsDivision), 'LAB', 'one tap = the user is in LAB, group unchanged');
         assert.deepEqual(errs, [], 'no page errors');
         console.log('PASS: User Hub picker — (division, group) sections, same group name under several divisions, picking sets both, one change counted');
     } finally { await browser.close(); }
