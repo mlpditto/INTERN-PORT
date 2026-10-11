@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.157)</title>
+    <title>Nika Admin (V102.158)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -5476,6 +5476,7 @@
         .review-running .audit-run { pointer-events:auto; }
         /* V102.109: the running ↻ button is also the Stop button — the spinner turns into a square on hover / focus. */
         .audit-run .run-stop { display:none; }
+        .audit-actions .clinical-angle[aria-pressed="true"] { background:#fde68a; color:#78350f; box-shadow:inset 0 0 0 1px #f59e0b; }   /* V102.158: 🩺 toggle on */
         .audit-run.is-running:is(:hover, :focus-visible) i.fa-spinner { display:none; }
         .audit-run.is-running:is(:hover, :focus-visible) .run-stop { display:inline; }
         .review-run-bar { position:sticky; z-index:6; height:3px; overflow:hidden; background:#e0f2fe; }
@@ -18204,7 +18205,7 @@
                 3. A source question with exactly 2 options (True/False) MUST still be evaluated like any other question — never skip it just because it doesn't match the OUTPUT FORMAT's 4-option example. If it has an issue, UPGRADE improvedQuestion to a proper 4-option multiple-choice question: keep the same correct-answer concept, and add well-reasoned, plausible distractors relevant to the topic. A 2-choice format caps guessability at 50% and is one of the easiest formats to game — expanding to 4 options is one of the most effective ways to raise the challenge. Only keep improvedQuestion at 2 options if a 4-option rewrite would be artificial for that specific content.
                 4. SELF-CHECK before returning: re-read each improvedQuestion.q and confirm its language matches the source Q[qNumber] from STEP 0. If you find a mismatch, REGENERATE that item in the correct language. A language mismatch is a hard format error.
                 5. "improvedQuestion.explanation" is shown to LEARNERS post-submit (not admin meta) — write it as concise teaching, NOT as a critique. Same language as improvedQuestion.q. The other fields ("issue", "suggestion") stay admin-facing in Thai.
-                6. SELF-CHECK "suggestedTitles" before returning: do both titles name the quiz's subject matter (aligned with the Quiz tags), and are they free of every FORBIDDEN word? If not, regenerate them — a title describing the analysis is a hard error.`;
+                6. SELF-CHECK "suggestedTitles" before returning: do both titles name the quiz's subject matter (aligned with the Quiz tags), and are they free of every FORBIDDEN word? If not, regenerate them — a title describing the analysis is a hard error.${window.clinicalAngleBlock ? window.clinicalAngleBlock() : ''}`;
         }
         window.buildQuizAnalyzePrompt = buildQuizAnalyzePrompt;
 
@@ -18806,6 +18807,25 @@
             const providers = [...new Set([...TEXT_AI_MODELS, ...extra].map(m => m.label.split(' ')[0]))];
             return `<div class="audit-model-row"><input type="hidden" id="${inputId}" value="${selected}"><div class="audit-providers" role="group" aria-label="Browse model providers">${providers.map(p => `<button type="button" class="audit-provider" data-provider="${p}" aria-pressed="${p === provider}" aria-label="${p}" title="${p} models · pick one to switch" data-th-title="รุ่นของ ${p} · กดเลือกรุ่นเพื่อเปลี่ยนโมเดล" onclick="browseAuditProvider(this)">${providerLogo[p] ? `<span class="text-ai-logo" data-owner="${providerLogo[p]}" aria-hidden="true"></span>` : p}</button>`).join('')}</div><div class="text-ai-chips" role="group" aria-label="AI model">${chips}</div></div>`;
         };
+        // V102.158: 🩺 Clinical angle — a toggle beside Rewrite for quizzes whose topic is not medical (Copilot, English, digital
+        // tools). While on, every rewrite path (the batch Rewrite, Regen, Compare B — all three build from the two prompt functions
+        // below) recasts each question as a pharmacy / hospital task while keeping the skill being tested. Remembered in this browser.
+        // The admin steer still wins: it is placed after this block and declares itself highest priority.
+        window.clinicalAngleOn = function() { try { return localStorage.getItem('quizClinicalAngle') === '1'; } catch (_) { return false; } };
+        window.toggleClinicalAngle = function(btn) {
+            const on = !window.clinicalAngleOn();
+            try { localStorage.setItem('quizClinicalAngle', on ? '1' : '0'); } catch (_) { /* storage may be blocked */ }
+            if (btn) btn.setAttribute('aria-pressed', String(on));
+            if (typeof showToast === 'function') showToast(on ? '🩺 Clinical angle on — the next Rewrite recasts every question as a pharmacy / hospital task' : '🩺 Clinical angle off');
+        };
+        window.clinicalAngleChipHtml = function() {
+            return `<button type="button" class="clinical-angle" onclick="toggleClinicalAngle(this)" aria-pressed="${window.clinicalAngleOn()}" aria-label="Clinical angle" title="Clinical angle — when on, every rewrite recasts a non-medical question (software, English, communication) as a task a pharmacy intern meets in a community pharmacy or a hospital. The skill tested stays the same." data-th-title="มุมคลินิก — เมื่อเปิด ทุกข้อที่เขียนใหม่จะกลายเป็นสถานการณ์งานเภสัช (ร้านยา / โรงพยาบาล) โดยยังวัดทักษะเดิม">🩺</button>`;
+        };
+        window.clinicalAngleBlock = function() {
+            if (!window.clinicalAngleOn()) return '';
+            return `
+                CLINICAL ANGLE — THE ADMIN TOGGLE IS ON. The quiz's subject is not itself medical (software, language, communication, workplace skills). Recast EVERY rewritten question as a concrete situation a pharmacy intern meets at work — in a COMMUNITY PHARMACY (OTC counselling, dispensing, drug-information look-ups, stock and sales records, patient handouts) or in HOSPITAL PHARMACY (ward rounds, medication reconciliation, drug-interaction checks, discharge counselling). Keep the SAME skill the original tests (the same software feature, language point or communication skill); only the setting, the documents, the medicines and the people change. Distractors must stay plausible inside that workflow. Keep clinical details generic and uncontroversial — never invent a dose, a guideline or an interaction that could be wrong. Vary the settings across questions; do not reuse one scenario. The language rule above still applies.`;
+        };
         window.auditModelControlsHtml = function(hasResult, mode = 'audit') {
             const isAudit = mode === 'audit';
             const inputId = isAudit ? 'quality-audit-model' : 'rewrite-ai-model';
@@ -18818,7 +18838,7 @@
             const run = isAudit ? 'runSelectedQualityAudit(this)' : 'runSelectedAnalyze(this)';
             const selected = isAudit ? 'gpt-6-luna' : textAIModel('ai-analyzer-model-val');
             const label = TEXT_AI_MODELS.find(m => m.id === selected).label;
-            return `<div class="audit-toolbar lang-no-toggle"><div class="audit-toolbar-top">${window.reviewTabsHtml(mode)}<div class="audit-actions"><button type="button" class="audit-run" onclick="${run}" title="Use ${label} for this task" data-th-title="ใช้ ${label} ทำงานนี้">↻ ${isAudit ? 'Review' : 'Rewrite'}</button>${allowExport ? '<button type="button" onclick="exportAiAnalysisMd()" title="Download the analysis as Markdown" data-th-title="ดาวน์โหลดผลการวิเคราะห์เป็น Markdown">Export</button>' : ''}<button type="button" class="audit-close" onclick="closeQuizReview()" aria-label="Close review" title="Close the quiz review" data-th-title="ปิดหน้าตรวจข้อสอบ">×</button></div></div>${window.auditModelControlsHtml(hasResult, mode)}</div>`;
+            return `<div class="audit-toolbar lang-no-toggle"><div class="audit-toolbar-top">${window.reviewTabsHtml(mode)}<div class="audit-actions">${isAudit ? '' : window.clinicalAngleChipHtml()}<button type="button" class="audit-run" onclick="${run}" title="Use ${label} for this task" data-th-title="ใช้ ${label} ทำงานนี้">↻ ${isAudit ? 'Review' : 'Rewrite'}</button>${allowExport ? '<button type="button" onclick="exportAiAnalysisMd()" title="Download the analysis as Markdown" data-th-title="ดาวน์โหลดผลการวิเคราะห์เป็น Markdown">Export</button>' : ''}<button type="button" class="audit-close" onclick="closeQuizReview()" aria-label="Close review" title="Close the quiz review" data-th-title="ปิดหน้าตรวจข้อสอบ">×</button></div></div>${window.auditModelControlsHtml(hasResult, mode)}</div>`;
         };
 
         window.runSelectedQualityAudit = function(btn) {
@@ -63934,7 +63954,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 4b. NO SELF-ELIMINATING STEM: the stem must never name, describe, or rule out any of the options. Writing "the patient is already taking X" or "X was tried and failed" while X is also an option destroys that option — a candidate deletes it with zero knowledge and the question quietly becomes 3-choice. This is the single most common way a richer vignette makes a question EASIER instead of harder, so check every option against the stem before you finish. If a treatment has to be named in the story, it must NOT appear among the options.
                 5. "explanation" is shown to LEARNERS after they submit — write it as concise teaching, NOT as a critique. "suggestion" stays admin-facing.
                 6. If the original question has only 2 options (True/False), upgrade "options" to 4 well-reasoned, plausible distractors instead of keeping it at 2 — a 2-choice format caps guessability at 50% and is one of the easiest formats to game.
-${steerBlock}
+${window.clinicalAngleBlock ? window.clinicalAngleBlock() : ''}${steerBlock}
                 Question to improve: ${JSON.stringify(originalQ)}
                 Identified Issue: ${issue || ''}
                 Previous Suggestion: ${suggestion || ''}
