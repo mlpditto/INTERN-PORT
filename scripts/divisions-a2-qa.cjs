@@ -35,6 +35,7 @@ assert.ok(modal.includes('id="dv-newrow" hidden') && modal.includes('id="div-sav
         const errs = []; page.on('pageerror', e => errs.push(e.message));
         await page.setContent('<!doctype html><meta charset="utf-8"><style>.modal{display:flex}</style><style>' + css + '</style>' + modal);
         await page.addScriptTag({ content: [
+            "let groupStyle = { groups: {}, divisions: {} }; let divLook = null;   // V102.180: the look doc (empty here) + the closed 🎨 editor",
             'var usersData = [',
             '  { id: "u1", displayName: "Bua", group: "EXTERN" }, { id: "u2", displayName: "nt", group: "EXTERN" }, { id: "u3", displayName: "YUI", group: "Audit" },',
             '  { id: "u4", displayName: "Kate", group: "Pharmacists" }, { id: "u5", displayName: "Joey", group: "Pharmacists" }, { id: "u6", displayName: "Gap", group: "Pharmacists", isIgnored: true },',
@@ -47,7 +48,7 @@ assert.ok(modal.includes('id="dv-newrow" hidden') && modal.includes('id="div-sav
             'var escapeHtml = function (s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;"); };',
             grabConst('const groupColorMap = {'), grabConst('const groupIconMap = {'),
             html.slice(html.indexOf('        const divUp = x =>'), html.indexOf('\n', html.indexOf('        const divUp = x =>'))),
-            ['function getGroupColor(', 'function getGroupIcon(', 'function groupActiveCount(', 'function groupTotalCount(', 'function groupChipHtml(', 'function userDivisionOf(', 'function divColor(',
+            ['function groupStyleOf(', 'function divChipLook(', 'function getGroupColor(', 'function getGroupIcon(', 'function groupActiveCount(', 'function groupTotalCount(', 'function groupChipHtml(', 'function userDivisionOf(', 'function divColor(',
                 'function divDiff(', 'function setDivDirty(', 'function divMembersOf(', 'function divGroupsOf(', 'function renderDivisionAdminList(', 'function onDivEditorClick(', 'function divAddGroup(', 'async function divMovePeople(',
                 'function addDivision(', 'function removeDivision('].map(grabFn).join('\n'),
             'var divDraft = JSON.parse(JSON.stringify(divisionConfig)), divPick = "", divPickDiv = "", divPeople = new Set(), divSel = "", divFilter = "", divShowEmpty = false;'
@@ -66,7 +67,7 @@ assert.ok(modal.includes('id="dv-newrow" hidden') && modal.includes('id="div-sav
         assert.equal(await page.locator('.dv-bar').count(), 0, 'no action bar until a group is picked');
         // 2. pick Audit inside RSU → inline bar + only THAT Audit's people (Zed, not YUI who is in CAFE)
         await page.click('.dv-chip[data-g="Audit"][data-d="RSU"]');
-        assert.deepEqual(await page.$$eval('.dv-bar [data-act]', els => els.map(e => e.dataset.act)), ['rename', 'merge', 'visibility', 'delete']);
+        assert.deepEqual(await page.$$eval('.dv-bar [data-act]', els => els.map(e => e.dataset.act)), ['rename', 'merge', 'visibility', 'look', 'delete']);   // V102.180: 🎨 Look joined the bar
         assert.deepEqual(await txt('.dv-person'), ['All 1', 'Zed'], 'the people of (RSU, Audit)');
         assert.equal(await page.locator('.dv-moverow').count(), 0, 'nothing selected → no move row');
         await page.click('.dv-bar [data-act="rename"]');

@@ -25,6 +25,9 @@ for (const id of ['gs-hub-pic', 'gs-title-name', 'gs-google-chip', 'gs-google-em
 const order = ['gs-header-person', 'class="gs-ident"', 'class="gs-spacer"', 'class="gs-lang-switch"', 'gs-bal-pts', 'gs-bal-beri', 'gs-header-close'].map(m => header.indexOf(m));
 assert.ok(order.every((v, i) => v >= 0 && (i === 0 || v > order[i - 1])), 'order: person · identity · spacer · EN/TH · points · Beri · ×');
 assert.ok(html.includes("function gsCopyEnrollmentCode()"), 'copy handler exists');
+// V102.180: Google = ONE icon (the G) + email; the chip itself disconnects (no 🌐 in front, no link-slash button behind)
+assert.ok(/<button type="button" id="gs-google-chip" class="gs-google" onclick="gsDisconnectGoogle\(\)"[^>]*><i class="fa-brands fa-google" aria-hidden="true"><\/i><code id="gs-google-email">-<\/code><\/button>/.test(header), 'Google chip = G icon + email, click disconnects');
+assert.ok(!header.includes('🌐') && !header.includes('fa-link-slash'), 'no second icon on the Google chip');
 const grp = html.slice(html.indexOf('<section class="gs-inline-group lang-no-toggle"'), html.indexOf('<div id="gs-pane-group" hidden>'));
 assert.ok(!grp.includes('gs-group-summary') && !grp.includes('Select one group') && !/<button[^>]*id="gs-group-toggle"/.test(grp), 'no summary box / help text / Change group button');
 assert.ok(/<div class="gs-grp-row">\s*<span id="gs-current-group"><\/span>\s*<span class="gs-also" id="gs-also" hidden/.test(grp), 'one row: main chip slot, then "also" (hidden until used)');
@@ -38,7 +41,7 @@ function grab(src, marker) {
     return src.slice(i, k + 1);
 }
 const fns = ['function gsPaintMainGroup(', 'function gsState(', 'function gsDirtyCount(', 'function gsDirtyPaint(', 'function gsExtraPaint(', 'function gsExtraRemove(', 'function gsExtraAdd(',
-    'function gsExtraRenderPick(', 'function gsExtraToggle(', 'function gsPickGroup(', 'function toggleGsGroups(', 'function groupChipHtml(', 'function gsDivisionChipHtml(', 'function divColor(', 'function userDivisionOf('].map(m => grab(html, m)).join('\n');
+    'function gsExtraRenderPick(', 'function gsExtraToggle(', 'function gsPickGroup(', 'function toggleGsGroups(', 'function groupStyleOf(', 'function divChipLook(', 'function groupChipHtml(', 'function gsDivisionChipHtml(', 'function divColor(', 'function userDivisionOf('].map(m => grab(html, m)).join('\n');
 const css = [
     html.slice(html.indexOf('        .grp-chip { --c:#64748b;'), html.indexOf('        /* V102.64: Event modal')),
     html.slice(html.indexOf('        .grp-chip:hover {'), html.indexOf('        /* V102.59: the picker is sections')),
@@ -59,6 +62,7 @@ const markup = '<div id="groupSelectModal" style="width:100%"><div class="modal-
         const errs = []; page.on('pageerror', e => errs.push(e.message));
         await page.setContent('<!doctype html><meta charset="utf-8"><style>:root{--primary:#4361ee;--text-sub:#64748b}body{margin:0;font:14px sans-serif}' + css + '</style>' + markup);
         await page.addScriptTag({ content: [
+            "let groupStyle = { groups: {}, divisions: {} };   // V102.180: the look doc, empty here",
             "var escapeHtml = s => String(s).replace(/[&<>\"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' }[c]));",
             "var getGroupColor = g => ({ MLP: '#ef4444', EXTERN: '#7209b7', CAFE: '#f97316' })[g] || '#6c757d'; var getGroupIcon = g => 'fa-tag';",
             "var groupActiveCount = g => ({ MLP: 9, EXTERN: 2, CAFE: 4 })[g] || 0; var groupTotalCount = g => groupActiveCount(g);",

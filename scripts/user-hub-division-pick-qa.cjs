@@ -31,12 +31,13 @@ const css = html.slice(html.indexOf('.grp-chip { --c:#64748b'), html.indexOf(':i
         const errs = []; page.on('pageerror', e => errs.push(e.message));
         await page.setContent('<!doctype html><meta charset="utf-8"><style>' + css + '</style><input id="gs-input" value="Audit"><span id="gs-current-group"></span><div id="gs-list"></div><div id="gs-pane-group" hidden></div><div id="gs-save-row" hidden></div>');
         await page.addScriptTag({ content: [
+            "let groupStyle = { groups: {}, divisions: {} };   // V102.180: the look doc, empty here",
             'var divisionConfig = { CAFE: ["Audit", "Marketing"], RSU: ["EXTERN", "Junior"] }, gsEmptyOpen = false, gsDivision = "CAFE", gsExtra = [], gsSnap = null, opened = 0, openDivisionsModal = function () { opened++; };',
             'var usersData = [{ group: "Audit", division: "CAFE" }, { group: "Audit", division: "RSU" }, { group: "EXTERN" }, { group: "EXTERN" }, { group: "Pharmacists" }, { group: "Pharmacists" }];',
             'var escapeHtml = function (s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;"); };',
             'var getGlobalGroups = function () { return ["Audit", "EXTERN", "Junior", "Marketing", "Pharmacists", "Public"]; }; var gsExtraPaint = function () {}; var gsDirtyPaint = function () {}; var gsCollectAddresses = function () { return []; };',
             grabConst('const groupColorMap = {'), grabConst('const groupIconMap = {'),
-            ['function getGroupColor(', 'function getGroupIcon(', 'function groupActiveCount(', 'function groupTotalCount(', 'function groupChipHtml(', 'function divColor(', 'function userDivisionOf(',
+            ['function groupStyleOf(', 'function divChipLook(', 'function getGroupColor(', 'function getGroupIcon(', 'function groupActiveCount(', 'function groupTotalCount(', 'function groupChipHtml(', 'function divColor(', 'function userDivisionOf(',
                 'function gsDivisionChipHtml(', 'function gsPaintMainGroup(', 'function renderGsGroupList(', 'function gsPickDivision(', 'function gsPickGroup(', 'function gsState(', 'function gsDirtyCount('].map(grabFn).join('\n'),
             'gsPaintMainGroup("Audit"); renderGsGroupList();'
         ].join('\n') });
