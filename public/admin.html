@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.154)</title>
+    <title>Nika Admin (V102.155)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -7499,18 +7499,6 @@
                         <!-- Quests management moved to bottom of Kanban -->
                     </div>
 
-                    <!-- Per-user Quiz/Journal/Case status for the group selected via
-                         #board-group-tabs (shared with the Quest kanban below). Quiz
-                         Coverage and LINE usage in #dashboard-summary stay global —
-                         neither is linked to a user group in the data model, so they
-                         don't react to this filter. Populated by renderGroupUsersPanel(). -->
-                    <div id="group-users-panel" style="margin-top:14px; border:1px solid #eef2ff; border-radius:12px; background:#fff; padding:14px 16px;">
-                        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:10px; flex-wrap:wrap;">
-                            <span id="group-users-title" class="lang-no-toggle" style="font-weight:700; color:#1f2937; font-size:0.92em;">Users</span>
-                            <span style="font-size:0.72em; color:#94a3b8;">Quiz · Journal · Case · Points · Beri</span>
-                        </div>
-                        <div id="group-users-list" class="lang-no-toggle" style="margin-top:10px; display:flex; flex-direction:column; gap:2px; max-height:360px; overflow-y:auto;"></div>
-                    </div>
 
 
             <div class="kanban-board" style="min-height: 450px;">
@@ -8210,6 +8198,16 @@
                     <span id="bstat-summary" style="font-size:0.78em; font-weight:600; color:#64748b; margin-left:auto;"></span>
                 </summary>
                 <div id="bstat-body" style="padding:10px 14px; border-top:1px solid #eef2ff; overflow-x:auto;"></div>
+            </details>
+            <!-- V102.155: per-user Quiz / Journal / Case / Points / Beri summary with a Copy per row (plain text for a LINE chat),
+                 moved here from the Dashboard (where it followed #board-group-tabs). It follows the User Hub group chips and renders
+                 its rows only while open; the count in the summary is kept current. Populated by renderGroupUsersPanel(). -->
+            <details id="group-users-panel" class="lang-no-toggle" ontoggle="if (this.open) renderGroupUsersPanel()" style="margin-bottom:14px; border:1px solid #e2e8f0; border-radius:12px; background:#fff;">
+                <summary style="padding:10px 14px; cursor:pointer; font-weight:700; color:var(--primary); list-style:none; display:flex; align-items:center; gap:8px;">
+                    <i class="fa-solid fa-users"></i> <span id="group-users-title">Users</span>
+                    <span style="font-size:0.72em; font-weight:600; color:#94a3b8; margin-left:auto;">Quiz · Journal · Case · Points · Beri · Copy</span>
+                </summary>
+                <div id="group-users-list" style="padding:6px 10px 10px; border-top:1px solid #eef2ff; display:flex; flex-direction:column; gap:2px; max-height:360px; overflow-y:auto;"></div>
             </details>
             <div style="overflow-x:auto;">
                 <table id="usersTable" class="lang-no-toggle">
@@ -36935,7 +36933,6 @@ They can connect again from LINE.
             renderBoardGroupTabs();
             drawKanban();
             renderAlabastaCases();
-            renderGroupUsersPanel();
         }
 
         // V102.30: mirror of achievementCatalog in index.html — add a row here when a badge
@@ -37624,7 +37621,8 @@ They can connect again from LINE.
             <div style="margin-top:8px; font-size:0.75em; color:#94a3b8;">Tap a number to show those interns in the table below; tap again to clear. Counts only interns whose app has saved badges. — = tier not offered.</div>`;
         }
 
-        // Per-user Quiz/Journal/Case status for #board-group-tabs' active group,
+        // Per-user Quiz/Journal/Case status for the User Hub's active group chip
+        // (V102.155: moved from the Dashboard, where it followed #board-group-tabs),
         // each row copyable as a plain-text summary (e.g. for pasting into a
         // supervisor's LINE chat). Reads existing client caches only — no new
         // Firestore queries. casesData is capped at the 200 most recent case
@@ -37635,9 +37633,11 @@ They can connect again from LINE.
             const title = document.getElementById('group-users-title');
             if (!list || !title) return;
 
-            const group = activeBoardGroup;
+            const group = activeUserGroup;
+            // A chip may be a division (divisionConfig) as well as a group — same test as renderBadgeStatsChip.
+            const inGroup = u => group === 'All' || (typeof divisionConfig !== 'undefined' && divisionConfig && divisionConfig[group] ? divisionConfig[group].includes(u.group || 'Public') : (u.group || 'Public') === group);
             const users = (usersData || [])
-                .filter(u => group === 'All' || ((u.group || 'Public') === group && !u.isIgnored && !u.isPreReg))
+                .filter(u => inGroup(u) && (group === 'All' || (!u.isIgnored && !u.isPreReg)))
                 .slice()
                 .sort((a, b) => {
                     const ls = u => (u.lastSeen && u.lastSeen.toMillis ? u.lastSeen.toMillis() : 0);
@@ -37645,6 +37645,8 @@ They can connect again from LINE.
                 });
 
             title.textContent = group === 'All' ? `Users (${users.length})` : `Users · ${group} (${users.length})`;
+            const panel = document.getElementById('group-users-panel');
+            if (panel && !panel.open) { list.innerHTML = ''; return; }   // folded: the count above is enough; rows are built on open (ontoggle)
 
             if (users.length === 0) {
                 list.innerHTML = '<div style="padding:8px 4px; font-size:0.78em; color:#94a3b8;">No users in this group.</div>';
@@ -37703,6 +37705,7 @@ They can connect again from LINE.
             window._userCampView = false; // V102.45
             renderUserGroupTabs();
             renderTable('users');
+            renderGroupUsersPanel(); // V102.155: the Users summary panel follows these chips
             renderLeaderboard();
             renderBadgeStatsIfOpen();
         }
