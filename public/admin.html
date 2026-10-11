@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.181)</title>
+    <title>Nika Admin (V102.182)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -6411,6 +6411,14 @@
         .u-tl-h { width: auto; min-height: 0; margin: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
         .u-tl-h:hover b { text-decoration: underline; }
         .u-row-quick { display: flex; align-items: center; justify-content: flex-end; gap: 4px; flex-wrap: nowrap; }
+        /* V102.182: the row carries what the Users summary panel used to — Q·J·C chips, last seen, ⧉ copy (row / all) */
+        .u-qjc { display: inline-flex; gap: 3px; font-weight: 700; }
+        .u-qjc > * { width: auto; min-height: 0; margin: 0; padding: 0 5px; border: 0; border-radius: 6px; background: #f1f5f9; color: #94a3b8; font: inherit; font-weight: 700; line-height: 1.5; cursor: default; }
+        .u-qjc > button { cursor: pointer; }
+        .u-qjc > .ok { background: #dcfce7; color: #15803d; }
+        .u-seen { display: inline-flex; align-items: center; gap: 3px; font-weight: 600; white-space: nowrap; }
+        .u-seen-fresh { color: #16a34a; } .u-seen-stale { color: #f97316; }
+        .u-copy-all { width: auto; min-height: 0; margin: 0 0 0 6px; padding: 1px 7px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #475569; font: inherit; font-size: 0.78em; font-weight: 700; cursor: pointer; }
         .u-row-quick > button:not(.u-row-kebab) { width: 28px; height: 28px; min-height: 0; margin: 0; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: transparent; color: var(--text-sub); cursor: pointer; font-size: 0.85em; }
         .u-row-quick > button:not(.u-row-kebab):hover { background: var(--bg-hover, #f1f5f9); }
         #num-adj-pop { position: fixed; z-index: 1000; padding: 8px 10px; background: var(--bg-card, #fff); border: 1px solid #10b981; border-radius: 12px; box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18); }
@@ -8243,21 +8251,12 @@
                 </summary>
                 <div id="bstat-body" style="padding:10px 14px; border-top:1px solid #eef2ff; overflow-x:auto;"></div>
             </details>
-            <!-- V102.155: per-user Quiz / Journal / Case / Points / Beri summary with a Copy per row (plain text for a LINE chat),
-                 moved here from the Dashboard (where it followed #board-group-tabs). It follows the User Hub group chips and renders
-                 its rows only while open; the count in the summary is kept current. Populated by renderGroupUsersPanel(). -->
-            <details id="group-users-panel" class="lang-no-toggle" ontoggle="if (this.open) renderGroupUsersPanel()" style="margin-bottom:14px; border:1px solid #e2e8f0; border-radius:12px; background:#fff;">
-                <summary style="padding:10px 14px; cursor:pointer; font-weight:700; color:var(--primary); list-style:none; display:flex; align-items:center; gap:8px;">
-                    <i class="fa-solid fa-users"></i> <span id="group-users-title">Users</span>
-                </summary>
-                <div id="group-users-list" style="padding:6px 10px 10px; border-top:1px solid #eef2ff; display:flex; flex-direction:column; gap:2px; max-height:360px; overflow-y:auto;"></div>
-            </details>
             <div style="overflow-x:auto;">
                 <table id="usersTable" class="lang-no-toggle">
                     <thead>
                         <tr>
                             <th style="width:40px;" title="Rank">#</th>
-                            <th>User <span id="user-sec-count" style="margin-left:4px; font-size:0.72em; font-weight:800; color:var(--text-sub); white-space:nowrap;"></span><button type="button" id="user-badge-sort" onclick="toggleUserBadgeSort()" aria-pressed="false" title="Sort by badges" style="width:auto; min-height:0; margin:0 0 0 6px; padding:0 4px; background:none; border:none; font:inherit; font-weight:inherit; color:inherit; cursor:pointer;">🏅↕</button></th>
+                            <th>User <span id="user-sec-count" style="margin-left:4px; font-size:0.72em; font-weight:800; color:var(--text-sub); white-space:nowrap;"></span><button type="button" id="user-badge-sort" onclick="toggleUserBadgeSort()" aria-pressed="false" title="Sort by badges" style="width:auto; min-height:0; margin:0 0 0 6px; padding:0 4px; background:none; border:none; font:inherit; font-weight:inherit; color:inherit; cursor:pointer;">🏅↕</button><button type="button" id="user-seen-sort" onclick="toggleUserSeenSort()" aria-pressed="false" title="Sort by last seen" style="width:auto; min-height:0; margin:0 0 0 2px; padding:0 4px; background:none; border:none; font:inherit; font-weight:inherit; color:inherit; cursor:pointer;">🕓↕</button><button type="button" id="user-copy-all" onclick="copyAllUserRows()" title="Copy every row shown — name · Quiz/Journal/Case · pts · Beri, one line each" aria-label="Copy all rows" class="u-copy-all"><i class="fa-regular fa-copy"></i> all</button></th>
                             <th style="width:70px;" title="Score">⭐</th>
                             <th style="width:60px;" title="Beri">🪙</th>
                             <th title="Internship period">⏳</th>
@@ -34702,7 +34701,6 @@ RULES:
             db.collection("cases").orderBy("timestamp", "desc").limit(200).onSnapshot(s => {
                 casesData = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderAlabastaCases();
-                renderGroupUsersPanel();
             }, e => {
                 console.error("🔥 [Firestore Error] cases:", e);
                 if (e.code === 'permission-denied') {
@@ -34726,7 +34724,6 @@ RULES:
                 if (typeof refreshHubHeaderIfOpen === 'function') refreshHubHeaderIfOpen(); // V98.45
                 renderUserGroupTabs();
                 renderBoardGroupTabs();
-                renderGroupUsersPanel();
                 renderTable('users');
                 renderLeaderboard();
                 updateAssigneeList();
@@ -35362,7 +35359,7 @@ RULES:
                 // 3. Refresh UI
                 renderQuizzes();
                 if (!hideCompletedWorks) renderTable('works');
-                renderGroupUsersPanel();
+                renderTable('users');   // V102.182: the Q count on the rows follows quiz_attempts
             });
             // 🔥 Feature: Load Poll Responses for Works Table
             db.collection("poll_responses").orderBy("timestamp", "desc").limit(50).onSnapshot(s => {
@@ -37861,6 +37858,24 @@ They can connect again from LINE.
             pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - pw - 8)) + 'px';
         }
 
+        // V102.182: 🕓↕ sorts the active section by last seen (latest first); ⧉ copies one row / every row shown (text lives on tr[data-copy]).
+        function toggleUserSeenSort() {
+            window._userSeenSort = !window._userSeenSort;
+            const btn = document.getElementById('user-seen-sort');
+            if (btn) { btn.setAttribute('aria-pressed', String(window._userSeenSort)); btn.textContent = window._userSeenSort ? '🕓▾' : '🕓↕'; }
+            renderTable('users');
+        }
+        function copyUserRow(el) {
+            const tr = el && el.closest ? el.closest('tr') : null;
+            const text = tr && tr.dataset.copy;
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(() => showToast('Copied: ' + text.split(' — ')[0])).catch(() => showToast('Copy failed'));
+        }
+        function copyAllUserRows() {
+            const lines = Array.from(document.querySelectorAll('#usersTable tbody tr[data-copy]')).map(tr => tr.dataset.copy);
+            if (!lines.length) { showToast('Nothing to copy'); return; }
+            navigator.clipboard.writeText(lines.join('\n')).then(() => showToast(`Copied ${lines.length} rows`)).catch(() => showToast('Copy failed'));
+        }
         function toggleUserBadgeSort() {
             window._userBadgeSort = !window._userBadgeSort;
             const btn = document.getElementById('user-badge-sort');
@@ -37918,85 +37933,12 @@ They can connect again from LINE.
         // Firestore queries. casesData is capped at the 200 most recent case
         // docs (see its onSnapshot), so a user's Case count can undercount if
         // they have older or very many cases.
-        function renderGroupUsersPanel() {
-            const list = document.getElementById('group-users-list');
-            const title = document.getElementById('group-users-title');
-            if (!list || !title) return;
-
-            const group = activeUserGroup;
-            // A chip may be a division (divisionConfig) as well as a group — same test as renderBadgeStatsChip.
-            const inGroup = u => userInScope(u, group, activeUserGroupDiv);   // V102.172
-            const users = (usersData || [])
-                .filter(u => inGroup(u) && (group === 'All' || (!u.isIgnored && !u.isPreReg)))
-                .slice()
-                .sort((a, b) => {
-                    const ls = u => (u.lastSeen && u.lastSeen.toMillis ? u.lastSeen.toMillis() : 0);
-                    return (ls(b) - ls(a)) || (a.fullName || a.displayName || '').localeCompare(b.fullName || b.displayName || '', 'th');
-                });
-
-            title.textContent = group === 'All' ? `Users (${users.length})` : `Users · ${group} (${users.length})`;
-            const panel = document.getElementById('group-users-panel');
-            if (panel && !panel.open) { list.innerHTML = ''; return; }   // folded: the count above is enough; rows are built on open (ontoggle)
-
-            if (users.length === 0) {
-                list.innerHTML = '<div style="padding:8px 4px; font-size:0.78em; color:#94a3b8;">No users in this group.</div>';
-                return;
-            }
-
-            const color = group === 'All' ? '#64748b' : (groupColorMap[group] || '#64748b');
-            list.innerHTML = '';
-            users.forEach(u => {
-                const name = u.fullName || u.displayName || u.id;
-                const quizCount = quizAttemptsAllCache.filter(a => a.userId === u.id && a.status === 'approved').length;
-                const journalCount = reflectiveLogsCache.filter(lg => lg.userId === u.id).length;
-                const caseCount = casesData.filter(c => c.userId === u.id).length;
-                const points = parseFloat((u.score || 0).toFixed(2));
-                const beri = Math.round(u.beri || 0);
-                const initials = name.trim().split(/\s+/).slice(0, 2).map(p => p[0] || '').join('');
-                // V102.112: list is sorted by it (latest first). users.lastSeen is stamped by index.html on every open.
-                const lastSeenMs = u.lastSeen && u.lastSeen.toMillis ? u.lastSeen.toMillis() : 0;
-                const lastSeenAgo = lastSeenMs ? alabastaAgo(u.lastSeen) : '';
-                const lastSeenText = !lastSeenMs ? 'never' : (/^\d+ (min|hr|d)$/.test(lastSeenAgo) ? `${lastSeenAgo} ago` : lastSeenAgo);
-                const lastSeenTitle = lastSeenMs ? `Last seen ${new Date(lastSeenMs).toLocaleString('th-TH')}` : 'Never opened the app';
-
-                const row = document.createElement('div');
-                row.style.cssText = 'display:flex; align-items:center; gap:10px; padding:7px 4px; border-radius:8px;';
-                row.innerHTML = `
-                    <div style="width:28px; height:28px; border-radius:50%; background:${color}22; color:${color}; display:flex; align-items:center; justify-content:center; font-size:0.68em; font-weight:700; flex-shrink:0; position:relative; overflow:hidden;">${escapeHtml(initials)}${u.pictureUrl ? `<img src="${escapeHtml(u.pictureUrl)}" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; border-radius:50%;" onerror="this.remove()">` : ''}</div>
-                    <div style="flex-grow:1; min-width:0;">
-                        <div style="font-size:0.8em; font-weight:600; color:#1f2937; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(name)}</div>
-                        <div style="display:flex; gap:10px; margin-top:1px; flex-wrap:wrap;">
-                            <span style="font-size:0.7em; color:${quizCount > 0 ? '#16a34a' : '#94a3b8'};">Quiz ${quizCount}</span>
-                            <span style="font-size:0.7em; color:${journalCount > 0 ? '#16a34a' : '#94a3b8'};">Journal ${journalCount}</span>
-                            <span style="font-size:0.7em; color:${caseCount > 0 ? '#16a34a' : '#94a3b8'};">Case ${caseCount}</span>
-                            <span style="font-size:0.7em; color:var(--primary); font-weight:700;">${points} pts</span>
-                            <span style="font-size:0.7em; color:#c2410c;" title="Beri balance"><span aria-hidden="true">🪙</span> ${beri}</span>
-                            <span style="font-size:0.7em; color:#94a3b8;" title="${escapeHtml(lastSeenTitle)}"><i class="fa-regular fa-clock" aria-hidden="true"></i> ${escapeHtml(lastSeenText)}</span>
-                        </div>
-                    </div>
-                `;
-                const copyBtn = document.createElement('button');
-                copyBtn.type = 'button';
-                copyBtn.textContent = 'Copy';
-                copyBtn.style.cssText = 'flex-shrink:0; padding:5px 12px; border-radius:14px; font-size:0.7em; font-weight:600; border:1px solid #e2e8f0; background:#f1f5f9; color:#475569; cursor:pointer;';
-                copyBtn.onclick = () => {
-                    const text = `${name} — Quiz ${quizCount} · Journal ${journalCount} · Case ${caseCount} · ${points} pts · 🪙${beri}`;
-                    navigator.clipboard.writeText(text)
-                        .then(() => showToast(`Copied: ${name}`))
-                        .catch(() => showToast('Copy failed'));
-                };
-                row.appendChild(copyBtn);
-                list.appendChild(row);
-            });
-        }
-
         function setUserGroupFilter(group, div) {
             activeUserGroup = group;
             activeUserGroupDiv = div;   // V102.172: undefined = a division chip / any division; '' = Only I; a name = that division
             window._userCampView = false; // V102.45
             renderUserGroupTabs();
             renderTable('users');
-            renderGroupUsersPanel(); // V102.155: the Users summary panel follows these chips
             renderLeaderboard();
             renderBadgeStatsIfOpen();
         }
@@ -49787,6 +49729,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const secIgn = data.filter(u => !u.isPreReg && u.isIgnored);
                 usersRank = new Map(secAct.map((u, i) => [u, i + 1])); // rank stays the score rank
                 if (window._userBadgeSort) secAct.sort((a, b) => userBadgeScore(b) - userBadgeScore(a)); // V102.32; stable, so score order breaks ties
+                if (window._userSeenSort) { const ls = u => (u.lastSeen && u.lastSeen.toMillis ? u.lastSeen.toMillis() : 0); secAct.sort((a, b) => ls(b) - ls(a)); }   // V102.182
                 data = [...secAct, ...secPend, ...secIgn];
                 // Camp rows only reach here in the 🙈 view or through a search (V102.45).
                 usersIgnOpen = true;
@@ -49979,6 +49922,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             <button type="button" onclick="userRowQuick('${d.id}', 'history')" title="ประวัติคะแนน" aria-label="Score history">📜</button>
                             <button type="button" onclick="userRowQuick('${d.id}', 'log')" title="บันทึกงานแทนผู้ใช้" aria-label="Log work for this user"><i class="fa-solid fa-upload"></i></button>
                             <button type="button" onclick="userRowQuick('${d.id}', 'cert')" title="ใบประกาศ" aria-label="Certificate">🎓</button>
+                            <button type="button" onclick="copyUserRow(this)" title="Copy this row — name · Quiz/Journal/Case · pts · Beri" aria-label="Copy row"><i class="fa-regular fa-copy"></i></button>
                             <button type="button" class="u-row-kebab" onclick="openUserRowMenu(event, '${d.id}')" aria-haspopup="menu" aria-expanded="false" aria-label="More actions" title="More actions"><i class="fa-solid fa-ellipsis"></i></button>
                         </div>`;
 
@@ -49988,8 +49932,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const logsN = reflectiveLogsCache.filter(lg => lg.userId === d.id && !lg.isArchived).length; // V102.35: same set Reflective Review lists
                     // V102.181: hide what is empty — no "—" for no badges, no "📝0"; the line itself goes when both are empty
                     const _badgesHtml = userBadgesCellHtml(d).replace(/^<span style="color:#cbd5e1;"[^>]*>—<\/span>$/, '');
-                    const _logsHtml = logsN ? `<button type="button" onclick="setReflectiveSearch('${(d.displayName || d.id).replace(/'/g, "\\'")}', '${d.id}')" title="All submitted journals, pending and reviewed" data-th-title="Journal ที่ส่งทั้งหมด รวมรายการที่รอตรวจและตรวจแล้ว" style="width:auto; min-height:0; margin:0; padding:0 2px; background:none; border:none; font:inherit; color:#e67e22; cursor:pointer;">📝${logsN}</button>` : '';
-                    tbody.innerHTML += `<tr class="${ignored ? 'u-ignored' : ''}">
+                    // V102.182: the Users summary panel folded into the row — approved quizzes · journals · cases as Q·J·C chips (green when > 0),
+                    // last seen (green < 1 d · grey · orange > 7 d), and the panel's one-line Copy text on the <tr> (⧉ in the rail / ⧉ all in the header).
+                    const _qN = (quizAttemptsAllCache || []).filter(a => a.userId === d.id && a.status === 'approved').length;
+                    const _cN = (casesData || []).filter(c => c.userId === d.id).length;
+                    const _seenMs = d.lastSeen && d.lastSeen.toMillis ? d.lastSeen.toMillis() : 0;
+                    const _seenAge = _seenMs ? Date.now() - _seenMs : 0;
+                    const _seenHtml = _seenMs ? `<span class="u-seen${_seenAge < 86400000 ? ' u-seen-fresh' : _seenAge > 7 * 86400000 ? ' u-seen-stale' : ''}" title="Last seen ${new Date(_seenMs).toLocaleString('th-TH')}"><i class="fa-regular fa-clock" aria-hidden="true"></i> ${escapeHtml(alabastaAgo(d.lastSeen))}</span>` : '';
+                    const _qjcHtml = `<span class="u-qjc" title="Quiz ${_qN} · Journal ${logsN} · Case ${_cN}"><button type="button" class="${_qN ? 'ok' : ''}" onclick="userRowQuick('${d.id}', 'history')" title="Approved quizzes — open the score history" aria-label="Quizzes ${_qN}">Q${_qN}</button><button type="button" class="${logsN ? 'ok' : ''}" onclick="setReflectiveSearch('${(d.displayName || d.id).replace(/'/g, "\\'")}', '${d.id}')" title="All submitted journals, pending and reviewed" data-th-title="Journal ที่ส่งทั้งหมด รวมรายการที่รอตรวจและตรวจแล้ว" aria-label="Journals ${logsN}">J${logsN}</button><span class="${_cN ? 'ok' : ''}" title="Cases" aria-label="Cases ${_cN}">C${_cN}</span></span>`;
+                    const _logsHtml = _qjcHtml + _seenHtml;
+                    const _copyText = `${d.fullName || d.displayName || d.id} — Quiz ${_qN} · Journal ${logsN} · Case ${_cN} · ${parseFloat((d.score || 0).toFixed(2))} pts · 🪙${Math.round(d.beri || 0)}`;
+                    tbody.innerHTML += `<tr class="${ignored ? 'u-ignored' : ''}" data-copy="${escapeHtml(_copyText)}">
                             <td style="text-align:center;">${rankDisplay}</td>
                             <td>
                                 <div style="display:flex; align-items:center; gap:10px;">
@@ -60353,7 +60306,6 @@ Save it anyway?`;
 
         // Filters + renders the cached logs (was the body of the snapshot callback).
         function renderReflectiveLogsAdmin() {
-            renderGroupUsersPanel();
 
             // 🔥 Refresh User Table if open to update Log counts [Version: V89.54]
             if (activeTab === 'tab-users') renderTable('users');
