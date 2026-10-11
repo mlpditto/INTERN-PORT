@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.160)</title>
+    <title>Nika Admin (V102.161)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -36438,7 +36438,7 @@ They can connect again from LINE.
                 gs.forEach(g => placed.add(g));
                 return [`🛡️ ${escapeHtml(name)}`, 'ranked together', gs];
             });
-            sections.push(['Solo', 'ranked on their own', all.filter(g => !placed.has(g))]);
+            sections.push(['Only I', 'ranked on their own', all.filter(g => !placed.has(g))]);   // V102.161: was "Solo"
             const chip = g => groupChipHtml(g, { cls: 'gs-chip', attrs: `data-group="${escapeHtml(g)}" aria-pressed="${g.toUpperCase() === curUp}" onclick="gsPickGroup(this, this.dataset.group)"` });
             list.innerHTML = sections.filter(([, , gs]) => gs.length).map(([title, note, gs]) => {
                 const live = gs.filter(g => groupActiveCount(g) > 0 || g.toUpperCase() === curUp);
@@ -50859,12 +50859,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // V102.59: the chip menu = where it is ranked (Move to) + what happens to the group itself.
             const a = groupActiveCount(divPick), t = groupTotalCount(divPick);
             const menu = `<div class="dv-menu" style="flex-direction:column; gap:6px; font-size:12.5px;">
-                <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;"><small style="color:#64748b; font-weight:700;">Move to</small>${names.map(n => `<button type="button" data-to="${escapeHtml(n)}" title="ย้าย ${escapeHtml(divPick)} ไป ${escapeHtml(n)}">🛡️ ${escapeHtml(n)}</button>`).join('')}<button type="button" data-to="" title="ไม่อยู่ใน Division ใด — จัดอันดับเฉพาะในกลุ่มตัวเอง">↩ Solo</button></div>
+                <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;"><small style="color:#64748b; font-weight:700;">Move to</small>${names.map(n => `<button type="button" data-to="${escapeHtml(n)}" title="ย้าย ${escapeHtml(divPick)} ไป ${escapeHtml(n)}">🛡️ ${escapeHtml(n)}</button>`).join('')}<button type="button" data-to="" title="ไม่อยู่ใน Division ใด — จัดอันดับเฉพาะในกลุ่มตัวเอง">↩ Only I</button></div>
                 <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;"><small style="color:#64748b; font-weight:700;">Group</small><button type="button" data-act="rename">✏️ Rename</button><button type="button" data-act="merge">⇄ Merge into…</button><button type="button" data-act="visibility">👁 Visibility</button>${String(divPick).toUpperCase() === 'PUBLIC' ? '' : '<button type="button" data-act="delete" style="color:#dc2626; border-color:#fecaca; background:#fff;">🗑 Delete</button>'}</div>
                 <div style="font-size:11.5px; color:#64748b;">${escapeHtml(divPick)} · <b>${a} active</b>${t > a ? ` · ${t} total (${t - a} hidden from boards)` : ''} · Rename / Merge / Delete change the database right away</div>
             </div>`;
             const row = list => list.map(chip).join('') + (list.includes(divPick) ? menu : '');
-            let h = `<div class="dv-solo" title="กลุ่มที่ยังไม่อยู่ใน Division ใด — จัดอันดับเฉพาะในกลุ่มตัวเอง"><small>Solo</small>${solo.length ? row(solo) : '<small class="dv-empty">—</small>'}</div>`;
+            let h = `<div class="dv-solo" title="กลุ่มที่ยังไม่อยู่ใน Division ใด — จัดอันดับเฉพาะในกลุ่มตัวเอง"><small>Only I</small>${solo.length ? row(solo) : '<small class="dv-empty">—</small>'}</div>`;
             names.forEach(n => {
                 const gs = divDraft[n] || [];
                 const total = gs.reduce((s, g) => s + divGroupCount(g), 0);
@@ -50886,7 +50886,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (divPick) { divPick = ''; renderDivisionAdminList(); }
         }
 
-        // One group lives in one division: take it out of every bucket, then drop it in the target ('' = Solo).
+        // One group lives in one division: take it out of every bucket, then drop it in the target ('' = Only I, the pool; called Solo until V102.161).
         function moveGroupToDivision(group, name) {
             if (!group) return;
             const key = group.toUpperCase();
