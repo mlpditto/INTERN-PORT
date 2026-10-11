@@ -228,17 +228,27 @@ const QuizCover = (() => {
     // 2:3), which left side bands in the 3:4 frame. A taller image loses more from the top than the
     // bottom (60:40) to protect the title band in the bottom 25%; a wider one is cropped evenly.
     // Admin uploads are not touched. Already-3:4 images (±1%) are returned unchanged.
+    // V102.157: a WIDER image (square / landscape — Image 2 and Nano Banana ignore the 3:4 ask) is no longer cropped at the sides:
+    // the title the model paints across the full width was losing its first and last letters ("icrosoft Copilo"). It is letterboxed
+    // onto a white 3:4 canvas instead, vertically centred; the list thumbs already show covers with object-fit:contain on a light
+    // ground, so the bands read as part of the frame. Taller images keep the 60:40 crop (that one protects the title band).
     const COVER_RATIO = 3 / 4;
     async function cropToCover(blob) {
         const bitmap = await createImageBitmap(blob);
         const { width: w, height: h } = bitmap;
         if (Math.abs(w / h - COVER_RATIO) / COVER_RATIO <= 0.01) { bitmap.close(); return blob; }
-        let sx = 0, sy = 0, sw = w, sh = h;
-        if (w / h < COVER_RATIO) { sh = Math.round(w / COVER_RATIO); sy = Math.round((h - sh) * 0.6); }
-        else { sw = Math.round(h * COVER_RATIO); sx = Math.round((w - sw) / 2); }
         const canvas = document.createElement('canvas');
-        canvas.width = sw; canvas.height = sh;
-        canvas.getContext('2d').drawImage(bitmap, sx, sy, sw, sh, 0, 0, sw, sh); bitmap.close();
+        if (w / h < COVER_RATIO) {
+            const sh = Math.round(w / COVER_RATIO), sy = Math.round((h - sh) * 0.6);
+            canvas.width = w; canvas.height = sh;
+            canvas.getContext('2d').drawImage(bitmap, 0, sy, w, sh, 0, 0, w, sh);
+        } else {
+            const H = Math.round(w / COVER_RATIO), ctx = canvas.getContext('2d');
+            canvas.width = w; canvas.height = H;
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, H);
+            ctx.drawImage(bitmap, 0, Math.round((H - h) / 2));
+        }
+        bitmap.close();
         const out = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', 0.92));
         if (!out) throw new Error('Could not crop the AI image');
         return out;
@@ -450,5 +460,5 @@ const QuizCover = (() => {
         const escaped = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, '&#39;');
         return `<span class="quiz-admin-cover" title="Quiz นี้มีปกแล้ว" data-th-title="Quiz นี้มีปกแล้ว"><img src="${escaped}" alt="Quiz cover" loading="lazy" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span hidden role="img" aria-label="Cover set; preview unavailable" title="มีปกแล้ว แต่โหลดภาพตัวอย่างไม่ได้">🖼️</span></span>`;
     }
-    return { set, setStyle, style: () => style, setBadge, badge: badgeText, decorate, adminThumbnail, quickInsert, isBusy: () => busy, value: () => editor().querySelector('[type=hidden]').value };
+    return { set, setStyle, style: () => style, setBadge, badge: badgeText, decorate, adminThumbnail, quickInsert, isBusy: () => busy, value: () => editor().querySelector('[type=hidden]').value, _cropToCover: cropToCover /* tests */ };
 })();
