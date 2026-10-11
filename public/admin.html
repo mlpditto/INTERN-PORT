@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.165)</title>
+    <title>Nika Admin (V102.166)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -5316,6 +5316,12 @@
             opacity: 1 !important;
             z-index: 9999 !important;
         }
+
+        /* V102.166: .modal[style*="flex"/"block"] above pins EVERY modal at 9999 !important, so an inline z-index is ignored and the
+           later one in the DOM wins — Groups & Divisions (opened from the User Hub) rendered UNDER the User Hub. An id rule (more specific,
+           also !important) restores the order: User Hub 9999 < Divisions 10000 < Visibility 10001. */
+        #divisionsModal { z-index: 10000 !important; }
+        #groupSettingsModal { z-index: 10001 !important; }
 
         .prompt-suggestion-btn {
             background: #f8f9fa;
@@ -12952,7 +12958,7 @@
                 <div class="dv-head">
                     <h3>🛡️ Groups &amp; Divisions</h3>
                     <span class="dv-help" aria-label="Group = the user's real unit (one per person). Division = a ranking board that joins several groups. Groups in no division are ranked on their own."
-                        title="Group = หน่วยจริงของผู้ใช้ (1 คน 1 กลุ่ม) · Division = กระดานจัดอันดับที่รวมหลายกลุ่ม เช่น รวม IT + Dev เป็น &quot;Technical&quot; · กลุ่มที่ไม่อยู่ใน Division ใด (Solo) จัดอันดับเฉพาะในกลุ่มตัวเอง · แตะชิปกลุ่มเพื่อย้าย">i</span>
+                        title="Group = หน่วยจริงของผู้ใช้ (1 คน 1 กลุ่ม) · Division = กระดานจัดอันดับที่รวมหลายกลุ่ม เช่น รวม IT + Dev เป็น &quot;Technical&quot; · กลุ่มที่ไม่อยู่ใน Division ใด (Only I) จัดอันดับเฉพาะในกลุ่มตัวเอง · แตะชิปกลุ่มเพื่อย้าย">i</span>
                 </div>
                 <div id="div-editor" class="lang-no-toggle" onclick="onDivEditorClick(event)"></div>
                 <!-- V102.59: Merge (exact spellings, e.g. Extern → EXTERN) moved here from the per-user picker. -->
@@ -50878,7 +50884,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             document.getElementById('gs-merge-panel').hidden = true; // V102.38 panel lives here since V102.59
             document.getElementById('gs-merge-btn').setAttribute('aria-expanded', 'false');
             const m = document.getElementById('divisionsModal');
-            m.style.zIndex = '4050'; // V102.59: above the per-user picker (4000), below Visibility (4100)
+            // z-order (above the User Hub, below Visibility) is the #divisionsModal rule in the stylesheet — an inline z-index loses to .modal[style*="flex"].
             m.style.display = 'flex';
             renderDivisionAdminList();
         }
@@ -50956,7 +50962,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             names.forEach(n => {
                 const gs = divDraft[n] || [];
                 const total = gs.reduce((s, g) => s + divGroupCount(g), 0);
-                h += `<section class="dv-bucket"><div class="dv-bucket-head"><b>🛡️ ${escapeHtml(n)}</b><small title="ผู้ใช้ที่แสดงบนบอร์ดใน Division นี้">👥 ${total} active</small><button type="button" class="dv-del" data-del="${escapeHtml(n)}" title="ลบ Division (กลุ่มกลับไป Solo)" aria-label="Delete division ${escapeHtml(n)}">✕</button></div><div class="dv-row">${gs.length ? row(gs) : '<small class="dv-empty">แตะกลุ่มใน Solo เพื่อย้ายเข้ามา</small>'}</div></section>`;
+                h += `<section class="dv-bucket"><div class="dv-bucket-head"><b>🛡️ ${escapeHtml(n)}</b><small title="ผู้ใช้ที่แสดงบนบอร์ดใน Division นี้">👥 ${total} active</small><button type="button" class="dv-del" data-del="${escapeHtml(n)}" title="ลบ Division (กลุ่มกลับไป Only I)" aria-label="Delete division ${escapeHtml(n)}">✕</button></div><div class="dv-row">${gs.length ? row(gs) : '<small class="dv-empty">แตะกลุ่มใน Only I เพื่อย้ายเข้ามา</small>'}</div></section>`;
             });
             if (!names.length) h += '<p class="dv-empty">ยังไม่มี Division · ตั้งชื่อด้านล่างแล้วกด ＋</p>';
             box.innerHTML = h;
