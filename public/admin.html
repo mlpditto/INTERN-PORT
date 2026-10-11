@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.162)</title>
+    <title>Nika Admin (V102.163)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -4857,9 +4857,11 @@
             #learningNoteReviewModal .lnr-controls { border-left:0; padding:16px 0 0; }
             #learningNoteReviewModal .lnr-footer button { flex:1 1 40%; min-width:0!important; }
         }
-        #dashboard-workspace { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:20px; align-items:start; }
-        #dashboard-work, #dashboard-summary { min-width:0; }
-        #dashboard-summary #line-usage-breakdown { margin-left:0!important; overflow-wrap:anywhere; }
+        #dashboard-workspace { display:grid; grid-template-columns:minmax(0,1fr); gap:20px; align-items:start; }   /* V102.163: the LINE sidebar moved into the board toolbar */
+        #dashboard-work { min-width:0; }
+        #line-usage-pop #line-usage-breakdown { margin-left:0!important; overflow-wrap:anywhere; }
+        #line-usage-pop[hidden] { display:none; }
+        #line-usage-chip[aria-expanded="true"] { background:#eef2ff; border-color:#c7d2fe; }
         #board-group-tabs { flex-wrap:wrap; align-items:center; overflow-x:visible!important; }
         #board-group-tabs button { min-height:32px; padding:4px 10px; border:1px solid #c7d2fe; border-radius:10px; background:#eef2ff; color:#4338ca; cursor:pointer; }
         #board-group-tabs button:focus-visible { outline:2px solid #6366f1; outline-offset:2px; }
@@ -7390,12 +7392,72 @@
                         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                             <h4 style="margin:0; color:var(--primary);" title="Kanban Board">🗂️</h4>
                             <input type="text" id="board-search" placeholder="🔍" title="Search tasks" onkeyup="filterBoard()" style="margin:0; width:110px; padding:5px 12px; font-size:0.85em; border-radius:30px;">
+                            <!-- V102.163: LINE push quota moved here from the Dashboard sidebar (which is now gone): a chip with this month's count; tap it for the full card
+                                 (breakdown, Preview digest → Send / Copy). loadLineUsage paints the chip together with the card. -->
+                            <button type="button" id="line-usage-chip" onclick="toggleLineUsagePop()" aria-expanded="false" aria-controls="line-usage-pop" title="LINE pushes this month — tap for the digest preview / send" style="margin:0; padding:5px 12px; font-size:0.85em; border-radius:30px; border:1px solid #e2e8f0; background:#fff; color:#475569; cursor:pointer; display:inline-flex; align-items:center; gap:6px;"><i class="fa-solid fa-paper-plane" style="color:var(--primary);"></i><b id="line-usage-chip-n">–/300</b></button>
                             <!-- γ.4d: opens the Escalated Learning Notes review queue. Hidden by
                                  refreshEscalatedNotesCount() until at least one note is escalated. -->
                             <button type="button" id="escalated-notes-btn" onclick="openEscalatedNotesView()" title="Learning notes you flagged with 🚀 Escalate — focused review queue" style="display:none; margin:0; padding:5px 14px; font-size:0.85em; border-radius:30px; border:1.5px solid #fecaca; background:#fff5f5; color:#b91c1c; font-weight:800; cursor:pointer; white-space:nowrap;">🚀 Escalated <span id="escalated-notes-count">0</span></button>
                             <button type="button" id="note-delete-requests-btn" onclick="openNoteDeleteRequests()" title="User requests to delete learning notes, including archived notes" style="display:none; margin:0; padding:5px 14px; font-size:0.85em; border-radius:30px; border:1.5px solid #fecaca; background:#fff5f5; color:#b91c1c; font-weight:800; cursor:pointer; white-space:nowrap;">🗑️ Note deletion requests <span id="note-delete-requests-count">0</span></button>
                         </div>
                         <div id="board-group-tabs" style="display:flex; gap:8px; margin-left:auto;"></div>
+                    </div>
+                    <!-- V102.163: the LINE push card, folded under the toolbar chip -->
+                    <div id="line-usage-pop" hidden style="max-width:460px;">
+<div id="line-usage-panel" style="display:none; margin-top:0; border:1px solid #e2e8f0; border-radius:12px; background:#fff; padding:12px 14px; box-shadow:0 6px 18px rgba(15,23,42,.08);">
+                        <!-- V97.64 / V98.98: preview-then-send. The panel offers only Preview; the
+                             Send button lives inside the preview box and is unreachable until a
+                             preview has rendered. A digest push is irreversible (it lands in the
+                             intern group), spends one push PER TARGET off a 300/month plan, and is
+                             assembled server-side from live data, so there is no way to know what it
+                             says without building it. V98.98 moved it from its own row under the bar
+                             into this row's right corner: the cost of the click used to be the number
+                             directly above it and is now the number directly to its left, and the card
+                             drops a whole row. Labels are English-only for the reason the panel comment
+                             above gives: Thai here must carry no Latin characters and must never
+                             follow a digit run. -->
+                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                            <span style="font-weight:700; color:var(--primary);"><i class="fa-solid fa-paper-plane"></i> LINE pushes this month เดือนนี้</span>
+                            <span id="line-usage-count" style="font-weight:800; font-size:0.95em;"></span>
+                            <span id="line-usage-breakdown" style="font-size:0.78em; color:#64748b; margin-left:auto;"></span>
+                            <button id="line-digest-preview-btn" onclick="previewDigest()"
+                                style="padding:6px 12px; border:1px solid #0f766e; border-radius:10px; background:#0f766e; color:#fff; font-size:0.78em; font-weight:700; cursor:pointer; white-space:nowrap;">
+                                <i class="fa-solid fa-eye"></i> Preview digest
+                            </button>
+                        </div>
+                        <!-- V98.08: name the OA this quota belongs to. The project wires
+                             several LINE channels; the notify pipeline uses this one. Latin
+                             + emoji only, so the no-Thai-after-digits rule above is moot. -->
+                        <div style="margin-top:3px; font-size:0.72em; color:#94a3b8;">🦉 MLP INTERN PORT Noti</div>
+                        <div style="margin-top:8px; height:8px; background:#eef2f7; border-radius:999px; overflow:hidden;">
+                            <div id="line-usage-bar" style="height:100%; width:0%; border-radius:999px; background:#22c55e; transition:width 0.3s;"></div>
+                        </div>
+                        <!-- V98.98: the quota note and the send/copy status share one row. Both are
+                             grey micro-text and the note is short, so the status no longer needs a
+                             row of its own now that the Preview button has left the card body. -->
+                        <div style="margin-top:6px; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;">
+                            <span id="line-usage-note" style="font-size:0.72em; color:#94a3b8;"></span>
+                            <span id="line-digest-now-status" style="font-size:0.74em; color:#64748b; margin-left:auto; text-align:right;"></span>
+                        </div>
+                        <div id="line-digest-preview-box" class="lang-no-toggle" style="display:none; margin-top:10px; border:1px solid #d8dee7; border-radius:10px; background:#f8fafc; padding:10px 12px;">
+                            <div id="line-digest-preview-meta" style="font-size:0.72em; color:#64748b; margin-bottom:8px;"></div>
+                            <div id="line-digest-preview-copies" style="display:flex; gap:12px; flex-wrap:wrap;"></div>
+                            <div style="margin-top:10px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                                <button id="line-digest-now-btn" onclick="sendDigestNow()"
+                                    style="padding:7px 14px; border:1px solid #b45309; border-radius:10px; background:#b45309; color:#fff; font-size:0.78em; font-weight:700; cursor:pointer;">
+                                    <i class="fa-solid fa-paper-plane"></i> Send this now
+                                </button>
+                                <button onclick="copyDigestText()" title="Copy the digest as plain text — paste it into the group yourself, 0 pushes"
+                                    style="padding:7px 12px; border:1px solid #0f766e; border-radius:10px; background:#fff; color:#0f766e; font-size:0.78em; font-weight:700; cursor:pointer;">
+                                    <i class="fa-solid fa-clipboard"></i> Copy text
+                                </button>
+                                <button onclick="closeDigestPreview()"
+                                    style="padding:7px 12px; border:1px solid #cbd5e1; border-radius:10px; background:#fff; color:#475569; font-size:0.78em; font-weight:600; cursor:pointer;">
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                     </div>
 
                 </div>
@@ -7542,78 +7604,7 @@
                 </div>
             </div>
                 </div>
-                <aside id="dashboard-summary" aria-label="LINE usage">
-
-                    <!-- V97.53: LINE push quota for the current Bangkok month, read from
-                         line_usage/{YYYY-MM} (written by pushLineFlex via the Admin SDK).
-                         The OA free plan carries 300 pushes/month shared by the quiz digest,
-                         milestone announcements and case notifications — milestone mode exists
-                         to protect that cap, so the cap belongs on the dashboard next to it.
-                         Hidden entirely until the first push of the month is recorded.
-                         V97.57: lang-no-toggle REMOVED. It was here so Thai labels would
-                         survive admin's EN-default toggle, but the panel renders only fixed
-                         labels and numbers — no user or AI content — so once the labels lead
-                         in English the shield has nothing left to protect, and dropping it
-                         lets the TH button actually work here. Thai in this panel must stay
-                         free of Latin characters and must never sit after a digit run: a
-                         Thai run backward-absorbs preceding 'other' chars, and digits count
-                         as 'other', so trailing Thai would swallow the counts. -->
-                    <div id="line-usage-panel" style="display:none; margin-top:10px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; padding:12px 14px;">
-                        <!-- V97.64 / V98.98: preview-then-send. The panel offers only Preview; the
-                             Send button lives inside the preview box and is unreachable until a
-                             preview has rendered. A digest push is irreversible (it lands in the
-                             intern group), spends one push PER TARGET off a 300/month plan, and is
-                             assembled server-side from live data, so there is no way to know what it
-                             says without building it. V98.98 moved it from its own row under the bar
-                             into this row's right corner: the cost of the click used to be the number
-                             directly above it and is now the number directly to its left, and the card
-                             drops a whole row. Labels are English-only for the reason the panel comment
-                             above gives: Thai here must carry no Latin characters and must never
-                             follow a digit run. -->
-                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                            <span style="font-weight:700; color:var(--primary);"><i class="fa-solid fa-paper-plane"></i> LINE pushes this month เดือนนี้</span>
-                            <span id="line-usage-count" style="font-weight:800; font-size:0.95em;"></span>
-                            <span id="line-usage-breakdown" style="font-size:0.78em; color:#64748b; margin-left:auto;"></span>
-                            <button id="line-digest-preview-btn" onclick="previewDigest()"
-                                style="padding:6px 12px; border:1px solid #0f766e; border-radius:10px; background:#0f766e; color:#fff; font-size:0.78em; font-weight:700; cursor:pointer; white-space:nowrap;">
-                                <i class="fa-solid fa-eye"></i> Preview digest
-                            </button>
-                        </div>
-                        <!-- V98.08: name the OA this quota belongs to. The project wires
-                             several LINE channels; the notify pipeline uses this one. Latin
-                             + emoji only, so the no-Thai-after-digits rule above is moot. -->
-                        <div style="margin-top:3px; font-size:0.72em; color:#94a3b8;">🦉 MLP INTERN PORT Noti</div>
-                        <div style="margin-top:8px; height:8px; background:#eef2f7; border-radius:999px; overflow:hidden;">
-                            <div id="line-usage-bar" style="height:100%; width:0%; border-radius:999px; background:#22c55e; transition:width 0.3s;"></div>
-                        </div>
-                        <!-- V98.98: the quota note and the send/copy status share one row. Both are
-                             grey micro-text and the note is short, so the status no longer needs a
-                             row of its own now that the Preview button has left the card body. -->
-                        <div style="margin-top:6px; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;">
-                            <span id="line-usage-note" style="font-size:0.72em; color:#94a3b8;"></span>
-                            <span id="line-digest-now-status" style="font-size:0.74em; color:#64748b; margin-left:auto; text-align:right;"></span>
-                        </div>
-                        <div id="line-digest-preview-box" class="lang-no-toggle" style="display:none; margin-top:10px; border:1px solid #d8dee7; border-radius:10px; background:#f8fafc; padding:10px 12px;">
-                            <div id="line-digest-preview-meta" style="font-size:0.72em; color:#64748b; margin-bottom:8px;"></div>
-                            <div id="line-digest-preview-copies" style="display:flex; gap:12px; flex-wrap:wrap;"></div>
-                            <div style="margin-top:10px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                                <button id="line-digest-now-btn" onclick="sendDigestNow()"
-                                    style="padding:7px 14px; border:1px solid #b45309; border-radius:10px; background:#b45309; color:#fff; font-size:0.78em; font-weight:700; cursor:pointer;">
-                                    <i class="fa-solid fa-paper-plane"></i> Send this now
-                                </button>
-                                <button onclick="copyDigestText()" title="Copy the digest as plain text — paste it into the group yourself, 0 pushes"
-                                    style="padding:7px 12px; border:1px solid #0f766e; border-radius:10px; background:#fff; color:#0f766e; font-size:0.78em; font-weight:700; cursor:pointer;">
-                                    <i class="fa-solid fa-clipboard"></i> Copy text
-                                </button>
-                                <button onclick="closeDigestPreview()"
-                                    style="padding:7px 12px; border:1px solid #cbd5e1; border-radius:10px; background:#fff; color:#475569; font-size:0.78em; font-weight:600; cursor:pointer;">
-                                    Close
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                </aside>
+                
             </div>
 
         </div>
@@ -34794,6 +34785,20 @@ RULES:
                 notifyAdminOnNewCase: 'case',
                 notifyQuizReminder: 'reminder'
             };
+            // V102.163: the LINE card folds under the toolbar chip. Open = load fresh numbers; outside click / Esc closes.
+            window.toggleLineUsagePop = function (force) {
+                const pop = document.getElementById('line-usage-pop'), chip = document.getElementById('line-usage-chip');
+                if (!pop || !chip) return;
+                const open = typeof force === 'boolean' ? force : pop.hidden;
+                pop.hidden = !open;
+                chip.setAttribute('aria-expanded', String(open));
+                if (open && window.loadLineUsage) window.loadLineUsage();
+            };
+            document.addEventListener('click', e => {
+                const pop = document.getElementById('line-usage-pop');
+                if (pop && !pop.hidden && !e.target.closest('#line-usage-pop, #line-usage-chip')) window.toggleLineUsagePop(false);
+            });
+            document.addEventListener('keydown', e => { if (e.key === 'Escape') window.toggleLineUsagePop(false); });
             window.loadLineUsage = async function () {
                 const panel = document.getElementById('line-usage-panel');
                 if (!panel) return;
@@ -34817,6 +34822,8 @@ RULES:
                         countEl.textContent = `${total}/${LINE_MONTHLY_QUOTA}`;
                         countEl.style.color = color;
                     }
+                    const chipN = document.getElementById('line-usage-chip-n');   // V102.163: the toolbar chip shows the same number in the same colour
+                    if (chipN) { chipN.textContent = `${total}/${LINE_MONTHLY_QUOTA}`; chipN.style.color = color; }
                     const bar = document.getElementById('line-usage-bar');
                     if (bar) { bar.style.width = pct + '%'; bar.style.background = color; }
 
