@@ -8,7 +8,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const html = fs.readFileSync('public/admin.html', 'utf8').replace(/\r\n/g, '\n');
 
 assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(html));
-assert.ok(html.includes('class="grp-chip gs-chip-div" onclick="openDivisionsModal()"'), 'V102.171: the picker rail ends with a Divisions & Groups chip');
+assert.ok(html.includes('class="gs-plus gs-chip-div" onclick="openDivisionsModal()"'), 'V102.178: step ① of the picker ends with a ＋ that opens Divisions & Groups');
 assert.ok(!html.includes('<i class="fa-solid fa-gear"></i> <span data-gs-en="Divisions'), 'the grey text link under the rail is gone');
 const header = html.slice(html.indexOf('<div class="gs-header lang-no-toggle">'), html.indexOf('<input type="hidden" id="gs-uid">'));
 assert.ok(!html.includes('class="gs-identity"'), 'the second identity row is gone');
@@ -63,7 +63,7 @@ const markup = '<div id="groupSelectModal" style="width:100%"><div class="modal-
             "var getGroupColor = g => ({ MLP: '#ef4444', EXTERN: '#7209b7', CAFE: '#f97316' })[g] || '#6c757d'; var getGroupIcon = g => 'fa-tag';",
             "var groupActiveCount = g => ({ MLP: 9, EXTERN: 2, CAFE: 4 })[g] || 0; var groupTotalCount = g => groupActiveCount(g);",
             "var getGlobalGroups = () => ['MLP', 'EXTERN', 'CAFE']; var gsCollectAddresses = () => []; var gsLanguage = 'en'; var gsText = (en, th) => gsLanguage === 'th' ? th : en;",
-            "var gsDivision = 'RSU', usersData = [{ group: 'EXTERN', division: 'RSU' }], divisionConfig = { RSU: ['EXTERN', 'Junior'] }, opened = 0, openDivisionsModal = function () { opened++; }; var gsRefreshProfileCards = function () {}; let gsExtra = []; let gsSnap = null;",
+            "var renderGsGroupList = function () {}; var gsDivision = 'RSU', usersData = [{ group: 'EXTERN', division: 'RSU' }], divisionConfig = { RSU: ['EXTERN', 'Junior'] }, opened = 0, openDivisionsModal = function () { opened++; }; var gsRefreshProfileCards = function () {}; let gsExtra = []; let gsSnap = null;",
             fns,
             "document.getElementById('gs-input').value = 'EXTERN'; gsPaintMainGroup('EXTERN'); gsExtraPaint(); gsSnap = Object.assign(gsState(), { groupName: 'EXTERN' }); gsDirtyPaint();",
             "document.getElementById('gs-profile-body').oninput = () => gsDirtyPaint();"
@@ -75,10 +75,12 @@ const markup = '<div id="groupSelectModal" style="width:100%"><div class="modal-
         assert.ok(Math.max(...tops) - Math.min(...tops) <= 6, 'everything on one line at 900px: ' + tops.join(','));
         // group block
         assert.equal(await page.$eval('#gs-current-group .grp-chip', e => e.id + '|' + e.className + '|' + e.querySelector('.grp-name').textContent + '|' + e.getAttribute('aria-expanded')), 'gs-group-toggle|grp-chip gs-main on|EXTERN|false', 'main group = rail chip, selected look, carries the toggle');
-        // V102.171: the division this group is ranked in sits beside the main chip; one tap opens Divisions & Groups
+        // V102.178: "Audit in RSU" — the division chip beside the main chip opens the same picker (step ① is where the division is chosen)
         assert.equal(await page.$eval('#gs-current-group .gs-divchip .grp-name', e => e.textContent), 'RSU', 'EXTERN lives in RSU');
+        assert.equal(await page.locator('#gs-current-group .gs-in').textContent(), 'in');
         await page.click('#gs-current-group .gs-divchip');
-        assert.equal(await page.evaluate(() => opened), 1, 'the division chip opens Divisions & Groups');
+        assert.equal(await page.$eval('#gs-pane-group', e => e.hidden), false, 'the division chip opens the picker');
+        await page.click('#gs-group-toggle');   // fold it again for the steps below
         assert.equal(await vis('#gs-also'), false, '"also" hidden with no extras');
         assert.equal(await vis('#gs-save-row'), false, 'nothing changed → no Save row');
         await page.click('#gs-group-toggle');
