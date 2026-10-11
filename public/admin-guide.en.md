@@ -68,6 +68,11 @@ The **Admin Portal** page has 3 ways in — use any one:
 ### 👥 User Hub
 - 🏆 **Elite Board** (ranking) · search box · 📅 score date range · 🏅 **Badge Stats** · 📤 share ranking · 🛡️ **Groups & Divisions** · 👥 **Entry** (pre-registration) · ⏳ preview of the points deducted for missed daily check-ins
 - Open one intern's history (drill-down) and filter by Q (Quiz) · W (Work) · L (Logs) · B (Bonus) · M (Manual) · 📍 Check-in · 🪙 Beri
+- 🛡️ **Groups & Divisions** (the shield button in the toolbar) — a *group* is a person's home team; a *division* is a bucket of groups that are **ranked together** and can switch on a special UI (a division named **Content Creator** gives its members the Content card instead of Mission). A group lives in one division at most; a group in no division is **Solo** (ranked only within itself).
+  - The window edits a **draft**: move groups around as much as you like, nothing is written until you press **Save** (the button lights up while there are unsaved changes). Closing without Save discards them.
+  - **Create a division**: type a name in the bottom box and press ＋ · **Move a group**: tap its chip → the **Move to** row → pick the destination division, or **Solo** to take it out · **Remove a division**: the delete button on its header (its groups go back to Solo; they are not deleted)
+  - ⚠️ In the same chip menu, the **Group** row (✏️ Rename · Merge · 👁 Visibility · Delete) acts on the **group itself** and **takes effect at once**, not on Save — Delete removes the group everywhere
+  - Chip counts are active people only (hidden / not-yet-registered are left out) · division names the code treats specially: **Content Creator** (or the old name CAFE)
 
 ### 🏝️ Laugh Tale
 - 📓 **Reflections** (reflective notes) and 🧠 **Quiz** (feedback on Quizzes) each have the tabs **Needs a fix · Analysis · Patterns · Comments**
