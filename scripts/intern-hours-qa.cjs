@@ -78,7 +78,7 @@ const timeDb = mkDb({
 
     const html = fs.readFileSync('public/admin.html', 'utf8');
     assert.match(html, /\['⏱', 'Internship hours…', \(\) => setInternHours\(uid\)\]/, '⋯ menu item');
-    const block = html.slice(html.indexOf("                    let hoursHtml = '';"), html.indexOf('                    const userCode = d.enrollmentCode'));
+    const block = html.slice(html.indexOf("                    let daysRemainingHtml = '', _tl = null;"), html.indexOf('                    const userCode = d.enrollmentCode'))   // V102.181: from the days block — hoursHtml folds into it when dates exist;
     const bar = d => { const c = { d, escapeHtml: s => String(s) }; vm.createContext(c); vm.runInContext(block + '\nthis.out = hoursHtml;', c); return c.out; };
     assert.equal(bar({ id: 'j' }), '', 'no goal → no bar');
     const ok = bar({ id: 'bua', internHoursTarget: 280, internHours: { status: 'ok', total: 151.13, days: 17 } });

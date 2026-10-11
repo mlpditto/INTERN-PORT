@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.180)</title>
+    <title>Nika Admin (V102.181)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -6399,6 +6399,17 @@
         /* V102.53: ⭐ / 🪙 numbers are the adjust buttons; 4 quick actions beside ⋯; the number editor popover */
         .u-num-tap { width: auto; min-height: 0; margin: 0; padding: 0 0 1px; border: 0; border-bottom: 1px dashed currentColor; border-radius: 0; background: none; font: inherit; cursor: pointer; color: inherit; }
         .u-num-tap:hover { background: rgba(99, 102, 241, 0.08); }
+        /* V102.181: the dashed "tap to adjust" line shows on the hovered / focused row only (it was on every number of every row) */
+        .u-num-tap { border-bottom-color: transparent; }
+        tr:hover .u-num-tap, .u-num-tap:focus-visible { border-bottom-color: currentColor; }
+        /* V102.181: ⏳ = ONE stacked block — days bar, a 2px hours line, one text line; was two bars with two text lines */
+        .u-tl { display: inline-flex; flex-direction: column; gap: 2px; min-width: 110px; }
+        .u-tl-bar { display: block; height: 5px; border-radius: 3px; background: var(--border-color); overflow: hidden; }
+        .u-tl-bar > span { display: block; height: 100%; }
+        .u-tl-bar-h { height: 2px; opacity: .85; }
+        .u-tl-txt { font-size: 0.8em; color: var(--text-sub); white-space: nowrap; font-weight: 600; }
+        .u-tl-h { width: auto; min-height: 0; margin: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
+        .u-tl-h:hover b { text-decoration: underline; }
         .u-row-quick { display: flex; align-items: center; justify-content: flex-end; gap: 4px; flex-wrap: nowrap; }
         .u-row-quick > button:not(.u-row-kebab) { width: 28px; height: 28px; min-height: 0; margin: 0; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: transparent; color: var(--text-sub); cursor: pointer; font-size: 0.85em; }
         .u-row-quick > button:not(.u-row-kebab):hover { background: var(--bg-hover, #f1f5f9); }
@@ -49890,7 +49901,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const group = d.group || "Public";
                     const dateStr = (d.startDate && d.endDate) ? `${d.startDate} ~ ${d.endDate}` : '<span style="color:#ccc; font-size:0.8em;">-</span>';
                     const certStatus = d.certRequested ? '<span class="badge" style="background:#ffc107;color:black;font-size:0.7em;">🔔</span>' : '';
-                    let daysRemainingHtml = '';
+                    let daysRemainingHtml = '', _tl = null;   // V102.181: _tl keeps the parts so the hours block below can fold into ONE stacked bar
                     if (d.startDate && d.endDate) {
                         const _now = new Date(); _now.setHours(0,0,0,0);
                         const _start = new Date(d.startDate);
@@ -49901,7 +49912,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         // V99.44 — Elite Board Phase 3: a bar of the share already served
                         // replaces the ⏳rem/total pill; same thresholds and colours.
                         const _pct = Math.min(100, Math.max(0, Math.round((_total - _rem) / _total * 100)));
-                        daysRemainingHtml = `<span style="display:inline-flex; flex-direction:column; gap:3px; min-width:96px;" title="${_rem} days remaining / ${_total} days total"><span style="display:block; height:5px; border-radius:3px; background:var(--border-color); overflow:hidden;"><span style="display:block; height:100%; width:${_pct}%; background:${_remColor};"></span></span><span style="font-size:0.8em; color:var(--text-sub); white-space:nowrap; font-weight:600;"><b style="color:${_remColor};">${_rem}d</b> left · ${_total}d</span></span>`;
+                        // V102.181: a period longer than 400 days is a typo (1988 → 2027 showed "15369d left") — say so instead of counting
+                        const _bad = _total > 400;
+                        _tl = { rem: _rem, total: _total, color: _bad ? '#cbd5e1' : _remColor, pct: _bad ? 0 : _pct, bad: _bad,
+                            tip: _bad ? `Check the internship dates: ${_start.getFullYear()} → ${_end.getFullYear()} (${_total} days)` : `${_rem} days remaining / ${_total} days total`,
+                            text: _bad ? `<b style="color:#dc2626;">⚠</b> dates ${_start.getFullYear()} → ${_end.getFullYear()}` : `<b style="color:${_remColor};">${_rem}d</b> left · ${_total}d` };
+                        daysRemainingHtml = `<span class="u-tl" title="${_tl.tip}"><span class="u-tl-bar"><span style="width:${_tl.pct}%; background:${_tl.color};"></span></span><span class="u-tl-txt">${_tl.text}</span></span>`;
                     }
 
                     // V102.49: hours from the time clock (syncInternHours), shown once a goal is set.
@@ -49916,6 +49932,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             : _ih.status === 'ambiguous' ? 'Two people share this name in the time clock — tap to fix'
                             : 'Not synced yet — tap for details';
                         hoursHtml = `<button type="button" onclick="openInternHoursDetail(event, '${d.id}')" title="${escapeHtml(_hTip)}" style="display:inline-flex; flex-direction:column; gap:3px; min-width:96px; width:auto; min-height:0; margin:3px 0 0; padding:0; background:none; border:none; font:inherit; cursor:pointer; text-align:left;"><span style="display:block; height:5px; border-radius:3px; background:var(--border-color); overflow:hidden;"><span style="display:block; height:100%; width:${_hPct}%; background:${_hColor};"></span></span><span style="font-size:0.8em; color:var(--text-sub); white-space:nowrap; font-weight:600;">${_ih.status === 'ok' ? '' : '⚠ '}<b style="color:${_hColor};">${_h.toFixed(1)}</b> / ${d.internHoursTarget} h</span></button>`;
+                        // V102.181: with dates set, the hours fold INTO the days block — a 2px line under the days bar and "· 180/200 h"
+                        // on the same text line (still a button → the day-by-day popup). hoursHtml alone stays for a goal without dates.
+                        if (_tl) {
+                            const _hTxt = `<button type="button" class="u-tl-h" onclick="openInternHoursDetail(event, '${d.id}')" title="${escapeHtml(_hTip)}">${_ih.status === 'ok' ? '' : '⚠ '}<b style="color:${_hColor};">${Math.round(_h)}</b>/${d.internHoursTarget} h</button>`;
+                            daysRemainingHtml = `<span class="u-tl" title="${_tl.tip}"><span class="u-tl-bar"><span style="width:${_tl.pct}%; background:${_tl.color};"></span></span><span class="u-tl-bar u-tl-bar-h"><span style="width:${_hPct}%; background:${_hColor};"></span></span><span class="u-tl-txt">${_tl.text} · ${_hTxt}</span></span>`;
+                            hoursHtml = '';
+                        }
                     }
 
                     const userCode = d.enrollmentCode || preRegData.find(p => p.claimedBy === d.id)?.code || preRegData.find(p => p.sourceUserId === d.id)?.code || '';
@@ -49924,15 +49947,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     // V98.16 lean: the dashed cert-name box was up to 5 stacked lines
                     // on every row. Collapse to one — "ชื่อ · สถาบัน" — with the
                     // English name / code / nickname behind a chevron (per row).
-                    const _instShort = d.institute || '';
-                    const _certSummary = `${d.fullName || '-'}${_instShort ? ` · ${_instShort}` : ''}`;
+                    // V102.181: an institute that repeats the division chip ("RSU", "CU69" under CU) is noise on the row — tooltip only.
+                    const _instRaw = d.institute || '';
+                    const _dvName = (typeof userDivisionOf === 'function' ? userDivisionOf(d) : '') || '';
+                    const _instShort = (_dvName && _instRaw.trim().toUpperCase().startsWith(_dvName.trim().toUpperCase())) ? '' : _instRaw;
+                    const _certTip = `${d.fullName || '-'}${_instRaw ? ` · ${_instRaw}` : ''}`;
+                    const _certSummary = d.fullName ? `${d.fullName}${_instShort ? ` · ${_instShort}` : ''}` : (_instShort || '');
                     const _certHasMore = d.fullNameEn || codeDisplay || userFloodInfo(d);
                     // V99.44 — Elite Board Phase 3: no dashed box; the summary is one grey
                     // line under the display name (still click-to-edit via setUserGroup).
                     const certNameDisplay = `
                         <div style="margin-top:1px; max-width:240px;">
                             <div style="display:flex; align-items:center; gap:4px;">
-                                <span onclick="setUserGroup('${d.id}', '${group}')" style="cursor:pointer; font-size:0.78em; color:var(--text-sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;" title="${_certSummary.replace(/"/g, '&quot;')}">${_certSummary} <i class="fa-solid fa-pen" style="font-size:0.8em; color:#cbd5e1;"></i></span>
+                                <span onclick="setUserGroup('${d.id}', '${group}')" style="cursor:pointer; font-size:0.78em; color:var(--text-sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;" title="${_certTip.replace(/"/g, '&quot;')}">${_certSummary || '<span style="color:#cbd5e1;">add name</span>'} <i class="fa-solid fa-pen" style="font-size:0.8em; color:#cbd5e1;"></i></span>
                                 ${_certHasMore ? `<button type="button" onclick="event.stopPropagation(); toggleRowDetail(this)" style="border:none; background:transparent; color:#94a3b8; cursor:pointer; font-size:0.8em; padding:0 2px; line-height:1;" title="More"><i class="fa-solid fa-chevron-down"></i></button>` : ''}
                             </div>
                             <div class="row-detail" style="display:none; margin-top:3px;">
@@ -49959,6 +49986,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     // badges sit under the name; Status went (ignore ⇄ show lives in ⋯, and the
                     // Hidden section already says who is ignored); Set / 👁 LIFF moved into ⋯.
                     const logsN = reflectiveLogsCache.filter(lg => lg.userId === d.id && !lg.isArchived).length; // V102.35: same set Reflective Review lists
+                    // V102.181: hide what is empty — no "—" for no badges, no "📝0"; the line itself goes when both are empty
+                    const _badgesHtml = userBadgesCellHtml(d).replace(/^<span style="color:#cbd5e1;"[^>]*>—<\/span>$/, '');
+                    const _logsHtml = logsN ? `<button type="button" onclick="setReflectiveSearch('${(d.displayName || d.id).replace(/'/g, "\\'")}', '${d.id}')" title="All submitted journals, pending and reviewed" data-th-title="Journal ที่ส่งทั้งหมด รวมรายการที่รอตรวจและตรวจแล้ว" style="width:auto; min-height:0; margin:0; padding:0 2px; background:none; border:none; font:inherit; color:#e67e22; cursor:pointer;">📝${logsN}</button>` : '';
                     tbody.innerHTML += `<tr class="${ignored ? 'u-ignored' : ''}">
                             <td style="text-align:center;">${rankDisplay}</td>
                             <td>
@@ -49967,10 +49997,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                     <div style="min-width:0;">
                                         <div style="font-weight:bold; line-height:1.25;">${d.displayName}${(() => { const n = String(d.nickname || '').trim(); return n && n !== '-' && n.toLowerCase() !== String(d.displayName || '').trim().toLowerCase() ? ` <span style="font-weight:600; font-size:0.85em; color:var(--text-sub);">· ${escapeHtml(n)}</span>` : ''; })()}${d.googleLink && d.googleLink.uid ? ` <span title="Google connected · ${escapeHtml(d.googleLink.email || '')}" aria-label="Google connected" style="font-size:0.85em;">🌐</span>` : ''}${ignored ? ' <span title="Hidden from boards (⋯ to show)" aria-label="Hidden from boards">🙈</span>' : ''}${userFloodMarkHtml(d)}${userGroupTagHtml(d)}</div>
                                         ${certNameDisplay}
-                                        <div style="display:flex; align-items:center; gap:6px; margin-top:2px; font-size:0.78em; color:var(--text-sub);">
-                                            ${userBadgesCellHtml(d)}
-                                            <button type="button" onclick="setReflectiveSearch('${(d.displayName || d.id).replace(/'/g, "\\'")}', '${d.id}')" title="All submitted journals, pending and reviewed" data-th-title="Journal ที่ส่งทั้งหมด รวมรายการที่รอตรวจและตรวจแล้ว" style="width:auto; min-height:0; margin:0; padding:0 2px; background:none; border:none; font:inherit; color:${logsN ? '#e67e22' : '#cbd5e1'}; cursor:pointer;">📝${logsN}</button>
-                                        </div>
+                                        ${(_badgesHtml || _logsHtml) ? `<div style="display:flex; align-items:center; gap:6px; margin-top:2px; font-size:0.78em; color:var(--text-sub);">${_badgesHtml}${_logsHtml}</div>` : ''}
                                     </div>
                                 </div>
                             </td>
