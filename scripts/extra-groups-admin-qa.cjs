@@ -35,7 +35,9 @@ assert.ok(/extraGroups: u\.extraGroups\.filter\(g => g !== groupName\)/.test(del
             "var escapeHtml = function (s) { return String(s).replace(/[&<>\"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' }[c]; }); };",
             "var getGlobalGroups = function () { return ['Pharmacists', 'Audit', 'Marketing', 'EXTERN', 'Public']; };",
             "var groupChipHtml = function (g, o) { o = o || {}; return '<button type=\"button\" class=\"grp-chip ' + (o.cls || '') + '\" ' + (o.attrs || '') + ' title=\"' + escapeHtml(o.hint || '') + '\">' + escapeHtml(g) + '</button>'; };",
-            "let gsExtra = [];"
+            "let gsExtra = [];",
+            "var gsPaintMainGroup = function (g) { document.getElementById('gs-current-group').textContent = g; };   // V102.164: the real one paints a chip + the Save row",
+            "var gsDirtyPaint = function () {};"
         ].join(String.fromCharCode(10));
         await page.addScriptTag({ content: prelude + String.fromCharCode(10) + fns });
         const chips = sel => page.$$eval(sel + ' button', els => els.map(e => e.textContent));
