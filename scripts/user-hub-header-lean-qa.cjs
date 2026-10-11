@@ -15,7 +15,7 @@ assert.ok(!html.includes('class="gs-identity"'), 'the second identity row is gon
 for (const gone of ['data-gs-en="Profile"', '>LINE ID<', '>Enrollment CODE<', '</span> pts<']) assert.ok(!header.includes(gone), 'no label text: ' + gone);
 assert.ok(!header.includes('class="gs-id"') && !html.includes('gsCopyLineId'), 'V102.174: no LINE ID chip in the header any more');
 const social = html.slice(html.indexOf('<section class="gs-profile-card gs-card-social">'), html.indexOf('</section>', html.indexOf('<section class="gs-profile-card gs-card-social">')));
-assert.ok(/id="gs-social-line" hidden><\/div>\n<div class="gs-card-field gs-line-uid"><label for="gs-line-uid">LINE ID<\/label>[\s\S]*?onclick="gsCopyProfile\(this, false\)">Copy<\/button>[\s\S]*?<input type="text" id="gs-line-uid" readonly hidden>/.test(social), 'V102.174: the LINE ID is a read-only field with Copy, right after LINE in the Social card');
+assert.ok(/id="gs-social-line" hidden><\/div>\n<div class="gs-card-field gs-line-uid"><label for="gs-line-uid">LINE User ID<\/label>[\s\S]*?onclick="gsCopyProfile\(this, false\)">Copy<\/button>[\s\S]*?<input type="text" id="gs-line-uid" readonly hidden>/.test(social), 'V102.174: the LINE ID is a read-only field with Copy, right after LINE in the Social card');
 // V102.176: the enrollment CODE chip lives inline in the Personal details card header (not in the modal header); same chip: icon · code · ⧉
 const basicStart = html.indexOf('<section class="gs-profile-card gs-card-basic"><header>');
 const basicHeader = html.slice(basicStart, html.indexOf('</header>', basicStart));
