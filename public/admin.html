@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.169)</title>
+    <title>Nika Admin (V102.170)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -3931,6 +3931,11 @@
             -webkit-backdrop-filter:blur(10px) saturate(160%); backdrop-filter:blur(10px) saturate(160%);
             transition:transform .18s ease, opacity .18s ease, box-shadow .18s ease, background .18s ease; }
         .grp-chip small { font-weight:600; opacity:.75; }
+        /* V102.170: Users table — the "RSU · EXTERN" tag next to the name, and the sub-row of a division's groups under the chip rail. */
+        .usr-grp-tag { --c:#64748b; display:inline-block; font-size:10.5px; font-weight:800; padding:1px 8px; border-radius:999px; color:var(--c); background:color-mix(in srgb, var(--c) 12%, #fff); border:1px solid color-mix(in srgb, var(--c) 35%, #fff); margin-left:4px; vertical-align:middle; white-space:nowrap; }
+        #user-subgroup-row { --dc:#64748b; display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:-4px 0 12px; padding:6px 10px; border-radius:12px; background:linear-gradient(180deg, color-mix(in srgb, var(--dc) 12%, #fff), color-mix(in srgb, var(--dc) 4%, #fff)); border:1px solid color-mix(in srgb, var(--dc) 28%, #fff); }
+        #user-subgroup-row[hidden] { display:none; }
+        #user-subgroup-row .sub-l { font-size:12px; font-weight:800; color:color-mix(in srgb, var(--dc) 70%, #334155); margin-right:2px; }
         /* V102.64: Event modal — lean glass form; icons instead of uppercase labels. */
         .evf { border:1px solid rgba(255,255,255,.8); border-radius:16px; padding:10px; margin-top:10px; background:linear-gradient(180deg, rgba(255,255,255,.8), rgba(255,255,255,.45)); box-shadow:inset 0 1px 0 #fff, 0 6px 18px rgba(15,23,42,.08); -webkit-backdrop-filter:blur(12px) saturate(160%); backdrop-filter:blur(12px) saturate(160%); }
         .evf input:not([type=checkbox]), .evf textarea { width:100%; min-width:0; padding:6px 9px; border:1px solid rgba(148,163,184,.45); border-radius:10px; background:rgba(255,255,255,.7); font-size:0.85em; box-sizing:border-box; }
@@ -8205,6 +8210,8 @@
                 <div id="user-pers-filter" class="lang-no-toggle"
                     style="display:none; gap:8px; flex-wrap:wrap; align-items:center; padding-left:12px; border-left:1px solid var(--border-color);"></div>
             </div>
+            <!-- V102.170: the groups of the selected division (or of the division the selected group belongs to). Filled by renderUserGroupTabs(). -->
+            <div id="user-subgroup-row" class="lang-no-toggle" hidden></div>
             <!-- V102.33: the leaderboard strip repeated the table's 🥇🥈🥉 rows, so it is hidden.
                  V102.41: and no longer rendered — see renderLeaderboard(). The rank cell opens
                  the Insight popup (openLbPopup → openUserHub), which loads its own data. -->
@@ -37035,8 +37042,11 @@ They can connect again from LINE.
             const groups = [...new Set(allUsersAndPre.map(u => u.group || 'Public'))].sort();
             
             // 🔥 Include Divisions in tabs ([Version: V86.96])
+            // V102.170: a group that lives in a division is reached through that division (sub-row below), not as a second flat chip.
             const divs = Object.keys(divisionConfig || {});
-            const allOptions = ['All', ...divs, ...groups.filter(g => !divs.includes(g))];
+            const inDivision = new Set(Object.values(divisionConfig || {}).flat().map(g => String(g).trim().toUpperCase()));
+            const allOptions = ['All', ...divs, ...groups.filter(g => !divs.includes(g) && !inDivision.has(String(g).trim().toUpperCase()))];
+            const selDiv = (divisionConfig && divisionConfig[activeUserGroup]) ? activeUserGroup : (divs.find(n => (divisionConfig[n] || []).some(g => String(g).trim().toUpperCase() === String(activeUserGroup).trim().toUpperCase())) || '');
 
             const campOn = !!window._userCampView;
             const floodCount = usersData.filter(u => !u.isIgnored && u.floodWatch && u.floodWatch.optIn === true).length;
@@ -37046,12 +37056,35 @@ They can connect again from LINE.
             const active = usersData.filter(u => !u.isIgnored);
             const inGroups = (gs, list) => { const keys = new Set(gs.map(x => String(x).trim().toUpperCase())); return list.filter(u => keys.has((u.group || 'Public').trim().toUpperCase())).length; };
             container.innerHTML = allOptions.map(g => {
-                const isActive = !campOn && g === activeUserGroup;
+                const isActive = !campOn && (g === activeUserGroup || (!!divisionConfig && !!divisionConfig[g] && g === selDiv));   // V102.170: a division stays lit while one of its groups is picked
                 const attrs = `data-g="${escapeHtml(g)}" onclick="setUserGroupFilter(this.dataset.g)" aria-pressed="${isActive}"`;
                 if (g === 'All') return groupChipHtml('All', { attrs, icon: 'fa-users', color: '#334155', active: active.length, total: usersData.length, hint: 'show every group' });
-                if (divisionConfig && divisionConfig[g]) return groupChipHtml(g, { attrs, icon: 'fa-shield-halved', color: '#4f46e5', active: inGroups(divisionConfig[g], active), total: inGroups(divisionConfig[g], usersData), hint: 'division' });
+                if (divisionConfig && divisionConfig[g]) return groupChipHtml(g, { attrs, icon: 'fa-shield-halved', color: divColor(g), active: inGroups(divisionConfig[g], active), total: inGroups(divisionConfig[g], usersData), hint: 'division' });
                 return groupChipHtml(g, { attrs });
             }).join('') + (floodCount ? `<button type="button" class="grp-chip${window._userFloodOnly ? ' on' : ''}" onclick="toggleUserFloodView()" aria-pressed="${!!window._userFloodOnly}" title="Flood alerts on · ${floodCount}" style="--c:#2563eb;">🌊<small>${floodCount}</small></button>` : '') + (campCount ? `<button type="button" class="grp-chip${campOn ? ' on' : ''}" onclick="toggleUserCampView()" aria-pressed="${campOn}" title="Camp · hidden from boards, not ranked · ${campCount}" style="--c:#64748b;">🙈<span class="grp-name">Camp</span><small>${campCount}</small></button>` : '');
+            renderUserSubgroupRow();   // V102.170
+        }
+
+        // V102.170: the groups of the selected division as a sub-row — "RSU › EXTERN · Junior". Hidden for All / Only I groups / the Camp view.
+        function renderUserSubgroupRow() {
+            const row = document.getElementById('user-subgroup-row');
+            if (!row) return;
+            const div = (divisionConfig && divisionConfig[activeUserGroup]) ? activeUserGroup : (Object.keys(divisionConfig || {}).find(n => (divisionConfig[n] || []).some(g => String(g).trim().toUpperCase() === String(activeUserGroup).trim().toUpperCase())) || '');
+            if (!div || window._userCampView) { row.hidden = true; row.innerHTML = ''; return; }
+            const chips = (divisionConfig[div] || []).map(g => groupChipHtml(g, { on: g === activeUserGroup, attrs: `data-g="${escapeHtml(g)}" onclick="setUserGroupFilter(this.dataset.g)" aria-pressed="${g === activeUserGroup}"`, hint: 'filter to this group' })).join('');
+            row.style.setProperty('--dc', divColor(div));
+            row.innerHTML = `<span class="sub-l">${escapeHtml(div)} ›</span>${chips || '<small style="color:#94a3b8;">no groups yet</small>'}`;
+            row.hidden = false;
+        }
+
+        // V102.170: "RSU · EXTERN" beside the name. Hidden when the table is already filtered to exactly this group; inside its division only the group is shown.
+        function userGroupTagHtml(group) {
+            const g = String(group || 'Public');
+            const key = g.trim().toUpperCase();
+            if (String(activeUserGroup).trim().toUpperCase() === key) return '';
+            const home = Object.keys(divisionConfig || {}).find(n => (divisionConfig[n] || []).some(x => String(x).trim().toUpperCase() === key)) || '';
+            const label = (home && home !== activeUserGroup ? home + ' · ' : '') + g;
+            return ` <span class="usr-grp-tag lang-no-toggle" style="--c:${home ? divColor(home) : '#64748b'};" title="${escapeHtml((home ? home + ' › ' : 'Only I › ') + g)}">${escapeHtml(label)}</span>`;
         }
 
         // Chip rail (house style — chips over dropdowns). Was a <select> + Reset
@@ -49863,7 +49896,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 <div style="display:flex; align-items:center; gap:10px;">
                                     ${avatarWithDot(d.id, d.pictureUrl, group)}
                                     <div style="min-width:0;">
-                                        <div style="font-weight:bold; line-height:1.25;">${d.displayName}${(() => { const n = String(d.nickname || '').trim(); return n && n !== '-' && n.toLowerCase() !== String(d.displayName || '').trim().toLowerCase() ? ` <span style="font-weight:600; font-size:0.85em; color:var(--text-sub);">· ${escapeHtml(n)}</span>` : ''; })()}${d.googleLink && d.googleLink.uid ? ` <span title="Google connected · ${escapeHtml(d.googleLink.email || '')}" aria-label="Google connected" style="font-size:0.85em;">🌐</span>` : ''}${ignored ? ' <span title="Hidden from boards (⋯ to show)" aria-label="Hidden from boards">🙈</span>' : ''}${userFloodMarkHtml(d)}</div>
+                                        <div style="font-weight:bold; line-height:1.25;">${d.displayName}${(() => { const n = String(d.nickname || '').trim(); return n && n !== '-' && n.toLowerCase() !== String(d.displayName || '').trim().toLowerCase() ? ` <span style="font-weight:600; font-size:0.85em; color:var(--text-sub);">· ${escapeHtml(n)}</span>` : ''; })()}${d.googleLink && d.googleLink.uid ? ` <span title="Google connected · ${escapeHtml(d.googleLink.email || '')}" aria-label="Google connected" style="font-size:0.85em;">🌐</span>` : ''}${ignored ? ' <span title="Hidden from boards (⋯ to show)" aria-label="Hidden from boards">🙈</span>' : ''}${userFloodMarkHtml(d)}${userGroupTagHtml(group)}</div>
                                         ${certNameDisplay}
                                         <div style="display:flex; align-items:center; gap:6px; margin-top:2px; font-size:0.78em; color:var(--text-sub);">
                                             ${userBadgesCellHtml(d)}
@@ -50979,11 +51012,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         // V102.168: one colour per division (stable from the name); Only I is grey.
-        const DIV_PALETTE = ['#f59e0b', '#0d9488', '#8b5cf6', '#ec4899', '#0ea5e9', '#84cc16'];
-        function divColor(name) {
+        function divColor(name) {   // V102.170: palette lives inside — the Users rail can call this before the rest of the script has run
+            const palette = ['#f59e0b', '#0d9488', '#8b5cf6', '#ec4899', '#0ea5e9', '#84cc16'];
             if (name === '__only') return '#64748b';
             let h = 0; for (const c of String(name)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-            return DIV_PALETTE[h % DIV_PALETTE.length];
+            return palette[h % palette.length];
         }
 
         function renderDivisionAdminList() {
