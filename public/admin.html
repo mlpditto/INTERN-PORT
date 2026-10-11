@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.177)</title>
+    <title>Nika Admin (V102.178)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -4018,6 +4018,13 @@
             box-shadow:inset 0 1px 0 rgba(255,255,255,.18), 0 1px 3px rgba(0,0,0,.3); }
         /* V102.59: the picker is sections by division (renderGsGroupList), no longer a 3-column grid. */
         #groupSelectModal #gs-list { max-height:360px; overflow-y:auto; margin-bottom:14px; }
+        /* V102.178: the group picker is two steps — ① Division (coloured chips) ② Group in that division (a panel in the division colour). */
+        #groupSelectModal .gs-step { display:flex; align-items:center; gap:6px; font-size:12px; color:#475569; margin:8px 0 5px; }
+        #groupSelectModal .gs-step .gs-n { width:18px; height:18px; border-radius:50%; background:var(--primary, #4361ee); color:#fff; font-size:11px; font-weight:800; display:inline-grid; place-items:center; }
+        #groupSelectModal .gs-step small { color:#94a3b8; font-weight:600; }
+        #groupSelectModal .gs-rail2 { --dc:#64748b; padding:8px 10px; border-radius:12px; background:linear-gradient(180deg, color-mix(in srgb, var(--dc) 12%, #fff), color-mix(in srgb, var(--dc) 4%, #fff)); border:1px solid color-mix(in srgb, var(--dc) 28%, #fff); }
+        #groupSelectModal .gs-plus { width:30px; height:30px; min-height:0; margin:0; padding:0; border-radius:50%; border:1px dashed #94a3b8; background:#fff; color:#64748b; font-size:15px; cursor:pointer; }
+        #groupSelectModal .gs-in { font-size:11px; color:#94a3b8; font-weight:700; }
         #groupSelectModal .gs-sec { margin-bottom:10px; }
         #groupSelectModal .gs-sec-head { font-size:12px; font-weight:800; color:#475569; margin-bottom:6px; }
         #groupSelectModal .gs-sec-head small { font-weight:600; color:#94a3b8; }
@@ -36484,30 +36491,45 @@ They can connect again from LINE.
         function renderGsGroupList() {
             const list = document.getElementById('gs-list');
             if (!list) return;
-            const curUp = (document.getElementById('gs-input').value || 'Public').trim().toUpperCase();
+            const up = x => String(x).trim().toUpperCase();
+            const curUp = up(document.getElementById('gs-input').value || 'Public');
             const all = getGlobalGroups();
-            const placed = new Set();
-            // V102.172: each section is a (division, group) pair — a division offers its list + the groups of the people in it, so the SAME group name can appear under
-            // several divisions; picking a chip sets the user's division AND group. Only I = groups no list offers (+ groups of people who are in no division).
-            const sections = Object.keys(divisionConfig || {}).map(name => {
-                const keys = new Set((divisionConfig[name] || []).map(g => String(g).trim().toUpperCase()));
-                (usersData || []).filter(u => userDivisionOf(u) === name).forEach(u => keys.add(String(u.group || 'Public').trim().toUpperCase()));
-                const gs = all.filter(g => keys.has(g.toUpperCase()));
-                gs.forEach(g => placed.add(g));
-                // V102.175: every division also offers THIS user's current group, so moving them into a division is one tap (even for an empty division)
-                const cur = all.find(g => g.toUpperCase() === curUp);
-                return [`🛡️ ${escapeHtml(name)}`, 'ranked together', (cur && !gs.includes(cur)) ? [...gs, cur] : gs, name];
-            });
-            const onlyKeys = new Set((usersData || []).filter(u => userDivisionOf(u) === '').map(u => String(u.group || 'Public').trim().toUpperCase()));
-            sections.push(['Only I', 'ranked on their own', all.filter(g => !placed.has(g) || onlyKeys.has(g.toUpperCase())), '']);   // V102.161: was "Solo"
-            const chip = (g, dv) => groupChipHtml(g, { cls: 'gs-chip', active: (usersData || []).filter(u => !u.isIgnored && userDivisionOf(u) === dv && (u.group || 'Public').trim().toUpperCase() === g.toUpperCase()).length,
-                total: (usersData || []).filter(u => userDivisionOf(u) === dv && (u.group || 'Public').trim().toUpperCase() === g.toUpperCase()).length,
-                attrs: `data-group="${escapeHtml(g)}" data-div="${escapeHtml(dv)}" aria-pressed="${g.toUpperCase() === curUp && dv === gsDivision}" onclick="gsPickGroup(this, this.dataset.group, this.dataset.div)"` });
-            list.innerHTML = sections.filter(([, , gs]) => gs.length).map(([title, note, gs, dv]) => {
-                const live = gs.filter(g => (usersData || []).some(u => !u.isIgnored && userDivisionOf(u) === dv && (u.group || 'Public').trim().toUpperCase() === g.toUpperCase()) || g.toUpperCase() === curUp);   // V102.175: the user's own group is always shown, in every division
-                const empty = gs.filter(g => !live.includes(g));
-                return `<div class="gs-sec"><div class="gs-sec-head">${title} <small>${note}</small></div><div class="gs-sec-row">${live.map(g => chip(g, dv)).join('')}${empty.length ? `<span class="gs-sec-empty" style="display:${gsEmptyOpen ? 'contents' : 'none'};">${empty.map(g => chip(g, dv)).join('')}</span>${gsEmptyOpen ? '' : `<button type="button" class="grp-chip grp-empty" onclick="gsEmptyOpen = true; renderGsGroupList();" style="--c:#64748b;">+ ${empty.length} empty</button>`}` : ''}</div></div>`;
-            }).join('') + `<div class="gs-sec-row"><button type="button" class="grp-chip grp-empty gs-chip-new" onclick="gsNewGroup(this)" style="--c:#475569;"><i class="fa-solid fa-plus"></i> New group</button><button type="button" class="grp-chip gs-chip-div" onclick="openDivisionsModal()" title="Rename, merge, delete groups · visibility · divisions" style="--c:#4f46e5;"><i class="fa-solid fa-shield-halved"></i> Divisions &amp; Groups</button></div>`;
+            const names = Object.keys(divisionConfig || {});
+            const dv = (gsDivision && divisionConfig && divisionConfig[gsDivision]) ? gsDivision : '';
+            const usersIn = (d, g) => (usersData || []).filter(u => userDivisionOf(u) === d && (g === undefined || up(u.group || 'Public') === up(g)));
+            // ① Division — pick where the user is ranked (their group stays; step ② is optional). ＋ opens Divisions & Groups to make / manage divisions.
+            const divChip = d => { const n = usersIn(d).filter(u => !u.isIgnored).length;
+                return groupChipHtml(d === '' ? 'Only I' : d, { cls: 'gs-divpick', icon: d === '' ? 'fa-user' : 'fa-shield-halved', color: divColor(d === '' ? '__only' : d), active: n, total: usersIn(d).length, on: dv === d,
+                    attrs: `data-div="${escapeHtml(d)}" aria-pressed="${dv === d}" onclick="gsPickDivision(this.dataset.div)"`, hint: d === '' ? 'ranked on their own' : 'ranked together' }); };
+            const rail1 = [...names, ''].map(divChip).join('') + '<button type="button" class="gs-plus gs-chip-div" onclick="openDivisionsModal()" title="New division · rename, merge, delete groups · visibility" aria-label="Divisions &amp; Groups">＋</button>';
+            // ② Group in that division — its list + the groups of the people in it; the user's own group is always offered (one tap = "same group, this division")
+            let gs;
+            if (dv === '') {
+                const listed = new Set(Object.values(divisionConfig || {}).flat().map(up)), has = new Set(usersIn('').map(u => up(u.group || 'Public')));
+                gs = all.filter(g => !listed.has(up(g)) || has.has(up(g)));
+            } else {
+                const keys = new Set((divisionConfig[dv] || []).map(up)); usersIn(dv).forEach(u => keys.add(up(u.group || 'Public')));
+                gs = all.filter(g => keys.has(up(g)));
+            }
+            const cur = all.find(g => up(g) === curUp);
+            if (cur && !gs.includes(cur)) gs.unshift(cur);
+            const chip = g => groupChipHtml(g, { cls: 'gs-chip', active: usersIn(dv, g).filter(u => !u.isIgnored).length, total: usersIn(dv, g).length,
+                attrs: `data-group="${escapeHtml(g)}" data-div="${escapeHtml(dv)}" aria-pressed="${up(g) === curUp}" onclick="gsPickGroup(this, this.dataset.group, this.dataset.div)"` });
+            // Only I can hold every group, so groups with nobody in it fold into "+ N empty"; a division shows all of its groups
+            const live = dv === '' ? gs.filter(g => usersIn('', g).some(u => !u.isIgnored) || up(g) === curUp) : gs;
+            const empty = gs.filter(g => !live.includes(g));
+            const fold = empty.length ? (gsEmptyOpen ? empty.map(chip).join('') : `<button type="button" class="grp-chip grp-empty" onclick="gsEmptyOpen = true; renderGsGroupList();" style="--c:#94a3b8;">+ ${empty.length} empty</button>`) : '';
+            const label = dv === '' ? 'Only I' : escapeHtml(dv);
+            list.innerHTML = `<div class="gs-step"><span class="gs-n">1</span><b>Division</b></div><div class="gs-sec-row">${rail1}</div>`
+                + `<div class="gs-step"><span class="gs-n">2</span><b>Group in ${label}</b> <small>${dv === '' ? 'ranked on their own' : 'ranked together'}</small></div>`
+                + `<div class="gs-sec-row gs-rail2" style="--dc:${divColor(dv === '' ? '__only' : dv)};">${live.map(chip).join('')}${fold}<button type="button" class="grp-chip grp-empty gs-chip-new" onclick="gsNewGroup(this)" style="--c:#475569;"><i class="fa-solid fa-plus"></i> New group</button></div>`;
+        }
+
+        // V102.178: step ① — put the user in a division (their group stays the same); step ② then lists that division's groups.
+        function gsPickDivision(d) {
+            gsDivision = d || '';
+            gsPaintMainGroup(document.getElementById('gs-input').value);
+            renderGsGroupList();
         }
 
         // V102.171: "🛡️ RSU 2" beside the main group chip = the division this group is ranked in ("Only I" when none). One tap opens Divisions & Groups.
@@ -36515,7 +36537,7 @@ They can connect again from LINE.
             const key = String(group || '').trim().toUpperCase();
             const home = (divisionConfig && divisionConfig[gsDivision]) ? gsDivision : '';   // V102.172: the division picked for this user, not looked up from the group
             const n = home ? (usersData || []).filter(u => !u.isIgnored && userDivisionOf(u) === home).length : (usersData || []).filter(u => !u.isIgnored && userDivisionOf(u) === '' && (u.group || 'Public').trim().toUpperCase() === key).length;
-            return groupChipHtml(home || 'Only I', { cls: 'gs-divchip', color: home ? divColor(home) : '#64748b', icon: home ? 'fa-shield-halved' : 'fa-user', active: n, total: n, hint: 'open Divisions & Groups', attrs: 'onclick="openDivisionsModal()"' });
+            return groupChipHtml(home || 'Only I', { cls: 'gs-divchip', color: home ? divColor(home) : '#64748b', icon: home ? 'fa-shield-halved' : 'fa-user', active: n, total: n, hint: 'change division', attrs: 'aria-controls="gs-pane-group" onclick="toggleGsGroups()"' });
         }
 
         // V102.164: the main group is painted as the rail chip; tapping it opens / folds the picker (it carries #gs-group-toggle).
@@ -36525,7 +36547,7 @@ They can connect again from LINE.
             const g = String(name || '').trim() || 'ไม่ระบุชื่อ';
             const pane = document.getElementById('gs-pane-group');
             const open = !!(pane && !pane.hidden);
-            box.innerHTML = groupChipHtml(g, { on: true, cls: 'gs-main', hint: 'tap to change group', attrs: `id="gs-group-toggle" aria-expanded="${open}" aria-controls="gs-pane-group" onclick="toggleGsGroups()"` }) + gsDivisionChipHtml(g);
+            box.innerHTML = groupChipHtml(g, { on: true, cls: 'gs-main', hint: 'tap to change group', attrs: `id="gs-group-toggle" aria-expanded="${open}" aria-controls="gs-pane-group" onclick="toggleGsGroups()"` }) + '<span class="gs-in">in</span>' + gsDivisionChipHtml(g);   // V102.178: "Audit in CAFE"
             gsDirtyPaint();
         }
 
@@ -36606,8 +36628,7 @@ They can connect again from LINE.
             if (typeof div === 'string') gsDivision = div;   // V102.172: the chip's section = the user's division
             document.getElementById('gs-input').value = g;
             gsPaintMainGroup(g);   // V102.164: chip, and the Save row follows
-            list.querySelectorAll('.gs-chip').forEach(c => c.setAttribute('aria-pressed', 'false'));
-            el.setAttribute('aria-pressed', 'true');
+            renderGsGroupList();   // V102.178: the chips are drawn from gsDivision + the group
         }
 
         // V98.30: "+ New" chip → inline input → a dashed "pending" chip. The new
@@ -36623,17 +36644,16 @@ They can connect again from LINE.
                 if (!inp.parentNode) return;
                 const name = inp.value.trim();
                 if (!name) { cancel(); return; }
-                // V102.38: "extern" when "EXTERN" exists picks EXTERN instead of creating a twin.
-                const twin = [...list.querySelectorAll('.gs-chip')].find(c => (c.dataset.group || '').trim().toUpperCase() === name.toUpperCase());
-                if (twin) {
+                // V102.38: "extern" when "EXTERN" exists picks EXTERN instead of creating a twin. (V102.178: looked up among ALL groups — the chips only show one division's.)
+                const twinName = getGlobalGroups().find(g => g.toUpperCase() === name.toUpperCase());
+                if (twinName) {
                     cancel();
-                    gsPickGroup(twin, twin.dataset.group, twin.dataset.div);
+                    gsPickGroup(null, twinName, gsDivision);
                     const hint = document.getElementById('gs-new-hint');
-                    if (hint) { hint.textContent = `“${twin.dataset.group}” already exists — picked it instead.`; hint.style.display = 'block'; }
+                    if (hint) { hint.textContent = `“${twinName}” already exists — picked it instead.`; hint.style.display = 'block'; }
                     return;
                 }
-                document.getElementById('gs-input').value = name;
-                gsDivision = '';   // V102.172: a brand-new group starts in Only I (move people in from Divisions & Groups)
+                document.getElementById('gs-input').value = name;   // V102.178: a brand-new group is created in the division chosen in step ①
                 gsPaintMainGroup(name);
                 list.querySelectorAll('.gs-chip').forEach(c => c.setAttribute('aria-pressed', 'false'));
                 const pend = document.createElement('div');
