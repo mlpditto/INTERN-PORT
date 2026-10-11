@@ -41,7 +41,7 @@ assert.ok(modal.includes('id="dv-newrow" hidden') && modal.includes('id="div-sav
             grabConst('const groupColorMap = {'), grabConst('const groupIconMap = {'),
             ['function getGroupColor(', 'function getGroupIcon(', 'function groupActiveCount(', 'function groupTotalCount(', 'function groupChipHtml(', 'function getGlobalGroups(', 'function divGroupCount(',
                 'function divHomeIn(', 'function divDiff(', 'function setDivDirty(', 'function renderDivisionAdminList(', 'function onDivEditorClick(', 'function moveGroupToDivision(', 'function addDivision(', 'function removeDivision('].map(grabFn).join('\n'),
-            'const DIV_PALETTE = ' + html.match(/const DIV_PALETTE = (\[[^\]]*\]);/)[1] + ';', grabFn('function divColor('),
+            grabFn('function divColor('),
             'var divDraft = JSON.parse(JSON.stringify(divisionConfig)), divPick = "", divSel = "", divFilter = "", divShowEmpty = false;'
         ].join('\n') });
         await page.evaluate(() => renderDivisionAdminList());
