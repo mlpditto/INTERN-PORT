@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.164)</title>
+    <title>Nika Admin (V102.165)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -35179,6 +35179,7 @@ RULES:
                                 ${hlTag} ${lock} ${tmpl} ${statusBadge}
                                 ${picker}
                                 <i class="fa-solid fa-pen-to-square" style="color:#cbd5e1;"></i>
+                                <button type="button" title="Delete quiz" data-th-title="ลบ quiz" aria-label="Delete quiz" onclick="event.stopPropagation(); window.deleteQuizFromCoverage('${q.id}')" style="border:none; background:none; padding:2px 4px; width:auto; cursor:pointer; color:#cbd5e1; font-size:0.9em;" onmouseover="this.style.color='#dc2626'" onmouseout="this.style.color='#cbd5e1'"><i class="fa-solid fa-trash-can"></i></button>
                             </div>`;
                         });
                         // Divider so "your quiz" reads as separate from the rest.
@@ -35190,6 +35191,21 @@ RULES:
                     }
                 }
                 forceShowModal('quizCoverageModal');
+            };
+
+            // V102.165: delete a quiz straight from the category list (it had no delete — only the quiz-card ⋯ menu did).
+            // Same collection delete as deleteQuiz(), but names the quiz in the confirm and refreshes the open list (the snapshot only re-renders the widget).
+            window.deleteQuizFromCoverage = function (id) {
+                const q = (Array.isArray(quizzesData) ? quizzesData : []).find(x => x.id === id);
+                if (!confirm('Delete quiz "' + ((q && q.title) || '(untitled)') + '"? This cannot be undone.')) return;
+                db.collection('quizzes').doc(id).delete()
+                    .then(() => {
+                        if (Array.isArray(quizzesData)) quizzesData = quizzesData.filter(x => x.id !== id);
+                        if (window.renderQuizCoverage) window.renderQuizCoverage();
+                        if (window._qcovOpenKey) window.openQuizCoverageList(window._qcovOpenKey);
+                        if (typeof showToast === 'function') showToast('🗑️ Quiz deleted');
+                    })
+                    .catch(e => { if (typeof showToast === 'function') showToast('❌ Could not delete: ' + e.message); });
             };
 
             // V95.25: persist a manual category override and refresh both the widget
