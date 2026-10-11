@@ -512,6 +512,24 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         await page.evaluate(() => { division = 'Content Creator'; window.cafeContentSync(); });
         const w412 = await page.$eval('#section-cafe-content .cc-card', e => e.getBoundingClientRect().right);
         assert.ok(w412 <= 412, 'card fits 412 px: ' + w412);
+        // A quiz deep link (?tab=quiz / ?quiz=<id>) wins over the Content UI: both-UI users flip to Intern (remembered), creator-only users get Mission shown under the card for this visit.
+        await page.evaluate(() => { localStorage.clear(); division = 'Content Creator'; myGroup = 'G1'; window.myExtraGroups = ['Rx']; localStorage.setItem('contentViewMode:U1', 'content'); window.cafeContentSync(); });
+        assert.equal(await vis('#section-cafe-content'), true, 'both-UI user starts on Content');
+        await page.evaluate(() => { history.replaceState(null, '', '?tab=quiz'); window.cafeContentSync(); });
+        assert.equal(await vis('#section-cafe-content'), false, '?tab=quiz flips a both-UI user to Intern'); assert.equal(await vis('#section-kanban'), true, 'Mission is on screen for the quiz link');
+        assert.equal(await page.evaluate(() => localStorage.getItem('contentViewMode:U1')), 'intern', 'the flip is remembered');
+        assert.deepEqual(await swBtns(), ['Intern:true', 'Content:false']);
+        await page.click('#cafe-view-switch [data-mode="content"]');
+        assert.equal(await vis('#section-cafe-content'), true, 'the user can still flip back to Content in the same visit (decided once per load)');
+        assert.equal(await page.evaluate(() => document.body.classList.contains('cafe-peek')), false, 'no peek for a user who has the Intern UI');
+        // creator-only: a fresh load with the link shows Mission under the Content card; a load without it hides Mission again
+        await page.evaluate(() => { history.replaceState(null, '', '?quiz=abc123'); localStorage.clear(); window.myExtraGroups = []; window.cafeContentSync(); });
+        assert.equal(await vis('#section-cafe-content'), true, 'creator-only stays on Content'); assert.equal(await vis('#section-kanban'), true, 'but Mission shows for the quiz link');
+        assert.equal(await page.evaluate(() => document.body.classList.contains('cafe-peek')), true);
+        assert.equal(await vis('#section-dd-codex'), false, 'DD Codex stays hidden');
+        await page.evaluate(() => { document.body.classList.remove('cafe-peek'); history.replaceState(null, '', '/h.html'); window.cafeContentSync(); });
+        assert.equal(await vis('#section-kanban'), false, 'no link, no Mission (as before)');
+        await page.evaluate(() => { localStorage.clear(); window.myExtraGroups = []; window.cafeContentSync(); });
         assert.deepEqual(errs, [], 'no page errors');
         console.log('PASS: CAFE content — only the Content Creator division (and the old name CAFE) gets the Content card (Mission + DD Codex hidden, ＋ opens the content sheet), ideas/drafts on users.socialDrafts, posting writes works(kind:social) + mirror, numbers + admin review show on the card, Thai toggle, moves back out of CAFE cleanly');
     } finally { await browser.close(); }

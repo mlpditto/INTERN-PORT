@@ -65,8 +65,25 @@
         return { creator: pc || ec, both: (pc || ec) && internSide, primaryCreator: pc };
     }
     function modeKey() { return 'contentViewMode:' + (typeof userId !== 'undefined' ? userId : ''); }
+    // A quiz deep link (?tab=quiz from the digest / reminder buttons, ?quiz=<id> from a shared card) means the reader came for a quiz, which the
+    // Content UI hides: a user with both UIs is flipped to Intern (remembered — one tap flips back), a creator-only user gets Mission shown
+    // under the Content card for this visit (body.cafe-peek). Decided once per page load so the user can still flip to Content afterwards.
+    function quizDeepLink() {
+        try { var p = typeof liffDeepLinkParams === 'function' ? liffDeepLinkParams() : new URLSearchParams(location.search || ''); return p.get('tab') === 'quiz' || !!p.get('quiz'); }
+        catch (_) { return false; }
+    }
+    var deepLinkSeen = null;   // the query this load already decided on (only once the division is known, so a late-loading division still gets its turn)
+    function applyQuizDeepLink(m) {
+        if (!m.creator) return;
+        var q = location.search || '';
+        if (deepLinkSeen === q) return;
+        deepLinkSeen = q;
+        if (!quizDeepLink()) return;
+        if (m.both) { try { localStorage.setItem(modeKey(), 'intern'); } catch (_) { /* storage may be blocked */ } }
+        else document.body.classList.add('cafe-peek');
+    }
     function getMode(m) { try { var v = localStorage.getItem(modeKey()); if (v === 'content' || v === 'intern') return v; } catch (_) { /* storage may be blocked */ } return m.primaryCreator ? 'content' : 'intern'; }
-    function isCafe() { try { var m = memberships(); return m.creator && (!m.both || getMode(m) === 'content'); } catch (_) { return false; } }
+    function isCafe() { try { var m = memberships(); applyQuizDeepLink(m); return m.creator && (!m.both || getMode(m) === 'content'); } catch (_) { return false; } }
     var switchSig = '';
     function paintSwitch() {
         var el = document.getElementById('cafe-view-switch'); if (!el) return;
