@@ -95,14 +95,25 @@ window.historyLean = (() => {
             '" onclick="event.stopPropagation(); qzLogMaterialClick(this)" title="' + esc(k.label) + ': ' + name + '" aria-label="Download ' + name + '">';
     }
     // One file → a direct download link; several → a count that opens the list.
+    // V101.114: a file the intern already opened on this device (qzLogMaterialClick remembers the url) shows as a solid tile with a ✓;
+    // 2–4 files show a dot per file in its kind colour instead of a bare count (the count stays for 5+). Both read-only for the data.
+    const SEEN_KEY = 'qzMatSeen';
+    function seenMap() { try { return JSON.parse(localStorage.getItem(SEEN_KEY) || '{}') || {}; } catch (_) { return {}; } }
+    function matSeen(url) { return !!seenMap()[String(url || '').trim()]; }
+    function kindDots(mats) { return '<span class="hl-kd" aria-hidden="true">' + mats.map(m => '<b style="background:' + materialKind(m.url).color + '"></b>').join('') + '</span>'; }
     function matHtml(ctx, s, big) {
         if (s.submissionType !== 'quiz') return '';
         const { q, mats } = materials(ctx, s);
         if (!q || !mats.length) return '';
         const k = materialKind(mats[0].url), cls = big ? 'hl-ib hl-mat' : 'hl-mat-s';
-        if (mats.length === 1) return matLink(mats[0], 0, q, cls) + '📎' + (big ? '' : '<i>↓</i>') + '</a>';
-        const list = mats.map((m, i) => matLink(m, i, q, 'hl-matitem') + '<span style="color:' + materialKind(m.url).color + '">●</span> ' + esc(materialDisplayName(m, i)) + '</a>').join('');
-        return '<details class="hl-matpick" onclick="event.stopPropagation()"><summary class="' + cls + '" style="--mk:' + k.color + '" title="' + mats.length + ' files">📎<i>' + mats.length + '</i></summary><div class="hl-matlist">' + list + '</div></details>';
+        if (mats.length === 1) {
+            const seen = matSeen(mats[0].url);
+            return matLink(mats[0], 0, q, cls + (seen ? ' hl-seen' : '')) + '📎' + (big ? '' : '<i>' + (seen ? '✓' : '↓') + '</i>') + '</a>';
+        }
+        const list = mats.map((m, i) => matLink(m, i, q, 'hl-matitem' + (matSeen(m.url) ? ' hl-seen' : '')) + '<span style="color:' + materialKind(m.url).color + '">●</span> ' + esc(materialDisplayName(m, i)) + (matSeen(m.url) ? ' <small>✓</small>' : '') + '</a>').join('');
+        const allSeen = mats.every(m => matSeen(m.url));
+        const badge = mats.length <= 4 && !big ? kindDots(mats) : '<i>' + mats.length + '</i>';
+        return '<details class="hl-matpick" onclick="event.stopPropagation()"><summary class="' + cls + (allSeen ? ' hl-seen' : '') + '" style="--mk:' + k.color + '" title="' + mats.length + ' files' + (allSeen ? ' · all opened' : '') + '">📎' + badge + '</summary><div class="hl-matlist">' + list + '</div></details>';
     }
     function actionsHtml(s, ctx) {
         const m = s.metadata || {};

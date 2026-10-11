@@ -15,7 +15,8 @@ const names = ['function escapeUnifiedHtml(s)', 'function escapeHtml(s)', 'funct
     'function formatQuizCount(n)', 'function formatThaiDate(dateObj, opts)', 'function isRecentlyReviewed(sub)', 'function groupByDateBucket(items)', 'function renderTypeDetailHtml(sub)',
     'function renderReflectiveDetailHtml(sub, m)', 'function renderQuestDetailHtml(sub, m)', 'function renderGenericDetailHtml(sub, m)', 'function mapQuizAttemptsToUnified()',
     'function mapLinkSuggestionsToUnified()', 'function getUnifiedAllItems()', 'function computeAttemptScore(attempt, totalPoints)'];
-const ctx = { console, Date, Math, JSON, Map, Set, Array, Object, String, Number, parseFloat, parseInt, isNaN, Intl };
+const ctx = { console, Date, Math, JSON, Map, Set, Array, Object, String, Number, parseFloat, parseInt, isNaN, Intl, URL };   // URL: materialKind parses the host
+ctx.__ls = {}; ctx.localStorage = { getItem: k => (k in ctx.__ls ? ctx.__ls[k] : null), setItem: (k, v) => { ctx.__ls[k] = String(v); }, removeItem: k => { delete ctx.__ls[k]; } };
 ctx.window = ctx; ctx.addEventListener = () => {};
 ctx.document = { getElementById: id => id === 'unified-timeline' ? ctx.__box : null };
 ctx.__box = { innerHTML: '' };
@@ -80,7 +81,22 @@ assert.doesNotMatch(q3, /viewQuizAnswers/);                      // pending → 
 assert.equal((q1.match(/href="https:\/\/example\.com\/a\.pdf"/g) || []).length, 2);   // inline + expanded
 assert.match(q1, /onclick="event\.stopPropagation\(\); qzLogMaterialClick\(this\)"/); assert.match(q1, /data-quiz-id="q1"/);
 assert.doesNotMatch(q1, /javascript:/);
-assert.match(q2, /<details class="hl-matpick"[\s\S]*<i>2<\/i>/); assert.equal((q2.match(/class="hl-matitem"/g) || []).length, 4);
+// V101.114: 2–4 files → a kind-coloured dot per file under the tile (no count); the count badge stays for 5+ and on the big (expanded) tile
+assert.match(q2, /<details class="hl-matpick"[\s\S]*<span class="hl-kd" aria-hidden="true"><b style="background:#0364b8"><\/b><b style="background:#1e8e3e"><\/b><\/span><\/summary>/, 'two dots in kind colours: ' + q2.slice(q2.indexOf('hl-matpick'), q2.indexOf('hl-matpick') + 260));
+assert.doesNotMatch(q2.split('hl-matlist')[0], /<i>2<\/i>/, 'no count badge on the small tile'); assert.match(q2, /class="hl-ib hl-mat"[^>]*>📎<i>2<\/i>/, 'the expanded big tile keeps the count');
+assert.equal((q2.match(/class="hl-matitem"/g) || []).length, 4);
+assert.match(q1, /class="hl-mat-s" [^>]*>📎<i>↓<\/i>/, 'one unseen file: ↓ badge'); assert.doesNotMatch(q1, /hl-seen/);
+// opened on this device (qzLogMaterialClick remembers the url) → solid tile with ✓; a list item shows ✓ too; all opened → the summary is seen
+run("localStorage.setItem('qzMatSeen', JSON.stringify({ 'https://example.com/a.pdf': 1, 'https://1drv.ms/x': 1 }))");
+run('window.historyLean.render(getUnifiedAllItems().sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()))');
+const fresh = id => { const o = ctx.__box.innerHTML; const a = o.indexOf('data-delete-item="' + id + '"'); const b = o.indexOf('data-delete-item=', a + 10); return o.slice(a, b < 0 ? o.length : b); };
+assert.match(fresh('q1_u1'), /class="hl-mat-s hl-seen" [^>]*>📎<i>✓<\/i>/, 'seen: solid tile + ✓');
+assert.match(fresh('q2_u1'), /class="hl-matitem hl-seen"[^>]*>[\s\S]*?<small>✓<\/small>/, 'the opened item in the list shows ✓'); assert.doesNotMatch(fresh('q2_u1'), /summary class="hl-mat-s hl-seen"/, 'not all opened → summary not seen');
+run("localStorage.setItem('qzMatSeen', JSON.stringify({ 'https://example.com/a.pdf': 1, 'https://1drv.ms/x': 1, 'https://drive.google.com/y': 1 }))");
+run('window.historyLean.render(getUnifiedAllItems().sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()))');
+assert.match(fresh('q2_u1'), /summary class="hl-mat-s hl-seen"[^>]*title="2 files · all opened"/, 'all opened → summary seen');
+run("localStorage.removeItem('qzMatSeen')");
+run('window.historyLean.render(getUnifiedAllItems().sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()))');
 
 // explore links: logo of the matching approved shop, no pt/Beri, ↗ only for http(s), escaped title
 const s1 = row('s1'), s2 = row('s2');
