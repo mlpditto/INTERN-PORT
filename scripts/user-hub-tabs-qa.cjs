@@ -10,7 +10,7 @@ assert.doesNotMatch(html, /id="gs-group-toggle" aria-expanded="false" aria-contr
 assert.match(html, /attrs: `id="gs-group-toggle" aria-expanded="\$\{open\}" aria-controls="gs-pane-group" onclick="toggleGsGroups\(\)"`/, 'the chip carries the toggle');
 assert.doesNotMatch(html, /gsText\('Change group'/, 'no Change group / Collapse wording left');
 const nodes = {};
-const context = { gsLanguage: 'en', document: { getElementById: id => nodes[id] ||= { hidden: id === 'gs-pane-group', value: 'unsaved', setAttribute(k, v) { this[k] = v; } } } };
+const context = { gsLanguage: 'en', gsMembMode: false, renderGsGroupList() {}, document: { getElementById: id => nodes[id] ||= { hidden: id === 'gs-pane-group', value: 'unsaved', setAttribute(k, v) { this[k] = v; } } } };
 vm.createContext(context);
 vm.runInContext(html.slice(html.indexOf('        function gsText('), html.indexOf('\n', html.indexOf('        function gsText('))), context);
 vm.runInContext(html.slice(html.indexOf('        function toggleGsGroups('), html.indexOf('        function setUserGroup(')), context);

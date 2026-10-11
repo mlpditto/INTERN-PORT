@@ -41,12 +41,12 @@ function grab(src, marker) {
     return src.slice(i, k + 1);
 }
 const fns = ['function gsPaintMainGroup(', 'function gsState(', 'function gsDirtyCount(', 'function gsDirtyPaint(', 'function gsExtraPaint(', 'function gsExtraRemove(', 'function gsExtraAdd(',
-    'function gsExtraRenderPick(', 'function gsExtraToggle(', 'function gsPickGroup(', 'function toggleGsGroups(', 'function groupStyleOf(', 'function divChipLook(', 'function groupChipHtml(', 'function gsDivisionChipHtml(', 'function divColor(', 'function userDivisionOf('].map(m => grab(html, m)).join('\n');
+    'function gsExtraRenderPick(', 'function gsExtraToggle(', 'function gsPickGroup(', 'function toggleGsGroups(', 'function groupStyleOf(', 'function divChipLook(', 'function groupChipHtml(', 'function gsDivisionChipHtml(', 'function userMemberships(', 'function userInDivision(', 'function divColor(', 'function userDivisionOf('].map(m => grab(html, m)).join('\n');
 const css = [
     html.slice(html.indexOf('        .grp-chip { --c:#64748b;'), html.indexOf('        /* V102.64: Event modal')),
     html.slice(html.indexOf('        .grp-chip:hover {'), html.indexOf('        /* V102.59: the picker is sections')),
     html.slice(html.indexOf('        /* V102.164: one header line'), html.indexOf('        /* --- [V92.37] User Hub Backlog')),
-    html.slice(html.indexOf('        /* V102.164: the group block is ONE row'), html.indexOf('        #groupSelectModal #gs-extra-pick {')),
+    html.slice(html.indexOf('        /* V102.164: the group block is ONE row'), html.indexOf('        #groupSelectModal .gs-inline-group h3 { font-size:13px')),
     html.slice(html.indexOf('        /* V102.164: the Save row appears only'), html.indexOf('        #groupSelectModal .gs-save-row span')),
     html.match(/        #groupSelectModal \.gs-lang-switch \{[^\n]*\n[^\n]*\n[^\n]*\n[^\n]*\n/)[0]
 ].join('\n');
@@ -67,7 +67,7 @@ const markup = '<div id="groupSelectModal" style="width:100%"><div class="modal-
             "var getGroupColor = g => ({ MLP: '#ef4444', EXTERN: '#7209b7', CAFE: '#f97316' })[g] || '#6c757d'; var getGroupIcon = g => 'fa-tag';",
             "var groupActiveCount = g => ({ MLP: 9, EXTERN: 2, CAFE: 4 })[g] || 0; var groupTotalCount = g => groupActiveCount(g);",
             "var getGlobalGroups = () => ['MLP', 'EXTERN', 'CAFE']; var gsCollectAddresses = () => []; var gsLanguage = 'en'; var gsText = (en, th) => gsLanguage === 'th' ? th : en;",
-            "var renderGsGroupList = function () {}; var gsDivision = 'RSU', usersData = [{ group: 'EXTERN', division: 'RSU' }], divisionConfig = { RSU: ['EXTERN', 'Junior'] }, opened = 0, openDivisionsModal = function () { opened++; }; var gsRefreshProfileCards = function () {}; let gsExtra = []; let gsSnap = null;",
+            "var renderGsGroupList = function () {}; var gsMembMode = false, gsMembDiv = ''; " + html.match(/const gsPairKey = [^\n]*/)[0] + " var gsDivision = 'RSU', usersData = [{ group: 'EXTERN', division: 'RSU' }], divisionConfig = { RSU: ['EXTERN', 'Junior'] }, opened = 0, openDivisionsModal = function () { opened++; }; var gsRefreshProfileCards = function () {}; let gsExtra = []; let gsSnap = null;",
             fns,
             "document.getElementById('gs-input').value = 'EXTERN'; gsPaintMainGroup('EXTERN'); gsExtraPaint(); gsSnap = Object.assign(gsState(), { groupName: 'EXTERN' }); gsDirtyPaint();",
             "document.getElementById('gs-profile-body').oninput = () => gsDirtyPaint();"
@@ -93,7 +93,7 @@ const markup = '<div id="groupSelectModal" style="width:100%"><div class="modal-
         await page.evaluate(() => gsExtraAdd('CAFE'));
         assert.equal(await vis('#gs-also'), true, '"also" shows with an extra');
         assert.equal(await page.$eval('#gs-extra-chips .grp-chip .grp-name', e => e.textContent), 'CAFE');
-        assert.equal(await page.$eval('#gs-extra-chips .grp-chip', e => getComputedStyle(e).opacity), '0.6', 'extra chips are faded');
+        assert.equal(await page.$eval('#gs-extra-chips .gs-pair', e => getComputedStyle(e).opacity), '0.6', 'membership pair chips are faded');
         assert.equal(await vis('#gs-save-row'), true, 'extras changed → Save row');
         assert.equal(await page.$eval('#gs-save-btn', e => e.textContent.trim()), 'Save 1 change');
         assert.equal(await page.$eval('#gs-save-diff', e => e.innerHTML), '', 'no group diff yet');

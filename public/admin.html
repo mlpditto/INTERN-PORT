@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.182)</title>
+    <title>Nika Admin (V102.183)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -3933,6 +3933,7 @@
         .grp-chip small { font-weight:600; opacity:.75; }
         .grp-chip .grp-img, .usr-grp-tag .grp-img { width:18px; height:18px; border-radius:50%; object-fit:cover; margin:-2px 0; box-shadow:0 0 0 1.5px rgba(255,255,255,.8); vertical-align:middle; }   /* V102.180: a group / division picture sits where the icon was */
         .usr-grp-tag .grp-img { width:14px; height:14px; margin:-1px 3px -1px 0; }
+        .usr-grp-also { opacity:.65; border-style:dashed; }   /* V102.183: a membership on the Users row */
         /* V102.170: Users table — the "RSU · EXTERN" tag next to the name, and the sub-row of a division's groups under the chip rail. */
         .usr-grp-tag { --c:#64748b; display:inline-block; font-size:10.5px; font-weight:800; padding:1px 8px; border-radius:999px; color:var(--c); background:color-mix(in srgb, var(--c) 12%, #fff); border:1px solid color-mix(in srgb, var(--c) 35%, #fff); margin-left:4px; vertical-align:middle; white-space:nowrap; }
         #user-subgroup-row { --dc:#64748b; display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:0 0 12px; padding:6px 10px; border-radius:12px; background:linear-gradient(180deg, color-mix(in srgb, var(--dc) 12%, #fff), color-mix(in srgb, var(--dc) 4%, #fff)); border:1px solid color-mix(in srgb, var(--dc) 28%, #fff); }
@@ -4095,10 +4096,14 @@
         #groupSelectModal .gs-divchip { font-size:12px; }
         #groupSelectModal .gs-extra-chips { display:contents; }
         #groupSelectModal .gs-extra-chips .grp-chip { opacity:.6; }
-        #groupSelectModal .gs-extra-chips .grp-chip::after { content:' ×'; opacity:.6; }
         #groupSelectModal .gs-extra-add { width:auto; min-height:0; padding:3px 10px; border:1px dashed #94a3b8; border-radius:999px; background:none; color:#64748b; font-size:12px; cursor:pointer; margin:0; }
-        #groupSelectModal #gs-extra-pick { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 8px; }
-        #groupSelectModal #gs-extra-pick[hidden] { display:none; }
+        /* V102.183: a membership is a PAIR chip — group | division — faded, × on the division half */
+        #groupSelectModal .gs-pair { display:inline-flex; align-items:center; opacity:.6; }
+        #groupSelectModal .gs-pair .grp-chip { opacity:1; }
+        #groupSelectModal .gs-pair .grp-chip:first-child { border-top-right-radius:0; border-bottom-right-radius:0; padding-right:8px; }
+        #groupSelectModal .gs-pair .gs-pair-div { border-top-left-radius:0; border-bottom-left-radius:0; padding-left:8px; margin-left:-1px; }
+        #groupSelectModal .gs-pair:hover { opacity:1; }
+        #groupSelectModal .gs-extra-add[aria-expanded="true"] { border-style:solid; border-color:#4361ee; color:#4361ee; }
         #groupSelectModal .gs-inline-group h3 { font-size:13px; margin:0 0 6px; }
         /* V102.62: EN / TH = one capsule switch with a sliding glass thumb (was two buttons). */
         #groupSelectModal .gs-lang-switch { position:relative; display:inline-grid; grid-template-columns:1fr 1fr; width:auto; min-height:0; margin:0; padding:3px; border-radius:999px; cursor:pointer;
@@ -12973,6 +12978,7 @@
             #divisionsModal .dv-person { width:auto; min-height:0; margin:0; padding:3px 10px; border-radius:999px; border:1px solid #cbd5e1; background:#fff; color:#334155; font:inherit; font-size:12px; font-weight:700; cursor:pointer; }
             #divisionsModal .dv-person[aria-pressed="true"] { background:#4361ee; border-color:#4361ee; color:#fff; }
             #divisionsModal .dv-person.dv-all { border-style:dashed; color:#64748b; }
+            #divisionsModal .dv-person.dv-also { border-style:dashed; opacity:.65; cursor:help; }   /* V102.183: a membership, not movable here */
             #divisionsModal .dv-moverow { flex-basis:100%; display:flex; flex-wrap:wrap; align-items:center; gap:5px; padding-top:6px; border-top:1px dashed #e2e8f0; font-size:12px; font-weight:800; color:#475569; }
             #divisionsModal .dv-mv:disabled { opacity:.45; cursor:not-allowed; }
             #divisionsModal .dv-addgrp { border-style:solid; border-color:var(--dc); color:var(--dc); background:#fff; }
@@ -14635,9 +14641,8 @@
                 <div class="gs-grp-row">
                     <span id="gs-current-group"></span>
                     <span class="gs-also" id="gs-also" hidden data-gs-en="also" data-gs-th="ร่วมกับ">also</span><span class="gs-extra-chips" id="gs-extra-chips"></span>
-                    <button type="button" class="gs-extra-add" id="gs-extra-add" aria-expanded="false" aria-controls="gs-extra-pick" onclick="gsExtraToggle()" aria-label="Add an extra group" title="Also in — extra groups only decide which UI the user can open (e.g. Content Creator). Points, rank, quizzes and events follow the main group."><i class="fa-solid fa-plus"></i></button>
+                    <button type="button" class="gs-extra-add" id="gs-extra-add" aria-expanded="false" aria-controls="gs-pane-group" onclick="gsExtraToggle()" aria-label="Add a membership" title="Also in — add a membership: pick a division, then a group in it. The person joins that division's board and sees its work; points, rank, quizzes and events follow the main group above."><i class="fa-solid fa-plus"></i></button>
                 </div>
-                <div id="gs-extra-pick" hidden></div>
             <div id="gs-pane-group" hidden>
             <!-- V98.30 lean: the chip rail below IS the group picker (since #954), so
                  the text field is hidden — it stays only because confirmSetGroup reads
@@ -36533,7 +36538,8 @@ They can connect again from LINE.
             const curUp = up(document.getElementById('gs-input').value || 'Public');
             const all = getGlobalGroups();
             const names = Object.keys(divisionConfig || {});
-            const dv = (gsDivision && divisionConfig && divisionConfig[gsDivision]) ? gsDivision : '';
+            const dvRaw = gsMembMode ? gsMembDiv : gsDivision;   // V102.183: in membership mode the steps pick the NEW pair, not the user's primary
+            const dv = (dvRaw && divisionConfig && divisionConfig[dvRaw]) ? dvRaw : '';
             const usersIn = (d, g) => (usersData || []).filter(u => userDivisionOf(u) === d && (g === undefined || up(u.group || 'Public') === up(g)));
             // ① Division — pick where the user is ranked (their group stays; step ② is optional). ＋ opens Divisions & Groups to make / manage divisions.
             const divChip = d => { const n = usersIn(d).filter(u => !u.isIgnored).length;
@@ -36552,19 +36558,21 @@ They can connect again from LINE.
             const cur = all.find(g => up(g) === curUp);
             if (cur && !gs.includes(cur)) gs.unshift(cur);
             const chip = g => groupChipHtml(g, { cls: 'gs-chip', active: usersIn(dv, g).filter(u => !u.isIgnored).length, total: usersIn(dv, g).length,
-                attrs: `data-group="${escapeHtml(g)}" data-div="${escapeHtml(dv)}" aria-pressed="${up(g) === curUp}" onclick="gsPickGroup(this, this.dataset.group, this.dataset.div)"` });
+                attrs: gsMembMode ? `data-group="${escapeHtml(g)}" data-div="${escapeHtml(dv)}" aria-pressed="${gsExtra.some(m => gsPairKey(m.division, m.group) === gsPairKey(dv, g))}" onclick="gsExtraAdd(this.dataset.group, this.dataset.div)"`
+                    : `data-group="${escapeHtml(g)}" data-div="${escapeHtml(dv)}" aria-pressed="${up(g) === curUp}" onclick="gsPickGroup(this, this.dataset.group, this.dataset.div)"` });
             // Only I can hold every group, so groups with nobody in it fold into "+ N empty"; a division shows all of its groups
             const live = dv === '' ? gs.filter(g => usersIn('', g).some(u => !u.isIgnored) || up(g) === curUp) : gs;
             const empty = gs.filter(g => !live.includes(g));
             const fold = empty.length ? (gsEmptyOpen ? empty.map(chip).join('') : `<button type="button" class="grp-chip grp-empty" onclick="gsEmptyOpen = true; renderGsGroupList();" style="--c:#94a3b8;">+ ${empty.length} empty</button>`) : '';
             const label = dv === '' ? 'Only I' : escapeHtml(dv);
-            list.innerHTML = `<div class="gs-step"><span class="gs-n">1</span><b>Division</b></div><div class="gs-sec-row">${rail1}</div>`
-                + `<div class="gs-step"><span class="gs-n">2</span><b>Group in ${label}</b> <small>${dv === '' ? 'ranked on their own' : 'ranked together'}</small></div>`
-                + `<div class="gs-sec-row gs-rail2" style="--dc:${divColor(dv === '' ? '__only' : dv)};">${live.map(chip).join('')}${fold}<button type="button" class="grp-chip grp-empty gs-chip-new" onclick="gsNewGroup(this)" style="--c:#475569;"><i class="fa-solid fa-plus"></i> New group</button></div>`;
+            list.innerHTML = `<div class="gs-step"><span class="gs-n">1</span><b>Division</b>${gsMembMode ? ' <small>— for the new membership</small>' : ''}</div><div class="gs-sec-row">${rail1}</div>`
+                + `<div class="gs-step"><span class="gs-n">2</span><b>Group in ${label}</b> <small>${gsMembMode ? 'tap = add as a membership' : (dv === '' ? 'ranked on their own' : 'ranked together')}</small></div>`
+                + `<div class="gs-sec-row gs-rail2" style="--dc:${divColor(dv === '' ? '__only' : dv)};">${live.map(chip).join('')}${fold}${gsMembMode ? '' : '<button type="button" class="grp-chip grp-empty gs-chip-new" onclick="gsNewGroup(this)" style="--c:#475569;"><i class="fa-solid fa-plus"></i> New group</button>'}</div>`;
         }
 
         // V102.178: step ① — put the user in a division (their group stays the same); step ② then lists that division's groups.
         function gsPickDivision(d) {
+            if (gsMembMode) { gsMembDiv = d || ''; renderGsGroupList(); return; }   // V102.183: step ① of a new membership
             gsDivision = d || '';
             gsPaintMainGroup(document.getElementById('gs-input').value);
             renderGsGroupList();
@@ -36598,7 +36606,7 @@ They can connect again from LINE.
             return {
                 group: ((document.getElementById('gs-input') || {}).value || 'Public').trim().toUpperCase(),
                 division: gsDivision,
-                extra: gsExtra.map(g => String(g).trim().toUpperCase()).sort().join('|'),
+                extra: gsExtra.map(m => gsPairKey(m.division, m.group)).sort().join('|'),   // V102.183: pairs
                 fields,
                 addresses: JSON.stringify(typeof gsCollectAddresses === 'function' ? gsCollectAddresses() : [])
             };
@@ -36627,41 +36635,47 @@ They can connect again from LINE.
             }
         }
 
-        // V102.148: extra groups (users.extraGroups, admin-set only). They never touch points / rank / quizzes / events — those follow users.group —
-        // they only tell the intern app which UI(s) this user may open (Intern | Content Creator).
+        // V102.148 → V102.183: "also" = MEMBERSHIPS, pairs { division, group } (was extraGroups: group names only). A membership puts the
+        // person on that division's board / work / UI; points, rank, quizzes, streak follow the primary pair above. gsExtra holds the pairs
+        // in this modal; + opens the same two-step picker (① Division → ② Group) in "add membership" mode (gsMembMode); × on a pair removes it.
         let gsExtra = [];
         let gsDivision = '';   // V102.172: the division chosen for the user in this modal ('' = none / Only I); saved to users.division when it changed
+        let gsMembMode = false, gsMembDiv = '';   // V102.183: the picker is adding a membership; the division picked for it
+        const gsPairKey = (d, g) => `${d || ''}/${String(g || '').trim().toUpperCase()}`;
         function gsExtraPaint() {
             const box = document.getElementById('gs-extra-chips');
             if (!box) return;
-            box.innerHTML = gsExtra.map(g => groupChipHtml(g, { cls: 'gs-chip', hint: 'tap to remove', attrs: `data-g="${escapeHtml(g)}" onclick="gsExtraRemove(this.dataset.g)"` })).join('');
+            box.innerHTML = gsExtra.map(m => `<span class="gs-pair" title="${escapeHtml(m.group)} in ${escapeHtml(m.division || 'Only I')} — also on that board, sees its work; points stay with the main group · × removes">`
+                + groupChipHtml(m.group, { cls: 'gs-chip', attrs: `data-g="${escapeHtml(m.group)}" data-d="${escapeHtml(m.division)}" onclick="gsExtraRemove(this.dataset.g, this.dataset.d)"` })
+                + groupChipHtml(m.division || 'Only I', { cls: 'gs-chip gs-pair-div', color: m.division ? divColor(m.division) : '#64748b', ...divChipLook(m.division || '__only'), active: '', total: '', attrs: `data-g="${escapeHtml(m.group)}" data-d="${escapeHtml(m.division)}" onclick="gsExtraRemove(this.dataset.g, this.dataset.d)"` }).replace(/<small>[^<]*<\/small>/, '<small>×</small>')
+                + '</span>').join('');
             const also = document.getElementById('gs-also');   // V102.164: "also" only when there is something after it
             if (also) also.hidden = !gsExtra.length;
             if (typeof gsDirtyPaint === 'function') gsDirtyPaint();
         }
-        function gsExtraRemove(g) { gsExtra = gsExtra.filter(x => x.toUpperCase() !== String(g).toUpperCase()); gsExtraPaint(); gsExtraRenderPick(); }
-        function gsExtraAdd(g) {
-            const main = (document.getElementById('gs-input').value || '').trim().toUpperCase();
-            if (!g || g.toUpperCase() === main || gsExtra.some(x => x.toUpperCase() === g.toUpperCase())) return;
-            gsExtra.push(g); gsExtraPaint(); gsExtraRenderPick();
+        function gsExtraRemove(g, d) { gsExtra = gsExtra.filter(m => gsPairKey(m.division, m.group) !== gsPairKey(d, g)); gsExtraPaint(); }
+        function gsExtraAdd(g, d) {
+            d = (typeof d === 'string' && divisionConfig && divisionConfig[d]) ? d : '';
+            const mainKey = gsPairKey(gsDivision, document.getElementById('gs-input').value || 'Public');
+            if (!g || gsPairKey(d, g) === mainKey || gsExtra.some(m => gsPairKey(m.division, m.group) === gsPairKey(d, g))) return;
+            gsExtra.push({ division: d, group: String(g).trim() });
+            gsExtraPaint();
+            if (gsMembMode) { gsMembMode = false; const pane = document.getElementById('gs-pane-group'); if (pane) pane.hidden = true; const btn = document.getElementById('gs-extra-add'); if (btn) btn.setAttribute('aria-expanded', 'false'); gsPaintMainGroup(document.getElementById('gs-input').value); }
         }
-        function gsExtraRenderPick() {
-            const pick = document.getElementById('gs-extra-pick');
-            if (!pick || pick.hidden) return;
-            const main = (document.getElementById('gs-input').value || '').trim().toUpperCase();
-            const left = getGlobalGroups().filter(g => g.toUpperCase() !== main && !gsExtra.some(x => x.toUpperCase() === g.toUpperCase()));
-            pick.innerHTML = left.length ? left.map(g => groupChipHtml(g, { cls: 'gs-chip', attrs: `data-g="${escapeHtml(g)}" onclick="gsExtraAdd(this.dataset.g)"` })).join('') : '<small style="color:var(--text-sub);">No other groups.</small>';
-        }
+        function gsExtraRenderPick() { renderGsGroupList(); }   // the picker itself is the pick list now (gsMembMode)
         function gsExtraToggle() {
-            const pick = document.getElementById('gs-extra-pick'), btn = document.getElementById('gs-extra-add');
-            pick.hidden = !pick.hidden;
-            btn.setAttribute('aria-expanded', String(!pick.hidden));
-            gsExtraRenderPick();
+            const pane = document.getElementById('gs-pane-group'), btn = document.getElementById('gs-extra-add');
+            gsMembMode = pane.hidden || !gsMembMode;   // + while the picker is in group mode → switch it to membership mode; + again → fold
+            gsMembDiv = gsDivision;
+            pane.hidden = !gsMembMode;
+            btn.setAttribute('aria-expanded', String(gsMembMode));
+            gsPaintMainGroup(document.getElementById('gs-input').value);
+            renderGsGroupList();
         }
 
         // V98.18 lean: chip-rail group picker for the User Hub modal.
         function gsPickGroup(el, g, div) {
-            gsExtra = gsExtra.filter(x => x.toUpperCase() !== String(g).trim().toUpperCase()); gsExtraPaint();   // the main group is never also an extra
+            gsExtra = gsExtra.filter(m => gsPairKey(m.division, m.group) !== gsPairKey(typeof div === 'string' ? div : gsDivision, g)); gsExtraPaint();   // V102.183: the primary pair is never also a membership
             const list = document.getElementById('gs-list');
             if (typeof div === 'string') gsDivision = div;   // V102.172: the chip's section = the user's division
             document.getElementById('gs-input').value = g;
@@ -36771,6 +36785,10 @@ They can connect again from LINE.
                 const next = [...new Set(u.extraGroups.map(g => g === from ? into : g))].filter(g => String(g).toUpperCase() !== main);
                 ops.push(b => b.update(db.collection('users').doc(u.id), { extraGroups: next }));
             });
+            usersData.filter(u => Array.isArray(u.memberships) && u.memberships.some(m => m && m.group === from)).forEach(u => {   // V102.183
+                const next = u.memberships.map(m => (m && m.group === from) ? { ...m, group: into } : m);
+                ops.push(b => b.update(db.collection('users').doc(u.id), { memberships: next }));
+            });
             preRegData.filter(p => !p.claimed && p.group === from).forEach(p => ops.push(b => b.update(db.collection('pre_users').doc(p.id), { group: into })));
             // V102.39: audiences can be comma lists ("Junior,Extern") — swap the one part.
             const swapList = raw => {
@@ -36822,7 +36840,9 @@ They can connect again from LINE.
 
         function toggleGsGroups() {
             const pane = document.getElementById('gs-pane-group');
+            if (gsMembMode) { gsMembMode = false; const b = document.getElementById('gs-extra-add'); if (b) b.setAttribute('aria-expanded', 'false'); pane.hidden = true; }   // V102.183: leaving membership mode
             pane.hidden = !pane.hidden;
+            if (!pane.hidden && typeof renderGsGroupList === 'function') renderGsGroupList();
             const button = document.getElementById('gs-group-toggle');   // V102.164: the main-group chip itself; the ▾/▴ is CSS on aria-expanded
             if (button) button.setAttribute('aria-expanded', String(!pane.hidden));
         }
@@ -36835,7 +36855,8 @@ They can connect again from LINE.
             const userName = user ? user.displayName : "Unknown User";
             const enrollmentCode = user?.enrollmentCode || preRegData.find(p => p.claimedBy === uid)?.code || preRegData.find(p => p.sourceUserId === uid)?.code || preRegData.find(p => p.id === uid)?.code || '-';
 
-            gsExtra = Array.isArray(user?.extraGroups) ? user.extraGroups.filter(Boolean) : [];
+            gsExtra = user ? userMemberships(user) : [];   // V102.183: pairs (legacy extraGroups read through the same helper)
+            gsMembMode = false; gsMembDiv = '';
             gsDivision = user ? userDivisionOf(user) : '';   // V102.172
             gsExtraPaint();
             document.getElementById('gs-extra-pick').hidden = true; document.getElementById('gs-extra-add').setAttribute('aria-expanded', 'false');
@@ -37012,7 +37033,9 @@ They can connect again from LINE.
                 await db.collection("users").doc(uid).update({
                     group: newGroup,
                     ...(gsSnap && gsDivision !== gsSnap.division ? { division: gsDivision } : {}),   // V102.172: only when changed — no silent migration of docs that derive it
-                    extraGroups: [...new Set(gsExtra.map(g => canonicalGroupName(g)).filter(g => g && g.toUpperCase() !== newGroup.toUpperCase()))],   // V102.148
+                    // V102.183: memberships = the pairs (canonical group names, never the primary pair); extraGroups stays in sync (group names) for the intern app until it reads memberships
+                    memberships: gsExtra.map(m => ({ division: m.division || '', group: canonicalGroupName(m.group) })).filter(m => m.group && gsPairKey(m.division, m.group) !== gsPairKey(gsDivision, newGroup)),
+                    extraGroups: [...new Set(gsExtra.map(m => canonicalGroupName(m.group)).filter(g => g && g.toUpperCase() !== newGroup.toUpperCase()))],   // V102.148
                     fullName: fnameTh,
                     firstNameEn: fnameEn,
                     middleNameEn: mnameEn,
@@ -37058,6 +37081,9 @@ They can connect again from LINE.
                 // V102.148: and out of everyone's extra groups
                 usersData.filter(u => (Array.isArray(u.extraGroups) ? u.extraGroups : []).includes(groupName)).forEach(u => {
                     batch.update(db.collection("users").doc(u.id), { extraGroups: u.extraGroups.filter(g => g !== groupName) });
+                });
+                usersData.filter(u => Array.isArray(u.memberships) && u.memberships.some(m => m && m.group === groupName)).forEach(u => {   // V102.183
+                    batch.update(db.collection("users").doc(u.id), { memberships: u.memberships.filter(m => !(m && m.group === groupName)) });
                 });
 
                 // 2. ลบออกจาก Division Config
@@ -37164,7 +37190,10 @@ They can connect again from LINE.
             if (String(activeUserGroup).trim().toUpperCase() === g.trim().toUpperCase() && (activeUserGroupDiv === undefined || activeUserGroupDiv === home)) return '';
             const label = (home && !inThisDiv ? home + ' · ' : '') + g;
             const img = groupStyleOf('groups', g).image;   // V102.180
-            return ` <span class="usr-grp-tag lang-no-toggle" style="--c:${home ? divColor(home) : '#64748b'};" title="${escapeHtml((home ? home + ' › ' : 'Only I › ') + g)}">${img ? `<img class="grp-img" src="${escapeHtml(img)}" alt="" referrerpolicy="no-referrer">` : ''}${escapeHtml(label)}</span>`;
+            // V102.183: memberships ride along as faded dashed tags; the one the filter is on is left out (the row is listed because of it)
+            const also = userMemberships(u).filter(m => !(activeUserGroupDiv !== undefined ? (activeUserGroupDiv === m.division && String(activeUserGroup).trim().toUpperCase() === m.group.trim().toUpperCase()) : (activeUserGroup === m.division)))
+                .map(m => ` <span class="usr-grp-tag usr-grp-also lang-no-toggle" style="--c:${m.division ? divColor(m.division) : '#64748b'};" title="also: ${escapeHtml(m.group)} in ${escapeHtml(m.division || 'Only I')} — on that board too; points stay with ${escapeHtml(g)}">+${escapeHtml((m.division ? m.division + ' · ' : '') + m.group)}</span>`).join('');
+            return ` <span class="usr-grp-tag lang-no-toggle" style="--c:${home ? divColor(home) : '#64748b'};" title="${escapeHtml((home ? home + ' › ' : 'Only I › ') + g)}">${img ? `<img class="grp-img" src="${escapeHtml(img)}" alt="" referrerpolicy="no-referrer">` : ''}${escapeHtml(label)}</span>` + also;
         }
 
         // Chip rail (house style — chips over dropdowns). Was a <select> + Reset
@@ -51067,12 +51096,34 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const key = String((u && u.group) || 'Public').trim().toUpperCase();
             return Object.keys(cfg).find(n => (cfg[n] || []).some(g => String(g).trim().toUpperCase() === key)) || '';
         }
+        // V102.183 (option A): besides the PRIMARY pair (users.group + users.division — points, rank, quizzes, streak, badges) a user may hold
+        // extra MEMBERSHIPS users.memberships = [{ division, group }] — they put the person on that division's board, show them that
+        // division's work and open its UI. No migration: no field = none; legacy users.extraGroups (group names only) reads as memberships
+        // whose division is the one whose list holds the group (the pre-V102.172 rule) and is kept in sync on save until the intern app reads
+        // memberships. The primary pair is never a membership; an unknown division reads as '' (Only I).
+        function userMemberships(u) {
+            const cfg = divisionConfig || {}, up = x => String(x || '').trim().toUpperCase();
+            const pd = userDivisionOf(u), pg = up((u && u.group) || 'Public');
+            const raw = Array.isArray(u && u.memberships) ? u.memberships
+                : (Array.isArray(u && u.extraGroups) ? u.extraGroups.map(g => ({ group: g, division: Object.keys(cfg).find(n => (cfg[n] || []).some(x => up(x) === up(g))) || '' })) : []);
+            const out = [];
+            raw.forEach(m => {
+                if (!m || !m.group) return;
+                const g = String(m.group).trim(), d = (typeof m.division === 'string' && cfg[m.division]) ? m.division : '';
+                if (!g || (d === pd && up(g) === pg) || out.some(x => x.division === d && up(x.group) === up(g))) return;
+                out.push({ division: d, group: g });
+            });
+            return out;
+        }
+        function userInDivision(u, dv) { return userDivisionOf(u) === dv || userMemberships(u).some(m => m.division === dv); }
         // One test for "is this user in the Users filter": All · a division chip · a group (optionally read inside one division — dv: undefined = any, '' = Only I).
+        // V102.183: a membership counts like the primary pair.
         function userInScope(u, g, dv) {
             if (g === 'All') return true;
-            if (dv === undefined && divisionConfig && divisionConfig[g]) return userDivisionOf(u) === g;
-            if ((u.group || 'Public') !== g) return false;
-            return dv === undefined ? true : userDivisionOf(u) === dv;
+            if (dv === undefined && divisionConfig && divisionConfig[g]) return userInDivision(u, g);
+            const up = x => String(x || '').trim().toUpperCase();
+            const pairs = [{ d: userDivisionOf(u), g: u.group || 'Public' }, ...userMemberships(u).map(m => ({ d: m.division, g: m.group }))];
+            return pairs.some(p => up(p.g) === up(g) && (dv === undefined || p.d === dv));
         }
         function divColor(name) {   // V102.170: palette lives inside — the Users rail can call this before the rest of the script has run
             const palette = ['#f59e0b', '#0d9488', '#8b5cf6', '#ec4899', '#0ea5e9', '#84cc16'];
@@ -51134,6 +51185,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // several divisions. Only I = people with no division; its groups = groups no list offers + groups of those people.
         const divUp = x => String(x).trim().toUpperCase();
         function divMembersOf(n) { const dv = n === '__only' ? '' : n; return (usersData || []).filter(u => !u.isPreReg && userDivisionOf(u) === dv); }
+        // V102.183: people whose MEMBERSHIP is in this division (primary elsewhere) — listed as dashed chips, counted, never moved from here
+        function divAlsoOf(n) { const dv = n === '__only' ? '' : n; return (usersData || []).filter(u => !u.isPreReg && userDivisionOf(u) !== dv && userMemberships(u).some(m => m.division === dv)); }
         function divGroupsOf(n) {
             const mem = divMembersOf(n), out = [], add = g => { if (g && !out.some(x => divUp(x) === divUp(g))) out.push(g); };
             if (n === '__only') {
@@ -51142,6 +51195,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             } else {
                 (divDraft[n] || []).forEach(add);
                 mem.forEach(u => add(u.group || 'Public'));
+                divAlsoOf(n).forEach(u => userMemberships(u).filter(m => m.division === n).forEach(m => add(m.group)));   // V102.183
             }
             return out;
         }
@@ -51153,7 +51207,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const q = String(divFilter || '').trim().toLowerCase();
             const all = [...names, '__only'], label = n => n === '__only' ? 'Only I' : n, dvOf = n => n === '__only' ? '' : n;
             const mem = {}; all.forEach(n => { mem[n] = divMembersOf(n); });
-            const inPair = (n, g) => mem[n].filter(u => divUp(u.group || 'Public') === divUp(g));
+            const alsoIn = (n, g) => divAlsoOf(n).filter(u => userMemberships(u).some(m => m.division === dvOf(n) && divUp(m.group) === divUp(g)));   // V102.183
+            const inPair = (n, g) => mem[n].filter(u => divUp(u.group || 'Public') === divUp(g)).concat(alsoIn(n, g));
             const cnt = (n, g) => inPair(n, g).filter(u => !u.isIgnored).length;
             const total = n => mem[n].filter(u => !u.isIgnored).length;
             const railChip = n => groupChipHtml(label(n), { cls: 'dv-rail', on: !q && divSel === n, color: divColor(n), ...divChipLook(n), active: total(n), total: mem[n].length, attrs: `data-sel="${escapeHtml(n)}"`, hint: n === '__only' ? 'people in no division — each group ranked on its own' : 'people ranked together as one board' });
@@ -51184,7 +51239,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             let bar = '';
             if (divPick && pk) {
                 const ppl = inPair(pk.n, pk.g), a = ppl.filter(u => !u.isIgnored).length, t = ppl.length;
-                const sel = ppl.filter(u => divPeople.has(u.id));
+                const own = u => userDivisionOf(u) === dvOf(pk.n);   // V102.183: primary here (movable) vs a membership (dashed, removed only in the User Hub)
+                const sel = ppl.filter(u => own(u) && divPeople.has(u.id));
                 const isSaved = n => n === '__only' || !!(divisionConfig && divisionConfig[n]);
                 const targets = [...names.filter(n => n !== pk.n), ...(pk.n === '__only' ? [] : ['__only'])];
                 const nm = u => (u.isIgnored ? '🙈 ' : '') + (u.displayName || u.fullName || String(u.id).slice(0, 6));
@@ -51195,7 +51251,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     + `<span class="dv-live" title="Rename / Merge / Delete / moving people change the database right away">⚡</span>`
                     + ((divLook && divLook.kind === 'groups' && divUp(divLook.name) === divUp(divPick)) ? divLookHtml() : '')   // V102.180
                     + (canRemove ? `<button type="button" class="dv-ib" data-rmlist="${escapeHtml(pk.n)}" title="Take this group out of ${escapeHtml(pk.n)}'s list (nobody is in it)" aria-label="Remove from list">⊖</button>` : '')
-                    + (ppl.length ? `<div class="dv-people"><button type="button" class="dv-person dv-all" data-allpeople="1" title="Select everyone here">All ${ppl.length}</button>${ppl.map(u => `<button type="button" class="dv-person" data-person="${escapeHtml(u.id)}" aria-pressed="${divPeople.has(u.id)}">${escapeHtml(nm(u))}</button>`).join('')}</div>` : '')
+                    + (ppl.length ? `<div class="dv-people"><button type="button" class="dv-person dv-all" data-allpeople="1" title="Select everyone here">All ${ppl.length}</button>${ppl.map(u => own(u) ? `<button type="button" class="dv-person" data-person="${escapeHtml(u.id)}" aria-pressed="${divPeople.has(u.id)}">${escapeHtml(nm(u))}</button>` : `<span class="dv-person dv-also" title="Membership — their main group is ${escapeHtml(u.group || 'Public')} in ${escapeHtml(userDivisionOf(u) || 'Only I')}; change it in the User Hub">${escapeHtml(nm(u))} +</span>`).join('')}</div>` : '')
                     + (sel.length ? `<div class="dv-moverow">Move ${sel.length} →${targets.map(n => `<button type="button" class="dv-mv" data-to="${n === '__only' ? '' : escapeHtml(n)}" style="--c:${divColor(n)}" ${isSaved(n) ? '' : 'disabled'} title="${isSaved(n) ? 'Move the selected people to ' + escapeHtml(label(n)) : 'Save the new division first'}">${escapeHtml(label(n))}</button>`).join('')}</div>` : '')
                     + '</div>';
             }

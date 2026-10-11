@@ -37,7 +37,7 @@ const css = html.slice(html.indexOf('.grp-chip { --c:#64748b'), html.indexOf(':i
             'var escapeHtml = function (s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;"); };',
             'var renderTable = function () {}, renderGroupUsersPanel = function () {}, renderLeaderboard = function () {}, renderBadgeStatsIfOpen = function () {};',
             grabConst('const groupColorMap = {'), grabConst('const groupIconMap = {'),
-            ['function groupStyleOf(', 'function divChipLook(', 'function getGroupColor(', 'function getGroupIcon(', 'function groupActiveCount(', 'function groupTotalCount(', 'function groupChipHtml(', 'function divColor(', 'function userDivisionOf(', 'function userInScope(',
+            ['function groupStyleOf(', 'function divChipLook(', 'function userMemberships(', 'function userInDivision(', 'function getGroupColor(', 'function getGroupIcon(', 'function groupActiveCount(', 'function groupTotalCount(', 'function groupChipHtml(', 'function divColor(', 'function userDivisionOf(', 'function userInScope(',
                 'function renderUserGroupTabs(', 'function renderUserSubgroupRow(', 'function userGroupTagHtml(', 'function setUserGroupFilter('].map(grabFn).join('\n'),
             'renderUserGroupTabs();'
         ].join('\n') });

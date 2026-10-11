@@ -21,7 +21,7 @@ function grab(src, marker) {
     for (; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}' && --d === 0) break; }
     return src.slice(i, k + 1);
 }
-const fns = ['function groupStyleOf(', 'function getGroupColor(', 'function getGroupIcon(', 'function groupActiveCount(', 'function groupTotalCount(', 'function groupChipHtml(', 'function userDivisionOf(', 'function divColor(',
+const fns = ['function groupStyleOf(', 'function getGroupColor(', 'function getGroupIcon(', 'function groupActiveCount(', 'function groupTotalCount(', 'function groupChipHtml(', 'function userDivisionOf(', 'function userMemberships(', 'function userInDivision(', 'function divAlsoOf(', 'function divColor(',
     'function divChipLook(', 'function divMembersOf(', 'function divGroupsOf(', 'function divLookHtml(', 'async function saveGroupStyle(', 'function divLookSet(', 'async function divLookUpload(', 'function renderDivisionAdminList(', 'function onDivEditorClick(', 'function userGroupTagHtml('].map(m => grab(html, m)).join('\n');
 const consts = [html.match(/const groupColorMap = \{[\s\S]*?\};/)[0], html.match(/const groupIconMap = \{[\s\S]*?\};/)[0], html.match(/const LOOK_COLORS = \[[^\n]*\];/)[0], html.match(/const LOOK_ICONS = \[[^\n]*\];/)[0], "const divUp = x => String(x).trim().toUpperCase();"].join('\n');
 

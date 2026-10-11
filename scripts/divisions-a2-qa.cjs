@@ -48,7 +48,7 @@ assert.ok(modal.includes('id="dv-newrow" hidden') && modal.includes('id="div-sav
             'var escapeHtml = function (s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;"); };',
             grabConst('const groupColorMap = {'), grabConst('const groupIconMap = {'),
             html.slice(html.indexOf('        const divUp = x =>'), html.indexOf('\n', html.indexOf('        const divUp = x =>'))),
-            ['function groupStyleOf(', 'function divChipLook(', 'function getGroupColor(', 'function getGroupIcon(', 'function groupActiveCount(', 'function groupTotalCount(', 'function groupChipHtml(', 'function userDivisionOf(', 'function divColor(',
+            ['function groupStyleOf(', 'function divChipLook(', 'function userMemberships(', 'function userInDivision(', 'function divAlsoOf(', 'function getGroupColor(', 'function getGroupIcon(', 'function groupActiveCount(', 'function groupTotalCount(', 'function groupChipHtml(', 'function userDivisionOf(', 'function divColor(',
                 'function divDiff(', 'function setDivDirty(', 'function divMembersOf(', 'function divGroupsOf(', 'function renderDivisionAdminList(', 'function onDivEditorClick(', 'function divAddGroup(', 'async function divMovePeople(',
                 'function addDivision(', 'function removeDivision('].map(grabFn).join('\n'),
             'var divDraft = JSON.parse(JSON.stringify(divisionConfig)), divPick = "", divPickDiv = "", divPeople = new Set(), divSel = "", divFilter = "", divShowEmpty = false;'
