@@ -84,7 +84,15 @@ assert.match(q2, /<details class="hl-matpick"[\s\S]*<i>2<\/i>/); assert.equal((q
 
 // explore links: logo of the matching approved shop, no pt/Beri, ↗ only for http(s), escaped title
 const s1 = row('s1'), s2 = row('s2');
-assert.match(s1, /dl\.example\/khao\.webp/); assert.doesNotMatch(s1, /class="hl-val"/); assert.match(s1, /class="hl-ib hl-go" href="https:\/\/shop\.example\/khao"/);
+assert.match(s1, /dl\.example\/khao\.webp/); assert.match(s1, /<span class="hl-val" aria-hidden="true"><\/span>/); assert.doesNotMatch(s1, /hl-pt|hl-br/); assert.match(s1, /class="hl-ib hl-go" href="https:\/\/shop\.example\/khao"/);
+// V101.113: every row carries the 📎 slot and the value column (empty when there is nothing) so pt lines up; the year shows only outside the current year
+assert.match(s1, /class="hl-mat-x"/); assert.doesNotMatch(q1, /hl-mat-x/); assert.match(row('c1'), /hl-mat-x/);
+assert.doesNotMatch(row('c1').split('<div class="hl-mt">')[1].split('</span>')[0], /\d{2}<\/span>|\s\d\d$/);   // this year: '8 ต.ค.' style, no year
+run("unifiedSubmissionsCache.push({ id: 'old1', submissionType: 'work', title: 'Old deck', score: 0, adminBonus: 0, status: 'approved', timestamp: ago(400), metadata: { link: 'https://example.com/old' } })");
+run('unifiedRenderedCount = 20; window.historyLean.render(getUnifiedAllItems().sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()))');   // 11 rows now: past the page size
+const oldRow = ctx.__box.innerHTML.split('data-delete-item="old1"')[1].split('data-delete-item=')[0];
+const yy = String((new Date(Date.now() - 400 * 86400000).getFullYear() + 543) % 100).padStart(2, '0'); assert.ok(oldRow.includes(' ' + yy + '</span><span class="hl-more-t">'), 'a row from another year shows the 2-digit BE year: ' + oldRow.split('hl-mt')[1].slice(0, 60));
+run('unifiedSubmissionsCache.pop(); unifiedRenderedCount = 10');
 assert.doesNotMatch(s2, /href="javascript:/); assert.doesNotMatch(s2, /<img src=x/); assert.match(s2, /hl-pill hl-bad">✕ Rejected/);
 
 // others keep their own detail; every row stays addressable for delete requests
