@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.171)</title>
+    <title>Nika Admin (V102.172)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -23376,6 +23376,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         let currentHistoryUserId = null;
         let certUser = null;
         let activeUserGroup = 'All'; // 🔥 [Version: V79.5] Group filter for Users tab
+        let activeUserGroupDiv;      // V102.172: the division a picked GROUP is read in (undefined = any, '' = Only I, 'RSU' = that division); unused while a division chip is the filter
         let activeBoardGroup = 'All'; // 🔥 Global for Dashboard/Kanban Filtering
         let inactiveQuizPage = 1; const INACTIVE_QUIZ_PER_PAGE = 10;
         const ONE_PIECE_SCOPE_THEME_KEY = 'MLP_ONEPIECE_SCOPE_THEME';
@@ -35469,6 +35470,7 @@ RULES:
                     nickName: data.nickName || "",
                     institute: data.institute || "",
                     group: data.group || "Public",
+                    ...(data.division ? { division: data.division } : {}),   // V102.172: the division asked for on the Request Access form (blank = none; the admin sets it later)
                     startDate: data.startDate || "",
                     endDate: data.endDate || "",
                     score: 0,
@@ -36492,27 +36494,32 @@ They can connect again from LINE.
             const curUp = (document.getElementById('gs-input').value || 'Public').trim().toUpperCase();
             const all = getGlobalGroups();
             const placed = new Set();
+            // V102.172: each section is a (division, group) pair — a division offers its list + the groups of the people in it, so the SAME group name can appear under
+            // several divisions; picking a chip sets the user's division AND group. Only I = groups no list offers (+ groups of people who are in no division).
             const sections = Object.keys(divisionConfig || {}).map(name => {
                 const keys = new Set((divisionConfig[name] || []).map(g => String(g).trim().toUpperCase()));
+                (usersData || []).filter(u => userDivisionOf(u) === name).forEach(u => keys.add(String(u.group || 'Public').trim().toUpperCase()));
                 const gs = all.filter(g => keys.has(g.toUpperCase()));
                 gs.forEach(g => placed.add(g));
-                return [`🛡️ ${escapeHtml(name)}`, 'ranked together', gs];
+                return [`🛡️ ${escapeHtml(name)}`, 'ranked together', gs, name];
             });
-            sections.push(['Only I', 'ranked on their own', all.filter(g => !placed.has(g))]);   // V102.161: was "Solo"
-            const chip = g => groupChipHtml(g, { cls: 'gs-chip', attrs: `data-group="${escapeHtml(g)}" aria-pressed="${g.toUpperCase() === curUp}" onclick="gsPickGroup(this, this.dataset.group)"` });
-            list.innerHTML = sections.filter(([, , gs]) => gs.length).map(([title, note, gs]) => {
-                const live = gs.filter(g => groupActiveCount(g) > 0 || g.toUpperCase() === curUp);
+            const onlyKeys = new Set((usersData || []).filter(u => userDivisionOf(u) === '').map(u => String(u.group || 'Public').trim().toUpperCase()));
+            sections.push(['Only I', 'ranked on their own', all.filter(g => !placed.has(g) || onlyKeys.has(g.toUpperCase())), '']);   // V102.161: was "Solo"
+            const chip = (g, dv) => groupChipHtml(g, { cls: 'gs-chip', active: (usersData || []).filter(u => !u.isIgnored && userDivisionOf(u) === dv && (u.group || 'Public').trim().toUpperCase() === g.toUpperCase()).length,
+                total: (usersData || []).filter(u => userDivisionOf(u) === dv && (u.group || 'Public').trim().toUpperCase() === g.toUpperCase()).length,
+                attrs: `data-group="${escapeHtml(g)}" data-div="${escapeHtml(dv)}" aria-pressed="${g.toUpperCase() === curUp && dv === gsDivision}" onclick="gsPickGroup(this, this.dataset.group, this.dataset.div)"` });
+            list.innerHTML = sections.filter(([, , gs]) => gs.length).map(([title, note, gs, dv]) => {
+                const live = gs.filter(g => (usersData || []).some(u => !u.isIgnored && userDivisionOf(u) === dv && (u.group || 'Public').trim().toUpperCase() === g.toUpperCase()) || (g.toUpperCase() === curUp && dv === gsDivision));
                 const empty = gs.filter(g => !live.includes(g));
-                return `<div class="gs-sec"><div class="gs-sec-head">${title} <small>${note}</small></div><div class="gs-sec-row">${live.map(chip).join('')}${empty.length ? `<span class="gs-sec-empty" style="display:${gsEmptyOpen ? 'contents' : 'none'};">${empty.map(chip).join('')}</span>${gsEmptyOpen ? '' : `<button type="button" class="grp-chip grp-empty" onclick="gsEmptyOpen = true; renderGsGroupList();" style="--c:#64748b;">+ ${empty.length} empty</button>`}` : ''}</div></div>`;
+                return `<div class="gs-sec"><div class="gs-sec-head">${title} <small>${note}</small></div><div class="gs-sec-row">${live.map(g => chip(g, dv)).join('')}${empty.length ? `<span class="gs-sec-empty" style="display:${gsEmptyOpen ? 'contents' : 'none'};">${empty.map(g => chip(g, dv)).join('')}</span>${gsEmptyOpen ? '' : `<button type="button" class="grp-chip grp-empty" onclick="gsEmptyOpen = true; renderGsGroupList();" style="--c:#64748b;">+ ${empty.length} empty</button>`}` : ''}</div></div>`;
             }).join('') + `<div class="gs-sec-row"><button type="button" class="grp-chip grp-empty gs-chip-new" onclick="gsNewGroup(this)" style="--c:#475569;"><i class="fa-solid fa-plus"></i> New group</button><button type="button" class="grp-chip gs-chip-div" onclick="openDivisionsModal()" title="Rename, merge, delete groups · visibility · divisions" style="--c:#4f46e5;"><i class="fa-solid fa-shield-halved"></i> Divisions &amp; Groups</button></div>`;
         }
 
         // V102.171: "🛡️ RSU 2" beside the main group chip = the division this group is ranked in ("Only I" when none). One tap opens Divisions & Groups.
         function gsDivisionChipHtml(group) {
             const key = String(group || '').trim().toUpperCase();
-            const cfg = divisionConfig || {};
-            const home = Object.keys(cfg).find(n => (cfg[n] || []).some(x => String(x).trim().toUpperCase() === key)) || '';
-            const n = home ? (cfg[home] || []).reduce((t, x) => t + groupActiveCount(x), 0) : groupActiveCount(group);
+            const home = (divisionConfig && divisionConfig[gsDivision]) ? gsDivision : '';   // V102.172: the division picked for this user, not looked up from the group
+            const n = home ? (usersData || []).filter(u => !u.isIgnored && userDivisionOf(u) === home).length : (usersData || []).filter(u => !u.isIgnored && userDivisionOf(u) === '' && (u.group || 'Public').trim().toUpperCase() === key).length;
             return groupChipHtml(home || 'Only I', { cls: 'gs-divchip', color: home ? divColor(home) : '#64748b', icon: home ? 'fa-shield-halved' : 'fa-user', active: n, total: n, hint: 'open Divisions & Groups', attrs: 'onclick="openDivisionsModal()"' });
         }
 
@@ -36535,6 +36542,7 @@ They can connect again from LINE.
             document.querySelectorAll('#gs-profile-body input[id]').forEach(i => { fields[i.id] = (i.value || '').trim(); });
             return {
                 group: ((document.getElementById('gs-input') || {}).value || 'Public').trim().toUpperCase(),
+                division: gsDivision,
                 extra: gsExtra.map(g => String(g).trim().toUpperCase()).sort().join('|'),
                 fields,
                 addresses: JSON.stringify(typeof gsCollectAddresses === 'function' ? gsCollectAddresses() : [])
@@ -36545,6 +36553,7 @@ They can connect again from LINE.
             const now = gsState();
             let n = 0;
             if (now.group !== gsSnap.group) n++;
+            else if (now.division !== gsSnap.division) n++;   // V102.172: a division change that came WITH a new group is one change
             if (now.extra !== gsSnap.extra) n++;
             Object.keys(now.fields).forEach(k => { if (now.fields[k] !== (gsSnap.fields[k] || '')) n++; });
             if (now.addresses !== gsSnap.addresses) n++;
@@ -36566,6 +36575,7 @@ They can connect again from LINE.
         // V102.148: extra groups (users.extraGroups, admin-set only). They never touch points / rank / quizzes / events — those follow users.group —
         // they only tell the intern app which UI(s) this user may open (Intern | Content Creator).
         let gsExtra = [];
+        let gsDivision = '';   // V102.172: the division chosen for the user in this modal ('' = none / Only I); saved to users.division when it changed
         function gsExtraPaint() {
             const box = document.getElementById('gs-extra-chips');
             if (!box) return;
@@ -36595,9 +36605,10 @@ They can connect again from LINE.
         }
 
         // V98.18 lean: chip-rail group picker for the User Hub modal.
-        function gsPickGroup(el, g) {
+        function gsPickGroup(el, g, div) {
             gsExtra = gsExtra.filter(x => x.toUpperCase() !== String(g).trim().toUpperCase()); gsExtraPaint();   // the main group is never also an extra
             const list = document.getElementById('gs-list');
+            if (typeof div === 'string') gsDivision = div;   // V102.172: the chip's section = the user's division
             document.getElementById('gs-input').value = g;
             gsPaintMainGroup(g);   // V102.164: chip, and the Save row follows
             list.querySelectorAll('.gs-chip').forEach(c => c.setAttribute('aria-pressed', 'false'));
@@ -36621,12 +36632,13 @@ They can connect again from LINE.
                 const twin = [...list.querySelectorAll('.gs-chip')].find(c => (c.dataset.group || '').trim().toUpperCase() === name.toUpperCase());
                 if (twin) {
                     cancel();
-                    gsPickGroup(twin, twin.dataset.group);
+                    gsPickGroup(twin, twin.dataset.group, twin.dataset.div);
                     const hint = document.getElementById('gs-new-hint');
                     if (hint) { hint.textContent = `“${twin.dataset.group}” already exists — picked it instead.`; hint.style.display = 'block'; }
                     return;
                 }
                 document.getElementById('gs-input').value = name;
+                gsDivision = '';   // V102.172: a brand-new group starts in Only I (move people in from Divisions & Groups)
                 gsPaintMainGroup(name);
                 list.querySelectorAll('.gs-chip').forEach(c => c.setAttribute('aria-pressed', 'false'));
                 const pend = document.createElement('div');
@@ -36771,6 +36783,7 @@ They can connect again from LINE.
             const enrollmentCode = user?.enrollmentCode || preRegData.find(p => p.claimedBy === uid)?.code || preRegData.find(p => p.sourceUserId === uid)?.code || preRegData.find(p => p.id === uid)?.code || '-';
 
             gsExtra = Array.isArray(user?.extraGroups) ? user.extraGroups.filter(Boolean) : [];
+            gsDivision = user ? userDivisionOf(user) : '';   // V102.172
             gsExtraPaint();
             document.getElementById('gs-extra-pick').hidden = true; document.getElementById('gs-extra-add').setAttribute('aria-expanded', 'false');
             document.getElementById('gs-uid').value = uid;
@@ -36945,6 +36958,7 @@ They can connect again from LINE.
             try {
                 await db.collection("users").doc(uid).update({
                     group: newGroup,
+                    ...(gsSnap && gsDivision !== gsSnap.division ? { division: gsDivision } : {}),   // V102.172: only when changed — no silent migration of docs that derive it
                     extraGroups: [...new Set(gsExtra.map(g => canonicalGroupName(g)).filter(g => g && g.toUpperCase() !== newGroup.toUpperCase()))],   // V102.148
                     fullName: fnameTh,
                     firstNameEn: fnameEn,
@@ -37045,14 +37059,13 @@ They can connect again from LINE.
             // V102.45: camp (isIgnored) users are left out of the group chips; the 🙈 chip holds them.
             const campCount = usersData.filter(u => u.isIgnored).length;
             const allUsersAndPre = [...usersData.filter(u => !u.isIgnored), ...unclaimedPre];
-            const groups = [...new Set(allUsersAndPre.map(u => u.group || 'Public'))].sort();
-            
             // 🔥 Include Divisions in tabs ([Version: V86.96])
-            // V102.170: a group that lives in a division is reached through that division (sub-row below), not as a second flat chip.
+            // V102.170/172: a group that lives in a division is reached through that division (sub-row below), not as a second flat chip. The flat chips are the
+            // groups of people who are in NO division (Only I) — the same group name can also sit inside a division.
+            const groups = [...new Set(allUsersAndPre.filter(u => userDivisionOf(u) === '').map(u => u.group || 'Public'))].sort();
             const divs = Object.keys(divisionConfig || {});
-            const inDivision = new Set(Object.values(divisionConfig || {}).flat().map(g => String(g).trim().toUpperCase()));
-            const allOptions = ['All', ...divs, ...groups.filter(g => !divs.includes(g) && !inDivision.has(String(g).trim().toUpperCase()))];
-            const selDiv = (divisionConfig && divisionConfig[activeUserGroup]) ? activeUserGroup : (divs.find(n => (divisionConfig[n] || []).some(g => String(g).trim().toUpperCase() === String(activeUserGroup).trim().toUpperCase())) || '');
+            const allOptions = ['All', ...divs, ...groups.filter(g => !divs.includes(g))];
+            const selDiv = (divisionConfig && divisionConfig[activeUserGroup] && activeUserGroupDiv === undefined) ? activeUserGroup : (activeUserGroupDiv || '');
 
             const campOn = !!window._userCampView;
             const floodCount = usersData.filter(u => !u.isIgnored && u.floodWatch && u.floodWatch.optIn === true).length;
@@ -37060,13 +37073,15 @@ They can connect again from LINE.
             // ACTIVE users (not hidden, not pending). Pending requests keep their own section
             // in the table; hidden (camp) users are the 🙈 chip.
             const active = usersData.filter(u => !u.isIgnored);
-            const inGroups = (gs, list) => { const keys = new Set(gs.map(x => String(x).trim().toUpperCase())); return list.filter(u => keys.has((u.group || 'Public').trim().toUpperCase())).length; };
+            const inDiv = (d, list) => list.filter(u => userDivisionOf(u) === d).length;   // V102.172: people in the division, not "people whose group is listed under it"
+            const inOnlyI = (g, list) => list.filter(u => userDivisionOf(u) === '' && (u.group || 'Public') === g).length;
             container.innerHTML = allOptions.map(g => {
-                const isActive = !campOn && (g === activeUserGroup || (!!divisionConfig && !!divisionConfig[g] && g === selDiv));   // V102.170: a division stays lit while one of its groups is picked
-                const attrs = `data-g="${escapeHtml(g)}" onclick="setUserGroupFilter(this.dataset.g)" aria-pressed="${isActive}"`;
+                const isDivChip = !!divisionConfig && !!divisionConfig[g];
+                const isActive = !campOn && (isDivChip ? g === selDiv : (g === activeUserGroup && (activeUserGroupDiv === undefined || activeUserGroupDiv === '')));   // V102.170: a division stays lit while one of its groups is picked
+                const attrs = `data-g="${escapeHtml(g)}"${isDivChip ? '' : ' data-dv=""'} onclick="setUserGroupFilter(this.dataset.g, this.dataset.dv)" aria-pressed="${isActive}"`;
                 if (g === 'All') return groupChipHtml('All', { attrs, icon: 'fa-users', color: '#334155', active: active.length, total: usersData.length, hint: 'show every group' });
-                if (divisionConfig && divisionConfig[g]) return groupChipHtml(g, { attrs, icon: 'fa-shield-halved', color: divColor(g), active: inGroups(divisionConfig[g], active), total: inGroups(divisionConfig[g], usersData), hint: 'division' });
-                return groupChipHtml(g, { attrs });
+                if (divisionConfig && divisionConfig[g]) return groupChipHtml(g, { attrs, icon: 'fa-shield-halved', color: divColor(g), active: inDiv(g, active), total: inDiv(g, usersData), hint: 'division' });
+                return groupChipHtml(g, { attrs, active: inOnlyI(g, active), total: inOnlyI(g, usersData) });
             }).join('') + (floodCount ? `<button type="button" class="grp-chip${window._userFloodOnly ? ' on' : ''}" onclick="toggleUserFloodView()" aria-pressed="${!!window._userFloodOnly}" title="Flood alerts on · ${floodCount}" style="--c:#2563eb;">🌊<small>${floodCount}</small></button>` : '') + (campCount ? `<button type="button" class="grp-chip${campOn ? ' on' : ''}" onclick="toggleUserCampView()" aria-pressed="${campOn}" title="Camp · hidden from boards, not ranked · ${campCount}" style="--c:#64748b;">🙈<span class="grp-name">Camp</span><small>${campCount}</small></button>` : '');
             renderUserSubgroupRow();   // V102.170
         }
@@ -37075,21 +37090,26 @@ They can connect again from LINE.
         function renderUserSubgroupRow() {
             const row = document.getElementById('user-subgroup-row');
             if (!row) return;
-            const div = (divisionConfig && divisionConfig[activeUserGroup]) ? activeUserGroup : (Object.keys(divisionConfig || {}).find(n => (divisionConfig[n] || []).some(g => String(g).trim().toUpperCase() === String(activeUserGroup).trim().toUpperCase())) || '');
-            if (!div || window._userCampView) { row.hidden = true; row.innerHTML = ''; return; }
-            const chips = (divisionConfig[div] || []).map(g => groupChipHtml(g, { on: g === activeUserGroup, attrs: `data-g="${escapeHtml(g)}" onclick="setUserGroupFilter(this.dataset.g)" aria-pressed="${g === activeUserGroup}"`, hint: 'filter to this group' })).join('');
+            const div = (divisionConfig && divisionConfig[activeUserGroup] && activeUserGroupDiv === undefined) ? activeUserGroup : (activeUserGroupDiv || '');
+            if (!div || !(divisionConfig && divisionConfig[div]) || window._userCampView) { row.hidden = true; row.innerHTML = ''; return; }
+            // the division's groups = its list + the groups of the people in it (the same group name can be in several divisions)
+            const members = (usersData || []).filter(u => userDivisionOf(u) === div);
+            const gs = [...new Set([...(divisionConfig[div] || []), ...members.map(u => u.group || 'Public')])];
+            const chips = gs.map(g => { const n = members.filter(u => !u.isIgnored && (u.group || 'Public') === g).length, t = members.filter(u => (u.group || 'Public') === g).length, on = g === activeUserGroup && activeUserGroupDiv === div;
+                return groupChipHtml(g, { on, active: n, total: t, attrs: `data-g="${escapeHtml(g)}" data-dv="${escapeHtml(div)}" onclick="setUserGroupFilter(this.dataset.g, this.dataset.dv)" aria-pressed="${on}"`, hint: 'filter to this group' }); }).join('');
             row.style.setProperty('--dc', divColor(div));
             row.innerHTML = `<span class="sub-l">${escapeHtml(div)} ›</span>${chips || '<small style="color:#94a3b8;">no groups yet</small>'}`;
             row.hidden = false;
         }
 
         // V102.170: "RSU · EXTERN" beside the name. Hidden when the table is already filtered to exactly this group; inside its division only the group is shown.
-        function userGroupTagHtml(group) {
-            const g = String(group || 'Public');
-            const key = g.trim().toUpperCase();
-            if (String(activeUserGroup).trim().toUpperCase() === key) return '';
-            const home = Object.keys(divisionConfig || {}).find(n => (divisionConfig[n] || []).some(x => String(x).trim().toUpperCase() === key)) || '';
-            const label = (home && home !== activeUserGroup ? home + ' · ' : '') + g;
+        // V102.172: takes the USER — the division is the user's own (users.division), not looked up from the group name.
+        function userGroupTagHtml(u) {
+            const g = String((u && u.group) || 'Public');
+            const home = userDivisionOf(u);
+            const inThisDiv = activeUserGroupDiv !== undefined ? activeUserGroupDiv === home : activeUserGroup === home;
+            if (String(activeUserGroup).trim().toUpperCase() === g.trim().toUpperCase() && (activeUserGroupDiv === undefined || activeUserGroupDiv === home)) return '';
+            const label = (home && !inThisDiv ? home + ' · ' : '') + g;
             return ` <span class="usr-grp-tag lang-no-toggle" style="--c:${home ? divColor(home) : '#64748b'};" title="${escapeHtml((home ? home + ' › ' : 'Only I › ') + g)}">${escapeHtml(label)}</span>`;
         }
 
@@ -37285,7 +37305,7 @@ They can connect again from LINE.
             const n = document.getElementById('bstat-chip-n');
             if (!n) return;
             const g = activeUserGroup;
-            const inGroup = u => g === 'All' || (divisionConfig && divisionConfig[g] ? divisionConfig[g].includes(u.group || 'Public') : (u.group || 'Public') === g);
+            const inGroup = u => userInScope(u, g, activeUserGroupDiv);   // V102.172
             const users = usersData.filter(u => !u.isIgnored && !u.isPreReg && inGroup(u));
             n.textContent = `${users.filter(u => u.badges && typeof u.badges === 'object').length}/${users.length}`;
         }
@@ -37804,7 +37824,7 @@ They can connect again from LINE.
             if (!body) return;
             // Same group rule as renderTable('users'): a division tab covers its groups.
             const g = activeUserGroup;
-            const inGroup = u => g === 'All' || (divisionConfig && divisionConfig[g] ? divisionConfig[g].includes(u.group || 'Public') : (u.group || 'Public') === g);
+            const inGroup = u => userInScope(u, g, activeUserGroupDiv);   // V102.172
             const users = usersData.filter(u => !u.isIgnored && !u.isPreReg && inGroup(u));
             const synced = users.filter(u => u.badges && typeof u.badges === 'object');
             const bf = window._userBadgeFilter;
@@ -37848,7 +37868,7 @@ They can connect again from LINE.
 
             const group = activeUserGroup;
             // A chip may be a division (divisionConfig) as well as a group — same test as renderBadgeStatsChip.
-            const inGroup = u => group === 'All' || (typeof divisionConfig !== 'undefined' && divisionConfig && divisionConfig[group] ? divisionConfig[group].includes(u.group || 'Public') : (u.group || 'Public') === group);
+            const inGroup = u => userInScope(u, group, activeUserGroupDiv);   // V102.172
             const users = (usersData || [])
                 .filter(u => inGroup(u) && (group === 'All' || (!u.isIgnored && !u.isPreReg)))
                 .slice()
@@ -37913,8 +37933,9 @@ They can connect again from LINE.
             });
         }
 
-        function setUserGroupFilter(group) {
+        function setUserGroupFilter(group, div) {
             activeUserGroup = group;
+            activeUserGroupDiv = div;   // V102.172: undefined = a division chip / any division; '' = Only I; a name = that division
             window._userCampView = false; // V102.45
             renderUserGroupTabs();
             renderTable('users');
@@ -49655,11 +49676,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
                 // 🔥 Unified Filtering (Divisions + Groups)
                 if (!campView && activeUserGroup !== 'All') {
-                    if (divisionConfig && divisionConfig[activeUserGroup]) {
-                        data = data.filter(u => divisionConfig[activeUserGroup].includes(u.group || 'Public'));
-                    } else {
-                        data = data.filter(u => (u.group || 'Public') === activeUserGroup);
-                    }
+                    data = data.filter(u => userInScope(u, activeUserGroup, activeUserGroupDiv));   // V102.172: a division = the people IN it (users.division)
                 }
 
                 if (window._userFloodOnly) data = data.filter(u => u.floodWatch && u.floodWatch.optIn === true);
@@ -49902,7 +49919,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 <div style="display:flex; align-items:center; gap:10px;">
                                     ${avatarWithDot(d.id, d.pictureUrl, group)}
                                     <div style="min-width:0;">
-                                        <div style="font-weight:bold; line-height:1.25;">${d.displayName}${(() => { const n = String(d.nickname || '').trim(); return n && n !== '-' && n.toLowerCase() !== String(d.displayName || '').trim().toLowerCase() ? ` <span style="font-weight:600; font-size:0.85em; color:var(--text-sub);">· ${escapeHtml(n)}</span>` : ''; })()}${d.googleLink && d.googleLink.uid ? ` <span title="Google connected · ${escapeHtml(d.googleLink.email || '')}" aria-label="Google connected" style="font-size:0.85em;">🌐</span>` : ''}${ignored ? ' <span title="Hidden from boards (⋯ to show)" aria-label="Hidden from boards">🙈</span>' : ''}${userFloodMarkHtml(d)}${userGroupTagHtml(group)}</div>
+                                        <div style="font-weight:bold; line-height:1.25;">${d.displayName}${(() => { const n = String(d.nickname || '').trim(); return n && n !== '-' && n.toLowerCase() !== String(d.displayName || '').trim().toLowerCase() ? ` <span style="font-weight:600; font-size:0.85em; color:var(--text-sub);">· ${escapeHtml(n)}</span>` : ''; })()}${d.googleLink && d.googleLink.uid ? ` <span title="Google connected · ${escapeHtml(d.googleLink.email || '')}" aria-label="Google connected" style="font-size:0.85em;">🌐</span>` : ''}${ignored ? ' <span title="Hidden from boards (⋯ to show)" aria-label="Hidden from boards">🙈</span>' : ''}${userFloodMarkHtml(d)}${userGroupTagHtml(d)}</div>
                                         ${certNameDisplay}
                                         <div style="display:flex; align-items:center; gap:6px; margin-top:2px; font-size:0.78em; color:var(--text-sub);">
                                             ${userBadgesCellHtml(d)}
@@ -50801,20 +50818,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (activeUserGroup === 'All') {
                 const divs = Object.entries(divisionConfig);
                 if (divs.length > 0) {
-                    divs.forEach(([divName, groups]) => {
-                        const divUsers = usersData.filter(u => !u.isIgnored && groups.includes(u.group || "Public")).sort((a, b) => (b.score || 0) - (a.score || 0));
+                    divs.forEach(([divName]) => {
+                        const divUsers = usersData.filter(u => !u.isIgnored && userDivisionOf(u) === divName).sort((a, b) => (b.score || 0) - (a.score || 0));   // V102.172
                         if (divUsers.length > 0) renderDivisionSection(l, divName, divUsers);
                     });
                 } else {
                     const allActiveUsers = usersData.filter(u => !u.isIgnored).sort((a, b) => (b.score || 0) - (a.score || 0));
                     renderDivisionSection(l, "Global Leaderboard", allActiveUsers, '#343a40');
                 }
-            } else if (divisionConfig && divisionConfig[activeUserGroup]) {
-                const groups = divisionConfig[activeUserGroup];
-                const divUsers = usersData.filter(u => !u.isIgnored && groups.includes(u.group || "Public")).sort((a, b) => (b.score || 0) - (a.score || 0));
+            } else if (divisionConfig && divisionConfig[activeUserGroup] && activeUserGroupDiv === undefined) {
+                const divUsers = usersData.filter(u => !u.isIgnored && userDivisionOf(u) === activeUserGroup).sort((a, b) => (b.score || 0) - (a.score || 0));   // V102.172
                 renderDivisionSection(l, activeUserGroup, divUsers);
             } else {
-                const groupUsers = usersData.filter(u => !u.isIgnored && (u.group || "Public") === activeUserGroup).sort((a, b) => (b.score || 0) - (a.score || 0));
+                const groupUsers = usersData.filter(u => !u.isIgnored && userInScope(u, activeUserGroup, activeUserGroupDiv)).sort((a, b) => (b.score || 0) - (a.score || 0));
                 let gColor = 'var(--primary)';
                 try { gColor = getGroupColor(activeUserGroup); } catch (e) { }
                 renderDivisionSection(l, `${activeUserGroup}`, groupUsers, gColor);
@@ -51018,6 +51034,21 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         // V102.168: one colour per division (stable from the name); Only I is grey.
+        // V102.172: a user's division. users.division (set by an admin in the User Hub / Divisions window; '' = none) wins, so the same group name can sit in
+        // several divisions; a doc without the field keeps the old rule — the division whose group list holds users.group. An unknown division counts as none.
+        function userDivisionOf(u) {
+            const cfg = divisionConfig || {};
+            if (u && typeof u.division === 'string') return (u.division !== '' && cfg[u.division]) ? u.division : '';
+            const key = String((u && u.group) || 'Public').trim().toUpperCase();
+            return Object.keys(cfg).find(n => (cfg[n] || []).some(g => String(g).trim().toUpperCase() === key)) || '';
+        }
+        // One test for "is this user in the Users filter": All · a division chip · a group (optionally read inside one division — dv: undefined = any, '' = Only I).
+        function userInScope(u, g, dv) {
+            if (g === 'All') return true;
+            if (dv === undefined && divisionConfig && divisionConfig[g]) return userDivisionOf(u) === g;
+            if ((u.group || 'Public') !== g) return false;
+            return dv === undefined ? true : userDivisionOf(u) === dv;
+        }
         function divColor(name) {   // V102.170: palette lives inside — the Users rail can call this before the rest of the script has run
             const palette = ['#f59e0b', '#0d9488', '#8b5cf6', '#ec4899', '#0ea5e9', '#84cc16'];
             if (name === '__only') return '#64748b';
@@ -57000,8 +57031,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (activeUserGroup === 'All') {
                 const divs = Object.entries(divisionConfig);
                 if (divs.length > 0) {
-                    divs.forEach(([divName, groups]) => {
-                        const divUsers = usersData.filter(u => !u.isIgnored && groups.includes(u.group || "Public")).sort((a, b) => (b.score - a.score)).slice(0, 5);
+                    divs.forEach(([divName]) => {
+                        const divUsers = usersData.filter(u => !u.isIgnored && userDivisionOf(u) === divName).sort((a, b) => (b.score - a.score)).slice(0, 5);   // V102.172
                         if (divUsers.length > 0) {
                             results.push(`\n🏅 ${divName}`);
                             divUsers.forEach((u, i) => results.push(`${i + 1}. ${showName ? u.displayName : `Lv.${Math.floor(u.score / 10) + 1}`} (${parseFloat((u.score || 0).toFixed(2))})`));
@@ -57011,13 +57042,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     usersData.filter(u => !u.isIgnored).sort((a, b) => b.score - a.score).slice(0, 20).forEach((u, i) => results.push(`${i + 1}. ${showName ? u.displayName : `Lv.${Math.floor(u.score / 10) + 1}`} (${parseFloat((u.score || 0).toFixed(2))})`));
                 }
             } else if (activeUserGroup === 'Others') {
-                const allGrouped = Object.values(divisionConfig).flat();
-                const otherUsers = usersData.filter(u => !u.isIgnored && !allGrouped.includes(u.group || "Public")).sort((a, b) => b.score - a.score).slice(0, 20);
+                const otherUsers = usersData.filter(u => !u.isIgnored && userDivisionOf(u) === '').sort((a, b) => b.score - a.score).slice(0, 20);   // V102.172: no division
                 header = "🏆 Rankings (Others/Public)\n";
                 otherUsers.forEach((u, i) => results.push(`${i + 1}. ${showName ? u.displayName : `Lv.${Math.floor(u.score / 10) + 1}`} (${parseFloat((u.score || 0).toFixed(2))})`));
             } else {
-                const groups = divisionConfig[activeUserGroup] || [activeUserGroup]; // Fallback to group itself
-                const divUsers = usersData.filter(u => !u.isIgnored && groups.includes(u.group || "Public")).sort((a, b) => b.score - a.score).slice(0, 20);
+                const divUsers = usersData.filter(u => !u.isIgnored && userInScope(u, activeUserGroup, activeUserGroupDiv)).sort((a, b) => b.score - a.score).slice(0, 20);   // V102.172
                 header = `🏆 Rankings (${activeUserGroup})\n`;
                 divUsers.forEach((u, i) => results.push(`${i + 1}. ${showName ? u.displayName : `Lv.${Math.floor(u.score / 10) + 1}`} (${parseFloat((u.score || 0).toFixed(2))})`));
             }

@@ -33,7 +33,7 @@ const panel = html.slice(panelAt, html.indexOf('</details>', panelAt) + '</detai
         const errs = []; page.on('pageerror', e => errs.push(e.message));
         await page.setContent('<!doctype html><meta charset="utf-8"><style>:root{--primary:#4361ee}</style><div id="tab-users">' + panel + '</div>');
         await page.addScriptTag({ content: [
-            'var activeUserGroup = "All", __toasts = [], __clip = [];',
+            'var activeUserGroup = "All", activeUserGroupDiv, __toasts = [], __clip = [];',
             'var escapeHtml = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", \'"\': "&quot;" }[c]));',
             'var alabastaAgo = () => "2 d"; var showToast = m => __toasts.push(m);',
             'var groupColorMap = { RSU: "#e11d48" }; var divisionConfig = { Clinical: ["RSU", "CU"] };',
@@ -45,7 +45,7 @@ const panel = html.slice(panelAt, html.indexOf('</details>', panelAt) + '</detai
             'var quizAttemptsAllCache = [{ userId: "u1", status: "approved" }, { userId: "u1", status: "approved" }, { userId: "u1", status: "pending" }, { userId: "u2", status: "approved" }];',
             'var reflectiveLogsCache = [{ userId: "u1" }]; var casesData = [{ userId: "u1" }, { userId: "u1" }];',
             'Object.defineProperty(navigator, "clipboard", { value: { writeText: t => { __clip.push(t); return Promise.resolve(); } } });',
-            render
+            grab(html, 'function userDivisionOf('), grab(html, 'function userInScope('), render
         ].join('\n') });
         const title = () => page.$eval('#group-users-title', e => e.textContent);
         const rows = () => page.$$eval('#group-users-list > div', els => els.map(e => e.innerText.replace(/\s+/g, ' ').trim()));
