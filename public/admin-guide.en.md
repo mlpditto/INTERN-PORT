@@ -69,9 +69,10 @@ The **Admin Portal** page has 3 ways in — use any one:
 - 🏆 **Elite Board** (ranking) · search box · 📅 score date range · 🏅 **Badge Stats** · 📤 share ranking · 🛡️ **Divisions & Groups** · 👥 **Entry** (pre-registration) · ⏳ preview of the points deducted for missed daily check-ins
 - Open one intern's history (drill-down) and filter by Q (Quiz) · W (Work) · L (Logs) · B (Bonus) · M (Manual) · 📍 Check-in · 🪙 Beri
 - 🛡️ **Divisions & Groups** (the shield button in the toolbar) — a *group* is a person's home team; a *division* is a bucket of groups that are **ranked together** and can switch on a special UI (a division named **Content Creator** gives its members the Content card instead of Mission). A group lives in one division at most; a group in no division is **Only I** (ranked only within itself).
-  - The window edits a **draft**: move groups around as much as you like, nothing is written until you press **Save** (the button lights up while there are unsaved changes). Closing without Save discards them.
-  - **Create a division**: type a name in the bottom box and press ＋ · **Move a group**: tap its chip → the **Move to** row → pick the destination division, or **Only I** to take it out · **Remove a division**: the delete button on its header (its groups go back to Only I; they are not deleted)
-  - ⚠️ In the same chip menu, the **Group** row (✏️ Rename · Merge · 👁 Visibility · Delete) acts on the **group itself** and **takes effect at once**, not on Save — Delete removes the group everywhere
+  - The window edits a **draft**: move groups around as much as you like, nothing is written until you press **Save** (a Save bar appears only while there are unsaved changes and summarises them, e.g. "Audit → CAFE"). Closing without Save discards them.
+  - The top row is a **rail of divisions** (each has its own colour, plus **Only I**): tap one and only its groups show below; the number on a chip is its active people. **Search** at the top looks in every division at once
+  - **Create a division**: the round ＋ at the end of the rail → type a name → ＋ · **Move a group**: tap its chip → in the bar under the chips tap the destination after **→** (a division, or **Only I** to take it out) · **Remove a division**: the ✕ on the right of the panel caption (its groups go back to Only I; they are not deleted)
+  - ⚠️ In the same bar, the icons (✏️ Rename · ⇄ Merge · 👁 Visibility · 🗑 Delete, marked ⚡) acts on the **group itself** and **takes effect at once**, not on Save — Delete removes the group everywhere
   - Chip counts are active people only (hidden / not-yet-registered are left out) · division names the code treats specially: **Content Creator** (or the old name CAFE)
 
 ### 🏝️ Laugh Tale
