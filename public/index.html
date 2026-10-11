@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.115)</title>
+    <title>Internship Portfolio (V101.116)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <link rel="stylesheet" href="cafe-content.css?v=V101.114">
     <meta charset="UTF-8">
@@ -6532,7 +6532,7 @@
         };
 
         let userId = "", userProfile = {}, userSubmissions = {};
-        let questsCache = [], mySubmissionsCache = {}, myWorksCache = [], sideQuestsCache = {}, myGroup = "Public", myScore = 0;
+        let questsCache = [], mySubmissionsCache = {}, myWorksCache = [], sideQuestsCache = {}, myGroup = "Public", myScore = 0, myDivisionRaw;   // V101.116: myDivisionRaw = users.division (admin-set; '' = no division; undefined = not set → derived from the group)
         let myBeri = 0; // V96.50: Beri Phase 1 — separate currency from `score`, see users/{uid}.beri
         let myEverUnlockedBeriShop = false; // V98.04: once true (persisted to users/{uid}.beriShopUnlocked), the Murthehelp shop stays visible even if myBeri later drops back under the threshold
         let quizzesCache = [], quizAttemptsCache = {}, allUsersData = [], divisionConfig = {}, groupSettings = {}; // 🔥 Added Settings V69
@@ -8134,7 +8134,7 @@
                 const rows = ((res && res.data && res.data.rows) || []).filter(r => !r.ignored || r.id === userId);
                 const mine = myOwnRow();
                 allUsersData = rows.map(r => (r.id === userId)
-                    ? Object.assign({}, r, {
+                    ? Object.assign({}, r, (typeof myDivisionRaw === 'string' ? { division: myDivisionRaw } : {}), {
                         displayName: mine.displayName || (userProfile && userProfile.displayName) || '',
                         pictureUrl: mine.pictureUrl || (userProfile && userProfile.pictureUrl) || ''
                     })
@@ -8200,6 +8200,7 @@
                     const da = d.data();
                     const score = parseFloat(da.score || 0);
                     myGroup = da.group || "Public"; // 🔥 Sync group V77.7
+                    myDivisionRaw = typeof da.division === 'string' ? da.division : undefined;   // V101.116
                     window.myExtraGroups = Array.isArray(da.extraGroups) ? da.extraGroups : [];   // V101.105: admin-set extra groups = which UIs this user may open (nothing else follows them)
                     window.cafeContentSync?.();
                     myScore = score; // V95.33: live score drives quiz unlock gate (renderAssignments runs below)
@@ -8787,6 +8788,7 @@
 
                 // Reflect profile changes immediately on current screen (no hard refresh needed)
                 myGroup = userData.group || "Public";
+                myDivisionRaw = typeof userData.division === 'string' ? userData.division : undefined;   // V101.116
                 myScore = parseFloat(userData.score || 0); // V95.33: keep unlock gate in sync
                 document.getElementById('u-group-badge').innerHTML = `<i class="fa-solid ${getGroupIcon(myGroup)}"></i> ${myGroup}`;
                 document.getElementById('u-group-badge').style.background = getGroupColor(myGroup);
@@ -9839,13 +9841,7 @@
         function updateDivisionAndVisibility() {
             // Update Division Badge
             const divBadge = document.getElementById('u-division-badge');
-            let myDiv = "";
-            for (const [divName, groups] of Object.entries(divisionConfig)) {
-                if (groups.includes(myGroup)) {
-                    myDiv = divName;
-                    break;
-                }
-            }
+            const myDiv = userDivisionOf({ group: myGroup, division: myDivisionRaw });   // V101.116: the user's own division, not "the division that lists my group"
             if (myDiv) {
                 divBadge.innerText = myDiv;
                 divBadge.style.display = 'inline-block';
@@ -9872,10 +9868,23 @@
         }
 
         function getMyDivision() {
-            for (const [divName, groups] of Object.entries(divisionConfig)) {
-                if (groups.includes(myGroup)) return divName;
-            }
+            const d = userDivisionOf({ group: myGroup, division: myDivisionRaw });   // V101.116
+            if (d) return d;
             return "General Division"; // Default
+        }
+
+        // V101.116: a user's division. users.division (set by an admin) wins — '' means none; a doc without the field falls back to the division whose
+        // group list holds users.group, which is how it worked while one group = one division. An unknown division name counts as none.
+        function userDivisionOf(u) {
+            const cfg = divisionConfig || {};
+            if (u && typeof u.division === 'string') return (u.division !== '' && cfg[u.division]) ? u.division : '';
+            const key = String((u && u.group) || 'Public').trim().toUpperCase();
+            return Object.keys(cfg).find(n => (cfg[n] || []).some(g => String(g).trim().toUpperCase() === key)) || '';
+        }
+        // The people ranked with me: my division, or — with no division — my own group (still without a division).
+        function myDivisionPeers(list) {
+            const myDiv = userDivisionOf({ group: myGroup, division: myDivisionRaw });
+            return list.filter(u => myDiv ? userDivisionOf(u) === myDiv : ((u.group || 'Public') === myGroup && userDivisionOf(u) === ''));
         }
 
         function switchLeaderboardMode(mode) {
@@ -9904,8 +9913,7 @@
             document.getElementById('lb-div-name').innerText = `${myDiv} • ${leaderboardMode === 'reflective' ? 'Reflective Rank' : 'Overall Rank'}`;
 
             // Filter users in the same division
-            const relevantGroups = divisionConfig[myDiv] || [myGroup];
-            const divUsers = allUsersData.filter(u => relevantGroups.includes(u.group || "Public") || (u.group === myGroup));
+            const divUsers = myDivisionPeers(allUsersData);   // V101.116: by users.division (was: groups listed under my division)
 
             // If myDiv is General and no groups match, it might just be myGroup
             let finalUsers = divUsers.length > 0 ? divUsers : allUsersData.filter(u => (u.group || "Public") === myGroup);
@@ -16431,8 +16439,7 @@
         function renderProfileLeaderboard() {
             // Rank position in division
             const myDiv = getMyDivision();
-            const relevantGroups = divisionConfig[myDiv] || [myGroup];
-            let divUsers = allUsersData.filter(u => relevantGroups.includes(u.group || 'Public') || (u.group === myGroup));
+            let divUsers = myDivisionPeers(allUsersData);   // V101.116
             if (!divUsers.length) divUsers = allUsersData.filter(u => (u.group || 'Public') === myGroup);
             divUsers = divUsers
                 .filter(u => (u.reflectiveTotalLogs || 0) > 0 || u.id === userId)
@@ -21307,8 +21314,7 @@
             if (!mini) return;
 
             const myDiv = getMyDivision();
-            const relevantGroups = divisionConfig[myDiv] || [myGroup];
-            let ranked = allUsersData.filter(u => relevantGroups.includes(u.group || 'Public') || (u.group === myGroup));
+            let ranked = myDivisionPeers(allUsersData);   // V101.116
             if (!ranked.length) ranked = allUsersData.filter(u => (u.group || 'Public') === myGroup);
 
             ranked = ranked
@@ -26121,7 +26127,7 @@ async function archiveDoneCard(cardId) {
 <script src="history-review.js?v=V99.81"></script>
 <script src="daily-canvas.js?v=V101.35"></script>
 <script src="intern-guide.js?v=V101.99" defer></script>
-<script src="cafe-content.js?v=V101.114" defer></script>
+<script src="cafe-content.js?v=V101.116" defer></script>
 <script src="history-lean.js?v=V101.114"></script><script src="history-compact.js?v=V101.55"></script><script src="delete-requests.js?v=V101.114"></script>
 </body>
 

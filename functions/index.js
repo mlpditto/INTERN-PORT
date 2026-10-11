@@ -246,6 +246,8 @@ exports.getLeaderboard = onCall(async (request) => {
             id: d.id,
             score: Number(u.score) || 0,
             group: u.group || 'Public',
+            // V101.116: the admin-set division (users.division; '' = none). Omitted when the doc has none, so the client falls back to the group's division.
+            ...(typeof u.division === 'string' ? { division: u.division } : {}),
             reflectiveTotalLogs: Number(u.reflectiveTotalLogs) || 0,
             reflectiveBestStreak: Number(u.reflectiveBestStreak) || 0,
             // Team Player (intern V101.25) leaves camp users out of the group total.
