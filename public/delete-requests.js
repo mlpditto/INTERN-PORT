@@ -87,13 +87,42 @@
         });
         return true;
     }
+    // Which userIds count as the requester's. A legacy-linked account (user_auth_links: effectiveUserId ≠ rawLiffUserId) still has
+    // items tagged with the raw LIFF id while the request carries the effective id — the Joeylive case; before this, every such
+    // request died on 'Owner mismatch'. `read` is the snapshot's shared reader when describing, a plain get when deleting.
+    async function ownerIds(r, read) {
+        const ids = new Set([r.userId]);
+        try {
+            const link = read ? await read('user_auth_links', r.authUid) : await db.collection('user_auth_links').doc(r.authUid).get().then(d => d.exists ? d.data() : null);
+            if (link && link.effectiveUserId === r.userId && link.rawLiffUserId) ids.add(link.rawLiffUserId);
+        } catch (_) { /* unreadable link: strict match only */ }
+        return ids;
+    }
     async function deleteSource(r) {
         const collection = r.itemType === 'quiz' ? 'quiz_attempts' : r.itemType === 'explore_link' ? 'review_link_suggestions' : 'submissions';
         const mirror = await db.collection(collection).doc(r.itemId).get();
         if (!mirror.exists) return true;
         const data = mirror.data();
-        if (data.userId !== r.userId) throw Error('Owner mismatch. Inspect the original item before deleting.');
+        if (!(await ownerIds(r)).has(data.userId)) throw Error('Owner mismatch. Inspect the original item before deleting.');
         const sourceId = data.metadata?.sourceId;
+        if (r.itemType === 'quiz') {
+            // Same moves as deletePollParticipant (admin.html): drop the attempt, take an approved score back off the user, log the
+            // reversal. The score goes back to whichever of the two ids has a users doc (effective first). Speed Beri is not reclaimed
+            // (it never was). Nothing else handled quiz attempts, so Delete used to end in 'Use the existing admin review screen…'.
+            const b = db.batch();
+            b.delete(mirror.ref);
+            const score = data.status === 'approved' ? (Number(data.score) || 0) : 0;
+            const known = id => id && id !== 'anon' && typeof usersData !== 'undefined' && Array.isArray(usersData) && usersData.some(u => u.id === id);
+            const target = [r.userId, data.userId].find(known);
+            if (score > 0 && target) {
+                b.update(db.collection('users').doc(target), { score: firebase.firestore.FieldValue.increment(-score) });
+                b.set(db.collection('checkin_logs').doc(), { userId: target, type: 'manual_adjust', amount: -score,
+                    note: 'Revert: quiz attempt deleted on request (' + (data.quizTitle || data.quizId || r.itemId) + ')', timestamp: stamp() });
+            }
+            await b.commit();
+            if (typeof quizAttemptsAllCache !== 'undefined' && Array.isArray(quizAttemptsAllCache)) quizAttemptsAllCache = quizAttemptsAllCache.filter(a => a.id !== r.itemId);
+            return !(await db.collection(collection).doc(r.itemId).get()).exists;
+        }
         const mapping = {case:['cases',deleteCaseSubmission],product:['product_listings',deleteProductListing],work:['works',delWork],reflective:['reflective_logs',deleteReflectiveLog]};
         if (mapping[r.itemType] && sourceId) {
             const [name, handler] = mapping[r.itemType], source = await db.collection(name).doc(sourceId).get();
@@ -115,7 +144,7 @@
     async function describeRequest(r, read) {
         const collection = r.itemType === 'quiz' ? 'quiz_attempts' : r.itemType === 'explore_link' ? 'review_link_suggestions' : 'submissions';
         const [user, item] = await Promise.all([read('users', r.userId), read(collection, r.itemId)]);
-        const owned = item && item.userId === r.userId ? item : {};
+        const owned = item && (await ownerIds(r, read)).has(item.userId) ? item : {};
         const types = {quiz:'Quiz attempt',case:'Case submission',product:'Product listing',work:'Work submission',reflective:'Reflection',learning_note:'Learning note',explore_link:'Explore link suggestion'};
         let title = owned.quizTitle || owned.title || owned.metadata?.title || '';
         if (r.itemType === 'quiz') {
