@@ -58,9 +58,15 @@
         return '';
     }
     function isCreatorDivision(name) { return DIVISIONS.indexOf(String(name || '').replace(/\s+/g, ' ').trim().toLowerCase()) >= 0; }
+    // V101.116: the primary group's division is the user's own users.division when the admin set one (the same group name can sit in several divisions);
+    // otherwise it is the division whose list holds the group, as before.
+    function primaryDivision(primary) {
+        try { if (typeof userDivisionOf === 'function') return userDivisionOf({ group: primary, division: typeof myDivisionRaw !== 'undefined' ? myDivisionRaw : undefined }); } catch (_) { /* fall through */ }
+        return divisionOfGroup(primary);
+    }
     function memberships() {
         var primary = typeof myGroup !== 'undefined' ? myGroup : '', extras = Array.isArray(window.myExtraGroups) ? window.myExtraGroups : [];
-        var pc = isCreatorDivision(divisionOfGroup(primary)), ec = extras.some(function (g) { return isCreatorDivision(divisionOfGroup(g)); });
+        var pc = isCreatorDivision(primaryDivision(primary)), ec = extras.some(function (g) { return isCreatorDivision(divisionOfGroup(g)); });
         var internSide = !pc || extras.some(function (g) { return g && !isCreatorDivision(divisionOfGroup(g)); });
         return { creator: pc || ec, both: (pc || ec) && internSide, primaryCreator: pc };
     }
