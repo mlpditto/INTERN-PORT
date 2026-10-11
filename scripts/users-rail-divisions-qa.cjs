@@ -7,7 +7,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const html = fs.readFileSync('public/admin.html', 'utf8').replace(/\r\n/g, '\n');
 assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(html));
 assert.ok(html.includes('<div id="user-subgroup-row" class="lang-no-toggle" hidden></div>'), 'the sub-row exists, hidden, language-toggle-proof');
-assert.ok(html.includes('${userFloodMarkHtml(d)}${userGroupTagHtml(group)}</div>'), 'the table row prints the tag after the name');
+assert.ok(html.includes('${userFloodMarkHtml(d)}${userGroupTagHtml(d)}</div>'), 'the table row prints the tag after the name');
 assert.ok(!html.includes("color: '#4f46e5', active: inGroups"), 'division chips no longer all share one colour');
 
 function grabFn(marker) {
@@ -32,11 +32,11 @@ const css = html.slice(html.indexOf('.grp-chip { --c:#64748b'), html.indexOf(':i
         await page.setContent('<!doctype html><meta charset="utf-8"><style>' + css + '</style><div id="user-group-tabs"></div><div id="user-subgroup-row" class="lang-no-toggle" hidden></div>');
         await page.addScriptTag({ content: [
             'var users = ["EXTERN", "EXTERN", "Pharmacists", "Pharmacists", "Pharmacists", "Audit"];',
-            'var usersData = users.map(function (g) { return { group: g }; }), preRegData = [], divisionConfig = { CAFE: ["Audit", "Marketing"], RSU: ["EXTERN", "Junior"] }, activeUserGroup = "All";',
+            'var usersData = users.map(function (g) { return { group: g }; }), preRegData = [], divisionConfig = { CAFE: ["Audit", "Marketing"], RSU: ["EXTERN", "Junior"] }, activeUserGroup = "All", activeUserGroupDiv;',
             'var escapeHtml = function (s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;"); };',
             'var renderTable = function () {}, renderGroupUsersPanel = function () {}, renderLeaderboard = function () {}, renderBadgeStatsIfOpen = function () {};',
             grabConst('const groupColorMap = {'), grabConst('const groupIconMap = {'),
-            ['function getGroupColor(', 'function getGroupIcon(', 'function groupActiveCount(', 'function groupTotalCount(', 'function groupChipHtml(', 'function divColor(',
+            ['function getGroupColor(', 'function getGroupIcon(', 'function groupActiveCount(', 'function groupTotalCount(', 'function groupChipHtml(', 'function divColor(', 'function userDivisionOf(', 'function userInScope(',
                 'function renderUserGroupTabs(', 'function renderUserSubgroupRow(', 'function userGroupTagHtml(', 'function setUserGroupFilter('].map(grabFn).join('\n'),
             'renderUserGroupTabs();'
         ].join('\n') });
@@ -60,6 +60,17 @@ const css = html.slice(html.indexOf('.grp-chip { --c:#64748b'), html.indexOf(':i
         assert.equal(await page.$eval('#user-group-tabs [data-g="RSU"]', e => e.getAttribute('aria-pressed')), 'true', 'RSU stays lit');
         assert.equal(await page.$eval('#user-subgroup-row [data-g="EXTERN"]', e => e.getAttribute('aria-pressed')), 'true');
         assert.equal(await page.$eval('#user-subgroup-row [data-g="Junior"]', e => e.getAttribute('aria-pressed')), 'false');
+        assert.equal(await page.evaluate(() => activeUserGroupDiv), 'RSU', 'a sub-row group is read inside its division');
+        // 3b. the SAME group name in two divisions: Audit sits in CAFE (listed) and, explicitly, in RSU — each division counts only its own people
+        await page.evaluate(() => { usersData.push({ group: 'Audit', division: 'RSU' }); setUserGroupFilter('RSU'); });
+        assert.deepEqual(await txt('#user-subgroup-row .sub-l, #user-subgroup-row .grp-chip'), ['RSU ›', 'EXTERN 2', 'Junior 0', 'Audit 1'], 'RSU lists Audit because someone is in it');
+        await page.click('#user-subgroup-row [data-g="Audit"]');
+        assert.equal(await page.evaluate(() => ({ g: activeUserGroup, d: activeUserGroupDiv })).then(o => o.g + '/' + o.d), 'Audit/RSU');
+        assert.deepEqual(await page.evaluate(() => usersData.filter(u => userInScope(u, activeUserGroup, activeUserGroupDiv)).map(u => u.division || '-')), ['RSU'], 'only the Audit person who is in RSU');
+        await page.evaluate(() => setUserGroupFilter('CAFE'));
+        assert.deepEqual(await txt('#user-subgroup-row .sub-l, #user-subgroup-row .grp-chip'), ['CAFE ›', 'Audit 1', 'Marketing 0'], 'CAFE counts only its own Audit');
+        assert.equal(await page.evaluate(() => usersData.filter(u => userInScope(u, 'CAFE', undefined)).length), 1, 'the CAFE chip = people in CAFE');
+        await page.evaluate(() => { usersData.pop(); setUserGroupFilter('All'); });
         // 4. an Only I group, or the Camp view → no sub-row
         await page.click('#user-group-tabs [data-g="Pharmacists"]');
         assert.equal(await page.$eval('#user-subgroup-row', e => getComputedStyle(e).display), 'none');
@@ -67,7 +78,7 @@ const css = html.slice(html.indexOf('.grp-chip { --c:#64748b'), html.indexOf(':i
         assert.equal(await page.$eval('#user-subgroup-row', e => getComputedStyle(e).display), 'none', 'Camp view has no sub-row');
         await page.evaluate(() => { window._userCampView = false; setUserGroupFilter('All'); });
         // 5. the row tag
-        const tag = g => page.evaluate(x => userGroupTagHtml(x), g);
+        const tag = (g, division) => page.evaluate(x => userGroupTagHtml(x), division === undefined ? { group: g } : { group: g, division });
         let t = await tag('EXTERN');
         assert.ok(t.includes('RSU · EXTERN') && t.includes('title="RSU › EXTERN"') && t.includes('lang-no-toggle'), t);
         t = await tag('Pharmacists');
@@ -77,6 +88,8 @@ const css = html.slice(html.indexOf('.grp-chip { --c:#64748b'), html.indexOf(':i
         await page.evaluate(() => { activeUserGroup = 'EXTERN'; });
         assert.equal(await tag('EXTERN'), '', 'filtered to exactly this group → no tag');
         await page.evaluate(() => { activeUserGroup = 'All'; });
+        t = await tag('Audit', 'RSU'); assert.ok(t.includes('RSU · Audit') && t.includes('title="RSU › Audit"'), 'the tag follows the user\'s own division: ' + t);
+        t = await tag('EXTERN', '');  assert.ok(t.includes('>EXTERN<') && t.includes('Only I › EXTERN'), 'explicit Only I: ' + t);
         t = await tag('<b>x</b>'); assert.ok(!t.includes('<b>x</b>') && t.includes('&lt;b'), 'group names are escaped');
         assert.deepEqual(errs, [], 'no page errors');
         console.log('PASS: Users rail — coloured divisions, no repeated group chips, sub-row of the selected division, division stays lit, "RSU · EXTERN" row tag');

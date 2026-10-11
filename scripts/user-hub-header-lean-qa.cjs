@@ -32,7 +32,7 @@ function grab(src, marker) {
     return src.slice(i, k + 1);
 }
 const fns = ['function gsPaintMainGroup(', 'function gsState(', 'function gsDirtyCount(', 'function gsDirtyPaint(', 'function gsExtraPaint(', 'function gsExtraRemove(', 'function gsExtraAdd(',
-    'function gsExtraRenderPick(', 'function gsExtraToggle(', 'function gsPickGroup(', 'function toggleGsGroups(', 'function groupChipHtml(', 'function gsDivisionChipHtml(', 'function divColor('].map(m => grab(html, m)).join('\n');
+    'function gsExtraRenderPick(', 'function gsExtraToggle(', 'function gsPickGroup(', 'function toggleGsGroups(', 'function groupChipHtml(', 'function gsDivisionChipHtml(', 'function divColor(', 'function userDivisionOf('].map(m => grab(html, m)).join('\n');
 const css = [
     html.slice(html.indexOf('        .grp-chip { --c:#64748b;'), html.indexOf('        /* V102.64: Event modal')),
     html.slice(html.indexOf('        .grp-chip:hover {'), html.indexOf('        /* V102.59: the picker is sections')),
@@ -43,7 +43,7 @@ const css = [
 ].join('\n');
 const markup = '<div id="groupSelectModal" style="width:100%"><div class="modal-content">' + header
     + '<input type="hidden" id="gs-uid"><div id="gs-profile-body"><input type="text" id="gs-tel" value="081"></div>'
-    + grp + '<div id="gs-pane-group" hidden><input type="text" id="gs-input" hidden><div id="gs-list"><button class="gs-chip" data-group="MLP" onclick="gsPickGroup(this, this.dataset.group)">MLP</button><button class="gs-chip" data-group="EXTERN" onclick="gsPickGroup(this, this.dataset.group)">EXTERN</button></div></div></section>'
+    + grp + '<div id="gs-pane-group" hidden><input type="text" id="gs-input" hidden><div id="gs-list"><button class="gs-chip" data-group="MLP" data-div="" onclick="gsPickGroup(this, this.dataset.group, this.dataset.div)">MLP</button><button class="gs-chip" data-group="EXTERN" data-div="RSU" onclick="gsPickGroup(this, this.dataset.group, this.dataset.div)">EXTERN</button></div></div></section>'
     + html.slice(html.indexOf('<div class="gs-save-row lang-no-toggle" id="gs-save-row" hidden>'), html.indexOf('</div>', html.indexOf('id="gs-save-row"')) + 6) + '</div></div>';
 
 (async () => {
@@ -57,7 +57,7 @@ const markup = '<div id="groupSelectModal" style="width:100%"><div class="modal-
             "var getGroupColor = g => ({ MLP: '#ef4444', EXTERN: '#7209b7', CAFE: '#f97316' })[g] || '#6c757d'; var getGroupIcon = g => 'fa-tag';",
             "var groupActiveCount = g => ({ MLP: 9, EXTERN: 2, CAFE: 4 })[g] || 0; var groupTotalCount = g => groupActiveCount(g);",
             "var getGlobalGroups = () => ['MLP', 'EXTERN', 'CAFE']; var gsCollectAddresses = () => []; var gsLanguage = 'en'; var gsText = (en, th) => gsLanguage === 'th' ? th : en;",
-            "var divisionConfig = { RSU: ['EXTERN', 'Junior'] }, opened = 0, openDivisionsModal = function () { opened++; }; var gsRefreshProfileCards = function () {}; let gsExtra = []; let gsSnap = null;",
+            "var gsDivision = 'RSU', usersData = [{ group: 'EXTERN', division: 'RSU' }], divisionConfig = { RSU: ['EXTERN', 'Junior'] }, opened = 0, openDivisionsModal = function () { opened++; }; var gsRefreshProfileCards = function () {}; let gsExtra = []; let gsSnap = null;",
             fns,
             "document.getElementById('gs-input').value = 'EXTERN'; gsPaintMainGroup('EXTERN'); gsExtraPaint(); gsSnap = Object.assign(gsState(), { groupName: 'EXTERN' }); gsDirtyPaint();",
             "document.getElementById('gs-profile-body').oninput = () => gsDirtyPaint();"
