@@ -12,10 +12,10 @@ const quizTabEnd = html.indexOf('</div><!-- /subtab-quiz-engine -->');
 const panelAt = html.indexOf('<details id="quiz-coverage-panel"');
 assert.ok(quizTabStart > 0 && quizTabEnd > quizTabStart && panelAt > quizTabStart && panelAt < quizTabEnd, 'the panel is inside Assignments ▸ Quiz Engine');
 assert.ok(panelAt < html.indexOf('id="quiz-search-global"'), 'and sits above the list toolbar');
-const asideAt = html.indexOf('<aside id="dashboard-summary"');
-const asideEnd = html.indexOf('</aside>', asideAt);
-assert.ok(asideAt > 0 && !html.slice(asideAt, asideEnd).includes('quiz-coverage-panel') && !html.slice(asideAt, asideEnd).includes('qcov-'), 'the Dashboard sidebar no longer carries it');
-assert.ok(html.slice(asideAt, asideEnd).includes('id="line-usage-panel"'), 'the LINE usage panel stays in the sidebar');
+const asideAt = html.indexOf('<div id="line-usage-pop"');   // V102.163: the sidebar is gone; the LINE card folds under the board toolbar chip
+const asideEnd = html.indexOf('<div id="dashboard-workspace">', asideAt);
+assert.ok(asideAt > 0 && !html.slice(asideAt, asideEnd).includes('quiz-coverage-panel') && !html.slice(asideAt, asideEnd).includes('qcov-'), 'the LINE popover does not carry it');
+assert.ok(html.slice(asideAt, asideEnd).includes('id="line-usage-panel"') && !html.includes('<aside id="dashboard-summary"'), 'the LINE usage panel lives in the toolbar popover; the sidebar is gone');
 assert.equal((html.match(/id="quiz-coverage-panel"/g) || []).length, 1, 'one panel');
 for (const gone of ['toggleQuizCoverageSummary', 'qcov-expand', 'qcov-extra', 'qcov-expanded', '#dashboard-summary #qcov-grid', '#dashboard-summary #quiz-coverage-panel'])
     assert.ok(!html.includes(gone), 'orphan removed: ' + gone);
