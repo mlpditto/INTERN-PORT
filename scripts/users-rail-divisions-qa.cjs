@@ -31,12 +31,13 @@ const css = html.slice(html.indexOf('.grp-chip { --c:#64748b'), html.indexOf(':i
         const errs = []; page.on('pageerror', e => errs.push(e.message));
         await page.setContent('<!doctype html><meta charset="utf-8"><style>' + css + '</style><div id="user-group-tabs"></div><div id="user-subgroup-row" class="lang-no-toggle" hidden></div>');
         await page.addScriptTag({ content: [
+            "let groupStyle = { groups: {}, divisions: {} };   // V102.180: the look doc, empty here",
             'var users = ["EXTERN", "EXTERN", "Pharmacists", "Pharmacists", "Pharmacists", "Audit"];',
             'var usersData = users.map(function (g) { return { group: g }; }), preRegData = [], divisionConfig = { CAFE: ["Audit", "Marketing"], RSU: ["EXTERN", "Junior"] }, activeUserGroup = "All", activeUserGroupDiv;',
             'var escapeHtml = function (s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;"); };',
             'var renderTable = function () {}, renderGroupUsersPanel = function () {}, renderLeaderboard = function () {}, renderBadgeStatsIfOpen = function () {};',
             grabConst('const groupColorMap = {'), grabConst('const groupIconMap = {'),
-            ['function getGroupColor(', 'function getGroupIcon(', 'function groupActiveCount(', 'function groupTotalCount(', 'function groupChipHtml(', 'function divColor(', 'function userDivisionOf(', 'function userInScope(',
+            ['function groupStyleOf(', 'function divChipLook(', 'function getGroupColor(', 'function getGroupIcon(', 'function groupActiveCount(', 'function groupTotalCount(', 'function groupChipHtml(', 'function divColor(', 'function userDivisionOf(', 'function userInScope(',
                 'function renderUserGroupTabs(', 'function renderUserSubgroupRow(', 'function userGroupTagHtml(', 'function setUserGroupFilter('].map(grabFn).join('\n'),
             'renderUserGroupTabs();'
         ].join('\n') });

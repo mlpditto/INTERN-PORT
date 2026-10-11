@@ -36,8 +36,9 @@ function grabConst(marker) {
         await page.setContent(html.replace(/<script[\s\S]*?<\/script>/g, ''), { waitUntil: 'domcontentloaded' });
         await page.addScriptTag({ content: [
             'var escapeHtml = function (s) { return String(s); }, usersData = [];',
+            'let groupStyle = { groups: {}, divisions: {} };',   // V102.180: the look doc, empty here
             grabConst('const groupColorMap = {'), grabConst('const groupIconMap = {'),
-            ['function getGroupColor(', 'function getGroupIcon(', 'function groupActiveCount(', 'function groupTotalCount(', 'function groupChipHtml('].map(grabFn).join('\n'),
+            ['function groupStyleOf(', 'function getGroupColor(', 'function getGroupIcon(', 'function groupActiveCount(', 'function groupTotalCount(', 'function groupChipHtml('].map(grabFn).join('\n'),
             // the real rail is icon-only chips: All · 2 divisions · a group, plus the Know Yourself chip
             'document.getElementById("user-group-tabs").innerHTML = ["All", "CAFE", "RSU", "Pharmacists"].map(function (g, i) { return groupChipHtml(g, { active: 6 - i, total: 6 - i, on: i === 0 }); }).join("");',
             'var pf = document.getElementById("user-pers-filter"); pf.style.display = "flex"; pf.innerHTML = \'<button type="button" class="grp-chip"><i class="fa-solid fa-compass"></i></button>\';'
