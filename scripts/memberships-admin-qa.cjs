@@ -19,6 +19,7 @@ assert.ok(/memberships: gsExtra\.map\(m => \(\{ division: m\.division \|\| '', g
 assert.ok(/extraGroups: \[\.\.\.new Set\(gsExtra\.map\(m => canonicalGroupName\(m\.group\)\)\.filter\(g => g && g\.toUpperCase\(\) !== newGroup\.toUpperCase\(\)\)\)\],/.test(html), 'extraGroups stays in sync (group names) for the intern app');
 assert.ok(html.includes('gsExtra = user ? userMemberships(user) : [];'), 'the modal loads pairs through the helper');
 assert.ok(!html.includes('id="gs-extra-pick"'), 'the flat extra-group pick list is gone (the two-step picker does it)');
+assert.ok(!html.includes("getElementById('gs-extra-pick')"), 'setUserGroup must not touch the removed gs-extra-pick (it threw and the profile window never opened)');
 assert.ok(/aria-controls="gs-pane-group" onclick="gsExtraToggle\(\)" aria-label="Add a membership"/.test(html), '+ = add a membership through the picker');
 assert.ok(grab(html, 'async function runGroupMerge(').includes('{ memberships: next }') && grab(html, 'async function deleteGroupGlobally(').includes("memberships: u.memberships.filter("), 'merge / delete rewrite memberships');
 const fns = ['function userDivisionOf(', 'function userMemberships(', 'function userInDivision(', 'function userInScope(', 'function userGroupTagHtml(', 'function divColor(', 'function divChipLook(', 'function groupStyleOf(',
