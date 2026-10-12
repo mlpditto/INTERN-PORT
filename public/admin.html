@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.201)</title>
+    <title>Nika Admin (V102.202)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -49794,10 +49794,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 : '<i class="fa-solid fa-chevron-up"></i>';
         }
 
+        function toggleUserPend() { window._userPendOpen = !window._userPendOpen; renderTable('users'); }
         function renderTable(type) {
             const tbody = document.querySelector(`#${type}Table tbody`);
             let data = (type === 'works') ? [...worksData] : [...usersData];
-            let usersRank = null, usersHeads = null, usersIgnOpen = false;
+            let usersRank = null, usersHeads = null, usersIgnOpen = false, usersPendOpen = true;
             if (type === 'works') {
                 if (!hideCompletedWorks) {
                     data = [...data, ...quizApprovedData, ...(window.pollData || [])];
@@ -49899,11 +49900,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const secLabel = (label, n, color) => `<span style="display:inline-flex; align-items:center; gap:6px; padding:7px 12px; font-size:0.78em; font-weight:800; color:${color};">${label} <span style="background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-sub); padding:0 8px; border-radius:10px; font-size:0.92em;">${n}</span></span>`;
                 usersHeads = new Map();
                 if (secPend.length) {
-                    usersHeads.set(secPend[0], secHead(secLabel('<i class="fa-solid fa-hourglass-half"></i> Pending requests', secPend.length, '#b45309')));
+                    // V102.202: Pending requests start folded — tap the header to open; a search shows them open
+                    usersPendOpen = !!window._userPendOpen || !!document.getElementById('userSearch').value.trim();
+                    usersHeads.set(secPend[0], secHead(`<button type="button" onclick="toggleUserPend()" aria-expanded="${usersPendOpen}" title="${usersPendOpen ? 'Hide' : 'Show'} pending requests" style="width:auto; min-height:0; margin:0; padding:0; background:none; border:none; cursor:pointer; font:inherit; text-align:left;">${secLabel('<i class="fa-solid fa-hourglass-half"></i> Pending requests', secPend.length, '#b45309')}<i class="fa-solid fa-chevron-${usersPendOpen ? 'up' : 'down'}" style="font-size:0.7em; color:var(--text-sub);"></i></button>`));
                     // V102.186: people with the same dates sit under ONE date header instead of repeating the range on every row
                     const fmtD = s => { const d0 = new Date(s + 'T00:00:00'); return isNaN(d0) ? s : d0.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: d0.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' }); };
                     const dkey = u => (u.startDate && u.endDate) ? `${u.startDate}|${u.endDate}` : '';
-                    secPend.forEach((u, i) => {
+                    if (usersPendOpen) secPend.forEach((u, i) => {
                         if (i && dkey(u) === dkey(secPend[i - 1])) return;
                         const n = secPend.filter(x => dkey(x) === dkey(u)).length;
                         const label = dkey(u) ? `Starts ${fmtD(u.startDate)} → ${fmtD(u.endDate)}` : 'No dates yet';
@@ -49983,6 +49986,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const secHeadHtml = usersHeads.get(d);
                     if (secHeadHtml) tbody.innerHTML += secHeadHtml;
                     if (d.isIgnored && !d.isPreReg && !usersIgnOpen) return;
+                    if (d.isPreReg && !usersPendOpen) return;
                     const rank = usersRank.get(d);
                     let rankDisplay = rank ? `<span style="color:#aaa; font-weight:bold;">${rank}</span>` : '<span style="color:#cbd5e1; font-weight:bold;">–</span>';
                     if (rank === 1) rankDisplay = '<span style="font-size:1.4em;">🥇</span>';
