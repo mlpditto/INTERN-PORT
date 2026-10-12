@@ -38,7 +38,7 @@ const hOnly = tl({ id: 'h', internHoursTarget: 200, internHours: { status: 'ok',
 assert.equal(hOnly.days, ''); assert.ok(/<button type="button" onclick="openInternHoursDetail\(event, 'h'\)"[^>]*>.*<b[^>]*>100\.0<\/b> \/ 200 h/s.test(hOnly.hours), 'no dates → the stand-alone hours button');
 // wrong dates (80 years) → ⚠ with the years, no "15369d left"
 const bad = tl({ id: 'j', startDate: '1988-11-08', endDate: '2027-11-08' });
-assert.ok(bad.days.includes('⚠</b> dates 1988 → 2027') && !/\d{4,}d left/.test(bad.days), 'bad dates → ⚠ dates 1988 → 2027');
+assert.ok(bad.days.includes('⚠</b> Check dates <small') && bad.days.includes('1988 → 2027') && bad.days.includes('class="u-tl-fix"') && !/\d{4,}d left/.test(bad.days), 'bad dates → ⚠ Check dates 1988 → 2027 + Fix');   // V102.188: was '⚠ dates 1988 → 2027', now with a Fix button
 assert.ok(bad.days.includes('title="Check the internship dates: 1988 → 2027'), 'tooltip names the problem');
 assert.ok(bad.days.includes('width:0%'), 'no progress drawn for a bad period');
 

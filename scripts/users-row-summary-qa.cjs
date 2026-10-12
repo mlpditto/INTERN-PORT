@@ -37,6 +37,7 @@ const helpers = ['function toggleUserSeenSort(', 'function copyUserRow(', 'funct
             "Object.defineProperty(navigator, 'clipboard', { value: { writeText: t => { __clip.push(t); return Promise.resolve(); } } });",
             "var userBadgesCellHtml = () => '';",
             "var alabastaAgo = ts => { const min = Math.floor((Date.now() - ts.toMillis()) / 60000); return min < 60 ? min + ' min' : Math.floor(min / 1440) + ' d'; };",
+            "var userSeenAgo = ts => { const min = Math.floor((Date.now() - ts.toMillis()) / 60000); return min < 60 ? min + 'm' : Math.floor(min / 1440) + 'd'; };",   // V102.188: the row uses userSeenAgo
             "var reflectiveLogsCache = [{ userId: 'u1' }, { userId: 'u1', isArchived: true }], quizAttemptsAllCache = [{ userId: 'u1', status: 'approved' }, { userId: 'u1', status: 'approved' }, { userId: 'u1', status: 'pending' }], casesData = [{ userId: 'u1' }];",
             "function rowBits(d) { " + slice + "\n return { _logsHtml, _copyText, _qN, _cN, logsN }; }",
             helpers
@@ -45,11 +46,11 @@ const helpers = ['function toggleUserSeenSort(', 'function copyUserRow(', 'funct
         const bits = await page.evaluate(now => rowBits({ id: 'u1', displayName: 'Bua', fullName: 'ณัชชา โคตรบุปผา', score: 13.75, beri: 257.4, lastSeen: { toMillis: () => now - 3 * 86400000 } }), now);
         assert.deepEqual([bits._qN, bits.logsN, bits._cN], [2, 1, 1], 'approved quizzes · non-archived journals · cases');
         assert.match(bits._logsHtml, /<span class="u-qjc"[^>]*><button type="button" class="ok" onclick="userRowQuick\('u1', 'history'\)"[^>]*>Q2<\/button><button type="button" class="ok" onclick="setReflectiveSearch\('Bua', 'u1'\)"[^>]*>J1<\/button><span class="ok"[^>]*>C1<\/span><\/span>/, 'Q·J·C chips, green: ' + bits._logsHtml);
-        assert.match(bits._logsHtml, /<span class="u-seen" title="Last seen [^"]+"><i class="fa-regular fa-clock" aria-hidden="true"><\/i> 3 d<\/span>$/, '3 days = plain 🕓');
+        assert.match(bits._logsHtml, /<span class="u-seen" title="Last seen [^"]+"><i class="fa-regular fa-clock" aria-hidden="true"><\/i> 3d<\/span>$/, '3 days = plain 🕓');
         assert.equal(bits._copyText, 'ณัชชา โคตรบุปผา — Quiz 2 · Journal 1 · Case 1 · 13.75 pts · 🪙257', 'the panel\'s one-line Copy text');
         const fresh = await page.evaluate(now => rowBits({ id: 'u2', displayName: 'Joey', score: 0, lastSeen: { toMillis: () => now - 17 * 60000 } }), now);
         assert.match(fresh._logsHtml, /class="u-qjc"[^>]*><button type="button" class="" [^>]*>Q0<\/button><button type="button" class="" [^>]*>J0<\/button><span class=""[^>]*>C0<\/span>/, 'zeros grey');
-        assert.match(fresh._logsHtml, /class="u-seen u-seen-fresh"[^>]*>.*? 17 min<\/span>/, '< 1 day = fresh');
+        assert.match(fresh._logsHtml, /class="u-seen u-seen-fresh"[^>]*>.*? 17m<\/span>/, '< 1 day = fresh');
         assert.equal(fresh._copyText, 'Joey — Quiz 0 · Journal 0 · Case 0 · 0 pts · 🪙0', 'displayName when there is no full name');
         const stale = await page.evaluate(now => rowBits({ id: 'u3', displayName: 'Old', score: 1, lastSeen: { toMillis: () => now - 20 * 86400000 } }), now);
         assert.match(stale._logsHtml, /u-seen u-seen-stale/, '> 7 days = stale');
