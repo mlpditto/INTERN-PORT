@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.187)</title>
+    <title>Nika Admin (V102.188)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -6423,6 +6423,8 @@
         .u-tl-bar > span { display: block; height: 100%; }
         .u-tl-bar-h { height: 2px; opacity: .85; }
         .u-tl-txt { font-size: 0.8em; color: var(--text-sub); white-space: nowrap; font-weight: 600; }
+        .u-tl-fix { width:auto; min-height:0; margin:0 0 0 4px; padding:1px 9px; border:none; border-radius:999px; background:#fee2e2; color:#b91c1c; font:inherit; font-size:0.95em; font-weight:800; cursor:pointer; }
+        .u-pend-dates { display:inline-flex; align-items:center; gap:6px; padding:5px 12px 5px 22px; font-size:0.74em; font-weight:800; color:#92400e; } .u-pend-dates small { color:#94a3b8; font-weight:700; }
         .u-tl-h { width: auto; min-height: 0; margin: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
         .u-tl-h:hover b { text-decoration: underline; }
         .u-row-quick { display: flex; align-items: center; justify-content: flex-end; gap: 4px; flex-wrap: nowrap; }
@@ -37169,8 +37171,9 @@ They can connect again from LINE.
                 const isActive = !campOn && (isDivChip ? g === selDiv : (g === activeUserGroup && (activeUserGroupDiv === undefined || activeUserGroupDiv === '')));   // V102.170: a division stays lit while one of its groups is picked
                 const attrs = `data-g="${escapeHtml(g)}"${isDivChip ? '' : ' data-dv=""'} onclick="setUserGroupFilter(this.dataset.g, this.dataset.dv)" aria-pressed="${isActive}"`;
                 if (g === 'All') return groupChipHtml('All', { attrs, icon: 'fa-users', color: '#334155', active: active.length, total: usersData.length, hint: 'show every group' });
-                if (divisionConfig && divisionConfig[g]) return groupChipHtml(g, { attrs, ...divChipLook(g), color: divColor(g), active: inDiv(g, active), total: inDiv(g, usersData), hint: 'division' });
-                return groupChipHtml(g, { attrs, active: inOnlyI(g, active), total: inOnlyI(g, usersData) });
+                if (divisionConfig && divisionConfig[g]) { const nDiv = inDiv(g, active); if (!nDiv && !isActive) return ''; return groupChipHtml(g, { attrs, ...divChipLook(g), color: divColor(g), active: nDiv, total: inDiv(g, usersData), hint: 'division' }); }   // V102.186: 0 active → no chip (it returns with its first member)
+                const nOnly = inOnlyI(g, active); if (!nOnly && !isActive) return '';
+                return groupChipHtml(g, { attrs, active: nOnly, total: inOnlyI(g, usersData) });
             }).join('') + (floodCount ? `<button type="button" class="grp-chip${window._userFloodOnly ? ' on' : ''}" onclick="toggleUserFloodView()" aria-pressed="${!!window._userFloodOnly}" title="Flood alerts on · ${floodCount}" style="--c:#2563eb;">🌊<small>${floodCount}</small></button>` : '') + (campCount ? `<button type="button" class="grp-chip${campOn ? ' on' : ''}" onclick="toggleUserCampView()" aria-pressed="${campOn}" title="Camp · hidden from boards, not ranked · ${campCount}" style="--c:#64748b;">🙈<span class="grp-name">Camp</span><small>${campCount}</small></button>` : '');
             renderUserSubgroupRow();   // V102.170
         }
@@ -49769,13 +49772,25 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 usersRank = new Map(secAct.map((u, i) => [u, i + 1])); // rank stays the score rank
                 if (window._userBadgeSort) secAct.sort((a, b) => userBadgeScore(b) - userBadgeScore(a)); // V102.32; stable, so score order breaks ties
                 if (window._userSeenSort) { const ls = u => (u.lastSeen && u.lastSeen.toMillis ? u.lastSeen.toMillis() : 0); secAct.sort((a, b) => ls(b) - ls(a)); }   // V102.182
+                secPend.sort((a, b) => String(a.startDate || '9999').localeCompare(String(b.startDate || '9999')) || String(a.endDate || '').localeCompare(String(b.endDate || '')));   // V102.186: same dates sit together
                 data = [...secAct, ...secPend, ...secIgn];
                 // Camp rows only reach here in the 🙈 view or through a search (V102.45).
                 usersIgnOpen = true;
                 const secHead = html => `<tr class="u-sec-row"><td colspan="6" style="padding:0; background:var(--bg-body); border-top:1px solid var(--border-color);">${html}</td></tr>`;
                 const secLabel = (label, n, color) => `<span style="display:inline-flex; align-items:center; gap:6px; padding:7px 12px; font-size:0.78em; font-weight:800; color:${color};">${label} <span style="background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-sub); padding:0 8px; border-radius:10px; font-size:0.92em;">${n}</span></span>`;
                 usersHeads = new Map();
-                if (secPend.length) usersHeads.set(secPend[0], secHead(secLabel('<i class="fa-solid fa-hourglass-half"></i> Pending requests', secPend.length, '#b45309')));
+                if (secPend.length) {
+                    usersHeads.set(secPend[0], secHead(secLabel('<i class="fa-solid fa-hourglass-half"></i> Pending requests', secPend.length, '#b45309')));
+                    // V102.186: people with the same dates sit under ONE date header instead of repeating the range on every row
+                    const fmtD = s => { const d0 = new Date(s + 'T00:00:00'); return isNaN(d0) ? s : d0.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: d0.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' }); };
+                    const dkey = u => (u.startDate && u.endDate) ? `${u.startDate}|${u.endDate}` : '';
+                    secPend.forEach((u, i) => {
+                        if (i && dkey(u) === dkey(secPend[i - 1])) return;
+                        const n = secPend.filter(x => dkey(x) === dkey(u)).length;
+                        const label = dkey(u) ? `Starts ${fmtD(u.startDate)} → ${fmtD(u.endDate)}` : 'No dates yet';
+                        usersHeads.set(u, (usersHeads.get(u) || '') + secHead(`<span class="u-pend-dates">⏳ ${label} <small>· ${n} ${n === 1 ? 'person' : 'people'}</small></span>`));
+                    });
+                }
                 // V102.115: the Active label lives in the table header ("Active 7"), not in its own row.
                 const secCount = document.getElementById('user-sec-count');
                 if (secCount) secCount.textContent = campView ? `Hidden ${secIgn.length}` : `Active ${secAct.length}`;
@@ -49860,13 +49875,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const avatarWithDot = (uid, pic, grp) => `<span style="position:relative; display:inline-block; flex-shrink:0;"><img src="${pic}" class="user-pic" style="display:block;"><button type="button" onclick="setUserGroup('${uid}', '${String(grp).replace(/'/g, "\\'")}')" title="${escapeHtml(grp)} — change group" aria-label="Group ${escapeHtml(grp)}" style="position:absolute; right:-3px; bottom:-3px; width:13px; height:13px; min-height:0; padding:0; margin:0; border-radius:50%; border:2px solid var(--bg-card, #fff); background:${getGroupColor(grp)}; cursor:pointer;"></button></span>`;
 
                     if (d.isPreReg) {
-                        const dateStr = (d.startDate && d.endDate) ? `${d.startDate} ~ ${d.endDate}` : '<span style="color:#ccc; font-size:0.8em;">-</span>';
                         tbody.innerHTML += `<tr style="background:#fcfcfc;">
                             <td style="text-align:center;">-</td>
-                            <td><div style="display:flex; align-items:center; gap:10px;">${avatarWithDot(d.id, d.pictureUrl, d.group || 'Public')}<div style="min-width:0;"><span style="font-weight:bold; color:#777;">⏳ ${d.displayName}</span><div style="font-size:0.75em; color:var(--primary); margin-top:3px;">🔑 <b style="background:#f3f0ff; padding:2px 8px; border-radius:10px; border:1px dashed var(--primary); font-family:monospace;">${d.code}</b></div></div></div></td>
-                            <td>-</td>
-                            <td>-</td>
-                            <td style="font-size:0.78em; white-space:nowrap;">${dateStr}</td>
+                            <td colspan="4"><div style="display:flex; align-items:center; gap:10px;">${avatarWithDot(d.id, d.pictureUrl, d.group || 'Public')}<div style="min-width:0;"><span style="font-weight:bold; color:#777;">⏳ ${d.displayName}</span><div style="font-size:0.75em; color:var(--primary); margin-top:3px;">🔑 <b style="background:#f3f0ff; padding:2px 8px; border-radius:10px; border:1px dashed var(--primary); font-family:monospace;">${d.code}</b></div></div></div></td>
                             <td>
                                 <div style="display:flex; gap:5px;">
                                     <button class="btn-sm" onclick="openMergeModal('${d.id}')" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; border-radius:5px; padding:4px 8px;" title="Link Data"><i class="fa-solid fa-link"></i></button>
@@ -49898,7 +49909,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         const _bad = _total > 400;
                         _tl = { rem: _rem, total: _total, color: _bad ? '#cbd5e1' : _remColor, pct: _bad ? 0 : _pct, bad: _bad,
                             tip: _bad ? `Check the internship dates: ${_start.getFullYear()} → ${_end.getFullYear()} (${_total} days)` : `${_rem} days remaining / ${_total} days total`,
-                            text: _bad ? `<b style="color:#dc2626;">⚠</b> dates ${_start.getFullYear()} → ${_end.getFullYear()}` : `<b style="color:${_remColor};">${_rem}d</b> left · ${_total}d` };
+                            text: _bad ? `<b style="color:#dc2626;">⚠</b> Check dates <small style="color:#94a3b8; font-weight:600;">${_start.getFullYear()} → ${_end.getFullYear()}</small> <button type="button" class="u-tl-fix" onclick="event.stopPropagation(); openHubProfile('${d.id}')" title="Open the profile to fix the internship dates">Fix</button>` : `<b style="color:${_remColor};">${_rem}d</b> left · ${_total}d` };
                         daysRemainingHtml = `<span class="u-tl" title="${_tl.tip}"><span class="u-tl-bar"><span style="width:${_tl.pct}%; background:${_tl.color};"></span></span><span class="u-tl-txt">${_tl.text}</span></span>`;
                     }
 
@@ -49977,7 +49988,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const _cN = (casesData || []).filter(c => c.userId === d.id).length;
                     const _seenMs = d.lastSeen && d.lastSeen.toMillis ? d.lastSeen.toMillis() : 0;
                     const _seenAge = _seenMs ? Date.now() - _seenMs : 0;
-                    const _seenHtml = _seenMs ? `<span class="u-seen${_seenAge < 86400000 ? ' u-seen-fresh' : _seenAge > 7 * 86400000 ? ' u-seen-stale' : ''}" title="Last seen ${new Date(_seenMs).toLocaleString('th-TH')}"><i class="fa-regular fa-clock" aria-hidden="true"></i> ${escapeHtml(alabastaAgo(d.lastSeen))}</span>` : '';
+                    const _seenHtml = _seenMs ? `<span class="u-seen${_seenAge < 86400000 ? ' u-seen-fresh' : _seenAge > 7 * 86400000 ? ' u-seen-stale' : ''}" title="Last seen ${new Date(_seenMs).toLocaleString('th-TH')}"><i class="fa-regular fa-clock" aria-hidden="true"></i> ${escapeHtml(userSeenAgo(d.lastSeen))}</span>` : '';
                     const _qjcHtml = `<span class="u-qjc" title="Quiz ${_qN} · Journal ${logsN} · Case ${_cN}"><button type="button" class="${_qN ? 'ok' : ''}" onclick="userRowQuick('${d.id}', 'history')" title="Approved quizzes — open the score history" aria-label="Quizzes ${_qN}">Q${_qN}</button><button type="button" class="${logsN ? 'ok' : ''}" onclick="setReflectiveSearch('${(d.displayName || d.id).replace(/'/g, "\\'")}', '${d.id}')" title="All submitted journals, pending and reviewed" data-th-title="Journal ที่ส่งทั้งหมด รวมรายการที่รอตรวจและตรวจแล้ว" aria-label="Journals ${logsN}">J${logsN}</button><span class="${_cN ? 'ok' : ''}" title="Cases" aria-label="Cases ${_cN}">C${_cN}</span></span>`;
                     const _logsHtml = _qjcHtml + _seenHtml;
                     const _copyText = `${d.fullName || d.displayName || d.id} — Quiz ${_qN} · Journal ${logsN} · Case ${_cN} · ${parseFloat((d.score || 0).toFixed(2))} pts · 🪙${Math.round(d.beri || 0)}`;
@@ -50015,6 +50026,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // V102.114: per-user flood watch in the Users table. Only users who opted in (users.floodWatch.optIn)
         // get a 🌊 mark: coloured by risk, dashed when no home is set yet, grey before the first hourly check.
         // Detail lines come from flood_status/{id}.summary and never print the home coordinates.
+        // V102.186: one unit per age on the Users row — 5m · 3h · 2d (the exact time stays in the tooltip, orange past 7 d already says "stale")
+        function userSeenAgo(ts) {
+            const ms = ts && ts.toMillis ? ts.toMillis() : (ts && ts.toDate ? ts.toDate().getTime() : 0);
+            if (!ms) return '';
+            const min = Math.max(0, Math.floor((Date.now() - ms) / 60000));
+            if (min < 1) return 'now';
+            if (min < 60) return `${min}m`;
+            if (min < 1440) return `${Math.floor(min / 60)}h`;
+            return `${Math.floor(min / 1440)}d`;
+        }
         function userFloodInfo(d) {
             const fw = d && d.floodWatch;
             if (!fw || fw.optIn !== true) return null;
@@ -50049,6 +50070,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function userFloodMarkHtml(d) {
             const f = userFloodInfo(d);
             if (!f) return '';
+            // V102.186: "low" is the OK state → nothing beside the name (the 🌊 chip and the detail rows still list who is opted in);
+            // high / moderate say what they are in words instead of an unlabelled coloured dot
+            if (f.cls === 'low') return '';
+            if (f.cls === 'high' || f.cls === 'moderate') {
+                const hi = f.cls === 'high';
+                return ` <span title="${escapeHtml(f.tip)}" aria-label="${escapeHtml(f.tip)}" style="display:inline-flex; align-items:center; gap:4px; padding:1px 8px; border-radius:999px; font-size:0.66em; font-weight:800; vertical-align:middle; cursor:help; ${hi ? 'background:#fee2e2; color:#b91c1c; box-shadow:0 0 0 2px #fecaca;' : 'background:#dbeafe; color:#1d4ed8;'}">🌊 Flood: ${hi ? 'high' : 'moderate'}</span>`;
+            }
             const bg = { high: 'background:#dc2626; box-shadow:0 0 0 3px #fecaca;', moderate: 'background:#2563eb;', low: 'background:#16a34a;', wait: 'background:#94a3b8;', nohome: 'background:#fff; border:1.5px dashed #94a3b8; opacity:0.85;' }[f.cls] || 'background:#94a3b8;';
             return ` <span title="${escapeHtml(f.tip)}" aria-label="${escapeHtml(f.tip)}" style="display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; font-size:0.62em; vertical-align:middle; cursor:help; ${bg}">🌊</span>`;
         }
