@@ -36,11 +36,12 @@ function grab(marker) {
     let cls = 'low';
     const ctx = vm.createContext({ escapeHtml: s => String(s), userFloodInfo: () => ({ cls, tip: 'Flood tip' }) });
     vm.runInContext(grab('function userFloodMarkHtml(d)'), ctx);
-    assert.equal(ctx.userFloodMarkHtml({}), '', 'low (OK) → nothing beside the name');
+    assert.match(ctx.userFloodMarkHtml({}), /#16a34a[^>]*>🌊<\/span>/, 'low (OK) → a small green 🌊, no blink');   // V102.205
+    assert.ok(!/u-flood-blink/.test(ctx.userFloodMarkHtml({})), 'low does not blink');
     cls = 'high';
-    assert.match(ctx.userFloodMarkHtml({}), /Flood: high/, 'high says so in words');
+    assert.match(ctx.userFloodMarkHtml({}), /#dc2626[^>]*u-flood-blink[^>]*>🌊<\/span>/, 'high → red and blinking');
     cls = 'moderate';
-    assert.match(ctx.userFloodMarkHtml({}), /Flood: moderate/);
+    assert.match(ctx.userFloodMarkHtml({}), /#f59e0b[^>]*>🌊<\/span>/, 'moderate → amber, steady');
     cls = 'wait';
     assert.match(ctx.userFloodMarkHtml({}), /🌊<\/span>/, 'still-waiting / no-home keep the small neutral dot');
     ctx.userFloodInfo = () => null;
