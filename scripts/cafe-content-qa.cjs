@@ -58,7 +58,7 @@ assert.ok(/getMyDivision\(\)/.test(index) && /return "General Division"/.test(in
     assert.equal(JSON.stringify(ctx.getUnifiedAllItems().map(s => s.id)), JSON.stringify(['p1', 'rv_W9']), 'V101.124: an Audit member\'s History = own posts + the reviews filed');
     delete ctx.window.cafeContentHistoryItems;
     const hl = fs.readFileSync('public/history-lean.js', 'utf8'), dr = fs.readFileSync('public/delete-requests.js', 'utf8');
-    assert.ok(/content_review: \{ e: '✓', n: 'Review' \}/.test(hl) && /'content_review'\];/.test(hl), 'History knows the Review type (chip + order)');
+    assert.ok(/content_review: \{ e: 'Ⓐ', n: 'Review' \}/.test(hl) && /'content_review'\];/.test(hl), 'History knows the Review type (chip + order)');
     assert.ok(/if \(!item \|\| item\.noDelete\) return;/.test(dr), 'a filed review has no delete menu');
     assert.ok(/explore_link: 0, content_review: 0 \}/.test(index), 'type counts include content_review');
     assert.ok(/id="intern-app-name">LINE LIFF Internship Management System<\/span><span id="intern-version-current">/.test(index), 'the footer name has its own span (the version stays)');
@@ -391,7 +391,8 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.equal(await page.locator('#section-cafe-content [data-view="review"]').count(), 1, 'Audit gets the Review view');
         // V101.122: CAFE Audit home — an Audit member lands on the queue: ☕ mark, hero (count + Review next), quick ✓ / ↩, no "New content" inside the queue
         assert.equal(await page.locator('#section-cafe-content .cc-brand .cc-audit').count(), 1, 'the CAFE mark carries Audit');
-        assert.ok(/☕/.test(await page.$eval('#section-cafe-content .cc-brand', e => e.textContent)) && /CAFE/.test(await page.$eval('#section-cafe-content .cc-brand', e => e.textContent)), '☕ CAFE mark');
+        assert.ok(/🌸/.test(await page.$eval('#section-cafe-content .cc-brand', e => e.textContent)) && /Blossom/.test(await page.$eval('#section-cafe-content .cc-brand', e => e.textContent)), '🌸 Blossom mark');
+        assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('unified-fab-btn'), '::after').content), '"🌸"', 'V101.125: the round ＋ is the Blossom mark in the CAFE UI');
         assert.equal(await page.$eval('#section-cafe-content .cc-qbig', e => e.textContent), '1', 'the hero shows how many wait for me');
         assert.equal(await page.locator('#section-cafe-content .cc-add').count(), 0, 'no New content button inside the queue');
         assert.equal(await page.locator('#section-cafe-content .cc-stats').count(), 0, 'no month stats in the queue');
@@ -530,7 +531,7 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.equal(await vis('#section-cafe-content'), true, 'Content UI'); assert.equal(await vis('#section-kanban'), false, 'Mission hidden in the Content UI');
         assert.equal(await page.evaluate(() => window.isContentCreator()), true, 'no badges in the Content UI');
         assert.equal(await mode(), 'content', 'remembered per user in this browser');
-        assert.equal(await page.$eval('#intern-app-name', e => e.textContent), 'CAFE Content Studio', 'footer name in the Content UI');
+        assert.equal(await page.$eval('#intern-app-name', e => e.textContent), 'Blossom Healing Café', 'footer name in the Content UI');
         const before = await page.evaluate(() => window.__unified);
         await page.click('#unified-fab-btn'); await page.waitForSelector('#ccOverlay.open');
         assert.equal(await page.evaluate(() => window.__unified), before, '＋ opens the content sheet in the Content UI');

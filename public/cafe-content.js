@@ -237,7 +237,7 @@
             '<div class="cc-meta"><b>' + esc(w.displayName || '') + '</b><span class="cc-pill">' + esc(typeLabel(w.ctype)) + '</span><span>' + esc(p[1]) + ' · ' + esc(dayLabel(w.postDate)) + '</span></div>' +
             '<div class="cc-cap">' + esc(w.caption || w.title) + '</div>' + (imgs ? '<div class="cc-mini">' + imgs + '</div>' : '') +
             '<div class="cc-foot">' + (m ? '<span><i class="fa-solid fa-heart"></i> ' + esc(fmtNum(m.likes || 0)) + '</span><span><i class="fa-solid fa-eye"></i> ' + esc(fmtNum(m.reach || 0)) + '</span>' : '') +
-            '<span class="cc-rqs"><button type="button" class="cc-rq ok" data-act="rvq" data-id="' + esc(w.id) + '" data-v="approve" title="' + esc(t.qOk) + '" aria-label="' + esc(t.qOk) + '"><i class="fa-solid fa-check"></i></button><button type="button" class="cc-rq fix" data-act="rvq" data-id="' + esc(w.id) + '" data-v="changes" title="' + esc(t.qFix) + '" aria-label="' + esc(t.qFix) + '"><i class="fa-solid fa-rotate-left"></i></button></span></div>' + sentLine(w, t) + '</div></div>';   // V101.122: icon-only quick verdicts (tap the row for the full sheet)
+            '<span class="cc-rqs"><button type="button" class="cc-rq ok" data-act="rvq" data-id="' + esc(w.id) + '" data-v="approve" title="' + esc(t.qOk) + '" aria-label="' + esc(t.qOk) + '"><b class="cc-av" aria-hidden="true">A</b></button><button type="button" class="cc-rq fix" data-act="rvq" data-id="' + esc(w.id) + '" data-v="changes" title="' + esc(t.qFix) + '" aria-label="' + esc(t.qFix) + '"><i class="fa-solid fa-rotate-left"></i></button></span></div>' + sentLine(w, t) + '</div></div>';   // V101.122: icon-only quick verdicts (tap the row for the full sheet)
     }
     function reviewHtml(t) {
         var others = allPosts.filter(function (w) { return w.userId !== userId; });
@@ -301,7 +301,7 @@
         return h;
     }
 
-    // V101.122: the CAFE mark (☕ + name) on top of the Content card; "Audit" for a reviewer
+    // V101.122: the CAFE mark (🌸 Blossom + 'Healing Café') on top of the Content card; "Audit" for a reviewer
     // V101.123 (from a pasted UX review, filtered against earlier picks): the stat tiles are buttons, the Posted list has a platform rail, the empty Posted state has two starter buttons, and the month's engagement shows when there is any.
     function statMonth() { return view === 'month' ? viewMonth : todayKey().slice(0, 7); }
     function postedRails(t, posted) {
@@ -335,7 +335,7 @@
     };
     window.cafeContentIsReviewer = isReviewer;
     function refreshHistory() { try { if (typeof renderUnifiedHistory === 'function') renderUnifiedHistory(); if (window.historyLean && window.historyLean.renderChrome) window.historyLean.renderChrome(); if (typeof syncUnifiedEmptyState === 'function') syncUnifiedEmptyState(); } catch (_) { /* History is optional here */ } }
-    function brandHtml() { return '<div class="cc-brand"><span class="cc-cup" aria-hidden="true">☕</span><b>CAFE</b>' + (isReviewer() ? '<span class="cc-audit">Audit</span>' : '') + '<small>Content Studio</small></div>'; }
+    function brandHtml() { return '<div class="cc-brand"><span class="cc-cup" aria-hidden="true">🌸</span><b>Blossom</b>' + (isReviewer() ? '<span class="cc-audit">Audit</span>' : '') + '<small>Healing Café</small></div>'; }
 
     function render() {
         if (!host || !on) return;
@@ -723,7 +723,7 @@
             on = now;
             document.body.classList.toggle('cafe-mode', on);
             // V101.121: the Content UI has its own name in the footer, and its History speaks only about content
-            var nm = document.getElementById('intern-app-name'); if (nm) { if (!nm.dataset.def) nm.dataset.def = nm.textContent; nm.textContent = on ? 'CAFE Content Studio' : nm.dataset.def; }
+            var nm = document.getElementById('intern-app-name'); if (nm) { if (!nm.dataset.def) nm.dataset.def = nm.textContent; nm.textContent = on ? 'Blossom Healing Café' : nm.dataset.def; }
             try { if (typeof renderUnifiedHistory === 'function') renderUnifiedHistory(); if (window.historyLean && window.historyLean.renderChrome) window.historyLean.renderChrome(); if (typeof syncUnifiedEmptyState === 'function') syncUnifiedEmptyState(); } catch (_) { /* History is optional here */ }
             if (on) ['achievementUnlockModal', 'achievementsModal'].forEach(function (id) { var m = document.getElementById(id); if (m) m.style.display = 'none'; });   // a badge popup that opened before the division loaded
             if (on) {

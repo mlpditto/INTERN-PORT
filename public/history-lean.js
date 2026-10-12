@@ -3,7 +3,7 @@
 window.historyLean = (() => {
     const T = {
         case: { e: '🩺', n: 'Case' }, work: { e: '📝', n: 'Work' }, quiz: { e: '🧠', n: 'Quiz' }, quest: { e: '⭐', n: 'Quest' },
-        reflective: { e: '😊', n: 'Journal' }, learning_note: { e: '🎓', n: 'Note' }, product: { e: '🛒', n: 'Product' }, explore_link: { e: '🔗', n: 'Link' }, content_review: { e: '✓', n: 'Review' }
+        reflective: { e: '😊', n: 'Journal' }, learning_note: { e: '🎓', n: 'Note' }, product: { e: '🛒', n: 'Product' }, explore_link: { e: '🔗', n: 'Link' }, content_review: { e: 'Ⓐ', n: 'Review' }
     };
     const ORDER = ['case', 'quiz', 'explore_link', 'work', 'reflective', 'learning_note', 'product', 'quest', 'content_review'];
     const esc = s => escapeUnifiedHtml(s);
@@ -65,7 +65,7 @@ window.historyLean = (() => {
             const k = caseKey(s), h = hueOf(k);
             return '<span class="hl-lead"><span class="hl-disc" title="' + esc(sysName(k)) + ' · case ' + ctx.nth.get(s.id) + '" style="background:hsl(' + h + ',85%,92%);border:1px solid hsl(' + h + ',60%,82%)">' + sysEmoji(k) + '<b class="hl-nb">' + ctx.nth.get(s.id) + '</b></span></span>';
         }
-        const emoji = type === 'reflective' && s.metadata && s.metadata.moodEmoji ? s.metadata.moodEmoji : (type === 'content_review' && s.metadata ? (s.metadata.verdict === 'approve' ? '✓' : '↩') : t.e);   // V101.124: a filed review shows its verdict
+        const emoji = type === 'reflective' && s.metadata && s.metadata.moodEmoji ? s.metadata.moodEmoji : (type === 'content_review' && s.metadata ? (s.metadata.verdict === 'approve' ? 'Ⓐ' : '↩') : t.e);   // V101.124: a filed review shows its verdict
         const h = hueOf(type);
         return '<span class="hl-lead"><span class="hl-disc" style="background:hsl(' + h + ',85%,93%);border:1px solid hsl(' + h + ',60%,84%)">' + esc(emoji) + '</span></span>';
     }
@@ -80,7 +80,7 @@ window.historyLean = (() => {
             (b ? '<span class="hl-br" title="Beri">🪙 <b>' + (b > 0 ? '+' : '−') + Math.abs(b) + '</b></span>' : '') + '</span>';
     }
     function pillHtml(s) {
-        if (s.submissionType === 'content_review') { const m = s.metadata || {}; return m.verdict === 'approve' ? '<span class="hl-pill">✓ OK' + (Number(m.suggested) ? ' · +' + Number(m.suggested) : '') + '</span>' : '<span class="hl-pill hl-warn">↩ Changes</span>'; }   // V101.124
+        if (s.submissionType === 'content_review') { const m = s.metadata || {}; return m.verdict === 'approve' ? '<span class="hl-pill">Ⓐ OK' + (Number(m.suggested) ? ' · +' + Number(m.suggested) : '') + '</span>' : '<span class="hl-pill hl-warn">↩ Changes</span>'; }   // V101.124
         if (pending(s)) return '<span class="hl-pill hl-warn">⏳ Pending</span>';
         if (s.status === 'rejected') return '<span class="hl-pill hl-bad">✕ Rejected</span>';
         return '';
