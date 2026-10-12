@@ -96,12 +96,15 @@ assert.ok(!/<td>-<\/td>/.test(pendBlock) && !pendBlock.includes('${dateStr}'), '
             const mk = (id, name, s, e) => ({ id, fullName: name, group: 'Public', startDate: s, endDate: e, code: 'C' + id, claimed: false });
             usersData = [];
             preRegData = [mk('p1', 'Pending One', '2026-10-19', '2026-11-27'), mk('p2', 'Pending Two', '2026-10-19', '2026-11-27'), mk('p3', 'Pending Three', '2026-12-01', '2027-01-10'), mk('p4', 'No Dates', '', '')];
+            const foldedRows = (() => { try { renderTable('users'); } catch (e) { return -1; } return [...document.querySelectorAll('#usersTable tbody tr')].map(r => r.textContent.replace(/\s+/g, ' ').trim()); })();   // V102.202: folded by default
+            window._userPendOpen = true;
             try { renderTable('users'); } catch (e) { return { err: String(e && e.message || e) }; }
             const tb = document.querySelector('#usersTable tbody');
             const rows = [...tb.querySelectorAll('tr')];
-            return { heads: rows.filter(r => r.classList.contains('u-sec-row')).map(r => r.textContent.replace(/\s+/g, ' ').trim()), cells: rows.filter(r => !r.classList.contains('u-sec-row')).map(r => r.children.length), spans: rows.filter(r => !r.classList.contains('u-sec-row')).map(r => (r.querySelector('td[colspan]') || {}).colSpan) };
+            return { foldedRows, heads: rows.filter(r => r.classList.contains('u-sec-row')).map(r => r.textContent.replace(/\s+/g, ' ').trim()), cells: rows.filter(r => !r.classList.contains('u-sec-row')).map(r => r.children.length), spans: rows.filter(r => !r.classList.contains('u-sec-row')).map(r => (r.querySelector('td[colspan]') || {}).colSpan) };
         });
         assert.ok(!res.err, 'renderTable threw: ' + res.err);
+        assert.ok(Array.isArray(res.foldedRows) && res.foldedRows.length === 1 && /Pending requests\s*4/.test(res.foldedRows[0]), 'folded by default: only the Pending requests header shows: ' + JSON.stringify(res.foldedRows));
         assert.ok(res.heads.some(h => /Pending requests/.test(h)), 'Pending requests header: ' + JSON.stringify(res.heads));
         assert.ok(res.heads.some(h => /Starts 19 Oct → 27 Nov\s*· 2 people/.test(h)), 'one header for the shared range: ' + JSON.stringify(res.heads));
         assert.ok(res.heads.some(h => /Starts 1 Dec/.test(h) && /1 person/.test(h)), 'another range, another header');
