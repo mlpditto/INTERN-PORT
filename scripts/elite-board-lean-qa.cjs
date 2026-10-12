@@ -1,5 +1,5 @@
 // V102.188 — Elite Board lean pass (the 5 proposals): empty chips vanish, flood = nothing when OK / words when not, a typo'd period says
-// "Check dates" + Fix, last-seen is one unit, and pending requests with the same dates sit under ONE header with no empty "-" columns.
+// a period over a year = 🧪 Beta tester (V102.189; was "Check dates" + Fix), last-seen is one unit, and pending requests with the same dates sit under ONE header with no empty "-" columns.
 // Real functions from public/admin.html in a vm; the pending table is rendered by the real renderTable('users') in Chromium.
 const fs = require('node:fs');
 const vm = require('node:vm');
@@ -76,8 +76,7 @@ function grab(marker) {
 }
 
 // ---- 3. + 5. static contract of the row/section markup ----
-assert.ok(html.includes('Check dates <small') && html.includes("openHubProfile('${d.id}')") , 'a typo’d period says "Check dates" with a Fix button into the profile');
-assert.ok(/\.u-tl-fix \{[^}]*width:auto; min-height:0;/.test(html), 'the Fix button beats the global button rule');
+assert.ok(html.includes('<span class="u-tl-beta">🧪 Beta tester</span>') && !html.includes('Check dates <small') && !html.includes('u-tl-fix'), 'a period over a year says 🧪 Beta tester (no warning, no Fix)');
 assert.ok(html.includes('secPend.sort((a, b) =>') && html.includes('class="u-pend-dates"'), 'pending sorted by dates, one date header per range');
 assert.ok(html.includes("'No dates yet'"), 'pending without dates get their own header');
 const pendBlock = html.slice(html.indexOf('if (d.isPreReg) {', html.indexOf('tbody.innerHTML = "";')), html.indexOf('return;', html.indexOf('if (d.isPreReg) {', html.indexOf('tbody.innerHTML = "";'))));
@@ -108,6 +107,6 @@ assert.ok(!/<td>-<\/td>/.test(pendBlock) && !pendBlock.includes('${dateStr}'), '
         assert.ok(res.heads.some(h => /Starts 1 Dec/.test(h) && /1 person/.test(h)), 'another range, another header');
         assert.ok(res.heads.some(h => /No dates yet/.test(h)), 'no dates → its own header');
         assert.deepEqual(res.cells, [3, 3, 3, 3], 'each pending row: rank + name (spans 4) + actions');
-        console.log('PASS: Elite Board lean — empty chips vanish, flood OK hidden / high in words, Check dates + Fix, last-seen 5m/3h/2d, pending grouped by dates with no empty columns');
+        console.log('PASS: Elite Board lean — empty chips vanish, flood OK hidden / high in words, Beta tester period, last-seen 5m/3h/2d, pending grouped by dates with no empty columns');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
