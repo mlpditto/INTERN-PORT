@@ -48,7 +48,7 @@ assert.ok(/\.subtab-sep \{[^}]*width:1px/.test(html), 'separator css');
         await page.goto(require('url').pathToFileURL(process.cwd() + '/public/admin.html').href);
         const mk = (id, over) => Object.assign({ id, title: 'Quiz ' + id, shortTitle: id, isActive: false, questions: [{ q: 'x', options: ['a', 'b'], correct: 0 }], tags: 'Diabetes', __c: 1 }, over);
         const run = (list) => page.evaluate((l) => {
-            l.forEach(q => { q.createdAt = { toMillis: () => q.__c, toDate: () => new Date(q.__c), seconds: q.__c }; });   // Timestamps can't cross the evaluate boundary
+            l.forEach(q => { q.createdAt = { toMillis: () => q.__c, toDate: () => new Date(q.__c), seconds: q.__c }; if (q.__d != null) q.deadline = { toDate: () => new Date(q.__d), toMillis: () => q.__d, seconds: Math.floor(q.__d / 1000) }; });   // Timestamps can't cross the evaluate boundary
             quizzesData = l;
             try { renderQuizzesNow(); } catch (e) { return { err: String(e && e.message || e) }; }
             const e = document.getElementById('active-quizzes-empty'), t = document.getElementById('quizzesTableActive');
@@ -64,6 +64,10 @@ assert.ok(/\.subtab-sep \{[^}]*width:1px/.test(html), 'separator css');
         r = await run([mk('a', { isActive: true, translations: { th: {} } }), mk('b', { translations: { th: {} } })]);
         assert.ok(!r.err, r.err); assert.equal(r.count, '', 'everything translated → no count'); assert.match(r.btnTitle, /already has its translations/);
         assert.ok(!r.emptyShown && r.tableShown, 'a live quiz → table, no empty line');
+        // V102.193: isActive but PAST its deadline = Expired, sits in Inactive — that is nothing live, not "filtered out" (found on the real page: 56 such quizzes)
+        r = await run([mk('e1', { isActive: true, __d: 1000, translations: { th: {} } }), mk('e2', { isActive: true, __d: 2000, translations: { th: {} } })]);
+        assert.ok(!r.err, r.err); assert.ok(r.emptyShown && !r.tableShown, 'expired-only → empty line');
+        assert.match(r.emptyText, /Nothing is live right now/, 'expired quizzes are not live: ' + r.emptyText); assert.ok(!/matches this filter/.test(r.emptyText));
         // a filter that hides the only live quiz → different wording
         await page.evaluate(() => { window.currentQuizSystem = 'nonexistent-system'; });
         r = await run([mk('a', { isActive: true, translations: { th: {} } })]);
