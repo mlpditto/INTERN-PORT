@@ -38,14 +38,14 @@ const fn = name => { const i = index.indexOf(name); assert.ok(i >= 0, name); ret
 for (const name of ['function updateEarnedBadgesBar(', 'function openAchievementsModal(', 'async function checkAchievementUnlocks(', 'function showNextAchievementUnlock(', 'function notifyNewReflectiveBadges('])
     assert.ok(fn(name).includes('window.isContentCreator?.()'), name + ' is guarded');
 assert.ok(/body\.cafe-mode #u-earned-badges \{ display: none !important; \}/.test(css), 'earned-badges row hidden in cafe-mode');
-assert.ok(/<div id="cafe-view-switch" class="lang-no-toggle" hidden><\/div>\s*<div id="section-cafe-content"/.test(index), 'the Intern | Content switch host sits before the Content card');
+assert.ok(/id="fw-btn"[\s\S]*?<\/button>\s*(?:<!--[\s\S]*?-->\s*)?<button type="button" id="cafe-view-switch" class="btn-sm lang-no-toggle" hidden><\/button>/.test(index) && !/<div id="cafe-view-switch"/.test(index), 'the Intern | Content switch is ONE round button in the profile rail, right of Flood watch (the old row above the Content card is gone)');
 assert.ok(/window\.myMemberships = Array\.isArray\(da\.memberships\)[^\n]*\n\s*window\.myExtraGroups = /.test(index), 'the users snapshot hands memberships pairs to cafe-content.js (before extraGroups)');
 assert.ok(/window\.myExtraGroups = Array\.isArray\(da\.extraGroups\) \? da\.extraGroups : \[\];[^\n]*\n\s*window\.cafeContentSync\?\.\(\);/.test(index), 'the users snapshot hands extraGroups to cafe-content.js');
 assert.ok(/getMyDivision\(\)/.test(index) && /return "General Division"/.test(index), 'getMyDivision defaults to General Division');
 
 const harness = `<!doctype html><meta charset="utf-8"><title>Internship Portfolio (V9.9)</title>
 <link rel="stylesheet" href="/cafe-content.css">
-<div id="cafe-view-switch" hidden></div><div id="section-cafe-content" hidden></div><div id="section-kanban" style="display:block">Mission</div><div id="section-dd-codex" style="display:block">Codex</div><div id="achievementUnlockModal" style="display:flex">badge</div><div id="achievementsModal" style="display:flex">list</div><div id="u-earned-badges" style="display:flex">row</div>
+<button type="button" id="cafe-view-switch" hidden></button><div id="section-cafe-content" hidden></div><div id="section-kanban" style="display:block">Mission</div><div id="section-dd-codex" style="display:block">Codex</div><div id="achievementUnlockModal" style="display:flex">badge</div><div id="achievementsModal" style="display:flex">list</div><div id="u-earned-badges" style="display:flex">row</div>
 <button id="unified-fab-btn" onclick="${FAB}">+</button><button id="lang-toggle-cycle">EN</button>
 <script>
 window.__unified = 0; window.__toasts = []; window.__upd = []; window.__subs = [];
@@ -468,7 +468,8 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
 
         // Extra groups (admin-set users.extraGroups) decide only which UI(s) a user may open; the primary group stays what everything else follows.
         const mode = () => page.evaluate(() => localStorage.getItem('contentViewMode:U1'));
-        const swBtns = () => page.$$eval('#cafe-view-switch button', els => els.map(e => e.textContent + ':' + e.getAttribute('aria-pressed')));
+        const swBtns = () => page.$eval('#cafe-view-switch', e => e.dataset.mode);   // V101.120: one button; data-mode = the view you are in
+        const goMode = async m => { if ((await swBtns()) !== m) await page.click('#cafe-view-switch'); };
         await page.evaluate(() => { localStorage.clear(); division = 'General Division'; window.myExtraGroups = []; window.cafeContentSync(); });
         assert.equal(await vis('#cafe-view-switch'), false, 'no switch without extra groups');
         assert.equal(await vis('#section-cafe-content'), false);
@@ -476,11 +477,12 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.equal(await vis('#cafe-view-switch'), false, 'an extra group outside the division alone gives nothing');
         await page.evaluate(() => { window.myExtraGroups = ['Audit']; window.cafeContentSync(); });
         assert.equal(await vis('#cafe-view-switch'), true, 'primary outside + extra inside the division → a switch');
-        assert.deepEqual(await swBtns(), ['Intern:true', 'Content:false'], 'opens in the Intern UI (the primary group is outside the division)');
+        assert.match(await page.$eval('#cafe-view-switch', e => e.title), /^View as: Intern → Content$/, 'title says where you are and where a tap goes'); assert.ok(await page.$('#cafe-view-switch i.fa-graduation-cap'), 'Intern view = graduation-cap icon');
+        assert.equal(await swBtns(), 'intern', 'opens in the Intern UI (the primary group is outside the division)');
         assert.equal(await vis('#section-cafe-content'), false); assert.equal(await vis('#section-kanban'), true);
         assert.equal(await page.evaluate(() => window.isContentCreator()), false, 'badge guard off in the Intern UI');
-        await page.click('#cafe-view-switch [data-mode="content"]');
-        assert.deepEqual(await swBtns(), ['Intern:false', 'Content:true']);
+        await goMode('content');
+        assert.equal(await swBtns(), 'content');
         assert.equal(await vis('#section-cafe-content'), true, 'Content UI'); assert.equal(await vis('#section-kanban'), false, 'Mission hidden in the Content UI');
         assert.equal(await page.evaluate(() => window.isContentCreator()), true, 'no badges in the Content UI');
         assert.equal(await mode(), 'content', 'remembered per user in this browser');
@@ -488,24 +490,24 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         await page.click('#unified-fab-btn'); await page.waitForSelector('#ccOverlay.open');
         assert.equal(await page.evaluate(() => window.__unified), before, '＋ opens the content sheet in the Content UI');
         await page.click('#ccOverlay .cc-x');
-        await page.click('#cafe-view-switch [data-mode="intern"]');
+        await goMode('intern');
         assert.equal(await vis('#section-cafe-content'), false); assert.equal(await vis('#section-kanban'), true, 'Mission is back'); assert.equal(await vis('#u-earned-badges'), true, 'badge row is back');
         await page.click('#unified-fab-btn');
         assert.equal(await page.evaluate(() => window.__unified), before + 1, '＋ opens Submit New in the Intern UI');
         // a creator-division primary group with an extra group outside it: default is the Content UI, and the switch can go back
         await page.evaluate(() => { localStorage.clear(); division = 'Content Creator'; window.myExtraGroups = ['Rx']; window.cafeContentSync(); });
-        assert.deepEqual(await swBtns(), ['Intern:false', 'Content:true'], 'primary in the division → opens in Content');
+        assert.equal(await swBtns(), 'content', 'primary in the division → opens in Content');
         assert.equal(await vis('#section-cafe-content'), true);
-        await page.click('#cafe-view-switch [data-mode="intern"]');
+        await goMode('intern');
         assert.equal(await vis('#section-cafe-content'), false, 'can flip to the Intern UI'); assert.equal(await vis('#section-kanban'), true);
         // V101.119: a CAFE membership stored ONLY as a users.memberships pair (admin V102.183) — the group is in no division list, no extraGroups
         await page.evaluate(() => { localStorage.clear(); division = 'General Division'; window.myExtraGroups = []; window.myMemberships = [{ division: 'CAFE', group: 'Social' }]; window.cafeContentSync(); });
         assert.equal(await vis('#cafe-view-switch'), true, 'a {CAFE, Social} pair alone → the Intern | Content switch');
-        assert.deepEqual(await swBtns(), ['Intern:true', 'Content:false'], 'primary outside the division → opens in the Intern UI');
+        assert.equal(await swBtns(), 'intern', 'primary outside the division → opens in the Intern UI');
         await page.evaluate(() => { window.myMemberships = [{ division: 'Clinical', group: 'Rx' }]; window.cafeContentSync(); });
         assert.equal(await vis('#cafe-view-switch'), false, 'a pair in a non-creator division gives nothing');
         await page.evaluate(() => { window.myMemberships = [{ division: 'CAFE', group: 'Audit' }]; window.cafeContentSync(); });
-        await page.click('#cafe-view-switch [data-mode="content"]');
+        await goMode('content');
         assert.ok(await page.$('#section-cafe-content [data-view="review"]'), 'the Audit group of a pair gets the Review view');
         await page.evaluate(() => { localStorage.clear(); division = 'Content Creator'; window.myExtraGroups = ['Rx']; window.myMemberships = []; window.cafeContentSync(); });   // back to the state the next case expects
         // primary in the division and nothing outside it: Content only, no switch
@@ -529,8 +531,8 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         await page.evaluate(() => { history.replaceState(null, '', '?tab=quiz'); window.cafeContentSync(); });
         assert.equal(await vis('#section-cafe-content'), false, '?tab=quiz flips a both-UI user to Intern'); assert.equal(await vis('#section-kanban'), true, 'Mission is on screen for the quiz link');
         assert.equal(await page.evaluate(() => localStorage.getItem('contentViewMode:U1')), 'intern', 'the flip is remembered');
-        assert.deepEqual(await swBtns(), ['Intern:true', 'Content:false']);
-        await page.click('#cafe-view-switch [data-mode="content"]');
+        assert.equal(await swBtns(), 'intern');
+        await goMode('content');
         assert.equal(await vis('#section-cafe-content'), true, 'the user can still flip back to Content in the same visit (decided once per load)');
         assert.equal(await page.evaluate(() => document.body.classList.contains('cafe-peek')), false, 'no peek for a user who has the Intern UI');
         // creator-only: a fresh load with the link shows Mission under the Content card; a load without it hides Mission again
