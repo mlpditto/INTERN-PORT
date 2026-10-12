@@ -75,6 +75,7 @@ const bar = html.slice(html.lastIndexOf('<div', barAt), html.indexOf('</div>', b
 
         // ---- Coverage chips as a filter ----
         await page.evaluate(() => window.renderQuizCoverage());
+        await page.$eval('#quiz-coverage-panel', e => { e.open = true; });   // V102.207: the panel starts folded
         const chip = label => page.locator('#qcov-grid > div', { hasText: label }).first();
         const frame = el => el.evaluate(e => e.style.boxShadow);
         assert.equal(await page.evaluate(() => window.quizSystemIds()), null, 'no system = no filter');

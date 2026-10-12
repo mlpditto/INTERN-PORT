@@ -46,13 +46,14 @@ const panel = html.slice(panelAt, html.indexOf('</details>', panelAt) + '</detai
             render
         ].join(String.fromCharCode(10)) });
         await page.evaluate(() => window.renderQuizCoverage());
+        assert.equal(await page.$eval('#quiz-coverage-panel', e => e.open), false, 'folded by default (V102.207)');
+        await page.$eval('#quiz-coverage-panel', e => { e.open = true; });
 
-        const cards = await page.$$eval('#qcov-grid > div', els => els.map(e => e.innerText.replace(/\s+/g, ' ').trim()));
+        const cards =await page.$$eval('#qcov-grid > div', els => els.map(e => e.innerText.replace(/\s+/g, ' ').trim()));
         assert.deepEqual(cards, ['🍽️ GI 0', '📦 Other Miscellaneous (assigned) 0', '🩸 Heme/Immune 1', '💧 Renal/Urinary 2', '👂 ENT 3', '📥 Uncategorized Tap to assign 1'], 'sorted by count (gaps first), Uncategorized last: ' + JSON.stringify(cards));
         assert.equal(await page.$$eval('#qcov-grid > div', els => els.filter(e => getComputedStyle(e).display === 'none').length), 0, 'every card is visible — no "Show all systems" needed here');
         assert.equal(await page.locator('#qcov-expand').count(), 0, 'the expand button is gone');
         assert.equal(await page.$eval('#qcov-summary', e => e.textContent), '3/5 systems · 1 uncat');
-        assert.equal(await page.$eval('#quiz-coverage-panel', e => e.open), true, 'open by default');
         const gap = await page.$eval('#qcov-grid > div', e => getComputedStyle(e).borderTopColor);
         assert.notEqual(gap, await page.$eval('#qcov-grid > div:nth-child(5)', e => getComputedStyle(e).borderTopColor), 'a gap card is coloured differently');
         await page.click('#qcov-grid > div:nth-child(5)');
