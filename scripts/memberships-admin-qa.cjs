@@ -20,10 +20,11 @@ assert.ok(/extraGroups: \[\.\.\.new Set\(gsExtra\.map\(m => canonicalGroupName\(
 assert.ok(html.includes('gsExtra = user ? userMemberships(user) : [];'), 'the modal loads pairs through the helper');
 assert.ok(!html.includes('id="gs-extra-pick"'), 'the flat extra-group pick list is gone (the two-step picker does it)');
 assert.ok(!html.includes("getElementById('gs-extra-pick')"), 'setUserGroup must not touch the removed gs-extra-pick (it threw and the profile window never opened)');
-assert.ok(/aria-controls="gs-pane-group" onclick="gsExtraToggle\(\)" aria-label="Add a membership"/.test(html), '+ = add a membership through the picker');
+assert.ok(!html.includes('id="gs-extra-add"') && !html.includes('gsExtraToggle'), 'V102.214: no separate + button — the main chip opens the picker');
+assert.ok(html.includes("gsSetMembMode(true)"), "the picker has a Main / Also in switch");
 assert.ok(grab(html, 'async function runGroupMerge(').includes('{ memberships: next }') && grab(html, 'async function deleteGroupGlobally(').includes("memberships: u.memberships.filter("), 'merge / delete rewrite memberships');
 const fns = ['function userDivisionOf(', 'function userMemberships(', 'function userInDivision(', 'function userInScope(', 'function userGroupTagHtml(', 'function divColor(', 'function divChipLook(', 'function groupStyleOf(',
-    'function getGroupColor(', 'function getGroupIcon(', 'function groupActiveCount(', 'function groupTotalCount(', 'function groupChipHtml(', 'function gsExtraPaint(', 'function gsExtraRemove(', 'function gsExtraAdd(', 'function gsExtraToggle(',
+    'function getGroupColor(', 'function getGroupIcon(', 'function groupActiveCount(', 'function groupTotalCount(', 'function groupChipHtml(', 'function gsExtraPaint(', 'function gsExtraRemove(', 'function gsExtraAdd(', 'function gsSetMembMode(',
     'function gsPickDivision(', 'function gsPickGroup(', 'function gsPaintMainGroup(', 'function gsDivisionChipHtml(', 'function renderGsGroupList(', 'function toggleGsGroups(', 'function gsState(', 'function gsDirtyCount(', 'function gsDirtyPaint('].map(m => grab(html, m)).join('\n');
 const consts = [html.match(/const groupColorMap = \{[\s\S]*?\};/)[0], html.match(/const groupIconMap = \{[\s\S]*?\};/)[0], html.match(/const gsPairKey = [^\n]*/)[0]].join('\n');
 
@@ -32,7 +33,7 @@ const consts = [html.match(/const groupColorMap = \{[\s\S]*?\};/)[0], html.match
     try {
         const page = await browser.newPage({ viewport: { width: 900, height: 700 } });
         const errs = []; page.on('pageerror', e => errs.push(e.message));
-        await page.setContent('<!doctype html><meta charset="utf-8"><div id="groupSelectModal"><input id="gs-input" hidden><span id="gs-current-group"></span><span id="gs-also" hidden>also</span><span id="gs-extra-chips"></span><button id="gs-extra-add" aria-expanded="false" onclick="gsExtraToggle()">+</button><div id="gs-pane-group" hidden><div id="gs-list"></div></div><div id="gs-save-row" hidden><span id="gs-save-diff"></span><button id="gs-save-btn">Save</button></div><div id="gs-profile-body"></div></div>');
+        await page.setContent('<!doctype html><meta charset="utf-8"><div id="groupSelectModal"><input id="gs-input" hidden><span id="gs-current-group"></span><span id="gs-extra-chips"></span><div id="gs-pane-group" hidden><div id="gs-list"></div></div><div id="gs-save-row" hidden><span id="gs-save-diff"></span><button id="gs-save-btn">Save</button></div><div id="gs-profile-body"></div></div>');
         await page.addScriptTag({ content: [
             "var escapeHtml = s => String(s).replace(/[&<>\"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' }[c]));",
             "let groupStyle = { groups: {}, divisions: {} }; var gsLanguage = 'en', gsText = (en, th) => en, gsEmptyOpen = false, gsSnap = null, gsDivision = 'CAFE', gsExtra = [], gsMembMode = false, gsMembDiv = '';",
@@ -55,14 +56,14 @@ const consts = [html.match(/const groupColorMap = \{[\s\S]*?\};/)[0], html.match
         // --- User Hub: load, pair chips, + → picker in membership mode, pick ① RSU ② Junior, dedupe, × remove, dirty count
         await ev("document.getElementById('gs-input').value = 'Audit'; gsExtra = userMemberships(usersData[0]); gsPaintMainGroup('Audit'); gsExtraPaint(); gsSnap = Object.assign(gsState(), { groupName: 'Audit' }); gsDirtyPaint();");
         assert.deepEqual(await page.$$eval('#gs-extra-chips .gs-pair .grp-name', els => els.map(e => e.textContent)), ['EXTERN', 'RSU'], 'a membership = group | division pair chip');
-        assert.equal(await page.$eval('#gs-also', e => e.hidden), false);
         assert.equal(await page.$eval('#gs-save-row', e => e.hidden), true, 'nothing changed yet');
-        await page.click('#gs-extra-add');
-        assert.deepEqual(await ev("[gsMembMode, document.getElementById('gs-pane-group').hidden, document.getElementById('gs-extra-add').getAttribute('aria-expanded')]"), [true, false, 'true'], '+ opens the picker in membership mode');
+        await ev("document.getElementById('gs-pane-group').hidden = false; gsSetMembMode(true)");   // main chip opens the picker, then the Also in switch
+        assert.deepEqual(await ev("[gsMembMode, document.getElementById('gs-pane-group').hidden]"), [true, false], 'the Also in switch puts the picker in membership mode');
+        assert.equal(await page.locator('#gs-list .gs-mode button[aria-pressed="true"]').textContent(), 'Also in', 'the switch shows Also in');
         assert.match(await page.$eval('#gs-list', e => e.textContent), /for the new membership/);
         assert.match(await page.$eval('#gs-list .gs-chip-new', e => e.textContent), /New group in CAFE/, 'V102.198: a brand-new group can be typed right in the membership picker');
         assert.equal(await page.locator('#gs-current-group .gs-prim').count(), 0, 'V102.209: no Primary label; the main pair sits in the header after the name');
-        assert.ok(/id="gs-also" hidden data-gs-en="Also in"/.test(fs.readFileSync('public/admin.html', 'utf8')), 'and the pairs sit under Also in');
+        assert.ok(fs.readFileSync('public/admin.html', 'utf8').includes('<span id="gs-current-group"></span><span class="gs-extra-chips" id="gs-extra-chips"></span>'), 'and the pairs ride right after the main chip in the header');
         await page.click('#gs-list [data-div="RSU"]');
         assert.equal(await ev("gsMembDiv"), 'RSU', 'step ① sets the membership division, not the primary');
         assert.equal(await ev("gsDivision"), 'CAFE');

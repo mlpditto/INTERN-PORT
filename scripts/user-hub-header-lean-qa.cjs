@@ -30,8 +30,8 @@ assert.ok(/<button type="button" id="gs-google-chip" class="gs-google" onclick="
 assert.ok(!header.includes('🌐') && !header.includes('fa-link-slash'), 'no second icon on the Google chip');
 const grp = html.slice(html.indexOf('<section class="gs-inline-group lang-no-toggle"'), html.indexOf('<div id="gs-pane-group" hidden>'));
 assert.ok(!grp.includes('gs-group-summary') && !grp.includes('Select one group') && !/<button[^>]*id="gs-group-toggle"/.test(grp), 'no summary box / help text / Change group button');
-assert.ok(/<div class="gs-grp-row">\s*<span class="gs-also" id="gs-also" hidden/.test(grp) && !grp.includes('id="gs-current-group"'), 'V102.209: the row starts with "also" (hidden until used); the main group lives in the header');
-assert.ok(/id="gs-title-name">\.\.\.<\/span><span id="gs-current-group"><\/span>/.test(html), 'V102.209: the main group chips sit right after the name in the header');
+assert.ok(!html.includes('gs-grp-row') && !html.includes('id="gs-also"') && !html.includes('id="gs-extra-add"') && !grp.includes('<h3'), 'V102.214: no separate User group block — no heading, "also" label or + button; the main chip opens the picker');
+assert.ok(/id="gs-title-name">\.\.\.<\/span><span id="gs-current-group"><\/span><span class="gs-extra-chips" id="gs-extra-chips"><\/span>/.test(html), 'V102.209: the main group chips sit right after the name in the header');
 assert.ok(/<div class="gs-save-row lang-no-toggle" id="gs-save-row" hidden><span id="gs-save-diff"/.test(html), 'the Save row starts hidden and carries the diff');
 assert.ok(!html.includes("'Save profile and group together'") && !html.includes("'Unsaved changes'"), 'the two status sentences are gone');
 
@@ -42,7 +42,7 @@ function grab(src, marker) {
     return src.slice(i, k + 1);
 }
 const fns = ['function gsPaintMainGroup(', 'function gsState(', 'function gsDirtyCount(', 'function gsDirtyPaint(', 'function gsExtraPaint(', 'function gsExtraRemove(', 'function gsExtraAdd(',
-    'function gsExtraRenderPick(', 'function gsExtraToggle(', 'function gsPickGroup(', 'function toggleGsGroups(', 'function groupStyleOf(', 'function divChipLook(', 'function groupChipHtml(', 'function gsDivisionChipHtml(', 'function userMemberships(', 'function userInDivision(', 'function divColor(', 'function userDivisionOf('].map(m => grab(html, m)).join('\n');
+    'function gsExtraRenderPick(', 'function gsSetMembMode(', 'function gsPickGroup(', 'function toggleGsGroups(', 'function groupStyleOf(', 'function divChipLook(', 'function groupChipHtml(', 'function gsDivisionChipHtml(', 'function userMemberships(', 'function userInDivision(', 'function divColor(', 'function userDivisionOf('].map(m => grab(html, m)).join('\n');
 const css = [
     html.slice(html.indexOf('        .grp-chip { --c:#64748b;'), html.indexOf('        /* V102.64: Event modal')),
     html.slice(html.indexOf('        .grp-chip:hover {'), html.indexOf('        /* V102.59: the picker is sections')),
@@ -86,13 +86,11 @@ const markup = '<div id="groupSelectModal" style="width:100%"><div class="modal-
         await page.click('#gs-current-group .gs-divchip');
         assert.equal(await page.$eval('#gs-pane-group', e => e.hidden), false, 'the division chip opens the picker');
         await page.click('#gs-group-toggle');   // fold it again for the steps below
-        assert.equal(await vis('#gs-also'), false, '"also" hidden with no extras');
         assert.equal(await vis('#gs-save-row'), false, 'nothing changed → no Save row');
         await page.click('#gs-group-toggle');
         assert.equal(await page.$eval('#gs-pane-group', e => e.hidden), false, 'tap the chip → picker opens');
         assert.equal(await page.$eval('#gs-group-toggle', e => e.getAttribute('aria-expanded')), 'true');
         await page.evaluate(() => gsExtraAdd('CAFE'));
-        assert.equal(await vis('#gs-also'), true, '"also" shows with an extra');
         assert.equal(await page.$eval('#gs-extra-chips .grp-chip .grp-name', e => e.textContent), 'CAFE');
         assert.equal(await page.$eval('#gs-extra-chips .gs-pair', e => getComputedStyle(e).opacity), '0.6', 'membership pair chips are faded');
         assert.equal(await vis('#gs-save-row'), true, 'extras changed → Save row');
@@ -105,7 +103,6 @@ const markup = '<div id="groupSelectModal" style="width:100%"><div class="modal-
         assert.deepEqual(await page.$$eval('#gs-save-diff .grp-chip', els => els.map(e => e.textContent.trim() + (e.classList.contains('on') ? '*' : ''))), ['EXTERN', 'MLP*'], 'diff = old chip → new chip (selected look)');
         await page.evaluate(() => gsExtraRemove('CAFE'));
         assert.equal(await page.$eval('#gs-save-btn', e => e.textContent.trim()), 'Save 1 change', 'extras back → one change');
-        assert.equal(await vis('#gs-also'), false);
         await page.fill('#gs-tel', '082');
         assert.equal(await page.$eval('#gs-save-btn', e => e.textContent.trim()), 'Save 2 changes', 'a profile field counts');
         await page.fill('#gs-tel', '081');
