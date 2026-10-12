@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.197)</title>
+    <title>Nika Admin (V102.198)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -4105,7 +4105,9 @@
         #groupSelectModal .gs-also { font-size:11px; color:#94a3b8; margin-left:4px; }
         #groupSelectModal .gs-also[hidden] { display:none; }
         #groupSelectModal .gs-divchip { font-size:12px; }
-        #groupSelectModal .gs-extra-chips { display:contents; }
+        #groupSelectModal .gs-extra-chips { display:flex; flex-direction:column; align-items:flex-start; gap:6px; flex-basis:100%; }
+        #groupSelectModal .gs-grp-row .gs-also { flex-basis:100%; margin:6px 0 0; font-weight:700; text-transform:uppercase; letter-spacing:.3px; }   /* V102.198: Primary / Also in = two labelled blocks */
+        #groupSelectModal .gs-grp-row .gs-also:first-child { margin-top:0; }
         #groupSelectModal .gs-extra-chips .grp-chip { opacity:.6; }
         #groupSelectModal .gs-extra-add { width:auto; min-height:0; padding:3px 10px; border:1px dashed #94a3b8; border-radius:999px; background:none; color:#64748b; font-size:12px; cursor:pointer; margin:0; }
         /* V102.183: a membership is a PAIR chip — group | division — faded, × on the division half */
@@ -14685,8 +14687,8 @@
                      gsPaintMainGroup paints #gs-current-group; the chip inside carries id="gs-group-toggle" for toggleGsGroups. -->
                 <div class="gs-grp-row">
                     <span id="gs-current-group"></span>
-                    <span class="gs-also" id="gs-also" hidden data-gs-en="also" data-gs-th="ร่วมกับ">also</span><span class="gs-extra-chips" id="gs-extra-chips"></span>
-                    <button type="button" class="gs-extra-add" id="gs-extra-add" aria-expanded="false" aria-controls="gs-pane-group" onclick="gsExtraToggle()" aria-label="Add a membership" title="Also in — add a membership: pick a division, then a group in it. The person joins that division's board and sees its work; points, rank, quizzes and events follow the main group above."><i class="fa-solid fa-plus"></i></button>
+                    <span class="gs-also" id="gs-also" hidden data-gs-en="Also in" data-gs-th="สังกัดเพิ่ม">Also in</span><span class="gs-extra-chips" id="gs-extra-chips"></span>
+                    <button type="button" class="gs-extra-add" id="gs-extra-add" aria-expanded="false" aria-controls="gs-pane-group" onclick="gsExtraToggle()" aria-label="Add a membership" title="Also in — add a membership: pick a division, then a group in it. The person joins that division's board and sees its work; points, rank, quizzes and events follow the main group above."><i class="fa-solid fa-plus"></i> <span data-gs-en="Add division / group" data-gs-th="เพิ่ม Division / กลุ่ม">Add division / group</span></button>
                 </div>
             <div id="gs-pane-group" hidden>
             <!-- V98.30 lean: the chip rail below IS the group picker (since #954), so
@@ -36688,7 +36690,7 @@ They can connect again from LINE.
             const label = dv === '' ? 'Only I' : escapeHtml(dv);
             list.innerHTML = `<div class="gs-step"><span class="gs-n">1</span><b>Division</b>${gsMembMode ? ' <small>— for the new membership</small>' : ''}</div><div class="gs-sec-row">${rail1}</div>`
                 + `<div class="gs-step"><span class="gs-n">2</span><b>Group in ${label}</b> <small>${gsMembMode ? 'tap = add as a membership' : (dv === '' ? 'ranked on their own' : 'ranked together')}</small></div>`
-                + `<div class="gs-sec-row gs-rail2" style="--dc:${divColor(dv === '' ? '__only' : dv)};">${live.map(chip).join('')}${fold}${gsMembMode ? '' : '<button type="button" class="grp-chip grp-empty gs-chip-new" onclick="gsNewGroup(this)" style="--c:#475569;"><i class="fa-solid fa-plus"></i> New group</button>'}</div>`;
+                + `<div class="gs-sec-row gs-rail2" style="--dc:${divColor(dv === '' ? '__only' : dv)};">${live.map(chip).join('')}${fold}<button type="button" class="grp-chip grp-empty gs-chip-new" onclick="gsNewGroup(this)" style="--c:#475569;"><i class="fa-solid fa-plus"></i> New group${gsMembMode ? ' in ' + label : ''}</button></div>`;
         }
 
         // V102.178: step ① — put the user in a division (their group stays the same); step ② then lists that division's groups.
@@ -36714,7 +36716,7 @@ They can connect again from LINE.
             const g = String(name || '').trim() || 'ไม่ระบุชื่อ';
             const pane = document.getElementById('gs-pane-group');
             const open = !!(pane && !pane.hidden);
-            box.innerHTML = groupChipHtml(g, { on: true, cls: 'gs-main', hint: 'tap to change group', attrs: `id="gs-group-toggle" aria-expanded="${open}" aria-controls="gs-pane-group" onclick="toggleGsGroups()"` }) + '<span class="gs-in">in</span>' + gsDivisionChipHtml(g);   // V102.178: "Audit in CAFE"
+            box.innerHTML = '<span class="gs-also gs-prim" data-gs-en="Primary" data-gs-th="หลัก">Primary</span>' + groupChipHtml(g, { on: true, cls: 'gs-main', hint: 'tap to change group', attrs: `id="gs-group-toggle" aria-expanded="${open}" aria-controls="gs-pane-group" onclick="toggleGsGroups()"` }) + '<span class="gs-in">in</span>' + gsDivisionChipHtml(g);   // V102.178: "Audit in CAFE"
             gsDirtyPaint();
         }
 
@@ -36817,6 +36819,8 @@ They can connect again from LINE.
                 if (!inp.parentNode) return;
                 const name = inp.value.trim();
                 if (!name) { cancel(); return; }
+                // V102.198: adding a membership → the typed name (an existing twin, or a brand-new group) joins as a pair in the division picked in step ①; Save puts a new name in that division's list
+                if (gsMembMode) { cancel(); gsExtraAdd(getGlobalGroups().find(g => g.toUpperCase() === name.toUpperCase()) || name, gsMembDiv); return; }
                 // V102.38: "extern" when "EXTERN" exists picks EXTERN instead of creating a twin. (V102.178: looked up among ALL groups — the chips only show one division's.)
                 const twinName = getGlobalGroups().find(g => g.toUpperCase() === name.toUpperCase());
                 if (twinName) {
@@ -37182,6 +37186,9 @@ They can connect again from LINE.
                 status.textContent = gsText('Saved', 'บันทึกแล้ว');
                 gsSnap = Object.assign(gsState(), { groupName: newGroup });   // V102.164: clean again
                 showToast("User updated successfully!");
+                // V102.198: a membership in a group its division does not list yet puts the group in that division's list (step ② then offers it to everyone)
+                try { const add = {}; gsExtra.forEach(m => { const g = canonicalGroupName(m.group); if (m.division && divisionConfig && Array.isArray(divisionConfig[m.division]) && !divisionConfig[m.division].some(x => String(x).trim().toUpperCase() === g.toUpperCase())) (add[m.division] = add[m.division] || divisionConfig[m.division].slice()).push(g); });
+                    if (Object.keys(add).length) await db.collection('quizzes').doc('--divisions-config--').set(add, { merge: true }); } catch (e) { console.warn('[gs] division list update failed', e); }
                 forceHideModal('groupSelectModal');
             } catch (e) { status.textContent = gsText('Save failed. Please try again.', 'บันทึกไม่สำเร็จ กรุณาลองใหม่'); alert("Error setting user data: " + e.message); }
             finally { saveBtn.disabled = false; gsDirtyPaint(); }

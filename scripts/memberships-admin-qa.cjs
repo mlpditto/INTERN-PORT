@@ -60,6 +60,9 @@ const consts = [html.match(/const groupColorMap = \{[\s\S]*?\};/)[0], html.match
         await page.click('#gs-extra-add');
         assert.deepEqual(await ev("[gsMembMode, document.getElementById('gs-pane-group').hidden, document.getElementById('gs-extra-add').getAttribute('aria-expanded')]"), [true, false, 'true'], '+ opens the picker in membership mode');
         assert.match(await page.$eval('#gs-list', e => e.textContent), /for the new membership/);
+        assert.match(await page.$eval('#gs-list .gs-chip-new', e => e.textContent), /New group in CAFE/, 'V102.198: a brand-new group can be typed right in the membership picker');
+        assert.match(await page.$eval('#gs-current-group .gs-prim', e => e.textContent), /Primary/, 'V102.198: the main group is labelled Primary');
+        assert.ok(/id="gs-also" hidden data-gs-en="Also in"/.test(fs.readFileSync('public/admin.html', 'utf8')), 'and the pairs sit under Also in');
         await page.click('#gs-list [data-div="RSU"]');
         assert.equal(await ev("gsMembDiv"), 'RSU', 'step ① sets the membership division, not the primary');
         assert.equal(await ev("gsDivision"), 'CAFE');
@@ -76,6 +79,9 @@ const consts = [html.match(/const groupColorMap = \{[\s\S]*?\};/)[0], html.match
         // picking the membership pair as the new PRIMARY drops it from the memberships
         await ev("gsPickDivision('RSU'); gsPickGroup(document.createElement('button'), 'EXTERN', 'RSU')");
         assert.deepEqual(await ev("[gsExtra, document.getElementById('gs-input').value, gsDivision]"), [[], 'EXTERN', 'RSU']);
+        { const html = fs.readFileSync('public/admin.html', 'utf8');
+          assert.ok(/if \(gsMembMode\) \{ cancel\(\); gsExtraAdd\(getGlobalGroups\(\)\.find/.test(html), 'gsNewGroup in membership mode adds the pair');
+          assert.ok(/doc\('--divisions-config--'\)\.set\(add, \{ merge: true \}\)/.test(html), 'Save lists a new membership group in its division (merge — never wipes the other divisions)'); }
         assert.deepEqual(errs, [], 'no page errors');
         console.log('PASS: memberships (option A) — pairs helper (legacy extraGroups, primary excluded, Only I for unknown), scope + row tag, User Hub pair chips, + → two-step picker in membership mode, dedupe, ×, dirty count, primary pick drops the pair; save + merge/delete pins');
     } finally { await browser.close(); }
