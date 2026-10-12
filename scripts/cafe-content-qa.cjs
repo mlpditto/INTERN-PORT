@@ -54,6 +54,13 @@ assert.ok(/getMyDivision\(\)/.test(index) && /return "General Division"/.test(in
     assert.equal(ctx.getUnifiedAllItems().length, 5, 'Intern UI: everything');
     cc = true;
     assert.equal(JSON.stringify(ctx.getUnifiedAllItems().map(s => s.id)), JSON.stringify(['p1']), 'Content UI: only the content posts — no quiz, journal, explore, ordinary work');
+    ctx.window.cafeContentHistoryItems = () => [{ id: 'rv_W9', submissionType: 'content_review' }];
+    assert.equal(JSON.stringify(ctx.getUnifiedAllItems().map(s => s.id)), JSON.stringify(['p1', 'rv_W9']), 'V101.124: an Audit member\'s History = own posts + the reviews filed');
+    delete ctx.window.cafeContentHistoryItems;
+    const hl = fs.readFileSync('public/history-lean.js', 'utf8'), dr = fs.readFileSync('public/delete-requests.js', 'utf8');
+    assert.ok(/content_review: \{ e: '✓', n: 'Review' \}/.test(hl) && /'content_review'\];/.test(hl), 'History knows the Review type (chip + order)');
+    assert.ok(/if \(!item \|\| item\.noDelete\) return;/.test(dr), 'a filed review has no delete menu');
+    assert.ok(/explore_link: 0, content_review: 0 \}/.test(index), 'type counts include content_review');
     assert.ok(/id="intern-app-name">LINE LIFF Internship Management System<\/span><span id="intern-version-current">/.test(index), 'the footer name has its own span (the version stays)');
     assert.ok(/No content history yet/.test(index) && /Posted pieces and their review scores appear here/.test(index), 'Content UI gets its own empty History text');
     assert.ok(/isContentCreator && window\.isContentCreator\(\)\) \?/.test(fs.readFileSync('public/history-lean.js', 'utf8')), 'the journal streak pill is hidden in the Content UI');
@@ -69,7 +76,7 @@ let userId = 'U1', userProfile = { displayName: 'Jo', pictureUrl: '' }, division
 const store = { users: { U1: {} }, works: {} }; let wn = 0, un = 0; const userCbs = [];
 function getMyDivision() { return division; }
 var myGroup = 'G1'; window.myExtraGroups = [];
-Object.defineProperty(window, 'divisionConfig', { configurable: true, get() { const o = { 'Content Creator': ['Audit'], Clinical: ['Rx'] }; o[division] = (o[division] || []).concat('G1'); return o; } });
+Object.defineProperty(window, 'divisionConfig', { configurable: true, get() { const o = { 'Content Creator': ['Audit', 'Social'], Clinical: ['Rx'] }; o[division] = (o[division] || []).concat('G1'); return o; } });
 function getBangkokDateTimeParts() { return { dateKey: '2026-10-09' }; }
 function ensureFirebaseAuthReady() { return Promise.resolve({ uid: 'A1' }); }
 function showToast(m) { window.__toasts.push(m); }
@@ -430,6 +437,9 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.equal(await page.evaluate(() => store.users.U1.contentReviews.W9.verdict + store.users.U1.contentReviews.W9.score), 'approve0.2', 'remembered on the own user doc of the reviewer');
         rv = await page.$eval('#section-cafe-content', e => e.innerText.replace(/\s+/g, ' '));
         assert.ok(/To review 0/.test(rv) && /Reviewed by me 1/.test(rv), 'it moved to Reviewed by me: ' + rv);
+        { const hi = await page.evaluate(() => window.cafeContentHistoryItems());
+          assert.equal(hi.length, 1, 'V101.124: the review I filed is a History item'); assert.equal(hi[0].submissionType, 'content_review'); assert.equal(hi[0].noDelete, true);
+          assert.equal(hi[0].metadata.verdict, 'approve'); assert.ok(/Mint/.test(hi[0].title), 'titled with the creator: ' + hi[0].title); assert.equal(hi[0].adminComment, 'Clear hook, good captions'); }
         assert.equal(await page.locator('#section-cafe-content .cc-qhero').count(), 0, 'no hero when nothing waits');
         assert.ok(/All caught up/.test(rv) && (await page.locator('#section-cafe-content .cc-qok').count()) === 1, 'ok = a green frame: All caught up');
         await page.click('#section-cafe-content [data-rvf="mine"]');
@@ -509,7 +519,7 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.equal(await vis('#section-cafe-content'), false);
         await page.evaluate(() => { window.myExtraGroups = ['Rx']; window.cafeContentSync(); });
         assert.equal(await vis('#cafe-view-switch'), false, 'an extra group outside the division alone gives nothing');
-        await page.evaluate(() => { window.myExtraGroups = ['Audit']; window.cafeContentSync(); });
+        await page.evaluate(() => { window.myExtraGroups = ['Social']; window.cafeContentSync(); });
         assert.equal(await vis('#cafe-view-switch'), true, 'primary outside + extra inside the division → a switch');
         assert.match(await page.$eval('#cafe-view-switch', e => e.title), /^View as: Intern → Content$/, 'title says where you are and where a tap goes'); assert.ok(await page.$('#cafe-view-switch i.fa-graduation-cap'), 'Intern view = graduation-cap icon');
         assert.equal(await swBtns(), 'intern', 'opens in the Intern UI (the primary group is outside the division)');
@@ -536,6 +546,13 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.equal(await vis('#section-cafe-content'), true);
         await goMode('intern');
         assert.equal(await vis('#section-cafe-content'), false, 'can flip to the Intern UI'); assert.equal(await vis('#section-kanban'), true);
+        // V101.124: an Audit member is never an intern — no remembered choice → the CAFE UI; a remembered choice still wins; a non-Audit CAFE member still opens in Intern
+        await page.evaluate(() => { localStorage.clear(); division = 'General Division'; window.myExtraGroups = ['Audit']; window.myMemberships = []; window.cafeContentSync(); });
+        assert.equal(await swBtns(), 'content', 'Audit → opens in the CAFE UI');
+        await goMode('intern'); assert.equal(await swBtns(), 'intern', 'a remembered choice still wins');
+        await page.evaluate(() => { localStorage.clear(); window.myExtraGroups = ['Social']; window.cafeContentSync(); });
+        assert.equal(await swBtns(), 'intern', 'a non-Audit CAFE member still opens in Intern');
+        await page.evaluate(() => { localStorage.clear(); window.myExtraGroups = []; window.cafeContentSync(); });
         // V101.119: a CAFE membership stored ONLY as a users.memberships pair (admin V102.183) — the group is in no division list, no extraGroups
         await page.evaluate(() => { localStorage.clear(); division = 'General Division'; window.myExtraGroups = []; window.myMemberships = [{ division: 'CAFE', group: 'Social' }]; window.cafeContentSync(); });
         assert.equal(await vis('#cafe-view-switch'), true, 'a {CAFE, Social} pair alone → the Intern | Content switch');

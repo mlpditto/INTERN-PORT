@@ -3,9 +3,9 @@
 window.historyLean = (() => {
     const T = {
         case: { e: '🩺', n: 'Case' }, work: { e: '📝', n: 'Work' }, quiz: { e: '🧠', n: 'Quiz' }, quest: { e: '⭐', n: 'Quest' },
-        reflective: { e: '😊', n: 'Journal' }, learning_note: { e: '🎓', n: 'Note' }, product: { e: '🛒', n: 'Product' }, explore_link: { e: '🔗', n: 'Link' }
+        reflective: { e: '😊', n: 'Journal' }, learning_note: { e: '🎓', n: 'Note' }, product: { e: '🛒', n: 'Product' }, explore_link: { e: '🔗', n: 'Link' }, content_review: { e: '✓', n: 'Review' }
     };
-    const ORDER = ['case', 'quiz', 'explore_link', 'work', 'reflective', 'learning_note', 'product', 'quest'];
+    const ORDER = ['case', 'quiz', 'explore_link', 'work', 'reflective', 'learning_note', 'product', 'quest', 'content_review'];
     const esc = s => escapeUnifiedHtml(s);
     const hueOf = s => { let h = 0; for (const c of String(s)) h = (h * 31 + c.codePointAt(0)) >>> 0; return h % 360; };
     const pending = s => s.status === 'pending' || s.status === 'รอตรวจ';
@@ -65,7 +65,7 @@ window.historyLean = (() => {
             const k = caseKey(s), h = hueOf(k);
             return '<span class="hl-lead"><span class="hl-disc" title="' + esc(sysName(k)) + ' · case ' + ctx.nth.get(s.id) + '" style="background:hsl(' + h + ',85%,92%);border:1px solid hsl(' + h + ',60%,82%)">' + sysEmoji(k) + '<b class="hl-nb">' + ctx.nth.get(s.id) + '</b></span></span>';
         }
-        const emoji = type === 'reflective' && s.metadata && s.metadata.moodEmoji ? s.metadata.moodEmoji : t.e;
+        const emoji = type === 'reflective' && s.metadata && s.metadata.moodEmoji ? s.metadata.moodEmoji : (type === 'content_review' && s.metadata ? (s.metadata.verdict === 'approve' ? '✓' : '↩') : t.e);   // V101.124: a filed review shows its verdict
         const h = hueOf(type);
         return '<span class="hl-lead"><span class="hl-disc" style="background:hsl(' + h + ',85%,93%);border:1px solid hsl(' + h + ',60%,84%)">' + esc(emoji) + '</span></span>';
     }
@@ -80,6 +80,7 @@ window.historyLean = (() => {
             (b ? '<span class="hl-br" title="Beri">🪙 <b>' + (b > 0 ? '+' : '−') + Math.abs(b) + '</b></span>' : '') + '</span>';
     }
     function pillHtml(s) {
+        if (s.submissionType === 'content_review') { const m = s.metadata || {}; return m.verdict === 'approve' ? '<span class="hl-pill">✓ OK' + (Number(m.suggested) ? ' · +' + Number(m.suggested) : '') + '</span>' : '<span class="hl-pill hl-warn">↩ Changes</span>'; }   // V101.124
         if (pending(s)) return '<span class="hl-pill hl-warn">⏳ Pending</span>';
         if (s.status === 'rejected') return '<span class="hl-pill hl-bad">✕ Rejected</span>';
         return '';
@@ -126,7 +127,7 @@ window.historyLean = (() => {
                 if (!m.feedbackGiven && fq && (fq.quizType === 'standard' || !fq.quizType)) a += '<button type="button" class="hl-ib" onclick="openFeedbackForPastAttempt(\'' + esc(s.quizId) + '\')" title="Give feedback" aria-label="Give feedback">💬</button>';
             }
             a += matHtml(ctx, s, true);
-        } else if (s.submissionType === 'explore_link' || s.submissionType === 'work') {
+        } else if (s.submissionType === 'explore_link' || s.submissionType === 'work' || s.submissionType === 'content_review') {
             const url = (m.url || m.link || '').trim();
             if (/^https?:\/\//i.test(url)) a += '<a class="hl-ib hl-go" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="Open" aria-label="Open link">↗</a>';
         }
@@ -138,7 +139,7 @@ window.historyLean = (() => {
         if (type === 'case') {
             const rows = [['Patient', m.customer], ['Symptoms', m.symptoms], ['Notes', m.notes]].filter(r => r[1]);
             if (rows.length) body = '<div class="hl-facts">' + rows.map(r => '<span>' + r[0] + '</span><span>' + esc(r[1]) + '</span>').join('') + '</div>';
-        } else if (type !== 'quiz' && type !== 'work' && type !== 'explore_link') {
+        } else if (type !== 'quiz' && type !== 'work' && type !== 'explore_link' && type !== 'content_review') {
             body = renderTypeDetailHtml(s);   // journal / quest / note / product keep their own detail
         }
         if (s.adminComment) body += '<div class="hl-comment">💬 ' + esc(s.adminComment) + '</div>';
@@ -189,6 +190,7 @@ window.historyLean = (() => {
         try { window.activityRewards?.start?.(); } catch (e) { /* rewards are optional here */ }
         const all = getUnifiedAllItems(), filtered = getFilteredUnifiedItems();
         const pts = filtered.reduce((n, s) => n + (parseFloat(s.score) || 0) + (parseFloat(s.adminBonus) || 0), 0);
+        const rvOnly = filtered.length > 0 && filtered.every(s => s.submissionType === 'content_review');   // V101.124: a list of filed reviews carries no points / beri
         const b = filtered.reduce((n, s) => n + beri(s.id), 0);
         const summary = root.querySelector('.hc-summary');
         if (summary) {
@@ -196,8 +198,8 @@ window.historyLean = (() => {
             // V101.58: the streak is a 🔥 N pill right after "History" (was a banner with two lines of text)
             const st = typeof getReflectiveStreak === 'function' ? getReflectiveStreak() : { current: 0, longest: 0 };
             summary.innerHTML = (st.current > 0 && !(window.isContentCreator && window.isContentCreator()) ? '<span class="hl-ts" title="' + st.current + '-day streak · best ' + st.longest + '">🔥 <b>' + st.current + '</b></span>' : '') +
-                '<span class="hl-tp" title="Points">' + pts.toFixed(1) + '<small>pt</small></span>' +
-                '<span class="hl-tb" title="Beri earned on these entries">🪙 <b>' + b + '</b></span>' +
+                (rvOnly ? '' : '<span class="hl-tp" title="Points">' + pts.toFixed(1) + '<small>pt</small></span>') +
+                (rvOnly ? '' : '<span class="hl-tb" title="Beri earned on these entries">🪙 <b>' + b + '</b></span>') +
                 (values.some(v => v > 0) ? '<span class="hl-spark" title="30-day trend">' + renderSparkline(values, 40, 16) + '</span>' : '');
             const head = document.getElementById('work-section-sum');   // V101.92: the home accordion header shows the same totals, also while it is folded
             if (head) head.innerHTML = summary.innerHTML;

@@ -89,7 +89,7 @@
         if (m.both) { try { localStorage.setItem(modeKey(), 'intern'); } catch (_) { /* storage may be blocked */ } }
         else document.body.classList.add('cafe-peek');
     }
-    function getMode(m) { try { var v = localStorage.getItem(modeKey()); if (v === 'content' || v === 'intern') return v; } catch (_) { /* storage may be blocked */ } return m.primaryCreator ? 'content' : 'intern'; }
+    function getMode(m) { try { var v = localStorage.getItem(modeKey()); if (v === 'content' || v === 'intern') return v; } catch (_) { /* storage may be blocked */ } return (m.primaryCreator || isReviewer()) ? 'content' : 'intern'; }   // V101.124: an Audit member is never an intern — no remembered choice → the CAFE UI
     function isCafe() { try { var m = memberships(); applyQuizDeepLink(m); return m.creator && (!m.both || getMode(m) === 'content'); } catch (_) { return false; } }
     var switchSig = '';
     function paintSwitch() {
@@ -321,6 +321,20 @@
         return '<div class="cc-stats">' + tile('posted', t.posted, mp.length) + tile('platforms', t.platforms, Object.keys(plats).length) + tile('reviewed', t.reviewed, rev + '/' + mp.length) + '</div>' +
             (any ? '<div class="cc-eng"><span><i class="fa-solid fa-heart"></i> ' + esc(fmtNum(lk)) + '</span><span><i class="fa-solid fa-eye"></i> ' + esc(fmtNum(rc)) + '</span><small>' + esc(t.engMonth) + '</small></div>' : '');
     }
+    // V101.124: History in the Content UI is split by role. A creator's History = their own posts (index.html keeps those); an Audit member's History = the REVIEWS they filed
+    // (users/{me}.contentReviews: verdict, suggested bonus, comment, at) — informational rows, no points, no delete menu.
+    window.cafeContentHistoryItems = function () {
+        if (!on || !isReviewer()) return [];
+        return Object.keys(myReviews || {}).map(function (id) {
+            var r = myReviews[id] || {}, w = allPosts.filter(function (x) { return x.id === id; })[0], at = Number(r.at) || 0;
+            return { id: 'rv_' + id, submissionType: 'content_review', noDelete: true, status: 'reviewed', score: 0, adminBonus: 0,
+                title: w ? (w.displayName || '') + ' · ' + typeLabel(w.ctype) + ' · ' + plat(w.platform)[1] : 'Reviewed post',
+                timestamp: { toDate: function () { return new Date(at); }, toMillis: function () { return at; }, seconds: Math.floor(at / 1000) },
+                adminComment: r.comment || '', metadata: { kind: 'content_review', verdict: r.verdict, suggested: r.score, workId: id, link: w ? w.link : '' } };
+        }).filter(function (it) { return it.timestamp.toMillis() > 0; });
+    };
+    window.cafeContentIsReviewer = isReviewer;
+    function refreshHistory() { try { if (typeof renderUnifiedHistory === 'function') renderUnifiedHistory(); if (window.historyLean && window.historyLean.renderChrome) window.historyLean.renderChrome(); if (typeof syncUnifiedEmptyState === 'function') syncUnifiedEmptyState(); } catch (_) { /* History is optional here */ } }
     function brandHtml() { return '<div class="cc-brand"><span class="cc-cup" aria-hidden="true">☕</span><b>CAFE</b>' + (isReviewer() ? '<span class="cc-audit">Audit</span>' : '') + '<small>Content Studio</small></div>'; }
 
     function render() {
@@ -388,6 +402,7 @@
             unsubAll = db.collection('works').where('kind', '==', 'social').onSnapshot(function (snap) {
                 allPosts = snap.docs.map(function (d) { var o = d.data() || {}; o.id = d.id; return o; }).sort(function (a, b) { return String(b.postDate || '').localeCompare(String(a.postDate || '')); });
                 render();
+                refreshHistory();   // V101.124: the titles of the reviewed posts have arrived
             }, function (e) { unsubAll = null; console.warn('[cafe] review listener', e); });
         });
     }
@@ -610,6 +625,7 @@
             var upd = {}; upd['contentReviews.' + id] = { verdict: verdict, score: score, comment: comment.slice(0, 500), at: Date.now() };
             await db.collection('users').doc(userId).update(upd);   // update, not set-merge: must never re-create a deleted user's doc
             myReviews[id] = upd['contentReviews.' + id];
+            refreshHistory();   // V101.124
             if (typeof showToast === 'function') showToast(t.revSent);
             closeSheet(); render();
         } catch (e) { console.error('[cafe] review failed', e); if (overlay.classList.contains('open')) setErr(t.fail); }

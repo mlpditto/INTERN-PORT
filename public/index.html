@@ -3,9 +3,9 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.123)</title>
+    <title>Internship Portfolio (V101.124)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
-    <link rel="stylesheet" href="cafe-content.css?v=V101.123">
+    <link rel="stylesheet" href="cafe-content.css?v=V101.124">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
@@ -24274,7 +24274,10 @@ async function archiveDoneCard(cardId) {
         function getUnifiedAllItems() {
             const _all = (unifiedSubmissionsCache || []).concat(mapQuizAttemptsToUnified(), mapLinkSuggestionsToUnified());
             // V101.121: in the Content (CAFE) UI the History is about CONTENT only — the posts and their review / score; never quiz, journal, case or explore entries (this also feeds the header totals, chips, sparkline and the empty state)
-            return (typeof window.isContentCreator === 'function' && window.isContentCreator()) ? _all.filter(s => s && s.metadata && s.metadata.kind === 'social_content') : _all;
+            if (!(typeof window.isContentCreator === 'function' && window.isContentCreator())) return _all;
+            // V101.124: split by role — own content posts (a creator), plus the reviews filed (an Audit member: window.cafeContentHistoryItems)
+            const _own = _all.filter(s => s && s.metadata && s.metadata.kind === 'social_content');
+            return _own.concat(typeof window.cafeContentHistoryItems === 'function' ? window.cafeContentHistoryItems() : []);
         }
 
         // V95.16: Toggle empty-state hero vs stats/search/filters based on whether the
@@ -24288,9 +24291,9 @@ async function archiveDoneCard(cardId) {
                 const _q = sel => _heroEl.querySelector(sel);
                 if (!_heroEl.dataset.def) _heroEl.dataset.def = JSON.stringify({ i: _q('.empty-hero-icon').textContent, t: _q('.empty-hero-title').textContent, s: _q('.empty-hero-subtitle').textContent, h: _q('.empty-hero-hint').textContent });
                 const _d = JSON.parse(_heroEl.dataset.def);
-                _q('.empty-hero-icon').textContent = _cc ? '📸' : _d.i; _q('.empty-hero-title').textContent = _cc ? 'No content history yet' : _d.t;
+                _q('.empty-hero-icon').textContent = _cc ? '📸' : _d.i; _q('.empty-hero-title').textContent = _cc ? (window.cafeContentIsReviewer && window.cafeContentIsReviewer() ? 'No reviews yet' : 'No content history yet') : _d.t;
                 _q('.empty-hero-subtitle').textContent = _cc ? '' : _d.s; _q('.empty-hero-subtitle').style.display = _cc ? 'none' : '';
-                _q('.empty-hero-hint').textContent = _cc ? 'Posted pieces and their review scores appear here' : _d.h;
+                _q('.empty-hero-hint').textContent = _cc ? (window.cafeContentIsReviewer && window.cafeContentIsReviewer() ? 'The posts you review — and your own content — appear here' : 'Posted pieces and their review scores appear here') : _d.h;
             }
             const hero = document.getElementById('unified-empty-hero');
             const stats = document.getElementById('unified-stats-card');
@@ -24312,7 +24315,7 @@ async function archiveDoneCard(cardId) {
             // other), so they DO reach the timeline — but `counts[s.submissionType]` was
             // undefined for them, the guard below skipped them, and getFilteredUnifiedItems
             // dropped them under every pill. They were reachable only under "All".
-            const counts = { all: 0, case: 0, work: 0, quiz: 0, quest: 0, reflective: 0, learning_note: 0, product: 0, explore_link: 0 };
+            const counts = { all: 0, case: 0, work: 0, quiz: 0, quest: 0, reflective: 0, learning_note: 0, product: 0, explore_link: 0, content_review: 0 };
             getUnifiedAllItems().forEach(s => {
                 counts.all++;
                 if (counts[s.submissionType] !== undefined) counts[s.submissionType]++;
@@ -26175,8 +26178,8 @@ async function archiveDoneCard(cardId) {
 <script src="history-review.js?v=V99.81"></script>
 <script src="daily-canvas.js?v=V101.35"></script>
 <script src="intern-guide.js?v=V101.99" defer></script>
-<script src="cafe-content.js?v=V101.123" defer></script>
-<script src="history-lean.js?v=V101.121"></script><script src="history-compact.js?v=V101.55"></script><script src="delete-requests.js?v=V101.114"></script>
+<script src="cafe-content.js?v=V101.124" defer></script>
+<script src="history-lean.js?v=V101.124"></script><script src="history-compact.js?v=V101.55"></script><script src="delete-requests.js?v=V101.114"></script>
 </body>
 
 </html>
