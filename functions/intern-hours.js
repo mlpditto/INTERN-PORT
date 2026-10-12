@@ -19,6 +19,10 @@ const bkkClock = (d) => d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Bangkok'
 // V102.117: also returns `daily`, newest first, for the admin "who worked when" popup:
 // { d: 'YYYY-MM-DD', h: hours, s: [{ i: 'HH:mm', o: 'HH:mm' | null }, ...] } - a null clock-out is
 // a clock-in that was never closed (counts 0 h). A day with only a lone clock-out is left out.
+// V102.190: what counts toward the goal is CREDITED time, not the clock span. Per Bangkok day: span (clock-in → clock-out) minus a fixed
+// 1 h break, never below 0 and never above 8 h. `total` = credited, `onSite` = the raw span, `daily[].c` / `.h` the same per day.
+const BREAK_H = 1;
+const DAY_H = 8;
 function sumInternHours(logs, startDate, endDate) {
     const byDay = {};
     logs.forEach((x) => {
@@ -28,6 +32,7 @@ function sumInternHours(logs, startDate, endDate) {
         (byDay[k] = byDay[k] || []).push(x);
     });
     let total = 0;
+    let onSite = 0;
     let days = 0;
     const daily = [];
     Object.keys(byDay).forEach((k) => {
@@ -47,12 +52,14 @@ function sumInternHours(logs, startDate, endDate) {
             }
         });
         if (inTime) segs.push({ i: bkkClock(inTime), o: null });
-        if (dayHours > 0) days++;
-        total += dayHours;
-        if (segs.length) daily.push({ d: k, h: Math.round(dayHours * 100) / 100, s: segs });
+        const credited = Math.max(0, Math.min(DAY_H, dayHours - BREAK_H));
+        if (credited > 0) days++;
+        total += credited;
+        onSite += dayHours;
+        if (segs.length) daily.push({ d: k, h: Math.round(dayHours * 100) / 100, c: Math.round(credited * 100) / 100, s: segs });
     });
     daily.sort((a, b) => (a.d < b.d ? 1 : -1));
-    return { total: Math.round(total * 100) / 100, days, daily };
+    return { total: Math.round(total * 100) / 100, onSite: Math.round(onSite * 100) / 100, days, daily };
 }
 
 // name -> time-clock user id. A name two people share maps to null: guessing
@@ -92,13 +99,13 @@ async function syncInternHours(db, timeDb, FieldValue, onlyUid) {
             .map((a) => a.data())
             .filter((a) => a.timestamp && a.timestamp.toDate)
             .map((a) => ({ type: a.type, timestamp: a.timestamp.toDate() }));
-        const { total, days, daily } = sumInternHours(logs, String(u.startDate || '').slice(0, 10), String(u.endDate || '').slice(0, 10));
+        const { total, onSite, days, daily } = sumInternHours(logs, String(u.startDate || '').slice(0, 10), String(u.endDate || '').slice(0, 10));
         await doc.ref.update({
-            internHours: { status: 'ok', total, days, daily, timeUserId, syncedAt: FieldValue.serverTimestamp() }
+            internHours: { status: 'ok', total, onSite, days, daily, timeUserId, syncedAt: FieldValue.serverTimestamp() }
         });
-        results.push(onlyUid ? { id: doc.id, name, status: 'ok', total, days, daily } : { id: doc.id, name, status: 'ok', total, days });
+        results.push(onlyUid ? { id: doc.id, name, status: 'ok', total, onSite, days, daily } : { id: doc.id, name, status: 'ok', total, onSite, days });
     }
     return { synced: results.filter((r) => r.status === 'ok').length, results };
 }
 
-module.exports = { sumInternHours, timeIdsByName, syncInternHours };
+module.exports = { sumInternHours, timeIdsByName, syncInternHours, BREAK_H, DAY_H };

@@ -15,24 +15,26 @@ const logs = [
     { type: 'ออกงาน', timestamp: t('2026-09-01T02:30:00') }
 ];
 const totals = (...a) => { const { total, days } = sumInternHours(logs, ...a); return { total, days }; };
-assert.deepEqual(totals('', ''), { total: 11.65, days: 2 });
-assert.deepEqual(totals('2026-09-02', '2026-09-30'), { total: 9.65, days: 1 });
-assert.deepEqual(totals('2026-09-01', '2026-09-01'), { total: 2, days: 1 });
+// V102.190: total = CREDITED hours — per day (clock span − 1 h break) capped at 8 h; onSite = the raw span
+assert.deepEqual(totals('', ''), { total: 9, days: 2 }, '9.65 h day → 8 (capped), 2 h day → 1 (break), open day → 0');
+assert.deepEqual(totals('2026-09-02', '2026-09-30'), { total: 8, days: 1 });
+assert.deepEqual(totals('2026-09-01', '2026-09-01'), { total: 1, days: 1 });
+assert.equal(sumInternHours(logs, '', '').onSite, 11.65, 'onSite keeps the raw clock span (9.65 + 2)');
 
 // V102.117: the day-by-day list behind the admin popup — newest first, Bangkok clock times,
 // an unclosed clock-in shows as a null clock-out (0 h), a lone clock-out leaves no row.
 assert.deepEqual(sumInternHours(logs, '', '').daily, [
-    { d: '2026-09-30', h: 9.65, s: [{ i: '08:59', o: '18:38' }] },
-    { d: '2026-09-29', h: 0, s: [{ i: '09:00', o: null }] },
-    { d: '2026-09-01', h: 2, s: [{ i: '00:30', o: '02:30' }] }
+    { d: '2026-09-30', h: 9.65, c: 8, s: [{ i: '08:59', o: '18:38' }] },
+    { d: '2026-09-29', h: 0, c: 0, s: [{ i: '09:00', o: null }] },
+    { d: '2026-09-01', h: 2, c: 1, s: [{ i: '00:30', o: '02:30' }] }
 ]);
 assert.deepEqual(sumInternHours([
     { type: 'เข้างาน', timestamp: t('2026-10-01T09:10:00') }, { type: 'ออกงาน', timestamp: t('2026-10-01T12:00:00') },
     { type: 'เข้างาน', timestamp: t('2026-10-01T13:00:00') }, { type: 'ออกงาน', timestamp: t('2026-10-01T17:05:00') },
     { type: 'เข้างาน', timestamp: t('2026-10-02T08:00:00') }, { type: 'เข้างาน', timestamp: t('2026-10-02T09:00:00') }
 ], '', '').daily, [
-    { d: '2026-10-02', h: 0, s: [{ i: '08:00', o: null }, { i: '09:00', o: null }] },
-    { d: '2026-10-01', h: 6.92, s: [{ i: '09:10', o: '12:00' }, { i: '13:00', o: '17:05' }] }
+    { d: '2026-10-02', h: 0, c: 0, s: [{ i: '08:00', o: null }, { i: '09:00', o: null }] },
+    { d: '2026-10-01', h: 6.92, c: 5.92, s: [{ i: '09:10', o: '12:00' }, { i: '13:00', o: '17:05' }] }
 ], 'lunch break = two segments; a repeated clock-in leaves the first one open');
 
 // V102.186: Firestore refuses an array directly inside an array. V102.117 stored daily[].s as [['08:59','18:38']] and every
@@ -40,6 +42,15 @@ assert.deepEqual(sumInternHours([
 const hasNestedArray = v => Array.isArray(v) ? v.some(x => Array.isArray(x) || hasNestedArray(x)) : (v && typeof v === 'object' ? Object.values(v).some(hasNestedArray) : false);
 assert.equal(hasNestedArray(sumInternHours(logs, '', '')), false, 'the stored daily list contains no array inside an array');
 assert.equal(hasNestedArray([[1]]), true, 'the guard itself catches a nested array');
+
+// V102.190 credit rule: span − 1 h break, floored at 0, capped at 8
+const day = (a, b) => sumInternHours([{ type: 'เข้างาน', timestamp: t('2026-10-05T' + a + ':00') }, { type: 'ออกงาน', timestamp: t('2026-10-05T' + b + ':00') }], '', '').daily[0];
+assert.equal(day('09:00', '18:00').c, 8, '9 h on site → 8 counted');
+assert.equal(day('08:58', '19:03').c, 8, '10.1 h on site → capped at 8');
+assert.equal(day('09:00', '17:00').c, 7, '8 h on site → 7 counted (the 1 h break is taken off)');
+assert.equal(day('09:00', '09:40').c, 0, 'under the break → 0, never negative');
+assert.equal(day('09:00', '13:00').c, 3, 'a half day: 4 h − 1 h break');
+assert.equal(require('../functions/intern-hours.js').BREAK_H, 1); assert.equal(require('../functions/intern-hours.js').DAY_H, 8);
 
 const doc = (id, d) => ({ id, data: () => d });
 const ids = timeIdsByName([doc('a', { name: 'ณัชชา  โคตรบุปผา', lineUserId: 'U1' }), doc('b', { name: 'X' }), doc('c', { name: 'X' })]);
@@ -66,8 +77,8 @@ const timeDb = mkDb({
 (async () => {
     const res = await syncInternHours(db, timeDb, { serverTimestamp: () => 'NOW' });
     assert.equal(res.synced, 1);
-    assert.deepEqual(writes.bua, { internHours: { status: 'ok', total: 9.65, days: 1, daily: [
-        { d: '2026-09-30', h: 9.65, s: [{ i: '08:59', o: '18:38' }] }, { d: '2026-09-29', h: 0, s: [{ i: '09:00', o: null }] }
+    assert.deepEqual(writes.bua, { internHours: { status: 'ok', total: 8, onSite: 9.65, days: 1, daily: [
+        { d: '2026-09-30', h: 9.65, c: 8, s: [{ i: '08:59', o: '18:38' }] }, { d: '2026-09-29', h: 0, c: 0, s: [{ i: '09:00', o: null }] }
     ], timeUserId: 'U1', syncedAt: 'NOW' } }, 'only days inside the period count; the list rides along');
 
     assert.deepEqual(writes.nt, { 'internHours.status': 'no-match', 'internHours.syncedAt': 'NOW' });
@@ -106,6 +117,15 @@ const timeDb = mkDb({
     assert.match(pop.innerHTML, /08:59 – 18:38/);
     assert.match(pop.innerHTML, /09:00 – ⚠/, 'unclosed clock-in is flagged');
     assert.match(pop.innerHTML, /no clock-out = 0 h/);
+    // V102.190: credited / on-site per day, the count rule under the head, legacy rows (no `c`) keep the single number
+    pc.usersData[0].internHours = { status: 'ok', total: 16, onSite: 19.1, days: 2, daily: [
+        { d: '2026-09-30', h: 9.65, c: 8, s: [{ i: '08:59', o: '18:38' }] }, { d: '2026-09-29', h: 5.5, c: 4.5, s: [{ i: '09:00', o: '14:30' }] }, { d: '2026-09-28', h: 9.2, s: [{ i: '09:00', o: '18:12' }] }] };
+    pc.renderInternHoursPopup('bua');
+    assert.match(pop.innerHTML, /16\.0 \/ 280 h · 2 days/, 'the head shows the CREDITED total');
+    assert.match(pop.innerHTML, /counted: clock span − 1 h break, max 8 h\/day · 19\.1 h on site/, 'the rule + the on-site total sit under the head');
+    assert.match(pop.innerHTML, /color:#16a34a;[^>]*>8<\/span><span[^>]*> \/ 9\.7<\/span>/, 'a full day: 8 (green) / 9.7 on site');
+    assert.match(pop.innerHTML, /color:#ea580c;[^>]*>4\.5<\/span><span[^>]*> \/ 5\.5<\/span>/, 'a short day: 4.5 (orange) / 5.5');
+    assert.ok(/>9\.2<\/span><\/div>/.test(pop.innerHTML) && !/ \/ 9\.2</.test(pop.innerHTML), 'a row synced before V102.190 keeps the single number');
     pc.usersData[0].internHours.daily = undefined;
     pc.renderInternHoursPopup('bua');
     assert.match(pop.innerHTML, /No day-by-day list yet/, 'before the first new-style sync');
