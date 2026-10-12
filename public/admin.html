@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.189)</title>
+    <title>Nika Admin (V102.190)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -50295,11 +50295,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 : daily.map(r => {
                     const open = (r.s || []).some(x => !x.o);
                     if (open) anyOpen = true;
-                    return `<div style="display:grid; grid-template-columns:84px 1fr 44px; gap:6px; padding:3px 4px; border-top:1px solid #f1f5f9; font-size:0.84em; align-items:center;${open ? ' background:#fff7ed; border-radius:6px;' : ''}"><span style="color:#475569;">${escapeHtml(dayLabel(r.d))}</span><span style="color:#64748b; font-variant-numeric:tabular-nums;">${escapeHtml(segText(r.s || []))}</span><span style="text-align:right; font-weight:700; color:${open ? '#c2410c' : '#2563eb'};">${Number(r.h || 0).toFixed(1)}</span></div>`;
+                    const _cr = r.c != null ? Number(r.c) : null;   // V102.190: credited / on-site; rows synced before it have no `c` and keep the single number
+                    return `<div style="display:grid; grid-template-columns:84px 1fr 78px; gap:6px; padding:3px 4px; border-top:1px solid #f1f5f9; font-size:0.84em; align-items:center;${open ? ' background:#fff7ed; border-radius:6px;' : ''}"><span style="color:#475569;">${escapeHtml(dayLabel(r.d))}</span><span style="color:#64748b; font-variant-numeric:tabular-nums;">${escapeHtml(segText(r.s || []))}</span><span style="text-align:right; font-weight:700; font-variant-numeric:tabular-nums; color:${open ? '#c2410c' : '#2563eb'};">${_cr == null ? Number(r.h || 0).toFixed(1) : `<span style="color:${open ? '#c2410c' : _cr >= 8 ? '#16a34a' : '#ea580c'};" title="counted toward the goal (clock span − 1 h break, max 8 h)">${_cr.toFixed(_cr % 1 ? 1 : 0)}</span><span style="color:#94a3b8; font-weight:600;" title="clock-in → clock-out"> / ${Number(r.h || 0).toFixed(1)}</span>`}</span></div>`;
                 }).join('');
             const head = ih.status === 'ok' ? `${Number(ih.total || 0).toFixed(1)}${target ? ` / ${target}` : ''} h · ${ih.days || 0} days` : 'Hours';
+            const countNote = ih.status === 'ok' && ih.onSite != null ? `<div style="font-size:0.72em; font-weight:500; color:#94a3b8; margin:-2px 0 4px;">counted: clock span − 1 h break, max 8 h/day · ${Number(ih.onSite).toFixed(1)} h on site</div>` : '';
             const btn = 'width:auto; min-height:0; margin:0; padding:2px 6px; background:none; border:none; font:inherit; cursor:pointer; color:#64748b;';
-            pop.innerHTML = `<div style="display:flex; align-items:center; gap:4px; font-weight:800; margin-bottom:4px;"><span style="flex:1;">⏱ ${escapeHtml(head)}</span><button type="button" id="ih-refresh" title="Sync from the time clock" aria-label="Sync from the time clock" style="${btn}">🔄</button><button type="button" id="ih-edit" title="Goal and time-clock name" aria-label="Edit goal and name" style="${btn}">✎</button><button type="button" id="ih-close" title="Close" aria-label="Close" style="${btn}">✕</button></div><div style="max-height:260px; overflow:auto;">${rows}</div><div style="display:flex; justify-content:space-between; gap:8px; margin-top:6px; font-size:0.72em; color:#94a3b8;"><span>${anyOpen ? '⚠ no clock-out = 0 h' : ''}</span><span>synced ${escapeHtml(syncedAt)}</span></div>`;
+            pop.innerHTML = `<div style="display:flex; align-items:center; gap:4px; font-weight:800; margin-bottom:4px;"><span style="flex:1;">⏱ ${escapeHtml(head)}</span><button type="button" id="ih-refresh" title="Sync from the time clock" aria-label="Sync from the time clock" style="${btn}">🔄</button><button type="button" id="ih-edit" title="Goal and time-clock name" aria-label="Edit goal and name" style="${btn}">✎</button><button type="button" id="ih-close" title="Close" aria-label="Close" style="${btn}">✕</button></div>${countNote}<div style="max-height:260px; overflow:auto;">${rows}</div><div style="display:flex; justify-content:space-between; gap:8px; margin-top:6px; font-size:0.72em; color:#94a3b8;"><span>${anyOpen ? '⚠ no clock-out = 0 h' : ''}</span><span>synced ${escapeHtml(syncedAt)}</span></div>`;
             pop.querySelector('#ih-close').onclick = closeInternHoursPopup;
             pop.querySelector('#ih-edit').onclick = () => { closeInternHoursPopup(); setInternHours(uid); };
             pop.querySelector('#ih-refresh').onclick = async e => {
