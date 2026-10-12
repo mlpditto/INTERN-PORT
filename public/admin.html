@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.195)</title>
+    <title>Nika Admin (V102.196)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -2619,6 +2619,17 @@
             color: white;
             border-color: #6366f1;
         }
+        /* V102.196: Quiz Engine toolbar — icon-only pills (+ hover), counts on the pills themselves, Style / Tags / Tag hygiene folded behind one button. */
+        .quiz-filter-pill.qf-icon { padding:5px 10px; min-width:34px; font-size:0.85em; letter-spacing:0; }
+        .qf-n { margin-left:5px; padding:0 6px; border-radius:999px; background:#e0e7ff; color:#3730a3; font-size:0.85em; font-weight:900; letter-spacing:0; }
+        .qf-n.hot { background:#fee2e2; color:#b91c1c; }
+        .quiz-filter-pill.is-active .qf-n { background:rgba(255,255,255,0.28); color:#fff; }
+        .qf-lbl { color:#94a3b8; font-size:0.78em; white-space:nowrap; }
+        .qf-more { margin-top:10px; padding:10px 12px; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:12px; flex-direction:column; gap:8px; }
+        .qf-ok { display:inline-flex; align-items:center; gap:6px; border:1.5px solid #86efac; background:#f0fdf4; color:#166534; border-radius:999px; padding:4px 11px; font-size:0.72em; font-weight:800; cursor:pointer; white-space:nowrap; }
+        .qf-ok.warn { border-color:#fde68a; background:#fffbeb; color:#92400e; }
+        .quiz-filter-pill.has-dot { position:relative; }
+        .quiz-filter-pill.has-dot::after { content:''; position:absolute; top:-3px; right:-3px; width:9px; height:9px; border-radius:50%; background:#6366f1; border:2px solid #fff; box-sizing:border-box; }
 
         .alabasta-visual-grid {
             display: grid;
@@ -7761,54 +7772,51 @@
                      Search box was moved here from the inactive wrapper so it filters BOTH lists.
                      Filter pills + sort dropdown are new. -->
                 <div style="background:#fff; padding:14px 18px; border-radius:14px; margin-bottom:18px; border:1px solid #e2e8f0; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
-                    <div style="display:grid; grid-template-columns: 1fr auto auto auto; gap:12px; align-items:center; margin-bottom:10px;">
+                    <div style="display:grid; grid-template-columns: 1fr auto; gap:10px; align-items:center; margin-bottom:10px;">
                         <div style="position:relative;">
                             <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:14px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:0.9em;"></i>
-                            <input type="text" id="quiz-search-global" placeholder="Search title, short title, or tag (Active + Inactive)..." oninput="renderQuizzes()" style="width:100%; padding:9px 15px 9px 42px; border-radius:12px; border:1.5px solid #cbd5e1; font-size:0.88em; outline:none; transition:0.3s; background:white; color:#1e293b;" onfocus="this.style.borderColor='#6366f1'; this.style.boxShadow='0 0 0 4px rgba(99,102,241,0.08)';" onblur="this.style.borderColor='#cbd5e1'; this.style.boxShadow='none';">
+                            <input type="text" id="quiz-search-global" placeholder="Search title or tag · # = tags only" title="Search title, short title and tags (Active + Inactive) · start with # to match tags only" oninput="renderQuizzes()" style="width:100%; padding:9px 15px 9px 42px; border-radius:12px; border:1.5px solid #cbd5e1; font-size:0.88em; outline:none; transition:0.3s; background:white; color:#1e293b;">
                         </div>
-                        <select id="quiz-sort-select" onchange="setQuizSort(this.value)" style="padding:9px 12px; border-radius:12px; border:1.5px solid #cbd5e1; font-size:0.85em; outline:none; background:white; cursor:pointer; font-weight:700; color:#475569;">
-                            <option value="newest">📅 Newest first</option>
-                            <option value="az">🔤 A → Z</option>
-                            <option value="submissions">📊 Most submissions</option>
-                            <option value="audit">🧪 Audit score ↑ (worst first)</option>
-                        </select>
-                        <!-- V97.80: audit coverage across every quiz, filled by renderQuizzes.
-                             Clicking it jumps straight to the 🧪 NOT AUDITED chip. -->
-                        <span id="quiz-audit-stat" onclick="setQuizFilter('unaudited')" style="cursor:pointer; white-space:nowrap;"></span>
-                        <!-- V102.22: tag completeness (System + Topic + Skill, QUIZ_TAG_VOCAB) — click = 🏷️ INCOMPLETE. -->
-                        <span id="quiz-tag-stat" onclick="setQuizFilter('tagsincomplete')" style="cursor:pointer; white-space:nowrap;"></span>
+                        <!-- V102.196: sort = one icon button that cycles (was a dropdown); the icon is the current sort, the tooltip says which and what a tap gives. -->
+                        <button type="button" id="quiz-sort-btn" class="quiz-filter-pill qf-icon" onclick="cycleQuizSort()" title="Sort: Newest first — tap for A → Z" aria-label="Sort: Newest first"><i class="fa-solid fa-calendar-days"></i></button>
                     </div>
-                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; border-top:1px solid #f1f5f9; padding-top:10px;">
-                        <span style="font-size:0.65em; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap;">
-                            <i class="fa-solid fa-filter" style="font-size:0.8em;"></i> Filter:
-                        </span>
-                        <div id="quiz-filter-pills" style="display:flex; gap:6px;">
+                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; border-top:1px solid #f1f5f9; padding-top:10px;">
+                        <span class="qf-lbl" title="Filter"><i class="fa-solid fa-filter"></i></span>
+                        <!-- V102.196: the audit / tag COUNTS live on their own pills (🧪 NOT AUDITED n, 🏷️ INCOMPLETE n) — the two status chips that duplicated them are gone. -->
+                        <div id="quiz-filter-pills" style="display:flex; gap:6px; flex-wrap:wrap;">
                             <button type="button" class="quiz-filter-pill is-active" data-filter="all" onclick="setQuizFilter('all')">All</button>
                             <button type="button" class="quiz-filter-pill" data-filter="graded" onclick="setQuizFilter('graded')">GRADED</button>
                             <button type="button" class="quiz-filter-pill" data-filter="template" onclick="setQuizFilter('template')">TEMPLATE</button>
                             <button type="button" class="quiz-filter-pill" data-filter="onetime" onclick="setQuizFilter('onetime')">ONE-TIME</button>
-                            <button type="button" class="quiz-filter-pill" data-filter="locked" onclick="setQuizFilter('locked')">🔒 LOCKED</button>
-                            <button type="button" class="quiz-filter-pill" data-filter="materials" onclick="setQuizFilter('materials')">📎 MATERIALS</button>
+                            <button type="button" class="quiz-filter-pill qf-icon" data-filter="locked" onclick="setQuizFilter('locked')" title="Locked — needs a score to unlock" aria-label="Locked">🔒</button>
+                            <button type="button" class="quiz-filter-pill qf-icon" data-filter="materials" onclick="setQuizFilter('materials')" title="With attached materials" aria-label="Materials">📎</button>
                             <!-- V97.80: never audited, or audited before the questions changed. -->
-                            <button type="button" class="quiz-filter-pill" data-filter="unaudited" onclick="setQuizFilter('unaudited')" title="Never audited, or audited before the questions changed">🧪 NOT AUDITED</button>
-                            <button type="button" class="quiz-filter-pill" data-filter="tagsincomplete" onclick="setQuizFilter('tagsincomplete')" title="Missing System, Topic or Skill tag · tag ยังไม่ครบ">🏷️ INCOMPLETE</button>
+                            <button type="button" class="quiz-filter-pill qf-icon" data-filter="unaudited" onclick="setQuizFilter('unaudited')" title="Never audited, or audited before the questions changed" aria-label="Not audited">🧪</button>
+                            <button type="button" class="quiz-filter-pill qf-icon" data-filter="tagsincomplete" onclick="setQuizFilter('tagsincomplete')" title="Missing System, Topic or Skill tag · tag ยังไม่ครบ" aria-label="Tags incomplete">🏷️</button>
                         </div>
-                        <!-- V101.76: exam style rail (quiz.examStyle), filled by renderQuizzes; hidden while no quiz carries a style. -->
-                        <div id="quiz-style-pills" class="lang-no-toggle" style="display:none; gap:6px; align-items:center;"></div>
-                        <span style="height:18px; border-left:1px solid #e2e8f0; margin:0 4px;"></span>
-                        <span style="font-size:0.65em; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap;">Tags:</span>
-                        <!-- V96.58: lang-no-toggle — same Thai-strip fix for the top-tags rail. -->
-                        <div id="quiz-tag-chips" class="lang-no-toggle" style="display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto; flex:1; min-width:120px;">
-                            <!-- Tag chips injected by renderQuizzes -->
-                        </div>
+                        <button type="button" id="quiz-ai-tag-btn" class="quiz-filter-pill qf-icon" onclick="openQuizAiTagReview(null)" hidden></button>
+                        <!-- V102.196: Style + Tags + Tag hygiene fold behind this one button (closed by default); a chosen style lights it. -->
+                        <button type="button" id="quiz-more-btn" class="quiz-filter-pill qf-icon" onclick="toggleQuizMoreFilters()" aria-expanded="false" aria-controls="quiz-more-filters" title="Style · Tags · Tag hygiene" aria-label="More filters"><i class="fa-solid fa-sliders"></i></button>
+                        <span id="quiz-hyg-badge" style="margin-left:auto;"></span>
                     </div>
-                    <!-- V101.06: Tag hygiene: distinct / case variants / near-duplicates / singletons
-                         over every quiz-level tag. Summary is refreshed by every renderQuizzes;
-                         the body renders only while open (ontoggle). -->
-                    <details id="quiz-tag-hygiene" class="lang-no-toggle" ontoggle="renderQuizTagHygiene()">
-                        <summary id="quiz-tag-hygiene-summary" title="Distinct tags, spelling drift and one-off tags across every quiz">🏷️ Tag hygiene</summary>
-                        <div id="quiz-tag-hygiene-body"></div>
-                    </details>
+                    <div id="quiz-more-filters" class="qf-more" style="display:none;">
+                        <!-- V101.76: exam style rail (quiz.examStyle), filled by renderQuizzes; hidden while fewer than two styles are in use. -->
+                        <div id="quiz-style-pills" class="lang-no-toggle" style="display:none; gap:6px; align-items:center; flex-wrap:wrap;"></div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span class="qf-lbl" title="Tags"><i class="fa-solid fa-hashtag"></i></span>
+                            <!-- V96.58: lang-no-toggle — same Thai-strip fix for the top-tags rail. -->
+                            <div id="quiz-tag-chips" class="lang-no-toggle" style="display:flex; gap:8px; flex-wrap:wrap; flex:1; min-width:120px;">
+                                <!-- Tag chips injected by renderQuizzes -->
+                            </div>
+                        </div>
+                        <!-- V101.06: Tag hygiene: distinct / case variants / near-duplicates / singletons
+                             over every quiz-level tag. Summary is refreshed by every renderQuizzes;
+                             the body renders only while open (ontoggle). -->
+                        <details id="quiz-tag-hygiene" class="lang-no-toggle" ontoggle="renderQuizTagHygiene()">
+                            <summary id="quiz-tag-hygiene-summary" title="Distinct tags, spelling drift and one-off tags across every quiz">🏷️ Tag hygiene</summary>
+                            <div id="quiz-tag-hygiene-body"></div>
+                        </details>
+                    </div>
                 </div>
 
                 <!-- V94.04: bulk quiz actions bar — hidden until ≥1 row checkbox is ticked -->
@@ -32226,7 +32234,14 @@ ${JSON.stringify(sourceObj)}`;
             if (!details || !summary || !body || typeof quizzesData === 'undefined') return;
             const h = window.computeQuizTagHygiene(quizzesData);
             const stat = (label, n, warn) => `<span class="tag-hyg-stat${warn && n ? ' warn' : ''}">${n} ${label}</span>`;
-            summary.innerHTML = `🏷️ Tag hygiene ${stat('distinct', h.distinct)}${stat('case variants', h.caseVariants.length, true)}${stat('near-duplicates', h.nearDuplicates.length, true)}${stat('singletons', h.singletons.length)}${stat('untagged quizzes', h.untagged, true)}`;
+            // V102.196: only the stats that are not 0 (the rest is noise); a compact badge in the toolbar (green frame = nothing to fix) opens the panel
+            summary.innerHTML = `🏷️ Tag hygiene ${stat('distinct', h.distinct)}${h.caseVariants.length ? stat('case variants', h.caseVariants.length, true) : ''}${h.nearDuplicates.length ? stat('near-duplicates', h.nearDuplicates.length, true) : ''}${h.singletons.length ? stat('singletons', h.singletons.length) : ''}${h.untagged ? stat('untagged quizzes', h.untagged, true) : ''}`;
+            const _hygBadge = document.getElementById('quiz-hyg-badge');
+            if (_hygBadge) {
+                const _issues = h.caseVariants.length + h.nearDuplicates.length + h.untagged;
+                const _tip = `Tag hygiene — ${h.distinct} distinct · ${h.caseVariants.length} case variants · ${h.nearDuplicates.length} near-duplicates · ${h.untagged} untagged · ${h.singletons.length} singletons (click to open)`;
+                _hygBadge.innerHTML = _issues ? `<span class="qf-ok warn" onclick="openQuizHygiene()" title="${_tip}">⚠ ${_issues}</span>` : `<span class="qf-ok" onclick="openQuizHygiene()" title="${_tip}">🏷️ OK · ${h.distinct}</span>`;
+            }
             if (!details.open) { body.innerHTML = ''; return; }
             const label = e => `${escapeHtml(e.forms[0].raw)} <small>×${e.count}</small>`;
             const chip = e => `<span class="tag-hyg-chip" data-tag="${escapeHtml(e.forms[0].raw)}" onclick="quizTagHygieneFilter(this)" title="Filter the list by this tag">${label(e)}</span>`;
@@ -32324,8 +32339,10 @@ ${JSON.stringify(sourceObj)}`;
             // V102.152: a Coverage-by-System chip filters both lists to that system's quizzes (the same buckets the chip counts come from).
             const sysIds = window.quizSystemIds();
 
+            const _tagOnly = searchVal.startsWith('#'), _sv = _tagOnly ? searchVal.slice(1).trim() : searchVal;   // V102.196
             const matchesSearch = (q) => {
-                if (!searchVal) return true;
+                if (!_sv) return true;
+                if (_tagOnly) return window.quizTagsCsv(q).toLowerCase().includes(_sv);   // V102.196: '#tag' = tags only
                 return (q.title || "").toLowerCase().includes(searchVal)
                     || (q.shortTitle || "").toLowerCase().includes(searchVal)
                     || window.quizTagsCsv(q).toLowerCase().includes(searchVal); // V101.15
@@ -32375,17 +32392,20 @@ ${JSON.stringify(sourceObj)}`;
             updateQuizBulkBar();
 
             // Update Tag Chips UI ([Version: V89.50]; V93.27: chips set quiz-search-global)
+            // V102.196: the six most-used tags + "+N ⌕" (focuses the search box with #) — 15 chips ran off the edge. The rail sits in the folded Style · Tags panel.
             const chipContainer = document.getElementById('quiz-tag-chips');
             if (chipContainer && !searchVal) {
-                const topTags = Array.from(allTags).slice(0, 15);
-                chipContainer.innerHTML = topTags.map(tag => `
-                    <span class="badge" onclick="document.getElementById('quiz-search-global').value='${tag}'; renderQuizzes();" style="background:white; color:#64748b; font-size:0.7em; cursor:pointer; padding:5px 12px; border:1px solid #cbd5e1; white-space:nowrap; border-radius:10px; font-weight:700; transition:0.2s; box-shadow:0 1px 2px rgba(0,0,0,0.05);" onmouseover="this.style.background='#f1f5f9'; this.style.borderColor='#6366f1'; this.style.color='#6366f1'" onmouseout="this.style.background='white'; this.style.borderColor='#cbd5e1'; this.style.color='#64748b'">#${tag}</span>
-                `).join('');
+                const _allT = Array.from(allTags), _top = _allT.slice(0, 6), _rest = _allT.length - _top.length;
+                chipContainer.innerHTML = _top.map(tag => `
+                    <span class="badge" data-tag="${escapeHtml(tag)}" onclick="quizTagChipSearch(this)" style="background:white; color:#64748b; font-size:0.7em; cursor:pointer; padding:5px 12px; border:1px solid #cbd5e1; white-space:nowrap; border-radius:10px; font-weight:700; transition:0.2s; box-shadow:0 1px 2px rgba(0,0,0,0.05);" onmouseover="this.style.background='#f1f5f9'; this.style.borderColor='#6366f1'; this.style.color='#6366f1'" onmouseout="this.style.background='white'; this.style.borderColor='#cbd5e1'; this.style.color='#64748b'">#${escapeHtml(tag)}</span>
+                `).join('') + (_rest > 0 ? `<span class="badge" onclick="quizTagSearchFocus()" title="${_rest} more tags — type # in the search box to match tags only" style="background:#eef2ff; color:#4f46e5; font-size:0.7em; cursor:pointer; padding:5px 12px; border:1px dashed #a5b4fc; white-space:nowrap; border-radius:10px; font-weight:800;">+${_rest} <i class="fa-solid fa-magnifying-glass"></i></span>` : '');
             } else if (chipContainer && searchVal) {
                 chipContainer.innerHTML = `<span class="badge" onclick="document.getElementById('quiz-search-global').value=''; renderQuizzes();" style="background:#fee2e2; color:#ef4444; font-size:0.75em; cursor:pointer; padding:6px 14px; border:1px solid #fecaca; border-radius:10px; font-weight:800; display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-circle-xmark"></i> Clear Search Filter</span>`;
             }
 
-            // V101.76: exam style rail — All · one pill per style in use · — none.
+            // V101.76: exam style rail — All · one pill per style in use.
+            // V102.196: shown only when at least TWO styles are in use (or one is selected); "— none (n)" is hidden unless it is the selected one; the rail sits in the folded
+            // Style · Tags panel and a selected style lights the ⚙ button (a dot) so a hidden filter is never silent.
             const stylePills = document.getElementById('quiz-style-pills');
             if (stylePills) {
                 const used = Object.keys(styleCounts).filter(k => k !== '__none');
@@ -32393,39 +32413,36 @@ ${JSON.stringify(sourceObj)}`;
                 used.sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
                 const cur = window.currentQuizStyle || '';
                 const pill = (k, label) => `<button type="button" class="quiz-filter-pill${cur === k ? ' is-active' : ''}" onclick="setQuizStyleFilter('${escapeHtml(k)}')">${escapeHtml(label)}</button>`;
-                stylePills.style.display = (used.length || cur) ? 'flex' : 'none';
-                stylePills.innerHTML = (used.length || cur)
-                    ? `<span style="height:18px; border-left:1px solid #e2e8f0; margin:0 4px;"></span><span style="font-size:0.65em; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap;">Style:</span>`
-                        + pill('', 'All') + used.map(k => pill(k, `${window.quizExamStyleLabel(k)} (${styleCounts[k]})`)).join('') + pill('__none', `— none (${styleCounts.__none})`)
+                const showStyles = used.length >= 2 || !!cur;
+                stylePills.style.display = showStyles ? 'flex' : 'none';
+                stylePills.innerHTML = showStyles
+                    ? `<span class="qf-lbl" title="Exam style"><i class="fa-solid fa-graduation-cap"></i></span>`
+                        + pill('', 'All') + used.map(k => pill(k, `${window.quizExamStyleLabel(k)} (${styleCounts[k]})`)).join('') + (cur === '__none' ? pill('__none', `— none (${styleCounts.__none})`) : '')
                     : '';
+                const _moreBtn = document.getElementById('quiz-more-btn');
+                if (_moreBtn) {
+                    _moreBtn.classList.toggle('has-dot', !!cur);
+                    _moreBtn.title = cur ? `Style: ${cur === '__none' ? 'none' : window.quizExamStyleLabel(cur)} · Tags · Tag hygiene` : 'Style · Tags · Tag hygiene';
+                }
             }
 
             // V101.06: tag hygiene summary rides the same pass (counts over ALL of quizzesData).
             if (typeof window.renderQuizTagHygiene === 'function') window.renderQuizTagHygiene();
 
-            // V97.80: audit coverage, deliberately counted over ALL of quizzesData rather
-            // than the filtered view — the number answers "how far through auditing am I",
-            // which a count of whatever is currently filtered cannot. Same docs the row
-            // badges already read, so it costs no extra Firestore reads.
-            const auditStatEl = document.getElementById('quiz-audit-stat');
-            if (auditStatEl) {
-                const auditTotal = quizzesData.length;
-                const auditDone = quizzesData.filter(q => !window.quizNeedsAudit(q)).length;
-                if (!auditTotal) {
-                    auditStatEl.innerHTML = '';
-                } else {
-                    const pct = Math.round((auditDone / auditTotal) * 100);
-                    const skin = pct >= 80 ? 'background:#dcfce7; color:#15803d; border:1px solid #86efac;'
-                        : pct >= 40 ? 'background:#fef9c3; color:#a16207; border:1px solid #fde68a;'
-                        : 'background:#fee2e2; color:#b91c1c; border:1px solid #fecaca;';
-                    auditStatEl.innerHTML = `<span title="${auditTotal - auditDone} quiz(zes) never audited or gone stale — click to filter" style="${skin} font-size:0.72em; font-weight:800; border-radius:10px; padding:6px 11px;">🧪 Audited: ${auditDone} / ${auditTotal}</span>`;
-                }
-            }
-
-            // V102.22: tag completeness over ALL quizzes (same reasoning as the audit pill).
-            const tagStatEl = document.getElementById('quiz-tag-stat');
-            if (tagStatEl) {
+            // V97.80 / V102.22 → V102.196: audit + tag-completeness coverage over ALL quizzes (not the filtered view — "how far through am I"). The two status chips are gone: the numbers
+            // ride on the 🧪 / 🏷️ filter pills (red while something is left), the AI-tag-all ✨ sits beside them, the detail is in the tooltips.
+            const qfPillCount = (filter, n, tip) => {
+                const b = document.querySelector(`#quiz-filter-pills [data-filter="${filter}"]`); if (!b) return;
+                let c = b.querySelector('.qf-n');
+                if (!c) { c = document.createElement('span'); c.className = 'qf-n'; b.appendChild(c); }
+                c.textContent = n || ''; c.hidden = !n; c.classList.toggle('hot', n > 0);
+                if (tip) b.title = tip;
+            };
+            const qfAiBtn = document.getElementById('quiz-ai-tag-btn');
+            {
                 const total = quizzesData.length;
+                const auditLeft = total ? quizzesData.filter(q => window.quizNeedsAudit(q)).length : 0;
+                qfPillCount('unaudited', auditLeft, auditLeft ? `${auditLeft} of ${total} quizzes never audited or gone stale (${total - auditLeft} audited) — filter` : 'Never audited, or audited before the questions changed');
                 const c = { complete: 0, untagged: 0, system: 0, topic: 0, skill: 0 };
                 quizzesData.forEach(q => {
                     const r = window.quizTagCompleteness(q);
@@ -32435,18 +32452,14 @@ ${JSON.stringify(sourceObj)}`;
                     if (!r.topic) c.topic++;
                     if (!r.skill) c.skill++;
                 });
-                if (!total) {
-                    tagStatEl.innerHTML = '';
-                } else {
-                    const pct = Math.round((c.complete / total) * 100);
-                    const skin = pct >= 80 ? 'background:#dcfce7; color:#15803d; border:1px solid #86efac;'
-                        : pct >= 40 ? 'background:#fef9c3; color:#a16207; border:1px solid #fde68a;'
-                        : 'background:#fee2e2; color:#b91c1c; border:1px solid #fecaca;';
-                    const tip = `Tags complete = System + Topic + Skill. ${c.untagged} without tags · ${c.system} missing System · ${c.topic} missing Topic · ${c.skill} missing Skill — click to filter`;
-                    tagStatEl.innerHTML = `<span title="${tip}" style="${skin} font-size:0.72em; font-weight:800; border-radius:10px; padding:6px 11px;">🏷️ Tags: ${c.complete} / ${total}</span>`
-                        + (c.complete < total ? `<button type="button" onclick="event.stopPropagation(); openQuizAiTagReview(null)" title="AI-tag every incomplete quiz (${total - c.complete}) · ให้ AI เติมแท็กที่ยังไม่ครบ" aria-label="AI-tag incomplete quizzes" style="width:auto; min-height:0; margin-left:4px; padding:4px 8px; border:1px solid #c7d2fe; border-radius:10px; background:#eef2ff; color:#4338ca; font-size:0.72em; cursor:pointer;">✨</button>` : ''); // V102.23
+                const incomplete = total - c.complete;
+                qfPillCount('tagsincomplete', incomplete, incomplete ? `Tags complete = System + Topic + Skill. ${incomplete} of ${total} incomplete: ${c.untagged} without tags · ${c.system} missing System · ${c.topic} missing Topic · ${c.skill} missing Skill — filter` : 'Every quiz has System + Topic + Skill tags');
+                if (qfAiBtn) {
+                    qfAiBtn.hidden = !(total && incomplete > 0);
+                    if (!qfAiBtn.hidden) { qfAiBtn.innerHTML = `✨<span class="qf-n hot">${incomplete}</span>`; qfAiBtn.title = `AI-tag every incomplete quiz (${incomplete}) · ให้ AI เติมแท็กที่ยังไม่ครบ`; qfAiBtn.setAttribute('aria-label', 'AI-tag incomplete quizzes'); }
                 }
             }
+            if (window.paintQuizSortBtn) window.paintQuizSortBtn();
 
             // V93.99 PR 2b: group all attempts by quizId once per render so generateRow
             // reads attemptsByQuiz[q.id] instead of re-scanning quizAttemptsAllCache for
@@ -32893,6 +32906,47 @@ ${JSON.stringify(sourceObj)}`;
             inactiveQuizPage = 1;
             renderQuizzes();
         }
+
+        // V102.196: sort = one icon button that cycles newest → A–Z → most submissions → audit; the icon is the current sort, the tooltip names it and the next one.
+        const QUIZ_SORT_MODES = [
+            { key: 'newest', icon: 'fa-calendar-days', label: 'Newest first' },
+            { key: 'az', icon: 'fa-arrow-down-a-z', label: 'A → Z' },
+            { key: 'submissions', icon: 'fa-chart-simple', label: 'Most submissions' },
+            { key: 'audit', icon: 'fa-flask', label: 'Audit score ↑ (worst first)' }
+        ];
+        window.paintQuizSortBtn = function () {
+            const btn = document.getElementById('quiz-sort-btn'); if (!btn) return;
+            const i = Math.max(0, QUIZ_SORT_MODES.findIndex(m => m.key === (window.currentQuizSort || 'newest')));
+            const cur = QUIZ_SORT_MODES[i], next = QUIZ_SORT_MODES[(i + 1) % QUIZ_SORT_MODES.length];
+            btn.innerHTML = `<i class="fa-solid ${cur.icon}"></i>`;
+            btn.title = `Sort: ${cur.label} — tap for ${next.label}`;
+            btn.setAttribute('aria-label', `Sort: ${cur.label}`);
+        };
+        window.cycleQuizSort = function () {
+            const i = Math.max(0, QUIZ_SORT_MODES.findIndex(m => m.key === (window.currentQuizSort || 'newest')));
+            setQuizSort(QUIZ_SORT_MODES[(i + 1) % QUIZ_SORT_MODES.length].key);
+            window.paintQuizSortBtn();   // renderQuizzes is debounced — the icon must not lag behind the tap
+        };
+        // The folded Style · Tags · Tag hygiene panel (closed by default).
+        window.toggleQuizMoreFilters = function (force) {
+            const p = document.getElementById('quiz-more-filters'), b = document.getElementById('quiz-more-btn'); if (!p) return;
+            const open = typeof force === 'boolean' ? force : p.style.display === 'none';
+            p.style.display = open ? 'flex' : 'none';
+            if (b) { b.setAttribute('aria-expanded', String(open)); b.classList.toggle('is-active', open); }
+        };
+        window.openQuizHygiene = function () {
+            window.toggleQuizMoreFilters(true);
+            const d = document.getElementById('quiz-tag-hygiene'); if (d) { d.open = true; d.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+        };
+        window.quizTagChipSearch = function (el) {
+            const input = document.getElementById('quiz-search-global'); if (!input || !el) return;
+            input.value = el.dataset.tag || '';
+            renderQuizzes();
+        };
+        window.quizTagSearchFocus = function () {
+            const input = document.getElementById('quiz-search-global'); if (!input) return;
+            input.value = '#'; input.focus(); renderQuizzes();
+        };
 
         function quizMatchesFilter(q) {
             const f = window.currentQuizFilter || 'all';
