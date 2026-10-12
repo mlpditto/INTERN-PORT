@@ -14,18 +14,26 @@ assert.ok(/id="gs-user-cafe-box"[^>]*hidden/.test(html), 'the 🌸 chip is hidde
         await page.addInitScript(() => { window.firebase = new Proxy(function () {}, { get: () => window.firebase, apply: () => window.firebase }); });
         await page.goto(require('url').pathToFileURL(process.cwd() + '/public/admin.html').href);
         const run = await page.evaluate(async () => {
-            const writes = [], works = { w1: { kind: 'social' }, w2: { kind: undefined } };
+            const writes = [], works = { w1: { kind: 'social' }, w2: {}, w3: { kind: 'social' }, w4: { kind: 'social', cafeBeriAwarded: true } };
+            const reviews = [{ workId: 'w1', verdict: 'approve' }, { workId: 'w3', verdict: 'changes' }, { workId: 'w4', verdict: 'approve' }];
             const inc = n => ({ inc: n });
             window.firebase = { firestore: { FieldValue: { increment: inc } } };
-            db = { collection: n => ({ doc: id => ({
+            const q = (filters) => ({ where: (f, o, v) => q(filters.concat([[f, v]])), limit: () => q(filters),
+                get: async () => { const hit = reviews.filter(r => filters.every(([f, v]) => (f === 'type' ? v === 'content_review' : r[f] === v))); return { empty: !hit.length }; } });
+            db = { collection: n => Object.assign(q([]), { doc: id => ({
                 get: async () => ({ exists: !!works[id], data: () => works[id] }),
                 update: async d => { writes.push([n, id, d]); } }) }), batch: () => ({}) };
             window.stageSubmissionMirror = async () => false; window.submissionReviewedFields = () => ({}); window.showToast = () => {};
             window.prompt = () => '0.5';
-            await svSc('w1', 'uA'); await svSc('w2', 'uB');
-            return writes.filter(w => w[0] === 'users');
+            for (const [id, uid] of [['w1', 'uA'], ['w2', 'uB'], ['w3', 'uC'], ['w4', 'uD']]) await svSc(id, uid);
+            return writes.filter(w => w[0] !== 'works' || w[2].cafeBeriAwarded);
         });
-        assert.deepEqual(run, [['users', 'uA', { cafePts: { inc: 0.5 } }], ['users', 'uB', { score: { inc: 0.5 } }]], 'a social work → cafePts, an ordinary work → score');
+        assert.deepEqual(run, [
+            ['users', 'uA', { cafePts: { inc: 0.5 } }], ['users', 'uA', { cafeBeri: { inc: 1 } }], ['works', 'w1', { cafeBeriAwarded: true }],
+            ['users', 'uB', { score: { inc: 0.5 } }],
+            ['users', 'uC', { cafePts: { inc: 0.5 } }],
+            ['users', 'uD', { cafePts: { inc: 0.5 } }]
+        ], 'a social work → cafePts; with an Ⓐ (approve) +1 cafeBeri once; changes-only / already awarded → no Beri; an ordinary work → score');
         // User Hub chip
         const chip = await page.evaluate(() => {
             const box = document.getElementById('gs-user-cafe-box'), set = u => { const el = document.getElementById('gs-user-score'); el.innerText = parseFloat((u.score || 0).toFixed(2)); const cp = parseFloat((u.cafePts || 0).toFixed(2)); box.hidden = !cp; document.getElementById('gs-user-cafe').innerText = cp; return [box.hidden, document.getElementById('gs-user-cafe').innerText]; };
