@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.203)</title>
+    <title>Nika Admin (V102.204)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -37278,7 +37278,6 @@ They can connect again from LINE.
             const selDiv = (divisionConfig && divisionConfig[activeUserGroup] && activeUserGroupDiv === undefined) ? activeUserGroup : (activeUserGroupDiv || '');
 
             const campOn = !!window._userCampView;
-            const floodCount = usersData.filter(u => !u.isIgnored && u.floodWatch && u.floodWatch.optIn === true).length;
             // V102.60: the same chip + count rule as the picker and Groups & Divisions —
             // ACTIVE users (not hidden, not pending). Pending requests keep their own section
             // in the table; hidden (camp) users are the 🙈 chip.
@@ -37293,7 +37292,7 @@ They can connect again from LINE.
                 if (divisionConfig && divisionConfig[g]) { const nDiv = inDiv(g, active); if (!nDiv && !isActive) return ''; return groupChipHtml(g, { attrs, ...divChipLook(g), color: divColor(g), active: nDiv, total: inDiv(g, usersData), hint: 'division' }); }   // V102.186: 0 active → no chip (it returns with its first member)
                 const nOnly = inOnlyI(g, active); if (!nOnly && !isActive) return '';
                 return groupChipHtml(g, { attrs, active: nOnly, total: inOnlyI(g, usersData) });
-            }).join('') + (floodCount ? `<button type="button" class="grp-chip${window._userFloodOnly ? ' on' : ''}" onclick="toggleUserFloodView()" aria-pressed="${!!window._userFloodOnly}" title="Flood alerts on · ${floodCount}" style="--c:#2563eb;">🌊<small>${floodCount}</small></button>` : '') + (campCount ? `<button type="button" class="grp-chip${campOn ? ' on' : ''}" onclick="toggleUserCampView()" aria-pressed="${campOn}" title="Camp · hidden from boards, not ranked · ${campCount}" style="--c:#64748b;">🙈<span class="grp-name">Camp</span><small>${campCount}</small></button>` : '');
+            }).join('') + (campCount ? `<button type="button" class="grp-chip${campOn ? ' on' : ''}" onclick="toggleUserCampView()" aria-pressed="${campOn}" title="Camp · hidden from boards, not ranked · ${campCount}" style="--c:#64748b;">🙈<span class="grp-name">Camp</span><small>${campCount}</small></button>` : '');
             renderUserSubgroupRow();   // V102.170
         }
 
@@ -49840,7 +49839,6 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     data = data.filter(u => userInScope(u, activeUserGroup, activeUserGroupDiv));   // V102.172: a division = the people IN it (users.division)
                 }
 
-                if (window._userFloodOnly) data = data.filter(u => u.floodWatch && u.floodWatch.optIn === true);
 
                 // V98.49 — Know Yourself rail. Built from the rows the group/search
                 // filters left, then applied. Read-only slice of a self-report: it
@@ -50209,7 +50207,6 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const warm = f.cls === 'nohome' || f.cls === 'wait';
             return `<div style="margin:3px 0 2px; max-width:420px; display:flex; flex-wrap:wrap; gap:4px 12px; align-items:center; font-size:0.74em; padding:6px 10px; border-radius:10px; border:1px solid ${warm ? '#e2e8f0' : '#bae6fd'}; background:${warm ? '#f8fafc' : '#f0f9ff'}; color:${warm ? '#475569' : '#0c4a6e'};">${f.detail}</div>`;
         }
-        function toggleUserFloodView() { window._userFloodOnly = !window._userFloodOnly; renderUserGroupTabs(); renderTable('users'); }
         function toggleWorkArchive() { hideCompletedWorks = !hideCompletedWorks; document.getElementById('btn-toggle-work-archive').classList.toggle('active'); renderTable('works'); }
         // V99.42: open/close the folded "Hidden (ignored)" section of the Users table.
         // A window flag, not DOM state — every users onSnapshot re-renders the table.
