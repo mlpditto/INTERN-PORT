@@ -39,6 +39,7 @@ for (const name of ['function updateEarnedBadgesBar(', 'function openAchievement
     assert.ok(fn(name).includes('window.isContentCreator?.()'), name + ' is guarded');
 assert.ok(/body\.cafe-mode #u-earned-badges \{ display: none !important; \}/.test(css), 'earned-badges row hidden in cafe-mode');
 assert.ok(/<div id="cafe-view-switch" class="lang-no-toggle" hidden><\/div>\s*<div id="section-cafe-content"/.test(index), 'the Intern | Content switch host sits before the Content card');
+assert.ok(/window\.myMemberships = Array\.isArray\(da\.memberships\)[^\n]*\n\s*window\.myExtraGroups = /.test(index), 'the users snapshot hands memberships pairs to cafe-content.js (before extraGroups)');
 assert.ok(/window\.myExtraGroups = Array\.isArray\(da\.extraGroups\) \? da\.extraGroups : \[\];[^\n]*\n\s*window\.cafeContentSync\?\.\(\);/.test(index), 'the users snapshot hands extraGroups to cafe-content.js');
 assert.ok(/getMyDivision\(\)/.test(index) && /return "General Division"/.test(index), 'getMyDivision defaults to General Division');
 
@@ -497,6 +498,16 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.equal(await vis('#section-cafe-content'), true);
         await page.click('#cafe-view-switch [data-mode="intern"]');
         assert.equal(await vis('#section-cafe-content'), false, 'can flip to the Intern UI'); assert.equal(await vis('#section-kanban'), true);
+        // V101.119: a CAFE membership stored ONLY as a users.memberships pair (admin V102.183) — the group is in no division list, no extraGroups
+        await page.evaluate(() => { localStorage.clear(); division = 'General Division'; window.myExtraGroups = []; window.myMemberships = [{ division: 'CAFE', group: 'Social' }]; window.cafeContentSync(); });
+        assert.equal(await vis('#cafe-view-switch'), true, 'a {CAFE, Social} pair alone → the Intern | Content switch');
+        assert.deepEqual(await swBtns(), ['Intern:true', 'Content:false'], 'primary outside the division → opens in the Intern UI');
+        await page.evaluate(() => { window.myMemberships = [{ division: 'Clinical', group: 'Rx' }]; window.cafeContentSync(); });
+        assert.equal(await vis('#cafe-view-switch'), false, 'a pair in a non-creator division gives nothing');
+        await page.evaluate(() => { window.myMemberships = [{ division: 'CAFE', group: 'Audit' }]; window.cafeContentSync(); });
+        await page.click('#cafe-view-switch [data-mode="content"]');
+        assert.ok(await page.$('#section-cafe-content [data-view="review"]'), 'the Audit group of a pair gets the Review view');
+        await page.evaluate(() => { localStorage.clear(); division = 'Content Creator'; window.myExtraGroups = ['Rx']; window.myMemberships = []; window.cafeContentSync(); });   // back to the state the next case expects
         // primary in the division and nothing outside it: Content only, no switch
         await page.evaluate(() => { localStorage.clear(); window.myExtraGroups = []; window.cafeContentSync(); });
         assert.equal(await vis('#cafe-view-switch'), false); assert.equal(await vis('#section-cafe-content'), true, 'Content only without a switch');
