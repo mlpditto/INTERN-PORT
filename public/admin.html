@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.191)</title>
+    <title>Nika Admin (V102.192)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -6034,6 +6034,7 @@
     transition: background 0.2s, color 0.2s, box-shadow 0.2s;
     font-family: inherit;
 }
+.subtab-sep { flex:none; align-self:stretch; width:1px; margin:6px 4px; background:#cbd5e1; }   /* V102.192: Quiz Engine · Exam │ Gourmet World · A Shop for Killers */
 .subtab-btn:hover:not(.active) {
     background: rgba(99, 102, 241, 0.06);
     color: #475569;
@@ -7711,6 +7712,7 @@
                 <button type="button" class="subtab-btn" data-subtab="subtab-exam-sessions" onclick="switchAssignmentsSubtab('subtab-exam-sessions')" role="tab">
                     🎓 Exam
                 </button>
+                <span class="subtab-sep" role="separator" aria-orientation="vertical" title="Quiz tools │ Beri · Explore"></span>
                 <!-- V96.50: Beri Phase 1 — admin-curated external links (Explore tab) -->
                 <button type="button" class="subtab-btn" data-subtab="subtab-review-links" onclick="switchAssignmentsSubtab('subtab-review-links')" role="tab">
                     🔗 Gourmet World
@@ -7735,7 +7737,7 @@
                             <span onclick="document.getElementById('section-inactive-quizzes').scrollIntoView({behavior:'smooth', block:'start'})" title="Jump to Inactive / Templates" style="color:#ef4444; font-weight:900; font-size:0.75em; display:flex; align-items:center; gap:4px; cursor:pointer;">⏸️ Pause: <span id="stat-inactive-count">0</span></span>
                             <span onclick="document.getElementById('section-inactive-quizzes').scrollIntoView({behavior:'smooth', block:'start'})" title="Jump to Inactive / Templates" style="color:#d97706; font-weight:900; font-size:0.75em; display:flex; align-items:center; gap:4px; cursor:pointer;">📂 Templates: <span id="stat-template-count">0</span></span>
                         </div>
-                        <button id="btn-translate-all-missing" class="magic-btn" onclick="event.stopPropagation(); qtAdminOpenBackfillSelect()" style="background:linear-gradient(135deg, #d97706, #b45309); padding:10px 18px; border-radius:14px; font-weight:900; font-size:0.85em;" title="Pick which quizzes to backfill translations for (Typhoon)">🌐 Translate Missing</button>
+                        <button id="btn-translate-all-missing" class="magic-btn" onclick="event.stopPropagation(); qtAdminOpenBackfillSelect()" style="background:linear-gradient(135deg, #d97706, #b45309); padding:10px 18px; border-radius:14px; font-weight:900; font-size:0.85em;" title="Pick which quizzes to backfill translations for (Typhoon)">🌐 Translate Missing<span id="tm-count"></span></button>
                         <!-- V100.80: "Create Quiz" moved into the global ➕ Create menu
                              (top toolbar) alongside Task/Quest/Event — one entry point for
                              everything creatable, per the same intent V98.63 stated when
@@ -7831,6 +7833,7 @@
                 <h4 id="section-active-quizzes" style="color:#0d47a1; margin-bottom:10px;">🟢 Active Quizzes</h4>
                 <div
                     style="overflow-x:auto; margin-bottom:30px; background:white; padding:15px; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                    <div id="active-quizzes-empty" style="display:none; align-items:baseline; flex-wrap:wrap; gap:6px 12px; padding:6px 4px; color:#475569; font-size:0.88em;"></div>
                     <table id="quizzesTableActive" style="width:100%;">
                         <thead>
                             <tr style="background:#e0f7fa;">
@@ -32631,6 +32634,18 @@ ${JSON.stringify(sourceObj)}`;
             if(document.getElementById('stat-active-count')) document.getElementById('stat-active-count').innerText = activeCount;
             if(document.getElementById('stat-inactive-count')) document.getElementById('stat-inactive-count').innerText = inactiveCount;
             if(document.getElementById('stat-template-count')) document.getElementById('stat-template-count').innerText = templateCount;
+            // V102.192: how many quizzes still miss a translation = how urgent the Translate Missing button is (the same scan its picker uses)
+            const _tmEl = document.getElementById('tm-count'), _tmBtn = document.getElementById('btn-translate-all-missing');
+            if (_tmEl && _tmBtn && !_tmBtn.disabled) { let _tm = 0; try { _tm = qtAdminBackfillFindMissing().length; } catch (e) { _tm = 0; } _tmEl.textContent = _tm ? ` (${_tm})` : ''; _tmBtn.title = _tm ? `${_tm} quizzes still miss a translation — pick which to backfill (Typhoon)` : 'Every quiz already has its translations'; }
+            // V102.192: nothing live → one line, not a table with only its header
+            const _aeEl = document.getElementById('active-quizzes-empty'), _atEl = document.getElementById('quizzesTableActive');
+            if (_aeEl && _atEl) {
+                _atEl.style.display = activeCount ? '' : 'none';
+                _aeEl.style.display = activeCount ? 'none' : 'flex';
+                if (!activeCount) _aeEl.innerHTML = quizzesData.some(q => q.isActive === true)
+                    ? '<b>No live quiz matches this filter</b><small>Clear the search / filter above to see them all</small>'
+                    : `<b>Nothing is live right now</b><small>Open <b>Inactive / Templates</b> below and tap <b>Go live</b> · ${inactiveCount} to choose from</small>`;
+            }
 
             const totalInactivePages = Math.ceil(sortedInactive.length / INACTIVE_QUIZ_PER_PAGE) || 1;
 
@@ -35199,6 +35214,9 @@ RULES:
                 const uncategorized = buckets.__uncat.length;
 
                 const covered = systems.filter(s => counts[s.key] > 0).length;
+                // V102.192: badge colour = how well the system is covered — green ≥ 10, amber 5–9, red < 5 (0 stays the light-red gap chip, "Other" is not scored)
+                const covBg = (key, n) => key === 'other' ? '#94a3b8' : n === 0 ? '#fca5a5' : n < 5 ? '#ef4444' : n < 10 ? '#f59e0b' : '#10b981';
+                const covTip = (key, n) => `${n} quiz${n === 1 ? '' : 'zes'}` + (key === 'other' ? '' : n >= 10 ? ' · enough' : n >= 5 ? ' · thin (< 10)' : ' · scarce (< 5)');
                 let html = [...systems].sort((a, b) => counts[a.key] - counts[b.key]).map((s, index) => {
                     const n = counts[s.key];
                     const isGap = n === 0;
@@ -35210,7 +35228,7 @@ RULES:
                             <div style="font-size:0.8em; font-weight:700; color:#334155; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(s.label.en)}</div>
                             ${s.key === 'other' ? '<div style="font-size:0.62em; color:#94a3b8;">Miscellaneous (assigned)</div>' : ''}
                         </div>
-                        <span class="badge" style="background:${isGap ? '#fca5a5' : 'var(--primary)'}; color:white; min-width:22px; text-align:center;">${n}</span>
+                        <span class="badge" title="${covTip(s.key, n)}" style="background:${covBg(s.key, n)}; color:white; min-width:22px; text-align:center;">${n}</span>
                     </div>`;
                 }).join('');
                 if (uncategorized > 0) {
@@ -35223,6 +35241,7 @@ RULES:
                 grid.innerHTML = html;
                 const sum = document.getElementById('qcov-summary');
                 if (sum) sum.textContent = `${covered}/${systems.length} systems` + (uncategorized ? ` · ${uncategorized} uncat` : '');
+                if (sum) sum.title = 'Badge colour = quizzes per system: green ≥ 10 · amber 5–9 · red < 5 (Other is not scored)';
             };
 
             // V95.23: click a coverage card → list its quizzes; click a row → open the editor.
