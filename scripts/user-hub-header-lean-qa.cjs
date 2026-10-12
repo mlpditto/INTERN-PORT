@@ -26,7 +26,7 @@ const order = ['gs-header-person', 'class="gs-ident"', 'class="gs-spacer"', 'cla
 assert.ok(order.every((v, i) => v >= 0 && (i === 0 || v > order[i - 1])), 'order: person · identity · spacer · EN/TH · points · Beri · ×');
 assert.ok(html.includes("function gsCopyEnrollmentCode()"), 'copy handler exists');
 // V102.180: Google = ONE icon (the G) + email; the chip itself disconnects (no 🌐 in front, no link-slash button behind)
-assert.ok(/<button type="button" id="gs-google-chip" class="gs-google" onclick="gsDisconnectGoogle\(\)"[^>]*><i class="fa-brands fa-google" aria-hidden="true"><\/i><code id="gs-google-email">-<\/code><\/button>/.test(header), 'Google chip = G icon + email, click disconnects');
+assert.ok(/<button type="button" id="gs-google-chip" class="gs-google" onclick="gsDisconnectGoogle\(\)"[^>]*><svg viewBox="0 0 48 48"[^>]*>(?:<path [^>]*\/>){4}<\/svg><code id="gs-google-email">-<\/code><\/button>/.test(header), 'Google chip = G icon + email, click disconnects');
 assert.ok(!header.includes('🌐') && !header.includes('fa-link-slash'), 'no second icon on the Google chip');
 const grp = html.slice(html.indexOf('<section class="gs-inline-group lang-no-toggle"'), html.indexOf('<div id="gs-pane-group" hidden>'));
 assert.ok(!grp.includes('gs-group-summary') && !grp.includes('Select one group') && !/<button[^>]*id="gs-group-toggle"/.test(grp), 'no summary box / help text / Change group button');
