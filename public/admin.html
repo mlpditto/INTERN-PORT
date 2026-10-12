@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.185)</title>
+    <title>Nika Admin (V102.186)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -54409,6 +54409,20 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return pcts.reduce((a, b) => a + b, 0) / pcts.length;
         }
 
+        // V102.186: a user's approved attempts come from the live quiz_attempts listener (quizAttemptsAllCache, every attempt of
+        // every user) — Quiz Insight used to re-query Firestore on every open AND every 7d/30d/All click (80–140 ms, ~23 reads each
+        // time) for data that was already in memory. Same shape as a query snapshot (docs[].id/.data(), empty); falls back to the
+        // query only while the listener has not delivered yet.
+        async function hubApprovedAttemptsSnap(userId) {
+            if (typeof quizAttemptsAllCache !== 'undefined' && quizAttemptsAllCache.length) {
+                const docs = quizAttemptsAllCache
+                    .filter(a => a.userId === userId && a.status === 'approved')
+                    .map(a => ({ id: a.id, data: () => a }));
+                return { docs, empty: docs.length === 0 };
+            }
+            return db.collection("quiz_attempts").where("userId", "==", userId).where("status", "==", "approved").get();
+        }
+
         async function renderQuizInsight(userId) {
             const chartBox = document.getElementById('quiz-trend-chart');
             const tagBox = document.getElementById('quiz-tags-stats');
@@ -54416,7 +54430,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             
             try {
                 // Fetch attempts for this user
-                const snap = await db.collection("quiz_attempts").where("userId", "==", userId).where("status", "==", "approved").get();
+                const snap = await hubApprovedAttemptsSnap(userId);
                 if (snap.empty) {
                     chartBox.innerHTML = '<div style="color:#94a3b8; font-size:0.85em;">No quiz data available for trend analysis.</div>';
                     tagBox.innerHTML = '(No quiz history)';
