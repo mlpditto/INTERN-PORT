@@ -97,12 +97,13 @@
         var m = memberships(), mode = m.both ? getMode(m) : '', sig = m.both + '|' + mode + '|' + lang();
         if (sig === switchSig) return;
         switchSig = sig;
-        if (!m.both) { el.hidden = true; el.innerHTML = ''; return; }
-        var t = L();
-        el.innerHTML = '<div class="cc-switch" role="group" aria-label="' + esc(t.viewAs) + '"><span>' + esc(t.viewAs) + '</span>' +
-            '<button type="button" data-mode="intern" aria-pressed="' + (mode === 'intern') + '">' + esc(t.modeIntern) + '</button><button type="button" data-mode="content" aria-pressed="' + (mode === 'content') + '">' + esc(t.modeContent) + '</button></div>';
+        if (!m.both) { el.hidden = true; el.innerHTML = ''; el.removeAttribute('data-mode'); return; }
+        var t = L(), inContent = mode === 'content', label = t.viewAs + ': ' + (inContent ? t.modeContent : t.modeIntern) + ' → ' + (inContent ? t.modeIntern : t.modeContent);
+        // V101.120: ONE round button in the profile rail (right of Flood watch) instead of a "View as  Intern | Content" row — the icon is the view you are IN, a tap flips to the other
+        el.dataset.mode = mode; el.title = label; el.setAttribute('aria-label', label);
+        el.innerHTML = '<i class="fa-solid ' + (inContent ? 'fa-clapperboard' : 'fa-graduation-cap') + '" aria-hidden="true"></i>';
         el.hidden = false;
-        if (!el.dataset.wired) { el.dataset.wired = '1'; el.addEventListener('click', function (e) { var b = e.target.closest('[data-mode]'); if (!b) return; try { localStorage.setItem(modeKey(), b.dataset.mode); } catch (_) { /* storage may be blocked */ } sync(); }); }
+        if (!el.dataset.wired) { el.dataset.wired = '1'; el.addEventListener('click', function () { var mm = memberships(); if (!mm.both) return; try { localStorage.setItem(modeKey(), getMode(mm) === 'content' ? 'intern' : 'content'); } catch (_) { /* storage may be blocked */ } sync(); }); }
     }
     function myWorks() { try { return (typeof usersWorksCache !== 'undefined' && usersWorksCache) || []; } catch (_) { return []; } }
     function postedList() {

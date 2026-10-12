@@ -10,7 +10,8 @@ assert.ok(/<title>Internship Portfolio \(V101\.\d+\)<\/title>/.test(html));
 assert.ok(!html.includes('id="settingsModal"'), 'the Settings modal is gone');
 const rail = html.slice(html.indexOf('<div id="profile-quick-actions">'), html.indexOf('<div class="u-hdr-more"'));   // V101.117: the rail sits inside the info row
 assert.ok(!rail.includes('openSettingsModal') && !rail.includes('fa-gear'), 'no ⚙ in the rail');
-assert.equal((rail.match(/<button/g) || []).length, 4, 'four rail buttons: Schedule · Info · EN · Flood');
+assert.equal((rail.match(/<button/g) || []).length, 5, 'four rail buttons: Schedule · Info · EN · Flood — plus the Intern | Content switch (V101.120), hidden unless the user has both UIs');
+assert.ok(/<button type="button" id="cafe-view-switch"[^>]*\bhidden\b/.test(rail), 'the switch is hidden by default');
 const info = html.slice(html.indexOf('<div id="personalInfoModal" class="modal">'), html.indexOf('<div class="pi-tabs"'));
 const xAt = info.indexOf('&times;'), gearAt = info.indexOf('id="pi-settings-btn"'), h3At = info.indexOf('<h3'), panelAt = info.indexOf('<div id="pi-settings" class="pi-settings" hidden>');
 assert.ok(xAt > 0 && gearAt > xAt && h3At > gearAt && panelAt > h3At, '× then ⚙ (both float right → ⚙ lands left of ×), then the title, then the folded panel');
