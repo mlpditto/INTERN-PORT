@@ -17,7 +17,7 @@ const bkkClock = (d) => d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Bangkok'
 // day, a clock-in is closed by the next clock-out, and a clock-in left open counts
 // nothing. startDate / endDate are 'YYYY-MM-DD', inclusive, either may be empty.
 // V102.117: also returns `daily`, newest first, for the admin "who worked when" popup:
-// { d: 'YYYY-MM-DD', h: hours, s: [['HH:mm', 'HH:mm' | null], ...] } - a null clock-out is
+// { d: 'YYYY-MM-DD', h: hours, s: [{ i: 'HH:mm', o: 'HH:mm' | null }, ...] } - a null clock-out is
 // a clock-in that was never closed (counts 0 h). A day with only a lone clock-out is left out.
 function sumInternHours(logs, startDate, endDate) {
     const byDay = {};
@@ -38,15 +38,15 @@ function sumInternHours(logs, startDate, endDate) {
         const segs = [];
         list.forEach((r) => {
             if (r.type === IN) {
-                if (inTime) segs.push([bkkClock(inTime), null]);   // a second clock-in leaves the first one open
+                if (inTime) segs.push({ i: bkkClock(inTime), o: null });   // a second clock-in leaves the first one open
                 inTime = r.timestamp;
             } else if (r.type === OUT && inTime) {
                 dayHours += (r.timestamp - inTime) / 3600000;
-                segs.push([bkkClock(inTime), bkkClock(r.timestamp)]);
+                segs.push({ i: bkkClock(inTime), o: bkkClock(r.timestamp) });
                 inTime = null;
             }
         });
-        if (inTime) segs.push([bkkClock(inTime), null]);
+        if (inTime) segs.push({ i: bkkClock(inTime), o: null });
         if (dayHours > 0) days++;
         total += dayHours;
         if (segs.length) daily.push({ d: k, h: Math.round(dayHours * 100) / 100, s: segs });
