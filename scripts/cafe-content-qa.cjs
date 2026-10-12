@@ -69,9 +69,9 @@ assert.ok(/getMyDivision\(\)/.test(index) && /return "General Division"/.test(in
 const harness = `<!doctype html><meta charset="utf-8"><title>Internship Portfolio (V9.9)</title>
 <link rel="stylesheet" href="/cafe-content.css">
 <button type="button" id="cafe-view-switch" hidden></button><div id="section-cafe-content" hidden></div><div id="section-kanban" style="display:block">Mission</div><div id="section-dd-codex" style="display:block">Codex</div><div id="achievementUnlockModal" style="display:flex">badge</div><div id="achievementsModal" style="display:flex">list</div><div id="u-earned-badges" style="display:flex">row</div>
-<span id="intern-app-name">LINE LIFF Internship Management System</span><button id="unified-fab-btn" onclick="${FAB}">+</button><span id="u-crew-rank">LV.1</span><span id="u-division-rank-badge" style="display:inline">#1</span><div id="u-timeline-bar">bar</div><button id="u-schedule-chip">s</button><button id="fw-btn">f</button><div id="fw-water">w</div><div id="metrics-bar" class="unified-metrics-bar">Quiz Journal Case</div><button id="lang-toggle-cycle">EN</button>
+<span id="intern-app-name">LINE LIFF Internship Management System</span><button id="unified-fab-btn" onclick="${FAB}">+</button><span id="u-crew-rank">LV.1</span><span id="u-division-rank-badge" style="display:inline">#1</span><div id="u-timeline-bar">bar</div><button id="u-schedule-chip">s</button><button id="fw-btn">f</button><span id="u-score">0</span><span id="u-beri-box" title="Beri — earned from the Explore tab"><span id="u-beri">🪙 0</span></span><div id="fw-water">w</div><div id="metrics-bar" class="unified-metrics-bar">Quiz Journal Case</div><button id="lang-toggle-cycle">EN</button>
 <script>
-window.__unified = 0; window.__toasts = []; window.__upd = []; window.__subs = [];
+window.__unified = 0; var myScore = 12.1, myBeri = 52; window.myCafePts = 4.5; window.myCafeBeri = 2; window.__toasts = []; window.__upd = []; window.__subs = [];
 let userId = 'U1', userProfile = { displayName: 'Jo', pictureUrl: '' }, division = 'General Division', usersWorksCache = [];
 const store = { users: { U1: {} }, works: {} }; let wn = 0, un = 0; const userCbs = [];
 function getMyDivision() { return division; }
@@ -368,12 +368,19 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         await page.click('#ccOverlay [data-act="close"]');
         for (const id of ['u-crew-rank', 'u-division-rank-badge', 'u-timeline-bar', 'u-schedule-chip', 'fw-btn', 'fw-water', 'metrics-bar']) assert.equal(await page.$eval('#' + id, e => getComputedStyle(e).display), 'none', 'V101.127: #' + id + ' hidden in the CAFE header');
         assert.notEqual(await page.$eval('#lang-toggle-cycle', e => getComputedStyle(e).display), 'none', 'EN stays');
+        assert.deepEqual(await page.evaluate(() => [document.getElementById('u-score').textContent, document.getElementById('u-beri').textContent, document.getElementById('u-beri-box').title]), ['4.50', '🪙 2', 'CAFE Beri — separate from the Explore Beri'], 'V101.130: the CAFE UI shows the CAFE points and Beri');
+        await page.evaluate(() => { window.myCafePts = 6; window.cafeContentPaintHeader(); });
+        assert.equal(await page.$eval('#u-score', e => e.textContent), '6.00', 'a live change repaints');
+
         await page.evaluate(() => { localStorage.setItem('uiLangTH', '1'); });
         await page.click('#lang-toggle-cycle');
         await page.waitForFunction(() => /คอนเทนต์/.test(document.getElementById('section-cafe-content').innerText));
         assert.ok(/ตรวจแล้ว/.test(await page.$eval('#section-cafe-content', e => e.innerText)), 'Thai card');
 
         // Moved out of CAFE → everything goes back.
+        await page.evaluate(() => { division = 'Dev'; window.myMemberships = []; window.myExtraGroups = []; window.cafeContentSync(); });
+        assert.deepEqual(await page.evaluate(() => [document.getElementById('u-score').textContent, document.getElementById('u-beri').textContent, document.getElementById('u-beri-box').title]), ['12.10', '🪙 52', 'Beri — earned from the Explore tab'], 'V101.130: outside the CAFE UI the normal score / Beri are back');
+
         await page.evaluate(() => { division = 'Dev'; window.cafeContentSync(); });
         assert.equal(await vis('#section-cafe-content'), false);
         assert.equal(await page.evaluate(() => document.body.classList.contains('cafe-mode')), false);
