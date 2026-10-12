@@ -66,8 +66,9 @@
     }
     function memberships() {
         var primary = typeof myGroup !== 'undefined' ? myGroup : '', extras = Array.isArray(window.myExtraGroups) ? window.myExtraGroups : [];
-        var pc = isCreatorDivision(primaryDivision(primary)), ec = extras.some(function (g) { return isCreatorDivision(divisionOfGroup(g)); });
-        var internSide = !pc || extras.some(function (g) { return g && !isCreatorDivision(divisionOfGroup(g)); });
+        var pairs = Array.isArray(window.myMemberships) ? window.myMemberships : [];   // V101.119: { division, group } pairs — the admin's "also in CAFE · Audit" (users.memberships)
+        var pc = isCreatorDivision(primaryDivision(primary)), ec = extras.some(function (g) { return isCreatorDivision(divisionOfGroup(g)); }) || pairs.some(function (p) { return isCreatorDivision(p.division); });
+        var internSide = !pc || extras.some(function (g) { return g && !isCreatorDivision(divisionOfGroup(g)); }) || pairs.some(function (p) { return !isCreatorDivision(p.division); });
         return { creator: pc || ec, both: (pc || ec) && internSide, primaryCreator: pc };
     }
     function modeKey() { return 'contentViewMode:' + (typeof userId !== 'undefined' ? userId : ''); }
@@ -128,7 +129,7 @@
     var REVIEWER_GROUPS = ['audit'];   // a group (primary or extra) named like this gets the Review view — a UI choice, not a permission
     function isReviewer() {
         try {
-            var gs = [typeof myGroup !== 'undefined' ? myGroup : ''].concat(Array.isArray(window.myExtraGroups) ? window.myExtraGroups : []);
+            var gs = [typeof myGroup !== 'undefined' ? myGroup : ''].concat(Array.isArray(window.myExtraGroups) ? window.myExtraGroups : []).concat((Array.isArray(window.myMemberships) ? window.myMemberships : []).map(function (p) { return p.group; }));   // V101.119: + the groups of the membership pairs
             return gs.some(function (g) { return REVIEWER_GROUPS.indexOf(String(g || '').trim().toLowerCase()) >= 0; });
         } catch (_) { return false; }
     }
