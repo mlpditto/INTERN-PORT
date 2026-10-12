@@ -42,11 +42,27 @@ assert.ok(/id="fw-btn"[\s\S]*?<\/button>\s*(?:<!--[\s\S]*?-->\s*)?<button type="
 assert.ok(/window\.myMemberships = Array\.isArray\(da\.memberships\)[^\n]*\n\s*window\.myExtraGroups = /.test(index), 'the users snapshot hands memberships pairs to cafe-content.js (before extraGroups)');
 assert.ok(/window\.myExtraGroups = Array\.isArray\(da\.extraGroups\) \? da\.extraGroups : \[\];[^\n]*\n\s*window\.cafeContentSync\?\.\(\);/.test(index), 'the users snapshot hands extraGroups to cafe-content.js');
 assert.ok(/getMyDivision\(\)/.test(index) && /return "General Division"/.test(index), 'getMyDivision defaults to General Division');
+// V101.121: in the Content UI the History is about content only (this one function feeds the rows, the totals, the chips, the sparkline and the empty state)
+{
+    const vm = require('node:vm');
+    const a = index.indexOf('function getUnifiedAllItems() {'); let i = index.indexOf('{', a), b = 0, k = i;
+    for (; k < index.length; k++) { if (index[k] === '{') b++; else if (index[k] === '}') { b--; if (!b) break; } }
+    let cc = false;
+    const ctx = vm.createContext({ unifiedSubmissionsCache: [{ id: 'p1', submissionType: 'work', metadata: { kind: 'social_content' } }, { id: 'j1', submissionType: 'reflective' }, { id: 'w1', submissionType: 'work', metadata: { kind: 'x' } }],
+        mapQuizAttemptsToUnified: () => [{ id: 'q1', submissionType: 'quiz' }], mapLinkSuggestionsToUnified: () => [{ id: 'l1', submissionType: 'explore_link' }], window: { isContentCreator: () => cc } });
+    vm.runInContext(index.slice(a, k + 1), ctx);
+    assert.equal(ctx.getUnifiedAllItems().length, 5, 'Intern UI: everything');
+    cc = true;
+    assert.equal(JSON.stringify(ctx.getUnifiedAllItems().map(s => s.id)), JSON.stringify(['p1']), 'Content UI: only the content posts — no quiz, journal, explore, ordinary work');
+    assert.ok(/id="intern-app-name">LINE LIFF Internship Management System<\/span><span id="intern-version-current">/.test(index), 'the footer name has its own span (the version stays)');
+    assert.ok(/No content history yet/.test(index) && /Posted pieces and their review scores appear here/.test(index), 'Content UI gets its own empty History text');
+    assert.ok(/isContentCreator && window\.isContentCreator\(\)\) \?/.test(fs.readFileSync('public/history-lean.js', 'utf8')), 'the journal streak pill is hidden in the Content UI');
+}
 
 const harness = `<!doctype html><meta charset="utf-8"><title>Internship Portfolio (V9.9)</title>
 <link rel="stylesheet" href="/cafe-content.css">
 <button type="button" id="cafe-view-switch" hidden></button><div id="section-cafe-content" hidden></div><div id="section-kanban" style="display:block">Mission</div><div id="section-dd-codex" style="display:block">Codex</div><div id="achievementUnlockModal" style="display:flex">badge</div><div id="achievementsModal" style="display:flex">list</div><div id="u-earned-badges" style="display:flex">row</div>
-<button id="unified-fab-btn" onclick="${FAB}">+</button><button id="lang-toggle-cycle">EN</button>
+<span id="intern-app-name">LINE LIFF Internship Management System</span><button id="unified-fab-btn" onclick="${FAB}">+</button><button id="lang-toggle-cycle">EN</button>
 <script>
 window.__unified = 0; window.__toasts = []; window.__upd = []; window.__subs = [];
 let userId = 'U1', userProfile = { displayName: 'Jo', pictureUrl: '' }, division = 'General Division', usersWorksCache = [];
@@ -486,12 +502,14 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.equal(await vis('#section-cafe-content'), true, 'Content UI'); assert.equal(await vis('#section-kanban'), false, 'Mission hidden in the Content UI');
         assert.equal(await page.evaluate(() => window.isContentCreator()), true, 'no badges in the Content UI');
         assert.equal(await mode(), 'content', 'remembered per user in this browser');
+        assert.equal(await page.$eval('#intern-app-name', e => e.textContent), 'CAFE Content Studio', 'footer name in the Content UI');
         const before = await page.evaluate(() => window.__unified);
         await page.click('#unified-fab-btn'); await page.waitForSelector('#ccOverlay.open');
         assert.equal(await page.evaluate(() => window.__unified), before, '＋ opens the content sheet in the Content UI');
         await page.click('#ccOverlay .cc-x');
         await goMode('intern');
         assert.equal(await vis('#section-cafe-content'), false); assert.equal(await vis('#section-kanban'), true, 'Mission is back'); assert.equal(await vis('#u-earned-badges'), true, 'badge row is back');
+        assert.equal(await page.$eval('#intern-app-name', e => e.textContent), 'LINE LIFF Internship Management System', 'footer name is back in the Intern UI');
         await page.click('#unified-fab-btn');
         assert.equal(await page.evaluate(() => window.__unified), before + 1, '＋ opens Submit New in the Intern UI');
         // a creator-division primary group with an extra group outside it: default is the Content UI, and the switch can go back
