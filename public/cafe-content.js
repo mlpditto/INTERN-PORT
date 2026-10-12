@@ -360,7 +360,7 @@
             }).join('') + '</div>' + (filter === 'posted' ? postedRails(t, posted) : '') + rows;
         }
         var monthName = new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7) - 1, 15)).toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' });
-        host.innerHTML = '<div class="cc-card">' + brandHtml() + '<div class="cc-head"><i class="fa-solid fa-camera"></i> ' + t.title + '<span class="cc-month">' + esc(monthName) + '</span>' +
+        host.innerHTML = '<div class="cc-card' + (isReviewer() ? '' : ' cc-ios') + '">' + brandHtml() + '<div class="cc-head"><i class="fa-solid fa-camera"></i> ' + t.title + '<span class="cc-month">' + esc(monthName) + '</span>' +
             '<span class="cc-view" role="group" aria-label="View"><button type="button" data-view="list" aria-pressed="' + (view === 'list') + '" aria-label="' + t.viewList + '"><i class="fa-solid fa-list"></i></button><button type="button" data-view="month" aria-pressed="' + (view === 'month') + '" aria-label="' + t.viewMonth + '"><i class="fa-solid fa-calendar-days"></i></button><button type="button" data-view="board" aria-pressed="' + (view === 'board') + '" aria-label="' + t.viewBoard + '"><i class="fa-solid fa-table-columns"></i></button>' +
             (isReviewer() ? '<button type="button" data-view="review" aria-pressed="' + (view === 'review') + '" aria-label="' + t.review + '" title="' + t.review + '"><i class="fa-solid fa-clipboard-check"></i></button>' : '') + '</span></div>' +
             (view === 'review' ? '' : statsHtml(t, mp, plats, rev)) +

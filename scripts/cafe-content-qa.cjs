@@ -248,6 +248,9 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.equal(await page.$eval('.cc-calnav b', e => e.textContent), 'September 2026');
         assert.equal(await page.locator('.cc-day i b').count(), 0, 'no dots last month');
         assert.ok(/Posted\s*0/.test((await page.$eval('.cc-stats', e => e.innerText)).replace(/\n/g, ' ')), 'stats follow the viewed month');
+        assert.equal(await page.locator('#section-cafe-content .cc-card.cc-ios').count(), 1, 'V101.126: a creator (non-Audit) gets the Apple skin');
+        assert.ok(await page.$eval('#section-cafe-content .cc-card.cc-ios .cc-head', e => parseFloat(getComputedStyle(e).fontSize) >= 26), 'big title');
+        assert.equal(await page.$eval('#section-cafe-content .cc-card.cc-ios', e => getComputedStyle(e).backgroundColor), 'rgb(242, 242, 247)', 'iOS grouped background');
         await page.click('.cc-calnav [data-cal="1"]');
         assert.equal(await page.$eval('.cc-calnav b', e => e.textContent), 'October 2026');
         // Week and Day modes of the calendar (Sun–Sat, around today = Fri 9 Oct): every day a header + Plan, posts and planned cards under their day.
@@ -396,6 +399,7 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.equal(await page.$eval('#section-cafe-content .cc-qbig', e => e.textContent), '1', 'the hero shows how many wait for me');
         assert.equal(await page.locator('#section-cafe-content .cc-add').count(), 0, 'no New content button inside the queue');
         assert.equal(await page.locator('#section-cafe-content .cc-stats').count(), 0, 'no month stats in the queue');
+        assert.equal(await page.locator('#section-cafe-content .cc-card.cc-ios').count(), 0, 'V101.126: the Audit queue keeps the card look');
         await page.click('.cc-rv[data-id="W9"] .cc-rq.fix'); await page.waitForSelector('#ccOverlay.open #rvComment');
         assert.equal(await page.$eval('#ccOverlay .cc-chip[data-v="changes"]', e => e.getAttribute('aria-pressed')), 'true', '↩ opens the sheet with Changes already picked');
         await page.click('#ccOverlay .cc-x');
