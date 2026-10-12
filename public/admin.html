@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.194)</title>
+    <title>Nika Admin (V102.195)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -34885,6 +34885,17 @@ RULES:
                     });
                     if (!matchedAny) buckets.__uncat.push(q);
                 });
+                // V102.195: Mental Health + Neurological are ONE coverage system. Merged HERE, after the classification, so tag matching and manual overrides still see both keys
+                // (a quiz stored as coverageSystem 'mental' lands in the merged chip); the shared case taxonomy (CASE_SYSTEMS) and the Alabasta case chips are untouched.
+                const _mi = systems.findIndex(s => s.key === 'mental'), _ni = systems.findIndex(s => s.key === 'neuro');
+                if (_mi >= 0 && _ni >= 0) {
+                    const _seen = new Set();
+                    buckets.neuro = buckets.neuro.concat(buckets.mental).filter(q => !_seen.has(q.id) && _seen.add(q.id));
+                    delete buckets.mental;
+                    systems.splice(_mi, 1);
+                    const _n2 = systems.findIndex(s => s.key === 'neuro');
+                    systems[_n2] = Object.assign({}, systems[_n2], { label: { en: 'Neuro & Mental Health', ko: '신경·정신건강', th: 'ระบบประสาทและสุขภาพจิต' } });
+                }
                 window._qcovBuckets = buckets;
                 return buckets;
             };
@@ -35282,7 +35293,7 @@ RULES:
                             const isManual = q.coverageSystem && q.coverageSystem !== '__auto';
                             const manual = isManual ? '<span title="Manually assigned" data-th-title="จัดหมวดเอง" style="font-size:0.8em;">📌</span>' : '';
                             const hlTag = hl ? '<span style="font-size:0.6em; font-weight:900; padding:2px 7px; border-radius:6px; background:#f59e0b; color:#fff; white-space:nowrap;">🎯 Your pick</span>' : '';
-                            const ov = q.coverageSystem || '__auto';
+                            const ov = (q.coverageSystem === 'mental' ? 'neuro' : q.coverageSystem) || '__auto';   // V102.195: 'mental' is part of the merged Neuro & Mental Health chip
                             const picker = `<select onclick="event.stopPropagation()" onchange="event.stopPropagation(); window.setQuizCoverage('${q.id}', this.value)" title="Move category" data-th-title="ย้ายหมวด" style="font-size:0.7em; padding:3px 4px; border:1px solid ${hl ? '#f59e0b' : '#e2e8f0'}; border-radius:6px; max-width:138px; cursor:pointer; background:#fff;">`
                                 + `<option value="__auto"${ov === '__auto' ? ' selected' : ''}>↩︎ Auto</option>`
                                 + allSystems.map(s2 => `<option value="${s2.key}"${ov === s2.key ? ' selected' : ''}>${s2.emoji} ${escapeHtml(s2.label.en)}</option>`).join('')
