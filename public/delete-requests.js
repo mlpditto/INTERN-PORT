@@ -21,7 +21,7 @@
         document.querySelectorAll('[data-delete-item]').forEach(card => {
             if (card.querySelector('.dr-menu')) return;
             const item = getUnifiedAllItems().find(s => s.id === card.dataset.deleteItem && s.submissionType === card.dataset.deleteType);
-            if (!item) return;
+            if (!item || item.noDelete) return;   // V101.124: a synthetic row (a filed review) has nothing to delete
             const menu = document.createElement('details'); menu.className = 'dr-menu';
             menu.innerHTML = '<summary aria-label="Request delete" title="Request delete">🗑</summary><div class="dr-body"><button type="button" class="dr-start">🗑 Request delete</button><div class="dr-form" hidden><label>Reason <select><option>Duplicate</option><option>Wrong entry</option><option>Other</option></select></label><input maxlength="240" aria-label="Delete reason details" placeholder="Short reason" hidden><button type="button" class="dr-send">↗ Send</button></div><span class="dr-state" role="status"></span><button type="button" class="dr-cancel" hidden>↩ Cancel request</button></div>';
             menu.addEventListener('click', e => e.stopPropagation());

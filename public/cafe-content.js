@@ -20,14 +20,14 @@
     var STAGES = [['idea', 'Idea', 'ไอเดีย'], ['draft', 'Script', 'สคริปต์'], ['film', 'Filming', 'ถ่ายทำ'], ['edit', 'Editing', 'ตัดต่อ'], ['sched', 'Scheduled', 'ตั้งโพสต์']];
     var STAGE_IDS = STAGES.map(function (s) { return s[0]; });
     var T = {
-        en: { review: 'Review', revTodo: 'To review', revMine: 'Reviewed by me', revEmpty: 'Nothing is waiting for review.', revMineEmpty: 'You have not reviewed anything yet.', revOpen: 'Review', revTitle: 'Review content', revVerdict: 'Verdict', revOk: 'Looks good', revFix: 'Needs changes', revScore: 'Suggested bonus (pts)', revComment: 'Comment', revCommentPh: 'What did you check? What should change?', revSend: 'Send to admin', revHint: 'Your review is a recommendation — the admin gives the final score.', revNeedVerdict: 'Choose a verdict first.', revNeedScore: 'Pick a suggested bonus.', revNeedComment: 'Say what needs to change.', revSent: 'Review sent', revYou: 'You suggested', boardReview: 'Review', revFb: 'Reviewer feedback', revChanges: 'Changes requested', revApproved: 'Looks good', resub: 'Edit & resubmit', resubBtn: 'Resubmit for review', resubDone: 'Resubmitted', resubHint: 'The reviewer and the admin see the new version; your numbers stay.', resubbed: 'Resubmitted', resubSince: 'resubmitted since your review', title: 'Content', viewAs: 'View as', modeIntern: 'Intern', modeContent: 'Content', viewList: 'List view', viewMonth: 'Calendar view', calMonth: 'Month', calWeek: 'Week', calDay: 'Day', viewBoard: 'Board view', brief: 'Brief / script', briefPh: 'Outline, hook, script, shot list…', steps: 'Checklist', stepPh: 'Add a step', stepAdd: 'Add', stepTpl: 'Use standard steps', links: 'Links (Drive, footage, thumbnail…)', badLink: 'Links must start with http:// or https://', tooMany: 'Up to 15 steps and 5 links.', movePrev: 'Move back a step', moveNext: 'Move to the next step', planDay: 'Plan', emptyDay: 'Nothing on this day yet.', pickDay: 'Tap a day to see or plan content.', plan: 'Due date (optional)', ideas: 'Ideas', drafts: 'Drafts', posted: 'Posted', platforms: 'Platforms', reviewed: 'Reviewed', pending: 'Pending review', add: 'New content', addNum: 'Add numbers',
+        en: { review: 'Review', all: 'All', noMatch: 'No posts match this view.', clearAll: 'Clear', engMonth: 'this month', startIdea: 'Jot an idea', startPlan: 'Plan a post', qWaiting: 'waiting for you', qNext: 'Review next', qResub: 'resubmitted', qDone: 'reviewed', qCaught: 'All caught up', qOk: 'OK — then pick a suggested bonus', qFix: 'Changes — a comment is required', revTodo: 'To review', revMine: 'Reviewed by me', revEmpty: 'Nothing is waiting for review.', revMineEmpty: 'You have not reviewed anything yet.', revOpen: 'Review', revTitle: 'Review content', revVerdict: 'Verdict', revOk: 'Looks good', revFix: 'Needs changes', revScore: 'Suggested bonus (pts)', revComment: 'Comment', revCommentPh: 'What did you check? What should change?', revSend: 'Send to admin', revHint: 'Your review is a recommendation — the admin gives the final score.', revNeedVerdict: 'Choose a verdict first.', revNeedScore: 'Pick a suggested bonus.', revNeedComment: 'Say what needs to change.', revSent: 'Review sent', revYou: 'You suggested', boardReview: 'Review', revFb: 'Reviewer feedback', revChanges: 'Changes requested', revApproved: 'Looks good', resub: 'Edit & resubmit', resubBtn: 'Resubmit for review', resubDone: 'Resubmitted', resubHint: 'The reviewer and the admin see the new version; your numbers stay.', resubbed: 'Resubmitted', resubSince: 'resubmitted since your review', title: 'Content', viewAs: 'View as', modeIntern: 'Intern', modeContent: 'Content', viewList: 'List view', viewMonth: 'Calendar view', calMonth: 'Month', calWeek: 'Week', calDay: 'Day', viewBoard: 'Board view', brief: 'Brief / script', briefPh: 'Outline, hook, script, shot list…', steps: 'Checklist', stepPh: 'Add a step', stepAdd: 'Add', stepTpl: 'Use standard steps', links: 'Links (Drive, footage, thumbnail…)', badLink: 'Links must start with http:// or https://', tooMany: 'Up to 15 steps and 5 links.', movePrev: 'Move back a step', moveNext: 'Move to the next step', planDay: 'Plan', emptyDay: 'Nothing on this day yet.', pickDay: 'Tap a day to see or plan content.', plan: 'Due date (optional)', ideas: 'Ideas', drafts: 'Drafts', posted: 'Posted', platforms: 'Platforms', reviewed: 'Reviewed', pending: 'Pending review', add: 'New content', addNum: 'Add numbers',
             emptyIdeas: 'No ideas yet. Jot one down before you forget it.', emptyDrafts: 'No drafts yet.', emptyPosted: 'Nothing posted yet. Share your first piece.',
             sheet: 'Submit content', edit: 'Edit content', stage: 'Stage', platform: 'Platform', type: 'Type', caption: 'Caption or idea', capPh: 'What is this content about?',
             images: 'Images', addImg: 'Add', link: 'Post link', date: 'Post date', send: 'Send for review', save: 'Save', saving: 'Saving…', other: 'Case, Work, Event… (other submissions)', del: 'Delete this draft', delAsk: 'Delete this draft?',
             hintPosted: 'Posted content is reviewed by the admin. Add numbers later from the card.', hintLocal: 'Saved for you only until you mark it Posted.',
             needCap: 'Write a caption or idea first.', needLink: 'Paste the post link (starting with http).', needDate: 'Pick the post date.', full: 'You already have 30 saved. Delete one first.', fail: 'Could not save. Please try again.', noimg: 'That image could not be read.',
             numTitle: 'Add numbers', likes: 'Likes', reach: 'Reach', numHint: 'Update any time — the latest numbers are what the admin sees.', saveNum: 'Save numbers', badNum: 'Enter whole numbers, zero or more.', likeReach: 'Likes cannot be higher than reach.', savedNum: 'Saved.', sentToast: 'Sent for review', savedToast: 'Saved' },
-        th: { review: 'ตรวจงาน', revTodo: 'รอตรวจ', revMine: 'ที่ฉันตรวจแล้ว', revEmpty: 'ยังไม่มีงานรอตรวจ', revMineEmpty: 'ยังไม่ได้ตรวจงานชิ้นไหน', revOpen: 'ตรวจ', revTitle: 'ตรวจคอนเทนต์', revVerdict: 'ผลตรวจ', revOk: 'ผ่าน', revFix: 'ต้องแก้', revScore: 'โบนัสที่แนะนำ (pts)', revComment: 'ความเห็น', revCommentPh: 'ตรวจอะไรไปบ้าง ต้องแก้ตรงไหน', revSend: 'ส่งให้แอดมิน', revHint: 'ผลตรวจของคุณเป็นข้อเสนอ แอดมินเป็นคนให้คะแนนจริง', revNeedVerdict: 'เลือกผลตรวจก่อน', revNeedScore: 'เลือกโบนัสที่แนะนำ', revNeedComment: 'บอกหน่อยว่าต้องแก้อะไร', revSent: 'ส่งผลตรวจแล้ว', revYou: 'คุณแนะนำ', boardReview: 'ตรวจ', revFb: 'ความเห็นผู้ตรวจ', revChanges: 'ต้องแก้ไข', revApproved: 'ผ่าน', resub: 'แก้แล้วส่งใหม่', resubBtn: 'ส่งให้ตรวจอีกครั้ง', resubDone: 'ส่งใหม่แล้ว', resubHint: 'ผู้ตรวจและแอดมินจะเห็นเวอร์ชันใหม่ ตัวเลขเดิมยังอยู่', resubbed: 'ส่งใหม่แล้ว', resubSince: 'ส่งใหม่หลังคุณตรวจ', title: 'คอนเทนต์', viewAs: 'มุมมอง', modeIntern: 'Intern', modeContent: 'คอนเทนต์', viewList: 'มุมมองรายการ', viewMonth: 'มุมมองปฏิทิน', calMonth: 'เดือน', calWeek: 'สัปดาห์', calDay: 'วัน', viewBoard: 'มุมมองบอร์ด', brief: 'บรีฟ / สคริปต์', briefPh: 'โครงเรื่อง ฮุค สคริปต์ รายการช็อต…', steps: 'เช็กลิสต์', stepPh: 'เพิ่มขั้นตอน', stepAdd: 'เพิ่ม', stepTpl: 'ใช้ขั้นตอนมาตรฐาน', links: 'ลิงก์ (Drive ฟุตเทจ ภาพปก…)', badLink: 'ลิงก์ต้องขึ้นต้นด้วย http:// หรือ https://', tooMany: 'ได้สูงสุด 15 ขั้นตอนและ 5 ลิงก์', movePrev: 'ย้อนกลับหนึ่งขั้น', moveNext: 'ไปขั้นถัดไป', planDay: 'วางแผน', emptyDay: 'วันนี้ยังไม่มีอะไร', pickDay: 'แตะวันที่เพื่อดูหรือวางแผนคอนเทนต์', plan: 'กำหนดส่ง (ไม่บังคับ)', ideas: 'ไอเดีย', drafts: 'ฉบับร่าง', posted: 'โพสต์แล้ว', platforms: 'แพลตฟอร์ม', reviewed: 'ตรวจแล้ว', pending: 'รอตรวจ', add: 'เพิ่มคอนเทนต์', addNum: 'เพิ่มตัวเลข',
+        th: { review: 'ตรวจงาน', all: 'ทั้งหมด', noMatch: 'ไม่มีโพสต์ในมุมมองนี้', clearAll: 'ล้าง', engMonth: 'เดือนนี้', startIdea: 'จดไอเดีย', startPlan: 'วางแผนโพสต์', qWaiting: 'รอคุณตรวจ', qNext: 'ตรวจถัดไป', qResub: 'ส่งซ้ำ', qDone: 'ตรวจแล้ว', qCaught: 'ตรวจครบแล้ว', qOk: 'ผ่าน — แล้วเลือกโบนัสที่แนะนำ', qFix: 'ขอแก้ — ต้องมีความเห็น', revTodo: 'รอตรวจ', revMine: 'ที่ฉันตรวจแล้ว', revEmpty: 'ยังไม่มีงานรอตรวจ', revMineEmpty: 'ยังไม่ได้ตรวจงานชิ้นไหน', revOpen: 'ตรวจ', revTitle: 'ตรวจคอนเทนต์', revVerdict: 'ผลตรวจ', revOk: 'ผ่าน', revFix: 'ต้องแก้', revScore: 'โบนัสที่แนะนำ (pts)', revComment: 'ความเห็น', revCommentPh: 'ตรวจอะไรไปบ้าง ต้องแก้ตรงไหน', revSend: 'ส่งให้แอดมิน', revHint: 'ผลตรวจของคุณเป็นข้อเสนอ แอดมินเป็นคนให้คะแนนจริง', revNeedVerdict: 'เลือกผลตรวจก่อน', revNeedScore: 'เลือกโบนัสที่แนะนำ', revNeedComment: 'บอกหน่อยว่าต้องแก้อะไร', revSent: 'ส่งผลตรวจแล้ว', revYou: 'คุณแนะนำ', boardReview: 'ตรวจ', revFb: 'ความเห็นผู้ตรวจ', revChanges: 'ต้องแก้ไข', revApproved: 'ผ่าน', resub: 'แก้แล้วส่งใหม่', resubBtn: 'ส่งให้ตรวจอีกครั้ง', resubDone: 'ส่งใหม่แล้ว', resubHint: 'ผู้ตรวจและแอดมินจะเห็นเวอร์ชันใหม่ ตัวเลขเดิมยังอยู่', resubbed: 'ส่งใหม่แล้ว', resubSince: 'ส่งใหม่หลังคุณตรวจ', title: 'คอนเทนต์', viewAs: 'มุมมอง', modeIntern: 'Intern', modeContent: 'คอนเทนต์', viewList: 'มุมมองรายการ', viewMonth: 'มุมมองปฏิทิน', calMonth: 'เดือน', calWeek: 'สัปดาห์', calDay: 'วัน', viewBoard: 'มุมมองบอร์ด', brief: 'บรีฟ / สคริปต์', briefPh: 'โครงเรื่อง ฮุค สคริปต์ รายการช็อต…', steps: 'เช็กลิสต์', stepPh: 'เพิ่มขั้นตอน', stepAdd: 'เพิ่ม', stepTpl: 'ใช้ขั้นตอนมาตรฐาน', links: 'ลิงก์ (Drive ฟุตเทจ ภาพปก…)', badLink: 'ลิงก์ต้องขึ้นต้นด้วย http:// หรือ https://', tooMany: 'ได้สูงสุด 15 ขั้นตอนและ 5 ลิงก์', movePrev: 'ย้อนกลับหนึ่งขั้น', moveNext: 'ไปขั้นถัดไป', planDay: 'วางแผน', emptyDay: 'วันนี้ยังไม่มีอะไร', pickDay: 'แตะวันที่เพื่อดูหรือวางแผนคอนเทนต์', plan: 'กำหนดส่ง (ไม่บังคับ)', ideas: 'ไอเดีย', drafts: 'ฉบับร่าง', posted: 'โพสต์แล้ว', platforms: 'แพลตฟอร์ม', reviewed: 'ตรวจแล้ว', pending: 'รอตรวจ', add: 'เพิ่มคอนเทนต์', addNum: 'เพิ่มตัวเลข',
             emptyIdeas: 'ยังไม่มีไอเดีย จดไว้ก่อนลืมนะ', emptyDrafts: 'ยังไม่มีฉบับร่าง', emptyPosted: 'ยังไม่มีงานที่โพสต์ ลองส่งชิ้นแรกดู',
             sheet: 'ส่งคอนเทนต์', edit: 'แก้คอนเทนต์', stage: 'ขั้นตอน', platform: 'แพลตฟอร์ม', type: 'ประเภท', caption: 'แคปชั่นหรือไอเดีย', capPh: 'คอนเทนต์นี้เกี่ยวกับอะไร',
             images: 'รูปภาพ', addImg: 'เพิ่ม', link: 'ลิงก์โพสต์', date: 'วันที่โพสต์', send: 'ส่งให้ตรวจ', save: 'บันทึก', saving: 'กำลังบันทึก…', other: 'Case, Work, Event… (งานประเภทอื่น)', del: 'ลบฉบับร่างนี้', delAsk: 'ลบฉบับร่างนี้ใช่ไหม',
@@ -89,7 +89,7 @@
         if (m.both) { try { localStorage.setItem(modeKey(), 'intern'); } catch (_) { /* storage may be blocked */ } }
         else document.body.classList.add('cafe-peek');
     }
-    function getMode(m) { try { var v = localStorage.getItem(modeKey()); if (v === 'content' || v === 'intern') return v; } catch (_) { /* storage may be blocked */ } return m.primaryCreator ? 'content' : 'intern'; }
+    function getMode(m) { try { var v = localStorage.getItem(modeKey()); if (v === 'content' || v === 'intern') return v; } catch (_) { /* storage may be blocked */ } return (m.primaryCreator || isReviewer()) ? 'content' : 'intern'; }   // V101.124: an Audit member is never an intern — no remembered choice → the CAFE UI
     function isCafe() { try { var m = memberships(); applyQuizDeepLink(m); return m.creator && (!m.both || getMode(m) === 'content'); } catch (_) { return false; } }
     var switchSig = '';
     function paintSwitch() {
@@ -123,6 +123,8 @@
     var WEEK = { en: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'], th: ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'] };
     var view = (function () { try { var v = localStorage.getItem('cafeContentView'); return v === 'month' || v === 'board' ? v : 'list'; } catch (_) { return 'list'; } })();
     var viewMonth = '', selDay = '', anchor = '';
+    var reviewDefaulted = false;   // V101.122: an Audit member lands on the review queue once per page load
+    var platFilter = '', scopeReviewed = false, scopeMonth = '';   // V101.123: Posted list scope — a platform chip, and what a tapped stat tile means (this month / reviewed)
     // The calendar view has three modes (Month grid, Week, Day); Week and Day are read around `anchor`.
     var calMode = (function () { try { var v = localStorage.getItem('cafeContentCal'); return v === 'week' || v === 'day' ? v : 'month'; } catch (_) { return 'month'; } })();
     var allPosts = [], unsubAll = null, myReviews = {}, revFilter = 'todo';
@@ -235,16 +237,20 @@
             '<div class="cc-meta"><b>' + esc(w.displayName || '') + '</b><span class="cc-pill">' + esc(typeLabel(w.ctype)) + '</span><span>' + esc(p[1]) + ' · ' + esc(dayLabel(w.postDate)) + '</span></div>' +
             '<div class="cc-cap">' + esc(w.caption || w.title) + '</div>' + (imgs ? '<div class="cc-mini">' + imgs + '</div>' : '') +
             '<div class="cc-foot">' + (m ? '<span><i class="fa-solid fa-heart"></i> ' + esc(fmtNum(m.likes || 0)) + '</span><span><i class="fa-solid fa-eye"></i> ' + esc(fmtNum(m.reach || 0)) + '</span>' : '') +
-            '<span class="cc-pill pending" style="margin-left:auto">' + esc(t.revOpen) + ' ›</span></div>' + sentLine(w, t) + '</div></div>';
+            '<span class="cc-rqs"><button type="button" class="cc-rq ok" data-act="rvq" data-id="' + esc(w.id) + '" data-v="approve" title="' + esc(t.qOk) + '" aria-label="' + esc(t.qOk) + '"><b class="cc-av" aria-hidden="true">A</b></button><button type="button" class="cc-rq fix" data-act="rvq" data-id="' + esc(w.id) + '" data-v="changes" title="' + esc(t.qFix) + '" aria-label="' + esc(t.qFix) + '"><i class="fa-solid fa-rotate-left"></i></button></span></div>' + sentLine(w, t) + '</div></div>';   // V101.122: icon-only quick verdicts (tap the row for the full sheet)
     }
     function reviewHtml(t) {
         var others = allPosts.filter(function (w) { return w.userId !== userId; });
         var todo = others.filter(function (w) { return !isReviewed(w) && (!myReviews[w.id] || tms(w.resubmittedAt) > tms(myReviews[w.id].at)); });   // resubmitted after my review = look again
         var mine = others.filter(function (w) { return myReviews[w.id] && todo.indexOf(w) < 0; });
         var list = revFilter === 'mine' ? mine : todo;
-        return '<div class="cc-rail" role="group">' + [['todo', t.revTodo, todo.length], ['mine', t.revMine, mine.length]].map(function (c) {
+        var _resub = todo.filter(function (w) { return myReviews[w.id]; }).length;   // V101.122
+        var _first = todo.slice().sort(function (a, b) { return String(a.postDate || '').localeCompare(String(b.postDate || '')); })[0];
+        var _hero = (revFilter === 'todo' && todo.length)
+            ? '<div class="cc-qhero"><div><span class="cc-qbig">' + todo.length + '</span><small>' + esc(t.qWaiting) + '</small></div><div class="cc-qsub"><span title="' + esc(t.resubSince) + '">↻ ' + _resub + ' ' + esc(t.qResub) + '</span><span>✓ ' + mine.length + ' ' + esc(t.qDone) + '</span></div><button type="button" class="cc-qgo" data-act="review" data-id="' + esc(_first.id) + '">▶ ' + esc(t.qNext) + '</button></div>' : '';
+        return _hero + '<div class="cc-rail" role="group">' + [['todo', t.revTodo, todo.length], ['mine', t.revMine, mine.length]].map(function (c) {
             return '<button type="button" class="cc-chip" data-rvf="' + c[0] + '" aria-pressed="' + (revFilter === c[0]) + '">' + c[1] + ' ' + c[2] + '</button>';
-        }).join('') + '</div>' + (list.length ? list.map(function (w) { return reviewRow(w, t); }).join('') : '<div class="cc-empty">' + (revFilter === 'mine' ? t.revMineEmpty : t.revEmpty) + '</div>');
+        }).join('') + '</div>' + (list.length ? list.map(function (w) { return reviewRow(w, t); }).join('') : (revFilter === 'mine' ? '<div class="cc-empty">' + t.revMineEmpty + '</div>' : '<div class="cc-qok"><b>' + esc(t.qCaught) + '</b><span>' + esc(t.revEmpty) + '</span></div>'));   // V101.122: ok = a green frame, no ✅
     }
 
     function dateAdd(key, n) { var d = new Date(key + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
@@ -295,9 +301,46 @@
         return h;
     }
 
+    // V101.122: the CAFE mark (🌸 Blossom + 'Healing Café') on top of the Content card; "Audit" for a reviewer
+    // V101.123 (from a pasted UX review, filtered against earlier picks): the stat tiles are buttons, the Posted list has a platform rail, the empty Posted state has two starter buttons, and the month's engagement shows when there is any.
+    function statMonth() { return view === 'month' ? viewMonth : todayKey().slice(0, 7); }
+    function postedRails(t, posted) {
+        var pc = {}; posted.forEach(function (w) { pc[w.platform] = (pc[w.platform] || 0) + 1; });
+        var keys = Object.keys(pc), h = '';
+        if (keys.length >= 2) h += '<div class="cc-rail cc-prail" role="group">' + [''].concat(keys).map(function (k) { return '<button type="button" class="cc-chip" data-plat="' + esc(k) + '" aria-pressed="' + (platFilter === k) + '">' + (k ? esc(plat(k)[1]) + ' ' + pc[k] : esc(t.all) + ' ' + posted.length) + '</button>'; }).join('') + '</div>';
+        if (scopeMonth || scopeReviewed) {
+            var parts = []; if (scopeMonth) parts.push(new Date(Date.UTC(+scopeMonth.slice(0, 4), +scopeMonth.slice(5, 7) - 1, 15)).toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' })); if (scopeReviewed) parts.push(t.reviewed);
+            h += '<div class="cc-scope"><span>' + esc(parts.join(' · ')) + '</span><button type="button" data-clear="1" aria-label="' + esc(t.clearAll) + '">&times;</button></div>';
+        }
+        return h;
+    }
+    function statsHtml(t, mp, plats, rev) {
+        var lk = 0, rc = 0, any = false;
+        mp.forEach(function (w) { var m = w.metrics; if (m && (m.likes != null || m.reach != null)) { any = true; lk += +m.likes || 0; rc += +m.reach || 0; } });
+        var tile = function (k, label, val) { return '<button type="button" class="cc-stat" data-stat="' + k + '" title="' + esc(label) + '"><span>' + esc(label) + '</span><b>' + val + '</b></button>'; };
+        return '<div class="cc-stats">' + tile('posted', t.posted, mp.length) + tile('platforms', t.platforms, Object.keys(plats).length) + tile('reviewed', t.reviewed, rev + '/' + mp.length) + '</div>' +
+            (any ? '<div class="cc-eng"><span><i class="fa-solid fa-heart"></i> ' + esc(fmtNum(lk)) + '</span><span><i class="fa-solid fa-eye"></i> ' + esc(fmtNum(rc)) + '</span><small>' + esc(t.engMonth) + '</small></div>' : '');
+    }
+    // V101.124: History in the Content UI is split by role. A creator's History = their own posts (index.html keeps those); an Audit member's History = the REVIEWS they filed
+    // (users/{me}.contentReviews: verdict, suggested bonus, comment, at) — informational rows, no points, no delete menu.
+    window.cafeContentHistoryItems = function () {
+        if (!on || !isReviewer()) return [];
+        return Object.keys(myReviews || {}).map(function (id) {
+            var r = myReviews[id] || {}, w = allPosts.filter(function (x) { return x.id === id; })[0], at = Number(r.at) || 0;
+            return { id: 'rv_' + id, submissionType: 'content_review', noDelete: true, status: 'reviewed', score: 0, adminBonus: 0,
+                title: w ? (w.displayName || '') + ' · ' + typeLabel(w.ctype) + ' · ' + plat(w.platform)[1] : 'Reviewed post',
+                timestamp: { toDate: function () { return new Date(at); }, toMillis: function () { return at; }, seconds: Math.floor(at / 1000) },
+                adminComment: r.comment || '', metadata: { kind: 'content_review', verdict: r.verdict, suggested: r.score, workId: id, link: w ? w.link : '' } };
+        }).filter(function (it) { return it.timestamp.toMillis() > 0; });
+    };
+    window.cafeContentIsReviewer = isReviewer;
+    function refreshHistory() { try { if (typeof renderUnifiedHistory === 'function') renderUnifiedHistory(); if (window.historyLean && window.historyLean.renderChrome) window.historyLean.renderChrome(); if (typeof syncUnifiedEmptyState === 'function') syncUnifiedEmptyState(); } catch (_) { /* History is optional here */ } }
+    function brandHtml() { return '<div class="cc-brand"><span class="cc-cup" aria-hidden="true">🌸</span><b>Blossom</b>' + (isReviewer() ? '<span class="cc-audit">Audit</span>' : '') + '<small>Healing Café</small></div>'; }
+
     function render() {
         if (!host || !on) return;
         if (view === 'review' && !isReviewer()) view = 'list';
+        if (isReviewer()) { listenAll(); if (!reviewDefaulted) { reviewDefaulted = true; view = 'review'; } }   // V101.122: the queue's data is loaded from the first paint (the counts), and an Audit member opens on it
         var t = L(), posted = postedList(), ideas = drafts.filter(function (d) { return d.stage === 'idea'; }), dr = drafts.filter(function (d) { return d.stage !== 'idea'; });
         if (!viewMonth) viewMonth = todayKey().slice(0, 7);
         var month = view === 'month' ? viewMonth : todayKey().slice(0, 7), mp = posted.filter(function (w) { return String(w.postDate || '').slice(0, 7) === month; });
@@ -307,18 +350,21 @@
         else if (view === 'month') body = calRail(t) + (calMode === 'month' ? monthHtml(t, posted) : rangeHtml(t, posted));
         else if (view === 'board') body = boardHtml(t, posted);
         else {
-            var rows = filter === 'posted' ? posted.map(function (w) { return postedRow(w, t); }).join('') : (filter === 'ideas' ? ideas : dr).map(function (d) { return draftRow(d, t); }).join('');
-            if (!rows) rows = '<div class="cc-empty">' + (filter === 'ideas' ? t.emptyIdeas : filter === 'drafts' ? t.emptyDrafts : t.emptyPosted) + '</div>';
+            var pl = posted.filter(function (w) { return (!platFilter || w.platform === platFilter) && (!scopeReviewed || isReviewed(w)) && (!scopeMonth || String(w.postDate || '').slice(0, 7) === scopeMonth); });
+            var rows = filter === 'posted' ? pl.map(function (w) { return postedRow(w, t); }).join('') : (filter === 'ideas' ? ideas : dr).map(function (d) { return draftRow(d, t); }).join('');
+            if (!rows) rows = (filter === 'posted' && !posted.length)
+                ? '<div class="cc-empty">' + t.emptyPosted + '<div class="cc-starts"><button type="button" class="cc-chip" data-act="newin" data-stage="idea"><i class="fa-solid fa-lightbulb"></i> ' + esc(t.startIdea) + '</button><button type="button" class="cc-chip" data-act="plan" data-day="' + todayKey() + '"><i class="fa-regular fa-calendar-plus"></i> ' + esc(t.startPlan) + '</button></div></div>'
+                : '<div class="cc-empty">' + (filter === 'posted' ? t.noMatch : filter === 'ideas' ? t.emptyIdeas : t.emptyDrafts) + '</div>';   // V101.123: first-run state gets two next steps
             body = '<div class="cc-rail" role="group">' + [['ideas', t.ideas, ideas.length], ['drafts', t.drafts, dr.length], ['posted', t.posted, posted.length]].map(function (c) {
                 return '<button type="button" class="cc-chip" data-filter="' + c[0] + '" aria-pressed="' + (filter === c[0]) + '">' + c[1] + ' ' + c[2] + '</button>';
-            }).join('') + '</div>' + rows;
+            }).join('') + '</div>' + (filter === 'posted' ? postedRails(t, posted) : '') + rows;
         }
         var monthName = new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7) - 1, 15)).toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' });
-        host.innerHTML = '<div class="cc-card"><div class="cc-head"><i class="fa-solid fa-camera"></i> ' + t.title + '<span class="cc-month">' + esc(monthName) + '</span>' +
+        host.innerHTML = '<div class="cc-card">' + brandHtml() + '<div class="cc-head"><i class="fa-solid fa-camera"></i> ' + t.title + '<span class="cc-month">' + esc(monthName) + '</span>' +
             '<span class="cc-view" role="group" aria-label="View"><button type="button" data-view="list" aria-pressed="' + (view === 'list') + '" aria-label="' + t.viewList + '"><i class="fa-solid fa-list"></i></button><button type="button" data-view="month" aria-pressed="' + (view === 'month') + '" aria-label="' + t.viewMonth + '"><i class="fa-solid fa-calendar-days"></i></button><button type="button" data-view="board" aria-pressed="' + (view === 'board') + '" aria-label="' + t.viewBoard + '"><i class="fa-solid fa-table-columns"></i></button>' +
             (isReviewer() ? '<button type="button" data-view="review" aria-pressed="' + (view === 'review') + '" aria-label="' + t.review + '" title="' + t.review + '"><i class="fa-solid fa-clipboard-check"></i></button>' : '') + '</span></div>' +
-            (view === 'review' ? '' : '<div class="cc-stats"><div class="cc-stat"><span>' + t.posted + '</span><b>' + mp.length + '</b></div><div class="cc-stat"><span>' + t.platforms + '</span><b>' + Object.keys(plats).length + '</b></div><div class="cc-stat"><span>' + t.reviewed + '</span><b>' + rev + '/' + mp.length + '</b></div></div>') +
-            body + '<div class="cc-add"><button type="button" class="cc-chip" data-act="new"><i class="fa-solid fa-plus"></i> ' + t.add + '</button></div></div>';
+            (view === 'review' ? '' : statsHtml(t, mp, plats, rev)) +
+            body + (view === 'review' ? '' : '<div class="cc-add"><button type="button" class="cc-chip" data-act="new"><i class="fa-solid fa-plus"></i> ' + t.add + '</button></div>') + '</div>';
     }
 
     // ---------- drafts (users/{uid}.socialDrafts) ----------
@@ -356,6 +402,7 @@
             unsubAll = db.collection('works').where('kind', '==', 'social').onSnapshot(function (snap) {
                 allPosts = snap.docs.map(function (d) { var o = d.data() || {}; o.id = d.id; return o; }).sort(function (a, b) { return String(b.postDate || '').localeCompare(String(a.postDate || '')); });
                 render();
+                refreshHistory();   // V101.124: the titles of the reviewed posts have arrived
             }, function (e) { unsubAll = null; console.warn('[cafe] review listener', e); });
         });
     }
@@ -530,10 +577,10 @@
     }
 
     // ---------- review (Audit) ----------
-    function openReview(id) {
+    function openReview(id, preset) {
         var w = allPosts.filter(function (x) { return x.id === id; })[0]; if (!w || w.userId === userId) return;
         ensureOverlay(); var t = L(), p = plat(w.platform), m = w.metrics || {}, prev = myReviews[id] || null;
-        sheet = { review: id, rvverdict: prev ? prev.verdict : '', rvscore: prev && prev.verdict === 'approve' ? String(prev.score) : '' };
+        sheet = { review: id, rvverdict: preset || (prev ? prev.verdict : ''), rvscore: prev && prev.verdict === 'approve' ? String(prev.score) : '' };
         var imgs = (w.images || []).map(function (u) { return '<a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" alt=""></a>'; }).join('');
         overlay.innerHTML = '<div class="cc-box"><div class="cc-bh"><i class="fa-solid fa-clipboard-check"></i> ' + t.revTitle + '<button type="button" class="cc-x" data-act="close" aria-label="Close">&times;</button></div>' +
             '<div class="cc-row" style="padding:12px 0;cursor:default">' + thumb(p, null) + '<div class="cc-main"><div class="cc-meta"><b>' + esc(w.displayName || '') + '</b><span class="cc-pill">' + esc(typeLabel(w.ctype)) + '</span><span>' + esc(p[1]) + ' · ' + esc(dayLabel(w.postDate)) + '</span></div>' +
@@ -578,6 +625,7 @@
             var upd = {}; upd['contentReviews.' + id] = { verdict: verdict, score: score, comment: comment.slice(0, 500), at: Date.now() };
             await db.collection('users').doc(userId).update(upd);   // update, not set-merge: must never re-create a deleted user's doc
             myReviews[id] = upd['contentReviews.' + id];
+            refreshHistory();   // V101.124
             if (typeof showToast === 'function') showToast(t.revSent);
             closeSheet(); render();
         } catch (e) { console.error('[cafe] review failed', e); if (overlay.classList.contains('open')) setErr(t.fail); }
@@ -639,6 +687,9 @@
     }
     // ---------- wiring ----------
     function onHostClick(e) {
+        var st = e.target.closest('[data-stat]'); if (st) { filter = 'posted'; platFilter = ''; scopeReviewed = st.dataset.stat === 'reviewed'; scopeMonth = statMonth(); return setView('list'); }   // V101.123: a stat tile opens the Posted list scoped to what it counts
+        var pf = e.target.closest('[data-plat]'); if (pf) { platFilter = pf.dataset.plat === platFilter ? '' : pf.dataset.plat; return render(); }
+        if (e.target.closest('[data-clear]')) { scopeMonth = ''; scopeReviewed = false; return render(); }
         var f = e.target.closest('[data-filter]'); if (f) { filter = f.dataset.filter; return render(); }
         var vw = e.target.closest('[data-view]'); if (vw) return setView(vw.dataset.view);
         var rf = e.target.closest('[data-rvf]'); if (rf) { revFilter = rf.dataset.rvf; return render(); }
@@ -660,6 +711,7 @@
         else if (a.dataset.act === 'mv') moveStage(a.dataset.id, +a.dataset.d);
         else if (a.dataset.act === 'draft') openSheet(drafts.filter(function (d) { return d.id === a.dataset.id; })[0] || null);
         else if (a.dataset.act === 'metrics') openNumbers(a.dataset.id);
+        else if (a.dataset.act === 'rvq') openReview(a.dataset.id, a.dataset.v);   // V101.122: ✓ / ↩ on a queue row opens the sheet with that verdict picked
         else if (a.dataset.act === 'review') openReview(a.dataset.id);
     }
     function sync() {
@@ -671,7 +723,7 @@
             on = now;
             document.body.classList.toggle('cafe-mode', on);
             // V101.121: the Content UI has its own name in the footer, and its History speaks only about content
-            var nm = document.getElementById('intern-app-name'); if (nm) { if (!nm.dataset.def) nm.dataset.def = nm.textContent; nm.textContent = on ? 'CAFE Content Studio' : nm.dataset.def; }
+            var nm = document.getElementById('intern-app-name'); if (nm) { if (!nm.dataset.def) nm.dataset.def = nm.textContent; nm.textContent = on ? 'Blossom Healing Café' : nm.dataset.def; }
             try { if (typeof renderUnifiedHistory === 'function') renderUnifiedHistory(); if (window.historyLean && window.historyLean.renderChrome) window.historyLean.renderChrome(); if (typeof syncUnifiedEmptyState === 'function') syncUnifiedEmptyState(); } catch (_) { /* History is optional here */ }
             if (on) ['achievementUnlockModal', 'achievementsModal'].forEach(function (id) { var m = document.getElementById(id); if (m) m.style.display = 'none'; });   // a badge popup that opened before the division loaded
             if (on) {

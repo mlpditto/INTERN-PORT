@@ -54,6 +54,13 @@ assert.ok(/getMyDivision\(\)/.test(index) && /return "General Division"/.test(in
     assert.equal(ctx.getUnifiedAllItems().length, 5, 'Intern UI: everything');
     cc = true;
     assert.equal(JSON.stringify(ctx.getUnifiedAllItems().map(s => s.id)), JSON.stringify(['p1']), 'Content UI: only the content posts — no quiz, journal, explore, ordinary work');
+    ctx.window.cafeContentHistoryItems = () => [{ id: 'rv_W9', submissionType: 'content_review' }];
+    assert.equal(JSON.stringify(ctx.getUnifiedAllItems().map(s => s.id)), JSON.stringify(['p1', 'rv_W9']), 'V101.124: an Audit member\'s History = own posts + the reviews filed');
+    delete ctx.window.cafeContentHistoryItems;
+    const hl = fs.readFileSync('public/history-lean.js', 'utf8'), dr = fs.readFileSync('public/delete-requests.js', 'utf8');
+    assert.ok(/content_review: \{ e: 'Ⓐ', n: 'Review' \}/.test(hl) && /'content_review'\];/.test(hl), 'History knows the Review type (chip + order)');
+    assert.ok(/if \(!item \|\| item\.noDelete\) return;/.test(dr), 'a filed review has no delete menu');
+    assert.ok(/explore_link: 0, content_review: 0 \}/.test(index), 'type counts include content_review');
     assert.ok(/id="intern-app-name">LINE LIFF Internship Management System<\/span><span id="intern-version-current">/.test(index), 'the footer name has its own span (the version stays)');
     assert.ok(/No content history yet/.test(index) && /Posted pieces and their review scores appear here/.test(index), 'Content UI gets its own empty History text');
     assert.ok(/isContentCreator && window\.isContentCreator\(\)\) \?/.test(fs.readFileSync('public/history-lean.js', 'utf8')), 'the journal streak pill is hidden in the Content UI');
@@ -69,7 +76,7 @@ let userId = 'U1', userProfile = { displayName: 'Jo', pictureUrl: '' }, division
 const store = { users: { U1: {} }, works: {} }; let wn = 0, un = 0; const userCbs = [];
 function getMyDivision() { return division; }
 var myGroup = 'G1'; window.myExtraGroups = [];
-Object.defineProperty(window, 'divisionConfig', { configurable: true, get() { const o = { 'Content Creator': ['Audit'], Clinical: ['Rx'] }; o[division] = (o[division] || []).concat('G1'); return o; } });
+Object.defineProperty(window, 'divisionConfig', { configurable: true, get() { const o = { 'Content Creator': ['Audit', 'Social'], Clinical: ['Rx'] }; o[division] = (o[division] || []).concat('G1'); return o; } });
 function getBangkokDateTimeParts() { return { dateKey: '2026-10-09' }; }
 function ensureFirebaseAuthReady() { return Promise.resolve({ uid: 'A1' }); }
 function showToast(m) { window.__toasts.push(m); }
@@ -382,6 +389,23 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
             pushWorks(); window.cafeContentSync();
         });
         assert.equal(await page.locator('#section-cafe-content [data-view="review"]').count(), 1, 'Audit gets the Review view');
+        // V101.122: CAFE Audit home — an Audit member lands on the queue: ☕ mark, hero (count + Review next), quick ✓ / ↩, no "New content" inside the queue
+        assert.equal(await page.locator('#section-cafe-content .cc-brand .cc-audit').count(), 1, 'the CAFE mark carries Audit');
+        assert.ok(/🌸/.test(await page.$eval('#section-cafe-content .cc-brand', e => e.textContent)) && /Blossom/.test(await page.$eval('#section-cafe-content .cc-brand', e => e.textContent)), '🌸 Blossom mark');
+        assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('unified-fab-btn'), '::after').content), '"🌸"', 'V101.125: the round ＋ is the Blossom mark in the CAFE UI');
+        assert.equal(await page.$eval('#section-cafe-content .cc-qbig', e => e.textContent), '1', 'the hero shows how many wait for me');
+        assert.equal(await page.locator('#section-cafe-content .cc-add').count(), 0, 'no New content button inside the queue');
+        assert.equal(await page.locator('#section-cafe-content .cc-stats').count(), 0, 'no month stats in the queue');
+        await page.click('.cc-rv[data-id="W9"] .cc-rq.fix'); await page.waitForSelector('#ccOverlay.open #rvComment');
+        assert.equal(await page.$eval('#ccOverlay .cc-chip[data-v="changes"]', e => e.getAttribute('aria-pressed')), 'true', '↩ opens the sheet with Changes already picked');
+        await page.click('#ccOverlay .cc-x');
+        await page.click('.cc-rv[data-id="W9"] .cc-rq.ok'); await page.waitForSelector('#ccOverlay.open #rvComment');
+        assert.equal(await page.$eval('#ccOverlay .cc-chip[data-v="approve"]', e => e.getAttribute('aria-pressed')), 'true', '✓ opens the sheet with OK already picked');
+        assert.equal(await vis('#rvScoreBox'), true, 'and the bonus picker is there');
+        await page.click('#ccOverlay .cc-x');
+        await page.click('.cc-qgo'); await page.waitForSelector('#ccOverlay.open #rvComment');
+        assert.ok(/Latte art reel/.test(await page.$eval('#ccOverlay', e => e.textContent)), 'Review next opens the oldest waiting post');
+        await page.click('#ccOverlay .cc-x');
         await page.click('#section-cafe-content [data-view="review"]');
         assert.equal(await page.locator('#section-cafe-content .cc-stats').count(), 0, 'no month stats in the Review view');
         let rv = await page.$eval('#section-cafe-content', e => e.innerText.replace(/\s+/g, ' '));
@@ -414,6 +438,11 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.equal(await page.evaluate(() => store.users.U1.contentReviews.W9.verdict + store.users.U1.contentReviews.W9.score), 'approve0.2', 'remembered on the own user doc of the reviewer');
         rv = await page.$eval('#section-cafe-content', e => e.innerText.replace(/\s+/g, ' '));
         assert.ok(/To review 0/.test(rv) && /Reviewed by me 1/.test(rv), 'it moved to Reviewed by me: ' + rv);
+        { const hi = await page.evaluate(() => window.cafeContentHistoryItems());
+          assert.equal(hi.length, 1, 'V101.124: the review I filed is a History item'); assert.equal(hi[0].submissionType, 'content_review'); assert.equal(hi[0].noDelete, true);
+          assert.equal(hi[0].metadata.verdict, 'approve'); assert.ok(/Mint/.test(hi[0].title), 'titled with the creator: ' + hi[0].title); assert.equal(hi[0].adminComment, 'Clear hook, good captions'); }
+        assert.equal(await page.locator('#section-cafe-content .cc-qhero').count(), 0, 'no hero when nothing waits');
+        assert.ok(/All caught up/.test(rv) && (await page.locator('#section-cafe-content .cc-qok').count()) === 1, 'ok = a green frame: All caught up');
         await page.click('#section-cafe-content [data-rvf="mine"]');
         assert.ok(/You suggested ✅ \+0\.2/.test(await page.$eval('#section-cafe-content', e => e.innerText)), 'the row shows what I suggested');
         // change my mind: re-open, send "needs changes" → a second notification
@@ -491,7 +520,7 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.equal(await vis('#section-cafe-content'), false);
         await page.evaluate(() => { window.myExtraGroups = ['Rx']; window.cafeContentSync(); });
         assert.equal(await vis('#cafe-view-switch'), false, 'an extra group outside the division alone gives nothing');
-        await page.evaluate(() => { window.myExtraGroups = ['Audit']; window.cafeContentSync(); });
+        await page.evaluate(() => { window.myExtraGroups = ['Social']; window.cafeContentSync(); });
         assert.equal(await vis('#cafe-view-switch'), true, 'primary outside + extra inside the division → a switch');
         assert.match(await page.$eval('#cafe-view-switch', e => e.title), /^View as: Intern → Content$/, 'title says where you are and where a tap goes'); assert.ok(await page.$('#cafe-view-switch i.fa-graduation-cap'), 'Intern view = graduation-cap icon');
         assert.equal(await swBtns(), 'intern', 'opens in the Intern UI (the primary group is outside the division)');
@@ -502,7 +531,7 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.equal(await vis('#section-cafe-content'), true, 'Content UI'); assert.equal(await vis('#section-kanban'), false, 'Mission hidden in the Content UI');
         assert.equal(await page.evaluate(() => window.isContentCreator()), true, 'no badges in the Content UI');
         assert.equal(await mode(), 'content', 'remembered per user in this browser');
-        assert.equal(await page.$eval('#intern-app-name', e => e.textContent), 'CAFE Content Studio', 'footer name in the Content UI');
+        assert.equal(await page.$eval('#intern-app-name', e => e.textContent), 'Blossom Healing Café', 'footer name in the Content UI');
         const before = await page.evaluate(() => window.__unified);
         await page.click('#unified-fab-btn'); await page.waitForSelector('#ccOverlay.open');
         assert.equal(await page.evaluate(() => window.__unified), before, '＋ opens the content sheet in the Content UI');
@@ -518,6 +547,13 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.equal(await vis('#section-cafe-content'), true);
         await goMode('intern');
         assert.equal(await vis('#section-cafe-content'), false, 'can flip to the Intern UI'); assert.equal(await vis('#section-kanban'), true);
+        // V101.124: an Audit member is never an intern — no remembered choice → the CAFE UI; a remembered choice still wins; a non-Audit CAFE member still opens in Intern
+        await page.evaluate(() => { localStorage.clear(); division = 'General Division'; window.myExtraGroups = ['Audit']; window.myMemberships = []; window.cafeContentSync(); });
+        assert.equal(await swBtns(), 'content', 'Audit → opens in the CAFE UI');
+        await goMode('intern'); assert.equal(await swBtns(), 'intern', 'a remembered choice still wins');
+        await page.evaluate(() => { localStorage.clear(); window.myExtraGroups = ['Social']; window.cafeContentSync(); });
+        assert.equal(await swBtns(), 'intern', 'a non-Audit CAFE member still opens in Intern');
+        await page.evaluate(() => { localStorage.clear(); window.myExtraGroups = []; window.cafeContentSync(); });
         // V101.119: a CAFE membership stored ONLY as a users.memberships pair (admin V102.183) — the group is in no division list, no extraGroups
         await page.evaluate(() => { localStorage.clear(); division = 'General Division'; window.myExtraGroups = []; window.myMemberships = [{ division: 'CAFE', group: 'Social' }]; window.cafeContentSync(); });
         assert.equal(await vis('#cafe-view-switch'), true, 'a {CAFE, Social} pair alone → the Intern | Content switch');
@@ -561,6 +597,39 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         await page.evaluate(() => { document.body.classList.remove('cafe-peek'); history.replaceState(null, '', '/h.html'); window.cafeContentSync(); });
         assert.equal(await vis('#section-kanban'), false, 'no link, no Mission (as before)');
         await page.evaluate(() => { localStorage.clear(); window.myExtraGroups = []; window.cafeContentSync(); });
+        // V101.123 (ideas from a pasted UX review, filtered against earlier picks): clickable stat tiles, platform rail, first-run starters, month engagement
+        await page.evaluate(() => { localStorage.clear(); division = 'Content Creator'; myGroup = 'G1'; window.myExtraGroups = []; window.myMemberships = []; store.works = {}; pushWorks(); window.cafeContentSync(); });
+        const hostText = () => page.$eval('#section-cafe-content', e => e.innerText.replace(/\s+/g, ' '));
+        await page.click('#section-cafe-content [data-filter="posted"]');
+        assert.ok(/Nothing posted yet/.test(await hostText()), 'first-run empty state');
+        assert.equal(await page.locator('#section-cafe-content .cc-starts .cc-chip').count(), 2, 'two starter buttons: Jot an idea / Plan a post');
+        await page.click('#section-cafe-content .cc-starts [data-stage="idea"]'); await page.waitForSelector('#ccOverlay.open'); await page.click('#ccOverlay .cc-x');
+        await page.evaluate(() => {
+            const mk = o => ({ authUid: 'A1', userId: 'U1', kind: 'social', status: 'รอตรวจ', score: 0, title: 't', link: 'https://x.test/p', ctype: 'reel', images: [], metrics: null, ...o });
+            store.works.P1 = mk({ platform: 'ig', postDate: '2026-10-08', caption: 'IG one', metrics: { likes: 120, reach: 2000 } });
+            store.works.P2 = mk({ platform: 'tt', postDate: '2026-10-07', caption: 'TT one', status: 'ตรวจแล้ว', score: 0.2, metrics: { likes: 30, reach: 400 } });
+            store.works.P3 = mk({ platform: 'ig', postDate: '2026-09-01', caption: 'IG old' });
+            pushWorks();
+        });
+        assert.equal(await page.locator('#section-cafe-content button.cc-stat[data-stat]').count(), 3, 'the three stat tiles are buttons');
+        let ht = await hostText();
+        assert.ok(/150/.test(ht) && /2\.4k/.test(ht) && /this month/.test(ht), 'month engagement shows when metrics exist: ' + ht.slice(0, 200));
+        assert.equal(await page.locator('#section-cafe-content .cc-prail .cc-chip').count(), 3, 'platform rail: All + ig + tt');
+        assert.ok(/IG one/.test(ht) && /TT one/.test(ht) && /IG old/.test(ht), 'all three posts before any filter');
+        await page.click('#section-cafe-content [data-stat="reviewed"]');
+        ht = await hostText();
+        assert.ok(/TT one/.test(ht) && !/IG one/.test(ht) && !/IG old/.test(ht), 'the Reviewed tile → only this month\'s reviewed posts: ' + ht.slice(0, 240));
+        assert.equal(await page.locator('#section-cafe-content .cc-scope').count(), 1, 'a scope chip says what the list is narrowed to');
+        await page.click('#section-cafe-content [data-clear]');
+        assert.equal(await page.locator('#section-cafe-content .cc-scope').count(), 0); assert.ok(/IG old/.test(await hostText()), '× clears the scope');
+        await page.click('#section-cafe-content [data-stat="posted"]');
+        ht = await hostText(); assert.ok(/IG one/.test(ht) && /TT one/.test(ht) && !/IG old/.test(ht), 'the Posted tile → this month\'s posts only');
+        await page.click('#section-cafe-content [data-clear]');
+        await page.click('#section-cafe-content [data-plat="tt"]');
+        ht = await hostText(); assert.ok(/TT one/.test(ht) && !/IG one/.test(ht), 'platform chip filters the list');
+        await page.click('#section-cafe-content [data-plat="tt"]');
+        assert.ok(/IG one/.test(await hostText()), 'tapping the chip again clears it');
+        await page.evaluate(() => { store.works = {}; pushWorks(); localStorage.clear(); });
         assert.deepEqual(errs, [], 'no page errors');
         console.log('PASS: CAFE content — only the Content Creator division (and the old name CAFE) gets the Content card (Mission + DD Codex hidden, ＋ opens the content sheet), ideas/drafts on users.socialDrafts, posting writes works(kind:social) + mirror, numbers + admin review show on the card, Thai toggle, moves back out of CAFE cleanly');
     } finally { await browser.close(); }
