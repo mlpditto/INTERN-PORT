@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.130)</title>
+    <title>Internship Portfolio (V101.131)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <link rel="stylesheet" href="cafe-content.css?v=V101.130">
     <meta charset="UTF-8">
@@ -9916,9 +9916,11 @@
             return Object.keys(cfg).find(n => (cfg[n] || []).some(g => String(g).trim().toUpperCase() === key)) || '';
         }
         // The people ranked with me: my division, or — with no division — my own group (still without a division).
+        // V101.131: a leaderboard row carries the admin's extra pairs (getLeaderboard sends users.memberships) — that person is ranked on those divisions' boards too.
+        function rowIsMemberOf(u, dv) { return !!dv && Array.isArray(u && u.memberships) && u.memberships.some(m => m && m.division === dv); }
         function myDivisionPeers(list) {
             const myDiv = userDivisionOf({ group: myGroup, division: myDivisionRaw });
-            return list.filter(u => myDiv ? userDivisionOf(u) === myDiv : ((u.group || 'Public') === myGroup && userDivisionOf(u) === ''));
+            return list.filter(u => myDiv ? (userDivisionOf(u) === myDiv || rowIsMemberOf(u, myDiv)) : ((u.group || 'Public') === myGroup && userDivisionOf(u) === ''));
         }
 
         function switchLeaderboardMode(mode) {
@@ -9983,7 +9985,7 @@
                     ? (leaderboardMode === 'reflective'
                         ? `📝 ${u.reflectiveTotalLogs || 0} logs | 🔥 Best ${u.reflectiveBestStreak || 0} วัน`
                         : `Lv.${lv} | <span class="lang-no-toggle" style="color:${getGroupColor(u.group)}; font-weight:bold;"><i class="fa-solid ${getGroupIcon(u.group)}"></i> ${u.group || 'Public'}</span>`)
-                    : `<span style="color:#ccc;"><i>Identity Hidden</i></span>`;
+                    : `<span style="color:#ccc;"><i>Identity Hidden</i></span>${myDiv && userDivisionOf(u) !== myDiv ? ' <span class="lang-no-toggle" style="color:#94a3b8;" title="Also in this division">· also</span>' : ''}`;
 
                 const valueText = leaderboardMode === 'reflective'
                     ? `${u.reflectiveTotalLogs || 0}`
@@ -10770,8 +10772,9 @@
                 .split(',').map(s => s.trim()).filter(Boolean);
             if (!parts.length) return true;
             // V101.23: case-insensitive — a quiz saved for "Extern" still reaches an "EXTERN" intern.
-            const mine = String(myGroup || '').toUpperCase();
-            return parts.some(p => p.toUpperCase() === 'PUBLIC' || p.toUpperCase() === mine);
+            // V101.131: a users.memberships pair's group counts too — someone "also in CAFE · Audit" sees the quizzes made for Audit.
+            const mine = [myGroup].concat((Array.isArray(window.myMemberships) ? window.myMemberships : []).map(m => m.group)).map(g => String(g || '').toUpperCase());
+            return parts.some(p => p.toUpperCase() === 'PUBLIC' || mine.includes(p.toUpperCase()));
         }
 
         function renderAssignments() {
