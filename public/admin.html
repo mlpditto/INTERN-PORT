@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.196)</title>
+    <title>Nika Admin (V102.197)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -4205,6 +4205,17 @@
         #groupSelectModal .gs-header { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; margin-bottom:10px; min-width:0; }
         #groupSelectModal .gs-header-person { display:flex; align-items:center; gap:8px; min-width:0; flex:0 1 auto; }
         #groupSelectModal #gs-hub-pic { width:36px; height:36px; border-radius:50%; object-fit:cover; flex-shrink:0; }
+        /* V102.197: the photo is a button — a grey photo + 🙈 means the user is in Camp (hidden from boards); the menu flips it */
+        #groupSelectModal .gs-pic-wrap { position:relative; flex-shrink:0; }
+        #groupSelectModal .gs-pic-btn { position:relative; display:block; width:auto; min-height:0; margin:0; padding:0; border:0; border-radius:50%; background:none; cursor:pointer; }
+        #groupSelectModal .gs-pic-btn:focus-visible { outline:3px solid #1d4ed8; outline-offset:2px; }
+        #groupSelectModal .gs-pic-btn.is-hidden #gs-hub-pic { filter:grayscale(1); opacity:.55; }
+        #groupSelectModal .gs-pic-badge { position:absolute; right:-4px; bottom:-4px; width:18px; height:18px; display:flex; align-items:center; justify-content:center; border-radius:50%; background:#fff; border:1.5px solid #cbd5e1; font-size:11px; line-height:1; }
+        #groupSelectModal .gs-pic-badge[hidden], #groupSelectModal .gs-pic-menu[hidden] { display:none; }
+        #groupSelectModal .gs-pic-menu { position:absolute; left:0; top:44px; z-index:30; min-width:210px; display:flex; flex-direction:column; gap:8px; padding:10px; border-radius:14px; background:#fff; border:1px solid #e2e8f0; box-shadow:0 12px 30px rgba(15,23,42,0.18); }
+        #groupSelectModal .gs-pic-state { font-size:13px; font-weight:800; color:#334155; } #groupSelectModal .gs-pic-state small { font-weight:600; color:#94a3b8; }
+        #groupSelectModal .gs-pic-act { width:auto; min-height:0; margin:0; padding:8px 12px; border:0; border-radius:10px; background:#dcfce7; color:#166534; font-weight:800; font-size:13px; text-align:left; cursor:pointer; }
+        #groupSelectModal .gs-pic-act.off { background:#f1f5f9; color:#475569; }
         #groupSelectModal #gs-title-name { font-size:17px; font-weight:700; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         #groupSelectModal .gs-ident { display:inline-flex; flex-wrap:wrap; align-items:center; gap:6px; }
         #groupSelectModal .gs-code, #groupSelectModal .gs-google { display:inline-flex; align-items:center; gap:5px; width:auto; min-height:0; margin:0; padding:3px 9px; border-radius:999px; font:inherit; font-size:12px; font-weight:700; white-space:nowrap; cursor:pointer; }
@@ -14621,7 +14632,7 @@
                      The words "Profile", "LINE ID", "Enrollment CODE", "pts" moved into tooltips; the icons and colours say the same. The old
                      second row (.gs-identity) is gone; on a narrow screen the identity chips wrap under the name. Every id is unchanged. -->
                 <div class="gs-header lang-no-toggle">
-                    <div class="gs-header-person"><img id="gs-hub-pic" src="" alt=""><span id="gs-title-name">...</span></div>
+                    <div class="gs-header-person"><span class="gs-pic-wrap"><button type="button" id="gs-pic-btn" class="gs-pic-btn" onclick="gsPicToggleMenu(event)" aria-haspopup="true" aria-expanded="false" title="On the boards — tap for options"><img id="gs-hub-pic" src="" alt=""><span id="gs-pic-badge" class="gs-pic-badge" hidden>🙈</span></button><div id="gs-pic-menu" class="gs-pic-menu" hidden></div></span><span id="gs-title-name">...</span></div>   <!-- V102.197: tap the photo = show / hide this user on the boards (🙈 Camp) -->
                     <span class="gs-ident">
                         <!-- V102.21: Connect Google (intern V101.16) — shown only when linked. -->
                         <!-- V102.180: ONE icon (the Google G) says "connected"; the chip itself is the disconnect control (confirm inside gsDisconnectGoogle). -->
@@ -34819,6 +34830,7 @@ RULES:
             db.collection("users").orderBy("score", "desc").onSnapshot(s => {
                 usersData = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 if (typeof refreshHubHeaderIfOpen === 'function') refreshHubHeaderIfOpen(); // V98.45
+                if (typeof gsPicPaint === 'function') gsPicPaint();   // V102.197: the profile photo's Camp state follows the live user doc
                 renderUserGroupTabs();
                 renderBoardGroupTabs();
                 renderTable('users');
@@ -36976,6 +36988,7 @@ They can connect again from LINE.
             const _fallbackPic = 'https://cdn-icons-png.flaticon.com/512/847/847969.png';
             _hubPic.onerror = function () { this.onerror = null; this.src = _fallbackPic; };
             _hubPic.src = user?.pictureUrl || _fallbackPic;
+            if (typeof gsPicPaint === 'function') { gsPicPaint(); const _pm = document.getElementById('gs-pic-menu'); if (_pm) _pm.hidden = true; }   // V102.197
             // V102.174: the LINE user id sits in the Social card next to LINE (read-only, with Copy) — it used to be a chip in the header
             const _lineUidEl = document.getElementById('gs-line-uid');
             if (_lineUidEl) _lineUidEl.value = uid || '';
@@ -57111,6 +57124,31 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
         }
         function toggleIgnoreUser(id, s) { db.collection("users").doc(id).update({ isIgnored: !s }); }
+        // V102.197: the profile modal's photo — the user's board state (Elite Board ↔ 🙈 Camp) in one tap. toggleIgnoreUser(id, s) writes isIgnored = !s.
+        window.gsPicPaint = function () {
+            const btn = document.getElementById('gs-pic-btn'), badge = document.getElementById('gs-pic-badge'), menu = document.getElementById('gs-pic-menu'); if (!btn || !badge || !menu) return;
+            const uid = (document.getElementById('gs-uid') || {}).value, u = (usersData || []).find(x => x.id === uid), hidden = !!(u && u.isIgnored);
+            btn.classList.toggle('is-hidden', hidden); badge.hidden = !hidden;
+            btn.title = hidden ? 'Hidden from boards (Camp) — tap to show' : 'On the boards — tap for options';
+            menu.innerHTML = hidden
+                ? '<div class="gs-pic-state">🙈 Hidden from boards <small>Camp · not ranked</small></div><button type="button" class="gs-pic-act" onclick="gsPicSet(false)">👀 Show on boards</button>'
+                : '<div class="gs-pic-state">On the boards</div><button type="button" class="gs-pic-act off" onclick="gsPicSet(true)">🙈 Hide from boards</button>';
+        };
+        window.gsPicToggleMenu = function (e) {
+            if (e) e.stopPropagation();
+            const menu = document.getElementById('gs-pic-menu'), btn = document.getElementById('gs-pic-btn'); if (!menu || !btn) return;
+            gsPicPaint(); menu.hidden = !menu.hidden; btn.setAttribute('aria-expanded', String(!menu.hidden));
+        };
+        window.gsPicSet = function (hide) {
+            const uid = (document.getElementById('gs-uid') || {}).value, u = (usersData || []).find(x => x.id === uid); if (!uid || !u) return;
+            toggleIgnoreUser(uid, !hide);
+            u.isIgnored = !!hide;   // optimistic; the users snapshot confirms
+            gsPicPaint(); const m = document.getElementById('gs-pic-menu'); if (m) m.hidden = true;
+            const b = document.getElementById('gs-pic-btn'); if (b) b.setAttribute('aria-expanded', 'false');
+            if (typeof showToast === 'function') showToast(hide ? `🙈 ${u.displayName || 'User'} is hidden from the boards` : `👀 ${u.displayName || 'User'} is back on the boards`);
+        };
+        document.addEventListener('click', e => { const m = document.getElementById('gs-pic-menu'); if (m && !m.hidden && !e.target.closest('.gs-pic-wrap')) { m.hidden = true; const b = document.getElementById('gs-pic-btn'); if (b) b.setAttribute('aria-expanded', 'false'); } });
+        document.addEventListener('keydown', e => { if (e.key !== 'Escape') return; const m = document.getElementById('gs-pic-menu'); if (m && !m.hidden) { m.hidden = true; e.stopPropagation(); } }, true);
 
         // V97.73: manual runner for the nightly no-check-in decay (applyCheckinDecay,
         // 00:05 Asia/Bangkok). Exists to recover a day the schedule missed and to let
