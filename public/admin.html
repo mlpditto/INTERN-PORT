@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.199)</title>
+    <title>Nika Admin (V102.200)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -14644,6 +14644,7 @@
                     <button type="button" class="gs-lang-switch" onclick="gsSetLanguage(gsLanguage === 'th' ? 'en' : 'th')" title="Profile language — tap to switch EN / TH" aria-label="Profile language: switch between English and Thai"><span data-gs-lang="en" aria-pressed="true">EN</span><span data-gs-lang="th" aria-pressed="false">TH</span></button>
                     <span class="gs-bal gs-bal-pts" title="Points" aria-label="Points">🏆 <span id="gs-user-score">0</span></span>
                     <span class="gs-bal gs-bal-beri" title="Beri" aria-label="Beri balance">🪙 <span id="gs-user-beri">0</span></span>
+                    <span class="gs-bal gs-bal-cafe" id="gs-user-cafe-box" title="CAFE points (content posts) — separate from 🏆" aria-label="CAFE points" hidden>🌸 <span id="gs-user-cafe">0</span></span>
                     <button type="button" class="gs-header-close" aria-label="Close User Hub" onclick="forceHideModal('groupSelectModal')">×</button>
                 </div>
                 <input type="hidden" id="gs-uid">
@@ -37001,6 +37002,7 @@ They can connect again from LINE.
                 (enrollmentCode && enrollmentCode !== '-') ? 'inline-flex' : 'none';   // V102.164: a chip on the header line
             gsRenderGoogleChip(user);
             document.getElementById('gs-user-score').innerText = parseFloat((user?.score || 0).toFixed(2));
+            { const _cp = parseFloat((user?.cafePts || 0).toFixed(2)), _cb = document.getElementById('gs-user-cafe-box'); if (_cb) { _cb.hidden = !_cp; document.getElementById('gs-user-cafe').innerText = _cp; } }   // V102.200
             document.getElementById('gs-user-beri').innerText = user?.beri || 0;
 
             // Load cert names
@@ -57560,7 +57562,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             let v = el ? el.value : prompt("Score:", "0.5");
             if (v !== null && v !== "") {
                 await db.collection("works").doc(id).update({ score: parseFloat(v), status: 'ตรวจแล้ว' });
-                await db.collection("users").doc(uid).update({ score: firebase.firestore.FieldValue.increment(parseFloat(v)) });
+                // V102.200: CAFE points are their own balance — a content post (works.kind 'social') adds to users.cafePts, never to users.score (Quiz / Journal / Explore / Case).
+                const _wSnap = await db.collection("works").doc(id).get(), _cafe = !!(_wSnap.exists && _wSnap.data().kind === 'social');
+                await db.collection("users").doc(uid).update({ [_cafe ? 'cafePts' : 'score']: firebase.firestore.FieldValue.increment(parseFloat(v)) });
                 // V95.98: sync the dual-written submissions mirror so the intern's pending banner clears.
                 const wmBatch = db.batch();
                 if (await stageSubmissionMirror(wmBatch, id, submissionReviewedFields(parseFloat(v)))) await wmBatch.commit();

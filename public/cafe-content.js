@@ -735,8 +735,27 @@
                 listen(); render();
             } else if (host) { host.hidden = true; host.innerHTML = ''; }
             if (was && !on && typeof updateEarnedBadgesBar === 'function') updateEarnedBadgesBar();   // flipped back to the Intern UI: the badge row returns
+            paintHeader();   // V101.130: CAFE balances in the header while the Content UI is on
         } catch (e) { console.warn('[cafe] sync failed', e); }
     }
+    // V101.130: CAFE points and Beri are their own balances (users.cafePts / users.cafeBeri, set by the admin when a content post is scored). In the Content UI the header shows
+    // them; everywhere else the normal score / Beri. index.html's users listener stores window.myCafePts / myCafeBeri and calls this after painting the normal numbers.
+    function paintHeader() {
+        var s = document.getElementById('u-score'), b = document.getElementById('u-beri'), bx = document.getElementById('u-beri-box');
+        if (!s) return;
+        if (on) {
+            s.textContent = (Number(window.myCafePts) || 0).toFixed(2);
+            if (b) b.textContent = '🪙 ' + (parseInt(window.myCafeBeri, 10) || 0);
+            if (bx) { if (!bx.dataset.def) bx.dataset.def = bx.title; bx.title = 'CAFE Beri — separate from the Explore Beri'; }
+            s.title = 'CAFE points — from content posts';
+        } else {
+            if (typeof myScore === 'number') s.textContent = myScore.toFixed(2);
+            if (b && typeof myBeri === 'number') b.textContent = '🪙 ' + myBeri;
+            if (bx && bx.dataset.def) bx.title = bx.dataset.def;
+            s.removeAttribute('title');
+        }
+    }
+    window.cafeContentPaintHeader = paintHeader;
     // The Content Creator division has no badge system: index.html's achievement / badge code asks this (live, not via body.cafe-mode, so it is right
     // even before the first sync) and does nothing when it is true.
     window.isContentCreator = isCafe;
