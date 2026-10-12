@@ -670,6 +670,9 @@
             var was = on;
             on = now;
             document.body.classList.toggle('cafe-mode', on);
+            // V101.121: the Content UI has its own name in the footer, and its History speaks only about content
+            var nm = document.getElementById('intern-app-name'); if (nm) { if (!nm.dataset.def) nm.dataset.def = nm.textContent; nm.textContent = on ? 'CAFE Content Studio' : nm.dataset.def; }
+            try { if (typeof renderUnifiedHistory === 'function') renderUnifiedHistory(); if (window.historyLean && window.historyLean.renderChrome) window.historyLean.renderChrome(); if (typeof syncUnifiedEmptyState === 'function') syncUnifiedEmptyState(); } catch (_) { /* History is optional here */ }
             if (on) ['achievementUnlockModal', 'achievementsModal'].forEach(function (id) { var m = document.getElementById(id); if (m) m.style.display = 'none'; });   // a badge popup that opened before the division loaded
             if (on) {
                 if (!host) {

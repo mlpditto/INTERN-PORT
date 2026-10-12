@@ -3,9 +3,9 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.120)</title>
+    <title>Internship Portfolio (V101.121)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
-    <link rel="stylesheet" href="cafe-content.css?v=V101.120">
+    <link rel="stylesheet" href="cafe-content.css?v=V101.121">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
@@ -5218,7 +5218,7 @@
                  minimum on the page background (#f4f6f9) and unreadable on a phone outdoors. #475569 measures
                  7.4:1 there. -->
             <div style="text-align:center; font-size:0.8em; color:#475569; margin-top:30px; padding-bottom:20px;">
-                LINE LIFF Internship Management System<span id="intern-version-current"></span>
+                <span id="intern-app-name">LINE LIFF Internship Management System</span><span id="intern-version-current"></span>   <!-- V101.121: cafe-content.js gives the Content (CAFE) UI its own name here -->
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=' · '+m[0];})();</script>
         </div>
@@ -24272,7 +24272,9 @@ async function archiveDoneCard(cardId) {
 
         // V95.16: Single source for the unified timeline — submissions + quiz attempts.
         function getUnifiedAllItems() {
-            return (unifiedSubmissionsCache || []).concat(mapQuizAttemptsToUnified(), mapLinkSuggestionsToUnified());
+            const _all = (unifiedSubmissionsCache || []).concat(mapQuizAttemptsToUnified(), mapLinkSuggestionsToUnified());
+            // V101.121: in the Content (CAFE) UI the History is about CONTENT only — the posts and their review / score; never quiz, journal, case or explore entries (this also feeds the header totals, chips, sparkline and the empty state)
+            return (typeof window.isContentCreator === 'function' && window.isContentCreator()) ? _all.filter(s => s && s.metadata && s.metadata.kind === 'social_content') : _all;
         }
 
         // V95.16: Toggle empty-state hero vs stats/search/filters based on whether the
@@ -24280,6 +24282,16 @@ async function archiveDoneCard(cardId) {
         // see the timeline. Called from both the submissions listener and renderUnifiedHistory.
         function syncUnifiedEmptyState() {
             const isEmpty = getUnifiedAllItems().length === 0;
+            const _cc = typeof window.isContentCreator === 'function' && window.isContentCreator();   // V101.121: its own empty state in the Content UI
+            const _heroEl = document.getElementById('unified-empty-hero');
+            if (_heroEl) {
+                const _q = sel => _heroEl.querySelector(sel);
+                if (!_heroEl.dataset.def) _heroEl.dataset.def = JSON.stringify({ i: _q('.empty-hero-icon').textContent, t: _q('.empty-hero-title').textContent, s: _q('.empty-hero-subtitle').textContent, h: _q('.empty-hero-hint').textContent });
+                const _d = JSON.parse(_heroEl.dataset.def);
+                _q('.empty-hero-icon').textContent = _cc ? '📸' : _d.i; _q('.empty-hero-title').textContent = _cc ? 'No content history yet' : _d.t;
+                _q('.empty-hero-subtitle').textContent = _cc ? '' : _d.s; _q('.empty-hero-subtitle').style.display = _cc ? 'none' : '';
+                _q('.empty-hero-hint').textContent = _cc ? 'Posted pieces and their review scores appear here' : _d.h;
+            }
             const hero = document.getElementById('unified-empty-hero');
             const stats = document.getElementById('unified-stats-card');
             const searchWrap = document.getElementById('unified-search-wrap');
@@ -26163,8 +26175,8 @@ async function archiveDoneCard(cardId) {
 <script src="history-review.js?v=V99.81"></script>
 <script src="daily-canvas.js?v=V101.35"></script>
 <script src="intern-guide.js?v=V101.99" defer></script>
-<script src="cafe-content.js?v=V101.120" defer></script>
-<script src="history-lean.js?v=V101.114"></script><script src="history-compact.js?v=V101.55"></script><script src="delete-requests.js?v=V101.114"></script>
+<script src="cafe-content.js?v=V101.121" defer></script>
+<script src="history-lean.js?v=V101.121"></script><script src="history-compact.js?v=V101.55"></script><script src="delete-requests.js?v=V101.114"></script>
 </body>
 
 </html>
