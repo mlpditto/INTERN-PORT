@@ -231,6 +231,13 @@ exports.fetchLinkLogo = onCall({ timeoutSeconds: 60, memory: '512MiB' }, async (
 // own name and avatar already come from your own doc on the client. That is why
 // this is a projection rather than a loosened read rule: `users` docs carry real
 // names and Big Five results, and no intern should be able to read another's.
+// V101.131: the admin's extra (division, group) pairs, strings only — no identity, so the intern can rank a member on that division's board too.
+function publicMemberships(u) {
+    const list = Array.isArray(u && u.memberships) ? u.memberships : [];
+    const pairs = list.filter((m) => m && typeof m.division === 'string' && m.division && typeof m.group === 'string').slice(0, 6).map((m) => ({ division: m.division, group: m.group }));
+    return pairs.length ? { memberships: pairs } : {};
+}
+
 exports.getLeaderboard = onCall(async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'Login required');
@@ -248,6 +255,7 @@ exports.getLeaderboard = onCall(async (request) => {
             group: u.group || 'Public',
             // V101.116: the admin-set division (users.division; '' = none). Omitted when the doc has none, so the client falls back to the group's division.
             ...(typeof u.division === 'string' ? { division: u.division } : {}),
+            ...publicMemberships(u),
             reflectiveTotalLogs: Number(u.reflectiveTotalLogs) || 0,
             reflectiveBestStreak: Number(u.reflectiveBestStreak) || 0,
             // Team Player (intern V101.25) leaves camp users out of the group total.

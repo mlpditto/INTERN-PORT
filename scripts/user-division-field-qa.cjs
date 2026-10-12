@@ -20,7 +20,7 @@ function grab(src, marker) {
 }
 const ctx = { divisionConfig: { RSU: ['EXTERN', 'Junior', 'Audit'], CAFE: ['Audit', 'Marketing'] }, myGroup: 'Public', myDivisionRaw: undefined, allUsersData: [] };
 vm.createContext(ctx);
-vm.runInContext(['function userDivisionOf(', 'function getMyDivision(', 'function myDivisionPeers('].map(m => grab(idx, m)).join('\n'), ctx);
+vm.runInContext(['function userDivisionOf(', 'function getMyDivision(', 'function rowIsMemberOf(', 'function myDivisionPeers('].map(m => grab(idx, m)).join('\n'), ctx);
 const div = u => vm.runInContext('userDivisionOf(' + JSON.stringify(u) + ')', ctx);
 
 // derived (no users.division): the first division whose list holds the group
