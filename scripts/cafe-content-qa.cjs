@@ -69,7 +69,7 @@ assert.ok(/getMyDivision\(\)/.test(index) && /return "General Division"/.test(in
 const harness = `<!doctype html><meta charset="utf-8"><title>Internship Portfolio (V9.9)</title>
 <link rel="stylesheet" href="/cafe-content.css">
 <button type="button" id="cafe-view-switch" hidden></button><div id="section-cafe-content" hidden></div><div id="section-kanban" style="display:block">Mission</div><div id="section-dd-codex" style="display:block">Codex</div><div id="achievementUnlockModal" style="display:flex">badge</div><div id="achievementsModal" style="display:flex">list</div><div id="u-earned-badges" style="display:flex">row</div>
-<span id="intern-app-name">LINE LIFF Internship Management System</span><button id="unified-fab-btn" onclick="${FAB}">+</button><button id="lang-toggle-cycle">EN</button>
+<span id="intern-app-name">LINE LIFF Internship Management System</span><button id="unified-fab-btn" onclick="${FAB}">+</button><span id="u-crew-rank">LV.1</span><span id="u-division-rank-badge" style="display:inline">#1</span><div id="u-timeline-bar">bar</div><button id="u-schedule-chip">s</button><button id="fw-btn">f</button><button id="lang-toggle-cycle">EN</button>
 <script>
 window.__unified = 0; window.__toasts = []; window.__upd = []; window.__subs = [];
 let userId = 'U1', userProfile = { displayName: 'Jo', pictureUrl: '' }, division = 'General Division', usersWorksCache = [];
@@ -364,8 +364,10 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
 
         // Other submission types are still one tap away; Thai follows the app's TH toggle.
         await page.click('#unified-fab-btn');
-        await page.click('#ccOverlay .cc-link[data-act="other"]');
-        assert.equal(await page.evaluate(() => window.__unified), 2, '"other submissions" opens Submit New');
+        assert.equal(await page.locator('#ccOverlay .cc-link[data-act="other"]').count(), 0, 'V101.127: no "Case, Work, Event…" link in the CAFE sheet');
+        await page.click('#ccOverlay [data-act="close"]');
+        for (const id of ['u-crew-rank', 'u-division-rank-badge', 'u-timeline-bar', 'u-schedule-chip', 'fw-btn']) assert.equal(await page.$eval('#' + id, e => getComputedStyle(e).display), 'none', 'V101.127: #' + id + ' hidden in the CAFE header');
+        assert.notEqual(await page.$eval('#lang-toggle-cycle', e => getComputedStyle(e).display), 'none', 'EN stays');
         await page.evaluate(() => { localStorage.setItem('uiLangTH', '1'); });
         await page.click('#lang-toggle-cycle');
         await page.waitForFunction(() => /คอนเทนต์/.test(document.getElementById('section-cafe-content').innerText));
@@ -379,7 +381,7 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.equal(await page.evaluate(() => window.isContentCreator()), false, 'badge guard off again outside the division');
         assert.equal(await vis('#u-earned-badges'), true, 'badge row is back');
         await page.click('#unified-fab-btn');
-        assert.equal(await page.evaluate(() => window.__unified), 3, 'back to Submit New');
+        assert.equal(await page.evaluate(() => window.__unified), 2, 'back to Submit New');
 
         // Audit review view: others' posts waiting for review; a review is a RECOMMENDATION filed for the admin (no score is written).
         await page.evaluate(() => { localStorage.clear(); division = 'Content Creator'; myGroup = 'G1'; window.myExtraGroups = []; window.cafeContentSync(); });

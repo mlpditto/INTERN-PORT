@@ -445,7 +445,7 @@
             '<div id="ccPosted"><span class="cc-lbl">' + t.link + '</span><input type="text" id="ccLink" maxlength="500" placeholder="https://…"><span class="cc-lbl">' + t.date + '</span><input type="date" id="ccDate" value="' + esc(todayKey()) + '" max="' + esc(todayKey()) + '"></div>' +
             '<div class="cc-err" id="ccErr" role="status"></div><button type="button" class="cc-go" id="ccGo" data-act="save"></button>' +
             '<div class="cc-err" style="color:#64748b;text-align:center" id="ccHint"></div>' +
-            (d ? '<button type="button" class="cc-link danger" data-act="del">' + t.del + '</button>' : '<button type="button" class="cc-link" data-act="other">' + t.other + '</button>') + '</div>';
+            (d ? '<button type="button" class="cc-link danger" data-act="del">' + t.del + '</button>' : '')   // V101.127: no "Case, Work, Event…" link — the CAFE UI has no other submission types + '</div>';
         paintImages(); paintDetail(); paintStage();
         overlay.classList.add('open');
     }
