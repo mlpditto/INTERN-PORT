@@ -22,18 +22,24 @@ assert.deepEqual(totals('2026-09-01', '2026-09-01'), { total: 2, days: 1 });
 // V102.117: the day-by-day list behind the admin popup — newest first, Bangkok clock times,
 // an unclosed clock-in shows as a null clock-out (0 h), a lone clock-out leaves no row.
 assert.deepEqual(sumInternHours(logs, '', '').daily, [
-    { d: '2026-09-30', h: 9.65, s: [['08:59', '18:38']] },
-    { d: '2026-09-29', h: 0, s: [['09:00', null]] },
-    { d: '2026-09-01', h: 2, s: [['00:30', '02:30']] }
+    { d: '2026-09-30', h: 9.65, s: [{ i: '08:59', o: '18:38' }] },
+    { d: '2026-09-29', h: 0, s: [{ i: '09:00', o: null }] },
+    { d: '2026-09-01', h: 2, s: [{ i: '00:30', o: '02:30' }] }
 ]);
 assert.deepEqual(sumInternHours([
     { type: 'เข้างาน', timestamp: t('2026-10-01T09:10:00') }, { type: 'ออกงาน', timestamp: t('2026-10-01T12:00:00') },
     { type: 'เข้างาน', timestamp: t('2026-10-01T13:00:00') }, { type: 'ออกงาน', timestamp: t('2026-10-01T17:05:00') },
     { type: 'เข้างาน', timestamp: t('2026-10-02T08:00:00') }, { type: 'เข้างาน', timestamp: t('2026-10-02T09:00:00') }
 ], '', '').daily, [
-    { d: '2026-10-02', h: 0, s: [['08:00', null], ['09:00', null]] },
-    { d: '2026-10-01', h: 6.92, s: [['09:10', '12:00'], ['13:00', '17:05']] }
+    { d: '2026-10-02', h: 0, s: [{ i: '08:00', o: null }, { i: '09:00', o: null }] },
+    { d: '2026-10-01', h: 6.92, s: [{ i: '09:10', o: '12:00' }, { i: '13:00', o: '17:05' }] }
 ], 'lunch break = two segments; a repeated clock-in leaves the first one open');
+
+// V102.186: Firestore refuses an array directly inside an array. V102.117 stored daily[].s as [['08:59','18:38']] and every
+// sync failed with "3 INVALID_ARGUMENT: Property internHours contains an invalid nested entity" (admin toast "Sync failed: INTERNAL").
+const hasNestedArray = v => Array.isArray(v) ? v.some(x => Array.isArray(x) || hasNestedArray(x)) : (v && typeof v === 'object' ? Object.values(v).some(hasNestedArray) : false);
+assert.equal(hasNestedArray(sumInternHours(logs, '', '')), false, 'the stored daily list contains no array inside an array');
+assert.equal(hasNestedArray([[1]]), true, 'the guard itself catches a nested array');
 
 const doc = (id, d) => ({ id, data: () => d });
 const ids = timeIdsByName([doc('a', { name: 'ณัชชา  โคตรบุปผา', lineUserId: 'U1' }), doc('b', { name: 'X' }), doc('c', { name: 'X' })]);
@@ -61,7 +67,7 @@ const timeDb = mkDb({
     const res = await syncInternHours(db, timeDb, { serverTimestamp: () => 'NOW' });
     assert.equal(res.synced, 1);
     assert.deepEqual(writes.bua, { internHours: { status: 'ok', total: 9.65, days: 1, daily: [
-        { d: '2026-09-30', h: 9.65, s: [['08:59', '18:38']] }, { d: '2026-09-29', h: 0, s: [['09:00', null]] }
+        { d: '2026-09-30', h: 9.65, s: [{ i: '08:59', o: '18:38' }] }, { d: '2026-09-29', h: 0, s: [{ i: '09:00', o: null }] }
     ], timeUserId: 'U1', syncedAt: 'NOW' } }, 'only days inside the period count; the list rides along');
 
     assert.deepEqual(writes.nt, { 'internHours.status': 'no-match', 'internHours.syncedAt': 'NOW' });
@@ -93,7 +99,7 @@ const timeDb = mkDb({
     const pfn = html.slice(html.indexOf('        function closeInternHoursPopup()'), html.indexOf('        function openInternHoursDetail('));
     const pop = { innerHTML: '', remove() {}, querySelector: () => ({}) };
     const pc = { usersData: [{ id: 'bua', internHoursTarget: 280, internHours: { status: 'ok', total: 9.65, days: 1,
-        daily: [{ d: '2026-09-30', h: 9.65, s: [['08:59', '18:38']] }, { d: '2026-09-29', h: 0, s: [['09:00', null]] }] } }],
+        daily: [{ d: '2026-09-30', h: 9.65, s: [{ i: '08:59', o: '18:38' }] }, { d: '2026-09-29', h: 0, s: [{ i: '09:00', o: null }] }] } }],
         document: { getElementById: () => pop }, window: {}, escapeHtml: x => String(x) };
     vm.createContext(pc); vm.runInContext(pfn, pc); pc.renderInternHoursPopup('bua');
     assert.match(pop.innerHTML, /9\.7 \/ 280 h · 1 days/);
