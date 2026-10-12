@@ -579,6 +579,39 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         await page.evaluate(() => { document.body.classList.remove('cafe-peek'); history.replaceState(null, '', '/h.html'); window.cafeContentSync(); });
         assert.equal(await vis('#section-kanban'), false, 'no link, no Mission (as before)');
         await page.evaluate(() => { localStorage.clear(); window.myExtraGroups = []; window.cafeContentSync(); });
+        // V101.123 (ideas from a pasted UX review, filtered against earlier picks): clickable stat tiles, platform rail, first-run starters, month engagement
+        await page.evaluate(() => { localStorage.clear(); division = 'Content Creator'; myGroup = 'G1'; window.myExtraGroups = []; window.myMemberships = []; store.works = {}; pushWorks(); window.cafeContentSync(); });
+        const hostText = () => page.$eval('#section-cafe-content', e => e.innerText.replace(/\s+/g, ' '));
+        await page.click('#section-cafe-content [data-filter="posted"]');
+        assert.ok(/Nothing posted yet/.test(await hostText()), 'first-run empty state');
+        assert.equal(await page.locator('#section-cafe-content .cc-starts .cc-chip').count(), 2, 'two starter buttons: Jot an idea / Plan a post');
+        await page.click('#section-cafe-content .cc-starts [data-stage="idea"]'); await page.waitForSelector('#ccOverlay.open'); await page.click('#ccOverlay .cc-x');
+        await page.evaluate(() => {
+            const mk = o => ({ authUid: 'A1', userId: 'U1', kind: 'social', status: 'รอตรวจ', score: 0, title: 't', link: 'https://x.test/p', ctype: 'reel', images: [], metrics: null, ...o });
+            store.works.P1 = mk({ platform: 'ig', postDate: '2026-10-08', caption: 'IG one', metrics: { likes: 120, reach: 2000 } });
+            store.works.P2 = mk({ platform: 'tt', postDate: '2026-10-07', caption: 'TT one', status: 'ตรวจแล้ว', score: 0.2, metrics: { likes: 30, reach: 400 } });
+            store.works.P3 = mk({ platform: 'ig', postDate: '2026-09-01', caption: 'IG old' });
+            pushWorks();
+        });
+        assert.equal(await page.locator('#section-cafe-content button.cc-stat[data-stat]').count(), 3, 'the three stat tiles are buttons');
+        let ht = await hostText();
+        assert.ok(/150/.test(ht) && /2\.4k/.test(ht) && /this month/.test(ht), 'month engagement shows when metrics exist: ' + ht.slice(0, 200));
+        assert.equal(await page.locator('#section-cafe-content .cc-prail .cc-chip').count(), 3, 'platform rail: All + ig + tt');
+        assert.ok(/IG one/.test(ht) && /TT one/.test(ht) && /IG old/.test(ht), 'all three posts before any filter');
+        await page.click('#section-cafe-content [data-stat="reviewed"]');
+        ht = await hostText();
+        assert.ok(/TT one/.test(ht) && !/IG one/.test(ht) && !/IG old/.test(ht), 'the Reviewed tile → only this month\'s reviewed posts: ' + ht.slice(0, 240));
+        assert.equal(await page.locator('#section-cafe-content .cc-scope').count(), 1, 'a scope chip says what the list is narrowed to');
+        await page.click('#section-cafe-content [data-clear]');
+        assert.equal(await page.locator('#section-cafe-content .cc-scope').count(), 0); assert.ok(/IG old/.test(await hostText()), '× clears the scope');
+        await page.click('#section-cafe-content [data-stat="posted"]');
+        ht = await hostText(); assert.ok(/IG one/.test(ht) && /TT one/.test(ht) && !/IG old/.test(ht), 'the Posted tile → this month\'s posts only');
+        await page.click('#section-cafe-content [data-clear]');
+        await page.click('#section-cafe-content [data-plat="tt"]');
+        ht = await hostText(); assert.ok(/TT one/.test(ht) && !/IG one/.test(ht), 'platform chip filters the list');
+        await page.click('#section-cafe-content [data-plat="tt"]');
+        assert.ok(/IG one/.test(await hostText()), 'tapping the chip again clears it');
+        await page.evaluate(() => { store.works = {}; pushWorks(); localStorage.clear(); });
         assert.deepEqual(errs, [], 'no page errors');
         console.log('PASS: CAFE content — only the Content Creator division (and the old name CAFE) gets the Content card (Mission + DD Codex hidden, ＋ opens the content sheet), ideas/drafts on users.socialDrafts, posting writes works(kind:social) + mirror, numbers + admin review show on the card, Thai toggle, moves back out of CAFE cleanly');
     } finally { await browser.close(); }
