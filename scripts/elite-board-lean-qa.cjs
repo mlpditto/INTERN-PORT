@@ -62,7 +62,7 @@ function grab(marker) {
         activeUserGroup: 'All', activeUserGroupDiv: undefined,
         userDivisionOf: u => u.division || '', escapeHtml: s => String(s),
         groupChipHtml: (g, o) => `[${g}:${o.active}]`, divChipLook: () => ({}), divColor: () => '#000',
-        renderUserSubgroupRow() {}, floodStatusData: {}
+        renderUserSubgroupRow() {}, paintUserFloodBtn() {}, floodStatusData: {}
     });
     vm.runInContext(grab('function renderUserGroupTabs()'), ctx);
     ctx.renderUserGroupTabs();
