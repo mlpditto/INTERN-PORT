@@ -1,7 +1,7 @@
 // V102.181: Users (Elite Board) rows lean — less duplication per row. The "RSU · EXTERN" chip stays after the name (owner's call); instead:
 // 1 an institute that starts with the user's division name (RSU, CU69 under CU) leaves the second line (tooltip only); no fullName → "add name";
 // 3 hide what is empty (no "—" / "📝0"; the badges line goes when both are empty);
-// 4 ⏳ = ONE stacked block: days bar + 2px hours line + one text line "5d left · 180/200 h"; a period > 400 days → "⚠ dates 1988 → 2027";
+// 4 ⏳ = ONE stacked block: days bar + 2px hours line + one text line "5d left · 180/200 h"; a period > 365 days → "🧪 Beta tester" (V102.189);
 // 6 the dashed "tap to adjust" underline on the numbers shows on the hovered row only.
 // Static pins + the REAL row code cut out of admin.html and run in vm.
 const fs = require('node:fs');
@@ -36,10 +36,14 @@ assert.ok(only.days.includes('class="u-tl"') && !only.days.includes('u-tl-bar-h'
 // hours without dates → the old stand-alone button
 const hOnly = tl({ id: 'h', internHoursTarget: 200, internHours: { status: 'ok', total: 100, days: 10 } });
 assert.equal(hOnly.days, ''); assert.ok(/<button type="button" onclick="openInternHoursDetail\(event, 'h'\)"[^>]*>.*<b[^>]*>100\.0<\/b> \/ 200 h/s.test(hOnly.hours), 'no dates → the stand-alone hours button');
-// wrong dates (80 years) → ⚠ with the years, no "15369d left"
+// a period over a year (80 years here) = a beta tester, no "15369d left", no warning
 const bad = tl({ id: 'j', startDate: '1988-11-08', endDate: '2027-11-08' });
-assert.ok(bad.days.includes('⚠</b> Check dates <small') && bad.days.includes('1988 → 2027') && bad.days.includes('class="u-tl-fix"') && !/\d{4,}d left/.test(bad.days), 'bad dates → ⚠ Check dates 1988 → 2027 + Fix');   // V102.188: was '⚠ dates 1988 → 2027', now with a Fix button
-assert.ok(bad.days.includes('title="Check the internship dates: 1988 → 2027'), 'tooltip names the problem');
+assert.ok(bad.days.includes('🧪 Beta tester') && !bad.days.includes('⚠') && !/\d{4,}d left/.test(bad.days), 'period over a year → 🧪 Beta tester (no ⚠, no day count)');   // V102.189: was '⚠ dates 1988 → 2027'
+assert.ok(bad.days.includes('title="Beta tester — helping test the system (period 1988 → 2027'), 'tooltip says why');
+const year = tl({ id: 'y', startDate: fmt(-100), endDate: fmt(265) });   // exactly 366 days
+assert.ok(year.days.includes('🧪 Beta tester'), 'just over 365 days → beta tester');
+const fits = tl({ id: 'f', startDate: fmt(-100), endDate: fmt(264) });   // 365 days
+assert.ok(!fits.days.includes('Beta tester') && /d<\/b> left/.test(fits.days), 'a full year still counts days');
 assert.ok(bad.days.includes('width:0%'), 'no progress drawn for a bad period');
 
 // ---- institute / name line ----
