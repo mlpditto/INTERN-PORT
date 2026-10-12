@@ -30,7 +30,8 @@ assert.ok(/<button type="button" id="gs-google-chip" class="gs-google" onclick="
 assert.ok(!header.includes('🌐') && !header.includes('fa-link-slash'), 'no second icon on the Google chip');
 const grp = html.slice(html.indexOf('<section class="gs-inline-group lang-no-toggle"'), html.indexOf('<div id="gs-pane-group" hidden>'));
 assert.ok(!grp.includes('gs-group-summary') && !grp.includes('Select one group') && !/<button[^>]*id="gs-group-toggle"/.test(grp), 'no summary box / help text / Change group button');
-assert.ok(/<div class="gs-grp-row">\s*<span id="gs-current-group"><\/span>\s*<span class="gs-also" id="gs-also" hidden/.test(grp), 'one row: main chip slot, then "also" (hidden until used)');
+assert.ok(/<div class="gs-grp-row">\s*<span class="gs-also" id="gs-also" hidden/.test(grp) && !grp.includes('id="gs-current-group"'), 'V102.209: the row starts with "also" (hidden until used); the main group lives in the header');
+assert.ok(/id="gs-title-name">\.\.\.<\/span><span id="gs-current-group"><\/span>/.test(html), 'V102.209: the main group chips sit right after the name in the header');
 assert.ok(/<div class="gs-save-row lang-no-toggle" id="gs-save-row" hidden><span id="gs-save-diff"/.test(html), 'the Save row starts hidden and carries the diff');
 assert.ok(!html.includes("'Save profile and group together'") && !html.includes("'Unsaved changes'"), 'the two status sentences are gone');
 
@@ -78,10 +79,10 @@ const markup = '<div id="groupSelectModal" style="width:100%"><div class="modal-
         const tops = await Promise.all(['.gs-header-person', '.gs-lang-switch', '.gs-bal-pts', '.gs-bal-beri', '.gs-header-close'].map(top));
         assert.ok(Math.max(...tops) - Math.min(...tops) <= 6, 'everything on one line at 900px: ' + tops.join(','));
         // group block
-        assert.equal(await page.$eval('#gs-current-group .grp-chip', e => e.id + '|' + e.className + '|' + e.querySelector('.grp-name').textContent + '|' + e.getAttribute('aria-expanded')), 'gs-group-toggle|grp-chip gs-main on|EXTERN|false', 'main group = rail chip, selected look, carries the toggle');
+        assert.equal(await page.$eval('#gs-current-group .gs-main', e => e.id + '|' + e.className + '|' + e.querySelector('.grp-name').textContent + '|' + e.getAttribute('aria-expanded')), 'gs-group-toggle|grp-chip gs-main on|EXTERN|false', 'main group = rail chip, selected look, carries the toggle');
         // V102.178: "Audit in RSU" — the division chip beside the main chip opens the same picker (step ① is where the division is chosen)
         assert.equal(await page.$eval('#gs-current-group .gs-divchip .grp-name', e => e.textContent), 'RSU', 'EXTERN lives in RSU');
-        assert.equal(await page.locator('#gs-current-group .gs-in').textContent(), 'in');
+        assert.equal(await page.locator('#gs-current-group .gs-in').textContent(), '›');
         await page.click('#gs-current-group .gs-divchip');
         assert.equal(await page.$eval('#gs-pane-group', e => e.hidden), false, 'the division chip opens the picker');
         await page.click('#gs-group-toggle');   // fold it again for the steps below
@@ -98,7 +99,7 @@ const markup = '<div id="groupSelectModal" style="width:100%"><div class="modal-
         assert.equal(await page.$eval('#gs-save-btn', e => e.textContent.trim()), 'Save 1 change');
         assert.equal(await page.$eval('#gs-save-diff', e => e.innerHTML), '', 'no group diff yet');
         await page.click('#gs-list [data-group="MLP"]');
-        assert.equal(await page.$eval('#gs-current-group .grp-name', e => e.textContent), 'MLP', 'picking repaints the chip');
+        assert.equal(await page.$eval('#gs-current-group .gs-main .grp-name', e => e.textContent), 'MLP', 'picking repaints the chip');
         assert.equal(await page.$eval('#gs-current-group .gs-divchip .grp-name', e => e.textContent), 'Only I', 'a group in no division → Only I');
         assert.equal(await page.$eval('#gs-save-btn', e => e.textContent.trim()), 'Save 2 changes');
         assert.deepEqual(await page.$$eval('#gs-save-diff .grp-chip', els => els.map(e => e.textContent.trim() + (e.classList.contains('on') ? '*' : ''))), ['EXTERN', 'MLP*'], 'diff = old chip → new chip (selected look)');
@@ -113,7 +114,9 @@ const markup = '<div id="groupSelectModal" style="width:100%"><div class="modal-
         // phone: identity chips wrap under the name, × stays on the first line
         await page.setViewportSize({ width: 375, height: 700 });
         assert.ok(await top('.gs-ident') > await top('.gs-header-person') + 20, 'identity chips drop under the name at 375px');
-        assert.ok(Math.abs(await top('.gs-header-close') - await top('.gs-header-person')) <= 6, '× stays on the first line');
+        const edge = sel => page.$eval(sel, e => Math.round(e.getBoundingClientRect().top));   // V102.209: the person block is taller on a phone (division › group under the name), so compare top edges
+        assert.ok(Math.abs(await edge('.gs-header-close') - await edge('.gs-header-person')) <= 6, '× stays on the first line');
+        assert.ok(await edge('#gs-current-group') > await edge('.gs-header-person') + 20, 'V102.209: division › group drops under the name on a phone');
         assert.deepEqual(errs, [], 'no page errors');
         console.log('PASS: User Hub — one-line header (labels → tooltips, ⧉ on LINE ID + code, wraps on phone), group block one row (rail chip toggles the picker, also/extras faded), Save row only when dirty with diff + count');
     } finally { await browser.close(); }

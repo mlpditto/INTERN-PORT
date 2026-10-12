@@ -61,7 +61,7 @@ const consts = [html.match(/const groupColorMap = \{[\s\S]*?\};/)[0], html.match
         assert.deepEqual(await ev("[gsMembMode, document.getElementById('gs-pane-group').hidden, document.getElementById('gs-extra-add').getAttribute('aria-expanded')]"), [true, false, 'true'], '+ opens the picker in membership mode');
         assert.match(await page.$eval('#gs-list', e => e.textContent), /for the new membership/);
         assert.match(await page.$eval('#gs-list .gs-chip-new', e => e.textContent), /New group in CAFE/, 'V102.198: a brand-new group can be typed right in the membership picker');
-        assert.match(await page.$eval('#gs-current-group .gs-prim', e => e.textContent), /Primary/, 'V102.198: the main group is labelled Primary');
+        assert.equal(await page.locator('#gs-current-group .gs-prim').count(), 0, 'V102.209: no Primary label; the main pair sits in the header after the name');
         assert.ok(/id="gs-also" hidden data-gs-en="Also in"/.test(fs.readFileSync('public/admin.html', 'utf8')), 'and the pairs sit under Also in');
         await page.click('#gs-list [data-div="RSU"]');
         assert.equal(await ev("gsMembDiv"), 'RSU', 'step ① sets the membership division, not the primary');

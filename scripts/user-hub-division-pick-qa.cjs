@@ -9,7 +9,7 @@ assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(html));
 assert.ok(html.includes("...(gsSnap && gsDivision !== gsSnap.division ? { division: gsDivision } : {}),"), 'the save writes users.division only when it changed');
 assert.ok(html.includes("...(data.division ? { division: data.division } : {}),"), 'approving a request keeps the division asked for');
 assert.ok(html.includes('class="gs-plus gs-chip-div" onclick="openDivisionsModal()"') && !html.includes('gs-sec-head"'), 'the ＋ at the end of step ① opens Divisions & Groups; the old per-division sections are gone');
-assert.ok(html.includes('<span class="gs-in">in</span>') && html.includes('hint: \'change division\', attrs: \'aria-controls="gs-pane-group" onclick="toggleGsGroups()"\''), 'the header reads "Audit in CAFE" and the division chip opens the same picker');
+assert.ok(html.includes('<span class="gs-in">›</span>') && html.includes('hint: \'change division\', attrs: \'aria-controls="gs-pane-group" onclick="toggleGsGroups()"\''), 'the header reads "CAFE › Audit" (division first) and the division chip opens the same picker');
 
 function grabFn(marker) {
     const i = html.indexOf(marker); assert.ok(i >= 0, marker);
@@ -46,8 +46,8 @@ const css = html.slice(html.indexOf('.grp-chip { --c:#64748b'), html.indexOf(':i
         const txt = sel => page.$$eval(sel, norm);
         const on = sel => page.$$eval(sel + '[aria-pressed="true"]', norm);
         // header: "Audit in CAFE"
-        assert.deepEqual(await txt('#gs-current-group .grp-chip'), ['Audit 2', 'CAFE 1']);
-        assert.equal(await page.locator('#gs-current-group .gs-in').textContent(), 'in');
+        assert.deepEqual(await txt('#gs-current-group .grp-chip'), ['CAFE 1', 'Audit 2']);   // V102.209: division first
+        assert.equal(await page.locator('#gs-current-group .gs-in').textContent(), '›');
         // step ①: every division + Only I, with its people; the user's division is lit
         assert.deepEqual(await txt('.gs-divpick'), ['CAFE 1', 'RSU 3', 'Only I 2'], 'division rail with people per division');
         assert.deepEqual(await on('.gs-divpick'), ['CAFE 1']);
@@ -67,7 +67,7 @@ const css = html.slice(html.indexOf('.grp-chip { --c:#64748b'), html.indexOf(':i
         assert.equal(await page.$eval('#gs-input', e => e.value), 'Audit', 'the group name did not change');
         assert.equal(await page.evaluate(() => gsDirtyCount()), 1, 'division only → one change');
         assert.deepEqual(await txt('#gs-list .gs-chip'), ['Audit 1', 'EXTERN 2', 'Junior 0'], 'RSU: its list + Audit (a person is in it) — the same group name, other division, other count');
-        assert.deepEqual(await txt('#gs-current-group .grp-chip'), ['Audit 2', 'RSU 3']);
+        assert.deepEqual(await txt('#gs-current-group .grp-chip'), ['RSU 3', 'Audit 2']);
         // pick another group inside RSU → group + division together = still one change
         await page.click('#gs-list .gs-chip[data-group="EXTERN"]');
         assert.equal(await page.evaluate(() => [gsDivision, document.getElementById('gs-input').value].join('/')), 'RSU/EXTERN');
