@@ -382,6 +382,22 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
             pushWorks(); window.cafeContentSync();
         });
         assert.equal(await page.locator('#section-cafe-content [data-view="review"]').count(), 1, 'Audit gets the Review view');
+        // V101.122: CAFE Audit home — an Audit member lands on the queue: ☕ mark, hero (count + Review next), quick ✓ / ↩, no "New content" inside the queue
+        assert.equal(await page.locator('#section-cafe-content .cc-brand .cc-audit').count(), 1, 'the CAFE mark carries Audit');
+        assert.ok(/☕/.test(await page.$eval('#section-cafe-content .cc-brand', e => e.textContent)) && /CAFE/.test(await page.$eval('#section-cafe-content .cc-brand', e => e.textContent)), '☕ CAFE mark');
+        assert.equal(await page.$eval('#section-cafe-content .cc-qbig', e => e.textContent), '1', 'the hero shows how many wait for me');
+        assert.equal(await page.locator('#section-cafe-content .cc-add').count(), 0, 'no New content button inside the queue');
+        assert.equal(await page.locator('#section-cafe-content .cc-stats').count(), 0, 'no month stats in the queue');
+        await page.click('.cc-rv[data-id="W9"] .cc-rq.fix'); await page.waitForSelector('#ccOverlay.open #rvComment');
+        assert.equal(await page.$eval('#ccOverlay .cc-chip[data-v="changes"]', e => e.getAttribute('aria-pressed')), 'true', '↩ opens the sheet with Changes already picked');
+        await page.click('#ccOverlay .cc-x');
+        await page.click('.cc-rv[data-id="W9"] .cc-rq.ok'); await page.waitForSelector('#ccOverlay.open #rvComment');
+        assert.equal(await page.$eval('#ccOverlay .cc-chip[data-v="approve"]', e => e.getAttribute('aria-pressed')), 'true', '✓ opens the sheet with OK already picked');
+        assert.equal(await vis('#rvScoreBox'), true, 'and the bonus picker is there');
+        await page.click('#ccOverlay .cc-x');
+        await page.click('.cc-qgo'); await page.waitForSelector('#ccOverlay.open #rvComment');
+        assert.ok(/Latte art reel/.test(await page.$eval('#ccOverlay', e => e.textContent)), 'Review next opens the oldest waiting post');
+        await page.click('#ccOverlay .cc-x');
         await page.click('#section-cafe-content [data-view="review"]');
         assert.equal(await page.locator('#section-cafe-content .cc-stats').count(), 0, 'no month stats in the Review view');
         let rv = await page.$eval('#section-cafe-content', e => e.innerText.replace(/\s+/g, ' '));
@@ -414,6 +430,8 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.equal(await page.evaluate(() => store.users.U1.contentReviews.W9.verdict + store.users.U1.contentReviews.W9.score), 'approve0.2', 'remembered on the own user doc of the reviewer');
         rv = await page.$eval('#section-cafe-content', e => e.innerText.replace(/\s+/g, ' '));
         assert.ok(/To review 0/.test(rv) && /Reviewed by me 1/.test(rv), 'it moved to Reviewed by me: ' + rv);
+        assert.equal(await page.locator('#section-cafe-content .cc-qhero').count(), 0, 'no hero when nothing waits');
+        assert.ok(/All caught up/.test(rv) && (await page.locator('#section-cafe-content .cc-qok').count()) === 1, 'ok = a green frame: All caught up');
         await page.click('#section-cafe-content [data-rvf="mine"]');
         assert.ok(/You suggested ✅ \+0\.2/.test(await page.$eval('#section-cafe-content', e => e.innerText)), 'the row shows what I suggested');
         // change my mind: re-open, send "needs changes" → a second notification
