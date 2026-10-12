@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.198)</title>
+    <title>Nika Admin (V102.199)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -59223,6 +59223,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
         function openPreRegModal() {
             document.getElementById('preRegModal').style.display = 'block';
+            preRegPaint();   // V102.199
             renderPreRegList();
         }
 
@@ -59297,7 +59298,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     <div style="flex:1; min-width:0; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                         <span style="font-weight:bold; font-size:0.9em;">${escapeHtml(p.fullName || p.fullNameEn || '-')}</span>
                         ${p.nickname ? `<span style="font-size:0.78em; color:#666;">(${escapeHtml(p.nickname)})</span>` : ''}
-                        <span style="background:${groupColor}; color:white; padding:1px 8px; border-radius:10px; font-size:0.68em; font-weight:700;">${escapeHtml(p.group || 'Public')}</span>
+                        <span class="pr-tags" onclick="preRegEditToggle('${p.id}')" title="Tap to change Division / Group"><span style="background:${groupColor}; color:white; padding:1px 8px; border-radius:10px; font-size:0.68em; font-weight:700;">${escapeHtml(p.group || 'Public')}</span><span class="pr-tag">${escapeHtml(p.division || 'Only I')}</span>${(Array.isArray(p.memberships) ? p.memberships : []).map(m => `<span class="pr-tag">+ ${escapeHtml((m.division || 'Only I') + ' › ' + m.group)}</span>`).join('')}</span>
                         ${dates ? `<span style="font-size:0.75em; color:#94a3b8; font-family:monospace;">${dates}</span>` : ''}
                     </div>
                     ${hasMore ? `<button type="button" onclick="toggleRowDetail(this)" style="width:auto; min-height:0; border:none; background:transparent; color:#94a3b8; cursor:pointer; font-size:0.8em; padding:0 2px; line-height:1;" title="English name"><i class="fa-solid fa-chevron-down"></i></button>` : ''}
@@ -59305,6 +59306,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     <button class="btn-sm btn-danger" onclick="deletePreReg('${p.id}')" style="padding:4px 8px; font-size:0.7em;">✕</button>
                 </div>
                 ${hasMore ? `<div class="row-detail" style="display:none; margin-top:4px; font-size:0.75em; color:var(--primary); font-style:italic;">${escapeHtml(p.fullNameEn)}</div>` : ''}
+                ${preRegEdit && preRegEdit.id === p.id ? `<div class="pr-rowpick">${preRegPickHtml(preRegEdit, p.id)}</div>` : ''}
             </div>`;
         }
         function preRegClaimedRow(p) {
@@ -59373,13 +59375,115 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 Save it anyway?`;
         }
 
+        // V102.199: Pre-register carries Division / Group / Also in. State: preRegForm (the form) and preRegEdit (a waiting row being re-assigned, saved at once).
+        // Not choosing a Division = Only I ('' — stored explicitly, so the claim does not guess a division from the group name).
+        const PR_BASE_GROUPS = ['Junior', 'INTERN', 'EXTERN', 'Public'];
+        let preRegForm = { division: '', group: 'Junior', extra: [], addOpen: false, addDiv: '' };
+        let preRegEdit = null;   // { id, division, group, extra, addOpen, addDiv }
+        const preRegUp = x => String(x == null ? '' : x).trim().toUpperCase();
+        function preRegGroupsFor(dv) {
+            const cfg = divisionConfig || {}, seen = new Set();
+            let names;
+            if (dv && cfg[dv]) { names = (cfg[dv] || []).slice(); (usersData || []).forEach(u => { if (u.group && userDivisionOf(u) === dv) names.push(u.group); }); }
+            else { const listed = new Set(Object.values(cfg).flat().map(preRegUp)); names = PR_BASE_GROUPS.concat((typeof getGlobalGroups === 'function' ? getGlobalGroups() : []).filter(g => !listed.has(preRegUp(g)))); }
+            return names.filter(g => g && !seen.has(preRegUp(g)) && seen.add(preRegUp(g)));
+        }
+        function preRegState(key) { return key === 'form' ? preRegForm : (preRegEdit && preRegEdit.id === key ? preRegEdit : null); }
+        function preRegChip(label, on, key, kind, v, color) {
+            return '<button type="button" class="pr-chip' + (on ? ' on' : '') + '" style="--c:' + color + ';" data-k="' + escapeHtml(key) + '" data-v="' + escapeHtml(v) + '" onclick="preRegSet(this, \'' + kind + '\')">' + escapeHtml(label) + '</button>';
+        }
+        function preRegPickHtml(st, key) {
+            const divs = [''].concat(Object.keys(divisionConfig || {}));
+            const divRow = divs.map(d => preRegChip(d === '' ? 'Only I' : d, st.division === d, key, 'division', d, d === '' ? '#64748b' : divColor(d))).join('');
+            const grpList = preRegGroupsFor(st.division); if (st.group && !grpList.some(g => preRegUp(g) === preRegUp(st.group))) grpList.push(st.group);   // a typed, not-yet-listed group still shows (selected)
+            const grpRow = grpList.map(g => preRegChip(g, preRegUp(g) === preRegUp(st.group), key, 'group', g, getGroupColor(g))).join('')
+                + '<button type="button" class="pr-chip dash" data-k="' + escapeHtml(key) + '" data-kind="group" onclick="preRegNewGroup(this)">＋ group</button>';
+            const extraRow = st.extra.map((m, i) => '<button type="button" class="pr-chip" title="Remove" data-k="' + escapeHtml(key) + '" data-v="' + i + '" onclick="preRegSet(this, \'rmExtra\')">' + escapeHtml((m.division || 'Only I') + ' › ' + m.group) + ' ×</button>').join('')
+                + '<button type="button" class="pr-chip dash" data-k="' + escapeHtml(key) + '" data-v="" onclick="preRegSet(this, \'addToggle\')">＋ Add division / group</button>';
+            let add = '';
+            if (st.addOpen) {
+                add = '<div class="pr-line" style="margin-left:68px;"><span class="pr-lab" style="min-width:0;">in</span>' + divs.map(d => preRegChip(d === '' ? 'Only I' : d, st.addDiv === d, key, 'addDiv', d, d === '' ? '#64748b' : divColor(d))).join('') + '</div>'
+                    + '<div class="pr-line" style="margin-left:68px;"><span class="pr-lab" style="min-width:0;">group</span>' + preRegGroupsFor(st.addDiv).map(g => preRegChip(g, false, key, 'addGroup', g, getGroupColor(g))).join('')
+                    + '<button type="button" class="pr-chip dash" data-k="' + escapeHtml(key) + '" data-kind="addGroup" onclick="preRegNewGroup(this)">＋ group</button></div>';
+            }
+            return '<div class="pr-line"><span class="pr-lab">Division</span>' + divRow + '</div>'
+                + '<div class="pr-line"><span class="pr-lab">Group</span>' + grpRow + '</div>'
+                + '<div class="pr-line"><span class="pr-lab">Also in</span>' + extraRow + '</div>' + add;
+        }
+        function preRegPaint() {
+            const host = document.getElementById('prereg-pick');
+            if (host) host.innerHTML = preRegPickHtml(preRegForm, 'form') + '<div class="pr-note">No Division chosen → Only I. Group starts as Junior.</div>';
+            if (preRegEdit) renderPreRegList();
+        }
+        function preRegApply(key, kind, v) {
+            const st = preRegState(key); if (!st) return;
+            if (kind === 'division') {
+                st.division = v;
+                const gs = preRegGroupsFor(v);
+                if (!gs.some(g => preRegUp(g) === preRegUp(st.group))) st.group = v === '' ? 'Junior' : (gs[0] || 'Junior');
+            } else if (kind === 'group') { st.group = v; }
+            else if (kind === 'rmExtra') { st.extra.splice(Number(v), 1); }
+            else if (kind === 'addToggle') { st.addOpen = !st.addOpen; st.addDiv = st.division; }
+            else if (kind === 'addDiv') { st.addDiv = v; }
+            else if (kind === 'addGroup') {
+                const g = canonicalGroupName(v) || String(v).trim(), pk = (d, x) => d + '/' + preRegUp(x);
+                if (g && pk(st.addDiv, g) !== pk(st.division, st.group) && !st.extra.some(m => pk(m.division, m.group) === pk(st.addDiv, g))) st.extra.push({ division: st.addDiv, group: g });
+                st.addOpen = false;
+            }
+            st.extra = st.extra.filter(m => (m.division || '') + '/' + preRegUp(m.group) !== (st.division || '') + '/' + preRegUp(st.group));   // the primary pair is never also a membership
+            if (key !== 'form') preRegSaveEdit(st);
+            preRegPaint();
+        }
+        function preRegSet(btn, kind) { preRegApply(btn.dataset.k, kind, btn.dataset.v); }
+        function preRegNewGroup(btn) {
+            const key = btn.dataset.k, kind = btn.dataset.kind || 'group';
+            const inp = document.createElement('input'); inp.type = 'text'; inp.placeholder = 'new group'; inp.className = 'pr-in';
+            const cancel = () => { if (inp.parentNode) inp.replaceWith(btn); };
+            const commit = () => {
+                if (!inp.parentNode) return;
+                const name = inp.value.trim(); if (!name) { cancel(); return; }
+                const twin = (typeof getGlobalGroups === 'function' ? getGlobalGroups() : []).find(g => preRegUp(g) === preRegUp(name));
+                preRegApply(key, kind, twin || name);
+            };
+            inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); commit(); } else if (e.key === 'Escape') { e.preventDefault(); cancel(); } });
+            inp.addEventListener('blur', () => setTimeout(cancel, 150));
+            btn.replaceWith(inp); inp.focus();
+        }
+        // A new Division › Group pair puts the group in that division's list (merge: only the touched divisions are written), so step ② of the User Hub offers it later.
+        async function preRegRegisterGroups(st) {
+            try {
+                const add = {}, cfg = divisionConfig || {};
+                [{ division: st.division, group: st.group }].concat(st.extra).forEach(m => {
+                    const g = canonicalGroupName(m.group) || m.group;
+                    if (m.division && Array.isArray(cfg[m.division]) && !cfg[m.division].some(x => preRegUp(x) === preRegUp(g))) (add[m.division] = add[m.division] || cfg[m.division].slice()).push(g);
+                });
+                if (Object.keys(add).length) await db.collection('quizzes').doc('--divisions-config--').set(add, { merge: true });
+            } catch (e) { console.warn('[prereg] division list update failed', e); }
+        }
+        function preRegSaveEdit(st) {
+            db.collection('pre_users').doc(st.id).update({ group: st.group, division: st.division, memberships: st.extra.map(m => ({ division: m.division, group: m.group })) })
+                .then(() => preRegRegisterGroups(st)).catch(e => alert('Error: ' + e.message));
+        }
+        function preRegEditToggle(id) {
+            if (preRegEdit && preRegEdit.id === id) { preRegEdit = null; renderPreRegList(); return; }
+            const p = preRegData.find(x => x.id === id); if (!p) return;
+            preRegEdit = { id, division: (divisionConfig && divisionConfig[p.division]) ? p.division : '', group: p.group || 'Public', extra: (Array.isArray(p.memberships) ? p.memberships : []).map(m => ({ division: m.division || '', group: m.group })), addOpen: false, addDiv: '' };
+            renderPreRegList();
+        }
+        function preRegDur() {
+            const s = document.getElementById('prereg-start').value, e = document.getElementById('prereg-end').value, el = document.getElementById('prereg-dur');
+            const d = (s && e) ? Math.round((new Date(e) - new Date(s)) / 86400000) : NaN;
+            el.hidden = !(d >= 0);
+            if (d >= 0) el.textContent = d >= 14 ? Math.round(d / 7) + ' wk' : d + ' d';
+        }
+
         async function addPreRegUser() {
             // V98.47: fullName is the THAI name (users.fullName), fullNameEn the
             // English one. Either alone is enough to create a code.
             const fullName = document.getElementById('prereg-name-th').value.trim();
             const fullNameEn = document.getElementById('prereg-name').value.trim();
             const nickname = document.getElementById('prereg-nick').value.trim();
-            const group = document.getElementById('prereg-group').value.trim() || 'Junior';
+            const group = (preRegForm.group || 'Junior').trim();
             const startDate = document.getElementById('prereg-start').value;
             const endDate = document.getElementById('prereg-end').value;
 
@@ -59405,14 +59509,16 @@ Save it anyway?`;
 
             try {
                 await db.collection("pre_users").add({
-                    fullName, fullNameEn, nickname, group, startDate, endDate, code,
+                    fullName, fullNameEn, nickname, group, division: preRegForm.division || '', memberships: preRegForm.extra.map(m => ({ division: m.division, group: m.group })), startDate, endDate, code,   // V102.199
                     claimed: false,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 showToast(`✅ Pre-registered: ${nickname || fullName || fullNameEn} → Code: ${code}`);
+                await preRegRegisterGroups(preRegForm);   // V102.199
                 document.getElementById('prereg-name-th').value = '';
                 document.getElementById('prereg-name').value = '';
                 document.getElementById('prereg-nick').value = '';
+                preRegForm = { division: preRegForm.division, group: preRegForm.group, extra: [], addOpen: false, addDiv: '' }; preRegPaint();   // V102.199: the next code keeps the Division / Group, drops the extras
             } catch (e) {
                 alert("Error: " + e.message);
             }
@@ -69263,6 +69369,20 @@ Summarize in English in 3–5 concise lines:
     </div>
 
     <!-- Pre-registration Modal -->
+    <style>
+        /* V102.199: Pre-register chips */
+        #preRegModal .pr-line { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:6px; }
+        #preRegModal .pr-lab { font-size:11px; color:#64748b; font-weight:800; text-transform:uppercase; letter-spacing:.3px; min-width:62px; }
+        #preRegModal .pr-chip { width:auto; min-height:0; margin:0; padding:3px 11px; border-radius:999px; border:1px solid #cbd5e1; background:#f8fafc; color:#475569; font-size:12.5px; font-weight:700; cursor:pointer; }
+        #preRegModal .pr-chip.on { background:var(--c, #3f8a74); border-color:var(--c, #3f8a74); color:#fff; }
+        #preRegModal .pr-chip.dash { border-style:dashed; background:transparent; color:#64748b; }
+        #preRegModal .pr-dur { background:#eef7f3; color:#2f6f5e; border-radius:999px; padding:2px 9px; font-weight:800; font-size:12px; }
+        #preRegModal .pr-note { font-size:11px; color:#94a3b8; margin:0 0 6px; }
+        #preRegModal .pr-rowpick { margin-top:8px; padding:8px 10px; background:#f8f9fa; border-radius:10px; }
+        #preRegModal .pr-tags { display:inline-flex; gap:5px; align-items:center; flex-wrap:wrap; cursor:pointer; }
+        #preRegModal .pr-tag { font-size:.68em; font-weight:700; padding:1px 8px; border-radius:10px; border:1px solid #cbd5e1; background:#f8fafc; color:#475569; }
+        #preRegModal .pr-in { width:140px; min-height:0; margin:0; padding:3px 8px; font-size:12px; border:1px solid #6f42c1; border-radius:999px; }
+    </style>
     <div id="preRegModal" class="modal">
         <div class="modal-content" style="max-width:900px;">
             <span class="close-modal"
@@ -69285,29 +69405,25 @@ Summarize in English in 3–5 concise lines:
                      copied user.fullName into pre_users.fullName, so the Thai box is
                      the one that feeds it; the English box now lands in fullNameEn
                      instead of overwriting the Thai slot. -->
+                <!-- V102.199: lean — one names row, Division / Group / Also in as chips (no dropdown), Period + Code on one line. Not choosing a Division = Only I. -->
                 <div style="display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
                     <input type="text" id="prereg-name-th" placeholder="Full name (Thai)"
-                        data-th-placeholder="ชื่อ-นามสกุล ภาษาไทย" style="flex:2; min-width:180px; margin:0;"
+                        data-th-placeholder="ชื่อ-นามสกุล ภาษาไทย" style="flex:2; min-width:160px; margin:0;"
                         title="Thai full name — shown across the admin and the LIFF profile">
-                    <input type="text" id="prereg-name" placeholder="Full Name (English)" style="flex:2; min-width:180px; margin:0;"
+                    <input type="text" id="prereg-name" placeholder="Full Name (English)" style="flex:2; min-width:160px; margin:0;"
                         title="English Full Name for Certificate">
-                    <input type="text" id="prereg-nick" placeholder="Nickname/AKA" style="flex:1; min-width:120px; margin:0;"
+                    <input type="text" id="prereg-nick" placeholder="Nickname/AKA" style="flex:1; min-width:100px; margin:0;"
                         title="Nickname/AKA">
-                    <select id="prereg-group" style="flex:1; min-width:120px; margin:0;">
-                        <option value="Junior">Junior</option>
-                        <option value="INTERN">INTERN</option>
-                        <option value="EXTERN">EXTERN</option>
-                        <option value="Public">Public</option>
-                    </select>
                 </div>
-                <div style="display:flex; gap:8px; margin-bottom:8px;">
-                    <div style="flex:1;"><label style="font-size:0.75em; color:#666;">Start:</label><input type="date"
-                            id="prereg-start" style="margin:0;"></div>
-                    <div style="flex:1;"><label style="font-size:0.75em; color:#666;">End:</label><input type="date"
-                            id="prereg-end" style="margin:0;"></div>
+                <div id="prereg-pick" class="lang-no-toggle"></div>
+                <div class="pr-line"><span class="pr-lab">Period</span>
+                    <input type="date" id="prereg-start" oninput="preRegDur()" style="margin:0; flex:1; min-width:130px;" aria-label="Start date">
+                    <span style="color:#94a3b8;">→</span>
+                    <input type="date" id="prereg-end" oninput="preRegDur()" style="margin:0; flex:1; min-width:130px;" aria-label="End date">
+                    <span id="prereg-dur" class="pr-dur" hidden></span>
+                    <button class="magic-btn" onclick="addPreRegUser()" style="width:auto; margin:0; padding:8px 16px; background:#6f42c1;" title="Generate Registration Code"><i
+                        class="fa-solid fa-user-plus"></i> Code</button>
                 </div>
-                <button class="magic-btn" onclick="addPreRegUser()" style="width:100%; background:#6f42c1;"><i
-                        class="fa-solid fa-user-plus"></i> Generate Registration Code</button>
             </div>
 
             <div style="font-size:0.85em; font-weight:bold; color:#333; margin-bottom:8px;">📃 Pre-registered Items
