@@ -69,7 +69,7 @@ assert.ok(/getMyDivision\(\)/.test(index) && /return "General Division"/.test(in
 const harness = `<!doctype html><meta charset="utf-8"><title>Internship Portfolio (V9.9)</title>
 <link rel="stylesheet" href="/cafe-content.css">
 <button type="button" id="cafe-view-switch" hidden></button><div id="section-cafe-content" hidden></div><div id="section-kanban" style="display:block">Mission</div><div id="section-dd-codex" style="display:block">Codex</div><div id="achievementUnlockModal" style="display:flex">badge</div><div id="achievementsModal" style="display:flex">list</div><div id="u-earned-badges" style="display:flex">row</div>
-<span id="intern-app-name">LINE LIFF Internship Management System</span><button id="unified-fab-btn" onclick="${FAB}">+</button><span id="u-crew-rank">LV.1</span><span id="u-division-rank-badge" style="display:inline">#1</span><div id="u-timeline-bar">bar</div><button id="u-schedule-chip">s</button><button id="fw-btn">f</button><button id="lang-toggle-cycle">EN</button>
+<span id="intern-app-name">LINE LIFF Internship Management System</span><button id="unified-fab-btn" onclick="${FAB}">+</button><span id="u-crew-rank">LV.1</span><span id="u-division-rank-badge" style="display:inline">#1</span><div id="u-timeline-bar">bar</div><button id="u-schedule-chip">s</button><button id="fw-btn">f</button><div id="fw-water">w</div><div id="metrics-bar" class="unified-metrics-bar">Quiz Journal Case</div><button id="lang-toggle-cycle">EN</button>
 <script>
 window.__unified = 0; window.__toasts = []; window.__upd = []; window.__subs = [];
 let userId = 'U1', userProfile = { displayName: 'Jo', pictureUrl: '' }, division = 'General Division', usersWorksCache = [];
@@ -366,7 +366,7 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         await page.click('#unified-fab-btn');
         assert.equal(await page.locator('#ccOverlay .cc-link[data-act="other"]').count(), 0, 'V101.127: no "Case, Work, Event…" link in the CAFE sheet');
         await page.click('#ccOverlay [data-act="close"]');
-        for (const id of ['u-crew-rank', 'u-division-rank-badge', 'u-timeline-bar', 'u-schedule-chip', 'fw-btn']) assert.equal(await page.$eval('#' + id, e => getComputedStyle(e).display), 'none', 'V101.127: #' + id + ' hidden in the CAFE header');
+        for (const id of ['u-crew-rank', 'u-division-rank-badge', 'u-timeline-bar', 'u-schedule-chip', 'fw-btn', 'fw-water', 'metrics-bar']) assert.equal(await page.$eval('#' + id, e => getComputedStyle(e).display), 'none', 'V101.127: #' + id + ' hidden in the CAFE header');
         assert.notEqual(await page.$eval('#lang-toggle-cycle', e => getComputedStyle(e).display), 'none', 'EN stays');
         await page.evaluate(() => { localStorage.setItem('uiLangTH', '1'); });
         await page.click('#lang-toggle-cycle');
