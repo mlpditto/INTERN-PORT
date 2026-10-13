@@ -205,6 +205,13 @@
         if (s.keep.size !== n) return s.keep.size + ' selected · target ' + n + ' — adjust your selection or Suggest again.';
         return '';
     }
+    // V102.219: the status line is read by screen readers and shown only when it is a PROBLEM; the History chip carries the state — green ring + the run time when
+    // a result is saved, amber when it could not be saved / loaded.
+    function setStatus(text, kind, time) {
+        const el = byId('curate-history-status'); el.textContent = text; el.classList.toggle('bad', kind === 'bad');
+        const h = byId('curate-history'); h.classList.toggle('saved', kind === 'saved'); h.classList.toggle('warn', kind === 'bad');
+        byId('curate-history-time').textContent = time || '';
+    }
     function setup() {
         if (dialog) return;
         dialog = document.createElement('dialog');
@@ -212,7 +219,7 @@
         dialog.setAttribute('aria-labelledby', 'curate-heading');
         dialog.innerHTML = `<div class="curate-head"><div><div class="curate-kicker">QUIZ EDITOR / AI TOOLS</div><h2 id="curate-heading">✦ AI Curate</h2><div id="curate-source"></div></div><button type="button" class="curate-close" aria-label="Close AI Curate" title="ปิดการคัดข้อสอบ">×</button></div>
             <div class="curate-main"><div class="curate-controls"><span class="curate-keep"><span id="curate-total"></span> → Keep <span class="curate-step"><button type="button" data-step="-1" aria-label="Keep one fewer" title="ลดจำนวนข้อที่เก็บ">−</button><input id="curate-target" type="number" min="1" aria-label="Number of questions to keep" title="จำนวนข้อที่ต้องการเก็บไว้"><button type="button" data-step="1" aria-label="Keep one more" title="เพิ่มจำนวนข้อที่เก็บ">+</button></span></span><div class="curate-modes" role="group" aria-label="Selection strategy"><button type="button" data-mode="balanced" aria-pressed="true" title="รักษาความครอบคลุมหัวข้อและลดความซ้ำ">Balanced</button><button type="button" data-mode="quality" aria-pressed="false" title="เน้นความชัดเจนและคุณภาพของแต่ละข้อ">Best quality</button><button type="button" data-mode="duplicates" aria-pressed="false" title="เลือกตัวแทนของข้อที่วัดประเด็นเดียวกัน">Less overlap</button></div><button type="button" id="curate-suggest" class="curate-primary" title="ให้ AI เสนอชุดข้อสอบตามจำนวนและข้อที่ปักหมุด">✦ Suggest</button></div>
-            <details class="curate-instructions"><summary title="เพิ่มเงื่อนไขให้ AI ใช้คัดข้อสอบ (ไม่บังคับ)">✏️ Instructions</summary><textarea id="curate-instructions" maxlength="4000" aria-label="Curation instructions" placeholder="e.g. Prioritize clinical application and retain all key topics."></textarea></details>
+            <details class="curate-instructions"><summary title="เพิ่มเงื่อนไขให้ AI ใช้คัดข้อสอบ (ไม่บังคับ)" aria-label="Instructions"><span aria-hidden="true">✏️</span><span class="curate-sr">Instructions</span></summary><textarea id="curate-instructions" maxlength="4000" aria-label="Curation instructions" placeholder="e.g. Prioritize clinical application and retain all key topics."></textarea></details>
             <div class="curate-review"><div class="curate-review-head"><div class="curate-tabs" role="group" aria-label="Proposed selection"><button type="button" data-view="keep" aria-pressed="true" title="ข้อที่เก็บไว้">Keep</button><button type="button" data-view="remove" aria-pressed="false" title="ข้อที่เสนอให้ตัด">Remove</button></div><span id="curate-coverage"></span></div><div id="curate-proposal-label"></div><div id="curate-rows"></div></div>
             <div class="curate-footer"><div id="curate-feedback" role="status" aria-live="polite"></div><button type="button" id="curate-save" class="curate-primary" title="บันทึกเป็นชุดใหม่ที่ยังไม่เปิดใช้งาน โดยต้นฉบับยังอยู่ครบ">Save as new quiz</button></div><div class="curate-note">New quizzes are saved inactive. Original questions and attempts are preserved.</div></div>`;
         document.body.append(dialog);
@@ -276,9 +283,10 @@
             state.needsSuggestion = true; state.done = false; state.message = ''; render();
         });
         const history = node('details'); history.id = 'curate-history';
-        history.innerHTML = '<summary title="ประวัติผล AI ล่าสุด สูงสุด 5 รอบ">🕘 History</summary><div id="curate-history-list"></div>';
+        history.innerHTML = '<summary title="ประวัติผล AI ล่าสุด สูงสุด 5 รอบ" aria-label="History"><span aria-hidden="true">🕘</span><span class="curate-hist-time" id="curate-history-time" aria-hidden="true"></span></summary><div id="curate-history-list"></div>';
         // V101.94: Instructions · History · status sit on one small line under the card; an opened one wraps full width.
-        const foot = node('div', undefined, 'curate-foot'); card.after(foot);
+        // V102.219: …now inside the controls row (display:contents, CSS orders them): 20→[15] │ ⚖ ★ ⇄ │ ✏️ 🕘 03:37 │ ↻. The status text is for screen readers unless it is a problem.
+        const foot = node('div', undefined, 'curate-foot'); byId('curate-suggest').before(foot);
         const status = node('div'); status.id = 'curate-history-status'; status.setAttribute('role', 'status');
         foot.append(dialog.querySelector('.curate-instructions'), history, status);
         // V101.95: when the editor's questions changed, this takes Suggest's place — no close / reopen needed.
@@ -367,6 +375,7 @@
         byId('curate-apply').textContent = s.applying ? 'Applying…' : 'Remove ' + (count - s.keep.size) + ' from original';
         dialog.querySelector('.curate-main > .curate-note').textContent = 'Remove updates the inactive original. Create backup quiz is optional; required history versions are preserved. Split creates a new quiz from removed questions.';
         byId('curate-suggest').textContent = s.busy ? 'Processing · ' + elapsed(s) : s.done ? 'Run again' : '✦ Suggest';
+        byId('curate-suggest').classList.toggle('icon', !!s.done && !s.busy);   // V102.219: icon-only ↻ after a run
         byId('curate-suggest').hidden = !!s.stale; byId('curate-reload').hidden = !s.stale;
         byId('curate-suggest').title = s.busy ? 'ความคืบหน้าตามขั้นตอนงาน API ไม่รายงานเปอร์เซ็นต์ประมวลผลจริงของโมเดล' : 'ให้ AI เสนอข้อที่ควรเก็บและตัด';
         renderComparison(s);
@@ -402,7 +411,7 @@
         byId('curate-instructions').value = keep.instructions || ''; dialog.querySelector('.curate-instructions').open = !!keep.instructions;
         byId('curate-create-backup').checked = true;
         byId('curate-history').open = false; byId('curate-history-list').replaceChildren();
-        byId('curate-history-status').textContent = source.sourceId ? 'Checking saved results…' : 'Save this quiz first to enable history.';
+        setStatus(source.sourceId ? 'Checking saved results…' : 'Save this quiz first to enable history.');
         render();
     }
     function reloadSource() {
@@ -429,11 +438,11 @@
                 s.proposal = validateProposal({ questions: match.proposal }, s, target(s));
                 s.keep = new Set(s.proposal.filter(q => q.keep).map(q => q.id)); s.needsSuggestion = false;
                 s.done = true; s.startedAt = 0; s.finishedAt = match.elapsedMs; s.view = 'remove';
-                byId('curate-history-status').textContent = 'Saved result · ' + match.model + ' · ' + new Date(match.createdAt).toLocaleString() + ' · No AI call';
+                setStatus('Saved result · ' + match.model + ' · ' + new Date(match.createdAt).toLocaleString() + ' · No AI call', 'saved', elapsed(s));
                 render();
-            } else byId('curate-history-status').textContent = s.runs.length ? 'Previous results differ from these questions or settings. Select Suggest.' : 'No saved result yet.';
+            } else setStatus(s.runs.length ? 'Previous results differ from these questions or settings. Select Suggest.' : 'No saved result yet.');
             renderHistory(s);
-        } catch (error) { console.warn('Curate history:', error); if (state === s) byId('curate-history-status').textContent = 'Could not load history. You can still select Suggest.'; }
+        } catch (error) { console.warn('Curate history:', error); if (state === s) setStatus('Could not load history. You can still select Suggest.', 'bad'); }
     }
     function renderHistory(s) {
         const list = byId('curate-history-list'); list.replaceChildren();
@@ -598,8 +607,8 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
                 await curateHistory.save(s.source.sourceId, run);
                 if (state !== s) return;
                 s.runs = [run, ...(s.runs || [])].slice(0, 5); renderHistory(s);
-                byId('curate-history-status').textContent = 'Done · ' + elapsed(s) + (s.source.sourceId ? ' · Result saved' : ' · History requires a saved quiz') + (s.evidenceNote ? ' · ' + s.evidenceNote : '');
-            } catch (error) { if (state === s) byId('curate-history-status').textContent = 'Done · Result available, but history could not be saved. ' + error.message; }
+                setStatus('Done · ' + elapsed(s) + (s.source.sourceId ? ' · Result saved' : ' · History requires a saved quiz') + (s.evidenceNote ? ' · ' + s.evidenceNote : ''), s.source.sourceId ? 'saved' : '', elapsed(s));
+            } catch (error) { if (state === s) setStatus('Done · Result available, but history could not be saved. ' + error.message, 'bad', elapsed(s)); }
         } catch (error) {
             if (state === s) { s.done = false; s.message = 'Could not suggest: ' + error.message; }
         } finally { clearInterval(s.timer); if (state === s) { s.finishedAt = performance.now(); s.busy = false; render(); } }
