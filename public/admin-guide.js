@@ -1,14 +1,14 @@
-/* Admin guide modal — renders admin-guide.en.md / admin-guide.md (TH) one section at a time behind a chip rail; EN is the default,
-   the EN | TH chips in the header switch language (remembered per browser). Both files keep the same ## sections in the same order.
+/* Admin guide modal — renders admin-guide.en.md / admin-guide.md (TH) / admin-guide.ko.md one section at a time behind a chip rail; EN is the default,
+   the EN | TH | KO chips in the header switch language (remembered per browser). Both files keep the same ## sections in the same order.
    Opened by the 📖 header button (openAdminGuide) and once automatically after the first admin login.
    Standalone overlay (z-index 150000) so it stays above any open editor modal. */
 (function () {
     'use strict';
-    var SEEN_KEY = 'adminGuideSeen', LANG_KEY = 'adminGuideLang', MD_URL = { en: 'admin-guide.en.md', th: 'admin-guide.md' };
-    var T = { en: { title: '📖 Admin guide', fail: 'Could not load the guide' }, th: { title: '📖 คู่มือ Admin', fail: 'โหลดคู่มือไม่สำเร็จ' } };
-    var docs = { en: null, th: null }, sections = [], lang = getLang(), cur = 0, opened = false, loading = {}, overlay = null;
+    var SEEN_KEY = 'adminGuideSeen', LANG_KEY = 'adminGuideLang', MD_URL = { en: 'admin-guide.en.md', th: 'admin-guide.md', ko: 'admin-guide.ko.md' };
+    var T = { en: { title: '📖 Admin guide', fail: 'Could not load the guide' }, th: { title: '📖 คู่มือ Admin', fail: 'โหลดคู่มือไม่สำเร็จ' }, ko: { title: '📖 관리자 가이드', fail: '가이드를 불러오지 못했습니다' } };
+    var docs = { en: null, th: null, ko: null }, sections = [], lang = getLang(), cur = 0, opened = false, loading = {}, overlay = null;
 
-    function getLang() { try { return localStorage.getItem(LANG_KEY) === 'th' ? 'th' : 'en'; } catch (_) { return 'en'; } }
+    function getLang() { try { var l = localStorage.getItem(LANG_KEY); return l === 'th' || l === 'ko' ? l : 'en'; } catch (_) { return 'en'; } }
     function seen() { try { return localStorage.getItem(SEEN_KEY) === '1'; } catch (_) { return false; } }
     function markSeen() { try { localStorage.setItem(SEEN_KEY, '1'); } catch (_) { /* storage may be blocked */ } }
     function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -75,7 +75,7 @@
         overlay.id = 'adminGuideOverlay';
         overlay.setAttribute('role', 'dialog'); overlay.setAttribute('aria-modal', 'true'); overlay.setAttribute('aria-label', 'Admin guide');
         overlay.innerHTML = '<div class="ag-box lang-no-toggle"><div class="ag-head"><h2 class="ag-title"></h2>' +
-            '<div class="ag-lang" role="group" aria-label="Language"><button type="button" class="ag-l" data-l="en">EN</button><button type="button" class="ag-l" data-l="th">TH</button></div>' +
+            '<div class="ag-lang" role="group" aria-label="Language"><button type="button" class="ag-l" data-l="en">EN</button><button type="button" class="ag-l" data-l="th">TH</button><button type="button" class="ag-l" data-l="ko">KO</button></div>' +
             '<button type="button" class="ag-close" aria-label="Close">&times;</button></div>' +
             '<div class="ag-rail"></div><div class="ag-body lang-no-toggle"></div></div>';
         document.body.appendChild(overlay);
@@ -100,7 +100,7 @@
 
     function paintLang() {
         overlay.querySelector('.ag-title').textContent = T[lang].title;
-        overlay.setAttribute('aria-label', lang === 'th' ? 'คู่มือ Admin' : 'Admin guide');
+        overlay.setAttribute('aria-label', lang === 'th' ? 'คู่มือ Admin' : lang === 'ko' ? '관리자 가이드' : 'Admin guide');
         overlay.querySelectorAll('.ag-l').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.l === lang)); });
     }
 

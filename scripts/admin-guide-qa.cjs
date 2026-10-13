@@ -7,6 +7,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const admin = fs.readFileSync('public/admin.html', 'utf8').replace(/\r\n/g, '\n');
 const md = fs.readFileSync('public/admin-guide.md', 'utf8');
 const mdEn = fs.readFileSync('public/admin-guide.en.md', 'utf8');
+const mdKo = fs.readFileSync('public/admin-guide.ko.md', 'utf8');
 const js = fs.readFileSync('public/admin-guide.js', 'utf8');
 
 // Static: wiring in admin.html, and the guide only names tabs that exist.
@@ -16,12 +17,14 @@ const tabs = [...admin.matchAll(/class="tab-btn[^"]*" onclick="switchTab\('tab-[
 assert.equal(tabs.length, 7, 'seven main tabs in admin.html: ' + tabs);
 const plain = md.split('**').join('');
 const plainEn = mdEn.split('**').join('');
-for (const t of tabs) { assert.ok(plain.includes(t), 'TH guide names the tab "' + t + '"'); assert.ok(plainEn.includes(t), 'EN guide names the tab "' + t + '"'); }
+for (const t of tabs) { assert.ok(plain.includes(t), 'TH guide names the tab "' + t + '"'); assert.ok(plainEn.includes(t), 'EN guide names the tab "' + t + '"'); assert.ok(mdKo.split('**').join('').includes(t), 'KO guide names the tab "' + t + '"'); }
 for (const label of ['Send Login Link', 'Create', 'Archive', 'Logout', 'Sync intern view', 'Bulk Review']) assert.ok(admin.includes(label), 'admin.html has "' + label + '" the guide mentions');
 const sections = md.split(/\r?\n/).filter(l => /^## /.test(l));
 assert.ok(sections.length >= 5, 'guide has sections: ' + sections.length);
 const sectionsEn = mdEn.split(/\r?\n/).filter(l => /^## /.test(l));
 assert.equal(sectionsEn.length, sections.length, 'EN and TH guides have the same number of sections');
+assert.equal(mdKo.split(/\r?\n/).filter(l => /^## /.test(l)).length, sections.length, 'KO guide has the same number of sections');
+for (const label of ['Send Login Link', 'Create', 'Archive', 'Logout']) assert.ok(mdKo.includes(label), 'KO guide names "' + label + '"');
 assert.ok(/<button id="btn-admin-guide"[^>]*>📖<\/button>/.test(admin), 'the header button is 📖');
 for (const label of ['Send Login Link', 'Create', 'Archive', 'Logout']) assert.ok(mdEn.includes(label), 'EN guide names "' + label + '"');
 
@@ -43,6 +46,7 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Nika Admin (V9.9)</
                 if (p === '/admin-guide.js') return r.fulfill({ contentType: 'text/javascript', body: js });
                 if (p === '/admin-guide.md') return r.fulfill({ contentType: 'text/markdown', body: md });
                 if (p === '/admin-guide.en.md') return r.fulfill({ contentType: 'text/markdown', body: mdEn });
+                if (p === '/admin-guide.ko.md') return r.fulfill({ contentType: 'text/markdown', body: mdKo });
                 return r.fulfill({ status: 404, body: '' });
             });
             await page.goto('https://qa.test/h.html');
@@ -88,6 +92,16 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Nika Admin (V9.9)</
             assert.equal(thChips.length, chips.length, 'TH has the same sections');
             assert.ok(thChips[2].on === 'true' && /แผนที่แท็บ/.test(thChips[2].t), 'switching language keeps the section (tab map): ' + JSON.stringify(thChips));
             assert.equal(await page.evaluate(() => localStorage.getItem('adminGuideLang')), 'th', 'language is remembered');
+            // KO: same section stays, Hangul title + chips, remembered.
+            await page.click('#adminGuideOverlay .ag-l[data-l="ko"]');
+            await page.waitForFunction(() => /[가-힣]/.test(document.querySelector('#adminGuideOverlay .ag-title').textContent));
+            await page.waitForFunction(() => /[가-힣]/.test(document.querySelector('#adminGuideOverlay .ag-chip').textContent));
+            const koChips = await page.$$eval('#adminGuideOverlay .ag-chip', els => els.map(e => ({ t: e.textContent, on: e.getAttribute('aria-pressed') })));
+            assert.equal(koChips.length, chips.length, 'KO has the same sections');
+            assert.ok(koChips[2].on === 'true' && /탭 지도/.test(koChips[2].t), 'switching to KO keeps the section (tab map): ' + JSON.stringify(koChips));
+            assert.ok(koChips.every(c => c.t.length <= 16), 'KO chips are short: ' + JSON.stringify(koChips.map(c => c.t)));
+            assert.equal(await page.evaluate(() => localStorage.getItem('adminGuideLang')), 'ko', 'KO is remembered');
+            assert.ok((await body()).includes('Alabasta'), 'KO tab map names Alabasta');
             await page.click('#adminGuideOverlay .ag-l[data-l="en"]');
             await page.waitForFunction(() => document.querySelector('#adminGuideOverlay .ag-title').textContent === '📖 Admin guide');
             await page.waitForFunction(() => /^[^ก-๙]+$/.test(document.querySelector('#adminGuideOverlay .ag-chip').textContent));
