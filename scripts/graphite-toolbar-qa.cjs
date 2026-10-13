@@ -100,6 +100,19 @@ const { chromium } = require('playwright');
         assert.equal(await page.evaluate(() => normalizeTextAIModel('or/x-ai/grok-4.7')), 'gpt-6-luna');
         await page.locator('#ai-analysis-popup button', { hasText: 'Export' }).click();
         assert.equal(await page.evaluate(() => exported), true);
+        // V102.221: the Rewrites result — tab badge, grey pill, ✨ + ⤓ icons, all on ONE row; nothing overflows on a phone
+        await page.evaluate(() => { document.getElementById('ai-analysis-popup').innerHTML = auditToolbarHtml(true, 'specialist', true, { count: 3, pills: '<span class="audit-pill">Sol 6 · 2.1k</span>', magic: true }); });
+        {
+            const pop = page.locator('#ai-analysis-popup');
+            await page.setViewportSize({ width: 1000, height: 800 });
+            assert.equal(await pop.locator('.review-tab[data-count]').evaluate(b => getComputedStyle(b, '::after').content), '"3"', 'count badge on the Rewrites tab');
+            assert.equal(await pop.locator('.review-tab[data-count]').evaluate(b => b.textContent), 'Rewrites', 'the badge is CSS only (tab text is saved/restored while loading)');
+            assert.deepEqual(await pop.locator('#btn-apply-ai-improve, .audit-export.ico').evaluateAll(ns => ns.map(n => [n.textContent, n.getAttribute('aria-label')])), [['✨', 'Magic Overhaul'], ['⤓', 'Export']]);
+            const ys = await pop.locator('.review-tab, .audit-pill, #btn-apply-ai-improve, .audit-run, .audit-export, .audit-close').evaluateAll(ns => ns.map(n => { const r = n.getBoundingClientRect(); return Math.round(r.top + r.height / 2); }));
+            assert.ok(Math.max(...ys) - Math.min(...ys) <= 6, 'tabs · pill · ✨ · Rewrite · ⤓ · × share one row: ' + ys);
+            await page.setViewportSize({ width: 320, height: 800 });
+            assert.equal(await pop.locator('button:visible, .audit-pill').evaluateAll(bs => bs.every(b => { const r = b.getBoundingClientRect(), h = b.closest('.audit-toolbar').getBoundingClientRect(); return r.left >= h.left && r.right <= h.right + 1; })), true, 'no overflow at 320');
+        }
         await page.locator('#ai-audit-popup [data-review-tab="specialist"]').click();
         assert.equal(await page.locator('#ai-audit-popup').isVisible(), false);
         assert.equal(await page.locator('#ai-analysis-popup').isVisible(), true);

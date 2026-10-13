@@ -23,7 +23,7 @@ const modelB = cut('        window._compareModelB = function', '        window.g
         for (const css of ['public/text-ai-chips.css', 'public/audit-toolbar.css']) await page.addStyleTag({ content: fs.readFileSync(css, 'utf8') });
         await page.addScriptTag({ path: 'public/ai-model-ui.js' });
         await page.addScriptTag({ content: modelB });
-        await page.evaluate(() => { localStorage.clear(); document.body.innerHTML = '<div id="b" style="background:#fff;padding:12px">' + window._compareModelBPickerHtml() + '</div>'; });
+        await page.evaluate(() => { localStorage.clear(); document.body.innerHTML = '<div id="b" style="background:#fff;padding:12px">' + window._compareModelBPickerHtml() + '</div>'; document.querySelectorAll('#b .text-ai-chips > button[hidden]').forEach(b => { b.hidden = false; }); }); // V102.221: the real picker shows one vendor's chips; this check styles them all
 
         const chips = await page.locator('#b .text-ai-chips > button').evaluateAll(bs => bs.map(b => ({ label: b.getAttribute('aria-label'), owner: b.querySelector('.text-ai-logo')?.dataset.owner || '', bg: b.querySelector('.text-ai-logo') ? getComputedStyle(b.querySelector('.text-ai-logo')).backgroundImage : '' })));
         const byLabel = Object.fromEntries(chips.map(c => [c.label, c]));
@@ -34,7 +34,7 @@ const modelB = cut('        window._compareModelB = function', '        window.g
         }
         // V102.76: local Ollama has no brand mark in assets/logos — its chip carries the name (like the old Qwen / DeepSeek text chips).
         assert.deepEqual(chips.filter(c => !c.owner && c.label !== 'Ollama local').map(c => c.label), [], 'every chip has a logo');
-        assert.equal(await page.locator('#b .text-ai-logo[data-owner="grok"]').evaluate(e => getComputedStyle(e).filter), 'invert(1)', 'white Grok mark is dark on the light rail');
+        assert.equal(await page.locator('#b .text-ai-chips .text-ai-logo[data-owner="grok"]').evaluate(e => getComputedStyle(e).filter), 'invert(1)', 'white Grok mark is dark on the light rail');
 
         // V102.12: OpenRouter theme — grape tint + grape border + Grape→Volt bar + corner glyph.
         const orLook = sel => page.locator(sel).evaluate(b => { const s = getComputedStyle(b), a = getComputedStyle(b, '::after'), z = getComputedStyle(b, '::before'); return { bg: s.backgroundColor, img: s.backgroundImage, border: s.borderTopColor, bar: a.backgroundImage, glyph: z.backgroundImage }; });
@@ -78,7 +78,7 @@ const modelB = cut('        window._compareModelB = function', '        window.g
         await page.locator('#b button[aria-label="Grok 4.7"]').click();
         assert.equal(await page.evaluate(() => window._compareModelB()), 'or/x-ai/grok-4.7');
         await page.evaluate(() => { document.getElementById('b').innerHTML = window._compareModelBPickerHtml(); });
-        assert.equal(await page.locator('#b button[aria-pressed="true"]').getAttribute('aria-label'), 'Grok 4.7', 'reopened rail shows Grok picked');
+        assert.equal(await page.locator('#b .text-ai-chips > button[aria-pressed="true"]').getAttribute('aria-label'), 'Grok 4.7', 'reopened rail shows Grok picked');
         await page.evaluate(() => localStorage.setItem('ai_default_2model_b', 'gpt-5.6-sol'));
         assert.equal(await page.evaluate(() => window._compareModelB()), 'gpt-6-sol', 'retired ids still move to their successor');
 

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.220)</title>
+    <title>Nika Admin (V102.221)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -7288,7 +7288,7 @@
     <script src="ollama-local.js?v=V102.109"></script>
     <script src="peds-dosing.js?v=V102.80"></script>
     <script src="bronchodilator-seed.js?v=V102.220"></script>
-    <link rel="stylesheet" href="text-ai-chips.css?v=V102.13">
+    <link rel="stylesheet" href="text-ai-chips.css?v=V102.221">
     <link rel="stylesheet" href="ai-settings-ui.css?v=V102.147">
     <link rel="stylesheet" href="quiz-resource-cards.css?v=V102.09">
     <link rel="stylesheet" href="case-split-studio.css?v=V100.38">
@@ -7310,7 +7310,7 @@
     <!-- V91.98 fix: walker skips user-content subtrees (q-text-preview / md-render / lang-no-toggle) -->
     <script src="lang-toggle.js?v=V102.46"></script>
     <script src="admin-guide.js?v=V102.143" defer></script>
-<link rel="stylesheet" href="audit-toolbar.css?v=V102.83">
+<link rel="stylesheet" href="audit-toolbar.css?v=V102.221">
 <link rel="stylesheet" href="quiz-curate.css?v=V102.219">
 <script src="quiz-revision.js?v=V100.07"></script>
 <script src="ai-usage-overview.js?v=V102.147"></script>
@@ -18658,16 +18658,11 @@
                 // V101.65: one summary line (as on the Scorecard) replaces the saved-analysis banner
                 // (V97.39) and the footer; the Fix/Compare buttons below stay live either way.
                 const rewriteTokens = Number(aiTokens) || 0;
-                const metaHtml = `<div class="audit-meta">
-                    <span>${(result.items || []).length} rewrite${(result.items || []).length === 1 ? '' : 's'}</span>
-                    ${(opts && opts.cachedResult && !opts.batchMerged) ? `<span title="Saved analysis — no tokens spent. Pick a model and press Rewrite to run again." data-th-title="ผลวิเคราะห์ที่บันทึกไว้ ไม่เสียโทเคน · เลือกโมเดลแล้วกด Rewrite เพื่อรันใหม่">· <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> ${escapeHtml(opts.cachedSavedAtLabel || 'Saved')}</span>` : ''}
-                    <span title="Tokens: ${rewriteTokens.toLocaleString()}">· ${escapeHtml(window.aiModelShortName(aiModel))} · ${rewriteTokens >= 1000 ? (rewriteTokens / 1000).toFixed(1) + 'k' : rewriteTokens} tok</span>
-                </div>`;
+                // V102.221: the count is a badge on the Rewrites tab; model · tokens (and the saved time) are grey pills in the same row.
+                const pillsHtml = `<span class="audit-pill" title="Model · tokens: ${rewriteTokens.toLocaleString()}">${escapeHtml(window.aiModelShortName(aiModel))} · ${rewriteTokens >= 1000 ? (rewriteTokens / 1000).toFixed(1) + 'k' : rewriteTokens}</span>${(opts && opts.cachedResult && !opts.batchMerged) ? `<span class="audit-pill" title="Saved analysis — no tokens spent. Pick a model and press Rewrite to run again." data-th-title="ผลวิเคราะห์ที่บันทึกไว้ ไม่เสียโทเคน · เลือกโมเดลแล้วกด Rewrite เพื่อรันใหม่"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> ${escapeHtml(opts.cachedSavedAtLabel || 'Saved')}</span>` : ''}`;
 
                 resultDiv.innerHTML = `
-                    ${window.auditToolbarHtml(true, 'specialist', true)}
-
-                    ${metaHtml}
+                    ${window.auditToolbarHtml(true, 'specialist', true, { count: (result.items || []).length, pills: pillsHtml, magic: true })}
                     ${titleSection}
 
                     <details style="margin-bottom:16px; background:#fafafa; border:1px solid #f0f0f0; border-radius:14px; padding:10px 16px;">
@@ -18680,14 +18675,6 @@
 
                     ${improvementsHtml}
 
-                    <div style="display:flex; align-items:center; gap:10px; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius:12px; padding:10px 10px 10px 16px; margin-top:20px; margin-bottom:20px;">
-                        <span style="color:#fff; font-size:0.9em; font-weight:700; flex:1;">✨ Magic Overhaul — rewrite all questions</span>
-                        <button id="btn-apply-ai-improve" style="padding:8px 16px; border-radius:8px; font-weight:800; background:linear-gradient(135deg, #ffe066 0%, #ffd43b 100%); color:#5a4a00; border:none; cursor:pointer; font-size:0.85em; white-space:nowrap;"
-                            title="Independent of the fixes above — regenerates the entire quiz"
-                            onclick="applyQuizImprovements()">
-                            Run ✨
-                        </button>
-                    </div>
                 `;
                 dropRunHost(); // V102.19: the previous Rewrites stayed up (locked) until now
                 document.body.appendChild(resultDiv);
@@ -18956,12 +18943,12 @@
             const action = `document.getElementById('${inputId}').value=this.dataset.value;this.parentElement.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b===this);b.setAttribute('aria-pressed',String(b===this))});this.closest('.audit-toolbar').querySelector('.audit-run').title='ใช้ '+this.getAttribute('aria-label')+' ทำงานนี้'` + (isAudit ? ';syncAuditFixHints()' : ";if(!isTrialTextAIModel(this.dataset.value))syncModelDefault('ai-analyzer-model-val',this.dataset.value)");
             return window.providerModelRailHtml(inputId, selected, action, TEXT_AI_TRIAL_MODELS);
         };
-        window.auditToolbarHtml = function(hasResult, mode = 'audit', allowExport = false) {
+        window.auditToolbarHtml = function(hasResult, mode = 'audit', allowExport = false, x = null) {
             const isAudit = mode === 'audit';
             const run = isAudit ? 'runSelectedQualityAudit(this)' : 'runSelectedAnalyze(this)';
             const selected = isAudit ? 'gpt-6-luna' : textAIModel('ai-analyzer-model-val');
             const label = TEXT_AI_MODELS.find(m => m.id === selected).label;
-            return `<div class="audit-toolbar lang-no-toggle"><div class="audit-toolbar-top">${window.reviewTabsHtml(mode)}<div class="audit-actions">${isAudit ? '' : window.clinicalAngleChipHtml()}<button type="button" class="audit-run" onclick="${run}" title="Use ${label} for this task" data-th-title="ใช้ ${label} ทำงานนี้">↻ ${isAudit ? 'Review' : 'Rewrite'}</button>${allowExport ? '<button type="button" onclick="exportAiAnalysisMd()" title="Download the analysis as Markdown" data-th-title="ดาวน์โหลดผลการวิเคราะห์เป็น Markdown">Export</button>' : ''}<button type="button" class="audit-close" onclick="closeQuizReview()" aria-label="Close review" title="Close the quiz review" data-th-title="ปิดหน้าตรวจข้อสอบ">×</button></div></div>${window.auditModelControlsHtml(hasResult, mode)}</div>`;
+            return `<div class="audit-toolbar lang-no-toggle"><div class="audit-toolbar-top">${window.reviewTabsHtml(mode, x && x.count)}${x && x.pills ? x.pills : ''}<div class="audit-actions">${x && x.magic ? '<button type="button" id="btn-apply-ai-improve" class="audit-magic" onclick="applyQuizImprovements()" title="Magic Overhaul — rewrite all questions (independent of the fixes below; regenerates the entire quiz)" data-th-title="Magic Overhaul — เขียนคำถามใหม่ทั้งหมด (แยกจากรายการแก้ไขด้านล่าง สร้างข้อสอบใหม่ทั้งชุด)" aria-label="Magic Overhaul">✨</button>' : ''}${isAudit ? '' : window.clinicalAngleChipHtml()}<button type="button" class="audit-run" onclick="${run}" title="Use ${label} for this task" data-th-title="ใช้ ${label} ทำงานนี้">↻ ${isAudit ? 'Review' : 'Rewrite'}</button>${allowExport ? `<button type="button" onclick="exportAiAnalysisMd()" class="audit-export${x ? ' ico' : ''}" aria-label="Export" title="Export — download the analysis as Markdown" data-th-title="ดาวน์โหลดผลการวิเคราะห์เป็น Markdown">${x ? '⤓' : 'Export'}</button>` : ''}<button type="button" class="audit-close" onclick="closeQuizReview()" aria-label="Close review" title="Close the quiz review" data-th-title="ปิดหน้าตรวจข้อสอบ">×</button></div></div>${window.auditModelControlsHtml(hasResult, mode)}</div>`;
         };
 
         window.runSelectedQualityAudit = function(btn) {
@@ -19282,10 +19269,10 @@ RULES:
         // The rail is rendered INTO each popup's header, in place of the <h2> each one used
         // to carry — so the two modals read as two tabs of one surface. The active chip keeps
         // its tool's own colour instead of the global --primary the .active class would give.
-        window.reviewTabsHtml = function(activeId) {
+        window.reviewTabsHtml = function(activeId, count) {
             const items = window.REVIEW_TABS.map(t => {
                 const title = t.id === 'audit' ? 'ตรวจคะแนนและคุณภาพข้อสอบ' : 'เสนอการปรับปรุงคำถาม';
-                return `<button type="button" class="review-tab" data-review-tab="${t.id}" aria-pressed="${t.id === activeId}" onclick="window.showReviewTab('${t.id}')" title="${title}">${t.label}</button>`;
+                return `<button type="button" class="review-tab" data-review-tab="${t.id}" aria-pressed="${t.id === activeId}" onclick="window.showReviewTab('${t.id}')" title="${title}"${count && t.id === 'specialist' ? ` data-count="${count}"` : ''}>${t.label}</button>`;
             }).join('');
             return `<div class="review-tabs" role="group" aria-label="Review mode">${items}</div>`;
         };
@@ -65028,8 +65015,20 @@ ${window.clinicalAngleBlock ? window.clinicalAngleBlock() : ''}${steerBlock}
                 c.setAttribute('aria-pressed', String(c === chip));
             });
         };
+        // V102.221: ONE row — `B` · vendor icons · only that vendor's models (was 15 chips in two rows). The vendor follows the picked model;
+        // the other vendors' chips stay in the DOM, hidden, so setCompareModelB / the rail QA see the same buttons.
+        window.cmpBrowseVendor = function(btn) {
+            const row = btn.closest('.cmp-b');
+            row.querySelectorAll('.cmp-vendor').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+            row.querySelectorAll('.text-ai-chips > button').forEach(b => { b.hidden = b.getAttribute('aria-label').split(' ')[0] !== btn.dataset.provider; });
+        };
         window._compareModelBPickerHtml = function() {
-            return '<span>Model B</span>' + textAIChipsHtml('', window._compareModelB(), 'window.setCompareModelB(this)', TEXT_AI_TRIAL_MODELS); // V102.11: + Grok trial
+            const picked = window._compareModelB(), provider = ((textAIModelInfo(picked) || TEXT_AI_MODELS[0]).label || '').split(' ')[0];
+            const logo = { Gemini: 'gemini', GPT: 'openai', Claude: 'claude', Qwen: 'qwen', DeepSeek: 'deepseek', Grok: 'grok', Ollama: 'ollama' };
+            const all = textAIChipsHtml('', window._compareModelB(), 'window.setCompareModelB(this)', TEXT_AI_TRIAL_MODELS);
+            const providers = [...new Set([...all.matchAll(/<button [^>]*aria-label="([^"]*)"/g)].map(m => m[1].split(' ')[0]))];
+            const chips = all.replace(/<button [^>]*>/g, tag => ((tag.match(/aria-label="([^"]*)"/) || [])[1] || '').split(' ')[0] === provider ? tag : tag.replace('<button ', '<button hidden ')); // V102.11: + Grok trial
+            return `<div class="cmp-b"><b class="cmp-b-lbl" title="Model B">B</b><span class="cmp-vendors" role="group" aria-label="Model B vendor">${providers.map(v => `<button type="button" class="cmp-vendor" data-provider="${v}" aria-pressed="${v === provider}" aria-label="${v}" title="${v}" onclick="cmpBrowseVendor(this)">${logo[v] ? `<span class="text-ai-logo" data-owner="${logo[v]}" aria-hidden="true"></span>` : v}</button>`).join('')}</span>${chips}</div>`;
         };
 
         window.generateAiProposalB = async function(qIdx, arrIdx, btn) {
@@ -66153,15 +66152,14 @@ RULES:
                         </div>
 
                         <div style="padding:14px 24px; background:#fff; border-top:1.5px solid #edf2f7; display:flex; flex-direction:column; gap:8px;">
+                            <div>${window._compareModelBPickerHtml()}</div>
                             <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                                ${window._compareModelBPickerHtml()}
-                                ${improvedB ? '' : `<input id="ai-compare-instruction" type="text" value="${escapeHtml(item.compareInstruction || '')}" placeholder="${mergedQV ? 'Re-merge instruction' : 'Steer the rewrite / merge'}" title="Optional, one line — it applies to whichever AI action you press next.&#10;🔄 Regenerate / ⚖️ Compare B: how to rewrite, e.g. &quot;keep the stem, only fix the distractors&quot;. It overrides the built-in brief, which otherwise always pushes for harder + a case vignette. Both read the same line, so A and B stay comparable.&#10;🧬 Merge: how to blend. Left empty, the default rule applies — keep the original wording, adopt the improved version's depth." style="width:190px; padding:7px 9px; border-radius:10px; border:1px solid #e2e8f0; background:#f8fafc; font-size:0.76em; font-family:inherit; color:#334155;">`}
-                                ${(improvedB || mergedQV) ? '' : `<button class="btn" onclick="generateAiProposalB(${index}, ${arrIdx}, this)" title="Run the same brief through Model B and show its proposal as a 3rd column. Uses tokens." style="${barChip} color:#0e7490;">⚖️ Compare B</button>`}
-                                ${improvedB ? '' : `<button class="btn" onclick="mergeAiVersions(${index}, ${arrIdx}, this)" title="Let AI merge ORIGINAL + IMPROVED into one version, shown as a 3rd column. Uses tokens." style="${barChip} color:#9d174d;">🧬 ${mergedQV ? 'Re-merge' : 'Merge'}</button>`}
-                            </div>
-                            <div style="display:flex; gap:8px; align-items:center; justify-content:flex-end; flex-wrap:wrap;">
-                                <button class="btn btn-secondary" onclick="document.getElementById('ai-compare-overlay').remove()" style="padding:8px 16px; border-radius:10px; font-weight:700; font-size:0.82em; white-space:nowrap;">Keep Original</button>
-                                ${(improvedB || mergedQV) ? '' : `<button class="btn" style="padding:8px 16px; border-radius:10px; font-weight:700; font-size:0.82em; background:#f1f5f9; color:#4338ca; border:1px solid #e2e8f0; display:flex; align-items:center; gap:6px; white-space:nowrap;" onclick="regenerateSingleAiSuggestion(${index}, ${arrIdx}, true, this)">🔄 Regenerate</button>${addButtonHtml}${applyButtonHtml}`}
+                                ${improvedB ? '' : `<input id="ai-compare-instruction" type="text" value="${escapeHtml(item.compareInstruction || '')}" placeholder="${mergedQV ? 'Re-merge instruction' : 'Steer…'}" title="Optional, one line — it applies to whichever AI action you press next.&#10;🔄 Regenerate / ⚖️ Compare B: how to rewrite, e.g. &quot;keep the stem, only fix the distractors&quot;. It overrides the built-in brief, which otherwise always pushes for harder + a case vignette. Both read the same line, so A and B stay comparable.&#10;🧬 Merge: how to blend. Left empty, the default rule applies — keep the original wording, adopt the improved version's depth." style="flex:1 1 120px; min-width:120px; padding:7px 9px; border-radius:10px; border:1px solid #e2e8f0; background:#f8fafc; font-size:0.76em; font-family:inherit; color:#334155;">`}
+                                ${(improvedB || mergedQV) ? '' : `<button onclick="generateAiProposalB(${index}, ${arrIdx}, this)" title="Compare B — run the same brief through Model B and show its proposal as a 3rd column. Uses tokens." aria-label="Compare B" class="btn cmp-ib">⚖️</button>`}
+                                ${improvedB ? '' : `<button onclick="mergeAiVersions(${index}, ${arrIdx}, this)" title="${mergedQV ? 'Re-merge' : 'Merge'} — let AI merge ORIGINAL + IMPROVED into one version, shown as a 3rd column. Uses tokens." aria-label="${mergedQV ? 'Re-merge' : 'Merge'}" class="btn cmp-ib">🧬</button>`}
+                                <span class="cmp-sp"></span>
+                                <button class="btn cmp-ib quiet" onclick="document.getElementById('ai-compare-overlay').remove()" title="Keep Original — close without changes" aria-label="Keep Original">↩</button>
+                                ${(improvedB || mergedQV) ? '' : `<button class="btn cmp-ib" style="color:#4338ca;" title="Regenerate" aria-label="Regenerate" onclick="regenerateSingleAiSuggestion(${index}, ${arrIdx}, true, this)">🔄</button>${addButtonHtml}${applyButtonHtml}`}
                             </div>
                         </div>
                     </div>
