@@ -1,7 +1,7 @@
 // V101.134 · History's right rail, news card: the latest headlines of the Mahidol Pharmacy Drug Information Center "ข่าวยา" list, each a link back to
 // the DIC page (new tab). Headlines only — no words around them. The getDrugNews callable fetches the list (the site has no CORS), the list is
 // kept in localStorage for 3 hours, × closes the card for today (the same list stays closed, a new headline brings it back). Nothing is drawn when
-// the callable is missing or fails. The rail itself (position, wide screens only) is in flood-watch.css; the flood card shares it (#hfr-flood).
+// the callable is missing or fails. The rail itself (position; shown only when there is room: hfrFit in flood-watch.js) is in flood-watch.css; the flood card shares it (#hfr-flood).
 (function () {
     'use strict';
     var KEY = 'hnNews', OFF = 'hnOff', TTL = 3 * 3600e3, SHOW = 5;
@@ -24,11 +24,12 @@
         if (!host) return;
         var closed = false;
         try { closed = items.length && localStorage.getItem(OFF) === sig(); } catch (e) { /* storage blocked: it just shows */ }
-        if (!items.length || closed) { host.innerHTML = ''; return; }
+        if (!items.length || closed) { host.innerHTML = ''; if (window.hfrFit) window.hfrFit(); return; }
         host.innerHTML = '<div class="hfr-card news"><button type="button" class="hfr-x" onclick="hnClose()" aria-label="Close">×</button><ul class="hfr-nl">' +
             items.map(function (x) {
                 return '<li><a href="' + esc(x.url) + '" target="_blank" rel="noopener noreferrer" title="' + esc((x.week ? x.week + ' · ' : '') + 'Drug Information Center, Mahidol Pharmacy') + '">' + esc(x.title) + '</a></li>';
             }).join('') + '</ul></div>';
+        if (window.hfrFit) window.hfrFit();
     }
     window.hnClose = function () {
         try { localStorage.setItem(OFF, sig()); } catch (e) { /* ignore */ }

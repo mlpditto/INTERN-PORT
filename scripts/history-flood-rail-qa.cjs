@@ -1,7 +1,7 @@
 // V101.134 — History's right rail: the flood places that are still at risk, one small card beside the timeline (wide screens only), no words.
 // The REAL public/index.html + flood-watch.js/css (file://, network blocked, Firebase + Open-Meteo stubbed). A place at เฝ้าระวัง / เสี่ยงสูง shows
 // 🏥 / 🏠 + the severity emoji + the river key + the 💧 canal / 🛣️ road numbers; everything ok = no card; × closes it for today (the same
-// situation stays closed, a worse one comes back); a tap opens the full popup; under 1240px it is not drawn at all.
+// situation stays closed, a worse one comes back); a tap opens the full popup; it is drawn only when there is room (V101.137: the measured gap right of the timeline >= 150 px, the card narrows to fit) — a ~900 px window has none.
 const path = require('node:path'), fs = require('node:fs'), assert = require('node:assert/strict');
 const { pathToFileURL } = require('node:url');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -30,6 +30,7 @@ async function open(browser, width, risk, presets) {
     await page.waitForTimeout(700);
     // show the History pane
     await page.evaluate(() => { const c = document.getElementById('work-section-content'); c.style.display = 'block'; document.getElementById('work-pane-history').style.display = 'block'; });
+    await page.waitForTimeout(300);   // the rail measures its room when the History panel becomes visible (ResizeObserver)
     return { ctx, page, errors };
 }
 const snap = page => page.evaluate(() => {
@@ -47,7 +48,7 @@ const snap = page => page.evaluate(() => {
         let s = await snap(page);
         assert.ok(s.shown && !s.hidden, 'a place at เสี่ยงสูง → the rail card is drawn: ' + JSON.stringify(s));
         assert.equal(s.places, 1, 'only the training site (no home set)'); assert.match(s.cls, /crit/, 'crit styling');
-        assert.ok(s.rightOfTimeline, 'it sits to the RIGHT of the History timeline'); assert.ok(s.width >= 200 && s.width <= 260, 'about 236px wide: ' + s.width);
+        assert.ok(s.rightOfTimeline, 'it sits to the RIGHT of the History timeline'); assert.ok(s.width >= 200 && s.width <= 240, 'about 236px wide when there is plenty of room: ' + s.width);
         assert.equal(s.hasLetters, false, 'no words in it — emoji and numbers only: ' + JSON.stringify(s.text));
         assert.match(s.text, /🏥/); assert.match(s.text, /m³\/s|2,600/, 'the river line shows its number'); assert.match(s.text, /15/, 'the road depth shows');
         // × closes it for today
@@ -73,8 +74,13 @@ const snap = page => page.evaluate(() => {
         await ctx.close();
 
         // narrow screen → not drawn even when at risk
-        ({ ctx, page, errors } = await open(browser, 1000, 'high'));
-        s = await snap(page); assert.equal(s.shown, false, 'under 1240px the rail is not shown');
+        ({ ctx, page, errors } = await open(browser, 900, 'high'));
+        s = await snap(page); assert.equal(s.shown, false, 'a ~900 px window has no room right of the timeline → the rail is not shown');
+        await ctx.close();
+        // a mid-size window (~1150 px): there IS room, the card narrows to fit instead of waiting for 1240 px
+        ({ ctx, page, errors } = await open(browser, 1150, 'high'));
+        s = await snap(page); assert.ok(s.shown && s.rightOfTimeline && s.width >= 120 && s.width < 236, 'at ~1150 px the card is drawn, narrower than 236: ' + JSON.stringify(s));
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), true, 'and it never causes sideways scroll');
         await ctx.close();
         console.log('PASS: History flood rail — at-risk places only, right of the timeline, no words, × = closed for today, tap = popup, hidden on narrow screens');
     } finally { await browser.close(); }
