@@ -238,6 +238,43 @@ function publicMemberships(u) {
     return pairs.length ? { memberships: pairs } : {};
 }
 
+// V101.134: headlines from the Mahidol Pharmacy Drug Information Center "ข่าวยา" list (pharmacy.mahidol.ac.th/dic/news_week_list.php) for the History rail.
+// The site has no CORS and answers 403 to a bare client, so the intern asks this callable; it identifies itself honestly (robots.txt allows /), keeps ONE
+// list in memory for 30 minutes and returns only {id, title, week, url} — the headline and a link back to the DIC page, nothing else of the article.
+const DIC_NEWS_LIST = 'https://pharmacy.mahidol.ac.th/dic/news_week_list.php';
+function parseDrugNews(html, limit) {
+    const decode = (t) => String(t || '').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\s+/g, ' ').trim();
+    const out = [], seen = new Set();
+    const re = /<h5[^>]*>\s*<a\s+href="news_week_full\.php\?id=(\d{1,7})"[^>]*>([\s\S]*?)<\/a>\s*<\/h5>\s*<div[^>]*>([\s\S]*?)<\/div>/g;
+    let m;
+    while ((m = re.exec(html)) && out.length < (limit || 8)) {
+        if (seen.has(m[1])) continue;
+        seen.add(m[1]);
+        const title = decode(m[2]).slice(0, 200);
+        if (!title) continue;
+        out.push({ id: Number(m[1]), title, week: decode(String(m[3]).replace(/<em>[\s\S]*?<\/em>/g, '')).slice(0, 60), url: 'https://pharmacy.mahidol.ac.th/dic/news_week_full.php?id=' + m[1] });
+    }
+    return out;
+}
+let drugNewsCache = { at: 0, items: [] };
+exports.getDrugNews = onCall({ timeoutSeconds: 30, memory: '256MiB' }, async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
+    if (Date.now() - drugNewsCache.at < 30 * 60 * 1000 && drugNewsCache.items.length) return { items: drugNewsCache.items, cached: true };
+    let html;
+    try {
+        const r = await fetch(DIC_NEWS_LIST, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; INTERN-PORT-news/1.0; +https://mlpditto.github.io/INTERN-PORT/)', 'Accept-Language': 'th,en;q=0.8' }, signal: AbortSignal.timeout(20000) });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        html = await r.text();
+    } catch (e) {
+        if (drugNewsCache.items.length) return { items: drugNewsCache.items, cached: true, stale: true };   // an old list beats an empty card
+        throw new HttpsError('unavailable', 'DIC news is not reachable right now');
+    }
+    const items = parseDrugNews(html, 8);
+    if (!items.length) throw new HttpsError('unavailable', 'DIC news list was empty');
+    drugNewsCache = { at: Date.now(), items };
+    return { items };
+});
+
 exports.getLeaderboard = onCall(async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'Login required');
