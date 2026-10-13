@@ -114,6 +114,50 @@
             .then(function () { p.loading = false; paint(); render(); });
     }
 
+    // V101.134 · History's right rail. The places that are still at risk (🏥 site, 🏠 home: เฝ้าระวัง / เสี่ยงสูง) as ONE small card beside the
+    // History timeline on wide screens — emoji + numbers only, no words. Nothing when every place is ok; × closes it for today (the same
+    // situation stays closed, a changed one comes back); a tap opens the full popup. Painted from paint(), so it follows every data load.
+    function railDay() {
+        try { return typeof getBangkokDateTimeParts === 'function' ? getBangkokDateTimeParts().dateKey : new Date().toISOString().slice(0, 10); } catch (e) { return ''; }
+    }
+    function railEntries() {
+        var out = [];
+        ['site', 'home'].forEach(function (k) {
+            if (k === 'home' && !homeSet()) return;
+            var d = places[k].data;
+            if (!d) return;
+            var al = riverAlert(d.river), lv = sevLevels(d, al);
+            if (lv.overall === 'warn' || lv.overall === 'crit') out.push({ k: k, d: d, al: al, lv: lv });
+        });
+        return out;
+    }
+    function railSig(es) { return es.map(function (e) { return e.k + ':' + e.lv.overall + (e.lv.river || '') + (e.lv.road || ''); }).join('|'); }
+    function railPaint() {
+        var rail = document.getElementById('hfr-flood');
+        if (!rail) return;
+        var es = railEntries(), closed = false;
+        try { closed = es.length && localStorage.getItem('fwRailOff') === railDay() + '|' + railSig(es); } catch (e) { /* storage blocked: it just shows */ }
+        if (!es.length || closed) { rail.innerHTML = ''; return; }
+        var crit = es.some(function (e) { return e.lv.overall === 'crit'; });
+        rail.innerHTML = '<div class="hfr-card ' + (crit ? 'crit' : 'warn') + '" role="button" tabindex="0" onclick="fwRailOpen(event)" onkeydown="if (event.key === \'Enter\') fwRailOpen(event)" title="' +
+            esc(es.map(function (e) { return (e.k === 'site' ? '🏥 ' : '🏠 ') + sevTxt(e.lv.overall); }).join(' · ')) + '">' +
+            '<button type="button" class="hfr-x" onclick="fwRailClose(event)" aria-label="Close">×</button>' +
+            es.map(function (e) {
+                return '<div class="hfr-p"><div class="hfr-h"><span aria-hidden="true">' + (e.k === 'site' ? '🏥' : '🏠') + '</span>' + emo(SEV_EM[e.lv.overall], e.lv.overall, 'bare') + '</div>' +
+                    (e.al ? '<div class="fw-key" title="' + esc(e.al.code + ' ' + rvPlace(e.al.code, e.al.place)) + '">' + emo('⚠️', e.lv.river) + '<div class="fw-kv ' + e.lv.river + '">' + fmtQ(e.al.q) + '<small>m³/s</small></div></div>' : '') + rowsHtml(e.d, e.lv) + '</div>';
+            }).join('') + '</div>';
+    }
+    window.fwRailClose = function (ev) {
+        if (ev) ev.stopPropagation();
+        try { localStorage.setItem('fwRailOff', railDay() + '|' + railSig(railEntries())); } catch (e) { /* ignore */ }
+        railPaint();
+    };
+    window.fwRailOpen = function (ev) {
+        if (ev && ev.target && ev.target.closest && ev.target.closest('.hfr-x')) return;
+        window.scrollTo({ top: 0, behavior: 'smooth' });   // the popup hangs under the 🌊 button in the profile card
+        if (!sheet) window.fwOpen();
+    };
+
     // Rail button + card water.
     function paint() {
         var btn = document.getElementById('fw-btn');
@@ -125,6 +169,7 @@
         }
         var water = document.getElementById('fw-water');
         if (water) water.innerHTML = skyHtml(places.site.wx) + slopeWater(home, site) + riverWater(places.site.data && places.site.data.river, home, site);
+        railPaint();   // V101.134
     }
 
     // V101.32: the card water shows BOTH places — one surface sloping from home (left)

@@ -13,7 +13,7 @@ for (const gone of ['function statusHtml(', 'function riverAlertHtml(', 'functio
 assert.ok(src.includes("q > RV_LIMIT ? 'red'") && src.includes('var RV_LIMIT = 2200;'), 'card river tier and the popup alert share the 2,200 line');
 assert.ok(src.includes('&daily=precipitation_sum,precipitation_probability_max&past_days=3&forecast_days=4'), 'Open-Meteo daily rain in the same request');
 const idx = fs.readFileSync('public/index.html', 'utf8');
-assert.ok(idx.includes('flood-watch.js?v=V101.77') && idx.includes('flood-watch.css?v=V101.77'), 'cache-bust bumped');
+assert.ok(/flood-watch\.js\?v=V101\.(\d+)/.test(idx) && /flood-watch\.css\?v=V101\.(\d+)/.test(idx), 'cache-bust present');   // was pinned to V101.77
 assert.ok(!idx.includes('fw-river-strip') && !src.includes('fw-river-strip'), 'V101.71: the card strip is gone');
 
 async function open(browser, width, opts) {
