@@ -12,7 +12,7 @@ assert.ok(html.includes("addressIdCard: document.getElementById('gs-address-idca
 assert.ok(html.includes("document.getElementById('gs-address-idcard').value = user?.addressIdCard || '';") && html.includes('gsRenderAddresses(user?.addresses);'), 'load reads them back');
 assert.ok(html.includes("document.getElementById('gs-address').value = user?.address || '';") && html.includes('address: address,'), 'users.address (Current) is untouched');
 assert.ok(html.includes('#groupSelectModal .gs-profile-card:not(.gs-editing) .gs-addr-tools { display:none; }'), 'tools only while editing');
-assert.ok(!fs.readFileSync('public/index.html', 'utf8').includes('addressIdCard'), 'intern side untouched (admin first)');
+assert.ok(fs.readFileSync('public/index.html', 'utf8').includes('addressIdCard'), 'the intern side follows (V101.133): Hometown (as on ID card) = users.addressIdCard');   // was: intern side untouched (admin first)
 
 function grab(src, marker) {
     const i = src.indexOf(marker); assert.ok(i >= 0, marker);

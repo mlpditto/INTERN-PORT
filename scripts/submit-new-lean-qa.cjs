@@ -153,21 +153,55 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.ok(form.noteH <= 48 && form.labelHidden, 'note is one line, labels are screen-reader only');
         assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('u-case-note')).resize), 'none', 'no resize grip on the one-line note (inline resize:vertical must not win)');
 
-        // ---- heat grid
-        const lv = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('#u-case-system-grid button')].map(b => [b.dataset.system, { lv: b.dataset.lv, n: (b.querySelector('.sg-n') || {}).textContent || '', title: b.title }])));
-        assert.deepEqual(Object.fromEntries(Object.entries(lv).map(([k, v]) => [k, v.lv])), { respiratory: '3', cardio: '2', gi: '1', neuro: '0', ent: '0', skin: '0', msk: '0', endocrine: '0', mental: '0', other: '0' }, 'levels follow the counts (7 → 3, 3 → 2, 1 → 1, none → 0)');
-        assert.equal(lv.respiratory.n, '7', 'rejected case is not counted'); assert.equal(lv.cardio.n, '3', 'pending counts'); assert.equal(lv.neuro.n, '', 'no badge at 0');
-        assert.equal(lv.gi.title, '1 case sent'); assert.equal(lv.neuro.title, 'none yet');
-        const lum = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('#u-case-system-grid button')].map(b => [b.dataset.system, getComputedStyle(b).backgroundColor])));
-        assert.ok(hsl(lum.respiratory) < hsl(lum.cardio) && hsl(lum.cardio) < hsl(lum.gi), 'more cases = deeper green: ' + JSON.stringify(lum));
-        assert.ok(await page.evaluate(() => getComputedStyle(document.querySelector('#u-case-system-grid button[data-system="neuro"]')).filter.includes('grayscale')), 'unsent = grey');
-        // picking still works; the count survives a re-render
-        await page.locator('#u-case-system-grid button[data-system="gi"]').click();
+        // ---- V101.132: Disease System = ONE dropdown, nothing chosen, nothing that nudges the choice (no counts, no colour levels)
+        const sys = await page.evaluate(() => { const e = document.getElementById('u-case-system'); const r = e.getBoundingClientRect(); return { tag: e.tagName, visible: r.height >= 40 && getComputedStyle(e).display !== 'none', value: e.value, first: e.options[0].textContent, labels: [...e.options].map(o => o.textContent).join('|'), grid: !!document.getElementById('u-case-system-grid'), legend: !!document.querySelector('.sg-legend') }; });
+        assert.ok(sys.tag === 'SELECT' && sys.visible, 'a visible dropdown: ' + JSON.stringify(sys));
+        assert.equal(sys.value, '', 'nothing pre-selected'); assert.match(sys.first, /Select system/);
+        assert.ok(!sys.grid && !sys.legend, 'the button grid and its green legend are gone');
+        assert.ok(!/\d/.test(sys.labels), 'no case counts in the options: ' + sys.labels);
+        // required = pale green, skippable = pale grey-blue
+        const bg = await page.evaluate(() => Object.fromEntries(['u-case-id', 'u-case-system', 'u-case-customer', 'u-case-note'].map(i => [i, getComputedStyle(document.getElementById(i)).backgroundColor])));
+        assert.equal(bg['u-case-id'], 'rgb(236, 253, 245)', 'HN: pale green'); assert.equal(bg['u-case-system'], 'rgb(236, 253, 245)', 'Disease System: pale green');
+        assert.equal(bg['u-case-customer'], 'rgb(241, 245, 249)', 'patient name (optional): pale'); assert.equal(bg['u-case-note'], 'rgb(241, 245, 249)', 'note (optional): pale');
+        // picking works and opens the symptoms
+        await page.selectOption('#u-case-system', 'gi');
         assert.equal(await page.evaluate(() => document.getElementById('u-case-system').value), 'gi');
-        assert.equal(await page.locator('#u-case-system-grid button[data-system="gi"] .sg-n').textContent(), '1');
+        assert.equal(await page.evaluate(() => document.getElementById('u-case-symptoms-section').style.display), 'block', 'symptoms follow the pick');
+
+        // ---- V101.132: optional details — 4 tiles fold blocks open, only what is filled is collected, rights has an "other" box
+        assert.equal(await page.evaluate(() => caseExtrasCollect()), null, 'nothing filled → nothing sent');
+        const opt = await page.evaluate(() => {
+            const o = {}; const hidden = id => document.getElementById(id).hidden;
+            o.start = ['meds', 'labs', 'rights', 'appt'].map(k => hidden('u-opt-' + k));
+            document.querySelector('.u-opt-tile[data-opt="meds"]').click();
+            o.medsOpen = !hidden('u-opt-meds'); o.medsRows = document.querySelectorAll('#u-opt-meds .u-opt-row').length;
+            const r = document.querySelector('#u-opt-meds .u-opt-row').querySelectorAll('input'); r[0].value = ' Metformin '; r[1].value = '500 mg 2x/day'; r[0].dispatchEvent(new Event('input', { bubbles: true }));
+            document.querySelector('.u-opt-add[data-add="meds"]').click(); o.medsRows2 = document.querySelectorAll('#u-opt-meds .u-opt-row').length;   // the empty 2nd row must not be collected
+            o.badge = [document.querySelector('.u-opt-tile[data-opt="meds"] .u-opt-n').textContent, document.querySelector('.u-opt-tile[data-opt="meds"]').classList.contains('has')];
+            document.querySelector('.u-opt-tile[data-opt="labs"]').click(); const l = document.querySelector('#u-opt-labs .u-opt-row').querySelectorAll('input'); l[0].value = 'HbA1c'; l[1].value = '8.2 %'; l[0].dispatchEvent(new Event('input', { bubbles: true }));
+            document.querySelector('.u-opt-tile[data-opt="rights"]').click();
+            o.chips = [...document.querySelectorAll('#u-opt-rights .u-opt-chip')].map(c => c.textContent);
+            o.otherHidden0 = document.getElementById('u-opt-rights-other').hidden;
+            document.querySelector('#u-opt-rights .u-opt-chip[data-v="other"]').click(); o.otherHidden1 = document.getElementById('u-opt-rights-other').hidden;
+            document.getElementById('u-opt-rights-other').value = 'ประกันสังคม';
+            document.querySelector('.u-opt-tile[data-opt="appt"]').click(); document.getElementById('u-opt-appt-date').value = '2026-10-26'; document.getElementById('u-opt-appt-place').value = 'อายุรกรรม';
+            o.collected = JSON.parse(JSON.stringify(caseExtrasCollect()));
+            document.querySelector('#u-opt-rights .u-opt-chip[data-v="other"]').click(); o.toggledOff = JSON.parse(JSON.stringify(caseExtrasCollect())).treatmentRights || null;   // tapping the chip again clears it
+            caseExtrasReset(); o.afterReset = caseExtrasCollect(); o.resetClosed = ['meds', 'labs', 'rights', 'appt'].map(k => hidden('u-opt-' + k));
+            return o;
+        });
+        assert.deepEqual(opt.start, [true, true, true, true], 'all four blocks start folded');
+        assert.ok(opt.medsOpen && opt.medsRows === 1, 'opening Medications adds the first row'); assert.equal(opt.medsRows2, 2);
+        assert.deepEqual(opt.badge, ['1', true], 'badge counts filled rows only');
+        assert.deepEqual(opt.chips, ['บัตรทอง (UCS)', 'ราชการ (CSMBS)', 'ประกันเอกชน', 'อื่นๆ / Other'], 'the four rights');
+        assert.ok(opt.otherHidden0 && !opt.otherHidden1, 'อื่นๆ shows a box to specify');
+        assert.deepEqual(opt.collected, { medications: [{ name: 'Metformin', dose: '500 mg 2x/day' }], labResults: [{ test: 'HbA1c', value: '8.2 %' }], treatmentRights: { type: 'other', other: 'ประกันสังคม' }, appointment: { date: '2026-10-26', place: 'อายุรกรรม' } }, 'only filled things, trimmed');
+        assert.equal(opt.toggledOff, null, 'a second tap clears the rights choice'); assert.equal(opt.afterReset, null, 'reset empties everything'); assert.deepEqual(opt.resetClosed, [true, true, true, true]);
+        assert.ok(/\.\.\.caseExtras,\s*status: "pending"/.test(idx) && /\.\.\.caseExtras,\s*sourceType: 'cases'/.test(idx), 'the extras are written to the cases doc AND its submissions mirror');
+        await page.selectOption('#u-case-system', '');
 
         // ---- required fields: red frame + scrolled into view, cleared when touched
-        await page.evaluate(() => { document.getElementById('u-case-id').value = ''; document.getElementById('u-case-system').value = ''; renderSubmitSystemGrid(); });
+        await page.evaluate(() => { document.getElementById('u-case-id').value = ''; document.getElementById('u-case-system').value = ''; });
         const r1 = await page.evaluate(async () => { try { await submitUnifiedCase(); return 'no throw'; } catch (e) { return e.message; } });
         assert.ok(/Case No\. is required/.test(r1), 'toast text unchanged: ' + r1);
         assert.ok(await page.evaluate(() => document.getElementById('u-case-id').classList.contains('u-err')), 'HN gets the red frame');
@@ -175,14 +209,14 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.ok(!(await page.evaluate(() => document.getElementById('u-case-id').classList.contains('u-err'))), 'typing clears it');
         const r2 = await page.evaluate(async () => { try { await submitUnifiedCase(); return 'no throw'; } catch (e) { return e.message; } });
         assert.ok(/disease system/.test(r2), 'then the system is asked for: ' + r2);
-        assert.ok(await page.evaluate(() => document.getElementById('u-case-system-grid').classList.contains('u-err')), 'the grid gets the red frame');
+        assert.ok(await page.evaluate(() => document.getElementById('u-case-system').classList.contains('u-err')), 'the dropdown gets the red frame');
 
         // ---- footer: only Submit, and it stays reachable mid-form on a short screen (keyboard up)
         assert.equal(await page.locator('#u-submit-btn').count(), 1);
         assert.ok(!/Cancel/.test(await page.evaluate(() => document.querySelector('#u-submit-btn').parentElement.innerText)), 'no Cancel in the footer');
         await page.setViewportSize({ width: 390, height: 520 });
         await page.waitForTimeout(250);
-        await page.evaluate(() => { const g = document.getElementById('u-case-system-grid'); let e = g; while (e && !(e.scrollHeight > e.clientHeight + 4 && /(auto|scroll)/.test(getComputedStyle(e).overflowY))) e = e.parentElement; if (e) e.scrollTop = 140; });
+        await page.evaluate(() => { const g = document.getElementById('u-case-system'); let e = g; while (e && !(e.scrollHeight > e.clientHeight + 4 && /(auto|scroll)/.test(getComputedStyle(e).overflowY))) e = e.parentElement; if (e) e.scrollTop = 140; });
         await page.waitForTimeout(200);
         const vis = await page.evaluate(() => { const r = document.getElementById('u-submit-btn').getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; });
         assert.ok(vis, 'Submit is on screen without scrolling to the end');
@@ -195,7 +229,7 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.equal(await page.evaluate(() => document.getElementById('u-submit-btn').parentElement.style.display), 'flex');
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true, 'no sideways scroll');
         if (process.env.SHOT) {
-            await page.evaluate(() => { const e = document.getElementById('u-case-system-grid'); e.classList.remove('u-err'); document.getElementById('u-case-system').value = ''; renderSubmitSystemGrid(); document.getElementById('unified-submit-modal').firstElementChild.scrollTop = 0; });
+            await page.evaluate(() => { const e = document.getElementById('u-case-system'); e.classList.remove('u-err'); e.value = ''; document.getElementById('unified-submit-modal').firstElementChild.scrollTop = 0; });
             const card = await page.evaluate(() => { const r = document.getElementById('unified-submit-modal').firstElementChild.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
             await page.screenshot({ path: path.join(process.env.SHOT, 'submit_new_real.png'), clip: { x: card.x, y: card.y, width: card.w, height: card.h } });
         }
@@ -203,6 +237,6 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.equal(await page.evaluate(() => document.getElementById('unified-submit-modal').style.display), 'none', '✕ closes the dialog');
         assert.deepEqual(errors.filter(e => !/firebase\./.test(e)), [], 'no page errors');
         await ctx.close();
-        console.log('PASS: Submit New lean — no header/label, ✕ in the launchers row, inline HN + patient, one-line note, Disease System coloured by cases sent (rejected not counted), red frame on a missing field, Submit pinned (no Cancel)');
+        console.log('PASS: Submit New lean — no header/label, ✕ in the launchers row, inline HN + patient, one-line note, Disease System = one unbiased dropdown, required = pale green / optional = pale, optional details (meds / labs / rights / appointment), red frame on a missing field, Submit pinned (no Cancel)');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
