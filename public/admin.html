@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.223)</title>
+    <title>Nika Admin (V102.224)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -23374,6 +23374,50 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             window._qImproveShowPanel(item, html, '#0891b2', applyFn);
         };
 
+        // V102.224: ✨ in the "Read first" box — AI drafts the page the learner reads BEFORE the timer. The CORRECT ANSWER IS NEVER SENT (only the stem + the options, unmarked),
+        // so the draft cannot lean on it; a draft that still names a correct option verbatim is flagged. 'full' = background + key terms, 'terms' = glossary lines only.
+        // An empty box is filled; a filled one gets the replace/cancel panel (same pattern as the Explanation draft). Nothing is saved until the quiz is.
+        window._qPrimerDraft = async function(btn, mode) {
+            const item = btn.closest('.quiz-q-item'), ctx = window._qImproveCtx(item), ta = item && item.querySelector('.q-primer');
+            if (!ta) return;
+            if (!ctx.question) { showToast('Write the question first'); return; }
+            const opts = ctx.options.filter(Boolean);
+            const prompt = [
+                'ภาษา: เขียนเป็นภาษาเดียวกับโจทย์ (โจทย์ไทย→ไทย) คงศัพท์เทคนิคภาษาอังกฤษไว้',
+                mode === 'terms'
+                    ? 'งานของคุณ: ทำ "อภิธานศัพท์สั้นๆ" ของคำเฉพาะ/ศัพท์วิชาการในโจทย์และตัวเลือก ที่ผู้เรียนควรรู้ก่อนตอบ (ไม่เกิน 6 คำ) รูปแบบบรรทัดละคำ: - **คำ** — ความหมายสั้นๆ 1 บรรทัด'
+                    : 'งานของคุณ: เขียน "หน้าอ่านก่อนทำ" ให้ผู้เรียนอ่านก่อนตอบข้อนี้ ประกอบด้วย (1) ความรู้พื้นฐานที่ต้องมี 2–4 ประโยคสั้น (2) คำศัพท์สำคัญ ไม่เกิน 5 คำ บรรทัดละคำ: - **คำ** — ความหมายสั้นๆ',
+                'กฎเด็ดขาด: ห้ามระบุ ห้ามบอกใบ้ หรือเปรียบเทียบว่าตัวเลือกใดถูก/ผิด ห้ามเฉลยโจทย์ เขียนเฉพาะความรู้ที่ผู้เรียนต้องมีก่อนคิดเอง ห้ามคัดลอกตัวเลือกมาทั้งประโยค',
+                'ไม่เกิน ~120 คำ ใช้ markdown เบาๆ ได้ ห้ามแต่งข้อมูลที่ไม่แน่ใจ',
+                '',
+                'โจทย์: ' + JSON.stringify(ctx.question),
+                'ตัวเลือก (ไม่มีการระบุคำตอบ):\n' + opts.map((o, i) => (i + 1) + '. ' + o).join('\n'),
+                '',
+                'OUTPUT RAW JSON เท่านั้น ห้าม code fence: {"primer":"..."}'
+            ].join('\n');
+            const html0 = btn.innerHTML;
+            btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            try {
+                const res = await window.callUniversalAI(window._qImproveModel(item), prompt, true, null, ctx.quickApiKey, { feature: 'question_primer' });
+                const data = safeJsonParse(res.text);
+                if (!data || typeof data.primer !== 'string' || !data.primer.trim()) throw new Error('AI ไม่ได้ส่งเนื้อหากลับมา');
+                const text = data.primer.trim();
+                const low = text.toLowerCase();
+                const leaks = ctx.correctIndices.map(i => String(ctx.options[i] || '').trim()).filter(t => t.length >= 4 && low.includes(t.toLowerCase()));
+                const warn = leaks.length ? ' — ⚠️ it repeats a correct option, check it' : '';
+                const existing = (ta.value || '').trim();
+                if (!existing) { ta.value = text; showToast('✨ Read first drafted' + warn); return; }
+                const applyFn = () => { ta.value = text; showToast('✨ Read first replaced' + warn); };
+                let html = '<div style="margin-bottom:6px;"><strong>📖 There is already a Read first text — replace it?</strong>' + (leaks.length ? ' <span style="color:#b45309;">⚠️ the new one repeats a correct option</span>' : '') + '</div>';
+                html += '<div style="color:#64748b; margin-bottom:4px;">The new one:</div><div style="padding:6px 8px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; white-space:pre-wrap; margin-bottom:8px;">' + escapeHtml(text) + '</div>';
+                html += window._qImproveActionBar('✅ แทนที่');
+                window._qImproveShowPanel(item, html, '#d97706', applyFn);
+            } catch (err) {
+                console.error('[primer-ai]', err);
+                showToast('Read first draft failed: ' + (err && err.message ? err.message : 'unknown error'));
+            } finally { btn.disabled = false; btn.innerHTML = html0; }
+        };
+
         window._qImproveExplanation = async function(item, ctx, model) {
             if (!ctx.expTa) throw new Error('No Explanation field found for this question.');
             const prompt = [
@@ -25089,7 +25133,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
 
                 <!-- V102.222: per-question "Read first" — a separate page the learner reads BEFORE this question's timer starts (explanations, vocabulary…). Markdown. -->
                 <div class="q-primer-row" style="margin-bottom:10px; padding:10px 12px; background:#fffbeb; border-radius:12px; border:1px dashed #fcd34d;">
-                    <label style="display:block; font-size:0.7em; font-weight:800; color:#b45309; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;"><i class="fa-solid fa-book-open" style="color:#d97706;"></i> Read first <span style="font-weight:600; color:#d97706; text-transform:none; letter-spacing:0; font-size:0.95em;">(own page before the timer starts, kept in the review — markdown)</span></label>
+                    <label style="display:flex; align-items:center; gap:6px; font-size:0.7em; font-weight:800; color:#b45309; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;"><i class="fa-solid fa-book-open" style="color:#d97706;"></i> Read first <span style="font-weight:600; color:#d97706; text-transform:none; letter-spacing:0; font-size:0.95em;">(own page before the timer starts, kept in the review — markdown)</span><span style="margin-left:auto; display:inline-flex; gap:4px; text-transform:none;"><button type="button" class="q-primer-ai" onclick="_qPrimerDraft(this, 'full')" title="Draft with AI — background + key terms. Uses the model picked in the toolbar. The correct answer is NOT sent." aria-label="Draft Read first with AI">✨</button><button type="button" class="q-primer-ai" onclick="_qPrimerDraft(this, 'terms')" title="Terms only — a short glossary of the specialist words in this question. The correct answer is NOT sent." aria-label="Draft terms only"><i class="fa-solid fa-list-ul"></i></button></span></label>
                     <textarea class="q-primer" placeholder="Background or vocabulary the learner needs before answering. Do not give away the answer. (optional)" style="width:100%; min-height:60px; padding:8px 10px; border-radius:8px; border:1px solid #fde68a; font-size:0.85em; font-family:inherit; outline:none; background:#ffffff; resize:vertical; box-sizing:border-box; color:#78350f; line-height:1.5;">${data && data.primer ? String(data.primer).replace(/</g, '&lt;') : ''}</textarea>
                 </div>
 
