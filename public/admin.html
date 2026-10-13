@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.228)</title>
+    <title>Nika Admin (V102.229)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -2625,6 +2625,8 @@
         .quiz-filter-pill.qf-icon { padding:5px 10px; min-width:34px; font-size:0.85em; letter-spacing:0; }
         .qf-n { margin-left:5px; padding:0 6px; border-radius:999px; background:#e0e7ff; color:#3730a3; font-size:0.85em; font-weight:900; letter-spacing:0; }
         .qf-n.hot { background:#fee2e2; color:#b91c1c; }
+        #tm-count:empty { display:none; }
+        @media (max-width:480px) { #qcov-caret { display:none; } }   /* V102.229: phone — the pill's colour already says open/closed; the caret gives the search box ~14px back */
         .quiz-filter-pill.is-active .qf-n { background:rgba(255,255,255,0.28); color:#fff; }
         .qf-lbl { color:#94a3b8; font-size:0.78em; white-space:nowrap; }
         .qf-more { margin-top:10px; padding:10px 12px; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:12px; flex-direction:column; gap:8px; }
@@ -7777,27 +7779,26 @@
                 <!-- V102.150: Quiz Coverage by System moved here from the Dashboard sidebar (same ids, same renderQuizCoverage).
                      Counts quizzesData tags matched against the disease systems + Uncategorized and highlights gaps (0 quizzes);
                      tap a card to list its quizzes, tap Uncategorized to assign. lang-no-toggle so the Thai gap labels survive the EN-default toggle. -->
-                <details id="quiz-coverage-panel" class="lang-no-toggle" style="margin-bottom:18px; border:1px solid #bbdefb; border-radius:14px; background:#fff; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
-                    <summary style="padding:12px 16px; cursor:pointer; font-weight:700; color:var(--primary); list-style:none; display:flex; align-items:center; gap:8px;">
-                        <i class="fa-solid fa-notes-medical"></i> Coverage by system
-                        <span id="qcov-summary" style="font-size:0.78em; font-weight:600; color:#64748b; margin-left:auto;"></span>
-                    </summary>
-                    <div id="qcov-grid" style="padding:12px 16px 14px; border-top:1px solid #eef2ff; display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:8px;"></div>
-                </details>
+                <!-- V102.229: the Coverage panel now unfolds from the 🩺 pill in the toolbar search row (same ids: #quiz-coverage-panel / #qcov-summary / #qcov-grid). -->
 
                 <!-- V93.27 PR #13 Phase 4A+4B+4C: global toolbar above both Active+Inactive lists.
                      Search box was moved here from the inactive wrapper so it filters BOTH lists.
                      Filter pills + sort dropdown are new. -->
                 <div style="background:#fff; padding:14px 18px; border-radius:14px; margin-bottom:18px; border:1px solid #e2e8f0; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
-                    <div style="display:grid; grid-template-columns: 1fr auto auto; gap:10px; align-items:center; margin-bottom:10px;">
-                        <div style="position:relative;">
+                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+                        <div style="position:relative; flex:1; min-width:0;">
                             <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:14px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:0.9em;"></i>
                             <input type="text" id="quiz-search-global" placeholder="Search title or tag · # = tags only" title="Search title, short title and tags (Active + Inactive) · start with # to match tags only" oninput="renderQuizzes()" class="quiz-search-pill">
                         </div>
+                        <button type="button" id="qcov-pill" class="quiz-filter-pill" onclick="toggleQuizCoverage()" aria-expanded="false" aria-controls="qcov-grid" title="Coverage by system" style="flex:none; white-space:nowrap;">🩺 <span class="qf-n" id="qcov-pill-n">…</span> <span id="qcov-caret">▾</span></button>
                         <!-- V102.196: sort = one icon button that cycles (was a dropdown); the icon is the current sort, the tooltip says which and what a tap gives. -->
-                        <button type="button" id="quiz-sort-btn" class="quiz-filter-pill qf-icon" onclick="cycleQuizSort()" title="Sort: Newest first — tap for A → Z" aria-label="Sort: Newest first"><i class="fa-solid fa-calendar-days"></i></button>
-                        <button id="btn-translate-all-missing" class="magic-btn" onclick="event.stopPropagation(); qtAdminOpenBackfillSelect()" style="background:linear-gradient(135deg, #d97706, #b45309); padding:7px 14px; border-radius:12px; font-weight:900; font-size:0.8em; white-space:nowrap;" title="Pick which quizzes to backfill translations for (Typhoon)">🌐 Translate Missing<span id="tm-count"></span></button>
+                        <button type="button" id="quiz-sort-btn" class="quiz-filter-pill qf-icon" style="flex:none;" onclick="cycleQuizSort()" title="Sort: Newest first — tap for A → Z" aria-label="Sort: Newest first"><i class="fa-solid fa-calendar-days"></i></button>
+                        <button id="btn-translate-all-missing" class="quiz-filter-pill qf-icon" onclick="event.stopPropagation(); qtAdminOpenBackfillSelect()" style="background:linear-gradient(135deg, #d97706, #b45309); color:#fff; border-color:#b45309; flex:none;" aria-label="Translate missing" title="Pick which quizzes to backfill translations for (Typhoon)">🌐<span id="tm-count" class="qf-n"></span></button>
                     </div>
+                    <details id="quiz-coverage-panel" class="lang-no-toggle" style="margin:0 0 10px;">
+                        <summary style="display:none;"><span id="qcov-summary"></span></summary>
+                        <div id="qcov-grid" style="padding:2px 0 4px; display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:8px;"></div>
+                    </details>
                     <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; border-top:1px solid #f1f5f9; padding-top:10px;">
                         <span class="qf-lbl" title="Filter"><i class="fa-solid fa-filter"></i></span>
                         <!-- V102.196: the audit / tag COUNTS live on their own pills (🧪 NOT AUDITED n, 🏷️ INCOMPLETE n) — the two status chips that duplicated them are gone. -->
@@ -27516,7 +27517,7 @@ ${JSON.stringify(sourceObj)}`;
             for (let i = 0; i < selected.length; i++) {
                 const quiz = selected[i];
                 const label = (quiz.shortTitle || quiz.title || quiz.id || '').slice(0, 30);
-                if (btn) btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${i + 1}/${selected.length}: ${label}`;
+                if (btn) { btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${i + 1}/${selected.length}`; btn.title = label; }
                 try {
                     const result = await qtAdminBatchTranslate(quiz.id, quiz.questions || [], true, quiz.caseContent);
                     if (result.success === result.total && result.total > 0) done++;
@@ -32715,7 +32716,7 @@ ${JSON.stringify(sourceObj)}`;
             }
             // V102.192: how many quizzes still miss a translation = how urgent the Translate Missing button is (the same scan its picker uses)
             const _tmEl = document.getElementById('tm-count'), _tmBtn = document.getElementById('btn-translate-all-missing');
-            if (_tmEl && _tmBtn && !_tmBtn.disabled) { let _tm = 0; try { _tm = qtAdminBackfillFindMissing().length; } catch (e) { _tm = 0; } _tmEl.textContent = _tm ? ` (${_tm})` : ''; _tmBtn.title = _tm ? `${_tm} quizzes still miss a translation — pick which to backfill (Typhoon)` : 'Every quiz already has its translations'; }
+            if (_tmEl && _tmBtn && !_tmBtn.disabled) { let _tm = 0; try { _tm = qtAdminBackfillFindMissing().length; } catch (e) { _tm = 0; } _tmEl.textContent = _tm ? String(_tm) : ''; _tmBtn.title = _tm ? `${_tm} quizzes still miss a translation — pick which to backfill (Typhoon)` : 'Every quiz already has its translations'; }
             // V102.192: nothing live → one line, not a table with only its header
             const _aeEl = document.getElementById('active-quizzes-empty'), _atEl = document.getElementById('quizzesTableActive');
             if (_aeEl && _atEl) {
@@ -35383,6 +35384,16 @@ RULES:
                 const sum = document.getElementById('qcov-summary');
                 if (sum) sum.textContent = `${covered}/${systems.length} systems` + (uncategorized ? ` · ${uncategorized} uncat` : '');
                 if (sum) sum.title = 'Badge colour = quizzes per system: green ≥ 10 · amber 5–9 · red < 5 (Other is not scored)';
+                { const pn = document.getElementById('qcov-pill-n'); if (pn) { pn.textContent = `${covered}/${systems.length}`; pn.classList.toggle('hot', covered < systems.length || uncategorized > 0); } const pb = document.getElementById('qcov-pill'); if (pb && sum) pb.title = 'Coverage by system — ' + sum.textContent; }
+            };
+
+            // V102.229: the 🩺 pill in the toolbar search row folds / unfolds the Coverage grid
+            window.toggleQuizCoverage = function () {
+                const d = document.getElementById('quiz-coverage-panel'); if (!d) return;
+                d.open = !d.open;
+                const b = document.getElementById('qcov-pill'), c = document.getElementById('qcov-caret');
+                if (b) { b.setAttribute('aria-expanded', String(d.open)); b.style.background = d.open ? '#eef2ff' : ''; b.style.borderColor = d.open ? '#6366f1' : ''; }
+                if (c) c.textContent = d.open ? '▴' : '▾';
             };
 
             // V95.23: click a coverage card → list its quizzes; click a row → open the editor.

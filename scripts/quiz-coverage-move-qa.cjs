@@ -11,7 +11,7 @@ const quizTabStart = html.indexOf('<div id="subtab-quiz-engine"');
 const quizTabEnd = html.indexOf('</div><!-- /subtab-quiz-engine -->');
 const panelAt = html.indexOf('<details id="quiz-coverage-panel"');
 assert.ok(quizTabStart > 0 && quizTabEnd > quizTabStart && panelAt > quizTabStart && panelAt < quizTabEnd, 'the panel is inside Assignments ▸ Quiz Engine');
-assert.ok(panelAt < html.indexOf('id="quiz-search-global"'), 'and sits above the list toolbar');
+assert.ok(html.indexOf('id="quiz-search-global"') < html.indexOf('id="qcov-pill"') && html.indexOf('id="qcov-pill"') < panelAt && panelAt < html.indexOf('id="quiz-filter-pills"'), 'V102.229: the 🩺 pill sits in the search row and the panel unfolds under it, above the filter pills');
 const asideAt = html.indexOf('<div id="line-usage-pop"');   // V102.163: the sidebar is gone; the LINE card folds under the board toolbar chip
 const asideEnd = html.indexOf('<div id="dashboard-workspace">', asideAt);
 assert.ok(asideAt > 0 && !html.slice(asideAt, asideEnd).includes('quiz-coverage-panel') && !html.slice(asideAt, asideEnd).includes('qcov-'), 'the LINE popover does not carry it');

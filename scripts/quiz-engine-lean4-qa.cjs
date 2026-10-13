@@ -57,7 +57,7 @@ assert.ok(/\.subtab-sep \{[^}]*width:1px/.test(html), 'separator css');
         // nothing live, 2 quizzes miss translations, 1 is translated, 1 template
         let r = await run([mk('a'), mk('b'), mk('c', { translations: { th: {} } }), mk('d', { isTemplate: true, translations: { th: {} } })]);
         assert.ok(!r.err, 'renderQuizzesNow threw: ' + r.err);
-        assert.equal(r.count, ' (2)', 'Translate Missing (2)'); assert.match(r.btnTitle, /2 quizzes still miss a translation/);
+        assert.equal(r.count, '2', 'Translate Missing 🌐 badge = 2'); assert.match(r.btnTitle, /2 quizzes still miss a translation/);
         assert.ok(r.emptyShown && !r.tableShown, 'Active = 0 → empty line, no table');
         assert.match(r.emptyText, /Nothing is live right now.*Go live · 4 to choose from/, 'tells where to go + how many there are (templates are part of Inactive): ' + r.emptyText);
         // one live quiz → the table is back, the line is gone
