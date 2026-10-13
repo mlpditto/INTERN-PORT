@@ -10,7 +10,7 @@ for (const file of ['public/index.html', 'public/admin.html']) {
 const elements = {};
 let logToday = false;
 const ctx = {
-    document: { getElementById: id => elements[id] ||= { style: {}, innerHTML: '', textContent: '', scrollIntoView() {} } },
+    document: { getElementById: id => elements[id] ||= { style: {}, innerHTML: '', textContent: '', scrollIntoView() {}, classList: { toggle() {} } } },   // V101.133: renderDailyCheckinCard toggles .checked-in on #u-info-btn
     getBangkokDateTimeParts: () => ({ dateKey: '2026-09-10' }),
     _lastActivityDateKey: cache => cache[0]?.key,
     _combinedLogCache: () => [],
