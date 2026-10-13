@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.224)</title>
+    <title>Nika Admin (V102.225)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -23377,6 +23377,15 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         // V102.224: ✨ in the "Read first" box — AI drafts the page the learner reads BEFORE the timer. The CORRECT ANSWER IS NEVER SENT (only the stem + the options, unmarked),
         // so the draft cannot lean on it; a draft that still names a correct option verbatim is flagged. 'full' = background + key terms, 'terms' = glossary lines only.
         // An empty box is filled; a filled one gets the replace/cancel panel (same pattern as the Explanation draft). Nothing is saved until the quiz is.
+        // The model for the draft: a small select in the Read first label row (short names), remembered in this browser; the first time it follows the quiz editor's toolbar model.
+        window._qPrimerModelSelect = function() {
+            let picked = '';
+            try { picked = localStorage.getItem('ai_primer_model') || ''; } catch (_) { /* storage blocked */ }
+            if (!picked) { const tb = document.getElementById('toolbar-ai-translate-model'); picked = (tb && tb.value) || ''; }
+            picked = window.normalizeTextAIModel(picked);
+            return '<select class="q-primer-model" aria-label="AI model for the Read first draft" title="AI model for the draft" onchange="try{localStorage.setItem(\'ai_primer_model\', this.value)}catch(e){}" style="max-width:130px; padding:4px 6px; border-radius:8px; border:1px solid #fde68a; background:#fff; color:#78350f; font:700 12px inherit; font-family:inherit;">' +
+                window.TEXT_AI_MODELS.map(m => '<option value="' + m.id + '"' + (m.id === picked ? ' selected' : '') + '>' + m.short + '</option>').join('') + '</select>';
+        };
         window._qPrimerDraft = async function(btn, mode) {
             const item = btn.closest('.quiz-q-item'), ctx = window._qImproveCtx(item), ta = item && item.querySelector('.q-primer');
             if (!ta) return;
@@ -23398,7 +23407,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const html0 = btn.innerHTML;
             btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
             try {
-                const res = await window.callUniversalAI(window._qImproveModel(item), prompt, true, null, ctx.quickApiKey, { feature: 'question_primer' });
+                const res = await window.callUniversalAI(((item.querySelector('.q-primer-model') || {}).value) || window._qImproveModel(item), prompt, true, null, ctx.quickApiKey, { feature: 'question_primer' });
                 const data = safeJsonParse(res.text);
                 if (!data || typeof data.primer !== 'string' || !data.primer.trim()) throw new Error('AI ไม่ได้ส่งเนื้อหากลับมา');
                 const text = data.primer.trim();
@@ -25133,7 +25142,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
 
                 <!-- V102.222: per-question "Read first" — a separate page the learner reads BEFORE this question's timer starts (explanations, vocabulary…). Markdown. -->
                 <div class="q-primer-row" style="margin-bottom:10px; padding:10px 12px; background:#fffbeb; border-radius:12px; border:1px dashed #fcd34d;">
-                    <label style="display:flex; align-items:center; gap:6px; font-size:0.7em; font-weight:800; color:#b45309; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;"><i class="fa-solid fa-book-open" style="color:#d97706;"></i> Read first <span style="font-weight:600; color:#d97706; text-transform:none; letter-spacing:0; font-size:0.95em;">(own page before the timer starts, kept in the review — markdown)</span><span style="margin-left:auto; display:inline-flex; gap:4px; text-transform:none;"><button type="button" class="q-primer-ai" onclick="_qPrimerDraft(this, 'full')" title="Draft with AI — background + key terms. Uses the model picked in the toolbar. The correct answer is NOT sent." aria-label="Draft Read first with AI">✨</button><button type="button" class="q-primer-ai" onclick="_qPrimerDraft(this, 'terms')" title="Terms only — a short glossary of the specialist words in this question. The correct answer is NOT sent." aria-label="Draft terms only"><i class="fa-solid fa-list-ul"></i></button></span></label>
+                    <label style="display:flex; align-items:center; gap:6px; font-size:0.7em; font-weight:800; color:#b45309; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;"><i class="fa-solid fa-book-open" style="color:#d97706;"></i> Read first <span style="font-weight:600; color:#d97706; text-transform:none; letter-spacing:0; font-size:0.95em;">(own page before the timer starts, kept in the review — markdown)</span><span style="margin-left:auto; display:inline-flex; gap:4px; align-items:center; text-transform:none;">${window._qPrimerModelSelect()}<button type="button" class="q-primer-ai" onclick="_qPrimerDraft(this, 'full')" title="Draft with AI — background + key terms. Uses the model picked in the toolbar. The correct answer is NOT sent." aria-label="Draft Read first with AI">✨</button><button type="button" class="q-primer-ai" onclick="_qPrimerDraft(this, 'terms')" title="Terms only — a short glossary of the specialist words in this question. The correct answer is NOT sent." aria-label="Draft terms only"><i class="fa-solid fa-list-ul"></i></button></span></label>
                     <textarea class="q-primer" placeholder="Background or vocabulary the learner needs before answering. Do not give away the answer. (optional)" style="width:100%; min-height:60px; padding:8px 10px; border-radius:8px; border:1px solid #fde68a; font-size:0.85em; font-family:inherit; outline:none; background:#ffffff; resize:vertical; box-sizing:border-box; color:#78350f; line-height:1.5;">${data && data.primer ? String(data.primer).replace(/</g, '&lt;') : ''}</textarea>
                 </div>
 
