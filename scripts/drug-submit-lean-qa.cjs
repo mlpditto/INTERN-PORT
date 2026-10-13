@@ -69,7 +69,7 @@ async function open(browser) {
             assert.ok(m.taH.every(h => h <= 44) && m.taResize.every(v => v === 'none'), K.k + ': empty textareas one line, no grip: ' + m.taH + ' ' + m.taResize);
             // 5 · hints
             assert.equal(m.hints.length, K.hints, K.k + ': two hints left: ' + JSON.stringify(m.hints));
-            assert.ok(m.hints.every(h => h.replace(/[฀-๿]/g, '').trim().length < 40), K.k + ': hints are short: ' + JSON.stringify(m.hints));
+            assert.ok(m.hints.every(h => h.replace(/[฀-๿가-힯]/g, '').trim().length < 40), K.k + ': hints are short (Thai + Korean runs show only in their own mode): ' + JSON.stringify(m.hints));
             assert.ok(m.notesPh.length < 40, K.k + ': notes placeholder fits one line: ' + m.notesPh);
             // 2 · fill-from-image hint short
             assert.ok(/AI fills the empty fields/.test(m.imgHint) && /image goes to admin/.test(m.imgHint) && m.imgHint.length < 100, K.k + ': image hint short, disclosure kept: ' + m.imgHint);
