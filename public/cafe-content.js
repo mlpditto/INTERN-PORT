@@ -21,14 +21,14 @@
     var STAGE_IDS = STAGES.map(function (s) { return s[0]; });
     var T = {
         en: { review: 'Review', all: 'All', noMatch: 'No posts match this view.', clearAll: 'Clear', engMonth: 'this month', startIdea: 'Jot an idea', startPlan: 'Plan a post', qWaiting: 'waiting for you', qNext: 'Review next', qResub: 'resubmitted', qDone: 'reviewed', qCaught: 'All caught up', qOk: 'OK — then pick a suggested bonus', qFix: 'Changes — a comment is required', revTodo: 'To review', revMine: 'Reviewed by me', revEmpty: 'Nothing is waiting for review.', revMineEmpty: 'You have not reviewed anything yet.', revOpen: 'Review', revTitle: 'Review content', revVerdict: 'Verdict', revOk: 'Looks good', revFix: 'Needs changes', revScore: 'Suggested bonus (pts)', revComment: 'Comment', revCommentPh: 'What did you check? What should change?', revSend: 'Send to admin', revHint: 'Your review is a recommendation — the admin gives the final score.', revNeedVerdict: 'Choose a verdict first.', revNeedScore: 'Pick a suggested bonus.', revNeedComment: 'Say what needs to change.', revSent: 'Review sent', revYou: 'You suggested', boardReview: 'Review', revFb: 'Reviewer feedback', revChanges: 'Changes requested', revApproved: 'Looks good', resub: 'Edit & resubmit', resubBtn: 'Resubmit for review', resubDone: 'Resubmitted', resubHint: 'The reviewer and the admin see the new version; your numbers stay.', resubbed: 'Resubmitted', resubSince: 'resubmitted since your review', title: 'Content', viewAs: 'View as', modeIntern: 'Intern', modeContent: 'Content', viewList: 'List view', viewMonth: 'Calendar view', calMonth: 'Month', calWeek: 'Week', calDay: 'Day', viewBoard: 'Board view', brief: 'Brief / script', briefPh: 'Outline, hook, script, shot list…', steps: 'Checklist', stepPh: 'Add a step', stepAdd: 'Add', stepTpl: 'Use standard steps', links: 'Links (Drive, footage, thumbnail…)', badLink: 'Links must start with http:// or https://', tooMany: 'Up to 15 steps and 5 links.', movePrev: 'Move back a step', moveNext: 'Move to the next step', planDay: 'Plan', emptyDay: 'Nothing on this day yet.', pickDay: 'Tap a day to see or plan content.', plan: 'Due date (optional)', ideas: 'Ideas', drafts: 'Drafts', posted: 'Posted', platforms: 'Platforms', reviewed: 'Reviewed', pending: 'Pending review', add: 'New content', addNum: 'Add numbers',
-            emptyIdeas: 'No ideas yet. Jot one down before you forget it.', emptyDrafts: 'No drafts yet.', emptyPosted: 'Nothing posted yet. Share your first piece.',
+            emptyIdeas: 'No ideas yet.', emptyDrafts: 'No drafts yet.', emptyPosted: 'Nothing posted yet.', startPost: 'Share a piece',
             sheet: 'Submit content', edit: 'Edit content', stage: 'Stage', platform: 'Platform', type: 'Type', caption: 'Caption or idea', capPh: 'What is this content about?',
             images: 'Images', addImg: 'Add', link: 'Post link', date: 'Post date', send: 'Send for review', save: 'Save', saving: 'Saving…', other: 'Case, Work, Event… (other submissions)', del: 'Delete this draft', delAsk: 'Delete this draft?',
             hintPosted: 'Posted content is reviewed by the admin. Add numbers later from the card.', hintLocal: 'Saved for you only until you mark it Posted.',
             needCap: 'Write a caption or idea first.', needLink: 'Paste the post link (starting with http).', needDate: 'Pick the post date.', full: 'You already have 30 saved. Delete one first.', fail: 'Could not save. Please try again.', noimg: 'That image could not be read.',
             numTitle: 'Add numbers', likes: 'Likes', reach: 'Reach', numHint: 'Update any time — the latest numbers are what the admin sees.', saveNum: 'Save numbers', badNum: 'Enter whole numbers, zero or more.', likeReach: 'Likes cannot be higher than reach.', savedNum: 'Saved.', sentToast: 'Sent for review', savedToast: 'Saved' },
         th: { review: 'ตรวจงาน', all: 'ทั้งหมด', noMatch: 'ไม่มีโพสต์ในมุมมองนี้', clearAll: 'ล้าง', engMonth: 'เดือนนี้', startIdea: 'จดไอเดีย', startPlan: 'วางแผนโพสต์', qWaiting: 'รอคุณตรวจ', qNext: 'ตรวจถัดไป', qResub: 'ส่งซ้ำ', qDone: 'ตรวจแล้ว', qCaught: 'ตรวจครบแล้ว', qOk: 'ผ่าน — แล้วเลือกโบนัสที่แนะนำ', qFix: 'ขอแก้ — ต้องมีความเห็น', revTodo: 'รอตรวจ', revMine: 'ที่ฉันตรวจแล้ว', revEmpty: 'ยังไม่มีงานรอตรวจ', revMineEmpty: 'ยังไม่ได้ตรวจงานชิ้นไหน', revOpen: 'ตรวจ', revTitle: 'ตรวจคอนเทนต์', revVerdict: 'ผลตรวจ', revOk: 'ผ่าน', revFix: 'ต้องแก้', revScore: 'โบนัสที่แนะนำ (pts)', revComment: 'ความเห็น', revCommentPh: 'ตรวจอะไรไปบ้าง ต้องแก้ตรงไหน', revSend: 'ส่งให้แอดมิน', revHint: 'ผลตรวจของคุณเป็นข้อเสนอ แอดมินเป็นคนให้คะแนนจริง', revNeedVerdict: 'เลือกผลตรวจก่อน', revNeedScore: 'เลือกโบนัสที่แนะนำ', revNeedComment: 'บอกหน่อยว่าต้องแก้อะไร', revSent: 'ส่งผลตรวจแล้ว', revYou: 'คุณแนะนำ', boardReview: 'ตรวจ', revFb: 'ความเห็นผู้ตรวจ', revChanges: 'ต้องแก้ไข', revApproved: 'ผ่าน', resub: 'แก้แล้วส่งใหม่', resubBtn: 'ส่งให้ตรวจอีกครั้ง', resubDone: 'ส่งใหม่แล้ว', resubHint: 'ผู้ตรวจและแอดมินจะเห็นเวอร์ชันใหม่ ตัวเลขเดิมยังอยู่', resubbed: 'ส่งใหม่แล้ว', resubSince: 'ส่งใหม่หลังคุณตรวจ', title: 'คอนเทนต์', viewAs: 'มุมมอง', modeIntern: 'Intern', modeContent: 'คอนเทนต์', viewList: 'มุมมองรายการ', viewMonth: 'มุมมองปฏิทิน', calMonth: 'เดือน', calWeek: 'สัปดาห์', calDay: 'วัน', viewBoard: 'มุมมองบอร์ด', brief: 'บรีฟ / สคริปต์', briefPh: 'โครงเรื่อง ฮุค สคริปต์ รายการช็อต…', steps: 'เช็กลิสต์', stepPh: 'เพิ่มขั้นตอน', stepAdd: 'เพิ่ม', stepTpl: 'ใช้ขั้นตอนมาตรฐาน', links: 'ลิงก์ (Drive ฟุตเทจ ภาพปก…)', badLink: 'ลิงก์ต้องขึ้นต้นด้วย http:// หรือ https://', tooMany: 'ได้สูงสุด 15 ขั้นตอนและ 5 ลิงก์', movePrev: 'ย้อนกลับหนึ่งขั้น', moveNext: 'ไปขั้นถัดไป', planDay: 'วางแผน', emptyDay: 'วันนี้ยังไม่มีอะไร', pickDay: 'แตะวันที่เพื่อดูหรือวางแผนคอนเทนต์', plan: 'กำหนดส่ง (ไม่บังคับ)', ideas: 'ไอเดีย', drafts: 'ฉบับร่าง', posted: 'โพสต์แล้ว', platforms: 'แพลตฟอร์ม', reviewed: 'ตรวจแล้ว', pending: 'รอตรวจ', add: 'เพิ่มคอนเทนต์', addNum: 'เพิ่มตัวเลข',
-            emptyIdeas: 'ยังไม่มีไอเดีย จดไว้ก่อนลืมนะ', emptyDrafts: 'ยังไม่มีฉบับร่าง', emptyPosted: 'ยังไม่มีงานที่โพสต์ ลองส่งชิ้นแรกดู',
+            emptyIdeas: 'ยังไม่มีไอเดีย', emptyDrafts: 'ยังไม่มีฉบับร่าง', emptyPosted: 'ยังไม่มีงานที่โพสต์', startPost: 'ส่งงานชิ้นแรก',
             sheet: 'ส่งคอนเทนต์', edit: 'แก้คอนเทนต์', stage: 'ขั้นตอน', platform: 'แพลตฟอร์ม', type: 'ประเภท', caption: 'แคปชั่นหรือไอเดีย', capPh: 'คอนเทนต์นี้เกี่ยวกับอะไร',
             images: 'รูปภาพ', addImg: 'เพิ่ม', link: 'ลิงก์โพสต์', date: 'วันที่โพสต์', send: 'ส่งให้ตรวจ', save: 'บันทึก', saving: 'กำลังบันทึก…', other: 'Case, Work, Event… (งานประเภทอื่น)', del: 'ลบฉบับร่างนี้', delAsk: 'ลบฉบับร่างนี้ใช่ไหม',
             hintPosted: 'งานที่โพสต์แล้วแอดมินจะตรวจ ใส่ตัวเลขทีหลังได้จากการ์ด', hintLocal: 'เห็นเฉพาะคุณ จนกว่าจะเลือก โพสต์แล้ว',
@@ -239,9 +239,10 @@
             '<div class="cc-foot">' + (m ? '<span><i class="fa-solid fa-heart"></i> ' + esc(fmtNum(m.likes || 0)) + '</span><span><i class="fa-solid fa-eye"></i> ' + esc(fmtNum(m.reach || 0)) + '</span>' : '') +
             '<span class="cc-rqs"><button type="button" class="cc-rq ok" data-act="rvq" data-id="' + esc(w.id) + '" data-v="approve" title="' + esc(t.qOk) + '" aria-label="' + esc(t.qOk) + '"><b class="cc-av" aria-hidden="true">A</b></button><button type="button" class="cc-rq fix" data-act="rvq" data-id="' + esc(w.id) + '" data-v="changes" title="' + esc(t.qFix) + '" aria-label="' + esc(t.qFix) + '"><i class="fa-solid fa-rotate-left"></i></button></span></div>' + sentLine(w, t) + '</div></div>';   // V101.122: icon-only quick verdicts (tap the row for the full sheet)
     }
+    function reviewTodo(others) { return others.filter(function (w) { return !isReviewed(w) && (!myReviews[w.id] || tms(w.resubmittedAt) > tms(myReviews[w.id].at)); }); }   // resubmitted after my review = look again
     function reviewHtml(t) {
         var others = allPosts.filter(function (w) { return w.userId !== userId; });
-        var todo = others.filter(function (w) { return !isReviewed(w) && (!myReviews[w.id] || tms(w.resubmittedAt) > tms(myReviews[w.id].at)); });   // resubmitted after my review = look again
+        var todo = reviewTodo(others);
         var mine = others.filter(function (w) { return myReviews[w.id] && todo.indexOf(w) < 0; });
         var list = revFilter === 'mine' ? mine : todo;
         var _resub = todo.filter(function (w) { return myReviews[w.id]; }).length;   // V101.122
@@ -314,12 +315,10 @@
         }
         return h;
     }
-    function statsHtml(t, mp, plats, rev) {
+    function engHtml(t, mp) {
         var lk = 0, rc = 0, any = false;
         mp.forEach(function (w) { var m = w.metrics; if (m && (m.likes != null || m.reach != null)) { any = true; lk += +m.likes || 0; rc += +m.reach || 0; } });
-        var tile = function (k, label, val) { return '<button type="button" class="cc-stat" data-stat="' + k + '" title="' + esc(label) + '"><span>' + esc(label) + '</span><b>' + val + '</b></button>'; };
-        return '<div class="cc-stats">' + tile('posted', t.posted, mp.length) + tile('platforms', t.platforms, Object.keys(plats).length) + tile('reviewed', t.reviewed, rev + '/' + mp.length) + '</div>' +
-            (any ? '<div class="cc-eng"><span><i class="fa-solid fa-heart"></i> ' + esc(fmtNum(lk)) + '</span><span><i class="fa-solid fa-eye"></i> ' + esc(fmtNum(rc)) + '</span><small>' + esc(t.engMonth) + '</small></div>' : '');
+        return (any ? '<div class="cc-eng"><span><i class="fa-solid fa-heart"></i> ' + esc(fmtNum(lk)) + '</span><span><i class="fa-solid fa-eye"></i> ' + esc(fmtNum(rc)) + '</span><small>' + esc(t.engMonth) + '</small></div>' : '');   // V101.140: the 3 stat tiles are gone (Posted = the ✓ tab, Platforms = the platform rail, Reviewed = the ★ chip)
     }
     // V101.124: History in the Content UI is split by role. A creator's History = their own posts (index.html keeps those); an Audit member's History = the REVIEWS they filed
     // (users/{me}.contentReviews: verdict, suggested bonus, comment, at) — informational rows, no points, no delete menu.
@@ -335,7 +334,7 @@
     };
     window.cafeContentIsReviewer = isReviewer;
     function refreshHistory() { try { if (typeof renderUnifiedHistory === 'function') renderUnifiedHistory(); if (window.historyLean && window.historyLean.renderChrome) window.historyLean.renderChrome(); if (typeof syncUnifiedEmptyState === 'function') syncUnifiedEmptyState(); } catch (_) { /* History is optional here */ } }
-    function brandHtml() { return '<div class="cc-brand"><span class="cc-cup" aria-hidden="true">🌸</span><b>Blossom</b>' + (isReviewer() ? '<span class="cc-audit">Audit</span>' : '') + '<small>Healing Café</small></div>'; }
+    function brandHtml(right) { return '<div class="cc-brand"><span class="cc-cup" aria-hidden="true">🌸</span><b>Blossom</b>' + (isReviewer() ? '<span class="cc-audit">Audit</span>' : '') + (right || '<small>Healing Café</small>') + '</div>'; }
 
     function render() {
         if (!host || !on) return;
@@ -352,19 +351,24 @@
         else {
             var pl = posted.filter(function (w) { return (!platFilter || w.platform === platFilter) && (!scopeReviewed || isReviewed(w)) && (!scopeMonth || String(w.postDate || '').slice(0, 7) === scopeMonth); });
             var rows = filter === 'posted' ? pl.map(function (w) { return postedRow(w, t); }).join('') : (filter === 'ideas' ? ideas : dr).map(function (d) { return draftRow(d, t); }).join('');
-            if (!rows) rows = (filter === 'posted' && !posted.length)
-                ? '<div class="cc-empty">' + t.emptyPosted + '<div class="cc-starts"><button type="button" class="cc-chip" data-act="newin" data-stage="idea"><i class="fa-solid fa-lightbulb"></i> ' + esc(t.startIdea) + '</button><button type="button" class="cc-chip" data-act="plan" data-day="' + todayKey() + '"><i class="fa-regular fa-calendar-plus"></i> ' + esc(t.startPlan) + '</button></div></div>'
-                : '<div class="cc-empty">' + (filter === 'posted' ? t.noMatch : filter === 'ideas' ? t.emptyIdeas : t.emptyDrafts) + '</div>';   // V101.123: first-run state gets two next steps
+            if (!rows) rows = '<div class="cc-empty">' + ((filter === 'posted' && posted.length) ? t.noMatch : filter === 'ideas' ? t.emptyIdeas : filter === 'drafts' ? t.emptyDrafts : t.emptyPosted) +
+                (filter === 'posted' && posted.length ? '' : '<div class="cc-starts">' + (filter === 'ideas'
+                    ? '<button type="button" class="cc-chip" data-act="newin" data-stage="idea"><i class="fa-solid fa-lightbulb"></i> ' + esc(t.startIdea) + '</button>'
+                    : filter === 'drafts'
+                        ? '<button type="button" class="cc-chip" data-act="plan" data-day="' + todayKey() + '"><i class="fa-regular fa-calendar-plus"></i> ' + esc(t.startPlan) + '</button>'
+                        : '<button type="button" class="cc-chip" data-act="new"><i class="fa-solid fa-check"></i> ' + esc(t.startPost) + '</button>') + '</div>') + '</div>';   // V101.140: ONE next step, the one that fits the empty tab
+            var tabIcon = { ideas: 'fa-lightbulb', drafts: 'fa-pen', posted: 'fa-check' };
             body = '<div class="cc-rail" role="group">' + [['ideas', t.ideas, ideas.length], ['drafts', t.drafts, dr.length], ['posted', t.posted, posted.length]].map(function (c) {
-                return '<button type="button" class="cc-chip" data-filter="' + c[0] + '" aria-pressed="' + (filter === c[0]) + '">' + c[1] + ' ' + c[2] + '</button>';
-            }).join('') + '</div>' + (filter === 'posted' ? postedRails(t, posted) : '') + rows;
+                return '<button type="button" class="cc-chip" data-filter="' + c[0] + '" aria-pressed="' + (filter === c[0]) + '" title="' + esc(c[1]) + '" aria-label="' + esc(c[1] + ' ' + c[2]) + '"><i class="fa-solid ' + tabIcon[c[0]] + '"></i> ' + c[2] + '</button>';
+            }).join('') + (mp.length ? '<button type="button" class="cc-chip cc-rv" data-stat="reviewed" aria-pressed="' + scopeReviewed + '" title="' + esc(t.reviewed + ' ' + rev + '/' + mp.length) + '" aria-label="' + esc(t.reviewed + ' ' + rev + '/' + mp.length) + '"><i class="fa-solid fa-star"></i> ' + rev + '/' + mp.length + '</button>' : '') + '</div>' + (filter === 'posted' ? postedRails(t, posted) : '') + rows;
         }
         var monthName = new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7) - 1, 15)).toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' });
-        host.innerHTML = '<div class="cc-card' + (isReviewer() ? '' : ' cc-ios') + '">' + brandHtml() + '<div class="cc-head"><i class="fa-solid fa-camera"></i> ' + t.title + '<span class="cc-month">' + esc(monthName) + '</span>' +
+        var todoN = isReviewer() ? reviewTodo(allPosts.filter(function (w) { return w.userId !== userId; })).length : 0;
+        var right = '<span class="cc-month">' + esc(monthName) + '</span>' +
             '<span class="cc-view" role="group" aria-label="View"><button type="button" data-view="list" aria-pressed="' + (view === 'list') + '" aria-label="' + t.viewList + '"><i class="fa-solid fa-list"></i></button><button type="button" data-view="month" aria-pressed="' + (view === 'month') + '" aria-label="' + t.viewMonth + '"><i class="fa-solid fa-calendar-days"></i></button><button type="button" data-view="board" aria-pressed="' + (view === 'board') + '" aria-label="' + t.viewBoard + '"><i class="fa-solid fa-table-columns"></i></button>' +
-            (isReviewer() ? '<button type="button" data-view="review" aria-pressed="' + (view === 'review') + '" aria-label="' + t.review + '" title="' + t.review + '"><i class="fa-solid fa-clipboard-check"></i></button>' : '') + '</span></div>' +
-            (view === 'review' ? '' : statsHtml(t, mp, plats, rev)) +
-            body + (view === 'review' ? '' : '<div class="cc-add"><button type="button" class="cc-chip" data-act="new"><i class="fa-solid fa-plus"></i> ' + t.add + '</button></div>') + '</div>';
+            (isReviewer() ? '<button type="button" data-view="review" aria-pressed="' + (view === 'review') + '" aria-label="' + t.review + (todoN ? ' ' + todoN : '') + '" title="' + t.review + '"><i class="fa-solid fa-clipboard-check"></i>' + (todoN ? '<i class="cc-bd">' + (todoN > 9 ? '9+' : todoN) + '</i>' : '') + '</button>' : '') + '</span>' +
+            (view === 'review' ? '' : '<button type="button" class="cc-plus" data-act="new" aria-label="' + esc(t.add) + '" title="' + esc(t.add) + '"><i class="fa-solid fa-plus"></i></button>');
+        host.innerHTML = '<div class="cc-card' + (isReviewer() ? '' : ' cc-ios') + '">' + brandHtml(right) + (view === 'review' ? '' : engHtml(t, mp)) + body + '</div>';
     }
 
     // ---------- drafts (users/{uid}.socialDrafts) ----------
