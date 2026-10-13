@@ -38,22 +38,23 @@ const setup = `
         const state = () => page.evaluate(() => ({
             text: document.getElementById('quiz-run-container').innerText, timer: document.getElementById('quiz-q-timer').innerText, badge: document.getElementById('quiz-q-type-badge').innerText,
             prev: getComputedStyle(document.getElementById('btn-quiz-prev')).display, next: getComputedStyle(document.getElementById('btn-quiz-next')).display, submit: getComputedStyle(document.getElementById('btn-quiz-submit')).display,
-            radios: document.querySelectorAll('#quiz-run-container input[name="q-opt"]').length, t: timeLeftForStep, seen: primerSeen.slice(), start: stepStartTimestamp }));
+            radios: document.querySelectorAll('#quiz-run-container input[name="q-opt"]').length, t: timeLeftForStep, seen: primerSeen.slice(), start: stepStartTimestamp,
+            ps: getComputedStyle(document.getElementById('btn-quiz-primer-start')).display, psText: document.getElementById('btn-quiz-primer-start').textContent, badgeTitle: document.getElementById('quiz-q-type-badge').getAttribute('title') }));
 
         // 1) the gate: text + Start, no question, no countdown, no footer buttons
         await page.evaluate(() => { document.getElementById('quizModal').style.display = 'flex'; renderQuizStep(false); });
         let s = await state();
-        assert.match(s.text, /Read first/i); assert.match(s.text, /LABA = long-acting beta-agonist/); assert.match(s.text, /▶ Start · ⏱ 45s/);
+        assert.match(s.text, /LABA = long-acting beta-agonist/); assert.ok(!/Read first/i.test(s.text), 'V101.141: no heading inside the page — the badge says it'); assert.equal(s.psText, '▶ ⏱ 45s', 'the Start button is in the footer slot'); assert.notEqual(s.ps, 'none');
         assert.ok(!/Which drug is a LABA/.test(s.text) && s.radios === 0, 'the question is NOT shown on the Read-first page');
-        assert.equal(s.timer, '📖'); assert.equal(s.badge, 'READ FIRST'); assert.deepEqual([s.prev, s.next, s.submit], ['none', 'none', 'none'], 'no navigation on the Read-first page');
+        assert.equal(s.timer, ''); assert.equal(s.badge, '📖 1/2'); assert.match(s.badgeTitle, /Read first/); assert.deepEqual([s.prev, s.next, s.submit], ['none', 'none', 'none'], 'no navigation on the Read-first page');
         await page.waitForTimeout(1300);
-        s = await state(); assert.equal(s.t, 99, 'no countdown while reading (timeLeftForStep untouched)'); assert.equal(s.timer, '📖');
+        s = await state(); assert.equal(s.t, 99, 'no countdown while reading (timeLeftForStep untouched)'); assert.equal(s.timer, '');
         assert.equal(await page.evaluate(() => stepTimeRemaining[0]), null, 'the step is not started');
         // 2) Start: the question appears, the timer starts NOW (45s, not reduced by the reading time)
         await page.evaluate(() => { stepStartTimestamp = 1; });
-        await page.locator('.quiz-primer button').click();
+        await page.locator('#btn-quiz-primer-start').click();
         s = await state();
-        assert.match(s.text, /Which drug is a LABA/); assert.equal(s.radios, 2); assert.deepEqual(s.seen, [true]); assert.ok(s.start > 1000, 'reading time is not part of the question duration');
+        assert.equal(s.ps, 'none', 'the Start slot is gone after Start'); assert.equal(s.badgeTitle, null); assert.match(s.text, /Which drug is a LABA/); assert.equal(s.radios, 2); assert.deepEqual(s.seen, [true]); assert.ok(s.start > 1000, 'reading time is not part of the question duration');
         assert.match(s.timer, /^⏱ 4[45]s/); assert.ok(s.prev === 'none' && s.next !== 'none', 'footer buttons are back (first question: no Prev)');
         await page.waitForTimeout(1200); assert.ok((await state()).t <= 44, 'the timer runs after Start');
         // 3) Q2 has no primer → straight to the question; back to Q1 → no second gate
@@ -63,10 +64,10 @@ const setup = `
         s = await state(); assert.match(s.text, /Which drug is a LABA/, 'a question whose Read-first page was passed is not gated again');
         // 4) a new run resets it
         await page.evaluate(() => { clearInterval(quizTimerInterval); primerSeen = []; renderQuizStep(false); });
-        assert.match((await state()).text, /Read first/i, 'a new run shows the page again');
+        assert.match((await state()).text, /LABA = long/, 'a new run shows the page again');
         // 5) total-time mode: Start has no per-question seconds, and the quiz clock is paused until Start
         await page.evaluate(() => { currentQuiz.timerMode = 'total_time'; timeLeftForStep = 600; primerSeen = []; renderQuizStep(true); });
-        s = await state(); assert.match(s.text, /▶ Start\s*$/); assert.ok(!/⏱ 45s/.test(s.text));
+        s = await state(); assert.equal(s.psText, '▶'); assert.ok(!/⏱ 45s/.test(s.psText));
         await page.waitForTimeout(1200); assert.equal((await state()).t, 600, 'total-time clock is paused on the Read-first page');
         // 6) phone: nothing overflows
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), true);

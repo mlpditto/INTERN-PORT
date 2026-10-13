@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.140)</title>
+    <title>Internship Portfolio (V101.141)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <link rel="stylesheet" href="cafe-content.css?v=V101.140">
     <meta charset="UTF-8">
@@ -5589,6 +5589,8 @@
                     style="flex:1; height:45px; font-weight:bold;">Next</button>
                 <button id="btn-quiz-submit" class="btn-sm btn-success" onclick="submitQuiz()"
                     style="display:none; flex:1; height:45px; font-weight:bold;">Submit Quiz</button>
+                <button id="btn-quiz-primer-start" class="btn-sm btn-primary" onclick="startQuizQuestionAfterPrimer()" aria-label="Start" title="Start"
+                    style="display:none; flex:1; height:45px; font-weight:bold;"></button>
             </div>
         </div>
     </div>
@@ -13199,6 +13201,7 @@
                     console.error('renderQuizStep: no currentQuiz');
                     return;
                 }
+                { const ps0 = document.getElementById('btn-quiz-primer-start'); if (ps0) ps0.style.display = 'none'; const bd0 = document.getElementById('quiz-q-type-badge'); if (bd0) bd0.removeAttribute('title'); }   // V101.141: the Read-first page's Start slot / badge hover
 
                 // 🔥 V80: Read-only Learning Mode UI
                 if (currentQuiz.quizType === 'read_only') {
@@ -13234,15 +13237,14 @@
                 // until the learner presses Start. Shown once per question per run; the text stays in the review afterwards.
                 if (question.primer && String(question.primer).trim() && !primerSeen[currentStep]) {
                     const qtm = document.getElementById('quiz-q-timer');
-                    if (qtm) { qtm.innerText = '📖'; qtm.style.color = ''; }
+                    if (qtm) { qtm.innerText = ''; qtm.style.color = ''; }
                     const tt = currentQuiz.timerMode === 'total_time';
-                    document.getElementById('quiz-q-type-badge').innerText = 'READ FIRST';
-                    quizRunContainer.innerHTML = `<div class="lang-no-toggle quiz-primer">
-                        <div style="font-size:0.78em; font-weight:800; color:#b45309; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:8px;"><i class="fa-solid fa-book-open"></i> Read first<span class="lang-th"> อ่านก่อน</span> · ${currentStep + 1}/${currentQuiz.questions.length}</div>
-                        <div class="md-render" style="padding:12px 14px; background:rgba(245,158,11,0.10); border-left:3px solid #d97706; border-radius:8px; line-height:1.6; color:#78350f;">${window.renderMd(question.primer)}</div>
-                        <button type="button" class="btn-sm btn-primary" onclick="startQuizQuestionAfterPrimer()" style="margin-top:14px; width:auto; padding:10px 22px;">▶ Start${tt ? '' : ' · ⏱ ' + (question.timer || 60) + 's'}</button>
-                    </div>`;
+                    const bdg = document.getElementById('quiz-q-type-badge');
+                    bdg.innerText = '📖 ' + (currentStep + 1) + '/' + currentQuiz.questions.length; bdg.title = 'Read first · อ่านก่อน';
+                    quizRunContainer.innerHTML = `<div class="lang-no-toggle quiz-primer"><div class="md-render" style="padding:10px 14px; background:rgba(245,158,11,0.10); border-left:3px solid #d97706; border-radius:8px; line-height:1.55; color:#78350f;">${window.renderMd(question.primer)}</div></div>`;
                     ['btn-quiz-prev', 'btn-quiz-next', 'btn-quiz-submit'].forEach(id => { const b = document.getElementById(id); if (b) b.style.display = 'none'; });
+                    const ps = document.getElementById('btn-quiz-primer-start');
+                    if (ps) { ps.innerHTML = '▶' + (tt ? '' : ' ⏱ ' + (question.timer || 60) + 's'); ps.style.display = 'inline-block'; }
                     return;
                 }
 
