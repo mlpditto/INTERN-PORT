@@ -135,7 +135,7 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.equal(await vis('#achievementsModal'), false, 'the achievements list is closed');
         assert.equal(await vis('#u-earned-badges'), false, 'badge row hidden');
         assert.ok((await page.$eval('#section-cafe-content', e => e.innerText)).includes('Nothing posted yet'), 'empty Posted state');
-        const chipTxt = () => page.$$eval('#section-cafe-content .cc-rail .cc-chip', els => els.map(e => e.textContent.trim() + ':' + e.getAttribute('aria-pressed')));
+        const chipTxt = () => page.$$eval('#section-cafe-content .cc-rail .cc-chip[data-filter]', els => els.map(e => e.getAttribute('aria-label') + ':' + e.getAttribute('aria-pressed')));   // V101.140: tabs are icon + count, the name is the aria-label
         assert.deepEqual(await chipTxt(), ['Ideas 0:false', 'Drafts 0:false', 'Posted 0:true']);
 
         // ＋ opens the content sheet (not Submit New); empty caption is refused; an idea is saved to users.socialDrafts.
@@ -186,7 +186,7 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.deepEqual(await chipTxt(), ['Ideas 0:false', 'Drafts 0:false', 'Posted 1:true'], 'card switches to Posted');
         let txt = await page.$eval('#section-cafe-content', e => e.innerText);
         assert.ok(txt.includes('Pending review') && txt.includes('TikTok') && txt.includes('Reel') && txt.includes('9 Oct'), 'posted card: ' + txt);
-        assert.ok(/Posted\s*1/.test(txt) && /Reviewed\s*0\/1/.test(txt.replace(/\n/g, ' ')), 'month stats');
+        assert.equal(await page.$eval('#section-cafe-content .cc-rv', e => e.textContent.trim()), '0/1', 'V101.140: the star chip is the old Reviewed tile (0 of 1 this month)');
         assert.ok((await page.evaluate(() => window.__toasts)).includes('Sent for review'));
 
         // Numbers: validated, saved on the works doc, shown on the card.
@@ -247,9 +247,9 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         await page.click('.cc-calnav [data-cal="-1"]');
         assert.equal(await page.$eval('.cc-calnav b', e => e.textContent), 'September 2026');
         assert.equal(await page.locator('.cc-day i b').count(), 0, 'no dots last month');
-        assert.ok(/Posted\s*0/.test((await page.$eval('.cc-stats', e => e.innerText)).replace(/\n/g, ' ')), 'stats follow the viewed month');
+        assert.equal(await page.locator('#section-cafe-content .cc-stats').count(), 0, 'V101.140: no stat tiles in any view'); assert.match(await page.$eval('#section-cafe-content .cc-brand .cc-month', e => e.textContent), /September/, 'the month sits in the brand row and follows the viewed month');
         assert.equal(await page.locator('#section-cafe-content .cc-card.cc-ios').count(), 1, 'V101.126: a creator (non-Audit) gets the Apple skin');
-        assert.ok(await page.$eval('#section-cafe-content .cc-card.cc-ios .cc-head', e => parseFloat(getComputedStyle(e).fontSize) >= 26), 'big title');
+        assert.equal(await page.locator('#section-cafe-content .cc-head').count(), 0, 'V101.140: no separate Content title row'); assert.equal(await page.locator('#section-cafe-content .cc-brand .cc-view').count() + await page.locator('#section-cafe-content .cc-brand .cc-plus').count(), 2, 'views + the round + live in the brand row');
         assert.equal(await page.$eval('#section-cafe-content .cc-card.cc-ios', e => getComputedStyle(e).backgroundColor), 'rgb(242, 242, 247)', 'iOS grouped background');
         await page.click('.cc-calnav [data-cal="1"]');
         assert.equal(await page.$eval('.cc-calnav b', e => e.textContent), 'October 2026');
@@ -299,7 +299,7 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
             ];
             userCbs.forEach(cb => cb({ exists: true, data: () => store.users.U1 }));
         });
-        assert.ok(/Drafts\s*2/.test((await page.$eval('#section-cafe-content', e => e.innerText)).replace(/\n/g, ' ')), 'list "Drafts" counts every in-progress stage; an unknown stage is ignored');
+        assert.equal(await page.getAttribute('#section-cafe-content [data-filter="drafts"]', 'aria-label'), 'Drafts 2', 'list "Drafts" counts every in-progress stage; an unknown stage is ignored');
         await page.click('#section-cafe-content .cc-view [data-view="board"]');
         assert.equal(await page.evaluate(() => localStorage.getItem('cafeContentView')), 'board', 'board is remembered');
         const cols = () => page.$$eval('.cc-colh', els => els.map(e => e.innerText.replace(/\s+/g, ' ').trim()));
@@ -374,8 +374,8 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
 
         await page.evaluate(() => { localStorage.setItem('uiLangTH', '1'); });
         await page.click('#lang-toggle-cycle');
-        await page.waitForFunction(() => /คอนเทนต์/.test(document.getElementById('section-cafe-content').innerText));
-        assert.ok(/ตรวจแล้ว/.test(await page.$eval('#section-cafe-content', e => e.innerText)), 'Thai card');
+        await page.waitForFunction(() => /[฀-๿]/.test(document.querySelector('#section-cafe-content [data-filter="posted"]').title));   // V101.140: no "Content" title any more — the tab's hover is Thai
+        assert.ok(/ตรวจแล้ว/.test(await page.$eval('#section-cafe-content .cc-rv', e => e.title)), 'Thai card');   // V101.140: the Reviewed tile became the star chip — its hover is Thai
 
         // Moved out of CAFE → everything goes back.
         await page.evaluate(() => { division = 'Dev'; window.myMemberships = []; window.myExtraGroups = []; window.cafeContentSync(); });
@@ -406,6 +406,8 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.ok(/🌸/.test(await page.$eval('#section-cafe-content .cc-brand', e => e.textContent)) && /Blossom/.test(await page.$eval('#section-cafe-content .cc-brand', e => e.textContent)), '🌸 Blossom mark');
         assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('unified-fab-btn'), '::after').content), '"🌸"', 'V101.125: the round ＋ is the Blossom mark in the CAFE UI');
         assert.equal(await page.$eval('#section-cafe-content .cc-qbig', e => e.textContent), '1', 'the hero shows how many wait for me');
+        assert.equal(await page.$eval('#section-cafe-content .cc-view [data-view="review"] .cc-bd', e => e.textContent), '1', 'V101.140: the Review icon carries an amber badge with how many wait');
+        assert.equal(await page.locator('#section-cafe-content .cc-plus').count(), 0, 'no + inside the queue');
         assert.equal(await page.locator('#section-cafe-content .cc-add').count(), 0, 'no New content button inside the queue');
         assert.equal(await page.locator('#section-cafe-content .cc-stats').count(), 0, 'no month stats in the queue');
         assert.equal(await page.locator('#section-cafe-content .cc-card.cc-ios').count(), 0, 'V101.126: the Audit queue keeps the card look');
@@ -615,8 +617,11 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         const hostText = () => page.$eval('#section-cafe-content', e => e.innerText.replace(/\s+/g, ' '));
         await page.click('#section-cafe-content [data-filter="posted"]');
         assert.ok(/Nothing posted yet/.test(await hostText()), 'first-run empty state');
-        assert.equal(await page.locator('#section-cafe-content .cc-starts .cc-chip').count(), 2, 'two starter buttons: Jot an idea / Plan a post');
-        await page.click('#section-cafe-content .cc-starts [data-stage="idea"]'); await page.waitForSelector('#ccOverlay.open'); await page.click('#ccOverlay .cc-x');
+        assert.equal(await page.locator('#section-cafe-content .cc-starts .cc-chip').count(), 1, 'V101.140: ONE starter, the one that fits the empty tab (Posted: Share a piece)');
+        await page.click('#section-cafe-content .cc-starts [data-act="new"]'); await page.waitForSelector('#ccOverlay.open'); await page.click('#ccOverlay .cc-x');
+        await page.click('#section-cafe-content [data-filter="ideas"]'); await page.click('#section-cafe-content .cc-starts [data-stage="idea"]'); await page.waitForSelector('#ccOverlay.open'); await page.click('#ccOverlay .cc-x');
+        await page.click('#section-cafe-content [data-filter="drafts"]'); assert.equal(await page.locator('#section-cafe-content .cc-starts [data-act="plan"]').count(), 1, 'Drafts: Plan a post');
+        await page.click('#section-cafe-content [data-filter="posted"]');
         await page.evaluate(() => {
             const mk = o => ({ authUid: 'A1', userId: 'U1', kind: 'social', status: 'รอตรวจ', score: 0, title: 't', link: 'https://x.test/p', ctype: 'reel', images: [], metrics: null, ...o });
             store.works.P1 = mk({ platform: 'ig', postDate: '2026-10-08', caption: 'IG one', metrics: { likes: 120, reach: 2000 } });
@@ -624,7 +629,7 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
             store.works.P3 = mk({ platform: 'ig', postDate: '2026-09-01', caption: 'IG old' });
             pushWorks();
         });
-        assert.equal(await page.locator('#section-cafe-content button.cc-stat[data-stat]').count(), 3, 'the three stat tiles are buttons');
+        assert.equal(await page.locator('#section-cafe-content .cc-stat').count(), 0, 'no stat tiles'); assert.equal(await page.locator('#section-cafe-content button.cc-rv[data-stat="reviewed"]').count(), 1, 'the star chip is the Reviewed filter');
         let ht = await hostText();
         assert.ok(/150/.test(ht) && /2\.4k/.test(ht) && /this month/.test(ht), 'month engagement shows when metrics exist: ' + ht.slice(0, 200));
         assert.equal(await page.locator('#section-cafe-content .cc-prail .cc-chip').count(), 3, 'platform rail: All + ig + tt');
@@ -635,9 +640,6 @@ window.__review = (id, score) => { store.works[id].status = 'ตรวจแล�
         assert.equal(await page.locator('#section-cafe-content .cc-scope').count(), 1, 'a scope chip says what the list is narrowed to');
         await page.click('#section-cafe-content [data-clear]');
         assert.equal(await page.locator('#section-cafe-content .cc-scope').count(), 0); assert.ok(/IG old/.test(await hostText()), '× clears the scope');
-        await page.click('#section-cafe-content [data-stat="posted"]');
-        ht = await hostText(); assert.ok(/IG one/.test(ht) && /TT one/.test(ht) && !/IG old/.test(ht), 'the Posted tile → this month\'s posts only');
-        await page.click('#section-cafe-content [data-clear]');
         await page.click('#section-cafe-content [data-plat="tt"]');
         ht = await hostText(); assert.ok(/TT one/.test(ht) && !/IG one/.test(ht), 'platform chip filters the list');
         await page.click('#section-cafe-content [data-plat="tt"]');
