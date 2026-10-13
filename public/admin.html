@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.217)</title>
+    <title>Nika Admin (V102.218)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -4177,6 +4177,22 @@
             .qi-view { grid-column:4; grid-row:1 / 3; align-self:center; }
             .quiz-insight-tags { grid-row:3; }
         }
+        /* V102.218: drill-down wrong questions — one folded line each (Qn · question · copy · LINE · ▾); the full question + choices open on tap */
+        .dd-q { border:1px solid #fecaca; border-radius:12px; background:#fef2f2; margin-bottom:6px; }
+        .dd-q > summary { list-style:none; display:flex; align-items:center; gap:8px; padding:7px 10px; cursor:pointer; }
+        .dd-q > summary::-webkit-details-marker { display:none; }
+        .dd-q > summary::after { content:'\25BE'; flex:none; color:#94a3b8; transition:transform .15s; } .dd-q[open] > summary::after { transform:rotate(180deg); }
+        .dd-qn { flex:none; padding:2px 7px; border-radius:6px; background:#fee2e2; color:#991b1b; font-size:10px; font-weight:800; white-space:nowrap; }
+        .dd-qt { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.85em; font-weight:700; color:#1e293b; }
+        .dd-qb { padding:2px 12px 12px; }
+        .dd-qm { font-size:.72em; color:#94a3b8; font-weight:700; margin-bottom:6px; word-break:break-word; }
+        .dd-qfull { font-size:.85em; color:#1e293b; font-weight:700; line-height:1.5; white-space:pre-wrap; word-break:break-word; margin-bottom:8px; }
+        .dd-opts { list-style:none; margin:0 0 4px; padding:0; font-size:.8em; display:flex; flex-direction:column; gap:3px; }
+        .dd-opts li { padding:3px 8px; border-radius:6px; color:#64748b; background:rgba(255,255,255,.6); word-break:break-word; }
+        .dd-opts li.ok { color:#065f46; background:#d1fae5; font-weight:700; } .dd-opts li.bad { color:#991b1b; background:#fee2e2; font-weight:700; }
+        .dd-ic { flex:none; width:28px; height:28px; min-height:0; margin:0; padding:0; border:1px solid #e2e8f0; border-radius:50%; background:#fff; color:#64748b; font-size:14px; line-height:1; cursor:pointer; display:inline-grid; place-items:center; }
+        .dd-ic:hover { color:#334155; border-color:#94a3b8; } .dd-ic.done { color:#16a34a; border-color:#86efac; }
+        .dd-ic.dd-line { color:#06c755; border-color:#bbf7d0; } .dd-ic.dd-line:hover { background:#06c755; border-color:#06c755; color:#fff; }
         #imageQuizModal .modal-content { height:auto !important; min-height:0 !important; max-height:90dvh; overflow-y:auto; flex:none !important; }
         #imageQuizModal .iq-workspace { display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
         #imageQuizModal .iq-image-panel { min-width:0; padding:16px; border-radius:16px; background:color-mix(in srgb, #f59e0b 10%, var(--bg-card, white)); }
@@ -5387,6 +5403,8 @@
            also !important) restores the order: User Hub 9999 < Divisions 10000 < Visibility 10001. */
         #divisionsModal { z-index: 100100 !important; }   /* V102.175: above forceShowModal's .force-show (99999 / content 100000) — the User Hub is one, so Divisions opened BEHIND it */
         #groupSettingsModal { z-index: 100200 !important; }
+        #tagDrillDownModal { z-index: 100300 !important; }   /* V102.218: opened from the User Hub (force-show 99999 / 100000) … */
+        #lineReminderModal { z-index: 100310 !important; }   /* … and the LINE reminder opened FROM it must sit on top (it rendered behind) */
 
         .prompt-suggestion-btn {
             background: #f8f9fa;
@@ -55154,8 +55172,33 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             assignSideQuestForQuiz(a.quizId, a.quizTitle, a.kind);
         };
 
+        // V102.218: one-click "copy the question WITHOUT the answer" (the question + its numbered choices, nothing marked) and the icon-only LINE button
+        function registerCopyAction(text) {
+            window._drillDownActions.copy.push(text);
+            return window._drillDownActions.copy.length - 1;
+        }
+        function drillQuestionPlainText(q) {
+            const base = String((q && q.q) || '').trim();
+            if (q && (q.type || 'choice') === 'choice' && Array.isArray(q.options) && q.options.length) return base + '\n' + q.options.map((o, i) => `${i + 1}. ${String(o)}`).join('\n');
+            return base;
+        }
+        window.drillCopyQuestion = function(idx, btn) {
+            const t = window._drillDownActions && window._drillDownActions.copy && window._drillDownActions.copy[idx];
+            if (t == null) return;
+            const done = () => { showToast('Copied (no answer)'); if (btn) { btn.classList.add('done'); setTimeout(() => btn.classList.remove('done'), 1200); } };
+            const fallback = () => {
+                const ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed; opacity:0;';
+                document.body.appendChild(ta); ta.select();
+                try { document.execCommand('copy'); done(); } catch (e) { showToast('Could not copy'); }
+                ta.remove();
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done).catch(fallback); else fallback();
+        };
+        const drillLineBtn = idx => `<button type="button" class="dd-ic dd-line" onclick="event.preventDefault(); event.stopPropagation(); invokeLineReminderAction(${idx})" title="Send LINE reminder" aria-label="Send LINE reminder"><i class="fa-brands fa-line" aria-hidden="true"></i></button>`;
+        const drillCopyBtn = idx => `<button type="button" class="dd-ic dd-copy" onclick="event.preventDefault(); event.stopPropagation(); drillCopyQuestion(${idx}, this)" title="Copy the question without the answer" aria-label="Copy question without answer"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>`;
+
         function renderTagDrillDownContent(group, wrong, practice, retake) {
-            window._drillDownActions = { line: [], assign: [] }; // reset per-render
+            window._drillDownActions = { line: [], assign: [], copy: [] }; // reset per-render
             const titleEl = document.getElementById('drilldown-title');
             const statsEl = document.getElementById('drilldown-stats');
             const bodyEl = document.getElementById('drilldown-body');
@@ -55178,26 +55221,28 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 html += `<div style="padding:14px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; color:#065f46; font-size:0.85em; font-weight:700;">No wrong answers in this cluster — strong performance!</div>`;
             } else {
                 wrong.forEach(w => {
-                    const qText = w.question.q || '';
-                    const truncated = qText.length > 220 ? qText.slice(0, 220) + '…' : qText;
-                    // V93.80: per-card LINE reminder CTA (closes pending item #3).
-                    // Stash {template, quizTitle} in registry so onclick passes only an index
-                    // (avoids attribute-quoting issues with multi-line + special chars).
+                    const q = w.question, qText = String(q.q || '');
+                    // V93.80: per-card LINE reminder (template stashed in a registry so onclick passes only an index). V102.218: each card is ONE folded line;
+                    // tap = the full question + its choices; icon-only copy (no answer) + LINE buttons sit in the folded line.
                     const tmplIdx = registerLineReminderAction(buildWrongQuestionReminderTemplate(w.quizTitle, w.qIdx, primary), w.quizTitle);
-                    const lineBtn = `<button onclick="invokeLineReminderAction(${tmplIdx})" style="padding:5px 10px; background:#06c755; color:white; border:none; border-radius:8px; font-size:0.72em; font-weight:800; cursor:pointer;"><i class="fa-brands fa-line"></i> Send LINE</button>`;
+                    const copyIdx = registerCopyAction(drillQuestionPlainText(q));
+                    const asSet = v => new Set((Array.isArray(v) ? v : (v !== undefined && v !== null ? [v] : [])).map(x => parseInt(x)));
+                    const picked = asSet(w.userAnswer), right = asSet(q.correct);
+                    const detail = (q.type || 'choice') === 'choice' && Array.isArray(q.options) && q.options.length
+                        ? `<ul class="dd-opts">${q.options.map((o, i) => `<li class="${right.has(i) ? 'ok' : picked.has(i) ? 'bad' : ''}">${i + 1}. ${escapeHtml(String(o))}${right.has(i) ? ' ✓' : picked.has(i) ? ' ✗' : ''}</li>`).join('')}</ul>`
+                        : `<div style="display:flex; flex-direction:column; gap:4px; font-size:0.78em;">
+                                <div><span style="color:#94a3b8; font-weight:700;">Your answer:</span> <span style="color:#991b1b; font-weight:700;">${renderAnswerLabel(q, w.userAnswer)}</span></div>
+                                <div><span style="color:#94a3b8; font-weight:700;">Correct:</span> <span style="color:#065f46; font-weight:700;">${renderAnswerLabel(q, q.correct)}</span></div>
+                            </div>`;
                     html += `
-                        <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:12px; padding:12px; margin-bottom:8px;">
-                            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px;">
-                                <div style="font-size:0.72em; color:#94a3b8; font-weight:700; min-width:0; flex:1; word-break:break-word;">${escapeHtml(w.quizTitle)} &middot; ${fmtDrillDownDate(w.timestamp)}</div>
-                                <span style="font-size:0.6em; padding:2px 8px; border-radius:6px; background:#fee2e2; color:#991b1b; font-weight:800; white-space:nowrap;">Q${w.qIdx + 1} WRONG</span>
+                        <details class="dd-q">
+                            <summary><span class="dd-qn">Q${w.qIdx + 1}</span><span class="dd-qt" title="${escapeHtml(qText)}">${escapeHtml(qText)}</span>${drillCopyBtn(copyIdx)}${drillLineBtn(tmplIdx)}</summary>
+                            <div class="dd-qb">
+                                <div class="dd-qm">${escapeHtml(w.quizTitle)} &middot; ${fmtDrillDownDate(w.timestamp)}</div>
+                                <div class="dd-qfull">${escapeHtml(qText)}</div>
+                                ${detail}
                             </div>
-                            <div style="font-size:0.85em; color:#1e293b; font-weight:700; margin-bottom:10px; line-height:1.5; word-break:break-word;">${escapeHtml(truncated)}</div>
-                            <div style="display:flex; flex-direction:column; gap:4px; font-size:0.78em; margin-bottom:10px;">
-                                <div><span style="color:#94a3b8; font-weight:700;">Your answer:</span> <span style="color:#991b1b; font-weight:700;">${renderAnswerLabel(w.question, w.userAnswer)}</span></div>
-                                <div><span style="color:#94a3b8; font-weight:700;">Correct:</span> <span style="color:#065f46; font-weight:700;">${renderAnswerLabel(w.question, w.question.correct)}</span></div>
-                            </div>
-                            <div style="display:flex; justify-content:flex-end; gap:6px;">${lineBtn}</div>
-                        </div>
+                        </details>
                     `;
                 });
             }
@@ -55220,7 +55265,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                     <div style="font-size:0.7em; color:#94a3b8; font-weight:600;">${p.matchCount} matching question${p.matchCount !== 1 ? 's' : ''}${p.questionCount ? ` of ${p.questionCount}` : ''}</div>
                                 </div>
                                 <button onclick="invokeAssignAction(${assignIdx})" title="Assign as Side Quest (Kanban task)" style="padding:5px 9px; background:#6366f1; color:white; border:none; border-radius:8px; font-size:0.7em; font-weight:800; cursor:pointer; white-space:nowrap;"><i class="fa-solid fa-plus"></i> Quest</button>
-                                <button onclick="invokeLineReminderAction(${lineIdx})" title="Send LINE reminder" style="padding:5px 9px; background:#06c755; color:white; border:none; border-radius:8px; font-size:0.7em; font-weight:800; cursor:pointer; white-space:nowrap;"><i class="fa-brands fa-line"></i> LINE</button>
+                                ${drillLineBtn(lineIdx)}
                             </div>
                         `;
                     });
@@ -55238,7 +55283,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                     <div style="font-size:0.7em; color:#94a3b8; font-weight:600;">${r.matchCount} matching question${r.matchCount !== 1 ? 's' : ''}${r.questionCount ? ` of ${r.questionCount}` : ''}${typeof r.prevScore === 'number' ? ` &middot; previous score ${r.prevScore}%` : ''}</div>
                                 </div>
                                 <button onclick="invokeAssignAction(${assignIdx})" title="Assign as Side Quest (Kanban task)" style="padding:5px 9px; background:#f59e0b; color:white; border:none; border-radius:8px; font-size:0.7em; font-weight:800; cursor:pointer; white-space:nowrap;"><i class="fa-solid fa-plus"></i> Quest</button>
-                                <button onclick="invokeLineReminderAction(${lineIdx})" title="Send LINE reminder" style="padding:5px 9px; background:#06c755; color:white; border:none; border-radius:8px; font-size:0.7em; font-weight:800; cursor:pointer; white-space:nowrap;"><i class="fa-brands fa-line"></i> LINE</button>
+                                ${drillLineBtn(lineIdx)}
                             </div>
                         `;
                     });
