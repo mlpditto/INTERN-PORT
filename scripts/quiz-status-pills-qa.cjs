@@ -7,11 +7,11 @@ const html = fs.readFileSync('public/admin.html', 'utf8');
 
 assert.ok(!/stat-(active|inactive|template)-count/.test(html), 'the old status chips and their counters are gone');
 assert.ok(!html.includes('Jump to Inactive / Templates'), 'no scroll-to chips left');
-const gridAt = html.indexOf('grid-template-columns: 1fr auto auto; gap:10px; align-items:center; margin-bottom:10px;');
+const gridAt = html.indexOf('display:flex; gap:8px; align-items:center; margin-bottom:10px;');
 const searchAt = html.indexOf('id="quiz-search-global"');
 const translateAt = html.indexOf('id="btn-translate-all-missing"');
 const pillsAt = html.indexOf('id="quiz-filter-pills"');
-assert.ok(gridAt > 0 && gridAt < searchAt && searchAt < html.indexOf('id="quiz-sort-btn"') && html.indexOf('id="quiz-sort-btn"') < translateAt && translateAt < pillsAt, 'toolbar grid: search, sort, then Translate Missing, above the pills');
+assert.ok(gridAt > 0 && gridAt < searchAt && searchAt < html.indexOf('id="qcov-pill"') && html.indexOf('id="qcov-pill"') < html.indexOf('id="quiz-sort-btn"') && html.indexOf('id="quiz-sort-btn"') < translateAt && translateAt < pillsAt, 'toolbar row (V102.229): search, 🩺 Coverage pill, sort, then the 🌐 Translate Missing icon, above the pills');
 const order = ['all', 'live', 'paused', 'template', 'graded', 'onetime'].map(f => html.indexOf(`data-filter="${f}" onclick="setQuizFilter('${f}')"`));
 assert.ok(order.every((n, i) => n > pillsAt && (!i || n > order[i - 1])), 'pills in order: All, LIVE, PAUSED, TEMPLATES, GRADED, ONE-TIME: ' + order);
 
