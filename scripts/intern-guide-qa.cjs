@@ -105,16 +105,25 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Internship Portfoli
             // Language: EN is the default; EN | TH switches (same section stays), is remembered, and the Thai side still reads.
             const title = () => page.$eval('#internGuideOverlay .ig-title', e => e.textContent);
             assert.equal(await title(), '📖 Guide', 'EN title by default @' + vw);
-            assert.equal(await page.$eval('#internGuideOverlay .ig-l[data-l="en"]', e => e.getAttribute('aria-pressed')), 'true', 'EN chip is pressed');
+            assert.equal(await page.locator('#internGuideOverlay .ig-l').count(), 1, 'V101.136: ONE language chip (no EN | TH pair)');
+            assert.equal(await page.$eval('#internGuideOverlay .ig-l', e => e.textContent), '🇬🇧', 'the chip shows the flag of the language on screen');
+            assert.match(await page.$eval('#internGuideOverlay .ig-l', e => e.getAttribute('aria-label')), /^Language: English → ไทย$/, 'it says what a tap does');
             await page.click('#internGuideOverlay .ig-chip[data-i="4"]');
-            await page.click('#internGuideOverlay .ig-l[data-l="th"]');
+            await page.click('#internGuideOverlay .ig-l');
             await page.waitForFunction(() => /[ก-๙]/.test(document.querySelector('#internGuideOverlay .ig-title').textContent));
+            assert.equal(await page.$eval('#internGuideOverlay .ig-l', e => e.textContent), '🇹🇭', 'a tap cycles to Thai');
+            // V101.136: the download icon follows the language — outside LIFF it downloads the pre-built PDF, inside LIFF it opens the external browser
+            assert.match(await page.$eval('#internGuideOverlay .ig-pdf', e => e.getAttribute('aria-label')), /ไทย/, 'the PDF button names the language');
+            const dl = await page.evaluate(() => { const got = []; const orig = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { got.push([this.getAttribute('href'), this.download]); }; document.querySelector('#internGuideOverlay .ig-pdf').click(); HTMLAnchorElement.prototype.click = orig; return got; });
+            assert.equal(dl.length, 1, 'one download'); assert.match(dl[0][0], /intern-guide\.th\.pdf(\?v=V\d+\.\d+)?$/, 'the Thai PDF: ' + dl[0][0]); assert.equal(dl[0][1], 'intern-guide.th.pdf');
+            const lf = await page.evaluate(() => { const got = []; window.liff = { isInClient: () => true, openWindow: o => got.push(o) }; document.querySelector('#internGuideOverlay .ig-pdf').click(); delete window.liff; return got; });
+            assert.ok(lf.length === 1 && lf[0].external === true && /intern-guide\.th\.pdf/.test(lf[0].url) && /^https?:|^file:/.test(lf[0].url), 'in LIFF: openWindow external with an absolute URL: ' + JSON.stringify(lf));
             await page.waitForFunction(() => /[ก-๙]/.test(document.querySelector('#internGuideOverlay .ig-chip').textContent));   // the TH guide is fetched, then drawn
             const thChips = await page.$$eval('#internGuideOverlay .ig-chip', els => els.map(e => ({ t: e.textContent, on: e.getAttribute('aria-pressed') })));
             assert.equal(thChips.length, chips.length, 'TH has the same sections');
             assert.ok(thChips[4].on === 'true' && /คะแนน/.test(thChips[4].t), 'switching language keeps the section (points): ' + JSON.stringify(thChips));
             assert.equal(await page.evaluate(() => localStorage.getItem('internGuideLang')), 'th', 'language is remembered');
-            await page.click('#internGuideOverlay .ig-l[data-l="en"]');
+            await page.click('#internGuideOverlay .ig-l');
             await page.waitForFunction(() => document.querySelector('#internGuideOverlay .ig-title').textContent === '📖 Guide');
             await page.waitForFunction(() => /^[^ก-๙]+$/.test(document.querySelector('#internGuideOverlay .ig-chip').textContent));
             assert.equal(await page.evaluate(() => localStorage.getItem('internGuideLang')), 'en');
@@ -137,7 +146,7 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Internship Portfoli
             assert.ok(/Start here/.test(fb[0].d.section), 'section is recorded: ' + fb[0].d.section);
             assert.equal(await page.$eval('#internGuideOverlay .ig-fb-form textarea', e => e.value), '', 'box is cleared after sending');
             await page.click('#internGuideOverlay .ig-chip[data-i="4"]');
-            await page.click('#internGuideOverlay .ig-l[data-l="th"]');
+            await page.click('#internGuideOverlay .ig-l');
             await page.waitForFunction(() => /[ก-๙]/.test(document.querySelector('#internGuideOverlay .ig-fb-open').textContent));
             await page.click('#internGuideOverlay .ig-fb-open');
             await page.fill('#internGuideOverlay .ig-fb-form textarea', 'ไม่เข้าใจเรื่องคะแนน');
@@ -151,7 +160,7 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Internship Portfoli
             assert.ok(/ในแอป/.test(await page.$eval('#internGuideOverlay .ig-fb-status', e => e.textContent)), 'no signed-in user → tells the intern, writes nothing');
             assert.equal(await page.evaluate(() => window.__fb.length), 2);
             await page.evaluate(() => { userId = 'U1'; });
-            await page.click('#internGuideOverlay .ig-l[data-l="en"]');
+            await page.click('#internGuideOverlay .ig-l');
             await page.waitForFunction(() => /Not clear/.test(document.querySelector('#internGuideOverlay .ig-fb-open').textContent));
             await page.click('#internGuideOverlay .ig-chip[data-i="0"]');
 

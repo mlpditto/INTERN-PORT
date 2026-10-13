@@ -1,5 +1,6 @@
 /* Intern guide modal — renders intern-guide.en.md / intern-guide.md (TH) one section at a time behind a chip rail; EN is the default,
-   the EN | TH chips in the header switch language (remembered per browser). Both files keep the same ## sections in the same order.
+   ONE flag chip in the header (🇬🇧 / 🇹🇭, 🇰🇷 when a Korean guide exists) cycles the language (remembered per browser), and a download icon next to it opens the
+   pre-built PDF of the language shown (intern-guide.<lang>.pdf, built by scripts/build-guide-pdf.cjs from the same markdown). Both markdown files keep the same ## sections in the same order.
    Opened by the 📖 Guide button in Settings (openInternGuide) and once automatically the first time the main app shows.
    Each section ends with a feedback box ("Didn't understand? Tell us") that files an admin_notifications doc of type guide_feedback
    (same inbox the Journal feedback uses; shown in admin ▸ Dashboard ▸ 📖 Guide feedback).
@@ -7,7 +8,9 @@
 (function () {
     'use strict';
     var SEEN_KEY = 'internGuideSeen', LANG_KEY = 'internGuideLang', MD_URL = { en: 'intern-guide.en.md', th: 'intern-guide.md' };
-    var T = { en: { title: '📖 Guide', fail: 'Could not load the guide' }, th: { title: '📖 คู่มือการใช้งาน', fail: 'โหลดคู่มือไม่สำเร็จ' } };
+    var LANGS = ['en', 'th'], FLAG = { en: '🇬🇧', th: '🇹🇭' }, LNAME = { en: 'English', th: 'ไทย' };   // V101.136: one flag chip cycles LANGS (add 'ko' here + MD_URL when the Korean guide exists)
+    var PDF_URL = { en: 'intern-guide.en.pdf', th: 'intern-guide.th.pdf' };
+    var T = { en: { title: '📖 Guide', fail: 'Could not load the guide', pdf: 'Download PDF (English)', lang: 'Language' }, th: { title: '📖 คู่มือการใช้งาน', fail: 'โหลดคู่มือไม่สำเร็จ', pdf: 'ดาวน์โหลด PDF (ไทย)', lang: 'ภาษา' } };
     var F = {
         en: { open: '💬 Not clear? Tell us what confused you', ph: 'What was confusing? (e.g. which button or step)', send: 'Send', sending: 'Sending…', done: '✓ Sent to the admin — thank you', fail: 'Could not send. Please try again.', empty: 'Please type a few words first.', noapp: 'Open the guide inside the app to send feedback.' },
         th: { open: '💬 ไม่เข้าใจตรงนี้? บอกเรา', ph: 'ตรงไหนที่งง? (เช่น ปุ่มหรือขั้นตอนไหน)', send: 'ส่ง', sending: 'กำลังส่ง…', done: '✓ ส่งถึงแอดมินแล้ว ขอบคุณครับ', fail: 'ส่งไม่สำเร็จ ลองอีกครั้ง', empty: 'พิมพ์สักหน่อยก่อนนะ', noapp: 'เปิดคู่มือในแอปเพื่อส่งความเห็น' }
@@ -15,7 +18,7 @@
     var docs = { en: null, th: null }, sections = [], lang = getLang(), cur = 0, opened = false, loading = {}, overlay = null;
 
     // own choice wins; otherwise follow the app's language toggle (TH on = Thai guide), else EN-first
-    function getLang() { try { var v = localStorage.getItem(LANG_KEY); if (v === 'th' || v === 'en') return v; return localStorage.getItem('uiLangTH') === '1' ? 'th' : 'en'; } catch (_) { return 'en'; } }
+    function getLang() { try { var v = localStorage.getItem(LANG_KEY); if (LANGS.indexOf(v) >= 0) return v; return localStorage.getItem('uiLangTH') === '1' ? 'th' : 'en'; } catch (_) { return 'en'; } }
     function seen() { try { return localStorage.getItem(SEEN_KEY) === '1'; } catch (_) { return false; } }
     function markSeen() { try { localStorage.setItem(SEEN_KEY, '1'); } catch (_) { /* storage may be blocked */ } }
     function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -27,9 +30,11 @@
         '#internGuideOverlay .ig-title{flex:1;margin:0;font-size:1.1em;font-weight:900}' +
         '#internGuideOverlay .ig-close{width:auto;min-height:0;border:none;background:transparent;color:var(--text-sub,#64748b);font-size:20px;line-height:1;cursor:pointer;padding:0 4px}' +
         '#internGuideOverlay .ig-head,#internGuideOverlay .ig-rail{flex:0 0 auto}' +
-        '#internGuideOverlay .ig-lang{display:flex;gap:4px}' +
-        '#internGuideOverlay .ig-l{width:auto;min-height:0;border:1px solid var(--border-color,#e2e8f0);border-color:color-mix(in srgb,var(--text-sub,#64748b) 45%,transparent);background:transparent;color:var(--text-sub,#64748b);border-radius:999px;padding:2px 9px;font-size:.72em;line-height:1.4;font-weight:800;cursor:pointer}' +
-        '#internGuideOverlay .ig-l[aria-pressed="true"]{background:var(--text-main,#1e293b);border-color:var(--text-main,#1e293b);color:var(--bg-card,#fff)}' +
+        '#internGuideOverlay .ig-lang{display:flex;gap:6px;align-items:center}' +
+        '#internGuideOverlay .ig-l,#internGuideOverlay .ig-pdf{width:34px;height:34px;min-height:0;margin:0;padding:0;border:1px solid var(--border-color,#e2e8f0);border-color:color-mix(in srgb,var(--text-sub,#64748b) 45%,transparent);background:transparent;color:var(--text-sub,#64748b);border-radius:50%;display:inline-grid;place-items:center;cursor:pointer;line-height:1}' +
+        '#internGuideOverlay .ig-l{font-size:19px}' +
+        '#internGuideOverlay .ig-pdf svg{width:17px;height:17px}' +
+        '#internGuideOverlay .ig-l:hover,#internGuideOverlay .ig-pdf:hover{border-color:var(--primary,#4361ee);color:var(--primary,#4361ee)}' +
         '#internGuideOverlay .ig-rail.ig-scrolled{box-shadow:0 1px 0 var(--border-color,#e2e8f0)}' +
         '#internGuideOverlay .ig-rail{display:flex;gap:6px;overflow-x:auto;padding:2px 18px 8px}' +
         '#internGuideOverlay .ig-chip{width:auto;min-height:0;flex:0 0 auto;white-space:nowrap;border:1px solid var(--border-color,#e2e8f0);border-color:color-mix(in srgb,var(--text-sub,#64748b) 45%,transparent);background:transparent;color:var(--text-sub,#64748b);border-radius:999px;padding:5px 12px;font-size:.8em;line-height:1.4;font-weight:800;cursor:pointer}' +
@@ -90,14 +95,15 @@
         overlay.id = 'internGuideOverlay';
         overlay.setAttribute('role', 'dialog'); overlay.setAttribute('aria-modal', 'true'); overlay.setAttribute('aria-label', 'Guide');
         overlay.innerHTML = '<div class="ig-box lang-no-toggle"><div class="ig-head"><h2 class="ig-title"></h2>' +
-            '<div class="ig-lang" role="group" aria-label="Language"><button type="button" class="ig-l" data-l="en">EN</button><button type="button" class="ig-l" data-l="th">TH</button></div>' +
+            '<div class="ig-lang"><button type="button" class="ig-l"></button><button type="button" class="ig-pdf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19h14"/></svg></button></div>' +
             '<button type="button" class="ig-close" aria-label="Close">&times;</button></div>' +
             '<div class="ig-rail"></div><div class="ig-body lang-no-toggle"></div></div>';
         document.body.appendChild(overlay);
         paintLang();
         overlay.addEventListener('click', function (e) {
             if (e.target === overlay || e.target.closest('.ig-close')) return close();
-            var l = e.target.closest('.ig-l'); if (l) setLang(l.dataset.l);
+            if (e.target.closest('.ig-l')) return setLang(LANGS[(LANGS.indexOf(lang) + 1) % LANGS.length]);
+            if (e.target.closest('.ig-pdf')) return openPdf();
         });
         document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && overlay.classList.contains('open')) close(); });
         overlay.querySelector('.ig-rail').addEventListener('click', function (e) {
@@ -118,7 +124,23 @@
     function paintLang() {
         overlay.querySelector('.ig-title').textContent = T[lang].title;
         overlay.setAttribute('aria-label', lang === 'th' ? 'คู่มือการใช้งาน' : 'Guide');
-        overlay.querySelectorAll('.ig-l').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.l === lang)); });
+        var next = LANGS[(LANGS.indexOf(lang) + 1) % LANGS.length], chip = overlay.querySelector('.ig-l'), pdf = overlay.querySelector('.ig-pdf');
+        chip.textContent = FLAG[lang];
+        chip.title = LNAME[lang] + ' → ' + LNAME[next];
+        chip.setAttribute('aria-label', T[lang].lang + ': ' + LNAME[lang] + ' → ' + LNAME[next]);
+        pdf.title = T[lang].pdf; pdf.setAttribute('aria-label', T[lang].pdf);
+    }
+
+    // V101.136: the PDF of the language on screen. In LIFF it opens in the phone's browser (the in-app view cannot save files); elsewhere it downloads.
+    function pdfUrl() {
+        var v = (document.title.match(/V\d+\.\d+/) || [''])[0];
+        return new URL(PDF_URL[lang] + (v ? '?v=' + v : ''), location.href).href;
+    }
+    function openPdf() {
+        var url = pdfUrl();
+        if (window.liff && liff.isInClient()) { liff.openWindow({ url: url, external: true }); return; }
+        var a = document.createElement('a'); a.href = url; a.download = PDF_URL[lang]; a.rel = 'noopener';
+        document.body.appendChild(a); a.click(); a.remove();
     }
 
     function fail(e) { overlay.querySelector('.ig-body').textContent = T[lang].fail + ' (' + e.message + ').'; }
