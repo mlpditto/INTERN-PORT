@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.137)</title>
+    <title>Internship Portfolio (V101.138)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <link rel="stylesheet" href="cafe-content.css?v=V101.130">
     <meta charset="UTF-8">
@@ -2300,7 +2300,7 @@
            intern no feedback at all. Ported from admin.html verbatim. */
         #toast {
             visibility: hidden;
-            width: max-content;   /* V101.118: hug the message — a 250px floor left dead black space on short toasts */
+            width: max-content;   /* V101.138: hug the message — a 250px floor left dead black space on short toasts */
             box-sizing: border-box;
             background-color: #333;
             color: #fff;
@@ -11441,6 +11441,7 @@
         let timeLeftForStep = 0;
         let accumulatedTime = 0; // 🔥 Added for V77.24 Carrying over time
         let stepStartTimestamp = Date.now(); // V86.14: Track duration per question
+        let primerSeen = []; // V101.138: questions whose "Read first" page was already passed in this run
         let durationsPerQuestion = [];
         let lastBonusTime = 0;   // 🔥 V81.3: Track bonus for UI display
         // V96.26: per-question "frozen" remaining time — [step] => seconds left when
@@ -11758,6 +11759,7 @@
                     accumulatedTime = existing.accumulatedTime || 0;
                     durationsPerQuestion = new Array(currentQuiz.questions.length).fill(0);
                     stepTimeRemaining = new Array(currentQuiz.questions.length).fill(null);
+                    primerSeen = [];
                     stepStartTimestamp = Date.now();
                     // The auto-save joins multi-select (ordering) answers with "\n---\n";
                     // reverse that here so userAnswers holds real arrays again.
@@ -11789,6 +11791,7 @@
                 accumulatedTime = 0;
                 durationsPerQuestion = new Array(currentQuiz.questions.length).fill(0); // V86.14
                 stepTimeRemaining = new Array(currentQuiz.questions.length).fill(null);
+                primerSeen = [];
                 stepStartTimestamp = Date.now();
                 userAnswers = new Array(currentQuiz.questions.length).fill(null);
                 // 🔥 V78.1: Timer initialization based on mode
@@ -11810,6 +11813,7 @@
                 accumulatedTime = 0;
                 durationsPerQuestion = new Array(currentQuiz.questions ? currentQuiz.questions.length : 1).fill(0); // V86.14
                 stepTimeRemaining = new Array(currentQuiz.questions ? currentQuiz.questions.length : 1).fill(null);
+                primerSeen = [];
                 stepStartTimestamp = Date.now();
                 userAnswers = new Array(currentQuiz.questions ? currentQuiz.questions.length : 1).fill(null);
                 // 🔥 V78.1: Timer initialization based on mode
@@ -13226,6 +13230,22 @@
                     passageArea.style.display = 'none';
                 }
 
+                // V101.138: per-question "Read first" — its own page BEFORE the timer: nothing is counted (no countdown, no step duration)
+                // until the learner presses Start. Shown once per question per run; the text stays in the review afterwards.
+                if (question.primer && String(question.primer).trim() && !primerSeen[currentStep]) {
+                    const qtm = document.getElementById('quiz-q-timer');
+                    if (qtm) { qtm.innerText = '📖'; qtm.style.color = ''; }
+                    const tt = currentQuiz.timerMode === 'total_time';
+                    document.getElementById('quiz-q-type-badge').innerText = 'READ FIRST';
+                    quizRunContainer.innerHTML = `<div class="lang-no-toggle quiz-primer">
+                        <div style="font-size:0.78em; font-weight:800; color:#b45309; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:8px;"><i class="fa-solid fa-book-open"></i> Read first<span class="lang-th"> อ่านก่อน</span> · ${currentStep + 1}/${currentQuiz.questions.length}</div>
+                        <div class="md-render" style="padding:12px 14px; background:rgba(245,158,11,0.10); border-left:3px solid #d97706; border-radius:8px; line-height:1.6; color:#78350f;">${window.renderMd(question.primer)}</div>
+                        <button type="button" class="btn-sm btn-primary" onclick="startQuizQuestionAfterPrimer()" style="margin-top:14px; width:auto; padding:10px 22px;">▶ Start${tt ? '' : ' · ⏱ ' + (question.timer || 60) + 's'}</button>
+                    </div>`;
+                    ['btn-quiz-prev', 'btn-quiz-next', 'btn-quiz-submit'].forEach(id => { const b = document.getElementById(id); if (b) b.style.display = 'none'; });
+                    return;
+                }
+
                 // 🔥 V78.1: Timer logic based on mode
                 const isTotalTimeMode = currentQuiz.timerMode === 'total_time';
 
@@ -13398,6 +13418,14 @@
                 console.error('[Quiz] renderQuizStep Error:', err);
                 alert('Could not display the question — close this and open it again.\n' + err.message);
             }
+        }
+
+        // V101.138: the learner pressed Start on a question's "Read first" page → the question renders and its timer starts now
+        function startQuizQuestionAfterPrimer() {
+            if (!currentQuiz) return;
+            primerSeen[currentStep] = true;
+            stepStartTimestamp = Date.now();   // reading time is not part of the question's duration
+            renderQuizStep(currentQuiz.timerMode === 'total_time');
         }
 
         function updateTimerUI() {
@@ -13741,6 +13769,11 @@
                     ? `<div style="margin-top:10px; padding:10px 12px; background:rgba(34,197,94,0.10); border-left:3px solid #16a34a; border-radius:6px; font-size:0.92em; color:#14532d; line-height:1.55;"><b style="display:block; margin-bottom:4px; color:#15803d; font-size:0.78em; text-transform:uppercase; letter-spacing:0.04em;"><i class="fa-solid fa-lightbulb"></i> Explanation<span class="lang-th"> เฉลย</span></b><div class="md-render lang-no-toggle">${window.renderMd(question.explanation)}</div></div>`
                     : '';
 
+                // V101.138: the question's "Read first" text stays readable in the review (collapsed)
+                const primerText = (question.primer && String(question.primer).trim())
+                    ? `<details style="margin-top:10px; padding:8px 12px; background:rgba(245,158,11,0.10); border-left:3px solid #d97706; border-radius:6px; font-size:0.92em; color:#78350f; line-height:1.55;"><summary style="cursor:pointer; font-weight:800; font-size:0.78em; text-transform:uppercase; letter-spacing:0.04em; color:#b45309;"><i class="fa-solid fa-book-open"></i> Read first<span class="lang-th"> อ่านก่อน</span></summary><div class="md-render lang-no-toggle" style="margin-top:6px;">${window.renderMd(question.primer)}</div></details>`
+                    : '';
+
                 // V95.41: for choice/flashcard, render the FULL option list with the
                 // user's pick + correct answer marked inline (clearer than a bare
                 // Answer/Correct pair). Score-0 (revealKey=false) still withholds the
@@ -13779,6 +13812,7 @@
                         </div>
                         <div class="md-render" style="font-size:1em; margin-bottom:8px; line-height:1.6;">${window.renderMd(question.q)}</div>
                         ${answerBlock}
+                        ${primerText}
                         ${explanationText}
                     </div>
                 `;

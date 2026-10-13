@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.221)</title>
+    <title>Nika Admin (V102.222)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -24712,7 +24712,10 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 // V93.74 Quiz Quality Q2: per-question explanation (optional)
                 const qExpEl = item.querySelector('.q-explanation');
                 const qExplanation = qExpEl ? (qExpEl.value || '').trim() : '';
-                questions.push({ q: qText, content: qContent, type: qType, options: opts, correct, timer, tags: qTags, explanation: qExplanation });
+                // V102.222: per-question "Read first" page (shown before the timer starts); the key is left out when empty so old quizzes stay byte-identical
+                const qPrimerEl = item.querySelector('.q-primer');
+                const qPrimer = qPrimerEl ? (qPrimerEl.value || '').trim() : '';
+                questions.push({ q: qText, content: qContent, type: qType, options: opts, correct, timer, tags: qTags, explanation: qExplanation, ...(qPrimer ? { primer: qPrimer } : {}) });
             });
 
             // V98.27: per-quiz Beri speed rewards. '' (blank) → null = use global
@@ -25082,6 +25085,12 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 <div class="q-explanation-row" style="margin-bottom:10px; padding:10px 12px; background:#f0fdf4; border-radius:12px; border:1px dashed #86efac;">
                     <label style="display:block; font-size:0.7em; font-weight:800; color:#15803d; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;"><i class="fa-solid fa-lightbulb" style="color:#16a34a;"></i> Explanation <span style="font-weight:600; color:#16a34a; text-transform:none; letter-spacing:0; font-size:0.95em;">(shown to learner after submit — supports markdown)</span></label>
                     <textarea class="q-explanation" placeholder="Why is the correct answer correct? Why are the distractors wrong? (optional, plain text or markdown)" style="width:100%; min-height:60px; padding:8px 10px; border-radius:8px; border:1px solid #bbf7d0; font-size:0.85em; font-family:inherit; outline:none; background:#ffffff; resize:vertical; box-sizing:border-box; color:#14532d; line-height:1.5;">${data && data.explanation ? String(data.explanation).replace(/</g, '&lt;') : ''}</textarea>
+                </div>
+
+                <!-- V102.222: per-question "Read first" — a separate page the learner reads BEFORE this question's timer starts (explanations, vocabulary…). Markdown. -->
+                <div class="q-primer-row" style="margin-bottom:10px; padding:10px 12px; background:#fffbeb; border-radius:12px; border:1px dashed #fcd34d;">
+                    <label style="display:block; font-size:0.7em; font-weight:800; color:#b45309; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;"><i class="fa-solid fa-book-open" style="color:#d97706;"></i> Read first <span style="font-weight:600; color:#d97706; text-transform:none; letter-spacing:0; font-size:0.95em;">(own page before the timer starts, kept in the review — markdown)</span></label>
+                    <textarea class="q-primer" placeholder="Background or vocabulary the learner needs before answering. Do not give away the answer. (optional)" style="width:100%; min-height:60px; padding:8px 10px; border-radius:8px; border:1px solid #fde68a; font-size:0.85em; font-family:inherit; outline:none; background:#ffffff; resize:vertical; box-sizing:border-box; color:#78350f; line-height:1.5;">${data && data.primer ? String(data.primer).replace(/</g, '&lt;') : ''}</textarea>
                 </div>
 
                 <!-- V92.28: per-question tags (collapsible, fallback to quiz.tags if blank) -->
