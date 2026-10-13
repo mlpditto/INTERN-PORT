@@ -159,7 +159,7 @@ const remap = cut('                if (onlyQNumbers && onlyQNumbers.length && Ar
         assert.equal(await page.locator('#ai-audit-popup .audit-pick').first().evaluate(e => getComputedStyle(e).pointerEvents), 'auto');
         // V102.16: the merged replay is saved as the last analysis and shows no "Saved analysis" badge
         assert.ok(html.includes("if (!(opts && opts.cachedResult && !opts.batchMerged)) { // V102.16"), 'merged batch is saved');
-        assert.ok(html.includes('${(opts && opts.cachedResult && !opts.batchMerged) ? `<span title="Saved analysis'), 'no saved badge on a merged batch');
+        assert.ok(html.includes('${(opts && opts.cachedResult && !opts.batchMerged) ? `<span class="audit-pill" title="Saved analysis'), 'no saved badge on a merged batch');
         assert.ok(html.includes('window._aiAnalysisTokens = aiTokens || 0;'), 'rounds can sum tokens');
         assert.deepEqual(errors, []);
         console.log('PASS: scorecard multi-select — checkbox per card, bar count/logo/cap/clear, one call with every picked question + its finding, specialist tab + toast (short reply), single pick → single fix, >10 → rounds of 10 merged (failed round skipped), batch prompt lines, result remap, 390 px');
