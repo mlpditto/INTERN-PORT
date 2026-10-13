@@ -19,7 +19,8 @@ assert.ok(html.includes('userGroupTagHtml(d)'), 'the RSU · EXTERN chip is still
 // ---- ⏳ block ----
 const tlBlock = html.slice(html.indexOf("                    let daysRemainingHtml = '', _tl = null;"), html.indexOf('                    const userCode = d.enrollmentCode'));
 assert.ok(tlBlock.length > 500, 'found the days + hours block');
-const tl = d => { const c = { d, escapeHtml: s => String(s) }; vm.createContext(c); vm.runInContext(tlBlock + '\nthis.out = { days: daysRemainingHtml, hours: hoursHtml };', c); return c.out; };
+const elapsedSrc = (() => { const i = html.indexOf('function elapsedSince('); let dd = 0, k = html.indexOf('{', i); for (; k < html.length; k++) { if (html[k] === '{') dd++; else if (html[k] === '}' && --dd === 0) break; } return html.slice(i, k + 1); })();   // V102.216
+const tl = d => { const c = { d, escapeHtml: s => String(s) }; vm.createContext(c); vm.runInContext(elapsedSrc + '\n' + tlBlock + '\nthis.out = { days: daysRemainingHtml, hours: hoursHtml };', c); return c.out; };
 const fmt = x => new Date(Date.now() + x * 86400000).toISOString().slice(0, 10);
 // dates + hours → ONE .u-tl with both bars and the merged text; no separate hours block
 const both = tl({ id: 'bua', startDate: fmt(-35), endDate: fmt(5), internHoursTarget: 200, internHours: { status: 'ok', total: 179.7, days: 20 } });
@@ -33,6 +34,17 @@ assert.ok(/class="u-tl-h"[^>]*>⚠ <b/.test(tl({ id: 'nt', startDate: fmt(-1), e
 // dates only → days block alone, no hours line
 const only = tl({ id: 'x', startDate: fmt(-10), endDate: fmt(20) });
 assert.ok(only.days.includes('class="u-tl"') && !only.days.includes('u-tl-bar-h') && only.hours === '', 'days only');
+// V102.216: Beta tester pill + how long since the start date (calendar years / months / days; a fixed 'now', so no clock flake)
+{ const c = vm.createContext({}); vm.runInContext(elapsedSrc, c); const el = (st, n) => c.elapsedSince(st, new Date(n));
+  assert.deepEqual(JSON.parse(JSON.stringify(el('2025-01-03', '2026-10-13T12:00:00'))), { short: '1y 9m 10d', long: '1 year 9 months 10 days' });
+  assert.equal(el('2025-10-13', '2026-10-13T08:00:00').short, '1y', 'exactly a year: no 0m 0d');
+  assert.equal(el('2026-10-13', '2026-10-13T08:00:00').short, '0d', 'started today');
+  assert.equal(el('2026-08-31', '2026-10-01T08:00:00').short, '1m 1d', 'days borrow from the previous month (Aug 31 to Oct 1)');
+  assert.equal(el('2025-11-20', '2026-10-13T08:00:00').long, '10 months 23 days', 'singular / plural');
+  assert.equal(el('2026-01-31', '2026-03-01T08:00:00').short, '1m 1d', 'Jan 31 to Mar 1: a short month never gives negative days');
+  assert.equal(el('2024-02-29', '2025-02-27T08:00:00').short, '11m 29d', 'leap day start, the day before the clamped anniversary');
+  assert.equal(el('2024-02-29', '2025-02-28T08:00:00').short, '1y', 'Feb 29 + 1 year clamps to Feb 28');
+  assert.equal(el('2026-12-01', '2026-10-13T08:00:00'), null, 'a start in the future: nothing'); assert.equal(el('', '2026-10-13'), null); }
 // hours without dates → the old stand-alone button
 const hOnly = tl({ id: 'h', internHoursTarget: 200, internHours: { status: 'ok', total: 100, days: 10 } });
 assert.equal(hOnly.days, ''); assert.ok(/<button type="button" onclick="openInternHoursDetail\(event, 'h'\)"[^>]*>.*<b[^>]*>100\.0<\/b> \/ 200 h/s.test(hOnly.hours), 'no dates → the stand-alone hours button');
@@ -40,6 +52,7 @@ assert.equal(hOnly.days, ''); assert.ok(/<button type="button" onclick="openInte
 const bad = tl({ id: 'j', startDate: '1988-11-08', endDate: '2027-11-08' });
 assert.ok(bad.days.includes('🧪 Beta tester') && !bad.days.includes('⚠') && !/\d{4,}d left/.test(bad.days), 'period over a year → 🧪 Beta tester (no ⚠, no day count)');   // V102.189: was '⚠ dates 1988 → 2027'
 assert.ok(bad.days.includes('title="Beta tester — helping test the system (period 1988 → 2027'), 'tooltip says why');
+assert.ok(/class="u-tl-ago">\d+y/.test(bad.days) && /started 1988-\d\d-\d\d, \d+ years/.test(bad.days), 'V102.216: the pill is followed by the time since the start date, the tooltip spells it out');
 const year = tl({ id: 'y', startDate: fmt(-100), endDate: fmt(265) });   // exactly 366 days
 assert.ok(year.days.includes('🧪 Beta tester'), 'just over 365 days → beta tester');
 const fits = tl({ id: 'f', startDate: fmt(-100), endDate: fmt(264) });   // 365 days
