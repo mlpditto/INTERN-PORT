@@ -1,4 +1,5 @@
-// V102.191 — Learning performance is ONE ROW per cluster (name · bar + % · n/N · peers · limited · view), not a 250 px card.
+// V102.191 — Learning performance is ONE ROW per cluster (name · bar + % · n/N · peers · view), not a 250 px card. V102.217: compact — two or more clusters
+// per row on a wide screen, the bar is a 44 px mini line, and 'limited' (thin evidence) is a coloured UNDERLINE on the name instead of a chip.
 // Real renderQuizInsightCard + the real CSS from public/admin.html, measured in Chromium at desktop and phone width.
 const fs = require('node:fs');
 const vm = require('node:vm');
@@ -12,11 +13,11 @@ function grab(marker) {
     for (; k < html.length; k++) { if (html[k] === '{') b++; else if (html[k] === '}') { b--; if (!b) break; } }
     return html.slice(a, k + 1);
 }
-const cssStart = html.indexOf('.quiz-insight-cards { display:flex;');
+const cssStart = html.indexOf('.quiz-insight-cards { display:grid;');
 const cssEnd = html.indexOf('\n        @media(max-width:600px) {', html.indexOf('.quiz-insight-tags span', cssStart));
 const mediaEnd = html.indexOf('\n        }\n', cssEnd) + 10;
 const css = html.slice(cssStart, mediaEnd);
-assert.ok(cssStart > 0 && css.includes('.qi-view') && css.includes('.qi-ev'), 'row CSS found');
+assert.ok(cssStart > 0 && css.includes('.qi-view') && css.includes('.qi-name b.limited') && !css.includes('.qi-ev'), 'row CSS found (no limited-chip rule left)');
 
 const ctx = vm.createContext({ escapeHtml: s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;') });
 vm.runInContext(grab('function renderQuizInsightCard('), ctx);
@@ -39,7 +40,10 @@ assert.ok(rows[2].includes('qi-peer down') && rows[2].includes('▼ −10'), '�
 assert.ok(rows[3].includes('qi-peer up') && rows[3].includes('▲ +7'), '▲ with the gap');
 assert.ok(/title="Same-group peers \(EXTERN\) average 61\.0% — 7\.4 pts above"/.test(rows[3]), 'tooltip carries the peer average');
 assert.ok(!rows[5].includes('qi-peer'), 'no cohort value → no peer chip');
-assert.ok(rows[0].includes('qi-ev') && rows[2].includes('qi-ev') && !rows[1].includes('qi-ev') && !rows[3].includes('qi-ev'), '"limited" only for 1 attempt or < 10 questions');
+assert.ok(rows.every(r => !r.includes('qi-ev') && !/>limited</.test(r)), 'no "limited" chip any more');
+const lim = r => /<b class="limited"/.test(r);
+assert.ok(lim(rows[0]) && lim(rows[2]) && !lim(rows[1]) && !lim(rows[3]), 'the name is underlined only for 1 attempt or < 10 questions');
+assert.ok(/title="Diabetes — Higher observed accuracy · Limited evidence \(1 attempt, small question sample\)"/.test(rows[0]), 'the tooltip says why it is underlined');
 assert.ok(rows[3].includes('>68.4%<') && rows[0].includes('>100%<') && rows[1].includes('>96%<'), 'decimals only when needed');
 assert.ok(rows[1].includes('onclick="openTagDrillDown(1)"') && rows[1].includes('aria-label="View questions"'), 'icon button → the same drill-down');
 assert.ok(rows[0].includes('class="quiz-insight-card higher"') && rows[4].includes('class="quiz-insight-card review"'), 'kind = accent class');
@@ -49,27 +53,32 @@ assert.ok(!html.includes('cohortBadge'), 'the old peer sentence helper is gone')
 (async () => {
     const browser = await chromium.launch();
     try {
-        for (const [vw, maxRowH] of [[1100, 56], [372, 66]]) {
+        for (const [vw, maxRowH] of [[1100, 50], [372, 66]]) {
             const page = await browser.newPage({ viewport: { width: vw, height: 800 } });
             await page.setContent(`<meta charset="utf-8"><style>:root{--border-color:#e2e8f0;--bg-card:#fff;--bg-body:#f1f5f9;--text-sub:#64748b}*{box-sizing:border-box}body{margin:0;padding:12px;font:14px Inter,sans-serif}button{width:100%;min-height:48px}${css}</style><div class="quiz-insight-cards">${rows.join('')}</div>`);
             const m = await page.evaluate(() => {
                 const cards = [...document.querySelectorAll('.quiz-insight-card')];
+                const lim = getComputedStyle(cards[0].querySelector('.qi-name b')), norm = getComputedStyle(cards[1].querySelector('.qi-name b'));
                 return { hs: cards.map(c => Math.round(c.getBoundingClientRect().height)), overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
-                    view: Math.round(cards[0].querySelector('.qi-view').getBoundingClientRect().width), bars: cards.map(c => Math.round(c.querySelector('.quiz-insight-track').getBoundingClientRect().width)) };
+                    view: Math.round(cards[0].querySelector('.qi-view').getBoundingClientRect().width), bars: cards.map(c => Math.round(c.querySelector('.quiz-insight-track').getBoundingClientRect().width)),
+                    perRow: cards.filter(c => Math.abs(c.getBoundingClientRect().top - cards[0].getBoundingClientRect().top) < 3).length,
+                    under: [lim.textDecorationLine, lim.textDecorationColor, norm.textDecorationLine] };
             });
             assert.ok(m.hs.every(h => h <= maxRowH), `rows stay slim @${vw}: ${m.hs}`);
             // phone = TWO lines: name · % · ☰ on line 1, bar · n/N · peer · limited on line 2 (desktop = one line)
-            const bands = await page.evaluate(() => [...document.querySelectorAll('.quiz-insight-card')].map(c => new Set([...c.querySelectorAll('.qi-name, .qi-pct, .quiz-insight-track, .qi-n, .qi-peer, .qi-ev')].map(x => { const r = x.getBoundingClientRect(); return Math.round((r.top + r.height / 2) / 18); })).size));
-            assert.ok(bands.every(n => n <= (vw < 600 ? 2 : 1)), `lines per row @${vw}: ${bands}`);
+            const bands = await page.evaluate(() => [...document.querySelectorAll('.quiz-insight-card')].map(c => new Set([...c.querySelectorAll('.qi-name, .qi-pct, .quiz-insight-track, .qi-n, .qi-peer')].map(x => { const r = x.getBoundingClientRect(); return Math.round((r.top + r.height / 2) / 18); })).size));
+            assert.ok(bands.every(n => n <= (vw < 600 ? 2 : 1)), `lines per card @${vw}: ${bands}`);
             assert.ok(!m.overflow, `no horizontal scroll @${vw}`);
             assert.ok(m.view <= 34, `the button beats the global button{width:100%} rule: ${m.view}px @${vw}`);
-            assert.ok(m.bars.every(w => w >= 60), `the bar keeps room @${vw}: ${m.bars}`);
+            assert.ok(m.bars.every(w => w === 44), `the % bar is a 44 px mini line @${vw}: ${m.bars}`);
+            assert.equal(m.perRow, vw >= 700 ? 2 : 1, `clusters per row @${vw}: ${m.perRow} (2+ on a wide screen, 1 on a phone)`);
+            assert.deepEqual(m.under, ['underline', 'rgb(245, 158, 11)', 'none'], `limited = amber underline on the name, others none @${vw}`);
             // the +N chip unfolds the tags inline
             await page.click('.qi-more');
             assert.equal(await page.evaluate(() => document.querySelector('.quiz-insight-tags').hidden), false, 'chip opens the tags');
             assert.equal(await page.evaluate(() => document.querySelector('.qi-more').getAttribute('aria-expanded')), 'true');
             await page.close();
         }
-        console.log('PASS: Learning performance rows — one slim row per cluster (desktop ≤ 56 px, phone ≤ 66 px, two lines, no overflow), ≈/▲/▼ peer chips, "limited" only when thin, +N unfolds tags inline, icon button → drill-down');
+        console.log('PASS: Learning performance — compact cards (2 per row at 1100 px, 1 on a phone, ≤ 50 / 66 px), 44 px mini % bar, amber underline instead of a "limited" chip, ≈/▲/▼ peer chips, +N unfolds tags inline, icon button → drill-down');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
