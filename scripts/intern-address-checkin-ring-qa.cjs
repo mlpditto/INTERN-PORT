@@ -28,7 +28,7 @@ assert.ok(/address: address,\n\s*addressIdCard: addressIdCard,/.test(idx), 'savi
             const h = document.getElementById('pi-address-idcard'), c = document.getElementById('pi-address');
             return { hLabel: lab('pi-address-idcard'), cLabel: lab('pi-address'), order: !!(h.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING), hPh: h.placeholder, cPh: c.placeholder, hTh: h.dataset.thPlaceholder, cTh: c.dataset.thPlaceholder };
         });
-        assert.match(a.hLabel, /^🏠 Hometown \(as on ID card\) ที่อยู่ตามบัตรประชาชน$/, 'label: English first, Thai after'); assert.match(a.cLabel, /^📍 Current address ที่อยู่ปัจจุบัน$/);
+        assert.match(a.hLabel, /^🏠 Hometown \(as on ID card\) ที่อยู่ตามบัตรประชาชน( [가-힯() 신분증기준]+)?$/, 'label: English first, Thai after (Korean run optional)'); assert.match(a.cLabel, /^📍 Current address ที่อยู่ปัจจุบัน( [가-힯]+)?$/);
         assert.ok(a.order, 'Hometown sits above Current');
         assert.ok(/^[A-Za-z]/.test(a.hPh) && /^[A-Za-z]/.test(a.cPh) && /[ก-๙]/.test(a.hTh) && /[ก-๙]/.test(a.cTh), 'placeholders: EN by default, Thai in data-th-placeholder');
 
