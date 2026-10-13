@@ -47,6 +47,7 @@ async function open(browser, width, mode, presets) {
     await pg.evaluate(() => { hnInit(); });
     await pg.waitForTimeout(500);
     await pg.evaluate(() => { document.getElementById('work-section-content').style.display = 'block'; document.getElementById('work-pane-history').style.display = 'block'; });
+    await pg.waitForTimeout(300);   // the rail measures its room when the History panel becomes visible (ResizeObserver)
     return { c, pg, errors };
 }
 
@@ -81,8 +82,8 @@ async function open(browser, width, mode, presets) {
         assert.equal(await pg.evaluate(() => getComputedStyle(document.getElementById('hist-flood-rail')).display), 'none', 'and the rail itself is not drawn');
         await c.close();
         // narrow
-        ({ c, pg } = await open(browser, 1000, 'ok'));
-        assert.equal(await pg.evaluate(() => { const card = document.querySelector('#hfr-news .hfr-card'); return !card || card.getBoundingClientRect().width === 0; }), true, 'under 1240px nothing is drawn');
+        ({ c, pg } = await open(browser, 900, 'ok'));
+        assert.equal(await pg.evaluate(() => { const card = document.querySelector('#hfr-news .hfr-card'); return !card || card.getBoundingClientRect().width === 0; }), true, 'a ~900 px window has no room → nothing is drawn');
         await c.close();
         console.log('PASS: History news card — DIC headlines as links (new tab), parser on the live page shape, ≤5, closes for today, silent on failure, wide screens only');
     } finally { await browser.close(); }

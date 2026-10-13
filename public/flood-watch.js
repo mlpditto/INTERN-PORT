@@ -137,7 +137,7 @@
         if (!rail) return;
         var es = railEntries(), closed = false;
         try { closed = es.length && localStorage.getItem('fwRailOff') === railDay() + '|' + railSig(es); } catch (e) { /* storage blocked: it just shows */ }
-        if (!es.length || closed) { rail.innerHTML = ''; return; }
+        if (!es.length || closed) { rail.innerHTML = ''; if (window.hfrFit) window.hfrFit(); return; }
         var crit = es.some(function (e) { return e.lv.overall === 'crit'; });
         rail.innerHTML = '<div class="hfr-card ' + (crit ? 'crit' : 'warn') + '" role="button" tabindex="0" onclick="fwRailOpen(event)" onkeydown="if (event.key === \'Enter\') fwRailOpen(event)" title="' +
             esc(es.map(function (e) { return (e.k === 'site' ? '🏥 ' : '🏠 ') + sevTxt(e.lv.overall); }).join(' · ')) + '">' +
@@ -146,7 +146,32 @@
                 return '<div class="hfr-p"><div class="hfr-h"><span aria-hidden="true">' + (e.k === 'site' ? '🏥' : '🏠') + '</span>' + emo(SEV_EM[e.lv.overall], e.lv.overall, 'bare') + '</div>' +
                     (e.al ? '<div class="fw-key" title="' + esc(e.al.code + ' ' + rvPlace(e.al.code, e.al.place)) + '">' + emo('⚠️', e.lv.river) + '<div class="fw-kv ' + e.lv.river + '">' + fmtQ(e.al.q) + '<small>m³/s</small></div></div>' : '') + rowsHtml(e.d, e.lv) + '</div>';
             }).join('') + '</div>';
+        if (window.hfrFit) window.hfrFit();
     }
+    // V101.137 · the rail turns on only when there is room: the free space between the timeline and the right edge of the History panel must be >= 150 px
+    // (the width follows it, up to 236). Measured, not a viewport guess — a retina laptop window is ~900 CSS px wide even in a 1780 px screenshot.
+    window.hfrFit = function () {
+        var rail = document.getElementById('hist-flood-rail');
+        if (!rail) return;
+        var shell = rail.parentElement, box = document.getElementById('work-section-content') || document.body;
+        var has = !!rail.querySelector('.hfr-card');
+        var gap = shell && shell.getBoundingClientRect().width > 0 ? Math.floor(box.getBoundingClientRect().right - shell.getBoundingClientRect().right) : 0;
+        if (!has || gap < 150) { rail.classList.remove('on'); rail.style.width = ''; return; }
+        rail.style.width = Math.min(236, gap - 16) + 'px';
+        rail.classList.add('on');
+    };
+    (function () {
+        function arm() {
+            var rail = document.getElementById('hist-flood-rail');
+            if (!rail || rail.dataset.fit) return;
+            rail.dataset.fit = '1';
+            window.addEventListener('resize', window.hfrFit);
+            if (window.ResizeObserver) { var ro = new ResizeObserver(window.hfrFit); ro.observe(rail.parentElement); var box = document.getElementById('work-section-content'); if (box) ro.observe(box); }
+            window.hfrFit();
+        }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arm); else arm();
+    })();
+
     window.fwRailClose = function (ev) {
         if (ev) ev.stopPropagation();
         try { localStorage.setItem('fwRailOff', railDay() + '|' + railSig(railEntries())); } catch (e) { /* ignore */ }
