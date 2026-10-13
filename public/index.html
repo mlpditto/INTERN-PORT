@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.134)</title>
+    <title>Internship Portfolio (V101.135)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <link rel="stylesheet" href="cafe-content.css?v=V101.130">
     <meta charset="UTF-8">
@@ -7855,6 +7855,7 @@
                 mountGrandLineToolSections();
                 // toggleGrandLineDashboard(true); // sections now flow directly in page
                 document.getElementById('u-img').src = userProfile.pictureUrl || "https://via.placeholder.com/150";
+                avatarBrowserInit();   // V101.135: inside LIFF the LINE photo opens this app in the phone's browser
                 document.getElementById('u-name').innerText = userProfile.displayName;
                 // Pre-set group display if needed
                 document.getElementById('u-group-badge').innerText = myGroup;
@@ -20574,6 +20575,23 @@
 
         // V101.82: the 🔥 check-in pill — orange button = check in now, green = done. It renders in Schedule's TODAY header
         // (schBucketHeadHtml); the 🎁 bonus hint lives in the title / aria-label only.
+        // V101.135: tap the LINE photo (inside LIFF) = this same app in the phone's own browser instead of the LIFF window (full screen, Google sign-in,
+        // wide layout). Outside LIFF the photo does nothing. Not signed in there → the sign-in page shows first (LINE Login or a linked Google account).
+        function openAppInBrowser() {
+            if (!(window.liff && liff.isInClient())) return;
+            liff.openWindow({ url: location.origin + location.pathname, external: true });
+        }
+        function avatarBrowserInit() {
+            var img = document.getElementById('u-img');
+            if (!img || img.dataset.ob) return;
+            img.dataset.ob = '1';
+            img.addEventListener('click', openAppInBrowser);
+            img.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openAppInBrowser(); } });
+            if (window.liff && liff.isInClient()) {
+                img.style.cursor = 'pointer'; img.title = 'Open in browser เปิดในเบราว์เซอร์'; img.setAttribute('role', 'button'); img.tabIndex = 0; img.setAttribute('aria-label', 'Open in browser');
+            }
+        }
+
         function checkinPillHtml() {
             const todayKey = getBangkokDateTimeParts().dateKey;
             const { streak, doneToday } = computeEngagementStreak();
