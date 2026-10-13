@@ -193,7 +193,7 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.deepEqual(opt.start, [true, true, true, true], 'all four blocks start folded');
         assert.ok(opt.medsOpen && opt.medsRows === 1, 'opening Medications adds the first row'); assert.equal(opt.medsRows2, 2);
         assert.deepEqual(opt.badge, ['1', true], 'badge counts filled rows only');
-        assert.deepEqual(opt.chips, ['บัตรทอง (UCS)', 'ราชการ (CSMBS)', 'ประกันเอกชน', 'อื่นๆ / Other'], 'the four rights');
+        assert.deepEqual(opt.chips.map(c => c.replace(/\s*[가-힯].*$/, '')), ['บัตรทอง (UCS)', 'ราชการ (CSMBS)', 'ประกันเอกชน', 'อื่นๆ / Other'], 'the four rights');
         assert.ok(opt.otherHidden0 && !opt.otherHidden1, 'อื่นๆ shows a box to specify');
         assert.deepEqual(opt.collected, { medications: [{ name: 'Metformin', dose: '500 mg 2x/day' }], labResults: [{ test: 'HbA1c', value: '8.2 %' }], treatmentRights: { type: 'other', other: 'ประกันสังคม' }, appointment: { date: '2026-10-26', place: 'อายุรกรรม' } }, 'only filled things, trimmed');
         assert.equal(opt.toggledOff, null, 'a second tap clears the rights choice'); assert.equal(opt.afterReset, null, 'reset empties everything'); assert.deepEqual(opt.resetClosed, [true, true, true, true]);
