@@ -45,7 +45,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
             assert.ok(!r.err, 'renderQuizzesNow threw: ' + r.err);
             assert.equal(r.rowsLive, 1, 'one live row'); assert.equal(r.rowsPaused, 2, 'paused + template rows');
             assert.ok(r.oneCard && r.dividerBetween, 'one card holds both tables with the divider between them @' + vw);
-            assert.equal(r.heading, '🟢 Live · 1', 'heading carries the live count @' + vw); assert.match(r.divider, /Paused · 📑 Templates\s*2$/, 'divider carries the paused/template count: ' + r.divider);
+            assert.equal(r.heading, '🟢 Live · 1', 'heading carries the live count @' + vw); assert.match(r.divider, /Paused · 📑 Templates\s*2\s*(▾ fold|▸ show)?$/, 'divider carries the paused/template count: ' + r.divider);
             assert.equal(r.theadI, 'none', 'one header row — the second one is hidden @' + vw);
             assert.equal(r.emDisplay, 'none', 'the "items" / "pts" words are out of the rows @' + vw);
             assert.equal(r.liveBg, 'rgb(236, 253, 243)', 'Live row is green-tinted @' + vw + ': ' + r.liveBg); assert.notEqual(r.pausedBg, 'rgb(236, 253, 243)', 'paused row is not tinted @' + vw);

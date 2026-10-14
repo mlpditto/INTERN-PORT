@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.234)</title>
+    <title>Nika Admin (V102.235)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -2655,6 +2655,13 @@
             #quizzesTableActive th:nth-child(3), #quizzesTableActive td:nth-child(3), #quizzesTableInactive td:nth-child(3) { width:330px; }
         }
         .qlist-div { display:flex; align-items:center; gap:8px; margin:14px 0 4px; padding:10px 4px 6px; border-top:1px solid #e2e8f0; color:#64748b; font-weight:800; font-size:0.85em; }
+        /* V102.235: the divider folds the whole Paused / Templates table (and its pager); a search / filter keeps it open */
+        .qlist-div { cursor:pointer; user-select:none; border-radius:8px; min-height:36px; }
+        .qlist-div:hover { background:#f8fafc; }
+        .qlist-div:focus-visible { outline:2px solid #4361ee; outline-offset:2px; }
+        .qlist-div.is-forced { cursor:default; }
+        .qlist-div .qd-caret { margin-left:auto; font-weight:600; color:#64748b; }
+        #quiz-list-card.is-folded #quizzesTableInactive, #quiz-list-card.is-folded ~ #inactive-quiz-pagination { display:none !important; }
         /* V102.230: Quiz Engine list on a phone (<=480px) — each row is a card: title full width (2 lines), chips on one scrolling line, items · pts + status pill + actions underneath;
            the Live rows get a soft green tint + green bar. Desktop / tablet untouched. */
         @media (max-width:480px) {
@@ -7921,7 +7928,7 @@
                         </thead>
                         <tbody></tbody>
                     </table>
-                    <div id="section-inactive-quizzes" class="qlist-div"><span>⏸️ Paused · 📑 Templates</span><span id="inactive-count" class="qf-n"></span></div>
+                    <div id="section-inactive-quizzes" class="qlist-div" role="button" tabindex="0" aria-expanded="true" onclick="toggleQuizPausedFold()" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleQuizPausedFold(); }"><span>⏸️ Paused · 📑 Templates</span><span id="inactive-count" class="qf-n"></span><span class="qd-caret"><span class="qd-t">▾ fold</span></span></div>
                     <table id="quizzesTableInactive" style="width:100%; opacity:0.8;">
                         <thead>
                             <tr style="background:#f1f3f5;">
@@ -32847,7 +32854,8 @@ ${JSON.stringify(sourceObj)}`;
                 paginContainer.innerHTML = quizPagerHtml(inactiveQuizPage, totalInactivePages, sortedInactive.length, INACTIVE_QUIZ_PER_PAGE); // V102.152: numbered pages + "from–to of N"
             }
             if (typeof loadQuizFeedbackBadges === 'function') loadQuizFeedbackBadges();
-            if (window.qaFitChips) window.qaFitChips();   // V102.233: fold only what does not fit
+            if (window.applyQuizPausedFold) window.applyQuizPausedFold();   // V102.235
+        if (window.qaFitChips) window.qaFitChips();   // V102.233: fold only what does not fit
         }
 
         function changeInactiveQuizPage(dir) {
@@ -33417,6 +33425,28 @@ ${JSON.stringify(sourceObj)}`;
                 b.innerHTML = iconHtml + (num ? `<span class="qa-fi-n">${num}</span>` : '');
             });
             return tpl.innerHTML;
+        };
+
+        // V102.235: fold / unfold the Paused + Templates group. Default = unfolded; the choice is remembered per browser (kept in memory too, in case storage is blocked).
+        // While a search text / filter pill / system chip / style filter is active the group stays open (the fold comes back when it is cleared) so results are never hidden.
+        window._quizPausedFolded = (() => { try { return localStorage.getItem('quizPausedFolded') === '1'; } catch (_) { return false; } })();
+        window.quizFilterActive = function () {
+            const sv = document.getElementById('quiz-search-global');
+            return !!((sv && sv.value.trim()) || (window.currentQuizFilter && window.currentQuizFilter !== 'all') || window.currentQuizSystem || window.currentQuizStyle);
+        };
+        window.applyQuizPausedFold = function () {
+            const card = document.getElementById('quiz-list-card'), div = document.getElementById('section-inactive-quizzes'); if (!card || !div) return;
+            const forced = window.quizFilterActive(), folded = !!window._quizPausedFolded && !forced;
+            card.classList.toggle('is-folded', folded);
+            div.setAttribute('aria-expanded', String(!folded)); div.classList.toggle('is-forced', forced);
+            const t = div.querySelector('.qd-t'); if (t) t.textContent = forced ? 'open while filtering' : (folded ? '▸ show' : '▾ fold');
+            div.title = forced ? 'A search / filter is active, so Paused stays open — your fold choice returns when you clear it' : (folded ? 'Show the Paused / Templates list' : 'Fold the Paused / Templates list');
+        };
+        window.toggleQuizPausedFold = function () {
+            if (window.quizFilterActive()) return;
+            window._quizPausedFolded = !window._quizPausedFolded;
+            try { localStorage.setItem('quizPausedFolded', window._quizPausedFolded ? '1' : '0'); } catch (_) { /* blocked storage: it just will not survive a reload */ }
+            window.applyQuizPausedFold(); if (window.qaFitChips) window.qaFitChips();
         };
 
         // V102.233: chips under the title carry a priority (data-qp, 1 = most important: ⭐ feedback · 🧪 audit · warnings · 🔒 · 🔄 · 📌 · type · 📎 · 🧭 · 🔔 · 👥 · GRADED).
