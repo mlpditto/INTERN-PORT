@@ -144,7 +144,7 @@ assert.match((await page.textContent('#sch-week .sch-rg h4')).trim(), /^\d{1,2}[
     await goTo(page, 0);
     await page.locator('#sch-week .sch-wd.today').click();
     const today = await page.textContent('#sch-week-day');
-    assert.ok(today.includes('Journal') && today.includes('Case') && today.includes('Daily check-in'), 'today lists what is still to do: ' + today);
+    assert.ok(/3 ↓/.test(today) && !today.includes('Journal') && !today.includes('Daily check-in'), 'V101.149: today does not repeat what the list below shows (3 ↓): ' + today);
     await goTo(page, 3);
     await page.locator('#sch-week [data-schday="' + (await page.evaluate(() => __key(3))) + '"]').click();
     assert.ok((await page.textContent('#sch-week-day')).includes('Journal club'), 'a future event day shows the event card');

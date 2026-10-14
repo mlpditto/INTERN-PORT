@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.148)</title>
+    <title>Internship Portfolio (V101.149)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -16205,7 +16205,10 @@
             const now = new Date();
             const done = schBuildDayMap()[key] || [];
             const events = schEventsOn(key);
-            const todo = items.filter(it => it.kind !== 'e' && schItemDayKey(it, now) === key);
+            const todoAll = items.filter(it => it.kind !== 'e' && schItemDayKey(it, now) === key);
+            // V101.149: a to-do that the list below already shows is not repeated here; only the collapsed Missed ones are (this panel is the one place they show).
+            const todo = todoAll.filter(it => schBucketOf(it, now) === 'missed' && !window._schMissedExpanded);
+            const listed = todoAll.length - todo.length;
             const row = (bg, border, icon, title, extra) => '<div style="display:flex; align-items:center; gap:7px; padding:5px 8px; background:' + bg
                 + '; border:1px solid ' + border + '; border-radius:7px; margin-bottom:5px; font-size:0.75em;">'
                 + '<span style="flex:0 0 auto;">' + icon + '</span>'
@@ -16214,8 +16217,8 @@
             const n = done.length + events.length + todo.length;
             return '<div id="sch-week-day" style="margin:8px 0 2px; padding-top:8px; border-top:1px solid #f1f5f9;">'
                 + '<div style="font-size:0.74em; font-weight:800; color:#7c3aed; margin-bottom:6px;">'
-                + d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) + '</div>'
-                + (n ? '' : '<div style="font-size:0.74em; color:#94a3b8; padding:2px 0 4px;">Nothing on this day</div>')
+                + d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) + (listed ? ' <span title="Listed below" style="color:#94a3b8; font-weight:700;">· ' + listed + ' ↓</span>' : '') + '</div>'
+                + (n || listed ? '' : '<div style="font-size:0.74em; color:#94a3b8; padding:2px 0 4px;">Nothing on this day</div>')
                 + events.map(ev => schEventRowHtml(ev)).join('')
                 + todo.map(it => row('#fff7ed', '#fed7aa', it.icon, it.title, schWhen(it, now))).join('')
                 + done.map(it => row('#f0fdf4', '#bbf7d0', schTypeIcon(it.submissionType), it.title || 'Untitled ไม่มีชื่อ', 'done')).join('')
