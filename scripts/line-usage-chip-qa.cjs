@@ -9,8 +9,9 @@ const html = fs.readFileSync('public/admin.html', 'utf8').replace(/\r\n/g, '\n')
 assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(html));
 assert.ok(!html.includes('<aside id="dashboard-summary"'), 'the sidebar is gone');
 assert.equal((html.match(/id="line-usage-panel"/g) || []).length, 1, 'one LINE panel');
-const chipAt = html.indexOf('id="line-usage-chip"'), popAt = html.indexOf('<div id="line-usage-pop"'), searchAt = html.indexOf('id="board-search"'), tabsAt = html.indexOf('id="board-group-tabs"'), wsAt = html.indexOf('<div id="dashboard-workspace">');
-assert.ok(searchAt < chipAt && chipAt < tabsAt, 'the chip sits in the toolbar between the search box and the group tabs');
+const chipAt = html.indexOf('id="line-usage-chip"'), popAt = html.indexOf('<div id="line-usage-pop"'), searchAt = html.indexOf('id="board-search"'), tabsAt = html.indexOf('<!-- V102.163: the LINE push card, folded under the toolbar chip -->'), wsAt = html.indexOf('<div id="dashboard-workspace">');
+assert.ok(searchAt < chipAt && chipAt < tabsAt, 'the chip sits in the toolbar after the search box (V102.239: the group-chip rail is gone from the Dashboard)');
+assert.ok(!html.includes('id="board-group-tabs"') && !/function renderBoardGroupTabs|function setBoardGroupFilter/.test(html), 'V102.239: no group-chip rail on the Dashboard');
 assert.ok(tabsAt < popAt && popAt < wsAt && html.indexOf('id="line-usage-panel"') > popAt && html.indexOf('id="line-usage-panel"') < wsAt, 'the card is inside the popover, under the toolbar, above the workspace');
 assert.ok(html.includes("grid-template-columns:minmax(0,1fr); gap:20px"), 'one-column workspace');
 for (const id of ['line-usage-count', 'line-usage-breakdown', 'line-digest-preview-btn', 'line-usage-bar', 'line-usage-note', 'line-digest-now-status', 'line-digest-preview-box', 'line-digest-now-btn']) assert.ok(html.includes('id="' + id + '"'), 'card keeps #' + id);
