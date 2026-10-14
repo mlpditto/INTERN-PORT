@@ -6,12 +6,14 @@ const html = fs.readFileSync('public/admin.html', 'utf8').replace(/\r/g, '');
 const cut = (a0, b0) => { const a = html.indexOf(a0), b = html.indexOf(b0, a + a0.length); if (a < 0 || b < 0) throw new Error('slice not found: ' + a0); return html.slice(a, b); };
 const modelB = cut('        window._compareModelB = function', '        window.generateAiProposalB =');
 
-// ---- footer markup
-const foot = cut("${window._compareModelBPickerHtml()}", "document.body.appendChild(overlay);");
+// ---- the modal template (V102.237: no footer any more — the AI controls sit in line 2 of the top bar)
+const foot = cut('overlay.id = "ai-compare-overlay";', "document.body.appendChild(overlay);");
 for (const [label, re] of [['Compare B', /aria-label="Compare B" class="btn cmp-ib">⚖️/], ['Merge', /aria-label="\$\{mergedQV \? 'Re-merge' : 'Merge'\}" class="btn cmp-ib">🧬/], ['Keep Original', /aria-label="Keep Original">↩/], ['Regenerate', /aria-label="Regenerate"[^>]*>🔄<\/button>/]]) assert.ok(re.test(foot), label + ' is a round icon button with an accessible name');
-assert.ok(!/>Keep Original<|>🔄 Regenerate<|⚖️ Compare B<|🧬 \$\{/.test(foot), 'no word labels left on the footer actions');
+assert.ok(!/>Keep Original<|>🔄 Regenerate<|⚖️ Compare B<|🧬 \$\{/.test(foot), 'no word labels left on the AI actions');
 assert.ok(/id="ai-compare-instruction"[^>]*placeholder="\$\{mergedQV \? 'Re-merge instruction' : 'Steer…'\}"/.test(foot), 'Steer… input');
-assert.ok(foot.indexOf('_compareModelBPickerHtml') < foot.indexOf('ai-compare-instruction') && foot.indexOf('ai-compare-instruction') < foot.indexOf('generateAiProposalB') && foot.indexOf('generateAiProposalB') < foot.indexOf('Keep Original'), 'order: picker row, then input · ⚖️ · 🧬 · ↩ · 🔄 · Add · Apply');
+assert.ok(!/border-top:1\.5px solid #edf2f7; display:flex; flex-direction:column; gap:8px/.test(foot), 'no footer bar left');
+const at = k => foot.indexOf(k);
+assert.ok(at('Keep Original') < at('_compareModelBPickerHtml') && at('_compareModelBPickerHtml') < at('ai-compare-instruction') && at('ai-compare-instruction') < at('generateAiProposalB') && at('generateAiProposalB') < at('mergeAiVersions') && at('mergeAiVersions') < at('aria-label="Regenerate"') && at('aria-label="Regenerate"') < at('${statusHtml}') && at('${statusHtml}') < at('showFullQuizPreview'), 'order: line 1 commit · line 2 Model B · steer · ⚖️ · 🧬 · 🔄 · line 3 chips · tools');
 
 (async () => {
     const browser = await chromium.launch();
@@ -45,6 +47,6 @@ assert.ok(foot.indexOf('_compareModelBPickerHtml') < foot.indexOf('ai-compare-in
         await page.evaluate(() => { localStorage.setItem('ai_default_2model_b', 'or/x-ai/grok-4.7'); document.getElementById('b').innerHTML = window._compareModelBPickerHtml(); });
         assert.deepEqual(await shown(), ['Grok 4.7']); assert.equal(await page.locator('#b .cmp-vendor[aria-pressed="true"]').getAttribute('aria-label'), 'Grok');
         assert.deepEqual(errors, [], 'no page errors: ' + errors.join(' | '));
-        console.log('PASS: Compare footer — Model B on one row (B · 7 vendor icons · that vendor\'s models, picked vendor pre-selected, no duplicates, trial models under their vendor), round icon actions with accessible names, steer input first');
+        console.log('PASS: Compare footer — Model B on one row (B · 7 vendor icons · that vendor\'s models, picked vendor pre-selected, no duplicates, trial models under their vendor), round icon actions with accessible names; the controls live in the 3-line top bar (no footer)');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

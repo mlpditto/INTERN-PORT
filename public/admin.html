@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.236)</title>
+    <title>Nika Admin (V102.237)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -2476,6 +2476,22 @@
         /* V102.236: Bulk Paste toolbar icon = the 📋 with a bold violet P on the sheet (decorative; the button keeps aria-label="Bulk Paste") */
         .bp-ico { position:relative; display:inline-flex; align-items:center; justify-content:center; line-height:1; }
         .bp-ico b { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding-top:0.2em; font:900 0.68em/1 system-ui, sans-serif; color:#5b21b6; text-shadow:0 0 2px #fff, 0 0 2px #fff; pointer-events:none; }
+        /* V102.237: Quality Improvement Comparison — the whole control area is 3 lines at the TOP (no footer): 1 title · commit · nav · ✕  /  2 Model B · Steer · ⚖️ 🧬 🔄  /  3 status chips · tools */
+        .cmp-line { display:flex; align-items:center; gap:8px; min-width:0; flex-wrap:wrap; }
+        .cmp-commit { display:flex; align-items:center; gap:6px; margin-left:auto; }
+        .cmp-chips { display:flex; align-items:center; gap:6px; flex-wrap:wrap; flex:1 1 200px; min-width:0; }
+        .cmp-tools { display:flex; align-items:center; gap:2px; flex:0 0 auto; margin-left:auto; }
+        .cmp-tool { width:auto; min-width:34px; min-height:0; padding:7px 9px; border-radius:10px; border:1px solid transparent; background:transparent; color:#334155; font-size:0.95em; line-height:1; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+        .cmp-tool:hover { border-color:#cbd5e1; background:#f1f5f9; }
+        .cmp-steer { flex:1 1 120px; min-width:90px; padding:6px 4px; border:none; border-bottom:1px solid #cbd5e1; border-radius:0; background:transparent; font-size:0.76em; font-family:inherit; color:#334155; outline:none; }
+        .cmp-steer:focus { border-bottom-color:#6366f1; }
+        .cmp-ib.is-busy { width:auto; min-width:34px; padding:0 9px !important; border-radius:17px !important; gap:4px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; white-space:nowrap; }
+        .cmp-split { display:inline-flex; align-items:stretch; padding:0 !important; overflow:hidden; border-radius:10px; border:none; background:#22c55e; color:#fff; font-weight:700; font-size:0.82em; box-shadow:0 3px 10px rgba(34,197,94,0.3); white-space:nowrap; cursor:pointer; }
+        .btn.btn-primary.cmp-split { background:#22c55e; }   /* beats the page-wide .btn-primary blue */
+        .btn.btn-primary.cmp-split:hover { background:#16a34a; }
+        .cmp-split > span { display:inline-flex; align-items:center; padding:8px 12px; }
+        .cmp-split .cmp-split-next { background:rgba(0,0,0,0.14); border-left:1px solid rgba(255,255,255,0.35); padding:8px 9px; font-size:0.9em; }
+        .cmp-ib.is-busy .cmp-sec { font-variant-numeric:tabular-nums; }
         .qa-l2 .qa-hid { display:none !important; }
         .qa-plus { flex:0 0 auto; width:auto; min-width:0; min-height:0; height:22px; padding:0 9px; border:1px dashed #94a3b8; border-radius:999px; background:#fff; color:#475569; font-size:0.72em; font-weight:800; cursor:pointer; }
         .qa-plus:hover { border-color:#4361ee; color:#4361ee; }
@@ -65273,7 +65289,7 @@ ${window.clinicalAngleBlock ? window.clinicalAngleBlock() : ''}${steerBlock}
             try {
                 if (btn) {
                     const t0 = Date.now();
-                    const paint = () => { btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Comparing… ' + Math.floor((Date.now() - t0) / 1000) + 's'; };
+                    const paint = () => { btn.classList.add('is-busy'); btn.title = 'Comparing…'; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span class="cmp-sec">' + Math.floor((Date.now() - t0) / 1000) + 's</span>'; };   // V102.237: compact — the words live in the tooltip
                     paint(); btn.disabled = true; tick = setInterval(paint, 1000);
                 }
                 const item = window._aiAnalysisItems[arrIdx];
@@ -65323,7 +65339,7 @@ ${window.clinicalAngleBlock ? window.clinicalAngleBlock() : ''}${steerBlock}
             } catch (e) {
                 console.error('2-model compare error:', e);
                 alert('Model B failed: ' + e.message);
-                if (btn) { btn.innerHTML = oldHtml; btn.disabled = false; }
+                if (btn) { btn.innerHTML = oldHtml; btn.disabled = false; btn.classList.remove('is-busy'); btn.title = 'Compare B — run the same brief through Model B and show its proposal as a 3rd column. Uses tokens.'; }
             } finally {
                 if (tick) clearInterval(tick);
             }
@@ -65799,8 +65815,8 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
                 // tooltip — now it's visible on the chip itself so the % isn't misread as
                 // "these two saved originals are only N% alike".
                 const pendingTag = h.pending ? ' · เทียบกับฉบับ AI เสนอ' : '';
-                const tip = `ฉบับ ${sideTag} ใกล้เคียง Q${h.qIndex + 1}${h.pending ? ' (ฉบับที่ AI เสนอ ยังไม่ apply — ไม่ใช่ฉบับเดิมที่บันทึกไว้)' : ''}:\n${h.text.slice(0, 240)}`;
-                return `<span title="${escapeHtml(tip)}" style="background:${strong ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.12)'}; color:${strong ? '#b91c1c' : '#92400e'}; padding:4px 12px; border-radius:20px; font-size:0.75em; font-weight:800; border:1px solid ${strong ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.30)'}; cursor:help;">⚠️ ซ้ำ Q${h.qIndex + 1} · ${pct}% · ${escapeHtml(sideTag)}${pendingTag}</span>`;
+                const tip = `ซ้ำ Q${h.qIndex + 1} · ${pct}% · ${sideTag}${pendingTag}${'\n'}ฉบับ ${sideTag} ใกล้เคียง Q${h.qIndex + 1}${h.pending ? ' (ฉบับที่ AI เสนอ ยังไม่ apply — ไม่ใช่ฉบับเดิมที่บันทึกไว้)' : ''}:\n${h.text.slice(0, 240)}`;
+                return `<span title="${escapeHtml(tip)}" style="background:${strong ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.12)'}; color:${strong ? '#b91c1c' : '#92400e'}; padding:4px 12px; border-radius:20px; font-size:0.75em; font-weight:800; border:1px solid ${strong ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.30)'}; cursor:help;" aria-label="${escapeHtml('ซ้ำ Q' + (h.qIndex + 1) + ' · ' + pct + '% · ' + sideTag + pendingTag)}">⚠ Q${h.qIndex + 1}</span>`;
             }).join('');
         };
 
@@ -66295,7 +66311,8 @@ RULES:
                 ];
                 window._compareDupHits = window.scanQuizSetDup(index, dupCandidates);
                 const dupChipsHtml = window._quizSetDupChipsHtml(window._compareDupHits);
-                const diffHtml = diffs.map(d => `<span style="background:rgba(99,102,241,0.1); color:#4338ca; padding:4px 12px; border-radius:20px; font-size:0.75em; font-weight:800; border:1px solid rgba(99,102,241,0.2);">${d}</span>`).join('');
+                const _diffIcon = { 'Text Reworded': ['✍️', 'Text reworded'], 'Options Balanced': ['🔢', 'Options balanced'], 'Logical Fix': ['🎯', 'Logical fix — the correct answer changed'] };
+                const diffHtml = diffs.map(d => { const ic = _diffIcon[d]; return `<span title="${ic ? ic[1] : d}" aria-label="${ic ? ic[1] : d}" style="background:rgba(99,102,241,0.1); color:#4338ca; padding:3px 8px; border-radius:20px; font-size:0.8em; font-weight:800; border:1px solid rgba(99,102,241,0.2);">${ic ? ic[0] : d}</span>`; }).join('');
                 const statusHtml = !shapeCheck.ok
                     ? `<span style="background:rgba(239,68,68,0.10); color:#b91c1c; padding:6px 12px; border-radius:20px; font-size:0.75em; font-weight:800; border:1px solid rgba(239,68,68,0.22);">⚠️ Malformed AI output</span><span style="color:#64748b; font-size:0.75em;">${escapeHtml(shapeCheck.error)} — please regenerate.</span>`
                     : canApplyImprovement
@@ -66308,18 +66325,18 @@ RULES:
                 // has to live in one place instead of drifting across duplicates.
                 const modelInfo = window._aiAnalysisModel ? window._compareModelMeta(window._aiAnalysisModel) : null;
                 const modelChipHtml = modelInfo
-                    ? `<span style="background:#fff; color:${modelInfo.color}; padding:4px 10px; border-radius:20px; font-size:0.72em; font-weight:800; border:1px solid ${modelInfo.color}55; display:inline-flex; align-items:center; gap:5px; white-space:nowrap; box-shadow:0 1px 3px rgba(0,0,0,0.06);" title="Generated by ${String(window._aiAnalysisModel || '')}">${modelInfo.emoji} ${modelInfo.label}</span>`
+                    ? `<span style="background:#fff; color:${modelInfo.color}; padding:4px 10px; border-radius:20px; font-size:0.72em; font-weight:800; border:1px solid ${modelInfo.color}55; display:inline-flex; align-items:center; gap:5px; white-space:nowrap; box-shadow:0 1px 3px rgba(0,0,0,0.06);" title="Generated by ${String(window._aiAnalysisModel || '')} · ${modelInfo.label}">${modelInfo.emoji} ${String(modelInfo.label).replace(/^GPT\s+(\d+(?:\.\d+)?)\s+(\S+)$/, '$2 $1')}</span>`
                     : '';
                 const improvedJson = JSON.stringify(improvedQ || {})
                     .replace(/\\/g, '\\\\')
                     .replace(/'/g, "\\'")
                     .replace(/"/g, '&quot;');
                 const addButtonHtml = canApplyImprovement
-                    ? `<button class="btn" onclick="confirmAddAiAsNewQuestion(${index}, '${improvedJson}')" title="Add as new question" style="padding:8px 16px; border-radius:10px; font-weight:700; font-size:0.82em; background:#0ea5e9; color:white; border:none; box-shadow:0 3px 10px rgba(14,165,233,0.28); white-space:nowrap;">➕ Add New</button>`
-                    : `<button class="btn" disabled title="Regenerate until the improved version is meaningfully different." style="padding:8px 16px; border-radius:10px; font-weight:700; font-size:0.82em; background:#e2e8f0; color:#64748b; border:none; cursor:not-allowed; box-shadow:none; opacity:0.95; white-space:nowrap;">➕ Add New</button>`;
+                    ? `<button class="btn" onclick="confirmAddAiAsNewQuestion(${index}, '${improvedJson}')" title="Add as new question" aria-label="Add New" style="padding:8px 12px; border-radius:10px; font-weight:700; font-size:0.82em; background:#0ea5e9; color:white; border:none; box-shadow:0 3px 10px rgba(14,165,233,0.28); white-space:nowrap;">➕</button>`
+                    : `<button class="btn" disabled title="Regenerate until the improved version is meaningfully different." style="padding:8px 16px; border-radius:10px; font-weight:700; font-size:0.82em; background:#e2e8f0; color:#64748b; border:none; cursor:not-allowed; box-shadow:none; opacity:0.95; white-space:nowrap;" aria-label="Add New">➕</button>`;
                 const applyButtonHtml = canApplyImprovement
-                    ? `<button class="btn btn-primary" onclick="applyAiFixAndAdvance(${index}, '${improvedJson}', ${arrIdx})" style="padding:8px 20px; border-radius:10px; font-weight:700; font-size:0.82em; background:#22c55e; border:none; box-shadow:0 3px 10px rgba(34,197,94,0.3); white-space:nowrap;">✅ ${arrIdx < ((window._aiAnalysisItems||[]).length - 1) ? 'Apply &amp; Next' : 'Apply Fix'}</button>`
-                    : `<button class="btn btn-primary" disabled title="Regenerate until the improved version is meaningfully different." style="padding:8px 20px; border-radius:10px; font-weight:700; font-size:0.82em; background:#cbd5e1; color:#64748b; border:none; cursor:not-allowed; box-shadow:none; opacity:0.95; white-space:nowrap;">✅ Apply Fix</button>`;
+                    ? `<button class="btn btn-primary cmp-split" onclick="applyAiFixAndAdvance(${index}, '${improvedJson}', ${arrIdx})" title="${arrIdx < ((window._aiAnalysisItems||[]).length - 1) ? 'Apply &amp; Next' : 'Apply Fix'}" aria-label="${arrIdx < ((window._aiAnalysisItems||[]).length - 1) ? 'Apply and go to the next suggestion' : 'Apply Fix'}">${arrIdx < ((window._aiAnalysisItems||[]).length - 1) ? '<span>Apply</span><span class="cmp-split-next">▶</span>' : '<span>Apply</span>'}</button>`
+                    : `<button class="btn btn-primary" disabled title="Regenerate until the improved version is meaningfully different." style="padding:8px 14px; border-radius:10px; font-weight:700; font-size:0.82em; background:#cbd5e1; color:#64748b; border:none; cursor:not-allowed; box-shadow:none; opacity:0.95; white-space:nowrap;" aria-label="Apply Fix">Apply</button>`;
 
                 // V96.36: header Prev/Next carousel — walk all AI-proposed improvements without
                 // closing the modal. Shown only when there's more than one item. Bounds disable
@@ -66350,22 +66367,31 @@ RULES:
 
                 overlay.innerHTML = `
                     <div style="width:100%; max-width:950px; background:#f8fafc; border-radius:32px; overflow:hidden; box-shadow:0 25px 70px rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.1); display:flex; flex-direction:column; max-height:90vh;">
-                        <div style="padding:20px 30px; background:white; border-bottom:1.5px solid #edf2f7; display:flex; flex-direction:column; gap:10px;">
-                            <div style="display:flex; justify-content:space-between; align-items:center; gap:16px;">
-                                <h3 style="margin:0; font-size:1.3em; color:#1e293b;">🛠️ Quality Improvement Comparison</h3>
-                                <div style="display:flex; align-items:center; gap:12px; flex-shrink:0;">
-                                    ${navHtml}
-                                    <button onclick="document.getElementById('ai-compare-overlay').remove()" style="width:40px; height:40px; border-radius:50%; border:none; background:#f1f5f9; color:#64748b; cursor:pointer; font-size:1.3em; display:flex; align-items:center; justify-content:center; transition:0.2s; flex-shrink:0;" onmouseover="this.style.background='#e2e8f0'; this.style.color='#0f172a'">✕</button>
-                                </div>
+                        <div style="padding:14px 22px 12px; background:white; border-bottom:1.5px solid #edf2f7; display:flex; flex-direction:column; gap:8px;">
+                            <div class="cmp-line">
+                                <h3 title="Quality Improvement Comparison" aria-label="Quality Improvement Comparison" style="margin:0; font-size:1.05em; color:#1e293b; white-space:nowrap;">🛠️ Compare</h3>
+                                <span class="cmp-commit">
+                                    <button class="btn cmp-ib quiet" onclick="document.getElementById('ai-compare-overlay').remove()" title="Keep Original — close without changes" aria-label="Keep Original">↩</button>
+                                    ${(improvedB || mergedQV) ? '' : `${addButtonHtml}${applyButtonHtml}`}
+                                </span>
+                                ${navHtml}
+                                <button onclick="document.getElementById('ai-compare-overlay').remove()" style="width:40px; height:40px; border-radius:50%; border:none; background:#f1f5f9; color:#64748b; cursor:pointer; font-size:1.3em; display:flex; align-items:center; justify-content:center; transition:0.2s; flex-shrink:0;" onmouseover="this.style.background='#e2e8f0'; this.style.color='#0f172a'">✕</button>
                             </div>
-                            <div style="display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;">
-                                <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; flex:1 1 240px; min-width:0;">${statusHtml}${modelChipHtml ? `<span style="color:#cbd5e1; font-weight:800; margin:0 2px; user-select:none;">·</span>${modelChipHtml}` : ''}${dupChipsHtml}</div>
-                                <div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; flex-shrink:0; margin-left:auto;">
-                                    <button onclick="showFullQuizPreview()" title="Preview all current questions in one page" style="${hdrChip} color:#334155;">👁️ Preview</button>
-                                    <button onclick="copyAllCompareOriginals()" title="Copy every ORIGINAL question in this analysis (Q+options, no answer key)" style="${hdrChip} color:#334155;">📋 Original</button>
-                                    <button onclick="copyAllCompareImproved()" title="Copy every IMPROVED question proposed so far (Q+options, no answer key)" style="${hdrChip} color:#334155;">📋 Improved</button>
-                                    <button class="btn" onclick="checkQuizSetDupAI(${index}, ${arrIdx}, this)" title="Ask AI whether this question tests the same concept as another one in the set — the chips on the left only catch wording overlap. Uses tokens." style="${hdrChip} color:#7c3aed;">🔎 Dup Check</button>
-                                    <button class="btn" onclick="openMergeBuilder(${index}, ${arrIdx})" title="Manually pick options from every version and set the answer — no AI, no tokens used." style="${hdrChip} color:#334155;">🧩 Build</button>
+                            <div class="cmp-line">
+                                ${window._compareModelBPickerHtml()}
+                                ${improvedB ? '' : `<input id="ai-compare-instruction" type="text" value="${escapeHtml(item.compareInstruction || '')}" placeholder="${mergedQV ? 'Re-merge instruction' : 'Steer…'}" title="Optional, one line — it applies to whichever AI action you press next.&#10;🔄 Regenerate / ⚖️ Compare B: how to rewrite, e.g. &quot;keep the stem, only fix the distractors&quot;. It overrides the built-in brief, which otherwise always pushes for harder + a case vignette. Both read the same line, so A and B stay comparable.&#10;🧬 Merge: how to blend. Left empty, the default rule applies — keep the original wording, adopt the improved version's depth." class="cmp-steer">`}
+                                ${(improvedB || mergedQV) ? '' : `<button onclick="generateAiProposalB(${index}, ${arrIdx}, this)" title="Compare B — run the same brief through Model B and show its proposal as a 3rd column. Uses tokens." aria-label="Compare B" class="btn cmp-ib">⚖️</button>`}
+                                ${improvedB ? '' : `<button onclick="mergeAiVersions(${index}, ${arrIdx}, this)" title="${mergedQV ? 'Re-merge' : 'Merge'} — let AI merge ORIGINAL + IMPROVED into one version, shown as a 3rd column. Uses tokens." aria-label="${mergedQV ? 'Re-merge' : 'Merge'}" class="btn cmp-ib">🧬</button>`}
+                                ${(improvedB || mergedQV) ? '' : `<button class="btn cmp-ib" style="color:#4338ca;" title="Regenerate" aria-label="Regenerate" onclick="regenerateSingleAiSuggestion(${index}, ${arrIdx}, true, this)">🔄</button>`}
+                            </div>
+                            <div class="cmp-line">
+                                <div class="cmp-chips">${statusHtml}${modelChipHtml}${dupChipsHtml}</div>
+                                <div class="cmp-tools">
+                                    <button onclick="showFullQuizPreview()" title="Preview all current questions in one page" aria-label="Preview" class="cmp-tool">👁️</button>
+                                    <button onclick="copyAllCompareOriginals()" title="Copy every ORIGINAL question in this analysis (Q+options, no answer key)" aria-label="Copy originals" class="cmp-tool">📄</button>
+                                    <button onclick="copyAllCompareImproved()" title="Copy every IMPROVED question proposed so far (Q+options, no answer key)" aria-label="Copy improved" class="cmp-tool">📝</button>
+                                    <button class="btn cmp-tool" onclick="checkQuizSetDupAI(${index}, ${arrIdx}, this)" title="Ask AI whether this question tests the same concept as another one in the set — the ⚠ chips only catch wording overlap. Uses tokens." aria-label="Dup Check" style="color:#7c3aed;">🔎</button>
+                                    <button class="btn cmp-tool" onclick="openMergeBuilder(${index}, ${arrIdx})" title="Manually pick options from every version and set the answer — no AI, no tokens used." aria-label="Build">🧩</button>
                                 </div>
                             </div>
                             <div class="lang-no-toggle" id="ai-dup-result" style="display:none; max-width:620px;"></div>
@@ -66385,18 +66411,6 @@ RULES:
                                 <div style="display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:1.5em; flex-shrink:0;">➡️</div>
                                 ${renderQInner(improvedQ, 'IMPROVED', 'linear-gradient(135deg, #6366f1, #4338ca)', index, 'improved')}
                             `}
-                        </div>
-
-                        <div style="padding:14px 24px; background:#fff; border-top:1.5px solid #edf2f7; display:flex; flex-direction:column; gap:8px;">
-                            <div>${window._compareModelBPickerHtml()}</div>
-                            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                                ${improvedB ? '' : `<input id="ai-compare-instruction" type="text" value="${escapeHtml(item.compareInstruction || '')}" placeholder="${mergedQV ? 'Re-merge instruction' : 'Steer…'}" title="Optional, one line — it applies to whichever AI action you press next.&#10;🔄 Regenerate / ⚖️ Compare B: how to rewrite, e.g. &quot;keep the stem, only fix the distractors&quot;. It overrides the built-in brief, which otherwise always pushes for harder + a case vignette. Both read the same line, so A and B stay comparable.&#10;🧬 Merge: how to blend. Left empty, the default rule applies — keep the original wording, adopt the improved version's depth." style="flex:1 1 120px; min-width:120px; padding:7px 9px; border-radius:10px; border:1px solid #e2e8f0; background:#f8fafc; font-size:0.76em; font-family:inherit; color:#334155;">`}
-                                ${(improvedB || mergedQV) ? '' : `<button onclick="generateAiProposalB(${index}, ${arrIdx}, this)" title="Compare B — run the same brief through Model B and show its proposal as a 3rd column. Uses tokens." aria-label="Compare B" class="btn cmp-ib">⚖️</button>`}
-                                ${improvedB ? '' : `<button onclick="mergeAiVersions(${index}, ${arrIdx}, this)" title="${mergedQV ? 'Re-merge' : 'Merge'} — let AI merge ORIGINAL + IMPROVED into one version, shown as a 3rd column. Uses tokens." aria-label="${mergedQV ? 'Re-merge' : 'Merge'}" class="btn cmp-ib">🧬</button>`}
-                                <span class="cmp-sp"></span>
-                                <button class="btn cmp-ib quiet" onclick="document.getElementById('ai-compare-overlay').remove()" title="Keep Original — close without changes" aria-label="Keep Original">↩</button>
-                                ${(improvedB || mergedQV) ? '' : `<button class="btn cmp-ib" style="color:#4338ca;" title="Regenerate" aria-label="Regenerate" onclick="regenerateSingleAiSuggestion(${index}, ${arrIdx}, true, this)">🔄</button>${addButtonHtml}${applyButtonHtml}`}
-                            </div>
                         </div>
                     </div>
                 `;
