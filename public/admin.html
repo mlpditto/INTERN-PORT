@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.231)</title>
+    <title>Nika Admin (V102.232)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -2484,6 +2484,20 @@
         .qa-stp { display:inline-flex; flex-direction:column; gap:2px; vertical-align:middle; margin-left:2px; }
         .qa-stp button { border:none; width:18px; min-height:0; height:18px; padding:0; border-radius:4px; font-size:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
         .qa-rail { display:flex; align-items:center; gap:6px; flex-wrap:nowrap; }
+        /* V102.232: wide screens — 👥 📖 + the ⋯ actions are ONE icon grid (4 per row, quiet grey, colour on hover); the ⋯ menu returns at <=1100px */
+        .qa-tools { display:grid; grid-template-columns:repeat(4, 32px); gap:4px; margin-left:8px; }
+        .qa-rail .qa-more-narrow { display:none; }
+        @media (min-width:1101px) {   /* quiet icons: grey, colour + frame on hover */
+            .qa-tools .qa-ib { color:#94a3b8; border-color:transparent; background:transparent; }
+            .qa-tools .qa-ib:hover { color:#1e293b; border-color:#cbd5e1; background:#fff; }
+            .qa-tools .qa-ib.is-set { color:#15803d; }
+            .qa-tools .qa-ib.is-danger:hover { color:#b91c1c; border-color:#fecaca; background:#fef2f2; }
+        }
+        @media (max-width:1100px) {   /* narrow: the grid dissolves (👥 📖 stay in the rail), the ⋯ menu carries the rest */
+            .qa-tools { display:contents; }
+            .qa-tools .qa-tx { display:none; }
+            .qa-rail .qa-more-narrow { display:block; }
+        }
         .qa-rail .quiz-more-menu { margin-left:0; }
         .qa-rail .quiz-more-menu:last-child { margin-left:auto; }
         .qa-ib { position:relative; width:32px; height:32px; min-height:0; padding:0; gap:0; flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; border-radius:9px; border:1px solid #e2e8f0; background:#fff; color:#64748b; font-size:0.9em; cursor:pointer; transition:0.15s; }
@@ -32649,6 +32663,17 @@ ${JSON.stringify(sourceObj)}`;
                     ? `<span class="badge" title="Recently live — live now or within the last 30 days" style="background:#dcfce7; color:#15803d; border:1px solid #86efac;">🆕 Recently Live</span>`
                     : '';
 
+                // V102.232: the same actions as the ⋯ menu, as icon buttons for wide screens (a 4-per-row grid next to 👥 📖); ≤1100px the grid folds back into ⋯
+                const _qaTools = [
+                    isExamEligibleQuiz(q) ? { icon: 'fa-graduation-cap', label: 'Launch as Exam', js: `openQuickLaunchExamModal('${q.id}')` } : null,
+                    { icon: 'fa-clone', label: 'Duplicate', js: `duplicateQuiz('${q.id}')` },
+                    (q.isPoll || hasWriting) ? { icon: 'fa-chart-column', label: 'View Results / Analytics', js: `showPollResults('${q.id}')` } : null,
+                    { icon: 'fa-comments', label: 'Discussion Board', js: `showQuizDiscussions('${q.id}')` },
+                    { icon: 'fa-star', label: 'User Feedback', js: `showQuizFeedbackPanel('${q.id}')` },
+                    { icon: 'fa-thumbtack', label: q.isTemplate ? 'Remove from Templates' : 'Mark as Template', js: `toggleTemplateStatus('${q.id}', ${q.isTemplate || false})`, set: !!q.isTemplate },
+                    { icon: 'fa-trash', label: 'Delete Quiz', js: `deleteQuiz('${q.id}')`, danger: true }
+                ].filter(Boolean).map(t => `<button type="button" class="qa-ib qa-tx${t.set ? ' is-set' : ''}${t.danger ? ' is-danger' : ''}" onclick="event.stopPropagation(); ${t.js}" title="${t.label}" aria-label="${t.label}"><i class="fa-solid ${t.icon}"></i></button>`).join('');
+
                 return `
                     <tr class="lang-no-toggle">
                         <td>
@@ -32681,9 +32706,12 @@ ${JSON.stringify(sourceObj)}`;
                                  participants · homework · ⋯ (🎓 Exam moved into ⋯). V102.29: edit = click the title. -->
                             <div class="qa-rail">
                                 ${window.quizLivePillHtml(q)}
+                                <span class="qa-tools">
                                 <button type="button" class="qa-ib" onclick="event.stopPropagation(); showQuizParticipants('${q.id}')" title="Participants · ผู้เข้าร่วม" aria-label="Participants"><i class="fa-solid fa-users"></i>${(window.quizCounts && window.quizCounts[q.id]) ? `<span class="qa-n">${window.quizCounts[q.id]}</span>` : ''}</button>
                                 <button type="button" class="qa-ib${q.isHomework && (q.assignedUsers || []).length ? ' is-set' : ''}" onclick="event.stopPropagation(); openHomeworkAssignModal('${q.id}')" title="Homework · มอบหมายการบ้าน" aria-label="Assign homework"><i class="fa-solid fa-book"></i>${q.isHomework && (q.assignedUsers || []).length ? `<span class="qa-n">${q.assignedUsers.length}</span>` : ''}</button>
-                                <details class="quiz-more-menu">
+                                ${_qaTools}
+                                </span>
+                                <details class="quiz-more-menu qa-more-narrow">
                                     <summary class="qa-ib" title="More · เพิ่มเติม" aria-label="More actions"><i class="fa-solid fa-ellipsis"></i></summary>
                                     <div class="quiz-more-menu-body" role="menu">
                                         ${isExamEligibleQuiz(q) ? `<button type="button" class="quiz-more-menu-item" onclick="closeQuizMoreMenus(); openQuickLaunchExamModal('${q.id}')">🎓 Launch as Exam</button>` : ''}
