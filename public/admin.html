@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.233)</title>
+    <title>Nika Admin (V102.234)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -2473,6 +2473,10 @@
         /* Quiz row, lean + inline: line 1 title, line 2 icon-only flags, Items + pts inline in one cell */
         .qa-l1 { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-weight:800; color:#333; }
         .qa-l2 { display:flex; align-items:center; gap:4px; flex-wrap:wrap; margin-top:4px; }
+        .qa-l2 .qa-hid { display:none !important; }
+        .qa-plus { flex:0 0 auto; width:auto; min-width:0; min-height:0; height:22px; padding:0 9px; border:1px dashed #94a3b8; border-radius:999px; background:#fff; color:#475569; font-size:0.72em; font-weight:800; cursor:pointer; }
+        .qa-plus:hover { border-color:#4361ee; color:#4361ee; }
+        .qa-l2.is-open .qa-plus { background:#eef2ff; border-style:solid; }
         .qa-sh { font-size:0.78em; color:#94a3b8; font-weight:600; }
         .qa-fi { display:inline-flex; align-items:center; justify-content:center; gap:2px; min-width:22px; height:22px; padding:0 6px; border-radius:999px; font-size:0.72em; font-weight:800; line-height:1; white-space:nowrap; margin-left:0 !important; }
         .qa-fi i { font-size:1em; }
@@ -2667,6 +2671,7 @@
             #quizzesTableActive .quiz-quick-cover, #quizzesTableInactive .quiz-quick-cover { width:34px !important; height:34px !important; min-width:34px !important; font-size:0.9em !important; }
             #quizzesTableActive .qa-title, #quizzesTableInactive .qa-title { white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; font-size:0.95em; line-height:1.3; }
             #quizzesTableActive .qa-l2, #quizzesTableInactive .qa-l2 { flex-wrap:nowrap; overflow-x:auto; white-space:nowrap; }
+            #quizzesTableActive .qa-l2.is-open, #quizzesTableInactive .qa-l2.is-open { flex-wrap:wrap; white-space:normal; overflow-x:visible; }
             #quizzesTableActive .qa-met em, #quizzesTableInactive .qa-met em, #quizzesTableActive .qa-stp, #quizzesTableInactive .qa-stp { display:none; }
             #quizzesTableActive .qa-met-n, #quizzesTableActive .qa-met-p, #quizzesTableInactive .qa-met-n, #quizzesTableInactive .qa-met-p { margin-right:6px; }
         }
@@ -32698,7 +32703,7 @@ ${JSON.stringify(sourceObj)}`;
                                 ${q.shortTitle && q.shortTitle.trim().toLowerCase() !== String(q.title || '').replace(/\s*\(Template\)$/i, '').trim().toLowerCase() ? `<span class="qa-sh">(${escapeHtml(q.shortTitle)})</span>` : ''}
                             </div>
                             <!-- Lean + inline: score / feedback / stat badges and all flags (icon-only, words in the tooltip) share one line under the title. -->
-                            <div class="qa-l2"><span id="fb-badge-${q.id}" style="font-size:0.7em; background:#fff7ed; color:#b45309; border:1px solid #fed7aa; border-radius:8px; padding:2px 7px; font-weight:800; cursor:pointer; white-space:nowrap;" onclick="event.stopPropagation(); showQuizFeedbackPanel('${q.id}')" title="View user feedback">⭐ —</span>${window.quizAuditBadgeHtml(q)}${_easyBadge}${_hardBadge}${_cheatBadge}${window.qaIconFlags([_liveTag, modeLabel, oneTimeLabel, pollLabel, subjLabel, orderingLabel, flashcardLabel, templateLabel, targetGroupLabel, examStyleLabel, unlockLabel, materialsLabel, clicksLabel, notifyLabel, systemLabel].join(' '))}</div>
+                            <div class="qa-l2"><span id="fb-badge-${q.id}" data-qp="1" style="font-size:0.7em; background:#fff7ed; color:#b45309; border:1px solid #fed7aa; border-radius:8px; padding:2px 7px; font-weight:800; cursor:pointer; white-space:nowrap;" onclick="event.stopPropagation(); showQuizFeedbackPanel('${q.id}')" title="View user feedback">⭐ —</span>${window.qaTag(window.quizAuditBadgeHtml(q), 2)}${window.qaTag(_easyBadge, 3)}${window.qaTag(_hardBadge, 3)}${window.qaTag(_cheatBadge, 3)}${window.qaIconFlags([[_liveTag, 13], [modeLabel, 12], [oneTimeLabel, 5], [pollLabel, 7], [subjLabel, 7], [orderingLabel, 7], [flashcardLabel, 7], [templateLabel, 6], [targetGroupLabel, 11], [examStyleLabel, 9], [unlockLabel, 4], [materialsLabel, 8], [clicksLabel, 8], [notifyLabel, 10], [systemLabel, 13]].map(([h, p]) => window.qaTag(h, p)).join(' '))}</div>
                         </td>
                         <td class="hide-mobile qa-met">
                             <span class="qa-met-n" title="Items" style="background:${(() => {
@@ -32842,6 +32847,7 @@ ${JSON.stringify(sourceObj)}`;
                 paginContainer.innerHTML = quizPagerHtml(inactiveQuizPage, totalInactivePages, sortedInactive.length, INACTIVE_QUIZ_PER_PAGE); // V102.152: numbered pages + "from–to of N"
             }
             if (typeof loadQuizFeedbackBadges === 'function') loadQuizFeedbackBadges();
+            if (window.qaFitChips) window.qaFitChips();   // V102.233: fold only what does not fit
         }
 
         function changeInactiveQuizPage(dir) {
@@ -33411,6 +33417,58 @@ ${JSON.stringify(sourceObj)}`;
                 b.innerHTML = iconHtml + (num ? `<span class="qa-fi-n">${num}</span>` : '');
             });
             return tpl.innerHTML;
+        };
+
+        // V102.233: chips under the title carry a priority (data-qp, 1 = most important: ⭐ feedback · 🧪 audit · warnings · 🔒 · 🔄 · 📌 · type · 📎 · 🧭 · 🔔 · 👥 · GRADED).
+        // qaTag stamps it on the top-level elements of a badge string; qaFitChips then SHOWS EVERY CHIP WHEN THE LINE HAS ROOM and only otherwise folds the lowest-priority ones into a "+n" button
+        // (hover = their names, tap = unfold in place). Measured per row, re-run on resize / when the list card changes size.
+        window.qaTag = function (html, p) {
+            if (!html || !String(html).trim()) return '';
+            const t = document.createElement('template'); t.innerHTML = html;
+            [...t.content.children].forEach(c => c.setAttribute('data-qp', p));
+            return t.innerHTML;
+        };
+        window.qaRoman = function (n) {
+            n = Math.max(0, Math.min(3999, Math.floor(n))); if (!n) return String(n);
+            const map = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
+            let out = ''; map.forEach(([v, r]) => { while (n >= v) { out += r; n -= v; } }); return out;
+        };
+        window.qaFitChipsRow = function (l2) {
+            l2.querySelectorAll(':scope > .qa-hid').forEach(c => c.classList.remove('qa-hid'));
+            const old = l2.querySelector(':scope > .qa-plus'); if (old) old.remove();
+            const chips = [...l2.children].filter(c => c.getAttribute && c.getAttribute('data-qp'));
+            const avail = l2.clientWidth; if (!chips.length || !avail) return;
+            const GAP = 4, PLUS = 48;
+            const widths = chips.map(c => c.getBoundingClientRect().width);
+            if (widths.reduce((a, w) => a + w + GAP, 0) <= avail + 1) { l2.classList.remove('is-open'); return; }   // everything fits → show it all
+            const order = chips.map((c, i) => ({ c, w: widths[i], p: +c.getAttribute('data-qp'), i })).sort((a, b) => a.p - b.p || a.i - b.i);
+            let used = PLUS; const keep = new Set();
+            order.forEach(o => { if (used + o.w + GAP <= avail) { keep.add(o.c); used += o.w + GAP; } });
+            const hidden = chips.filter(c => !keep.has(c)); if (!hidden.length) return;
+            const open = l2.classList.contains('is-open');
+            if (!open) hidden.forEach(c => c.classList.add('qa-hid'));
+            const label = el => (el.getAttribute('title') || el.getAttribute('aria-label') || el.textContent || '').replace(/ — .*/, '').replace(/\s+/g, ' ').trim();
+            const plus = document.createElement('button'); plus.type = 'button'; plus.className = 'qa-plus';
+            // phone (<=480px): the count is a Roman numeral (+V); the tooltip / aria text keeps plain digits
+            plus.textContent = open ? '−' : '+' + (window.matchMedia && window.matchMedia('(max-width:480px)').matches ? window.qaRoman(hidden.length) : hidden.length);
+            plus.title = (open ? 'Fold ' : 'Show ') + hidden.length + ' more: ' + hidden.map(label).join(' · ');
+            plus.setAttribute('aria-expanded', String(open));
+            plus.onclick = e => { e.stopPropagation(); l2.classList.toggle('is-open'); window.qaFitChipsRow(l2); };
+            l2.appendChild(plus);
+        };
+        window.qaFitChips = function () {
+            const card = document.getElementById('quiz-list-card'); if (!card) return;
+            window._qaFitting = true;
+            card.querySelectorAll('.qa-l2').forEach(window.qaFitChipsRow);
+            if (window._qaFitObs) window._qaFitObs.takeRecords();
+            window._qaFitting = false;
+            if (!window._qaFitWatch) {   // once: re-fit when the card changes size, and when a badge text changes (feedback / audit numbers arrive late)
+                window._qaFitWatch = true;
+                let raf = 0; const again = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => window.qaFitChips()); };
+                if (window.ResizeObserver) new ResizeObserver(again).observe(card);
+                window._qaFitObs = new MutationObserver(() => { if (!window._qaFitting) again(); });
+                window._qaFitObs.observe(card, { childList: true, subtree: true, characterData: true });
+            }
         };
 
         window.quizLivePillHtml = function (q) {
