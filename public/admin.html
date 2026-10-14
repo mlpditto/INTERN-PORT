@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.235)</title>
+    <title>Nika Admin (V102.236)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -2473,6 +2473,9 @@
         /* Quiz row, lean + inline: line 1 title, line 2 icon-only flags, Items + pts inline in one cell */
         .qa-l1 { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-weight:800; color:#333; }
         .qa-l2 { display:flex; align-items:center; gap:4px; flex-wrap:wrap; margin-top:4px; }
+        /* V102.236: Bulk Paste toolbar icon = the 📋 with a bold violet P on the sheet (decorative; the button keeps aria-label="Bulk Paste") */
+        .bp-ico { position:relative; display:inline-flex; align-items:center; justify-content:center; line-height:1; }
+        .bp-ico b { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding-top:0.2em; font:900 0.68em/1 system-ui, sans-serif; color:#5b21b6; text-shadow:0 0 2px #fff, 0 0 2px #fff; pointer-events:none; }
         .qa-l2 .qa-hid { display:none !important; }
         .qa-plus { flex:0 0 auto; width:auto; min-width:0; min-height:0; height:22px; padding:0 9px; border:1px dashed #94a3b8; border-radius:999px; background:#fff; color:#475569; font-size:0.72em; font-weight:800; cursor:pointer; }
         .qa-plus:hover { border-color:#4361ee; color:#4361ee; }
@@ -14077,7 +14080,7 @@
 
                         <!-- Group 2: Bulk Actions -->
                         <div style="display:flex; align-items:center; gap:4px; padding-right:8px; border-right:1px solid rgba(245,158,11,0.35);">
-                            <button class="btn-sm" onclick="openBulkPasteModal()" style="background:linear-gradient(135deg,#7c3aed,#6d28d9); color:#ede9fe; border:none; padding:0 10px; border-radius:8px; font-weight:800; font-size:0.68em; height:28px; cursor:pointer; display:flex; align-items:center; gap:4px;" type="button" aria-label="Bulk Paste" title="Paste multiple questions from text" data-th-title="วางข้อสอบหลายข้อจากข้อความ">📋</button>
+                            <button class="btn-sm" onclick="openBulkPasteModal()" style="background:linear-gradient(135deg,#7c3aed,#6d28d9); color:#ede9fe; border:none; padding:0 10px; border-radius:8px; font-weight:800; font-size:0.68em; height:28px; cursor:pointer; display:flex; align-items:center; gap:4px;" type="button" aria-label="Bulk Paste" title="Paste multiple questions from text" data-th-title="วางข้อสอบหลายข้อจากข้อความ"><span class="bp-ico" aria-hidden="true">📋<b>P</b></span></button>
                             <button class="btn-sm" onclick="openImageQuizModal()" style="background:linear-gradient(135deg,#f59e0b,#d97706); color:#fffbeb; border:none; padding:0 10px; border-radius:8px; font-weight:800; font-size:0.68em; height:28px; cursor:pointer; display:flex; align-items:center; gap:4px;" type="button" aria-label="From Image" title="Create questions from an image" data-th-title="สร้างข้อสอบจากรูปภาพ">🖼️</button>
                             <button class="btn-sm" onclick="openImportQuizModal()" style="background:linear-gradient(135deg,#0f766e,#0d9488); color:#ecfeff; border:none; padding:0 10px; border-radius:8px; font-weight:800; font-size:0.68em; height:28px; cursor:pointer; display:flex; align-items:center; gap:4px;" type="button" aria-label="Import from Quiz" title="Import questions from another quiz" data-th-title="นำเข้าข้อจากชุดข้อสอบอื่น">📥</button>
                             <button class="btn-sm" onclick="openExportQuizPdfModal()" style="background:linear-gradient(135deg,#0284c7,#0369a1); color:#fef3c7; border:none; padding:0 10px; border-radius:8px; font-weight:800; font-size:0.68em; height:28px; cursor:pointer; display:flex; align-items:center; gap:4px;" type="button" aria-label="Export PDF" title="Export the quiz as PDF" data-th-title="ส่งออกข้อสอบเป็น PDF">📄</button>
@@ -30759,12 +30762,18 @@ ${JSON.stringify(sourceObj)}`;
             // moment the real question is built — renderMd on the intern side turns
             // it into an <img>. Keeping it off r.q until now is what lets the
             // preview and the 📋/💡 copy output stay free of raw Markdown noise.
+            // V102.236: a fresh editor opens with ONE blank starter question. Appending after it left a blank Q1 (the pasted questions began at Q2 and the admin had to delete it).
+            // When every question already in the form is blank (no stem, no option text, no explanation) the paste REPLACES them; anything the admin typed is never touched.
+            const _isBlankQ = el => { const t = el.querySelector('.q-text'), ex = el.querySelector('.q-explanation'); return !!t && !t.value.trim() && !(ex && ex.value.trim()) && [...el.querySelectorAll('.q-opt')].every(o => { const v = o.value.trim(); return !v || /^Option \d+$/.test(v); }); };   // a new question's options are pre-filled "Option 1", "Option 2" = still untouched
+            const _before = [...document.querySelectorAll('.quiz-q-item')];
+            const _blankStarters = _before.length && _before.every(_isBlankQ) ? _before : [];
             rows.forEach(r => addQuestionUI({
                 q: (r.illustrationUrl ? '![ภาพประกอบ](' + r.illustrationUrl + ')\n\n' : '') + r.q,
                 type: 'choice', options: r.options, correct: r.correct, timer: 60,
                 explanation: (r.rationale || '').trim(),
                 tags: (r.tags || '').trim()   // V100.98: JSON-imported rows carry per-question tags
             }));
+            _blankStarters.forEach(el => el.remove());   // after the new ones are in, so the form never drops below one question
             document.getElementById('bulkPasteModal').style.display = 'none';
             if (typeof triggerAutoSave === 'function') triggerAutoSave();
             const items = document.querySelectorAll('.quiz-q-item');
