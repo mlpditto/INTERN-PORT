@@ -41,7 +41,8 @@ const SAMPLE = `
             assert.ok(name.l > img.r && score.l > img.r, 'name + score beside the avatar');
             if (touch) assert.ok(rail.t >= img.b - 2, 'phone: rail is its own row under the name'); else assert.ok(Math.abs(rail.c - img.c) <= 8 && rail.l > score.r, 'desktop: rail on the same line, right');
             const buttons = await page.$$eval('#profile-quick-actions > button:not([hidden])', els => els.map(e => Math.round(e.getBoundingClientRect().top)));
-            assert.equal(buttons.length, 4); assert.ok(Math.max(...buttons) - Math.min(...buttons) <= 2, 'rail buttons on one row');
+            assert.equal(buttons.length, 5);   // V101.147: ⋯ beside Flood
+             assert.ok(Math.max(...buttons) - Math.min(...buttons) <= 2, 'rail buttons on one row');
             assert.equal(await page.$eval('#u-division-badge', e => getComputedStyle(e).display), 'none', 'badge row hidden even when JS shows it');
             assert.equal(await page.$eval('#u-img', e => e.style.borderColor), 'rgb(139, 92, 246)', 'ring = division colour (divColor("CU") = palette[2162 % 6])');
             assert.equal(await page.$eval('#u-img', e => e.title), 'CU › EXTERN', 'tooltip names division › group');

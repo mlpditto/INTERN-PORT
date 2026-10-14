@@ -3,9 +3,9 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.146)</title>
+    <title>Internship Portfolio (V101.147)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
-    <link rel="stylesheet" href="cafe-content.css?v=V101.140">
+    <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
@@ -2458,6 +2458,8 @@
                     <button id="fw-btn" class="btn-sm fw-tb" onclick="fwOpen()" title="Flood watch" data-th-title="เฝ้าระวังน้ำท่วม" data-kr-title="홍수 감시" aria-label="Flood watch">
                         <i class="fa-solid fa-water"></i><span class="fw-home-dot"></span>
                     </button>
+                    <!-- V101.147: the ⋯ activity-details toggle sits right of Flood watch (was a round button on the activity row). -->
+                    <button type="button" id="activity-more" class="btn-sm activity-more" aria-label="Activity details" data-th-aria-label="รายละเอียดกิจกรรม" data-kr-aria-label="활동 상세" aria-expanded="false" style="position: relative; width: 28px; height: 28px; min-width: 28px; border-radius: 50%; padding: 0; background: #f8f9fa; color: #64748b; border: 1px solid #eee; display: flex; align-items: center; justify-content: center; min-height: auto; font-size: 0.8em;" aria-controls="activity-details" onclick="const panel=document.getElementById('activity-details'); panel.hidden=!panel.hidden; this.setAttribute('aria-expanded', String(!panel.hidden));">⋯</button>
                     <!-- V101.120: the Intern | Content switch (cafe-content.js) — ONE round button, right of Flood watch; only users who have both UIs see it. The icon is the view you are in; a tap flips. -->
                     <button type="button" id="cafe-view-switch" class="btn-sm lang-no-toggle" hidden></button>
                     <!-- V101.117: the ⚙ Settings button moved into the Info modal (top-right, left of ×) — the rail is four buttons. -->
@@ -2542,7 +2544,6 @@
                 <!-- 🔥 Unified Metrics Bar (V91.38) - Combines KPI + Voyage Metrics -->
                 <div class="unified-metrics-bar lean-activity">
                     <div id="daily-checkin-card" class="lang-no-toggle"></div>
-                    <button type="button" class="activity-more" aria-label="Activity details" data-th-aria-label="รายละเอียดกิจกรรม" data-kr-aria-label="활동 상세" aria-expanded="false" aria-controls="activity-details" onclick="const panel=document.getElementById('activity-details'); panel.hidden=!panel.hidden; this.setAttribute('aria-expanded', String(!panel.hidden));">⋯</button>
                     <div id="activity-details" class="lang-no-toggle" hidden>
                         <div id="monthly-progress" class="lang-no-toggle"></div>
                         <section aria-label="Submission history" data-th-aria-label="ประวัติการส่ง" data-kr-aria-label="제출 기록" hidden>
@@ -15996,8 +15997,8 @@
         }
 
         // V101.82: one bucket header; the TODAY header carries the 🔥 check-in pill inline.
-        function schBucketHeadHtml(label, color, bg, border, count, extra) {
-            return '<div style="display:flex; align-items:center; gap:6px; margin:12px 0 6px;">'
+        function schBucketHeadHtml(label, color, bg, border, count, extra, click) {   // V101.147: click = the whole header is a toggle (Missed)
+            return '<div' + (click ? ' onclick="' + click + '" role="button" tabindex="0" style="cursor:pointer; display:flex; align-items:center; gap:6px; margin:12px 0 6px;"' : ' style="display:flex; align-items:center; gap:6px; margin:12px 0 6px;"') + '>'
                 + '<span style="font-size:0.66em; font-weight:800; letter-spacing:0.04em; text-transform:uppercase; color:' + color + ';">' + label + '</span>'
                 + (count ? '<span style="font-size:0.62em; font-weight:800; color:' + color + '; background:' + bg + '; border:1px solid ' + border + '; border-radius:999px; padding:1px 7px;">' + count + '</span>' : '')
                 + (extra || '') + '</div>';
@@ -16045,16 +16046,16 @@
                 // quiz whose deadline had ever passed. Expanding shows all of them rather
                 // than the old first-five-then-more, since the section now sits last and
                 // buries nothing.
-                let hidden = 0;
                 if (key === 'missed') {
                     list = list.slice().reverse();
                     if (!window._schMissedExpanded) {
-                        hidden = list.length;
                         list = [];
                     }
                 }
                 const badgeCount = (grouped[key] || list).length;
-                html += schBucketHeadHtml(label, color, bg, border, key === 'today' ? 0 : badgeCount, key === 'today' ? checkinPillHtml() : '');   // V101.93: no "N" badge on TODAY — its tiles are all visible
+                const missedOpen = key === 'missed' && window._schMissedExpanded;
+                // V101.147: Missed = ONE line — the header is the toggle (the "Show 54 missed ›" / "Show less" row repeated its label and count).
+                html += schBucketHeadHtml(label, color, bg, border, key === 'today' ? 0 : badgeCount, key === 'today' ? checkinPillHtml() : (key === 'missed' ? '<span style="margin-left:auto; font-size:0.8em; font-weight:800; color:' + color + ';">' + (missedOpen ? '▴' : '▾') + '</span>' : ''), key === 'missed' ? 'schToggleMissed()' : '');   // V101.93: no "N" badge on TODAY — its tiles are all visible
                 // Today reads as upright tiles left → right; an opened event still drops its card full-width underneath.
                 if (key === 'today') {
                     html += '<div class="sch-tiles">' + list.map(it => schTileHtml(it, color, bg, border, acts, now)).join('') + '</div>';
@@ -16117,14 +16118,6 @@
                         if (ev) html += '<div style="margin:-2px 0 8px;">' + schEventRowHtml(ev, { hideTitle: true }) + '</div>';
                     }
                 });
-                if (hidden) {
-                    html += '<div onclick="schToggleMissed()" style="text-align:center; font-size:0.7em; font-weight:800; color:'
-                        + color + '; padding:4px 0 2px; cursor:pointer; opacity:0.85;">'
-                        + 'Show ' + hidden + ' missed ดูรายการที่พลาด ›</div>';
-                } else if (key === 'missed' && window._schMissedExpanded && (grouped[key] || []).length) {
-                    html += '<div onclick="schToggleMissed()" style="text-align:center; font-size:0.7em; font-weight:800; color:'
-                        + color + '; padding:4px 0 2px; cursor:pointer; opacity:0.85;">Show less ย่อกลับ ›</div>';
-                }
             });
             box.innerHTML = html;
             // An inline onclick can only name a global; a closure over `ev` is not one.
@@ -21300,7 +21293,7 @@
                     // feeds the streak or its +0.05 bonus; the 'activity' callers pay that
                     // themselves right after their own submit.
                     if (!isManual && schActivityDays) schActivityDays.add(todayKey);
-                    if (source === 'open') showToast(`🔥 ${result.streak} · เช็คอินแล้ว`);   // V101.68: the only sign the auto check-in happened
+                    if (source === 'open') showToast(`🔥 ${result.streak} · ${['Checked in', document.body.classList.contains('lang-kr-on') ? '출석 완료' : '', document.body.classList.contains('lang-th-on') ? 'เช็คอินแล้ว' : ''].filter(Boolean).join(' · ')}`);   // V101.68: the only sign the auto check-in happened; V101.147: wording follows the language chip (EN always, + KR / TH when on)
                 }
             } catch (err) {
                 console.warn('Daily check-in transaction failed:', err);

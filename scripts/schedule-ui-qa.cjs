@@ -171,7 +171,7 @@ assert.match((await page.textContent('#sch-week .sch-rg h4')).trim(), /^\d{1,2}[
     // ---- 7. the list below and the tabs are untouched
     const list = await page.textContent('#sch-agenda');
     assert.ok(/Today/.test(list) && /Journal/.test(list) && /Case/.test(list) && /Vitamin B quiz/.test(list) && /Journal club/.test(list), 'Agenda list still there: ' + list.slice(0, 160));
-    assert.ok(/Show 2 missed/.test(list), 'Missed still collapsed behind its link');
+    assert.ok(/Missed[^0-9]*2/i.test(list) && !/Show 2 missed/.test(list), 'Missed is ONE collapsed header line (no separate Show-N row)');
     // V101.81: Today = upright tiles, side by side, left → right
     const tiles = await page.locator('#sch-agenda .sch-tiles .sch-tile').evaluateAll(t => t.map(x => { const r = x.getBoundingClientRect(); return { l: r.left, t: r.top, w: r.width, h: r.height, txt: x.textContent.replace(/\s+/g, ' ').trim() }; }));
     assert.equal(tiles.length, 3, 'three Today tiles (check-in, Journal, Case): ' + JSON.stringify(tiles));
