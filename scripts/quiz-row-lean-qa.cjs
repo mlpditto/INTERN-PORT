@@ -106,7 +106,10 @@ function grabTable(id) {
 
     // Items + pts: one cell, inline, stepper wired
     const met = (await row(0).locator('.qa-met').innerText()).replace(/\s+/g, ' ');
-    assert(/15\s*items/.test(met) && /1\.5\s*pts/.test(met), 'items and pts inline: ' + met);
+    // V102.231: the "items" / "pts" words are in the DOM (read by the column header + tooltips) but hidden — the cell shows the bare numbers
+    assert(/15/.test(met) && /1\.5/.test(met) && !/items|pts/.test(met), 'items and pts inline, bare numbers: ' + met);
+    assert.deepEqual(await row(0).locator('.qa-met em').allTextContents(), ['items', 'pts'], 'unit words stay in the markup');
+    assert.equal(await row(0).locator('.qa-met em').first().evaluate(e => getComputedStyle(e).display), 'none', 'unit words hidden');
     assert.equal(await row(0).locator('.qa-met .qa-stp button').count(), 2);
     assert.match(await row(0).locator('.qa-met .qa-stp button').first().getAttribute('onclick'), /adjustQuizPoints\('q1', 0\.1\)/);
     assert.equal(await row(0).locator('.qa-met br').count(), 0, 'no stacked label under the numbers');
