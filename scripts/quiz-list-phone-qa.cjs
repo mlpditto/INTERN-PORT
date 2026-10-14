@@ -1,4 +1,5 @@
 // V102.230 — Quiz Engine list on a phone: each row is a card (title full width, chips on one line, metrics + actions below), Live rows tinted green.
+// V102.231 — desktop: ONE card + one header row, thin divider with counts (⏸️ Paused · 📑 Templates n), columns aligned across both tables, no "items"/"pts" words, Live tinted too.
 // Real admin.html + the real renderQuizzesNow with fixture quizzes; ≤480px gets the card rules, 1200px must be untouched.
 const assert = require('node:assert/strict');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -35,24 +36,32 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
                     metDisplay: cs(liveRow.querySelector('td.qa-met'), 'display'), liveBg: cs(liveRow, 'backgroundColor'), pausedBg: cs(pausedRow, 'backgroundColor'),
                     rowsLive: document.querySelectorAll('#quizzesTableActive tbody tr').length, rowsPaused: document.querySelectorAll('#quizzesTableInactive tbody tr:not([style*="pointer-events"])').length,
                     clamp: cs(liveRow.querySelector('.qa-title'), 'webkitLineClamp'),
+                    heading: document.getElementById('section-active-quizzes').textContent.trim(), divider: document.getElementById('section-inactive-quizzes').textContent.replace(/\s+/g, ' ').trim(),
+                    oneCard: document.getElementById('quiz-list-card').contains(document.getElementById('quizzesTableActive')) && document.getElementById('quiz-list-card').contains(document.getElementById('quizzesTableInactive')) && document.getElementById('quiz-list-card').contains(document.getElementById('section-inactive-quizzes')),
+                    dividerBetween: !!(document.getElementById('quizzesTableActive').compareDocumentPosition(document.getElementById('section-inactive-quizzes')) & Node.DOCUMENT_POSITION_FOLLOWING) && !!(document.getElementById('section-inactive-quizzes').compareDocumentPosition(document.getElementById('quizzesTableInactive')) & Node.DOCUMENT_POSITION_FOLLOWING),
+                    metX: [liveRow, pausedRow].map(r => { const c = r.querySelector('td.qa-met'); return c ? Math.round(c.getBoundingClientRect().left) : -1; }),
                 };
             });
             assert.ok(!r.err, 'renderQuizzesNow threw: ' + r.err);
             assert.equal(r.rowsLive, 1, 'one live row'); assert.equal(r.rowsPaused, 2, 'paused + template rows');
+            assert.ok(r.oneCard && r.dividerBetween, 'one card holds both tables with the divider between them @' + vw);
+            assert.equal(r.heading, '🟢 Live · 1', 'heading carries the live count @' + vw); assert.match(r.divider, /Paused · 📑 Templates\s*2$/, 'divider carries the paused/template count: ' + r.divider);
+            assert.equal(r.theadI, 'none', 'one header row — the second one is hidden @' + vw);
+            assert.equal(r.emDisplay, 'none', 'the "items" / "pts" words are out of the rows @' + vw);
+            assert.equal(r.liveBg, 'rgb(236, 253, 243)', 'Live row is green-tinted @' + vw + ': ' + r.liveBg); assert.notEqual(r.pausedBg, 'rgb(236, 253, 243)', 'paused row is not tinted @' + vw);
             if (phone) {
                 assert.equal(r.theadA, 'none', 'phone: header row hidden (Live)'); assert.equal(r.theadI, 'none', 'phone: header row hidden (Inactive)');
                 assert.ok(r.titleW >= 140, 'phone: the title keeps a readable width, not vertical letters: ' + r.titleW);
                 assert.ok(r.titleRight <= r.docW, 'phone: the title stays inside the screen: ' + r.titleRight + ' vs ' + r.docW);
                 assert.equal(r.clamp, '2', 'phone: title clamps to 2 lines');
                 assert.ok(r.l2H < 50, 'phone: chips stay on one line: ' + r.l2H);
-                assert.equal(r.shDisplay, 'none', 'phone: short title hidden'); assert.equal(r.emDisplay, 'none', 'phone: "items"/"pts" words hidden'); assert.equal(r.metDisplay, 'block', 'phone: items · pts shown on the card');
-                assert.equal(r.liveBg, 'rgb(236, 253, 243)', 'phone: Live row is green-tinted: ' + r.liveBg); assert.notEqual(r.pausedBg, 'rgb(236, 253, 243)', 'phone: paused row is not tinted');
+                assert.equal(r.shDisplay, 'none', 'phone: short title hidden'); assert.equal(r.metDisplay, 'block', 'phone: items · pts shown on the card');
             } else {
-                assert.notEqual(r.theadA, 'none', 'desktop: header row still there'); assert.notEqual(r.shDisplay, 'none', 'desktop: short title still shown');
-                assert.notEqual(r.emDisplay, 'none', 'desktop: "items"/"pts" words still shown'); assert.notEqual(r.liveBg, 'rgb(236, 253, 243)', 'desktop: no green tint (phone only)');
+                assert.notEqual(r.theadA, 'none', 'desktop: the (single) header row is there'); assert.notEqual(r.shDisplay, 'none', 'desktop: short title still shown');
+                assert.ok(Math.abs(r.metX[0] - r.metX[1]) <= 1, 'desktop: items · pts column lines up between Live and Paused rows: ' + r.metX);
             }
             await page.close();
         }
-        console.log('PASS: Quiz list on a phone — card rows (title ≥140px, 2-line clamp, chips on one line, items · pts + actions below), Live row green-tinted, header rows hidden; desktop 1200px unchanged');
+        console.log('PASS: Quiz list — phone: card rows (title ≥140px, 2-line clamp, one-line chips, items · pts + actions below); both: one card, one header row, counts on the Live heading + Paused/Templates divider, Live row green-tinted, no "items"/"pts" words; desktop: columns line up across Live and Paused');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
