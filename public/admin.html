@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.237)</title>
+    <title>Nika Admin (V102.238)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -8336,6 +8336,8 @@
                         style="display:none; gap:8px; flex-wrap:wrap; align-items:center; padding-left:12px; border-left:1px solid var(--border-color); flex-shrink:0;"></div>
                 </div>
                 <button type="button" id="bstat-chip" onclick="toggleBadgeStatsPanel()" title="Badge Stats — interns whose app has synced badges" aria-label="Badge Stats" aria-expanded="false" style="width:34px; height:34px; min-height:0; padding:0; margin:0; border-radius:10px; border:1px solid var(--border-color); background:var(--bg-card); font-size:1.05em; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; width:auto; padding:0 10px; gap:5px; font-size:0.85em; font-weight:700;">🏅 <span id="bstat-chip-n">–</span></button>
+                <!-- V102.238: CAFE / Content Creator / Audit keep their own points + Beri (users.cafePts / cafeBeri) and have no leaderboard in the app — this chip opens a small list of them. -->
+                <button type="button" id="cafepb-chip" onclick="toggleCafePBPanel()" title="CAFE · Content Creator · Audit — points and Beri" aria-label="CAFE points and Beri" aria-expanded="false" style="min-height:0; margin:0; border-radius:10px; border:1px solid var(--border-color); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; height:34px; width:auto; padding:0 10px; gap:5px; font-size:0.85em; font-weight:700;">🌸 <span id="cafepb-chip-n">–</span></button>
                 <button type="button" onclick="openShareModalForGroup(activeUserGroup === 'All' ? 'Global Leaderboard' : activeUserGroup)" title="Share ranking" aria-label="Share ranking" style="width:34px; height:34px; min-height:0; padding:0; margin:0; border-radius:10px; border:1px solid var(--border-color); background:var(--bg-card); font-size:1.05em; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">📤</button>
                 <button type="button" onclick="openDivisionsModal()" title="Manage Divisions &amp; Groups" aria-label="Divisions and Groups" style="width:34px; height:34px; min-height:0; padding:0; margin:0; border-radius:10px; border:1px solid var(--border-color); background:var(--bg-card); font-size:1.05em; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">⚙️</button>
                 <button type="button" onclick="openPreRegModal()" title="Entry (pre-registration)" aria-label="Entry" style="width:34px; height:34px; min-height:0; padding:0; margin:0; border-radius:10px; border:1px solid var(--border-color); background:var(--bg-card); font-size:1.05em; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">👥</button>
@@ -8374,6 +8376,13 @@
                     <span id="bstat-summary" style="font-size:0.78em; font-weight:600; color:#64748b; margin-left:auto;"></span>
                 </summary>
                 <div id="bstat-body" style="padding:10px 14px; border-top:1px solid #eef2ff; overflow-x:auto;"></div>
+            </details>
+            <details id="cafepb-panel" class="lang-no-toggle" style="display:none; margin-bottom:14px; border:1px solid #fbd9b5; border-radius:12px; background:#fff;" open>
+                <summary style="padding:10px 14px; cursor:pointer; font-weight:700; color:#b45309; list-style:none; display:flex; align-items:center; gap:8px;">
+                    🌸 CAFE · Audit — ⭐ points · 🪙 Beri
+                    <span id="cafepb-summary" style="font-size:0.78em; font-weight:600; color:#64748b; margin-left:auto;"></span>
+                </summary>
+                <div id="cafepb-body" style="padding:10px 14px; border-top:1px solid #fff3e6; overflow-x:auto;"></div>
             </details>
             <div style="overflow-x:auto;">
                 <table id="usersTable" class="lang-no-toggle">
@@ -24553,6 +24562,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const groups = getGlobalGroups();
             groups.forEach(g => {
                 if (known.has(g.toUpperCase())) return;
+                if (g.trim().toLowerCase() === 'audit') return;   // V102.238: Audit has no quizzes — not offered as an audience (a quiz already saved for it still loads: setQuizTargetGroupValue keeps its value)
                 const opt = document.createElement('option');
                 opt.value = g;
                 opt.text = g;
@@ -37748,8 +37758,40 @@ They can connect again from LINE.
                 + `</svg>`;
         }
 
+        // V102.238: CAFE · Content Creator · Audit — their own balances (users.cafePts / users.cafeBeri, written when a content post is scored). Read-only list, no new query.
+        let cafePBSort = 'pts';
+        function cafePBUsers() {
+            const creatorDivs = Object.keys(divisionConfig || {}).filter(d => ['content creator', 'cafe'].includes(String(d).trim().toLowerCase()));
+            return usersData.filter(u => !u.isIgnored && !u.isPreReg && (creatorDivs.some(d => userInDivision(u, d)) || userInScope(u, 'Audit') || Number(u.cafePts) || Number(u.cafeBeri)));
+        }
+        function renderCafePB() {
+            const users = cafePBUsers();
+            const n = document.getElementById('cafepb-chip-n'); if (n) n.textContent = users.length;
+            const body = document.getElementById('cafepb-body'); if (!body) return;
+            const key = cafePBSort === 'beri' ? 'cafeBeri' : 'cafePts';
+            const rows = users.slice().sort((a, b) => (Number(b[key]) || 0) - (Number(a[key]) || 0));
+            const fmt = v => parseFloat((Number(v) || 0).toFixed(2));
+            const tp = rows.reduce((t, u) => t + (Number(u.cafePts) || 0), 0), tb = rows.reduce((t, u) => t + (parseInt(u.cafeBeri, 10) || 0), 0);
+            const sum = document.getElementById('cafepb-summary'); if (sum) sum.textContent = `${rows.length} · ⭐ ${fmt(tp)} · 🪙 ${tb}`;
+            const th = (k, label) => `<th style="text-align:right; cursor:pointer; ${cafePBSort === k ? 'color:var(--primary);' : ''}" onclick="cafePBSort='${k}'; renderCafePB()" title="Sort">${label}${cafePBSort === k ? ' ▾' : ''}</th>`;
+            body.innerHTML = rows.length
+                ? `<table style="width:100%; font-size:0.85em;"><thead><tr><th style="text-align:left;">User</th><th style="text-align:left;">Group</th>${th('pts', '⭐')}${th('beri', '🪙')}</tr></thead><tbody>`
+                    + rows.map(u => `<tr><td>${escapeHtml(u.fullName || u.displayName || u.id)}</td><td class="lang-no-toggle">${escapeHtml(u.group || 'Public')}</td><td style="text-align:right; font-weight:800; color:#4361ee;">${fmt(u.cafePts)}</td><td style="text-align:right; font-weight:800; color:#b45309;">${parseInt(u.cafeBeri, 10) || 0}</td></tr>`).join('')
+                    + `<tr><td colspan="2"><b>Total</b></td><td style="text-align:right; font-weight:800;">${fmt(tp)}</td><td style="text-align:right; font-weight:800;">${tb}</td></tr></tbody></table>`
+                : '<div style="color:#94a3b8; font-size:0.85em;">Nobody yet.</div>';
+        }
+        function toggleCafePBPanel() {
+            const panel = document.getElementById('cafepb-panel'), chip = document.getElementById('cafepb-chip');
+            if (!panel) return;
+            const show = panel.style.display === 'none';
+            panel.style.display = show ? '' : 'none';
+            panel.open = true;
+            if (chip) chip.setAttribute('aria-expanded', String(show));
+            if (show) renderCafePB();
+        }
         function renderBadgeStatsIfOpen() {
             renderBadgeStatsChip();
+            renderCafePB();
             const panel = document.getElementById('badge-stats-panel');
             if (panel && panel.open && panel.style.display !== 'none') renderBadgeStats();
         }

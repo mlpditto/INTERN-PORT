@@ -50,7 +50,7 @@ const overlaps = (a, b) => a.l < b.r - 0.5 && a.r > b.l + 0.5 && a.t < b.b - 0.5
       assert(card && card.r > card.l, 'card renders' + tag);
       // tool rail: one row, no 🔄
       const rail = await rect(page, '#profile-quick-actions > button');
-      assert.equal(rail.length, 4, 'four rail buttons (V101.117: ⚙ moved into Info)' + tag);
+      assert.equal(rail.length, 5, 'five rail buttons (V101.117: ⚙ moved into Info; V101.147: ⋯ beside Flood)' + tag);
       // 320px (the narrowest phones) may still wrap the fifth button — 44px targets + the avatar pad leave ~200px; it overlaps nothing
       if (width >= 360) assert(Math.max(...rail.map(b => b.t)) - Math.min(...rail.map(b => b.t)) <= 2, 'rail on one row' + tag + ': ' + rail.map(b => Math.round(b.t)));
       for (let i = 0; i < rail.length; i++) for (let j = i + 1; j < rail.length; j++) assert(!overlaps(rail[i], rail[j]), 'rail buttons do not overlap each other' + tag);
