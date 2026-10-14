@@ -4288,8 +4288,24 @@ function popnixNear(all, lat, lon) {
     const roads = nearest(all.roads.roads, 2, 3).map(({ s, km }) => ({
         name: String(s.name || '').slice(0, 80), km: Math.round(km * 10) / 10, depthCm: num(s.depth), level: String(s.level || '')
     }));
+    // V101.148: everything within 10 km (the page shows one summary row only when something there needs attention).
+    const within = list => nearest(list, 1000, 10);
+    const c10 = within(all.overview.stations).filter(x => x.s.online !== false);
+    const cBad = c10.filter(x => x.s.level === 'warn' || x.s.level === 'crit');
+    const rd10 = within(all.roads.roads).filter(x => x.s.level !== 'off');
+    const rdWet = rd10.filter(x => x.s.level === 'slight' || x.s.level === 'flood');
+    const rn10 = within(all.rain.stations).filter(x => num(x.s.r1h) != null);
+    const rnHeavy = rn10.filter(x => x.s.r1h >= 10);   // mm in the last hour: a downpour, not drizzle
+    const r10 = {
+        canals: { n: c10.length, bad: cBad.length }, roads: { n: rd10.length, wet: rdWet.length }, rains: { n: rn10.length, heavy: rnHeavy.length },
+        items: [].concat(
+            cBad.map(x => ({ k: 'canal', name: String(x.s.name || '').slice(0, 60), km: Math.round(x.km * 10) / 10, level: x.s.level, wl: num(x.s.wl) })),
+            rdWet.map(x => ({ k: 'road', name: String(x.s.name || '').slice(0, 60), km: Math.round(x.km * 10) / 10, depthCm: num(x.s.depth) })),
+            rnHeavy.map(x => ({ k: 'rain', name: String(x.s.name || '').slice(0, 60), km: Math.round(x.km * 10) / 10, r1h: num(x.s.r1h) }))
+        ).sort((x, y) => x.km - y.km).slice(0, 8)
+    };
     return {
-        canals, rains, roads,
+        canals, rains, roads, r10,
         city: {
             raining: num(rainSum.raining),
             max1h: rainSum.max1h ? { name: String(rainSum.max1h.name || '').slice(0, 60), v: num(rainSum.max1h.v) } : null,
