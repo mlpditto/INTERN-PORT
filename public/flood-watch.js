@@ -447,18 +447,29 @@
     function line(icon, label, value, small, keys) {
         return '<div class="fw-dl' + srcBar(keys || ['fw']) + '"><i class="fa-solid ' + icon + '"></i><span>' + label + '</span><b>' + value + '</b>' + (small ? '<small>' + small + '</small>' : '') + '</div>';
     }
+    // V101.148: 10 km around the point. Normal = nothing written (the popup turns soft green); a flood-relevant hit adds ONE summary row.
+    function r10Show(pop) { var r = pop && pop.r10; return !!r && (r.canals.bad > 0 || r.roads.wet > 0 || r.rains.heavy > 0); }
+    function r10Html(r) {
+        var items = (r.items || []).map(function (x) {
+            var ic = x.k === 'canal' ? 'fa-water' : x.k === 'road' ? 'fa-road' : 'fa-cloud-rain';
+            var txt = x.k === 'canal' ? (x.level === 'crit' ? T('วิกฤต', '심각') : sevTxt('warn')) : x.k === 'road' ? (x.depthCm ? x.depthCm + ' cm' : T('มีน้ำ', '침수')) : (x.r1h + ' mm/' + T('ชม.', '시간'));
+            return '<div><i class="fa-solid ' + ic + '"></i><span>' + esc(x.name) + ' · ' + txt + '</span><small>' + x.km + ' km</small></div>';
+        }).join('');
+        return '<details class="fw-r10"><summary class="fw-dl"><i class="fa-solid fa-bullseye"></i><span>' + T('รัศมี 10 กม.', '반경 10 km') + '</span><b>🌊 ' + r.canals.bad + '/' + r.canals.n + ' · 🛣️ ' + r.roads.wet + '/' + r.roads.n + ' · 🌧 ' + r.rains.heavy + '/' + r.rains.n + '</b></summary><div class="fw-r10-list">' + items + '</div></details>';
+    }
     function moreHtml(d, p, alert) {
         var rows = [];
         var pop = d.pop;
         (pop && pop.canals || []).forEach(function (c, i) {
             var rate = i === 0 && c.deltaCm != null ? ' · ' + (c.deltaCm > 0 ? '▲ +' : '▼ ') + c.deltaCm + T(' cm/ชม.', ' cm/시간') : '';
-            rows.push(line('fa-water', esc(c.name), m2(c.wl) + ' m <span class="fw-lv ' + (LV[c.level] || 'unk') + '">' + (c.level === 'crit' ? T('วิกฤต', '심각') : c.level === 'warn' ? sevTxt('warn') : c.level === 'ok' ? sevTxt('ok') : '?') + '</span>', c.km + ' km' + esc(rate), ['pop']));
+            rows.push(line('fa-water', esc(c.name), m2(c.wl) + ' m' + (c.level === 'ok' ? '' : ' <span class="fw-lv ' + (LV[c.level] || 'unk') + '">' + (c.level === 'crit' ? T('วิกฤต', '심각') : c.level === 'warn' ? sevTxt('warn') : '?') + '</span>'), c.km + ' km' + esc(rate), ['pop']));
         });
         var roads = pop && pop.roads || [];
         if (roads.length) {
             var wet = roads.filter(function (r) { return r.level !== 'dry'; });
-            rows.push(line('fa-road', roads.map(function (r) { return esc(r.name); }).join(' · '), wet.length ? wet.map(function (r) { return (r.depthCm == null ? T('มีน้ำ', '침수') : r.depthCm + ' cm'); }).join(', ') : T('แห้ง', '물 없음'), roads.map(function (r) { return r.km; }).sort().filter(function (v, i, a) { return i === 0 || i === a.length - 1; }).join('–') + ' km', d.road ? ['pop', 'fb'] : ['pop']));
+            rows.push(line('fa-road', roads.map(function (r) { return esc(r.name); }).join(' · '), wet.length ? wet.map(function (r) { return (r.depthCm == null ? T('มีน้ำ', '침수') : r.depthCm + ' cm'); }).join(', ') : '–', roads.map(function (r) { return r.km; }).sort().filter(function (v, i, a) { return i === 0 || i === a.length - 1; }).join('–') + ' km', d.road ? ['pop', 'fb'] : ['pop']));
         }
+        if (r10Show(pop)) rows.push(r10Html(pop.r10));   // V101.148: only when something within 10 km needs attention
         if (d.traffy6h) rows.push(line('fa-triangle-exclamation', T('รายงานน้ำท่วมจากประชาชน (Traffy)', '시민 침수 제보 (Traffy)'), d.traffy6h, '≤1 km · ' + T('6 ชม.', '6시간'), ['fw']));
         var rv = d.river && d.river.stations ? d.river.stations.filter(fresh) : [];   // V101.71: shown on the front (riverRowHtml); kept here for the legend
         var wx = p.wx;
@@ -503,6 +514,9 @@
         }
         // Flood data can fail on its own (FloodWatch is flaky); the 7-day rain still shows.
         if (!d && p.wx && !p.loading) body += rain7Html(p.wx);
+        // V101.148: soft tint instead of words: green when all is calm, amber when something within 10 km needs attention (stronger risks keep the water colour).
+        var tone = d && !p.loading && !p.err ? (r10Show(d.pop) ? 'watch' : (!risk || risk === 'low' ? 'calm' : '')) : '';
+        sheet.classList.toggle('fw-tone-calm', tone === 'calm'); sheet.classList.toggle('fw-tone-watch', tone === 'watch');
         sheet.innerHTML = '<div class="fw-water' + (risk ? ' fw-' + risk : '') + '" aria-hidden="true"></div>' +
             '<div class="fw-top">' + top + '</div>' + body;
     }

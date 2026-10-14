@@ -107,7 +107,7 @@ const text = (page, sel) => page.locator(sel).evaluateAll(ns => ns.map(n => n.te
         const lines = await text(page, '.fw-sheet .fw-dl');
         assert.equal(lines.length, 5, 'canal ×2 · roads · Traffy · weather: ' + JSON.stringify(lines));
         assert.ok(lines[0].includes('ค.ทรงกระเทียม ปตร') && lines[0].includes('-0.03 m') && lines[0].includes('▲ +5 cm/ชม.'));
-        assert.ok(lines[2].startsWith('ถ.นาคนิวาส (ซ. 38) · ถ.สุคนธสวัสดิ์ (ซ. 15)') && lines[2].includes('แห้ง'), lines[2]);
+        assert.ok(lines[2].startsWith('ถ.นาคนิวาส (ซ. 38) · ถ.สุคนธสวัสดิ์ (ซ. 15)') && lines[2].includes('–') && !lines[2].includes('แห้ง'), lines[2]);   // V101.148: dry = a dash, no word
         assert.ok(lines[3].includes('Traffy') && lines[3].includes('2'));
         assert.ok(lines[4].includes('26°') && lines[4].includes('76'), lines[4]);
         const meta = (await text(page, '.fw-sheet .fw-meta'))[0];
