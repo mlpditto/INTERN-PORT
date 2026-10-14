@@ -3,7 +3,7 @@
 // "units" (an element that owns a .lang-th / .lang-kr span) that have Thai but NO Korean, grouped by the screen (nearest id'd ancestor).
 // Attributes: elements with data-th-* but no data-kr-*. Most screens are drawn by JS, whose strings are not in the static DOM, so they
 // are counted from source: Thai string literals inside index.html's own <script> blocks, and source lines of the companion .js files.
-// --md prints Markdown for docs/KR-COVERAGE.md; --list <screen-id> prints that screen's Thai-only units (EN text → Thai text).
+// --json prints the totals as one JSON line (used by kr-gap-ratchet-check.cjs). --md prints Markdown for docs/KR-COVERAGE.md; --list <screen-id> prints that screen's Thai-only units (EN text → Thai text).
 const path = require('node:path'), fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -80,6 +80,11 @@ function inlineScriptLiterals(file) {
         return { f, thOnly: lines.filter(l => TH.test(l) && !KR.test(l)).length, both: lines.filter(l => TH.test(l) && KR.test(l)).length };
     }).sort((a, b) => b.thOnly - a.thOnly);
 
+    if (process.argv.includes('--json')) {   // step 7: machine-readable totals for scripts/kr-gap-ratchet-check.cjs
+        const companion = {}; src.forEach(x => { companion[x.f] = x.thOnly; });
+        console.log(JSON.stringify({ labelsNoKorean: enUnits - enWithKr, thOnlyUnits: sum('thOnly'), attrGap: sum('attrGap'), inlineThaiNoKorean: inl.th, companion }));
+        return;
+    }
     const total = sum('thOnly') + sum('both');
     const enLine = `English labels in the static markup: ${enUnits} elements show English text of their own · ${enWithKr} of them also carry a Korean run (${enUnits - enWithKr} have no Korean — the full Korean-UI target)`;
     const head = enLine + '\n\n' + `index.html static markup: ${total} units have Thai · ${sum('both')} also have Korean · ${sum('thOnly')} Thai but NO Korean · ${sum('krOnly')} Korean only · ${sum('attrGap')} attributes (placeholder/title/aria-label) with Thai but no Korean`;
