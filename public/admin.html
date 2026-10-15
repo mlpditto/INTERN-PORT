@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.248)</title>
+    <title>Nika Admin (V102.249)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -35835,6 +35835,12 @@ RULES:
                 const ed = document.getElementById('div-editor'); if (ed && ed.innerHTML && typeof renderDivisionAdminList === 'function') renderDivisionAdminList();
             }, e => console.error('🔥 [Firestore Error] quizzes/--group-style--:', e));
 
+            // V102.249: division links (admin only — _meta)
+            db.collection('_meta').doc('division-links').onSnapshot(doc => {
+                divLinks = (doc.exists && doc.data().links) || {};
+                const ed = document.getElementById('div-editor'); if (ed && ed.innerHTML && typeof renderDivisionAdminList === 'function') renderDivisionAdminList();
+            }, e => console.error('🔥 [Firestore Error] _meta/division-links:', e));
+
             db.collection("pre_users").orderBy("createdAt", "desc").onSnapshot(s => {
                 preRegData = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 if (document.getElementById('preRegModal').style.display === 'block') {
@@ -52058,6 +52064,31 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // V102.180: 🎨 Look — colour · icon · picture for the picked group or the selected division. Each pick saves at once (⚡, like Rename),
         // into quizzes/--group-style--; the picture goes through the shop-logo path (256px WebP, content-addressed in link-logos/, admin-only).
         let divLook = null;   // { kind: 'groups' | 'divisions', name }
+        // V102.249: 🔗 a link per division (e.g. the RSU evaluation Google Form) — ADMIN ONLY. It lives in _meta/division-links = { links: { RSU: { url, label } } }: `_meta` is
+        // admin-read in firestore.rules, unlike quizzes/--group-style-- (read by every intern), so the link never reaches the intern app.
+        let divLinks = {};       // UPPER division name -> { url, label }
+        let divLinkOpen = '';    // the division whose Link row is open
+        const divLinkOf = name => divLinks[String(name).trim().toUpperCase()] || {};
+        function divLinkHtml() {
+            const name = divLinkOpen, l = divLinkOf(name);
+            if (!name) return '';
+            const btn = (attr, title, glyph) => `<button type="button" class="dv-ib dv-ib-sm" ${attr}="1" title="${title}" aria-label="${title}"${l.url ? '' : ' disabled'}>${glyph}</button>`;
+            return `<div class="dv-look dv-linkrow"><span>Link</span><span class="rail"><input type="url" value="${escapeHtml(l.url || '')}" placeholder="https://… (a form, a page)" onchange="divLinkSet('url', this.value.trim())" aria-label="Division link">`
+                + btn('data-divlink-open', 'Open in a new tab', '↗') + btn('data-divlink-rm', 'Remove the link', '✕') + `</span>`
+                + `<span>Label</span><span class="rail"><input type="text" value="${escapeHtml(l.label || '')}" maxlength="80" placeholder="what it is (optional)" onchange="divLinkSet('label', this.value.trim())" aria-label="Link label" style="flex:1;min-width:120px;margin:0;padding:4px 8px;border:1px solid #e2e8f0;border-radius:8px;font:inherit;font-size:12px"><span class="dv-live" title="Each change saves right away">⚡</span><small style="color:#64748b">🔒 admins only — interns never receive it</small></span></div>`;
+        }
+        async function saveDivLink(name, patch) {
+            const key = divUp(name), cur = Object.assign({}, divLinks[key] || {}, patch);
+            if (cur.url && !/^https?:\/\/\S+$/i.test(cur.url)) { showToast('The link must start with http:// or https://'); renderDivisionAdminList(); return; }
+            Object.keys(cur).forEach(k => { if (!cur[k]) delete cur[k]; });
+            if (!cur.url) delete cur.label;   // a label without a link means nothing
+            if (Object.keys(cur).length) divLinks[key] = cur; else delete divLinks[key];   // paint now; the listener echoes the write
+            renderDivisionAdminList();
+            try {
+                await db.collection('_meta').doc('division-links').set({ links: { [key]: Object.keys(cur).length ? cur : firebase.firestore.FieldValue.delete() } }, { merge: true });
+            } catch (e) { console.error('[saveDivLink]', e); showToast('Could not save the link: ' + (e.message || e.code || e)); }
+        }
+        function divLinkSet(field, value) { if (divLinkOpen) saveDivLink(divLinkOpen, { [field]: value }); }
         const LOOK_COLORS = ['#4361ee', '#22c55e', '#f97316', '#ef4444', '#8338ec', '#14b8a6', '#d946ef', '#06b6d4', '#ec4899', '#eab308', '#0ea5e9', '#f59e0b', '#0d9488', '#84cc16', '#64748b'];
         const LOOK_ICONS = ['fa-tag', 'fa-users', 'fa-user-md', 'fa-user-graduate', 'fa-pills', 'fa-hospital-user', 'fa-stethoscope', 'fa-flask', 'fa-bullhorn', 'fa-laptop-code', 'fa-palette', 'fa-mug-hot', 'fa-clipboard-check', 'fa-child', 'fa-star', 'fa-shield-halved', 'fa-terminal', 'fa-heart-pulse'];
         function divLookHtml() {
@@ -52148,7 +52179,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const people = mem[divSel].filter(u => !u.isIgnored).length;
             const caption = q ? 'matches in all divisions' : divSel === '__only' ? `ranked on their own · ${people} ${people === 1 ? 'person' : 'people'}` : (pairs.length ? `ranked together as one board · ${people} ${people === 1 ? 'person' : 'people'}` : 'no groups yet — type a name below to add one');
             const divLookOn = !!(divLook && divLook.kind === 'divisions' && divUp(divLook.name) === divUp(divSel));
-            const delDiv = (!q && divSel !== '__only') ? `<button type="button" class="dv-ib dv-ib-sm" data-divlook="${escapeHtml(divSel)}" aria-pressed="${divLookOn}" title="Look — colour, icon, picture of this division" aria-label="Division look">🎨</button><button type="button" class="dv-del" data-del="${escapeHtml(divSel)}" title="Delete division — its people go back to Only I" aria-label="Delete division ${escapeHtml(divSel)}">✕</button>` : '';   // V102.180: 🎨 beside ✕
+            const delDiv = (!q && divSel !== '__only') ? `<button type="button" class="dv-ib dv-ib-sm" data-divlook="${escapeHtml(divSel)}" aria-pressed="${divLookOn}" title="Look — colour, icon, picture of this division" aria-label="Division look">🎨</button><button type="button" class="dv-ib dv-ib-sm" data-divlink="${escapeHtml(divSel)}" aria-pressed="${divUp(divLinkOpen) === divUp(divSel)}" title="${divLinkOf(divSel).url ? 'Link — ' + escapeHtml(divLinkOf(divSel).label || divLinkOf(divSel).url) + ' (admin only)' : 'Add a link for this division (admin only)'}" aria-label="Division link"${divLinkOf(divSel).url ? ' style="background:#e0f2fe;border-color:#7dd3fc"' : ''}>🔗</button><button type="button" class="dv-del" data-del="${escapeHtml(divSel)}" title="Delete division — its people go back to Only I" aria-label="Delete division ${escapeHtml(divSel)}">✕</button>` : '';   // V102.180: 🎨 beside ✕
 
             // the picked group (in its division): rename / merge / visibility / delete act on the database at once; the people below can be moved between divisions (also at once)
             let bar = '';
@@ -52171,7 +52202,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     + '</div>';
             }
             box.innerHTML = `<div class="dv-rail-row">${names.map(railChip).join('')}${railChip('__only')}<button type="button" class="dv-newbtn" data-newdiv="1" title="New division" aria-label="New division">＋</button></div>`
-                + `<div class="dv-panel" style="--dc:${divColor(divSel)}"><div class="dv-cap"><span>${caption}</span>${delDiv}</div>${(!q && divLookOn) ? divLookHtml() : ''}<div class="dv-chips">${chips}</div>${bar}</div>`;
+                + `<div class="dv-panel" style="--dc:${divColor(divSel)}"><div class="dv-cap"><span>${caption}</span>${delDiv}</div>${(!q && divLookOn) ? divLookHtml() : ''}${(!q && divSel !== '__only' && divLinkOpen && divUp(divLinkOpen) === divUp(divSel)) ? divLinkHtml() : ''}<div class="dv-chips">${chips}</div>${bar}</div>`;
         }
 
         function onDivEditorClick(e) {
@@ -52185,7 +52216,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 else if (lk.dataset.lookReset) saveGroupStyle(divLook.kind, divLook.name, { color: '', icon: '', image: '' });
                 return;
             }
+            const lo = e.target.closest('[data-divlink-open]'), lr = e.target.closest('[data-divlink-rm]');   // V102.249
+            if (lo) { const u = divLinkOf(divLinkOpen).url; if (u) window.open(u, '_blank', 'noopener'); return; }
+            if (lr) { saveDivLink(divLinkOpen, { url: '', label: '' }); return; }
             if (e.target.closest('.dv-look')) return;   // typing in the URL / colour inputs
+            const dk = e.target.closest('[data-divlink]');
+            if (dk) { const n = dk.dataset.divlink; divLinkOpen = divUp(divLinkOpen) === divUp(n) ? '' : n; renderDivisionAdminList(); return; }
             const dl = e.target.closest('[data-divlook]');
             if (dl) { const n = dl.dataset.divlook; divLook = (divLook && divLook.kind === 'divisions' && divLook.name === n) ? null : { kind: 'divisions', name: n }; renderDivisionAdminList(); return; }
             const act = e.target.closest('[data-act]');
@@ -52207,7 +52243,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 renderDivisionAdminList(); return;
             }
             const sel = e.target.closest('[data-sel]');
-            if (sel) { divSel = sel.dataset.sel; divPick = ''; divPickDiv = ''; divPeople = new Set(); divFilter = ''; divLook = null; document.getElementById('dv-filter').value = ''; divShowEmpty = false; renderDivisionAdminList(); return; }
+            if (sel) { divSel = sel.dataset.sel; divPick = ''; divPickDiv = ''; divPeople = new Set(); divFilter = ''; divLook = null; divLinkOpen = ''; document.getElementById('dv-filter').value = ''; divShowEmpty = false; renderDivisionAdminList(); return; }
             const more = e.target.closest('[data-more]');
             if (more) { divShowEmpty = more.dataset.more === '1'; renderDivisionAdminList(); return; }
             if (e.target.closest('[data-newdiv]')) { const row = document.getElementById('dv-newrow'); row.hidden = !row.hidden; if (!row.hidden) document.getElementById('new-div-name').focus(); return; }

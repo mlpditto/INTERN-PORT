@@ -35,7 +35,7 @@ assert.ok(modal.includes('id="dv-newrow" hidden') && modal.includes('id="div-sav
         const errs = []; page.on('pageerror', e => errs.push(e.message));
         await page.setContent('<!doctype html><meta charset="utf-8"><style>.modal{display:flex}</style><style>' + css + '</style>' + modal);
         await page.addScriptTag({ content: [
-            "let groupStyle = { groups: {}, divisions: {} }; let divLook = null;   // V102.180: the look doc (empty here) + the closed 🎨 editor",
+            "let groupStyle = { groups: {}, divisions: {} }; let divLook = null; let divLinks = {}; let divLinkOpen = ''; const divLinkOf = name => divLinks[String(name).trim().toUpperCase()] || {};   // V102.180: the look doc (empty here) + the closed 🎨 editor",
             'var usersData = [',
             '  { id: "u1", displayName: "Bua", group: "EXTERN" }, { id: "u2", displayName: "nt", group: "EXTERN" }, { id: "u3", displayName: "YUI", group: "Audit" },',
             '  { id: "u4", displayName: "Kate", group: "Pharmacists" }, { id: "u5", displayName: "Joey", group: "Pharmacists" }, { id: "u6", displayName: "Gap", group: "Pharmacists", isIgnored: true },',
@@ -49,7 +49,7 @@ assert.ok(modal.includes('id="dv-newrow" hidden') && modal.includes('id="div-sav
             grabConst('const groupColorMap = {'), grabConst('const groupIconMap = {'),
             html.slice(html.indexOf('        const divUp = x =>'), html.indexOf('\n', html.indexOf('        const divUp = x =>'))),
             ['function groupStyleOf(', 'function divChipLook(', 'function userMemberships(', 'function userInDivision(', 'function divAlsoOf(', 'function getGroupColor(', 'function getGroupIcon(', 'function groupActiveCount(', 'function groupTotalCount(', 'function groupChipHtml(', 'function userDivisionOf(', 'function divColor(',
-                'function divDiff(', 'function setDivDirty(', 'function divMembersOf(', 'function divGroupsOf(', 'function renderDivisionAdminList(', 'function onDivEditorClick(', 'function divAddGroup(', 'async function divMovePeople(',
+                'function divDiff(', 'function setDivDirty(', 'function divMembersOf(', 'function divGroupsOf(', 'function divLinkHtml(', 'function renderDivisionAdminList(', 'function onDivEditorClick(', 'function divAddGroup(', 'async function divMovePeople(',
                 'function addDivision(', 'function removeDivision('].map(grabFn).join('\n'),
             'var divDraft = JSON.parse(JSON.stringify(divisionConfig)), divPick = "", divPickDiv = "", divPeople = new Set(), divSel = "", divFilter = "", divShowEmpty = false;'
         ].join('\n') });
