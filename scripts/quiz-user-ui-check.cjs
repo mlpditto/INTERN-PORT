@@ -27,7 +27,7 @@ const fbMarkup = html.slice(fbStart,fbEnd);
    window.userId='test-user';window.userProfile={displayName:'Test'};window.quizAttemptsCache={};
    window.firebase={firestore:{FieldValue:{serverTimestamp:()=>123}}};window.writes=[];window.closed=0;
    window.db={collection:()=>({add:async data=>{writes.push(data);await new Promise(r=>setTimeout(r,30));},doc:()=>({set:async()=>{}}),where:()=>({get:async()=>({size:1})})})};
-   window.showFeedbackReward=()=>{};window.closeFeedbackModal=()=>closed++;
+   window.requireRegistered=()=>true;window.showFeedbackReward=()=>{};window.closeFeedbackModal=()=>closed++;
   });
   await page.addScriptTag({path:path.join(dir,'quiz-feedback-lang.js')}); // V101.95: fbT() for the feedback sheet
   for(const [a,b] of [

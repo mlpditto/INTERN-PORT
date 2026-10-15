@@ -27,7 +27,7 @@ for (const k of ['score', 'group', 'enrollmentCode', 'createdAt']) assert.equal(
 
 // checkUser only runs the signed-in branch for a registered doc, otherwise it shows Register.
 const check = grab('checkUser').src;
-assert.ok(/r\.onSnapshot\(d => \{\n\s*if \(d\.exists && isRegisteredUserDoc\(d\.data\(\)\)\) \{/.test(check), 'checkUser gates on isRegisteredUserDoc');
+assert.ok(/r\.onSnapshot\(d => \{\n(?:\s*window\.myRegistered[^\n]*\n)?\s*if \(d\.exists && isRegisteredUserDoc\(d\.data\(\)\)\) \{/.test(check), 'checkUser gates on isRegisteredUserDoc');
 assert.ok(/\} else \{\n\s*\/\/ First time user — show enrollment modal\n\s*showEnrollmentModal\(\);/.test(check), 'else branch still opens Register');
 
 // The three boot-time writers must not be able to create the doc.
