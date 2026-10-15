@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.249)</title>
+    <title>Nika Admin (V102.250)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -4027,7 +4027,8 @@
         .usr-grp-tag { --c:#64748b; display:inline-block; font-size:10.5px; font-weight:800; padding:1px 8px; border-radius:999px; color:var(--c); background:color-mix(in srgb, var(--c) 12%, #fff); border:1px solid color-mix(in srgb, var(--c) 35%, #fff); margin-left:4px; vertical-align:middle; white-space:nowrap; }
         #user-subgroup-row { --dc:#64748b; display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:0 0 12px; padding:6px 10px; border-radius:12px; background:linear-gradient(180deg, color-mix(in srgb, var(--dc) 12%, #fff), color-mix(in srgb, var(--dc) 4%, #fff)); border:1px solid color-mix(in srgb, var(--dc) 28%, #fff); }
         #user-subgroup-row[hidden] { display:none; }
-        #user-subgroup-row .sub-l { font-size:12px; font-weight:800; color:color-mix(in srgb, var(--dc) 70%, #334155); margin-right:2px; }
+        #user-subgroup-row .sub-l { font-size:12px; font-weight:800; color:color-mix(in srgb, var(--dc) 70%, #334155); margin:0 2px 0 0; padding:2px 4px; width:auto; min-height:0; background:none; border:none; border-radius:6px; cursor:pointer; }   /* V102.250: a button now */
+        #user-subgroup-row .sub-l:hover { background:color-mix(in srgb, var(--dc) 14%, transparent); text-decoration:underline; }
         /* V102.64: Event modal — lean glass form; icons instead of uppercase labels. */
         .evf { border:1px solid rgba(255,255,255,.8); border-radius:16px; padding:10px; margin-top:10px; background:linear-gradient(180deg, rgba(255,255,255,.8), rgba(255,255,255,.45)); box-shadow:inset 0 1px 0 #fff, 0 6px 18px rgba(15,23,42,.08); -webkit-backdrop-filter:blur(12px) saturate(160%); backdrop-filter:blur(12px) saturate(160%); }
         .evf input:not([type=checkbox]), .evf textarea { width:100%; min-width:0; padding:6px 9px; border:1px solid rgba(148,163,184,.45); border-radius:10px; background:rgba(255,255,255,.7); font-size:0.85em; box-sizing:border-box; }
@@ -37961,7 +37962,7 @@ They can connect again from LINE.
             const chips = gs.map(g => { const n = members.filter(u => !u.isIgnored && (u.group || 'Public') === g).length, t = members.filter(u => (u.group || 'Public') === g).length, on = g === activeUserGroup && activeUserGroupDiv === div;
                 return groupChipHtml(g, { on, active: n, total: t, attrs: `data-g="${escapeHtml(g)}" data-dv="${escapeHtml(div)}" onclick="setUserGroupFilter(this.dataset.g, this.dataset.dv)" aria-pressed="${on}"`, hint: 'filter to this group' }); }).join('');
             row.style.setProperty('--dc', divColor(div));
-            row.innerHTML = `<span class="sub-l">${escapeHtml(div)} ›</span>${chips || '<small style="color:#94a3b8;">no groups yet</small>'}`;
+            row.innerHTML = `<button type="button" class="sub-l" onclick="openDivisionsModal(this.dataset.dv)" data-dv="${escapeHtml(div)}" title="Open Divisions &amp; Groups on ${escapeHtml(div)}" aria-label="Open Divisions and Groups on ${escapeHtml(div)}">${escapeHtml(div)} ›</button>${chips || '<small style="color:#94a3b8;">no groups yet</small>'}`;
             row.hidden = false;
         }
 
@@ -51922,9 +51923,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         let divSel = '', divFilter = '', divShowEmpty = false;
         // V102.173: people, not groups, move between divisions. divPickDiv = the division the picked group is read in ('' = Only I); divPeople = the selected user ids.
         let divPickDiv = '', divPeople = new Set();
-        function openDivisionsModal() {
+        // V102.250: `sel` = a division to land on (the "RSU ›" label above the Users table opens it straight there); no argument = as before
+        function openDivisionsModal(sel) {
             divDraft = JSON.parse(JSON.stringify(divisionConfig || {}));
-            divPick = ''; divPickDiv = ''; divPeople = new Set(); divSel = ''; divFilter = ''; divShowEmpty = false;
+            divPick = ''; divPickDiv = ''; divPeople = new Set(); divSel = (typeof sel === 'string' && divDraft[sel]) ? sel : ''; divLinkOpen = ''; divFilter = ''; divShowEmpty = false;
             document.getElementById('dv-filter').value = '';
             document.getElementById('dv-newrow').hidden = true;
             document.getElementById('new-div-name').value = '';
@@ -52066,29 +52068,26 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         let divLook = null;   // { kind: 'groups' | 'divisions', name }
         // V102.249: 🔗 a link per division (e.g. the RSU evaluation Google Form) — ADMIN ONLY. It lives in _meta/division-links = { links: { RSU: { url, label } } }: `_meta` is
         // admin-read in firestore.rules, unlike quizzes/--group-style-- (read by every intern), so the link never reaches the intern app.
-        let divLinks = {};       // UPPER division name -> { url, label }
+        let divLinks = {};       // UPPER division name -> { url }
         let divLinkOpen = '';    // the division whose Link row is open
         const divLinkOf = name => divLinks[String(name).trim().toUpperCase()] || {};
         function divLinkHtml() {
             const name = divLinkOpen, l = divLinkOf(name);
             if (!name) return '';
-            const btn = (attr, title, glyph) => `<button type="button" class="dv-ib dv-ib-sm" ${attr}="1" title="${title}" aria-label="${title}"${l.url ? '' : ' disabled'}>${glyph}</button>`;
-            return `<div class="dv-look dv-linkrow"><span>Link</span><span class="rail"><input type="url" value="${escapeHtml(l.url || '')}" placeholder="https://… (a form, a page)" onchange="divLinkSet('url', this.value.trim())" aria-label="Division link">`
-                + btn('data-divlink-open', 'Open in a new tab', '↗') + btn('data-divlink-rm', 'Remove the link', '✕') + `</span>`
-                + `<span>Label</span><span class="rail"><input type="text" value="${escapeHtml(l.label || '')}" maxlength="80" placeholder="what it is (optional)" onchange="divLinkSet('label', this.value.trim())" aria-label="Link label" style="flex:1;min-width:120px;margin:0;padding:4px 8px;border:1px solid #e2e8f0;border-radius:8px;font:inherit;font-size:12px"><span class="dv-live" title="Each change saves right away">⚡</span><small style="color:#64748b">🔒 admins only — interns never receive it</small></span></div>`;
+            // ONE line: the 🔗 on the caption already says what it is; the lock is a tooltip; emptying the field removes the link (no second ✕ next to the division's own).
+            return `<div class="dv-look dv-linkrow" style="grid-template-columns:1fr"><span class="rail"><input type="url" value="${escapeHtml(l.url || '')}" placeholder="https://… link for this division" title="🔒 Admins only — interns never receive this link. Empty the field to remove it." onchange="divLinkSet(this.value.trim())" aria-label="Division link">`
+                + `<button type="button" class="dv-ib dv-ib-sm" data-divlink-open="1" title="Open in a new tab" aria-label="Open in a new tab"${l.url ? '' : ' disabled'}>↗</button></span></div>`;
         }
-        async function saveDivLink(name, patch) {
-            const key = divUp(name), cur = Object.assign({}, divLinks[key] || {}, patch);
-            if (cur.url && !/^https?:\/\/\S+$/i.test(cur.url)) { showToast('The link must start with http:// or https://'); renderDivisionAdminList(); return; }
-            Object.keys(cur).forEach(k => { if (!cur[k]) delete cur[k]; });
-            if (!cur.url) delete cur.label;   // a label without a link means nothing
-            if (Object.keys(cur).length) divLinks[key] = cur; else delete divLinks[key];   // paint now; the listener echoes the write
+        async function saveDivLink(name, url) {
+            const key = divUp(name);
+            if (url && !/^https?:\/\/\S+$/i.test(url)) { showToast('The link must start with http:// or https://'); renderDivisionAdminList(); return; }
+            if (url) divLinks[key] = { url }; else delete divLinks[key];   // paint now; the listener echoes the write
             renderDivisionAdminList();
             try {
-                await db.collection('_meta').doc('division-links').set({ links: { [key]: Object.keys(cur).length ? cur : firebase.firestore.FieldValue.delete() } }, { merge: true });
+                await db.collection('_meta').doc('division-links').set({ links: { [key]: url ? { url } : firebase.firestore.FieldValue.delete() } }, { merge: true });
             } catch (e) { console.error('[saveDivLink]', e); showToast('Could not save the link: ' + (e.message || e.code || e)); }
         }
-        function divLinkSet(field, value) { if (divLinkOpen) saveDivLink(divLinkOpen, { [field]: value }); }
+        function divLinkSet(value) { if (divLinkOpen) saveDivLink(divLinkOpen, value); }
         const LOOK_COLORS = ['#4361ee', '#22c55e', '#f97316', '#ef4444', '#8338ec', '#14b8a6', '#d946ef', '#06b6d4', '#ec4899', '#eab308', '#0ea5e9', '#f59e0b', '#0d9488', '#84cc16', '#64748b'];
         const LOOK_ICONS = ['fa-tag', 'fa-users', 'fa-user-md', 'fa-user-graduate', 'fa-pills', 'fa-hospital-user', 'fa-stethoscope', 'fa-flask', 'fa-bullhorn', 'fa-laptop-code', 'fa-palette', 'fa-mug-hot', 'fa-clipboard-check', 'fa-child', 'fa-star', 'fa-shield-halved', 'fa-terminal', 'fa-heart-pulse'];
         function divLookHtml() {
@@ -52179,7 +52178,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const people = mem[divSel].filter(u => !u.isIgnored).length;
             const caption = q ? 'matches in all divisions' : divSel === '__only' ? `ranked on their own · ${people} ${people === 1 ? 'person' : 'people'}` : (pairs.length ? `ranked together as one board · ${people} ${people === 1 ? 'person' : 'people'}` : 'no groups yet — type a name below to add one');
             const divLookOn = !!(divLook && divLook.kind === 'divisions' && divUp(divLook.name) === divUp(divSel));
-            const delDiv = (!q && divSel !== '__only') ? `<button type="button" class="dv-ib dv-ib-sm" data-divlook="${escapeHtml(divSel)}" aria-pressed="${divLookOn}" title="Look — colour, icon, picture of this division" aria-label="Division look">🎨</button><button type="button" class="dv-ib dv-ib-sm" data-divlink="${escapeHtml(divSel)}" aria-pressed="${divUp(divLinkOpen) === divUp(divSel)}" title="${divLinkOf(divSel).url ? 'Link — ' + escapeHtml(divLinkOf(divSel).label || divLinkOf(divSel).url) + ' (admin only)' : 'Add a link for this division (admin only)'}" aria-label="Division link"${divLinkOf(divSel).url ? ' style="background:#e0f2fe;border-color:#7dd3fc"' : ''}>🔗</button><button type="button" class="dv-del" data-del="${escapeHtml(divSel)}" title="Delete division — its people go back to Only I" aria-label="Delete division ${escapeHtml(divSel)}">✕</button>` : '';   // V102.180: 🎨 beside ✕
+            const delDiv = (!q && divSel !== '__only') ? `<button type="button" class="dv-ib dv-ib-sm" data-divlook="${escapeHtml(divSel)}" aria-pressed="${divLookOn}" title="Look — colour, icon, picture of this division" aria-label="Division look">🎨</button><button type="button" class="dv-ib dv-ib-sm" data-divlink="${escapeHtml(divSel)}" aria-pressed="${divUp(divLinkOpen) === divUp(divSel)}" title="${divLinkOf(divSel).url ? 'Link — ' + escapeHtml(divLinkOf(divSel).url) + ' (admin only)' : 'Add a link for this division (admin only)'}" aria-label="Division link"${divLinkOf(divSel).url ? ' style="background:#e0f2fe;border-color:#7dd3fc"' : ''}>🔗</button><button type="button" class="dv-del" data-del="${escapeHtml(divSel)}" title="Delete division — its people go back to Only I" aria-label="Delete division ${escapeHtml(divSel)}">✕</button>` : '';   // V102.180: 🎨 beside ✕
 
             // the picked group (in its division): rename / merge / visibility / delete act on the database at once; the people below can be moved between divisions (also at once)
             let bar = '';
@@ -52216,9 +52215,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 else if (lk.dataset.lookReset) saveGroupStyle(divLook.kind, divLook.name, { color: '', icon: '', image: '' });
                 return;
             }
-            const lo = e.target.closest('[data-divlink-open]'), lr = e.target.closest('[data-divlink-rm]');   // V102.249
+            const lo = e.target.closest('[data-divlink-open]');   // V102.249
             if (lo) { const u = divLinkOf(divLinkOpen).url; if (u) window.open(u, '_blank', 'noopener'); return; }
-            if (lr) { saveDivLink(divLinkOpen, { url: '', label: '' }); return; }
             if (e.target.closest('.dv-look')) return;   // typing in the URL / colour inputs
             const dk = e.target.closest('[data-divlink]');
             if (dk) { const n = dk.dataset.divlink; divLinkOpen = divUp(divLinkOpen) === divUp(n) ? '' : n; renderDivisionAdminList(); return; }

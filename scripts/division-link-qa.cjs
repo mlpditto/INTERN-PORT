@@ -1,4 +1,5 @@
 // V102.249 — 🔗 a link per division in Divisions & Groups, ADMIN ONLY. The REAL divLinkHtml / saveDivLink / divLinkOf / click handler from public/admin.html with the real admin CSS in Chromium.
+// V102.250: ONE row (🔗 field + ↗); no label, no second ✕ — emptying the field removes the link.
 // Covers: the write goes to _meta/division-links (never quizzes/--group-style--, which every intern can read), only http(s) is accepted, attribute values are escaped, remove clears the label too,
 // the 🔗 button sits beside 🎨 and is tinted when a link exists, ↗ opens a new tab, the row does not render for Only I / another division.
 const fs = require('fs'), path = require('path'), vm = require('vm'), assert = require('assert');
@@ -28,29 +29,29 @@ const run = c => vm.runInContext(c, ctx);
 (async () => {
     // 1. save: _meta/division-links, merge, nested map keyed by the UPPER division name
     run('divLinkOpen = "RSU"');
-    await run('saveDivLink("RSU", { url: "https://docs.google.com/forms/d/e/abc/viewform" })');
+    await run('saveDivLink("RSU", "https://docs.google.com/forms/d/e/abc/viewform")');
     assert.deepStrictEqual(writes[0], { n: '_meta', id: 'division-links', d: { links: { RSU: { url: 'https://docs.google.com/forms/d/e/abc/viewform' } } }, o: { merge: true } }, 'writes _meta/division-links only');
-    await run('saveDivLink("rsu", { label: "แบบประเมิน 2569" })');
-    assert.deepStrictEqual(writes[1].d.links.RSU, { url: 'https://docs.google.com/forms/d/e/abc/viewform', label: 'แบบประเมิน 2569' }, 'a second field merges into the same entry (case-insensitive key)');
+    await run('saveDivLink("rsu", "https://x.y/z")');
+    assert.deepStrictEqual(writes[1].d.links.RSU, { url: 'https://x.y/z' }, 'the key is the UPPER division name (case-insensitive), the value is just the url');
     assert.ok(writes.every(w => w.n === '_meta'), 'nothing is ever written to quizzes/--group-style--');
     // 2. only http(s)
-    for (const bad of ['javascript:alert(1)', 'ftp://x.y/z', 'docs.google.com/forms', 'https://a b']) { const n = writes.length; await run('saveDivLink("RSU", { url: ' + JSON.stringify(bad) + ' })'); assert.strictEqual(writes.length, n, 'rejected: ' + bad); }
+    for (const bad of ['javascript:alert(1)', 'ftp://x.y/z', 'docs.google.com/forms', 'https://a b']) { const n = writes.length; await run('saveDivLink("RSU", ' + JSON.stringify(bad) + ')'); assert.strictEqual(writes.length, n, 'rejected: ' + bad); }
     assert.ok(toasts.some(t => /http/.test(t)), 'the admin is told why');
-    // 3. remove clears url AND label, deletes the entry
-    await run('saveDivLink("RSU", { url: "", label: "" })');
-    assert.strictEqual(writes[writes.length - 1].d.links.RSU, '__DELETE__', 'remove deletes the entry');
+    // 3. emptying the field removes the entry
+    await run('saveDivLink("RSU", "")');
+    assert.strictEqual(writes[writes.length - 1].d.links.RSU, '__DELETE__', 'an empty field deletes the entry');
     assert.strictEqual(JSON.stringify(run('divLinkOf("RSU")')), '{}', 'and the local copy');
-    // a label alone (no url) is dropped
-    await run('saveDivLink("CU", { label: "just a label" })');
-    assert.strictEqual(writes[writes.length - 1].d.links.CU, '__DELETE__', 'a label with no link is not stored');
 
     // 4. render: escaped values, open / remove disabled until there is a link
-    run('divLinks = { RSU: { url: "https://x.y/?a=\\"><script>1</script>", label: "L<b>" } }; divLinkOpen = "RSU"');
+    run('divLinks = { RSU: { url: "https://x.y/?a=\\"><script>1</script>" } }; divLinkOpen = "RSU"');
     const row = run('divLinkHtml()');
-    assert.ok(!/<script>|<b>/.test(row), 'values are escaped: ' + row.slice(0, 200));
+    assert.ok(!/<script>/.test(row), 'values are escaped: ' + row.slice(0, 200));
     assert.ok(/data-divlink-open="1" title="Open in a new tab" aria-label="Open in a new tab">/.test(row), '↗ enabled when a link exists');
     run('divLinks = {}');
-    assert.ok(/data-divlink-open="1"[^>]*disabled/.test(run('divLinkHtml()')), '↗ / ✕ disabled with no link');
+    assert.ok(/data-divlink-open="1"[^>]*disabled/.test(run('divLinkHtml()')), '↗ disabled with no link');
+    const one = run('divLinkHtml()');
+    assert.strictEqual((one.match(/<input/g) || []).length, 1, 'one field'); assert.ok(!/Label|data-divlink-rm|⚡|interns never receive it<\/small>/.test(one), 'no label row, no second ✕, no ⚡, no long caption');
+    assert.ok(/title="🔒 Admins only/.test(one), 'the lock is a tooltip');
     run('divLinkOpen = ""'); assert.strictEqual(run('divLinkHtml()'), '', 'closed → nothing');
 
     // 5. the wiring in the real file: 🔗 beside 🎨 (before ✕), row after the Look row, click handler before the generic .dv-look return
@@ -60,10 +61,21 @@ const run = c => vm.runInContext(c, ctx);
     assert.ok(html.indexOf("e.target.closest('[data-divlink-open]')") < html.indexOf("if (e.target.closest('.dv-look')) return;"), '↗ / ✕ are handled before the "typing in a .dv-look" return');
     assert.ok(/divLookHtml\(\)[\s\S]{0,400}divLinkOpen = ''; document\.getElementById\('dv-filter'\)|divLinkOpen = ''; document\.getElementById\('dv-filter'\)/.test(html), 'picking another division closes the Link row');
 
+    // 5b. the "RSU ›" label above the Users table opens Divisions & Groups on that division (V102.250)
+    assert.ok(/<button type="button" class="sub-l" onclick="openDivisionsModal\(this\.dataset\.dv\)" data-dv=/.test(html), 'the sub-row label is a button that opens the modal on its division');
+    const el = () => ({ value: '', hidden: false, style: {}, setAttribute() {}, parentElement: {}, appendChild() {} });
+    const c2 = { divisionConfig: { RSU: ['EXTERN'], BUU: [] }, JSON, document: { getElementById: () => el(), body: { appendChild() {} } }, setDivDirty() {}, renderDivisionAdminList() { c2.rendered = vm.runInContext('divSel', c2); } };
+    vm.createContext(c2);
+    vm.runInContext('let divDraft, divPick, divPickDiv, divPeople, divSel, divFilter, divShowEmpty, divLinkOpen = "x";\n' + grab('function openDivisionsModal(sel)'), c2);
+    vm.runInContext('openDivisionsModal("RSU")', c2); assert.strictEqual(c2.rendered, 'RSU', 'opens on the clicked division');
+    assert.strictEqual(vm.runInContext('divLinkOpen', c2), '', 'a stale open Link row is closed');
+    vm.runInContext('openDivisionsModal()', c2); assert.strictEqual(c2.rendered, '', 'no argument = as before');
+    vm.runInContext('openDivisionsModal("NOPE")', c2); assert.strictEqual(c2.rendered, '', 'an unknown division falls back to the default');
+
     // 6. Chromium: the row lays out with the real CSS (input fills the line, nothing overflows)
     const allCss = (html.match(/<style\b[^>]*>[\s\S]*?<\/style>/g) || []).join('\n').replace(/<\/?style[^>]*>/g, '');
     const css = (allCss.match(/[^{}]+\{[^{}]*\}/g) || []).filter(r => /divisionsModal|dv-/.test(r.split('{')[0])).join('\n');
-    run('divLinks = { RSU: { url: "https://docs.google.com/forms/d/e/1FAIpQLSdi3CmCNDwu2clPJz6ckkunNsmt5zG9TpO-Cq50Mb-rCvtGbQ/viewform", label: "แบบประเมินผลฝึกปฏิบัติงานฯ ชุมชน 2569" } }; divLinkOpen = "RSU"');
+    run('divLinks = { RSU: { url: "https://docs.google.com/forms/d/e/1FAIpQLSdi3CmCNDwu2clPJz6ckkunNsmt5zG9TpO-Cq50Mb-rCvtGbQ/viewform" } }; divLinkOpen = "RSU"');
     const file = path.resolve('public/_division_link_qa.html');
     fs.writeFileSync(file, `<!doctype html><meta charset="utf-8"><style>${css}</style><div id="divisionsModal" style="display:block;position:static;background:none"><div style="width:560px"><div class="dv-panel">${run('divLinkHtml()')}</div></div></div>`);
     const browser = await chromium.launch();
@@ -78,5 +90,5 @@ const run = c => vm.runInContext(c, ctx);
             await page.close();
         }
     } finally { await browser.close(); try { fs.unlinkSync(file); } catch (e) { /* gone */ } }
-    console.log('PASS: division link — _meta/division-links only (admin-read), http(s) only, escaped, remove clears label, 🎨·🔗·✕ order, row hidden for Only I, lays out at 560 and 360px');
+    console.log('PASS: division link — _meta/division-links only (admin-read), http(s) only, escaped, emptying removes, one row, 🎨·🔗·✕ order, row hidden for Only I, lays out at 560 and 360px');
 })().catch(e => { console.error(e); process.exit(1); });
