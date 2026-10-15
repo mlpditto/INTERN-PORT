@@ -32,7 +32,9 @@ assert.ok(cr.includes("allow read: if isAdmin() || (isSignedIn() && (resource.da
 assert.ok(cr.includes("reviewId == d.workId + '_' + request.auth.uid") && cr.includes('d.at == request.time') && cr.includes("d.verdict in ['approve', 'changes']") && cr.includes('d.authUid == request.auth.uid'), 'content_reviews: own doc id, server time, bounded verdict');
 assert.ok(/allow update: if isSignedIn\(\) && resource\.data\.authUid == request\.auth\.uid/.test(cr) && /allow delete: if isAdmin\(\);/.test(cr), 'content_reviews: only the reviewer edits, only admin deletes');
 assert.ok(!/allow (read|write|create|update)[^;]*: if (true|isSignedIn\(\));/.test(cr), 'content_reviews: no open rule');
-assert.ok(/match \/users\/\{userId\} \{[\s\S]*?allow create, update: if isAdmin\(\) \|\| request\.auth\.uid == userId/.test(rules), 'users: owner can update their doc (socialDrafts)');
+// V101.160: the users rule is split into create / update and gates only score / beri on being registered — socialDrafts (any other field) stays owner-writable
+const usersRule = rules.slice(rules.indexOf('match /users/{userId} {'), rules.indexOf('// 2. Works'));
+assert.ok(/allow update: if isAdmin\(\) \|\| \(isSelfOrLinked\(userId\) && \(\s*!request\.resource\.data\.diff\(resource\.data\)\.affectedKeys\(\)\.hasAny\(\['score', 'beri'\]\)/.test(usersRule) && /function isSelfOrLinked\(userId\) \{\s*return request\.auth\.uid == userId/.test(rules), 'users: owner can update their doc (socialDrafts) — only score / beri need a registered doc');
 // No badge system for the division: every entry point of the achievement / badge code asks window.isContentCreator() first.
 const fn = name => { const i = index.indexOf(name); assert.ok(i >= 0, name); return index.slice(i, i + 700); };
 for (const name of ['function updateEarnedBadgesBar(', 'function openAchievementsModal(', 'async function checkAchievementUnlocks(', 'function showNextAchievementUnlock(', 'function notifyNewReflectiveBadges('])
