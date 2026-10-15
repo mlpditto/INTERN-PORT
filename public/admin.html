@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.250)</title>
+    <title>Nika Admin (V102.251)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -61818,6 +61818,11 @@ Save it anyway?`;
             }).join('');
         }
 
+        // V102.251: how many POINTS a feedback entry credited to its user — and so how many a delete may take back. Today: none. submitFeedback() writes no score; `pointsEarned`
+        // on a feedback doc is only a snapshot of the QUIZ score at that moment, so subtracting it on delete (what these three delete paths did) removed QUIZ points that were
+        // still approved (Bew, PRETEST-1.1: +0.90 quiz, then -0.90 "Revert: Quiz Feedback deleted" = 0). The Feedback add-on (its own log type) will return its own amount here.
+        window.feedbackAddOnPoints = function(fb) { return 0; };
+
         // V92.83: delete a quiz_feedback doc that has no learner comment, and
         // revert pointsEarned from the user's score. Mirrors deletePollParticipant
         // pattern (batch delete + increment(-x) + checkin_logs audit row).
@@ -61831,14 +61836,14 @@ Save it anyway?`;
             const userName = user.displayName || fb.displayName || 'Unknown user';
             const quiz = (quizzesData || []).find(q => q.id === fb.quizId);
             const quizTitle = quiz?.title || quiz?.name || fb.quizId || 'Quiz';
-            const pointsToRevert = (typeof fb.pointsEarned === 'number' && fb.pointsEarned > 0) ? fb.pointsEarned : 0;
+            const pointsToRevert = feedbackAddOnPoints(fb);
 
             const userExists = fb.userId && fb.userId !== 'anon' && (usersData || []).some(u => u.id === fb.userId);
             const willRevert = pointsToRevert > 0 && userExists;
 
             const confirmMsg = willRevert
                 ? `Delete this empty-comment feedback?\n\nUser: ${userName}\nQuiz: ${quizTitle}\nFeedback reward to revert: −${pointsToRevert.toFixed(1)} PTS\n(This is the reward for giving feedback — does NOT affect the quiz score.)\n\nThis cannot be undone.`
-                : `Delete this empty-comment feedback?\n\nUser: ${userName}\nQuiz: ${quizTitle}\n(No feedback reward to revert${pointsToRevert === 0 ? '' : ' — user not found in cache'})\n\nThis cannot be undone.`;
+                : `Delete this empty-comment feedback?\n\nUser: ${userName}\nQuiz: ${quizTitle}\n(Feedback has no points of its own — the quiz score is NOT affected)\n\nThis cannot be undone.`;
             if (!confirm(confirmMsg)) return;
 
             try {
@@ -68860,13 +68865,13 @@ Reply ONLY with raw JSON, no markdown:
             const userName = user.displayName || fb.displayName || 'Unknown user';
             const quiz = (quizzesData || []).find(q => q.id === fb.quizId);
             const quizTitle = quiz?.title || quiz?.name || fb.quizId || 'Quiz';
-            const pointsToRevert = (typeof fb.pointsEarned === 'number' && fb.pointsEarned > 0) ? fb.pointsEarned : 0;
+            const pointsToRevert = feedbackAddOnPoints(fb);
             const userExists = fb.userId && fb.userId !== 'anon' && (usersData || []).some(u => u.id === fb.userId);
             const willRevert = pointsToRevert > 0 && userExists;
 
             const confirmMsg = willRevert
                 ? `Delete this feedback?\n\nUser: ${userName}\nQuiz: ${quizTitle}\nFeedback reward to revert: −${pointsToRevert.toFixed(1)} PTS\n(This is the reward for giving feedback — does NOT affect the quiz score.)\n\nThis cannot be undone.`
-                : `Delete this feedback?\n\nUser: ${userName}\nQuiz: ${quizTitle}\n(No feedback reward to revert)\n\nThis cannot be undone.`;
+                : `Delete this feedback?\n\nUser: ${userName}\nQuiz: ${quizTitle}\n(Feedback has no points of its own — the quiz score is NOT affected)\n\nThis cannot be undone.`;
             if (!confirm(confirmMsg)) return;
 
             try {
@@ -68930,7 +68935,7 @@ Reply ONLY with raw JSON, no markdown:
 
             const revertByUser = {};
             empties.forEach(f => {
-                const pts = (typeof f.pointsEarned === 'number' && f.pointsEarned > 0) ? f.pointsEarned : 0;
+                const pts = feedbackAddOnPoints(f);
                 const userExists = f.userId && f.userId !== 'anon' && (usersData || []).some(u => u.id === f.userId);
                 if (pts > 0 && userExists) {
                     if (!revertByUser[f.userId]) revertByUser[f.userId] = { pts: 0, count: 0, name: f.displayName || 'Unknown user' };
@@ -68946,7 +68951,7 @@ Reply ONLY with raw JSON, no markdown:
             const confirmMsg = `Delete ${empties.length} empty feedback entr${empties.length === 1 ? 'y' : 'ies'} for '${quizTitle}'?\n(No rating + no comment + no next topic)\n\n` +
                 (totalRevert > 0
                     ? `Feedback rewards to revert — −${totalRevert.toFixed(1)} PTS total:\n${revertLines.join('\n')}\n\n`
-                    : 'No feedback rewards to revert.\n\n') +
+                    : 'Feedback has no points of its own — quiz scores are NOT affected.\n\n') +
                 'This cannot be undone.';
             if (!confirm(confirmMsg)) return;
 
