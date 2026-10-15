@@ -399,7 +399,7 @@
         var lv = sevLevels(d, alert);
         if (!lv.overall) return '';
         if ((lv.overall === 'warn' || lv.overall === 'crit') && lv.canal) return sceneHtml(d, lv, alert);
-        return pillHtml(lv.overall) + keyHtml(alert, lv.river, false) + rowsHtml(d, lv);
+        return (lv.overall === 'ok' ? '' : pillHtml(lv.overall)) + keyHtml(alert, lv.river, false) + rowsHtml(d, lv);   // V101.150: normal needs no word — the soft green card says it
     }
 
     // 7 days of rain: 3 back (measured), today, 3 ahead (forecast with its chance) — Open-Meteo daily, see loadWeather.
@@ -462,12 +462,12 @@
         var pop = d.pop;
         (pop && pop.canals || []).forEach(function (c, i) {
             var rate = i === 0 && c.deltaCm != null ? ' · ' + (c.deltaCm > 0 ? '▲ +' : '▼ ') + c.deltaCm + T(' cm/ชม.', ' cm/시간') : '';
-            rows.push(line('fa-water', esc(c.name), m2(c.wl) + ' m' + (c.level === 'ok' ? '' : ' <span class="fw-lv ' + (LV[c.level] || 'unk') + '">' + (c.level === 'crit' ? T('วิกฤต', '심각') : c.level === 'warn' ? sevTxt('warn') : '?') + '</span>'), c.km + ' km' + esc(rate), ['pop']));
+            rows.push(line('fa-water', esc(c.name), m2(c.wl) + ' m <span class="fw-lv ' + (LV[c.level] || 'unk') + '">' + (c.level === 'crit' ? T('วิกฤต', '심각') : c.level === 'warn' ? sevTxt('warn') : c.level === 'ok' ? sevTxt('ok') : '?') + '</span>', c.km + ' km' + esc(rate), ['pop']));
         });
         var roads = pop && pop.roads || [];
         if (roads.length) {
             var wet = roads.filter(function (r) { return r.level !== 'dry'; });
-            rows.push(line('fa-road', roads.map(function (r) { return esc(r.name); }).join(' · '), wet.length ? wet.map(function (r) { return (r.depthCm == null ? T('มีน้ำ', '침수') : r.depthCm + ' cm'); }).join(', ') : '–', roads.map(function (r) { return r.km; }).sort().filter(function (v, i, a) { return i === 0 || i === a.length - 1; }).join('–') + ' km', d.road ? ['pop', 'fb'] : ['pop']));
+            rows.push(line('fa-road', roads.map(function (r) { return esc(r.name); }).join(' · '), wet.length ? wet.map(function (r) { return (r.depthCm == null ? T('มีน้ำ', '침수') : r.depthCm + ' cm'); }).join(', ') : T('แห้ง', '물 없음'), roads.map(function (r) { return r.km; }).sort().filter(function (v, i, a) { return i === 0 || i === a.length - 1; }).join('–') + ' km', d.road ? ['pop', 'fb'] : ['pop']));
         }
         if (r10Show(pop)) rows.push(r10Html(pop.r10));   // V101.148: only when something within 10 km needs attention
         if (d.traffy6h) rows.push(line('fa-triangle-exclamation', T('รายงานน้ำท่วมจากประชาชน (Traffy)', '시민 침수 제보 (Traffy)'), d.traffy6h, '≤1 km · ' + T('6 ชม.', '6시간'), ['fw']));
