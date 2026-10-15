@@ -27,7 +27,7 @@ assert.ok(fnSrc.includes("if (source === 'open') showToast("), 'toast only for t
             userId: 'u1', userProfile: { displayName: 'Joey' },
             CHECKIN_DAILY_AMOUNT: 0.01, myCheckin: { lastDate: '' }, schActivityDays: new Set(), toasts: [], buttonTouched: false,
             document: { body: { classList: { contains: () => false } }, getElementById: id => id === 'daily-checkin-btn' ? { set disabled(v) { ctx.buttonTouched = true; }, set textContent(v) { ctx.buttonTouched = true; } } : null },
-            ensureFirebaseAuthReady: async () => ({ uid: 'u1' }),
+            ensureFirebaseAuthReady: async () => ({ uid: 'u1' }), requireRegistered: () => true,
             getBangkokDateTimeParts: (d) => ({ dateKey: (d ? '2026-10-07' : '2026-10-08') }),
             renderDailyCheckinCard: () => {}, showToast: m => ctx.toasts.push(m), console,
             firebase: { firestore: { FieldValue: { serverTimestamp: () => 'ts', increment: n => ({ inc: n }) } } },

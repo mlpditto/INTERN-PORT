@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.158)</title>
+    <title>Internship Portfolio (V101.159)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -8212,6 +8212,13 @@
         // V101.102: a users doc counts as REGISTERED only if enrollment (or an admin pre-registration) ever wrote one of these.
         // Background writers (language, reflective stats, badges) used to `set(..., {merge:true})` and so re-created a deleted
         // user's doc as a ghost with none of them; checkUser then saw `exists` and skipped the Register step.
+        // V101.159: an intern who closed the enrollment modal without a CODE must not be able to earn or submit anything — score / Beri writes are set-merge and would
+        // create a users doc with a score (= "registered" without a code). window.myRegistered is false only once the profile listener has answered "no registered doc".
+        function requireRegistered() {
+            if (window.myRegistered !== false) return true;
+            showEnrollmentModal();
+            return false;
+        }
         function isRegisteredUserDoc(data) {
             return !!data && ['score', 'group', 'enrollmentCode', 'createdAt'].some(k => data[k] !== undefined && data[k] !== null);
         }
@@ -8247,6 +8254,7 @@
             }
 
             r.onSnapshot(d => {
+                window.myRegistered = !!(d.exists && isRegisteredUserDoc(d.data()));   // V101.159
                 if (d.exists && isRegisteredUserDoc(d.data())) {
                     const da = d.data();
                     const score = parseFloat(da.score || 0);
@@ -9414,6 +9422,7 @@
         }
 
         async function saveNerisResult() {
+            if (!requireRegistered()) return;   // V101.159
             if (!userId) return;
             if (!_persDraft.type) {
                 showToast('Pick your four-letter type first เลือกผลลัพธ์ก่อน');
@@ -9677,6 +9686,7 @@
         // must see their result whatever the network or the auth state is
         // doing — a failed write is worth a toast, not twenty lost answers.
         async function submitBig5() {
+            if (!requireRegistered()) return;   // V101.159
             if (_b5Answers.some(v => !v)) return;
             const btn = document.getElementById('b5-submit-btn');
             const label = btn.innerHTML;
@@ -10328,6 +10338,7 @@
         // Never blocks the link — opens immediately regardless of whether the Beri
         // credit succeeds (same "never block the download" rule as qzLogMaterialClick).
         async function explOpenLink(linkId) {
+            if (!requireRegistered()) return;   // V101.159
             const link = reviewLinksCache.find(l => l.id === linkId);
             if (!link || !link.url) return;
             window.open(link.url, '_blank', 'noopener,noreferrer');
@@ -10459,6 +10470,7 @@
         }
 
         async function submitExploreReview() {
+            if (!requireRegistered()) return;   // V101.159
             const linkId = document.getElementById('er-link-id').value;
             const text = document.getElementById('er-text').value.trim();
             const tags = EXPLORE_REVIEW_TAGS.map(t => t[0]).filter(k => erTags.has(k));
@@ -10526,6 +10538,7 @@
         // own catch block + button success/error state handles it, same convention
         // as submitUnifiedCase/submitUnifiedWork below. No self modal-close/alert.
         async function submitLinkSuggestion() {
+            if (!requireRegistered()) return;   // V101.159
             const title = document.getElementById('sl-title').value.trim();
             const url = document.getElementById('sl-url').value.trim();
             const type = document.getElementById('sl-type').value || 'line_man';
@@ -10638,6 +10651,7 @@
         // the local myBeri/beriRewardsCache mirrors, which can be stale) so two
         // concurrent redemptions can never both succeed past the real balance.
         async function redeemBeriReward(rewardId) {
+            if (!requireRegistered()) return;   // V101.159
             // Mirrors the shop's own render-time lock — the button isn't in the DOM while
             // locked, but this guards a direct console call too (same posture as the quiz
             // unlockScore gate: client-side only, no rules-level enforcement). V98.04:
@@ -11650,6 +11664,7 @@
         }
 
         async function confirmRunQuiz(quizId) {
+            if (!requireRegistered()) return;   // V101.159
             const q = quizzesCache.find(x => x.id === quizId);
             if (!q) return;
 
@@ -11720,6 +11735,7 @@
         let currentQuizMultiplier = 1;
 
         async function runQuiz(quizId) {
+            if (!requireRegistered()) return;   // V101.159
             currentQuiz = quizForAttempt(quizzesCache.find(x => x.id === quizId), quizAttemptsCache[quizId], quizzesCache);
             if (!currentQuiz) return;
 
@@ -14498,6 +14514,7 @@
         }
 
         async function submitFeedback() {
+            if (!requireRegistered()) return;   // V101.159
             const submitButton = document.getElementById('fb-submit');
             if (!currentQuizIdForFeedback || submitButton.disabled) return;
 
@@ -17332,6 +17349,7 @@
         }
 
         async function submitProduct() {
+            if (!requireRegistered()) return;   // V101.159
             const s = getProductFormState();
             if (!s.name || !Number.isFinite(s.price) || !s.category || !s.description) return;
 
@@ -20626,6 +20644,7 @@
 
         // Award the +0.05 milestone once per day when the engagement streak hits a 7-day multiple.
         async function awardEngagementBonusIfDue() {
+            if (!requireRegistered()) return;   // V101.159
             if (!userId) return;
             await schLoadCheckinDays(); // V101.21: activity-check-in history must be in before the streak is judged
             const todayKey = getBangkokDateTimeParts().dateKey;
@@ -20806,6 +20825,7 @@
         // on `amount`, so the two budgets stay independent as asked.
         const FIN_DAILY_BERI_CAP = 5;
         async function finAwardBeri(exp) {
+            if (!requireRegistered()) return;   // V101.159
             if (!exp || !exp.id || !finCanSync()) return;
             try {
                 const dateKey = getBangkokDateTimeParts().dateKey;
@@ -21299,6 +21319,7 @@
         // "submitting work counts as a check-in" costs no extra field here and no
         // four-collection scan per user per day server-side.
         async function tryDailyCheckin(source) {
+            if (!requireRegistered()) return;   // V101.159
             if (!userId) return;
             const isManual = source !== 'activity';
             // Auto calls have no button press behind them; grabbing the chip would
@@ -21760,6 +21781,7 @@
         }
 
         async function submitReflectiveLog() {
+            if (!requireRegistered()) return;   // V101.159
             const content = document.getElementById('rl-content').value.trim();
             const mood = document.getElementById('rl-mood').value;
             const btn = document.getElementById('rl-submit-btn');
@@ -22696,6 +22718,7 @@
         // same writing box, and either way the first entry of the day earns the +0.1
         // (V96.85). Kept as a router so both original paths stay intact and testable.
         async function submitJournalEntry() {
+            if (!requireRegistered()) return;   // V101.159
             if (document.getElementById('dc-day')) return submitReflectiveLog();
             const title = (document.getElementById('lp-note-title')?.value || '').trim();
             const hasTags = ((window._lpNoteTags || []).length > 0);
@@ -22754,6 +22777,7 @@
         window.updateJournalSubmitLabel = updateJournalSubmitLabel;
 
         async function submitLpNoteOnly() {
+            if (!requireRegistered()) return;   // V101.159
             const title = (document.getElementById('lp-note-title').value || '').trim();
             const noteInput = document.getElementById('dc-note-content') || document.getElementById('rl-content');
             const content = (noteInput.value || '').trim();
@@ -23607,6 +23631,7 @@ async function archiveDoneCard(cardId) {
         // depended on a form the user could no longer see. The DOM fallback stays for
         // any caller still passing nothing.
         async function submitWork(titleArg, linkArg) {
+            if (!requireRegistered()) return;   // V101.159
             const titleEl = document.getElementById('w-title');
             const linkEl = document.getElementById('w-link');
             const t = (titleArg !== undefined ? titleArg : (titleEl ? titleEl.value : '')).trim();
@@ -24708,6 +24733,7 @@ async function archiveDoneCard(cardId) {
         }
 
         async function submitUnified() {
+            if (!requireRegistered()) return;   // V101.159
             const submitBtn = document.getElementById('u-submit-btn');
             if (submitBtn.disabled) return;
             submitBtn.disabled = true;
@@ -24750,6 +24776,7 @@ async function archiveDoneCard(cardId) {
         }
 
         async function submitUnifiedCase() {
+            if (!requireRegistered()) return;   // V101.159
             const caseId = document.getElementById('u-case-id').value.trim();
             const customer = document.getElementById('u-case-customer').value.trim();
             const systemKey = document.getElementById('u-case-system').value;
@@ -24787,6 +24814,7 @@ async function archiveDoneCard(cardId) {
         }
 
         async function submitUnifiedWork() {
+            if (!requireRegistered()) return;   // V101.159
             const title = document.getElementById('u-work-title').value.trim();
             const link = document.getElementById('u-work-link').value.trim();
             if (!title) throw new Error('A title is required · กรุณากรอกหัวข้องาน');
@@ -25720,6 +25748,7 @@ async function archiveDoneCard(cardId) {
         }
 
         async function submitCase() {
+            if (!requireRegistered()) return;   // V101.159
             const caseId = document.getElementById('c-id').value.trim();
             const customer = document.getElementById('c-customer').value.trim();
             const customerTel = (document.getElementById('c-tel')?.value || '').trim();
