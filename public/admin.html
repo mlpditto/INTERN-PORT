@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.239)</title>
+    <title>Nika Admin (V102.240)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -33786,7 +33786,7 @@ ${JSON.stringify(sourceObj)}`;
                             // structurally higher than the old Jaccard score did.
                             // V100.91: clickable — expands both full questions inline via
                             // toggleQuizCompareNgramDetail, same look as the AI overlap cards below.
-                            return `<span onclick="toggleQuizCompareNgramDetail(${qi}, ${i}, ${m.other.quizIdx}, ${m.other.qIndex})" title="${escapeHtml(otherStem.slice(0, 200))} — click to view both full questions" style="display:inline-flex; align-items:center; gap:4px; cursor:pointer; margin:3px 4px 0 0; padding:2px 8px; border-radius:999px; font-size:0.72em; font-weight:700; background:${pct >= 60 ? '#fee2e2' : '#fef3c7'}; color:${pct >= 60 ? '#991b1b' : '#92400e'};">≈ ${pct}% · ${escapeHtml(otherQuiz.shortTitle || otherQuiz.title || 'Quiz')} Q${m.other.qIndex + 1} <i class="fa-solid fa-eye" style="font-size:0.85em; opacity:0.7;"></i></span>`;
+                            return `<span onclick="toggleQuizCompareNgramDetail(${qi}, ${i}, ${m.other.quizIdx}, ${m.other.qIndex})" title="${escapeHtml(otherStem.slice(0, 200))} — click to view both full questions" style="display:inline-flex; align-items:center; gap:4px; cursor:pointer; margin:3px 4px 0 0; padding:2px 8px; border-radius:999px; font-size:0.72em; font-weight:700; background:${pct >= 60 ? '#fee2e2' : '#fef3c7'}; color:${pct >= 60 ? '#991b1b' : '#92400e'};">≈ ${pct}% · ${escapeHtml(otherQuiz.shortTitle || otherQuiz.title || 'Quiz')} Q${m.other.qIndex + 1} <i class="fa-solid fa-eye" style="font-size:0.85em; opacity:0.7;"></i></span><span class="qc-jev" data-jev="${qi}-${i}-${m.other.quizIdx}-${m.other.qIndex}"></span>`;
                         }).join('');
                         const rowBg = myMatches.length ? (myMatches[0].score >= 0.6 ? '#fef2f2' : '#fffbeb') : '#fff';
                         const rowBorder = myMatches.length ? '#fde68a' : '#f1f5f9';
@@ -33807,6 +33807,7 @@ ${JSON.stringify(sourceObj)}`;
             }
 
             forceShowModal('quizCompareModal');
+            quizCompareJev(matches, usable);
         }
 
         // V97.07: click-to-expand for the AI overlap cards below — resolved quiz+question
@@ -33952,6 +33953,34 @@ RULES:
         // way to see either question in full to actually judge the match. Reuses
         // quizCleanup.quizzes() (not the closure's `usable`) since this can be clicked
         // long after openQuizCompareModal's own closure ran.
+        // V102.240: Jev ("do these test the SAME fact?") verdict chip beside each n-gram match. Admin-only callable `jevCompare`;
+        // answers are cached server-side by content, so re-opening costs nothing. Suggest-only: nothing is written because of a chip.
+        // A missing key / kill switch / network error leaves the modal exactly as it was.
+        let quizCompareJevRun = 0;
+        async function quizCompareJev(matches, usable) {
+            const run = ++quizCompareJevRun;
+            if (!matches.length) return;
+            const side = ref => { const quiz = usable[ref.quizIdx], q = (quiz.questions || [])[ref.qIndex] || {}; return { quiz: quiz.shortTitle || quiz.title || '', stem: quizCompareStripMd(q.q), options: (q.options || []).map(quizCompareStripMd) }; };
+            const top = matches.slice().sort((x, y) => y.score - x.score).slice(0, 60);
+            try {
+                const res = (await adminApp.functions().httpsCallable('jevCompare')({ pairs: top.map(m => ({ a: side(m.a), b: side(m.b) })) })).data;
+                if (run !== quizCompareJevRun || !res || res.enabled === false || !Array.isArray(res.results)) return;
+                top.forEach((m, k) => { const r = res.results[k]; if (r && !r.error) quizCompareJevPaint(m, r); });
+            } catch (err) { console.info('[jev] skipped:', err && err.message); }
+        }
+        function quizCompareJevPaint(m, r) {
+            const pct = x => (typeof x === 'number' ? Math.round(x * 100) : null);
+            const v = r.verdict === 'dup' ? { t: 'Jev ✓ ' + pct(r.sameFact) + '%', bg: '#ede9fe', fg: '#5b21b6', tip: 'Jev: the same fact is tested — answering one gives away the other' }
+                : r.verdict === 'different' ? { t: 'Jev ✗', bg: '#f1f5f9', fg: '#64748b', tip: 'Jev: different facts — the wording overlaps but the question does not' }
+                    : { t: 'Jev ?', bg: '#fff', fg: '#92400e', tip: 'Jev is not sure — read both questions' };
+            const tip = v.tip + ' · same fact ' + pct(r.sameFact) + '%' + (r.sameTopic == null ? '' : ' · same topic ' + pct(r.sameTopic) + '%');
+            [[m.a, m.b], [m.b, m.a]].forEach(([x, y]) => {
+                const el = document.querySelector(`.qc-jev[data-jev="${x.quizIdx}-${x.qIndex}-${y.quizIdx}-${y.qIndex}"]`);
+                if (!el) return;
+                el.innerHTML = `<span title="${escapeHtml(tip)}" style="display:inline-flex; align-items:center; margin:3px 4px 0 0; padding:2px 8px; border-radius:999px; font-size:0.72em; font-weight:800; background:${v.bg}; color:${v.fg}; border:1px solid ${v.fg}33;">${escapeHtml(v.t)}</span>`;
+            });
+        }
+
         function toggleQuizCompareNgramDetail(qi, i, otherQuizIdx, otherQIndex) {
             const panel = document.getElementById(`quiz-compare-ngram-detail-${qi}-${i}`);
             if (!panel) return;

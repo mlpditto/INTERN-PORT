@@ -76,6 +76,12 @@ Both issues were **closed on 2026-09-30** at the owner's request (by Claude Code
    - **⏸** marks an issue "Not a problem".
 8. **Later, on its own:** the next 🐞/❌ comment is grouped within the hour. The red count comes back only for issues with a report in the last 60 days, and for fixed issues that get a new report (🔁 Back again).
 
+### JEV — Compare modal "Jev ✓ / ✗" chip (admin V102.240; plan: memory project_jev_integration_plan)
+1. `firebase functions:secrets:set JEV_API_KEY` (paste the TypeSafe key yourself; the same key as `D:_Code	ypesafe.key`). It must exist BEFORE the deploy.
+2. `FUNCTIONS_DISCOVERY_TIMEOUT=60 firebase deploy --only functions:jevCompare` (clean `production` checkout, after `npm --prefix functions ci`).
+3. Admin → Quiz Engine → tick 2+ quizzes → Compare: each ≈% badge gets a lilac chip — `Jev ✓ 92%` = same fact, `Jev ✗` = different, `Jev ?` = not sure. Hover for the numbers. Nothing is written because of a chip.
+4. Kill switch: set `quiz_dup_scores/_config` → `{ enabled: false }` (console). Without the secret / function the modal behaves exactly as before.
+
 ### CLOUD — Claude Code on the web (optional)
 At claude.ai/code:
 1. Install the Claude GitHub App on `INTERN-PORT` **and** `INTERN-PORT-claude-memory`, then attach the memory repo to sessions.

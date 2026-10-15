@@ -4755,3 +4755,37 @@ async function groupUrgentFeedback(db) {
     }
     return out;
 }
+
+// ---- Jev: "same fact?" verdicts for the Compare modal (Phase 0 + use #1 of the Jev plan) ----
+// Admin-only, suggest-only (the page shows a chip next to the n-gram %, nothing is written because of it).
+// Answers are cached by content hash in quiz_dup_scores (client-closed: no rule = no access), so re-opening a
+// comparison costs nothing. Kill switch: quiz_dup_scores/_config { enabled: false }. Key: secret JEV_API_KEY
+// (firebase functions:secrets:set JEV_API_KEY) — it must exist BEFORE this function is deployed.
+const jev = require("./jev");
+exports.jevCompare = onCall({ secrets: ["JEV_API_KEY"], timeoutSeconds: 120, memory: "256MiB" }, async (request) => {
+    requireAdminCallable(request);
+    const db = admin.firestore();
+    const cfg = await db.collection("quiz_dup_scores").doc("_config").get();
+    if (cfg.exists && cfg.data().enabled === false) return { enabled: false, results: [] };
+    const pairs = request.data && request.data.pairs;
+    if (!Array.isArray(pairs) || !pairs.length || pairs.length > jev.MAX_PAIRS) throw new HttpsError("invalid-argument", "1-" + jev.MAX_PAIRS + " pairs");
+    const out = await jev.compareBatch(pairs, {
+        apiKey: process.env.JEV_API_KEY,
+        fetch: (url, opts) => fetch(url, opts),
+        readCache: async (keys) => {
+            const m = {};
+            for (let i = 0; i < keys.length; i += 30) {
+                const snaps = await db.getAll(...keys.slice(i, i + 30).map(k => db.collection("quiz_dup_scores").doc(k)));
+                snaps.forEach(sn => { if (sn.exists && typeof sn.data().sameFact === "number") m[sn.id] = sn.data(); });
+            }
+            return m;
+        },
+        writeCache: async (entries) => {
+            const batch = db.batch();
+            entries.forEach(e => batch.set(db.collection("quiz_dup_scores").doc(e.key), { sameFact: e.sameFact, sameTopic: e.sameTopic, model: e.model, at: admin.firestore.FieldValue.serverTimestamp() }));
+            await batch.commit();
+        },
+    });
+    if (out.calls) recordAiUsage("typesafe", jev.JEV_MODEL, out.inputTokens, true, "jev_dup", { inputTokens: out.inputTokens, outputTokens: 0 });
+    return { enabled: true, results: out.results };
+});
