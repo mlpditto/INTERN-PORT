@@ -143,6 +143,11 @@ assert.match((await page.textContent('#sch-week .sch-rg h4')).trim(), /^\d{1,2}[
     await page.locator('#sch-week [data-schday="' + (await page.evaluate(() => __key(-2))) + '"]').click();
     await page.evaluate(() => { schCheckinDays = new Set(); schRenderAgenda(); });
 
+    // ---- 3c. V101.152: an empty day is ONE line — "Wed 14 Oct · Nothing on this day"
+    const emptyHtml = await page.evaluate(() => schWeekDayHtml('2030-01-02', []));
+    assert.ok(/^<div id="sch-week-day"[^>]*><div[^>]*>[^<]*<span[^>]*>· Nothing on this day<\/span><\/div><\/div>$/.test(emptyHtml), 'empty day = date + words on one line: ' + emptyHtml);
+    assert.ok(/margin-bottom:0px/.test(emptyHtml), 'no gap under the one-line header');
+
     // ---- 4. tap a day: its rows; tap again closes; focus stays on the day
     await goTo(page, -1);
     await page.locator('#sch-week [data-schday="' + (await page.evaluate(() => __key(-1))) + '"]').click();
