@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.243)</title>
+    <title>Nika Admin (V102.244)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -36166,10 +36166,11 @@ RULES:
                     ? '<img src="' + r.previewUrl + '" alt="" style="width:48px; height:48px; border-radius:50%; object-fit:cover; border:1px solid #e2e8f0; flex-shrink:0;">'
                     : rlLogoDisc(r.link, 48);
                 const label = {
-                    wait: 'In queue', run: 'Reading the page…', found: 'from ' + escapeHtml(r.source), saved: 'Saved ✓', none: escapeHtml(r.note), error: escapeHtml(r.note)
+                    wait: 'In queue', run: r.searching ? 'Searching the web…' : 'Reading the page…', found: 'from ' + escapeHtml(r.source), saved: 'Saved ✓', none: escapeHtml(r.note), error: escapeHtml(r.note)
                 }[r.status];
-                const color = r.status === 'saved' ? '#15803d' : (r.status === 'error' || r.status === 'none') ? '#b91c1c' : '#64748b';
-                const note = r.status === 'found' && r.note ? ' · ' + escapeHtml(r.note) : '';
+                const color = r.status === 'saved' ? '#15803d' : (r.status === 'error' || r.status === 'none') ? '#b91c1c' : (r.status === 'found' && r.warn) ? '#b45309' : '#64748b';
+                const pageLink = r.status === 'found' && r.pageUrl ? ' · <a href="' + escapeHtml(r.pageUrl) + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" style="color:#6366f1; font-weight:700;">page ↗</a>' : '';
+                const note = (r.status === 'found' && r.note ? ' · ' + escapeHtml(r.note) : '') + pageLink;
                 return '<label style="display:flex; align-items:center; gap:10px; padding:8px 4px; border-bottom:1px solid #f1f5f9;' + (r.status === 'found' ? ' cursor:pointer;' : '') + '">' +
                     '<input type="checkbox" onchange="rlBulkToggle(' + i + ', this.checked)" ' + (r.checked ? 'checked ' : '') + (r.status !== 'found' || st.applying ? 'disabled ' : '') + 'style="width:16px; height:16px; margin:0; padding:0; flex-shrink:0;">' +
                     preview + '<span style="min-width:0;"><span style="display:block; font-weight:800; color:#334155; font-size:0.88em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + escapeHtml(r.link.title || 'Untitled') + '</span>' +
@@ -36183,6 +36184,7 @@ RULES:
                 '<div style="display:flex; align-items:center; gap:8px; padding:12px 18px; border-top:1px solid #f1f5f9; flex-wrap:wrap;">' +
                 '<button type="button" onclick="rlBulkSelect(true)" ' + (busy ? 'disabled ' : '') + 'style="' + btnBase + ' border:1px solid #e2e8f0; background:#fff; color:#475569;">All</button>' +
                 '<button type="button" onclick="rlBulkSelect(false)" ' + (busy ? 'disabled ' : '') + 'style="' + btnBase + ' border:1px solid #e2e8f0; background:#fff; color:#475569;">None</button>' +
+                (st.rows.some(r => r.status === 'none' || r.status === 'error') ? '<button type="button" onclick="rlBulkSearch()" ' + (busy ? 'disabled ' : '') + 'title="Search the web for each missing shop&#39;s own Facebook page or website (about $0.007 per shop). Nothing is saved until you tick a picture and press Save." style="' + btnBase + ' border:1px solid #c7d2fe; background:#eef2ff; color:#4338ca;">🔎 Search (' + st.rows.filter(r => r.status === 'none' || r.status === 'error').length + ')</button>' : '') +
                 '<span style="flex:1;"></span>' +
                 '<button type="button" onclick="rlBulkClose()" ' + (st.applying ? 'disabled ' : '') + 'style="' + btnBase + ' border:1px solid #e2e8f0; background:#fff; color:#64748b;">' + (reading ? 'Cancel' : 'Close') + '</button>' +
                 '<button type="button" onclick="rlBulkApply()" ' + (busy || !picked ? 'disabled ' : '') + 'style="' + btnBase + ' border:none; background:linear-gradient(135deg,#6366f1,#a855f7); color:#fff;' + (busy || !picked ? ' opacity:.5;' : '') + '">' + (st.applying ? 'Saving…' : 'Save ' + picked + ' logo' + (picked === 1 ? '' : 's')) + '</button></div></div>';
@@ -36236,6 +36238,52 @@ RULES:
                 }
             };
             await Promise.all([worker(), worker(), worker()]);
+            rlBulkPaint();
+        }
+        // V102.244: 🔎 Search — for the shops whose page had no picture: a cheap web search picks the shop's OWN Facebook page / website (callable findShopLogo),
+        // the server reads the picture from that page, and it is shown here UNTICKED with a link to the page. A page whose name differs from the shop is amber.
+        // A photo of people is never offered. Nothing is stored until you tick it and press Save.
+        async function rlBulkSearch() {
+            const st = rlBulk;
+            if (!st || st.applying) return;
+            const todo = st.rows.filter(r => r.status === 'none' || r.status === 'error');
+            if (!todo.length) return;
+            todo.forEach(r => { r.status = 'wait'; r.searching = true; r.note = ''; });
+            rlBulkPaint();
+            const call = adminApp.functions().httpsCallable('findShopLogo');
+            const queue = todo.slice();
+            const worker = async () => {
+                while (queue.length && !st.cancelled) {
+                    const row = queue.shift();
+                    row.status = 'run';
+                    rlBulkPaint();
+                    try {
+                        const r = (await call({ title: row.link.title || '' })).data;
+                        if (st.cancelled) return;
+                        if (r && r.found) {
+                            row.blob = await rlPrepareLogo(await (await fetch(r.dataUrl)).blob());
+                            row.previewUrl = URL.createObjectURL(row.blob);
+                            let host = ''; try { host = new URL(r.pageUrl).hostname.replace(/^www\./, ''); } catch (err) { host = r.site || 'web'; }
+                            row.source = 'web · ' + host;
+                            row.pageUrl = r.pageUrl;
+                            row.warn = !r.verified;
+                            row.note = (r.verified ? '' : '⚠ the page says "' + String(r.pageTitle || '?').slice(0, 40) + '" — check it is the same shop') + (r.kind === 'food' ? (r.verified ? '' : ' · ') + 'looks like a food photo' : '');
+                            row.status = 'found';
+                            row.checked = false;
+                        } else {
+                            row.status = 'none';
+                            row.note = 'Search: ' + ((r && r.reason) || 'nothing found') + ' — use Upload';
+                        }
+                    } catch (err) {
+                        if (st.cancelled) return;
+                        row.status = 'error';
+                        row.note = (err && err.message) ? err.message : 'Search failed';
+                    }
+                    row.searching = false;
+                    rlBulkPaint();
+                }
+            };
+            await Promise.all([worker(), worker()]);
             rlBulkPaint();
         }
         async function rlBulkApply() {
