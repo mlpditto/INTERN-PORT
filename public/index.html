@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.150)</title>
+    <title>Internship Portfolio (V101.151)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -699,6 +699,15 @@
         #sch-agenda .act-streak { display:inline-flex; align-items:center; gap:4px; width:auto; height:24px; min-height:24px; margin:0; padding:0 9px; border-radius:999px; font-weight:800; font-size:0.72em; line-height:1; white-space:nowrap; font-family:inherit; text-transform:none; letter-spacing:0; }
         #sch-agenda .act-streak.todo { background:linear-gradient(135deg,#f97316,#ea580c); color:#fff; border:0; box-shadow:0 2px 6px rgba(234,88,12,.3); cursor:pointer; }
         #sch-agenda .act-streak.done { background:rgba(240,253,244,.9); color:#15803d; border:1px solid #bbf7d0; }
+        /* V101.151: the check-in mark = a 🔥 ring that fills toward the 7-day bonus (green + full on the bonus day); the same element is the button while today is still open */
+        #sch-agenda .act-streak.ck { gap:6px; padding:0; background:none; border:0; box-shadow:none; color:#c2410c; font-size:0.78em; }
+        #sch-agenda .act-streak.ck.done { color:#15803d; }
+        #sch-agenda .act-streak.ck.todo { cursor:pointer; }
+        .ck-ring { width:24px; height:24px; border-radius:50%; background:conic-gradient(#f97316 calc(var(--p) * 1%), #fde6d3 0); display:inline-grid; place-items:center; flex:0 0 auto; }
+        .ck-ring em { width:17px; height:17px; border-radius:50%; background:#fff; display:grid; place-items:center; font-style:normal; font-size:10px; line-height:1; }
+        .act-streak.ck.full .ck-ring { background:#22c55e; }
+        /* V101.151: ⭐ in the corner of every week-strip day you checked in */
+        #sch-week .sch-star { position:absolute; right:-5px; top:-5px; min-width:15px; height:15px; border-radius:999px; background:#fff; box-shadow:0 0 0 1.5px #fff, 0 1px 3px rgba(15,23,42,.25); font-size:10px; font-style:normal; line-height:15px; display:grid; place-items:center; pointer-events:none; }
         /* V101.83: the orange button stays 24px tall; on touch its tap area grows to 44px with an invisible ::after (bottom = the 6px under the header, so it never covers the tiles) */
         @media (pointer: coarse) { #sch-agenda button.act-streak { position:relative; } #sch-agenda button.act-streak::after { content:''; position:absolute; left:-8px; right:-8px; top:-14px; bottom:-6px; } }
         #daily-checkin-card .act-ic { width:36px; height:36px; min-height:36px; padding:0; border-radius:50%; font-size:1em; background:rgba(255,255,255,.85); display:inline-flex; align-items:center; justify-content:center; }
@@ -16203,7 +16212,7 @@
             const d = schParseDay(key);
             if (!d) return '';
             const now = new Date();
-            const done = schBuildDayMap()[key] || [];
+            const done = (schBuildDayMap()[key] || []).filter(it => it.submissionType !== 'checkin');   // V101.151: the check-in is the ⭐ on the day circle, not a row
             const events = schEventsOn(key);
             const todoAll = items.filter(it => it.kind !== 'e' && schItemDayKey(it, now) === key);
             // V101.149: a to-do that the list below already shows is not repeated here; only the collapsed Missed ones are (this panel is the one place they show).
@@ -16290,7 +16299,7 @@
                 const label = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) + ' — ' + (names.length ? names.join(', ') : 'nothing');
                 const ring = schRingBg(m);
                 html += '<button type="button" class="sch-wd' + (key === todayKey ? ' today' : '') + '" data-schday="' + key + '" data-marks="' + tokens.join(' ') + '" aria-pressed="' + (schWeekSel === key)
-                    + '" aria-label="' + label + '" onclick="schWeekPick(\'' + key + '\')"><small>' + 'MTWTFSS'[i] + '</small><span class="sch-n"' + (ring ? ' style="--ring:' + ring + '"' : '') + '><b>' + d.getDate() + '</b></span></button>';
+                    + '" aria-label="' + label + '" onclick="schWeekPick(\'' + key + '\')"><small>' + 'MTWTFSS'[i] + '</small><span class="sch-n"' + (ring ? ' style="--ring:' + ring + '"' : '') + '><b>' + d.getDate() + '</b>' + (schCheckinDays && schCheckinDays.has(key) ? '<i class="sch-star" title="Checked in">⭐</i>' : '') + '</span></button>';
             }
             html += '</div>';
             if (schWeekSel) html += schWeekDayHtml(schWeekSel, items);
@@ -20639,10 +20648,11 @@
             }
             const checkDone = (myCheckin || {}).lastDate === todayKey;
             const streakLabel = `${streak}-day streak${giftTitle ? ' · ' + giftTitle : ''}`;
+            const prog = Math.round(streak % CHECKIN_STREAK_BONUS_EVERY / CHECKIN_STREAK_BONUS_EVERY * 100), full = checkDone && streak > 0 && streak % CHECKIN_STREAK_BONUS_EVERY === 0;   // V101.151: ring = days into the 7-day bonus cycle
             if (checkDone && streak === 0) return '';   // V101.93: "🔥0" says nothing — the pill shows from a streak of 1, or as the orange check-in button
             return checkDone
-                ? `<span class="act-streak done" title="Checked in today · ${streakLabel}" aria-label="Checked in today · ${streakLabel}">🔥${streak}</span>`
-                : `<button type="button" id="daily-checkin-btn" class="act-streak todo" onclick="tryDailyCheckin()" title="Check in · ${streakLabel}" aria-label="Check in · ${streakLabel}">🔥${streak}</button>`;
+                ? `<span class="act-streak ck done${full ? ' full' : ''}" title="Checked in today · ${streakLabel}" aria-label="Checked in today · ${streakLabel}"><span class="ck-ring" style="--p:${full ? 100 : prog}"><em>🔥</em></span>${streak}</span>`
+                : `<button type="button" id="daily-checkin-btn" class="act-streak ck todo" onclick="tryDailyCheckin()" title="Check in · ${streakLabel}" aria-label="Check in · ${streakLabel}"><span class="ck-ring" style="--p:${prog}"><em>🔥</em></span>${streak}</button>`;
         }
 
         function renderDailyCheckinCard() {
