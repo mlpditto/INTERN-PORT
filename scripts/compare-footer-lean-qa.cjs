@@ -31,7 +31,7 @@ assert.ok(at('Keep Original') < at('_compareModelBPickerHtml') && at('_compareMo
         assert.deepEqual(vendors, [['Gemini', 'false', 'gemini'], ['GPT', 'true', 'openai'], ['Claude', 'false', 'claude'], ['Qwen', 'false', 'qwen'], ['DeepSeek', 'false', 'deepseek'], ['Grok', 'false', 'grok'], ['Ollama', 'false', 'ollama']], 'seven vendor icons, the picked model\'s vendor pressed');
         const shown = () => page.locator('#b .text-ai-chips > button:visible').evaluateAll(bs => bs.map(b => b.getAttribute('aria-label')));
         assert.deepEqual(await shown(), ['GPT 6 Luna', 'GPT 5.6 Terra', 'GPT 6 Sol', 'GPT 6 Astra'], 'only the picked vendor\'s models');
-        assert.equal(await page.locator('#b .text-ai-chips > button').count(), 16, 'every chip is still in the DOM (hidden), nothing duplicated');
+        assert.equal(await page.locator('#b .text-ai-chips > button').count(), 17, 'every chip is still in the DOM (hidden), nothing duplicated');
         const ys = await page.locator('#b .cmp-b-lbl, #b .cmp-vendors, #b .text-ai-chips > button:visible').evaluateAll(ns => ns.map(n => { const r = n.getBoundingClientRect(); return Math.round(r.top + r.height / 2); }));
         assert.ok(Math.max(...ys) - Math.min(...ys) <= 8, 'B · vendors · models are ONE row: ' + ys);
         // pick another vendor → its models; picking a chip keeps ONE pressed chip and saves the choice
