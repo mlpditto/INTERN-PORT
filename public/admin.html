@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.245)</title>
+    <title>Nika Admin (V102.246)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -4153,9 +4153,9 @@
         #groupSelectModal .modal-content { padding:18px 20px !important; }
         #groupSelectModal .gs-profile-cards { gap:10px; margin-bottom:10px; }
         #groupSelectModal .gs-profile-card { border-radius:14px; }
-        #groupSelectModal .gs-profile-card header { padding:6px 8px 6px 12px; gap:4px; }
+        #groupSelectModal .gs-profile-card header { padding:4px 8px 4px 12px; gap:4px; }   /* V102.246: 56px → ~34px (see the chip rule below) */
         #groupSelectModal .gs-profile-card h3 { font-size:13.5px; }
-        #groupSelectModal .gs-profile-card button.gs-copy-card, #groupSelectModal .gs-profile-card button.gs-edit-card { width:30px; min-height:30px; height:30px; padding:0; font-size:14px; border-radius:8px; }
+        #groupSelectModal .gs-profile-card button.gs-copy-card, #groupSelectModal .gs-profile-card button.gs-edit-card { width:26px; min-height:26px; height:26px; padding:0; font-size:13px; border-radius:7px; }   /* V102.246: 30 → 26 */
         #groupSelectModal .gs-card-fields { gap:2px; padding:6px 12px 8px; }
         #groupSelectModal .gs-card-field { display:grid; grid-template-columns:minmax(84px, 34%) minmax(0, 1fr) auto; align-items:center; column-gap:8px; min-height:28px; }
         #groupSelectModal .gs-card-field label { margin:0; font-size:11.5px; line-height:1.25; }
@@ -4319,6 +4319,8 @@
         /* V102.176: the enrollment CODE chip sits inline after "Personal details" (it used to be in the header); the card's buttons stay on the right */
         #groupSelectModal .gs-card-basic header h3 { flex:0 0 auto; }
         #groupSelectModal .gs-card-basic header .gs-code { margin-right:auto; }
+        /* V102.246: the enrollment-code chip was 44px tall — `#groupSelectModal .gs-profile-card button { min-height:44px }` (id+class+element) beats `.gs-code { min-height:0 }` — and it alone made the whole header 56px. */
+        #groupSelectModal .gs-profile-card button.gs-code { min-height:0; height:26px; padding:0 9px; }
         #groupSelectModal .gs-line-uid .gs-read-value { font-family:ui-monospace, Consolas, monospace; font-size:0.82em; word-break:break-all; }   /* V102.174: the full LINE user id */
         #groupSelectModal .gs-line-uid input { background:#f1f5f9; color:#64748b; }
         #groupSelectModal .gs-code code { background:none; padding:0; color:inherit; }
@@ -51847,6 +51849,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const palette = ['#f59e0b', '#0d9488', '#8b5cf6', '#ec4899', '#0ea5e9', '#84cc16'];
             if (name === '__only') return '#64748b';
             if (typeof groupStyleOf === 'function' && groupStyleOf('divisions', name).color) return groupStyleOf('divisions', name).color;   // V102.180: admin-set colour wins
+            if (String(name).trim().toUpperCase() === 'CU') return '#e0218a';   // V102.246: Chulalongkorn pink (the hash gave CU the same purple as BUU); an admin-set colour above still wins
             let h = 0; for (const c of String(name)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
             return palette[h % palette.length];
         }
@@ -68385,8 +68388,15 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
         }
 
         // V95.60: filter predicate for the Individual Feedback list.
+        // V102.246: a 10/10 with no comment and no next topic says nothing an admin can act on — it is dropped from the review list (never deleted: it keeps its
+        // bonus record and still counts in the average / Responses). The 👍 chip shows them.
+        function qfpIsEmptyPraise(f) {
+            return typeof f.rating === 'number' && f.rating >= 10 && !qfpNormalizeTopic(f.comment) && !qfpNormalizeTopic(f.nextTopic);
+        }
         function qfpMatchesFilter(f) {
             const rc = qfpNormalizeTopic(f.comment);
+            if (_qfpFilter === 'praise') return qfpIsEmptyPraise(f);
+            if (qfpIsEmptyPraise(f)) return false;
             switch (_qfpFilter) {
                 case 'unscored': return rc.length > 0 && typeof f.aiFeedbackScore !== 'number';
                 case 'short':    return rc.length > 0 && rc.length < 100;
@@ -68407,7 +68417,10 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
                 list = list.slice().sort((a, b) => rk(a) - rk(b));
             }
             if (!list.length) {
-                container.innerHTML = `<p style="text-align:center;color:#94a3b8;padding:20px;">ไม่มีรายการที่ตรงกับตัวกรองนี้</p>`;
+                const nPraise = _qfpFeedbacks.filter(qfpIsEmptyPraise).length;
+                container.innerHTML = _qfpFilter === 'all' && nPraise
+                    ? `<p style="text-align:center;color:#94a3b8;padding:20px;">Nothing to review — ${nPraise} × 10/10 without a comment hidden <button type="button" onclick="qfpSetFilter('praise')" style="width:auto; min-height:0; margin:0 0 0 6px; padding:2px 10px; border-radius:999px; border:1px solid #e2e8f0; background:#fff; cursor:pointer; font-size:0.85em;">show</button></p>`
+                    : `<p style="text-align:center;color:#94a3b8;padding:20px;">ไม่มีรายการที่ตรงกับตัวกรองนี้</p>`;
                 return;
             }
             container.innerHTML = list.map(qfpCardHtml).join('');
@@ -68419,10 +68432,11 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
         function qfpRenderFilterRail() {
             const rail = document.getElementById('qfp-comments-controls');
             if (!rail) return;
-            if (_qfpFeedbacks.length <= 3) { rail.innerHTML = ''; return; }
+            const nPraise = _qfpFeedbacks.filter(qfpIsEmptyPraise).length;   // V102.246
+            if (_qfpFeedbacks.length <= 3 && !nPraise) { rail.innerHTML = ''; return; }
             const norm = f => qfpNormalizeTopic(f.comment);
             const counts = {
-                all: _qfpFeedbacks.length,
+                all: _qfpFeedbacks.length - nPraise,
                 unscored: _qfpFeedbacks.filter(f => norm(f).length > 0 && typeof f.aiFeedbackScore !== 'number').length,
                 short: _qfpFeedbacks.filter(f => { const n = norm(f).length; return n > 0 && n < 100; }).length,
                 low: _qfpFeedbacks.filter(f => typeof f.rating === 'number' && f.rating <= 5).length,
@@ -68443,6 +68457,7 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
                     ${chip('unscored', 'Unscored', counts.unscored)}
                     ${chip('short', 'Short <100', counts.short)}
                     ${chip('low', 'Low rating', counts.low)}
+                    ${nPraise > 0 || _qfpFilter === 'praise' ? chip('praise', '👍 10/10 · no comment', nPraise) : ''}
                     <span style="width:1px;height:18px;background:#e2e8f0;margin:0 3px;"></span>
                     <span style="font-size:0.7em;color:#94a3b8;font-weight:700;">Sort:</span>
                     ${sortChip('recent', 'Recent')}
