@@ -81,7 +81,7 @@ function attr(tag, name) {
     const m = tag.match(new RegExp('\\b' + name + '\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\'|([^\\s>]+))', 'i'));
     return m ? (m[1] != null ? m[1] : m[2] != null ? m[2] : m[3]) : '';
 }
-const unescapeHtml = s => String(s || '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+const unescapeHtml = s => String(s || '').replace(/&#x([0-9a-f]+);/gi, (m, h) => { try { return String.fromCodePoint(parseInt(h, 16)); } catch (e) { return m; } }).replace(/&#(\d+);/g, (m, d) => { try { return String.fromCodePoint(parseInt(d, 10)); } catch (e) { return m; } }).replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>');
 
 // Candidate image URLs in preference order, absolute.
 function logoCandidates(html, pageUrl) {
@@ -103,6 +103,14 @@ function logoCandidates(html, pageUrl) {
     return out.filter(c => (seen.has(c.url) ? false : seen.add(c.url)));
 }
 
+// The page's own name for itself (og:title, else <title>) + description — lets a caller check that the page really is the shop it was looking for.
+function pageIdentity(html) {
+    const metas = (html.match(/<meta\b[^>]*>/gi) || []).map(t => ({ key: (attr(t, 'property') || attr(t, 'name')).toLowerCase(), val: attr(t, 'content') }));
+    const og = k => (metas.find(m => m.key === k) || {}).val || '';
+    const t = (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1] || '';
+    return { title: unescapeHtml(og('og:title') || t).replace(/\s+/g, ' ').trim().slice(0, 200), description: unescapeHtml(og('og:description') || og('description')).replace(/\s+/g, ' ').trim().slice(0, 300) };
+}
+
 async function findLinkLogo(rawUrl) {
     // V102.127: the link may itself be a picture (a Facebook / CDN image address) — then that picture is the candidate.
     const page = await getBytes(String(rawUrl || ''), MAX_IMAGE);
@@ -113,18 +121,19 @@ async function findLinkLogo(rawUrl) {
     if (page.buf.length > MAX_HTML) throw new Error('The page is too large');
     const html = page.buf.toString('utf8');
     const candidates = logoCandidates(html, page.url);
+    const identity = pageIdentity(html);   // V102.244
     const tried = [];
     for (const c of candidates.slice(0, 5)) {
         try {
             const img = await getBytes(c.url, MAX_IMAGE);
             if (!OK_IMAGE.test(img.type)) { tried.push(c.source + ': not a raster image'); continue; }
             if (img.buf.length < 200) { tried.push(c.source + ': too small'); continue; }
-            return { found: true, source: c.source, from: c.url, contentType: img.type, bytes: img.buf.length, dataUrl: 'data:' + img.type + ';base64,' + img.buf.toString('base64') };
+            return { found: true, source: c.source, from: c.url, contentType: img.type, bytes: img.buf.length, dataUrl: 'data:' + img.type + ';base64,' + img.buf.toString('base64'), pageTitle: identity.title, pageDescription: identity.description };
         } catch (e) {
             tried.push(c.source + ': ' + (e && e.message ? e.message : 'failed'));
         }
     }
-    return { found: false, candidates: candidates.length, tried };
+    return { found: false, candidates: candidates.length, tried, pageTitle: identity.title, pageDescription: identity.description };
 }
 
-module.exports = { findLinkLogo, logoCandidates, isPrivateIp, assertPublicUrl };
+module.exports = { findLinkLogo, logoCandidates, pageIdentity, isPrivateIp, assertPublicUrl };

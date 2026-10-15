@@ -206,6 +206,23 @@ exports.generatePreviewToken = onCall(async (request) => {
 // Admin-only. Returns the image as a data URL so the admin can PREVIEW it and approve; nothing is
 // stored here — the admin page resizes it and uploads to Storage (link-logos/). The fetch of an
 // admin-typed URL is SSRF-guarded in link-logo.js. Lazy require keeps cold start / discovery light.
+// V102.244: the logo for a shop whose page has none — web search (cheap model + OpenRouter web plugin) finds its Facebook / Wongnai page, then the
+// guarded fetcher above reads the picture. Admin-only; the admin confirms the picture before anything is stored. See functions/shop-logo-search.js.
+exports.findShopLogo = onCall({ secrets: ['OPENROUTER_API_KEY'], timeoutSeconds: 120, memory: '512MiB' }, async (request) => {
+    requireAdminCallable(request);
+    const title = String((request.data && request.data.title) || '').trim();
+    if (!title) throw new HttpsError('invalid-argument', 'title is required');
+    const search = require('./shop-logo-search');
+    try {
+        const out = await search.findShopLogo(title, { apiKey: process.env.OPENROUTER_API_KEY, fetch: (u, o) => fetch(u, o), findLogo: require('./link-logo').findLinkLogo });
+        recordAiUsage('openrouter', search.SEARCH_MODEL, out.tokens, true, 'shop_logo_search', {});
+        return out;
+    } catch (e) {
+        console.warn('[findShopLogo]', title.slice(0, 60), e && e.message);
+        throw new HttpsError('failed-precondition', (e && e.message) || 'Search failed');
+    }
+});
+
 exports.fetchLinkLogo = onCall({ timeoutSeconds: 60, memory: '512MiB' }, async (request) => {
     requireAdminCallable(request);
     const url = String((request.data && request.data.url) || '').trim();
