@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.247)</title>
+    <title>Nika Admin (V102.248)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -4175,6 +4175,8 @@
         #gs-cv-sheet .cv-row.same, #gs-cv-sheet .cv-row.none { opacity:.55; cursor:default; }
         #gs-cv-sheet .cv-row.diff { background:#fffbeb; }
         #gs-cv-sheet .cv-warn { margin:6px 12px; padding:7px 10px; border-radius:8px; background:#fffbeb; border:1px solid #fcd34d; color:#92400e; }
+        #gs-cv-sheet .cv-keep { display:flex; align-items:center; gap:6px; padding:6px 12px; border-top:1px solid #f1f5f9; color:#475569; cursor:pointer; margin:0; }
+        #gs-cv-sheet .cv-keep input { width:16px; height:16px; margin:0; min-height:0; }
         #gs-cv-sheet .cv-ft { display:flex; align-items:center; gap:8px; padding:8px 12px; background:#f8fafc; color:#64748b; }
         #gs-cv-sheet .cv-ft .sp { flex:1; }
         #gs-cv-sheet .cv-btn { border:none; border-radius:999px; height:30px; min-height:0; width:auto; margin:0; padding:0 14px; font-weight:700; cursor:pointer; background:#fff; border:1px solid #e2e8f0; color:#475569; }
@@ -37078,7 +37080,7 @@ They can connect again from LINE.
         // V102.247: 📄 Import CV. The admin picks a PDF or an image of a CV; the text (pdf.js) or the picture (vision) goes to the AI, which returns the profile fields. Nothing is written here:
         // Apply only fills the User Hub inputs and fires the card's own oninput, so the normal "Save N changes" row (and its single users update) stays the one write path.
         // A field is ticked by default only when it is empty today; a different value is shown amber and left unticked; a CV name that differs from the user's is a warning, never a block.
-        const GS_CV_MODEL = 'claude-opus-5-5';
+        const GS_CV_MODEL = 'claude-opus-5-5', GS_CV_MODEL_LABEL = 'Claude Opus 5.5';   // V102.248: the sheet names the model that read the CV
         const GS_CV_FIELDS = [
             { key: 'fullName', id: 'gs-fullname-th', label: 'Full name (Thai)', sec: 'Personal', kind: 'text' },
             { key: 'nickname', id: 'gs-cert-nickname', label: 'Nickname', sec: 'Personal', kind: 'text' },
@@ -37129,7 +37131,7 @@ They can connect again from LINE.
                 return { key: f.key, id: f.id, label: f.label, sec: f.sec, kind: f.kind, cur, val, state, nameMismatch, checked: state === 'new' };
             });
         }
-        let _gsCvRows = [], _gsCvFilter = 'all';
+        let _gsCvRows = [], _gsCvFilter = 'all', _gsCvFileRef = null, _gsCvKeep = true;   // V102.248: the CV file itself is kept with the user (admin-only) unless the admin unticks it
         function gsCvOpen() { const f = document.getElementById('gs-cv-file'); if (f) { f.value = ''; f.click(); } }
         function gsCvClose() { const sh = document.getElementById('gs-cv-sheet'); if (sh) { sh.hidden = true; sh.innerHTML = ''; } _gsCvRows = []; }
         function gsCvMsg(html, withClose) {
@@ -37166,6 +37168,7 @@ They can connect again from LINE.
         async function gsCvFile(input) {
             const file = input && input.files && input.files[0];
             if (!file) return;
+            _gsCvFileRef = file;
             gsCvMsg('⏳ Reading <b>' + escapeHtml(file.name) + '</b>…', false);
             try {
                 let text = '', pdf = null, via = '';
@@ -37173,7 +37176,8 @@ They can connect again from LINE.
                 const useImage = text.replace(/\s+/g, '').length < 60;
                 const vision = useImage ? await gsCvImage(file, pdf) : null;
                 via = useImage ? '🖼 read as an image (vision model)' : '✓ text read from the PDF';
-                gsCvMsg('🤖 Asking the AI… <small>' + via + '</small>', false);
+                via += ' · 🤖 ' + GS_CV_MODEL_LABEL;
+                gsCvMsg('🤖 Asking ' + GS_CV_MODEL_LABEL + '… <small>' + via + '</small>', false);
                 const res = await window.callUniversalAI(GS_CV_MODEL, useImage ? GS_CV_PROMPT : GS_CV_PROMPT + '\n\nCV TEXT:\n' + text.slice(0, 12000), true, vision, '', { feature: 'cv_import' });
                 const data = window.safeJsonParse(res && res.text);
                 if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('The AI did not return usable JSON: ' + String(res && res.text || '').slice(0, 120));
@@ -37200,6 +37204,7 @@ They can connect again from LINE.
                     return '<label class="cv-row ' + r.state + '"><input type="checkbox" data-i="' + i + '"' + (r.checked ? ' checked' : '') + (dis ? ' disabled' : '') + ' onchange="gsCvTick(this)"><span><b>' + escapeHtml(r.label) + '</b><small>' + r.sec + '</small></span>'
                         + '<span class="cur">' + (r.cur ? escapeHtml(r.cur) : '<i>empty</i>') + '</span><span class="ar">→</span><span class="val">' + (r.val ? escapeHtml(r.val) : '<i>—</i>') + '</span>'
                         + '<span class="cv-tg ' + r.state + '">' + ({ new: 'new', diff: 'differs', same: 'same', none: 'not in CV' })[r.state] + '</span></label>'; }).join('')
+                + '<label class="cv-keep"><input type="checkbox" id="gs-cv-keep"' + (_gsCvKeep && gsCvKeepable() ? ' checked' : '') + (gsCvKeepable() ? '' : ' disabled') + ' onchange="_gsCvKeep = this.checked; gsCvCount()"> 📎 ' + (gsCvKeepable() ? 'Keep this CV in the user\'s documents (admin only)' : 'Cannot keep this file (PDF / JPG / PNG / WEBP under 4 MB only)') + '</label>'
                 + '<div class="cv-ft"><span id="gs-cv-count"></span><span class="sp"></span><button type="button" class="cv-btn" onclick="gsCvClose()">Cancel</button><button type="button" class="cv-btn p" id="gs-cv-apply" onclick="gsCvApply()"></button></div>';
             gsCvCount();
         }
@@ -37208,14 +37213,33 @@ They can connect again from LINE.
         function gsCvCount() {
             const k = _gsCvRows.filter(r => r.checked).length, d = _gsCvRows.filter(r => r.state === 'diff').length;
             const c = document.getElementById('gs-cv-count'), b = document.getElementById('gs-cv-apply');
-            if (c) c.textContent = k + ' to apply' + (d ? ' · ' + d + ' differs' : '');
-            if (b) { b.textContent = 'Apply ' + k + ' field' + (k === 1 ? '' : 's'); b.disabled = !k; }
+            const keep = _gsCvKeep && gsCvKeepable();
+            if (c) c.textContent = k + ' to apply' + (d ? ' · ' + d + ' differs' : '') + (keep ? ' · CV kept' : '');
+            if (b) { b.textContent = k ? 'Apply ' + k + ' field' + (k === 1 ? '' : 's') : (keep ? 'Save CV only' : 'Apply 0 fields'); b.disabled = !k && !keep; }
         }
-        function gsCvApply() {
+        // the CV file is stored exactly like an applicant document (Storage applicant-docs/<owner>/<sha256>.<ext> + a Firestore applicant_docs row; both admin-only), under the user's pre-registration
+        // when they have one, else under their own id; the User Hub History then shows "Document received" and the 📎 documents list opens it. Same file twice = one row.
+        const gsCvKeepable = () => !!(_gsCvFileRef && _APPLICANT_EXT[_gsCvFileRef.type] && _gsCvFileRef.size < 4 * 1024 * 1024);
+        async function gsCvKeepFile(uid) {
+            const user = (usersData || []).find(u => u.id === uid), owner = (user && applicantOwnerFor(user)) || uid, file = _gsCvFileRef;
+            if (!owner || !gsCvKeepable()) return 'skipped';
+            const path = `applicant-docs/${owner}/${await _sha256Hex(file)}.${_APPLICANT_EXT[file.type]}`;
+            if ((applicantDocsCache[owner] || []).some(d => d.path === path)) return 'already kept';
+            await adminApp.storage().ref(path).put(file, { contentType: file.type });
+            const editor = (auth && auth.currentUser) || {};
+            await db.collection('applicant_docs').add({ preUserId: owner, name: file.name, path, size: file.size, contentType: file.type, uploadedAt: firebase.firestore.FieldValue.serverTimestamp(), byEmail: editor.email || ALLOWED_EMAIL });
+            await syncResumeFlag(owner);
+            return 'kept';
+        }
+        async function gsCvApply() {
             const todo = _gsCvRows.filter(r => r.checked);
             todo.forEach(r => { const el = document.getElementById(r.id); if (el) { el.value = r.val; el.dispatchEvent(new Event('input', { bubbles: true })); } });   // bubbles to #gs-profile-body.oninput → refresh + the Save row
+            let kept = '';
+            if (_gsCvKeep && gsCvKeepable()) {
+                try { kept = await gsCvKeepFile((document.getElementById('gs-uid') || {}).value); } catch (e) { console.warn('[cv-import] keep failed', e); kept = 'failed: ' + (e.message || e); }
+            }
             gsCvClose();
-            if (todo.length) showToast('📄 ' + todo.length + ' field' + (todo.length === 1 ? '' : 's') + ' filled from the CV — press Save to keep them');
+            showToast((todo.length ? '📄 ' + todo.length + ' field' + (todo.length === 1 ? '' : 's') + ' filled from the CV — press Save to keep them' : '') + (todo.length && kept ? ' · ' : '') + (kept ? '📎 CV ' + kept : ''));
         }
 
         function gsEditProfileCard(button) {
