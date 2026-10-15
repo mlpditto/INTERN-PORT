@@ -99,7 +99,7 @@ for (const id of ['ai-model-review', 'ai-model-grammar', 'rr-providers', 'rr-gra
         // rrSyncModelRow (modal open) follows a programmatic value
         await p.evaluate(() => { document.getElementById('ai-model-review').value = 'gemini-3.8-flash'; window.rrSyncModelRow('ai-model-review', 'rr-providers'); });
         assert.equal(await openTab(p, 'rr-providers'), 'Gemini');
-        assert.deepEqual(await visibleChips(p, 'rr-model-row'), ['Lite 3.5', 'Flash 3.8']);
+        assert.deepEqual(await visibleChips(p, 'rr-model-row'), ['Lite 3.5', 'Flash 3.8', 'Gemma 4 26B']);   // V102.242: + Gemma under the Gemini tab
         await p.close();
 
         // ---- phone ----

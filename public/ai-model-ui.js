@@ -5,6 +5,9 @@
         // it is shown elsewhere and the audit toolbar filters on its first word.
         { id: 'as/gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', short: 'Lite 3.5', hint: 'Gemini รุ่นประหยัด สำหรับงานสั้น' },
         { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', short: 'Flash 3.8', hint: 'Gemini สำหรับวิเคราะห์และสรุปข้อมูล' },
+        // V102.242: Gemma 4 26B A4B (Google open weights, MoE with 4B active) via OpenRouter — grouped under the Gemini tab (the tab = the first word of `label`),
+        // billed by OpenRouter (isGoogleBilledModel is false for or/google/). Phase 0 probe 2026-10-15: Thai from an image exact, JSON + Thai quiz JSON + Thai translation pass, ~4 s, ~$0.00005 per quiz item.
+        { id: 'or/google/gemma-4-26b-a4b-it', label: 'Gemini Gemma 4 26B A4B', short: 'Gemma 4 26B', hint: 'Gemma 4 ของ Google เร็วและประหยัดมาก อ่านภาษาไทยจากรูปได้ ผ่าน OpenRouter 구글 Gemma 4, 매우 빠르고 저렴, OpenRouter 경유' },
         { id: 'gpt-6-luna', label: 'GPT 6 Luna', short: 'Luna 6', hint: 'GPT รุ่นประหยัด ค่าเริ่มต้นสำหรับงานทั่วไป' },
         { id: 'gpt-5.6-terra', label: 'GPT 5.6 Terra', short: 'Terra 5.6', hint: 'GPT สำหรับงานวิเคราะห์ที่ซับซ้อนขึ้น' },
         { id: 'gpt-6-sol', label: 'GPT 6 Sol', short: 'Sol 6', hint: 'GPT สำหรับงานที่ต้องการรายละเอียดมากขึ้น' },
