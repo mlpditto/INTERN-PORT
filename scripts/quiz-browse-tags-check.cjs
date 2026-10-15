@@ -31,7 +31,7 @@ const quizzesCache = [
 const ctx = {
     document: { getElementById: mk },
     quizzesCache, quizAttemptsCache: {}, myScore: 100, _qbTakerCounts: {},
-    qbIsAvailableToMe: () => true,
+    qbIsAvailableToMe: q => q.id !== 'NA',
     QuizCover: { adminThumbnail: () => '' },
     escapeHtml: v => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 };
@@ -87,6 +87,12 @@ const pillsA = chips(rowA);
 check('row pills: first 3 tags as #pills', pillsA.map(c => c.label).join('|'), '#Headache|#Pharmacotherapy|#Ibuprofen');
 check('row pills: +N for the rest', /class="qb-tag" style="cursor:default; border-style:dashed;">\+2</.test(rowA), true);
 check('row pills: tags no longer in the meta text', /Headache, Pharmacotherapy/.test(rowA), false);
+const startA = api.qbRowHtml(quizzesCache[0]);
+check('V101.157: an open quiz found in Browse is a round ▶ Start (no request)', /onclick="qbCloseBrowse\(\);confirmRunQuiz\(&quot;A&quot;\)"/.test(startA) && />▶<\/button>/.test(startA) && /Start this quiz now — no request needed/.test(startA), true);
+check('V101.157: no "Ready — in Mission" label any more', /Ready — in Mission/.test(startA), false);
+check('V101.157: the Start button is finger-sized', /width:44px; min-width:44px; height:44px/.test(startA), true);
+check('V101.157: a quiz not open to me (other group / not started) still offers Request', /qbRequestQuiz\('NA'\)/.test(api.qbRowHtml({ id: 'NA', title: 'Closed', isActive: true })) && !/confirmRunQuiz/.test(api.qbRowHtml({ id: 'NA', title: 'Closed', isActive: true })), true);
+check('V101.157: a paused quiz has no Start and no Request', /Not open yet/.test(api.qbRowHtml({ id: 'P9', title: 'Paused', isActive: false })) && !/confirmRunQuiz|qbRequestQuiz/.test(api.qbRowHtml({ id: 'P9', title: 'Paused', isActive: false })), true);
 const rowC = api.qbRowHtml(quizzesCache[2]);
 check('row pills: marker tag hidden', chips(rowC).map(c => c.label).join('|'), '#Fever');
 check('row pills: click stops row propagation', /event\.stopPropagation\(\); qbSetTagFilter\(this\.dataset\.key\)/.test(rowA), true);
