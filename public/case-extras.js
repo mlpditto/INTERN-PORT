@@ -9,7 +9,7 @@
         meds: { box: 'u-opt-meds', a: ['Drug name', 'ชื่อยา'], b: ['Dose · frequency', 'ขนาด · ความถี่'], add: 'Add drug' },
         labs: { box: 'u-opt-labs', a: ['Test', 'รายการตรวจ'], b: ['Result', 'ผล'], add: 'Add result' }
     };
-    var RIGHTS = ['ucs', 'csmbs', 'private', 'other'];
+    var RIGHTS = ['ucs', 'sss', 'csmbs', 'private', 'other'];   // V101.155: + sss (Social Security / ประกันสังคม — it used to be typed under Other)
     var rights = '';
     function $(id) { return document.getElementById(id); }
     function trimTo(v, n) { return String(v || '').trim().slice(0, n); }

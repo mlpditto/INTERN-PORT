@@ -181,6 +181,7 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
             document.querySelector('.u-opt-tile[data-opt="labs"]').click(); const l = document.querySelector('#u-opt-labs .u-opt-row').querySelectorAll('input'); l[0].value = 'HbA1c'; l[1].value = '8.2 %'; l[0].dispatchEvent(new Event('input', { bubbles: true }));
             document.querySelector('.u-opt-tile[data-opt="rights"]').click();
             o.chips = [...document.querySelectorAll('#u-opt-rights .u-opt-chip')].map(c => c.textContent);
+            o.chipsVisibleEn = (() => { const blk = document.getElementById('u-opt-rights'), was = blk.hidden; blk.hidden = false; const v = [...blk.querySelectorAll('.u-opt-chip')].map(c => c.innerText.replace(/\s+/g, ' ').trim()); blk.hidden = was; return v; })();
             o.otherHidden0 = document.getElementById('u-opt-rights-other').hidden;
             document.querySelector('#u-opt-rights .u-opt-chip[data-v="other"]').click(); o.otherHidden1 = document.getElementById('u-opt-rights-other').hidden;
             document.getElementById('u-opt-rights-other').value = 'ประกันสังคม';
@@ -193,7 +194,8 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.deepEqual(opt.start, [true, true, true, true], 'all four blocks start folded');
         assert.ok(opt.medsOpen && opt.medsRows === 1, 'opening Medications adds the first row'); assert.equal(opt.medsRows2, 2);
         assert.deepEqual(opt.badge, ['1', true], 'badge counts filled rows only');
-        assert.deepEqual(opt.chips.map(c => c.replace(/\s*[가-힯].*$/, '')), ['บัตรทอง (UCS)', 'ราชการ (CSMBS)', 'ประกันเอกชน', 'อื่นๆ / Other'], 'the four rights');
+        assert.deepEqual(opt.chips.map(c => c.replace(/\s*[가-힯].*$/, '')), ['Gold card (UCS) บัตรทอง', 'Social Security (SSS) ประกันสังคม', 'Civil servant (CSMBS) ข้าราชการ', 'Private insurance ประกันเอกชน', 'Other อื่นๆ'], 'the five rights (V101.155: EN first, + Social Security)');
+        assert.deepEqual(opt.chipsVisibleEn, ['Gold card (UCS)', 'Social Security (SSS)', 'Civil servant (CSMBS)', 'Private insurance', 'Other'], 'English mode shows a whole English label on every chip (no "(UCS)(UCS)" / blank chip): ' + JSON.stringify(opt.chipsVisibleEn));
         assert.ok(opt.otherHidden0 && !opt.otherHidden1, 'อื่นๆ shows a box to specify');
         assert.deepEqual(opt.collected, { medications: [{ name: 'Metformin', dose: '500 mg 2x/day' }], labResults: [{ test: 'HbA1c', value: '8.2 %' }], treatmentRights: { type: 'other', other: 'ประกันสังคม' }, appointment: { date: '2026-10-26', place: 'อายุรกรรม' } }, 'only filled things, trimmed');
         assert.equal(opt.toggledOff, null, 'a second tap clears the rights choice'); assert.equal(opt.afterReset, null, 'reset empties everything'); assert.deepEqual(opt.resetClosed, [true, true, true, true]);
