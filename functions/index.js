@@ -4759,18 +4759,21 @@ async function groupUrgentFeedback(db) {
 // ---- Jev: "same fact?" verdicts for the Compare modal (Phase 0 + use #1 of the Jev plan) ----
 // Admin-only, suggest-only (the page shows a chip next to the n-gram %, nothing is written because of it).
 // Answers are cached by content hash in quiz_dup_scores (client-closed: no rule = no access), so re-opening a
-// comparison costs nothing. Kill switch: quiz_dup_scores/_config { enabled: false }. Key: secret JEV_API_KEY
-// (firebase functions:secrets:set JEV_API_KEY) — it must exist BEFORE this function is deployed.
+// comparison costs nothing. Config doc quiz_dup_scores/_config: { enabled: false } = kill switch; { provider: 'typesafe' } = go straight
+// to TypeSafe instead of OpenRouter (default) — that needs a JEV_API_KEY secret added to this function's list and a redeploy.
 const jev = require("./jev");
-exports.jevCompare = onCall({ secrets: ["JEV_API_KEY"], timeoutSeconds: 120, memory: "256MiB" }, async (request) => {
+exports.jevCompare = onCall({ secrets: ["OPENROUTER_API_KEY"], timeoutSeconds: 120, memory: "256MiB" }, async (request) => {
     requireAdminCallable(request);
     const db = admin.firestore();
     const cfg = await db.collection("quiz_dup_scores").doc("_config").get();
     if (cfg.exists && cfg.data().enabled === false) return { enabled: false, results: [] };
+    const provider = jev.providerOf(cfg.exists ? cfg.data().provider : null);
+    const apiKey = provider === "typesafe" ? process.env.JEV_API_KEY : process.env.OPENROUTER_API_KEY;
+    if (!apiKey) throw new HttpsError("failed-precondition", "No API key configured for provider " + provider);
     const pairs = request.data && request.data.pairs;
     if (!Array.isArray(pairs) || !pairs.length || pairs.length > jev.MAX_PAIRS) throw new HttpsError("invalid-argument", "1-" + jev.MAX_PAIRS + " pairs");
     const out = await jev.compareBatch(pairs, {
-        apiKey: process.env.JEV_API_KEY,
+        apiKey, provider,
         fetch: (url, opts) => fetch(url, opts),
         readCache: async (keys) => {
             const m = {};
@@ -4786,6 +4789,6 @@ exports.jevCompare = onCall({ secrets: ["JEV_API_KEY"], timeoutSeconds: 120, mem
             await batch.commit();
         },
     });
-    if (out.calls) recordAiUsage("typesafe", jev.JEV_MODEL, out.inputTokens, true, "jev_dup", { inputTokens: out.inputTokens, outputTokens: 0 });
+    if (out.calls) recordAiUsage(provider, jev.JEV_MODEL, out.inputTokens, true, "jev_dup", { inputTokens: out.inputTokens, outputTokens: 0 });
     return { enabled: true, results: out.results };
 });
