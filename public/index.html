@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.155)</title>
+    <title>Internship Portfolio (V101.156)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -594,6 +594,15 @@
         .expl-cat { position:relative; z-index:2; pointer-events:none; font-size:0.72em; font-weight:700; color:var(--tx, #64748b); opacity:.85; }
         .expl-coin { color:#b45309; font-weight:800; font-size:0.8em; background:#fff; border-radius:999px; padding:2px 8px; box-shadow:0 1px 4px rgba(15,23,42,.18); white-space:nowrap; }
         .expl-shop-card .expl-peer-list { position:relative; z-index:2; width:100%; text-align:left; background:rgba(255,255,255,.85); border-radius:10px; padding:2px 10px; }
+        /* V101.156: review sheet — ★ rating + icon-only quick tags; the spend box has no spinner */
+        .er-stars { display:flex; gap:2px; justify-content:center; margin:2px 0 6px; }
+        .er-star { width:44px; height:44px; min-height:0; margin:0; padding:0; border:0; background:none; font-size:32px; line-height:1; color:#cbd5e1; cursor:pointer; }
+        .er-star.on { color:#f59e0b; }
+        .er-tags { display:flex; gap:8px; justify-content:center; margin-bottom:10px; }
+        .er-tag { width:48px; height:38px; min-height:0; margin:0; padding:0; border-radius:999px; border:1px solid #e2e8f0; background:#fff; font-size:19px; line-height:1; cursor:pointer; }
+        .er-tag[aria-pressed="true"] { background:#fff7ed; border-color:#fdba74; }
+        .er-spend::-webkit-outer-spin-button, .er-spend::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+        .er-spend { -moz-appearance:textfield; appearance:textfield; }
         /* V101.53: shop logo disc + Easter egg — tapping the logo of a shop whose Beri is already earned pops "Earned" here for ~2 s. */
         .expl-egg-pop { display:inline-flex; align-items:center; gap:4px; color:#16a34a; font-weight:800; background:#dcfce7; border:1px solid #bbf7d0; border-radius:999px; padding:2px 9px; animation:explEggPop 2s ease both; }
         @keyframes explEggPop { 0% { opacity:0; transform:scale(.7); } 12% { opacity:1; transform:scale(1.06); } 20% { transform:scale(1); } 80% { opacity:1; } 100% { opacity:0; } }
@@ -5633,22 +5642,26 @@
     <!-- V96.5x: Explore link review — writes a pending review, admin approves
          (admin.html approveExploreReview) before the 1 Beri credits. -->
     <div id="exploreReviewModal" class="modal lang-no-toggle" style="z-index: 10001;">
-        <div class="modal-content" style="max-width:420px; padding:20px; border-radius:16px;">
-            <span onclick="document.getElementById('exploreReviewModal').style.display='none'" style="position:absolute; top:14px; right:16px; cursor:pointer; font-size:1.4em; color:#64748b;">&times;</span>
-            <h3 style="margin:0 0 4px 0; color:#c2410c; font-weight:900;">✍️ Write a review</h3>
-            <div id="er-link-title" style="font-size:0.85em; color:#64748b; margin-bottom:14px;"></div>
+        <!-- V101.156: lean review sheet — shop logo + name, ★ rating first (tap the same star to clear), four icon-only quick tags, a short text box with a counter
+             that appears once you type, then ฿ + Send on ONE row. No captions: the tooltips carry the words. A star, a tag or text is enough to send. -->
+        <div class="modal-content" style="max-width:420px; padding:18px 20px 20px; border-radius:16px; position:relative;">
+            <span onclick="document.getElementById('exploreReviewModal').style.display='none'" aria-label="Close" role="button" style="position:absolute; top:12px; right:16px; cursor:pointer; font-size:1.4em; color:#64748b;">&times;</span>
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px; padding-right:28px;">
+                <span id="er-logo" style="display:inline-flex; flex-shrink:0;"></span>
+                <div id="er-link-title" style="min-width:0; font-weight:900; font-size:1.05em; color:#1e293b; overflow-wrap:anywhere;"></div>
+            </div>
             <input type="hidden" id="er-link-id">
-            <textarea id="er-text" rows="4" placeholder="Share your experience..." data-th-placeholder="แชร์ประสบการณ์ของคุณ..." data-kr-placeholder="경험을 공유해 주세요..." style="width:100%; border-radius:12px; resize:none; font-size:0.9em; padding:12px; border:1.5px solid #cbd5e1; box-sizing:border-box; margin-bottom:10px;"></textarea>
-            <!-- V96.5x: optional spend amount — not required, no automatic Beri
-                 formula. Just extra info for admin to see alongside the review;
-                 any bonus Beri for a verified purchase is awarded separately via
-                 the existing manual adjBeri() tool in Elite Board, not computed
-                 here. -->
-            <label style="display:block; font-size:0.72em; font-weight:700; color:#78716c; margin-bottom:6px;">Amount spent (฿) — optional</label>
-            <input type="number" id="er-spend" min="0" step="1" placeholder="e.g. 250" data-th-placeholder="เช่น 250" data-kr-placeholder="예: 250" style="width:100%; border-radius:10px; font-size:0.9em; padding:10px 12px; border:1.5px solid #cbd5e1; box-sizing:border-box; margin-bottom:14px;">
-            <div style="display:flex; gap:8px; justify-content:flex-end;">
-                <button onclick="document.getElementById('exploreReviewModal').style.display='none'" style="width:auto; min-height:auto; padding:9px 18px; border-radius:10px; border:1px solid #e2e8f0; background:#fff; cursor:pointer; font-weight:700; color:#64748b;">Cancel</button>
-                <button onclick="submitExploreReview()" style="width:auto; min-height:auto; padding:9px 22px; background:linear-gradient(135deg, #ea580c, #c2410c); border:none; border-radius:10px; color:white; font-weight:900; font-size:0.88em; cursor:pointer;">Send review</button>
+            <div id="er-stars" class="er-stars" role="radiogroup" aria-label="Rating" title="Tap to rate" data-th-title="แตะเพื่อให้คะแนน" data-kr-title="탭하여 평가"></div>
+            <div id="er-tags" class="er-tags" role="group" aria-label="Quick tags"></div>
+            <div style="position:relative; margin-bottom:10px;">
+                <textarea id="er-text" rows="2" maxlength="300" oninput="explReviewCount()" placeholder="Share your experience..." data-th-placeholder="แชร์ประสบการณ์ของคุณ..." data-kr-placeholder="경험을 공유해 주세요..." style="width:100%; border-radius:12px; resize:none; font-size:0.9em; padding:10px 12px; border:1.5px solid #cbd5e1; box-sizing:border-box; margin:0;"></textarea>
+                <span id="er-count" hidden style="position:absolute; right:10px; bottom:8px; font-size:0.7em; color:#94a3b8; pointer-events:none;"></span>
+            </div>
+            <!-- optional spend amount — extra info for admin only, no automatic Beri formula (bonus Beri for a verified purchase is awarded separately via adjBeri()). -->
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span aria-hidden="true" style="font-weight:800; color:#78716c;">฿</span>
+                <input type="number" id="er-spend" class="er-spend" min="0" step="1" inputmode="numeric" placeholder="250" title="Amount spent — optional" data-th-title="ยอดที่ใช้ (ไม่บังคับ)" data-kr-title="사용 금액 (선택)" aria-label="Amount spent, optional" style="flex:1; min-width:0; border-radius:10px; font-size:0.9em; padding:9px 12px; border:1.5px solid #cbd5e1; box-sizing:border-box; margin:0;">
+                <button onclick="submitExploreReview()" style="width:auto; min-height:auto; padding:10px 24px; background:linear-gradient(135deg, #ea580c, #c2410c); border:none; border-radius:10px; color:white; font-weight:900; font-size:0.9em; cursor:pointer;">Send</button>
             </div>
         </div>
     </div>
@@ -10209,7 +10222,7 @@
 
                 // Public feed: other users' APPROVED reviews for this same link.
                 const linkReviews = exploreReviewsCache.filter(r => r.linkId === link.id);
-                const reviewsListHtml = linkReviews.length ? `<div class="expl-peer-list" hidden>${linkReviews.map(r => `<div style="padding:6px 0; font-size:13px; color:#475569;"><strong>${escapeHtml(r.displayName || 'Anonymous')}</strong>: ${escapeHtml(r.text || '')}</div>`).join('')}</div>` : '';
+                const reviewsListHtml = linkReviews.length ? `<div class="expl-peer-list" hidden>${linkReviews.map(r => `<div style="padding:6px 0; font-size:13px; color:#475569;"><strong>${escapeHtml(r.displayName || 'Anonymous')}</strong>${r.rating ? ` <span style="color:#f59e0b; font-weight:800;">★${Number(r.rating) || ''}</span>` : ''}${Array.isArray(r.tags) ? ' ' + EXPLORE_REVIEW_TAGS.filter(t => r.tags.includes(t[0])).map(t => t[1]).join('') : ''}${r.text ? ': ' + escapeHtml(r.text) : ''}</div>`).join('')}</div>` : '';
                 const reviewsButton = linkReviews.length ? `<button type="button" class="expl-peer-button" aria-label="Read ${linkReviews.length} reviews" aria-expanded="false" onclick="const panel=this.closest('.expl-shop-card').querySelector('.expl-peer-list'); panel.hidden=!panel.hidden; this.setAttribute('aria-expanded',String(!panel.hidden));">💬 ${linkReviews.length}</button>` : '';
 
                 const cat = EXPLORE_CATS[link.category];
@@ -10417,20 +10430,39 @@
             }, e => handleFirestoreListenerError('my explore reviews listener', e));
         }
 
+        // V101.156: quick tags (icon-only, tooltip = the words) — keys are stored in review_link_reviews.tags; admin.html ER_TAGS carries the same keys.
+        const EXPLORE_REVIEW_TAGS = [['tasty', '😋', 'Tasty', 'อร่อย|맛있어요'], ['service', '🤝', 'Good service', 'บริการดี|서비스 좋음'], ['worth', '💰', 'Worth it', 'คุ้มค่า|가성비 좋음'], ['fast', '⚡', 'Fast', 'รวดเร็ว|빠름']];   // [key, icon, EN, 'TH|KR' tooltips — the Korean is a draft]
+        let erRating = 0, erTags = new Set();
+        function explReviewPaint() {
+            document.getElementById('er-stars').innerHTML = [1, 2, 3, 4, 5].map(n => `<button type="button" class="er-star${n <= erRating ? ' on' : ''}" role="radio" aria-checked="${n === erRating}" aria-label="${n} / 5" onclick="explReviewStar(${n})">★</button>`).join('');
+            document.getElementById('er-tags').innerHTML = EXPLORE_REVIEW_TAGS.map(t => `<button type="button" class="er-tag" aria-pressed="${erTags.has(t[0])}" aria-label="${t[2]}" title="${t[2]}" data-th-title="${t[3].split('|')[0]}" data-kr-title="${t[3].split('|')[1]}" onclick="explReviewTag('${t[0]}')">${t[1]}</button>`).join('');
+        }
+        function explReviewStar(n) { erRating = erRating === n ? 0 : n; explReviewPaint(); }
+        function explReviewTag(k) { if (erTags.has(k)) erTags.delete(k); else erTags.add(k); explReviewPaint(); }
+        function explReviewCount() {
+            const t = document.getElementById('er-text'), c = document.getElementById('er-count');
+            c.hidden = !t.value.length;
+            c.textContent = t.value.length + '/' + (t.maxLength > 0 ? t.maxLength : 300);
+        }
         function openExploreReviewModal(linkId) {
             const link = reviewLinksCache.find(l => l.id === linkId);
             if (!link) return;
             document.getElementById('er-link-id').value = linkId;
             document.getElementById('er-link-title').textContent = link.title || 'Untitled';
+            document.getElementById('er-logo').innerHTML = explLogoHtml(link, 40);
             document.getElementById('er-text').value = '';
             document.getElementById('er-spend').value = '';
+            erRating = 0; erTags = new Set();
+            explReviewPaint();
+            explReviewCount();
             document.getElementById('exploreReviewModal').style.display = 'flex';
         }
 
         async function submitExploreReview() {
             const linkId = document.getElementById('er-link-id').value;
             const text = document.getElementById('er-text').value.trim();
-            if (!text) { alert('Please write a review first.'); return; }
+            const tags = EXPLORE_REVIEW_TAGS.map(t => t[0]).filter(k => erTags.has(k));
+            if (!text && !erRating && !tags.length) { alert('Tap a star, pick a tag or write a few words first.'); return; }   // V101.156: any one is enough
             // Optional, not required — no automatic Beri formula from this. Just
             // extra info for admin; a verified purchase gets bonus Beri separately
             // via the manual adjBeri() tool, not computed here.
@@ -10442,6 +10474,8 @@
                     displayName: (userProfile && userProfile.displayName) || '',
                     pictureUrl: (userProfile && userProfile.pictureUrl) || '',
                     text,
+                    rating: erRating || null,   // V101.156: 1–5, null = none
+                    tags,
                     spendAmount,
                     status: 'pending',
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
