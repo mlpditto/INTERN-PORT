@@ -77,9 +77,23 @@ service cloud.firestore {
     }
 
     // 1. Users
+    // V101.160: no CODE, no earning — enforced here too, not only in the app (an old cached client, or a hand-made call, would otherwise create a users doc with a `score`, which
+    // the app then reads as "registered"). A person writes their OWN score / Beri only when their doc already counts as registered (the same four markers the app uses:
+    // score / group / enrollmentCode / createdAt), or when the very write is the enrollment (it carries enrollmentCode; a brand-new doc must also carry createdAt).
+    // Every other field (profile, settings, socials, personality …) is unchanged. NOT tamper-proof: pre_users is open and a user can still write their own fields, so a
+    // determined person could forge enrollmentCode — this closes the accidental / stale-client path, not a hostile one. Real enforcement = a server-side claim.
+    function isSelfOrLinked(userId) {
+      return request.auth.uid == userId || hasAuthLinkToUserId(userId);
+    }
     match /users/{userId} {
       allow read: if isAdmin() || request.auth.uid == userId || hasAuthLinkToUserId(userId);
-      allow create, update: if isAdmin() || request.auth.uid == userId || hasAuthLinkToUserId(userId);
+      allow create: if isAdmin() || (isSelfOrLinked(userId) && (
+        !request.resource.data.keys().hasAny(['score', 'beri'])
+        || request.resource.data.keys().hasAll(['enrollmentCode', 'createdAt'])));
+      allow update: if isAdmin() || (isSelfOrLinked(userId) && (
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['score', 'beri'])
+        || resource.data.keys().hasAny(['score', 'group', 'enrollmentCode', 'createdAt'])
+        || request.resource.data.keys().hasAny(['enrollmentCode'])));
       allow delete: if isAdmin();
     }
 
