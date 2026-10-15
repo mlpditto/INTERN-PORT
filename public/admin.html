@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.247)</title>
+    <title>Nika Admin (V102.248)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -37078,7 +37078,7 @@ They can connect again from LINE.
         // V102.247: 📄 Import CV. The admin picks a PDF or an image of a CV; the text (pdf.js) or the picture (vision) goes to the AI, which returns the profile fields. Nothing is written here:
         // Apply only fills the User Hub inputs and fires the card's own oninput, so the normal "Save N changes" row (and its single users update) stays the one write path.
         // A field is ticked by default only when it is empty today; a different value is shown amber and left unticked; a CV name that differs from the user's is a warning, never a block.
-        const GS_CV_MODEL = 'claude-opus-5-5';
+        const GS_CV_MODEL = 'claude-opus-5-5', GS_CV_MODEL_LABEL = 'Claude Opus 5.5';   // V102.248: the sheet names the model that read the CV
         const GS_CV_FIELDS = [
             { key: 'fullName', id: 'gs-fullname-th', label: 'Full name (Thai)', sec: 'Personal', kind: 'text' },
             { key: 'nickname', id: 'gs-cert-nickname', label: 'Nickname', sec: 'Personal', kind: 'text' },
@@ -37173,7 +37173,8 @@ They can connect again from LINE.
                 const useImage = text.replace(/\s+/g, '').length < 60;
                 const vision = useImage ? await gsCvImage(file, pdf) : null;
                 via = useImage ? '🖼 read as an image (vision model)' : '✓ text read from the PDF';
-                gsCvMsg('🤖 Asking the AI… <small>' + via + '</small>', false);
+                via += ' · 🤖 ' + GS_CV_MODEL_LABEL;
+                gsCvMsg('🤖 Asking ' + GS_CV_MODEL_LABEL + '… <small>' + via + '</small>', false);
                 const res = await window.callUniversalAI(GS_CV_MODEL, useImage ? GS_CV_PROMPT : GS_CV_PROMPT + '\n\nCV TEXT:\n' + text.slice(0, 12000), true, vision, '', { feature: 'cv_import' });
                 const data = window.safeJsonParse(res && res.text);
                 if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('The AI did not return usable JSON: ' + String(res && res.text || '').slice(0, 120));
