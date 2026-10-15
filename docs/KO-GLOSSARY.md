@@ -114,9 +114,10 @@
 | Hometown (as on ID card) | ที่อยู่ตามบัตรประชาชน | 본적지(신분증 기준) | | ร่าง |
 | Current address | ที่อยู่ปัจจุบัน | 현주소 | | ร่าง |
 | Save | บันทึกข้อมูล | 저장 | | ร่าง |
-| Treatment rights: UCS | บัตรทอง (UCS) | 보편적 건강보장(UCS) | | ร่าง |
-| Treatment rights: CSMBS | ราชการ (CSMBS) | 공무원 의료급여(CSMBS) | | ร่าง |
-| Treatment rights: private | ประกันเอกชน | 민간보험 | | ร่าง |
+| Treatment rights: UCS | Gold card (UCS) · บัตรทอง | 보편적 건강보장 | | ร่าง |
+| Treatment rights: CSMBS | Civil servant (CSMBS) · ข้าราชการ | 공무원 의료급여 | | ร่าง |
+| Treatment rights: Social Security (SSS) | Social Security · ประกันสังคม | 사회보험 | | ร่าง |
+| Treatment rights: private | Private insurance · ประกันเอกชน | 민간보험 | | ร่าง |
 | Other | อื่นๆ | 기타 | | ร่าง |
 | Confirm Mission | ยืนยันรับภารกิจ | 미션 수락 확인 | | ร่าง |
 | Countdown starts immediately | เวลานับถอยหลังจะเริ่มทันที | 카운트다운이 바로 시작됩니다 | | ร่าง |
