@@ -40,6 +40,5 @@ ok(!JSON.stringify(b).includes('"lat"'), 'no coordinates leave the server');
 
 // popup
 ok(/function r10Show\(pop\)/.test(fw) && /if \(r10Show\(pop\)\) rows\.push\(r10Html\(pop\.r10\)\)/.test(fw), 'the 10 km row appears only when r10Show()');
-ok(/c\.level === 'ok' \? '' :/.test(fw), 'a normal canal has no "ok" pill');
 ok(/fw-tone-calm/.test(fw) && /fw-tone-watch/.test(fw) && /\.fw-sheet\.fw-tone-calm/.test(css) && /\.fw-sheet\.fw-tone-watch/.test(css), 'calm / watch tint wired in JS and CSS');
 process.exit(fail ? 1 : 0);

@@ -60,8 +60,8 @@ const text = (page, sel) => page.locator(sel).evaluateAll(ns => ns.map(n => n.te
     try {
         // ---- 1. normal day (ok), home in บึงกุ่ม ----
         let { page, ctx, errors } = await open(browser, 412, { c13: 2150, district: 'บึงกุ่ม' });
-        assert.deepEqual(await text(page, '.fw-sheet .fw-pill'), ['🌊ปกติ']);
-        assert.equal(await page.locator('.fw-sheet .fw-pill.ok').count(), 1);
+        assert.equal(await page.locator('.fw-sheet .fw-pill').count(), 0, 'V101.150: ok = no pill word (the soft green card says it)');
+        assert.equal(await page.locator('.fw-sheet.fw-tone-calm').count(), 1, 'ok = soft green card');
         for (const gone of ['.fw-scene', '.fw-key', '.fw-badge', '.fw-sub', '.fw-tile', '.fw-rv-alert', '.fw-hist']) assert.equal(await page.locator('.fw-sheet ' + gone).count(), 0, gone + ': no scene / sentence / old rows when ok');
         assert.deepEqual(await text(page, '.fw-sheet .fw-r2 .fw-v2'), ['93cm', 'ไม่ท่วม']);
         assert.deepEqual(await text(page, '.fw-sheet .fw-r2 .fw-n2'), ['▼46'], 'arrow + number only: the wording moved to hover');
@@ -74,11 +74,10 @@ const text = (page, sel) => page.locator(sel).evaluateAll(ns => ns.map(n => n.te
         await page.locator('.fw-sheet .fw-r2').first().click();
         assert.deepEqual(await text(page, '.fw-sheet .fw-tip'), [tips[0][0]], 'a tap shows the description bubble');
         assert.ok(await page.evaluate(() => { const b = document.querySelector('.fw-sheet .fw-tip').getBoundingClientRect(), s = document.querySelector('.fw-sheet').getBoundingClientRect(); return b.left >= s.left && b.right <= s.right && b.bottom <= s.bottom + 1; }), 'bubble stays inside the sheet');
-        await page.locator('.fw-sheet .fw-pill').click();
+        await page.locator('.fw-sheet .fw-top').click({ position: { x: 150, y: 5 } });
         assert.equal(await page.locator('.fw-sheet .fw-tip').count(), 0, 'a tap elsewhere hides it');
         assert.ok((await page.locator('.fw-sheet .fw-river-row .fw-rs').first().getAttribute('data-tip')).includes('C.2 นครสวรรค์'), 'chips explain themselves too');
         assert.deepEqual(await page.locator('.fw-sheet .fw-r2 .fw-e').evaluateAll(ns => ns.map(n => n.className.replace('fw-e', '').trim() + ':' + n.getBoundingClientRect().width)), ['ok:26', 'ok:26'], 'ok = small emoji');
-        const pe0 = await page.locator('.fw-sheet .fw-pill .fw-pe').evaluate(n => n.offsetWidth);
         assert.equal(await page.locator('.fw-sheet .fw-river-row .fw-rs').count(), 3, 'C.2 · C.13 · C.29B chips');
         assert.ok((await text(page, '.fw-sheet .fw-river-row'))[0].includes('2.0k'), 'values in k m³/s');
         assert.deepEqual(await text(page, '.fw-sheet .fw-river-row .fw-rl'), ['C.2', 'C.13', 'C.29B'], 'each chip names its station');
@@ -107,7 +106,7 @@ const text = (page, sel) => page.locator(sel).evaluateAll(ns => ns.map(n => n.te
         const lines = await text(page, '.fw-sheet .fw-dl');
         assert.equal(lines.length, 5, 'canal ×2 · roads · Traffy · weather: ' + JSON.stringify(lines));
         assert.ok(lines[0].includes('ค.ทรงกระเทียม ปตร') && lines[0].includes('-0.03 m') && lines[0].includes('▲ +5 cm/ชม.'));
-        assert.ok(lines[2].startsWith('ถ.นาคนิวาส (ซ. 38) · ถ.สุคนธสวัสดิ์ (ซ. 15)') && lines[2].includes('–') && !lines[2].includes('แห้ง'), lines[2]);   // V101.148: dry = a dash, no word
+        assert.ok(lines[2].startsWith('ถ.นาคนิวาส (ซ. 38) · ถ.สุคนธสวัสดิ์ (ซ. 15)') && lines[2].includes('แห้ง'), lines[2]);
         assert.ok(lines[3].includes('Traffy') && lines[3].includes('2'));
         assert.ok(lines[4].includes('26°') && lines[4].includes('76'), lines[4]);
         const meta = (await text(page, '.fw-sheet .fw-meta'))[0];
@@ -164,7 +163,7 @@ const text = (page, sel) => page.locator(sel).evaluateAll(ns => ns.map(n => n.te
         ({ page, ctx, errors } = await open(browser, 412, { c13: 2650, district: 'คันนายาว', risk: 'high', canalRisk: 'high', fb: -0.06, closedRoad: true }));
         assert.deepEqual(await text(page, '.fw-sheet .fw-scene .fw-pill'), ['⛔เสี่ยงสูง']); assert.equal(await page.locator('.fw-sheet .fw-scene .fw-pill.crit').count(), 1);
         const pe2 = await page.locator('.fw-sheet .fw-pill .fw-pe').evaluate(n => n.offsetWidth);
-        assert.deepEqual([pe0, pe1, pe2], [22, 30, 38], 'pill emoji grows with severity: ok 22 · warn 30 · crit 38');
+        assert.deepEqual([pe1, pe2], [30, 38], 'pill emoji grows with severity: warn 30 · crit 38 (ok has no pill)');
         assert.ok((await text(page, '.fw-sheet .fw-sc-lvl'))[0].includes('+6cm'), 'over the bank: +6');
         assert.equal(await page.locator('.fw-sheet .fw-sc-spill').count(), 1, '💦 when over the bank');
         assert.deepEqual(await text(page, '.fw-sheet .fw-sc-road'), ['🛣️ปิด']); assert.equal(await page.locator('.fw-sheet .fw-sc-road .fw-e.crit').count(), 1);
