@@ -223,6 +223,23 @@ exports.findShopLogo = onCall({ secrets: ['OPENROUTER_API_KEY'], timeoutSeconds:
     }
 });
 
+// V102.245: Jev suggests the category of Explore shops that have none (admin Categories button). One Choice question per shop (~$0.00002), the shop's own page title
+// + description are added when readable; suggest-only - the admin ticks what to save. Honors the same kill switch as jevCompare (quiz_dup_scores/_config).
+exports.jevClassifyShops = onCall({ secrets: ['OPENROUTER_API_KEY'], timeoutSeconds: 120, memory: '512MiB' }, async (request) => {
+    requireAdminCallable(request);
+    const db = admin.firestore();
+    const cfg = await db.collection('quiz_dup_scores').doc('_config').get();
+    if (cfg.exists && cfg.data().enabled === false) return { enabled: false, results: [] };
+    const shops = request.data && request.data.shops;
+    const sc = require('./shop-category');
+    if (!Array.isArray(shops) || !shops.length || shops.length > sc.MAX_SHOPS) throw new HttpsError('invalid-argument', '1-' + sc.MAX_SHOPS + ' shops');
+    const out = await sc.classifyShops(shops.map(x => ({ id: String((x && x.id) || ''), title: String((x && x.title) || ''), url: String((x && x.url) || '') })), {
+        apiKey: process.env.OPENROUTER_API_KEY, fetch: (u, o) => fetch(u, o), provider: 'openrouter', readIdentity: require('./link-logo').readPageIdentity,
+    });
+    recordAiUsage('openrouter', require('./jev').JEV_MODEL, out.inputTokens, true, 'jev_shop_category', { inputTokens: out.inputTokens, outputTokens: 0 });
+    return { enabled: true, results: out.results };
+});
+
 exports.fetchLinkLogo = onCall({ timeoutSeconds: 60, memory: '512MiB' }, async (request) => {
     requireAdminCallable(request);
     const url = String((request.data && request.data.url) || '').trim();

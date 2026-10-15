@@ -111,6 +111,13 @@ function pageIdentity(html) {
     return { title: unescapeHtml(og('og:title') || t).replace(/\s+/g, ' ').trim().slice(0, 200), description: unescapeHtml(og('og:description') || og('description')).replace(/\s+/g, ' ').trim().slice(0, 300) };
 }
 
+// V102.245: just the page's own name + description (no picture is downloaded) - for callers that classify a shop by what its page says.
+async function readPageIdentity(rawUrl) {
+    const page = await getBytes(String(rawUrl || ''), MAX_IMAGE);
+    if (OK_IMAGE.test(page.type) || page.buf.length > MAX_HTML) return { title: '', description: '' };
+    return pageIdentity(page.buf.toString('utf8'));
+}
+
 async function findLinkLogo(rawUrl) {
     // V102.127: the link may itself be a picture (a Facebook / CDN image address) — then that picture is the candidate.
     const page = await getBytes(String(rawUrl || ''), MAX_IMAGE);
@@ -136,4 +143,4 @@ async function findLinkLogo(rawUrl) {
     return { found: false, candidates: candidates.length, tried, pageTitle: identity.title, pageDescription: identity.description };
 }
 
-module.exports = { findLinkLogo, logoCandidates, pageIdentity, isPrivateIp, assertPublicUrl };
+module.exports = { findLinkLogo, readPageIdentity, logoCandidates, pageIdentity, isPrivateIp, assertPublicUrl };
