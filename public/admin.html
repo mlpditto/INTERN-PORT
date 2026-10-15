@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.244)</title>
+    <title>Nika Admin (V102.245)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -8063,6 +8063,8 @@
                     <div style="display:flex; gap:8px; flex-wrap:wrap;">
                         <!-- V102.75: reads every shop that has no logo yet, shows what it found, saves only the ones you tick -->
                         <button id="rl-bulk-btn" class="magic-btn" onclick="rlOpenBulkLogos()" title="Look for a logo on each shop's page, then pick which to save" style="display:none; background:linear-gradient(135deg, #6366f1, #a855f7); padding:10px 18px; border-radius:14px; font-weight:900;">🖼️ Fetch missing logos <span id="rl-bulk-count"></span></button>
+                        <!-- V102.245: Jev suggests a category for every shop that has none (lavender = Jev's colour); you tick what to save -->
+                        <button id="rl-cat-btn" class="magic-btn" onclick="rlOpenCategories()" title="Jev suggests a category for each shop that has none — you tick what to save" style="display:none; background:#ede9fe; color:#5b21b6; border:1px solid #c4b5fd; padding:10px 18px; border-radius:14px; font-weight:900;">⚡ Categories <span id="rl-cat-count"></span></button>
                         <button class="magic-btn" onclick="openReviewLinkModal()" style="background:linear-gradient(135deg, #ea580c, #c2410c); padding:10px 22px; border-radius:14px; font-weight:900;">➕ Add Link</button>
                     </div>
                 </div>
@@ -36153,6 +36155,8 @@ RULES:
             b.style.display = n ? '' : 'none';
             const c = document.getElementById('rl-bulk-count');
             if (c) c.textContent = n ? '(' + n + ')' : '';
+            const cb = document.getElementById('rl-cat-btn');   // V102.245
+            if (cb) { const k = rlUncategorized().length; cb.style.display = k ? '' : 'none'; const cc = document.getElementById('rl-cat-count'); if (cc) cc.textContent = k ? '(' + k + ')' : ''; }
         }
         function rlBulkPaint() {
             const st = rlBulk;
@@ -36285,6 +36289,103 @@ RULES:
             };
             await Promise.all([worker(), worker()]);
             rlBulkPaint();
+        }
+        // ── V102.245: ⚡ Categories — Jev suggests a category for every shop that has none (callable jevClassifyShops, ≈ $0.00002 per shop) ─────────────
+        // Suggest-only: the list opens with the confident answers (>= 80 %) ticked and the doubtful ones unticked + amber; tap another chip to change a pick.
+        // Nothing is stored until Save.
+        let rlCat = null;
+        function rlUncategorized() { return reviewLinksCache.filter(l => !RL_CATEGORIES.some(c => c[0] === l.category)); }
+        function rlCatDial(p, color) {
+            const r = 6, C = 2 * Math.PI * r * 0.75, f = C * Math.max(0, Math.min(1, p));
+            return '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="flex:0 0 auto;"><circle cx="8" cy="8" r="' + r + '" fill="none" stroke="' + color + '33" stroke-width="2.4" stroke-dasharray="' + C + ' 99" transform="rotate(135 8 8)" stroke-linecap="round"/><circle cx="8" cy="8" r="' + r + '" fill="none" stroke="' + color + '" stroke-width="2.4" stroke-dasharray="' + f + ' 99" transform="rotate(135 8 8)" stroke-linecap="round"/></svg>';
+        }
+        function rlCatPaint() {
+            const st = rlCat;
+            if (!st) return;
+            const busy = st.rows.some(r => r.status === 'wait' || r.status === 'run') || st.applying;
+            const picked = st.rows.filter(r => r.status === 'ok' && r.checked && r.pick).length;
+            const btnBase = 'width:auto; min-height:0; padding:8px 14px; border-radius:10px; font-weight:800; font-size:0.82em; cursor:pointer;';
+            const rowHtml = st.rows.map((r, i) => {
+                const chips = r.status === 'ok' ? r.options.map(o => {
+                    const c = RL_CATEGORIES.find(x => x[0] === o.key) || [o.key, '', o.key];
+                    const on = r.pick === o.key, low = (r.confidence == null || r.confidence < 0.8);
+                    const col = on ? (low ? '#b45309' : '#7c3aed') : '#94a3b8';
+                    return '<button type="button" onclick="rlCatPick(' + i + ', &quot;' + o.key + '&quot;)" ' + (busy ? 'disabled ' : '') + 'style="width:auto; min-height:0; margin:0; padding:3px 9px 3px 6px; border-radius:999px; display:inline-flex; align-items:center; gap:4px; font-size:0.74em; font-weight:800; cursor:pointer; border:1px solid ' + col + '55; background:' + (on ? (low ? '#fffbeb' : '#ede9fe') : '#fff') + '; color:' + col + ';">' + (on ? rlCatDial(o.p, col) : '') + c[1] + ' ' + escapeHtml(c[2]) + ' ' + Math.round(o.p * 100) + '%</button>';
+                }).join(' ') : '';
+                const status = { wait: 'In queue', run: 'Asking Jev…', saved: 'Saved ✓', none: escapeHtml(r.note || 'No answer'), error: escapeHtml(r.note || 'Failed') }[r.status] || '';
+                const color = r.status === 'saved' ? '#15803d' : (r.status === 'none' || r.status === 'error') ? '#b91c1c' : '#64748b';
+                return '<div style="display:flex; align-items:center; gap:10px; padding:8px 4px; border-bottom:1px solid #f1f5f9;">' +
+                    '<input type="checkbox" onchange="rlCatToggle(' + i + ', this.checked)" ' + (r.checked ? 'checked ' : '') + (r.status !== 'ok' || st.applying ? 'disabled ' : '') + 'style="width:16px; height:16px; margin:0; padding:0; flex-shrink:0;">' +
+                    rlLogoDisc(r.link, 36) + '<div style="min-width:0; flex:1;"><div style="font-weight:800; color:#334155; font-size:0.88em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + escapeHtml(r.link.title || 'Untitled') + '</div>' +
+                    (chips ? '<div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">' + chips + '</div>' : '<div style="font-size:0.74em; color:' + color + ';">' + status + '</div>') + '</div></div>';
+            }).join('');
+            st.el.innerHTML = '<div style="background:#fff; border-radius:16px; width:100%; max-width:560px; max-height:90vh; display:flex; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,0.3);">' +
+                '<div style="padding:16px 18px 8px;"><div style="font-weight:900; color:#334155;">⚡ Categories</div><div style="font-size:0.74em; color:#64748b; margin-top:4px;">' + st.rows.filter(r => r.status === 'ok').length + ' suggested of ' + st.rows.length + ' · ' + picked + ' ticked</div></div>' +
+                '<div style="overflow-y:auto; padding:0 14px; flex:1;">' + rowHtml + '</div>' +
+                '<div style="display:flex; align-items:center; gap:8px; padding:12px 18px; border-top:1px solid #f1f5f9;"><span style="flex:1;"></span>' +
+                '<button type="button" onclick="rlCatClose()" ' + (st.applying ? 'disabled ' : '') + 'style="' + btnBase + ' border:1px solid #e2e8f0; background:#fff; color:#64748b;">' + (busy ? 'Cancel' : 'Close') + '</button>' +
+                '<button type="button" onclick="rlCatApply()" ' + (busy || !picked ? 'disabled ' : '') + 'style="' + btnBase + ' border:none; background:#7c3aed; color:#fff;">Save ' + (picked || '') + '</button></div></div>';
+        }
+        function rlCatToggle(i, on) { if (rlCat && rlCat.rows[i]) { rlCat.rows[i].checked = !!on; rlCatPaint(); } }
+        function rlCatPick(i, key) { const r = rlCat && rlCat.rows[i]; if (r && r.status === 'ok') { r.pick = key; r.checked = true; rlCatPaint(); } }
+        function rlCatClose() { const st = rlCat; if (!st || st.applying) return; st.cancelled = true; st.el.remove(); rlCat = null; }
+        async function rlOpenCategories() {
+            if (rlCat) return;
+            const links = rlUncategorized();
+            if (!links.length) return;
+            const el = document.createElement('div');
+            el.id = 'rl-cat-overlay';
+            el.style.cssText = 'position:fixed; inset:0; z-index:150000; background:rgba(15,23,42,0.55); display:flex; align-items:center; justify-content:center; padding:16px;';
+            document.body.appendChild(el);
+            const st = rlCat = { el, cancelled: false, applying: false, rows: links.map(link => ({ link, status: 'wait', options: [], pick: '', confidence: null, checked: false, note: '' })) };
+            rlCatPaint();
+            const call = adminApp.functions().httpsCallable('jevClassifyShops');
+            for (let i = 0; i < st.rows.length && !st.cancelled; i += 20) {
+                const chunk = st.rows.slice(i, i + 20);
+                chunk.forEach(r => { r.status = 'run'; });
+                rlCatPaint();
+                try {
+                    const res = (await call({ shops: chunk.map(r => ({ id: r.link.id, title: r.link.title || '', url: r.link.url || '' })) })).data;
+                    if (st.cancelled) return;
+                    if (res && res.enabled === false) { chunk.forEach(r => { r.status = 'none'; r.note = 'Jev is switched off'; }); continue; }
+                    const byId = {};
+                    ((res && res.results) || []).forEach(x => { byId[x.id] = x; });
+                    chunk.forEach(r => {
+                        const x = byId[r.link.id];
+                        if (x && x.ok && Array.isArray(x.options) && x.options.length) {
+                            r.status = 'ok'; r.options = x.options; r.pick = x.category; r.confidence = x.confidence;
+                            r.checked = typeof x.confidence === 'number' && x.confidence >= 0.8;
+                        } else { r.status = 'none'; r.note = 'Jev gave no answer'; }
+                    });
+                } catch (err) {
+                    if (st.cancelled) return;
+                    chunk.forEach(r => { r.status = 'error'; r.note = (err && err.message) ? err.message : 'Could not ask Jev'; });
+                }
+                rlCatPaint();
+            }
+            rlCatPaint();
+        }
+        async function rlCatApply() {
+            const st = rlCat;
+            if (!st || st.applying) return;
+            const picked = st.rows.filter(r => r.status === 'ok' && r.checked && r.pick);
+            if (!picked.length) return;
+            st.applying = true;
+            rlCatPaint();
+            let ok = 0, fail = 0;
+            for (const row of picked) {
+                try {
+                    await db.collection('review_links').doc(row.link.id).update({ category: row.pick });
+                    row.status = 'saved'; row.checked = false; ok++;
+                } catch (err) {
+                    console.error('Category save:', row.link.id, err);
+                    row.status = 'error'; row.note = (err && err.message) ? err.message : 'Save failed'; fail++;
+                }
+                rlCatPaint();
+            }
+            st.applying = false;
+            rlCatPaint();
+            showToast(ok + ' categor' + (ok === 1 ? 'y' : 'ies') + ' saved' + (fail ? ' · ' + fail + ' failed' : ''));
         }
         async function rlBulkApply() {
             const st = rlBulk;

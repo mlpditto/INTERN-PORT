@@ -56,18 +56,23 @@ function verdictOf(sameFact) {
     return sameFact >= DUP_AT ? 'dup' : sameFact <= DIFFERENT_AT ? 'different' : 'unsure';
 }
 
-async function askJev(state, apiKey, fetchImpl, provider, attempt = 1) {
+// One request to the System One API (either transport); returns the parsed JSON. Retries 429 / 529 with exponential backoff.
+async function askJevRaw(state, questions, apiKey, fetchImpl, provider, attempt = 1) {
     const res = await fetchImpl(PROVIDERS[provider].url, {
         method: 'POST',
         headers: { ...PROVIDERS[provider].headers, Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: JEV_MODEL, state, questions: QUESTIONS }),
+        body: JSON.stringify({ model: JEV_MODEL, state, questions }),
     });
     if ((res.status === 429 || res.status === 529) && attempt <= 3) {
         await new Promise(r => setTimeout(r, 400 * 2 ** attempt));   // docs: exponential backoff on 429 / 529
-        return askJev(state, apiKey, fetchImpl, provider, attempt + 1);
+        return askJevRaw(state, questions, apiKey, fetchImpl, provider, attempt + 1);
     }
     if (!res.ok) throw new Error('Jev HTTP ' + res.status);
-    const json = await res.json();
+    return res.json();
+}
+
+async function askJev(state, apiKey, fetchImpl, provider) {
+    const json = await askJevRaw(state, QUESTIONS, apiKey, fetchImpl, provider);
     const num = v => (typeof v === 'number' && isFinite(v) ? v : null);
     return {
         sameFact: num(json && json.answers && json.answers.same_fact && json.answers.same_fact.noul),
@@ -109,4 +114,4 @@ async function compareBatch(pairs, deps) {
     return { results, inputTokens, cost, calls: todo.length, provider };
 }
 
-module.exports = { compareBatch, normalizePair, verdictOf, providerOf, PROVIDERS, DEFAULT_PROVIDER, MAX_PAIRS, JEV_MODEL, DUP_AT, DIFFERENT_AT };
+module.exports = { askJevRaw, compareBatch, normalizePair, verdictOf, providerOf, PROVIDERS, DEFAULT_PROVIDER, MAX_PAIRS, JEV_MODEL, DUP_AT, DIFFERENT_AT };
