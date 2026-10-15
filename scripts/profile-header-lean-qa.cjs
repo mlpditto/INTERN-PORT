@@ -44,7 +44,7 @@ const SAMPLE = `
             assert.equal(buttons.length, 5);   // V101.147: ⋯ beside Flood
              assert.ok(Math.max(...buttons) - Math.min(...buttons) <= 2, 'rail buttons on one row');
             assert.equal(await page.$eval('#u-division-badge', e => getComputedStyle(e).display), 'none', 'badge row hidden even when JS shows it');
-            assert.equal(await page.$eval('#u-img', e => e.style.borderColor), 'rgb(139, 92, 246)', 'ring = division colour (divColor("CU") = palette[2162 % 6])');
+            assert.equal(await page.$eval('#u-img', e => e.style.borderColor), 'rgb(224, 33, 138)', 'ring = division colour (V101.158: CU is pinned to Chulalongkorn pink #e0218a; the hash gave it the same purple as BUU)');
             assert.equal(await page.$eval('#u-img', e => e.title), 'CU › EXTERN', 'tooltip names division › group');
             assert.equal(await page.$eval('#u-group-dot', e => e.hidden), false, 'corner dot = group');
             assert.deepEqual(errs, [], 'no page errors ' + tag);
