@@ -21,7 +21,12 @@ const quizzesCache = [
     { id: 'B', title: 'Beta', isActive: true, tags: 'headache, AI_VARIANT' },
     { id: 'C', title: 'Gamma', isActive: true, tags: 'Fever, PharmCamp' },
     { id: 'D', title: 'Poll', isActive: true, isPoll: true, tags: 'Headache' },
-    { id: 'E', title: 'Off', isActive: false, tags: 'Headache' }
+    { id: 'E', title: 'Off', isActive: false, tags: 'Headache' },
+    { id: 'P1', title: 'PRETEST-1.1', isActive: false, isTemplate: true, questions: [{ q: 'x' }], tags: 'Pretest' },
+    { id: 'P2', title: 'PRETEST-2', isActive: false, questions: [{ q: 'y' }] },
+    { id: 'P4', title: 'Alpha (old draft)', isActive: false, questions: [{ q: 'w' }] },
+    { id: 'P3', title: 'PRETEST-locked', isActive: false, questions: [{ q: 'z' }], unlockScore: 999 },
+    { id: '--divisions-config--', title: 'PRETEST config', isActive: false, questions: [{ q: 'c' }] }
 ];
 const ctx = {
     document: { getElementById: mk },
@@ -65,6 +70,18 @@ check('tap the active chip again → cleared', api.filter, '');
 check('cleared → all rows back', rowTitles().join(','), 'Alpha,Beta,Gamma');
 
 api.qbSetTagFilter('');
+mk('qb-search').value = 'pre';
+api.qbRenderList();
+check('search reaches paused quizzes (title match, open ones first)', rowTitles().join(','), 'PRETEST-1.1,PRETEST-2');
+check('paused: no Request button, "Not open yet" badge', (mk('qb-list').innerHTML.match(/Not open yet/g) || []).length === 2 && !/qbRequestQuiz\('P/.test(mk('qb-list').innerHTML), true);
+check('score-locked + config docs stay hidden', /PRETEST-locked|PRETEST config/.test(mk('qb-list').innerHTML), false);
+mk('qb-search').value = 'alpha';
+api.qbRenderList();
+check('open quizzes sort before paused ones', rowTitles().join(','), 'Alpha,Alpha (old draft)');
+mk('qb-search').value = '';
+api.qbRenderList();
+check('no search → paused quizzes are NOT listed', rowTitles().join(','), 'Alpha,Beta,Gamma');
+
 const rowA = api.qbRowHtml(quizzesCache[0]);
 const pillsA = chips(rowA);
 check('row pills: first 3 tags as #pills', pillsA.map(c => c.label).join('|'), '#Headache|#Pharmacotherapy|#Ibuprofen');

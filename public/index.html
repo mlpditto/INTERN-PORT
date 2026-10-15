@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.152)</title>
+    <title>Internship Portfolio (V101.153)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -12112,14 +12112,21 @@
                 if ((q.unlockScore || 0) > (myScore || 0) && !quizAttemptsCache[q.id]) return false;
                 return true;
             });
-            const matched = items.filter(function (q) {
+            // V101.153: a search also reaches PAUSED quizzes (shown with a "Not open yet" badge, no Request button) — the catalogue
+            // itself stays active-only until something is typed, and the same score-lock gate applies.
+            const paused = !term ? [] : (quizzesCache || []).filter(function (q) {
+                if (!(q && q.id && String(q.id).indexOf('--') !== 0 && q.title && q.isActive !== true && !q.isPoll)) return false;
+                if (!Array.isArray(q.questions) || !q.questions.length) return false;
+                return !((q.unlockScore || 0) > (myScore || 0) && !quizAttemptsCache[q.id]);
+            });
+            const matched = items.concat(paused).filter(function (q) {
                 // V100.84: tag chip filter, exact tag (case-insensitive), AND with the search box.
                 if (qbTagFilter && !quizTagList(q).some(function (t) { return t.toLowerCase() === qbTagFilter; })) return false;
                 if (!term) return true;
                 const hay = [q.title, q.shortTitle, quizTagsCsv(q), q.targetGroup, q.description].filter(Boolean).join(' ').toLowerCase();
                 return hay.indexOf(term) !== -1;
             });
-            matched.sort(function (a, b) { return String(a.title || '').localeCompare(String(b.title || '')); });
+            matched.sort(function (a, b) { return ((a.isActive === true ? 0 : 1) - (b.isActive === true ? 0 : 1)) || String(a.title || '').localeCompare(String(b.title || '')); });   // V101.153: paused ones after the open ones
             // V100.84: rail counts over the whole visible catalogue, so they do not shrink while filtering.
             const rail = document.getElementById('qb-tag-rail');
             if (rail) rail.innerHTML = qbTagRailHtml(items);
@@ -12328,6 +12335,8 @@
                     doneLabel = '✓ ' + Math.round((a.correctCount / a.totalQuestions) * 100) + '%';
                 }
                 right = badge(doneLabel, '#475569', '#f1f5f9');
+            } else if (q.isActive !== true) {
+                right = '<span title="Paused — ask an admin to open it" data-th-title="ยังไม่เปิด — ติดต่อแอดมิน" data-kr-title="아직 열리지 않음">' + badge('⏸ Not open yet', '#475569', '#f1f5f9') + '</span>';   // V101.153
             } else if (avail) {
                 right = badge('Ready — in Mission', '#0369a1', '#e0f2fe');
             } else if (!q.oneTimeMode && qbIsAvailableToMe(q, true)) {
