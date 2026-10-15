@@ -132,6 +132,17 @@ assert.match((await page.textContent('#sch-week .sch-rg h4')).trim(), /^\d{1,2}[
     await page.locator('#sch-week .sch-rg-today').click();
     assert.equal(await page.evaluate(() => schWeekOffset), 0, 'Today › returns');
 
+    // ---- 3b. V101.151: ⭐ on a checked-in day circle; the check-in is not a row in the day panel
+    await page.evaluate(() => { schCheckinDays = new Set([__key(-2)]); schRenderAgenda(); });
+    await goTo(page, 0);
+    const stars = await page.evaluate(() => [...document.querySelectorAll('#sch-week .sch-wd')].filter(b => b.querySelector('.sch-star')).map(b => b.dataset.schday));
+    assert.deepEqual(stars, await page.evaluate(() => [__key(-2)]), 'only the checked-in day carries ⭐: ' + JSON.stringify(stars));
+    await page.locator('#sch-week [data-schday="' + (await page.evaluate(() => __key(-2))) + '"]').click();
+    const ckPanel = await page.evaluate(() => (document.querySelector('#sch-week-day') || { textContent: '' }).textContent);
+    assert.ok(!/check-in/i.test(ckPanel), 'no "Daily check-in" row in the day panel: ' + ckPanel);
+    await page.locator('#sch-week [data-schday="' + (await page.evaluate(() => __key(-2))) + '"]').click();
+    await page.evaluate(() => { schCheckinDays = new Set(); schRenderAgenda(); });
+
     // ---- 4. tap a day: its rows; tap again closes; focus stays on the day
     await goTo(page, -1);
     await page.locator('#sch-week [data-schday="' + (await page.evaluate(() => __key(-1))) + '"]').click();

@@ -47,10 +47,10 @@ assert.equal(elements['daily-checkin-card'].innerHTML, '');
 assert.equal(elements['daily-checkin-card'].children, undefined);
 // The pill builder: green + bonus wording in aria-label (no 🎁 text on the pill), orange button when not checked in yet.
 const pill = ctx.checkinPillHtml();
-assert.match(pill, /class="act-streak done"[^>]*aria-label="Checked in today · 3-day streak · Bonus \+0.05 in 4 days"[^>]*>🔥3<\/span>/);
+assert.match(pill, /class="act-streak ck done"[^>]*aria-label="Checked in today · 3-day streak · Bonus \+0.05 in 4 days"[^>]*><span class="ck-ring" style="--p:43"><em>🔥<\/em><\/span>3<\/span>/);
 assert.doesNotMatch(pill, /act-gift|🎁|[☑✓]/);
 ctx.myCheckin = { lastDate: '2026-09-09' };
-assert.match(ctx.checkinPillHtml(), /<button type="button" id="daily-checkin-btn" class="act-streak todo" onclick="tryDailyCheckin\(\)"[^>]*>🔥3<\/button>/);
+assert.match(ctx.checkinPillHtml(), /<button type="button" id="daily-checkin-btn" class="act-streak ck todo" onclick="tryDailyCheckin\(\)"[^>]*><span class="ck-ring" style="--p:43"><em>🔥<\/em><\/span>3<\/button>/);
 ctx.myCheckin = { lastDate: '2026-09-10' };
 logToday = true; ctx.renderDailyCheckinCard();
 assert.match(elements['activity-history'].innerHTML, /Log: .*ส่งแล้ววันนี้ ✓/);
