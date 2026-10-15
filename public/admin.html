@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.251)</title>
+    <title>Nika Admin (V102.252)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -14451,6 +14451,15 @@
                     <span id="reflective-detail-date"></span>
                     <span id="reflective-detail-score" style="font-weight:bold; color:var(--primary);"></span>
                 </div>
+            </div>
+        </div>
+
+        <!-- V102.252: ↩️ Repair — feedback deletes that took quiz points back (step ② of the Feedback-score plan) -->
+        <div id="qfpRepairModal" class="modal lang-no-toggle" style="z-index:2510;">
+            <div class="modal-content" style="max-width:640px; border-radius:14px;">
+                <button type="button" class="close-modal" aria-label="Close" title="Close" onclick="document.getElementById('qfpRepairModal').style.display='none'">&times;</button>
+                <h3 style="margin:0 0 4px; color:#4338ca;" title="Old feedback deletes subtracted the QUIZ score (feedback never credited points). Each row can be re-credited once.">↩️ Repair</h3>
+                <div id="qfp-repair-body"></div>
             </div>
         </div>
 
@@ -68491,6 +68500,7 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
                 <span title="Average time taken" data-th-title="เวลาที่ใช้เฉลี่ย">Avg. time <strong>${avgTimeMMSS} min</strong></span>
                 ${topics.length ? `<div class="qfp-topics" title="Topics interns want next" data-th-title="หัวข้อที่ผู้เรียนอยากทำต่อ">Next topics: ${topicEntries.slice(0,8).map((e,i)=>`<span>${qfpEscapeHtml(e.topic)} <button onclick="qfpClearTopicChip(${i})" title="Remove only the suggested topic" data-th-title="ลบเฉพาะหัวข้อที่เสนอ">×</button></span>`).join(' ')}</div>` : ''}
                 ${_qfpFeedbacks.some(qfpIsEmptyFeedback) ? `<button onclick="qfpCleanEmptyFeedback()" title="Delete entries with no rating, comment or topic (asks to confirm)" data-th-title="ลบรายการที่ไม่มีคะแนน ข้อความ และหัวข้อ โดยจะขอยืนยัน">Clean empty</button>` : ''}
+                <button type="button" onclick="qfpOpenRepair()" title="↩️ Old feedback deletes that took QUIZ points back — find them and re-credit">↩️ Repair</button>
             `;
             const hasComments = _qfpFeedbacks.some(f => qfpNormalizeTopic(f.comment));
             document.getElementById('qfp-ai-btn').disabled = !hasComments;
@@ -68918,6 +68928,77 @@ Reply ONLY with raw JSON, no markdown:
             return !(typeof f.rating === 'number' && (f.rating > 0 || (f.rating === 0 && f.ratingProvided === true)))
                 && !qfpNormalizeTopic(f.comment)
                 && !qfpNormalizeTopic(f.nextTopic);
+        }
+
+        // V102.252: ↩️ Repair. Until V102.251 deleting a feedback subtracted `pointsEarned` — the QUIZ score snapshot, not a feedback reward — and wrote a manual_adjust
+        // "Revert: Quiz Feedback deleted …". This finds those rows (nobody has re-credited them: no `repairedAt`), shows whether the user's quiz row is still there, and re-credits ONE row
+        // per tap: users.score +amount, a new manual_adjust "Repair: …" (so History shows both), the old row stamped repairedAt / repairedBy so it never shows again.
+        const QFP_REVERT_RE = /^Revert: (?:Quiz Feedback deleted|\d+ empty Quiz Feedback bulk-cleaned)/;
+        let _qfpRepairRows = [];
+        const qfpRevertTitle = note => { const m = /—\s*'(.+)'\s*$/.exec(String(note || '')); return m ? m[1] : ''; };
+        const qfpMillis = t => (t && typeof t.toMillis === 'function') ? t.toMillis() : (t && t.seconds ? t.seconds * 1000 : 0);
+        async function qfpOpenRepair() {
+            const modal = document.getElementById('qfpRepairModal'), body = document.getElementById('qfp-repair-body');
+            if (!modal || !body) return;
+            modal.style.display = 'flex';
+            body.innerHTML = '<p style="color:#64748b">⏳</p>';
+            try {
+                const snap = await db.collection('checkin_logs').where('type', '==', 'manual_adjust').get();
+                const rows = snap.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(r => QFP_REVERT_RE.test(String(r.note || '')) && Number(r.amount) < 0 && !r.repairedAt);
+                const quizRows = {};
+                await Promise.all([...new Set(rows.map(r => r.userId))].map(async uid => {
+                    const q = await db.collection('checkin_logs').where('userId', '==', uid).where('type', '==', 'quiz').get();
+                    quizRows[uid] = q.docs.map(d => d.data());
+                }));
+                _qfpRepairRows = rows.map(r => {
+                    const title = qfpRevertTitle(r.note);
+                    const quizPts = (quizRows[r.userId] || []).filter(x => title && String(x.note || '').includes(title) && Number(x.amount) > 0).reduce((a, x) => a + Number(x.amount), 0);
+                    return Object.assign({}, r, { title, quizPts, amt: Math.abs(Number(r.amount)) });
+                }).sort((a, b) => qfpMillis(b.timestamp) - qfpMillis(a.timestamp));
+                qfpRenderRepair();
+            } catch (e) {
+                body.innerHTML = '<p style="color:#dc2626">⚠️ ' + escapeHtml(e.message || String(e)) + '</p>';
+            }
+        }
+        function qfpRenderRepair() {
+            const body = document.getElementById('qfp-repair-body');
+            if (!body) return;
+            if (!_qfpRepairRows.length) { body.innerHTML = '<p style="color:#16a34a; margin:8px 0">✅</p>'; return; }
+            body.innerHTML = _qfpRepairRows.map((r, i) => {
+                const u = (usersData || []).find(x => x.id === r.userId), name = (u && (u.displayName || u.fullName)) || r.userId || '?';
+                const when = qfpMillis(r.timestamp) ? new Date(qfpMillis(r.timestamp)).toLocaleDateString() : '';
+                return '<div style="display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #f1f5f9; flex-wrap:wrap;">'
+                    + '<b style="min-width:90px;">' + escapeHtml(name) + '</b>'
+                    + '<span style="flex:1; min-width:120px; color:#475569;" title="' + escapeHtml(r.note || '') + '">📝 ' + escapeHtml(r.title || '—') + '</span>'
+                    + '<span style="color:#dc2626; font-weight:800;" title="What the revert took off">−' + r.amt.toFixed(2) + '</span>'
+                    + '<span style="font-size:12px; color:' + (r.quizPts > 0 ? '#16a34a' : '#b45309') + ';" title="' + (r.quizPts > 0 ? 'The quiz row for this user is still in History' : 'No quiz row with this title found for this user — check before re-crediting') + '">' + (r.quizPts > 0 ? '📝 +' + r.quizPts.toFixed(2) : '❔') + '</span>'
+                    + '<small style="color:#94a3b8;">' + escapeHtml(when) + '</small>'
+                    + '<button type="button" onclick="qfpRepairOne(' + i + ')" title="Re-credit +' + r.amt.toFixed(2) + ' to ' + escapeHtml(name) + '">↩️ +' + r.amt.toFixed(2) + '</button></div>';
+            }).join('');
+        }
+        async function qfpRepairOne(i) {
+            const r = _qfpRepairRows[i];
+            if (!r) return;
+            const u = (usersData || []).find(x => x.id === r.userId);
+            if (!u) { alert('User not found — nothing to re-credit.'); return; }
+            const name = u.displayName || u.fullName || r.userId;
+            if (!confirm(`Re-credit +${r.amt.toFixed(2)} PTS to ${name}?\nQuiz: ${r.title || '—'}` + (r.quizPts > 0 ? '' : '\n\n❔ No matching quiz row found for this user — make sure the quiz points were really earned.') + '\n\nThis undoes the feedback-delete revert (once).')) return;
+            try {
+                const b = db.batch();
+                b.update(db.collection('users').doc(r.userId), { score: firebase.firestore.FieldValue.increment(r.amt) });
+                b.set(db.collection('checkin_logs').doc(), {
+                    userId: r.userId, type: 'manual_adjust', amount: r.amt, repairOf: r.id,
+                    note: `Repair: quiz points restored after a feedback delete — '${r.title}'`,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                b.update(db.collection('checkin_logs').doc(r.id), { repairedAt: firebase.firestore.FieldValue.serverTimestamp(), repairedBy: (typeof auth !== 'undefined' && auth && auth.currentUser && auth.currentUser.email) || 'admin' });
+                await b.commit();
+                _qfpRepairRows.splice(i, 1);
+                qfpRenderRepair();
+                showToast('↩️ +' + r.amt.toFixed(2) + ' → ' + name);
+            } catch (e) {
+                alert('Failed to re-credit: ' + e.message);
+            }
         }
 
         // V95.54: bulk-delete every empty entry for the open quiz in one confirmed
