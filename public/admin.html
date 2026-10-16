@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.257)</title>
+    <title>Nika Admin (V102.258)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -68717,9 +68717,9 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
                             ${aiSuggestion ? `<div><b>Suggestion:</b> ${aiSuggestion}</div>` : ''}` : ''}
                         </div>
                         <div id="qfp-admin-bonus-${f.id}" style="margin-top:10px; padding:10px; border:1px dashed #cbd5e1; border-radius:8px; background:#f8fafc; display:none;">
-                            <div style="font-size:0.78em; font-weight:800; color:#334155; margin-bottom:8px;" title="Credited to the user's score now, as its own 'Feedback add-on' row. Max 1.0 per quiz; saving a new number credits only the difference.">🎁 Feedback add-on · max 1.0 · credited on save</div>
+                            <div style="font-size:0.78em; font-weight:800; color:#334155; margin-bottom:8px;" title="Credited to the user's score now, as its own 'Feedback add-on' row. Never more than 1.0 and never more than the quiz points this user earned (${(Number(f.pointsEarned) || 0).toFixed(2)}); saving a new number credits only the difference.">🎁 Feedback add-on · max ${qfpAddOnCap(f)}</div>
                             <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                                <input id="qfp-admin-score-${f.id}" type="number" min="0" max="1" step="0.05" value="${adminScoreValue}" placeholder="0-1" style="width:90px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;">
+                                <input id="qfp-admin-score-${f.id}" type="number" min="0" max="${qfpAddOnCap(f)}" step="0.05" value="${adminScoreValue}" placeholder="0-${qfpAddOnCap(f)}" style="width:90px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;">
                                 <input id="qfp-admin-note-${f.id}" type="text" value="${adminNoteValue}" placeholder="Reason / note" style="flex:1; min-width:180px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;">
                                 <button class="btn-sm" onclick="saveAdminFeedbackScore('${f.id}')" style="background:#0f766e; color:white; border:none; border-radius:8px; padding:6px 12px;" title="Credit the add-on to the user">🎁 Credit</button>
                             </div>
@@ -68932,6 +68932,12 @@ Reply ONLY with raw JSON, no markdown:
         // difference, a second feedback doc of the same user + quiz cannot add another. `addOnCredited` on the feedback doc is what was credited so far — what deleting it takes back
         // (feedbackAddOnPoints). Quiz points are never touched.
         const QFP_ADDON_MAX = 1;
+        // V102.258: a feedback add-on can never exceed the points the user earned for THAT quiz (and never 1.0). The card shows the cap from the quiz score the feedback recorded
+        // (`pointsEarned`); the save re-checks it against the user's real quiz rows in checkin_logs.
+        function qfpAddOnCap(f) {
+            const q = Math.max(0, Number(f && f.pointsEarned) || 0);
+            return Math.round(Math.min(QFP_ADDON_MAX, q) * 100) / 100;
+        }
         function qfpAddOnQualifies(f) {
             if (!f) return false;
             return (typeof f.rating === 'number' || !!qfpNormalizeTopic(f.comment)) && !qfpIsEmptyPraise(f);
@@ -68952,6 +68958,16 @@ Reply ONLY with raw JSON, no markdown:
             }
             const user = (usersData || []).find(u => u.id === item.userId);
             if (!user) { alert('User not found — nothing to credit.'); return; }
+            // the add-on may not exceed what the user earned for this quiz: the sum of their quiz rows (the feedback's own score snapshot when there is none), and never 1.0
+            let quizPts = 0;
+            try {
+                const qs = await db.collection('checkin_logs').where('userId', '==', item.userId).where('type', '==', 'quiz').where('quizId', '==', item.quizId).get();
+                quizPts = qs.docs.reduce((a, d) => a + (Number(d.data().amount) || 0), 0);
+            } catch (e) { console.warn('[add-on] quiz rows lookup failed', e); }
+            if (!(quizPts > 0)) quizPts = Number(item.pointsEarned) || 0;
+            const cap = Math.round(Math.min(QFP_ADDON_MAX, Math.max(0, quizPts)) * 100) / 100;
+            if (cap <= 0) { alert('No add-on: this user has no quiz points for this quiz to match.'); return; }
+            if (score > cap) { alert(`The add-on cannot be more than the quiz points this user earned (${quizPts.toFixed(2)}) — max ${cap.toFixed(2)}.`); return; }
             const before = typeof item.addOnCredited === 'number' ? item.addOnCredited : 0;
             const other = (_qfpFeedbacks || []).find(x => x.id !== feedbackId && x.userId === item.userId && x.quizId === item.quizId && Number(x.addOnCredited) > 0);
             if (other) { alert('This user already got a feedback add-on for this quiz (one per quiz).'); return; }

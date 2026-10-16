@@ -12,13 +12,14 @@ const ctx = {
     document: { getElementById: id => els[id] || null },
     usersData: [{ id: 'U1', displayName: 'Bew' }], quizzesData: [{ id: 'Q1', title: 'PRETEST-1.1' }],
     firebase: { firestore: { FieldValue: { increment: n => ({ inc: n }), serverTimestamp: () => 'ts' } } },
-    db: { collection: n => ({ doc: id => ({ n, id }) }), batch: () => ({ update: (r, d) => ops.push(['update', r.n, r.id, JSON.parse(JSON.stringify(d))]), set: (r, d) => ops.push(['set', r.n, JSON.parse(JSON.stringify(d))]), commit: async () => {} }) },
+    db: { collection: n => ({ doc: id => ({ n, id }), where() { const api = { where() { return api; }, get: async () => ({ docs: (ctx.__quizRows || []).map(a => ({ data: () => ({ amount: a }) })) }) }; return api; } }), batch: () => ({ update: (r, d) => ops.push(['update', r.n, r.id, JSON.parse(JSON.stringify(d))]), set: (r, d) => ops.push(['set', r.n, JSON.parse(JSON.stringify(d))]), commit: async () => {} }) },
     qfpNormalizeTopic: s => String(s || '').replace(/[​-‍﻿]/g, '').trim(),
 };
 vm.createContext(ctx);
-vm.runInContext('let _qfpFeedbacks = [];\nconst QFP_ADDON_MAX = 1;\n' + ['function qfpIsEmptyPraise(', 'function qfpAddOnQualifies(', 'async function saveAdminFeedbackScore('].map(grab).join('\n') + '\n' + grab('window.hubBucketOf = function(e)') + ';\nwindow.feedbackAddOnPoints = ' + line('window.feedbackAddOnPoints =').replace(/^\s*window\.feedbackAddOnPoints = /, ''), ctx);
+vm.runInContext('let _qfpFeedbacks = [];\nconst QFP_ADDON_MAX = 1;\n' + ['function qfpIsEmptyPraise(', 'function qfpAddOnCap(', 'function qfpAddOnQualifies(', 'async function saveAdminFeedbackScore('].map(grab).join('\n') + '\n' + grab('window.hubBucketOf = function(e)') + ';\nwindow.feedbackAddOnPoints = ' + line('window.feedbackAddOnPoints =').replace(/^\s*window\.feedbackAddOnPoints = /, ''), ctx);
 const run = c => vm.runInContext(c, ctx);
-const fb = (id, extra) => Object.assign({ id, userId: 'U1', quizId: 'Q1', rating: 8, comment: 'good', nextTopic: '' }, extra || {});
+const fb = (id, extra) => Object.assign({ id, userId: 'U1', quizId: 'Q1', rating: 8, comment: 'good', nextTopic: '', pointsEarned: 0.9 }, extra || {});
+ctx.__quizRows = [0.9];
 const setFb = list => run('_qfpFeedbacks = ' + JSON.stringify(list));
 const save = async (id, score, note) => { ops.length = 0; alerts.length = 0; toasts.length = 0; field('qfp-admin-score-' + id, String(score)); field('qfp-admin-note-' + id, note || ''); await run(`saveAdminFeedbackScore(${JSON.stringify(id)})`); };
 
@@ -60,6 +61,22 @@ const save = async (id, score, note) => { ops.length = 0; alerts.length = 0; toa
     setFb([fb('F6', { quizId: 'Q2' }), fb('F4', { addOnCredited: 0.4 })]);
     await save('F6', 0.5); assert.strictEqual(ops.length, 3, 'a different quiz is a different add-on');
 
+    // 4b. V102.258: never more than the quiz points the user earned for THAT quiz (and never 1.0)
+    setFb([fb('C1')]); ctx.__quizRows = [0.9];
+    await save('C1', 0.95); assert.strictEqual(ops.length, 0); assert.ok(/cannot be more than the quiz points this user earned \(0\.90\) — max 0\.90/.test(alerts[0]), 'above the quiz points: ' + alerts[0]);
+    await save('C1', 0.9); assert.strictEqual(ops.length, 3, 'exactly the quiz points is allowed'); assert.strictEqual(ops[1][3].score.inc, 0.9);
+    ctx.__quizRows = [2.5, 0.5]; setFb([fb('C2', { pointsEarned: 3 })]);
+    await save('C2', 1.05); assert.strictEqual(ops.length, 0); assert.ok(/between 0 and 1/.test(alerts[0]), 'a big quiz score still caps at 1.0: ' + alerts[0]);
+    await save('C2', 1); assert.strictEqual(ops.length, 3, '1.0 is fine when the quiz gave 3.0');
+    ctx.__quizRows = []; setFb([fb('C3', { pointsEarned: 0.4 })]);   // no quiz rows → the score the feedback recorded
+    await save('C3', 0.5); assert.strictEqual(ops.length, 0); assert.ok(/max 0\.40/.test(alerts[0]), 'falls back to the recorded quiz-score snapshot: ' + alerts[0]);
+    await save('C3', 0.4); assert.strictEqual(ops.length, 3);
+    ctx.__quizRows = []; setFb([fb('C4', { pointsEarned: 0 })]);
+    await save('C4', 0.1); assert.strictEqual(ops.length, 0); assert.ok(/no quiz points for this quiz/.test(alerts[0]), 'no quiz points = no add-on: ' + alerts[0]);
+    ctx.__quizRows = [0.9];
+    const cap = f => run('qfpAddOnCap(' + JSON.stringify(f) + ')');
+    assert.deepStrictEqual([cap({ pointsEarned: 0.9 }), cap({ pointsEarned: 7 }), cap({ pointsEarned: 0 }), cap({}), cap(null)], [0.9, 1, 0, 0, 0], 'the card cap = min(1.0, the recorded quiz score)');
+
     // 5. what a delete takes back = what was credited
     const fa = f => run('window.feedbackAddOnPoints(' + JSON.stringify(f) + ')');
     assert.deepStrictEqual([fa({ addOnCredited: 0.5 }), fa({ pointsEarned: 0.9 }), fa({ addOnCredited: 0 }), fa({ addOnCredited: -1 }), fa(null)], [0.5, 0, 0, 0, 0], 'only addOnCredited counts — never the quiz-score snapshot');
@@ -70,7 +87,7 @@ const save = async (id, score, note) => { ops.length = 0; alerts.length = 0; toa
     assert.ok(/feedback: '💬 Feedback add-on'/.test(html) && /feedback: \{ accent: '#ec4899'/.test(html), 'the group has a name and a colour');
     assert.ok(/where\('type', '==', 'feedback'\)/.test(html) && /💬 Feedback add-on<\/div>/.test(html), 'the Score breakdown sums the add-on rows (not quiz_feedback.pointsEarned)');
     // 7. the card: max 1, disabled 🎁 for a feedback that does not count
-    assert.ok(/id="qfp-admin-score-\$\{f\.id\}" type="number" min="0" max="1" step="0\.05"/.test(html), 'the box is capped at 1');
+    assert.ok(/id="qfp-admin-score-\$\{f\.id\}" type="number" min="0" max="\$\{qfpAddOnCap\(f\)\}" step="0\.05"/.test(html) && /max \$\{qfpAddOnCap\(f\)\}<\/div>/.test(html), 'the box max and the label show the cap (min of 1.0 and the quiz points)');
     assert.ok(/class="btn-sm"\$\{qfpAddOnQualifies\(f\) \? '' : ' disabled'\}/.test(html), '🎁 is disabled when the feedback does not count');
     console.log('PASS: Feedback add-on — 🎁 credits 0–1.0 once per quiz (difference on re-save), only for a rating or a comment (10/10 with none = no), own log type + History group, deletes take back only what was credited');
 })().catch(e => { console.error(e); process.exit(1); });
