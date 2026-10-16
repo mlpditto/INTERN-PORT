@@ -88,6 +88,6 @@ const save = async (id, score, note) => { ops.length = 0; alerts.length = 0; toa
     assert.ok(/where\('type', '==', 'feedback'\)/.test(html) && /💬 Feedback add-on<\/div>/.test(html), 'the Score breakdown sums the add-on rows (not quiz_feedback.pointsEarned)');
     // 7. the card: max 1, disabled 🎁 for a feedback that does not count
     assert.ok(/id="qfp-admin-score-\$\{f\.id\}" type="number" min="0" max="\$\{qfpAddOnCap\(f\)\}" step="0\.05"/.test(html) && /max \$\{qfpAddOnCap\(f\)\}<\/div>/.test(html), 'the box max and the label show the cap (min of 1.0 and the quiz points)');
-    assert.ok(/class="btn-sm"\$\{qfpAddOnQualifies\(f\) \? '' : ' disabled'\}/.test(html), '🎁 is disabled when the feedback does not count');
+    assert.ok(/const addOnOn = qfpAddOnQualifies\(f\);/.test(html) && /id="qfp-bonus-btn-\$\{f\.id\}" type="button" class="qfp-ib"\$\{addOnOn \? '' : ' disabled'\}/.test(html), '🎁 is disabled when the feedback does not count');
     console.log('PASS: Feedback add-on — 🎁 credits 0–1.0 once per quiz (difference on re-save), only for a rating or a comment (10/10 with none = no), own log type + History group, deletes take back only what was credited');
 })().catch(e => { console.error(e); process.exit(1); });

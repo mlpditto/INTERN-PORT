@@ -58,7 +58,7 @@ const modalEnd = html.indexOf('        <!-- V92.95: Score Audit Modal',modalStar
             assert.equal(await page.evaluate(()=>localStorage.getItem('ai_default_qfp_model')),expected);
         }
         assert.equal(await page.locator('#qfp-ai-btn').isDisabled(),true);
-        assert.equal(await page.locator('#qfp-comments details').getAttribute('open'),null);
+        assert.equal(await page.locator('#qfp-comments details').count(),0,'V102.259: no Details / Manage fold any more — three flat rows');
         assert.match(await page.locator('#qfp-comments').innerText(),/No comment provided/);
         assert.doesNotMatch(await page.locator('#qfp-summary').innerText(),/blank|★/);
         // the rail is drawn when the panel opens and the comment-less state hides it — open with a comment to drive it
@@ -87,7 +87,7 @@ const modalEnd = html.indexOf('        <!-- V92.95: Score Audit Modal',modalStar
             await page.setViewportSize({width,height:900});
             assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`overflow at ${width}`);
         }
-        await page.locator('#qfp-comments summary').click();
+        // V102.259: the actions are always visible (no Details / Manage fold to open first)
         assert.equal(await page.locator('#qfp-ai-btn-f1').isDisabled(),true);
         await page.evaluate(async()=>{fixture=[{id:'f1',userId:'u1',displayName:'<img src=x>',rating:8,comment:'Useful teaching',timeUsedSeconds:353}];await showQuizFeedbackPanel('test');});
         assert.equal(await page.locator('#qfp-ai-btn').isDisabled(),false);
