@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.260)</title>
+    <title>Nika Admin (V102.261)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -28532,8 +28532,16 @@ ${JSON.stringify(sourceObj)}`;
                 });
                 // The count now reads "graded / total attempts", so the badge explains
                 // its own denominator instead of implying every attempt was graded.
-                avgBadge.innerText = scoredCount > 0
-                    ? `📊 ${(totalScorePct / scoredCount * 100).toFixed(1)}% · ${scoredCount}/${attempts.length}`
+                let secSum = 0, qSum = 0;
+                activeAttempts.forEach(a => {
+                    if (!a.startTime || !a.timestamp) return;
+                    const sec = Math.floor((a.timestamp.toMillis() - a.startTime.toMillis()) / 1000), qn = quizAttemptCounts(a, quiz).total;
+                    if (sec > 0 && qn > 0) { secSum += sec; qSum += qn; }
+                });
+                const avgQ = qSum ? Math.round(secSum / qSum) : 0;
+                const avgQStr = avgQ ? ` · <span style="color:#e8963c;">⏱ ⌀ ${avgQ >= 60 ? Math.floor(avgQ / 60) + 'm ' + (avgQ % 60) + 's' : avgQ + 's'}/Q</span>` : '';
+                avgBadge.innerHTML = scoredCount > 0
+                    ? `<span style="color:#6f8df0;">📊 ${(totalScorePct / scoredCount * 100).toFixed(1)}%</span> · <span style="color:#2fb59a;">${scoredCount}/${attempts.length}</span>${avgQStr}`
                     : `📊 — · 0/${attempts.length}`;
                 avgBadge.title = `Average of the ${scoredCount} graded attempt(s) out of ${attempts.length} total`;
 
@@ -28591,7 +28599,7 @@ ${JSON.stringify(sourceObj)}`;
                     const rowWarning = cheatLabel === 'High' ? 'background:#fff1f2;' : (cheatLabel === 'Moderate' ? 'background:#fffbf0;' : '');
                     const timeStr = att.timestamp ? att.timestamp.toDate().toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' }) : "-";
 
-                    // Calculate Duration
+                    // Calculate Duration (V102.261: + average per question — quizzes differ in length)
                     let durationStr = "";
                     if (att.startTime && att.timestamp) {
                         const diffMs = att.timestamp.toMillis() - att.startTime.toMillis();
@@ -28599,7 +28607,11 @@ ${JSON.stringify(sourceObj)}`;
                         if (diffSec > 0) {
                             const mm = Math.floor(diffSec / 60);
                             const ss = diffSec % 60;
-                            durationStr = ` <br> <small style="color:#4361ee; font-weight:bold;">⏱ ${mm}m ${ss}s</small>`;
+                            const qN = quizAttemptCounts(att, quiz).total;
+                            const perQ = qN > 0 ? Math.round(diffSec / qN) : 0;
+                            const perQStr = perQ ? ` · <span title="Average per question (${qN} questions)">⌀ ${perQ >= 60 ? Math.floor(perQ / 60) + 'm ' + (perQ % 60) + 's' : perQ + 's'}/Q</span>` : '';
+                            const slow = perQ > 0 && avgQ > 0 && perQ > avgQ;
+                            durationStr = ` <br> <small style="color:${slow ? '#c2610c' : '#4361ee'}; font-weight:bold;${slow ? ' background:#ffe8cc; padding:2px 7px; border-radius:999px;' : ''}"${slow ? ' title="Slower than the class average per question"' : ''}>⏱ ${mm}m ${ss}s${perQStr}</small>`;
                         }
                     }
 
@@ -28621,6 +28633,7 @@ ${JSON.stringify(sourceObj)}`;
                             ${!hideQuizScores ? `<td style="font-weight:800; text-align:center; color:var(--primary); font-size:1.1em;">${score}</td>` : ''}
                             <td style="text-align:center;">
                                 <span class="badge" style="background:${statusColor}; font-size:0.75em; padding:4px 10px; border-radius:8px; font-weight:700;">${att.status.toUpperCase()}</span>
+                                ${(() => { const dv = u ? userDivisionOf(u) : ''; return dv ? `<div class="lang-no-toggle" title="Division" style="font-size:0.72em; font-weight:700; margin-top:4px; color:${divColor(dv)};">🏷️ ${escapeHtml(dv)}</div>` : ''; })()}
                             </td>
                             <td style="text-align:center;">
                                 <span style="display:inline-flex; align-items:center; gap:6px; justify-content:center; padding:6px 10px; border-radius:999px; background:${cheatColor}; color:white; font-weight:700; font-size:0.8em; min-width:72px;">${cheatLabel}</span>
