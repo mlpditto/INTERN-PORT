@@ -49,7 +49,7 @@ assert.ok(modal.includes('id="dv-newrow" hidden') && modal.includes('id="div-sav
             grabConst('const groupColorMap = {'), grabConst('const groupIconMap = {'),
             html.slice(html.indexOf('        const divUp = x =>'), html.indexOf('\n', html.indexOf('        const divUp = x =>'))),
             ['function groupStyleOf(', 'function divChipLook(', 'function userMemberships(', 'function userInDivision(', 'function divAlsoOf(', 'function getGroupColor(', 'function getGroupIcon(', 'function groupActiveCount(', 'function groupTotalCount(', 'function groupChipHtml(', 'function userDivisionOf(', 'function divColor(',
-                'function divDiff(', 'function setDivDirty(', 'function divMembersOf(', 'function divGroupsOf(', 'function divLinkHtml(', 'function renderDivisionAdminList(', 'function onDivEditorClick(', 'function divAddGroup(', 'async function divMovePeople(',
+                'function divDiff(', 'function setDivDirty(', 'function divMembersOf(', 'function divGroupsOf(', 'function divLinkHtml(', 'function renderDivisionAdminList(', 'function dvToggleNewRow(', 'function onDivEditorClick(', 'function divAddGroup(', 'async function divMovePeople(',
                 'function addDivision(', 'function removeDivision('].map(grabFn).join('\n'),
             'var divDraft = JSON.parse(JSON.stringify(divisionConfig)), divPick = "", divPickDiv = "", divPeople = new Set(), divSel = "", divFilter = "", divShowEmpty = false;'
         ].join('\n') });
@@ -98,7 +98,7 @@ assert.ok(modal.includes('id="dv-newrow" hidden') && modal.includes('id="div-sav
         await page.fill('#dv-filter', 'aud');
         await page.dispatchEvent('#dv-filter', 'input');
         assert.deepEqual(await chips(), ['Audit 2', '＋ Add “Audit” to RSU', '＋ New group “aud” in RSU'], 'Audit lives in CAFE (2 people); one tap offers it in RSU too, or creates the typed name');
-        assert.ok((await txt('.dv-cap span'))[0].includes('all divisions'));
+        assert.ok((await page.$$eval('.dv-cap .dv-cap-i', els => els.map(e => e.title)))[0].includes('all divisions'), 'V102.257: the caption sentence is the search icon tooltip');
         await page.locator('.dv-addgrp').first().click();
         assert.deepEqual(await page.evaluate(() => divDraft.RSU), ['EXTERN', 'Junior', 'Pharmacists', 'Audit']);
         assert.equal(await page.$eval('#div-save-diff', e => e.textContent), '2 changes · + Pharmacists in RSU · + Audit in RSU');
