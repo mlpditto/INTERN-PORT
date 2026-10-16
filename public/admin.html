@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.262)</title>
+    <title>Nika Admin (V102.264)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -38089,6 +38089,15 @@ They can connect again from LINE.
             { id: 'social_butterfly', title: 'Social Butterfly', art: 'butterfly', steps: 4 },
             { id: 'legend', title: 'Legend', art: 'gem', steps: 1, oneOff: 4 }
         ];
+        // V102.263: the milestone of each tier (steps) and its unit, copied from index.html achievementCatalog — the export writes "150+ questions" under a badge.
+        // Admin only knows the LEVEL a person reached (users.badges[id].level), not the live count, so the label is the milestone reached, never an exact count.
+        const BADGE_STEP_INFO = {
+            on_fire: { thr: [3, 7, 14, 30], unit: 'days' }, early_bird: { thr: [5, 15, 30], unit: 'check-ins' }, quiz_master: { thr: [10, 50, 150, 300], unit: 'questions' },
+            perfectionist: { thr: [1, 5, 15], unit: 'quizzes' }, case_hunter: { thr: [1, 5, 15, 30], unit: 'cases' }, reflective_mind: { thr: [1, 7, 15, 30], unit: 'logs' },
+            mentor_feedback: { thr: [1, 5, 15], unit: 'reviews' }, quest_finisher: { thr: [1, 5, 10], unit: 'quests' }, speedrunner: { thr: [1, 5, 15], unit: 'quizzes' },
+            explorer: { thr: [3, 6, 10], unit: 'topics' }, codex_contributor: { thr: [1, 5, 15], unit: 'entries' }, team_player: { thr: [25, 100, 250, 500], unit: 'journals' },
+            social_butterfly: { thr: [1, 5, 10, 20], unit: 'events' }
+        };
         const BADGE_STATS_TIERS = [['Bronze', '#a0592a'], ['Silver', '#5b6b80'], ['Gold', '#8f6200'], ['Diamond', '#4c3aa8']];
 
         // V102.32: badge art copied from index.html (BADGE_TIERS / BADGE_ART / badgeSvgHtml)
@@ -38593,10 +38602,10 @@ They can connect again from LINE.
         function badgeBoardGeom(st, layout) {
             const items = layout === 'banner' ? st.items : st.items.filter(i => i.t);
             const photo = st.avatar === 'photo' && !!(st.photo64 || st.pictureUrl);
-            if (layout === 'banner') { const rows = Math.max(1, Math.ceil(items.length / 8)); return { items, photo, w: 560, h: 92 + rows * 62 + 18, cols: 8, cell: 64, bw: 52, y0: 92, row: 62 }; }
-            if (layout === 'story') { const rows = Math.max(1, Math.ceil(items.length / 4)), y0 = photo ? 268 : 206; return { items, photo, w: 360, h: y0 + rows * 72 + 24, cols: 4, cell: 76, bw: 62, y0, row: 72 }; }   // height follows the badge count
+            if (layout === 'banner') { const rows = Math.max(1, Math.ceil(items.length / 8)); return { items, photo, w: 560, h: 92 + rows * 83 + 18, cols: 8, cell: 64, bw: 52, y0: 92, row: 83 }; }   // V102.263: row = tile 62 + label 21
+            if (layout === 'story') { const rows = Math.max(1, Math.ceil(items.length / 4)), y0 = photo ? 268 : 206; return { items, photo, w: 360, h: y0 + rows * 101 + 24, cols: 4, cell: 76, bw: 62, y0, row: 101 }; }   // height follows the badge count
             const rows = Math.max(1, Math.ceil(items.length / 7)), y0 = photo ? 142 : 76;
-            return { items, photo, w: 400, h: y0 + rows * 54 + 12, cols: 7, cell: 50, bw: 44, y0, row: 54 };
+            return { items, photo, w: 400, h: y0 + rows * 72 + 12, cols: 7, cell: 50, bw: 44, y0, row: 72 };
         }
         function badgeBoardSvg(st, layout, px) {
             const g = badgeBoardGeom(st, layout), esc = escapeHtml, uid = 'bb' + (++_boardSvgN);   // unique ids — the dialog shows three of these side by side
@@ -38606,10 +38615,18 @@ They can connect again from LINE.
             const circle = (cx, cy, r, ring) => g.photo
                 ? `<clipPath id="${uid}c"><circle cx="${cx}" cy="${cy}" r="${r}"/></clipPath><image href="${esc(st.photo64 || st.pictureUrl)}" x="${cx - r}" y="${cy - r}" width="${2 * r}" height="${2 * r}" clip-path="url(#${uid}c)" preserveAspectRatio="xMidYMid slice"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${ring}" stroke-width="3"/>`
                 : '';
+            const lc = layout === 'story' ? ['#ffffffee', '#ffffffa6', 8.2, 7.4] : layout === 'banner' ? ['#e2e8f0', '#94a3b8', 7, 6] : ['#334155', '#64748b', 5.2, 4.6];
+            const label = (it, d, cx, y) => {
+                if (!it.t) return '';
+                const info = BADGE_STEP_INFO[d.id], thr = info && d.steps > 1 ? info.thr[Math.min(it.t, info.thr.length) - 1] : 0;
+                // A line wider than its cell (≈ 0.6 em per bold char — the font may be Nunito or a wider fallback) is squeezed to the cell, so neighbours never touch.
+                const fit = (t, size) => t.replace('<text ', t.length && (t.match(/>([^<]*)</) || [, ''])[1].length * size * 0.6 > g.cell - 3 ? `<text textLength="${g.cell - 3}" lengthAdjust="spacingAndGlyphs" ` : '<text ');
+                return fit(txt(cx, y + lc[2] + 3, lc[2], 800, lc[0], d.title), lc[2]) + (thr ? fit(txt(cx, y + lc[2] + lc[3] + 5.5, lc[3], 700, lc[1], thr + '+ ' + info.unit), lc[3]) : '');
+            };
             const tiles = (x0) => g.items.map((it, i) => {
                 const d = BADGE_STATS_DEFS.find(x => x.id === it.id), x = x0 + (i % g.cols) * g.cell + (g.cell - g.bw) / 2, y = g.y0 + Math.floor(i / g.cols) * g.row;
                 const svg = badgeSvgHtml(d.art, it.t, g.bw, false).replace('<svg viewBox', `<svg x="${x}" y="${y}" viewBox`).replace(/ style="[^"]*"/, '');
-                return it.t ? svg : `<g opacity=".25">${svg}</g>`;
+                return (it.t ? svg : `<g opacity=".25">${svg}</g>`) + label(it, d, x0 + (i % g.cols) * g.cell + g.cell / 2, y + g.bw * 0.98);
             }).join('');
             const open = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${g.w} ${g.h}" width="${px}" height="${Math.round(px * g.h / g.w)}" style="overflow:hidden;">`;
             const x0 = (g.w - g.cols * g.cell) / 2;
