@@ -6,6 +6,8 @@ Behavioral guidelines to reduce common LLM coding mistakes, customized for the I
 
 **Read [THINKING-PLAYBOOK.md](THINKING-PLAYBOOK.md) alongside this file.** This file says what the rules are for this codebase; the playbook says how to work — build a model before editing, cut the task into slices you can prove done, verify at the surface the user actually sees, and report what you observed rather than what you hoped. Where the two overlap, this file wins on project specifics.
 
+**For any UI work read [DESIGN.md](DESIGN.md).** It holds the house rules (lean · inline · less text · more emoji · minimal · low cognitive load, each number once, the emoji vocabulary, the mockup-before-code process and the pre-PR checklist).
+
 ---
 
 ## Karpathy-Inspired Core Principles
