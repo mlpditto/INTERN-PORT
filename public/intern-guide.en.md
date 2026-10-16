@@ -38,7 +38,18 @@ The bot posts a **Daily Quiz Digest** in the intern LINE group at **16:00**:
 
 ---
 
-## 3. 📓 Journal
+## 3. 💬 Feedback
+
+After a scored quiz, tell us how it went — under a minute, and it makes the quizzes better.
+
+- **When** — right after you submit, or later: **Give Feedback** on the quiz card (**Mission**) or in **History**. One per quiz.
+- **How** — ⭐ tap a rating · ✍️ a short comment (optional) · 🎯 pick a topic you want next
+- 🎁 **Bonus** — the admin reads it and may add a bonus when accepting it. Once per quiz, never more than your score on that quiz. Stars or a comment count; a 10/10 with no comment does not.
+- ⏰ **Reminder** — once a day while you are in your internship period, if a graded quiz has no feedback yet. Tap **Later** three times in a row and it stops until you give feedback once.
+
+---
+
+## 4. 📓 Journal
 
 Open **Mission ▸ Journal** and write your **daily reflection**: pick a **mood** (😊 😓 💪 🤔 …) then write what you did and learned. Thai or English — both are fine.
 
@@ -48,7 +59,7 @@ Open **Mission ▸ Journal** and write your **daily reflection**: pick a **mood*
 
 ---
 
-## 4. ➕ Submit New
+## 5. ➕ Submit New
 
 The round **＋** button (bottom right) is the one door for everything you hand in:
 
@@ -64,7 +75,7 @@ Everything you submit shows up in **History** with its status. Cases are also in
 
 ---
 
-## 5. 🏆 Points
+## 6. 🏆 Points
 
 **pts = learning points.** They set your level and your Leaderboard rank.
 
@@ -83,7 +94,7 @@ Everything you submit shows up in **History** with its status. Cases are also in
 
 ---
 
-## 6. 🪙 Beri
+## 7. 🪙 Beri
 
 **Beri = collectible coins.** Separate from pts (they do **not** count towards level or Leaderboard); you spend them in the shop.
 
@@ -101,7 +112,7 @@ Everything you submit shows up in **History** with its status. Cases are also in
 
 ---
 
-## 7. 💊 Codex
+## 8. 💊 Codex
 
 **DD Codex** — a shared library of **💊 Drugs** and **🩺 Diseases** written by interns and approved by the admin.
 - Search and open an entry; some entries have files you can download in one tap
