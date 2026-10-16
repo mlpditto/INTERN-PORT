@@ -66,6 +66,22 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         // the actions still work: 🎁 opens the add-on form (max shows the cap), 🗡️ is there, 🗑 is there
         await page.click('#qfp-bonus-btn-F1');
         assert.ok(await page.$eval('#qfp-admin-bonus-F1', e => getComputedStyle(e).display !== 'none') && (await page.$eval('#qfp-admin-score-F1', e => e.max)) === '1', '🎁 opens the form; max = min(1.0, the quiz points 2.4) = 1');
+        // V102.260 — EN first: the empty-filter message is English (Thai in the tooltip attribute); the header never grows past two rows even with a long title and many long topics
+        await page.click('#qfp-comments-controls button[aria-label="Low rating (5 or less)"]');
+        const empty = await page.$eval('#qfp-comments p', e => ({ t: e.textContent.trim(), th: e.getAttribute('data-th-title') }));
+        assert.ok(/^🔎 No entries match this filter$/.test(empty.t) && /[฀-๿]/.test(empty.th), 'empty filter: English text, Thai only in data-th-title: ' + JSON.stringify(empty));
+        await page.click('#qfp-comments-controls button[aria-label="All"]');
+        await page.setViewportSize({ width: 560, height: 1000 });
+        await page.evaluate(async () => {
+            const long = Array.from({ length: 8 }, (_, i) => 'หัวข้อที่อยากให้ทำต่อยาว ๆ ลำดับที่ ' + (i + 1) + ' เกี่ยวกับยา');
+            const docs = long.map((t, i) => ({ id: 'T' + i, userId: 'B1', displayName: 'Bew', quizId: 'Q9', rating: 8, ratingProvided: true, comment: 'ok', nextTopic: t, timeUsedSeconds: 60, pointsEarned: 0.5, timestamp: { toDate: () => new Date(), toMillis: () => Date.now(), seconds: 1 } }));
+            quizzesData = [{ id: 'Q9', title: 'A very long quiz title for the header: Allergic Rhinitis and Chronic Sinusitis — Part 2 (retake)' }];
+            db = { collection: () => { const api = { where: () => api, orderBy: () => api, limit: () => api, get: async () => ({ docs: docs.map(d => ({ id: d.id, data: () => { const { id, ...r } = d; return r; } })) }) }; return api; } };
+            await showQuizFeedbackPanel('Q9');
+        });
+        await page.waitForTimeout(300);
+        const hh = await page.evaluate(() => ({ h: Math.round(document.querySelector('.qfp-head').getBoundingClientRect().height), over: document.querySelector('#quizFeedbackPanelModal .modal-content').scrollWidth > document.querySelector('#quizFeedbackPanelModal .modal-content').clientWidth + 1 }));
+        assert.ok(hh.h <= 100 && !hh.over, 'long title + 8 topics at 560px: the header is at most TWO rows (' + hh.h + 'px), nothing overflows');
         console.log('PASS: Quiz Feedback lean — one-row header, one-row AI Insight, icon filter rail + one sort button, flat 3-row cards, 📝 instead of "Bonus", ⏰ signal (red) / 🕒 (grey) / none when credited or not eligible');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
