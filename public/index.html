@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.160)</title>
+    <title>Internship Portfolio (V101.161)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -3732,6 +3732,10 @@
                 #sch-week .sch-wd.today .sch-n b { background: #7c3aed; color: #fff; font-weight: 700; }
                 #sch-week .sch-wd[aria-pressed="true"] .sch-n b { background: #ede9fe; color: #5b21b6; font-weight: 700; box-shadow: inset 0 0 0 2px #7c3aed; }
                 #sch-week .sch-wd.today[aria-pressed="true"] .sch-n b { background: #7c3aed; color: #fff; box-shadow: inset 0 0 0 2px #c4b5fd; }
+                /* V101.161: today is alive — a soft purple ring pings out of its circle every 2 s (still when the phone asks for reduced motion) */
+                #sch-week .sch-wd.today .sch-n::after { content: ''; position: absolute; inset: 0; border-radius: 50%; border: 2px solid #7c3aed; pointer-events: none; animation: schTodayPing 2s ease-out infinite; }
+                @keyframes schTodayPing { 0% { transform: scale(1); opacity: .75; } 70%, 100% { transform: scale(1.45); opacity: 0; } }
+                @media (prefers-reduced-motion: reduce) { #sch-week .sch-wd.today .sch-n::after { animation: none; opacity: 0; } }
                 #sch-goals-box { margin: 6px 0; padding: 0; border: 1px solid #e2e8f0; border-radius: 16px; background: #f8fafc; overflow: hidden; }
                 #sch-goals-box .sch-gb-main { display: flex; align-items: stretch; padding: 10px 4px; }
                 #sch-goals-box .sch-bars { display: flex; flex: 1; min-width: 0; }
@@ -15945,10 +15949,10 @@
                 out.push({ bucket: 'today', kind: 'x', icon: '✅', short: 'Check-in', title: 'Daily check-in เช็คอินประจำวัน', act: 'tryDailyCheckin()' });
             }
             if (typeof _activityDoneToday === 'function' && !_activityDoneToday(_combinedLogCache())) {
-                out.push({ bucket: 'today', kind: 'j', icon: '📝', title: 'Journal', hint: 'ปิดหน้าต่างนี้และไปเขียนบันทึกประจำวัน', tag: '+0.1', act: 'closeScheduleModal(); gotoLog()' });
+                out.push({ bucket: 'today', kind: 'j', icon: '📝', title: 'Journal', hint: 'ปิดหน้าต่างนี้และไปเขียนบันทึกประจำวัน', act: 'closeScheduleModal(); gotoLog()' });
             }
             if (typeof _activityDoneToday === 'function' && !_activityDoneToday(window.myCasesCache)) {
-                out.push({ bucket: 'today', kind: 'c', icon: '🩺', title: 'Case', hint: 'ปิดหน้าต่างนี้และไปบันทึกเคส รับ +0.1 คะแนนเมื่อส่งสำเร็จ', tag: '+0.1', act: 'closeScheduleModal(); gotoCaseSubmit()' });
+                out.push({ bucket: 'today', kind: 'c', icon: '🩺', title: 'Case', hint: 'ปิดหน้าต่างนี้และไปบันทึกเคส', act: 'closeScheduleModal(); gotoCaseSubmit()' });
             }
 
             const openMission = "openJourneySection('section-kanban','toggleKanban')";
@@ -16304,7 +16308,7 @@
             const empty = !(n || listed);   // V101.152: nothing that day = ONE line, the words sit beside the date
             return '<div id="sch-week-day" style="margin:8px 0 2px; padding-top:8px; border-top:1px solid #f1f5f9;">'
                 + '<div style="font-size:0.74em; font-weight:800; color:#7c3aed; margin-bottom:' + (empty ? 0 : 6) + 'px;">'
-                + d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) + (listed ? ' <span title="Listed below" style="color:#94a3b8; font-weight:700;">· ' + listed + ' ↓</span>' : '') + (empty ? ' <span style="color:#94a3b8; font-weight:600;">· Nothing on this day</span>' : '') + '</div>'
+                + d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) + (listed ? ' <span title="To do on this day — listed below" data-th-title="งานที่ต้องทำในวันนี้ — อยู่ในรายการด้านล่าง" data-kr-title="이 날 할 일 — 아래 목록에 있어요" style="color:#94a3b8; font-weight:700;">· ' + listed + ' to do ↓</span>' : '') + (empty ? ' <span style="color:#94a3b8; font-weight:600;">· Nothing on this day</span>' : '') + '</div>'
                 + events.map(ev => schEventRowHtml(ev)).join('')
                 + todo.map(it => row('#fff7ed', '#fed7aa', it.icon, it.title, schWhen(it, now))).join('')
                 + done.map(it => row('#f0fdf4', '#bbf7d0', schTypeIcon(it.submissionType), it.title || 'Untitled ไม่มีชื่อ', 'done')).join('')
