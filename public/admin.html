@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.265)</title>
+    <title>Nika Admin (V102.266)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -38092,11 +38092,11 @@ They can connect again from LINE.
         // V102.263: the milestone of each tier (steps) and its unit, copied from index.html achievementCatalog — the export writes "150+ questions" under a badge.
         // Admin only knows the LEVEL a person reached (users.badges[id].level), not the live count, so the label is the milestone reached, never an exact count.
         const BADGE_STEP_INFO = {
-            on_fire: { thr: [3, 7, 14, 30], unit: 'days' }, early_bird: { thr: [5, 15, 30], unit: 'check-ins' }, quiz_master: { thr: [10, 50, 150, 300], unit: 'questions' },
-            perfectionist: { thr: [1, 5, 15], unit: 'quizzes' }, case_hunter: { thr: [1, 5, 15, 30], unit: 'cases' }, reflective_mind: { thr: [1, 7, 15, 30], unit: 'logs' },
-            mentor_feedback: { thr: [1, 5, 15], unit: 'reviews' }, quest_finisher: { thr: [1, 5, 10], unit: 'quests' }, speedrunner: { thr: [1, 5, 15], unit: 'quizzes' },
-            explorer: { thr: [3, 6, 10], unit: 'topics' }, codex_contributor: { thr: [1, 5, 15], unit: 'entries' }, team_player: { thr: [25, 100, 250, 500], unit: 'journals' },
-            social_butterfly: { thr: [1, 5, 10, 20], unit: 'events' }
+            on_fire: { thr: [3, 7, 14, 30], unit: 'days', one: 'day' }, early_bird: { thr: [5, 15, 30], unit: 'check-ins', one: 'check-in' }, quiz_master: { thr: [10, 50, 150, 300], unit: 'questions', one: 'question' },
+            perfectionist: { thr: [1, 5, 15], unit: 'quizzes', one: 'quiz' }, case_hunter: { thr: [1, 5, 15, 30], unit: 'cases', one: 'case' }, reflective_mind: { thr: [1, 7, 15, 30], unit: 'logs', one: 'log' },
+            mentor_feedback: { thr: [1, 5, 15], unit: 'reviews', one: 'review' }, quest_finisher: { thr: [1, 5, 10], unit: 'quests', one: 'quest' }, speedrunner: { thr: [1, 5, 15], unit: 'quizzes', one: 'quiz' },
+            explorer: { thr: [3, 6, 10], unit: 'topics', one: 'topic' }, codex_contributor: { thr: [1, 5, 15], unit: 'entries', one: 'entry' }, team_player: { thr: [25, 100, 250, 500], unit: 'journals', one: 'journal' },
+            social_butterfly: { thr: [1, 5, 10, 20], unit: 'events', one: 'event' }
         };
         const BADGE_STATS_TIERS = [['Bronze', '#a0592a'], ['Silver', '#5b6b80'], ['Gold', '#8f6200'], ['Diamond', '#4c3aa8']];
 
@@ -38550,6 +38550,7 @@ They can connect again from LINE.
         }
 
         async function badgeExportPng(st) {
+            if (st.countsPromise) await st.countsPromise;
             if ((st.kind === 'stamp' || st.kind === 'board') && st.avatar === 'photo' && !st.photo64) {
                 try { st.photo64 = await badgeExportPhoto64(st.pictureUrl); }
                 catch (e) { throw new Error('The LINE photo could not be loaded (' + e.message + ') — pick 👾 8-bit or None.'); }
@@ -38630,7 +38631,8 @@ They can connect again from LINE.
                 const info = BADGE_STEP_INFO[d.id], thr = st.labels !== 'name' && info && d.steps > 1 ? info.thr[Math.min(it.t, info.thr.length) - 1] : 0;
                 // ≈ 0.6 em per bold char (the font may be Nunito or a wider fallback): a line that would not fit its cell gets a smaller font, never a stretched one
                 const fs = (t, size) => Math.min(size, (g.cell - 8) / (String(t).length * 0.6));
-                const t2 = thr ? thr + '+ ' + info.unit : '';
+                const n = st.counts && st.counts[d.id];   // V102.266: a number only when it was read (never a 0 for "not loaded")
+                const t2 = thr ? (Number.isFinite(n) ? n + ' ' + (n === 1 ? info.one : info.unit) : thr + '+ ' + info.unit) : '';
                 return txt(cx, y + lc[2] + 3, fs(d.title, lc[2]), 800, lc[0], d.title) + (thr ? txt(cx, y + lc[2] + lc[3] + 5.5, fs(t2, lc[3]), 700, lc[1], t2) : '');
             };
             const tiles = (x0) => g.items.map((it, i) => {
@@ -38655,10 +38657,70 @@ They can connect again from LINE.
                 + (g.photo ? circle(200, 52, 34, '#fff') : '') + txt(200, g.photo ? 110 : 40, 22, 900, '#1e293b', person) + txt(200, g.photo ? 128 : 58, 12, 700, '#475569', sub)
                 + `<rect x="14" y="${g.y0 - 10}" width="${g.w - 28}" height="${g.h - g.y0 - 4}" rx="16" fill="#fff"/>` + tiles(x0) + '</svg>';
         }
+        // V102.266: exact counts for the export, read NOW from the person's own data. Only the badges whose number admin can derive exactly like the app
+        // (index.html collectAchievementMetrics / collectReflectiveMetrics / schLoadCheckinDays): early_bird, quiz_master, perfectionist, speedrunner, explorer,
+        // reflective_mind, mentor_feedback, quest_finisher, social_butterfly. A source that fails to load leaves its badges out (shown as the milestone "N+") — never a 0.
+        const BADGE_LIVE_IDS = ['early_bird', 'quiz_master', 'perfectionist', 'speedrunner', 'explorer', 'reflective_mind', 'mentor_feedback', 'quest_finisher', 'social_butterfly'];
+        const BADGE_QB_MARKER_TAG = /^(ai_variant|ai_from_case|pharmcamp)$/i;   // = QB_MARKER_TAG in index.html
+        function badgeQuizTags(q) {
+            if (!q) return [];
+            if (Array.isArray(q.tagList)) return q.tagList.map(t => String(t || '').trim().replace(/\s+/g, ' ')).filter(Boolean);
+            return String(q.tags || '').split(',').map(t => t.trim().replace(/\s+/g, ' ')).filter(Boolean);
+        }
+        function badgeBkkHour(date) { return Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', hour: 'numeric', hourCycle: 'h23' }).format(date)); }
+        // src = { attempts, quizzes, logs, subs, checkins, stamps } — each an array of plain docs, or null/undefined when that read failed (its badges are skipped).
+        function badgeCountsFromData(src) {
+            const out = {};
+            if (Array.isArray(src.attempts)) {
+                const byQuiz = {}; src.attempts.forEach(a => { if (a) byQuiz[a.quizId] = a; });   // the app keeps one attempt per quiz (last wins)
+                let questions = 0, perfect = 0, fast = 0; const topics = new Set();
+                Object.values(byQuiz).forEach(a => {
+                    if (!['pending', 'approved', 'completed'].includes(a.status)) return;
+                    const total = Number(a.totalQuestions) || 0;
+                    questions += total;
+                    const quiz = Array.isArray(src.quizzes) ? src.quizzes.find(q => q.id === a.quizId) : null;
+                    if (quiz) badgeQuizTags(quiz).forEach(t => { if (!BADGE_QB_MARKER_TAG.test(t)) topics.add(t.toLowerCase()); });
+                    if (!(total > 0 && Number(a.correctCount) >= total)) return;
+                    perfect++;
+                    if (quiz && Array.isArray(a.durations)) {
+                        const used = a.durations.reduce((x, d) => x + (Number(d) || 0), 0);
+                        const allowed = quiz.timerMode === 'total_time' ? (quiz.totalTimer || 300) : (quiz.questions || []).reduce((x, q) => x + ((q && q.timer) || 60), 0);
+                        if (used > 0 && allowed > 0 && used * 2 < allowed) fast++;
+                    }
+                });
+                out.quiz_master = questions; out.perfectionist = perfect;
+                if (Array.isArray(src.quizzes) && src.quizzes.length) { out.speedrunner = fast; out.explorer = topics.size; }   // these two need the quiz list
+            }
+            if (Array.isArray(src.logs)) {
+                out.reflective_mind = src.logs.length;
+                out.mentor_feedback = src.logs.filter(l => l && l.timestamp && (l.adminComment || (l.adminBonus || 0) > 0)).length;
+            }
+            if (Array.isArray(src.subs)) {
+                const byQuest = {}; src.subs.forEach(x => { if (x) byQuest[x.questId] = x; });
+                out.quest_finisher = Object.values(byQuest).filter(x => x.status === 'submitted').length;
+            }
+            if (Array.isArray(src.checkins)) out.early_bird = src.checkins.filter(d => d && d.type === 'daily_checkin' && d.timestamp && d.timestamp.toDate && badgeBkkHour(d.timestamp.toDate()) < 12).length;
+            if (Array.isArray(src.stamps)) out.social_butterfly = src.stamps.length;
+            return out;
+        }
+        async function badgeLiveCounts(uid) {
+            // a read that fails or hangs (5 s) leaves its badges out — the export never waits for it
+            const read = q => Promise.race([q.get().then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() }))), new Promise(r => setTimeout(() => r(null), 5000))]).catch(() => null);
+            const [attempts, logs, subs, checkins, stamps] = await Promise.all([
+                read(db.collection('quiz_attempts').where('userId', '==', uid)),
+                read(db.collection('reflective_logs').where('userId', '==', uid)),
+                read(db.collection('quest_submissions').where('userId', '==', uid)),
+                read(db.collection('checkin_logs').where('userId', '==', uid).limit(500)),   // same 500-doc window the app reads
+                read(db.collection('event_stamps').where('userId', '==', uid))
+            ]);
+            return badgeCountsFromData({ attempts, quizzes: typeof quizzesData !== 'undefined' ? quizzesData : null, logs, subs, checkins, stamps });
+        }
         function openBoardExportFor(uid) {
             const u = (usersData || []).find(x => x.id === uid); if (!u) return;
             const items = BADGE_STATS_DEFS.map(d => ({ id: d.id, t: userBadgeTier(u, d.id) || 0 }));
             openBadgeExport({ kind: 'board', items, person: u.displayName || '', sub: [u.division, u.group].filter(Boolean).join(' › '), score: u.score !== undefined ? parseFloat(Number(u.score || 0).toFixed(2)) : '', pictureUrl: u.pictureUrl || '', avatar: u.pictureUrl ? 'photo' : 'none', layout: 'card', showName: true, showScore: true, labels: 'full', bg: 'clear' });
+            const st = badgeExportState; st.countsState = 'loading';
+            st.countsPromise = badgeLiveCounts(uid).then(c => { st.counts = c; st.countsState = 'ok'; }).catch(() => { st.countsState = 'fail'; }).then(() => { if (badgeExportState === st) renderBadgeExport(); });
         }
 
         // A person's earned badge (User Hub popover).
@@ -38717,6 +38779,7 @@ They can connect again from LINE.
                     <button type="button" onclick="closeBadgeExport()" aria-label="Close" style="margin-left:auto; width:32px; height:32px; min-height:0; padding:0; border:none; background:transparent; font-size:20px; cursor:pointer; color:#94a3b8;">×</button></div>
                 <div style="display:grid; grid-template-columns:repeat(${layouts.length}, minmax(0, 1fr)); gap:10px;">${thumbs}</div>
                 <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:12px; font-size:0.85em;">${tierChips}${avatarChips}<span style="margin-left:auto; color:#94a3b8; font-size:0.85em;">${st.kind === 'board' ? '1024 px PNG' : '1024 px · transparent PNG'}</span></div>
+                ${st.kind === 'board' && (st.labels || 'full') === 'full' ? `<div style="font-size:0.72em; color:#94a3b8; margin-top:8px;">${st.countsState === 'loading' ? 'Reading the exact counts…' : st.countsState === 'fail' || !st.counts ? 'Exact counts unavailable — showing milestones (N+)' : 'Exact counts read now for ' + Object.keys(st.counts).filter(k => st.items.some(i => i.id === k && i.t)).length + ' badges; the others show their milestone (N+)'}</div>` : ''}
                 <div style="display:flex; gap:8px; margin-top:12px;">
                     <button type="button" onclick="badgeExportDownload()" style="flex:1; min-height:0; padding:9px; border:none; border-radius:10px; background:#7c3aed; color:#fff; font-weight:800; font-size:0.86em; cursor:pointer;">⬇ Download PNG</button>
                     <button type="button" onclick="badgeExportCopy()" style="width:auto; min-height:0; padding:9px 14px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; color:#334155; font-weight:800; font-size:0.86em; cursor:pointer;">Copy image</button>
