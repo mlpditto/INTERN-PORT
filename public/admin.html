@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.253)</title>
+    <title>Nika Admin (V102.254)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -14463,43 +14463,74 @@
             </div>
         </div>
 
-        <!-- V92.10: Manual Adjust Edit + Audit Trail modal (mirrors lpAdminEditModal pattern) -->
+        <!-- V92.10: Manual Adjust Edit + Audit Trail modal. V102.254: lean — icons + hover instead of captions, four inline rows, the row says what it is and what the user's score becomes. Every id the JS uses is kept. -->
         <div id="manualAdjustEditModal" class="modal" style="z-index: 2503;">
-            <div class="modal-content" style="max-width: 640px; border-top: 5px solid #6366f1; border-radius: 14px;">
-                <span class="close-modal" onclick="document.getElementById('manualAdjustEditModal').style.display='none'">&times;</span>
-                <h3 style="color:#4338ca; margin:0 0 4px 0;"><i class="fa-solid fa-pen-to-square"></i> Edit Manual Adjustment</h3>
-                <div id="ma-edit-meta" style="font-size:0.78em; color:#64748b; margin-bottom:14px;"></div>
-
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
-                    <label style="font-size:0.78em; font-weight:700; color:#475569;">Amount (pts)
-                        <input id="ma-edit-amount" type="number" step="0.01" style="margin:4px 0 0; padding:8px 10px; border-radius:10px; width:100%; box-sizing:border-box;">
-                    </label>
-                    <div style="font-size:0.78em; font-weight:700; color:#475569;">Original
-                        <div id="ma-edit-amount-orig" style="margin:4px 0 0; padding:8px 10px; border-radius:10px; background:#f1f5f9; color:#475569; font-weight:800;">—</div>
-                    </div>
+            <style>
+                #manualAdjustEditModal .ma-card { max-width:460px; width:94%; padding:12px 14px; border-top:4px solid #6366f1; border-radius:14px; font-size:13px; }
+                #manualAdjustEditModal .ma-h { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:6px; }
+                #manualAdjustEditModal .ma-h .sp { flex:1; }
+                #manualAdjustEditModal .ma-pill { font-size:11px; border-radius:999px; padding:2px 8px; background:#f1f5f9; color:#475569; white-space:nowrap; }
+                #manualAdjustEditModal .ma-pill.r { background:#fee2e2; color:#991b1b; }
+                #manualAdjustEditModal .ma-x { border:none; background:none; font-size:16px; cursor:pointer; color:#64748b; padding:2px 6px; width:auto; min-height:0; margin:0; }
+                #manualAdjustEditModal .ma-meta { font-size:11.5px; color:#94a3b8; margin:0 0 6px; }
+                #manualAdjustEditModal .ma-row { display:flex; align-items:center; gap:6px; margin:6px 0; }
+                #manualAdjustEditModal .ma-row .e { width:22px; text-align:center; font-size:15px; flex-shrink:0; cursor:help; }
+                #manualAdjustEditModal .ma-row input, #manualAdjustEditModal .ma-row textarea { flex:1; min-width:0; margin:0; padding:6px 9px; border:1px solid #e2e8f0; border-radius:9px; font:inherit; box-sizing:border-box; }
+                #manualAdjustEditModal .ma-row textarea { min-height:34px; height:34px; resize:vertical; line-height:1.4; }
+                #manualAdjustEditModal .ma-row input.n { flex:0 0 96px; font-weight:800; }
+                #manualAdjustEditModal .ma-qc { border:1px solid #e2e8f0; background:#fff; border-radius:999px; font-size:12px; padding:2px 8px; cursor:pointer; line-height:1.4; width:auto; min-height:0; margin:0; color:#475569; }
+                #manualAdjustEditModal .ma-dl { font-size:12px; border-radius:8px; padding:3px 8px; background:#f0fdf4; color:#166534; white-space:nowrap; }
+                #manualAdjustEditModal .ma-dl.neg { background:#fef2f2; color:#991b1b; }
+                #manualAdjustEditModal .ma-warn { background:#fffbeb; border:1px solid #fcd34d; border-radius:9px; padding:5px 9px; margin:6px 0; display:flex; align-items:center; gap:6px; font-size:12.5px; cursor:help; }
+                #manualAdjustEditModal .ma-warn[hidden] { display:none; }
+                #manualAdjustEditModal .ma-warn .sp { flex:1; }
+                #manualAdjustEditModal .ma-err { font-size:11.5px; color:#dc2626; margin:-2px 0 4px 28px; }
+                #manualAdjustEditModal .ma-ft { display:flex; align-items:center; gap:6px; margin-top:10px; }
+                #manualAdjustEditModal .ma-ft .sp { flex:1; }
+                #manualAdjustEditModal .ma-b { border:none; border-radius:999px; height:30px; padding:0 14px; font-weight:700; cursor:pointer; width:auto; min-height:0; margin:0; }
+                #manualAdjustEditModal .ma-b.g { background:#f1f5f9; color:#475569; }
+                #manualAdjustEditModal .ma-b.p { background:#4338ca; color:#fff; }
+                #manualAdjustEditModal .ma-b:disabled { opacity:.5; cursor:default; }
+                #manualAdjustEditModal details.ma-hist { margin-top:8px; font-size:12.5px; }
+                #manualAdjustEditModal details.ma-hist > summary { cursor:pointer; color:#5b21b6; font-weight:700; user-select:none; }
+            </style>
+            <div class="modal-content ma-card">
+                <div class="ma-h">
+                    <b title="Edit adjustment" style="color:#4338ca; font-size:15px;">✏️</b>
+                    <span class="ma-pill" id="ma-edit-score" title="This user's score right now">⭐ —</span>
+                    <span class="ma-pill" id="ma-edit-kind" title="What this row is">⚙️ manual</span>
+                    <span class="ma-pill" id="ma-edit-quiz" title="Quiz this row is about" hidden></span>
+                    <span class="sp"></span>
+                    <button type="button" class="ma-x" title="Close" aria-label="Close" onclick="document.getElementById('manualAdjustEditModal').style.display='none'">✕</button>
                 </div>
-
-                <label style="font-size:0.78em; font-weight:700; color:#475569; display:block;">Note
-                    <textarea id="ma-edit-note" style="margin:4px 0 10px; min-height:80px; padding:10px 12px; border-radius:10px; width:100%; box-sizing:border-box; font-size:0.9em; line-height:1.5;"></textarea>
-                </label>
-
-                <div style="background:#fffbeb; border:1px solid #fde68a; padding:10px 12px; border-radius:10px; margin-bottom:12px;">
-                    <label style="font-size:0.78em; font-weight:800; color:#92400e; display:block;">Reason for this edit (required)
-                        <input id="ma-edit-reason" type="text" placeholder="e.g. fix wrong number, add context, adjust to actual time" data-th-placeholder="แก้ตัวเลขผิด, เพิ่ม context, ปรับตามเวลาจริง" maxlength="240" style="margin:6px 0 0; padding:8px 10px; border-radius:8px; width:100%; box-sizing:border-box; background:#fff; border:1px solid #fcd34d;">
-                    </label>
-                    <div id="ma-edit-reason-error" style="display:none; font-size:0.75em; color:#dc2626; margin-top:4px; font-weight:700;">Reason is required to create an audit log entry.</div>
+                <div id="ma-edit-meta" class="ma-meta"></div>
+                <div id="ma-edit-warn" class="ma-warn" hidden title="The quiz itself is still approved, but this revert cancelled its points. Feedback must only ever remove its own add-on."><span>⚠️ took back <b>quiz</b> points</span><span class="sp"></span><button type="button" class="ma-qc" onclick="maEditUndoRevert()" title="Set the amount to 0 and fill the reason">↩️ undo</button></div>
+                <div class="ma-row">
+                    <span class="e" title="Amount (pts) — negative takes points off">💯</span>
+                    <input id="ma-edit-amount" class="n" type="number" step="0.01" oninput="maEditRefresh()">
+                    <button type="button" class="ma-qc" onclick="maEditSetAmount(0)" title="Set to 0 = cancel this row's effect">0</button>
+                    <button type="button" class="ma-qc" onclick="maEditReset()" title="Back to the original amount">↺ <span id="ma-edit-amount-orig">—</span></button>
+                    <span id="ma-edit-delta" class="ma-dl" title="The user's score after saving"></span>
                 </div>
-
-                <div id="ma-edit-status" style="font-size:0.78em; color:#64748b; margin-bottom:8px; min-height:1.2em;"></div>
-
-                <div style="display:flex; gap:10px; justify-content:flex-end;">
-                    <button onclick="document.getElementById('manualAdjustEditModal').style.display='none'" style="background:#e5e7eb; color:#374151; border:none; padding:10px 18px; border-radius:10px; font-weight:700; cursor:pointer;">Cancel</button>
-                    <button id="ma-edit-save-btn" onclick="manualAdjustSaveEdit()" style="background:#4338ca; color:#fff; border:none; padding:10px 22px; border-radius:10px; font-weight:800; cursor:pointer;">💾 Save with Audit</button>
+                <div class="ma-row"><span class="e" title="Note — shown in History">📝</span><textarea id="ma-edit-note" rows="1"></textarea></div>
+                <div class="ma-row">
+                    <span class="e" title="Reason — required, kept in the audit trail">🔎</span>
+                    <input id="ma-edit-reason" type="text" placeholder="reason (required)" aria-label="Reason for this edit (required)">
+                    <button type="button" class="ma-qc" onclick="maEditReason('Wrong number')" title="Wrong number">🔢</button>
+                    <button type="button" class="ma-qc" onclick="maEditReason('Add context')" title="Add context">💬</button>
+                    <button type="button" class="ma-qc" onclick="maEditReason('Adjust to actual')" title="Adjust to actual">⏱</button>
+                    <button type="button" class="ma-qc" onclick="maEditReason('Rule fix')" title="Rule fix">⚖️</button>
                 </div>
-
-                <details style="margin-top:18px; background:#f5f3ff; border:1px solid #e9d5ff; border-radius:12px; padding:10px 14px;">
-                    <summary style="cursor:pointer; font-weight:800; color:#5b21b6; font-size:0.9em; user-select:none;">📜 Edit History (<span id="ma-edit-history-count">0</span>)</summary>
-                    <div id="ma-edit-history-list" style="margin-top:10px; display:flex; flex-direction:column; gap:8px; max-height:340px; overflow-y:auto;"></div>
+                <div id="ma-edit-reason-error" class="ma-err" style="display:none;">Reason is required for the audit trail.</div>
+                <div id="ma-edit-status" style="font-size:12px; color:#64748b; min-height:1.1em;"></div>
+                <div class="ma-ft">
+                    <span class="sp"></span>
+                    <button type="button" class="ma-b g" onclick="document.getElementById('manualAdjustEditModal').style.display='none'">Cancel</button>
+                    <button type="button" class="ma-b p" id="ma-edit-save-btn" onclick="manualAdjustSaveEdit()" title="Save and write the audit entry">💾 Save</button>
+                </div>
+                <details class="ma-hist">
+                    <summary title="Edit history — who changed what, when">📜 <span id="ma-edit-history-count">0</span></summary>
+                    <div id="ma-edit-history-list" style="margin-top:8px; display:flex; flex-direction:column; gap:8px; max-height:300px; overflow-y:auto;"></div>
                 </details>
             </div>
         </div>
@@ -54859,12 +54890,23 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const createdAt = data.timestamp?.toDate ? data.timestamp.toDate() : null;
                 const createdBy = data.createdByEmail || data.editorEmail || '—';
                 const editCount = (data.editHistory || []).length;
-                document.getElementById('ma-edit-meta').innerHTML =
-                    `Log ID: <code>${logId}</code> · Created: <strong>${createdAt ? createdAt.toLocaleString() : '—'}</strong> · By: <strong>${createdBy}</strong> · Edits so far: <strong>${editCount}</strong>`;
+                // V102.254: lean header — who / when / edits as one grey line (full text on hover); the row's kind + quiz + the user's score as pills
+                const metaEl = document.getElementById('ma-edit-meta');
+                metaEl.textContent = `🕒 ${createdAt ? createdAt.toLocaleDateString() + ' ' + createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'} · 👤 ${String(createdBy).split('@')[0]} · ✏️ ${editCount}`;
+                metaEl.title = `Log ID ${logId} · created ${createdAt ? createdAt.toLocaleString() : '—'} · by ${createdBy} · edits so far ${editCount}`;
+                const noteText = String(data.note || '');
+                const isFbRevert = /^Revert: (?:Quiz Feedback deleted|\d+ empty Quiz Feedback bulk-cleaned)/.test(noteText) && Number(data.amount) < 0;
+                const quizM = /—\s*'(.+)'\s*$/.exec(noteText), kindEl = document.getElementById('ma-edit-kind'), quizEl = document.getElementById('ma-edit-quiz');
+                kindEl.textContent = isFbRevert ? '↩️ feedback revert' : '⚙️ manual'; kindEl.classList.toggle('r', isFbRevert);
+                quizEl.hidden = !quizM; quizEl.textContent = quizM ? '📝 ' + quizM[1] : '';
+                document.getElementById('ma-edit-warn').hidden = !isFbRevert;
+                window._maEditCache.userScore = Number(((usersData || []).find(u => u.id === uid) || {}).score || 0);
+                document.getElementById('ma-edit-score').textContent = '⭐ ' + window._maEditCache.userScore.toFixed(2);
 
                 const amt = Number(data.amount || 0);
                 document.getElementById('ma-edit-amount').value = amt.toFixed(2);
                 document.getElementById('ma-edit-amount-orig').textContent = `${amt >= 0 ? '+' : ''}${amt.toFixed(2)}`;
+                maEditRefresh();
                 document.getElementById('ma-edit-note').value = data.note || '';
                 document.getElementById('ma-edit-reason').value = '';
                 document.getElementById('ma-edit-reason-error').style.display = 'none';
@@ -54878,6 +54920,21 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 alert('Failed to open editor: ' + (err.message || 'unknown'));
             }
         };
+
+        // V102.254: live "what the user's score becomes", quick amount / reason chips, undo for a feedback revert
+        window.maEditRefresh = function() {
+            const c = window._maEditCache, el = document.getElementById('ma-edit-delta');
+            if (!c || !el) return;
+            const v = parseFloat(String(document.getElementById('ma-edit-amount').value).replace(',', '.'));
+            const d = isNaN(v) ? 0 : v - Number(c.data.amount || 0);
+            el.textContent = isNaN(v) ? '' : `→ ⭐ ${(c.userScore + d).toFixed(2)}`;
+            el.classList.toggle('neg', d < 0);
+            el.title = d === 0 ? "No change to the user's score" : `${d > 0 ? '+' : ''}${d.toFixed(2)} on the user's score`;
+        };
+        window.maEditSetAmount = function(v) { document.getElementById('ma-edit-amount').value = Number(v).toFixed(2); maEditRefresh(); };
+        window.maEditReset = function() { const c = window._maEditCache; if (c) maEditSetAmount(Number(c.data.amount || 0)); };
+        window.maEditReason = function(t) { const r = document.getElementById('ma-edit-reason'); r.value = t; r.focus(); };
+        window.maEditUndoRevert = function() { maEditSetAmount(0); maEditReason('Feedback rule fix — quiz points restored'); };
 
         window.manualAdjustRenderHistory = function(history) {
             const listEl = document.getElementById('ma-edit-history-list');
