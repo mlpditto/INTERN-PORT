@@ -5,7 +5,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm'), assert = r
 const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'admin.html'), 'utf8').replace(/\r\n/g, '\n');
 function grab(head) { const i = html.indexOf(head); if (i < 0) throw new Error('missing ' + head); let d = 0; for (let k = html.indexOf('{', i + head.length - 1); k < html.length; k++) { if (html[k] === '{') d++; else if (html[k] === '}' && --d === 0) return html.slice(i, k + 1); } }
 const line = h => { const i = html.indexOf(h); if (i < 0) throw new Error('missing ' + h); return html.slice(i, html.indexOf('\n', i)); };
-assert.ok(/id="qfpRepairModal"[^>]*style="z-index:2510;"/.test(html) && /qfpOpenRepair\(\)" title="↩️/.test(html), 'the modal and the ↩️ Repair button exist in the Quiz Feedback panel');
+assert.ok(/id="qfpRepairModal"[^>]*style="z-index:2510;"/.test(html) && /qfpOpenRepair\(\)" aria-label="Repair" title="↩️/.test(html), 'the modal and the ↩️ Repair button exist in the Quiz Feedback panel');
 
 const ts = ms => ({ toMillis: () => ms });
 const logs = [

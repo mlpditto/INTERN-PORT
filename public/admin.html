@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.257)</title>
+    <title>Nika Admin (V102.259)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -7444,7 +7444,7 @@
 <link rel="stylesheet" href="quiz-compare-cleanup.css?v=V100.02">
 <link rel="stylesheet" href="learning-review.css?v=V100.13">
 <link rel="stylesheet" href="delete-requests.css?v=V100.40">
-<link rel="stylesheet" href="quiz-feedback.css?v=V102.126">
+<link rel="stylesheet" href="quiz-feedback.css?v=V102.259">
 <script src="assigned-goals.js?v=V100.30"></script><link rel="stylesheet" href="assigned-goals.css?v=V100.30">
 <!-- V100.82: hub-progress-menu.js/.css retired — its only 2 items (Goals,
      Certificates) moved into the global ➕ Create menu; nothing else used this
@@ -14572,17 +14572,21 @@
         <div id="quizFeedbackPanelModal" class="modal lang-no-toggle" style="z-index:2501;">
             <div class="modal-content qfp-panel">
                 <button type="button" class="close-modal" aria-label="Close feedback" title="Close feedback" data-th-title="ปิดผลตอบรับ" onclick="document.getElementById('quizFeedbackPanelModal').style.display='none'">&times;</button>
-                <h3 title="Quiz feedback overview" data-th-title="ภาพรวมผลตอบรับแบบทดสอบ">Quiz Feedback</h3>
-                <div id="qfp-quiz-title" title="Quiz title" data-th-title="ชื่อชุดแบบทดสอบ"></div>
-                <div id="qfp-summary"></div>
+                <div class="qfp-head">
+                    <h3 title="Quiz feedback overview" data-th-title="ภาพรวมผลตอบรับแบบทดสอบ" aria-label="Quiz Feedback">📊</h3>
+                    <div id="qfp-quiz-title" title="Quiz title" data-th-title="ชื่อชุดแบบทดสอบ"></div>
+                    <div id="qfp-summary"></div>
+                </div>
                 <section class="qfp-insight">
-                    <div class="qfp-insight-heading"><strong title="Summarize the comments with AI" data-th-title="สรุปความคิดเห็นด้วย AI">AI Insight</strong><button id="qfp-ai-btn" onclick="generateAIFeedbackInsight()" title="Summarize the comments with the selected model" data-th-title="สรุปข้อความแสดงความคิดเห็นด้วยโมเดลที่เลือก">Generate</button></div>
-                    <div id="qfp-model-rail" class="audit-toolbar lang-no-toggle" role="group" aria-label="Choose one AI model"></div>
+                    <div class="qfp-ins-row">
+                        <span class="qfp-ins-ic" title="AI insight — summarize the comments with the model you pick" data-th-title="สรุปความคิดเห็นด้วย AI — เลือกโมเดลแล้วกด Generate" aria-hidden="true">✨</span>
+                        <div id="qfp-model-rail" class="audit-toolbar lang-no-toggle" role="group" aria-label="Choose one AI model"></div>
+                        <button id="qfp-ai-btn" onclick="generateAIFeedbackInsight()" title="Summarize the comments with the selected model" data-th-title="สรุปข้อความแสดงความคิดเห็นด้วยโมเดลที่เลือก">Generate</button>
+                    </div>
                     <input type="hidden" id="ai-model-selector" value="gpt-6-luna">
                     <div id="qfp-ai-result" title="AI summary" data-th-title="ผลสรุปจาก AI"></div>
                 </section>
                 <section class="qfp-feedback">
-                    <h4 title="Individual feedback" data-th-title="ผลตอบรับรายบุคคล">Individual Feedback</h4>
                     <div id="qfp-comments-controls"></div>
                     <div id="qfp-comments"></div>
                 </section>
@@ -68592,18 +68596,20 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
             // V95.58: single mm:ss value instead of "6 min" + "373s avg" (same value twice)
             const avgTimeR = Math.round(avgTime);
             const avgTimeMMSS = `${Math.floor(avgTimeR / 60)}:${String(avgTimeR % 60).padStart(2, '0')}`;
+            const qfpPill = (t, bg, fg, tip, thTip) => `<span title="${tip}" data-th-title="${thTip || tip}" style="display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;background:${bg};color:${fg};white-space:nowrap;cursor:help;">${t}</span>`;
             document.getElementById('qfp-summary').innerHTML = `
-                <span title="Average satisfaction rating" data-th-title="คะแนนความพึงพอใจเฉลี่ย">Avg. rating <strong>${avgRating !== null ? avgRating.toFixed(1) : '—'}/10</strong></span>
-                <span title="Number of respondents" data-th-title="จำนวนผู้ตอบ">Responses <strong>${_qfpFeedbacks.length}</strong></span>
-                <span title="Average time taken" data-th-title="เวลาที่ใช้เฉลี่ย">Avg. time <strong>${avgTimeMMSS} min</strong></span>
-                ${topics.length ? `<div class="qfp-topics" title="Topics interns want next" data-th-title="หัวข้อที่ผู้เรียนอยากทำต่อ">Next topics: ${topicEntries.slice(0,8).map((e,i)=>`<span>${qfpEscapeHtml(e.topic)} <button onclick="qfpClearTopicChip(${i})" title="Remove only the suggested topic" data-th-title="ลบเฉพาะหัวข้อที่เสนอ">×</button></span>`).join(' ')}</div>` : ''}
-                ${_qfpFeedbacks.some(qfpIsEmptyFeedback) ? `<button onclick="qfpCleanEmptyFeedback()" title="Delete entries with no rating, comment or topic (asks to confirm)" data-th-title="ลบรายการที่ไม่มีคะแนน ข้อความ และหัวข้อ โดยจะขอยืนยัน">Clean empty</button>` : ''}
-                <button type="button" onclick="qfpOpenRepair()" title="↩️ Old feedback deletes that took QUIZ points back — find them and re-credit">↩️ Repair</button>
+                ${qfpPill('⭐ ' + (avgRating !== null ? avgRating.toFixed(1) : '—'), '#fef3c7', '#92400e', 'Average satisfaction rating (out of 10)', 'คะแนนความพึงพอใจเฉลี่ย')}
+                ${qfpPill('👥 ' + _qfpFeedbacks.length, '#e0f2fe', '#075985', 'Responses', 'จำนวนผู้ตอบ')}
+                ${qfpPill('⏱ ' + avgTimeMMSS, '#f1f5f9', '#475569', 'Average time taken (min)', 'เวลาที่ใช้เฉลี่ย')}
+                ${topics.length ? `<div class="qfp-topics" title="Topics interns want next" data-th-title="หัวข้อที่ผู้เรียนอยากทำต่อ">🎯 ${topicEntries.slice(0,8).map((e,i)=>`<span>${qfpEscapeHtml(e.topic)} <button onclick="qfpClearTopicChip(${i})" title="Remove only the suggested topic" data-th-title="ลบเฉพาะหัวข้อที่เสนอ">×</button></span>`).join(' ')}</div>` : ''}
+                <span class="qfp-sp"></span>
+                ${_qfpFeedbacks.some(qfpIsEmptyFeedback) ? `<button onclick="qfpCleanEmptyFeedback()" aria-label="Clean empty" title="🧹 Delete entries with no rating, comment or topic (asks to confirm)" data-th-title="ลบรายการที่ไม่มีคะแนน ข้อความ และหัวข้อ โดยจะขอยืนยัน">🧹</button>` : ''}
+                <button type="button" onclick="qfpOpenRepair()" aria-label="Repair" title="↩️ Old feedback deletes that took QUIZ points back — find them and re-credit">↩️</button>
             `;
             const hasComments = _qfpFeedbacks.some(f => qfpNormalizeTopic(f.comment));
             document.getElementById('qfp-ai-btn').disabled = !hasComments;
             document.querySelector('#quizFeedbackPanelModal .qfp-insight').classList.toggle('qfp-insight--empty', !hasComments);
-            document.getElementById('qfp-ai-result').textContent = hasComments ? 'Choose a model to summarize comments.' : 'No comments to summarize';
+            document.getElementById('qfp-ai-result').textContent = hasComments ? '' : 'No comments to summarize';   // V102.259: no helper sentence — the ✨ tooltip says it
 
             // Update badge in quiz table
             const badge = document.getElementById(`fb-badge-${quizId}`);
@@ -68675,56 +68681,51 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
                         </details>
                     </div>`;
                 }
-                // Sakura surface; empty comments have an explicit text state.
-                const cardBg = '#fff0f5';
-                const cardBorder = '1px solid #edcad8';
+                // V102.259: three rows — who · facts · actions / the comment / next topic + AI. The green "Bonus +x" badge was the QUIZ score the feedback copied (pointsEarned), so it is now 📝.
+                const sig = qfpSignal(f);
+                const mkPill = (t, bg, fg, tip) => `<span title="${tip}" style="display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;background:${bg};color:${fg};white-space:nowrap;cursor:help;">${t}</span>`;
+                const mkBtn = (idAttr, emoji, tip, onclick, extra) => `<button ${idAttr} type="button" class="qfp-ib" title="${tip}" aria-label="${tip}" onclick="${onclick}" ${extra || ''}>${emoji}</button>`;
+                const addOnOn = qfpAddOnQualifies(f);
+                const credited = Number(f.addOnCredited) > 0;
+                const legacy = !credited && typeof f.adminExtraScore === 'number' && f.adminExtraScore > 0;
+                const pills = [
+                    typeof f.rating === 'number' ? mkPill('⭐ ' + f.rating + (rawComment ? '' : ' 👍'), '#fef3c7', '#92400e', 'Rating ' + f.rating + '/10') : '',
+                    typeof f.pointsEarned === 'number' && f.pointsEarned > 0 ? mkPill('📝 +' + f.pointsEarned.toFixed(1), '#dcfce7', '#166534', 'Quiz points this user earned on this quiz (copied when the feedback was sent). It is NOT a bonus.') : '',
+                    credited ? mkPill('🎁 +' + Number(f.addOnCredited).toFixed(2), '#ccfbf1', '#0f766e', 'Feedback add-on credited to this user') : '',
+                    legacy ? mkPill('⚠️ ' + f.adminExtraScore, '#fee2e2', '#991b1b', 'A bonus of ' + f.adminExtraScore + ' was recorded before the add-on rules and never credited. Press 🎁 and save a number within the cap to credit it.') : '',
+                    rawComment && !meetsMin ? mkPill('✂️ ' + commentLength, '#ffedd5', '#9a3412', 'Below 100 characters (' + commentLength + ')') : '',
+                    sig ? (sig.kind === 'ended'
+                        ? mkPill('⏰ ' + sig.days + 'd', '#fee2e2', '#991b1b', `Signal — training ended ${sig.end} · feedback given ${sig.given} (${sig.days} days ago) · no add-on credited. It can still be credited (max 1.0 and at most the quiz points), or ignored.`)
+                        : mkPill('🕒 ' + sig.days + 'd', '#f1f5f9', '#475569', `Feedback given ${sig.days} days ago · no add-on credited yet`)) : '',
+                ].filter(Boolean).join('');
+                const nt = qfpNormalizeTopic(f.nextTopic);
                 return `
-                    <div data-fb-user="${f.userId || ''}" style="background:${cardBg};border:${cardBorder};border-radius:12px;padding:14px 16px;">
-                        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
-                            <div>
-                                <span style="font-weight:800;font-size:0.9em;color:#1e293b;">${qfpEscapeHtml(f.displayName || 'Anonymous')}</span>
-                                <span style="margin-left:6px;font-size:0.8em;font-weight:700;color:#64748b;">${typeof f.rating === 'number' ? 'Rating ' + f.rating + '/10' : ''}</span>${fbTriageChip(f)}
-                                ${typeof f.pointsEarned === 'number' && f.pointsEarned > 0 ? `<span style="margin-left:8px;font-size:0.72em;font-weight:800;color:#065f46;background:#d1fae5;border:1px solid #6ee7b7;border-radius:999px;padding:2px 8px;" title="Reward points earned — deleting reverts them" data-th-title="คะแนนรางวัลที่ได้รับ การลบจะคืนคะแนนส่วนนี้">Bonus +${f.pointsEarned.toFixed(1)}</span>` : ''}
-                            </div>
-                            <div style="font-size:0.75em;color:#94a3b8;">${dateStr} · ⏱ ${mins}:${String(secs).padStart(2,'0')}</div>
+                    <div data-fb-user="${f.userId || ''}" style="background:#fff;border:1px solid #fbcfe8;border-left:4px solid ${sig && sig.kind === 'ended' ? '#ef4444' : '#ec4899'};border-radius:12px;padding:8px 12px;">
+                        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0;">
+                            <span style="font-weight:800;font-size:0.9em;color:#1e293b;">${qfpEscapeHtml(f.displayName || 'Anonymous')}</span>${fbTriageChip(f)}${pills}
+                            <span style="flex:1;"></span>
+                            <span style="font-size:0.72em;color:#94a3b8;white-space:nowrap;" title="${dateStr} · time used ${mins}:${String(secs).padStart(2,'0')}">🕒 ${dateStr} · ⏱ ${mins}:${String(secs).padStart(2,'0')}</span>
+                            ${f.userId && f.userId !== 'anon' ? mkBtn('', '📜', 'Score history and sources', `showUserScoreAudit('${f.userId}', ${qfpEscapeHtml(JSON.stringify(f.displayName || ''))})`) : ''}
+                            <button id="qfp-bonus-btn-${f.id}" type="button" class="qfp-ib"${addOnOn ? '' : ' disabled'} onclick="qfpToggleBonus('${f.id}')" title="${addOnOn ? 'Credit a feedback add-on to this user (max ' + qfpAddOnCap(f) + ' — never more than the quiz points, never 1.0+; once per quiz)' : 'No add-on: needs a rating or a comment (a 10/10 with no comment does not count)'}" aria-label="Feedback add-on">🎁${adminScoreValue !== '' ? ' ' + adminScoreValue : ''}</button>
+                            <button id="qfp-ai-btn-${f.id}" type="button" class="qfp-ib" onclick="runAIFeedbackScoring('${f.id}')" ${!rawComment ? 'disabled title="No comment to evaluate" data-th-title="ไม่มีข้อความให้ประเมิน"' : 'title="AI-score this comment"'} aria-label="AI score">🗡️</button>
+                            <button type="button" class="qfp-ib qfp-ib-del" onclick="deleteQuizFeedbackItem('${f.id}')" title="Delete this feedback (asks to confirm)" data-th-title="ลบผลตอบรับนี้ โดยจะขอยืนยัน" aria-label="Delete feedback">🗑</button>
                         </div>
-                        ${rawComment ? '' : '<p title="No comment provided" data-th-title="ผู้ตอบไม่ได้กรอกความคิดเห็น" style="color:#80566a;margin:4px 0;">No comment provided</p>'}
-                        ${rawComment ? `<div class="lang-no-toggle" style="font-size:0.85em;color:#475569;background:#f8fafc;padding:8px 12px;border-radius:8px;border-left:3px solid #cbd5e1; white-space:pre-wrap;">${safeComment}</div>` : ''}
-                        <details class="qfp-manage"><summary title="Details and actions" data-th-title="ดูข้อมูลและคำสั่งจัดการ">Details / Manage</summary>
-
-                                ${f.userId && f.userId !== 'anon' ? `<button onclick="showUserScoreAudit('${f.userId}', ${qfpEscapeHtml(JSON.stringify(f.displayName || ''))})" title="Score history and sources" data-th-title="ดูประวัติและที่มาของคะแนน" style="margin-left:6px;background:#ecfdf5;border:1px solid #6ee7b7;color:#065f46;border-radius:8px;padding:2px 8px;font-size:0.72em;font-weight:700;cursor:pointer;">📊 Audit</button>` : ''}
+                        ${rawComment ? `<div class="lang-no-toggle" style="margin-top:6px;font-size:0.85em;color:#475569;background:#f8fafc;padding:6px 10px;border-radius:8px;border-left:3px solid #cbd5e1;white-space:pre-wrap;">${safeComment}</div>` : '<p title="No comment provided" data-th-title="ผู้ตอบไม่ได้กรอกความคิดเห็น" style="color:#80566a;margin:6px 0 0;font-size:0.85em;">No comment provided</p>'}
                         ${quizResultHtml}
-                        ${(() => { const nt = qfpNormalizeTopic(f.nextTopic); return nt ? `<div style="margin-bottom:6px;"><span style="font-size:0.75em;font-weight:700;color:#7c3aed;">🎯 Next Topic:</span> <span class="lang-no-toggle" style="font-size:0.82em;color:#6d28d9;">${qfpEscapeHtml(nt)}</span></div>` : ''; })()}
-                        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:8px; flex-wrap:wrap;">
-                            <span style="font-size:0.76em; font-weight:700; color:${meetsMin ? '#166534' : '#b45309'}; background:${meetsMin ? '#dcfce7' : '#ffedd5'}; border:1px solid ${meetsMin ? '#86efac' : '#fdba74'}; border-radius:999px; padding:3px 10px;">
-                                Length: ${commentLength} chars · ${meetsMin ? 'Meets minimum' : 'Below 100'}
-                            </span>
-                            <div style="display:flex; gap:6px; align-items:center;">
-                                <button id="qfp-bonus-btn-${f.id}" class="btn-sm"${qfpAddOnQualifies(f) ? '' : ' disabled'} onclick="qfpToggleBonus('${f.id}')" title="${qfpAddOnQualifies(f) ? 'Credit a feedback add-on to this user (max 1.0, once per quiz)' : 'No add-on: needs a rating or a comment (a 10/10 with no comment does not count)'}" data-th-title="เปิดหรือปิดการให้โบนัสย้อนหลัง" style="background:#f0fdfa; color:#0f766e; border:1px solid #99f6e4; border-radius:8px; padding:5px 10px;">
-                                    🎁 Bonus${adminScoreValue !== '' ? ' ' + adminScoreValue : ''}
-                                </button>
-                                <button id="qfp-ai-btn-${f.id}" class="btn-sm" onclick="runAIFeedbackScoring('${f.id}')" ${!rawComment ? 'disabled title="No comment to evaluate" data-th-title="ไม่มีข้อความให้ประเมิน"' : ''} style="background:${rawComment ? '#1d4ed8' : '#94a3b8'}; color:white; border:none; border-radius:8px; padding:5px 10px; ${!rawComment ? 'cursor:not-allowed; opacity:0.6;' : ''}">
-                                    🗡️ Score
-                                </button>
-                                <button class="btn-sm" onclick="deleteQuizFeedbackItem('${f.id}')" title="Delete this feedback (asks to confirm)" data-th-title="ลบผลตอบรับนี้ โดยจะขอยืนยัน" style="margin-left:10px; background:transparent; color:#cbd5e1; border:1px solid #e2e8f0; border-radius:8px; padding:5px 9px; cursor:pointer; transition:0.2s;" onmouseover="this.style.color='#dc2626';this.style.borderColor='#fca5a5';this.style.background='#fef2f2';" onmouseout="this.style.color='#cbd5e1';this.style.borderColor='#e2e8f0';this.style.background='transparent';">
-                                    <i class="fa-solid fa-trash"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div id="qfp-ai-review-${f.id}" style="margin-top:8px; font-size:0.8em; color:#334155; background:#eef2ff; border:1px solid #c7d2fe; border-radius:8px; padding:8px 10px; line-height:1.5;${hasAiReview ? '' : ' display:none;'}">
+                        ${(nt || hasAiReview) ? `<div style="margin-top:5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:0.82em;">${nt ? `<span class="lang-no-toggle" style="color:#6d28d9;font-weight:700;" title="Next topic requested">🎯 ${qfpEscapeHtml(nt)}</span>` : ''}<span style="flex:1;"></span>${hasAiReview ? `<span onclick="var e=document.getElementById('qfp-ai-review-${f.id}');e.style.display=e.style.display==='none'?'block':'none'" title="🗡️ ${aiScoreText} — tap to show the issue and the suggestion" style="font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;background:#e0e7ff;color:#3730a3;cursor:pointer;">🗡️ ${f.aiFeedbackScore.toFixed(1)} · 💡</span>` : ''}</div>` : ''}
+                        <div id="qfp-ai-review-${f.id}" style="margin-top:6px; font-size:0.8em; color:#334155; background:#eef2ff; border:1px solid #c7d2fe; border-radius:8px; padding:8px 10px; line-height:1.5; display:none;">
                             ${hasAiReview ? `<div><b>🗡️</b> ${aiScoreText}</div>
                             ${aiIssue ? `<div><b>Issue:</b> ${aiIssue}</div>` : ''}
                             ${aiSuggestion ? `<div><b>Suggestion:</b> ${aiSuggestion}</div>` : ''}` : ''}
                         </div>
-                        <div id="qfp-admin-bonus-${f.id}" style="margin-top:10px; padding:10px; border:1px dashed #cbd5e1; border-radius:8px; background:#f8fafc; display:none;">
-                            <div style="font-size:0.78em; font-weight:800; color:#334155; margin-bottom:8px;" title="Credited to the user's score now, as its own 'Feedback add-on' row. Max 1.0 per quiz; saving a new number credits only the difference.">🎁 Feedback add-on · max 1.0 · credited on save</div>
+                        <div id="qfp-admin-bonus-${f.id}" style="margin-top:8px; padding:8px 10px; border:1px dashed #cbd5e1; border-radius:8px; background:#f8fafc; display:none;">
+                            <div style="font-size:0.78em; font-weight:800; color:#334155; margin-bottom:6px;" title="Credited to the user's score now, as its own 'Feedback add-on' row. Never more than 1.0 and never more than the quiz points this user earned (${(Number(f.pointsEarned) || 0).toFixed(2)}); saving a new number credits only the difference.">🎁 Feedback add-on · max ${qfpAddOnCap(f)}</div>
                             <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                                <input id="qfp-admin-score-${f.id}" type="number" min="0" max="1" step="0.05" value="${adminScoreValue}" placeholder="0-1" style="width:90px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;">
+                                <input id="qfp-admin-score-${f.id}" type="number" min="0" max="${qfpAddOnCap(f)}" step="0.05" value="${adminScoreValue}" placeholder="0-${qfpAddOnCap(f)}" style="width:90px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;">
                                 <input id="qfp-admin-note-${f.id}" type="text" value="${adminNoteValue}" placeholder="Reason / note" style="flex:1; min-width:180px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;">
                                 <button class="btn-sm" onclick="saveAdminFeedbackScore('${f.id}')" style="background:#0f766e; color:white; border:none; border-radius:8px; padding:6px 12px;" title="Credit the add-on to the user">🎁 Credit</button>
                             </div>
                         </div>
-                        </details>
                     </div>`;
         }
 
@@ -68740,6 +68741,7 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
             if (qfpIsEmptyPraise(f)) return false;
             switch (_qfpFilter) {
                 case 'unscored': return rc.length > 0 && typeof f.aiFeedbackScore !== 'number';
+                case 'signal':   { const g = qfpSignal(f); return !!g && g.kind === 'ended'; }   // V102.259
                 case 'short':    return rc.length > 0 && rc.length < 100;
                 case 'low':      return typeof f.rating === 'number' && f.rating <= 5;
                 case 'fix':      return fbNeedsFix(f);
@@ -68783,27 +68785,25 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
                 low: _qfpFeedbacks.filter(f => typeof f.rating === 'number' && f.rating <= 5).length,
                 fix: _qfpFeedbacks.filter(fbNeedsFix).length,
             };
+            counts.signal = _qfpFeedbacks.filter(f => { const g = qfpSignal(f); return g && g.kind === 'ended'; }).length;   // V102.259
+            const chipTips = { all: 'All', fix: 'Reported bugs still open', unscored: 'Not AI-scored yet', short: 'Shorter than 100 characters', low: 'Low rating (5 or less)', praise: '10/10 with no comment (kept out of All; never gets an add-on)', signal: 'Signal — the training is over and no add-on was credited' };
             const chip = (key, label, count) => {
                 const active = _qfpFilter === key;
-                return `<button onclick="qfpSetFilter('${key}')" style="padding:3px 10px;border-radius:20px;font-size:0.72em;font-weight:800;cursor:pointer;transition:0.2s;border:1.5px solid ${active ? '#f59e0b' : '#e2e8f0'};background:${active ? '#f59e0b' : 'transparent'};color:${active ? 'white' : '#64748b'};">${label} ${count}</button>`;
-            };
-            const sortChip = (key, label) => {
-                const active = _qfpSort === key;
-                return `<button onclick="qfpSetSort('${key}')" style="padding:3px 10px;border-radius:20px;font-size:0.72em;font-weight:800;cursor:pointer;transition:0.2s;border:1.5px solid ${active ? '#1d4ed8' : '#e2e8f0'};background:${active ? '#eff6ff' : 'transparent'};color:${active ? '#1d4ed8' : '#64748b'};">${label}</button>`;
+                return `<button onclick="qfpSetFilter('${key}')" title="${chipTips[key] || label}" aria-label="${chipTips[key] || label}" style="padding:3px 10px;border-radius:20px;font-size:0.72em;font-weight:800;cursor:pointer;transition:0.2s;border:1.5px solid ${active ? '#f59e0b' : '#e2e8f0'};background:${active ? '#f59e0b' : 'transparent'};color:${active ? 'white' : '#64748b'};">${label} ${count}</button>`;
             };
             rail.innerHTML = `
                 <div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;">
+                    <b style="color:#9d174d;" title="Individual feedback" aria-hidden="true">💬</b>
                     ${chip('all', 'All', counts.all)}
-                    ${counts.fix > 0 || _qfpFilter === 'fix' ? chip('fix', '🐞❌ Fix', counts.fix) : ''}
-                    ${chip('unscored', 'Unscored', counts.unscored)}
-                    ${chip('short', 'Short <100', counts.short)}
-                    ${chip('low', 'Low rating', counts.low)}
-                    ${nPraise > 0 || _qfpFilter === 'praise' ? chip('praise', '👍 10/10 · no comment', nPraise) : ''}
-                    <span style="width:1px;height:18px;background:#e2e8f0;margin:0 3px;"></span>
-                    <span style="font-size:0.7em;color:#94a3b8;font-weight:700;">Sort:</span>
-                    ${sortChip('recent', 'Recent')}
-                    ${sortChip('rating', 'Rating ↑')}
-                    ${counts.unscored > 0 ? `<button id="qfp-bulk-score-btn" onclick="qfpScoreAllUnscored()" title="Evaluate the unrated comments with the selected model, one by one" data-th-title="ตรวจข้อความที่ยังไม่ได้ประเมินด้วยโมเดลที่เลือก ทีละรายการ" style="margin-left:auto;padding:3px 12px;border-radius:20px;font-size:0.72em;font-weight:800;cursor:pointer;transition:0.2s;border:1.5px solid #1d4ed8;background:#1d4ed8;color:white;">Score unreviewed (${counts.unscored})</button>` : ''}
+                    ${counts.fix > 0 || _qfpFilter === 'fix' ? chip('fix', '🐞❌', counts.fix) : ''}
+                    ${chip('unscored', '🆕', counts.unscored)}
+                    ${chip('short', '✂️', counts.short)}
+                    ${chip('low', '👎', counts.low)}
+                    ${nPraise > 0 || _qfpFilter === 'praise' ? chip('praise', '👍', nPraise) : ''}
+                    ${counts.signal > 0 || _qfpFilter === 'signal' ? chip('signal', '⏰', counts.signal) : ''}
+                    <span style="flex:1;"></span>
+                    <button type="button" onclick="qfpSetSort('${_qfpSort === 'recent' ? 'rating' : 'recent'}')" title="Sort: ${_qfpSort === 'recent' ? 'Recent — tap for Rating ↑' : 'Rating ↑ — tap for Recent'}" aria-label="Sort" style="padding:3px 10px;border-radius:20px;font-size:0.72em;font-weight:800;cursor:pointer;border:1.5px solid #1d4ed8;background:#eff6ff;color:#1d4ed8;">${_qfpSort === 'recent' ? '🕒' : '⭐'} ↕</button>
+                    ${counts.unscored > 0 ? `<button id="qfp-bulk-score-btn" onclick="qfpScoreAllUnscored()" title="🗡️ Score the ${counts.unscored} unrated comments with the selected model, one by one" data-th-title="ตรวจข้อความที่ยังไม่ได้ประเมินด้วยโมเดลที่เลือก ทีละรายการ" style="margin-left:auto;padding:3px 12px;border-radius:20px;font-size:0.72em;font-weight:800;cursor:pointer;transition:0.2s;border:1.5px solid #1d4ed8;background:#1d4ed8;color:white;" aria-label="Score unreviewed">🗡️ ${counts.unscored}</button>` : ''}
                 </div>`;
         }
 
@@ -68932,6 +68932,25 @@ Reply ONLY with raw JSON, no markdown:
         // difference, a second feedback doc of the same user + quiz cannot add another. `addOnCredited` on the feedback doc is what was credited so far — what deleting it takes back
         // (feedbackAddOnPoints). Quiz points are never touched.
         const QFP_ADDON_MAX = 1;
+        // V102.259: ⏰ Signal — a feedback that could still earn an add-on but nobody credited it. `ended` = the user's training is over (users.endDate before today), the pill shows the age of the feedback
+        // in days; `late` (still in training, older than 30 days) is a grey 🕒. It only points: nothing is credited or removed by it.
+        function qfpSignal(f) {
+            const u = (usersData || []).find(x => x.id === f.userId);
+            if (!u || Number(f.addOnCredited) > 0 || !qfpAddOnQualifies(f)) return null;
+            const ts = f.timestamp && (typeof f.timestamp.toDate === 'function' ? f.timestamp.toDate() : new Date(f.timestamp));
+            const days = ts && !isNaN(+ts) ? Math.max(0, Math.floor((Date.now() - +ts) / 86400000)) : null;
+            const t = new Date(), pad = n => String(n).padStart(2, '0'), today = `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
+            const end = String(u.endDate || '').slice(0, 10);
+            if (end && end < today) return { kind: 'ended', days, end, given: ts ? ts.toISOString().slice(0, 10) : '' };
+            if (days !== null && days > 30) return { kind: 'late', days };
+            return null;
+        }
+        // V102.258: a feedback add-on can never exceed the points the user earned for THAT quiz (and never 1.0). The card shows the cap from the quiz score the feedback recorded
+        // (`pointsEarned`); the save re-checks it against the user's real quiz rows in checkin_logs.
+        function qfpAddOnCap(f) {
+            const q = Math.max(0, Number(f && f.pointsEarned) || 0);
+            return Math.round(Math.min(QFP_ADDON_MAX, q) * 100) / 100;
+        }
         function qfpAddOnQualifies(f) {
             if (!f) return false;
             return (typeof f.rating === 'number' || !!qfpNormalizeTopic(f.comment)) && !qfpIsEmptyPraise(f);
@@ -68952,6 +68971,16 @@ Reply ONLY with raw JSON, no markdown:
             }
             const user = (usersData || []).find(u => u.id === item.userId);
             if (!user) { alert('User not found — nothing to credit.'); return; }
+            // the add-on may not exceed what the user earned for this quiz: the sum of their quiz rows (the feedback's own score snapshot when there is none), and never 1.0
+            let quizPts = 0;
+            try {
+                const qs = await db.collection('checkin_logs').where('userId', '==', item.userId).where('type', '==', 'quiz').where('quizId', '==', item.quizId).get();
+                quizPts = qs.docs.reduce((a, d) => a + (Number(d.data().amount) || 0), 0);
+            } catch (e) { console.warn('[add-on] quiz rows lookup failed', e); }
+            if (!(quizPts > 0)) quizPts = Number(item.pointsEarned) || 0;
+            const cap = Math.round(Math.min(QFP_ADDON_MAX, Math.max(0, quizPts)) * 100) / 100;
+            if (cap <= 0) { alert('No add-on: this user has no quiz points for this quiz to match.'); return; }
+            if (score > cap) { alert(`The add-on cannot be more than the quiz points this user earned (${quizPts.toFixed(2)}) — max ${cap.toFixed(2)}.`); return; }
             const before = typeof item.addOnCredited === 'number' ? item.addOnCredited : 0;
             const other = (_qfpFeedbacks || []).find(x => x.id !== feedbackId && x.userId === item.userId && x.quizId === item.quizId && Number(x.addOnCredited) > 0);
             if (other) { alert('This user already got a feedback add-on for this quiz (one per quiz).'); return; }

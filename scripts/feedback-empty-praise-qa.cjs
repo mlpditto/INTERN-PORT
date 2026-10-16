@@ -10,11 +10,11 @@ function grab(head) {
 const els = { 'qfp-comments': { innerHTML: '' }, 'qfp-comments-controls': { innerHTML: '' } };
 const ctx = {
     console, document: { getElementById: id => els[id] || null },
-    qfpNormalizeTopic: s => String(s || '').replace(/[​-‍﻿]/g, '').trim(), fbNeedsFix: () => false,
+    qfpNormalizeTopic: s => String(s || '').replace(/[​-‍﻿]/g, '').trim(), fbNeedsFix: () => false, usersData: [],
     qfpCardHtml: f => '<card id="' + f.id + '">', qfpSetFilter() {}, qfpSetSort() {}, qfpScoreAllUnscored() {},
 };
 vm.createContext(ctx);
-vm.runInContext('let _qfpFilter = "all", _qfpSort = "recent", _qfpFeedbacks = [];\n' + ['function qfpIsEmptyPraise(', 'function qfpMatchesFilter(', 'function qfpRenderComments()', 'function qfpRenderFilterRail()'].map(grab).join('\n') + '\nvar _set = (list, f, s) => { _qfpFeedbacks = list; _qfpFilter = f || "all"; _qfpSort = s || "recent"; };', ctx);
+vm.runInContext('let _qfpFilter = "all", _qfpSort = "recent", _qfpFeedbacks = [];\n' + ['function qfpIsEmptyPraise(', 'function qfpAddOnQualifies(', 'function qfpSignal(', 'function qfpMatchesFilter(', 'function qfpRenderComments()', 'function qfpRenderFilterRail()'].map(grab).join('\n') + '\nvar _set = (list, f, s) => { _qfpFeedbacks = list; _qfpFilter = f || "all"; _qfpSort = s || "recent"; };', ctx);
 
 const fb = (id, rating, comment, extra) => Object.assign({ id, rating, comment: comment || '', nextTopic: '' }, extra || {});
 const list = [fb('praise1', 10), fb('praise2', 10, '   ​  '), fb('good', 10, 'ชอบมาก ขอเคสเพิ่ม'), fb('topic', 10, '', { nextTopic: 'GERD' }), fb('nine', 9), fb('low', 3), fb('norating', undefined, ''), fb('zero', 0, 'bad')];
@@ -30,7 +30,7 @@ const render = (f, s) => { vm.runInContext(`_set(${JSON.stringify(list)}, ${JSON
     assert.deepStrictEqual(ids(), ['good', 'topic', 'nine', 'low', 'norating', 'zero'], 'All = what needs a look: the two empty 10/10 are gone, the order is kept');
     let rail = els['qfp-comments-controls'].innerHTML;
     assert.ok(/All[^<]*<[^>]*>[^<]*6|>6</.test(rail) || /All.{0,80}6/.test(rail.replace(/\s+/g, ' ')), 'All counts 6, not 8: ' + rail.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 120));
-    assert.ok(/👍 10\/10 · no comment/.test(rail) && />2</.test(rail.replace(/\s+/g, '')) || /👍 10\/10 · no comment.{0,60}2/.test(rail.replace(/\s+/g, ' ')), 'the 👍 chip counts 2');
+    assert.ok(/qfpSetFilter\('praise'\)[^>]*>\s*👍 2\s*</.test(rail), 'the 👍 chip counts 2 (V102.259: icon + count): ' + rail.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 160));
 
     render('praise');
     assert.deepStrictEqual(ids(), ['praise1', 'praise2'], 'the 👍 chip shows exactly the hidden ones — nothing was deleted');
@@ -41,7 +41,7 @@ const render = (f, s) => { vm.runInContext(`_set(${JSON.stringify(list)}, ${JSON
     // a panel whose only entries are empty praise: still a rail (≤ 3 items) and a clear way to see them
     vm.runInContext(`_set(${JSON.stringify([fb('a', 10), fb('b', 10)])}, "all", "recent"); qfpRenderComments(); qfpRenderFilterRail();`, ctx);
     assert.ok(/Nothing to review — 2 × 10\/10 without a comment hidden/.test(els['qfp-comments'].innerHTML) && /qfpSetFilter\('praise'\)/.test(els['qfp-comments'].innerHTML), 'all hidden → a message + a show button');
-    assert.ok(els['qfp-comments-controls'].innerHTML.includes('👍 10/10 · no comment'), 'the rail stays even with ≤ 3 entries when something is hidden');
+    assert.ok(/qfpSetFilter\('praise'\)[^>]*title="10\/10 with no comment[^>]*>👍 /.test(els['qfp-comments-controls'].innerHTML), 'the rail stays even with ≤ 3 entries when something is hidden (the 👍 chip, V102.259: icon + count, the sentence is its tooltip)');
     // nothing hidden, ≤ 3 entries: no rail, no chip (unchanged behaviour)
     vm.runInContext(`_set(${JSON.stringify([fb('a', 8, 'ok')])}, "all", "recent"); qfpRenderComments(); qfpRenderFilterRail();`, ctx);
     assert.strictEqual(els['qfp-comments-controls'].innerHTML, '');
