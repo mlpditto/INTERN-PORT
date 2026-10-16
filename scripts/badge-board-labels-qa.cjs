@@ -17,10 +17,11 @@ assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(fs.readFileSync('publi
       const full = {}; BADGE_STATS_DEFS.forEach(d => { full[d.id] = d.steps === 1 ? (d.oneOff || 3) : Math.min(d.steps, 4); });
       const base = { kind: 'board', person: 'Bua', sub: 'Hospital Pharmacy › PRETEST', score: 11.85, avatar: 'none' };
       const out = { layouts: {} };
-      for (const [name, tiers] of [['sample', { on_fire: 1, quiz_master: 3, perfectionist: 2, speedrunner: 1, social_butterfly: 4, graduate: 3 }], ['full', full]]) {
+      for (const [name, tiers] of [['sample', { on_fire: 1, quiz_master: 3, perfectionist: 2, speedrunner: 1, social_butterfly: 4, graduate: 3 }], ['full', full], ['full-wide', full]]) {
         for (const l of ['card', 'banner', 'story']) {
           const st = Object.assign({ items: mkItems(tiers), layout: l }, base);
-          const svg = badgeBoardSvg(st, l, 800);
+          let svg = badgeBoardSvg(st, l, 800);
+          if (name === 'full-wide') svg = svg.replace(/font-family="[^"]*"/g, 'font-family="monospace"');   // a wide fallback font (CI has no Nunito): labels must still not touch
           const holder = document.createElement('div'); holder.innerHTML = svg; document.body.appendChild(holder);
           const el = holder.querySelector('svg'), all = [...el.querySelectorAll('text')], texts = all;
           const labelTexts = all.filter(t => parseFloat(t.getAttribute('font-size')) <= 8.2);   // the header (name, score) is the old layout, not ours
@@ -49,7 +50,7 @@ assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(fs.readFileSync('publi
       const milestones = t.filter(x => /^\d+\+ /.test(x)).length; assert.equal(milestones, 5, l + ': 5 milestone lines for the 5 multi-step badges (Graduate has none)');
       assert.ok(!t.includes('Night Owl') && !t.includes('Early Bird') && !t.includes('Legend'), l + ': locked / unearned badges are not named');
       assert.ok(!t.some(x => /\d+\/\d+/.test(x)), l + ': no n/16 count');
-      for (const k of ['sample:', 'full:']) { const v = L[k + l]; assert.equal(v.overlaps, 0, k + l + ': no overlapping text ' + JSON.stringify(r.ov)); assert.ok(v.inside, k + l + ': every label is inside the picture'); }
+      for (const k of ['sample:', 'full:', 'full-wide:']) { const v = L[k + l]; assert.equal(v.overlaps, 0, k + l + ': no overlapping text ' + JSON.stringify(r.ov)); assert.ok(v.inside, k + l + ': every label is inside the picture'); }
     }
     assert.ok(L['full:story'].texts.includes('Codex Contributor') && L['full:story'].texts.includes('500+ journals'), 'longest names + the 4th Team Player step are drawn');
     assert.deepEqual(r.png, { type: 'image/png', size: true }, 'PNG encodes');

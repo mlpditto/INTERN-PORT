@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.263)</title>
+    <title>Nika Admin (V102.264)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -38619,7 +38619,9 @@ They can connect again from LINE.
             const label = (it, d, cx, y) => {
                 if (!it.t) return '';
                 const info = BADGE_STEP_INFO[d.id], thr = info && d.steps > 1 ? info.thr[Math.min(it.t, info.thr.length) - 1] : 0;
-                return txt(cx, y + lc[2] + 3, lc[2], 800, lc[0], d.title) + (thr ? txt(cx, y + lc[2] + lc[3] + 5.5, lc[3], 700, lc[1], thr + '+ ' + info.unit) : '');
+                // A line wider than its cell (≈ 0.6 em per bold char — the font may be Nunito or a wider fallback) is squeezed to the cell, so neighbours never touch.
+                const fit = (t, size) => t.replace('<text ', t.length && (t.match(/>([^<]*)</) || [, ''])[1].length * size * 0.6 > g.cell - 3 ? `<text textLength="${g.cell - 3}" lengthAdjust="spacingAndGlyphs" ` : '<text ');
+                return fit(txt(cx, y + lc[2] + 3, lc[2], 800, lc[0], d.title), lc[2]) + (thr ? fit(txt(cx, y + lc[2] + lc[3] + 5.5, lc[3], 700, lc[1], thr + '+ ' + info.unit), lc[3]) : '');
             };
             const tiles = (x0) => g.items.map((it, i) => {
                 const d = BADGE_STATS_DEFS.find(x => x.id === it.id), x = x0 + (i % g.cols) * g.cell + (g.cell - g.bw) / 2, y = g.y0 + Math.floor(i / g.cols) * g.row;
