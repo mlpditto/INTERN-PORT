@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.254)</title>
+    <title>Nika Admin (V102.255)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -2485,6 +2485,17 @@
         .cmp-tool:hover { border-color:#cbd5e1; background:#f1f5f9; }
         .cmp-steer { flex:1 1 120px; min-width:90px; padding:6px 4px; border:none; border-bottom:1px solid #cbd5e1; border-radius:0; background:transparent; font-size:0.76em; font-family:inherit; color:#334155; outline:none; }
         .cmp-steer:focus { border-bottom-color:#6366f1; }
+        /* V102.255: the Compare header is TWO lines — 🛠️ · B + vendors + that vendor's models · ⚖️ 🧬 🔄 · ↩ ➕ Apply · ✕ over ✍️ 🔢 🎯 ✦model · Steer… · tools · ◀ n/N ▶.
+           The model chips drop their logo (the vendor rail shows it) and never wrap. */
+        #ai-compare-overlay .cmp-l1 { flex-wrap:nowrap; }
+        #ai-compare-overlay .cmp-l2 { flex-wrap:nowrap; }
+        #ai-compare-overlay .cmp-b { flex:0 1 auto; flex-wrap:nowrap; }
+        #ai-compare-overlay .cmp-b .text-ai-chips { flex:0 1 auto; display:flex; flex-wrap:nowrap; gap:4px; }
+        #ai-compare-overlay .cmp-b .text-ai-chips > button { flex:0 0 auto; white-space:nowrap; padding:4px 9px; font-size:0.72em; min-height:0; }
+        #ai-compare-overlay .cmp-b .text-ai-chips > button .text-ai-logo { display:none; }
+        #ai-compare-overlay .cmp-b .cmp-vendor { width:28px; height:28px; min-width:0; }
+        #ai-compare-overlay .cmp-l2 .cmp-chips { flex:0 1 auto; flex-wrap:nowrap; }
+        #ai-compare-overlay .cmp-l1 .cmp-commit { margin-left:auto; }
         .cmp-ib.is-busy { width:auto; min-width:34px; padding:0 9px !important; border-radius:17px !important; gap:4px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; white-space:nowrap; }
         .cmp-split { display:inline-flex; align-items:stretch; padding:0 !important; overflow:hidden; border-radius:10px; border:none; background:#22c55e; color:#fff; font-weight:700; font-size:0.82em; box-shadow:0 3px 10px rgba(34,197,94,0.3); white-space:nowrap; cursor:pointer; }
         .btn.btn-primary.cmp-split { background:#22c55e; }   /* beats the page-wide .btn-primary blue */
@@ -2673,6 +2684,7 @@
             #quizzesTableActive th:nth-child(2), #quizzesTableActive td.qa-met, #quizzesTableInactive td.qa-met { width:170px; }
             #quizzesTableActive th:nth-child(3), #quizzesTableActive td:nth-child(3), #quizzesTableInactive td:nth-child(3) { width:330px; }
         }
+        #quizzesTableActive tr.qlist-live th { text-align:left; background:#eff6ff; color:#0d47a1; font-size:0.85em; font-weight:800; padding:7px 10px; border-top:1px solid #dbeafe; }
         .qlist-div { display:flex; align-items:center; gap:8px; margin:14px 0 4px; padding:10px 4px 6px; border-top:1px solid #e2e8f0; color:#64748b; font-weight:800; font-size:0.85em; }
         /* V102.235: the divider folds the whole Paused / Templates table (and its pager); a search / filter keeps it open */
         .qlist-div { cursor:pointer; user-select:none; border-radius:8px; min-height:36px; }
@@ -7959,7 +7971,6 @@
                 <!-- V102.152: the Coverage-by-System chip that is filtering the lists below (display:none when none) -->
                 <div id="quiz-system-filter-bar" style="display:none; align-items:center; gap:10px; margin:0 0 12px; padding:8px 14px; border-radius:10px; background:#eef2ff; border:1px solid #c7d2fe; font-size:0.88em;"></div>
                 <!-- Active Quizzes -->
-                <h4 id="section-active-quizzes" style="color:#0d47a1; margin-bottom:10px;">🟢 Live</h4>
                 <!-- V102.231: ONE card for the whole list — Live rows, a thin divider, then Paused / Templates (second header row hidden; columns share widths so they line up) -->
                 <div id="quiz-list-card" style="overflow-x:auto; margin-bottom:15px; background:white; padding:15px; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
                     <div id="active-quizzes-empty" style="display:none; align-items:baseline; flex-wrap:wrap; gap:6px 12px; padding:6px 4px; color:#475569; font-size:0.88em;"></div>
@@ -7970,6 +7981,8 @@
                                 <th class="hide-mobile">Items · pts</th>
                                 <th>Action</th>
                             </tr>
+                            <!-- V102.255: the Live band sits UNDER the column header (the header serves every group), like the Paused · Templates band further down; same id, JS sets "🟢 Live · n" -->
+                            <tr class="qlist-live"><th id="section-active-quizzes" colspan="3">🟢 Live</th></tr>
                         </thead>
                         <tbody></tbody>
                     </table>
@@ -18745,11 +18758,12 @@
                     }
                 }
 
+                // V102.255: no divider / 25px above / 20px padding any more — together with the summary block they were ~110px of nothing above "Improvements"
                 let improvementsHtml = "";
                 if (result.items && result.items.length > 0) {
                     improvementsHtml = `
-                        <div style="margin-top:25px; border-top:2px solid #f8f9fa; padding-top:20px;">
-                            <h4 style="color:var(--primary); margin-bottom:15px; font-size:0.85em;"><i class="fa-solid fa-list-check"></i> Improvements (${result.items.length})</h4>
+                        <div style="margin-top:0;">
+                            <h4 style="color:var(--primary); margin:0 0 8px; font-size:0.85em;"><i class="fa-solid fa-list-check"></i> Improvements (${result.items.length})</h4>
                             <div style="display:flex; flex-direction:column; gap:12px;">
                                 ${result.items.map((item, arrIdx) => {
                                     let qIdx = (item.qNumber !== undefined) ? item.qNumber - 1 : (item.index !== undefined ? item.index : 0);
@@ -18819,7 +18833,7 @@
                     ${window.auditToolbarHtml(true, 'specialist', true, { count: (result.items || []).length, pills: pillsHtml, magic: true })}
                     ${titleSection}
 
-                    <details style="margin-bottom:16px; background:#fafafa; border:1px solid #f0f0f0; border-radius:14px; padding:10px 16px;">
+                    <details style="margin-bottom:10px; background:#fafafa; border:1px solid #f0f0f0; border-radius:14px; padding:10px 16px;">
                         <summary style="cursor:pointer; display:flex; align-items:center; gap:8px; font-size:0.85em; color:#475569; font-weight:700;">
                             <span>📊</span>
                             <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:400; color:#64748b;">${analysisClean}</span>
@@ -66859,24 +66873,21 @@ RULES:
                 overlay.innerHTML = `
                     <div style="width:100%; max-width:950px; background:#f8fafc; border-radius:32px; overflow:hidden; box-shadow:0 25px 70px rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.1); display:flex; flex-direction:column; max-height:90vh;">
                         <div style="padding:14px 22px 12px; background:white; border-bottom:1.5px solid #edf2f7; display:flex; flex-direction:column; gap:8px;">
-                            <div class="cmp-line">
-                                <h3 title="Quality Improvement Comparison" aria-label="Quality Improvement Comparison" style="margin:0; font-size:1.05em; color:#1e293b; white-space:nowrap;">🛠️ Compare</h3>
+                            <div class="cmp-line cmp-l1">
+                                <h3 title="Quality Improvement Comparison" aria-label="Quality Improvement Comparison" style="margin:0; font-size:1.05em; color:#1e293b; white-space:nowrap;">🛠️</h3>
+                                ${window._compareModelBPickerHtml()}
+                                ${(improvedB || mergedQV) ? '' : `<button onclick="generateAiProposalB(${index}, ${arrIdx}, this)" title="Compare B — run the same brief through Model B and show its proposal as a 3rd column. Uses tokens." aria-label="Compare B" class="btn cmp-ib">⚖️</button>`}
+                                ${improvedB ? '' : `<button onclick="mergeAiVersions(${index}, ${arrIdx}, this)" title="${mergedQV ? 'Re-merge' : 'Merge'} — let AI merge ORIGINAL + IMPROVED into one version, shown as a 3rd column. Uses tokens." aria-label="${mergedQV ? 'Re-merge' : 'Merge'}" class="btn cmp-ib">🧬</button>`}
+                                ${(improvedB || mergedQV) ? '' : `<button class="btn cmp-ib" style="color:#4338ca;" title="Regenerate" aria-label="Regenerate" onclick="regenerateSingleAiSuggestion(${index}, ${arrIdx}, true, this)">🔄</button>`}
                                 <span class="cmp-commit">
                                     <button class="btn cmp-ib quiet" onclick="document.getElementById('ai-compare-overlay').remove()" title="Keep Original — close without changes" aria-label="Keep Original">↩</button>
                                     ${(improvedB || mergedQV) ? '' : `${addButtonHtml}${applyButtonHtml}`}
                                 </span>
-                                ${navHtml}
                                 <button onclick="document.getElementById('ai-compare-overlay').remove()" style="width:40px; height:40px; border-radius:50%; border:none; background:#f1f5f9; color:#64748b; cursor:pointer; font-size:1.3em; display:flex; align-items:center; justify-content:center; transition:0.2s; flex-shrink:0;" onmouseover="this.style.background='#e2e8f0'; this.style.color='#0f172a'">✕</button>
                             </div>
-                            <div class="cmp-line">
-                                ${window._compareModelBPickerHtml()}
-                                ${improvedB ? '' : `<input id="ai-compare-instruction" type="text" value="${escapeHtml(item.compareInstruction || '')}" placeholder="${mergedQV ? 'Re-merge instruction' : 'Steer…'}" title="Optional, one line — it applies to whichever AI action you press next.&#10;🔄 Regenerate / ⚖️ Compare B: how to rewrite, e.g. &quot;keep the stem, only fix the distractors&quot;. It overrides the built-in brief, which otherwise always pushes for harder + a case vignette. Both read the same line, so A and B stay comparable.&#10;🧬 Merge: how to blend. Left empty, the default rule applies — keep the original wording, adopt the improved version's depth." class="cmp-steer">`}
-                                ${(improvedB || mergedQV) ? '' : `<button onclick="generateAiProposalB(${index}, ${arrIdx}, this)" title="Compare B — run the same brief through Model B and show its proposal as a 3rd column. Uses tokens." aria-label="Compare B" class="btn cmp-ib">⚖️</button>`}
-                                ${improvedB ? '' : `<button onclick="mergeAiVersions(${index}, ${arrIdx}, this)" title="${mergedQV ? 'Re-merge' : 'Merge'} — let AI merge ORIGINAL + IMPROVED into one version, shown as a 3rd column. Uses tokens." aria-label="${mergedQV ? 'Re-merge' : 'Merge'}" class="btn cmp-ib">🧬</button>`}
-                                ${(improvedB || mergedQV) ? '' : `<button class="btn cmp-ib" style="color:#4338ca;" title="Regenerate" aria-label="Regenerate" onclick="regenerateSingleAiSuggestion(${index}, ${arrIdx}, true, this)">🔄</button>`}
-                            </div>
-                            <div class="cmp-line">
+                            <div class="cmp-line cmp-l2">
                                 <div class="cmp-chips">${statusHtml}${modelChipHtml}${dupChipsHtml}</div>
+                                ${improvedB ? '' : `<input id="ai-compare-instruction" type="text" value="${escapeHtml(item.compareInstruction || '')}" placeholder="${mergedQV ? 'Re-merge instruction' : 'Steer…'}" title="Optional, one line — it applies to whichever AI action you press next.&#10;🔄 Regenerate / ⚖️ Compare B: how to rewrite, e.g. &quot;keep the stem, only fix the distractors&quot;. It overrides the built-in brief, which otherwise always pushes for harder + a case vignette. Both read the same line, so A and B stay comparable.&#10;🧬 Merge: how to blend. Left empty, the default rule applies — keep the original wording, adopt the improved version's depth." class="cmp-steer">`}
                                 <div class="cmp-tools">
                                     <button onclick="showFullQuizPreview()" title="Preview all current questions in one page" aria-label="Preview" class="cmp-tool">👁️</button>
                                     <button onclick="copyAllCompareOriginals()" title="Copy every ORIGINAL question in this analysis (Q+options, no answer key)" aria-label="Copy originals" class="cmp-tool">📄</button>
@@ -66884,6 +66895,7 @@ RULES:
                                     <button class="btn cmp-tool" onclick="checkQuizSetDupAI(${index}, ${arrIdx}, this)" title="Ask AI whether this question tests the same concept as another one in the set — the ⚠ chips only catch wording overlap. Uses tokens." aria-label="Dup Check" style="color:#7c3aed;">🔎</button>
                                     <button class="btn cmp-tool" onclick="openMergeBuilder(${index}, ${arrIdx})" title="Manually pick options from every version and set the answer — no AI, no tokens used." aria-label="Build">🧩</button>
                                 </div>
+                                ${navHtml}
                             </div>
                             <div class="lang-no-toggle" id="ai-dup-result" style="display:none; max-width:620px;"></div>
                         </div>

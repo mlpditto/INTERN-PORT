@@ -1,5 +1,5 @@
-// V102.237 — Quality Improvement Comparison: the whole control area is 3 lines at the TOP (no footer), less text + inline + minimal.
-//   1 · 🛠️ Compare · ↩ ➕ [Apply │ ▶] · ◀ n/N ▶ · ✕     2 · Model B · Steer · ⚖️ 🧬 🔄     3 · icon chips (✍️ 🔢 🎯 · ✦ model · ⚠ Qn) · tools 👁️ 📄 📝 🔎 🧩
+// V102.237 → V102.255 — Quality Improvement Comparison: the whole control area is TWO lines at the TOP (no footer), less text + inline + minimal.
+//   1 · 🛠️ · B + vendors + models · ⚖️ 🧬 🔄 · ↩ ➕ [Apply │ ▶] · ✕     2 · icon chips (✍️ 🔢 🎯 · ✦ model · ⚠ Qn) · Steer… · tools 👁️ 📄 📝 🔎 🧩 · ◀ n/N ▶
 // The REAL previewAiFix in the real admin.html with a fixture question.
 const assert = require('node:assert/strict');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -27,22 +27,23 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
             const apply = box.querySelector('.cmp-split');
             return {
                 kids: box.children.length, lineCount: lines.length, headerH: Math.round(h.getBoundingClientRect().height),
-                l1: labels(lines[0]), l2Text: lines[1].querySelector('.cmp-b') ? 'B-picker' : '', l2: labels(lines[1]).filter(x => !/Gemini|GPT|Claude|Qwen|DeepSeek|Grok|Ollama|Luna|Terra|Sol|Astra|Haiku|Sonnet|Opus|Fable|Lite|Flash|Pro|Max|Mini/i.test(x)), steer: !!lines[1].querySelector('input.cmp-steer'),
-                l3Chips: [...lines[2].querySelectorAll('.cmp-chips > *')].map(c => ({ t: txt(c), title: c.getAttribute('title') || '' })), l3Tools: labels(lines[2].querySelector('.cmp-tools')),
-                title: txt(lines[0].querySelector('h3')), titleTip: lines[0].querySelector('h3').title,
+                l1: labels(lines[0]).filter(x => !/Gemini|GPT|Claude|Qwen|DeepSeek|Grok|Ollama|Luna|Terra|Sol|Astra|Haiku|Sonnet|Opus|Fable|Lite|Flash|Pro|Max|Mini/i.test(x)), l1Picker: !!lines[0].querySelector('.cmp-b'), steerOnL2: !!lines[1].querySelector('input.cmp-steer'), steerOnL1: !!lines[0].querySelector('input.cmp-steer'), l2HasNav: !!lines[1].querySelector('.cmp-nav, [aria-label="Previous"], [aria-label="Next"]') || /\d+\s*\/\s*\d+/.test(txt(lines[1])),
+                l3Chips: [...lines[1].querySelectorAll('.cmp-chips > *')].map(c => ({ t: txt(c), title: c.getAttribute('title') || '' })), l3Tools: labels(lines[1].querySelector('.cmp-tools')),
+                title: txt(lines[0].querySelector('h3')), titleTip: lines[0].querySelector('h3').title, tall: Math.round(h.getBoundingClientRect().height),
                 header: txt(h), applyHtml: apply ? apply.innerHTML : null, applyBg: apply ? getComputedStyle(apply).backgroundColor : null, applyDisabled: !!box.querySelector('button[disabled][aria-label="Apply Fix"]'),
                 addTxt: (box.querySelector('button[aria-label="Add New"]') || {}).textContent, over: Math.max(...[...h.querySelectorAll('button,input')].map(e => e.getBoundingClientRect().right)) <= h.getBoundingClientRect().right + 1,
             };
         }, [arrIdx, same]);
 
-        // 1 · layout: exactly 3 lines, no footer, everything inside the header
+        // 1 · layout: exactly 2 lines, no footer, everything inside the header
         let r = await open(1, false);
-        assert.equal(r.kids, 2, 'only header + body — no footer'); assert.equal(r.lineCount, 3, 'exactly three lines'); assert.ok(r.headerH <= 175, 'compact header: ' + r.headerH); assert.ok(r.over, 'nothing sticks out of the header on the right');
+        assert.equal(r.kids, 2, 'only header + body — no footer'); assert.equal(r.lineCount, 2, 'exactly two lines'); assert.ok(r.headerH <= 130, 'compact header: ' + r.headerH); assert.ok(r.over, 'nothing sticks out of the header on the right');
         assert.ok(r.l1.includes('Keep Original') && r.l1.includes('Add New') && r.l1.some(x => /Apply/.test(x)) && r.l1.includes('Close') === false, 'line 1 holds the commit buttons: ' + r.l1);
         assert.ok(r.l1.indexOf('Keep Original') < r.l1.indexOf('Add New'), 'order ↩ ➕ Apply');
-        assert.equal(r.title, '🛠️ Compare', 'short title'); assert.equal(r.titleTip, 'Quality Improvement Comparison', 'full name in the tooltip');
-        assert.equal(r.l2Text, 'B-picker', 'line 2 starts with Model B'); assert.ok(r.steer, 'Steer… field on line 2'); for (const n of ['Compare B', 'Merge', 'Regenerate']) assert.ok(r.l2.includes(n), 'line 2 has ' + n + ': ' + r.l2);
-        assert.deepEqual(r.l3Tools, ['Preview', 'Copy originals', 'Copy improved', 'Dup Check', 'Build'], 'line 3 tools are icon-only with names in aria-label');
+        assert.equal(r.title, '🛠️', 'icon-only title'); assert.equal(r.titleTip, 'Quality Improvement Comparison', 'full name in the tooltip');
+        assert.ok(r.l1Picker, 'line 1 holds Model B (vendors + models)'); assert.ok(r.steerOnL2 && !r.steerOnL1, 'Steer… field on line 2'); for (const n of ['Compare B', 'Merge', 'Regenerate']) assert.ok(r.l1.includes(n), 'line 1 has ' + n + ': ' + r.l1);
+        assert.ok(r.l1.indexOf('Compare B') < r.l1.indexOf('Merge') && r.l1.indexOf('Merge') < r.l1.indexOf('Regenerate') && r.l1.indexOf('Regenerate') < r.l1.indexOf('Keep Original'), 'line 1 order: ⚖️ 🧬 🔄 then ↩ ➕ Apply'); assert.ok(r.l2HasNav, '◀ n/N ▶ moved to line 2');
+        assert.deepEqual(r.l3Tools, ['Preview', 'Copy originals', 'Copy improved', 'Dup Check', 'Build'], 'line 2 tools are icon-only with names in aria-label');
 
         // 2 · less text: icon chips, short model name, "⚠ Qn" (the % lives in the tooltip), commit = ➕ + Apply │ ▶, no check marks
         const chipText = r.l3Chips.map(c => c.t);
@@ -74,6 +75,6 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         });
         assert.ok(busy.fits && !busy.overlaps && busy.w <= 90, 'the busy button fits its box and does not cover its neighbour: ' + JSON.stringify(busy));
         assert.ok(!/Comparing…\s*['"+]/.test(require('fs').readFileSync('public/admin.html', 'utf8').slice(require('fs').readFileSync('public/admin.html', 'utf8').indexOf('window.generateAiProposalB = async'), require('fs').readFileSync('public/admin.html', 'utf8').indexOf('window.generateAiProposalB = async') + 900).replace(/title = 'Comparing…'/, '')), 'the words "Comparing…" are no longer written into the button face');
-        console.log('PASS: Compare modal top bar — 3 lines and no footer (commit · Model B / Steer / AI · chips / tools), less text (icon chips, short names, ⚠ Qn, ➕ + Apply │ ▶, no check marks), disabled / last-item states, ↩ works, busy button stays inside its box');
+        console.log('PASS: Compare modal top bar — 2 lines and no footer (🛠️ · Model B · ⚖️ 🧬 🔄 · commit / chips · Steer · tools · nav), less text (icon chips, short names, ⚠ Qn, ➕ + Apply │ ▶, no check marks), disabled / last-item states, ↩ works, busy button stays inside its box');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
