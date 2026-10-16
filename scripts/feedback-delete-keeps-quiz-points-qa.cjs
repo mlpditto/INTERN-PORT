@@ -33,6 +33,15 @@ const noPointOps = () => ops.every(o => o[0] === 'delete' && o[1] === 'quiz_feed
     assert.ok(!/−0\.9|-0\.9|to revert: /.test(confirms[0]) && /quiz score is NOT affected/.test(confirms[0]), 'the confirm says no points move');
     assert.ok(!/reverted/.test(toasts.join('|')), 'the toast does not claim a revert: ' + toasts.join('|'));
 
+    // 1b. V102.253: when the admin's 🎁 add-on WAS credited (addOnCredited), deleting takes back exactly that — as a 'feedback' row, never a quiz revert
+    reset(); run('_qfpFeedbacks = ' + JSON.stringify([fb('F1b', 'U1', { addOnCredited: 0.5 })]));
+    await run('deleteQuizFeedbackItem("F1b")');
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(ops)), [
+        ['delete', 'quiz_feedback', 'F1b'],
+        ['update', 'users', 'U1', { score: { inc: -0.5 } }],
+        ['set', 'checkin_logs', { userId: 'U1', type: 'feedback', amount: -0.5, note: "Feedback add-on removed (feedback deleted) — 'PRETEST-1.1'", timestamp: 'ts' }],
+    ], 'credited add-on: −0.5 (not the 0.9 quiz snapshot), logged as type feedback');
+
     // 2. the empty-comment delete (LAUGH TALE grid)
     reset(); ctx.window._quizFeedbackCache = [fb('F2', 'U1')];
     await run('deleteEmptyCommentFeedback("F2")');
@@ -52,5 +61,5 @@ const noPointOps = () => ops.every(o => o[0] === 'delete' && o[1] === 'quiz_feed
         assert.ok(!/\.pointsEarned/.test(src), name + ' no longer reads pointsEarned');
         assert.ok(/feedbackAddOnPoints\(/.test(src), name + ' asks feedbackAddOnPoints for the amount');
     }
-    console.log('PASS: deleting a quiz feedback (panel / empty-comment / bulk clean) never touches users.score or writes a manual_adjust — quiz points stay');
+    console.log('PASS: deleting a quiz feedback (panel / empty-comment / bulk clean) never touches quiz points (it takes back only a credited 🎁 add-on, as a feedback row)');
 })().catch(e => { console.error(e); process.exit(1); });
