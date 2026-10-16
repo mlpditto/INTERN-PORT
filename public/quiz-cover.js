@@ -5,12 +5,19 @@ const QuizCover = (() => {
     // icon-only cells so five models stay readable; `imageApi` models go through OpenRouter's Image API
     // (POST /api/v1/images, aspect_ratio 3:4) — Seedream 5.0 Lite and Muse Image output images only.
     const AI_MODELS = [
-        { id: 'as/gemini-3.1-flash-image', logo: 'gemini', label: 'Nano Banana 2', ariaLabel: 'Nano Banana 2 (recommended)', titleTh: 'Nano Banana 2 · Google AI Studio · แนะนำ' },
+        { id: 'as/gemini-3.1-flash-image', logo: 'gemini', ref: true, label: 'Nano Banana 2', ariaLabel: 'Nano Banana 2 (recommended)', titleTh: 'Nano Banana 2 · Google AI Studio · แนะนำ' },
         { id: 'or/openai/gpt-5.4-image-2', logo: 'openai', label: 'Image 2', ariaLabel: 'GPT Image 2 via OpenRouter', titleTh: 'GPT-5.4 Image 2 · ผ่าน OpenRouter' },
         { id: 'or/bytedance-seed/seedream-5-0-lite', label: 'Seedream 5.0 Lite', imageApi: true, ariaLabel: 'ByteDance Seedream 5.0 Lite via OpenRouter', titleTh: 'ByteDance Seed: Seedream 5.0 Lite · ผ่าน OpenRouter' },
         { id: 'or/meta/muse-image', label: 'Muse Image', imageApi: true, ariaLabel: 'Meta Muse Image via OpenRouter', titleTh: 'Meta: Muse Image · ผ่าน OpenRouter (ช้ากว่า — คิดก่อนวาด)' }
     ];
     const MODEL_PREF_KEY = 'quiz_cover_ai_model';
+    // V102.262: style reference — the admin ticks up to 2 covers of other quizzes; they are stitched into ONE sheet and sent as the
+    // model's base image (visionData), so a new cover follows the collection's look. Only models flagged `ref` take an image
+    // (Nano Banana 2 via AI Studio); the others get no sheet and no reference sentence.
+    const REF_MAX = 2;
+    const REF_LINE = 'An image is attached: a reference sheet of existing covers from this collection. Match their illustration style, colour palette, lighting, hero scale and title-band treatment closely, but draw a NEW hero subject for the topic below; do not copy their subjects or text.';
+    let refs = [];
+    const refOk = id => !!(AI_MODELS.find(m => m.id === id) || {}).ref;
     // V101.90: cover styles change only the material/lighting; the frame (3:4, hero in the upper 75%,
     // ivory title band, navy title) stays fixed so mixed styles still read as one collection.
     // Clay's `material` is the pre-V101.90 wording, so its prompt is unchanged. Saved per quiz as coverStyle.
@@ -148,8 +155,10 @@ const QuizCover = (() => {
 <div class="quiz-cover-model-rail" data-model-rail role="group" aria-label="AI model">${AI_MODELS.map((model, i) => `<button type="button" data-model-chip data-value="${model.id}" class="${i === 0 ? 'active' : ''}" aria-pressed="${i === 0}" title="${model.titleTh}" aria-label="${model.ariaLabel}">${model.logo ? `<span class="text-ai-logo" data-owner="${model.logo}" aria-hidden="true"></span>` : ''}${model.label}</button>`).join('')}</div>
 <button type="button" data-prompt-toggle class="quiz-cover-plus" title="แนวภาพเพิ่มเติม (ไม่บังคับ)" aria-label="Add optional visual detail" aria-expanded="false">＋</button>
 <button type="button" data-badge-toggle class="quiz-cover-plus" title="ป้ายมุมปก เช่น ICD-11 6B00 (ไม่บังคับ) · ใช้กับปกที่สร้างด้วย AI" aria-label="Add corner badge" aria-expanded="false">🏷️</button>
+<button type="button" data-ref-toggle class="quiz-cover-plus" title="Style reference: pick covers of other quizzes (optional)" aria-label="Style reference from other quiz covers" aria-expanded="false">🧬</button>
 <button type="button" data-generate class="quiz-cover-generate" title="สร้างปกด้วย AI" aria-label="Generate cover with AI">✨ Generate</button>
 <div class="quiz-cover-style-row"><span class="quiz-cover-style-label" aria-hidden="true">🎨</span><div class="quiz-cover-style-rail" role="group" aria-label="Cover style">${STYLES.map((s, i) => `<button type="button" data-style-chip data-value="${s.id}" class="${i === 0 ? 'active' : ''}" aria-pressed="${i === 0}" aria-label="${s.label}" title="${s.label} · ${s.titleTh}"><span aria-hidden="true">${s.emoji}</span><span class="quiz-cover-style-name"> ${s.label}</span></button>`).join('')}</div><span class="quiz-cover-lock" title="กรอบคงที่ทุกสไตล์: แนวตั้ง 3:4 · ภาพหลักด้านบน · แถบชื่อด้านล่าง" aria-label="Fixed frame for every style: portrait 3:4, title band" role="img">🔒</span></div>
+<div class="quiz-cover-refs" data-refs hidden></div>
 <input type="text" data-prompt maxlength="300" placeholder="Optional detail — e.g. blue tones, a heart as the hero" title="แนวภาพเพิ่มเติม (ไม่บังคับ)" hidden>
 <input type="text" data-badge maxlength="${BADGE_MAX}" placeholder="Corner badge — e.g. ICD-11 6B00 · empty = none" title="ป้ายมุมปก · เว้นว่าง = ไม่มีป้าย · ระวังอย่าใส่สิ่งที่เป็นคำตอบของข้อสอบ" aria-label="Corner badge text" hidden>
 <div class="quiz-cover-ai-preview" hidden><img alt="AI cover candidate"><div><button type="button" data-apply title="ใช้ปกนี้" aria-label="Apply this cover">✓</button><button type="button" data-discard title="ยกเลิกภาพนี้" aria-label="Discard this candidate">✕</button></div></div>
@@ -167,6 +176,7 @@ const QuizCover = (() => {
             chip.onclick = () => {
                 pickModel(chip.dataset.value);
                 try { localStorage.setItem(MODEL_PREF_KEY, chip.dataset.value); } catch (_) {}
+                renderRefs(el);
             };
         });
         el.querySelectorAll('[data-style-chip]').forEach(chip => { chip.onclick = () => setStyle(chip.dataset.value); });
@@ -194,6 +204,15 @@ const QuizCover = (() => {
         };
         let badgeTimer = 0;
         badgeInput.oninput = () => { clearTimeout(badgeTimer); badgeTimer = setTimeout(badgeChanged, 250); };
+        const refBox = el.querySelector('[data-refs]'), refToggle = el.querySelector('[data-ref-toggle]');
+        refToggle.onclick = () => { refBox.hidden = !refBox.hidden; refToggle.setAttribute('aria-expanded', String(!refBox.hidden)); renderRefs(el); };
+        refBox.onclick = e => {
+            const tile = e.target.closest('[data-ref-tile]');
+            if (!tile || busy || !refOk(currentModel(el))) return;
+            const url = tile.dataset.url;
+            refs = refs.includes(url) ? refs.filter(u => u !== url) : [...refs, url].slice(-REF_MAX);
+            renderRefs(el);
+        };
         el.querySelector('[data-upload]').onclick = () => input.click();
         el.querySelector('[data-remove]').onclick = () => set('');
         el.querySelector('[data-generate]').onclick = generate;
@@ -215,7 +234,43 @@ const QuizCover = (() => {
                 console.error('Quiz cover upload:', error);
             } finally { if (token === revision || !busy) { busy = false; controls(false); busyCard(null); } }
         };
+        renderRefs(el);
         return el;
+    }
+    const currentModel = el => (el || editor()).querySelector('[data-model-chip].active')?.dataset.value || AI_MODELS[0].id;
+    const attr = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    function renderRefs(el) {
+        const box = el.querySelector('[data-refs]'), toggle = el.querySelector('[data-ref-toggle]');
+        if (!box || !toggle) return;
+        const ok = refOk(currentModel(el));
+        toggle.classList.toggle('has-value', refs.length > 0);
+        toggle.classList.toggle('ref-off', !ok);
+        toggle.title = ok ? 'Style reference: pick up to ' + REF_MAX + ' covers of other quizzes (optional)' : 'Only Nano Banana 2 takes a reference cover';
+        if (box.hidden) return;
+        const covers = (typeof quizzesData !== 'undefined' && Array.isArray(quizzesData) ? quizzesData : []).filter(q => safeUrl(q.coverUrl)).slice(0, 40);
+        box.classList.toggle('ref-off', !ok);
+        box.innerHTML = covers.length
+            ? '<span aria-hidden="true">🧬</span>' + covers.map(q => `<button type="button" data-ref-tile data-url="${attr(safeUrl(q.coverUrl))}" aria-pressed="${refs.includes(safeUrl(q.coverUrl))}" title="${attr(q.title || q.id)}"><img src="${attr(safeUrl(q.coverUrl))}" alt="${attr(q.title || q.id)}" loading="lazy"></button>`).join('') + `<small>${ok ? refs.length + ' / ' + REF_MAX : '🚫 Nano Banana 2 only'}</small>`
+            : '<small>No other covers yet</small>';
+    }
+    // The ticked covers side by side on one 3:4-per-cover sheet (white ground), as a base64 JPEG for visionData.
+    async function refSheet() {
+        const bitmaps = [];
+        try {
+            for (const url of refs) {
+                const r = await fetch(url, { mode: 'cors' });
+                if (!r.ok) throw new Error('bad status');
+                bitmaps.push(await createImageBitmap(await r.blob()));
+            }
+        } catch (_) { bitmaps.forEach(b => b.close()); throw new Error('Could not read a reference cover — untick it or retry'); }
+        const H = 640, W = Math.round(H * COVER_RATIO), canvas = document.createElement('canvas');
+        canvas.width = W * bitmaps.length; canvas.height = H;
+        const ctx = canvas.getContext('2d'); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, H);
+        bitmaps.forEach((b, i) => { const k = Math.min(W / b.width, H / b.height), w = b.width * k, h = b.height * k; ctx.drawImage(b, i * W + (W - w) / 2, (H - h) / 2, w, h); b.close(); });
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.88));
+        if (!blob) throw new Error('Could not build the reference sheet');
+        const data = await new Promise((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(String(fr.result)); fr.onerror = reject; fr.readAsDataURL(blob); });
+        return { image_base64: data.split('base64,')[1], image_mimetype: 'image/jpeg' };
     }
     function clearCandidate() {
         if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -319,10 +374,13 @@ const QuizCover = (() => {
         const order = start < 0 ? [model] : [...AI_MODELS.slice(start), ...AI_MODELS.slice(0, start)].map(m => m.id);
         const tried = [];
         try {
+            let sheet = null;
+            if (refs.length && refOk(model)) { busyCard('Reading reference covers…'); sheet = await refSheet(); busyCard('Generating cover…'); }
             for (const id of order) {
                 if (tried.length) busyCard(tried[0] + ' blocked this topic — trying ' + modelName(id) + '…');
                 let cropped;
-                try { cropped = await coverFrom(id, prompt); } catch (error) {
+                const useRef = !!sheet && refOk(id);
+                try { cropped = await coverFrom(id, useRef ? REF_LINE + '\n' + prompt : prompt, useRef ? sheet : null); } catch (error) {
                     if (token !== revision) return;
                     if (!tried.length && !isModerationBlock(error)) throw error;
                     tried.push(modelName(id));
@@ -344,10 +402,10 @@ const QuizCover = (() => {
     const isModerationBlock = error => /moderation|content (?:filter|policy)|safety (?:filter|system)/i.test(String(error && error.message || ''));
     // Rail text is not unique (Nano Banana 2 on two routes), so the OpenRouter one says so.
     const modelName = id => { const m = AI_MODELS.find(x => x.id === id); return m ? m.label + (id.startsWith('or/') && AI_MODELS.some(x => x !== m && x.label === m.label) ? ' (OpenRouter)' : '') : id; };
-    async function coverFrom(model, prompt) {
+    async function coverFrom(model, prompt, vision = null) {
         // V101.53: Image-API models get the collection's 3:4 as a real parameter, not just prompt text.
         const imageApi = !!(AI_MODELS.find(m => m.id === model) || {}).imageApi;
-        const response = await window.callUniversalAI(model, prompt, false, null, '', { feature: 'quiz_cover', ...(imageApi ? { imageApi: true, aspectRatio: '3:4' } : {}) });
+        const response = await window.callUniversalAI(model, prompt, false, vision, '', { feature: 'quiz_cover', ...(imageApi ? { imageApi: true, aspectRatio: '3:4' } : {}) });
         const image = pickAiImageFromResponse(response);
         if (!image) throw new Error('AI did not return an image — please retry');
         const result = await fetch(image);
