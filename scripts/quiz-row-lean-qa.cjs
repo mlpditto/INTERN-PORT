@@ -65,7 +65,7 @@ function grabTable(id) {
 
     // headers: 3 columns, Items and Score/Q merged
     for (const id of ['quizzesTableActive', 'quizzesTableInactive']) {
-      assert.deepEqual(await page.locator('#' + id + ' thead th').allInnerTexts(), ['Title', 'Items · pts', 'Action']);
+      assert.deepEqual(await page.locator('#' + id + ' thead tr:first-child th').allInnerTexts(), ['Title', 'Items · pts', 'Action']);
     }
     assert.equal(await row(0).locator('td').count(), 3, 'row has 3 cells');
 

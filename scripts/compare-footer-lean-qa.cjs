@@ -13,7 +13,7 @@ assert.ok(!/>Keep Original<|>🔄 Regenerate<|⚖️ Compare B<|🧬 \$\{/.test(
 assert.ok(/id="ai-compare-instruction"[^>]*placeholder="\$\{mergedQV \? 'Re-merge instruction' : 'Steer…'\}"/.test(foot), 'Steer… input');
 assert.ok(!/border-top:1\.5px solid #edf2f7; display:flex; flex-direction:column; gap:8px/.test(foot), 'no footer bar left');
 const at = k => foot.indexOf(k);
-assert.ok(at('Keep Original') < at('_compareModelBPickerHtml') && at('_compareModelBPickerHtml') < at('ai-compare-instruction') && at('ai-compare-instruction') < at('generateAiProposalB') && at('generateAiProposalB') < at('mergeAiVersions') && at('mergeAiVersions') < at('aria-label="Regenerate"') && at('aria-label="Regenerate"') < at('${statusHtml}') && at('${statusHtml}') < at('showFullQuizPreview'), 'order: line 1 commit · line 2 Model B · steer · ⚖️ · 🧬 · 🔄 · line 3 chips · tools');
+assert.ok(at('_compareModelBPickerHtml') < at('generateAiProposalB') && at('generateAiProposalB') < at('mergeAiVersions') && at('mergeAiVersions') < at('aria-label="Regenerate"') && at('aria-label="Regenerate"') < at('Keep Original') && at('Keep Original') < at('${statusHtml}') && at('${statusHtml}') < at('ai-compare-instruction') && at('ai-compare-instruction') < at('showFullQuizPreview'), 'order (V102.255): line 1 Model B · ⚖️ · 🧬 · 🔄 · commit · line 2 chips · steer · tools');
 
 (async () => {
     const browser = await chromium.launch();
