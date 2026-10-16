@@ -15,7 +15,7 @@ assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(fs.readFileSync('publi
       const out = {};
       const badges = {}; BADGE_STATS_DEFS.slice(0, 5).forEach((d, i) => { badges[d.id] = { level: Math.min(i + 1, 3) }; });
       usersData = [{ id: 'u1', displayName: 'nt', division: 'Hospital', group: 'PRETEST', score: 3.31, badges }];
-      eventStampsCache = [];
+      eventStampsCache = []; window.badgeLiveCounts = async () => ({});   // the counts read is tested in badge-live-counts-qa
       document.body.insertAdjacentHTML('beforeend', '<button id="trig" type="button">x</button>');
       openUserBadgesPop({ stopPropagation() {}, currentTarget: document.getElementById('trig') }, 'u1', false);
       document.querySelector('#user-badges-pop button[aria-label="Export badge board"]').click();

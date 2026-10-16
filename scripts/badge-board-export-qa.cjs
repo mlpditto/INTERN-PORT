@@ -19,7 +19,7 @@ assert.ok(!html.includes('Nika · INTERN-PORT'), 'no brand footer on the export'
             const out = {};
             const badges = {}; BADGE_STATS_DEFS.slice(0, 4).forEach((d, i) => { badges[d.id] = { level: i + 1 }; });
             usersData = [{ id: 'u1', displayName: 'TARIT', division: 'BUU', group: 'Junior', score: 5.96, pictureUrl: 'https://example.com/p.png', badges }];
-            eventStampsCache = [];
+            eventStampsCache = []; window.badgeLiveCounts = async () => ({});   // the counts read is tested in badge-live-counts-qa
             document.body.insertAdjacentHTML('beforeend', '<button id="trig" type="button">x</button>');
             const trig = document.getElementById('trig');
             openUserBadgesPop({ stopPropagation() {}, currentTarget: trig }, 'u1', false);
