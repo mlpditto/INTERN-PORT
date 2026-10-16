@@ -108,7 +108,7 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Internship Portfoli
             assert.equal(await page.locator('#internGuideOverlay .ig-l').count(), 1, 'V101.136: ONE language chip (no EN | TH pair)');
             assert.equal(await page.$eval('#internGuideOverlay .ig-l', e => e.textContent), '🇬🇧', 'the chip shows the flag of the language on screen');
             assert.match(await page.$eval('#internGuideOverlay .ig-l', e => e.getAttribute('aria-label')), /^Language: English → ไทย$/, 'it says what a tap does');
-            await page.click('#internGuideOverlay .ig-chip[data-i="4"]');
+            await page.click('#internGuideOverlay .ig-chip[data-i="5"]');
             await page.click('#internGuideOverlay .ig-l');
             await page.waitForFunction(() => /[ก-๙]/.test(document.querySelector('#internGuideOverlay .ig-title').textContent));
             assert.equal(await page.$eval('#internGuideOverlay .ig-l', e => e.textContent), '🇹🇭', 'a tap cycles to Thai');
@@ -121,7 +121,7 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Internship Portfoli
             await page.waitForFunction(() => /[ก-๙]/.test(document.querySelector('#internGuideOverlay .ig-chip').textContent));   // the TH guide is fetched, then drawn
             const thChips = await page.$$eval('#internGuideOverlay .ig-chip', els => els.map(e => ({ t: e.textContent, on: e.getAttribute('aria-pressed') })));
             assert.equal(thChips.length, chips.length, 'TH has the same sections');
-            assert.ok(thChips[4].on === 'true' && /คะแนน/.test(thChips[4].t), 'switching language keeps the section (points): ' + JSON.stringify(thChips));
+            assert.ok(thChips[5].on === 'true' && /คะแนน/.test(thChips[5].t), 'switching language keeps the section (points): ' + JSON.stringify(thChips));
             assert.equal(await page.evaluate(() => localStorage.getItem('internGuideLang')), 'th', 'language is remembered');
             await page.click('#internGuideOverlay .ig-l');
             await page.waitForFunction(() => document.querySelector('#internGuideOverlay .ig-title').textContent === '📖 Guide');
@@ -145,7 +145,7 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Internship Portfoli
             assert.deepEqual({ ...fb[0].d, section: undefined }, { type: 'guide_feedback', authUid: 'A1', userId: 'U1', userName: 'Jo', section: undefined, lang: 'en', message: 'I could not find the Guide button', read: false, timestamp: 'TS' });
             assert.ok(/Start here/.test(fb[0].d.section), 'section is recorded: ' + fb[0].d.section);
             assert.equal(await page.$eval('#internGuideOverlay .ig-fb-form textarea', e => e.value), '', 'box is cleared after sending');
-            await page.click('#internGuideOverlay .ig-chip[data-i="4"]');
+            await page.click('#internGuideOverlay .ig-chip[data-i="5"]');
             await page.click('#internGuideOverlay .ig-l');
             await page.waitForFunction(() => /[ก-๙]/.test(document.querySelector('#internGuideOverlay .ig-fb-open').textContent));
             await page.click('#internGuideOverlay .ig-fb-open');
