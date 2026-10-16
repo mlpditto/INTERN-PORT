@@ -92,12 +92,12 @@ async function open(browser) {
         // ---- V101.93 lean TODAY: no count badge, tiles ~64px with the reward as a corner pill, no "🔥0"
         const lean = await page.evaluate(() => {
             const head = document.querySelector('#sch-agenda > div'), kids = [...head.children].map(e => e.className.includes('act-streak') ? 'pill' : 'label');
-            const tile = document.querySelector('#sch-agenda .sch-tile'), tr = tile.getBoundingClientRect(), g = tile.querySelector('.tg').getBoundingClientRect();
-            return { kids, headText: head.textContent.replace(/\s+/g, ' ').trim(), tileH: Math.round(tr.height), rewardInside: g.left >= tr.left && g.right <= tr.right + 0.5 && g.top >= tr.top && g.top - tr.top < 14, rewardRight: tr.right - g.right < 14, rewardText: tile.querySelector('.tg').textContent.trim() };
+            const tile = document.querySelector('#sch-agenda .sch-tile'), tr = tile.getBoundingClientRect(), hasReward = !!tile.querySelector('.tg');
+            return { kids, headText: head.textContent.replace(/\s+/g, ' ').trim(), tileH: Math.round(tr.height), hasReward };
         });
         assert.deepEqual(lean.kids, ['label', 'pill'], 'TODAY header = label + pill, no count badge: ' + JSON.stringify(lean));
         assert.ok(lean.tileH >= 56 && lean.tileH <= 90, 'tile as tall as its content (was 116): ' + lean.tileH);
-        assert.ok(lean.rewardInside && lean.rewardRight && /^\+0\./.test(lean.rewardText), 'reward is a pill in the tile\'s top-right corner: ' + JSON.stringify(lean));
+        assert.equal(lean.hasReward, false, 'V101.161: the +0.1 reward pill is gone from the tile: ' + JSON.stringify(lean));
         // streak 0 + checked in → no pill (and no lonely TODAY label when nothing else is due)
         await page.evaluate(() => { window.computeEngagementStreak = () => ({ streak: 0, doneToday: true }); schRenderAgenda(); });
         assert.equal(await page.locator('#sch-agenda .act-streak').count(), 0, 'no "🔥0" pill');

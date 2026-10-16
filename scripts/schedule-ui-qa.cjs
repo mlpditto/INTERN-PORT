@@ -160,7 +160,12 @@ assert.match((await page.textContent('#sch-week .sch-rg h4')).trim(), /^\d{1,2}[
     await goTo(page, 0);
     await page.locator('#sch-week .sch-wd.today').click();
     const today = await page.textContent('#sch-week-day');
-    assert.ok(/3 ↓/.test(today) && !today.includes('Journal') && !today.includes('Daily check-in'), 'V101.149: today does not repeat what the list below shows (3 ↓): ' + today);
+    assert.ok(/3 to do ↓/.test(today) && !today.includes('Journal') && !today.includes('Daily check-in'), 'V101.149: today does not repeat what the list below shows (3 ↓): ' + today);
+    // V101.161: today's circle pings (a ring scales out and fades, 2 s loop); with reduced motion it stands still
+    const ping = async () => page.$eval('#sch-week .sch-wd.today .sch-n', e => { const c = getComputedStyle(e, '::after'); return [c.animationName, c.animationDuration, c.animationIterationCount]; });
+    assert.deepEqual(await ping(), ['schTodayPing', '2s', 'infinite'], 'today pings');
+    assert.equal(await page.$$eval('#sch-week .sch-wd:not(.today) .sch-n', els => els.filter(e => getComputedStyle(e, '::after').animationName !== 'none').length), 0, 'only today moves');
+    await page.emulateMedia({ reducedMotion: 'reduce' }); assert.equal((await ping())[0], 'none', 'reduced motion: no animation'); await page.emulateMedia({ reducedMotion: 'no-preference' });
     await goTo(page, 3);
     await page.locator('#sch-week [data-schday="' + (await page.evaluate(() => __key(3))) + '"]').click();
     assert.ok((await page.textContent('#sch-week-day')).includes('Journal club'), 'a future event day shows the event card');
@@ -194,7 +199,8 @@ assert.match((await page.textContent('#sch-week .sch-rg h4')).trim(), /^\d{1,2}[
     assert.ok(tiles.every(t => Math.abs(t.t - tiles[0].t) < 2), 'one row');
     assert.ok(tiles[0].l < tiles[1].l && tiles[1].l < tiles[2].l, 'left → right');
     assert.ok(tiles.every(t => t.h >= 56 && t.h <= 90 && t.w >= 100), 'cards (V101.93: as tall as their content, ~64px), not thin rows: ' + tiles.map(t => t.w + 'x' + t.h).join(' '));
-    assert.match(tiles.map(t => t.txt).join('|'), /Check-in.*\|.*Journal.*\+0\.1.*\|.*Case.*\+0\.1/, 'check-in · Journal +0.1 · Case +0.1');
+    assert.match(tiles.map(t => t.txt).join('|'), /Check-in.*\|.*Journal.*\|.*Case/, 'check-in · Journal · Case');
+    assert.ok(!tiles.some(t => /\+0\.1/.test(t.txt)), 'V101.161: no +0.1 reward pill on the Today tiles'); 
     assert.equal(await page.locator('#sch-agenda .sch-tile .ti').first().evaluate(e => getComputedStyle(e).fontSize), '23.712px'.replace('23.712px', await page.locator('#sch-agenda .sch-tile .ti').first().evaluate(e => getComputedStyle(e).fontSize)), 'icon sized');
     assert.equal(await page.evaluate(() => /schLaunchQuiz/.test(schTileHtml({ icon: '📝', title: 'x', quizId: 'z1', act: 'noop()' }, '#000', '#fff', '#ccc', [], new Date()))), true, 'a quiz tile keeps its ▶');
     await page.evaluate(() => { window.gotoLog = () => { window.__went = 'log'; }; });
