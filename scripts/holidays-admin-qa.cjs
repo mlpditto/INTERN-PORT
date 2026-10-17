@@ -80,7 +80,36 @@ const NAGER_JP = [{ date: '2026-02-11', name: 'Foundation Day', localName: '建�
       out.obsWrite = (() => { const w2 = writes[writes.length - 1]; return [w2[1], w2[2].items.map(i => i.k + ':' + i.en).sort()]; })();
       Holidays.toggleKind('c'); out.noCat = pills().map(p => p.title === 'Cat Day').includes(true); Holidays.toggleKind('c');
       failWrites = true; const before = pills().filter(p => p.ok).length; strip().querySelectorAll('.hol-ok')[4].click(); await new Promise(r => setTimeout(r, 50)); out.rollback = [before, pills().filter(p => p.ok).length]; failWrites = false;
-      S.saved = {}; S.obsList = []; Holidays.renderStrip(); out.emptyHidden = strip().hidden;
+      // ---- V102.276: the month view. 🗓 ▾ opens it; a pill opens its own day; any month; ✓ works inside; the kind switch applies
+      const cal = () => document.getElementById('hol-cal'), cells = () => [...cal().querySelectorAll('.hol-c:not(.e)')];
+      out.calClosed = [!!cal() && cal().hidden, strip().querySelector('.hol-calbtn').getAttribute('aria-expanded')];
+      strip().querySelector('.hol-calbtn').click();
+      const todayKey = dayStr(0), ty = Number(todayKey.slice(0, 4)), tm = Number(todayKey.slice(5, 7));
+      out.calOpen = [cal().hidden, cal().querySelector('.hol-ch b').textContent, cells().length, new Date(Date.UTC(ty, tm, 0)).getUTCDate(), cells().filter(c => c.classList.contains('today')).length];
+      const dayCell = d => cells().find(c => c.querySelector('b').textContent === String(Number(d.slice(8))));
+      const inMonth = d => d.slice(0, 7) === todayKey.slice(0, 7);
+      // a day of this month that carries the soon holiday (t(5) may fall in the next month: then use the pill route)
+      strip().querySelectorAll('.hol-pill')[3].click();   // Soon Holiday
+      out.pillOpen = [cal().hidden, !!cal().querySelector('.hol-cd'), cal().querySelector('.hol-cr') && cal().querySelector('.hol-cr').textContent.includes('Soon Holiday'), cal().querySelectorAll('.hol-cr .hol-ok.fixed').length];
+      // the ✓ inside a pill still toggles (does not just open the calendar)
+      const w0 = writes.length; strip().querySelectorAll('.hol-ok')[1].click(); await new Promise(r => setTimeout(r, 50)); out.pillOkStillWrites = writes.length - w0;
+      // move: next month, back, Today
+      const title0 = cal().querySelector('.hol-ch b').textContent;
+      cal().querySelector('[aria-label="Next month"]').click(); const title1 = cal().querySelector('.hol-ch b').textContent;
+      cal().querySelector('[aria-label="Previous month"]').click(); cal().querySelector('[aria-label="Previous month"]').click(); const title2 = cal().querySelector('.hol-ch b').textContent;
+      [...cal().querySelectorAll('.hol-ch button')].find(b => b.textContent === 'Today').click();
+      out.move = [title0 !== title1, title1 !== title2, cal().querySelector('.hol-ch b').textContent === new Date(Date.UTC(ty, tm - 1, 1)).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' }), cells().find(c => c.classList.contains('sel')) && cells().find(c => c.classList.contains('sel')).classList.contains('today')];
+      // a month with data in another year: January next year shows Thai holidays only if saved (S.saved is for this year) — health days come from observances
+      S.cal.y = ty + 1; S.cal.m = 0; S.cal.sel = ''; Holidays.renderStrip();
+      out.nextYear = [cal().querySelector('.hol-ch b').textContent.endsWith(String(ty + 1)), cells().length];
+      // the kind switch hides the cat day icons in the grid
+      S.cal.y = Number(t(2).slice(0, 4)); S.cal.m = Number(t(2).slice(5, 7)) - 1; S.cal.sel = t(2); Holidays.renderStrip();
+      const catShown = () => cal().textContent.includes('Cat Day'); const catBefore = catShown(); Holidays.toggleKind('c'); const catHidden = !catShown(); Holidays.toggleKind('c');
+      out.kindSwitch = [catBefore, catHidden];
+      // the month items helper itself: holidays + approved flag, any year
+      out.monthItems = Holidays._monthItems({ ['TH_2031']: [{ d: '2031-03-05', en: 'X', local: '' }, { d: '2031-04-01', en: 'Y', local: '' }] }, [{ md: '03-05', k: 'm', en: 'M' }, { md: '03-06', k: 'c', en: 'C' }], { '2031': [{ d: '2031-03-06', k: 'c' }] }, 2031, 2).map(i => i.d + ':' + i.k + ':' + i.on);
+      S.cal.open = false;
+      S.saved = {}; S.obsList = []; Holidays.renderStrip(); out.emptyHidden = [strip().hidden, strip().querySelectorAll('.hol-pill').length, !!strip().querySelector('.hol-calbtn')];
       return out;
     }, { TH, OBS, NAGER_JP });
     const nth = (JSON.parse(fs.readFileSync('public/th-holidays.json', 'utf8')).years); const thN = nth[Object.keys(nth)[0]].length;
@@ -101,7 +130,15 @@ const NAGER_JP = [{ date: '2026-02-11', name: 'Foundation Day', localName: '建�
     assert.equal(pills[0].op, '0.5', 'a day that is past is faded'); assert.ok(pills[0].fixed && pills[0].ok && pills[3].fixed, 'public holidays are ✓ (ticked in the panel), not switchable here');
     assert.deepEqual(pills.filter(p => !p.fixed).map(p => p.ok), [false, true, false], 'health / cat days need an approval: only the Cat Day is approved'); assert.equal(r.stripHost, 'tab-sidequest', 'the strip sits at the top of the Dashboard');
     assert.equal(r.obsWrite[0].startsWith('OBS_'), true, 'approvals are saved in holidays/OBS_<year>'); assert.deepEqual(r.obsWrite[1], ['c:Cat Day', 'm:Health Day'], 'approving the health day keeps the cat day');
-    assert.equal(r.noCat, false, 'the kind switch hides the cat days'); assert.deepEqual(r.rollback, [r.rollback[0], r.rollback[0]], 'a failed write rolls the ✓ back'); assert.equal(r.emptyHidden, true, 'nothing in the window → the strip is hidden');
-    console.log('PASS: admin Holidays — panel beside the Event form (load / tick / ring save → holidays/<CC>_<year>), Dashboard strip (−3…+14 days, ✓ approvals in OBS_<year>, rollback), rule + wiring');
+    assert.equal(r.noCat, false, 'the kind switch hides the cat days'); assert.deepEqual(r.rollback, [r.rollback[0], r.rollback[0]], 'a failed write rolls the ✓ back'); assert.deepEqual(r.emptyHidden, [false, 0, true], 'nothing in the window → no pills, but the 🗓 button stays so the month view is reachable');
+    assert.deepEqual(r.calClosed, [true, 'false'], 'the month view is closed until 🗓 is tapped');
+    assert.equal(r.calOpen[0], false); assert.match(r.calOpen[1], /\d{4}$/); assert.equal(r.calOpen[2], r.calOpen[3], 'one cell per day of the month'); assert.equal(r.calOpen[4], 1, 'today has its own mark');
+    assert.deepEqual(r.pillOpen, [false, true, true, 1], 'a pill opens the month on its day, lists it, a public holiday is a fixed ✓');
+    assert.equal(r.pillOkStillWrites, 1, 'the ✓ inside a pill still approves (saved in OBS_<year>), it does not just open the calendar');
+    assert.deepEqual(r.move, [true, true, true, true], '‹ › change the month, Today returns and selects today: ' + JSON.stringify(r.move));
+    assert.deepEqual(r.nextYear, [true, 31], 'January of next year draws 31 days');
+    assert.deepEqual(r.kindSwitch, [true, true], 'the 🎌 🩺 🐱 switch hides the cat day in the grid and list too');
+    assert.deepEqual(r.monthItems, ['2031-03-05:h:true', '2031-03-05:m:false', '2031-03-06:c:true'], 'monthItems: one month only, holidays always ✓, health / cat by approval');
+    console.log('PASS: admin Holidays — panel beside the Event form (load / tick / ring save → holidays/<CC>_<year>), Dashboard strip (−3…+14 days, ✓ approvals in OBS_<year>, rollback) + month view (🗓, pill → day, ‹ ›, Today), rule + wiring');
   } finally { await browser.close(); }
 })().catch(e => { console.error('FAIL:', e.message); process.exit(1); });

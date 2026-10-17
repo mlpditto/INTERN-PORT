@@ -26,6 +26,17 @@
         expandObs(obsList, years).forEach(function (o) { var a = (obsApproved[o.d.slice(0, 4)] || []).some(function (x) { return x.d === o.d && x.k === o.k; }); items.push({ d: o.d, k: o.k, f: KIND[o.k].ic, t: o.t, on: a }); });
         return items.filter(function (i) { var n = dayNum(i.d); return n >= lo && n <= hi; }).sort(function (a, b) { return a.d.localeCompare(b.d) || 'hmc'.indexOf(a.k) - 'hmc'.indexOf(b.k); });
     }
+    // V102.276: the same items for one whole month (m = 0..11), any year — the month view under the 🗓 button
+    function monthItems(saved, obsList, obsApproved, y, m) {
+        var pre = y + '-' + (m < 9 ? '0' : '') + (m + 1) + '-', items = [];
+        Object.keys(saved).forEach(function (id) { var cc = id.split('_')[0]; (saved[id] || []).forEach(function (h) { if (String(h.d).indexOf(pre) === 0) items.push({ d: h.d, k: 'h', f: flagOf(cc), t: h.en, on: true, cc: cc }); }); });
+        expandObs(obsList, [y]).forEach(function (o) { if (o.d.indexOf(pre) !== 0) return; var a = (obsApproved[String(y)] || []).some(function (x) { return x.d === o.d && x.k === o.k; }); items.push({ d: o.d, k: o.k, f: KIND[o.k].ic, t: o.t, on: a }); });
+        return items.sort(function (a, b) { return a.d.localeCompare(b.d) || 'hmc'.indexOf(a.k) - 'hmc'.indexOf(b.k); });
+    }
+    // ✓ = shown to interns: a public holiday is always ✓ (ticked in 🎌 Holidays), a health / cat day is a button (👁 = not shown yet)
+    function okHtml(i) {
+        return i.k === 'h' ? '<span class="hol-ok on fixed" title="Interns see this day (ticked in 🎌 Holidays)">✓</span>' : '<button type="button" class="hol-ok' + (i.on ? ' on' : '') + '" onclick="Holidays.toggleObs(\'' + i.d + '\',\'' + i.k + '\')" aria-pressed="' + !!i.on + '" title="' + (i.on ? 'Shown to interns — tap to hide' : 'Not shown to interns — tap to show') + '">' + (i.on ? '✓' : '👁') + '</button>';
+    }
 
     // ---- data
     function css() {
@@ -43,6 +54,13 @@
             '.hol-ok{display:inline-grid;place-items:center;width:20px;height:20px;min-height:0;padding:0;margin:0 0 0 2px;border-radius:50%;font-size:12px;font-weight:900;cursor:pointer;border:1.5px dashed #cbd5e1;background:#fff;color:#94a3b8}.hol-ok.on{background:#16a34a;color:#fff;border:0}.hol-ok.fixed{cursor:default}' +
             '.hol-kinds{display:inline-flex;gap:4px;margin-left:auto}.hol-kinds button{width:auto;min-height:0;margin:0;padding:2px 9px;border-radius:999px;font-size:15px;cursor:pointer;border:1px solid}.hol-kinds button[aria-pressed="false"]{opacity:.35}';
         document.head.appendChild(s);
+        var c = document.createElement('style'); c.id = 'hol-cal-css';
+        c.textContent = '.hol-calbtn{width:auto;min-height:0;margin:0;padding:2px 9px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;font-size:15px;cursor:pointer}#hol-cal{margin:-4px 0 10px;padding:10px 12px;background:#fff;border:1px solid #e2e8f0;border-radius:12px}#hol-cal[hidden]{display:none}' +
+            '.hol-ch{display:flex;align-items:center;gap:8px;margin-bottom:8px}.hol-ch b{font-weight:800}.hol-ch button{width:auto;min-height:0;margin:0;padding:2px 10px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;cursor:pointer}.hol-ch button:last-child{margin-left:4px}' +
+            '.hol-cg{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}.hol-dn{font-size:11px;color:#94a3b8;text-align:center}.hol-c{display:block;width:auto;min-height:48px;margin:0;padding:3px 4px;border-radius:8px;border:1px solid #f1f5f9;background:#f8fafc;text-align:left;font-size:12px;cursor:default;font-family:inherit}' +
+            '.hol-c.e{background:transparent;border-color:transparent}.hol-c b{display:block;font-weight:600}.hol-c span{display:block;line-height:1.3}.hol-c.has{background:#fff;border-color:#e2e8f0;cursor:pointer}.hol-c.today{outline:2px solid #7c3aed}.hol-c.past{opacity:.55}.hol-c.sel{background:#ede9fe;border-color:#c4b5fd}' +
+            '.hol-cd{margin-top:10px;font-size:12px;font-weight:700;color:#64748b}.hol-cr{display:flex;align-items:center;gap:8px;margin-top:6px;padding:6px 8px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px}.hol-cr .hol-ok{margin-left:auto}';
+        document.head.appendChild(c);
     }
     function loadDocs() {
         if (S.loading || S.loaded) return Promise.resolve();
@@ -118,16 +136,45 @@
         var el = document.getElementById('hol-strip');
         if (!el) { el = document.createElement('div'); el.id = 'hol-strip'; el.className = 'lang-no-toggle'; host.insertBefore(el, host.firstChild); }
         var today = bkkToday(), all = windowItems(S.saved, S.obsList, S.obs, today), items = all.filter(function (i) { return !S.hide[i.k]; });
-        if (!all.length) { el.hidden = true; return; }
         el.hidden = false;
         var pills = items.slice(0, 12).map(function (i) {
             var k = KIND[i.k], diff = dayNum(i.d) - dayNum(today), tail = diff === 0 ? 'today' : diff > 0 ? '+' + diff : String(diff);
-            var ok = i.k === 'h' ? '<span class="hol-ok on fixed" title="Interns see this day (ticked in 🎌 Holidays)">✓</span>' : '<button type="button" class="hol-ok' + (i.on ? ' on' : '') + '" onclick="Holidays.toggleObs(\'' + i.d + '\',\'' + i.k + '\')" aria-pressed="' + !!i.on + '" title="' + (i.on ? 'Shown to interns — tap to hide' : 'Not shown to interns — tap to show') + '">' + (i.on ? '✓' : '👁') + '</button>';
-            return '<span class="hol-pill" style="background:' + k.bg + ';border-color:' + k.bd + ';color:' + k.fg + ';opacity:' + (diff < 0 ? 0.5 : 1) + '" title="' + esc(i.t) + '">' + i.f + ' ' + shortDate(i.d) + ' <span style="font-weight:600;opacity:.85">' + esc(i.t.length > 24 ? i.t.slice(0, 23) + '…' : i.t) + '</span> <em>' + tail + '</em>' + ok + '</span>';
+            return '<span class="hol-pill" style="cursor:pointer;background:' + k.bg + ';border-color:' + k.bd + ';color:' + k.fg + ';opacity:' + (diff < 0 ? 0.5 : 1) + '" title="' + esc(i.t) + '" onclick="Holidays.openDay(\'' + i.d + '\', event)">' + i.f + ' ' + shortDate(i.d) + ' <span style="font-weight:600;opacity:.85">' + esc(i.t.length > 24 ? i.t.slice(0, 23) + '…' : i.t) + '</span> <em>' + tail + '</em>' + okHtml(i) + '</span>';
         }).join('');
         var kinds = ['h', 'm', 'c'].map(function (k) { var x = KIND[k]; return '<button type="button" aria-pressed="' + !S.hide[k] + '" title="' + x.name + '" style="background:' + x.bg + ';border-color:' + x.bd + '" onclick="Holidays.toggleKind(\'' + k + '\')">' + x.ic + '</button>'; }).join('');
-        el.innerHTML = '<span title="Coming up" style="font-size:18px">🗓</span>' + pills + '<span class="hol-kinds">' + kinds + '</span>';
+        var open = !!(S.cal && S.cal.open);
+        el.innerHTML = '<button type="button" class="hol-calbtn" onclick="Holidays.toggleCal()" aria-expanded="' + open + '" aria-controls="hol-cal" title="Month view">🗓 ' + (open ? '▴' : '▾') + '</button>' + pills + '<span class="hol-kinds">' + kinds + '</span>';
+        renderCal();
     }
+    // ---- V102.276: the month view under the strip (🗓 ▾ opens it, a pill opens its own day)
+    function calState() { if (!S.cal) { var t = bkkToday(); S.cal = { open: false, y: Number(t.slice(0, 4)), m: Number(t.slice(5, 7)) - 1, sel: '' }; } return S.cal; }
+    function renderCal() {
+        var strip = document.getElementById('hol-strip'), c = calState(), el = document.getElementById('hol-cal');
+        if (!strip) return;
+        if (!el) { el = document.createElement('div'); el.id = 'hol-cal'; el.className = 'lang-no-toggle'; strip.parentNode.insertBefore(el, strip.nextSibling); }
+        el.hidden = !c.open; if (!c.open) return;
+        var today = bkkToday(), items = monthItems(S.saved, S.obsList, S.obs, c.y, c.m).filter(function (i) { return !S.hide[i.k]; }), by = {};
+        items.forEach(function (i) { (by[i.d] = by[i.d] || []).push(i); });
+        var pad = (new Date(Date.UTC(c.y, c.m, 1)).getUTCDay() + 6) % 7, dim = new Date(Date.UTC(c.y, c.m + 1, 0)).getUTCDate(), cells = '';
+        for (var p = 0; p < pad; p++) cells += '<span class="hol-c e"></span>';
+        for (var d = 1; d <= dim; d++) {
+            var key = c.y + '-' + (c.m < 9 ? '0' : '') + (c.m + 1) + '-' + (d < 10 ? '0' : '') + d, it = by[key] || [];
+            cells += '<button type="button" class="hol-c' + (it.length ? ' has' : '') + (key === today ? ' today' : '') + (key === c.sel ? ' sel' : '') + (key < today ? ' past' : '') + '" onclick="Holidays.pickDay(\'' + key + '\')"><b>' + d + '</b><span>' + it.map(function (i) { return i.f; }).join(' ') + '</span></button>';
+        }
+        var title = new Date(Date.UTC(c.y, c.m, 1)).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+        var sel = c.sel ? (by[c.sel] || []) : [], list = '';
+        if (c.sel) list = '<div class="hol-cd">' + shortDate(c.sel) + ' ' + c.sel.slice(0, 4) + '</div>' + (sel.length ? sel.map(function (i) { var k = KIND[i.k]; return '<div class="hol-cr" style="background:' + k.bg + ';border-color:' + k.bd + ';color:' + k.fg + '"><span>' + i.f + '</span><span>' + esc(i.t) + '</span>' + okHtml(i) + '</div>'; }).join('') : '<div class="hol-cr">Nothing on this day</div>');
+        el.innerHTML = '<div class="hol-ch"><button type="button" onclick="Holidays.calMove(-1)" aria-label="Previous month">‹</button><b>' + title + '</b><button type="button" onclick="Holidays.calMove(1)" aria-label="Next month">›</button><button type="button" onclick="Holidays.calToday()">Today</button></div>'
+            + '<div class="hol-cg">' + ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(function (x) { return '<span class="hol-dn">' + x + '</span>'; }).join('') + cells + '</div>' + list;
+    }
+    function toggleCal() { var c = calState(); c.open = !c.open; renderStrip(); }
+    function openDay(d, ev) {
+        if (ev && ev.target && ev.target.closest && ev.target.closest('.hol-ok')) return;   // the ✓ inside a pill keeps its own job
+        var c = calState(); c.open = true; c.y = Number(d.slice(0, 4)); c.m = Number(d.slice(5, 7)) - 1; c.sel = d; renderStrip();
+    }
+    function pickDay(d) { var c = calState(); c.sel = c.sel === d ? '' : d; renderCal(); }
+    function calMove(n) { var c = calState(), t = c.y * 12 + c.m + n; c.y = Math.floor(t / 12); c.m = t % 12; c.sel = ''; renderCal(); }
+    function calToday() { var c = calState(), t = bkkToday(); c.y = Number(t.slice(0, 4)); c.m = Number(t.slice(5, 7)) - 1; c.sel = t; renderCal(); }
     function toggleKind(k) { S.hide[k] = !S.hide[k]; renderStrip(); }
     function toggleObs(d, k) {
         var y = d.slice(0, 4), items = (S.obs[y] || []).slice(), at = items.findIndex(function (x) { return x.d === d && x.k === k; });
@@ -137,5 +184,5 @@
         return db.collection('holidays').doc('OBS_' + y).set({ kind: 'obs', year: Number(y), items: items, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }).catch(function (e) { S.obs[y] = before || []; renderStrip(); if (typeof showToast === 'function') showToast('⚠️ ' + ((e && e.message) || 'save failed')); });
     }
     function boot() { css(); return loadDocs().then(renderStrip); }
-    window.Holidays = { init: init, boot: boot, pick: pick, setYear: setYear, load: load, tick: tick, tickAll: tickAll, save: save, toggleKind: toggleKind, toggleObs: toggleObs, renderStrip: renderStrip, _S: S, _windowItems: windowItems, _expandObs: expandObs };
+    window.Holidays = { init: init, boot: boot, pick: pick, setYear: setYear, load: load, tick: tick, tickAll: tickAll, save: save, toggleKind: toggleKind, toggleObs: toggleObs, renderStrip: renderStrip, toggleCal: toggleCal, openDay: openDay, pickDay: pickDay, calMove: calMove, calToday: calToday, _monthItems: monthItems, _S: S, _windowItems: windowItems, _expandObs: expandObs };
 })();
