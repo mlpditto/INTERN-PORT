@@ -25,10 +25,10 @@ const checks = [];
 const check = (name, got, want) => checks.push([name, got, want]);
 const html = window.auditModelControlsHtml(false, 'audit');
 const tabs = [...html.matchAll(/class="audit-provider" data-provider="([^"]+)" aria-pressed="([^"]+)"/g)].map(m => [m[1], m[2] === 'true']);
-check('one tab per provider, in model-list order', tabs.map(t => t[0]).join('|'), 'Gemini|GPT|Claude|Qwen|DeepSeek|Grok|Ollama'); // V101.52: Grok trial tab; V102.76: + local Ollama
+check('one tab per provider, in model-list order', tabs.map(t => t[0]).join('|'), 'Gemini|GPT|Claude|Qwen|DeepSeek|Muse|Grok|Ollama'); // V102.268: + Muse tab; V101.52: Grok trial tab; V102.76: + local Ollama
 check('GPT tab pressed for the default gpt-6-luna', tabs.find(t => t[0] === 'GPT')[1] && tabs.filter(t => t[1]).length === 1, true);
 const chips = [...html.matchAll(/<button (hidden )?[^>]*data-value="([^"]+)"[^>]*aria-label="([^"]+)"/g)].map(m => ({ hidden: !!m[1], id: m[2], label: m[3] }));
-check('Qwen + DeepSeek chips are rendered', chips.filter(c => c.id.startsWith('or/')).map(c => c.label).join('|'), 'Gemini Gemma 4 26B A4B|Qwen 3.8 Flash|Qwen 3.8 Max|DeepSeek V4.1 Flash|DeepSeek V4 Pro|Grok 4.7');   // V102.242: + Gemma 4 26B A4B (or/google/, under the Gemini tab)
+check('Qwen + DeepSeek chips are rendered', chips.filter(c => c.id.startsWith('or/')).map(c => c.label).join('|'), 'Gemini Gemma 4 26B A4B|Qwen 3.8 Flash|Qwen 3.8 Max|DeepSeek V4.1 Flash|DeepSeek V4 Pro|Muse Spark Open|Grok 4.7');   // V102.268: + Muse Spark Open; V102.242: + Gemma 4 26B A4B (or/google/, under the Gemini tab)
 check('only the pressed provider\'s chips are visible initially', chips.filter(c => !c.hidden).map(c => c.label).every(l => l.startsWith('GPT ')) && chips.filter(c => !c.hidden).length === 4, true);
 check('no provider heading spans leak into the rail', /text-ai-provider/.test(html), false);
 check('rewrite mode uses the analyzer default', /id="rewrite-ai-model" value="gemini-3.8-flash"/.test(window.auditModelControlsHtml(false, 'rewrite')), true);
@@ -39,7 +39,7 @@ const tabEls = tabs.map(t => ({ dataset: { provider: t[0] }, pressed: null, setA
 const row = { querySelectorAll: sel => sel === '.audit-provider' ? tabEls : chipEls };
 const deepseek = tabEls.find(t => t.dataset.provider === 'DeepSeek'); deepseek.closest = () => row;
 window.browseAuditProvider(deepseek);
-check('browse: DeepSeek tab pressed, others not', tabEls.map(t => t.pressed).join('|'), 'false|false|false|false|true|false|false');
+check('browse: DeepSeek tab pressed, others not', tabEls.map(t => t.pressed).join('|'), 'false|false|false|false|true|false|false|false');
 check('browse: exactly the DeepSeek chips visible', chipEls.filter(c => !c.hidden).map(c => c.label).join('|'), 'DeepSeek V4.1 Flash|DeepSeek V4 Pro');
 
 check('css: Qwen + DeepSeek tab colours match the chip-rail headings', /\.audit-provider\[data-provider="Qwen"\]\{color:#c9a0f0\}/.test(css) && /\.audit-provider\[data-provider="DeepSeek"\]\{color:#7fc8f5\}/.test(css), true);

@@ -20,7 +20,9 @@
         { id: 'or/qwen/qwen3.8-flash', label: 'Qwen 3.8 Flash', short: 'Qwen Flash 3.8', hint: 'Qwen รุ่นประหยัด ภาษาไทยดี ผ่าน OpenRouter' },
         { id: 'or/qwen/qwen3.8-max-0902', label: 'Qwen 3.8 Max', short: 'Qwen Max 3.8', hint: 'Qwen รุ่นใหญ่ ภาษาไทยดี สำหรับคัดและเปรียบเทียบข้อสอบ ผ่าน OpenRouter' },
         { id: 'or/deepseek/deepseek-v4.1-flash', label: 'DeepSeek V4.1 Flash', short: 'DeepSeek Flash V4.1', hint: 'DeepSeek รุ่นประหยัด ผ่าน OpenRouter' },
-        { id: 'or/deepseek/deepseek-v4-pro-0813', label: 'DeepSeek V4 Pro', short: 'DeepSeek Pro V4', hint: 'DeepSeek รุ่นใหญ่ เหมาะกับงานวิเคราะห์ ผ่าน OpenRouter' }
+        { id: 'or/deepseek/deepseek-v4-pro-0813', label: 'DeepSeek V4 Pro', short: 'DeepSeek Pro V4', hint: 'DeepSeek รุ่นใหญ่ เหมาะกับงานวิเคราะห์ ผ่าน OpenRouter' },
+        // V102.268: Meta Muse Spark Open (open weights, 1M context; text / image / video / audio in, text out) via OpenRouter — its own Muse tab, drawn with the Meta mark.
+        { id: 'or/meta/muse-spark-open', label: 'Muse Spark Open', short: 'Muse Spark Open', hint: 'Muse Spark Open ของ Meta (open weights, บริบท 1M) ผ่าน OpenRouter รับภาพ วิดีโอ เสียง เหมาะกับงานโค้ดและงาน agent' }
     ];
     // Official marks (assets/logos, from openai.com/brand and anthropic.com/press-kit). Owners
     // without a small official mark (Qwen, DeepSeek) carry their name in `short` instead.
@@ -28,7 +30,7 @@
     // the owner, so Gemini's `short` drops the word like GPT / Claude.
     // V102.11: Qwen / DeepSeek / Grok marks (assets/logos, already on the provider tabs) on every chip too — their
     // `short` keeps the name, since aiModelShortName shows it where no logo is drawn.
-    const LOGO_OWNERS = { GPT: 'openai', Claude: 'claude', Gemini: 'gemini', Qwen: 'qwen', DeepSeek: 'deepseek', Grok: 'grok' };
+    const LOGO_OWNERS = { GPT: 'openai', Claude: 'claude', Gemini: 'gemini', Qwen: 'qwen', DeepSeek: 'deepseek', Grok: 'grok', Muse: 'meta' };
     // V101.52: opt-in trial models. Only the audit toolbar offers them; they are NOT in
     // TEXT_AI_MODELS, so no other rail, select, Settings default or normaliser sees them.
     // Grok 4.7 trial (GROK_OPENROUTER_INTEGRATION_PLAN.md step C, 2026-09-24): Audit + Analyze.

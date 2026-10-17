@@ -116,6 +116,7 @@ const ok = (content, finish = 'stop', usage = { prompt_tokens: 100, completion_t
     check('T1 router: or/x-ai/grok-4.7 → openrouter + x-ai/grok-4.7', JSON.stringify(route('or/x-ai/grok-4.7')), '["openrouter","x-ai/grok-4.7"]');
     check('T1 router: or/qwen still openrouter', route('or/qwen/qwen3.8-flash')[0], 'openrouter');
     check('T1 router: or/google/gemma-4 → openrouter + google/gemma-4-26b-a4b-it (not caught by the Gemini branches)', JSON.stringify(route('or/google/gemma-4-26b-a4b-it')), '["openrouter","google/gemma-4-26b-a4b-it"]');   // V102.242
+    check('T1 router: or/meta/muse-spark-open → openrouter + meta/muse-spark-open', JSON.stringify(route('or/meta/muse-spark-open')), '["openrouter","meta/muse-spark-open"]');   // V102.268
     check('T1 router: gpt-6-luna still openai', route('gpt-6-luna')[0], 'openai');
 
     // T7 — client: Grok is proxy-only and a proxy answer is not re-sent
