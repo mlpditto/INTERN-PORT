@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.270)</title>
+    <title>Nika Admin (V102.271)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -2514,7 +2514,9 @@
         .qa-met { white-space:nowrap; vertical-align:middle; font-size:0.8em; color:#475569; font-weight:700; }
         .qa-met em { font-style:normal; color:#94a3b8; font-weight:600; font-size:0.88em; margin:0 10px 0 3px; }
         .qa-met-n { display:inline-block; min-width:26px; text-align:center; padding:1px 9px; border-radius:12px; color:#fff; font-weight:900; }
-        .qa-met-p { display:inline-block; padding:1px 7px; border-radius:7px; border:2px solid; font-weight:900; }
+        .qa-met-p { display:inline-block; padding:1px 7px; border-radius:7px; border:2px solid; font-weight:900; min-width:52px; box-sizing:border-box; text-align:center; font-variant-numeric:tabular-nums; }   /* V102.271: two decimals ("1.00"), wide enough for "10.00" */
+        .qa-livecol { display:flex; flex-direction:column; align-items:flex-start; gap:2px; min-width:0; }
+        .qa-last { font-size:0.68em; font-weight:700; color:#64748b; white-space:nowrap; line-height:1.1; padding-left:4px; }   /* V102.271: when the last person took this quiz */
         .qa-stp { display:inline-flex; flex-direction:column; gap:2px; vertical-align:middle; margin-left:2px; }
         .qa-stp button { border:none; width:18px; min-height:0; height:18px; padding:0; border-radius:4px; font-size:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
         .qa-rail { display:flex; align-items:center; gap:6px; flex-wrap:nowrap; }
@@ -32869,7 +32871,7 @@ ${JSON.stringify(sourceObj)}`;
                                 if (n >= 10) return '#4361ee';
                                 return '#6c757d';
                             })()};">${q.questions ? q.questions.length : 0}</span><em>items</em>
-                            <span class="qa-met-p" title="Points per quiz" style="border-color:${pointsBorder}; color:${pointsColor}; background:${pointsBg};">${pointsVal}</span><em>pts</em>
+                            <span class="qa-met-p" title="Points per quiz" style="border-color:${pointsBorder}; color:${pointsColor}; background:${pointsBg};">${pointsVal.toFixed(2)}</span><em>pts</em>
                             <span class="qa-stp">
                                 <button type="button" onclick="adjustQuizPoints('${q.id}', 0.1)" title="+0.1" aria-label="Add 0.1 point" style="background:#f0f7f4; color:#2e7d32;"><i class="fa-solid fa-chevron-up"></i></button>
                                 <button type="button" onclick="adjustQuizPoints('${q.id}', -0.1)" title="-0.1" aria-label="Remove 0.1 point" style="background:#fff5f5; color:#c62828;"><i class="fa-solid fa-chevron-down"></i></button>
@@ -32880,7 +32882,7 @@ ${JSON.stringify(sourceObj)}`;
                                  removed; Go Live + Timer select merged into its menu), then outline icons:
                                  participants · homework · ⋯ (🎓 Exam moved into ⋯). V102.29: edit = click the title. -->
                             <div class="qa-rail">
-                                ${window.quizLivePillHtml(q)}
+                                <span class="qa-livecol">${window.quizLivePillHtml(q)}${window.quizLastAttemptHtml ? window.quizLastAttemptHtml(_qAttempts) : ''}</span>
                                 <span class="qa-tools">
                                 <button type="button" class="qa-ib" onclick="event.stopPropagation(); showQuizParticipants('${q.id}')" title="Participants · ผู้เข้าร่วม" aria-label="Participants"><i class="fa-solid fa-users"></i>${(window.quizCounts && window.quizCounts[q.id]) ? `<span class="qa-n">${window.quizCounts[q.id]}</span>` : ''}</button>
                                 <button type="button" class="qa-ib${q.isHomework && (q.assignedUsers || []).length ? ' is-set' : ''}" onclick="event.stopPropagation(); openHomeworkAssignModal('${q.id}')" title="Homework · มอบหมายการบ้าน" aria-label="Assign homework"><i class="fa-solid fa-book"></i>${q.isHomework && (q.assignedUsers || []).length ? `<span class="qa-n">${q.assignedUsers.length}</span>` : ''}</button>
@@ -33649,6 +33651,14 @@ ${JSON.stringify(sourceObj)}`;
             }
         };
 
+            // V102.271: "🕒 16 Oct 14:20" under the Live pill — the newest attempt on this quiz (Bangkok time); nothing when nobody has taken it
+        window.quizLastAttemptHtml = function (attempts) {
+                let best = 0;
+                (attempts || []).forEach(a => { const t = a && (a.timestamp || a.startTime); const ms = t && t.toMillis ? t.toMillis() : (t instanceof Date ? t.getTime() : 0); if (ms > best) best = ms; });
+                if (!best) return '';
+                const d = new Date(best), f = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(d).replace(',', '');
+                return `<span class="qa-last" title="Latest attempt · ${escapeHtml(d.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' }))}" aria-label="Latest attempt ${escapeHtml(f)}">🕒 ${escapeHtml(f)}</span>`;
+        };
         window.quizLivePillHtml = function (q) {
             const st = window.quizLiveState(q);
             let cls, label, title;
