@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.274)</title>
+    <title>Nika Admin (V102.275)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -35834,10 +35834,43 @@ RULES:
                     .catch(e => { if (typeof showToast === 'function') showToast('❌ Could not move category: ' + e.message); });
             };
 
+            // V102.275: a blank quiz (no title, no questions, nothing else) that has sat in the system for 12 h+ is deleted once per admin session, with an admin_logs entry.
+            // The `quizzes` collection ALSO holds config docs (--divisions-config--, --group-settings--, …) that have no title either — the `--` guard is what keeps them safe.
+            const EMPTY_QUIZ_MAX_AGE_MS = 12 * 3600 * 1000;
+            window.isEmptyQuizDoc = function (q, nowMs) {
+                if (!q || typeof q.id !== 'string' || !q.id || q.id.startsWith('--')) return false;
+                const has = v => (Array.isArray(v) ? v.length > 0 : !!String(v == null ? '' : v).trim());
+                if (['title', 'shortTitle', 'questions', 'description', 'materials', 'coverUrl', 'assignedUsers', 'tagList', 'tags'].some(k => has(q[k]))) return false;
+                if (q.blueprint) return false;
+                const ms = q.createdAt && typeof q.createdAt.toMillis === 'function' ? q.createdAt.toMillis() : null;
+                return ms !== null && nowMs - ms >= EMPTY_QUIZ_MAX_AGE_MS;
+            };
+            window.sweepEmptyQuizzes = async function () {
+                if (window._emptyQuizSweepDone) return;
+                window._emptyQuizSweepDone = true;
+                const editor = (firebase.auth && firebase.auth().currentUser) || {};
+                const nowMs = Date.now();
+                for (const q of quizzesData.filter(x => window.isEmptyQuizDoc(x, nowMs))) {
+                    try {
+                        const used = await db.collection('quiz_attempts').where('quizId', '==', q.id).limit(1).get();   // someone took it: keep
+                        if (!used.empty) continue;
+                        await db.collection('admin_logs').add({
+                            userId: '', action: 'quiz_auto_deleted_empty',
+                            details: { quizId: q.id, createdAt: q.createdAt.toMillis(), fields: Object.keys(q).filter(k => k !== 'id'), isTemplate: q.isTemplate === true, isActive: q.isActive === true },
+                            reason: 'Blank quiz older than 12 h', timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                            createdByUid: editor.uid || null, createdByEmail: editor.email || ''
+                        });   // the log goes first: no log, no delete
+                        await db.collection('quizzes').doc(q.id).delete();
+                        console.info('[empty-quiz sweep] deleted', q.id);
+                    } catch (e) { console.warn('[empty-quiz sweep] skipped', q.id, e); }
+                }
+            };
+
             db.collection("quizzes").onSnapshot(s => {
                 quizzesData = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderQuizzes();
                 if (window.renderQuizCoverage) window.renderQuizCoverage(); // V95.22 dashboard coverage widget
+                window.sweepEmptyQuizzes();
             }, e => console.error("🔥 [Firestore Error] quizzes:", e));
             // 🔥 Refined [Version: V77.6] Listen only for actionable items (Pending Review or New Request)
             db.collection("quiz_attempts").where("status", "in", ["pending", "requesting"]).onSnapshot(s => {
