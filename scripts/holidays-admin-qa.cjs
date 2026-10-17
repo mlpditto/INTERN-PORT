@@ -91,6 +91,19 @@ const NAGER_JP = [{ date: '2026-02-11', name: 'Foundation Day', localName: '建�
       // a day of this month that carries the soon holiday (t(5) may fall in the next month: then use the pill route)
       strip().querySelectorAll('.hol-pill')[3].click();   // Soon Holiday
       out.pillOpen = [cal().hidden, !!cal().querySelector('.hol-cd'), cal().querySelector('.hol-cr') && cal().querySelector('.hol-cr').textContent.includes('Soon Holiday'), cal().querySelectorAll('.hol-cr .hol-ok.fixed').length];
+      // V102.277 lean + colour: one-line cells, colour by kind, weekend tint, counts in the header, the day's items inline
+      out.lean = (() => {
+        const cs = cells(), has = cs.filter(c => c.classList.contains('has')), det = cal().querySelector('.hol-det');
+        const dows = cs.map((c, i) => (new Date(Date.UTC(ty, tm - 1, i + 1)).getUTCDay()));
+        return {
+          maxH: Math.max(...cs.map(c => c.offsetHeight)), oneLine: cs.every(c => c.querySelector('b').getBoundingClientRect().top <= c.getBoundingClientRect().top + 14 && (!c.querySelector('span') || !c.querySelector('span').textContent || Math.abs(c.querySelector('span').getBoundingClientRect().top - c.querySelector('b').getBoundingClientRect().top) < 8)),
+          kinds: has.map(c => [...c.classList].filter(x => /^k-/.test(x)).join('')).filter(Boolean).length === has.length,
+          weekends: cs.filter(c => c.classList.contains('we')).length === dows.filter(d => d === 0 || d === 6).length,
+          counts: [...cal().querySelectorAll('.hol-n')].map(n => n.className.replace('hol-n ', '')),
+          inline: !!det && getComputedStyle(det).display === 'flex' && det.querySelector('.hol-cd').parentElement === det && [...det.querySelectorAll('.hol-cr')].every(r => r.parentElement === det),
+          colorOf: getComputedStyle(has[0]).backgroundColor !== getComputedStyle(cs.find(c => !c.classList.contains('has') && !c.classList.contains('we'))).backgroundColor
+        };
+      })();
       // the ✓ inside a pill still toggles (does not just open the calendar)
       const w0 = writes.length; strip().querySelectorAll('.hol-ok')[1].click(); await new Promise(r => setTimeout(r, 50)); out.pillOkStillWrites = writes.length - w0;
       // move: next month, back, Today
@@ -134,6 +147,9 @@ const NAGER_JP = [{ date: '2026-02-11', name: 'Foundation Day', localName: '建�
     assert.deepEqual(r.calClosed, [true, 'false'], 'the month view is closed until 🗓 is tapped');
     assert.equal(r.calOpen[0], false); assert.match(r.calOpen[1], /\d{4}$/); assert.equal(r.calOpen[2], r.calOpen[3], 'one cell per day of the month'); assert.equal(r.calOpen[4], 1, 'today has its own mark');
     assert.deepEqual(r.pillOpen, [false, true, true, 1], 'a pill opens the month on its day, lists it, a public holiday is a fixed ✓');
+    assert.ok(r.lean.maxH <= 40, 'cells are one line tall (≤ 40 px), got ' + r.lean.maxH); assert.ok(r.lean.oneLine, 'the day number and its icons share one line');
+    assert.ok(r.lean.kinds && r.lean.colorOf, 'a day with items is coloured by its kind (k-h / k-m / k-c)'); assert.ok(r.lean.weekends, 'Saturday and Sunday are tinted');
+    assert.ok(r.lean.counts.length >= 1 && r.lean.counts.every(c => /^k-[hmc]$/.test(c)), 'the header shows a coloured count per kind: ' + r.lean.counts); assert.ok(r.lean.inline, "the day's items are inline pills in one flex row");
     assert.equal(r.pillOkStillWrites, 1, 'the ✓ inside a pill still approves (saved in OBS_<year>), it does not just open the calendar');
     assert.deepEqual(r.move, [true, true, true, true], '‹ › change the month, Today returns and selects today: ' + JSON.stringify(r.move));
     assert.deepEqual(r.nextYear, [true, 31], 'January of next year draws 31 days');

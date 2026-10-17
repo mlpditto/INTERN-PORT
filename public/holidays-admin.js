@@ -55,11 +55,14 @@
             '.hol-kinds{display:inline-flex;gap:4px;margin-left:auto}.hol-kinds button{width:auto;min-height:0;margin:0;padding:2px 9px;border-radius:999px;font-size:15px;cursor:pointer;border:1px solid}.hol-kinds button[aria-pressed="false"]{opacity:.35}';
         document.head.appendChild(s);
         var c = document.createElement('style'); c.id = 'hol-cal-css';
-        c.textContent = '.hol-calbtn{width:auto;min-height:0;margin:0;padding:2px 9px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;font-size:15px;cursor:pointer}#hol-cal{margin:-4px 0 10px;padding:10px 12px;background:#fff;border:1px solid #e2e8f0;border-radius:12px}#hol-cal[hidden]{display:none}' +
-            '.hol-ch{display:flex;align-items:center;gap:8px;margin-bottom:8px}.hol-ch b{font-weight:800}.hol-ch button{width:auto;min-height:0;margin:0;padding:2px 10px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;cursor:pointer}.hol-ch button:last-child{margin-left:4px}' +
-            '.hol-cg{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}.hol-dn{font-size:11px;color:#94a3b8;text-align:center}.hol-c{display:block;width:auto;min-height:48px;margin:0;padding:3px 4px;border-radius:8px;border:1px solid #f1f5f9;background:#f8fafc;text-align:left;font-size:12px;cursor:default;font-family:inherit}' +
-            '.hol-c.e{background:transparent;border-color:transparent}.hol-c b{display:block;font-weight:600}.hol-c span{display:block;line-height:1.3}.hol-c.has{background:#fff;border-color:#e2e8f0;cursor:pointer}.hol-c.today{outline:2px solid #7c3aed}.hol-c.past{opacity:.55}.hol-c.sel{background:#ede9fe;border-color:#c4b5fd}' +
-            '.hol-cd{margin-top:10px;font-size:12px;font-weight:700;color:#64748b}.hol-cr{display:flex;align-items:center;gap:8px;margin-top:6px;padding:6px 8px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px}.hol-cr .hol-ok{margin-left:auto}';
+        c.textContent = '.hol-calbtn{width:auto;min-height:0;margin:0;padding:2px 9px;border-radius:8px;border:1px solid #ddd6fe;background:#f5f3ff;color:#6d28d9;font-size:15px;cursor:pointer}#hol-cal{margin:-4px 0 10px;padding:8px 12px 10px;background:#fff;border:1px solid #ddd6fe;border-radius:12px}#hol-cal[hidden]{display:none}#hol-cal img.emoji,#hol-strip img.emoji{width:1.1em;height:1.1em;vertical-align:-.15em}' +
+            '.hol-ch{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px}.hol-ch b{font-weight:800;color:#6d28d9}.hol-ch button{width:auto;min-height:0;margin:0;padding:1px 9px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;cursor:pointer}.hol-ns{margin-left:auto;display:inline-flex;gap:4px}' +
+            '.hol-n{font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px;border:1px solid}' +
+            '.hol-cg{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}.hol-dn{font-size:11px;text-align:center;color:#94a3b8}.hol-dn.we{color:#be185d}' +
+            '.hol-c{display:flex;align-items:center;justify-content:space-between;gap:2px;width:auto;min-height:0;margin:0;padding:3px 6px;border-radius:7px;border:1px solid #f1f5f9;background:#f8fafc;font-size:12px;cursor:default;font-family:inherit;color:#475569}.hol-c.we{background:#f1f5f9}.hol-c.e{background:transparent;border-color:transparent}' +
+            '.hol-c b{font-weight:600}.hol-c span{white-space:nowrap}.hol-c.has{cursor:pointer;font-weight:700}.hol-c.today b{background:#7c3aed;color:#fff;border-radius:999px;padding:0 6px}.hol-c.past{opacity:.55}.hol-c.sel{box-shadow:0 0 0 2px #c4b5fd}' +
+            '.k-h{background:#fff1f2;border-color:#fecdd3;color:#9f1239}.k-m{background:#ecfdf5;border-color:#a7f3d0;color:#065f46}.k-c{background:#fffbeb;border-color:#fde68a;color:#92400e}' +
+            '.hol-det{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;font-size:12px}.hol-cd{font-weight:700;color:#64748b}.hol-cr{display:inline-flex;align-items:center;gap:6px;padding:2px 4px 2px 10px;border:1px solid #e2e8f0;border-radius:999px;font-size:12px}.hol-cr .hol-ok{margin:0}';
         document.head.appendChild(c);
     }
     function loadDocs() {
@@ -145,6 +148,7 @@
         var open = !!(S.cal && S.cal.open);
         el.innerHTML = '<button type="button" class="hol-calbtn" onclick="Holidays.toggleCal()" aria-expanded="' + open + '" aria-controls="hol-cal" title="Month view">🗓 ' + (open ? '▴' : '▾') + '</button>' + pills + '<span class="hol-kinds">' + kinds + '</span>';
         renderCal();
+        if (window.twemoji) twemoji.parse(el, { folder: 'svg', ext: '.svg' });
     }
     // ---- V102.276: the month view under the strip (🗓 ▾ opens it, a pill opens its own day)
     function calState() { if (!S.cal) { var t = bkkToday(); S.cal = { open: false, y: Number(t.slice(0, 4)), m: Number(t.slice(5, 7)) - 1, sel: '' }; } return S.cal; }
@@ -153,19 +157,21 @@
         if (!strip) return;
         if (!el) { el = document.createElement('div'); el.id = 'hol-cal'; el.className = 'lang-no-toggle'; strip.parentNode.insertBefore(el, strip.nextSibling); }
         el.hidden = !c.open; if (!c.open) return;
-        var today = bkkToday(), items = monthItems(S.saved, S.obsList, S.obs, c.y, c.m).filter(function (i) { return !S.hide[i.k]; }), by = {};
-        items.forEach(function (i) { (by[i.d] = by[i.d] || []).push(i); });
+        var today = bkkToday(), items = monthItems(S.saved, S.obsList, S.obs, c.y, c.m).filter(function (i) { return !S.hide[i.k]; }), by = {}, n = { h: 0, m: 0, c: 0 };
+        items.forEach(function (i) { (by[i.d] = by[i.d] || []).push(i); n[i.k]++; });
         var pad = (new Date(Date.UTC(c.y, c.m, 1)).getUTCDay() + 6) % 7, dim = new Date(Date.UTC(c.y, c.m + 1, 0)).getUTCDate(), cells = '';
         for (var p = 0; p < pad; p++) cells += '<span class="hol-c e"></span>';
         for (var d = 1; d <= dim; d++) {
-            var key = c.y + '-' + (c.m < 9 ? '0' : '') + (c.m + 1) + '-' + (d < 10 ? '0' : '') + d, it = by[key] || [];
-            cells += '<button type="button" class="hol-c' + (it.length ? ' has' : '') + (key === today ? ' today' : '') + (key === c.sel ? ' sel' : '') + (key < today ? ' past' : '') + '" onclick="Holidays.pickDay(\'' + key + '\')"><b>' + d + '</b><span>' + it.map(function (i) { return i.f; }).join(' ') + '</span></button>';
+            var key = c.y + '-' + (c.m < 9 ? '0' : '') + (c.m + 1) + '-' + (d < 10 ? '0' : '') + d, it = by[key] || [], col = (pad + d - 1) % 7 > 4;
+            cells += '<button type="button" class="hol-c' + (it.length ? ' has k-' + it[0].k : '') + (col ? ' we' : '') + (key === today ? ' today' : '') + (key === c.sel ? ' sel' : '') + (key < today ? ' past' : '') + '" onclick="Holidays.pickDay(\'' + key + '\')"><b>' + d + '</b><span>' + it.map(function (i) { return i.f; }).join('') + '</span></button>';
         }
         var title = new Date(Date.UTC(c.y, c.m, 1)).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+        var counts = ['h', 'm', 'c'].filter(function (k) { return n[k]; }).map(function (k) { return '<span class="hol-n k-' + k + '" title="' + KIND[k].name + '">' + KIND[k].ic + ' ' + n[k] + '</span>'; }).join('');
         var sel = c.sel ? (by[c.sel] || []) : [], list = '';
-        if (c.sel) list = '<div class="hol-cd">' + shortDate(c.sel) + ' ' + c.sel.slice(0, 4) + '</div>' + (sel.length ? sel.map(function (i) { var k = KIND[i.k]; return '<div class="hol-cr" style="background:' + k.bg + ';border-color:' + k.bd + ';color:' + k.fg + '"><span>' + i.f + '</span><span>' + esc(i.t) + '</span>' + okHtml(i) + '</div>'; }).join('') : '<div class="hol-cr">Nothing on this day</div>');
-        el.innerHTML = '<div class="hol-ch"><button type="button" onclick="Holidays.calMove(-1)" aria-label="Previous month">‹</button><b>' + title + '</b><button type="button" onclick="Holidays.calMove(1)" aria-label="Next month">›</button><button type="button" onclick="Holidays.calToday()">Today</button></div>'
-            + '<div class="hol-cg">' + ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(function (x) { return '<span class="hol-dn">' + x + '</span>'; }).join('') + cells + '</div>' + list;
+        if (c.sel) list = '<div class="hol-det"><span class="hol-cd">' + shortDate(c.sel) + ' ' + c.sel.slice(0, 4) + '</span>' + (sel.length ? sel.map(function (i) { return '<span class="hol-cr k-' + i.k + '"><span>' + i.f + '</span><span>' + esc(i.t) + '</span>' + okHtml(i) + '</span>'; }).join('') : '<span class="hol-cr">Nothing on this day</span>') + '</div>';
+        el.innerHTML = '<div class="hol-ch"><button type="button" onclick="Holidays.calMove(-1)" aria-label="Previous month">‹</button><b>' + title + '</b><button type="button" onclick="Holidays.calMove(1)" aria-label="Next month">›</button><button type="button" onclick="Holidays.calToday()">Today</button><span class="hol-ns">' + counts + '</span></div>'
+            + '<div class="hol-cg">' + ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(function (x, k) { return '<span class="hol-dn' + (k > 4 ? ' we' : '') + '">' + x + '</span>'; }).join('') + cells + '</div>' + list;
+        if (window.twemoji) twemoji.parse(el, { folder: 'svg', ext: '.svg' });   // Windows draws flag emoji as letters
     }
     function toggleCal() { var c = calState(); c.open = !c.open; renderStrip(); }
     function openDay(d, ev) {
