@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.272)</title>
+    <title>Nika Admin (V102.273)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -41916,6 +41916,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
         }
 
+        // V102.273: a case can carry a userId whose users/{id} document no longer exists (deleted, or a legacy-linked id). batch.update() on a missing document fails the WHOLE
+        // batch ("No document to update"), so nothing was deleted. Points are reverted only where the user document exists; the case is deleted either way.
+        async function alabastaExistingUsers(userIds) {
+            const ids = [...new Set((userIds || []).filter(Boolean))];
+            const found = await Promise.all(ids.map(id => db.collection('users').doc(id).get().then(snap => snap.exists ? id : null).catch(() => id)));   // a failed read = assume it exists (the old behaviour)
+            return new Set(found.filter(Boolean));
+        }
         async function deleteCaseSubmission(caseDocId) {
             const caseItem = casesData.find(c => c.id === caseDocId);
             if (!caseItem) {
@@ -41932,7 +41939,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const batch = db.batch();
                 batch.delete(db.collection('cases').doc(caseDocId));
 
-                if (bonus > 0 && caseItem.userId) {
+                const userAlive = bonus > 0 && caseItem.userId ? (await alabastaExistingUsers([caseItem.userId])).has(caseItem.userId) : false;
+                if (bonus > 0 && caseItem.userId && userAlive) {
                     batch.update(db.collection('users').doc(caseItem.userId), {
                         score: firebase.firestore.FieldValue.increment(-bonus)
                     });
@@ -42267,12 +42275,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
             try {
                 const batch = db.batch();
+                const alive = await alabastaExistingUsers(ids.map(id => casesData.find(c => c.id === id)).filter(c => c && Number(c.adminBonus || 0) > 0).map(c => c.userId));
+                let reverted = 0;
+                const gone = new Set();   // users whose document is missing: their cases are still deleted, no points to revert
                 ids.forEach(id => {
                     const caseItem = casesData.find(c => c.id === id);
                     if (!caseItem) return;
                     const bonus = Number(caseItem.adminBonus || 0);
                     batch.delete(db.collection('cases').doc(id));
-                    if (bonus > 0 && caseItem.userId) {
+                    if (bonus > 0 && caseItem.userId && !alive.has(caseItem.userId)) gone.add(caseItem.userId);
+                    if (bonus > 0 && caseItem.userId && alive.has(caseItem.userId)) {
+                        reverted += bonus;
                         batch.update(db.collection('users').doc(caseItem.userId), {
                             score: firebase.firestore.FieldValue.increment(-bonus)
                         });
@@ -42290,10 +42303,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 casesData = casesData.filter(c => !deletedSet.has(c.id));
                 clearAlabastaSelection();
                 renderAlabastaCases();
-                const toastMsg = (totalRevert > 0
-                    ? `Bulk deleted ${ids.length} case(s), reverted ${totalRevert.toFixed(2)} pts`
+                const toastMsg = (reverted > 0
+                    ? `Bulk deleted ${ids.length} case(s), reverted ${reverted.toFixed(2)} pts`
                     : `Bulk deleted ${ids.length} case(s)`)
-                    + (mirrorCount ? ` · cleared ${mirrorCount} history entr${mirrorCount === 1 ? 'y' : 'ies'}` : '');
+                    + (mirrorCount ? ` · cleared ${mirrorCount} history entr${mirrorCount === 1 ? 'y' : 'ies'}` : '')
+                    + (gone.size ? ` · ${gone.size} user(s) no longer exist — no points to revert` : '');
                 if (typeof showToast === 'function') showToast(toastMsg, 'success');
             } catch (e) {
                 console.error('Bulk delete failed:', e);
