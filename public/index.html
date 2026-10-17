@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.161)</title>
+    <title>Internship Portfolio (V101.162)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -3730,6 +3730,10 @@
                 #sch-week .sch-n { position: relative; display: block; width: 40px; height: 40px; border-radius: 50%; background: var(--ring, transparent); }
                 #sch-week .sch-n b { position: absolute; inset: 4px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.98em; font-weight: 500; line-height: 1; }
                 #sch-week .sch-wd.today .sch-n b { background: #7c3aed; color: #fff; font-weight: 700; }
+                /* V101.162: a holiday / approved health or cat day = a pale amber fill on the day circle; its name is one line under the strip */
+                #sch-week .sch-wd.hol:not(.today) .sch-n b { background: #fef3c7; color: #92400e; }
+                #sch-week .sch-hol { display: flex; align-items: center; gap: 6px; margin: 4px 0 0; padding: 4px 8px; border-radius: 7px; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; font-size: 0.75em; }
+                #sch-week .sch-hol span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
                 #sch-week .sch-wd[aria-pressed="true"] .sch-n b { background: #ede9fe; color: #5b21b6; font-weight: 700; box-shadow: inset 0 0 0 2px #7c3aed; }
                 #sch-week .sch-wd.today[aria-pressed="true"] .sch-n b { background: #7c3aed; color: #fff; box-shadow: inset 0 0 0 2px #c4b5fd; }
                 /* V101.161: today is alive — a soft purple ring pings out of its circle every 2 s (still when the phone asks for reduced motion) */
@@ -6039,14 +6043,28 @@
                 </div>
             </div>
 
-            <!-- Row: Nickname + วันเกิด, sharing one line (V100.75) -->
-            <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
-                <div style="flex:1; min-width:110px;">
+            <!-- Row: Nickname + Nationality (V101.162; the flag picks whose public holidays Schedule shows, "—" = Thailand), then วันเกิด on its own line -->
+            <div style="display:flex; gap:8px; margin-bottom:10px;">
+                <div style="flex:1.4; min-width:0;">
                     <label for="pi-nickname"
                         style="font-size:0.78em; font-weight:bold; display:block; margin-bottom:4px; color:#555;">Nickname</label>
                     <input type="text" id="pi-nickname" placeholder="e.g. Satoru" data-th-placeholder="เช่น Satoru" data-kr-placeholder="예: Satoru"
                         style="width:100%; padding:9px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.9em;">
                 </div>
+                <div style="flex:1; min-width:0;">
+                    <label for="pi-nationality"
+                        style="font-size:0.78em; font-weight:bold; display:block; margin-bottom:4px; color:#555; white-space:nowrap;">Nationality · สัญชาติ · 국적</label>
+                    <select id="pi-nationality" aria-label="Nationality"
+                        style="width:100%; padding:9px 4px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.9em; background:white;">
+                        <option value="">—</option>
+                        <option value="TH">🇹🇭 Thailand</option>
+                        <option value="JP">🇯🇵 Japan</option>
+                        <option value="KR">🇰🇷 Korea</option>
+                        <option value="SG">🇸🇬 Singapore</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
                 <div style="flex:1.8; min-width:190px;">
                     <div class="pi-birthday-heading"><label style="font-size:0.78em; font-weight:bold; display:block; margin-bottom:4px; color:#555;">🎂 DOB</label><span id="pi-age" aria-live="polite"></span></div>
                     <!-- V94.76: native <input type="date"> rendered as a grey blob in the
@@ -8455,6 +8473,7 @@
                     document.getElementById('pi-middlename-en').value = d.middleNameEn || "";
                     document.getElementById('pi-lastname-en').value = d.lastNameEn || "";
                     document.getElementById('pi-nickname').value = d.nickName || "";
+                    document.getElementById('pi-nationality').value = d.nationality || "";
                     document.getElementById('pi-institute').value = d.institute || "";
                     document.getElementById('pi-phone').value = d.phone || "";
                     document.getElementById('pi-email').value = d.email || "";
@@ -8610,6 +8629,7 @@
                     middleNameEn: mnameEn,
                     lastNameEn: lnameEn,
                     nickName: nname,
+                    nationality: document.getElementById('pi-nationality').value,   // V101.162: '' | TH | JP | KR | SG
                     institute: institute,
                     phone: phone,
                     email: email,
@@ -16340,6 +16360,30 @@
             return 'Day ' + Math.min(total, Math.max(0, Math.ceil((new Date() - s0) / 86400000))) + ' / ' + total;
         }
 
+        // V101.162: the holidays an admin saved for the intern's nationality (holidays/<CC>_<year>, "—" = TH) and the health / cat days
+        // an admin approved (holidays/OBS_<year>; the health / cat names come from observances.json). Each document is read once per session.
+        const SCH_HOL = { docs: {}, obs: null, flag: { TH: '🇹🇭', JP: '🇯🇵', KR: '🇰🇷', SG: '🇸🇬' }, icon: { m: '🩺', c: '🐱' } };
+        function schHolCountry() { const n = ((typeof myOwnRow === 'function' && myOwnRow()) || {}).nationality; return SCH_HOL.flag[n] ? n : 'TH'; }
+        function schHolEnsure(years) {
+            const again = () => { if (schModalOpen()) schRenderAgenda(); };
+            years.forEach(y => [schHolCountry() + '_' + y, 'OBS_' + y].forEach(id => {
+                if (SCH_HOL.docs[id] !== undefined) return;
+                SCH_HOL.docs[id] = [];
+                db.collection('holidays').doc(id).get().then(s => { SCH_HOL.docs[id] = (s.exists && (s.data().items || [])) || []; again(); }).catch(e => console.warn('holidays read failed', id, e));
+            }));
+            if (SCH_HOL.obs === null) {
+                SCH_HOL.obs = {};
+                fetch('observances.json').then(r => r.ok ? r.json() : { items: [] })
+                    .then(j => { (j.items || []).forEach(o => { SCH_HOL.obs[o.md + o.k] = o.en; }); again(); }).catch(e => console.warn('observances.json failed', e));
+            }
+        }
+        function schHolOn(key) {
+            const y = key.slice(0, 4), cc = schHolCountry(), out = [];
+            (SCH_HOL.docs[cc + '_' + y] || []).forEach(h => { if (h.d === key) out.push({ ic: SCH_HOL.flag[cc], t: h.local && h.local !== h.en ? h.en + ' · ' + h.local : h.en }); });
+            (SCH_HOL.docs['OBS_' + y] || []).forEach(o => { const t = SCH_HOL.obs && SCH_HOL.obs[key.slice(5) + o.k]; if (o.d === key && t) out.push({ ic: SCH_HOL.icon[o.k] || '🗓', t }); });
+            return out;
+        }
+
         function schRenderWeek(items) {
             const box = document.getElementById('sch-week');
             if (!box) return;
@@ -16357,6 +16401,8 @@
             mon.setDate(mon.getDate() + schWeekOffset * 7);
             const end = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 6);
             const todayKey = schDateKey(new Date());
+            schHolEnsure(mon.getFullYear() === end.getFullYear() ? [mon.getFullYear()] : [mon.getFullYear(), end.getFullYear()]);
+            const holLines = [];
             const mo = x => x.toLocaleDateString('en-GB', { month: 'short' });
             const title = mon.getMonth() === end.getMonth()
                 ? mon.getDate() + '–' + end.getDate() + ' ' + mo(end)
@@ -16377,12 +16423,14 @@
                     if (m[k + 'o']) tokens.push(k + 'o');
                     if (m[k + 'd'] || m[k + 'o']) names.push(SCH_KIND_NAME[k] + (m[k + 'o'] ? (m[k + 'd'] ? ' done + to do' : ' to do') : ' done'));
                 });
+                const hol = schHolOn(key);
+                hol.forEach(h => { names.push(h.t); holLines.push('<div class="sch-hol lang-no-toggle"><span>' + escapeHtml(d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })) + '</span><span>' + h.ic + ' ' + escapeHtml(h.t) + '</span></div>'); });
                 const label = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) + ' — ' + (names.length ? names.join(', ') : 'nothing');
                 const ring = schRingBg(m);
-                html += '<button type="button" class="sch-wd' + (key === todayKey ? ' today' : '') + '" data-schday="' + key + '" data-marks="' + tokens.join(' ') + '" aria-pressed="' + (schWeekSel === key)
+                html += '<button type="button" class="sch-wd' + (key === todayKey ? ' today' : '') + (hol.length ? ' hol' : '') + '" data-schday="' + key + '" data-marks="' + tokens.join(' ') + '" aria-pressed="' + (schWeekSel === key)
                     + '" aria-label="' + label + '" onclick="schWeekPick(\'' + key + '\')"><small>' + 'MTWTFSS'[i] + '</small><span class="sch-n"' + (ring ? ' style="--ring:' + ring + '"' : '') + '><b>' + d.getDate() + '</b>' + (schCheckinDays && schCheckinDays.has(key) ? '<i class="sch-star" title="Checked in">⭐</i>' : '') + '</span></button>';
             }
-            html += '</div>';
+            html += '</div>' + holLines.join('');
             if (schWeekSel) html += schWeekDayHtml(schWeekSel, items);
             box.innerHTML = html;
         }
