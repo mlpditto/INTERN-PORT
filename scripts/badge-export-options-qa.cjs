@@ -19,7 +19,7 @@ assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(fs.readFileSync('publi
       document.body.insertAdjacentHTML('beforeend', '<button id="trig" type="button">x</button>');
       openUserBadgesPop({ stopPropagation() {}, currentTarget: document.getElementById('trig') }, 'u1', false);
       document.querySelector('#user-badges-pop button[aria-label="Export badge board"]').click();
-      const st = badgeExportState;
+      const st = badgeExportState; await st.countsPromise; st.counts = { on_fire: 4, quiz_master: 187 };
       out.defaults = [st.showName, st.showScore, st.labels, st.bg];
       const texts = (l, extra) => { const s = badgeBoardSvg(Object.assign({}, st, { layout: l }, extra), l, 600); return [...new DOMParser().parseFromString(s, 'image/svg+xml').querySelectorAll('text')].map(t => t.textContent); };
       const geom = (l, extra) => { const g = badgeBoardGeom(Object.assign({}, st, { layout: l }, extra), l); return [g.row, g.h]; };
@@ -46,9 +46,9 @@ assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(fs.readFileSync('publi
     assert.deepEqual(r.defaults, [true, true, 'full', 'clear'], 'defaults = today\'s look');
     for (const l of ['card', 'banner', 'story']) {
       const T = r.t[l];
-      assert.ok(T.full.some(x => /^\d+\+ /.test(x)), l + ': full has the milestone lines');
-      assert.ok(!T.name.some(x => /^\d+\+ /.test(x)) && T.name.includes('On Fire'), l + ': Name = titles only');
-      assert.ok(!T.none.includes('On Fire') && !T.none.some(x => /^\d+\+ /.test(x)), l + ': None = no labels');
+      assert.ok(T.full.includes('187 questions'), l + ': full has the count lines');
+      assert.ok(!T.name.includes('187 questions') && T.name.includes('On Fire'), l + ': Name = titles only');
+      assert.ok(!T.none.includes('On Fire') && !T.none.includes('187 questions'), l + ': None = no labels');
       assert.ok(T.geom.none[0] < T.geom.name[0] && T.geom.name[0] < T.geom.full[0] && T.geom.none[1] < T.geom.name[1] && T.geom.name[1] < T.geom.full[1], l + ': the image shrinks with the labels ' + JSON.stringify(T.geom));
     }
     assert.deepEqual([r.t.card.geom.none[0], r.t.banner.geom.none[0], r.t.story.geom.none[0]], [54, 62, 72], 'no labels = the pre-label geometry exactly');
@@ -57,7 +57,7 @@ assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(fs.readFileSync('publi
     assert.ok(r.t.card.noScore.includes('nt'), 'the name stays');
     for (const l of ['card', 'banner', 'story']) {
       assert.ok(r.t[l].full.includes('nt') && !r.t[l].noName.includes('nt'), l + ': Person Hide removes the name from the picture');
-      assert.ok(r.t[l].noName.some(x => /^\d+\+ /.test(x)) && r.t[l].noName.includes('On Fire'), l + ': the badge labels stay');
+      assert.ok(r.t[l].noName.includes('187 questions') && r.t[l].noName.includes('On Fire'), l + ': the badge labels stay');
       assert.deepEqual(r.t[l].file, ['badges-nt-' + l + '.png', 'badges-' + l + '.png'], l + ': the file name drops the name too');
     }
     assert.ok(r.t.card.noName.includes('⭐ 3.31'), 'Person Hide leaves the score (a separate switch)');
