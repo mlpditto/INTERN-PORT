@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.277)</title>
+    <title>Nika Admin (V102.278)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -5627,7 +5627,7 @@
         #ai-suggest-config-modal .sqm-head h3 { margin:0; color:#7c3aed; font-size:1.1em; display:flex; align-items:center; gap:8px; }
         #ai-suggest-config-modal .sqm-close { width:30px; height:30px; min-height:30px; padding:0; border:none; border-radius:50%; background:#f1f5f9; color:#64748b; cursor:pointer; }
         #ai-suggest-config-modal .sqm-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:12px; }
-        #ai-suggest-config-modal .sqm-lb { font-size:0.72em; color:#94a3b8; min-width:48px; }
+        #ai-suggest-config-modal .sqm-lb { font-size:1em; color:#94a3b8; min-width:26px; text-align:center; }
         #ai-suggest-config-modal .sqm-chip { width:auto; min-height:32px; padding:5px 11px; border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc; color:#334155; font-size:0.8em; font-weight:600; cursor:pointer; }
         #ai-suggest-config-modal .sqm-chip.on { background:#7c3aed; border-color:#7c3aed; color:#fff; }
         #ai-suggest-config-modal .sqm-num { width:64px; padding:6px 8px; border:1.5px solid #c4b5fd; border-radius:8px; font-weight:700; text-align:center; }
@@ -5734,7 +5734,22 @@
         @media (pointer:coarse) { #ai-audit-popup .audit-pick { width:24px; height:24px; } #ai-audit-popup .audit-batch-fix, #ai-audit-popup .audit-batch-clear { height:44px; } }
         #ai-suggest-config-modal .sqm-style img.emoji { width:1.15em; height:1.15em; vertical-align:-0.2em; margin-right:2px; }
         #ai-suggest-config-modal .sqm-scope-row[hidden], #ai-suggest-config-modal .sqm-style-hint[hidden] { display:none; }
-        #ai-suggest-config-modal .sqm-style-hint { margin:6px 0 0 54px; padding:5px 8px; border:1px solid #bbf7d0; border-radius:7px; background:#f0fdf4; color:#475569; font-size:0.72em; line-height:1.5; }
+        #ai-suggest-config-modal .sqm-style-hint { margin:6px 0 0 32px; padding:5px 8px; border:1px solid #bbf7d0; border-radius:7px; background:#f0fdf4; color:#475569; font-size:0.72em; line-height:1.5; }
+        /* V102.278: Expand quiz lean — flag-only Style, emoji-only Focus / Level / row labels, and a waiting state
+           (seconds on the button, form locked, Stop, amber when slower than usual). Names live in title / aria-label. */
+        #ai-suggest-config-modal .sqm-style { padding:5px 8px; }
+        #ai-suggest-config-modal .sqm-style img.emoji { margin-right:0; }
+        #ai-suggest-config-modal .sqm-lb img.emoji { width:1.1em; height:1.1em; vertical-align:-0.2em; }
+        #ai-suggest-config-modal .sqm-style small { margin-left:3px; font-size:0.85em; font-weight:800; }
+        #ai-suggest-config-modal .sqm-focus { padding:5px 10px; font-size:1em; }
+        #ai-suggest-config-modal .sqm-seg .sq-diff-btn { font-size:1em; padding:5px 11px; }
+        #ai-suggest-config-modal .sqm-gorow { display:flex; gap:8px; margin-top:16px; }
+        #ai-suggest-config-modal .sqm-gorow .sqm-go { margin-top:0; flex:1; position:relative; overflow:hidden; }
+        #ai-suggest-config-modal .sqm-go.slow { background:linear-gradient(135deg,#f59e0b,#d97706); }
+        #ai-suggest-config-modal .sqm-go b { font-variant-numeric:tabular-nums; font-weight:800; margin-left:4px; }
+        #ai-suggest-config-modal .sqm-bar { position:absolute; left:0; bottom:0; height:3px; background:rgba(255,255,255,0.9); border-radius:0 3px 3px 0; }
+        #ai-suggest-config-modal .sqm-stop { width:48px; flex:0 0 48px; min-height:0; padding:0; border:1px solid #e2e8f0; border-radius:14px; background:#fff; color:#7c3aed; cursor:pointer; }
+        #ai-suggest-config-modal.sqm-busy .sqm-row, #ai-suggest-config-modal.sqm-busy .sqm-custom, #ai-suggest-config-modal.sqm-busy .sqm-style-hint { opacity:0.45; pointer-events:none; }
         /* Translate is now the row's last item: anchor its popover to the row's right edge, capped at the row width,
            so it never runs past the modal (anchored under the button it overflowed by ~400px). */
         #quiz-editor-review-actions { position:relative; }
@@ -20028,36 +20043,36 @@ RULES:
                     <h3><i class="fa-solid fa-wand-magic-sparkles"></i> Expand quiz</h3>
                     <button type="button" class="sqm-close" onclick="this.closest('#ai-suggest-config-modal').remove()" aria-label="Close" title="Close">✕</button>
                 </div>
-                <div class="sqm-row"><span class="sqm-lb">Add</span>
+                <div class="sqm-row"><span class="sqm-lb" title="Questions to add" aria-label="Add">🔢</span>
                     ${[1, 3, 5, 10].map(v => `<button type="button" class="sqm-chip sqm-n${v === 3 ? ' on' : ''}" aria-pressed="${v === 3}" onclick="sqmSetCount(this, ${v})">${v}</button>`).join('')}
                     <button type="button" class="sqm-chip" onclick="sqmToggleCustomCount(this)" title="Type another number (1–10)" aria-label="Type another number" aria-expanded="false">±</button>
                     <input type="number" id="suggest-n" value="3" min="1" max="10" class="sqm-num" hidden oninput="sqmCountTyped()" aria-label="Number of questions">
                 </div>
-                <div class="sqm-row sqm-style-row"><span class="sqm-lb">Style</span>
-                    ${Object.entries(window.SQM_EXAM_STYLES).map(([k, s], i) => `<button type="button" class="sqm-chip sqm-style${i === 0 ? ' on' : ''}" aria-pressed="${i === 0}" data-val="${k}" title="${s.title}" onclick="sqmSetStyle(this)">${s.flag} ${s.label}</button>`).join('')}
+                <div class="sqm-row sqm-style-row"><span class="sqm-lb" title="Exam style" aria-label="Style">🎓</span>
+                    ${Object.entries(window.SQM_EXAM_STYLES).map(([k, s], i) => `<button type="button" class="sqm-chip sqm-style${i === 0 ? ' on' : ''}" aria-pressed="${i === 0}" data-val="${k}" title="${s.label} · ${s.title}" aria-label="${s.label}" onclick="sqmSetStyle(this)">${s.flag}${s.tag ? `<small>${s.tag}</small>` : ''}</button>`).join('')}
                     <input type="hidden" id="suggest-style" value="thai">
                 </div>
-                <div class="sqm-row sqm-scope-row" hidden><span class="sqm-lb">Scope</span>
+                <div class="sqm-row sqm-scope-row" hidden><span class="sqm-lb" title="Scope" aria-label="Scope">🎚️</span>
                     <div class="sqm-seg" role="group" aria-label="Scope">
-                        <button type="button" class="sqm-scope on" data-val="clinical" onclick="sqmSetScope(this)">Clinical only</button>
-                        <button type="button" class="sqm-scope" data-val="full" onclick="sqmSetScope(this)">+ Law &amp; systems</button>
+                        <button type="button" class="sqm-scope on" data-val="clinical" title="Clinical only" aria-label="Clinical only" onclick="sqmSetScope(this)">🩺</button>
+                        <button type="button" class="sqm-scope" data-val="full" title="+ Law &amp; systems" aria-label="Clinical + law &amp; systems" onclick="sqmSetScope(this)">🩺⚖️</button>
                     </div>
                     <input type="hidden" id="suggest-scope" value="clinical">
                 </div>
                 <div class="sqm-style-hint" hidden></div>
-                <div class="sqm-row"><span class="sqm-lb">Level</span>
+                <div class="sqm-row"><span class="sqm-lb" title="Difficulty" aria-label="Level">📶</span>
                     <div class="sqm-seg" role="group" aria-label="Difficulty">
-                        <button type="button" class="sq-diff-btn on" data-val="easy" onclick="setSqDiff(this, 'easy')">Easy</button>
-                        <button type="button" class="sq-diff-btn" data-val="medium" onclick="setSqDiff(this, 'medium')">Medium</button>
-                        <button type="button" class="sq-diff-btn" data-val="hard" onclick="setSqDiff(this, 'hard')">Hard</button>
+                        <button type="button" class="sq-diff-btn on" data-val="easy" title="Easy" aria-label="Easy" onclick="setSqDiff(this, 'easy')">🟢</button>
+                        <button type="button" class="sq-diff-btn" data-val="medium" title="Medium" aria-label="Medium" onclick="setSqDiff(this, 'medium')">🟡</button>
+                        <button type="button" class="sq-diff-btn" data-val="hard" title="Hard" aria-label="Hard" onclick="setSqDiff(this, 'hard')">🔴</button>
                     </div>
                     <input type="hidden" id="suggest-diff" value="easy">
                 </div>
-                <div class="sqm-row"><span class="sqm-lb">Model</span>
+                <div class="sqm-row"><span class="sqm-lb" title="AI model" aria-label="Model">🤖</span>
                     <div class="audit-toolbar sqm-rail lang-no-toggle">${window.providerModelRailHtml('suggest-more-model', sqmModel, sqmAction)}</div>
                 </div>
-                <div class="sqm-row"><span class="sqm-lb">Focus</span>
-                    ${sqmFocus.map(([v, label, title], i) => `<button type="button" class="sqm-chip sqm-focus${i === 0 ? ' on' : ''}" aria-pressed="${i === 0}" data-val="${v}" title="${title}" onclick="sqmSetFocus(this)">${label}</button>`).join('')}
+                <div class="sqm-row"><span class="sqm-lb" title="Focus" aria-label="Focus">🎯</span>
+                    ${sqmFocus.map(([v, label, title], i) => { const sp = label.indexOf(' '), lb = label.slice(sp + 1); return `<button type="button" class="sqm-chip sqm-focus${i === 0 ? ' on' : ''}" aria-pressed="${i === 0}" data-val="${v}" data-lb="${lb}" title="${lb} — ${title}" aria-label="${lb}" onclick="sqmSetFocus(this)">${label.slice(0, sp)}</button>`; }).join('')}
                     <input type="hidden" id="suggest-focus" value="new_topics">
                 </div>
                 <div class="sqm-custom" hidden>
@@ -20072,6 +20087,7 @@ RULES:
             const sqmStyleRow = modal.querySelector('.sqm-style-row');
             if (window.twemoji && sqmStyleRow) twemoji.parse(sqmStyleRow, { folder: 'svg', ext: '.svg' });
             if (window.speechSynthesis) speechSynthesis.getVoices(); // V102.01: Chrome loads voices on first ask — ask now, not on the chip press
+            sqmLoadTypical();
             sqmSummary();
         };
 
@@ -20081,7 +20097,7 @@ RULES:
         window.SQM_EXAM_STYLES = {
             thai: { flag: '🇹🇭', label: 'Thai PC', title: 'Thai Pharmacy Council blueprint (default)', hint: '', scope: false,
                 prompt: n => `- Cognitive-level mix across the ${n} questions (Thai Pharmacy Council exam blueprint, recall:interpretation:problem-solving = 3:8:4): mostly INTERPRETATION (apply given patient/case data to reach an answer), some PROBLEM-SOLVING (multi-step clinical reasoning), at most 1 in 5 pure RECALL` },
-            pebc1: { flag: '🇨🇦', label: 'PEBC I', title: 'PEBC Qualifying Exam Part I — applied MCQ, from the public 2026 blueprint', scope: true,
+            pebc1: { flag: '🇨🇦', label: 'PEBC I', tag: 'I', title: 'PEBC Qualifying Exam Part I — applied MCQ, from the public 2026 blueprint', scope: true,
                 hint: 'Applied case-based MCQ · clinical care ~45%, then dispensing, health promotion, safety · generic names. Our own questions in PEBC Part I style — not real PEBC items.',
                 prompt: (n, scope) => [
                     `- Exam style: PEBC Part I-style (Canadian Pharmacist Qualifying Exam, MCQ), modelled on the public 2026 blueprint. Write original items; never reproduce or closely paraphrase real PEBC questions.`,
@@ -20092,7 +20108,7 @@ RULES:
                         ? `- Scope: Canadian practice context allowed where it fits (NAPRA drug schedules, federal/provincial regulation); use generic drug names.`
                         : `- Scope: clinical only — no Canadian law, drug schedules or provincial rules; use generic drug names and internationally accepted guidelines.`
                 ].join('\n                ') },
-            pebc2: { flag: '🇨🇦', label: 'PEBC II · OSCE', title: 'PEBC Qualifying Exam Part II — OSCE station style, from the public station format', scope: true,
+            pebc2: { flag: '🇨🇦', label: 'PEBC II · OSCE', tag: 'II', title: 'PEBC Qualifying Exam Part II — OSCE station style, from the public station format', scope: true,
                 hint: 'OSCE stations as questions · counselling / drug-therapy-problem / written-response tasks · best-response MCQ or a marking guide. Our own stations — not real PEBC items.',
                 prompt: (n, scope) => [
                     `- Exam style: PEBC Part II-style OSCE STATIONS (Canadian Pharmacist Qualifying Exam), modelled on the public station format. Write original stations; never reproduce real PEBC stations.`,
@@ -20227,13 +20243,80 @@ RULES:
             const btn = document.getElementById('btn-suggest-start');
             if (!btn) return;
             const n = Math.max(1, Math.min(10, parseInt(document.getElementById('suggest-n').value, 10) || 3));
-            const level = (document.querySelector('#ai-suggest-config-modal .sq-diff-btn.on') || {}).textContent || 'Easy';
-            const focus = ((document.querySelector('#ai-suggest-config-modal .sqm-focus.on') || {}).textContent || '').replace(/^\S+\s/, '');
+            const lv = ((document.querySelector('#ai-suggest-config-modal .sq-diff-btn.on') || {}).dataset || {}).val || 'easy';
+            const level = lv.charAt(0).toUpperCase() + lv.slice(1);
+            const focus = ((document.querySelector('#ai-suggest-config-modal .sqm-focus.on') || {}).dataset || {}).lb || '';
             const model = window.aiModelShortName(document.getElementById('suggest-more-model').value);
             const styleKey = (document.getElementById('suggest-style') || {}).value || 'thai';
             const styleDef = window.SQM_EXAM_STYLES[styleKey] || window.SQM_EXAM_STYLES.thai;
             const style = styleKey === 'thai' ? '' : styleDef.label + (styleDef.scope ? ((document.getElementById('suggest-scope') || {}).value === 'full' ? ' · + Law' : ' · Clinical') : '');
             btn.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> Generate ${n} question${n === 1 ? '' : 's'}<small>${escapeHtml([style, level, focus, model].filter(Boolean).join(' · '))}</small>`;
+        };
+
+        // V102.278: typical seconds per model for Expand quiz = this week's ai_evals average of feature `quiz_suggestion`
+        // (written by recordAiLatency). One read per page load; nothing shown when a model has no history yet.
+        window.sqmLoadTypical = function() {
+            if (window._sqmTypical || window._sqmTypicalLoading) return;
+            window._sqmTypicalLoading = true;
+            try {
+                const since = new Date(Date.now() - 6 * 86400000).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+                db.collection('ai_evals').where('date', '>=', since).orderBy('date', 'desc').get().then(snap => {
+                    const t = {};
+                    snap.forEach(doc => Object.entries(doc.data().latency || {}).forEach(([m, feats]) => {
+                        const v = (feats || {}).quiz_suggestion;
+                        if (v && v.n) { const a = t[m] = t[m] || { n: 0, ms: 0 }; a.n += v.n; a.ms += v.ms || 0; }
+                    }));
+                    window._sqmTypical = t;
+                }).catch(() => { window._sqmTypical = {}; });
+            } catch (_) { window._sqmTypical = {}; }
+        };
+        window.sqmTypicalSec = function(model) {
+            const a = (window._sqmTypical || {})[model];
+            return a && a.n ? Math.max(1, Math.round(a.ms / a.n / 1000)) : 0;
+        };
+        // Waiting state: the form locks, the button counts seconds (bar = share of the usual time, amber past 2x the usual
+        // or 60 s when the model has no history) and a Stop button appears. callUniversalAI has no abort signal, so Stop
+        // only stops WAITING — the call may still finish on the server and its answer is dropped.
+        window.sqmBusyStart = function(btn) {
+            const modal = document.getElementById('ai-suggest-config-modal');
+            const run = { t0: Date.now(), text: 'Brainstorming…', stopped: false, timer: null };
+            const modelId = (document.getElementById('suggest-more-model') || {}).value;
+            const typ = window.sqmTypicalSec(modelId);
+            const model = window.aiModelShortName(modelId);
+            run.cancelled = new Promise((_, rej) => { run.stop = () => { run.stopped = true; const e = new Error('Stopped'); e.sqmStopped = true; rej(e); }; });
+            run.cancelled.catch(() => {});
+            if (modal) {
+                modal.classList.add('sqm-busy');
+                modal.querySelectorAll('.sqm-row, .sqm-custom, .sqm-style-hint').forEach(el => { el.inert = true; });
+                const row = document.createElement('div'); row.className = 'sqm-gorow';
+                btn.replaceWith(row); row.appendChild(btn);
+                const stop = document.createElement('button');
+                stop.type = 'button'; stop.className = 'sqm-stop';
+                stop.title = 'Stop waiting — the AI call may still finish on the server'; stop.setAttribute('aria-label', 'Stop waiting');
+                stop.innerHTML = '<i class="fa-solid fa-stop"></i>';
+                stop.onclick = () => { stop.disabled = true; run.stop(); };
+                row.appendChild(stop);
+                run.row = row;
+            }
+            const paint = () => {
+                const secs = Math.floor((Date.now() - run.t0) / 1000);
+                const slow = secs > (typ ? typ * 2 : 60);
+                btn.className = 'sqm-go' + (slow ? ' slow' : '');
+                btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${run.text} <b>${secs}s</b><small>${slow ? '⏳ Slower than usual' : escapeHtml(model) + (typ ? ' · ~' + typ + 's' : '')}</small>${typ ? `<i class="sqm-bar" style="width:${Math.min(100, Math.round(secs / typ * 100))}%"></i>` : ''}`;
+            };
+            run.label = text => { run.text = text; paint(); };
+            run.end = () => {
+                clearInterval(run.timer);
+                const m = document.getElementById('ai-suggest-config-modal');
+                if (!m) return;
+                m.classList.remove('sqm-busy');
+                m.querySelectorAll('.sqm-row, .sqm-custom, .sqm-style-hint').forEach(el => { el.inert = false; });
+                if (run.row && run.row.parentNode) run.row.replaceWith(btn);
+                btn.className = 'sqm-go';
+            };
+            paint();
+            run.timer = setInterval(paint, 1000);
+            return run;
         };
 
         window.suggestMoreQuestionsAI = async function() {
@@ -20267,15 +20350,17 @@ RULES:
                 ? detectLanguage(formData.questions[0].q)
                 : 'Thai';
             
+            let run = null;
             try {
                 btn.disabled = true;
+                run = window.sqmBusyStart(btn);
                 // V101.77: links in the Custom box are read server-side (fetchLinkText) and
                 // their page text goes into the prompt; a link that can't be read stops here.
                 const links = [...new Set(customText.match(/\bhttps?:\/\/[^\s<>"')\]]+|\bwww\.[^\s<>"')\]]+/gi) || [])].map(u => u.replace(/[.,;:]+$/, ''));
                 if (links.length > 3) throw new Error(`Up to 3 links can be read — this box has ${links.length}.`);
                 const pages = [];
                 for (const [i, link] of links.entries()) {
-                    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Reading link ${i + 1}/${links.length}...`;
+                    run.label(`Reading link ${i + 1}/${links.length}…`);
                     const resp = await fetch('https://us-central1-intern-port-edfa7.cloudfunctions.net/fetchLinkText', {
                         method: 'POST', headers: await window._aiAuthHeaders(), body: JSON.stringify({ url: link })
                     });
@@ -20287,7 +20372,8 @@ RULES:
                 --- SOURCE PAGES (text read from the admin's links) ---
                 ${pages.join('\n\n')}
                 ` : '';
-                btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Brainstorming...`;
+                if (run.stopped) throw run.stopErr || Object.assign(new Error('Stopped'), { sqmStopped: true });
+                run.label('Brainstorming…');
 
                 const prompt = `You are an expert educational assessment designer. Create exactly ${n} HIGH-QUALITY, CHALLENGING questions that enhance the quiz "${quizTitle}" beyond simple translation.
                 
@@ -20329,7 +20415,9 @@ RULES:
                 ]}`;
 
                 const selectedModel = window._suggestMoreModel = textAIModel(document.getElementById('suggest-more-model') ? 'suggest-more-model' : 'ai-analyzer-model-val'); // V101.34: modal rail, else Settings default
-                const { text: resultRaw } = await callUniversalAI(selectedModel, prompt, true, null, '', { feature: 'quiz_suggestion' });
+                const aiCall = callUniversalAI(selectedModel, prompt, true, null, '', { feature: 'quiz_suggestion' });
+                aiCall.catch(() => {}); // a call Stop walked away from may still fail later — nobody is waiting on it
+                const { text: resultRaw } = await Promise.race([aiCall, run.cancelled]);
                 // V92.35: use shared safeJsonParse with bracket-extraction fallback
                 const suggestions = safeJsonParse(resultRaw);
                 if (!suggestions) throw new Error('AI returned invalid JSON. First 200 chars: ' + String(resultRaw || '').slice(0, 200));
@@ -20342,10 +20430,14 @@ RULES:
                 if (got && got < Number(n)) showToast(`AI returned ${got} of ${n} questions.`);
 
             } catch(e) {
-                console.error(e);
-                alert("Suggestion error: " + e.message);
+                if (run) run.end();
                 btn.disabled = false;
                 sqmSummary();
+                if (e && e.sqmStopped) return; // the admin pressed Stop — not an error
+                console.error(e);
+                alert("Suggestion error: " + e.message);
+            } finally {
+                if (run) run.end();
             }
         };
 
