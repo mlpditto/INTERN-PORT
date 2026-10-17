@@ -1,7 +1,7 @@
 // V102.266 — the exact badge counts admin reads for the export must be the SAME numbers the intern app computes. The REAL index.html functions
 // (collectAchievementMetrics, collectReflectiveMetrics, schLoadCheckinDays, quizTagList, …) run in a vm on a fixture; the REAL admin.html
 // badgeCountsFromData runs in Chromium on the same fixture; every number is compared. Also: a failed read leaves its badges out (never 0),
-// the export label shows the exact number (singular for 1) and falls back to the milestone, and the dialog says which.
+// the export label shows the exact number (singular for 1) or nothing but the name (no "N+" guess), and the dialog says which.
 const fs = require('node:fs'), vm = require('node:vm');
 const assert = require('node:assert/strict');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -94,11 +94,11 @@ vm.runInContext([
     assert.deepEqual(r.nothing, {}, 'nothing loaded → no numbers at all (never zeros)');
     assert.deepEqual(r.live, app, 'badgeLiveCounts reads the five collections and gives the same numbers');
     assert.ok(!('reflective_mind' in r.liveNoLogs) && !('mentor_feedback' in r.liveNoLogs) && r.liveNoLogs.early_bird === 2, 'a rejected read is skipped, the others stay');
-    assert.ok(r.labelNone.includes('5+ questions') === false && r.labelNone.includes('50+ questions'), 'no counts → the milestone (Quiz Master silver = 50+)');
-    assert.ok(r.labelLive.includes('29 questions') && !r.labelLive.includes('50+ questions'), 'a read number replaces the milestone');
+    assert.ok(r.labelNone.includes('Quiz Master') && !r.labelNone.some(x => /^\d+ \S+$|\d\+ /.test(x)), 'no counts → the names only, no number and no "N+" guess');
+    assert.ok(r.labelLive.includes('29 questions'), 'a read number is written');
     assert.ok(r.labelLive.includes('1 event') && !r.labelLive.includes('1 events'), 'singular for 1');
     assert.ok(r.labelLive.includes('0 check-ins'), 'a real 0 is shown as 0 (only "unknown" falls back)');
-    assert.ok(r.labelLive.includes('7+ logs'), 'a badge without a read number keeps its milestone');
+    assert.ok(r.labelLive.includes('Reflective Mind') && !r.labelLive.some(x => /logs$/.test(x)) && !r.labelLive.some(x => /\d\+ /.test(x)), 'a badge without a read number keeps its name only');
     console.log('PASS: badge live counts — admin numbers equal the app\'s on one fixture (9 badges), failed / missing sources are skipped (never 0), label shows the number (singular, real 0) or the milestone');
   } finally { await browser.close(); }
 })().catch(e => { console.error('FAIL:', e.message); process.exit(1); });

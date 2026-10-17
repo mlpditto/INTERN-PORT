@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.266)</title>
+    <title>Nika Admin (V102.267)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -38089,14 +38089,14 @@ They can connect again from LINE.
             { id: 'social_butterfly', title: 'Social Butterfly', art: 'butterfly', steps: 4 },
             { id: 'legend', title: 'Legend', art: 'gem', steps: 1, oneOff: 4 }
         ];
-        // V102.263: the milestone of each tier (steps) and its unit, copied from index.html achievementCatalog — the export writes "150+ questions" under a badge.
-        // Admin only knows the LEVEL a person reached (users.badges[id].level), not the live count, so the label is the milestone reached, never an exact count.
+        // V102.263 / V102.267: the unit written after a count under a badge in the export ("187 questions", "1 event"). A count is written ONLY when it was read
+        // (badgeLiveCounts); a badge whose number is not certain shows its name alone — no "N+" milestone any more.
         const BADGE_STEP_INFO = {
-            on_fire: { thr: [3, 7, 14, 30], unit: 'days', one: 'day' }, early_bird: { thr: [5, 15, 30], unit: 'check-ins', one: 'check-in' }, quiz_master: { thr: [10, 50, 150, 300], unit: 'questions', one: 'question' },
-            perfectionist: { thr: [1, 5, 15], unit: 'quizzes', one: 'quiz' }, case_hunter: { thr: [1, 5, 15, 30], unit: 'cases', one: 'case' }, reflective_mind: { thr: [1, 7, 15, 30], unit: 'logs', one: 'log' },
-            mentor_feedback: { thr: [1, 5, 15], unit: 'reviews', one: 'review' }, quest_finisher: { thr: [1, 5, 10], unit: 'quests', one: 'quest' }, speedrunner: { thr: [1, 5, 15], unit: 'quizzes', one: 'quiz' },
-            explorer: { thr: [3, 6, 10], unit: 'topics', one: 'topic' }, codex_contributor: { thr: [1, 5, 15], unit: 'entries', one: 'entry' }, team_player: { thr: [25, 100, 250, 500], unit: 'journals', one: 'journal' },
-            social_butterfly: { thr: [1, 5, 10, 20], unit: 'events', one: 'event' }
+            on_fire: { unit: 'days', one: 'day' }, early_bird: { unit: 'check-ins', one: 'check-in' }, quiz_master: { unit: 'questions', one: 'question' },
+            perfectionist: { unit: 'quizzes', one: 'quiz' }, case_hunter: { unit: 'cases', one: 'case' }, reflective_mind: { unit: 'logs', one: 'log' },
+            mentor_feedback: { unit: 'reviews', one: 'review' }, quest_finisher: { unit: 'quests', one: 'quest' }, speedrunner: { unit: 'quizzes', one: 'quiz' },
+            explorer: { unit: 'topics', one: 'topic' }, codex_contributor: { unit: 'entries', one: 'entry' }, team_player: { unit: 'journals', one: 'journal' },
+            social_butterfly: { unit: 'events', one: 'event' }
         };
         const BADGE_STATS_TIERS = [['Bronze', '#a0592a'], ['Silver', '#5b6b80'], ['Gold', '#8f6200'], ['Diamond', '#4c3aa8']];
 
@@ -38628,12 +38628,12 @@ They can connect again from LINE.
             const lc = layout === 'story' ? ['#ffffffee', '#ffffffa6', 8.2, 7.4] : layout === 'banner' ? ['#e2e8f0', '#94a3b8', 7, 6] : ['#334155', '#64748b', 5.2, 4.6];
             const label = (it, d, cx, y) => {
                 if (!it.t || st.labels === 'none') return '';
-                const info = BADGE_STEP_INFO[d.id], thr = st.labels !== 'name' && info && d.steps > 1 ? info.thr[Math.min(it.t, info.thr.length) - 1] : 0;
+                const info = BADGE_STEP_INFO[d.id], n = st.counts && st.counts[d.id];
                 // ≈ 0.6 em per bold char (the font may be Nunito or a wider fallback): a line that would not fit its cell gets a smaller font, never a stretched one
                 const fs = (t, size) => Math.min(size, (g.cell - 8) / (String(t).length * 0.6));
-                const n = st.counts && st.counts[d.id];   // V102.266: a number only when it was read (never a 0 for "not loaded")
-                const t2 = thr ? (Number.isFinite(n) ? n + ' ' + (n === 1 ? info.one : info.unit) : thr + '+ ' + info.unit) : '';
-                return txt(cx, y + lc[2] + 3, fs(d.title, lc[2]), 800, lc[0], d.title) + (thr ? txt(cx, y + lc[2] + lc[3] + 5.5, fs(t2, lc[3]), 700, lc[1], t2) : '');
+                // V102.266: a number only when it was read (never a 0 for "not loaded"); V102.267: nothing when it was not — no milestone guess
+                const t2 = st.labels !== 'name' && info && d.steps > 1 && Number.isFinite(n) ? n + ' ' + (n === 1 ? info.one : info.unit) : '';
+                return txt(cx, y + lc[2] + 3, fs(d.title, lc[2]), 800, lc[0], d.title) + (t2 ? txt(cx, y + lc[2] + lc[3] + 5.5, fs(t2, lc[3]), 700, lc[1], t2) : '');
             };
             const tiles = (x0) => g.items.map((it, i) => {
                 const d = BADGE_STATS_DEFS.find(x => x.id === it.id), x = x0 + (i % g.cols) * g.cell + (g.cell - g.bw) / 2, y = g.y0 + Math.floor(i / g.cols) * g.row;
@@ -38779,7 +38779,7 @@ They can connect again from LINE.
                     <button type="button" onclick="closeBadgeExport()" aria-label="Close" style="margin-left:auto; width:32px; height:32px; min-height:0; padding:0; border:none; background:transparent; font-size:20px; cursor:pointer; color:#94a3b8;">×</button></div>
                 <div style="display:grid; grid-template-columns:repeat(${layouts.length}, minmax(0, 1fr)); gap:10px;">${thumbs}</div>
                 <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:12px; font-size:0.85em;">${tierChips}${avatarChips}<span style="margin-left:auto; color:#94a3b8; font-size:0.85em;">${st.kind === 'board' ? '1024 px PNG' : '1024 px · transparent PNG'}</span></div>
-                ${st.kind === 'board' && (st.labels || 'full') === 'full' ? `<div style="font-size:0.72em; color:#94a3b8; margin-top:8px;">${st.countsState === 'loading' ? 'Reading the exact counts…' : st.countsState === 'fail' || !st.counts ? 'Exact counts unavailable — showing milestones (N+)' : 'Exact counts read now for ' + Object.keys(st.counts).filter(k => st.items.some(i => i.id === k && i.t)).length + ' badges; the others show their milestone (N+)'}</div>` : ''}
+                ${st.kind === 'board' && (st.labels || 'full') === 'full' ? `<div style="font-size:0.72em; color:#94a3b8; margin-top:8px;">${st.countsState === 'loading' ? 'Reading the exact counts…' : st.countsState === 'fail' || !st.counts ? 'Exact counts unavailable — badge names only' : 'Exact counts read now for ' + Object.keys(st.counts).filter(k => st.items.some(i => i.id === k && i.t)).length + ' badges; the others show the name only'}</div>` : ''}
                 <div style="display:flex; gap:8px; margin-top:12px;">
                     <button type="button" onclick="badgeExportDownload()" style="flex:1; min-height:0; padding:9px; border:none; border-radius:10px; background:#7c3aed; color:#fff; font-weight:800; font-size:0.86em; cursor:pointer;">⬇ Download PNG</button>
                     <button type="button" onclick="badgeExportCopy()" style="width:auto; min-height:0; padding:9px 14px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; color:#334155; font-weight:800; font-size:0.86em; cursor:pointer;">Copy image</button>

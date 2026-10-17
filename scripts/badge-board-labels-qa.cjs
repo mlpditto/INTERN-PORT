@@ -1,4 +1,4 @@
-// V102.263 — the exported badge board writes a label under every earned badge: its name, then the milestone reached ("150+ questions").
+// V102.263 / V102.267 — the exported badge board writes a label under every earned badge: its name, then the exact count when it was read ("187 questions"); no count = the name alone (no "N+" milestone).
 // Real admin.html functions in Chromium. Checks: label text per tier (steps from the catalog), one-off badges = name only, locked tiles
 // unlabelled (no secret names leak), no two labels overlap in any layout even with the longest names, the PNG still encodes, no n/16 count.
 const fs = require('node:fs');
@@ -15,7 +15,8 @@ assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(fs.readFileSync('publi
     const r = await page.evaluate(async () => {
       const mkItems = tiers => BADGE_STATS_DEFS.map(d => ({ id: d.id, t: tiers[d.id] || 0 }));
       const full = {}; BADGE_STATS_DEFS.forEach(d => { full[d.id] = d.steps === 1 ? (d.oneOff || 3) : Math.min(d.steps, 4); });
-      const base = { kind: 'board', person: 'Bua', sub: 'Hospital Pharmacy › PRETEST', score: 11.85, avatar: 'none' };
+      const COUNTS = { on_fire: 4, quiz_master: 187, perfectionist: 5, case_hunter: 2, reflective_mind: 7, mentor_feedback: 3, quest_finisher: 1, speedrunner: 2, explorer: 5, codex_contributor: 1, team_player: 612, social_butterfly: 6, early_bird: 9 };
+      const base = { kind: 'board', person: 'Bua', sub: 'Hospital Pharmacy › PRETEST', score: 11.85, avatar: 'none', counts: COUNTS };
       const out = { layouts: {} };
       for (const [name, tiers] of [['sample', { on_fire: 1, quiz_master: 3, perfectionist: 2, speedrunner: 1, social_butterfly: 4, graduate: 3 }], ['full', full], ['full-wide', full]]) {
         for (const l of ['card', 'banner', 'story']) {
@@ -42,17 +43,18 @@ assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(fs.readFileSync('publi
     const L = r.layouts;
     for (const l of ['card', 'banner', 'story']) {
       const t = L['sample:' + l].texts;
-      assert.ok(t.includes('On Fire') && t.includes('3+ days'), l + ': On Fire bronze = "3+ days"');
-      assert.ok(t.includes('Quiz Master') && t.includes('150+ questions'), l + ': Quiz Master gold = "150+ questions"');
-      assert.ok(t.includes('Perfectionist') && t.includes('5+ quizzes'), l + ': Perfectionist silver = "5+ quizzes"');
-      assert.ok(t.includes('Social Butterfly') && t.includes('20+ events'), l + ': Social Butterfly diamond = "20+ events"');
-      assert.ok(t.includes('Graduate') && !t.some(x => /^\d+\+ /.test(x) && x.includes('Graduate')), l + ': one-off badge = name only');
-      const milestones = t.filter(x => /^\d+\+ /.test(x)).length; assert.equal(milestones, 5, l + ': 5 milestone lines for the 5 multi-step badges (Graduate has none)');
+      assert.ok(t.includes('On Fire') && t.includes('4 days'), l + ': On Fire = "4 days"');
+      assert.ok(t.includes('Quiz Master') && t.includes('187 questions'), l + ': Quiz Master = "187 questions"');
+      assert.ok(t.includes('Perfectionist') && t.includes('5 quizzes'), l + ': Perfectionist = "5 quizzes"');
+      assert.ok(t.includes('Social Butterfly') && t.includes('6 events'), l + ': Social Butterfly = "6 events"');
+      assert.ok(t.includes('Graduate'), l + ': one-off badge = name only');
+      const counts = t.filter(x => /^\d+ \S+$/.test(x)).length; assert.equal(counts, 5, l + ': 5 count lines for the 5 multi-step badges (Graduate has none)');
+      assert.ok(!t.some(x => /\d\+ /.test(x)), l + ': no "N+" milestone anywhere');
       assert.ok(!t.includes('Night Owl') && !t.includes('Early Bird') && !t.includes('Legend'), l + ': locked / unearned badges are not named');
       assert.ok(!t.some(x => /\d+\/\d+/.test(x)), l + ': no n/16 count');
       for (const k of ['sample:', 'full:', 'full-wide:']) { const v = L[k + l]; assert.equal(v.overlaps, 0, k + l + ': no overlapping text ' + JSON.stringify(r.ov)); assert.ok(v.inside, k + l + ': every label is inside the picture'); }
     }
-    assert.ok(L['full:story'].texts.includes('Codex Contributor') && L['full:story'].texts.includes('500+ journals'), 'longest names + the 4th Team Player step are drawn');
+    assert.ok(L['full:story'].texts.includes('Codex Contributor') && L['full:story'].texts.includes('612 journals'), 'longest names + a 3-digit count are drawn');
     assert.deepEqual(r.png, { type: 'image/png', size: true }, 'PNG encodes');
     assert.equal(r.rowStory, 101, 'story row = tile 72 + label 29');
     console.log('PASS: badge board labels — name + milestone under each earned badge (Card / Banner / Story), one-offs name only, locked unlabelled, no overlaps with the longest names, PNG encodes');
