@@ -22,7 +22,7 @@
         { id: 'or/deepseek/deepseek-v4.1-flash', label: 'DeepSeek V4.1 Flash', short: 'DeepSeek Flash V4.1', hint: 'DeepSeek รุ่นประหยัด ผ่าน OpenRouter' },
         { id: 'or/deepseek/deepseek-v4-pro-0813', label: 'DeepSeek V4 Pro', short: 'DeepSeek Pro V4', hint: 'DeepSeek รุ่นใหญ่ เหมาะกับงานวิเคราะห์ ผ่าน OpenRouter' },
         // V102.268: Meta Muse Spark Open (open weights, 1M context; text / image / video / audio in, text out) via OpenRouter — its own Muse tab, drawn with the Meta mark.
-        { id: 'or/meta/muse-spark-open', label: 'Muse Spark Open', short: 'Muse Spark Open', hint: 'Muse Spark Open ของ Meta (open weights, บริบท 1M) ผ่าน OpenRouter รับภาพ วิดีโอ เสียง เหมาะกับงานโค้ดและงาน agent' }
+        { id: 'or/meta/muse-spark-open', label: 'Muse Spark Open', short: 'Muse Spark Open', hint: 'Muse Spark Open ของ Meta (open weights, บริบท 1M) ผ่าน OpenRouter รับภาพ วิดีโอ เสียง เหมาะกับงานโค้ดและงาน agent 메타 Muse Spark Open (오픈 웨이트, 컨텍스트 1M), OpenRouter 경유, 이미지·영상·음성 입력, 코드·에이전트 작업에 적합' }
     ];
     // Official marks (assets/logos, from openai.com/brand and anthropic.com/press-kit). Owners
     // without a small official mark (Qwen, DeepSeek) carry their name in `short` instead.
