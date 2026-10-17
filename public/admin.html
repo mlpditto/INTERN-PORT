@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.269)</title>
+    <title>Nika Admin (V102.270)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -38610,6 +38610,24 @@ They can connect again from LINE.
             }
             return parts.join('   ·   ');
         }
+        // V102.270: a short quote on the picture (any layout). Wraps to at most 3 lines; widths in em: CJK / Hangul = 1, Thai = .5, others = .56.
+        function badgeQuoteLines(text, maxEm, maxLines = 3) {
+            const t = String(text || '').replace(/\s+/g, ' ').trim();
+            if (!t) return [];
+            const w = ch => /[\u1100-\u11ff\u2e80-\u9fff\uac00-\ud7af\uff00-\uffef]/.test(ch) ? 1 : (/[\u0e00-\u0e7f]/.test(ch) ? 0.5 : 0.56);
+            const width = str => [...str].reduce((a, ch) => a + w(ch), 0);
+            let words;
+            try { words = [...new Intl.Segmenter(undefined, { granularity: 'word' }).segment(t)].map(x => x.segment); } catch (_) { words = t.split(/(?<=\s)/); }
+            const lines = []; let cur = '';
+            for (const word of words) {
+                if (width(cur + word) <= maxEm || !cur) cur += word;
+                else { lines.push(cur.trim()); cur = word.trimStart(); }
+                while (width(cur) > maxEm) { let k = 1; while (k < cur.length && width(cur.slice(0, k + 1)) <= maxEm) k++; lines.push(cur.slice(0, k).trim()); cur = cur.slice(k); }   // one very long word
+            }
+            if (cur.trim()) lines.push(cur.trim());
+            if (lines.length > maxLines) { const keep = lines.slice(0, maxLines); let last = keep[maxLines - 1]; while (last && width(last + '…') > maxEm) last = last.slice(0, -1); keep[maxLines - 1] = last.trimEnd() + '…'; return keep; }
+            return lines;
+        }
         function badgeBoardGeom(st, layout) {
             const lab = ({ full: { banner: 21, story: 29, card: 18 }, name: { banner: 13, story: 17, card: 11 } }[st.labels || 'full'] || {})[layout] || 0;   // V102.265: room under a tile for its label (none = 0)
             const hide = st.hide || [];
@@ -38617,10 +38635,12 @@ They can connect again from LINE.
             const photo = st.avatar === 'photo' && !!(st.photo64 || st.pictureUrl);
             const nOn = st.showName !== false && !!st.person, sOn = st.showScore !== false && st.score !== undefined && st.score !== '';   // V102.269: the header closes up when the name / score line is off
             const footText = badgeBoardFoot(st, items.filter(i => i.t)), foot = footText ? { banner: 24, story: 34, card: 26 }[layout] : 0;
-            if (layout === 'banner') { const rows = Math.max(1, Math.ceil(items.length / 8)); return { items, photo, footText, w: 560, h: 92 + rows * (62 + lab) + 18 + foot, cols: 8, cell: 64, bw: 52, y0: 92, row: 62 + lab }; }
-            if (layout === 'story') { const rows = Math.max(1, Math.ceil(items.length / 4)), y0 = (photo ? 268 : 206) - (nOn ? 0 : 30) - (sOn ? 0 : 24); return { items, photo, footText, w: 360, h: y0 + rows * (72 + lab) + 24 + foot, cols: 4, cell: 76, bw: 62, y0, row: 72 + lab }; }   // height follows the badge count
+            const qfs = { banner: 11, story: 13, card: 11.5 }[layout], qLines = st.showQuote ? badgeQuoteLines(st.quote, (({ banner: 560, story: 360, card: 400 })[layout] - 60) / qfs) : [];
+            const quoteH = qLines.length ? Math.round(qLines.length * qfs * 1.45 + 18) : 0;   // room for the quote, just above the bottom line
+            if (layout === 'banner') { const rows = Math.max(1, Math.ceil(items.length / 8)); return { items, photo, footText, w: 560, h: 92 + rows * (62 + lab) + 18 + foot + quoteH, qLines, qfs, quoteH, foot, cols: 8, cell: 64, bw: 52, y0: 92, row: 62 + lab }; }
+            if (layout === 'story') { const rows = Math.max(1, Math.ceil(items.length / 4)), y0 = (photo ? 268 : 206) - (nOn ? 0 : 30) - (sOn ? 0 : 24); return { items, photo, footText, w: 360, h: y0 + rows * (72 + lab) + 24 + foot + quoteH, qLines, qfs, quoteH, foot, cols: 4, cell: 76, bw: 62, y0, row: 72 + lab }; }   // height follows the badge count
             const rows = Math.max(1, Math.ceil(items.length / 7)), y0 = (photo ? 142 : 76) - (nOn ? 0 : 22) - (sOn ? 0 : 18);
-            return { items, photo, footText, w: 400, h: y0 + rows * (54 + lab) + 12 + foot, cols: 7, cell: 50, bw: 44, y0, row: 54 + lab };
+            return { items, photo, footText, w: 400, h: y0 + rows * (54 + lab) + 12 + foot + quoteH, qLines, qfs, quoteH, foot, cols: 7, cell: 50, bw: 44, y0, row: 54 + lab };
         }
         function badgeBoardSvg(st, layout, px) {
             const svg = badgeBoardSvgInner(st, layout, px);
@@ -38653,22 +38673,23 @@ They can connect again from LINE.
                 const svg = badgeSvgHtml(d.art, it.t, g.bw, false).replace('<svg viewBox', `<svg x="${x}" y="${y}" viewBox`).replace(/ style="[^"]*"/, '');
                 return (it.t ? svg : `<g opacity=".25">${svg}</g>`) + label(it, d, x0 + (i % g.cols) * g.cell + g.cell / 2, y + g.bw * 0.98);
             }).join('');
+            const quote = (fill) => g.qLines.map((ln, k, a) => txt(g.w / 2, g.h - g.foot - g.quoteH + 8 + g.qfs + k * g.qfs * 1.45, g.qfs, 700, fill, (k === 0 ? '“' : '') + ln + (k === a.length - 1 ? '”' : ''))).join('');
             const open = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${g.w} ${g.h}" width="${px}" height="${Math.round(px * g.h / g.w)}" style="overflow:hidden;">`;
             const x0 = (g.w - g.cols * g.cell) / 2;
             if (layout === 'banner') {
                 return open + `<rect width="${g.w}" height="${g.h}" rx="22" fill="#0f172a"/>${circle(40, 42, 26, '#334155')}`
                     + txt(g.photo ? 78 : 24, 38, 18, 900, '#fff', person, 'start') + txt(g.photo ? 78 : 24, 58, 11, 700, '#94a3b8', showSub ? st.sub || '' : '', 'start')
-                    + tiles(x0) + (g.footText ? txt(g.w / 2, g.h - 12, 11.5, 800, '#cbd5e1', g.footText) : '') + '</svg>';
+                    + tiles(x0) + quote('#e2e8f0') + (g.footText ? txt(g.w / 2, g.h - 12, 11.5, 800, '#cbd5e1', g.footText) : '') + '</svg>';
             }
             if (layout === 'story') {
                 return open + `<defs><linearGradient id="${uid}g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#312e81"/><stop offset="1" stop-color="#be185d"/></linearGradient></defs><rect width="${g.w}" height="${g.h}" rx="28" fill="url(#${uid}g)"/>`
                     + txt(180, 58, 14, 900, '#ffffffcc', 'MY BADGES') + (g.photo ? circle(180, 130, 52, '#fff') : '')
                     + txt(180, g.photo ? 214 : 160, 26, 900, '#fff', person) + txt(180, (g.photo ? 214 : 160) + (person ? 24 : 0), 13, 700, '#ffffffcc', sub)
-                    + tiles(x0) + (g.footText ? txt(180, g.h - 22, 13, 800, '#ffffffdd', g.footText) : '') + '</svg>';
+                    + tiles(x0) + quote('#ffffffee') + (g.footText ? txt(180, g.h - 22, 13, 800, '#ffffffdd', g.footText) : '') + '</svg>';
             }
             return open + `<defs><linearGradient id="${uid}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#eef2ff"/><stop offset="1" stop-color="#fdf2f8"/></linearGradient></defs><rect width="${g.w}" height="${g.h}" rx="26" fill="url(#${uid}g)"/>`
                 + (g.photo ? circle(200, 52, 34, '#fff') : '') + txt(200, g.photo ? 110 : 40, 22, 900, '#1e293b', person) + txt(200, (g.photo ? 110 : 40) + (person ? 18 : 0), 12, 700, '#475569', sub)
-                + `<rect x="14" y="${g.y0 - 10}" width="${g.w - 28}" height="${g.h - g.y0 - 4}" rx="16" fill="#fff"/>` + tiles(x0) + (g.footText ? txt(200, g.h - 18, 12, 800, '#475569', g.footText) : '') + '</svg>';
+                + `<rect x="14" y="${g.y0 - 10}" width="${g.w - 28}" height="${g.h - g.y0 - 4}" rx="16" fill="#fff"/>` + tiles(x0) + quote('#334155') + (g.footText ? txt(200, g.h - 18, 12, 800, '#475569', g.footText) : '') + '</svg>';
         }
         // V102.266: exact counts for the export, read NOW from the person's own data. Only the badges whose number admin can derive exactly like the app
         // (index.html collectAchievementMetrics / collectReflectiveMetrics / schLoadCheckinDays): early_bird, quiz_master, perfectionist, speedrunner, explorer,
@@ -38731,7 +38752,7 @@ They can connect again from LINE.
         function openBoardExportFor(uid) {
             const u = (usersData || []).find(x => x.id === uid); if (!u) return;
             const items = BADGE_STATS_DEFS.map(d => ({ id: d.id, t: userBadgeTier(u, d.id) || 0, earnedAt: ((u.badges || {})[d.id] || {}).earnedAt || null }));
-            openBadgeExport({ kind: 'board', items, person: u.displayName || '', sub: [u.division, u.group].filter(Boolean).join(' › '), score: u.score !== undefined ? parseFloat(Number(u.score || 0).toFixed(2)) : '', pictureUrl: u.pictureUrl || '', avatar: u.pictureUrl ? 'photo' : 'none', layout: 'card', showName: true, showScore: true, labels: 'full', bg: 'clear', hide: [], showTotals: false, showLatest: false });
+            openBadgeExport({ kind: 'board', items, person: u.displayName || '', sub: [u.division, u.group].filter(Boolean).join(' › '), score: u.score !== undefined ? parseFloat(Number(u.score || 0).toFixed(2)) : '', pictureUrl: u.pictureUrl || '', avatar: u.pictureUrl ? 'photo' : 'none', layout: 'card', showName: true, showScore: true, labels: 'full', bg: 'clear', hide: [], showTotals: false, showLatest: false, quote: '', showQuote: false });
             const st = badgeExportState; st.countsState = 'loading';
             st.countsPromise = badgeLiveCounts(uid).then(c => { st.counts = c; st.countsState = 'ok'; }).catch(() => { st.countsState = 'fail'; }).then(() => { if (badgeExportState === st) renderBadgeExport(); });
         }
@@ -38768,6 +38789,12 @@ They can connect again from LINE.
             openBadgeExport({ kind: 'ach', blank: true, art: d.art, tierIdx: tiers[tiers.length - 1], tiers, title: d.title, layout: 'badge' });
         }
 
+        function badgeExportQuote(v) {   // V102.270: typing a quote switches it on; the pictures follow after a short pause (the box keeps its focus)
+            if (!badgeExportState) return;
+            badgeExportState.quote = v; if (v.trim()) badgeExportState.showQuote = true;
+            clearTimeout(window._bxq);
+            window._bxq = setTimeout(() => { if (!badgeExportState) return; badgeExportState._focusQuote = true; renderBadgeExport(); }, 350);
+        }
         function badgeExportToggle(id) {   // V102.269: leave a badge out of the picture / put it back
             if (!badgeExportState) return;
             const h = badgeExportState.hide || [];
@@ -38792,7 +38819,7 @@ They can connect again from LINE.
                     <div style="font-size:0.72em; font-weight:800; margin-top:5px; color:${st.layout === k ? '#6d28d9' : '#475569'};">${label}</div></button>`).join('');
             const tierChips = st.blank && st.tiers && st.tiers.length > 1 ? `<span style="color:#64748b; font-weight:700;">Tier</span>${st.tiers.map(t => chip(st.tierIdx === t, `badgeExportSet('tierIdx', ${t})`, BADGE_TIERS[t].name.charAt(0) + BADGE_TIERS[t].name.slice(1).toLowerCase())).join('')}` : '';
             const grp = (label, tip, inner) => `<span style="display:inline-flex; align-items:center; gap:6px; flex-wrap:nowrap;"><span style="color:#64748b; font-weight:700;" title="${tip}">${label}</span>${inner}</span>`;
-            const avatarChips = st.kind === 'board' ? `<span style="color:#64748b; font-weight:700;">In the circle</span>${chip(st.avatar === 'photo', "badgeExportSet('avatar', 'photo')", '📷 LINE photo', !st.pictureUrl)}${chip(st.avatar === 'none', "badgeExportSet('avatar', 'none')", 'None')}${grp('Person', 'The name in the picture (and in the file name)', chip(st.showName !== false, "badgeExportSet('showName', true)", '👤 Show') + chip(st.showName === false, "badgeExportSet('showName', false)", 'Hide'))}${grp('Score', 'The line under the name', chip(st.showScore !== false, "badgeExportSet('showScore', true)", '⭐ Show') + chip(st.showScore === false, "badgeExportSet('showScore', false)", 'Hide'))}${grp('Labels', 'Under each badge', chip((st.labels || 'full') === 'full', "badgeExportSet('labels', 'full')", 'Name + count') + chip(st.labels === 'name', "badgeExportSet('labels', 'name')", 'Name') + chip(st.labels === 'none', "badgeExportSet('labels', 'none')", 'None'))}${grp('🏅', 'Badges shown — tap to leave one out', st.items.filter(i => i.t).map(i => { const d = BADGE_STATS_DEFS.find(x => x.id === i.id), on = !(st.hide || []).includes(i.id); return `<button type="button" onclick="badgeExportToggle('${i.id}')" aria-pressed="${on}" aria-label="${escapeHtml(d.title)}" title="${escapeHtml(d.title)}" style="width:34px; min-height:0; height:34px; padding:2px; margin:0; border-radius:9px; border:1.5px solid ${on ? '#c4b5fd' : '#e2e8f0'}; background:#fff; cursor:pointer; opacity:${on ? 1 : 0.35};">${badgeSvgHtml(d.art, i.t, 26, false)}</button>`; }).join(''))}${grp('Σ', 'A line at the bottom: 📚 questions · ⭐ perfect quizzes · 🧭 topics, and 🆕 the latest badge', chip(!!st.showTotals, `badgeExportSet('showTotals', ${!st.showTotals})`, '📚⭐🧭') + chip(!!st.showLatest, `badgeExportSet('showLatest', ${!st.showLatest})`, '🆕'))}${grp('Corners', 'Transparent = see-through corners · White = the rounded card on a white square', chip(st.bg !== 'white', "badgeExportSet('bg', 'clear')", 'Transparent') + chip(st.bg === 'white', "badgeExportSet('bg', 'white')", 'White'))}` : st.kind === 'stamp' && !st.blank ? `<span style="color:#64748b; font-weight:700;">In the circle</span>${chip(st.avatar === '8bit', "badgeExportSet('avatar', '8bit')", '👾 8-bit manga', !st.avatar8)}${chip(st.avatar === 'photo', "badgeExportSet('avatar', 'photo')", '📷 LINE photo', !st.pictureUrl)}${chip(st.avatar === 'none', "badgeExportSet('avatar', 'none')", 'None')}${st.avatar8 ? '' : '<span style="color:#94a3b8;">no 8-bit yet (User Hub ⋯ → 👾)</span>'}` : '';
+            const avatarChips = st.kind === 'board' ? `<span style="color:#64748b; font-weight:700;">In the circle</span>${chip(st.avatar === 'photo', "badgeExportSet('avatar', 'photo')", '📷 LINE photo', !st.pictureUrl)}${chip(st.avatar === 'none', "badgeExportSet('avatar', 'none')", 'None')}${grp('Person', 'The name in the picture (and in the file name)', chip(st.showName !== false, "badgeExportSet('showName', true)", '👤 Show') + chip(st.showName === false, "badgeExportSet('showName', false)", 'Hide'))}${grp('Score', 'The line under the name', chip(st.showScore !== false, "badgeExportSet('showScore', true)", '⭐ Show') + chip(st.showScore === false, "badgeExportSet('showScore', false)", 'Hide'))}${grp('Labels', 'Under each badge', chip((st.labels || 'full') === 'full', "badgeExportSet('labels', 'full')", 'Name + count') + chip(st.labels === 'name', "badgeExportSet('labels', 'name')", 'Name') + chip(st.labels === 'none', "badgeExportSet('labels', 'none')", 'None'))}${grp('🏅', 'Badges shown — tap to leave one out', st.items.filter(i => i.t).map(i => { const d = BADGE_STATS_DEFS.find(x => x.id === i.id), on = !(st.hide || []).includes(i.id); return `<button type="button" onclick="badgeExportToggle('${i.id}')" aria-pressed="${on}" aria-label="${escapeHtml(d.title)}" title="${escapeHtml(d.title)}" style="width:34px; min-height:0; height:34px; padding:2px; margin:0; border-radius:9px; border:1.5px solid ${on ? '#c4b5fd' : '#e2e8f0'}; background:#fff; cursor:pointer; opacity:${on ? 1 : 0.35};">${badgeSvgHtml(d.art, i.t, 26, false)}</button>`; }).join(''))}${grp('Σ', 'A line at the bottom: 📚 questions · ⭐ perfect quizzes · 🧭 topics, and 🆕 the latest badge', chip(!!st.showTotals, `badgeExportSet('showTotals', ${!st.showTotals})`, '📚⭐🧭') + chip(!!st.showLatest, `badgeExportSet('showLatest', ${!st.showLatest})`, '🆕'))}${grp('💬', 'A short quote on the picture — thanks, farewell, a saying', chip(!!st.showQuote, `badgeExportSet('showQuote', ${!st.showQuote})`, st.showQuote ? '💬 on' : '💬 off'))}<input type="text" id="bx-quote" value="${escapeHtml(st.quote || '')}" maxlength="90" oninput="badgeExportQuote(this.value)" placeholder="“ … ”" aria-label="Quote" style="flex:1 1 100%; box-sizing:border-box; padding:7px 10px; border:1px solid #e2e8f0; border-radius:10px; font-size:0.95em;">${grp('Corners', 'Transparent = see-through corners · White = the rounded card on a white square', chip(st.bg !== 'white', "badgeExportSet('bg', 'clear')", 'Transparent') + chip(st.bg === 'white', "badgeExportSet('bg', 'white')", 'White'))}` : st.kind === 'stamp' && !st.blank ? `<span style="color:#64748b; font-weight:700;">In the circle</span>${chip(st.avatar === '8bit', "badgeExportSet('avatar', '8bit')", '👾 8-bit manga', !st.avatar8)}${chip(st.avatar === 'photo', "badgeExportSet('avatar', 'photo')", '📷 LINE photo', !st.pictureUrl)}${chip(st.avatar === 'none', "badgeExportSet('avatar', 'none')", 'None')}${st.avatar8 ? '' : '<span style="color:#94a3b8;">no 8-bit yet (User Hub ⋯ → 👾)</span>'}` : '';
             box.innerHTML = `<div style="background:var(--bg-card, #fff); color:var(--text-main, #1e293b); border-radius:16px; padding:16px; width:min(600px, 100%); max-height:92vh; overflow:auto; box-shadow:0 20px 40px rgba(15, 23, 42, 0.25);">
                 <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;"><b>⬇ ${st.kind === 'board' ? 'Export badges — ' + escapeHtml(st.person || '') : st.blank ? 'Blank badge — ' + escapeHtml(st.title) : 'Export badge — ' + escapeHtml(st.person || '')}</b>
                     <button type="button" onclick="closeBadgeExport()" aria-label="Close" style="margin-left:auto; width:32px; height:32px; min-height:0; padding:0; border:none; background:transparent; font-size:20px; cursor:pointer; color:#94a3b8;">×</button></div>
@@ -38805,6 +38832,7 @@ They can connect again from LINE.
                 </div>
                 <div style="font-size:0.7em; color:#94a3b8; margin-top:8px;">File: ${escapeHtml(badgeExportFileName(st))}</div>
             </div>`;
+            if (st._focusQuote) { st._focusQuote = false; const q = document.getElementById('bx-quote'); if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); } }
         }
 
         async function badgeExportDownload() {
