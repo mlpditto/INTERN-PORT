@@ -1,4 +1,4 @@
-// V102.289: User Hub › Personal details — the Birthday read value shows the age against today ("2002-12-11 · 23 y" / "· 23 ปี").
+// V102.290: User Hub › Personal details — the Birthday read value shows the age against today ("2002-12-11 · 23 y" / "· 23 ปี").
 // Runs the REAL gsAgeText() + the read-value line of gsRefreshProfileCards() from admin.html under a pinned clock (no Playwright).
 const fs = require('node:fs');
 const vm = require('node:vm');
