@@ -37,8 +37,9 @@ window.activityRewards = (() => {
         if(history && (selected==='other' || host===history)) host=history;
         const monthly=document.querySelector('#monthly-progress .mp-reward-detail');
         if(monthly && selected==='other') monthly.hidden=true;
-        if(history && selected!=='other') {history.replaceChildren();document.getElementById('history-adjustments')?.setAttribute('aria-expanded','false');}
-        document.querySelectorAll('#monthly-progress [data-reward-key], #history-adjustments').forEach(b=>b.setAttribute('aria-expanded',String(b.dataset.rewardKey===selected)));
+        if(history && selected!=='other') history.replaceChildren();
+        document.querySelectorAll('#monthly-progress [data-reward-key]').forEach(b=>b.setAttribute('aria-expanded',String(b.dataset.rewardKey===selected)));
+        document.querySelectorAll('button.hl-tp').forEach(b=>b.setAttribute('aria-expanded',String(selected==='other')));   // V101.165
         let detail=host.querySelector('.mp-reward-detail');
         if(!detail){detail=node('section');detail.className='mp-reward-detail';detail.id=host===history?'history-adjustment-records':'mp-reward-detail';host.append(detail);}
         detail.hidden=!selected; detail.replaceChildren(); if(!selected)return;
@@ -83,12 +84,23 @@ window.activityRewards = (() => {
             const rows=sources[key], count=rows?rows.filter(current).filter(r=>!['draft','rejected','unsuccessful'].includes(r.status)).length:null;
             const value=node('span',errors.has(key)?'—':count===null?'—':count.toLocaleString());value.className='mp-value';tile.dataset.n=count||0;tile.style.setProperty('--mp-pct',count>0?100:0);tile.append(value,node('small',errors.has(key)?'Unavailable':count===null?'Loading…':unit));bind(tile,key);pending(tile,rows);grid.append(tile);
         });
-        historyChip();
+        paintPill();
         if(errors.size){const retry=node('button','Retry unavailable data');retry.type='button';retry.onclick=()=>{identity='';start();};host.append(retry);}
         paintDetail(host);
         if(!identity&&!observer){observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){observer.disconnect();observer=null;start();}});observer.observe(host);const history=document.getElementById('work-pane-history');if(history)observer.observe(history);}
     }
-    function historyChip() {
+    // V101.165: the ⚖️ chip is gone — the month's adjustments are folded into the pt pill (history-lean.js renderChrome) and
+    // tapping that pill opens the same records list under the header. These three are the pill's API.
+    function ensureDetail() {
+        const header=document.querySelector('#work-pane-history .lr-header');if(!header)return null;
+        let detail=document.getElementById('history-adjustment-detail');
+        if(!detail){detail=node('div');detail.id='history-adjustment-detail';header.after(detail);}
+        return detail;
+    }
+    function adjustmentsPoints(){ if(!rewardReady())return null; return records('other').filter(r=>r.currency==='Points').reduce((s,r)=>s+r.amount,0); }
+    function toggleAdjustments(){ start(); const detail=ensureDetail(); if(!detail)return; show('other',detail); }
+    function paintPill(){ try{ if(window.historyLean&&window.historyLean.renderChrome)window.historyLean.renderChrome(); }catch(e){ /* the History pane may not be built yet */ } }
+    function historyChip_legacy() {
         const header=document.querySelector('#work-pane-history .lr-header');if(!header)return;
         let chip=document.getElementById('history-adjustments');
         if(!chip){chip=node('button');chip.id='history-adjustments';chip.type='button';chip.dataset.rewardKey='other';chip.setAttribute('aria-controls','history-adjustment-records');chip.title='รายการปรับยอดเดือนนี้ รวมคะแนนเช็กอินและรายการย้อนคืน แยกจากคะแนน History';header.querySelector('h3').after(chip);
@@ -97,7 +109,6 @@ window.activityRewards = (() => {
         }
         chip.textContent=rewardReady()?'⚖️ '+summary('other').replace(' · 0 Beri','').replace(' Beri',' 🪙'):'…';   // V101.84: ⚖️ = the visible cue that this is an adjustments list (the title is hover-only)chip.setAttribute('aria-label','Adjustments · '+summary('other'));chip.setAttribute('aria-expanded',String(selected==='other'));
     }
-    document.addEventListener('DOMContentLoaded',historyChip);
     function pending(tile,rows){const n=(rows||[]).filter(current).filter(r=>r.status==='pending').length;if(n){const note=node('small',`${labels[tile.dataset.rewardKey]} · ${n} pending review`);note.className='mp-pending';document.getElementById('monthly-progress').append(note);}}
     function start() {
         const uid=typeof userId==='undefined'?'':userId, authUid=typeof firebase==='undefined'?'':firebase.auth().currentUser?.uid;
@@ -110,5 +121,5 @@ window.activityRewards = (() => {
     window.addEventListener('pagehide',()=>{stops.forEach(off=>off());stops=[];identity='';});
     // V101.55: Beri recorded for one History entry (beri_ledger rows whose refId is the entry id)
     const beriFor=id=>(sources.beri||[]).filter(r=>r.refId===id).reduce((s,r)=>s+(Number(r.amount)||0),0);
-    return {decorate,category,start,beriFor};
+    return {decorate,category,start,beriFor,adjustmentsPoints,toggleAdjustments};   // V101.165: + the pt pill's API
 })();

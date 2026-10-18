@@ -1,5 +1,5 @@
 // V101.92: the home accordion that holds History is titled "History" (it was "Work 워크" over a second "History" title) and its header carries the totals — also while it is
-// folded. Inside, the duplicate title + totals are hidden; only the adjustments chip stays. The REAL public/index.html + history-lean/compact on a touch phone
+// folded. Inside, the duplicate title + totals are hidden; the header's pt pill is the adjustments control (V101.165). The REAL public/index.html + history-lean/compact on a touch phone
 // (file://, network blocked, Firebase stubbed). SHOT=<dir> writes PNGs.
 const path = require('node:path'), fs = require('node:fs'), assert = require('node:assert/strict');
 const { pathToFileURL } = require('node:url');
@@ -95,15 +95,16 @@ async function open(browser) {
         assert.ok(/0\.5\s*pt/.test(r.sum), 'header totals follow the active filter: ' + r.sum);
         await page.evaluate(() => filterUnifiedHistory('all'));
 
-        // open: no second "History" title, no second copy of the totals; the adjustments chip is still there
+        // open: no second "History" title, no second copy of the totals; the pt pill in the header is the adjustments control now (V101.165)
         await page.locator('#section-general-work .gl-minimal-header').click();
         await page.waitForTimeout(400);
         const inner = await page.evaluate(() => {
             const pane = document.getElementById('work-pane-history'), vis = e => !!e && e.getClientRects().length > 0 && getComputedStyle(e).display !== 'none';
-            return { open: document.getElementById('work-section-content').style.display === 'block', h3: vis(pane.querySelector('.lr-header > h3')), sum: vis(pane.querySelector('.lr-header > .hc-summary')), chip: vis(document.getElementById('history-adjustments')), rail: vis(document.getElementById('unified-type-filters')), rows: pane.querySelectorAll('.hl-row').length, rotate: document.getElementById('work-section-icon').style.transform };
+            return { open: document.getElementById('work-section-content').style.display === 'block', h3: vis(pane.querySelector('.lr-header > h3')), sum: vis(pane.querySelector('.lr-header > .hc-summary')), chip: document.getElementById('history-adjustments') === null && vis(document.querySelector('#work-section-sum button.hl-tp')) && /stopPropagation/.test(document.querySelector('#work-section-sum button.hl-tp').getAttribute('onclick') || ''), rail: vis(document.getElementById('unified-type-filters')), rows: pane.querySelectorAll('.hl-row').length, rotate: document.getElementById('work-section-icon').style.transform };
         });
         assert.ok(inner.open && !inner.h3 && !inner.sum, 'inside: the duplicate title and totals are hidden: ' + JSON.stringify(inner));
-        assert.ok(inner.chip && inner.rail && inner.rows === 3 && /180/.test(inner.rotate), 'adjustments chip, chip rail and rows are still there; chevron turned: ' + JSON.stringify(inner));
+        if (process.env.HH_SHOT) await page.locator('#section-general-work').screenshot({ path: process.env.HH_SHOT });
+        assert.ok(inner.chip && inner.rail && inner.rows === 3 && /180/.test(inner.rotate), 'V101.165: no adjustments chip, the header pt pill is a tappable button that does not fold the accordion; chip rail and rows are still there; chevron turned: ' + JSON.stringify(inner));
         // folding again keeps the totals in the header
         await page.locator('#section-general-work .gl-minimal-header').click();
         await page.waitForTimeout(250);

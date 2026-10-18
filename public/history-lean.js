@@ -190,6 +190,12 @@ window.historyLean = (() => {
         try { window.activityRewards?.start?.(); } catch (e) { /* rewards are optional here */ }
         const all = getUnifiedAllItems(), filtered = getFilteredUnifiedItems();
         const pts = filtered.reduce((n, s) => n + (parseFloat(s.score) || 0) + (parseFloat(s.adminBonus) || 0), 0);
+        // V101.165: the month's "Other adjustments" (admin corrections, out-of-hours ×0.95 …) are folded into the pill —
+        // the number shown is entries + adjustments; the pill is a button that opens the adjustment list (activity-rewards.js).
+        const adj = (window.activityRewards && window.activityRewards.adjustmentsPoints) ? window.activityRewards.adjustmentsPoints() : null;
+        const net = pts + (adj || 0);
+        const open = !!document.querySelector('#history-adjustment-records:not([hidden])');
+        const ptTitle = pts.toFixed(2) + ' pt on these entries' + (adj === null ? '' : ' · ⚖️ ' + (adj >= 0 ? '+' : '') + adj.toFixed(2) + ' adjustments this month') + ' · tap for the list · แตะดูรายการปรับยอด · 조정 내역 보기';
         const rvOnly = filtered.length > 0 && filtered.every(s => s.submissionType === 'content_review');   // V101.124: a list of filed reviews carries no points / beri
         const b = filtered.reduce((n, s) => n + beri(s.id), 0);
         const summary = root.querySelector('.hc-summary');
@@ -198,11 +204,12 @@ window.historyLean = (() => {
             // V101.58: the streak is a 🔥 N pill right after "History" (was a banner with two lines of text)
             const st = typeof getReflectiveStreak === 'function' ? getReflectiveStreak() : { current: 0, longest: 0 };
             summary.innerHTML = (st.current > 0 && !(window.isContentCreator && window.isContentCreator()) ? '<span class="hl-ts" title="' + st.current + '-day streak · best ' + st.longest + '">🔥 <b>' + st.current + '</b></span>' : '') +
-                (rvOnly ? '' : '<span class="hl-tp" title="Points">' + pts.toFixed(1) + '<small>pt</small></span>') +
+                (rvOnly ? '' : '<button type="button" class="hl-tp" onclick="activityRewards.toggleAdjustments()" aria-expanded="' + open + '" title="' + ptTitle + '" aria-label="Points, with this month\'s adjustments">' + net.toFixed(1) + '<small>pt</small>' + (adj ? '<i class="hl-adj" aria-hidden="true">⚖️</i>' : '') + '</button>') +
                 (rvOnly ? '' : '<span class="hl-tb" title="Beri earned on these entries">🪙 <b>' + b + '</b></span>') +
                 (values.some(v => v > 0) ? '<span class="hl-spark" title="30-day trend">' + renderSparkline(values, 40, 16) + '</span>' : '');
             const head = document.getElementById('work-section-sum');   // V101.92: the home accordion header shows the same totals, also while it is folded
-            if (head) head.innerHTML = summary.innerHTML;
+            // V101.165: the home header shows the same pill; there it must not fold the accordion when tapped (the pane hides .hc-summary while open, so this copy is the one you tap)
+            if (head) head.innerHTML = summary.innerHTML.replace('onclick="activityRewards.toggleAdjustments()"', 'onclick="event.stopPropagation(); activityRewards.toggleAdjustments()"');
         }
         const counts = getUnifiedTypeCounts(), rail = document.getElementById('unified-type-filters');
         if (rail) {
