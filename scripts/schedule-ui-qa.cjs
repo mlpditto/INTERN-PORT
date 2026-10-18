@@ -134,7 +134,7 @@ assert.match((await page.textContent('#sch-week .sch-rg h4')).trim(), /^\d{1,2}[
 
     // ---- 3b. V101.151: ⭐ on a checked-in day circle; the check-in is not a row in the day panel
     await page.evaluate(() => { schCheckinDays = new Set([__key(-2)]); schRenderAgenda(); });
-    await goTo(page, 0);
+    await goTo(page, -2);   // the week that holds day −2 — on a Monday/Tuesday that is LAST week, not today's (CI red every Mon/Tue 00:00–07:00 Bangkok)
     const stars = await page.evaluate(() => [...document.querySelectorAll('#sch-week .sch-wd')].filter(b => b.querySelector('.sch-star')).map(b => b.dataset.schday));
     assert.deepEqual(stars, await page.evaluate(() => [__key(-2)]), 'only the checked-in day carries ⭐: ' + JSON.stringify(stars));
     await page.locator('#sch-week [data-schday="' + (await page.evaluate(() => __key(-2))) + '"]').click();
