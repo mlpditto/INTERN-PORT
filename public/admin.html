@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.287)</title>
+    <title>Nika Admin (V102.291)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -23988,7 +23988,6 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         var knowledgeBaseCache = []; // Required by PDF-to-Quiz and Research grounding
         var reflectiveLogsCache = [];
         var learningNotesCache = []; // V91.71: Section 9 — Learning Note submissions for admin Kanban review
-        var accessRequestsCache = []; 
         var pendingQuizzesCache = [];
         var reviewLinksCache = []; // V96.50: Beri Phase 1 — Explore Links admin catalog
         var pendingExploreReviewsCache = []; // V96.5x: Explore link reviews awaiting approval
@@ -36379,7 +36378,6 @@ RULES:
         }
 
         function renderAccessRequests(data) {
-            accessRequestsCache = data; // Store for Kanban
             const tbody = document.querySelector("#accessRequestTable tbody");
             const section = document.getElementById('access-request-section');
             if (data.length === 0) {
@@ -57379,32 +57377,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 });
             } catch (e) { console.error("Kanban Section 3 (Works) Error:", e); }
 
-            // 4. Render Access Requests in "Review"
-            try {
-                accessRequestsCache.forEach(req => {
-                    const dName = req.displayName || 'Unknown';
-                    if (filter && !dName.toLowerCase().includes(filter)) return;
-                    if (activeBoardGroup !== 'All' && (req.group || 'Public') !== activeBoardGroup) return;
-
-                    cnt["Review"]++;
-                    const d = document.createElement('div');
-                    d.className = 'kanban-card card-Review access-card';
-                    d.style.borderLeft = "4px solid #6f42c1";
-                    d.innerHTML = `
-                        <div class="card-header-row">
-                            <span class="badge" style="background:#6f42c1;">New Access</span>
-                            <div class="card-header-right"><img src="${req.pictureUrl || ''}" class="assignee-img" title="${dName}"></div>
-                        </div>
-                        <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${dName}</div>
-                        <div style="font-size:0.8em; color:#666;">AKA: ${req.nickName || '-'} • ${req.division ? 'Div: ' + escapeHtml(req.division) : 'Grp: ' + (req.group || 'Public')}</div>
-                        <div style="margin-top:8px; display:flex; gap:5px;">
-                            <button class="btn-sm btn-success" style="flex:1;" onclick="approveAccessRequest('${req.id}')">Approve</button>
-                            <button class="btn-sm btn-danger" style="flex:1;" onclick="rejectAccessRequest('${req.id}')">Reject</button>
-                        </div>
-                    `;
-                    cols["Review"].appendChild(d);
-                });
-            } catch (e) { console.error("Kanban Section 4 Error:", e); }
+            // 4. V102.291: access requests are no longer duplicated here — the Dashboard's own
+            // "Access Requests" table (#access-request-section, Time · Name · Group · Period ·
+            // Approve / Reject) is the one surface, same call as V96.77 made for Reflective logs.
 
             // 5. Render Points Claimed in "Review"
             try {
