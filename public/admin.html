@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.307)</title>
+    <title>Nika Admin (V102.309)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -5809,6 +5809,27 @@
         #applicantDocsModal .s-sug .apd-box, #gs-cv-sheet .s-sug .apd-box { color:#a78bfa; flex-shrink:0; }
         #applicantDocsModal .s-sug li.done > label > span, #gs-cv-sheet .s-sug li.done > label > span { text-decoration:line-through; color:#94a3b8; }
         #applicantDocsModal .apd-dots i, #gs-cv-sheet .apd-dots i { display:inline-block; width:7px; height:7px; border-radius:50%; margin-left:2px; vertical-align:middle; }
+        /* V102.309: the 🤖 row button — hover widens to "Review ×2" and the robot wakes; ●● vendor dots while a review runs; ✓ then a run count */
+        #applicantDocsModal .apd-aib { position:relative; display:inline-flex; align-items:center; width:auto; min-height:0; height:22px; margin:0; padding:0 7px; border:none; border-radius:6px; background:#ede9fe; color:#7c3aed; font-size:0.68em; font-weight:800; cursor:pointer; line-height:1; white-space:nowrap; transition:transform .16s, box-shadow .16s, background .16s; }
+        #applicantDocsModal .apd-aib:hover { transform:translateY(-1px); box-shadow:0 3px 10px rgba(124,58,237,.28); background:#e9d5ff; }
+        #applicantDocsModal .apd-aib:active { transform:scale(.94); box-shadow:none; }
+        #applicantDocsModal .apd-aib-ic { display:inline-block; font-size:1.2em; }
+        #applicantDocsModal .apd-aib:hover .apd-aib-ic { animation:apdAiWake .45s ease-out 1; }
+        #applicantDocsModal .apd-aib-txt { display:inline-block; max-width:0; opacity:0; overflow:hidden; transition:max-width .18s ease, opacity .18s ease, margin .18s ease; }
+        #applicantDocsModal .apd-aib:hover .apd-aib-txt, #applicantDocsModal .apd-aib:focus-visible .apd-aib-txt { max-width:80px; opacity:1; margin-left:5px; }
+        #applicantDocsModal .apd-aib-dots { display:none; align-items:center; gap:3px; }
+        #applicantDocsModal .apd-aib-dots i { display:inline-block; width:7px; height:7px; border-radius:50%; animation:apdAiPulse .9s ease-in-out infinite; }
+        #applicantDocsModal .apd-aib-dots i + i { animation-delay:.45s; }
+        #applicantDocsModal .apd-aib.is-run { cursor:progress; }
+        #applicantDocsModal .apd-aib.is-run .apd-aib-ic, #applicantDocsModal .apd-aib.is-run .apd-aib-n { display:none; }
+        #applicantDocsModal .apd-aib.is-run .apd-aib-dots { display:inline-flex; }
+        #applicantDocsModal .apd-aib.is-run .apd-aib-txt { max-width:0; opacity:0; margin-left:0; }
+        #applicantDocsModal .apd-aib.is-done { background:#dcfce7; color:#166534; }
+        #applicantDocsModal .apd-aib.is-done .apd-aib-ic { animation:none; font-size:1em; }
+        #applicantDocsModal .apd-aib-n { position:absolute; top:-6px; right:-5px; min-width:14px; height:14px; padding:0 3px; border-radius:999px; background:#7c3aed; color:#fff; font-size:0.78em; font-weight:800; line-height:14px; text-align:center; box-sizing:border-box; }
+        @keyframes apdAiWake { 0% { transform:rotate(0); } 30% { transform:rotate(-12deg); } 60% { transform:rotate(7deg); } 100% { transform:rotate(0); } }
+        @keyframes apdAiPulse { 0%, 100% { transform:scale(.7); opacity:.45; } 50% { transform:scale(1.15); opacity:1; } }
+        @media (prefers-reduced-motion:reduce) { #applicantDocsModal .apd-aib, #applicantDocsModal .apd-aib-txt { transition:none; } #applicantDocsModal .apd-aib:hover .apd-aib-ic, #applicantDocsModal .apd-aib-dots i { animation:none; } #applicantDocsModal .apd-aib-dots i { opacity:1; } }
         #applicantDocsModal .apd-both, #gs-cv-sheet .apd-both { margin-left:4px; white-space:nowrap; }
         #applicantDocsModal .apd-foot-note, #gs-cv-sheet .apd-foot-note { font-size:0.64em; color:#cbd5e1; margin:4px 0 0; }
         /* V102.304 (Phase 2): mode chips + TH|EN · tabs · summary */
@@ -61886,7 +61907,7 @@ Save it anyway?`;
                 <div style="display:flex; align-items:center; gap:6px; padding:5px 8px; border:1px solid #eef2f7; border-radius:8px; margin-bottom:4px;">
                     <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:0.78em;">${escapeHtml(d.name)}</span>
                     <span style="font-size:0.66em; color:#cbd5e1; white-space:nowrap;">${Math.round((d.size || 0) / 1024)} KB</span>
-                    ${d.contentType === 'application/pdf' ? `<button class="btn-sm" style="width:auto; min-height:0; background:#ede9fe; color:#7c3aed; padding:2px 8px; font-size:0.68em; border:none; border-radius:6px; cursor:pointer;" onclick="aiReviewApplicantDoc('${d.id}')" title="AI review — two models">🤖</button>` : ''}
+                    ${d.contentType === 'application/pdf' ? apdAiBtnHtml(d) : ''}
                     <button class="btn-sm" style="width:auto; min-height:0; background:#e0f2fe; color:#0369a1; padding:2px 8px; font-size:0.68em; border:none; border-radius:6px; cursor:pointer;" onclick="openApplicantDoc('${d.id}')">Open</button>
                     <button class="btn-sm" style="width:auto; min-height:0; background:#fee2e2; color:#b91c1c; padding:2px 8px; font-size:0.68em; border:none; border-radius:6px; cursor:pointer;" onclick="deleteApplicantDoc('${d.id}')">Del</button>
                 </div>`).join('');
@@ -62449,35 +62470,70 @@ Save it anyway?`;
             h.hidden = !h.hidden; btn.setAttribute('aria-expanded', String(!h.hidden));
             if (!h.hidden) _apdLastResults = _apdReviews[0] ? (_apdReviews[0].results || []) : _apdLastResults;
         }
+        // V102.309: the 🤖 button on a document row. Hover widens it to "Review ×2"; the tooltip names the two models and the
+        // mode/language the run would use (read when the pointer arrives, so a new pick on the rails shows at once); while a
+        // review runs the icon gives way to ●● in the two vendor colours; when it ends a ✓ flashes and the row is repainted with
+        // a small count of the reviews this document already has. A re-render mid-run keeps the running state (_apdAiRun).
+        let _apdAiRun = null;
+        function apdAiShort(id) {
+            const m = (window.TEXT_AI_MODELS || []).find(x => x.id === id);
+            return m ? (m.short || m.label) : String(id || '').replace(/^.*\//, '');
+        }
+        function apdAiBtnTitle() {
+            const mode = apdMode(), lang = apdLang(), M = APD_MODES[mode] || {};
+            return 'AI review ×2 · ' + apdReviewModels().map(apdAiShort).join(' + ') + ' · ' + (M.e || '') + ' ' + (M.th || '') + ' · ' + lang.toUpperCase() + ' · รีวิวด้วย AI 2 ตัว';
+        }
+        function apdAiBtnHtml(d) {
+            const n = _apdReviews.filter(r => r.docId === d.id).length;
+            const dots = apdReviewModels().slice(0, 2).map(m => `<i style="background:${APD_VENDOR_COLOR[apdVendor(m)] || APD_VENDOR_COLOR.ai}"></i>`).join('');
+            return `<button type="button" class="apd-aib${_apdAiRun === d.id ? ' is-run' : ''}" data-doc="${escapeHtml(d.id)}" onclick="aiReviewApplicantDoc('${escapeHtml(d.id)}')" onmouseenter="this.title = apdAiBtnTitle()" title="${escapeHtml(apdAiBtnTitle())}" aria-label="AI review, two models">`
+                + `<span class="apd-aib-ic" aria-hidden="true">🤖</span><span class="apd-aib-dots" aria-hidden="true">${dots}</span><span class="apd-aib-txt">Review ×2</span>`
+                + (n ? `<sup class="apd-aib-n" title="${n} review${n === 1 ? '' : 's'} saved">${n}</sup>` : '') + `</button>`;
+        }
+        function apdAiBtnState(docId, state) {
+            _apdAiRun = state === 'run' ? docId : null;
+            const btn = document.querySelector('#apd-list .apd-aib[data-doc="' + (window.CSS && CSS.escape ? CSS.escape(docId) : docId) + '"]');
+            if (!btn) return;
+            btn.classList.toggle('is-run', state === 'run');
+            btn.classList.toggle('is-done', state === 'done');
+            if (state === 'done') { btn.querySelector('.apd-aib-ic').textContent = '✓'; setTimeout(() => { if (!_apdAiRun) renderApplicantDocs(); }, 700); }
+            else if (state === 'idle') renderApplicantDocs();
+        }
+
         async function aiReviewApplicantDoc(docId) {
             const d = (applicantDocsCache[apdTargetId] || []).find(x => x.id === docId);
             const box = document.getElementById('apd-ai');
             if (!d) return;
-            box.innerHTML = '<div style="font-size:0.74em; color:#64748b;">Reading the PDF…</div>';
-            let text;
+            apdAiBtnState(docId, 'run');
+            let ok = false;
             try {
-                const url = await adminApp.storage().ref(d.path).getDownloadURL();
-                text = await apdExtractPdfText(url);
-            } catch (e) {
-                box.innerHTML = '<div style="font-size:0.74em; color:#b91c1c;">Could not read the PDF: ' + escapeHtml(e.message) + '</div>';
-                return;
-            }
-            // A scanned CV has no text layer at all. Say that plainly instead of sending
-            // an empty prompt and presenting whatever the models invent from nothing.
-            if (text.length < 200) {
-                box.innerHTML = '<div style="font-size:0.74em; color:#b45309;">This PDF has almost no text layer ('
-                    + text.length + ' chars) — it is probably a scan. AI review needs a text PDF.</div>';
-                return;
-            }
-            const mode = apdMode(), lang = apdLang();
-            box.innerHTML = '<div style="font-size:0.74em; color:#64748b;">Asking ' + apdReviewModels().length + ' models… ' + APD_MODES[mode].e + (lang === 'en' ? ' · EN' : '') + '</div>';
-            const results = await apdRunReview(text, mode, lang);
-            apdRenderReview(results);
-            box.insertAdjacentHTML('afterbegin', '<div class="apd-dim" style="font-size:0.72em;">✨ Summarising…</div>');
-            const summary = await apdSummarise(results, mode, lang);   // V102.304: one more small call → the สรุปรวม tab
-            _apdTab = summary ? 'sum' : 'cmp';
-            if (await apdSaveReview(d, results, { mode, lang, summary })) apdRenderSavedReviews();   // V102.298: the run just made becomes "Last review"; an unsaved run stays on screen as is
-            else apdRenderReview(results);
+                box.innerHTML = '<div style="font-size:0.74em; color:#64748b;">Reading the PDF…</div>';
+                let text;
+                try {
+                    const url = await adminApp.storage().ref(d.path).getDownloadURL();
+                    text = await apdExtractPdfText(url);
+                } catch (e) {
+                    box.innerHTML = '<div style="font-size:0.74em; color:#b91c1c;">Could not read the PDF: ' + escapeHtml(e.message) + '</div>';
+                    return;
+                }
+                // A scanned CV has no text layer at all. Say that plainly instead of sending
+                // an empty prompt and presenting whatever the models invent from nothing.
+                if (text.length < 200) {
+                    box.innerHTML = '<div style="font-size:0.74em; color:#b45309;">This PDF has almost no text layer ('
+                        + text.length + ' chars) — it is probably a scan. AI review needs a text PDF.</div>';
+                    return;
+                }
+                const mode = apdMode(), lang = apdLang();
+                box.innerHTML = '<div style="font-size:0.74em; color:#64748b;">Asking ' + apdReviewModels().length + ' models… ' + APD_MODES[mode].e + (lang === 'en' ? ' · EN' : '') + '</div>';
+                const results = await apdRunReview(text, mode, lang);
+                apdRenderReview(results);
+                box.insertAdjacentHTML('afterbegin', '<div class="apd-dim" style="font-size:0.72em;">✨ Summarising…</div>');
+                const summary = await apdSummarise(results, mode, lang);   // V102.304: one more small call → the สรุปรวม tab
+                _apdTab = summary ? 'sum' : 'cmp';
+                if (await apdSaveReview(d, results, { mode, lang, summary })) apdRenderSavedReviews();   // V102.298: the run just made becomes "Last review"; an unsaved run stays on screen as is
+                else apdRenderReview(results);
+                ok = true;
+            } finally { apdAiBtnState(docId, ok ? 'done' : 'idle'); }
         }
 
         // ---- V98.61: events -------------------------------------------------------
