@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.296)</title>
+    <title>Nika Admin (V102.297)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -5744,6 +5744,7 @@
         #applicantDocsModal .apd-ab-row:nth-child(2) .apd-ab-lbl { background:#0ea5e9; }
         #applicantDocsModal .apd-ab .audit-toolbar { flex:1; min-width:0; margin:0; padding:4px 6px; }
         #applicantDocsModal .apd-ab .audit-model-row { margin-top:0; padding-top:0; border-top:0; gap:5px; }
+        #applicantDocsModal .apd-ab .audit-provider .text-ai-logo[data-owner="grok"] { filter:invert(1); }   /* V102.297: the Grok mark is white; the tab is light */
         #applicantDocsModal .apd-foot { margin:10px 0 0; font-size:0.66em; color:#cbd5e1; line-height:1.45; }
         #ai-suggest-config-modal .sqm-custom textarea { width:100%; box-sizing:border-box; padding:8px 10px; border:1.5px solid #c4b5fd; border-radius:10px; background:#faf5ff; font:inherit; font-size:0.85em; line-height:1.5; resize:vertical; }
         #ai-suggest-config-modal .sqm-warn, #ai-suggest-config-modal .sqm-need { margin-top:5px; padding:4px 8px; border-radius:7px; font-size:0.75em; }
@@ -61632,9 +61633,11 @@ Save it anyway?`;
             box.innerHTML = Object.entries(APD_MODEL_DEFAULTS).map(([id, def], i) => {
                 let saved = '';
                 try { saved = localStorage.getItem('ai_text_' + id) || ''; } catch (_) { /* storage may be blocked */ }
-                const selected = typeof window.normalizeTextAIModel === 'function' ? window.normalizeTextAIModel(saved || def) : (saved || def);
+                // V102.297: + Grok (the OpenRouter trial model) as a provider tab; a saved Grok pick stays Grok (resolveTrial…), never normalised away
+                const extra = (window.TEXT_AI_TRIAL_MODELS || []).filter(m => /grok/i.test(m.id));
+                const selected = typeof window.resolveTrialTextAIModel === 'function' ? window.resolveTrialTextAIModel(saved || def) : (saved || def);
                 const lb = i ? 'B' : 'A';
-                return `<div class="apd-ab-row"><span class="apd-ab-lbl" title="Review model ${lb} · โมเดลตรวจ ${lb} · 검토 모델 ${lb}">${lb}</span><div class="audit-toolbar lang-no-toggle">${window.providerModelRailHtml(id, selected, `apdPickModel(this,'${id}')`)}</div></div>`;
+                return `<div class="apd-ab-row"><span class="apd-ab-lbl" title="Review model ${lb} · โมเดลตรวจ ${lb} · 검토 모델 ${lb}">${lb}</span><div class="audit-toolbar lang-no-toggle">${window.providerModelRailHtml(id, selected, `apdPickModel(this,'${id}')`, extra)}</div></div>`;
             }).join('');
         }
         function apdPickModel(btn, id) {
@@ -61951,7 +61954,9 @@ Save it anyway?`;
         // Two on purpose: one model's opinion of a person is not evidence. Where they
         // agree is worth acting on; where they disagree is exactly what a human should
         // look at, so the disagreement is shown rather than averaged away.
-        const apdReviewModels = () => [...new Set([textAIModel('apd-model-a'), textAIModel('apd-model-b')])];
+        // V102.297: resolveTrial… keeps a Grok pick (textAIModel would normalise the trial id to the default)
+        const apdModel = id => (window.resolveTrialTextAIModel || window.normalizeTextAIModel)((document.getElementById(id) || {}).value);
+        const apdReviewModels = () => [...new Set([apdModel('apd-model-a'), apdModel('apd-model-b')])];
 
         async function apdExtractPdfText(url) {
             if (!window.pdfjsLib) throw new Error('pdf.js did not load');
