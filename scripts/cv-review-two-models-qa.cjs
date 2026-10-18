@@ -18,7 +18,7 @@ function grab(src, marker) {
     for (; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}' && --d === 0) break; }
     return src.slice(i, k + 1);
 }
-const code = html.slice(a, b) + '\n' + ['function apdReviewPrompt(', 'function apdBulletSim(', 'function apdOnlyMap(', 'function apdVendor(', 'function apdAgreeCounts(', 'function apdDotsHtml(', 'function apdReviewHtml(', 'function apdHeadHtml(', 'function apdWide(', 'function apdRenderReview(', 'async function apdRunReview('].map(m => grab(html, m)).join('\n');
+const code = html.slice(a, b) + '\n' + ['function apdPref(', 'function apdMode(', 'function apdLang(', 'function apdReviewPrompt(', 'function apdBulletSim(', 'function apdOnlyMap(', 'function apdVendor(', 'function apdAgreeCounts(', 'function apdDotsHtml(', 'function apdReviewHtml(', 'function apdHeadHtml(', 'function apdWide(', 'function apdRenderReview(', 'async function apdRunReview('].map(m => grab(html, m)).join('\n');
 const page_html = `<!doctype html><meta charset="utf-8">${styles}<body style="font-size:16px"><div id="apd-ai"></div>
 <div id="gs-pane-profile"><div id="gs-cv-sheet" hidden></div><input id="gs-fullname-th" value="ภัทราพร"><input id="gs-tel" value=""></div>
 <script>
@@ -29,6 +29,7 @@ window.callUniversalAI = async (model, prompt, isJson, vision, sys, opts) => { w
 window.apdReviewModels = () => ['gpt-6-luna', 'claude-haiku-4-5'];
 window.__init = 0; window.apdInitModelRows = () => { window.__init++; };
 var APD_REVIEW_KEYS = ['strengths', 'gaps', 'questions', 'suggestions'];   // V102.299: the diff helpers read it
+var APD_MODES = { pharmacy: { e: '🏪', th: 'ร้านยา', en: 'Community pharmacy', ko: '약국', role: 'ROLE-PHARMACY' } };   // V102.304
 var APD_VENDOR_COLOR = { gemini: '#4285f4', openai: '#10a37f', claude: '#d97757', qwen: '#7c3aed', deepseek: '#2563eb', grok: '#111827', meta: '#0668e1', ollama: '#475569', ai: '#64748b' };
 window.aiModelShortName = id => ({ 'gpt-6-luna': 'Luna 6', 'claude-haiku-4-5': 'Haiku 4.5' })[id] || id;
 var _APPLICANT_EXT = { 'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
