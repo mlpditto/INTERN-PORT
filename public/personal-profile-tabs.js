@@ -122,6 +122,70 @@ window.validatePersonalCards = function() {
     error.textContent = missing === 'pi-phone' ? 'Please enter Phone or Email · กรุณากรอกโทรศัพท์หรืออีเมล' : 'Please enter English first and last names and institution · กรุณากรอกชื่อ–นามสกุลอังกฤษและสถาบัน';
     card.append(error); input.focus(); return false;
 };
+// V101.163: the Persona cards start folded and open one at a time. A yellow dot on a card = something expected inside is still empty.
+window.piOpenCard = function(key) {
+    const d = key === 'social' ? document.querySelector('#pi-info-panel .pi-socials') : document.querySelector('#pi-info-panel details.pi-card-' + key);
+    if (d) d.open = true;
+};
+window.piFoldAll = function() { document.querySelectorAll('#pi-info-panel details').forEach(d => { d.open = false; }); };
+window.piRefreshDots = function() {
+    const v = id => (document.getElementById(id) || {}).value || '';
+    const empty = id => !v(id).trim();
+    const dots = {
+        personal: ['pi-firstname', 'pi-lastname', 'pi-nickname', 'pi-birthplace', 'pi-bday-day', 'pi-bday-month', 'pi-bday-year'].some(empty),
+        certificate: ['pi-firstname-en', 'pi-lastname-en', 'pi-institute'].some(empty),
+        contact: (empty('pi-phone') && empty('pi-email')) || empty('pi-address') || empty('pi-ref-name-1') || empty('pi-ref-phone-1'),
+        period: empty('pi-start-date') || empty('pi-end-date'),
+        social: ['facebook', 'line', 'instagram', 'tiktok', 'duolingo'].every(k => empty('pi-social-' + k))
+    };
+    Object.entries(dots).forEach(([k, missing]) => {
+        const dot = document.querySelector('#pi-info-panel [data-dot="' + k + '"]');
+        if (dot) { dot.hidden = !missing; dot.title = missing ? 'Something is still empty · ยังมีช่องว่าง' : ''; }
+    });
+};
+// Health (optional, admin-only). "None" writes "-" so an answered "no" differs from a blank; the consent tick is stored as health.consentAt.
+window.piSyncNone = function() {
+    document.querySelectorAll('#personalInfoModal .pi-none').forEach(b => {
+        const on = (document.getElementById(b.dataset.for).value || '').trim() === '-';
+        b.setAttribute('aria-pressed', String(on)); b.classList.toggle('on', on);
+    });
+};
+window.piToggleNone = function(btn) {
+    const input = document.getElementById(btn.dataset.for);
+    input.value = btn.getAttribute('aria-pressed') === 'true' ? '' : '-';
+    piSyncNone();
+};
+window.piLoadHealth = function(h) {
+    h = h || {};
+    document.getElementById('pi-allergies').value = h.allergies || '';
+    document.getElementById('pi-conditions').value = h.conditions || '';
+    document.getElementById('pi-hospital').value = h.hospitalizations || '';
+    document.getElementById('pi-health-consent').checked = !!h.consentAt;
+    window._piConsentAt = !!h.consentAt;
+    document.getElementById('pi-health-error').hidden = true;
+    piSyncNone();
+};
+// The users/{uid} update fields for health, or null when health text is present without the consent tick.
+window.piHealthPayload = function() {
+    const g = id => document.getElementById(id).value.trim();
+    const vals = { allergies: g('pi-allergies'), conditions: g('pi-conditions'), hospitalizations: g('pi-hospital') };
+    const consent = document.getElementById('pi-health-consent').checked;
+    const err = document.getElementById('pi-health-error');
+    err.hidden = true;
+    if (!consent && Object.values(vals).some(Boolean)) {
+        err.hidden = false; piOpenCard('health'); document.getElementById('pi-health-consent').focus();
+        return null;
+    }
+    const out = {};
+    if (consent) {
+        Object.entries(vals).forEach(([k, val]) => { out['health.' + k] = val; });
+        if (!window._piConsentAt) out['health.consentAt'] = firebase.firestore.FieldValue.serverTimestamp();
+    } else if (window._piConsentAt) {   // consent withdrawn with the fields cleared: remove it all
+        Object.keys(vals).forEach(k => { out['health.' + k] = ''; });
+        out['health.consentAt'] = firebase.firestore.FieldValue.delete();
+    }
+    return out;
+};
 window.copyPersonalSocial = async function(key) {
     const input = document.getElementById('pi-social-' + key), value = input.value.trim();
     if (!value) { input.focus(); return; }
@@ -134,6 +198,17 @@ window.copyPersonalSocial = async function(key) {
     if (confirm('Copied\nOpen in a new window?\n' + url.href)) window.open(url.href, '_blank', 'noopener,noreferrer');
 };
 document.addEventListener('DOMContentLoaded', () => {
+    const piPanel = document.getElementById('pi-info-panel');
+    // accordion: opening a card folds the others ('toggle' does not bubble, so listen in the capture phase)
+    piPanel?.addEventListener('toggle', event => {
+        if (!event.target.open) return;
+        piPanel.querySelectorAll(':scope > details[open]').forEach(d => { if (d !== event.target) d.open = false; });
+    }, true);
+    const piModal = document.getElementById('personalInfoModal');
+    ['input', 'change'].forEach(ev => piModal?.addEventListener(ev, event => {
+        piRefreshDots();
+        if (event.target.matches?.('#pi-allergies,#pi-conditions,#pi-hospital')) piSyncNone();
+    }));
     ['pi-start-date','pi-end-date'].forEach(id => document.getElementById(id)?.addEventListener('input', () => updatePersonalPeriod()));
     ['day','month','year'].forEach(k => document.getElementById('pi-bday-' + k)?.addEventListener('change', updatePersonalBirthday));
     document.getElementById('bucket-input')?.addEventListener('keydown', event => {
