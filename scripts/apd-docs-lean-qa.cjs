@@ -44,7 +44,7 @@ assert.ok(!/apd-mode-lbl" title=/.test(html) && !/<span class="apd-seg"/.test(ht
         assert.equal(r.empty, 'No documents yet · ยังไม่มีเอกสาร');
         assert.deepEqual(r.head, { h3: '📎 Documents · นภาพร ลักษณวงศ์', kids: ['', 'apd-attach', 'apd-x'], attach: '📎+', attachTitle: 'Attach · PDF or image, under 4 MB · แนบไฟล์ · 파일 첨부', oneLine: true }, 'one head line: title · name · 📎+ · ×');
         assert.deepEqual(r.rows, [
-            { ic: '📄', name: 'Resume_นศภ.นภาพร.pdf', kb: '790 KB', btns: [':🤖', 'Open:↗', 'Delete:🗑'], h: r.rows[0].h },
+            { ic: '📄', name: 'Resume_นศภ.นภาพร.pdf', kb: '790 KB', btns: ['AI review, two models:🤖Review ×2', 'Open:↗', 'Delete:🗑'], h: r.rows[0].h },   // V102.309: the 🤖 button carries its collapsed label
             { ic: '🖼', name: 'transcript_scan.jpg', kb: '1.2 MB', btns: ['Open:↗', 'Delete:🗑'], h: r.rows[1].h }
         ], 'rows: type icon · name · ghost size · 🤖 (PDF only) ↗ 🗑');
         assert.ok(r.rows.every(x => x.h <= 40), 'one-line rows: ' + JSON.stringify(r.rows.map(x => x.h)));
