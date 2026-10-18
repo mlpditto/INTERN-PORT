@@ -37,8 +37,12 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
         assert.equal(await page.locator('#apd-ab .apd-ab-row').count(), 2, 'two rows');
         assert.deepEqual(await page.$$eval('#apd-ab .apd-ab-lbl', es => es.map(e => e.textContent)), ['A', 'B']);
         assert.ok(await page.$eval('#apd-ab .apd-ab-lbl', e => /โมเดลตรวจ/.test(e.title) && /검토/.test(e.title)), 'label tooltip EN · TH · KO');
-        const ids = await page.evaluate(() => TEXT_AI_MODELS.map(m => m.id));
-        const providers = await page.evaluate(() => [...new Set(TEXT_AI_MODELS.map(m => m.label.split(' ')[0]))]);
+        // V102.297: + Grok (the OpenRouter trial model) — one more tab, its chips behind it
+        const grok = await page.evaluate(() => TEXT_AI_TRIAL_MODELS.filter(m => /grok/i.test(m.id)).map(m => m.id));
+        assert.ok(grok.length >= 1, 'a Grok trial model exists');
+        const ids = await page.evaluate(g => [...TEXT_AI_MODELS.map(m => m.id), ...g], grok);
+        const providers = await page.evaluate(() => [...new Set([...TEXT_AI_MODELS, ...TEXT_AI_TRIAL_MODELS.filter(m => /grok/i.test(m.id))].map(m => m.label.split(' ')[0]))]);
+        assert.ok(providers.includes('Grok'), 'Grok tab');
         for (const [row, id, def] of [[0, 'apd-model-a', 'gpt-6-luna'], [1, 'apd-model-b', 'claude-haiku-4-5']]) {
             const r = page.locator('#apd-ab .apd-ab-row').nth(row);
             assert.equal(await r.locator(`#${id}`).count(), 1, id + ' hidden input lives in its row');
@@ -68,6 +72,19 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
         const B = page.locator('#apd-ab .apd-ab-row').nth(1);
         await B.locator('.text-ai-chips > button[data-value="claude-opus-5-5"]').evaluate(b => b.click());
         assert.deepEqual(await page.evaluate(() => apdReviewModels()), ['claude-opus-5-5']);
+        // Grok: tab → its chip, pick → input + review list keep the trial id (not normalised to the default), logo inverted on the light tab
+        await A.locator('.audit-provider[data-provider="Grok"]').evaluate(b => b.click());
+        const grokShown = await A.locator('.text-ai-chips > button:not([hidden])').evaluateAll(bs => bs.map(b => b.dataset.value));
+        assert.deepEqual(grokShown, grok, 'Grok tab shows the Grok chip(s)');
+        await A.locator('.text-ai-chips > button[data-value="' + grok[0] + '"]').evaluate(b => b.click());
+        assert.equal(await page.locator('#apd-model-a').inputValue(), grok[0]);
+        assert.deepEqual(await page.evaluate(() => apdReviewModels()), [grok[0], 'claude-opus-5-5'], 'review runs Grok, not the normalised default');
+        assert.equal(await A.locator('.audit-provider[data-provider="Grok"] .text-ai-logo').evaluate(e => getComputedStyle(e).filter), 'invert(1)', 'white Grok mark inverted on the light tab');
+        await open();
+        assert.equal(await page.locator('#apd-model-a').inputValue(), grok[0], 'a saved Grok pick survives reload');
+        assert.equal(await page.locator('#apd-ab .apd-ab-row').nth(0).locator('.audit-provider[aria-pressed="true"]').getAttribute('data-provider'), 'Grok');
+        await A.locator('.audit-provider[data-provider="Claude"]').evaluate(b => b.click());
+        await A.locator('.text-ai-chips > button[data-value="claude-opus-5-5"]').evaluate(b => b.click());
         // reopen the page: saved picks (incl. one from before this version, same key) restored, tab follows the pick
         const gem = ids.find(i => /gemini/.test(i));
         await page.evaluate(g => { localStorage.setItem('ai_text_apd-model-b', g); }, gem);
