@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.295)</title>
+    <title>Nika Admin (V102.296)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -4329,6 +4329,12 @@
         /* V102.62: EN / TH = one capsule switch with a sliding glass thumb (was two buttons). */
         #groupSelectModal .gs-header .gs-prev { width:28px; min-width:0; height:28px; min-height:0; padding:0; margin:0; border-radius:8px; border:1px solid #bae6fd; background:#f0f9ff; font-size:14px; line-height:1; cursor:pointer; flex-shrink:0; }   /* V102.256 */
         #groupSelectModal .gs-header .gs-prev:hover { background:#e0f2fe; }
+        /* V102.296: ⧉ Copy all — same pill family as the EN / TH switch */
+        #groupSelectModal .gs-copy-all { width:34px; min-height:0; height:30px; margin:0; padding:0; border-radius:999px; font-size:15px; font-weight:800; line-height:1; cursor:pointer; vertical-align:middle; color:var(--primary, #4361ee);
+            border:1px solid color-mix(in srgb, var(--primary, #4361ee) 25%, rgba(255,255,255,.6));
+            background:linear-gradient(180deg, rgba(255,255,255,.7), rgba(255,255,255,.25)), color-mix(in srgb, var(--primary, #4361ee) 12%, transparent);
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 1px 3px rgba(15,23,42,.08); }
+        #groupSelectModal .gs-copy-all:hover { background:color-mix(in srgb, var(--primary, #4361ee) 22%, #fff); }
         #groupSelectModal .gs-lang-switch { position:relative; display:inline-grid; grid-template-columns:1fr 1fr; width:auto; min-height:0; margin:0; padding:3px; border-radius:999px; cursor:pointer;
             border:1px solid color-mix(in srgb, var(--primary, #4361ee) 25%, rgba(255,255,255,.6));
             background:linear-gradient(180deg, rgba(255,255,255,.7), rgba(255,255,255,.25)), color-mix(in srgb, var(--primary, #4361ee) 12%, transparent);
@@ -14966,6 +14972,7 @@
                     </span>
                     <button type="button" class="gs-prev" onclick="gsLiffPreview()" title="LIFF Preview — open the intern app as this user" aria-label="LIFF Preview">📱</button>
                     <span class="gs-spacer"></span>
+                    <button type="button" class="gs-copy-all" onclick="gsCopyAll()" title="Copy the whole profile in one click · คัดลอกข้อมูลทั้งหมดในคลิกเดียว · 프로필 전체 복사" aria-label="Copy the whole profile">⧉</button>
                     <button type="button" class="gs-lang-switch" onclick="gsSetLanguage(gsLanguage === 'th' ? 'en' : 'th')" title="Profile language — tap to switch EN / TH" aria-label="Profile language: switch between English and Thai"><span data-gs-lang="en" aria-pressed="true">EN</span><span data-gs-lang="th" aria-pressed="false">TH</span></button>
                     <span class="gs-bal gs-bal-pts" title="Points" aria-label="Points">🏆 <span id="gs-user-score">0</span></span>
                     <span class="gs-bal gs-bal-beri" title="Beri" aria-label="Beri balance">🪙 <span id="gs-user-beri">0</span></span>
@@ -38138,18 +38145,35 @@ They can connect again from LINE.
             openLiffPreview(uid);
         }
 
-        // V102.280: one card open at a time; the header (not its buttons) toggles it.
-        function gsFoldCards(openCard) { document.querySelectorAll('#gs-profile-body .gs-profile-card').forEach(c => c.classList.toggle('gs-folded', c !== openCard)); }
+        // V102.280: the header (not its buttons) toggles its card. V102.296: cards fold independently — any number may be open
+        // at once (it used to be an accordion). gsFoldCards(card, fold) folds or unfolds ONE card; nothing touches the others.
+        function gsFoldCards(card, fold = false) { if (card) card.classList.toggle('gs-folded', !!fold); }
         function gsBodyClick(ev) {
             const head = ev.target.closest('.gs-profile-card > header');
             if (!head || ev.target.closest('button')) return;
             const card = head.parentElement;
-            gsFoldCards(card.classList.contains('gs-folded') ? card : null);
+            gsFoldCards(card, !card.classList.contains('gs-folded'));
+        }
+        // V102.296: ⧉ Copy all — the whole profile in one click, every card's filled fields under its (current-language) title.
+        async function gsCopyAll() {
+            const text = Array.from(document.querySelectorAll('#gs-profile-body .gs-profile-card')).map(card => {
+                const rows = Array.from(card.querySelectorAll('.gs-card-field')).filter(row => row.querySelector('input') && row.querySelector('input').value.trim());
+                if (!rows.length) return '';
+                return '== ' + card.querySelector('header h3').textContent.trim() + ' ==\n'
+                    + rows.map(row => row.querySelector('label').textContent.trim() + ': ' + row.querySelector('input').value.trim()).join('\n');
+            }).filter(Boolean).join('\n\n');
+            if (!text) { if (typeof showToast === 'function') showToast(gsText('Nothing to copy', 'ไม่มีข้อมูลให้คัดลอก')); return; }
+            try {
+                await navigator.clipboard.writeText(text);
+                if (typeof showToast === 'function') showToast(gsText('Copied the whole profile ✓', 'คัดลอกข้อมูลทั้งหมดแล้ว ✓'));
+            } catch (error) {
+                if (typeof showToast === 'function') showToast(gsText('Copy failed. Select and copy the text manually.', 'คัดลอกไม่สำเร็จ กรุณาเลือกและคัดลอกเอง'));
+            }
         }
         function gsEditProfileCard(button) {
             const card = button.closest('.gs-profile-card');
             const editing = button.getAttribute('aria-expanded') !== 'true';
-            if (editing) gsFoldCards(card);
+            if (editing) gsFoldCards(card, false);
             button.setAttribute('aria-expanded', String(editing));
             card.classList.toggle('gs-editing', editing); // V102.62: edit mode shows the empty fields too
             gsSetLanguage(gsLanguage);
