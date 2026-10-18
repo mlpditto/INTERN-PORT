@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.297)</title>
+    <title>Nika Admin (V102.299)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -5745,6 +5745,22 @@
         #applicantDocsModal .apd-ab .audit-toolbar { flex:1; min-width:0; margin:0; padding:4px 6px; }
         #applicantDocsModal .apd-ab .audit-model-row { margin-top:0; padding-top:0; border-top:0; gap:5px; }
         #applicantDocsModal .apd-ab .audit-provider .text-ai-logo[data-owner="grok"] { filter:invert(1); }   /* V102.297: the Grok mark is white; the tab is light */
+        /* V102.298: ⧉ per card · saved reviews header · History fold */
+        #applicantDocsModal .apd-copy, #gs-cv-sheet .apd-copy { width:22px; height:22px; min-height:0; padding:0; margin:0; border:1px solid #e2e8f0; border-radius:6px; background:#fff; color:#64748b; font-size:12px; line-height:1; cursor:pointer; flex-shrink:0; }
+        #applicantDocsModal .apd-copy:hover, #gs-cv-sheet .apd-copy:hover { background:#f1f5f9; color:#1e293b; }
+        #applicantDocsModal .apd-saved-head { display:flex; align-items:center; gap:8px; font-size:0.68em; color:#64748b; margin:4px 0 6px; }
+        #applicantDocsModal .apd-saved-head span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        #applicantDocsModal .apd-hist-btn { width:auto; min-height:0; padding:2px 8px; font-size:0.95em; border:1px solid #e2e8f0; border-radius:999px; background:#fff; color:#475569; cursor:pointer; }
+        #applicantDocsModal .apd-hist-btn[aria-expanded="true"] { background:#e2e8f0; }
+        #applicantDocsModal #apd-hist[hidden] { display:none; }
+        /* V102.299: A | B side by side; a bullet only one model raised is amber; the sheet widens while a review shows */
+        #applicantDocsModal .modal-content.apd-wide { max-width:820px; }
+        #applicantDocsModal .apd-cmp.two, #gs-cv-sheet .apd-cmp.two { display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:start; }
+        #applicantDocsModal .apd-cmp.two > div, #gs-cv-sheet .apd-cmp.two > div { margin-bottom:0 !important; }
+        @media (max-width: 640px) { #applicantDocsModal .apd-cmp.two, #gs-cv-sheet .apd-cmp.two { grid-template-columns:1fr; } }
+        #applicantDocsModal li.apd-only, #gs-cv-sheet li.apd-only { background:#fef3c7; border-radius:4px; padding:0 4px; margin-left:-4px; }
+        #applicantDocsModal .apd-legend, #gs-cv-sheet .apd-legend { font-size:0.64em; color:#94a3b8; margin:6px 0 0; }
+        #applicantDocsModal .apd-legend .apd-only, #gs-cv-sheet .apd-legend .apd-only { display:inline-block; margin:0 2px 0 0; }
         #applicantDocsModal .apd-foot { margin:10px 0 0; font-size:0.66em; color:#cbd5e1; line-height:1.45; }
         #ai-suggest-config-modal .sqm-custom textarea { width:100%; box-sizing:border-box; padding:8px 10px; border:1.5px solid #c4b5fd; border-radius:10px; background:#faf5ff; font:inherit; font-size:0.85em; line-height:1.5; resize:vertical; }
         #ai-suggest-config-modal .sqm-warn, #ai-suggest-config-modal .sqm-need { margin-top:5px; padding:4px 8px; border-radius:7px; font-size:0.75em; }
@@ -61656,8 +61672,10 @@ Save it anyway?`;
             document.getElementById('apd-who').textContent = u.fullName || u.displayName || preUserId;
             document.getElementById('apd-msg').textContent = '';
             document.getElementById('apd-ai').innerHTML = '';
+            apdWide(false);
             renderApplicantDocs();
             document.getElementById('applicantDocsModal').style.display = 'flex';
+            apdLoadReviews(preUserId);   // V102.298: the saved opinions, latest first
         }
 
         function renderApplicantDocs() {
@@ -61984,31 +62002,69 @@ Save it anyway?`;
         }
 
         // V102.295: html + runner are shared with the 📄 Import CV sheet (gsCvReview); the card names the slot (A / B) and the short model name.
+        // V102.298: the cards remember their results (_apdLastResults) so ⧉ on a card copies that model's review as plain text.
+        let _apdLastResults = [];
+        function apdReviewText(r, i) {
+            const name = (i < 2 ? 'AB'[i] + ' · ' : '') + (typeof window.aiModelShortName === 'function' ? window.aiModelShortName(r.model) : r.model);
+            if (r.error) return name + '\n' + r.error;
+            const d = r.data || {}, block = (t, arr) => (arr && arr.length) ? '\n' + t + '\n' + arr.map(x => '- ' + x).join('\n') : '';
+            return name + '\n' + (d.summary || '') + block('จุดแข็ง', d.strengths) + block('จุดที่ขาด', d.gaps) + block('ควรถามตอนสัมภาษณ์', d.questions) + block('ผู้สมัครควรปรับ', d.suggestions);
+        }
+        async function apdCopyReview(i) {
+            const r = _apdLastResults[i]; if (!r) return;
+            try { await navigator.clipboard.writeText(apdReviewText(r, i)); if (typeof showToast === 'function') showToast('Copied ✓ · คัดลอกแล้ว'); }
+            catch (e) { if (typeof showToast === 'function') showToast('Copy failed · คัดลอกไม่สำเร็จ'); }
+        }
+        // V102.299: the two opinions sit side by side (A | B) and a bullet that only one model raised is highlighted —
+        // "where they disagree is what a human should look at". Two bullets count as the same point when their character-
+        // bigram Dice similarity is ≥ 0.35 (works for Thai, which has no word spaces): unrelated Thai bullets score ≈ 0.1, the same point reworded ≈ 0.45–0.55.
+        const APD_REVIEW_KEYS = ['strengths', 'gaps', 'questions', 'suggestions'];
+        function apdBulletSim(a, b) {
+            const grams = t => { const n = String(t || '').toLowerCase().replace(/[\s\p{P}]/gu, ''), g = new Set(); for (let i = 0; i < n.length - 1; i++) g.add(n.slice(i, i + 2)); return g; };
+            const A = grams(a), B = grams(b); if (!A.size || !B.size) return 0;
+            let c = 0; A.forEach(x => { if (B.has(x)) c++; }); return 2 * c / (A.size + B.size);
+        }
+        function apdOnlyMap(results) {
+            const only = results.map(() => ({}));
+            if (results.length !== 2 || !results[0].data || !results[1].data) return only;
+            for (const k of APD_REVIEW_KEYS) {
+                const L = results[0].data[k] || [], R = results[1].data[k] || [];
+                only[0][k] = L.map(x => !R.some(y => apdBulletSim(x, y) >= 0.35));
+                only[1][k] = R.map(x => !L.some(y => apdBulletSim(x, y) >= 0.35));
+            }
+            return only;
+        }
         function apdReviewHtml(results) {
+            _apdLastResults = results;
+            const copyBtn = i => `<button type="button" class="apd-copy" onclick="apdCopyReview(${i})" title="Copy this review · คัดลอกรีวิวนี้ · 이 리뷰 복사" aria-label="Copy this review">⧉</button>`;
             const name = (r, i) => (i < 2 ? 'AB'[i] + ' · ' : '') + (typeof window.aiModelShortName === 'function' ? window.aiModelShortName(r.model) : r.model);
-            const li = (arr) => (arr && arr.length)
-                ? arr.map(x => '<li>' + escapeHtml(String(x)) + '</li>').join('')
+            const only = apdOnlyMap(results), twoWay = results.length === 2 && !!(results[0].data && results[1].data);
+            const li = (arr, i, k) => (arr && arr.length)
+                ? arr.map((x, j) => '<li' + (only[i][k] && only[i][k][j] ? ' class="apd-only" title="Only this model raised this · มีเฉพาะโมเดลนี้ที่พูดถึง · 이 모델만 언급"' : '') + '>' + escapeHtml(String(x)) + '</li>').join('')
                 : '<li style="color:#cbd5e1;">—</li>';
-            return results.map((r, i) => {
+            return '<div class="apd-cmp' + (results.length === 2 ? ' two' : '') + '">' + results.map((r, i) => {
                 if (r.error) {
                     return `<div style="border:1px solid #fee2e2; background:#fef2f2; border-radius:8px; padding:8px; margin-bottom:6px;">
-                        <div style="font-size:0.7em; font-weight:800; color:#b91c1c;">${escapeHtml(name(r, i))}</div>
+                        <div style="font-size:0.7em; font-weight:800; color:#b91c1c; display:flex; align-items:center; gap:6px;"><span style="flex:1;">${escapeHtml(name(r, i))}</span>${copyBtn(i)}</div>
                         <div style="font-size:0.72em; color:#b91c1c;">${escapeHtml(r.error)}</div></div>`;
                 }
                 const d = r.data || {};
                 return `<div style="border:1px solid #eef2f7; border-radius:8px; padding:8px; margin-bottom:6px;">
-                    <div style="font-size:0.7em; font-weight:800; color:#7c3aed; margin-bottom:3px;">${escapeHtml(name(r, i))}</div>
+                    <div style="font-size:0.7em; font-weight:800; color:#7c3aed; margin-bottom:3px; display:flex; align-items:center; gap:6px;"><span style="flex:1;">${escapeHtml(name(r, i))}</span>${copyBtn(i)}</div>
                     <div style="font-size:0.74em; color:#334155; margin-bottom:5px;">${escapeHtml(d.summary || '')}</div>
                     <div style="font-size:0.7em; color:#475569;">
-                        <b>จุดแข็ง</b><ul style="margin:2px 0 5px 16px; padding:0;">${li(d.strengths)}</ul>
-                        <b>จุดที่ขาด</b><ul style="margin:2px 0 5px 16px; padding:0;">${li(d.gaps)}</ul>
-                        <b>ควรถามตอนสัมภาษณ์</b><ul style="margin:2px 0 5px 16px; padding:0;">${li(d.questions)}</ul>
-                        <b>ผู้สมัครควรปรับ</b><ul style="margin:2px 0 0 16px; padding:0;">${li(d.suggestions)}</ul>
+                        <b>จุดแข็ง</b><ul style="margin:2px 0 5px 16px; padding:0;">${li(d.strengths, i, 'strengths')}</ul>
+                        <b>จุดที่ขาด</b><ul style="margin:2px 0 5px 16px; padding:0;">${li(d.gaps, i, 'gaps')}</ul>
+                        <b>ควรถามตอนสัมภาษณ์</b><ul style="margin:2px 0 5px 16px; padding:0;">${li(d.questions, i, 'questions')}</ul>
+                        <b>ผู้สมัครควรปรับ</b><ul style="margin:2px 0 0 16px; padding:0;">${li(d.suggestions, i, 'suggestions')}</ul>
                     </div></div>`;
-            }).join('')
+            }).join('') + '</div>'
+            + (twoWay ? '<p class="apd-legend"><span class="apd-only">&nbsp;&nbsp;&nbsp;</span> raised by one model only · มีเฉพาะโมเดลเดียวที่พูดถึง</p>' : '')
             + '<p style="font-size:0.64em; color:#cbd5e1; margin:4px 0 0;">Two models, shown separately on purpose — where they disagree is what a human should look at. Not a hiring decision.</p>';
         }
-        function apdRenderReview(results) { document.getElementById('apd-ai').innerHTML = apdReviewHtml(results); }
+        // V102.299: the sheet widens while a review is on screen (two columns need room); back to 420px when it opens empty.
+        function apdWide(on) { const mc = document.querySelector('#applicantDocsModal .modal-content'); if (mc) mc.classList.toggle('apd-wide', !!on); }
+        function apdRenderReview(results) { document.getElementById('apd-ai').innerHTML = apdReviewHtml(results); apdWide(true); }
         async function apdRunReview(text) {
             const prompt = apdReviewPrompt(text);
             return Promise.all(apdReviewModels().map(async model => {
@@ -62024,6 +62080,49 @@ Save it anyway?`;
             }));
         }
 
+        // V102.298: every run is kept in `applicant_reviews` (one doc per run: who, when, which file, both results) so the opinion
+        // is still there next time the sheet opens — the latest run renders at once, older ones fold under "History".
+        // Admin-only like applicant_docs; no index needed (one where, sorted here). Not written from the Import CV sheet (no file yet).
+        let _apdReviews = [];
+        function apdReviewDate(r) { const t = r.at && r.at.toDate ? r.at.toDate() : (r.at ? new Date(r.at) : null); return t ? t.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''; }
+        async function apdSaveReview(d, results) {
+            try {
+                const by = (typeof auth !== 'undefined' && auth && auth.currentUser && auth.currentUser.email) || 'admin-ui';
+                const payload = { preUserId: apdTargetId, docId: d.id, docName: d.name || '', by, at: firebase.firestore.FieldValue.serverTimestamp(),
+                    models: results.map(r => r.model), results: results.map(r => r.error ? { model: r.model, error: String(r.error).slice(0, 500) } : { model: r.model, data: r.data }) };
+                const ref = await db.collection('applicant_reviews').add(payload);
+                _apdReviews.unshift(Object.assign({ id: ref.id }, payload, { at: new Date() }));
+                return true;
+            } catch (e) { console.warn('[applicant_reviews] not saved:', e); if (typeof showToast === 'function') showToast('⚠️ Review shown but not saved: ' + (e.message || e)); return false; }
+        }
+        async function apdLoadReviews(owner) {
+            _apdReviews = [];
+            try {
+                const snap = await db.collection('applicant_reviews').where('preUserId', '==', owner).get();
+                _apdReviews = snap.docs.map(x => Object.assign({ id: x.id }, x.data()))
+                    .sort((a, b) => ((b.at && b.at.toDate ? b.at.toDate() : new Date(b.at || 0)) - (a.at && a.at.toDate ? a.at.toDate() : new Date(a.at || 0))));
+            } catch (e) { console.warn('[applicant_reviews] load failed:', e); }
+            if (apdTargetId === owner) apdRenderSavedReviews();
+        }
+        function apdSavedRunHtml(r, i) {
+            return `<div class="apd-run">${apdReviewHtml(r.results || [])}</div>`;
+        }
+        function apdRenderSavedReviews() {
+            const box = document.getElementById('apd-ai');
+            if (!box || !_apdReviews.length) return;
+            const latest = _apdReviews[0], older = _apdReviews.slice(1);
+            box.innerHTML = `<div class="apd-saved-head"><span>💬 Last review · ${escapeHtml(apdReviewDate(latest))} · ${escapeHtml(latest.docName || '')} · ${escapeHtml(String(latest.by || '').split('@')[0])}</span>`
+                + (older.length ? `<button type="button" class="apd-hist-btn" onclick="apdToggleHistory(this)" aria-expanded="false" title="Earlier reviews · รีวิวก่อนหน้า · 이전 리뷰">${older.length} earlier</button>` : '') + '</div>'
+                + apdReviewHtml(latest.results || [])
+                + (older.length ? `<div id="apd-hist" hidden>${older.map(r => `<div class="apd-saved-head"><span>${escapeHtml(apdReviewDate(r))} · ${escapeHtml(r.docName || '')} · ${escapeHtml(String(r.by || '').split('@')[0])}</span></div>${apdReviewHtml(r.results || [])}`).join('')}</div>` : '');
+            _apdLastResults = latest.results || [];   // ⧉ on the latest cards copies the latest run
+            apdWide(true);
+        }
+        function apdToggleHistory(btn) {
+            const h = document.getElementById('apd-hist'); if (!h) return;
+            h.hidden = !h.hidden; btn.setAttribute('aria-expanded', String(!h.hidden));
+            if (!h.hidden) _apdLastResults = _apdReviews[0] ? (_apdReviews[0].results || []) : _apdLastResults;
+        }
         async function aiReviewApplicantDoc(docId) {
             const d = (applicantDocsCache[apdTargetId] || []).find(x => x.id === docId);
             const box = document.getElementById('apd-ai');
@@ -62045,7 +62144,9 @@ Save it anyway?`;
                 return;
             }
             box.innerHTML = '<div style="font-size:0.74em; color:#64748b;">Asking ' + apdReviewModels().length + ' models…</div>';
-            apdRenderReview(await apdRunReview(text));
+            const results = await apdRunReview(text);
+            apdRenderReview(results);
+            if (await apdSaveReview(d, results)) apdRenderSavedReviews();   // V102.298: the run just made becomes "Last review", older ones fold under History; an unsaved run stays on screen as is
         }
 
         // ---- V98.61: events -------------------------------------------------------
