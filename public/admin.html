@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.285)</title>
+    <title>Nika Admin (V102.286)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -17032,7 +17032,7 @@
         <div class="modal-content" style="max-width:760px; text-align:left;">
             <span class="close-modal"
                 onclick="document.getElementById('persCompositionModal').style.display='none'">&times;</span>
-            <h3 style="margin-top:0;">🧭 Know Yourself — group composition</h3>
+            <h3 style="margin-top:0;">🧭 Know thyself — group composition</h3>
             <p style="font-size:0.85em; color:#666; margin-bottom:14px;">
                 How each group splits across the four NERIS role groups, and its mean Big Five.
                 Groups are listed by name, never ordered by any of this.</p>
@@ -54712,7 +54712,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // filter shows on the chip so a narrowed table never looks unexplained.
             const cur = opts.find(o => o.k === window._userPersFilter) || opts[0];
             const railOpen = !!window._persRailOpen;
-            const persToggle = `<button type="button" onclick="window._persRailOpen = !window._persRailOpen; renderTable('users');" aria-expanded="${railOpen}" title="Know Yourself" aria-label="Know Yourself" style="
+            const persToggle = `<button type="button" onclick="window._persRailOpen = !window._persRailOpen; renderTable('users');" aria-expanded="${railOpen}" title="Know thyself" aria-label="Know thyself" style="
                         width:auto; min-height:0; padding:5px 11px; border-radius:20px;
                         border:2px solid ${cur.k === 'all' ? '#ddd' : cur.color}; background:#fff; color:${cur.k === 'all' ? '#64748b' : cur.color};
                         font-size:0.78em; font-weight:bold; cursor:pointer; white-space:nowrap;
@@ -54805,6 +54805,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const type = p.neris && p.neris.type;
             if (type) return type + (p.neris.variant ? `-${p.neris.variant}` : '');
             if (p.big5 && p.big5.scores) return 'Big Five';
+            if (p.self && ((p.self.habits || '').trim() || (p.self.likes || '').trim())) return 'In my words';   // V102.286
             return '';
         }
         function buildHubPersonalityChip(u) {
@@ -54860,10 +54861,20 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         ${der.letters ? `<div style="margin-top:7px; color:#94a3b8;">Would suggest <b style="color:#475569;">${escapeHtml(der.letters)}${der.variant ? `-${escapeHtml(der.variant)}` : ''}</b> — % of the scale, not a percentile.</div>` : ''}
                     </div>`;
             }
+            // V102.286: "In my words" (users.personality.self — habits, likes) from the intern's Know thyself tab
+            const s = p.self || {};
+            if ((s.habits || '').trim() || (s.likes || '').trim()) {
+                const line = (ic, en, v) => v && v.trim() ? `<div style="margin-top:4px;"><span style="color:#94a3b8;">${ic} ${en}:</span> <span style="color:#334155; white-space:pre-wrap;">${escapeHtml(v.trim())}</span></div>` : '';
+                body += `
+                    <div style="margin-top:${body ? '10px' : '0'}; padding-top:${body ? '9px' : '0'}; ${body ? 'border-top:1px dashed #e2e8f0;' : ''}">
+                        <div style="font-size:0.9em; color:#94a3b8; font-weight:800; margin-bottom:2px;">In my words${hubPersDate(s.at) ? ` · ${hubPersDate(s.at)}` : ''}</div>
+                        ${line('🪞', 'Habits', s.habits)}${line('💛', 'Likes', s.likes)}
+                    </div>`;
+            }
             if (!body) body = '<div style="color:#94a3b8;">Nothing self-reported yet.</div>';
             popover.innerHTML = `
                 <div style="background:white; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px; box-shadow:0 8px 24px rgba(15,23,42,0.18); min-width:290px; max-width:340px; font-size:0.85em;">
-                    <div style="font-size:0.7em; color:#94a3b8; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">Know Yourself</div>
+                    <div style="font-size:0.7em; color:#94a3b8; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">Know thyself</div>
                     ${body}
                     <div style="margin-top:10px; padding-top:8px; border-top:1px dashed #e2e8f0; font-size:0.8em; color:#94a3b8;">Self-reported by the intern. Never used to score, rank or evaluate.</div>
                 </div>`;
