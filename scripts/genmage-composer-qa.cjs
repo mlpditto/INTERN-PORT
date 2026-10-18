@@ -68,7 +68,7 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
         assert.equal(await page.evaluate(() => getAIDesignEnhancerModel()), 'claude-opus-5-5');
         assert.equal(await page.evaluate(() => localStorage.getItem('ai_default_design_enhancer_model')), 'claude-opus-5-5', 'same pref key as before');
         assert.equal(await bar.locator('.text-ai-chips > button[aria-pressed="true"]').count(), 1);
-        assert.equal(await page.locator('#design-engine').inputValue(), 'as/gemini-3.1-flash-image');
+        assert.equal(await page.locator('#design-engine').inputValue(), 'as/gemini-nano-banana-2.1');
         // engine switch still works in the new bar
         await bar.locator('.alabasta-genmage-quick-rail[aria-label="Engine quick switch"] button[data-value="or/openai/gpt-5.4-image-2"]').evaluate(b => b.click());
         assert.equal(await page.locator('#design-engine').inputValue(), 'or/openai/gpt-5.4-image-2');

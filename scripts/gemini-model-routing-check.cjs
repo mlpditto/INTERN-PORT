@@ -19,14 +19,16 @@ const back = new Function('provider', 'input', 'const req={body:{model:input}};'
     '        if (!provider') + '; return model;');
 assert.ok(!admin.includes('value="as/gemini-2.5-flash-image"'));
 assert.ok(!admin.includes('value="as/gemini-3.1-flash-image-preview"'));
-assert.ok(backend.includes('const asModel = geminiApiModel || model || "gemini-3.1-flash-image";')); // V101.60: rerouted gemini 3.x first
+assert.ok(backend.includes('const asModel = geminiApiModel || model || "gemini-nano-banana-2.1";')); // V101.60: rerouted gemini 3.x first
+assert.ok(backend.includes('const isImageRequest = /image|nano-banana/i.test(asModel);'), 'V102.293: the 2.1 id carries no "image" — the proxy must still treat it as an image request');
 for (const [old, next] of Object.entries({
  'gemini-2.5-flash':'gemini-3.6-flash',
  'gemini-3.5-flash':'gemini-3.6-flash',
  'gemini-2.5-flash-lite':'gemini-3.6-flash',
- 'gemini-2.5-flash-image':'gemini-3.1-flash-image',
- 'gemini-2.5-flash-image-preview':'gemini-3.1-flash-image',
- 'gemini-3.1-flash-image-preview':'gemini-3.1-flash-image'
+ 'gemini-2.5-flash-image':'gemini-nano-banana-2.1',
+ 'gemini-2.5-flash-image-preview':'gemini-nano-banana-2.1',
+ 'gemini-3.1-flash-image-preview':'gemini-nano-banana-2.1',
+ 'gemini-3.1-flash-image':'gemini-nano-banana-2.1'   // V102.293: Nano Banana 2 deprecated → 2.1
 })) {
  assert.equal(front(old).model,next);
  assert.deepEqual(front('as/'+old),{model:next,provider:'gemini-aistudio'});

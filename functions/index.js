@@ -915,9 +915,10 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 'gemini-2.5-flash': 'gemini-3.6-flash',
                 'gemini-3.5-flash': 'gemini-3.6-flash',
                 'gemini-2.5-flash-lite': 'gemini-3.6-flash',
-                'gemini-2.5-flash-image': 'gemini-3.1-flash-image',
-                'gemini-2.5-flash-image-preview': 'gemini-3.1-flash-image',
-                'gemini-3.1-flash-image-preview': 'gemini-3.1-flash-image'
+                'gemini-2.5-flash-image': 'gemini-nano-banana-2.1',
+                'gemini-2.5-flash-image-preview': 'gemini-nano-banana-2.1',
+                'gemini-3.1-flash-image-preview': 'gemini-nano-banana-2.1',
+                'gemini-3.1-flash-image': 'gemini-nano-banana-2.1'   // V102.293: Nano Banana 2 deprecated 2026-10-06 → 2.1 (GA, cheaper)
             };
             model = googleModelAliases[model] || model;
         }
@@ -1342,8 +1343,8 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             const apiKey = process.env.GEMINI_API_KEY;
             if (!apiKey) return res.status(500).json({ error: "GEMINI_API_KEY is not configured on server." });
 
-            const asModel = geminiApiModel || model || "gemini-3.1-flash-image";
-            const isImageRequest = /image/i.test(asModel);
+            const asModel = geminiApiModel || model || "gemini-nano-banana-2.1";
+            const isImageRequest = /image|nano-banana/i.test(asModel);   // V102.293: the 2.1 id has no "image" in it
             const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${asModel}:generateContent?key=${apiKey}`;
 
             // V96.01: image-to-image editing — when visionData carries a base image,

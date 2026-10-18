@@ -16,7 +16,7 @@ const firestoreRules = fs.readFileSync('firestore.rules', 'utf8');
 assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(html));
 assert.ok(html.includes('data-value="as/gemini-omni-1.1-flash" onclick="selectDesignEngine(this)"'), 'Clip chip in the engine rail');
 assert.ok(/\|\| \(proxyProvider === 'gemini-aistudio' && \/\^gemini-omni\/i\.test\(modelName\)\)/.test(html), 'Omni is proxy-only (no local text fallback)');
-assert.ok(/if \(\/omni\/i\.test\(engine\)\) engine = 'as\/gemini-3\.1-flash-image';/.test(html), 'Bulk Paste illustrations never go to the video engine');
+assert.ok(/if \(\/omni\/i\.test\(engine\)\) engine = 'as\/gemini-nano-banana-2\.1';/.test(html), 'Bulk Paste illustrations never go to the video engine');
 assert.ok(!/(?:^|[^.\w])confirm\(\s*['"`]/.test(html.slice(html.indexOf('window.GLC_ENGINE ='), html.indexOf('window.downloadDesign = function'))), 'no native confirm() in the clips block');
 assert.ok(/match \/teach-clips\/\{seriesId\}\/\{fileName\} \{[\s\S]*?allow read, delete: if isAdmin\(\);[\s\S]*?contentType == 'video\/mp4'/.test(storageRules), 'storage.rules: teach-clips admin-only, mp4');
 assert.ok(storageRules.indexOf('match /teach-clips/') < storageRules.indexOf('match /{allPaths=**}'), 'teach-clips rule sits before the catch-all');
@@ -147,7 +147,7 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
             out.btnBack = txt($('#btn-generate-design')); out.cardBack = $('#glc-episodes-card').style.display; out.placeholderBack = $('#design-prompt').placeholder;
             return out;
         });
-        assert.deepEqual(r.chips, ['as/gemini-3.1-flash-image', 'or/openai/gpt-5.4-image-2', 'as/gemini-omni-1.1-flash'], 'three engine chips');
+        assert.deepEqual(r.chips, ['as/gemini-nano-banana-2.1', 'or/openai/gpt-5.4-image-2', 'as/gemini-omni-1.1-flash'], 'three engine chips');
         assert.equal(r.clipChipLabel, '🎬 Clip 9:16'); assert.match(r.clipChipTitle, /9:16 vertical clip with audio · about \$0\.10 per second/);
         assert.ok(r.valid.includes('as/gemini-omni-1.1-flash'), 'pref restore accepts the clip engine');
         assert.deepEqual([r.btnBefore, r.cardBefore], ['Create', 'none'], 'image mode untouched before the pick');

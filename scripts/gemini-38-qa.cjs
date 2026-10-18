@@ -41,6 +41,11 @@ function valid() { providerData = {modelVersion:'gemini-3.8-flash-001',candidate
     providerData={candidates:[{content:{parts:[{inlineData:{data:'abc',mimeType:'image/png'}}]}}]};
     r=await call({model:'gemini-3.1-flash-image-preview'}); assert.equal(r.data.imageDataUrl,'data:image/png;base64,abc');
     assert.equal(JSON.stringify(request.body.generationConfig),'{"responseModalities":["IMAGE","TEXT"]}');
+    // V102.293: Nano Banana 2.1 — the id has no "image" in it, yet it is an image request; the retired 3.1 id is aliased to it
+    r=await call({model:'gemini-nano-banana-2.1'}); assert.equal(r.data.imageDataUrl,'data:image/png;base64,abc');
+    assert.ok(request.url.includes('/models/gemini-nano-banana-2.1:generateContent'), request.url);
+    assert.equal(JSON.stringify(request.body.generationConfig),'{"responseModalities":["IMAGE","TEXT"]}');
+    r=await call({model:'gemini-3.1-flash-image'}); assert.ok(request.url.includes('/models/gemini-nano-banana-2.1:generateContent'), 'retired id aliased: '+request.url);
     const terraData = () => ({status:'completed',model:'gpt-5.6-terra',output:[{content:[{type:'output_text',text:'{"ok":true}'}]}],usage:{input_tokens:12,output_tokens:8,total_tokens:20,output_tokens_details:{reasoning_tokens:3}}});
     providerData=terraData(); r=await call({provider:'openai',model:'gpt-5.6-terra'});
     assert.equal(r.code,200); assert.equal(r.data.finishReason,'completed'); assert.equal(r.data.usage.thinkingTokens,3);
