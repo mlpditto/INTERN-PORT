@@ -68,18 +68,22 @@ The owner's pasted blueprint is compared line by line; where it differs, the off
 
 ## 4. SPC Forensic (Singapore — pharmacy law)
 
+Checked 2026-10-18: the SPC site has no "syllabus" document by that name — the syllabus is the **legislation list** in the Forensic Examination Information Sheet, plus the newer Legislation for Reference list.
+
 | Fact | Value | Status | Source |
 |---|---|---|---|
-| Format | **60** multiple-choice questions + **2** structured questions | ⚠️ SPC annual reports 2020 / 2022 / 2023 (search summaries) | [Annual Report 2023](https://isomer-user-content.by.gov.sg/79/e1851203-b688-47aa-a7ef-ecf0214825c5/spc-annual-report-2023_full_final-w-fs_2sepalttextremoved_pdfa.pdf) |
-| Pass mark / attempts | pass mark **60** · max **3** attempts · covers Pharmacy Laws in Singapore | ⚠️ SPC web pages (search summary) | [SPC — foreign-trained graduates](https://www.spc.gov.sg/for-professionals/apply-for-registration/foreign-trained-pharmacy-graduates-pharmacists/) |
-| Mark split (60 + 20 + 20) | — | ❓ | pasted text only |
-| Acts / code on the syllabus (Pharmacists Registration Act, Health Products Act, Poisons, Misuse of Drugs, Code of Ethics …) | — | ❓ no syllabus document found | pasted text only |
+| Format | **Section A** 60 MCQ = 60 marks, on ALL the legislation and codes · **Section B** 1 structured question = 20 marks, on area (a) pharmacy profession · **Section C** 1 structured question = 20 marks, on area (b) health products · attempt all · **2 hours** | ✅ | [Forensic Examination Information Sheet, 1 Aug 2021](https://isomer-user-content.by.gov.sg/79/e22d780a-bc26-4554-9f60-30c6e23b9b68/forensic-exam-info.pdf) §3 |
+| Pass / attempts | **60%** of total marks · fail → up to 2 re-sits at the examiners' recommendation · all 3 attempts within 2 years | ✅ | Info Sheet §5 |
+| Open book | candidates may bring the **hard-copy legislation** (tagged / highlighted, no writing; no electronic copies); no other reference material | ✅ | Info Sheet §4 · [Forensic Examination page](https://www.spc.gov.sg/for-professionals/standards-exams/forensic-examination/) |
+| Area (a) Pharmacy profession | Pharmacists Registration Act 2007 + its Orders / Regulations (Exemption 2018; Practising Certificates 2008; Prescribed Qualifications for Conditional Registration 2020; Registration of Pharmacists 2013) · **SPC Code of Ethics (May 2015)** | ✅ | [Legislation for Reference, July 2024](https://isomer-user-content.by.gov.sg/79/b6a98c51-c44d-451d-8613-6249c1af8284/legislation-for-reference.pdf) |
+| Area (b) Health products | Health Products Act 2007 + Regulations (Advertisement of Specified HP 2016; CTGTP 2021; Clinical Research Materials 2016; Clinical Trials 2016; Cosmetic Products 2007; Exemptions Order 2016; **Licensing of Retail Pharmacies 2016**; Medical Devices 2010; **Therapeutic Products 2016**) · Medicines Act 1975 + its Orders / Regulations (General Sales List 2016, Labelling, Medical Advertisements, Licensing, CPM labelling, automatic machines, traditional / homoeopathic exemption …) · Medicines (Advertisement and Sale) Act 1955 · Poisons Act 1938 + Poisons Rules · Misuse of Drugs Act 1973 + Regulations | ✅ | Legislation for Reference, July 2024 |
+| Schedules that may be left out of the printed copy | Cosmetic Products Third Schedule · Therapeutic Products Second Schedule (POM / P ingredient lists) · Poisons Act Schedule · Poisons Rules First–Tenth Schedules · Misuse of Drugs Act First–Fifth Schedules (controlled drugs, penalty tables) | ✅ | Legislation for Reference, footnotes 1–5 |
+| Frequency / fee | 3 sittings a year (Apr · Aug · Nov per the 2021 sheet; 4 dates listed for 2026) · S$300 | ✅ / ⚠️ | Info Sheet §1–2 · examination-dates page (search summary) |
+| Sale of Drugs Act | on the 2021 sheet, **not** on the July 2024 list | ✅ | both documents |
 
-**Pasted blueprint vs official:** the two-part shape is consistent; the mark split and the list of Acts are unverified.
+**Pasted blueprint vs official:** the 60 + 20 + 20 split and 2 hours are confirmed; the Act names match (Pharmacists Registration, Health Products, Poisons, Misuse of Drugs, Code of Ethics) and the list is longer than pasted (Medicines Act family, Medicines (Advertisement and Sale) Act).
 
-**For the prompt:** generic "Singapore pharmacy law and professional ethics" scenarios only, unless the owner supplies the syllabus. **Do not let the model cite Act names, section numbers or penalties** — it will invent them.
-
----
+**For the prompt:** two areas with their real weights (A 60 marks across everything; B = profession / ethics; C = health products). The model may name the **Act or Regulation an item sits in** (that is the syllabus) but must **not cite section numbers, schedule entries, penalties, fees or dates** — those are exactly the open-book details a candidate looks up, and the model will invent them. The structured questions (B, C) map to `short_answer` with a marking guide, as PEBC II already does.
 
 ## 5. KPLE — Korean Pharmacist Licensing Examination (한국보건의료인국가시험원)
 
@@ -90,7 +94,7 @@ The owner's pasted blueprint is compared line by line; where it differs, the off
 | Clinical + practice total | 77 + 63 = **140** | ✅ | same page |
 | Total test time | 90 + 85 + 75 + 75 = **325 min** | ✅ | same page |
 | Law subject covers | 약사법 · 마약류 관리에 관한 법률 · 국민건강증진법 · 보건의료기본법 · 국민건강보험법 · 지역보건법 and their decrees / rules | ✅ | same page |
-| Pass rule (≥ 60% overall and ≥ 40% in every subject) | — | ⚠️ secondary source; the regulation annex PDF had unreadable Korean text (only "60" / "40" digits visible) | [법령 별표](https://www.law.go.kr/LSW//flDownload.do?flSeq=43909142&flNm=%5B%EB%B3%84%ED%91%9C+1%EC%9D%983%5D+%EA%B5%AD%EA%B0%80%EC%8B%9C%ED%97%98%EC%9D%98+%EC%8B%9C%ED%97%98%EA%B3%BC%EB%AA%A9%2C+%EC%8B%9C%ED%97%98%EB%B0%A9%EB%B2%95+%EB%B0%8F+%ED%95%A9%EA%B2%A9%EC%9E%90+%EA%B2%B0%EC%A0%95%EB%B0%A9%EB%B2%95%28%EC%A0%9C2%EC%A1%B0+%EA%B4%80%EB%A0%A8%29%0A) |
+| Pass rule | **≥ 60% of the total and ≥ 40% in every subject** ("전 과목 총점의 60퍼센트 이상, 매 과목 40퍼센트 이상") | ✅ (2026-10-18) [kuksiwon.or.kr 합격기준](https://www.kuksiwon.or.kr/subcnt/c_2009/5/view.do?seq=7) | [법령 별표](https://www.law.go.kr/LSW//flDownload.do?flSeq=43909142&flNm=%5B%EB%B3%84%ED%91%9C+1%EC%9D%983%5D+%EA%B5%AD%EA%B0%80%EC%8B%9C%ED%97%98%EC%9D%98+%EC%8B%9C%ED%97%98%EA%B3%BC%EB%AA%A9%2C+%EC%8B%9C%ED%97%98%EB%B0%A9%EB%B2%95+%EB%B0%8F+%ED%95%A9%EA%B2%A9%EC%9E%90+%EA%B2%B0%EC%A0%95%EB%B0%A9%EB%B2%95%28%EC%A0%9C2%EC%A1%B0+%EA%B4%80%EB%A0%A8%29%0A) |
 | Moves to computer-based testing | from the 2026 sitting (77th) | ⚠️ search summary of the official notice | open the notice |
 
 **Pasted blueprint vs official:** 100 / 90 / 140 / 20 = 350 and ~325 min **match the official page exactly**. An older 2017 paper gave Clinical = 104 (total 314) — superseded; ignore it.
@@ -107,8 +111,8 @@ The owner's pasted blueprint is compared line by line; where it differs, the off
 | NAPLEX | yes (official) | confirm duration / 225 items only if we want them in the hint text |
 | FPGEE | yes (official 2025) | — |
 | SPC Competency | yes (official 2023; case-based = 50%) | — |
-| SPC Forensic | **format only** | the syllabus (Acts list) if law-specific items are wanted |
-| KPLE | yes (official) | confirm the pass rule if it goes in the hint |
+| SPC Forensic | yes (official info sheet 2021 + legislation list 2024) | — |
+| KPLE | yes (official, incl. the pass rule) | — |
 
 ## Rules for every new style (same as the existing styles)
 
@@ -119,4 +123,4 @@ The owner's pasted blueprint is compared line by line; where it differs, the off
 
 ## Not verified (carry forward)
 
-NAPLEX 225 items / 6 h · NAPLEX ordered response · FPGEE format line (page not opened) · SPC Forensic mark split and syllabus · KPLE pass rule and CBT date.
+NAPLEX 225 items / 6 h · NAPLEX ordered response · FPGEE format line (page not opened) · KPLE CBT date. (SPC Forensic syllabus and KPLE pass rule: confirmed 2026-10-18.)
