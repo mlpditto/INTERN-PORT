@@ -895,6 +895,29 @@ function omniFileId(uri) {
 function omniStatus(data) {
     return String((data && (data.status || data.state)) || "").toLowerCase();
 }
+// === Grand Line Clips (admin V102.306): the same clip through OpenRouter's video API ===
+// POST /api/v1/videos → 202 { id, polling_url, status } · GET /api/v1/videos/{id} → { status, unsigned_urls[], usage.cost }
+// · GET /api/v1/videos/{id}/content?index=0 (Authorization) → the MP4. Only the four models the admin can pick.
+const OR_VIDEO_BASE = "https://openrouter.ai/api/v1/videos";
+const OR_VIDEO_MODELS = { "google/veo-3.1-lite": 8, "kwaivgi/kling-v3.0-std": 15, "heygen/heygen-video-1": 15, "bytedance/seedance-2.0-fast": 15 };
+function orVideoBody(model, prompt, video) {
+    const v = video || {};
+    const max = OR_VIDEO_MODELS[model] || 8;
+    const seconds = Math.min(max, Math.max(4, Math.round(Number(v.seconds) || 8)));
+    return {
+        model,
+        prompt: String(prompt || "").trim(),
+        duration: seconds,
+        resolution: ["480p", "720p", "1080p"].includes(v.resolution) ? v.resolution : "720p",
+        aspect_ratio: v.aspectRatio === "16:9" ? "16:9" : "9:16",
+        generate_audio: true
+    };
+}
+function orVideoStatus(data) { return String((data && data.status) || "").toLowerCase(); }
+function orVideoUrl(data, id) {
+    const u = data && Array.isArray(data.unsigned_urls) && data.unsigned_urls[0];
+    return u || (id ? `${OR_VIDEO_BASE}/${encodeURIComponent(id)}/content?index=0` : "");
+}
 
 /**
  * 🤖 AI Proxy Function (V89.19)
@@ -1269,6 +1292,49 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 text: response.data.content[0].text, 
                 tokens: (response.data.usage.input_tokens + response.data.usage.output_tokens) || 0,
                 model: actualModel
+            });
+        }
+
+        // --- 🎬 Grand Line Clips: OpenRouter video (admin V102.306) — Veo 3.1 Lite · Kling 3.0 Std · HeyGen Video 1 · Seedance 2.0 Fast ---
+        // Same two calls as Omni below: submit → { pending, interactionId } · poll → { pending } or the clip. Submit is a plain
+        // axios.post (a retried submit would be a second paid render); the MP4 is fetched here because the content URL needs the key.
+        if (provider === "openrouter" && generationOptions && generationOptions.video && OR_VIDEO_MODELS[String(model || "")]) {
+            const apiKey = process.env.OPENROUTER_API_KEY;
+            if (!apiKey) return res.status(500).json({ error: "OPENROUTER_API_KEY is not configured on server." });
+            const video = generationOptions.video || {};
+            const orHeaders = { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" };
+            const startedAt = Date.now();
+            let data;
+            try {
+                if (video.state === "poll") {
+                    if (!video.interactionId) return res.status(400).json({ error: "Missing interactionId for the clip poll." });
+                    data = (await axios.get(`${OR_VIDEO_BASE}/${encodeURIComponent(video.interactionId)}`, { headers: orHeaders, timeout: 30000 })).data;
+                } else {
+                    data = (await axios.post(OR_VIDEO_BASE, orVideoBody(model, prompt, video), { headers: orHeaders, timeout: 60000 })).data;
+                }
+            } catch (err) {
+                const head = JSON.stringify(err.response?.data || err.message || "").slice(0, 300);
+                return res.status(err.response?.status === 400 ? 400 : 502).json({ error: `OpenRouter video ${video.state === "poll" ? "poll" : "submit"} failed (${err.response?.status || "no response"}): ${head}`, model });
+            }
+            const status = orVideoStatus(data);
+            if (status !== "completed") {
+                if (/fail|cancel|expire|error/.test(status) || data?.error) {
+                    return res.status(502).json({ error: `OpenRouter video ${status || "error"}: ${JSON.stringify(data?.error || data).slice(0, 300)}`, model, interactionId: data?.id || video.interactionId || null });
+                }
+                return _sendJson({ pending: true, status: status || "pending", interactionId: data?.id || video.interactionId || null, model });
+            }
+            const bin = await axios.get(orVideoUrl(data, data.id || video.interactionId), { headers: { Authorization: `Bearer ${apiKey}` }, responseType: "arraybuffer", timeout: 120000, maxContentLength: 60 * 1024 * 1024 });
+            const mime = String(bin.headers["content-type"] || "video/mp4").split(";")[0];
+            const cost = Number(data.usage && data.usage.cost);
+            return res.json({
+                videoDataUrl: `data:${mime};base64,${Buffer.from(bin.data).toString("base64")}`,
+                seconds: Math.min(OR_VIDEO_MODELS[model] || 8, Math.max(4, Math.round(Number(video.seconds) || 8))),
+                costUsd: Number.isFinite(cost) ? cost : null,
+                tokens: 0,
+                usage: { inputTokens: null, outputTokens: null, totalTokens: null },
+                latencyMs: Date.now() - startedAt,
+                interactionId: data.id || video.interactionId || null,
+                model
             });
         }
 
