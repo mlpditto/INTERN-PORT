@@ -37,7 +37,7 @@ const profileHtml = adm.slice(bodyStart, adm.indexOf('</section>', healthStart) 
 const exportStart = adm.indexOf('<div id="piExportModal"');
 const exportHtml = adm.slice(exportStart, adm.indexOf('        <div id="groupSelectModal"', exportStart));
 const admCss = adm.split('\n').filter(l => /^\s*#(groupSelectModal|piExportModal) /.test(l)).join('\n');
-const admFns = ['function gsFoldCards(', 'function gsBodyClick(', 'function gsEditProfileCard(', 'function gsRefreshProfileCards(', 'function gsNewFieldWrites(', 'function pixRows(', 'function pixStatusChip(', 'function pixVisible(', 'function pixRender(',
+const admFns = ['function gsFoldCards(', 'function gsBodyClick(', 'function gsEditProfileCard(', 'function gsAgeText(', 'function gsRefreshProfileCards(', 'function gsNewFieldWrites(', 'function pixRows(', 'function pixStatusChip(', 'function pixVisible(', 'function pixRender(',
     'function pixFilter(', 'function openPiExport(', 'async function pixCopy(', 'function pixCsvCell(', 'function pixCsv('].map(m => grab(adm, m)).join('\n')
     + '\nconst PIX_STATE = { filter: "all" };'
     + '\n' + ['const PIX_HEAD', 'const pixStatusText', 'const pixLine'].map(m => adm.slice(adm.indexOf(m), adm.indexOf('\n', adm.indexOf(m)))).join('\n');
