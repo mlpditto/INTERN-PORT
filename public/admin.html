@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.281)</title>
+    <title>Nika Admin (V102.282)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -5780,6 +5780,12 @@
         #ai-suggest-config-modal .sqm-style img.emoji { width:1.15em; height:1.15em; vertical-align:-0.2em; margin-right:2px; }
         #ai-suggest-config-modal .sqm-scope-row[hidden], #ai-suggest-config-modal .sqm-style-hint[hidden] { display:none; }
         #ai-suggest-config-modal .sqm-style-hint { margin:6px 0 0 32px; padding:5px 8px; border:1px solid #bbf7d0; border-radius:7px; background:#f0fdf4; color:#475569; font-size:0.72em; line-height:1.5; }
+        /* V102.282: Style chips by region — one row per region, a small EN-first caption (Thai in the tooltip); still flag-only chips. */
+        #ai-suggest-config-modal .sqm-style-row { align-items:flex-start; }
+        #ai-suggest-config-modal .sqm-style-row .sqm-lb { margin-top:7px; }
+        #ai-suggest-config-modal .sqm-style-box { display:flex; flex-direction:column; gap:6px; flex:1; min-width:0; }
+        #ai-suggest-config-modal .sqm-region { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+        #ai-suggest-config-modal .sqm-rg { font-size:0.68em; color:#94a3b8; min-width:62px; }
         /* V102.278: Expand quiz lean — flag-only Style, emoji-only Focus / Level / row labels, and a waiting state
            (seconds on the button, form locked, Stop, amber when slower than usual). Names live in title / aria-label. */
         #ai-suggest-config-modal .sqm-style { padding:5px 8px; }
@@ -20118,7 +20124,7 @@ RULES:
                     <input type="number" id="suggest-n" value="3" min="1" max="10" class="sqm-num" hidden oninput="sqmCountTyped()" aria-label="Number of questions">
                 </div>
                 <div class="sqm-row sqm-style-row"><span class="sqm-lb" title="Exam style" aria-label="Style">🎓</span>
-                    ${Object.entries(window.SQM_EXAM_STYLES).map(([k, s], i) => `<button type="button" class="sqm-chip sqm-style${i === 0 ? ' on' : ''}" aria-pressed="${i === 0}" data-val="${k}" title="${s.label} · ${s.title}" aria-label="${s.label}" onclick="sqmSetStyle(this)">${s.flag}${s.tag ? `<small>${s.tag}</small>` : ''}</button>`).join('')}
+                    <div class="sqm-style-box">${window.sqmStyleBoxHtml(window.SQM_EXAM_STYLES)}</div>
                     <input type="hidden" id="suggest-style" value="thai">
                 </div>
                 <div class="sqm-row sqm-scope-row" hidden><span class="sqm-lb" title="Scope" aria-label="Scope">🎚️</span>
@@ -20269,6 +20275,28 @@ RULES:
                         `- Scope: describe situations, never legal detail — name no statute, regulation section, penalty or licence rule.`
                     ].join('\n                ');
                 } }
+        };
+        // V102.282: the Style chips grouped by region — a small EN-first caption per row, Thai in the tooltip. Keys the table does not know fall into "Other";
+        // keys it lists that SQM_EXAM_STYLES does not have yet (styles still to come) are skipped — a new style needs one key here, not a layout change.
+        window.SQM_REGIONS = [
+            ['Thailand', 'Thailand · ไทย', ['thai']],
+            ['N. America', 'North America · อเมริกาเหนือ', ['pebc1', 'pebc2', 'naplex', 'fpgee']],
+            ['Oceania', 'Oceania · โอเชียเนีย', ['opra']],
+            ['ASEAN', 'ASEAN · อาเซียน', ['spc', 'spcf']],
+            ['E. Asia', 'East Asia · เอเชียตะวันออก', ['japan', 'kple', 'china']]
+        ];
+        window.sqmStyleBoxHtml = function(styles) {
+            const chip = k => { const s = styles[k], on = k === 'thai'; return `<button type="button" class="sqm-chip sqm-style${on ? ' on' : ''}" aria-pressed="${on}" data-val="${k}" title="${s.label} · ${s.title}" aria-label="${s.label}" onclick="sqmSetStyle(this)">${s.flag}${s.tag ? `<small>${s.tag}</small>` : ''}</button>`; };
+            const row = (caption, title, keys) => `<div class="sqm-region"><span class="sqm-rg" title="${title}">${caption}</span>${keys.map(chip).join('')}</div>`;
+            const listed = new Set();
+            const rows = window.SQM_REGIONS.map(([caption, title, keys]) => {
+                const have = keys.filter(k => styles[k]);
+                have.forEach(k => listed.add(k));
+                return have.length ? row(caption, title, have) : '';
+            });
+            const other = Object.keys(styles).filter(k => !listed.has(k));
+            if (other.length) rows.push(row('Other', 'Other · อื่น ๆ', other));
+            return rows.join('');
         };
         window.sqmSetStyle = function(btn) {
             sqmPress(btn, '.sqm-style');
