@@ -113,6 +113,11 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
             out.count = txt($('#glc-episodes-count')); out.cost = txt($('#glc-cost-pill'));
             out.row3 = txt($('#glc-ep-3 .glc-t')); out.row3chips = [...document.querySelectorAll('#glc-ep-3 .glc-f span')].map(txt);
             out.btnAfterPlan = txt($('#btn-generate-design'));
+            // V102.305: ⧉ copies one episode / the whole plan as text
+            window.__clip = []; Object.defineProperty(navigator, 'clipboard', { value: { writeText: t => { window.__clip.push(t); return Promise.resolve(); } }, configurable: true });
+            out.copyBtns = document.querySelectorAll('#glc-episodes-list .glc-a button[onclick^="glcCopyEpisode"]').length + '/' + document.querySelectorAll('#glc-copy-plan').length;
+            glcCopyEpisode(1); await new Promise(r => setTimeout(r, 20)); out.copyEp = window.__clip[0];
+            glcCopyPlan(); await new Promise(r => setTimeout(r, 20)); out.copyPlan = window.__clip[1];
             // 4. edit EP03 in place
             glcToggleEdit(3);
             out.editFields = [...document.querySelectorAll('#glc-ep-3 .glc-edit [data-f]')].map(el => el.dataset.f);
@@ -158,6 +163,9 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
         assert.match(r.btnTitle, /nothing is rendered or paid yet/); assert.match(r.placeholderClip, /10-episode 9:16 series/);
         assert.deepEqual(r.planCall, { model: r.enhancer, isJson: true, feature: 'clip_plan', asksObject: true, tenAsked: true, hasTopic: true }, 'the Enhancer plans as a JSON object');
         assert.deepEqual([r.rows, r.cardAfterPlan, r.btnAfterPlan], [10, 'block', 'Plan 10 episodes'], '10 rows in the Episodes card');
+        assert.equal(r.copyBtns, '10/1', '⧉ on every row + one for the plan');
+        assert.ok(/^EP01 · /.test(r.copyEp) && /\n🎯 /.test(r.copyEp) && /\n💡 /.test(r.copyEp) && /\n🗣 /.test(r.copyEp) && /\n🎨 /.test(r.copyEp), 'episode text: EP · title, then 🎯 💡 🗣 🎨 lines: ' + JSON.stringify(r.copyEp).slice(0, 120));
+        assert.ok(/EP01 · /.test(r.copyPlan) && /EP10 · /.test(r.copyPlan) && (r.copyPlan.match(/\n\n/g) || []).length >= 9, 'plan text: all ten episodes separated by blank lines');
         assert.deepEqual(r.statuses, Array(10).fill('planned'));
         assert.equal(r.count, '10'); assert.equal(r.cost, '8 s · ≈ $0.80 / clip · $8.00 all', 'cost before any click');
         assert.equal(r.row3, 'Episode 3 titleตอนที่ 3'); assert.deepEqual(r.row3chips, ['🎯 Objective 3', '💡 Fact 3', '🗣 Spoken line 3', '🎨 Visual 3 scene']);
