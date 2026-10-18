@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.303)</title>
+    <title>Nika Admin (V102.304)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -5790,6 +5790,28 @@
         #applicantDocsModal .apd-dots i, #gs-cv-sheet .apd-dots i { display:inline-block; width:7px; height:7px; border-radius:50%; margin-left:2px; vertical-align:middle; }
         #applicantDocsModal .apd-both, #gs-cv-sheet .apd-both { margin-left:4px; white-space:nowrap; }
         #applicantDocsModal .apd-foot-note, #gs-cv-sheet .apd-foot-note { font-size:0.64em; color:#cbd5e1; margin:4px 0 0; }
+        /* V102.304 (Phase 2): mode chips + TH|EN · tabs · summary */
+        #applicantDocsModal .apd-mode { display:flex; align-items:center; gap:5px; flex-wrap:wrap; margin-top:6px; font-size:0.7em; }
+        #applicantDocsModal .apd-mode-lbl { font-weight:800; color:#94a3b8; margin-right:2px; }
+        #applicantDocsModal .apd-mode-chip { width:auto; min-height:0; height:24px; padding:0 9px; margin:0; border:1px solid #e2e8f0; border-radius:999px; background:#fff; color:#475569; font-size:1em; font-weight:700; line-height:1; white-space:nowrap; cursor:pointer; }
+        #applicantDocsModal .apd-mode-chip.on { background:#1e293b; border-color:#1e293b; color:#fff; }
+        #applicantDocsModal .apd-seg { display:inline-flex; margin-left:auto; border:1px solid #e2e8f0; border-radius:999px; overflow:hidden; }
+        #applicantDocsModal .apd-seg button { width:auto; min-height:0; height:22px; padding:0 9px; margin:0; border:0; background:#fff; color:#64748b; font-size:1em; font-weight:800; line-height:1; cursor:pointer; }
+        #applicantDocsModal .apd-seg button.on { background:#4361ee; color:#fff; }
+        #applicantDocsModal .apd-tabs { display:flex; gap:2px; border-bottom:1px solid #e2e8f0; margin:4px 0 8px; font-size:0.72em; }
+        #applicantDocsModal .apd-tab { width:auto; min-height:0; margin:0; padding:5px 10px; border:0; border-bottom:2px solid transparent; border-radius:0; background:none; color:#64748b; font-weight:700; cursor:pointer; }
+        #applicantDocsModal .apd-tab.on { color:#1e293b; border-bottom-color:#1e293b; }
+        #applicantDocsModal .apd-tab small { font-weight:600; color:#7c3aed; }
+        #applicantDocsModal .apd-sum { border:1px solid #e2e8f0; border-radius:12px; padding:10px 12px; font-size:0.74em; color:#334155; line-height:1.5; }
+        #applicantDocsModal .apd-sum h5 { margin:0 0 6px; font-size:1em; }
+        #applicantDocsModal .apd-sum ul { margin:0; padding-left:18px; }
+        #applicantDocsModal .apd-sum li { margin:3px 0; }
+        #applicantDocsModal .apd-src { font-size:.85em; color:#94a3b8; margin-left:4px; font-weight:700; }
+        #applicantDocsModal .apd-verdict { margin-top:8px; padding:6px 8px; border-radius:8px; background:#f8fafc; }
+        #applicantDocsModal .apd-dim { color:#94a3b8; }
+        #applicantDocsModal .apd-sum-empty { margin:0; display:flex; align-items:center; gap:8px; }
+        #applicantDocsModal .apd-sum-btn { width:auto; min-height:0; height:24px; padding:0 10px; margin:0; border:1px solid #c4b5fd; border-radius:999px; background:#faf5ff; color:#6d28d9; font-size:1em; font-weight:800; cursor:pointer; }
+        #applicantDocsModal .apd-sug-all .apd-sec { margin:0 0 8px; }
         #applicantDocsModal .apd-foot { margin:10px 0 0; font-size:0.66em; color:#cbd5e1; line-height:1.45; }
         #ai-suggest-config-modal .sqm-custom textarea { width:100%; box-sizing:border-box; padding:8px 10px; border:1.5px solid #c4b5fd; border-radius:10px; background:#faf5ff; font:inherit; font-size:0.85em; line-height:1.5; resize:vertical; }
         #ai-suggest-config-modal .sqm-warn, #ai-suggest-config-modal .sqm-need { margin-top:5px; padding:4px 8px; border-radius:7px; font-size:0.75em; }
@@ -61687,6 +61709,7 @@ Save it anyway?`;
         // (ai_text_apd-model-a / -b), so what an admin chose before this version is still what runs.
         const APD_MODEL_DEFAULTS = { 'apd-model-a': 'gpt-6-luna', 'apd-model-b': 'claude-haiku-4-5' };
         function apdInitModelRows() {
+            apdPaintModeRow();   // V102.304
             const box = document.getElementById('apd-ab');
             if (!box || box.childElementCount || typeof window.providerModelRailHtml !== 'function') return;
             box.innerHTML = Object.entries(APD_MODEL_DEFAULTS).map(([id, def], i) => {
@@ -61718,6 +61741,7 @@ Save it anyway?`;
             apdWide(false);
             renderApplicantDocs();
             document.getElementById('applicantDocsModal').style.display = 'flex';
+            _apdTab = '';   // V102.304: Summary first when the latest run has one
             apdLoadReviews(preUserId);   // V102.298: the saved opinions, latest first
         }
 
@@ -62034,14 +62058,57 @@ Save it anyway?`;
             return out.trim();
         }
 
-        function apdReviewPrompt(text) {
-            return 'คุณคือเภสัชกรพี่เลี้ยงที่คัดเลือกนักศึกษาฝึกงานร้านยา '
+        // V102.304 (Phase 2): the review is read for ONE context — 🏪 community pharmacy · 🏥 hospital · 🏭 industry / marketing ·
+        // 🎓 study abroad — and in Thai or English. Both are chips under the A / B rails, remembered in this browser, stored on the run.
+        const APD_MODES = {
+            pharmacy: { e: '🏪', th: 'ร้านยา', en: 'Community pharmacy', ko: '약국', role: 'คุณคือเภสัชกรพี่เลี้ยงที่คัดเลือกนักศึกษาฝึกงานร้านยาชุมชน ให้น้ำหนักกับการจ่ายยา OTC การให้คำปรึกษา การสื่อสารกับลูกค้า สต็อก และงานหน้าร้าน' },
+            hospital: { e: '🏥', th: 'โรงพยาบาล', en: 'Hospital', ko: '병원', role: 'คุณคือเภสัชกรโรงพยาบาลที่คัดเลือกนักศึกษาฝึกงาน ให้น้ำหนักกับงานบริบาลเภสัชกรรม DI การจ่ายยาผู้ป่วยในและนอก และการทำงานกับทีมสหวิชาชีพ' },
+            industry: { e: '🏭', th: 'อุตสาหกรรม', en: 'Industry / marketing', ko: '제약산업', role: 'คุณคือหัวหน้างานในอุตสาหกรรมยาที่คัดเลือกนักศึกษาฝึกงาน ให้น้ำหนักกับ GMP QA/QC R&D การตลาดยา การขึ้นทะเบียน และงานเอกสาร' },
+            study: { e: '🎓', th: 'เรียนต่อ', en: 'Study abroad', ko: '유학', role: 'คุณคืออาจารย์ที่ปรึกษาสำหรับการสมัครเรียนต่อต่างประเทศ ให้น้ำหนักกับผลการเรียน ภาษาอังกฤษ งานวิจัย กิจกรรม และ statement of purpose' }
+        };
+        function apdPref(k, def) { try { return localStorage.getItem(k) || def; } catch (_) { return def; } }
+        function apdMode() { const m = apdPref('apd_review_mode', 'pharmacy'); return APD_MODES[m] ? m : 'pharmacy'; }
+        function apdLang() { return apdPref('apd_review_lang', 'th') === 'en' ? 'en' : 'th'; }
+        function apdSetMode(m) { try { localStorage.setItem('apd_review_mode', m); } catch (_) {} apdPaintModeRow(); }
+        function apdSetLang(l) { try { localStorage.setItem('apd_review_lang', l); } catch (_) {} apdPaintModeRow(); }
+        function apdPaintModeRow() {
+            const row = document.getElementById('apd-mode'); if (!row) return;
+            const m = apdMode(), l = apdLang();
+            row.innerHTML = '<span class="apd-mode-lbl" title="Review context · บริบทการตรวจ · 검토 맥락">Mode</span>'
+                + Object.keys(APD_MODES).map(k => `<button type="button" class="apd-mode-chip${k === m ? ' on' : ''}" onclick="apdSetMode('${k}')" aria-pressed="${k === m}" title="${APD_MODES[k].en} · ${APD_MODES[k].th} · ${APD_MODES[k].ko}">${APD_MODES[k].e} ${APD_MODES[k].th}</button>`).join('')
+                + `<span class="apd-seg" role="group" aria-label="Review language"><button type="button" class="${l === 'th' ? 'on' : ''}" onclick="apdSetLang('th')" aria-pressed="${l === 'th'}" title="ผลตรวจภาษาไทย">TH</button><button type="button" class="${l === 'en' ? 'on' : ''}" onclick="apdSetLang('en')" aria-pressed="${l === 'en'}" title="Review in English">EN</button></span>`;
+        }
+        function apdReviewPrompt(text, mode, lang) {
+            const M = APD_MODES[mode] || APD_MODES.pharmacy, en = lang === 'en';
+            return M.role + ' '
                 + 'อ่านเรซูเม่ต่อไปนี้แล้วตอบเป็น JSON เท่านั้น ตามรูปแบบ '
                 + '{"summary":"สรุป 1-2 ประโยค","strengths":["..."],"gaps":["..."],'
                 + '"questions":["คำถามที่ควรถามตอนสัมภาษณ์"],"suggestions":["สิ่งที่ผู้สมัครควรปรับในเรซูเม่"]}'
-                + ' ตอบเป็นภาษาไทย สั้น กระชับ ข้อละไม่เกิน 1 บรรทัด อย่างละไม่เกิน 4 ข้อ '
+                + (en ? ' Answer in English (keep the JSON keys). ' : ' ตอบเป็นภาษาไทย ')
+                + 'สั้น กระชับ ข้อละไม่เกิน 1 บรรทัด อย่างละไม่เกิน 4 ข้อ '
+                + 'ใน suggestions ให้มีอย่างน้อย 1 ข้อที่เป็นตัวอย่างประโยคสำหรับเขียนประสบการณ์ให้ดูมืออาชีพในบริบทนี้ '
                 + 'ห้ามเดาข้อมูลที่ไม่มีในเอกสาร ถ้าข้อมูลไม่พอให้บอกตรง ๆ ใน gaps\n\n--- เรซูเม่ ---\n'
                 + text.slice(0, 12000);
+        }
+        // one more small call: the two opinions merged into ≤ 5 points (from A / B / AB) + a verdict for the chosen context
+        function apdSummaryPrompt(results, mode, lang) {
+            const M = APD_MODES[mode] || APD_MODES.pharmacy, en = lang === 'en';
+            const compact = results.map((r, i) => ({ model: 'AB'[i] || r.model, data: r.data || { error: r.error } }));
+            return 'ด้านล่างคือความเห็นของผู้ประเมิน 2 คน (A และ B) ต่อเรซูเม่เดียวกัน บริบท: ' + M.th + ' (' + M.en + '). '
+                + 'รวมเป็น JSON เท่านั้น: {"points":[{"text":"ประเด็นสำคัญ 1 บรรทัด","from":"AB"}],"verdict":"1-2 ประโยค: เหมาะนัดสัมภาษณ์หรือควรขอข้อมูลเพิ่ม และประเด็นที่ควรยืนยันก่อน"} '
+                + 'ไม่เกิน 5 points; from = "AB" เมื่อทั้งคู่พูดถึง, "A" หรือ "B" เมื่อมีคนเดียวพูดถึง; เรียงจากสำคัญที่สุด; '
+                + (en ? 'Answer in English (keep the keys). ' : 'ตอบเป็นภาษาไทย ')
+                + 'ไม่เพิ่มข้อมูลที่ไม่มีในความเห็นทั้งสอง\n\n' + JSON.stringify(compact).slice(0, 12000);
+        }
+        async function apdSummarise(results, mode, lang) {
+            const model = apdReviewModels()[0]; if (!model || !results.some(r => r.data)) return null;
+            try {
+                const res = await window.callUniversalAI(model, apdSummaryPrompt(results, mode, lang), true, null, '', { feature: 'resume_summary' });
+                const raw = (res && res.text) || '', m = raw.match(/\{[\s\S]*\}/);
+                const j = m ? JSON.parse(m[0]) : null;
+                if (!j || !Array.isArray(j.points)) return null;
+                return { model, points: j.points.slice(0, 5).map(p => ({ text: String(p.text || ''), from: /^(AB|A|B)$/.test(p.from) ? p.from : 'AB' })), verdict: String(j.verdict || '') };
+            } catch (e) { console.warn('[resume_summary]', e); return null; }
         }
 
         // V102.295: html + runner are shared with the 📄 Import CV sheet (gsCvReview); the card names the slot (A / B) and the short model name.
@@ -62099,7 +62166,9 @@ Save it anyway?`;
             const name = (r, i) => (i < 2 ? 'AB'[i] + ' · ' : '') + (typeof window.aiModelShortName === 'function' ? window.aiModelShortName(r.model) : r.model);
             const { only } = apdAgreeCounts(results), dots = apdDotsHtml(results);
             const done = opts.done || {};
-            const SEC = [['strengths', 'จุดแข็ง', 's-str', '✓'], ['gaps', 'จุดที่ควรปรับ', 's-gap', '!'], ['questions', 'คำถามสัมภาษณ์', 's-q', '?'], ['suggestions', 'ข้อเสนอแนะ', 's-sug', '☐']];
+            const SEC = opts.lang === 'en'
+                ? [['strengths', 'Strengths', 's-str', '✓'], ['gaps', 'Gaps', 's-gap', '!'], ['questions', 'Interview questions', 's-q', '?'], ['suggestions', 'Suggestions', 's-sug', '☐']]
+                : [['strengths', 'จุดแข็ง', 's-str', '✓'], ['gaps', 'จุดที่ควรปรับ', 's-gap', '!'], ['questions', 'คำถามสัมภาษณ์', 's-q', '?'], ['suggestions', 'ข้อเสนอแนะ', 's-sug', '☐']];   // V102.304: per run language
             const li = (arr, i, k) => {
                 if (!arr || !arr.length) return '<li class="apd-none">—</li>';
                 return arr.map((x, j) => {
@@ -62141,15 +62210,16 @@ Save it anyway?`;
         async function apdTickSuggestion(runId, i, j, on) {
             const run = _apdReviews.find(r => r.id === runId); if (!run) return;
             run.done = run.done || {}; run.done[i + '_' + j] = !!on;
-            const li = document.querySelector(`#apd-ai input[onchange*="'${runId}',${i},${j},"]`); if (li) li.closest('li').classList.toggle('done', !!on);
+            document.querySelectorAll(`#apd-ai input[onchange*="'${runId}',${i},${j},"]`).forEach(el => el.closest('li').classList.toggle('done', !!on));
+            const run2 = _apdReviews[0]; if (run2 && run2.id === runId) { const t = document.querySelector('.apd-tabs'); if (t) t.outerHTML = apdTabsHtml(run2, _apdTab || (run2.summary ? 'sum' : 'cmp')); }
             try { await db.collection('applicant_reviews').doc(runId).update({ ['done.' + i + '_' + j]: !!on }); }
             catch (e) { console.warn('[applicant_reviews] tick not saved:', e); if (typeof showToast === 'function') showToast('⚠️ Tick not saved: ' + (e.message || e)); }
         }
         // V102.299: the sheet widens while a review is on screen (two columns need room); back to 420px when it opens empty.
         function apdWide(on) { const mc = document.querySelector('#applicantDocsModal .modal-content'); if (mc) mc.classList.toggle('apd-wide', !!on); }
         function apdRenderReview(results) { document.getElementById('apd-ai').innerHTML = apdHeadHtml(results, '💬 Just now · ตอนนี้', 0) + apdReviewHtml(results); apdWide(true); }
-        async function apdRunReview(text) {
-            const prompt = apdReviewPrompt(text);
+        async function apdRunReview(text, mode, lang) {
+            const prompt = apdReviewPrompt(text, mode || apdMode(), lang || apdLang());
             return Promise.all(apdReviewModels().map(async model => {
                 try {
                     const res = await window.callUniversalAI(model, prompt, true, null, '', { feature: 'resume_review' });
@@ -62168,13 +62238,14 @@ Save it anyway?`;
         // Admin-only like applicant_docs; no index needed (one where, sorted here). Not written from the Import CV sheet (no file yet).
         let _apdReviews = [];
         function apdReviewDate(r) { const t = r.at && r.at.toDate ? r.at.toDate() : (r.at ? new Date(r.at) : null); return t ? t.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''; }
-        async function apdSaveReview(d, results) {
+        async function apdSaveReview(d, results, extra) {
             try {
                 const by = (typeof auth !== 'undefined' && auth && auth.currentUser && auth.currentUser.email) || 'admin-ui';
-                const payload = { preUserId: apdTargetId, docId: d.id, docName: d.name || '', by, at: firebase.firestore.FieldValue.serverTimestamp(),
-                    models: results.map(r => r.model), results: results.map(r => r.error ? { model: r.model, error: String(r.error).slice(0, 500) } : { model: r.model, data: r.data }) };
+                const payload = Object.assign({ preUserId: apdTargetId, docId: d.id, docName: d.name || '', by, at: firebase.firestore.FieldValue.serverTimestamp(),
+                    models: results.map(r => r.model), results: results.map(r => r.error ? { model: r.model, error: String(r.error).slice(0, 500) } : { model: r.model, data: r.data }) }, extra || {});
                 const ref = await db.collection('applicant_reviews').add(payload);
                 _apdReviews.unshift(Object.assign({ id: ref.id }, payload, { at: new Date(), done: {} }));
+                _apdTab = payload.summary ? 'sum' : 'cmp';
                 return true;
             } catch (e) { console.warn('[applicant_reviews] not saved:', e); if (typeof showToast === 'function') showToast('⚠️ Review shown but not saved: ' + (e.message || e)); return false; }
         }
@@ -62195,12 +62266,51 @@ Save it anyway?`;
             if (!box || !_apdReviews.length) return;
             const latest = _apdReviews[0], older = _apdReviews.slice(1);
             const who = r => escapeHtml(String(r.by || '').split('@')[0]);
-            const olderHtml = older.map(r => apdHeadHtml(r.results || [], `${escapeHtml(apdReviewDate(r))} · ${escapeHtml(r.docName || '')} · ${who(r)}`, 0) + apdReviewHtml(r.results || [], { runId: r.id, done: r.done })).join('');
-            box.innerHTML = apdHeadHtml(latest.results || [], `💬 ${escapeHtml(apdReviewDate(latest))} · ${escapeHtml(latest.docName || '')} · ${who(latest)}`, older.length)
-                + apdReviewHtml(latest.results || [], { runId: latest.id, done: latest.done })
+            const tag = r => (r.mode && APD_MODES[r.mode] ? ' · ' + APD_MODES[r.mode].e : '') + (r.lang === 'en' ? ' · EN' : '');
+            const olderHtml = older.map(r => apdHeadHtml(r.results || [], `${escapeHtml(apdReviewDate(r))} · ${escapeHtml(r.docName || '')} · ${who(r)}${tag(r)}`, 0) + apdReviewHtml(r.results || [], { runId: r.id, done: r.done, lang: r.lang })).join('');
+            // V102.304: three tabs on the latest run — สรุปรวม (first, when the run has a summary) · เทียบ A|B · ข้อเสนอแนะ
+            const tab = _apdTab || (latest.summary ? 'sum' : 'cmp');
+            box.innerHTML = apdHeadHtml(latest.results || [], `💬 ${escapeHtml(apdReviewDate(latest))} · ${escapeHtml(latest.docName || '')} · ${who(latest)}${tag(latest)}`, older.length)
+                + apdTabsHtml(latest, tab) + apdTabBody(latest, tab)
                 + (older.length ? `<div id="apd-hist" hidden>${olderHtml}</div>` : '');
             _apdLastResults = latest.results || [];   // ⧉ on the latest cards copies the latest run
             apdWide(true);
+        }
+        let _apdTab = '';
+        function apdSetTab(t) { _apdTab = t; apdRenderSavedReviews(); }
+        function apdTabsHtml(run, tab) {
+            const en = run.lang === 'en', sug = run.results.reduce((n, r) => n + ((r.data && r.data.suggestions) || []).length, 0), done = Object.values(run.done || {}).filter(Boolean).length;
+            const t = (k, label) => `<button type="button" class="apd-tab${tab === k ? ' on' : ''}" onclick="apdSetTab('${k}')" aria-pressed="${tab === k}">${label}</button>`;
+            return '<div class="apd-tabs lang-no-toggle">' + t('sum', en ? 'Summary' : 'สรุปรวม') + t('cmp', en ? 'Compare A | B' : 'เทียบ A | B') + t('sug', (en ? 'Suggestions' : 'ข้อเสนอแนะ') + (sug ? ` <small>☐ ${done}/${sug}</small>` : '')) + '</div>';
+        }
+        function apdTabBody(run, tab) {
+            const en = run.lang === 'en', M = APD_MODES[run.mode] || null;
+            if (tab === 'sum') {
+                if (!run.summary) return `<div class="apd-sum"><p class="apd-sum-empty">${en ? 'No summary yet for this run.' : 'รีวิวนี้ยังไม่มีสรุปรวม'} <button type="button" class="apd-sum-btn" onclick="apdSummariseRun('${run.id}')">✨ ${en ? 'Summarise · 1 call' : 'สรุป · 1 call'}</button></p></div>`;
+                const S = run.summary, dots = apdDotsHtml(run.results || []);
+                const src = p => p.from === 'AB' ? ` <span class="apd-both" title="Both models · ทั้งสองโมเดล">${dots}</span>` : ` <span class="apd-src">${p.from}</span>`;
+                return `<div class="apd-sum"><h5>📋 ${en ? 'Summary of both models' : 'สรุปจาก 2 โมเดล'}${M ? ' · ' + M.e + ' ' + (en ? M.en : M.th) : ''}</h5><ul>${S.points.map(p => `<li>${escapeHtml(p.text)}${src(p)}</li>`).join('')}</ul>`
+                    + (S.verdict ? `<div class="apd-verdict">${M ? M.e + ' ' : ''}${escapeHtml(S.verdict)} <span class="apd-dim">· ${en ? 'AI advice, not a hiring decision' : 'AI = ข้อเสนอแนะ ไม่ใช่การตัดสินรับเข้าทำงาน'}</span></div>` : '') + '</div>';
+            }
+            if (tab === 'sug') {
+                const done = run.done || {};
+                return '<div class="apd-sug-all">' + (run.results || []).map((r, i) => {
+                    const list = (r.data && r.data.suggestions) || [];
+                    return `<div class="apd-sec s-sug"><h5><span class="ic">☐</span>${'AB'[i] || ''} · ${escapeHtml(window.aiModelShortName ? window.aiModelShortName(r.model) : r.model)}</h5><ul>`
+                        + (list.length ? list.map((x, j) => { const on = !!done[i + '_' + j]; return `<li class="${on ? 'done' : ''}"><label><input type="checkbox" ${on ? 'checked ' : ''}onchange="apdTickSuggestion('${run.id}',${i},${j},this.checked)" aria-label="Done"><span>${escapeHtml(String(x))}</span></label></li>`; }).join('') : '<li class="apd-none">—</li>') + '</ul></div>';
+                }).join('') + '</div>';
+            }
+            return apdReviewHtml(run.results || [], { runId: run.id, done: run.done, lang: run.lang });
+        }
+        async function apdSummariseRun(runId) {
+            const run = _apdReviews.find(r => r.id === runId); if (!run) return;
+            const btn = document.querySelector('.apd-sum-btn'); if (btn) { btn.disabled = true; btn.textContent = '…'; }
+            const summary = await apdSummarise(run.results || [], run.mode || apdMode(), run.lang || 'th');
+            if (!summary) { if (typeof showToast === 'function') showToast('⚠️ No summary came back'); apdRenderSavedReviews(); return; }
+            run.summary = summary;
+            try { await db.collection('applicant_reviews').doc(runId).update({ summary }); }
+            catch (e) { console.warn('[applicant_reviews] summary not saved:', e); if (typeof showToast === 'function') showToast('⚠️ Summary shown but not saved: ' + (e.message || e)); }
+            apdRenderSavedReviews();
         }
         function apdToggleHistory(btn) {
             const h = document.getElementById('apd-hist'); if (!h) return;
@@ -62227,10 +62337,15 @@ Save it anyway?`;
                     + text.length + ' chars) — it is probably a scan. AI review needs a text PDF.</div>';
                 return;
             }
-            box.innerHTML = '<div style="font-size:0.74em; color:#64748b;">Asking ' + apdReviewModels().length + ' models…</div>';
-            const results = await apdRunReview(text);
+            const mode = apdMode(), lang = apdLang();
+            box.innerHTML = '<div style="font-size:0.74em; color:#64748b;">Asking ' + apdReviewModels().length + ' models… ' + APD_MODES[mode].e + (lang === 'en' ? ' · EN' : '') + '</div>';
+            const results = await apdRunReview(text, mode, lang);
             apdRenderReview(results);
-            if (await apdSaveReview(d, results)) apdRenderSavedReviews();   // V102.298: the run just made becomes "Last review", older ones fold under History; an unsaved run stays on screen as is
+            box.insertAdjacentHTML('afterbegin', '<div class="apd-dim" style="font-size:0.72em;">✨ Summarising…</div>');
+            const summary = await apdSummarise(results, mode, lang);   // V102.304: one more small call → the สรุปรวม tab
+            _apdTab = summary ? 'sum' : 'cmp';
+            if (await apdSaveReview(d, results, { mode, lang, summary })) apdRenderSavedReviews();   // V102.298: the run just made becomes "Last review"; an unsaved run stays on screen as is
+            else apdRenderReview(results);
         }
 
         // ---- V98.61: events -------------------------------------------------------
@@ -71885,6 +72000,7 @@ Summarize in English in 3–5 concise lines:
             <button class="btn-sm" onclick="document.getElementById('apd-file').click()" style="width:auto; min-height:0; padding:5px 12px; font-size:0.75em; font-weight:700; background:#f5f3ff; color:#7c3aed; border:1px solid #ddd6fe; border-radius:999px; cursor:pointer;">+ Attach</button>
             <span style="font-size:0.68em; color:#cbd5e1; margin-left:6px;">PDF or image, under 4 MB</span>
             <div class="apd-ab lang-no-toggle" id="apd-ab"></div>
+            <div class="apd-mode lang-no-toggle" id="apd-mode"></div>
             <div class="lang-no-toggle" id="apd-ai" style="margin-top:10px;"></div>
             <p class="apd-foot">🔒 Admins only · deleted with the applicant · AI review sends the CV text to the two providers</p>
         </div>
