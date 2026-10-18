@@ -3,7 +3,7 @@
 const fs = require('fs');
 const src = fs.readFileSync('public/admin.html', 'utf8').replace(/\r/g, '');
 const a = src.indexOf('window.SQM_EXAM_STYLES = {');
-const b = src.indexOf('\n        };', a) + 11;
+const b = src.indexOf('        window.sqmSetStyle = function(btn) {', a);   // V102.284: the slice also holds SQM_LEVELS_DEFAULT + sqmLevelLine
 if (a < 0 || b < a) throw new Error('SQM_EXAM_STYLES not found in admin.html');
 const window = {};
 new Function('window', src.slice(a, b))(window);
@@ -51,6 +51,18 @@ check('kple: clinical scope leaves law out, full scope names the Acts in general
 check('kple: subject weights 40 / 29 / 26 / 6 (full) and re-normalised without law (clinical)', [/about 40% clinical/.test(KP(5, 'full')), /6% health and pharmacy law/.test(KP(5, 'full')), /about 43% clinical/.test(KP(5, 'clinical')), /27% industrial/.test(KP(5, 'clinical'))], [true, true, true, true]);
 check('spcf+kple: hints tell the admin to check law items', [S.spcf.hint, S.kple.hint].map(x => /check every law item/.test(x)), [true, true]);
 check('spcf+kple: no Thai blueprint leftovers', [SF(5), KP(5, 'full')].map(p => /3:8:4/.test(p)), [false, false]);
+// V102.284: the Level chips mean something per style. `levels` overrides a tier; anything else falls back to the Bloom default.
+const L = (k, d) => window.sqmLevelLine(k, d);
+check('levels: every style defines all three tiers', Object.keys(S).filter(k => !(S[k].levels && ['easy', 'medium', 'hard'].every(d => typeof S[k].levels[d] === 'string' && S[k].levels[d].length > 40))), []);
+check('levels: the line starts with "- Difficulty: " and names the tier', ['easy', 'medium', 'hard'].map(d => /^- Difficulty: (EASY|MEDIUM|HARD) — /.test(L('thai', d)) && L('thai', d).includes(d.toUpperCase())), [true, true, true]);
+check('levels: unknown style or tier → Bloom default / easy', [L('nope', 'hard') === '- Difficulty: ' + window.SQM_LEVELS_DEFAULT.hard, L('thai', 'x') === L('thai', 'easy')], [true, true]);
+check('levels: three tiers differ for every style', Object.keys(S).filter(k => new Set(['easy', 'medium', 'hard'].map(d => L(k, d))).size !== 3), []);
+check('levels: Thai PC shifts the cognitive mix', [/RECALL/.test(L('thai', 'easy')), /3 : 8 : 4/.test(L('thai', 'medium')), /PROBLEM-SOLVING/.test(L('thai', 'hard'))], [true, true, true]);
+check('levels: Kokushi = 必須 / 理論 / 実践', [/必須/.test(L('japan', 'easy')), /理論/.test(L('japan', 'medium')), /実践/.test(L('japan', 'hard')) && /LINKED PAIRS/.test(L('japan', 'hard'))], [true, true, true]);
+check('levels: China = A / B / C+X', [/A-type/.test(L('china', 'easy')), /B-type/.test(L('china', 'medium')), /C-type/.test(L('china', 'hard')) && /X-type/.test(L('china', 'hard'))], [true, true, true]);
+check('levels: Forensic hard = structured B / C; easy = read the rule', [/read-the-rule/.test(L('spcf', 'easy')), /Section B \/ C/.test(L('spcf', 'hard'))], [true, true]);
+check('levels: NAPLEX hard brings calculations, select-all, ordering; easy forbids them', [/no calculations or select-all/.test(L('naplex', 'easy')), /ordering/.test(L('naplex', 'hard'))], [true, true]);
+check('levels: the prompt uses the helper, not the old static sentence', [/\$\{window\.sqmLevelLine\(window\._suggestMoreStyle, diff\)\}/.test(src), /Make questions genuinely challenging, not just harder vocabulary/.test(src)], [true, false]);
 check('law styles: the suggestions popup carries the verify-law line', /\(\(window\.SQM_EXAM_STYLES \|\| \{\}\)\[window\._suggestMoreStyle\] \|\| \{\}\)\.law \? `<p class="sqm-law-note"/.test(src), true);
 for (const [key, s] of Object.entries(S)) {
     check(`${key}: flag / label / title / hint / prompt present`, !!(s.flag && s.label && s.title && typeof s.hint === 'string' && typeof s.prompt === 'function'), true);
