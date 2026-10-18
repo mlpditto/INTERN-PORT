@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.294)</title>
+    <title>Nika Admin (V102.295)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -4232,6 +4232,11 @@
         #gs-cv-sheet .cv-row.same, #gs-cv-sheet .cv-row.none { opacity:.55; cursor:default; }
         #gs-cv-sheet .cv-row.diff { background:#fffbeb; }
         #gs-cv-sheet .cv-warn { margin:6px 12px; padding:7px 10px; border-radius:8px; background:#fffbeb; border:1px solid #fcd34d; color:#92400e; }
+        /* V102.295: 💬 Review ×2 — the same two-model CV review as 📎 Documents, inside the import sheet */
+        #gs-cv-sheet .cv-revbtn { flex-shrink:0; font-size:11px; border:1px solid #c7d2fe; border-radius:999px; padding:2px 9px; background:#fff; color:#3730a3; cursor:pointer; min-height:0; height:auto; width:auto; margin:0; font-weight:700; }
+        #gs-cv-sheet .cv-revbtn:disabled { opacity:.6; cursor:default; }
+        #gs-cv-sheet .cv-rev { padding:8px 12px 2px; border-top:1px solid #f1f5f9; font-size:16px; }
+        #gs-cv-sheet .cv-rev[hidden] { display:none; }
         #gs-cv-sheet .cv-keep { display:flex; align-items:center; gap:6px; padding:6px 12px; border-top:1px solid #f1f5f9; color:#475569; cursor:pointer; margin:0; }
         #gs-cv-sheet .cv-keep input { width:16px; height:16px; margin:0; min-height:0; }
         #gs-cv-sheet .cv-ft { display:flex; align-items:center; gap:8px; padding:8px 12px; background:#f8fafc; color:#64748b; }
@@ -37991,9 +37996,9 @@ They can connect again from LINE.
                 return { key: f.key, id: f.id, label: f.label, sec: f.sec, kind: f.kind, cur, val, state, nameMismatch, checked: state === 'new' };
             });
         }
-        let _gsCvRows = [], _gsCvFilter = 'all', _gsCvFileRef = null, _gsCvKeep = true;   // V102.248: the CV file itself is kept with the user (admin-only) unless the admin unticks it
+        let _gsCvRows = [], _gsCvFilter = 'all', _gsCvFileRef = null, _gsCvKeep = true, _gsCvText = '', _gsCvReviewHtml = '';   // V102.295: + the CV text and the 2-model review, so a re-render keeps them   // V102.248: the CV file itself is kept with the user (admin-only) unless the admin unticks it
         function gsCvOpen() { const f = document.getElementById('gs-cv-file'); if (f) { f.value = ''; f.click(); } }
-        function gsCvClose() { const sh = document.getElementById('gs-cv-sheet'); if (sh) { sh.hidden = true; sh.innerHTML = ''; } _gsCvRows = []; }
+        function gsCvClose() { const sh = document.getElementById('gs-cv-sheet'); if (sh) { sh.hidden = true; sh.innerHTML = ''; } _gsCvRows = []; _gsCvText = ''; _gsCvReviewHtml = ''; }
         function gsCvMsg(html, withClose) {
             const sh = document.getElementById('gs-cv-sheet'); if (!sh) return;
             sh.hidden = false;
@@ -38034,6 +38039,7 @@ They can connect again from LINE.
                 let text = '', pdf = null, via = '';
                 if (/pdf$/i.test(file.type) || /\.pdf$/i.test(file.name)) { const r = await gsCvPdfText(await file.arrayBuffer()); text = r.text; pdf = r.pdf; }
                 const useImage = text.replace(/\s+/g, '').length < 60;
+                _gsCvText = useImage ? '' : text; _gsCvReviewHtml = '';   // V102.295: the review reads the same text; an image-only CV has none
                 const vision = useImage ? await gsCvImage(file, pdf) : null;
                 via = useImage ? '🖼 read as an image (vision model)' : '✓ text read from the PDF';
                 via += ' · 🤖 ' + GS_CV_MODEL_LABEL;
@@ -38056,7 +38062,8 @@ They can connect again from LINE.
             const shown = _gsCvRows.filter(r => _gsCvFilter === 'all' ? true : r.state === 'diff');
             const mism = _gsCvRows.some(r => r.nameMismatch);
             sh.hidden = false;
-            sh.innerHTML = '<div class="cv-h"><b>📄 Import from CV</b><small>' + escapeHtml(name || '') + ' · ' + via + '</small></div>'
+            sh.innerHTML = '<div class="cv-h"><b>📄 Import from CV</b><small>' + escapeHtml(name || '') + ' · ' + via + '</small>'
+                + '<button type="button" class="cv-revbtn" id="gs-cv-review-btn" onclick="gsCvReview()" title="AI review by two models — the models picked in 📎 Documents · รีวิว CV ด้วย 2 โมเดล · 두 모델 리뷰" aria-label="Review by two models">💬 Review ×2</button></div>'
                 + '<div class="cv-sum"><span class="cv-tg new">new ' + n('new') + '</span><span class="cv-tg">same ' + n('same') + '</span><span class="cv-tg diff">differs ' + n('diff') + '</span><span class="cv-tg">not in CV ' + n('none') + '</span><span class="sp"></span>'
                 + '<button type="button" class="cv-chip' + (_gsCvFilter === 'all' ? ' on' : '') + '" onclick="gsCvSetFilter(\'all\')">All</button><button type="button" class="cv-chip' + (_gsCvFilter === 'diff' ? ' on' : '') + '" onclick="gsCvSetFilter(\'diff\')">Differs only</button></div>'
                 + (mism ? '<div class="cv-warn">⚠️ The name on this CV differs from this user — shown, not blocked. The name row stays unticked; tick it if it is right. Anything wrong can be edited before you Save.</div>' : '')
@@ -38064,9 +38071,31 @@ They can connect again from LINE.
                     return '<label class="cv-row ' + r.state + '"><input type="checkbox" data-i="' + i + '"' + (r.checked ? ' checked' : '') + (dis ? ' disabled' : '') + ' onchange="gsCvTick(this)"><span><b>' + escapeHtml(r.label) + '</b><small>' + r.sec + '</small></span>'
                         + '<span class="cur">' + (r.cur ? escapeHtml(r.cur) : '<i>empty</i>') + '</span><span class="ar">→</span><span class="val">' + (r.val ? escapeHtml(r.val) : '<i>—</i>') + '</span>'
                         + '<span class="cv-tg ' + r.state + '">' + ({ new: 'new', diff: 'differs', same: 'same', none: 'not in CV' })[r.state] + '</span></label>'; }).join('')
+                + '<div id="gs-cv-review" class="cv-rev lang-no-toggle"' + (_gsCvReviewHtml ? '' : ' hidden') + '>' + _gsCvReviewHtml + '</div>'
                 + '<label class="cv-keep"><input type="checkbox" id="gs-cv-keep"' + (_gsCvKeep && gsCvKeepable() ? ' checked' : '') + (gsCvKeepable() ? '' : ' disabled') + ' onchange="_gsCvKeep = this.checked; gsCvCount()"> 📎 ' + (gsCvKeepable() ? 'Keep this CV in the user\'s documents (admin only)' : 'Cannot keep this file (PDF / JPG / PNG / WEBP under 4 MB only)') + '</label>'
                 + '<div class="cv-ft"><span id="gs-cv-count"></span><span class="sp"></span><button type="button" class="cv-btn" onclick="gsCvClose()">Cancel</button><button type="button" class="cv-btn p" id="gs-cv-apply" onclick="gsCvApply()"></button></div>';
             gsCvCount();
+        }
+        // V102.295: 💬 Review ×2 — the same two-model opinion as the 📎 Documents sheet (apdReviewPrompt / apdRunReview / apdReviewHtml),
+        // on the text already read for the import. The models are the Documents picks (apd-model-a / -b). Not a hiring decision.
+        async function gsCvReview() {
+            const box = document.getElementById('gs-cv-review'), btn = document.getElementById('gs-cv-review-btn');
+            if (!box) return;
+            box.hidden = false;
+            if (!_gsCvText || _gsCvText.length < 200) {
+                _gsCvReviewHtml = '<div style="font-size:0.74em; color:#b45309;">This CV was read as an image (no text layer) — the review needs a text PDF.</div>';
+                box.innerHTML = _gsCvReviewHtml; return;
+            }
+            if (typeof apdInitModelRows === 'function') apdInitModelRows();
+            if (btn) { btn.disabled = true; btn.textContent = '💬 …'; }
+            box.innerHTML = '<div style="font-size:0.74em; color:#64748b;">Asking ' + apdReviewModels().length + ' models…</div>';
+            try {
+                _gsCvReviewHtml = apdReviewHtml(await apdRunReview(_gsCvText));
+            } catch (e) {
+                _gsCvReviewHtml = '<div style="font-size:0.74em; color:#b91c1c;">' + escapeHtml(e.message || String(e)) + '</div>';
+            }
+            box.innerHTML = _gsCvReviewHtml;
+            if (btn) { btn.disabled = false; btn.textContent = '💬 Review ×2'; }
         }
         function gsCvSetFilter(f) { _gsCvFilter = f; const sh = document.getElementById('gs-cv-sheet'); const h = sh && sh.querySelector('.cv-h small'); gsCvRender((h && h.textContent.split(' · ')[0]) || '', (h && h.textContent.split(' · ').slice(1).join(' · ')) || ''); }
         function gsCvTick(box) { const r = _gsCvRows[+box.dataset.i]; if (r) r.checked = box.checked; gsCvCount(); }
@@ -61925,20 +61954,21 @@ Save it anyway?`;
                 + text.slice(0, 12000);
         }
 
-        function apdRenderReview(results) {
-            const box = document.getElementById('apd-ai');
+        // V102.295: html + runner are shared with the 📄 Import CV sheet (gsCvReview); the card names the slot (A / B) and the short model name.
+        function apdReviewHtml(results) {
+            const name = (r, i) => (i < 2 ? 'AB'[i] + ' · ' : '') + (typeof window.aiModelShortName === 'function' ? window.aiModelShortName(r.model) : r.model);
             const li = (arr) => (arr && arr.length)
                 ? arr.map(x => '<li>' + escapeHtml(String(x)) + '</li>').join('')
                 : '<li style="color:#cbd5e1;">—</li>';
-            box.innerHTML = results.map(r => {
+            return results.map((r, i) => {
                 if (r.error) {
                     return `<div style="border:1px solid #fee2e2; background:#fef2f2; border-radius:8px; padding:8px; margin-bottom:6px;">
-                        <div style="font-size:0.7em; font-weight:800; color:#b91c1c;">${escapeHtml(r.model)}</div>
+                        <div style="font-size:0.7em; font-weight:800; color:#b91c1c;">${escapeHtml(name(r, i))}</div>
                         <div style="font-size:0.72em; color:#b91c1c;">${escapeHtml(r.error)}</div></div>`;
                 }
                 const d = r.data || {};
                 return `<div style="border:1px solid #eef2f7; border-radius:8px; padding:8px; margin-bottom:6px;">
-                    <div style="font-size:0.7em; font-weight:800; color:#7c3aed; margin-bottom:3px;">${escapeHtml(r.model)}</div>
+                    <div style="font-size:0.7em; font-weight:800; color:#7c3aed; margin-bottom:3px;">${escapeHtml(name(r, i))}</div>
                     <div style="font-size:0.74em; color:#334155; margin-bottom:5px;">${escapeHtml(d.summary || '')}</div>
                     <div style="font-size:0.7em; color:#475569;">
                         <b>จุดแข็ง</b><ul style="margin:2px 0 5px 16px; padding:0;">${li(d.strengths)}</ul>
@@ -61948,6 +61978,21 @@ Save it anyway?`;
                     </div></div>`;
             }).join('')
             + '<p style="font-size:0.64em; color:#cbd5e1; margin:4px 0 0;">Two models, shown separately on purpose — where they disagree is what a human should look at. Not a hiring decision.</p>';
+        }
+        function apdRenderReview(results) { document.getElementById('apd-ai').innerHTML = apdReviewHtml(results); }
+        async function apdRunReview(text) {
+            const prompt = apdReviewPrompt(text);
+            return Promise.all(apdReviewModels().map(async model => {
+                try {
+                    const res = await window.callUniversalAI(model, prompt, true, null, '', { feature: 'resume_review' });
+                    const raw = (res && res.text) || '';
+                    const m = raw.match(/\{[\s\S]*\}/);      // models like to wrap JSON in prose
+                    if (!m) throw new Error('no JSON in the reply: ' + raw.slice(0, 120));
+                    return { model, data: JSON.parse(m[0]) };
+                } catch (e) {
+                    return { model, error: e.message };
+                }
+            }));
         }
 
         async function aiReviewApplicantDoc(docId) {
@@ -61971,19 +62016,7 @@ Save it anyway?`;
                 return;
             }
             box.innerHTML = '<div style="font-size:0.74em; color:#64748b;">Asking ' + apdReviewModels().length + ' models…</div>';
-            const prompt = apdReviewPrompt(text);
-            const results = await Promise.all(apdReviewModels().map(async model => {
-                try {
-                    const res = await window.callUniversalAI(model, prompt, true, null, '', { feature: 'resume_review' });
-                    const raw = (res && res.text) || '';
-                    const m = raw.match(/\{[\s\S]*\}/);      // models like to wrap JSON in prose
-                    if (!m) throw new Error('no JSON in the reply: ' + raw.slice(0, 120));
-                    return { model, data: JSON.parse(m[0]) };
-                } catch (e) {
-                    return { model, error: e.message };
-                }
-            }));
-            apdRenderReview(results);
+            apdRenderReview(await apdRunReview(text));
         }
 
         // ---- V98.61: events -------------------------------------------------------
