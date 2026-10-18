@@ -7,7 +7,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const html = fs.readFileSync('public/admin.html', 'utf8').replace(/\r\n/g, '\n');
 const rules = fs.readFileSync('firestore.rules', 'utf8');
 assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(html));
-assert.ok(/match \/applicant_reviews\/\{docId\} \{\s*allow read, create: if isAdmin\(\);\s*allow update, delete: if false;\s*\}/.test(rules), 'applicant_reviews rule: admin read/create, append-only');
+assert.ok(/match \/applicant_reviews\/\{docId\} \{\s*allow read, create: if isAdmin\(\);[\s\S]{0,200}allow update: if isAdmin\(\) && request\.resource\.data\.diff\(resource\.data\)\.affectedKeys\(\)\.hasOnly\(\['done'\]\);\s*allow delete: if false;\s*\}/.test(rules), 'applicant_reviews rule: admin read/create, update = done ticks only, no delete');
 assert.ok(html.includes("db.collection('applicant_reviews').add(") && html.includes("db.collection('applicant_reviews').where('preUserId', '==', owner).get()"), 'one collection, one where, no index');
 const styles = (html.match(/<style\b[^>]*>[\s\S]*?<\/style>/g) || []).join('\n');
 function grab(src, marker) {
@@ -39,8 +39,9 @@ window.callUniversalAI = async (model, prompt, isJson, v, s, opts) => { __calls.
 window.__store = []; window.__queries = [];
 var db = { collection: name => ({
     add: async data => { if (name !== 'applicant_reviews') throw new Error('unexpected ' + name); const id = 'r' + (__store.length + 1); __store.push({ id, data }); return { id }; },
-    where: (f, op, v) => ({ get: async () => { __queries.push([name, f, op, v]); return { docs: __store.filter(x => x.data[f] === v).map(x => ({ id: x.id, data: () => x.data })) }; } })
-}) };
+    where: (f, op, v) => ({ get: async () => { __queries.push([name, f, op, v]); return { docs: __store.filter(x => x.data[f] === v).map(x => ({ id: x.id, data: () => x.data })) }; } }),
+    doc: id => ({ update: async patch => { window.__updates.push({ id, patch }); } })
+}) }; window.__updates = [];
 ${code}
 </script>`;
 (async () => {
@@ -65,13 +66,15 @@ ${code}
                        { model: 'b', data: { strengths: ['มีประสบการณ์ร้านยาจริงที่ Boots ทั้งจ่ายยา ให้คำปรึกษา'], gaps: ['ไม่ระบุชั้นปีปัจจุบันและระดับภาษาอังกฤษ', 'ข้อมูลไม่พอเรื่องกิจกรรม'], questions: [], suggestions: [] } }];
             const o = apdOnlyMap(r); return [o[0].strengths, o[0].gaps, o[1].strengths, o[1].gaps];
         }), [[false, false], [false], [false], [false, true]], 'shared points unmarked (both A strengths overlap the one Boots line of B), the unique gap marked');
+        assert.equal(await page.evaluate(() => { const r = [{ model: 'gpt-6-luna', data: { strengths: ['ไม่ระบุชั้นปีที่กำลังศึกษา'], gaps: [], questions: [], suggestions: [] } }, { model: 'claude-haiku-4-5', data: { strengths: ['ไม่ระบุชั้นปีปัจจุบันและระดับภาษาอังกฤษ', 'ข้อมูลไม่พอเรื่องกิจกรรม'], gaps: [], questions: [], suggestions: [] } }]; const d = document.createElement('div'); d.innerHTML = apdReviewHtml(r); return d.querySelectorAll('.apd-both .apd-dots i').length; }), 4, '●● (two dots) on each of the two shared bullets, none on the unique one');
         await page.evaluate(() => aiReviewApplicantDoc('d1'));
-        await page.waitForFunction(() => window.__store.length === 1 && /Last review/.test(document.getElementById('apd-ai').textContent));
+        await page.waitForFunction(() => window.__store.length === 1 && document.querySelector('#apd-ai .apd-saved-head .apd-copy-sug'));
         const saved = await page.evaluate(() => __store[0].data);
         assert.equal(saved.preUserId, 'PRE1'); assert.equal(saved.docId, 'd1'); assert.equal(saved.docName, 'CV_a.pdf'); assert.equal(saved.by, 'admin@x.com'); assert.equal(saved.at, 'SERVER_TS');
         assert.deepEqual(saved.models, ['gpt-6-luna', 'claude-haiku-4-5']);
         assert.deepEqual(saved.results[0], { model: 'gpt-6-luna', data: { summary: 'สรุป A', strengths: ['s1', 's2'], gaps: ['g1'], questions: [], suggestions: ['x'] } });
-        assert.equal(await page.locator('#apd-ai .apd-copy').count(), 2, '⧉ on each card');
+        assert.equal(await page.locator('#apd-ai .apd-card .apd-copy').count(), 2, '⧉ on each card');
+        assert.equal(await page.locator('#apd-ai .apd-saved-head .apd-copy-sug').count(), 1, '⧉ suggestions in the head line');
         // V102.299: A | B side by side; the sheet widens; bullets only one model raised are amber, shared ones are not
         assert.equal(await page.$eval('#applicantDocsModal .modal-content', e => e.classList.contains('apd-wide')), true, 'sheet widens for the review');
         // V102.300: it really widens past its inline max-width:420px — most of a desktop, capped at 1180px
@@ -82,24 +85,35 @@ ${code}
         if (process.env.REV_SHOT) await page.locator('#applicantDocsModal .modal-content').screenshot({ path: process.env.REV_SHOT });
         await page.setViewportSize({ width: 900, height: 900 });
         assert.equal(await page.$eval('#apd-ai .apd-cmp.two', e => getComputedStyle(e).gridTemplateColumns.split(' ').length), 2, 'two columns at 900px');
+        // Phase 1: vendor strip, four tinted sections, suggestions as a checklist on the saved run, no legend box
+        assert.deepEqual(await page.$$eval('#apd-ai .apd-card .apd-ch', es => es.map(e => e.style.background)), ['rgb(16, 163, 127)', 'rgb(217, 119, 87)'], 'OpenAI green / Claude terracotta strips');
+        assert.deepEqual(await page.$$eval('#apd-ai .apd-card:first-child .apd-sec h5', es => es.map(e => e.textContent)), ['✓จุดแข็ง', '!จุดที่ควรปรับ', '?คำถามสัมภาษณ์', '☐ข้อเสนอแนะ']);
+        assert.equal(await page.locator('#apd-ai .apd-legend, #apd-ai .p1-banner').count(), 0, 'no legend, no banner box');
+        assert.equal(await page.locator('#apd-ai .s-sug input[type=checkbox]').count(), 1, 'the saved run has a checkbox per suggestion (A has one, B none)');
         assert.deepEqual(await page.$$eval('#apd-ai .apd-cmp.two > div', es => es.map(e => Math.round(e.getBoundingClientRect().top))).then(t => new Set(t).size), 1, 'A and B on the same line');
-        assert.ok(await page.locator('#apd-ai .apd-legend').count() === 1, 'legend');
         await page.setViewportSize({ width: 500, height: 900 });
         assert.equal(await page.$eval('#apd-ai .apd-cmp.two', e => getComputedStyle(e).gridTemplateColumns.split(' ').length), 1, 'one column on a phone');
         await page.setViewportSize({ width: 900, height: 900 });
-        assert.ok(await page.$eval('#apd-ai .apd-saved-head', e => /Last review/.test(e.textContent) && /CV_a\.pdf/.test(e.textContent) && /admin$/.test(e.textContent.trim().replace(/\s+$/, ''))), 'saved header: date · file · who (no domain)');
+        assert.ok(await page.$eval('#apd-ai .apd-saved-head > span', e => /CV_a\.pdf/.test(e.textContent) && /admin/.test(e.textContent) && !/@/.test(e.textContent)), 'one-line head: date · file · who (no domain)');
+        assert.equal(await page.locator('#apd-ai .apd-saved-head > span .apd-dots i').count(), 2, '●● in the head line');
+        assert.ok(/·\s*0\s*·\s*5/.test(await page.$eval('#apd-ai .apd-saved-head > span', e => e.textContent.replace(/\s+/g, ' '))), 'agree · differ counts (fixture: 0 shared, 5 unique)');
         assert.equal(await page.locator('.apd-hist-btn').count(), 0, 'no History with a single run');
         // 3. ⧉ copies that model's review as text (A / B, short name, Thai section titles, bullets)
-        await page.click('#apd-ai .apd-copy >> nth=1');
+        await page.click('#apd-ai .apd-card .apd-copy >> nth=1');
         await page.waitForFunction(() => window.__clip.length === 1);
         const txt = await page.evaluate(() => __clip[0]);
         assert.equal(txt, 'B · Haiku 4.5\nสรุป B\nควรถามตอนสัมภาษณ์\n- q1', 'copy text of card B: ' + JSON.stringify(txt));
-        await page.click('#apd-ai .apd-copy >> nth=0');
+        // ⧉ suggestions in the head → only the suggestions of both models, as a checklist
+        await page.click('#apd-ai .apd-copy-sug');
+        await page.waitForFunction(() => window.__clip.length === 2);
+        assert.equal(await page.evaluate(() => __clip[1]), 'A · Luna 6\n☐ x\n\nB · Haiku 4.5\n', 'suggestions-only text');
+        await page.evaluate(() => { window.__clip.pop(); });
+        await page.click('#apd-ai .apd-card .apd-copy >> nth=0');
         await page.waitForFunction(() => window.__clip.length === 2);
         assert.ok((await page.evaluate(() => __clip[1])).startsWith('A · Luna 6\nสรุป A\nจุดแข็ง\n- s1\n- s2\nจุดที่ขาด\n- g1'), 'copy text of card A');
         assert.equal(await page.evaluate(() => TOASTS.at(-1)), 'Copied ✓ · คัดลอกแล้ว');
         // 4. a second run → saved as another doc; reopening shows the newest first + "1 earlier" folded
-        await page.evaluate(() => { __answers['gpt-6-luna'] = '{"summary":"สรุป A2","strengths":[],"gaps":[],"questions":[],"suggestions":[]}'; });
+        await page.evaluate(() => { __answers['gpt-6-luna'] = '{"summary":"สรุป A2","strengths":[],"gaps":[],"questions":[],"suggestions":["y"]}'; });
         await page.evaluate(() => aiReviewApplicantDoc('d1'));
         await page.waitForFunction(() => window.__store.length === 2);
         await page.evaluate(() => { __store[0].data.at = new Date('2026-10-01T10:00:00Z'); __store[1].data.at = new Date('2026-10-18T09:00:00Z'); });
@@ -107,20 +121,29 @@ ${code}
         await page.waitForFunction(() => document.querySelector('.apd-hist-btn'));
         assert.ok(/สรุป A2/.test(await page.$eval('#apd-ai > div:nth-of-type(2)', e => e.textContent)), 'newest run first');
         assert.equal(await page.$eval('.apd-hist-btn', e => e.textContent), '1 earlier');
+        // tick a suggestion on the latest run → local strike-through + ONE update of done.<i>_<j> only
+        await page.click('#apd-ai > .apd-cmp .s-sug input[type=checkbox]');
+        await page.waitForFunction(() => window.__updates.length === 1);
+        assert.deepEqual(await page.evaluate(() => __updates[0]), { id: 'r2', patch: { 'done.0_0': true } }, 'tick written as done.0_0 on the latest run');
+        assert.equal(await page.$eval('#apd-ai > .apd-cmp .s-sug li', e => e.classList.contains('done')), true, 'struck through');
+        await page.evaluate(() => { __store[1].data.done = { '0_0': true }; });
+        await page.evaluate(() => openApplicantDocs('PRE1'));
+        await page.waitForFunction(() => document.querySelector('.apd-hist-btn'));
+        assert.equal(await page.$eval('#apd-ai > .apd-cmp .s-sug input[type=checkbox]', e => e.checked), true, 'tick restored from the saved run');
         assert.equal(await page.$eval('#apd-hist', e => e.hidden), true, 'history folded');
         assert.ok(/18 Oct 2026/.test(await page.$eval('#apd-ai .apd-saved-head', e => e.textContent)), 'date shown');
         await page.click('.apd-hist-btn');
         assert.equal(await page.$eval('#apd-hist', e => e.hidden), false, 'History opens');
         assert.ok(/สรุป A\b/.test(await page.$eval('#apd-hist', e => e.textContent)) && /1 Oct 2026/.test(await page.$eval('#apd-hist', e => e.textContent)), 'older run inside with its date');
         // ⧉ on the latest cards copies the latest run
-        await page.click('#apd-ai > div:nth-of-type(2) .apd-copy');
+        await page.click('#apd-ai > .apd-cmp .apd-card .apd-copy');
         await page.waitForFunction(() => window.__clip.length === 3);
-        assert.ok((await page.evaluate(() => __clip[2])).startsWith('A · Luna 6\nสรุป A2'), 'copy from the latest run');
+        assert.ok((await page.evaluate(() => __clip.at(-1))).startsWith('A · Luna 6\nสรุป A2'), 'copy from the latest run');
         // 5. save failure → review still shown, toast says not saved
         await page.evaluate(() => { db.collection = () => ({ add: async () => { throw new Error('permission-denied'); }, where: () => ({ get: async () => ({ docs: [] }) }) }); });
         await page.evaluate(() => aiReviewApplicantDoc('d1'));
         await page.waitForFunction(() => /not saved/.test(TOASTS.at(-1)));
-        assert.equal(await page.locator('#apd-ai .apd-copy').count(), 2, 'cards still there');
+        assert.equal(await page.locator('#apd-ai .apd-card .apd-copy').count(), 2, 'cards still there');
         // 6. another applicant → their own (empty) list, not PRE1's
         await page.evaluate(() => { __store.length = 0; db.collection = name => ({ add: async () => ({ id: 'z' }), where: (f, op, v) => ({ get: async () => { __queries.push([name, f, op, v]); return { docs: [] }; } }) }); openApplicantDocs('PRE2'); });
         await page.waitForFunction(() => __queries.at(-1)[3] === 'PRE2');

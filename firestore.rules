@@ -363,7 +363,9 @@ service cloud.firestore {
     // answers. Same audience as applicant_docs; append-only (a run is a record, not a draft).
     match /applicant_reviews/{docId} {
       allow read, create: if isAdmin();
-      allow update, delete: if false;
+      // V102.302: the only thing that may change on a saved run is the suggestion ticks (`done` map)
+      allow update: if isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done']);
+      allow delete: if false;
     }
 
     // 12. Quiz Feedback
