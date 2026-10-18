@@ -130,6 +130,7 @@ window.historyLean = (() => {
         } else if (s.submissionType === 'explore_link' || s.submissionType === 'work' || s.submissionType === 'content_review') {
             const url = (m.url || m.link || '').trim();
             if (/^https?:\/\//i.test(url)) a += '<a class="hl-ib hl-go" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="Open" aria-label="Open link">↗</a>';
+            else if (m.fileDoc && m.fileDoc.docId) a += '<span class="hl-ib" title="File · held by admin · ไฟล์อยู่กับแอดมิน" aria-label="File held by admin">📎</span>';   // V101.166: logged by admin with a file
         }
         return '<div class="hl-acts">' + a + '</div>';
     }

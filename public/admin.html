@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.306)</title>
+    <title>Nika Admin (V102.307)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -4220,6 +4220,25 @@
         #groupSelectModal .gs-profile-card header { padding:4px 8px 4px 12px; gap:4px; }   /* V102.246: 56px → ~34px (see the chip rule below) */
         #groupSelectModal .gs-profile-card h3 { font-size:13.5px; }
         #groupSelectModal .gs-profile-card button.gs-copy-card, #groupSelectModal .gs-profile-card button.gs-edit-card { width:26px; min-height:26px; height:26px; padding:0; font-size:13px; border-radius:7px; }   /* V102.246: 30 → 26 */
+        /* V102.307: 📤 Log work sheet — lean head, Link-or-file rail */
+        #adminLogWorkModal .alw-head { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
+        #adminLogWorkModal .alw-head h3 { margin:0; flex:1; min-width:0; color:#0ea5e9; font-size:1.05em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        #adminLogWorkModal .alw-for { font-weight:600; color:#64748b; font-size:0.82em; }
+        #adminLogWorkModal .alw-x { cursor:pointer; font-size:24px; line-height:1; color:#94a3b8; }
+        #adminLogWorkModal .alw-in { width:100%; padding:9px 10px; border:1px solid #e2e8f0; border-radius:10px; box-sizing:border-box; margin:0 0 8px; font-size:0.9em; }
+        #adminLogWorkModal .alw-rail { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 6px; }
+        #adminLogWorkModal .alw-chip { display:inline-flex; align-items:center; gap:5px; width:auto; min-height:0; margin:0; padding:5px 10px; border:1px solid #e2e8f0; border-radius:999px; background:#fff; color:#334155; font-size:0.78em; font-weight:700; cursor:pointer; line-height:1.2; max-width:100%; }
+        #adminLogWorkModal .alw-chip span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:200px; }
+        #adminLogWorkModal .alw-chip small { font-weight:500; color:#94a3b8; font-size:0.85em; }
+        #adminLogWorkModal .alw-chip.on { background:#e0f2fe; border-color:#7dd3fc; color:#0369a1; }
+        #adminLogWorkModal .alw-chip.on small { color:#0ea5e9; }
+        #adminLogWorkModal .alw-up { border-style:dashed; color:#0ea5e9; border-color:#7dd3fc; }
+        #adminLogWorkModal .alw-chip:disabled { opacity:.45; cursor:default; }
+        #adminLogWorkModal .alw-ghost { display:block; font-size:0.68em; color:#94a3b8; line-height:1.4; margin:0 0 8px; }
+        #adminLogWorkModal .alw-ghost b { color:#64748b; }
+        #adminLogWorkModal .alw-msg { font-size:0.78em; font-weight:700; color:#ef4444; min-height:1em; margin:0 0 6px; }
+        #adminLogWorkModal .alw-save { width:100%; min-height:0; margin:0; padding:10px 12px; border:none; border-radius:12px; background:linear-gradient(135deg,#0ea5e9,#2563eb); color:#fff; font-weight:800; font-size:0.95em; cursor:pointer; }
+        #adminLogWorkModal .alw-save:disabled { opacity:.6; cursor:default; }
         /* V102.247: 📄 Import CV — icon button in the Personal details header, review sheet above the cards */
         #groupSelectModal .gs-profile-card button.gs-cv-btn { width:26px; min-height:26px; height:26px; padding:0; font-size:13px; border-radius:7px; flex-shrink:0; margin:0; }
         #gs-cv-sheet { border:1px solid #c7d2fe; border-radius:12px; margin:0 0 10px; overflow:hidden; background:#fff; font-size:12.5px; }
@@ -52502,33 +52521,96 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         // V98.57: log a Work submission on behalf of a user.
-        let alwTargetId = null;
+        // V102.307: Link OR file. The file path is the Import CV one (gsCvKeepFile): Storage applicant-docs/<owner>/<sha256>.<ext>
+        // + an applicant_docs row, owner = the user's pre-registration when they have one, else their own id. The work row then
+        // carries `fileDoc` {docId, owner, name} and an empty link; a document the user already has can be picked instead of uploading.
+        let alwTargetId = null, alwFile = null, alwDocId = null;
+
+        function alwOwner() {
+            const u = (usersData || []).find(x => x.id === alwTargetId);
+            return (u && typeof applicantOwnerFor === 'function' && applicantOwnerFor(u)) || alwTargetId;
+        }
+        function alwRenderRail() {
+            const box = document.getElementById('alw-rail');
+            if (!box) return;
+            const esc = window.escapeHtml || (x => String(x));
+            const linkTyped = !!(document.getElementById('alw-link').value || '').trim();
+            const kb = n => '<small>' + Math.round((n || 0) / 1024) + ' KB</small>';
+            const docs = (typeof applicantDocsCache !== 'undefined' && applicantDocsCache[alwOwner()]) || [];
+            box.innerHTML = '<button type="button" class="alw-chip alw-up' + (alwFile ? ' on' : '') + '" onclick="document.getElementById(\'alw-file\').click()"' + (linkTyped ? ' disabled' : '')
+                + ' title="PDF · JPG · PNG · WEBP · under 4 MB · stored like Import CV in this user\'s 📎 Documents (admin-only) · อัปโหลดไฟล์">'
+                + (alwFile ? '📎 <span>' + esc(alwFile.name) + '</span>' + kb(alwFile.size) : '📎 Upload') + '</button>'
+                + docs.map(d => '<button type="button" class="alw-chip' + (alwDocId === d.id ? ' on' : '') + '" onclick="alwPickDoc(\'' + esc(d.id) + '\')"' + (linkTyped ? ' disabled' : '')
+                    + ' title="Already in this user\'s 📎 Documents — use it as the work file · ใช้ไฟล์นี้">' + (d.contentType === 'application/pdf' ? '📄' : '🖼') + ' <span>' + esc(d.name || '') + '</span>' + kb(d.size) + '</button>').join('');
+        }
+        function alwPickFile(input) {
+            const msg = document.getElementById('alw-msg');
+            const f = input.files && input.files[0];
+            input.value = '';
+            if (!f) return;
+            if (!_APPLICANT_EXT[f.type] || f.size >= 4 * 1024 * 1024) { msg.style.color = '#ef4444'; msg.textContent = 'PDF, JPG, PNG or WEBP under 4 MB.'; return; }
+            msg.textContent = '';
+            alwFile = f; alwDocId = null;
+            alwRenderRail();
+        }
+        function alwPickDoc(id) {
+            alwDocId = alwDocId === id ? null : id;
+            if (alwDocId) alwFile = null;
+            document.getElementById('alw-msg').textContent = '';
+            alwRenderRail();
+        }
 
         function openAdminLogWorkModal(uid) {
             const u = (usersData || []).find(x => x.id === uid) || {};
-            alwTargetId = uid;
-            document.getElementById('alw-who').textContent =
-                'For ' + (u.displayName || uid) + (u.group ? ' · ' + u.group : '');
+            alwTargetId = uid; alwFile = null; alwDocId = null;
+            document.getElementById('alw-who').textContent = '· ' + (u.displayName || uid) + (u.group ? ' · ' + u.group : '');
             document.getElementById('alw-title').value = '';
             document.getElementById('alw-link').value = '';
-            document.getElementById('alw-msg').textContent = '';
+            const msg = document.getElementById('alw-msg'); msg.textContent = ''; msg.style.color = '';
+            document.getElementById('alw-save').disabled = false;
+            alwRenderRail();
             document.getElementById('adminLogWorkModal').style.display = 'flex';
         }
 
+        // the file half: upload (or reuse) → {docId, owner, name}; nothing else is written before this succeeds
+        async function alwStoreFile() {
+            const owner = alwOwner();
+            if (alwDocId) {
+                const d = (applicantDocsCache[owner] || []).find(x => x.id === alwDocId);
+                if (!d) throw new Error('That document is no longer in the list.');
+                return { docId: d.id, owner, name: d.name || '' };
+            }
+            const file = alwFile;
+            const path = `applicant-docs/${owner}/${await _sha256Hex(file)}.${_APPLICANT_EXT[file.type]}`;
+            const same = (applicantDocsCache[owner] || []).find(d => d.path === path);
+            if (same) return { docId: same.id, owner, name: same.name || file.name };   // same bytes already kept = one row
+            await adminApp.storage().ref(path).put(file, { contentType: file.type });
+            const editor = (auth && auth.currentUser) || {};
+            const ref = await db.collection('applicant_docs').add({ preUserId: owner, name: file.name, path, size: file.size, contentType: file.type, uploadedAt: firebase.firestore.FieldValue.serverTimestamp(), byEmail: editor.email || ALLOWED_EMAIL });
+            syncResumeFlag(owner).catch(() => {});
+            return { docId: ref.id, owner, name: file.name };
+        }
+
         async function adminSubmitWorkFor() {
-            const msg = document.getElementById('alw-msg');
+            const msg = document.getElementById('alw-msg'), saveBtn = document.getElementById('alw-save');
             const title = document.getElementById('alw-title').value.trim();
             const link = document.getElementById('alw-link').value.trim();
             if (!alwTargetId) return;
-            if (!title || !link) { msg.textContent = 'Both a title and a link are required.'; return; }
-            if (!/^https?:\/\//i.test(link)) { msg.textContent = 'The link must start with http:// or https://'; return; }
+            const hasFile = !!(alwFile || alwDocId);
+            msg.style.color = '#ef4444';
+            if (!title) { msg.textContent = 'A title is required.'; return; }
+            if (!link && !hasFile) { msg.textContent = 'Paste a link, or attach a file.'; return; }
+            if (link && !/^https?:\/\//i.test(link)) { msg.textContent = 'The link must start with http:// or https://'; return; }
 
             const u = (usersData || []).find(x => x.id === alwTargetId) || {};
             const editor = (auth && auth.currentUser) || {};
             const by = { uid: editor.uid || 'unknown', email: editor.email || ALLOWED_EMAIL };
             msg.style.color = '#64748b';
-            msg.textContent = 'Saving…';
+            msg.textContent = hasFile && !link ? 'Uploading…' : 'Saving…';
+            saveBtn.disabled = true;
             try {
+                const fileDoc = link ? null : await alwStoreFile();   // a link wins when both are given (the rail is disabled while a link is typed)
+                msg.textContent = 'Saving…';
                 // Mirrors submitWork() in index.html — BOTH collections. `works` is what
                 // the review queue and the intern's own history actually read;
                 // `submissions` is the unified mirror. Writing one and not the other
@@ -52540,13 +52622,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     userId: alwTargetId,
                     displayName: u.displayName || '',
                     pictureUrl: u.pictureUrl || '',
-                    title, link,
+                    title, link: link || '',
                     status: 'รอตรวจ',
                     score: 0,
                     submittedByAdmin: by,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 };
+                if (fileDoc) workData.fileDoc = fileDoc;
                 const legacyRef = await db.collection('works').add(workData);
+                const meta = { link: link || '', sourceType: 'works', sourceId: legacyRef.id };
+                if (fileDoc) meta.fileDoc = fileDoc;
                 await db.collection('submissions').add({
                     submissionType: 'work',
                     authUid: null,
@@ -52554,19 +52639,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     displayName: u.displayName || '',
                     pictureUrl: u.pictureUrl || '',
                     title,
-                    description: link,
+                    description: link || (fileDoc ? '📎 ' + fileDoc.name : ''),
                     status: 'pending',
                     score: 0,
                     adminComment: '',
                     adminBonus: 0,
                     submittedByAdmin: by,
-                    metadata: { link, sourceType: 'works', sourceId: legacyRef.id },
+                    metadata: meta,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 db.collection('admin_logs').add({
                     userId: alwTargetId,
                     action: 'work_logged_on_behalf',
-                    details: { title, link, workId: legacyRef.id },
+                    details: Object.assign({ title, link: link || '', workId: legacyRef.id }, fileDoc ? { fileDoc } : {}),
                     reason: '',
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                     createdByUid: by.uid,
@@ -52578,7 +52663,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             } catch (e) {
                 msg.style.color = '#ef4444';
                 msg.textContent = 'Could not save: ' + e.message;
-            }
+            } finally { saveBtn.disabled = false; }
         }
 
         // V96.52: manual Beri adjust — e.g. crediting Beri for a real-world/offline
@@ -57897,6 +57982,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         if (work.link) {
                             const href = work.link.startsWith('http') ? work.link : 'https://' + work.link;
                             linkHtml = `<button class="btn-sm btn-dark" style="flex:1;" onclick="window.open('${href}', '_blank')"><i class="fa-solid fa-link"></i> Link</button>`;
+                        } else if (work.fileDoc && work.fileDoc.docId) {   // V102.307: logged by admin with a file — it lives in 📎 Documents
+                            linkHtml = `<button class="btn-sm btn-dark" style="flex:1;" title="${escapeHtml(work.fileDoc.name || 'File')} · in 📎 Documents" onclick="openApplicantDoc('${escapeHtml(work.fileDoc.docId)}', '${escapeHtml(work.fileDoc.owner || work.userId)}')">📎 File</button>`;
                         }
 
                         d.innerHTML = `
@@ -72116,21 +72203,22 @@ Summarize in English in 3–5 concise lines:
          app (LINE, in person) previously had no way in at all — an admin could review
          submissions but never create one, so the only options were to ask the intern to
          re-submit or to fudge the score with Adj, which leaves no record of the work. -->
+    <!-- V102.307: 📤 Log work — one-line head · Title · Link OR file. A file is stored exactly like Import CV / 📎 Documents
+         (Storage applicant-docs/<owner>/<sha256>.<ext> + an applicant_docs row, both admin-only); the work row then carries
+         `fileDoc` instead of a link, the review queue opens it from there, the intern's History shows 📎 held by admin. -->
     <div id="adminLogWorkModal" class="modal" style="display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);">
-        <div class="modal-content" style="max-width:460px; width:90%; border-radius:20px; border:none;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                <h3 style="margin:0; color:#0ea5e9;"><i class="fa-solid fa-upload"></i> Log work for user</h3>
-                <span onclick="document.getElementById('adminLogWorkModal').style.display='none'" style="cursor:pointer; font-size:24px; color:#94a3b8;">&times;</span>
+        <div class="modal-content alw-lean" style="max-width:460px; width:90%; border-radius:20px; border:none;">
+            <div class="alw-head">
+                <h3><i class="fa-solid fa-upload"></i> Log work <span id="alw-who" class="alw-for lang-no-toggle"></span></h3>
+                <span class="alw-x" onclick="document.getElementById('adminLogWorkModal').style.display='none'" role="button" aria-label="Close">&times;</span>
             </div>
-            <p id="alw-who" class="lang-no-toggle" style="margin:0 0 14px; font-size:0.85em; color:#64748b;"></p>
-            <label style="font-size:0.78em; font-weight:bold; color:#555; display:block; margin-bottom:4px;">Title ชื่องาน</label>
-            <input type="text" id="alw-title" placeholder="e.g. Case report — DM type 2" style="width:100%; padding:9px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; margin-bottom:10px;">
-            <label style="font-size:0.78em; font-weight:bold; color:#555; display:block; margin-bottom:4px;">Link ลิงก์งาน</label>
-            <input type="url" id="alw-link" placeholder="https://…" style="width:100%; padding:9px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; margin-bottom:4px;">
-            <p style="margin:0 0 12px; font-size:0.72em; color:#94a3b8;">Work is a link in this system — upload the file to Drive first, then paste the share link.</p>
-            <div id="alw-msg" style="font-size:0.78em; font-weight:700; color:#ef4444; min-height:1em; margin-bottom:8px;"></div>
-            <button class="btn-primary" style="width:100%;" onclick="adminSubmitWorkFor()">Save — goes to the review queue</button>
-            <p style="margin:10px 0 0; font-size:0.72em; color:#94a3b8;">The intern sees this marked <b>logged by admin</b>, and it is written to <code>admin_logs</code>. It earns no points until you review it like any other submission.</p>
+            <input type="text" id="alw-title" class="alw-in" placeholder="Title · ชื่องาน · e.g. Case report — DM type 2" aria-label="Title">
+            <input type="url" id="alw-link" class="alw-in" placeholder="https://… link — or attach a file below" aria-label="Link" oninput="alwRenderRail()">
+            <input type="file" id="alw-file" accept="application/pdf,image/jpeg,image/png,image/webp" style="display:none;" onchange="alwPickFile(this)">
+            <div id="alw-rail" class="alw-rail" role="group" aria-label="Attach a file"></div>
+            <small class="alw-ghost">Link <b>or</b> file. A file goes to this user's 📎 Documents (same store as Import CV, admin-only); the review queue opens it there, the intern's History shows <b>📎 file · held by admin</b>.</small>
+            <div id="alw-msg" class="alw-msg" aria-live="polite"></div>
+            <button type="button" id="alw-save" class="alw-save" onclick="adminSubmitWorkFor()" title="Logged by admin · written to admin_logs · no points until you review it like any other submission · บันทึกเข้าคิวตรวจ">Save → review queue</button>
         </div>
     </div>
 
