@@ -20,7 +20,7 @@ const a = html.indexOf('let _apdLastResults = [];'), b = html.indexOf('// ---- V
 assert.ok(a > 0 && b > a, 'apd review block found');
 const code = html.slice(a, b) + '\n' + ['function apdReviewPrompt(', 'function openApplicantDocs(', 'function renderApplicantDocs('].map(m => grab(html, m)).join('\n');
 const page_html = `<!doctype html><meta charset="utf-8">${styles}<body style="font-size:16px">
-<div id="applicantDocsModal" style="display:block"><div class="modal-content"><span id="apd-who"></span><div id="apd-list"></div><div id="apd-msg"></div><div class="apd-ab" id="apd-ab"></div><div id="apd-ai" class="lang-no-toggle"></div></div></div>
+<div id="applicantDocsModal" style="display:block"><div class="modal-content" style="max-width:420px; width:92%; margin:auto; padding:14px 16px; border-radius:16px; border:none;"><span id="apd-who"></span><div id="apd-list"></div><div id="apd-msg"></div><div class="apd-ab" id="apd-ab"></div><div id="apd-ai" class="lang-no-toggle"></div></div></div>
 <script>
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 var TOASTS = []; function showToast(t) { TOASTS.push(t); }
@@ -54,6 +54,7 @@ ${code}
         await page.waitForFunction(() => window.__queries.length === 1);
         assert.deepEqual(await page.evaluate(() => __queries[0]), ['applicant_reviews', 'preUserId', '==', 'PRE1']);
         assert.equal(await page.$eval('#apd-ai', e => e.innerHTML), '', 'nothing saved → nothing shown');
+        assert.ok(await page.$eval('#applicantDocsModal .modal-content', e => e.getBoundingClientRect().width) <= 420, 'empty sheet keeps its 420px');
         // 2. run a review → two cards with ⧉, saved as ONE run doc, then shown as "Last review"
         await page.evaluate(() => { __answers = {
             'gpt-6-luna': '{"summary":"สรุป A","strengths":["s1","s2"],"gaps":["g1"],"questions":[],"suggestions":["x"]}',
@@ -73,6 +74,13 @@ ${code}
         assert.equal(await page.locator('#apd-ai .apd-copy').count(), 2, '⧉ on each card');
         // V102.299: A | B side by side; the sheet widens; bullets only one model raised are amber, shared ones are not
         assert.equal(await page.$eval('#applicantDocsModal .modal-content', e => e.classList.contains('apd-wide')), true, 'sheet widens for the review');
+        // V102.300: it really widens past its inline max-width:420px — most of a desktop, capped at 1180px
+        assert.ok(await page.$eval('#applicantDocsModal .modal-content', e => e.getBoundingClientRect().width) >= 800, 'wider than 800 at 900px viewport');
+        await page.setViewportSize({ width: 1400, height: 900 });
+        const wide = await page.$eval('#applicantDocsModal .modal-content', e => Math.round(e.getBoundingClientRect().width));
+        assert.ok(wide >= 1100 && wide <= 1180, 'about 1180px on a 1400px desktop: ' + wide);
+        if (process.env.REV_SHOT) await page.locator('#applicantDocsModal .modal-content').screenshot({ path: process.env.REV_SHOT });
+        await page.setViewportSize({ width: 900, height: 900 });
         assert.equal(await page.$eval('#apd-ai .apd-cmp.two', e => getComputedStyle(e).gridTemplateColumns.split(' ').length), 2, 'two columns at 900px');
         assert.deepEqual(await page.$$eval('#apd-ai .apd-cmp.two > div', es => es.map(e => Math.round(e.getBoundingClientRect().top))).then(t => new Set(t).size), 1, 'A and B on the same line');
         assert.ok(await page.locator('#apd-ai .apd-legend').count() === 1, 'legend');
@@ -103,7 +111,6 @@ ${code}
         assert.ok(/18 Oct 2026/.test(await page.$eval('#apd-ai .apd-saved-head', e => e.textContent)), 'date shown');
         await page.click('.apd-hist-btn');
         assert.equal(await page.$eval('#apd-hist', e => e.hidden), false, 'History opens');
-        if (process.env.REV_SHOT) await page.locator('#applicantDocsModal .modal-content').screenshot({ path: process.env.REV_SHOT });
         assert.ok(/สรุป A\b/.test(await page.$eval('#apd-hist', e => e.textContent)) && /1 Oct 2026/.test(await page.$eval('#apd-hist', e => e.textContent)), 'older run inside with its date');
         // ⧉ on the latest cards copies the latest run
         await page.click('#apd-ai > div:nth-of-type(2) .apd-copy');
