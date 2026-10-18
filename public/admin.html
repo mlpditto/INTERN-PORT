@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.304)</title>
+    <title>Nika Admin (V102.305)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -8918,6 +8918,7 @@
                                         <span id="glc-cost-pill" class="glc-cost" title="Estimate before you click: 8 s × about $0.10 per second of 720p video. You pay only for a clip that comes back."></span>
                                     </div>
                                     <div style="display:flex; gap:8px; align-items:center;">
+                                        <button type="button" id="glc-copy-plan" onclick="glcCopyPlan()" title="Copy the whole plan as text · คัดลอกแผนทั้ง 10 ตอน · 전체 계획 복사" aria-label="Copy the whole plan" style="padding:7px 12px; border-radius:12px; border:1px solid #e2e8f0; background:#fff; color:#475569; font-weight:800; cursor:pointer; min-height:0; width:auto; margin:0;">⧉</button>
                                         <button type="button" id="glc-replan-btn" onclick="glcPlanEpisodes()" title="Plan the 10 episodes again with the Enhancer model (text only, no clip cost)" aria-label="Re-plan" style="padding:7px 12px; border-radius:12px; border:1px solid #e2e8f0; background:#fff; cursor:pointer; font-size:0.85em;">🔁</button>
                                     </div>
                                 </div>
@@ -21513,6 +21514,7 @@ Exactly 10 episodes, n = 1..10, in a sensible learning order. Keep drug names, d
                     + '</div></div>'
                     + '<div class="glc-a" id="glc-a-' + e.n + '">'
                     + '<span class="glc-dot" title="' + (e.status === 'done' ? 'Rendered · ' + e.seconds + ' s · $' + Number(e.costUsd || 0).toFixed(2) : e.status === 'rendering' ? 'Rendering…' : e.status === 'failed' ? 'Failed — ▶ to try again' : 'Planned — not rendered, nothing paid') + '"></span>'
+                    + '<button type="button" onclick="glcCopyEpisode(' + e.n + ')" title="Copy this episode (title · objective · fact · narration · visual) · คัดลอกตอนนี้ · 이 에피소드 복사" aria-label="Copy episode ' + e.n + '">⧉</button>'   // V102.305
                     + '<button type="button" onclick="glcToggleEdit(' + e.n + ')" title="Edit the 5 fields" aria-label="Edit episode ' + e.n + '"' + (busy ? ' disabled' : '') + '>✏️</button>'
                     + '<button type="button" onclick="glcAskRender(' + e.n + ')" title="' + (e.status === 'done' ? 'Re-render' : 'Render') + ' this episode · ' + window.GLC_SECONDS + ' s ≈ $' + (window.GLC_SECONDS * window.GLC_USD_PER_SECOND).toFixed(2) + '" aria-label="Render episode ' + e.n + '"' + (busy ? ' disabled' : '') + '>' + (busy ? '⏳' : e.status === 'done' ? '🔁' : '▶') + '</button>'
                     + '</div>';
@@ -21521,6 +21523,24 @@ Exactly 10 episodes, n = 1..10, in a sensible learning order. Keep drug names, d
             card.style.display = window.glcIsClipMode() ? 'block' : 'none';
         };
 
+        // V102.305: ⧉ — one episode, or the whole plan, as plain text (title · ชื่อไทย · 🎯 objective · 💡 fact · 🗣 narration · 🎨 visual)
+        window.glcEpisodeText = function(e) {
+            return 'EP' + String(e.n).padStart(2, '0') + ' · ' + (e.title || '') + (e.titleTh ? ' · ' + e.titleTh : '')
+                + '\n🎯 ' + (e.objective || '') + '\n💡 ' + (e.fact || '') + '\n🗣 ' + (e.narration || '') + '\n🎨 ' + (e.visual || '');
+        };
+        window.glcCopyText = async function(text, msg) {
+            try { await navigator.clipboard.writeText(text); showToast(msg, 'success'); }
+            catch (e) { showToast('Copy failed · คัดลอกไม่สำเร็จ', 'warning'); }
+        };
+        window.glcCopyEpisode = function(n) {
+            const e = window._glcSeries && window._glcSeries.episodes[n - 1]; if (!e) return;
+            window.glcCopyText(window.glcEpisodeText(e), 'Copied EP' + String(n).padStart(2, '0') + ' ✓ · คัดลอกแล้ว');
+        };
+        window.glcCopyPlan = function() {
+            const s = window._glcSeries; if (!s || !s.episodes.length) return;
+            const head = (s.topic ? s.topic + '\n' : '') + (s.style ? 'Style: ' + s.style + '\n' : '');
+            window.glcCopyText(head + s.episodes.map(window.glcEpisodeText).join('\n\n'), 'Copied the plan (' + s.episodes.length + ' episodes) ✓ · คัดลอกแผนแล้ว');
+        };
         // ✏️ — the 5 fields open inside the row; Done writes them back.
         window.glcToggleEdit = function(n) {
             const row = document.getElementById('glc-ep-' + n);
