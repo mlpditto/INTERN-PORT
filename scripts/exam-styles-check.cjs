@@ -12,7 +12,16 @@ const S = window.SQM_EXAM_STYLES;
 const checks = [];
 const check = (name, got, want) => checks.push([name, JSON.stringify(got), JSON.stringify(want)]);
 
-check('order: thai first (the hidden #suggest-style defaults to it), new styles last', Object.keys(S), ['thai', 'pebc1', 'pebc2', 'opra', 'japan', 'china']);
+check('order: thai first (the hidden #suggest-style defaults to it), new styles last', Object.keys(S), ['thai', 'pebc1', 'pebc2', 'opra', 'japan', 'china', 'spc']);
+// V102.279: SPC Competency (Singapore) — written from the public March 2023 guide.
+check('spc: single best answer, exactly 4 options', /EXACTLY 4 options/.test(S.spc.prompt(5)) && /MOST APPROPRIATE/.test(S.spc.prompt(5)), true);
+check('spc: at least half the questions are case-based', [1, 5, 10].map(n => (S.spc.prompt(String(n)).match(/at least (\d+) of the/) || [])[1]), ['1', '3', '5']);
+check('spc: ~15% ethics / systems / procedures scales with n (round)', [1, 3, 5, 10].map(n => /test professional conduct/.test(S.spc.prompt(String(n)))), [false, false, true, true]);
+check('spc: n arrives as a string from the input — singular wording for 1', /With only 1 question, make it pharmaceutical care/.test(S.spc.prompt('1')), true);
+check('spc: no scope toggle (ethics share is part of the exam)', S.spc.scope, false);
+check('spc: names no Act, section number or penalty', /name no Act, section number, penalty/.test(S.spc.prompt(5)), true);
+check('spc: no Thai-blueprint leftovers', /3:8:4/.test(S.spc.prompt(5)), false);
+check('spc: silent (no say)', S.spc.say, undefined);
 for (const [key, s] of Object.entries(S)) {
     check(`${key}: flag / label / title / hint / prompt present`, !!(s.flag && s.label && s.title && typeof s.hint === 'string' && typeof s.prompt === 'function'), true);
     check(`${key}: prompt renders for n = 1 and 10`, [1, 10].every(n => typeof s.prompt(n, 'clinical') === 'string' && s.prompt(n, 'clinical').length > 40), true);
