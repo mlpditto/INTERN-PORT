@@ -19,7 +19,7 @@ assert.ok(/\|\| \(proxyProvider === 'gemini-aistudio' && \/\^gemini-omni\/i\.tes
 // V102.303: the Plan / Refine / Manifest buttons count the seconds they wait (gmBusy), the counter is stopped before the label is restored
 assert.ok(html.includes("const stopBusy = window.gmBusy(btn, 'Planning…');") && html.includes("let stopBusy = window.gmBusy(btn, 'Refining…');") && html.includes("stopBusy = window.gmBusy(btn, 'Manifesting…');"), 'all three busy labels go through gmBusy');
 assert.equal((html.match(/stopBusy\(\);/g) || []).length, 4, 'every path stops the counter (plan finally, editor cancel, before Manifesting, create finally)');
-assert.ok(/if \(\/omni\/i\.test\(engine\)\) engine = 'as\/gemini-nano-banana-2\.1';/.test(html), 'Bulk Paste illustrations never go to the video engine');
+assert.ok(/if \(window\.GLC_ENGINES && window\.GLC_ENGINES\[engine\]\) engine = 'as\/gemini-nano-banana-2\.1';/.test(html), 'Bulk Paste illustrations never go to a video engine');
 assert.ok(!/(?:^|[^.\w])confirm\(\s*['"`]/.test(html.slice(html.indexOf('window.GLC_ENGINE ='), html.indexOf('window.downloadDesign = function'))), 'no native confirm() in the clips block');
 assert.ok(/match \/teach-clips\/\{seriesId\}\/\{fileName\} \{[\s\S]*?allow read, delete: if isAdmin\(\);[\s\S]*?contentType == 'video\/mp4'/.test(storageRules), 'storage.rules: teach-clips admin-only, mp4');
 assert.ok(storageRules.indexOf('match /teach-clips/') < storageRules.indexOf('match /{allPaths=**}'), 'teach-clips rule sits before the catch-all');
@@ -29,7 +29,18 @@ assert.ok(/match \/clip_series\/\{seriesId\} \{\s*allow read, write: if isAdmin\
 const a = fn.indexOf('const OMNI_VIDEO_MODEL = ');
 const b = fn.indexOf('/**\n * 🤖 AI Proxy Function');
 assert.ok(a > 0 && b > a, 'Omni helpers sit above callAIProxy');
-const h = new Function(fn.slice(a, b) + '\nreturn { omniVideoBody, omniFindVideo, omniFileId, omniStatus, OMNI_VIDEO_MODEL };')();
+const h = new Function(fn.slice(a, b) + '\nreturn { omniVideoBody, omniFindVideo, omniFileId, omniStatus, OMNI_VIDEO_MODEL, orVideoBody, orVideoStatus, orVideoUrl, OR_VIDEO_MODELS };')();
+// V102.306: the OpenRouter video helpers — four models, duration clamped to each model's maximum, 720p 9:16 with audio
+assert.deepEqual(Object.keys(h.OR_VIDEO_MODELS), ['google/veo-3.1-lite', 'kwaivgi/kling-v3.0-std', 'heygen/heygen-video-1', 'bytedance/seedance-2.0-fast']);
+assert.deepEqual(h.orVideoBody('google/veo-3.1-lite', ' Scene: a pill ', { aspectRatio: '9:16', resolution: '720p', seconds: 8 }), { model: 'google/veo-3.1-lite', prompt: 'Scene: a pill', duration: 8, resolution: '720p', aspect_ratio: '9:16', generate_audio: true });
+assert.equal(h.orVideoBody('google/veo-3.1-lite', 'x', { seconds: 15 }).duration, 8, 'Veo Lite caps at 8 s');
+assert.equal(h.orVideoBody('kwaivgi/kling-v3.0-std', 'x', { seconds: 99 }).duration, 15, 'Kling caps at 15 s');
+assert.equal(h.orVideoBody('heygen/heygen-video-1', 'x', { seconds: 1 }).duration, 4, 'floor 4 s');
+assert.equal(h.orVideoBody('bytedance/seedance-2.0-fast', 'x', {}).duration, 8, 'default 8 s');
+assert.deepEqual([h.orVideoBody('x', 'x', { aspectRatio: '4:3', resolution: '8k' }).aspect_ratio, h.orVideoBody('x', 'x', { aspectRatio: '16:9', resolution: '480p' }).resolution], ['9:16', '480p']);
+assert.equal(h.orVideoStatus({ status: 'Completed' }), 'completed'); assert.equal(h.orVideoStatus(null), '');
+assert.equal(h.orVideoUrl({ unsigned_urls: ['https://cdn.test/v.mp4'] }, 'id1'), 'https://cdn.test/v.mp4', 'unsigned url first');
+assert.equal(h.orVideoUrl({}, 'id 1'), 'https://openrouter.ai/api/v1/videos/id%201/content?index=0', 'else the content endpoint');
 const body = h.omniVideoBody('Scene: a pill', { aspectRatio: '9:16', resolution: '720p', seconds: 8, background: true });
 assert.equal(body.model, 'gemini-omni-1.1-flash');
 assert.deepEqual(body.response_format, { type: 'video', aspect_ratio: '9:16', resolution: '720p', delivery: 'uri' });
@@ -48,7 +59,17 @@ assert.equal(h.omniFileId('https://generativelanguage.googleapis.com/v1beta/file
 assert.equal(h.omniFileId('files/zz9'), 'zz9');
 assert.equal(h.omniFileId('nothing'), '');
 assert.equal(h.omniStatus({ status: 'Completed' }), 'completed');
+const orAt = fn.indexOf('if (provider === "openrouter" && generationOptions && generationOptions.video && OR_VIDEO_MODELS[String(model || "")])');
 const branchAt = fn.indexOf('if (provider === "gemini-aistudio" && /^gemini-omni/.test(String(model || "")))');
+assert.ok(orAt > 0 && orAt < branchAt, 'V102.306: the OpenRouter video branch sits right before the Omni one');
+const orBranch = fn.slice(orAt, fn.indexOf('// --- 🎬 Grand Line Clips: Gemini Omni Flash video'));   // stop before the Omni comment (it names postWithRetry)
+assert.ok(/axios\.post\(OR_VIDEO_BASE, orVideoBody\(model, prompt, video\)/.test(orBranch) && !/postWithRetry/.test(orBranch), 'OR submit is a plain axios.post');
+assert.ok(/axios\.get\(`\$\{OR_VIDEO_BASE\}\/\$\{encodeURIComponent\(video\.interactionId\)\}`/.test(orBranch), 'OR poll by id');
+assert.ok(/return _sendJson\(\{ pending: true, status: status \|\| "pending", interactionId/.test(orBranch), 'OR pending tick bypasses the usage row');
+assert.ok(/orVideoUrl\(data, data\.id \|\| video\.interactionId\)/.test(orBranch) && /responseType: "arraybuffer"/.test(orBranch) && /Authorization: `Bearer \$\{apiKey\}`/.test(orBranch), 'OR download with the key → base64');
+assert.ok(/costUsd: Number\.isFinite\(cost\) \? cost : null/.test(orBranch) && /videoDataUrl: `data:\$\{mime\};base64,/.test(orBranch), 'OR reply carries videoDataUrl + the catalogue cost');
+assert.ok(/process\.env\.OPENROUTER_API_KEY/.test(orBranch) && !/OPENROUTER_API_KEY\s*=\s*["']/.test(orBranch), 'key from the secret, never inline');
+assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < orAt, 'the admin role gate runs before the OR video branch');
 assert.ok(branchAt > 0 && branchAt < fn.indexOf('// --- 🟡 Google AI Studio (Gemini Generative Language API'), 'video branch runs before the AI Studio image branch');
 const branch = fn.slice(branchAt, fn.indexOf('// --- 🟡 Google AI Studio (Gemini Generative Language API'));
 assert.ok(/axios\.post\(`\$\{OMNI_API_BASE\}\/interactions`/.test(branch) && !/postWithRetry/.test(branch), 'submit is a plain axios.post (a retry would be a second paid render)');
@@ -82,6 +103,7 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
             const txt = el => (el && el.textContent || '').replace(/\s+/g, ' ').trim();
             const chips = [...document.querySelectorAll('.alabasta-genmage-quick-rail[aria-label="Engine quick switch"] .alabasta-genmage-quick-chip')];
             out.chips = chips.map(c => c.dataset.value);
+            out.ghosts = chips.map(c => txt(c.querySelector('.gm-ghost')));   // V102.306: price · time beside every engine chip
             out.clipChipLabel = txt(chips[2]); out.clipChipTitle = chips[2].title;
             out.valid = window.DESIGN_ENGINE_VALID.slice();
             out.btnBefore = txt($('#btn-generate-design'));
@@ -98,6 +120,7 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
                 calls.push({ model, prompt, isJson, opts });
                 if (opts.feature === 'clip_plan') return { text: '```json\n' + JSON.stringify({ episodes }) + '\n```', model: 'gemini-3.6-flash' };
                 if (opts.feature === 'clip_render' && opts.video.state === 'submit') return { text: '', raw: { pending: true, interactionId: 'int-1', status: 'in_progress' } };
+                if (opts.feature === 'clip_render' && opts.video.state === 'poll' && /veo/.test(model)) return { text: '', raw: { videoDataUrl: 'data:video/mp4;base64,AAAAIGZ0eXBpc29t', seconds: 8, model: 'google/veo-3.1-lite', costUsd: 0.37, interactionId: 'int-1' } };
                 if (opts.feature === 'clip_render' && opts.video.state === 'poll') return { text: '', raw: { videoDataUrl: 'data:video/mp4;base64,AAAAIGZ0eXBpc29t', seconds: 8, model: 'gemini-omni-1.1-flash', tokens: 46336 } };
                 throw new Error('unexpected call ' + JSON.stringify(opts));
             };
@@ -153,11 +176,22 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
             // 7. back to Nano Banana → the pane is the image pane again
             selectDesignEngine(chips[0]);
             out.btnBack = txt($('#btn-generate-design')); out.cardBack = $('#glc-episodes-card').style.display; out.placeholderBack = $('#design-prompt').placeholder;
+            // 8. V102.306: Veo 3.1 Lite chip → clip mode again, the plan card returns, the pill and the ask show Veo's price; render EP02 through OpenRouter
+            selectDesignEngine(chips[3]);
+            out.veo = { engine: glcEngine(), clip: glcIsClipMode(), card: $('#glc-episodes-card').style.display, cost: txt($('#glc-cost-pill')), secs: glcSeconds(), usd: glcUsd(), ghost: glcGhost('or/kwaivgi/kling-v3.0-std') };
+            glcAskRender(2); out.veoAsk = txt($('#glc-a-2 .glc-ask'));
+            calls.length = 0;
+            await glcRenderEpisode(2);
+            out.veoCalls = calls.filter(c => c.opts.feature === 'clip_render').map(c => ({ model: c.model, video: c.opts.video }));
+            out.veoEp2 = { status: $('#glc-ep-2').dataset.status, dotTitle: $('#glc-ep-2 .glc-dot').title, costUsd: window._glcSeries.episodes[1].costUsd, model: window._glcClip.model };
+            out.veoPreview = txt($('#design-preview-container'));
+            selectDesignEngine(chips[0]);
             return out;
         });
-        assert.deepEqual(r.chips, ['as/gemini-nano-banana-2.1', 'or/openai/gpt-5.4-image-2', 'as/gemini-omni-1.1-flash'], 'three engine chips');
-        assert.equal(r.clipChipLabel, '🎬 Clip 9:16'); assert.match(r.clipChipTitle, /9:16 vertical clip with audio · about \$0\.10 per second/);
-        assert.ok(r.valid.includes('as/gemini-omni-1.1-flash'), 'pref restore accepts the clip engine');
+        assert.deepEqual(r.chips, ['as/gemini-nano-banana-2.1', 'or/openai/gpt-5.4-image-2', 'as/gemini-omni-1.1-flash', 'or/google/veo-3.1-lite', 'or/kwaivgi/kling-v3.0-std', 'or/heygen/heygen-video-1', 'or/bytedance/seedance-2.0-fast'], 'V102.306: seven engine chips');
+        assert.deepEqual(r.ghosts, ['$0.03', '$0.04–0.08', '8 s · $0.80', '8 s · $0.40', '8 s · $1.01', '8 s · $0.80', '8 s · $0.32'], 'ghost price · time beside every chip');
+        assert.equal(r.clipChipLabel, '🎬 Clip 9:168 s · $0.80'); assert.match(r.clipChipTitle, /9:16 vertical clip with audio · about \$0\.10 per second/);
+        assert.deepEqual(r.valid, r.chips, 'pref restore accepts every chip, nothing else');
         assert.deepEqual([r.btnBefore, r.cardBefore], ['Create', 'none'], 'image mode untouched before the pick');
         assert.deepEqual([r.engine, r.clipMode, r.btnClip, r.cardClipNoPlan], ['as/gemini-omni-1.1-flash', true, 'Plan 10 episodes', 'none'], 'Clip mode: button relabelled, no card until a plan exists');
         assert.match(r.btnTitle, /nothing is rendered or paid yet/); assert.match(r.placeholderClip, /10-episode 9:16 series/);
@@ -167,7 +201,7 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
         assert.ok(/^EP01 · /.test(r.copyEp) && /\n🎯 /.test(r.copyEp) && /\n💡 /.test(r.copyEp) && /\n🗣 /.test(r.copyEp) && /\n🎨 /.test(r.copyEp), 'episode text: EP · title, then 🎯 💡 🗣 🎨 lines: ' + JSON.stringify(r.copyEp).slice(0, 120));
         assert.ok(/EP01 · /.test(r.copyPlan) && /EP10 · /.test(r.copyPlan) && (r.copyPlan.match(/\n\n/g) || []).length >= 9, 'plan text: all ten episodes separated by blank lines');
         assert.deepEqual(r.statuses, Array(10).fill('planned'));
-        assert.equal(r.count, '10'); assert.equal(r.cost, '8 s · ≈ $0.80 / clip · $8.00 all', 'cost before any click');
+        assert.equal(r.count, '10'); assert.equal(r.cost, 'Omni Flash · 8 s · ≈ $0.80 / clip · $8.00 all', 'cost before any click');
         assert.equal(r.row3, 'Episode 3 titleตอนที่ 3'); assert.deepEqual(r.row3chips, ['🎯 Objective 3', '💡 Fact 3', '🗣 Spoken line 3', '🎨 Visual 3 scene']);
         assert.deepEqual(r.editFields, ['title', 'titleTh', 'objective', 'fact', 'narration', 'captionTh', 'visual'], 'in-place edit has the 7 fields');
         assert.deepEqual([r.row3After, r.ep3Visual, r.editClosed], ['Missed dose ruleตอนที่ 3', 'Clock face flipping day to night', true], 'Done writes the row back');
@@ -190,9 +224,17 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
         assert.deepEqual([r.set.ep1.status, r.set.ep1.clipUrl, r.set.ep1.storagePath, r.set.ep1.seconds, r.set.ep1.costUsd, r.set.ep1.captionTh], ['done', 'https://storage.test/teach-clips/S1/EP01.mp4', 'teach-clips/S1/EP01.mp4', 8, 0.8, 'คำบรรยาย 1']);
         assert.deepEqual([r.set.createdAt, r.set.updatedAt], ['TS', 'TS']); assert.equal(r.saveBtn, '✅ Saved');
         assert.deepEqual([r.btnBack, r.cardBack], ['Create', 'none'], 'image mode restored'); assert.match(r.placeholderBack, /Describe the image, object, or location/);
+        assert.deepEqual(r.veo, { engine: 'or/google/veo-3.1-lite', clip: true, card: 'block', cost: 'Veo 3.1 Lite · 8 s · ≈ $0.40 / clip · $4.00 all', secs: 8, usd: 0.05, ghost: '8 s · $1.01' }, 'Veo chip: clip mode, the plan is back, the pill follows the engine');
+        assert.equal(r.veoAsk, '≈ $0.40 · 8 sRender✕', 'the ask shows Veo\'s price');
+        assert.deepEqual(r.veoCalls, [
+            { model: 'or/google/veo-3.1-lite', video: { aspectRatio: '9:16', resolution: '720p', seconds: 8, state: 'submit' } },
+            { model: 'or/google/veo-3.1-lite', video: { state: 'poll', interactionId: 'int-1' } }
+        ], 'EP02 submits and polls on the Veo engine');
+        assert.deepEqual(r.veoEp2, { status: 'done', dotTitle: 'Rendered · 8 s · $0.37', costUsd: 0.37, model: 'google/veo-3.1-lite' }, 'the proxy\'s catalogue cost wins over the estimate');
+        assert.match(r.veoPreview, /google\/veo-3\.1-lite · \d+ s · \$0\.37/, 'preview meta names the engine and the real cost');
         assert.deepEqual(dialogs, [], 'no native dialog opened');
         const mine = errs.filter(e => /glc|Grand Line|clip/i.test(e));
         assert.deepEqual(mine, [], 'no clips page errors: ' + mine.join(' | '));
-        console.log('PASS: Grand Line Clips slice 1 — Clip chip, 10-episode plan, in-place edit, inline cost ask, submit→poll render, portrait preview, Save path + doc, Omni helpers, rules');
+        console.log('PASS: Grand Line Clips slice 1 + V102.306 engines — 7 chips with ghost price · time, Veo/Kling/HeyGen/Seedance via OpenRouter, Clip chip, 10-episode plan, in-place edit, inline cost ask, submit→poll render, portrait preview, Save path + doc, Omni helpers, rules');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
