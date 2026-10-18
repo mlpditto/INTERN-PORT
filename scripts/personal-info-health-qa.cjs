@@ -210,16 +210,16 @@ const admFns = ['function gsFoldCards(', 'function gsBodyClick(', 'function gsEd
             assert.equal(await page.$eval('.gs-card-social .gs-prev-line', e => e.textContent), 'Not provided', 'no socials → "Not provided"');
             assert.equal(await shown('.gs-card-basic .gs-copy-card') && await shown('.gs-card-basic .gs-edit-card'), true, 'header keeps 📋 and ✏️ so a copy needs no unfolding');
             await page.click('.gs-card-contact > header h3');
-            assert.deepEqual(await folded(), [true, false, true, true, true], 'header click opens that card only');
+            assert.deepEqual(await folded(), [true, false, true, true, true], 'header click opens that card');
             assert.equal(await shown('.gs-card-contact .gs-prev-line'), false, 'preview hides while open');
             await page.click('.gs-card-basic > header h3');
-            assert.deepEqual(await folded(), [false, true, true, true, true], 'opening another folds the first');
-            await page.click('.gs-card-basic > header h3');
-            assert.deepEqual(await folded(), [true, true, true, true, true], 'clicking the open header folds it');
+            assert.deepEqual(await folded(), [false, false, true, true, true], 'V102.296: opening another keeps the first open (no accordion)');
+            await page.click('.gs-card-basic > header h3'); await page.click('.gs-card-contact > header h3');
+            assert.deepEqual(await folded(), [true, true, true, true, true], 'clicking an open header folds that card');
             await page.click('.gs-card-contact .gs-copy-card');
             assert.deepEqual(await folded(), [true, true, true, true, true], 'a header BUTTON does not toggle');
             await page.click('.gs-card-health .gs-edit-card');
-            assert.deepEqual(await folded(), [true, true, true, true, false], '✏️ unfolds its card (and folds the rest)');
+            assert.deepEqual(await folded(), [true, true, true, true, false], '✏️ unfolds its card, nothing else moves');
             await page.click('.gs-card-health .gs-edit-card');   // done editing
 
             // Health chip + empty fields listed
