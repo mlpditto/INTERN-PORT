@@ -27,7 +27,7 @@ const css = html.split('\n').filter(l => /^\s*#groupSelectModal \.gs-/.test(l)).
 const flipAt = html.indexOf("const editing = button.getAttribute('aria-expanded') !== 'true';");
 const toggleName = html.slice(html.lastIndexOf('function ', flipAt) + 9, html.indexOf('(', html.lastIndexOf('function ', flipAt)));
 const code = ['gsAddressRowHtml(', 'window.gsAddAddressRow = function', 'window.gsRemoveAddressRow = function', 'window.gsSyncAddressLabel = function', 'function gsRenderAddresses(', 'function gsCollectAddresses(',
-    'async function gsCopyProfile(', 'function gsRefreshProfileCards(', 'function ' + toggleName + '('].map(m => grab(html, m.startsWith('gsAddressRowHtml') ? 'function gsAddressRowHtml(' : m)).join('\n');
+    'async function gsCopyProfile(', 'function gsRefreshProfileCards(', 'function gsFoldCards(', 'function ' + toggleName + '('].map(m => grab(html, m.startsWith('gsAddressRowHtml') ? 'function gsAddressRowHtml(' : m)).join('\n');
 
 (async () => {
     const browser = await chromium.launch();
@@ -52,7 +52,7 @@ const code = ['gsAddressRowHtml(', 'window.gsAddAddressRow = function', 'window.
             document.querySelectorAll('.gs-profile-card input').forEach(i => { i.hidden = true; });
             gsRefreshProfileCards();
         });
-        assert.deepEqual(await rows(), ['Phone=0957050499', 'Email=', 'Current address=99 Sukhumvit, Bangkok', 'Address (National ID)=12 Moo 3, Nakhon Pathom', 'Work=MLP Pharmacy, Ratchada'], 'rows in order; an empty / null extra is not rendered');
+        assert.deepEqual(await rows(), ['Phone=0957050499', 'Email=', 'Current address=99 Sukhumvit, Bangkok', 'Address (National ID)=12 Moo 3, Nakhon Pathom', 'Work=MLP Pharmacy, Ratchada', 'Reference 1 · name=', 'Reference 1 · phone=', 'Reference 2 · name=', 'Reference 2 · phone='], 'rows in order (V102.280: the four reference-person rows follow the addresses); an empty / null extra is not rendered');
         assert.equal(await vis('.gs-addr-add'), false, 'no add button in read mode');
         assert.equal(await page.$eval('.gs-addr-extra .gs-read-value', e => e.textContent), 'MLP Pharmacy, Ratchada');
         assert.ok((await page.$eval('.gs-card-contact .gs-empty-note', e => e.textContent)).includes('Email'), '"Not provided" names the empty field only');
