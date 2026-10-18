@@ -221,7 +221,7 @@
             <div class="curate-main"><div class="curate-controls"><span class="curate-keep"><span id="curate-total"></span> → Keep <span class="curate-step"><button type="button" data-step="-1" aria-label="Keep one fewer" title="ลดจำนวนข้อที่เก็บ">−</button><input id="curate-target" type="number" min="1" aria-label="Number of questions to keep" title="จำนวนข้อที่ต้องการเก็บไว้"><button type="button" data-step="1" aria-label="Keep one more" title="เพิ่มจำนวนข้อที่เก็บ">+</button></span></span><div class="curate-modes" role="group" aria-label="Selection strategy"><button type="button" data-mode="balanced" aria-pressed="true" title="รักษาความครอบคลุมหัวข้อและลดความซ้ำ">Balanced</button><button type="button" data-mode="quality" aria-pressed="false" title="เน้นความชัดเจนและคุณภาพของแต่ละข้อ">Best quality</button><button type="button" data-mode="duplicates" aria-pressed="false" title="เลือกตัวแทนของข้อที่วัดประเด็นเดียวกัน">Less overlap</button></div><button type="button" id="curate-suggest" class="curate-primary" title="ให้ AI เสนอชุดข้อสอบตามจำนวนและข้อที่ปักหมุด">✦ Suggest</button></div>
             <details class="curate-instructions"><summary title="เพิ่มเงื่อนไขให้ AI ใช้คัดข้อสอบ (ไม่บังคับ)" aria-label="Instructions"><span aria-hidden="true">✏️</span><span class="curate-sr">Instructions</span></summary><textarea id="curate-instructions" maxlength="4000" aria-label="Curation instructions" placeholder="e.g. Prioritize clinical application and retain all key topics."></textarea></details>
             <div class="curate-review"><div class="curate-review-head"><div class="curate-tabs" role="group" aria-label="Proposed selection"><button type="button" data-view="keep" aria-pressed="true" title="ข้อที่เก็บไว้">Keep</button><button type="button" data-view="remove" aria-pressed="false" title="ข้อที่เสนอให้ตัด">Remove</button></div><span id="curate-coverage"></span></div><div id="curate-proposal-label"></div><div id="curate-rows"></div></div>
-            <div class="curate-footer"><div id="curate-feedback" role="status" aria-live="polite"></div><button type="button" id="curate-save" class="curate-primary" title="บันทึกเป็นชุดใหม่ที่ยังไม่เปิดใช้งาน โดยต้นฉบับยังอยู่ครบ">Save as new quiz</button></div><div class="curate-note">New quizzes are saved inactive. Original questions and attempts are preserved.</div></div>`;
+            <div class="curate-footer"><div id="curate-confirm" hidden><div id="curate-confirm-text"></div><span class="curate-confirm-actions"><button type="button" id="curate-confirm-ok" class="curate-apply"></button><button type="button" id="curate-confirm-cancel" title="ยกเลิก ไม่มีการเปลี่ยนแปลง">Cancel</button></span></div><div id="curate-feedback" role="status" aria-live="polite"></div><button type="button" id="curate-save" class="curate-primary" title="บันทึกเป็นชุดใหม่ที่ยังไม่เปิดใช้งาน โดยต้นฉบับยังอยู่ครบ">Save as new quiz</button></div><div class="curate-note">New quizzes are saved inactive. Original questions and attempts are preserved.</div></div>`;
         document.body.append(dialog);
         // V101.88: shared provider-logo rail (Expand Quiz / audit toolbar) — logo tabs + name-only chips.
         const models = node('div', undefined, 'curate-models audit-toolbar'); models.id = 'curate-models';
@@ -270,11 +270,13 @@
         const split = node('button', 'Split into two quizzes', 'curate-primary'); split.type = 'button'; split.id = 'curate-split';
         split.title = 'ชุดเดิมเก็บ Keep ชุดใหม่รับ Remove พร้อมสำเนา Before Split'; apply.after(split);
         split.onclick = () => save(true, true);
+        byId('curate-confirm-ok').onclick = () => settleConfirm(true);
+        byId('curate-confirm-cancel').onclick = () => settleConfirm(false);
         dialog.querySelector('.curate-close').onclick = () => dialog.close();
         // Keep the editor's global Escape handler from closing the underlying modal.
         document.addEventListener('keydown', event => { if (dialog.open && event.key === 'Escape') event.stopPropagation(); }, true);
         dialog.addEventListener('cancel', event => { if (state?.saving) event.preventDefault(); else if (state?.compare) { event.preventDefault(); backToReview(); } });
-        dialog.addEventListener('close', () => { clearInterval(state?.timer); state = null; stemObserver.disconnect(); });
+        dialog.addEventListener('close', () => { settleConfirm(false); clearInterval(state?.timer); state = null; stemObserver.disconnect(); });
         dialog.querySelectorAll('[data-mode]').forEach(button => button.onclick = () => {
             state.mode = button.dataset.mode; state.needsSuggestion = true; state.done = false; state.message = ''; render();
         });
@@ -296,6 +298,16 @@
         byId('curate-suggest').onclick = () => suggest();
         byId('curate-save').onclick = () => save(false);
         apply.onclick = () => save(true);
+    }
+    // V102.285: the native confirm() sat after several awaits (server reads of the quiz and its history), far from the click.
+    // Browsers drop such dialogs silently (confirm() returns false), so Remove / Split reported "cancelled" or nothing at all.
+    // The question is asked inside the dialog instead: same text, Confirm / Cancel buttons, nothing to throttle.
+    function confirmInDialog(s, text, label) {
+        return new Promise(resolve => { s.confirming = { text, label, resolve }; s.message = ''; render(); byId('curate-confirm-cancel').focus(); });
+    }
+    function settleConfirm(ok) {
+        const s = state, pending = s?.confirming; if (!pending) return;
+        s.confirming = null; pending.resolve(ok); render();
     }
     function render() {
         const s = state; if (!s) return;
@@ -361,18 +373,22 @@
         byId('curate-coverage').textContent = coverage;
         byId('curate-proposal-label').textContent = s.proposal ? 'AI proposal · review before saving · topics and difficulty are AI estimates' : 'Pin must-keep questions, then select Suggest.';
         byId('curate-feedback').textContent = s.message || problem(s) || count + ' → ' + s.keep.size + ' questions · total points unchanged';
+        byId('curate-confirm').hidden = !s.confirming;
+        byId('curate-confirm-text').textContent = s.confirming?.text || '';
+        byId('curate-confirm-ok').textContent = s.confirming?.label || '';
         dialog.querySelectorAll('button, input, textarea').forEach(el => {
-            if (el.classList.contains('curate-close')) el.disabled = s.saving;
+            if (el.closest('#curate-confirm')) el.disabled = !s.confirming;
+            else if (el.classList.contains('curate-close')) el.disabled = s.saving;
             else if (!el.classList.contains('curate-move')) el.disabled = s.busy || s.saving || s.saved;
             else el.disabled = el.disabled || s.busy || s.saving || s.saved;
         });
         byId('curate-save').disabled = s.busy || s.saving || s.saved || !!problem(s);
-        byId('curate-save').textContent = s.saving ? 'Saving…' : s.saved ? 'Saved' : 'Save as new quiz';
+        byId('curate-save').textContent = s.saving && !s.confirming ? 'Saving…' : s.saved ? 'Saved' : 'Save as new quiz';
         byId('curate-create-backup').disabled = s.busy || s.saving || s.saved || !!s.applyOperation?.backupRef;
         byId('curate-apply').disabled = s.busy || s.saving || s.saved || !s.source.sourceId || !!problem(s) || s.keep.size === count;
         byId('curate-split').disabled = byId('curate-apply').disabled;
-        byId('curate-split').textContent = s.splitting ? 'Splitting…' : 'Split into two quizzes';
-        byId('curate-apply').textContent = s.applying ? 'Applying…' : 'Remove ' + (count - s.keep.size) + ' from original';
+        byId('curate-split').textContent = s.splitting && !s.confirming ? 'Splitting…' : 'Split into two quizzes';
+        byId('curate-apply').textContent = s.applying && !s.confirming ? 'Applying…' : 'Remove ' + (count - s.keep.size) + ' from original';
         dialog.querySelector('.curate-main > .curate-note').textContent = 'Remove updates the inactive original. Create backup quiz is optional; required history versions are preserved. Split creates a new quiz from removed questions.';
         byId('curate-suggest').textContent = s.busy ? 'Processing · ' + elapsed(s) : s.done ? 'Run again' : '✦ Suggest';
         byId('curate-suggest').classList.toggle('icon', !!s.done && !s.busy);   // V102.219: icon-only ↻ after a run
@@ -640,7 +656,7 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
         const confirmation = split
             ? 'Split into two quizzes: ' + s.source.form.title + '\n\nOriginal keeps ' + ids.length + ': ' + ids.map(id => 'Q' + id).join(', ') + '\nNew inactive quiz receives ' + removed.length + ': ' + removed.map(id => 'Q' + id).join(', ') + '\n\nA Before Split backup will preserve all ' + s.source.form.questions.length + ' questions. Current editor settings will be saved; each resulting quiz retains the current total points.\n\nยืนยันแยก Keep ไว้ชุดเดิม และย้าย Remove ไปชุดใหม่ พร้อมสำเนาก่อนแยก?'
             : 'Apply to current quiz: ' + s.source.form.title + '\n\nRemove: ' + removed.map(id => 'Q' + id).join(', ') + '\n' + s.source.form.questions.length + ' → ' + ids.length + ' questions.\n\nCurrent editor settings will also be saved. ' + backupMessage + '\n\nยืนยันตัดข้อที่ระบุออกจากชุดเดิม และบันทึกการตั้งค่าปัจจุบัน?';
-        if (!confirm(confirmation)) return false;
+        if (!await confirmInDialog(s, confirmation, split ? 'Confirm split' : 'Confirm · remove ' + removed.length) || state !== s) return false;
         operation.createBackup = createBackup;
         if (!operation.backupRef) operation.backupRef = db.collection('quizzes').doc();
         if (split && !operation.newRef) operation.newRef = db.collection('quizzes').doc();
