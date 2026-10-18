@@ -150,7 +150,7 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
         assert.deepEqual(r.chips, ['as/gemini-3.1-flash-image', 'or/openai/gpt-5.4-image-2', 'as/gemini-omni-1.1-flash'], 'three engine chips');
         assert.equal(r.clipChipLabel, '🎬 Clip 9:16'); assert.match(r.clipChipTitle, /9:16 vertical clip with audio · about \$0\.10 per second/);
         assert.ok(r.valid.includes('as/gemini-omni-1.1-flash'), 'pref restore accepts the clip engine');
-        assert.deepEqual([r.btnBefore, r.cardBefore], ['Create Masterpiece', 'none'], 'image mode untouched before the pick');
+        assert.deepEqual([r.btnBefore, r.cardBefore], ['Create', 'none'], 'image mode untouched before the pick');
         assert.deepEqual([r.engine, r.clipMode, r.btnClip, r.cardClipNoPlan], ['as/gemini-omni-1.1-flash', true, 'Plan 10 episodes', 'none'], 'Clip mode: button relabelled, no card until a plan exists');
         assert.match(r.btnTitle, /nothing is rendered or paid yet/); assert.match(r.placeholderClip, /10-episode 9:16 series/);
         assert.deepEqual(r.planCall, { model: r.enhancer, isJson: true, feature: 'clip_plan', asksObject: true, tenAsked: true, hasTopic: true }, 'the Enhancer plans as a JSON object');
@@ -178,7 +178,7 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
         assert.equal(r.set.topic, 'warfarin counselling for new patients'); assert.equal(r.set.ep3Title, 'Missed dose rule', 'the edited row is what gets saved');
         assert.deepEqual([r.set.ep1.status, r.set.ep1.clipUrl, r.set.ep1.storagePath, r.set.ep1.seconds, r.set.ep1.costUsd, r.set.ep1.captionTh], ['done', 'https://storage.test/teach-clips/S1/EP01.mp4', 'teach-clips/S1/EP01.mp4', 8, 0.8, 'คำบรรยาย 1']);
         assert.deepEqual([r.set.createdAt, r.set.updatedAt], ['TS', 'TS']); assert.equal(r.saveBtn, '✅ Saved');
-        assert.deepEqual([r.btnBack, r.cardBack], ['Create Masterpiece', 'none'], 'image mode restored'); assert.match(r.placeholderBack, /Describe the image, object, or location/);
+        assert.deepEqual([r.btnBack, r.cardBack], ['Create', 'none'], 'image mode restored'); assert.match(r.placeholderBack, /Describe the image, object, or location/);
         assert.deepEqual(dialogs, [], 'no native dialog opened');
         const mine = errs.filter(e => /glc|Grand Line|clip/i.test(e));
         assert.deepEqual(mine, [], 'no clips page errors: ' + mine.join(' | '));
