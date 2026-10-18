@@ -12,7 +12,7 @@ const S = window.SQM_EXAM_STYLES;
 const checks = [];
 const check = (name, got, want) => checks.push([name, JSON.stringify(got), JSON.stringify(want)]);
 
-check('order: thai first (the hidden #suggest-style defaults to it), new styles last', Object.keys(S), ['thai', 'pebc1', 'pebc2', 'opra', 'japan', 'china', 'spc']);
+check('order: thai first (the hidden #suggest-style defaults to it), new styles last', Object.keys(S), ['thai', 'pebc1', 'pebc2', 'opra', 'japan', 'china', 'spc', 'naplex', 'fpgee']);
 // V102.279: SPC Competency (Singapore) — written from the public March 2023 guide.
 check('spc: single best answer, exactly 4 options', /EXACTLY 4 options/.test(S.spc.prompt(5)) && /MOST APPROPRIATE/.test(S.spc.prompt(5)), true);
 check('spc: at least half the questions are case-based', [1, 5, 10].map(n => (S.spc.prompt(String(n)).match(/at least (\d+) of the/) || [])[1]), ['1', '3', '5']);
@@ -22,6 +22,22 @@ check('spc: no scope toggle (ethics share is part of the exam)', S.spc.scope, fa
 check('spc: names no Act, section number or penalty', /name no Act, section number, penalty/.test(S.spc.prompt(5)), true);
 check('spc: no Thai-blueprint leftovers', /3:8:4/.test(S.spc.prompt(5)), false);
 check('spc: silent (no say)', S.spc.say, undefined);
+// V102.281: NAPLEX and FPGEE (US) — written from the public 2025 NABP content outlines (docs/EXAM-STYLES-SOURCES.md).
+// The app grades choice (single / multi) and ordering by itself; short_answer earns credit for any typed text — so calculations must be MCQ.
+const NP = n => S.naplex.prompt(String(n)), FP = n => S.fpgee.prompt(String(n));
+check('naplex+fpgee: two US chips told apart by a tag', [S.naplex.tag, S.fpgee.tag, S.naplex.flag === S.fpgee.flag], ['N', 'F', true]);
+check('naplex+fpgee: no scope toggle', [S.naplex.scope, S.fpgee.scope], [false, false]);
+check('naplex: blueprint shares 40 / 25 / 25 / 10', ['about 40% person-centered', '25% medication use process', '25% foundational knowledge', '10% professional practice'].map(x => NP(5).includes(x)), [true, true, true, true]);
+check('fpgee: domain weights 37 / 31 / 20 / 12', ['about 37% pharmacy practice', '31% pharmaceutical sciences', '20% social, behavioral', '12% foundational biomedical'].map(x => FP(5).includes(x)), [true, true, true, true]);
+check('naplex: item types scale with n (select-all / calculation / ordering)', [1, 3, 4, 6, 8].map(n => [/select-all item/.test(NP(n)), /calculation item/.test(NP(n)), /ordering item/.test(NP(n))].join()),
+    ['false,false,false', 'false,true,false', 'true,true,false', 'true,true,true', 'true,true,true']);
+check('naplex: counts are real numbers even though n arrives as a string', [/2 select-all items/.test(NP(8)), /1 select-all item —/.test(NP(5)), /1 ordering item/.test(NP(6))], [true, true, true]);
+check('fpgee: select-all from 6, calculation from 3', [1, 3, 6].map(n => [/select-all item/.test(FP(n)), /calculation item/.test(FP(n))].join()), ['false,false', 'false,true', 'true,true']);
+check('naplex+fpgee: ordering is only for NAPLEX, options in correct order', [/"type": "ordering"/.test(NP(6)), /CORRECT order from first to last/.test(NP(6)), /ordering/.test(FP(10))], [true, true, false]);
+check('naplex+fpgee: calculations are MCQ, never short_answer', [NP(8), FP(8)].map(p => /never "short_answer" for a calculation/.test(p)), [true, true]);
+check('naplex+fpgee: no statute / section numbers', [NP(5), FP(5)].map(p => /name no statute, regulation section, penalty/.test(p)), [true, true]);
+check('naplex: US units; no SI-only line, no Thai blueprint', [/mg\/dL/.test(NP(5)), /mmol\/L/.test(NP(5)), /3:8:4/.test(NP(5))], [true, false, false]);
+check('naplex+fpgee: silent (no say)', [S.naplex.say, S.fpgee.say], [undefined, undefined]);
 for (const [key, s] of Object.entries(S)) {
     check(`${key}: flag / label / title / hint / prompt present`, !!(s.flag && s.label && s.title && typeof s.hint === 'string' && typeof s.prompt === 'function'), true);
     check(`${key}: prompt renders for n = 1 and 10`, [1, 10].every(n => typeof s.prompt(n, 'clinical') === 'string' && s.prompt(n, 'clinical').length > 40), true);
