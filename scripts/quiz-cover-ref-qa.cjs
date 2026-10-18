@@ -1,5 +1,5 @@
 // V102.262: Quiz cover style reference — real quiz-cover.js + quiz-cover.css in a page with a fake quizzesData and callUniversalAI.
-// 🧬 opens a strip of other quizzes' covers; ≤ 2 can be ticked (a third drops the oldest); Nano Banana 2 sends ONE stitched
+// 🧬 opens a strip of other quizzes' covers; ≤ 2 can be ticked (a third drops the oldest); Nano Banana 2.1 sends ONE stitched
 // sheet as visionData and the reference sentence leads the prompt; a model that cannot take an image (Image 2) sends none and the
 // strip is disabled; unticked = no visionData at all (behaviour unchanged).
 const fs = require('fs');
@@ -43,11 +43,11 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     assert.deepEqual(await ed.locator('[data-ref-tile]').evaluateAll(b => b.map(x => x.getAttribute('aria-pressed'))), ['false', 'true', 'true'], 'a third tick drops the oldest');
     await tile(2).click(); await tile(0).click(); // now 1 and 0
     assert.deepEqual(await ed.locator('[data-ref-tile]').evaluateAll(b => b.map(x => x.getAttribute('aria-pressed'))), ['true', 'true', 'false']);
-    // Nano Banana 2 (first chip) → generate sends one sheet + the reference line first
+    // Nano Banana 2.1 (first chip) → generate sends one sheet + the reference line first
     await ed.locator('[data-generate]').click();
     await page.waitForFunction(() => calls.length === 1);
     const c1 = await page.evaluate(() => calls[0]);
-    assert.equal(c1.model, 'as/gemini-3.1-flash-image');
+    assert.equal(c1.model, 'as/gemini-nano-banana-2.1');
     assert.ok(c1.vision && c1.vision.image_mimetype === 'image/jpeg' && c1.vision.image_base64.length > 200, 'visionData = one JPEG sheet');
     assert.ok(c1.prompt.startsWith('An image is attached: a reference sheet'), 'reference sentence leads the prompt');
     const dims = await page.evaluate(async b64 => { const bmp = await createImageBitmap(await (await fetch('data:image/jpeg;base64,' + b64)).blob()); return [bmp.width, bmp.height]; }, c1.vision.image_base64);
@@ -62,7 +62,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     await page.waitForFunction(() => !QuizCover.isBusy());
     const c2 = await page.evaluate(() => calls[1]);
     assert.equal(c2.vision, null, 'no visionData for Image 2'); assert.ok(!/reference sheet/.test(c2.prompt), 'no reference sentence for Image 2');
-    // nothing ticked → unchanged behaviour on Nano Banana 2
+    // nothing ticked → unchanged behaviour on Nano Banana 2.1
     await ed.locator('[data-model-chip]').nth(0).click();
     for (const i of [0, 1]) await tile(i).click();
     assert.deepEqual(await ed.locator('[data-ref-tile]').evaluateAll(b => b.map(x => x.getAttribute('aria-pressed'))), ['false', 'false', 'false']);
@@ -70,6 +70,6 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     await page.waitForFunction(() => calls.length === 3);
     const c3 = await page.evaluate(() => calls[2]);
     assert.equal(c3.vision, null); assert.ok(!/reference sheet/.test(c3.prompt));
-    console.log('PASS: Quiz cover style reference — 🧬 strip of other covers, ≤ 2 refs, one JPEG sheet + leading sentence on Nano Banana 2, nothing sent on Image 2 (strip disabled) or when none ticked');
+    console.log('PASS: Quiz cover style reference — 🧬 strip of other covers, ≤ 2 refs, one JPEG sheet + leading sentence on Nano Banana 2.1, nothing sent on Image 2 (strip disabled) or when none ticked');
   } finally { await browser.close(); }
 })().catch(e => { console.error('FAIL:', e.message); process.exit(1); });

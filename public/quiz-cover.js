@@ -5,7 +5,7 @@ const QuizCover = (() => {
     // icon-only cells so five models stay readable; `imageApi` models go through OpenRouter's Image API
     // (POST /api/v1/images, aspect_ratio 3:4) — Seedream 5.0 Lite and Muse Image output images only.
     const AI_MODELS = [
-        { id: 'as/gemini-3.1-flash-image', logo: 'gemini', ref: true, label: 'Nano Banana 2', ariaLabel: 'Nano Banana 2 (recommended)', titleTh: 'Nano Banana 2 · Google AI Studio · แนะนำ' },
+        { id: 'as/gemini-nano-banana-2.1', logo: 'gemini', ref: true, label: 'Nano Banana 2.1', ariaLabel: 'Nano Banana 2.1 (recommended)', titleTh: 'Nano Banana 2.1 · Google AI Studio · แนะนำ' },
         { id: 'or/openai/gpt-5.4-image-2', logo: 'openai', label: 'Image 2', ariaLabel: 'GPT Image 2 via OpenRouter', titleTh: 'GPT-5.4 Image 2 · ผ่าน OpenRouter' },
         { id: 'or/bytedance-seed/seedream-5-0-lite', label: 'Seedream 5.0 Lite', imageApi: true, ariaLabel: 'ByteDance Seedream 5.0 Lite via OpenRouter', titleTh: 'ByteDance Seed: Seedream 5.0 Lite · ผ่าน OpenRouter' },
         { id: 'or/meta/muse-image', label: 'Muse Image', imageApi: true, ariaLabel: 'Meta Muse Image via OpenRouter', titleTh: 'Meta: Muse Image · ผ่าน OpenRouter (ช้ากว่า — คิดก่อนวาด)' }
@@ -13,7 +13,7 @@ const QuizCover = (() => {
     const MODEL_PREF_KEY = 'quiz_cover_ai_model';
     // V102.262: style reference — the admin ticks up to 2 covers of other quizzes; they are stitched into ONE sheet and sent as the
     // model's base image (visionData), so a new cover follows the collection's look. Only models flagged `ref` take an image
-    // (Nano Banana 2 via AI Studio); the others get no sheet and no reference sentence.
+    // (Nano Banana 2.1 via AI Studio); the others get no sheet and no reference sentence.
     const REF_MAX = 2;
     const REF_LINE = 'An image is attached: a reference sheet of existing covers from this collection. Match their illustration style, colour palette, lighting, hero scale and title-band treatment closely, but draw a NEW hero subject for the topic below; do not copy their subjects or text.';
     let refs = [];
@@ -245,12 +245,12 @@ const QuizCover = (() => {
         const ok = refOk(currentModel(el));
         toggle.classList.toggle('has-value', refs.length > 0);
         toggle.classList.toggle('ref-off', !ok);
-        toggle.title = ok ? 'Style reference: pick up to ' + REF_MAX + ' covers of other quizzes (optional)' : 'Only Nano Banana 2 takes a reference cover';
+        toggle.title = ok ? 'Style reference: pick up to ' + REF_MAX + ' covers of other quizzes (optional)' : 'Only Nano Banana 2.1 takes a reference cover';
         if (box.hidden) return;
         const covers = (typeof quizzesData !== 'undefined' && Array.isArray(quizzesData) ? quizzesData : []).filter(q => safeUrl(q.coverUrl)).slice(0, 40);
         box.classList.toggle('ref-off', !ok);
         box.innerHTML = covers.length
-            ? '<span aria-hidden="true">🧬</span>' + covers.map(q => `<button type="button" data-ref-tile data-url="${attr(safeUrl(q.coverUrl))}" aria-pressed="${refs.includes(safeUrl(q.coverUrl))}" title="${attr(q.title || q.id)}"><img src="${attr(safeUrl(q.coverUrl))}" alt="${attr(q.title || q.id)}" loading="lazy"></button>`).join('') + `<small>${ok ? refs.length + ' / ' + REF_MAX : '🚫 Nano Banana 2 only'}</small>`
+            ? '<span aria-hidden="true">🧬</span>' + covers.map(q => `<button type="button" data-ref-tile data-url="${attr(safeUrl(q.coverUrl))}" aria-pressed="${refs.includes(safeUrl(q.coverUrl))}" title="${attr(q.title || q.id)}"><img src="${attr(safeUrl(q.coverUrl))}" alt="${attr(q.title || q.id)}" loading="lazy"></button>`).join('') + `<small>${ok ? refs.length + ' / ' + REF_MAX : '🚫 Nano Banana 2.1 only'}</small>`
             : '<small>No other covers yet</small>';
     }
     // The ticked covers side by side on one 3:4-per-cover sheet (white ground), as a base64 JPEG for visionData.
@@ -400,7 +400,7 @@ const QuizCover = (() => {
         }
     }
     const isModerationBlock = error => /moderation|content (?:filter|policy)|safety (?:filter|system)/i.test(String(error && error.message || ''));
-    // Rail text is not unique (Nano Banana 2 on two routes), so the OpenRouter one says so.
+    // Rail text is not unique (Nano Banana 2.1 on two routes), so the OpenRouter one says so.
     const modelName = id => { const m = AI_MODELS.find(x => x.id === id); return m ? m.label + (id.startsWith('or/') && AI_MODELS.some(x => x !== m && x.label === m.label) ? ' (OpenRouter)' : '') : id; };
     async function coverFrom(model, prompt, vision = null) {
         // V101.53: Image-API models get the collection's 3:4 as a real parameter, not just prompt text.
