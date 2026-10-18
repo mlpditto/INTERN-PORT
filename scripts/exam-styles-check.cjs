@@ -12,7 +12,7 @@ const S = window.SQM_EXAM_STYLES;
 const checks = [];
 const check = (name, got, want) => checks.push([name, JSON.stringify(got), JSON.stringify(want)]);
 
-check('order: thai first (the hidden #suggest-style defaults to it), new styles last', Object.keys(S), ['thai', 'pebc1', 'pebc2', 'opra', 'japan', 'china', 'spc', 'naplex', 'fpgee']);
+check('order: thai first (the hidden #suggest-style defaults to it), new styles last', Object.keys(S), ['thai', 'pebc1', 'pebc2', 'opra', 'japan', 'china', 'spc', 'naplex', 'fpgee', 'spcf', 'kple']);
 // V102.279: SPC Competency (Singapore) — written from the public March 2023 guide.
 check('spc: single best answer, exactly 4 options', /EXACTLY 4 options/.test(S.spc.prompt(5)) && /MOST APPROPRIATE/.test(S.spc.prompt(5)), true);
 check('spc: at least half the questions are case-based', [1, 5, 10].map(n => (S.spc.prompt(String(n)).match(/at least (\d+) of the/) || [])[1]), ['1', '3', '5']);
@@ -38,6 +38,20 @@ check('naplex+fpgee: calculations are MCQ, never short_answer', [NP(8), FP(8)].m
 check('naplex+fpgee: no statute / section numbers', [NP(5), FP(5)].map(p => /name no statute, regulation section, penalty/.test(p)), [true, true]);
 check('naplex: US units; no SI-only line, no Thai blueprint', [/mg\/dL/.test(NP(5)), /mmol\/L/.test(NP(5)), /3:8:4/.test(NP(5))], [true, false, false]);
 check('naplex+fpgee: silent (no say)', [S.naplex.say, S.fpgee.say], [undefined, undefined]);
+// V102.283: SPC Forensic (Singapore law, open-book) and KPLE (Korea) — docs/EXAM-STYLES-SOURCES.md. Both are law-bearing (`law: true`):
+// the suggestions popup shows a verify-law line, and the prompt may name an Act but never a section / article number.
+const SF = n => S.spcf.prompt(String(n)), KP = (n, sc) => S.kple.prompt(String(n), sc);
+check('spcf+kple: tags F / K, law flag on both, no say', [S.spcf.tag, S.kple.tag, S.spcf.law, S.kple.law, S.spcf.say, S.kple.say], ['F', 'K', true, true, undefined, undefined]);
+check('spcf: no scope toggle (the paper IS the law); kple: scope toggle', [S.spcf.scope, S.kple.scope], [false, true]);
+check('spcf: both syllabus areas named (profession + health products)', ['Pharmacists Registration Act', 'Code of Ethics', 'Health Products Act', 'Medicines Act', 'Poisons Act', 'Misuse of Drugs Act'].map(x => SF(5).includes(x)), [true, true, true, true, true, true]);
+check('spcf: 4-option MCQ; structured short_answer items from n = 4, two from 8', [1, 4, 8].map(n => [/EXACTLY 4 options/.test(SF(n)), (SF(n).match(/(\d) structured item/) || [])[1] || '0'].join()), ['true,0', 'true,1', 'true,2']);
+check('spcf: never a section / schedule number, penalty, fee or date', /NEVER cite a section, regulation or schedule number, a penalty, fee, quantity limit or date/.test(SF(5)), true);
+check('kple: five-option single answer', /EXACTLY 5 options/.test(KP(5, 'clinical')) && /EXACTLY 5 options/.test(KP(5, 'full')), true);
+check('kple: clinical scope leaves law out, full scope names the Acts in general terms', [/No law, insurance or regulatory/.test(KP(5, 'clinical')), /약사법/.test(KP(5, 'clinical')), /약사법/.test(KP(5, 'full')), /NEVER cite an article/.test(KP(5, 'full'))], [true, false, true, true]);
+check('kple: subject weights 40 / 29 / 26 / 6 (full) and re-normalised without law (clinical)', [/about 40% clinical/.test(KP(5, 'full')), /6% health and pharmacy law/.test(KP(5, 'full')), /about 43% clinical/.test(KP(5, 'clinical')), /27% industrial/.test(KP(5, 'clinical'))], [true, true, true, true]);
+check('spcf+kple: hints tell the admin to check law items', [S.spcf.hint, S.kple.hint].map(x => /check every law item/.test(x)), [true, true]);
+check('spcf+kple: no Thai blueprint leftovers', [SF(5), KP(5, 'full')].map(p => /3:8:4/.test(p)), [false, false]);
+check('law styles: the suggestions popup carries the verify-law line', /\(\(window\.SQM_EXAM_STYLES \|\| \{\}\)\[window\._suggestMoreStyle\] \|\| \{\}\)\.law \? `<p class="sqm-law-note"/.test(src), true);
 for (const [key, s] of Object.entries(S)) {
     check(`${key}: flag / label / title / hint / prompt present`, !!(s.flag && s.label && s.title && typeof s.hint === 'string' && typeof s.prompt === 'function'), true);
     check(`${key}: prompt renders for n = 1 and 10`, [1, 10].every(n => typeof s.prompt(n, 'clinical') === 'string' && s.prompt(n, 'clinical').length > 40), true);
