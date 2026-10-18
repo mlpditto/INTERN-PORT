@@ -155,7 +155,6 @@
             ['ai-analyzer-model-val', '#ai-analyze-model-toggle'],
             ['toolbar-ai-translate-model', '#ai-translate-model-toggle'],
             ['ai-tagging-model-val', '#unused-tag-rail', 'ai_default_tagging_model'],
-            ['ai-model-design-enhancer', '[aria-label="Step 1 enhancer model"]', 'ai_default_design_enhancer_model'],
             ['ai-model-grammar', '.reflective-grammar-model-chip', 'ai_default_grammar_model'],
             ['dxa-ai-model-val', '#dxa-ai-chip-rail', 'ai_default_disease_codex_model'],
             ['alabasta-case-card-refine-model', '.alabasta-casecard-tools-chip-rail', 'ai_default_casecard_refine_model']

@@ -59,9 +59,8 @@ const { chromium } = require('playwright');
         }
         const ids = await page.evaluate(() => TEXT_AI_MODELS.map(m => m.id));
         assert.equal(ids.length, 16); // V102.268: + Muse Spark Open; V101.05: + Qwen 3.8 Flash/Max, DeepSeek V4.1 Flash/V4 Pro; V101.64: + Claude Opus 5.5; V102.61: Sonnet 5 → 5.5; V102.242: + Gemma 4 26B A4B
-        const controls = ['toolbar-ai-translate-model', 'ai-tagging-model-val', 'ai-model-design-enhancer', 'ai-model-grammar', 'dxa-ai-model-val', 'ai-model-review', 'research-model-select', 'tts-polish-model', 'laughtale-ai-model', 'storyteller-model-select', 'lp-ai-model', 'case-note-ai-model', 'default-translate-model', 'default-analyzer-model', 'default-review-model', 'default-qfp-model'];
+        const controls = ['toolbar-ai-translate-model', 'ai-tagging-model-val', 'ai-model-grammar', 'dxa-ai-model-val', 'ai-model-review', 'research-model-select', 'tts-polish-model', 'laughtale-ai-model', 'storyteller-model-select', 'lp-ai-model', 'case-note-ai-model', 'default-translate-model', 'default-analyzer-model', 'default-review-model', 'default-qfp-model'];
         assert.equal(await page.locator('#ai-model-review').inputValue(), 'gpt-6-luna');
-        assert.equal(await page.locator('#ai-model-design-enhancer').inputValue(), 'gpt-6-sol');
         for (const id of controls) {
             const rail = page.locator(`[data-model-input="${id}"]`);
             assert.equal(await rail.count(), 1, id);
