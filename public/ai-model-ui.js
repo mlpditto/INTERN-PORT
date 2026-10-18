@@ -168,7 +168,7 @@
         // V102.118: Reflective Review's rail is built after its hidden select inside #rr-model-row (admin.html
         // rrInitModelRow adds the provider tabs); the V95.46 dropdown shell it used to replace is gone.
         bind('ai-model-review', null);
-        ['research-model-select', 'tts-polish-model', 'laughtale-ai-model', 'storyteller-model-select', 'lp-ai-model', 'apd-model-a', 'apd-model-b', 'case-note-ai-model', 'bp-ai-model'].forEach(id => bind(id, null, 'ai_text_' + id));
+        ['research-model-select', 'tts-polish-model', 'laughtale-ai-model', 'storyteller-model-select', 'lp-ai-model', 'case-note-ai-model', 'bp-ai-model'].forEach(id => bind(id, null, 'ai_text_' + id));
         const qfp = document.getElementById('ai-model-selector');
         if (qfp) window.syncModelDefault('ai-model-selector', localStorage.getItem('ai_default_qfp_model') || qfp.value);
         Object.values(preferences).forEach(([id, key]) => bind(id, null, key));

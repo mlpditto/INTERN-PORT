@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.287)</title>
+    <title>Nika Admin (V102.288)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -5682,6 +5682,14 @@
         #ai-suggest-config-modal .sqm-rail { flex:1; min-width:0; margin:0; padding:5px 6px; }
         #ai-suggest-config-modal .sqm-rail .audit-model-row { margin-top:0; padding-top:0; border-top:0; gap:5px; }
         #ai-suggest-config-modal .sqm-custom { margin-top:8px; }
+        /* V102.288: 📎 Documents — review models A / B as two provider-first rails (logo tabs + that provider's models) */
+        #applicantDocsModal .apd-ab { display:flex; flex-direction:column; gap:6px; margin-top:10px; }
+        #applicantDocsModal .apd-ab-row { display:flex; align-items:center; gap:8px; }
+        #applicantDocsModal .apd-ab-lbl { flex:0 0 18px; width:18px; height:18px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:900; color:#fff; background:#7c3aed; }
+        #applicantDocsModal .apd-ab-row:nth-child(2) .apd-ab-lbl { background:#0ea5e9; }
+        #applicantDocsModal .apd-ab .audit-toolbar { flex:1; min-width:0; margin:0; padding:4px 6px; }
+        #applicantDocsModal .apd-ab .audit-model-row { margin-top:0; padding-top:0; border-top:0; gap:5px; }
+        #applicantDocsModal .apd-foot { margin:10px 0 0; font-size:0.66em; color:#cbd5e1; line-height:1.45; }
         #ai-suggest-config-modal .sqm-custom textarea { width:100%; box-sizing:border-box; padding:8px 10px; border:1.5px solid #c4b5fd; border-radius:10px; background:#faf5ff; font:inherit; font-size:0.85em; line-height:1.5; resize:vertical; }
         #ai-suggest-config-modal .sqm-warn, #ai-suggest-config-modal .sqm-need { margin-top:5px; padding:4px 8px; border-radius:7px; font-size:0.75em; }
         #ai-suggest-config-modal .sqm-warn { background:#fef3c7; border:1px solid #fcd34d; color:#92400e; }
@@ -61210,8 +61218,29 @@ Save it anyway?`;
             return hits.length === 1 ? hits[0].id : null;
         }
 
+        // V102.288: review models A / B — the Expand quiz rail (provider-logo tabs + that provider's models) built on first
+        // open, instead of two full catalogue rails from ai-model-ui.js. Picks persist under the registry's old keys
+        // (ai_text_apd-model-a / -b), so what an admin chose before this version is still what runs.
+        const APD_MODEL_DEFAULTS = { 'apd-model-a': 'gpt-6-luna', 'apd-model-b': 'claude-haiku-4-5' };
+        function apdInitModelRows() {
+            const box = document.getElementById('apd-ab');
+            if (!box || box.childElementCount || typeof window.providerModelRailHtml !== 'function') return;
+            box.innerHTML = Object.entries(APD_MODEL_DEFAULTS).map(([id, def], i) => {
+                let saved = '';
+                try { saved = localStorage.getItem('ai_text_' + id) || ''; } catch (_) { /* storage may be blocked */ }
+                const selected = typeof window.normalizeTextAIModel === 'function' ? window.normalizeTextAIModel(saved || def) : (saved || def);
+                const lb = i ? 'B' : 'A';
+                return `<div class="apd-ab-row"><span class="apd-ab-lbl" title="Review model ${lb} · โมเดลตรวจ ${lb} · 검토 모델 ${lb}">${lb}</span><div class="audit-toolbar lang-no-toggle">${window.providerModelRailHtml(id, selected, `apdPickModel(this,'${id}')`)}</div></div>`;
+            }).join('');
+        }
+        function apdPickModel(btn, id) {
+            document.getElementById(id).value = btn.dataset.value;
+            btn.parentElement.querySelectorAll('button').forEach(b => { b.classList.toggle('active', b === btn); b.setAttribute('aria-pressed', String(b === btn)); });
+            try { localStorage.setItem('ai_text_' + id, btn.dataset.value); } catch (_) { /* storage may be blocked */ }
+        }
         function openApplicantDocs(preUserId) {
             apdTargetId = preUserId;
+            apdInitModelRows();
             // V98.59: pending rows come from `preRegData`, NOT `usersData` — renderTable
             // maps them in with isPreReg:true. Looking in the wrong array made the
             // heading read the raw doc id ("For 1HckMT56eFo1WWbB73Kv").
@@ -71257,9 +71286,9 @@ Summarize in English in 3–5 concise lines:
             <input type="file" id="apd-file" accept="application/pdf,image/jpeg,image/png,image/webp" style="display:none;" onchange="uploadApplicantDoc(this)">
             <button class="btn-sm" onclick="document.getElementById('apd-file').click()" style="width:auto; min-height:0; padding:5px 12px; font-size:0.75em; font-weight:700; background:#f5f3ff; color:#7c3aed; border:1px solid #ddd6fe; border-radius:999px; cursor:pointer;">+ Attach</button>
             <span style="font-size:0.68em; color:#cbd5e1; margin-left:6px;">PDF or image, under 4 MB</span>
-            <div class="lang-no-toggle"><span>Review model A</span><input type="hidden" id="apd-model-a" value="gpt-6-luna"><span>Review model B</span><input type="hidden" id="apd-model-b" value="claude-haiku-4-5"></div>
+            <div class="apd-ab lang-no-toggle" id="apd-ab"></div>
             <div class="lang-no-toggle" id="apd-ai" style="margin-top:10px;"></div>
-            <p style="margin:10px 0 0; font-size:0.66em; color:#cbd5e1; line-height:1.45;">Admins only · deleting the applicant deletes these files too · AI review sends the CV text to the model providers</p>
+            <p class="apd-foot">🔒 Admins only · deleted with the applicant · AI review sends the CV text to the two providers</p>
         </div>
     </div>
 
