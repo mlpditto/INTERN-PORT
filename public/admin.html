@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.302)</title>
+    <title>Nika Admin (V102.303)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -673,6 +673,7 @@
         #tab-ai-hub .deck-guide-btn { display:flex; align-items:center; gap:12px; width:auto; min-height:0; margin:0; padding:0; border:none; background:transparent; cursor:pointer; text-align:left; }
         #tab-ai-hub .deck-guide-btn .deck-guide-hint { font-size:0.95em; opacity:.55; transition:opacity .15s; }
         #tab-ai-hub .deck-guide-btn:hover .deck-guide-hint, #tab-ai-hub .deck-guide-btn:focus-visible .deck-guide-hint { opacity:1; }
+        #hub-view-design .gm-elapsed { font-weight:600; opacity:.8; margin-left:2px; font-size:.85em; }   /* V102.303: the busy counter */
         #hub-view-design .gm-formula { font-size:0.68em; font-weight:600; color:#b4b9c9; letter-spacing:0.2px; margin-left:4px; }
         #hub-view-design .gm-bar { display:flex; align-items:center; gap:10px; padding:8px 12px; background:#f8fafc; border:1px solid #edf2f7; border-radius:16px; flex-wrap:wrap; }
         #hub-view-design .gm-ico { font-size:0.9em; color:#94a3b8; flex-shrink:0; }
@@ -21269,8 +21270,7 @@ RULES:
             if (!promptInput.value.trim()) return alert("Please describe what to generate.");
 
             try {
-                btn.disabled = true;
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Refining...';
+                let stopBusy = window.gmBusy(btn, 'Refining…');   // V102.303: with a seconds counter
                 
                 // Step 1: AI Translation & Enhancement (Refinement)
                 let enhancerPrompt = `You are an expert AI Prompt Engineer.
@@ -21327,12 +21327,13 @@ RULES:
                 });
 
                 if (!finalPrompt) {
+                    stopBusy();
                     btn.disabled = false;
                     btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Create';
                     return;
                 }
 
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Manifesting...';
+                stopBusy(); stopBusy = window.gmBusy(btn, 'Manifesting…');
                 previewContainer.innerHTML = `
                     <div class="loader-container" style="text-align:center;">
                         <i class="fa-solid fa-wand-sparkles fa-beat" style="font-size:4em; color:#e67e22; margin-bottom:20px;"></i>
@@ -21357,6 +21358,7 @@ RULES:
                     </div>
                 `;
             } finally {
+                stopBusy();
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Create';
             }
@@ -21406,6 +21408,16 @@ RULES:
         };
 
         // Step 1 — the Enhancer model writes the plan as JSON ({"episodes":[…]} — an object, never a bare array).
+        // V102.303: a busy button counts the seconds it has been waiting (Planning · Refining · Manifesting) — the render step
+        // already had its own timer in the preview. Returns the stop function; the caller restores the label afterwards.
+        window.gmBusy = function(btn, label) {
+            if (!btn) return function() {};
+            const t0 = Date.now();
+            const paint = () => { btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + label + ' <small class="gm-elapsed">' + Math.round((Date.now() - t0) / 1000) + ' s</small>'; };
+            btn.disabled = true; paint();
+            const id = setInterval(paint, 1000);
+            return function() { clearInterval(id); };
+        };
         window.glcPlanEpisodes = async function() {
             const promptInput = document.getElementById('design-prompt');
             const btn = document.getElementById('btn-generate-design');
@@ -21422,7 +21434,7 @@ Visual style for every clip: ${style}
 Return ONLY valid JSON of this exact shape:
 {"episodes":[{"n":1,"title":"short English title","titleTh":"ชื่อตอนภาษาไทยสั้น ๆ","objective":"what the viewer can do after (English, ≤ 12 words)","fact":"the one key fact, clinically correct (English, ≤ 20 words)","narration":"the spoken English line, natural, ≤ 25 words","captionTh":"คำบรรยายภาษาไทย 1 บรรทัดสำหรับโพสต์","visual":"English prompt for a video model: scene, subject, motion, camera, mood — consistent style across episodes, NO on-screen text"}]}
 Exactly 10 episodes, n = 1..10, in a sensible learning order. Keep drug names, doses and targets correct for Thailand practice.`;
-            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Planning…'; }
+            const stopBusy = window.gmBusy(btn, 'Planning…');
             try {
                 const res = await window.callUniversalAI(plannerModel, plannerPrompt, true, null, '', { feature: 'clip_plan' });
                 const parsed = window.safeJsonParse(res && res.text);
@@ -21447,6 +21459,7 @@ Exactly 10 episodes, n = 1..10, in a sensible learning order. Keep drug names, d
                 console.warn('[grand-line-clips] plan failed:', e);
                 showToast('Plan failed: ' + ((e && e.message) || e), 'error');
             } finally {
+                stopBusy();
                 if (btn) { btn.disabled = false; }
                 window.glcSyncMode();
             }

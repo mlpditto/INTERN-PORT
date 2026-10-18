@@ -57,7 +57,8 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Nika Admin (V9.9)</
         assert.ok(/Plan 10 episodes/.test(await body()) && /\$0\.80/.test(await body()) && /teach-clips/.test(await body()), 'video section');
         // Thai switch stays on the deck set
         await page.click('#adminGuideOverlay .ag-l[data-l="th"]');
-        await page.waitForFunction(() => /วิธีใช้ Grand Line Deck/.test(document.querySelector('#adminGuideOverlay .ag-title').textContent));
+        // the title repaints at once, the body after the TH file loads — wait for the body (CI is slow)
+        await page.waitForFunction(() => /วิธีใช้ Grand Line Deck/.test(document.querySelector('#adminGuideOverlay .ag-title').textContent) && /ยืนยัน/.test(document.querySelector('#adminGuideOverlay .ag-body').innerText));
         assert.ok(/Plan 10 episodes/.test(await body()) && /ยืนยัน/.test(await body()), 'TH video section, same index');
         assert.deepEqual(await page.$$eval('#adminGuideOverlay .ag-chip', els => els.map(e => e.textContent)), ['🖼 ภาพ', '🎬 วิดีโอ', '🐳 เสียง', '🧭 Research Log']);
         // close, open the ADMIN guide → its own title, its own chips (not the deck's), lands on the tab map; the deck remembers its page
@@ -73,7 +74,7 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Nika Admin (V9.9)</
         assert.equal(await page.$eval('#adminGuideOverlay .ag-chip[aria-pressed="true"]', e => e.dataset.i), '1', 'deck guide reopens where it was (video)');
         // KO
         await page.click('#adminGuideOverlay .ag-l[data-l="ko"]');
-        await page.waitForFunction(() => /사용법/.test(document.querySelector('#adminGuideOverlay .ag-title').textContent));
+        await page.waitForFunction(() => /사용법/.test(document.querySelector('#adminGuideOverlay .ag-title').textContent) && /에피소드/.test(document.querySelector('#adminGuideOverlay .ag-body').innerText));
         assert.ok(/Plan 10 episodes/.test(await body()), 'KO video section');
         await page.click('#adminGuideOverlay .ag-l[data-l="en"]');
         assert.deepEqual(errs, []);
