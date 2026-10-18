@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.309)</title>
+    <title>Nika Admin (V102.310)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -52123,7 +52123,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     // actions used most sit beside ⋯ (they stay in the menu too); userRowQuick looks the user up by id.
                     const actionsGroup = `
                         <div class="u-row-quick">
-                            <button type="button" onclick="userRowQuick('${d.id}', 'period')" title="ตั้งช่วงฝึกงาน" aria-label="Set period">📅</button>
+                            ${_apdOwner ? `<button type="button" onclick="userRowQuick('${d.id}', 'docs')" title="Documents · เอกสาร${_apdN ? ` (${_apdN})` : ''}" aria-label="Applicant documents">📎</button>` : `<button type="button" disabled title="No applicant record to attach to · ไม่มีระเบียนผู้สมัคร" aria-label="Applicant documents (none)">📎</button>`}
                             <button type="button" onclick="userRowQuick('${d.id}', 'history')" title="ประวัติคะแนน" aria-label="Score history">📜</button>
                             <button type="button" onclick="userRowQuick('${d.id}', 'log')" title="บันทึกงานแทนผู้ใช้" aria-label="Log work for this user"><i class="fa-solid fa-upload"></i></button>
                             <button type="button" onclick="userRowQuick('${d.id}', 'cert')" title="ใบประกาศ" aria-label="Certificate">🎓</button>
@@ -52146,6 +52146,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const _seenHtml = _seenMs ? `<span class="u-seen${_seenAge < 86400000 ? ' u-seen-fresh' : _seenAge > 7 * 86400000 ? ' u-seen-stale' : ''}" title="Last seen ${new Date(_seenMs).toLocaleString('th-TH')}"><i class="fa-regular fa-clock" aria-hidden="true"></i> ${escapeHtml(userSeenAgo(d.lastSeen))}</span>` : '';
                     const _qjcHtml = `<span class="u-qjc" title="Quiz ${_qN} · Journal ${logsN} · Case ${_cN}"><button type="button" class="${_qN ? 'ok' : ''}" onclick="userRowQuick('${d.id}', 'history')" title="Approved quizzes — open the score history" aria-label="Quizzes ${_qN}">Q${_qN}</button><button type="button" class="${logsN ? 'ok' : ''}" onclick="setReflectiveSearch('${(d.displayName || d.id).replace(/'/g, "\\'")}', '${d.id}')" title="All submitted journals, pending and reviewed" data-th-title="Journal ที่ส่งทั้งหมด รวมรายการที่รอตรวจและตรวจแล้ว" aria-label="Journals ${logsN}">J${logsN}</button><span class="${_cN ? 'ok' : ''}" title="Cases" aria-label="Cases ${_cN}">C${_cN}</span></span>`;
                     const _logsHtml = _qjcHtml + _seenHtml;
+                    // V102.310: 📎 sits in the rail (it swapped places with 📅 Set period, now in the ⋯ menu); V98.73's rule still holds — only when the applicant record resolves
+                    const _apdOwner = typeof applicantOwnerFor === 'function' ? applicantOwnerFor(d) : null, _apdN = _apdOwner ? applicantDocCount(_apdOwner) : 0;
                     const _copyText = `${d.fullName || d.displayName || d.id} — Quiz ${_qN} · Journal ${logsN} · Case ${_cN} · ${parseFloat((d.score || 0).toFixed(2))} pts · 🪙${Math.round(d.beri || 0)}`;
                     tbody.innerHTML += `<tr class="${ignored ? 'u-ignored' : ''}" data-copy="${escapeHtml(_copyText)}">
                             <td style="text-align:center;">${rankDisplay}</td>
@@ -52301,13 +52303,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     its[e.key === 'ArrowDown' ? (i + 1) % its.length : (i - 1 + its.length) % its.length].focus();
                 });
             }
-            // V98.73: 📎 only when the applicant record resolves unambiguously — an item
-            // that would attach to the wrong person is worse than no item.
-            const apdOwner = applicantOwnerFor(u);
-            const apdCount = apdOwner ? applicantDocCount(apdOwner) : 0;
             const items = [
                 // V102.33 (lean B): Set period, LIFF visibility and ignore moved here from the row.
-                ['📅', 'Set period', () => openPeriodModal(uid, u.displayName, u.startDate || '', u.endDate || '')],
                 ['⏱', 'Internship hours…', () => setInternHours(uid)], // V102.49
                 [u.hidePeriod ? '👁' : '🙈', u.hidePeriod ? 'Show period in LIFF' : 'Hide period in LIFF', () => toggleHidePeriod(uid, u.hidePeriod === true)],
                 [u.isIgnored ? '👀' : '🙈', u.isIgnored ? 'Show on boards' : 'Hide from boards', () => toggleIgnoreUser(uid, u.isIgnored === true)],
@@ -52317,7 +52314,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 ['📜', 'Score history', () => showHistory(uid, u.displayName, u.score || 0)],
                 // V98.57: log work handed in outside the app (LINE, in person).
                 ['<i class="fa-solid fa-upload"></i>', 'Log work for this user', () => openAdminLogWorkModal(uid)],
-                apdOwner ? ['📎', `Applicant documents${apdCount ? ` (${apdCount})` : ''}`, () => openApplicantDocs(apdOwner)] : null,
+                ['📅', 'Set period', () => openPeriodModal(uid, u.displayName, u.startDate || '', u.endDate || '')],   // V102.310: swapped with 📎, which is in the row rail now
                 ['<i class="fa-solid fa-link"></i>', 'Merge / transfer data', () => openMergeModal(uid)],
                 ['<i class="fa-solid fa-key"></i>', 'Generate enrollment code', () => regenPreRegCode(uid)],
                 'sep',
@@ -52363,6 +52360,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const u = (usersData || []).find(x => x.id === uid);
             if (!u) return;
             if (act === 'period') openPeriodModal(uid, u.displayName, u.startDate || '', u.endDate || '');
+            else if (act === 'docs') { const o = applicantOwnerFor(u); if (o) openApplicantDocs(o); }   // V102.310
             else if (act === 'history') showHistory(uid, u.displayName, u.score || 0);
             else if (act === 'log') openAdminLogWorkModal(uid);
             else if (act === 'cert') openCertModal(uid);
