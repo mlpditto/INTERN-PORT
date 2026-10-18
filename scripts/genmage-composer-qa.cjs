@@ -82,6 +82,24 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
         await page.evaluate(() => localStorage.setItem('ai_default_design_enhancer_model', 'no-such-model'));
         await open();
         assert.equal(await page.locator('#ai-model-design-enhancer').inputValue(), 'gpt-6-luna', 'unknown id → default');
+        // V102.294: phone width — the bar wraps instead of overflowing; Create is a full-width line inside the viewport
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.evaluate(() => {
+            const c = document.querySelector('#hub-view-design > div');
+            let el = c; while (el && el !== document.body) { if (el !== c) el.style.display = 'block'; el.style.visibility = 'visible'; el = el.parentElement; }
+            c.style.cssText += ';position:fixed;inset:8px;z-index:2147483647;background:#fff;overflow:auto;padding:16px;';
+        });
+        await page.waitForTimeout(300);
+        const ph = await page.evaluate(() => {
+            const b = document.querySelector('#hub-view-design .gm-bar'), r = b.getBoundingClientRect();
+            const btn = document.getElementById('btn-generate-design').getBoundingClientRect();
+            const chip = document.querySelector('#hub-view-design .gm-bar .text-ai-chips > button:not([hidden])').getBoundingClientRect();
+            return { right: Math.round(r.right), scrollW: b.scrollWidth, clientW: b.clientWidth, btnRight: Math.round(btn.right), btnW: Math.round(btn.width), chipVisible: chip.width > 0 && chip.right <= 390, sep: getComputedStyle(document.querySelector('#hub-view-design .gm-sep')).display };
+        });
+        assert.ok(ph.right <= 390 && ph.scrollW <= ph.clientW, 'bar inside the phone viewport: ' + JSON.stringify(ph));
+        assert.ok(ph.btnRight <= 390 && ph.btnW >= 300, 'Create on its own full line, inside the viewport: ' + JSON.stringify(ph));
+        assert.ok(ph.chipVisible, 'chips still shown');
+        assert.equal(ph.sep, 'none', 'divider hidden on a phone');
         assert.deepEqual(errs, []);
         console.log('genmage-composer-qa: all passed');
     } finally { await browser.close(); }
