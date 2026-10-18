@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.310)</title>
+    <title>Nika Admin (V102.311)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -5833,9 +5833,25 @@
         #applicantDocsModal .apd-both, #gs-cv-sheet .apd-both { margin-left:4px; white-space:nowrap; }
         #applicantDocsModal .apd-foot-note, #gs-cv-sheet .apd-foot-note { font-size:0.64em; color:#cbd5e1; margin:4px 0 0; }
         /* V102.304 (Phase 2): mode chips + TH|EN · tabs · summary */
+        /* V102.311: lean head · rows · mode row */
+        #applicantDocsModal .apd-head { display:flex; align-items:center; gap:8px; margin:0 0 8px; }
+        #applicantDocsModal .apd-head h3 { margin:0; flex:1; min-width:0; font-size:1em; color:#0ea5e9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        #applicantDocsModal .apd-who { font-weight:500; font-size:0.8em; color:#94a3b8; }
+        #applicantDocsModal .apd-attach { width:auto; min-height:0; height:26px; margin:0; padding:0 8px; font-size:0.8em; font-weight:800; background:#f5f3ff; color:#7c3aed; border:1px dashed #c4b5fd; border-radius:999px; cursor:pointer; line-height:1; display:inline-flex; align-items:center; gap:1px; }
+        #applicantDocsModal .apd-attach b { font-size:1.05em; }
+        #applicantDocsModal .apd-x { cursor:pointer; font-size:20px; line-height:1; color:#cbd5e1; }
+        #applicantDocsModal #apd-list { margin:0 0 8px; }
+        #applicantDocsModal .apd-empty { color:#94a3b8; font-size:0.78em; padding:2px 0; }
+        #applicantDocsModal .apd-row { display:flex; align-items:center; gap:6px; padding:4px 6px 4px 8px; border:1px solid #eef2f7; border-radius:10px; margin-bottom:4px; }
+        #applicantDocsModal .apd-ic { font-size:0.9em; }
+        #applicantDocsModal .apd-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:0.78em; color:#0f172a; }
+        #applicantDocsModal .apd-kb { font-size:0.64em; color:#cbd5e1; white-space:nowrap; }
+        #applicantDocsModal .apd-ib { width:26px; height:26px; min-height:0; margin:0; padding:0; border:1px solid #e2e8f0; border-radius:8px; background:#fff; color:#334155; font-size:0.8em; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; line-height:1; }
+        #applicantDocsModal .apd-ib.apd-del { color:#b91c1c; background:#fff1f2; border-color:#fecdd3; }
+        #applicantDocsModal .apd-lang { width:auto; min-height:0; height:24px; margin:0; padding:0 9px; border:1px solid #c7d2fe; border-radius:999px; background:#eef2ff; color:#4361ee; font-size:1em; font-weight:800; line-height:1; cursor:pointer; }
         #applicantDocsModal .apd-mode { display:flex; align-items:center; gap:5px; flex-wrap:wrap; margin-top:6px; font-size:0.7em; }
         #applicantDocsModal .apd-mode-lbl { font-weight:800; color:#94a3b8; margin-right:2px; }
-        #applicantDocsModal .apd-mode-chip { width:auto; min-height:0; height:24px; padding:0 9px; margin:0; border:1px solid #e2e8f0; border-radius:999px; background:#fff; color:#475569; font-size:1em; font-weight:700; line-height:1; white-space:nowrap; cursor:pointer; }
+        #applicantDocsModal .apd-mode-chip { width:auto; min-height:0; height:24px; padding:0 8px; font-size:1.15em; margin:0; border:1px solid #e2e8f0; border-radius:999px; background:#fff; color:#475569; font-size:1em; font-weight:700; line-height:1; white-space:nowrap; cursor:pointer; }
         #applicantDocsModal .apd-mode-chip.on { background:#1e293b; border-color:#1e293b; color:#fff; }
         #applicantDocsModal .apd-seg { display:inline-flex; margin-left:auto; border:1px solid #e2e8f0; border-radius:999px; overflow:hidden; }
         #applicantDocsModal .apd-seg button { width:auto; min-height:0; height:22px; padding:0 9px; margin:0; border:0; background:#fff; color:#64748b; font-size:1em; font-weight:800; line-height:1; cursor:pointer; }
@@ -61886,7 +61902,7 @@ Save it anyway?`;
             // heading read the raw doc id ("For 1HckMT56eFo1WWbB73Kv").
             const u = (typeof preRegData !== 'undefined' ? preRegData : []).find(x => x.id === preUserId)
                 || (usersData || []).find(x => x.id === preUserId) || {};
-            document.getElementById('apd-who').textContent = u.fullName || u.displayName || preUserId;
+            document.getElementById('apd-who').textContent = '· ' + (u.fullName || u.displayName || preUserId);
             document.getElementById('apd-msg').textContent = '';
             document.getElementById('apd-ai').innerHTML = '';
             apdWide(false);
@@ -61900,14 +61916,16 @@ Save it anyway?`;
             const box = document.getElementById('apd-list');
             if (!box) return;
             const docs = applicantDocsCache[apdTargetId] || [];
-            if (!docs.length) { box.innerHTML = '<div style="color:#94a3b8; font-size:0.85em;">No documents yet.</div>'; return; }
+            if (!docs.length) { box.innerHTML = '<div class="apd-empty">No documents yet · ยังไม่มีเอกสาร</div>'; return; }
+            const kb = n => n >= 1024 * 1024 ? (n / 1024 / 1024).toFixed(1) + ' MB' : Math.round(n / 1024) + ' KB';
             box.innerHTML = docs.map(d => `
-                <div style="display:flex; align-items:center; gap:6px; padding:5px 8px; border:1px solid #eef2f7; border-radius:8px; margin-bottom:4px;">
-                    <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:0.78em;">${escapeHtml(d.name)}</span>
-                    <span style="font-size:0.66em; color:#cbd5e1; white-space:nowrap;">${Math.round((d.size || 0) / 1024)} KB</span>
+                <div class="apd-row">
+                    <span class="apd-ic" aria-hidden="true">${d.contentType === 'application/pdf' ? '📄' : '🖼'}</span>
+                    <span class="apd-name">${escapeHtml(d.name)}</span>
+                    <small class="apd-kb">${kb(d.size || 0)}</small>
                     ${d.contentType === 'application/pdf' ? apdAiBtnHtml(d) : ''}
-                    <button class="btn-sm" style="width:auto; min-height:0; background:#e0f2fe; color:#0369a1; padding:2px 8px; font-size:0.68em; border:none; border-radius:6px; cursor:pointer;" onclick="openApplicantDoc('${d.id}')">Open</button>
-                    <button class="btn-sm" style="width:auto; min-height:0; background:#fee2e2; color:#b91c1c; padding:2px 8px; font-size:0.68em; border:none; border-radius:6px; cursor:pointer;" onclick="deleteApplicantDoc('${d.id}')">Del</button>
+                    <button type="button" class="apd-ib" onclick="openApplicantDoc('${d.id}')" title="Open in-app · เปิดดู · 열기" aria-label="Open">↗</button>
+                    <button type="button" class="apd-ib apd-del" onclick="deleteApplicantDoc('${d.id}')" title="Delete · ลบ · 삭제" aria-label="Delete">🗑</button>
                 </div>`).join('');
         }
 
@@ -62225,9 +62243,10 @@ Save it anyway?`;
         function apdPaintModeRow() {
             const row = document.getElementById('apd-mode'); if (!row) return;
             const m = apdMode(), l = apdLang();
-            row.innerHTML = '<span class="apd-mode-lbl" title="Review context · บริบทการตรวจ · 검토 맥락">Mode</span>'
-                + Object.keys(APD_MODES).map(k => `<button type="button" class="apd-mode-chip${k === m ? ' on' : ''}" onclick="apdSetMode('${k}')" aria-pressed="${k === m}" title="${APD_MODES[k].en} · ${APD_MODES[k].th} · ${APD_MODES[k].ko}">${APD_MODES[k].e} ${APD_MODES[k].th}</button>`).join('')
-                + `<span class="apd-seg" role="group" aria-label="Review language"><button type="button" class="${l === 'th' ? 'on' : ''}" onclick="apdSetLang('th')" aria-pressed="${l === 'th'}" title="ผลตรวจภาษาไทย">TH</button><button type="button" class="${l === 'en' ? 'on' : ''}" onclick="apdSetLang('en')" aria-pressed="${l === 'en'}" title="Review in English">EN</button></span>`;
+            // V102.311: lean — one language chip (TH ↔ EN) on the left, emoji-only mode chips with EN · TH · KO in the tooltip
+            row.innerHTML = `<button type="button" class="apd-lang" onclick="apdSetLang('${l === 'th' ? 'en' : 'th'}')" title="Review language · ${l === 'th' ? 'ผลตรวจภาษาไทย · tap for EN' : 'Review in English · tap for TH'} · 검토 언어" aria-label="Review language: ${l.toUpperCase()}">${l.toUpperCase()}</button>`
+                + Object.keys(APD_MODES).map(k => `<button type="button" class="apd-mode-chip${k === m ? ' on' : ''}" onclick="apdSetMode('${k}')" aria-pressed="${k === m}" title="${APD_MODES[k].en} · ${APD_MODES[k].th} · ${APD_MODES[k].ko}" aria-label="${APD_MODES[k].en}">${APD_MODES[k].e}</button>`).join('')
+                ;
         }
         function apdReviewPrompt(text, mode, lang) {
             const M = APD_MODES[mode] || APD_MODES.pharmacy, en = lang === 'en';
@@ -72175,16 +72194,15 @@ Summarize in English in 3–5 concise lines:
          flow, and a Storage download URL is a bearer token. -->
     <div id="applicantDocsModal" class="modal" style="display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);">
         <div class="modal-content" style="max-width:420px; width:92%; margin:auto; padding:14px 16px; border-radius:16px; border:none;">
-            <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;">
-                <h3 style="margin:0; font-size:1em; color:#0ea5e9;">📎 Documents</h3>
-                <span id="apd-who" class="lang-no-toggle" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:0.78em; color:#94a3b8;"></span>
-                <span onclick="document.getElementById('applicantDocsModal').style.display='none'" style="cursor:pointer; font-size:20px; line-height:1; color:#cbd5e1;">&times;</span>
+            <!-- V102.311: one head line — title · name · 📎+ (the Attach hint lives in its tooltip) · × -->
+            <div class="apd-head">
+                <h3>📎 Documents <span id="apd-who" class="apd-who lang-no-toggle"></span></h3>
+                <button type="button" class="apd-attach" onclick="document.getElementById('apd-file').click()" title="Attach · PDF or image, under 4 MB · แนบไฟล์ · 파일 첨부" aria-label="Attach a document">📎<b>+</b></button>
+                <span class="apd-x" onclick="document.getElementById('applicantDocsModal').style.display='none'" role="button" aria-label="Close">&times;</span>
             </div>
-            <div id="apd-list" class="lang-no-toggle" style="margin:10px 0 8px;"></div>
+            <div id="apd-list" class="lang-no-toggle"></div>
             <div id="apd-msg" style="font-size:0.75em; font-weight:700; margin-bottom:6px;"></div>
             <input type="file" id="apd-file" accept="application/pdf,image/jpeg,image/png,image/webp" style="display:none;" onchange="uploadApplicantDoc(this)">
-            <button class="btn-sm" onclick="document.getElementById('apd-file').click()" style="width:auto; min-height:0; padding:5px 12px; font-size:0.75em; font-weight:700; background:#f5f3ff; color:#7c3aed; border:1px solid #ddd6fe; border-radius:999px; cursor:pointer;">+ Attach</button>
-            <span style="font-size:0.68em; color:#cbd5e1; margin-left:6px;">PDF or image, under 4 MB</span>
             <div class="apd-ab lang-no-toggle" id="apd-ab"></div>
             <div class="apd-mode lang-no-toggle" id="apd-mode"></div>
             <div class="lang-no-toggle" id="apd-ai" style="margin-top:10px;"></div>

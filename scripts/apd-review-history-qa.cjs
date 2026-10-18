@@ -60,8 +60,12 @@ ${code}
         assert.equal(await page.$eval('#apd-ai', e => e.innerHTML), '', 'nothing saved → nothing shown');
         // V102.304: mode chips + TH|EN under the rails — default 🏪 pharmacy / TH, remembered in this browser
         await page.evaluate(() => apdPaintModeRow());
-        assert.deepEqual(await page.$$eval('#apd-mode .apd-mode-chip', es => es.map(e => e.textContent + (e.classList.contains('on') ? '*' : ''))), ['🏪 ร้านยา*', '🏥 โรงพยาบาล', '🏭 อุตสาหกรรม', '🎓 เรียนต่อ']);
-        assert.deepEqual(await page.$$eval('#apd-mode .apd-seg button', es => es.map(e => e.textContent + (e.classList.contains('on') ? '*' : ''))), ['TH*', 'EN']);
+        // V102.311: emoji-only chips (EN · TH · KO in the tooltip), one language chip on the left that flips to the other language
+        assert.deepEqual(await page.$$eval('#apd-mode .apd-mode-chip', es => es.map(e => e.textContent + (e.classList.contains('on') ? '*' : ''))), ['🏪*', '🏥', '🏭', '🎓']);
+        assert.deepEqual(await page.$$eval('#apd-mode .apd-mode-chip', es => es.map(e => e.title)), ['Community pharmacy · ร้านยา · 약국', 'Hospital · โรงพยาบาล · 병원', 'Industry / marketing · อุตสาหกรรม · 제약산업', 'Study abroad · เรียนต่อ · 유학']);
+        assert.deepEqual(await page.$$eval('#apd-mode .apd-lang', es => es.map(e => e.textContent + '|' + e.getAttribute('onclick'))), ['TH|apdSetLang(\'en\')'], 'the language chip shows TH and flips to EN');
+        assert.equal(await page.$eval('#apd-mode', e => e.firstElementChild.className), 'apd-lang', 'language chip sits first (left)');
+        assert.equal(await page.$$eval('#apd-mode .apd-seg, #apd-mode .apd-mode-lbl', es => es.length), 0, 'no TH|EN segment, no "Mode" label');
         assert.ok(await page.$eval('#applicantDocsModal .modal-content', e => e.getBoundingClientRect().width) <= 420, 'empty sheet keeps its 420px');
         // 2. run a review → two cards with ⧉, saved as ONE run doc, then shown as "Last review"
         await page.evaluate(() => { __answers = {
@@ -183,7 +187,7 @@ ${code}
         // EN + hospital: the chips persist and the next run's prompts and section titles follow
         await page.evaluate(() => { apdSetMode('hospital'); apdSetLang('en'); __calls = []; __store.length = 0; __answers['gpt-6-luna'] = '{"summary":"A en","strengths":["en-s"],"gaps":[],"questions":[],"suggestions":[]}'; __answers['claude-haiku-4-5'] = '{"summary":"B en","strengths":[],"gaps":[],"questions":[],"suggestions":[]}'; });
         assert.equal(await page.evaluate(() => localStorage.getItem('apd_review_mode') + '/' + localStorage.getItem('apd_review_lang')), 'hospital/en');
-        assert.deepEqual(await page.$$eval('#apd-mode .on', es => es.map(e => e.textContent)), ['🏥 โรงพยาบาล', 'EN']);
+        assert.deepEqual(await page.$$eval('#apd-mode .on, #apd-mode .apd-lang', es => es.map(e => e.textContent)), ['EN', '🏥']);
         await page.evaluate(() => aiReviewApplicantDoc('d1'));
         await page.waitForFunction(() => window.__store.length === 1 && document.querySelector('#apd-ai .apd-tabs'));
         const en = await page.evaluate(() => ({ p: __calls[0].prompt, mode: __store[0].data.mode, lang: __store[0].data.lang }));
