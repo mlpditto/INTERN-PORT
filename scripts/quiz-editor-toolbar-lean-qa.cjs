@@ -1,4 +1,4 @@
-// V102.317: Quiz Editor toolbar, lean A (owner's mockup pick). The REAL admin.html in Chromium (network stubbed):
+// V102.321: Quiz Editor toolbar, lean A (owner's mockup pick). The REAL admin.html in Chromium (network stubbed):
 // rows 3+4 became one strip — Answer type | this question (📑 🐑 ☑️ 🗑️) | whole quiz on the right (Per Q|Total chips, − 60 s +, ✓, 📄, ✂️);
 // 📋P 🖼️ 📥 sit next to + Add; + Add is the only amber; icon-only buttons carry EN · TH · KO tooltips;
 // on a phone the 1–10 pager is one sideways-scrolling line and the current number is kept in view.

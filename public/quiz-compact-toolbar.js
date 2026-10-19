@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const navRow = nav.parentElement;
     navRow.classList.add('quiz-compact-navigation');
     oldRow.prepend(navRow);
-    // V102.317 (lean A): the Answer type chips open the tool strip, ahead of the this-question buttons.
+    // V102.321 (lean A): the Answer type chips open the tool strip, ahead of the this-question buttons.
     const bar = document.getElementById('quiz-editor-toolbar');
     type.setAttribute('aria-label', 'Answer type');
     if (bar) bar.prepend(type);
