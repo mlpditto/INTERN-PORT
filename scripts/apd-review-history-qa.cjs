@@ -7,7 +7,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const html = fs.readFileSync('public/admin.html', 'utf8').replace(/\r\n/g, '\n');
 const rules = fs.readFileSync('firestore.rules', 'utf8');
 assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(html));
-assert.ok(/match \/applicant_reviews\/\{docId\} \{\s*allow read, create: if isAdmin\(\);[\s\S]{0,200}allow update: if isAdmin\(\) && request\.resource\.data\.diff\(resource\.data\)\.affectedKeys\(\)\.hasOnly\(\['done', 'summary'\]\);\s*allow delete: if false;\s*\}/.test(rules), 'applicant_reviews rule: admin read/create, update = done ticks + summary only, no delete');
+assert.ok(/match \/applicant_reviews\/\{docId\} \{\s*allow read, create: if isAdmin\(\);[\s\S]{0,400}allow update: if isAdmin\(\) && request\.resource\.data\.diff\(resource\.data\)\.affectedKeys\(\)\.hasOnly\(\['done', 'summary', 'pick', 'edits', 'regen'\]\);\s*allow delete: if false;\s*\}/.test(rules), 'applicant_reviews rule: admin read/create, update = done ticks + summary + the V102.319 overlay (pick, edits, regen), no delete');
 assert.ok(html.includes("db.collection('applicant_reviews').add(") && html.includes("db.collection('applicant_reviews').where('preUserId', '==', owner).get()"), 'one collection, one where, no index');
 assert.ok(html.includes('<div class="apd-mode lang-no-toggle" id="apd-mode"></div>'), 'V102.304: the mode row under the rails');
 const styles = (html.match(/<style\b[^>]*>[\s\S]*?<\/style>/g) || []).join('\n');
@@ -92,7 +92,7 @@ ${code}
         assert.ok(/"model":"A"/.test(calls[2].prompt) && /ร้านยา/.test(calls[2].prompt), 'the summary prompt carries both opinions and the context');
         assert.equal(saved.mode, 'pharmacy'); assert.equal(saved.lang, 'th');
         assert.deepEqual(saved.summary, { model: 'gpt-6-luna', points: [{ text: 'ประเด็นร่วม', from: 'AB' }, { text: 'เฉพาะ B', from: 'B' }], verdict: 'เหมาะนัดสัมภาษณ์ ยืนยันระยะเวลาฝึกก่อน' }, 'summary saved on the run');
-        assert.deepEqual(await page.$$eval('#apd-ai .apd-tab', es => es.map(e => e.textContent.trim() + (e.classList.contains('on') ? '*' : ''))), ['สรุปรวม*', 'เทียบ A | B', 'ข้อเสนอแนะ ☐ 0/1']);
+        assert.deepEqual(await page.$$eval('#apd-ai .apd-tab', es => es.map(e => e.textContent.trim() + (e.classList.contains('on') ? '*' : ''))), ['สรุปรวม*', 'เทียบ A | B', 'ข้อเสนอแนะ ☐ 0/1', 'ฉบับสรุป']);   // V102.319: + Final
         assert.ok(await page.$eval('#apd-ai .apd-sum', e => /ประเด็นร่วม/.test(e.textContent) && /เฉพาะ B/.test(e.textContent) && /เหมาะนัดสัมภาษณ์/.test(e.textContent) && /🏪 ร้านยา/.test(e.textContent)), 'summary tab: points, verdict, context');
         assert.equal(await page.locator('#apd-ai .apd-sum li .apd-both .apd-dots i').count(), 2, '●● on the AB point');
         assert.equal(await page.locator('#apd-ai .apd-sum li .apd-src').first().textContent(), 'B', 'single-source point says B');
@@ -117,7 +117,7 @@ ${code}
         assert.equal(await page.$eval('#apd-ai .apd-cmp.two', e => getComputedStyle(e).gridTemplateColumns.split(' ').length), 2, 'two columns at 900px');
         // Phase 1: vendor strip, four tinted sections, suggestions as a checklist on the saved run, no legend box
         assert.deepEqual(await page.$$eval('#apd-ai .apd-card .apd-ch', es => es.map(e => e.style.background)), ['rgb(16, 163, 127)', 'rgb(217, 119, 87)'], 'OpenAI green / Claude terracotta strips');
-        assert.deepEqual(await page.$$eval('#apd-ai .apd-card:first-child .apd-sec h5', es => es.map(e => e.textContent)), ['✓จุดแข็ง', '!จุดที่ควรปรับ', '?คำถามสัมภาษณ์', '☐ข้อเสนอแนะ']);
+        assert.deepEqual(await page.$$eval('#apd-ai .apd-card:first-child .apd-sec h5', es => es.map(e => e.textContent)), ['✓จุดแข็ง↻', '!จุดที่ควรปรับ↻', '?คำถามสัมภาษณ์↻', '☐ข้อเสนอแนะ↻'], 'V102.319: a saved run has ↻ on every section head');
         assert.equal(await page.locator('#apd-ai .apd-legend, #apd-ai .p1-banner').count(), 0, 'no legend, no banner box');
         assert.equal(await page.locator('#apd-ai .s-sug input[type=checkbox]').count(), 1, 'the saved run has a checkbox per suggestion (A has one, B none)');
         assert.deepEqual(await page.$$eval('#apd-ai .apd-cmp.two > div', es => es.map(e => Math.round(e.getBoundingClientRect().top))).then(t => new Set(t).size), 1, 'A and B on the same line');
@@ -195,9 +195,56 @@ ${code}
         assert.deepEqual([en.mode, en.lang], ['hospital', 'en']);
         await page.click('#apd-ai .apd-tab >> nth=1');
         await page.waitForFunction(() => document.querySelector('#apd-ai .apd-card'));
-        assert.deepEqual(await page.$$eval('#apd-ai > .apd-cmp .apd-card:first-child .apd-sec h5', es => es.map(e => e.textContent)), ['✓Strengths', '!Gaps', '?Interview questions', '☐Suggestions'], 'EN section titles on an EN run: ' + JSON.stringify(await page.evaluate(() => ({ lang: _apdReviews[0].lang, titles: [...document.querySelectorAll('#apd-ai .apd-sec h5')].map(e => e.textContent).slice(0, 8) }))));
+        assert.deepEqual(await page.$$eval('#apd-ai > .apd-cmp .apd-card:first-child .apd-sec h5', es => es.map(e => e.textContent)), ['✓Strengths↻', '!Gaps↻', '?Interview questions↻', '☐Suggestions↻'], 'EN section titles on an EN run: ' + JSON.stringify(await page.evaluate(() => ({ lang: _apdReviews[0].lang, titles: [...document.querySelectorAll('#apd-ai .apd-sec h5')].map(e => e.textContent).slice(0, 8) }))));
         assert.ok(/🏥 · EN/.test(await page.$eval('#apd-ai .apd-saved-head > span', e => e.textContent)), 'head shows mode + EN');
         await page.evaluate(() => { apdSetMode('pharmacy'); apdSetLang('th'); });
+        // V102.319 (Phase 3): ✓ / ✕ / ✎ per point and ↻ per section are an overlay (`pick` / `edits` / `regen`); `results` is never written
+        await page.evaluate(() => { firebase.firestore.FieldValue.delete = () => 'DELETE'; __calls = []; __store.length = 0; __updates.length = 0; _apdTab = '';
+            __answers['gpt-6-luna'] = '{"summary":"A","strengths":["s-a1","s-a2"],"gaps":["g-a1"],"questions":[],"suggestions":["x-a1"]}';
+            __answers['claude-haiku-4-5'] = '{"summary":"B","strengths":["s-b1"],"gaps":[],"questions":["q-b1"],"suggestions":[]}'; });
+        await page.evaluate(() => aiReviewApplicantDoc('d1'));
+        await page.waitForFunction(() => window.__store.length === 1 && document.querySelector('#apd-ai .apd-tabs'));
+        const rid = await page.evaluate(() => _apdReviews[0].id);
+        await page.click('#apd-ai .apd-tab >> nth=1');
+        const pt = (key, sel) => `#apd-ai > .apd-cmp li[data-pt="${rid}:${key}"]${sel ? ' ' + sel : ''}`;
+        assert.equal(await page.locator('#apd-ai > .apd-cmp li[data-pt] .apd-pt').count(), 6, 'every point of the latest run has ✓ ✕ ✎');
+        await page.click(pt('0_strengths_0', '.apd-pt button.y'));
+        await page.waitForFunction(() => __updates.length === 1);
+        assert.deepEqual(await page.evaluate(() => __updates[0].patch), { 'pick.0_strengths_0': 'y' });
+        assert.ok(await page.$eval(pt('0_strengths_0'), e => e.classList.contains('kept')), '✓ point is marked kept');
+        assert.equal(await page.$eval('#apd-ai .apd-tab >> nth=3', e => e.textContent.trim()), 'ฉบับสรุป ✓ 1');
+        await page.click(pt('1_strengths_0', '.apd-pt button.n'));
+        await page.waitForFunction(() => __updates.length === 2);
+        assert.ok(await page.$eval(pt('1_strengths_0'), e => e.classList.contains('dropped')), '✕ point is struck');
+        await page.click(pt('1_strengths_0', '.apd-pt button.n'));   // the same button again = undecided
+        await page.waitForFunction(() => __updates.length === 3);
+        assert.deepEqual(await page.evaluate(() => __updates[2].patch), { 'pick.1_strengths_0': 'DELETE' });
+        // ✎ edit: Enter saves the new text, the original stays in the tooltip and in `results`
+        await page.click(pt('0_gaps_0', '.apd-pt button:not(.y):not(.n)'));
+        await page.fill(pt('0_gaps_0', 'textarea.apd-edit'), 'g-a1 edited');
+        await page.press(pt('0_gaps_0', 'textarea.apd-edit'), 'Enter');
+        await page.waitForFunction(() => __updates.length === 4);
+        assert.deepEqual(await page.evaluate(() => __updates[3].patch), { 'edits.0_gaps_0': 'g-a1 edited' });
+        assert.ok(await page.$eval(pt('0_gaps_0'), e => /^g-a1 edited/.test(e.textContent) && /AI wrote: g-a1$/.test(e.querySelector('.apd-ed').title)), 'edited text shown, original in the ✎ tooltip');
+        await page.click(pt('0_gaps_0', '.apd-pt button.y'));
+        await page.waitForFunction(() => __updates.length === 5);
+        // Final tab: ✓ points only, by section, edited text; ⧉ copies that list
+        await page.click('#apd-ai .apd-tab >> nth=3');
+        assert.deepEqual(await page.$$eval('#apd-ai .apd-fin li', es => es.map(e => e.textContent)), ['s-a1 A', 'g-a1 edited A']);
+        assert.ok(/4 ข้อยังไม่ได้เลือก/.test(await page.$eval('#apd-ai .apd-fin-head', e => e.textContent)), '6 points − 2 kept = 4 undecided');
+        await page.click('#apd-ai .apd-fin-head .apd-copy');
+        assert.equal(await page.evaluate(() => __clip.at(-1)), 'จุดแข็ง\n- s-a1\n\nจุดที่ควรปรับ\n- g-a1 edited');
+        // ↻ A · gaps: one call to model A for that section only; the new list replaces it; that section's pick / edit are cleared
+        await page.click('#apd-ai .apd-tab >> nth=1');
+        await page.evaluate(() => { __calls = []; __answers['gpt-6-luna'] = 'ok {"items":["g-new1","g-new2"]}'; });
+        await page.click(`#apd-ai > .apd-cmp .apd-regen[data-regen="${rid}:0_gaps"]`);
+        await page.waitForFunction(() => __updates.length === 6);
+        assert.deepEqual(await page.evaluate(() => __calls.map(c => c.model + ':' + c.opts.feature)), ['gpt-6-luna:resume_review']);
+        assert.ok(await page.evaluate(() => /จุดที่ขาดหรือควรปรับ/.test(__calls[0].prompt) && /"items"/.test(__calls[0].prompt) && /ร้านยาชุมชน/.test(__calls[0].prompt)), 'section prompt: that section, items JSON, the run\'s context');
+        assert.deepEqual(await page.evaluate(() => __updates[5].patch), { 'regen.0_gaps': ['g-new1', 'g-new2'], 'pick.0_gaps_0': 'DELETE', 'edits.0_gaps_0': 'DELETE' });
+        assert.deepEqual(await page.$$eval('#apd-ai > .apd-cmp .apd-card:first-child .s-gap li', es => es.map(e => e.firstChild.textContent)), ['g-new1', 'g-new2']);
+        assert.deepEqual(await page.evaluate(() => __store[0].data.results[0].data.gaps), ['g-a1'], '`results` keeps what the model first said');
+        assert.ok(await page.evaluate(() => __updates.every(u => Object.keys(u.patch).every(k => /^(done|summary|pick|edits|regen)(\.|$)/.test(k)))), 'every write stays inside the rule\'s keys');
         // 5. save failure → review still shown, toast says not saved
         await page.evaluate(() => { db.collection = () => ({ add: async () => { throw new Error('permission-denied'); }, where: () => ({ get: async () => ({ docs: [] }) }) }); });
         await page.evaluate(() => aiReviewApplicantDoc('d1'));
