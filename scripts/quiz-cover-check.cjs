@@ -92,7 +92,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         await page.locator('[data-prompt]').fill('Blue pastel');
         assert.equal(await page.locator('#quiz-cover-editor.lang-no-toggle').count(), 1, 'Thai controls must bypass the language text splitter');
         // V100.86: model picker is an icon chip rail (one .active chip), not a <select>.
-        assert.equal(await page.locator('[data-model-chip]').count(), 4, 'Four supported image models are available'); // V101.53: + Seedream 5.0 Lite, Muse Image; V101.61: OpenRouter Nano Banana 2.1 removed
+        assert.equal(await page.locator('[data-model-chip]').count(), 3, 'Three supported image models are available');   // V102.315: Muse Image left (no OpenRouter provider) // V101.53: + Seedream 5.0 Lite, Muse Image; V101.61: OpenRouter Nano Banana 2.1 removed
         assert.equal(await page.locator('[data-model-chip].active').count(), 1);
         assert.equal(await page.locator('[data-model-chip].active').getAttribute('data-value'), 'as/gemini-nano-banana-2.1');
         await page.locator('[data-model-chip][data-value="or/openai/gpt-5.4-image-2"]').click();
@@ -196,7 +196,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         });
         await page.locator('[data-generate]').click();
         await page.waitForFunction(() => !QuizCover.isBusy());
-        assert.deepEqual(await page.evaluate(() => calls), ['or/bytedance-seed/seedream-5-0-lite', 'or/meta/muse-image', 'as/gemini-nano-banana-2.1']);
+        assert.deepEqual(await page.evaluate(() => calls), ['or/bytedance-seed/seedream-5-0-lite', 'as/gemini-nano-banana-2.1']);
         assert.equal(await page.locator('.quiz-cover-ai-preview').isVisible(), true, 'Fallback image shown as a preview');
         assert.match(await page.locator('#quiz-cover-editor [role=status]').innerText(), /Seedream 5\.0 Lite blocked this topic \(content filter\) — made with Nano Banana 2.1\. Check/);
         assert.equal(await page.evaluate(() => uploads), 1, 'Fallback preview does not upload');
@@ -209,8 +209,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         await page.evaluate(() => { window.calls = []; window.callUniversalAI = async model => { calls.push(model); throw new Error('Request rejected by content policy'); }; });
         await page.locator('[data-generate]').click();
         await page.waitForFunction(() => !QuizCover.isBusy());
-        assert.equal(await page.evaluate(() => calls.length), 4, 'Every model tried once');
-        assert.match(await page.locator('#quiz-cover-editor [role=status]').innerText(), /^Generate failed: Seedream 5\.0 Lite blocked this topic; Muse Image, Nano Banana 2.1, Image 2 also failed/);
+        assert.equal(await page.evaluate(() => calls.length), 3, 'Every model tried once');
+        assert.match(await page.locator('#quiz-cover-editor [role=status]').innerText(), /^Generate failed: Seedream 5\.0 Lite blocked this topic; Nano Banana 2.1, Image 2 also failed/);
         assert.equal(await page.locator('.quiz-cover-ai-preview').isVisible(), false);
         // Switching quiz invalidates an in-flight result, including its busy state.
         await page.evaluate(() => {

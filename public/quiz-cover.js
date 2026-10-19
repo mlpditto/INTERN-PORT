@@ -7,8 +7,8 @@ const QuizCover = (() => {
     const AI_MODELS = [
         { id: 'as/gemini-nano-banana-2.1', logo: 'gemini', ref: true, label: 'Nano Banana 2.1', ariaLabel: 'Nano Banana 2.1 (recommended)', titleTh: 'Nano Banana 2.1 · Google AI Studio · แนะนำ' },
         { id: 'or/openai/gpt-5.4-image-2', logo: 'openai', label: 'Image 2', ariaLabel: 'GPT Image 2 via OpenRouter', titleTh: 'GPT-5.4 Image 2 · ผ่าน OpenRouter' },
-        { id: 'or/bytedance-seed/seedream-5-0-lite', label: 'Seedream 5.0 Lite', imageApi: true, ariaLabel: 'ByteDance Seedream 5.0 Lite via OpenRouter', titleTh: 'ByteDance Seed: Seedream 5.0 Lite · ผ่าน OpenRouter' },
-        { id: 'or/meta/muse-image', label: 'Muse Image', imageApi: true, ariaLabel: 'Meta Muse Image via OpenRouter', titleTh: 'Meta: Muse Image · ผ่าน OpenRouter (ช้ากว่า — คิดก่อนวาด)' }
+        { id: 'or/bytedance-seed/seedream-5-0-lite', label: 'Seedream 5.0 Lite', imageApi: true, ariaLabel: 'ByteDance Seedream 5.0 Lite via OpenRouter', titleTh: 'ByteDance Seed: Seedream 5.0 Lite · ผ่าน OpenRouter' }
+        // V102.315: Muse Image left — OpenRouter lists no provider for meta/muse-image (endpoints: []), so every call failed; a saved Muse pick falls back to the first chip
     ];
     const MODEL_PREF_KEY = 'quiz_cover_ai_model';
     // V102.262: style reference — the admin ticks up to 2 covers of other quizzes; they are stitched into ONE sheet and sent as the
