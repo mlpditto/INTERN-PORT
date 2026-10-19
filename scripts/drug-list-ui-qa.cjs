@@ -24,7 +24,7 @@ const cut = (from, to) => { const a = html.indexOf(from), b = html.indexOf(to, a
             cut('        var dcaState = {', '\n        };') + '\n};',
             cut('        function dcaSearch() {', '        function dcaRenderDraftsList() {'),
         ].join('\n') });
-        await page.addScriptTag({ content: 'window.dcaBatch = { sel: new Set(), running: false }; window.dcaBatchChipHtml = () => ""; window.dcaListContribChipsHtml = () => ""; window.dcaFormatAbsolute = () => "09 Oct 2026"; window.dcaRenderAzRail = () => {}; ' +
+        await page.addScriptTag({ content: 'window.dcaBatch = { sel: new Set(), running: false }; window.dcaBatchChipHtml = () => ""; window.dcaListContribChipsHtml = () => ""; window.dcaFormatAbsolute = () => "09 Oct 2026"; window.dcaRenderAzRail = () => {}; window.dcaPedsUntaggedPlan = () => ({ tag: [], skip: 0 }); window.DCA_BATCH_MAX = 20; ' +
             'window.__calls = []; window.dcaEdit = id => __calls.push("edit:" + id); window.dcaDelete = id => __calls.push("del:" + id); window.dcaCopyRow = id => __calls.push("copy:" + id); window.dcaQuickVisual = id => __calls.push("visual:" + id);' });
         await page.addScriptTag({ path: 'public/drug-list-ui.js' });
 
@@ -44,7 +44,7 @@ const cut = (from, to) => { const a = html.indexOf(from), b = html.indexOf(to, a
         // ---- default = least complete first, flat, no letters ----
         assert.equal(await page.evaluate(() => dcaState.sortMode), 'completeness');
         const order = await names(), pcts = await pctOf();
-        assert.equal(order[0], 'untouched'); assert.equal(order[order.length - 1], 'metformin');
+        assert.equal(order[0], 'untouched'); assert.ok(!order.includes('metformin'), 'V102.327: a drug at ≥ 90 % leaves the Incomplete view');
         assert.deepEqual(pcts, [...pcts].sort((a, b) => a - b), 'ascending %: ' + pcts);
         assert.equal(await page.locator('#dca-list .dca-letter-heading').count(), 0, 'flat list, no letter headings');
         const items = await page.locator('.dca-sort-row .glass-toggle-item').evaluateAll(es => es.map(e => [e.dataset.sort, e.classList.contains('active'), e.textContent.trim()]));
@@ -62,17 +62,19 @@ const cut = (from, to) => { const a = html.indexOf(from), b = html.indexOf(to, a
 
         // ---- three fixed tiers: every row has them, so every row is the same height ----
         const rows = page.locator('#dca-list .dca-row');
-        assert.equal(await page.locator('#dca-list .dca-row .dca-t1').count(), 6); assert.equal(await page.locator('#dca-list .dca-row .dca-t2').count(), 6); assert.equal(await page.locator('#dca-list .dca-row .dca-t3').count(), 6);
+        const nRows = await rows.count();
+        assert.ok(nRows >= 4, 'incomplete rows: ' + nRows);
+        assert.equal(await page.locator('#dca-list .dca-row .dca-t1').count(), nRows); assert.equal(await page.locator('#dca-list .dca-row .dca-t2').count(), nRows); assert.equal(await page.locator('#dca-list .dca-row .dca-t3').count(), nRows);
         const hs = await rows.evaluateAll(es => es.map(e => Math.round(e.getBoundingClientRect().height)));
         assert.ok(Math.min(...hs) > 40, 'rows are laid out: ' + hs); assert.ok(Math.max(...hs) - Math.min(...hs) <= 2, 'rows share one height: ' + hs);
         const first = rows.filter({ hasText: 'UNTOUCHED' });
-        assert.match(await first.locator('.dca-t2').innerText(), /ATC —[\s\S]*class not set/); assert.match(await first.locator('.dca-t3 .dca-row-brands').innerText(), /brands —/);
+        assert.match(await first.locator('.dca-t2').innerText(), /＋ ATC[\s\S]*＋ class/); assert.match(await first.locator('.dca-t3 .dca-row-brands').innerText(), /＋ brands/);   // V102.327: the placeholders are ＋ buttons
         const amox = rows.filter({ hasText: 'AMOXICILLIN' });
         assert.equal(await amox.locator('.dca-br:not(.dca-br-more)').count(), 2); assert.equal((await amox.locator('.dca-br-more').innerText()).trim(), '+1'); assert.equal(await amox.locator('.dca-br-more').getAttribute('title'), 'Clamoxyl');
         assert.equal((await amox.locator('.dca-row-meta-chip').innerText()).trim(), 'J01CA04');
 
         // ---- actions: Edit + ⋯ only; the menu holds visual / copy / delete ----
-        assert.deepEqual(await amox.locator('.dca-row-actions > *').evaluateAll(es => es.map(e => e.tagName.toLowerCase() + '.' + (e.className.split(' ')[0]))), ['button.dca-row-edit-btn', 'details.dca-more']);
+        assert.deepEqual(await amox.locator('.dca-row-actions > *').evaluateAll(es => es.map(e => e.tagName.toLowerCase() + '.' + (e.className.split(' ')[0]))), ['button.dca-row-ai-btn', 'button.dca-row-edit-btn', 'details.dca-more'], 'V102.327: 🤖 sits before ✏️ while the drug is under 90 %');
         assert.equal(await amox.locator('.dca-more-menu').isVisible(), false, 'menu closed by default');
         await amox.locator('.dca-more > summary').click();
         assert.equal(await amox.locator('.dca-more-menu').isVisible(), true);
@@ -82,20 +84,22 @@ const cut = (from, to) => { const a = html.indexOf(from), b = html.indexOf(to, a
         assert.deepEqual(await page.evaluate(() => __calls), ['copy:Amoxicillin']);
         await amox.locator('.dca-more > summary').click(); await page.keyboard.press('Escape');
         assert.equal(await amox.locator('.dca-more-menu').isVisible(), false, 'Esc closes it');
-        await amox.locator('.dca-more > summary').click(); await rows.filter({ hasText: 'METFORMIN' }).locator('.dca-t1').click();
+        await amox.locator('.dca-more > summary').click(); await rows.filter({ hasText: 'UNTOUCHED' }).locator('.dca-t1').click();
         assert.equal(await amox.locator('.dca-more-menu').isVisible(), false, 'a click elsewhere closes it');
         await amox.locator('.dca-row-edit-btn').click();
         assert.equal((await page.evaluate(() => __calls)).pop(), 'edit:Amoxicillin');
         assert.equal(await page.locator('#dca-list .dca-row-edit-btn').first().getAttribute('aria-label'), 'Edit');
-        assert.equal(await page.locator('#dca-list .dca-row-side-top').count(), 6, 'the batch-chip slot (.dca-row-side-top) is still there');
-        assert.equal(await page.locator('#dca-list .dca-row .dca-pick').count(), 6, 'the batch checkbox is still there');
+        assert.equal(await page.locator('#dca-list .dca-row-side-top').count(), nRows, 'the batch-chip slot (.dca-row-side-top) is still there');
+        assert.equal(await page.locator('#dca-list .dca-row .dca-pick').count(), nRows, 'the batch checkbox is still there');
 
         // ---- ONE colour scale (same steps as the form tabs) ----
         const col = async pct => page.evaluate(p => { const c = dcaCompletenessColor(p); return [c.bg, c.fg]; }, pct);
         assert.deepEqual(await col(0), ['#eef2f7', '#64748b']); assert.deepEqual(await col(39), ['#ffedd5', '#9a3412']); assert.deepEqual(await col(40), ['#fef08a', '#713f12']);
         assert.deepEqual(await col(74), ['#fef08a', '#713f12']); assert.deepEqual(await col(75), ['#bbf7d0', '#14532d']); assert.deepEqual(await col(89), ['#bbf7d0', '#14532d']); assert.deepEqual(await col(90), ['#15803d', '#ffffff']); assert.deepEqual(await col(100), ['#15803d', '#ffffff']);
+        await page.evaluate(() => dcaSetSort('az', document.querySelector('.dca-sort-row [data-sort="az"]')));   // V102.327: the complete drug lives outside the Incomplete view
         const bg = await page.locator('#dca-list .dca-row-complete').evaluateAll(es => es.map(e => getComputedStyle(e).backgroundColor));
-        assert.equal(bg[0], 'rgb(255, 237, 213)', 'a drug with only a name (5%) is orange — grey is for 0%, checked above'); assert.equal(bg[bg.length - 1], 'rgb(21, 128, 61)', 'a complete drug is dark green');
+        const metIdx = (await names()).indexOf('metformin');
+        assert.equal(bg[(await names()).indexOf('untouched')], 'rgb(255, 237, 213)', 'a drug with only a name (5%) is orange — grey is for 0%, checked above'); assert.equal(bg[metIdx], 'rgb(21, 128, 61)', 'a complete drug is dark green');
         assert.equal(new Set(bg).size >= 4, true, 'the sample spans several steps: ' + [...new Set(bg)]);
 
         if (process.env.SHOT) {
