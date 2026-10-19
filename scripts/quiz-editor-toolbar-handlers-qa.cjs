@@ -1,4 +1,4 @@
-// V102.318: two Quiz Editor toolbar handlers. The REAL admin.html in Chromium (network stubbed):
+// V102.320: two Quiz Editor toolbar handlers. The REAL admin.html in Chromium (network stubbed):
 // · 🐑 toolbarCloneQ(btn) used to throw after cloning — it swapped the icon of an <i> the emoji button never had;
 // · the toolbar Answer type (toolbarSetQType) used to set only the hidden .q-type — now it redraws the question
 //   (toggleQType) and autosaves, like the per-question toggle (selectQTypeToggle); re-picking the same type is a no-op.

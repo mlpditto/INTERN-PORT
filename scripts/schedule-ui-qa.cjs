@@ -215,7 +215,7 @@ assert.match((await page.textContent('#sch-week .sch-rg h4')).trim(), /^\d{1,2}[
     assert.deepEqual(await page.locator('#scheduleModal .sch-modal-header button').evaluateAll(b => b.map(x => x.id || x.getAttribute('aria-label'))), ['How to use Schedule', 'sch-invite-btn', 'Close Schedule'], 'header = title + ⓘ, ＋ event and ×');
     assert.equal(await page.locator('#sch-sub').count(), 0, 'the separate Day N / M bar is gone');
     const note = (await page.textContent('#sch-week .sch-day-note')).trim();
-    assert.match(note, /^Day \d+ \/ \d+$/, 'small Day N / M beside the icon: ' + note);
+    assert.match(note, /^Day \d+ \/ \d+\s*\d+ days? left$/, 'small Day N / M, then K days left under it (V101.169): ' + note);
     const edit = page.locator('#sch-week .sch-rg-edit');
     assert.equal((await edit.textContent()).trim(), '✎', 'Dates is an icon only');
     assert.equal(await edit.getAttribute('aria-label'), 'Edit training dates');

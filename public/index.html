@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.168)</title>
+    <title>Internship Portfolio (V101.169)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -730,6 +730,20 @@
         .act-streak.ck.full .ck-ring { background:#22c55e; }
         /* V101.151: ⭐ in the corner of every week-strip day you checked in */
         #sch-week .sch-star { position:absolute; right:-5px; top:-5px; min-width:15px; height:15px; border-radius:999px; background:#fff; box-shadow:0 0 0 1.5px #fff, 0 1px 3px rgba(15,23,42,.25); font-size:10px; font-style:normal; line-height:15px; display:grid; place-items:center; pointer-events:none; }
+        /* V101.169: days left + a thin bar under "Day N / M"; a count when 2+ things are due that day; an orange bar under a
+           past day that still has an overdue quiz / quest (a Missed item used to draw nothing, so it looked like an empty day);
+           one legend line with only what this week shows */
+        #sch-week .sch-dn { display:inline-flex; flex-direction:column; align-items:flex-end; gap:2px; line-height:1.15; }
+        #sch-week .sch-dn-sub { display:inline-flex; align-items:center; gap:5px; font-size:0.92em; color:#a78bfa; }
+        #sch-week .sch-dn-bar { display:block; width:28px; height:4px; border-radius:99px; background:#ede9fe; overflow:hidden; }
+        #sch-week .sch-dn-bar i { display:block; height:100%; border-radius:99px; background:linear-gradient(90deg,#a78bfa,#7c3aed); }
+        #sch-week .sch-cnt { position:absolute; right:-4px; bottom:-4px; min-width:17px; height:17px; padding:0 3px; box-sizing:border-box; border-radius:999px; background:#6366f1; color:#fff; border:2px solid #fff; font-size:10px; font-weight:900; font-style:normal; line-height:13px; text-align:center; }
+        #sch-week .sch-over { position:absolute; left:50%; bottom:-8px; transform:translateX(-50%); width:18px; height:5px; border-radius:999px; background:#f97316; }
+        #sch-week .sch-legend { display:flex; flex-wrap:wrap; justify-content:center; gap:4px 12px; margin:10px 0 2px; font-size:0.66em; font-weight:700; color:#64748b; }
+        #sch-week .sch-legend span { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
+        #sch-week .sch-legend i { width:9px; height:9px; border-radius:50%; display:inline-block; }
+        #sch-week .sch-legend i.ov { width:14px; height:5px; background:#f97316; }
+        #sch-week .sch-legend .pale { color:#94a3b8; }
         /* V101.83: the orange button stays 24px tall; on touch its tap area grows to 44px with an invisible ::after (bottom = the 6px under the header, so it never covers the tiles) */
         @media (pointer: coarse) { #sch-agenda button.act-streak { position:relative; } #sch-agenda button.act-streak::after { content:''; position:absolute; left:-8px; right:-8px; top:-14px; bottom:-6px; } }
         #daily-checkin-card .act-ic { width:36px; height:36px; min-height:36px; padding:0; border-radius:50%; font-size:1em; background:rgba(255,255,255,.85); display:inline-flex; align-items:center; justify-content:center; }
@@ -16504,6 +16518,14 @@
         }
 
         // "Day N / M" for the title row — or the plain fact that the dates are not set (the ✎ beside it fixes that).
+        // V101.169: "Day N / M · K days left" with a thin progress bar; any other note is printed as it is
+        function schDayNoteHtml() {
+            const t = schDayNote(), m = /^Day (\d+) \/ (\d+)$/.exec(t);
+            if (!m) return '<span class="sch-day-note">' + escapeHtml(t) + '</span>';
+            const d = +m[1], n = +m[2], left = Math.max(0, n - d);
+            // two short lines, so the title row is no wider than before ("Day N / M" alone): the bar + "K days left" sit underneath
+            return '<span class="sch-day-note sch-dn"><span>' + t + '</span><span class="sch-dn-sub"><i class="sch-dn-bar" aria-hidden="true"><i style="width:' + Math.round(Math.min(1, d / n) * 100) + '%"></i></i>' + left + ' day' + (left === 1 ? '' : 's') + ' left</span></span>';
+        }
         function schDayNote() {
             const me = (typeof myOwnRow === 'function') ? myOwnRow() : {};
             const s0 = schParseDay(me && me.startDate), e0 = schParseDay(me && me.endDate);
@@ -16549,6 +16571,14 @@
             }
             const marks = schWeekMarks(items);
             const [lo, hi] = schWeekRange(marks);
+            // V101.169: deadline items per day (count when 2+) and Missed items per deadline day (the orange bar)
+            const dueN = {}, overN = {}, nowW = new Date();
+            items.forEach(it => {
+                if (!it.due) return;
+                if (schBucketOf(it, nowW) === 'missed') { const k = schDateKey(it.due); overN[k] = (overN[k] || 0) + 1; return; }
+                const k = schItemDayKey(it, nowW); if (k) dueN[k] = (dueN[k] || 0) + 1;
+            });
+            const seen = new Set(); let anyStar = false, anyTodo = false, anyOver = false;
             schWeekOffset = Math.min(hi, Math.max(lo, schWeekOffset));
             const mon = schMonday(new Date());
             mon.setDate(mon.getDate() + schWeekOffset * 7);
@@ -16564,7 +16594,7 @@
                 + '<h4>' + title + '</h4>'
                 + '<button type="button" class="sch-nv" onclick="schWeekShift(1)" aria-label="Next week"' + (schWeekOffset >= hi ? ' disabled' : '') + '>›</button>'
                 + (schWeekOffset !== 0 ? '<button type="button" class="sch-rg-today" onclick="schWeekToday()">Today ›</button>' : '')
-                + '<span class="sch-rg-sp"></span><span class="sch-day-note">' + schDayNote() + '</span>'
+                + '<span class="sch-rg-sp"></span>' + schDayNoteHtml()
                 + '<button type="button" class="sch-rg-edit" onclick="schEditDates()" title="Edit the internship start and end dates" data-th-title="แก้ไขวันเริ่มและวันสิ้นสุดการฝึกงาน" data-kr-title="실습 시작일과 종료일 수정" aria-label="Edit training dates">✎</button></div>'
                 + '<div class="sch-wk-row">';
             for (let i = 0; i < 7; i++) {
@@ -16578,12 +16608,23 @@
                 });
                 const hol = schHolOn(key);
                 hol.forEach(h => { names.push(h.t); holLines.push('<div class="sch-hol lang-no-toggle"><span>' + escapeHtml(d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })) + '</span><span>' + h.ic + ' ' + escapeHtml(h.t) + '</span></div>'); });
-                const label = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) + ' — ' + (names.length ? names.join(', ') : 'nothing');
+                const label = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) + ' — ' + (names.length ? names.join(', ') : 'nothing')
+                    + (overN[key] ? ' · ' + overN[key] + ' overdue' : '') + (dueN[key] >= 2 ? ' · ' + dueN[key] + ' due' : '');   // V101.169
+                SCH_KIND_ORDER.forEach(k => { if (m[k + 'd'] || m[k + 'o']) seen.add(k); if (m[k + 'o']) anyTodo = true; });
+                const star = !!(schCheckinDays && schCheckinDays.has(key)); if (star) anyStar = true; if (overN[key]) anyOver = true;
                 const ring = schRingBg(m);
                 html += '<button type="button" class="sch-wd' + (key === todayKey ? ' today' : '') + (hol.length ? ' hol' : '') + '" data-schday="' + key + '" data-marks="' + tokens.join(' ') + '" aria-pressed="' + (schWeekSel === key)
-                    + '" aria-label="' + label + '" onclick="schWeekPick(\'' + key + '\')"><small>' + 'MTWTFSS'[i] + '</small><span class="sch-n"' + (ring ? ' style="--ring:' + ring + '"' : '') + '><b>' + d.getDate() + '</b>' + (schCheckinDays && schCheckinDays.has(key) ? '<i class="sch-star" title="Checked in">⭐</i>' : '') + '</span></button>';
+                    + '" aria-label="' + label + '" onclick="schWeekPick(\'' + key + '\')"><small>' + 'MTWTFSS'[i] + '</small><span class="sch-n"' + (ring ? ' style="--ring:' + ring + '"' : '') + '><b>' + d.getDate() + '</b>' + (star ? '<i class="sch-star" title="Checked in">⭐</i>' : '')
+                    + (dueN[key] >= 2 ? '<i class="sch-cnt" title="' + dueN[key] + ' due">' + dueN[key] + '</i>' : '')
+                    + (overN[key] ? '<i class="sch-over" title="' + overN[key] + ' overdue"></i>' : '') + '</span></button>';
             }
-            html += '</div>' + holLines.join('');
+            // V101.169: one legend line — only what this week shows
+            const leg = [];
+            if (anyStar) leg.push('<span>⭐ checked in</span>');
+            SCH_KIND_ORDER.forEach(k => { if (seen.has(k)) leg.push('<span><i style="background:' + SCH_KIND_COL[k] + '"></i>' + SCH_KIND_NAME[k] + '</span>'); });
+            if (anyOver) leg.push('<span><i class="ov"></i>overdue</span>');
+            if (anyTodo) leg.push('<span class="pale">pale = to do</span>');
+            html += '</div>' + (leg.length ? '<div class="sch-legend">' + leg.join('') + '</div>' : '') + holLines.join('');
             if (schWeekSel) html += schWeekDayHtml(schWeekSel, items);
             box.innerHTML = html;
         }
