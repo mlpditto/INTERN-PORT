@@ -21,14 +21,20 @@ document.addEventListener('DOMContentLoaded', function () {
     type.setAttribute('aria-label', 'Answer type');
     if (bar) bar.prepend(type);
     else oldRow.append(type);
-    const names = {choice:'Multiple choice',short_answer:'Short answer',ordering:'Ordering',flashcard:'Flashcard'};
+    // V102.323 (toolbar D): emoji on every chip, a short word only on the chosen one (.qe-w is hidden on the others)
+    const names = {choice:'Choice',short_answer:'Short',ordering:'Order',flashcard:'Flashcard'};
     document.querySelectorAll('.qe-timer-mode [data-value]').forEach(el => {
         el.addEventListener('keydown', e => {
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
         });
     });
     type.querySelectorAll('[data-value]').forEach(el => {
-        el.textContent = names[el.dataset.value] || el.title;
+        const word = document.createElement('span');
+        word.className = 'qe-w';
+        word.textContent = ' ' + (names[el.dataset.value] || el.title);
+        el.textContent = el.textContent.trim();
+        el.append(word);
+        el.setAttribute('aria-label', el.title);
         el.setAttribute('role', 'button');
         el.tabIndex = 0;
         el.addEventListener('keydown', e => {
@@ -50,9 +56,8 @@ document.addEventListener('DOMContentLoaded', function () {
         sync();
         actions.append(button);
     });
+    // V102.323 (toolbar D): + and 🏷 stay icon-only (no " Add" / " Tags" words); the name is in title + aria-label
     navRow.querySelectorAll('button[title]').forEach(button => {
         button.setAttribute('aria-label', button.title);
-        if (button.getAttribute('onclick') === 'addQuestionUI()') button.append(' Add');
-        if (button.getAttribute('onclick') === 'openBulkTagModal()') button.append(' Tags');
     });
 });
