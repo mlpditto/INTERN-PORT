@@ -130,7 +130,14 @@ async function open(browser, o = {}) {
 
         // ---- 6. open-ended account
         ({ page, ctx, errors } = await open(browser, { open: true }));
-        assert.equal((await page.textContent('#sch-week .sch-day-note')).trim(), '🌐 Open-ended', 'no Day 13860 / 29220');
+        // V101.170: the note sits beside the Schedule title, on the same line; the week row keeps only ✎
+        assert.equal(await page.locator('#sch-week .sch-day-note').count(), 0, 'no Day 13860 / 29220 and no note on the week row');
+        const on = await page.evaluate(() => { const n = document.getElementById('sch-open-note'), h = document.querySelector('#scheduleModal .sch-modal-header h3');
+            const cy = e => { const r = e.getBoundingClientRect(); return r.top + r.height / 2; };
+            return { text: n.textContent.trim(), shown: !n.hidden && getComputedStyle(n).display !== 'none', sameLine: Math.abs(cy(n) - cy(h)) <= 6, w: n.getBoundingClientRect().width }; });
+        assert.ok(on.text === '🌐 Open-ended' && on.shown && on.sameLine && on.w > 20, 'open-ended note inline with the Schedule title: ' + JSON.stringify(on));
+        assert.ok(await page.locator('#sch-week .sch-rg-edit').isVisible(), '✎ still on the week row');
+        if (process.env.QA_SHOT) await page.locator('#scheduleModal .modal-content').screenshot({ path: process.env.QA_SHOT + '/sch-open.png' });
         await page.evaluate(() => schEditDates()); await page.waitForTimeout(150);
         assert.deepEqual(await st(), ['open', '🌐 Open-ended account · no 182-day limit']);
         assert.match(await page.textContent('#training-date-length'), /\w{3}, 8 Nov 1988 → \w{3}, 8 Nov 2068\s*29,220 days · ≈ 80 years/);

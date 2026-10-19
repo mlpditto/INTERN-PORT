@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.169)</title>
+    <title>Internship Portfolio (V101.170)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.35">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -3731,6 +3731,8 @@
                 #sch-week .sch-nv:disabled { color: #e2e8f0; cursor: default; }
                 #sch-week .sch-rg-sp { flex: 1; }
                 #sch-week .sch-day-note { font-size: 0.68em; color: #94a3b8; font-weight: 700; white-space: nowrap; }
+                .sch-open-note { font-size: 0.72em; color: #94a3b8; font-weight: 700; white-space: nowrap; }   /* V101.170: beside 📅 Schedule ⓘ */
+                .sch-open-note[hidden] { display: none; }
                 #sch-week .sch-rg-today { width: auto; min-height: 44px; padding: 0 8px; border: none; background: transparent; color: #7c3aed; font-weight: 800; font-size: 0.8em; cursor: pointer; font-family: inherit; }
                 #sch-week .sch-rg-edit { width: 44px; min-height: 44px; padding: 0; flex: 0 0 auto; border: none; background: transparent; color: #7c3aed; font-size: 18px; font-weight: 800; cursor: pointer; font-family: inherit; }
                 #sch-week .sch-wk-row { display: flex; }
@@ -5952,6 +5954,8 @@
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;">
                     <h3 style="margin:0;font-size:1.05em;color:#7c3aed;">📅 Schedule</h3>
                     <button type="button" class="ip-help-button lang-no-toggle" onclick="internshipProgress.showHelp(this)" aria-label="How to use Schedule" data-th-aria-label="วิธีใช้งาน Schedule" data-kr-aria-label="Schedule 사용 방법" title="How to use Schedule" data-th-title="วิธีใช้งาน Schedule" data-kr-title="Schedule 사용 방법">ⓘ</button>
+                    <!-- V101.170: an open-ended account's note sits beside the title (it used to sit on the week row); schDayNoteHtml() shows it -->
+                    <span id="sch-open-note" class="sch-open-note lang-no-toggle" hidden title="Open-ended account — no internship countdown" data-th-title="บัญชีแบบไม่จำกัดช่วงฝึก — ไม่มีการนับถอยหลัง" data-kr-title="기간 제한 없는 계정">🌐 Open-ended</span>
                 </div>
                 <div class="sch-header-actions">
                     <button type="button" id="sch-invite-btn" class="lang-no-toggle" onclick="schToggleNewEvent(true)"
@@ -16521,6 +16525,10 @@
         // V101.169: "Day N / M · K days left" with a thin progress bar; any other note is printed as it is
         function schDayNoteHtml() {
             const t = schDayNote(), m = /^Day (\d+) \/ (\d+)$/.exec(t);
+            // V101.170: "🌐 Open-ended" moved up beside the Schedule title; the week row keeps only ✎ for that account
+            const open = t === '🌐 Open-ended', on = document.getElementById('sch-open-note');
+            if (on) on.hidden = !open;
+            if (open) return '';
             if (!m) return '<span class="sch-day-note">' + escapeHtml(t) + '</span>';
             const d = +m[1], n = +m[2], left = Math.max(0, n - d);
             // two short lines, so the title row is no wider than before ("Day N / M" alone): the bar + "K days left" sit underneath
