@@ -17,7 +17,7 @@ assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(html));
 assert.ok(html.includes('data-value="as/gemini-omni-1.1-flash" onclick="selectDesignEngine(this)"'), 'Clip chip in the engine rail');
 assert.ok(/\|\| \(proxyProvider === 'gemini-aistudio' && \/\^gemini-omni\/i\.test\(modelName\)\)/.test(html), 'Omni is proxy-only (no local text fallback)');
 // V102.303: the Plan / Refine / Manifest buttons count the seconds they wait (gmBusy), the counter is stopped before the label is restored
-assert.ok(html.includes("const stopBusy = window.gmBusy(btn, 'Planning…');") && html.includes("let stopBusy = window.gmBusy(btn, 'Refining…');") && html.includes("stopBusy = window.gmBusy(btn, 'Manifesting…');"), 'all three busy labels go through gmBusy');
+assert.ok(html.includes("const stopBusy = window.gmBusy(btn, 'Planning…');") && html.includes("stopBusy = window.gmBusy(btn, 'Refining…');") && html.includes('let stopBusy = function() {};') && html.includes("stopBusy = window.gmBusy(btn, 'Manifesting…');"), 'all three busy labels go through gmBusy');
 assert.equal((html.match(/stopBusy\(\);/g) || []).length, 4, 'every path stops the counter (plan finally, editor cancel, before Manifesting, create finally)');
 assert.ok(/if \(window\.GLC_ENGINES && window\.GLC_ENGINES\[engine\]\) engine = 'as\/gemini-nano-banana-2\.1';/.test(html), 'Bulk Paste illustrations never go to a video engine');
 assert.ok(!/(?:^|[^.\w])confirm\(\s*['"`]/.test(html.slice(html.indexOf('window.GLC_ENGINE ='), html.indexOf('window.downloadDesign = function'))), 'no native confirm() in the clips block');
@@ -104,12 +104,12 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
             const chips = [...document.querySelectorAll('.alabasta-genmage-quick-rail[aria-label="Engine quick switch"] .alabasta-genmage-quick-chip')];
             out.chips = chips.map(c => c.dataset.value);
             out.ghosts = chips.map(c => txt(c.querySelector('.gm-ghost')));   // V102.306: price · time beside every engine chip
-            out.clipChipLabel = txt(chips[2]); out.clipChipTitle = chips[2].title;
+            out.clipChipLabel = txt(chips.find(c => c.dataset.value === 'as/gemini-omni-1.1-flash')); out.clipChipTitle = chips.find(c => c.dataset.value === 'as/gemini-omni-1.1-flash').title;
             out.valid = window.DESIGN_ENGINE_VALID.slice();
             out.btnBefore = txt($('#btn-generate-design'));
             out.cardBefore = $('#glc-episodes-card').style.display;
             // 1. pick the Clip chip → labels follow, nothing else changes
-            selectDesignEngine(chips[2]);
+            selectDesignEngine(chips.find(c => c.dataset.value === 'as/gemini-omni-1.1-flash'));
             out.engine = $('#design-engine').value; out.clipMode = glcIsClipMode();
             out.btnClip = txt($('#btn-generate-design')); out.btnTitle = $('#btn-generate-design').title;
             out.placeholderClip = $('#design-prompt').placeholder; out.cardClipNoPlan = $('#glc-episodes-card').style.display;
@@ -177,7 +177,7 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
             selectDesignEngine(chips[0]);
             out.btnBack = txt($('#btn-generate-design')); out.cardBack = $('#glc-episodes-card').style.display; out.placeholderBack = $('#design-prompt').placeholder;
             // 8. V102.306: Veo 3.1 Lite chip → clip mode again, the plan card returns, the pill and the ask show Veo's price; render EP02 through OpenRouter
-            selectDesignEngine(chips[3]);
+            selectDesignEngine(chips.find(c => c.dataset.value === 'or/google/veo-3.1-lite'));
             out.veo = { engine: glcEngine(), clip: glcIsClipMode(), card: $('#glc-episodes-card').style.display, cost: txt($('#glc-cost-pill')), secs: glcSeconds(), usd: glcUsd(), ghost: glcGhost('or/kwaivgi/kling-v3.0-std') };
             glcAskRender(2); out.veoAsk = txt($('#glc-a-2 .glc-ask'));
             calls.length = 0;
@@ -188,8 +188,8 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
             selectDesignEngine(chips[0]);
             return out;
         });
-        assert.deepEqual(r.chips, ['as/gemini-nano-banana-2.1', 'or/openai/gpt-5.4-image-2', 'as/gemini-omni-1.1-flash', 'or/google/veo-3.1-lite', 'or/kwaivgi/kling-v3.0-std', 'or/heygen/heygen-video-1', 'or/bytedance/seedance-2.0-fast'], 'V102.306: seven engine chips');
-        assert.deepEqual(r.ghosts, ['$0.03', '$0.04–0.08', '8 s · $0.80', '8 s · $0.40', '8 s · $1.01', '8 s · $0.80', '8 s · $0.32'], 'ghost price · time beside every chip');
+        assert.deepEqual(r.chips, ['as/gemini-nano-banana-2.1', 'or/openai/gpt-5.4-image-2', 'or/bytedance-seed/seedream-5-0-flash', 'or/openai/gpt-image-2.5-sunburst', 'as/gemini-omni-1.1-flash', 'or/google/veo-3.1-lite', 'or/kwaivgi/kling-v3.0-std', 'or/heygen/heygen-video-1', 'or/bytedance/seedance-2.0-fast'], 'V102.306: seven engine chips · V102.315: + Seedream 5 · Sunburst');
+        assert.deepEqual(r.ghosts, ['$0.03', '$0.04–0.08', '$0.02', '≈ $0.04–0.08', '8 s · $0.80', '8 s · $0.40', '8 s · $1.01', '8 s · $0.80', '8 s · $0.32'], 'ghost price · time beside every chip');
         assert.equal(r.clipChipLabel, '🎬 Clip 9:168 s · $0.80'); assert.match(r.clipChipTitle, /9:16 vertical clip with audio · about \$0\.10 per second/);
         assert.deepEqual(r.valid, r.chips, 'pref restore accepts every chip, nothing else');
         assert.deepEqual([r.btnBefore, r.cardBefore], ['Create', 'none'], 'image mode untouched before the pick');
