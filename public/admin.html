@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.312)</title>
+    <title>Nika Admin (V102.313)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -4270,6 +4270,10 @@
         #gs-cv-sheet .cv-btn { border:none; border-radius:999px; height:30px; min-height:0; width:auto; margin:0; padding:0 14px; font-weight:700; cursor:pointer; background:#fff; border:1px solid #e2e8f0; color:#475569; }
         #gs-cv-sheet .cv-btn.p { background:linear-gradient(135deg,#6366f1,#4338ca); color:#fff; border:none; }
         #gs-cv-sheet .cv-msg { padding:12px; color:#475569; }
+        /* V102.313: model rail before the file is picked */
+        #gs-cv-sheet .cv-pick { padding:8px 12px; display:flex; flex-direction:column; gap:6px; }
+        #gs-cv-sheet .cv-hint { color:#94a3b8; font-size:11px; }
+        #gs-cv-sheet .cv-hint.warn { color:#b45309; }
         @media(max-width:600px) { #gs-cv-sheet .cv-row { grid-template-columns:20px minmax(0,1fr) auto; } #gs-cv-sheet .cv-row .cur, #gs-cv-sheet .cv-row .ar { display:none; } }
         #groupSelectModal .gs-card-fields { gap:2px; padding:6px 12px 8px; }
         #groupSelectModal .gs-card-field { display:grid; grid-template-columns:minmax(84px, 34%) minmax(0, 1fr) auto; align-items:center; column-gap:8px; min-height:28px; }
@@ -38135,7 +38139,26 @@ They can connect again from LINE.
         // V102.247: 📄 Import CV. The admin picks a PDF or an image of a CV; the text (pdf.js) or the picture (vision) goes to the AI, which returns the profile fields. Nothing is written here:
         // Apply only fills the User Hub inputs and fires the card's own oninput, so the normal "Save N changes" row (and its single users update) stays the one write path.
         // A field is ticked by default only when it is empty today; a different value is shown amber and left unticked; a CV name that differs from the user's is a warning, never a block.
-        const GS_CV_MODEL = 'claude-opus-5-5', GS_CV_MODEL_LABEL = 'Claude Opus 5.5';   // V102.248: the sheet names the model that read the CV
+        const GS_CV_MODEL = 'claude-opus-5-5';   // V102.248: the sheet names the model that read the CV. V102.313: the default of the rail; the pick is kept in ai_text_gs-cv-model
+        function gsCvModel() {
+            let id = ((document.getElementById('gs-cv-model') || {}).value) || '';
+            if (!id) { try { id = localStorage.getItem('ai_text_gs-cv-model') || ''; } catch (_) { /* storage may be blocked */ } }
+            id = id || GS_CV_MODEL;
+            return typeof window.normalizeTextAIModel === 'function' ? window.normalizeTextAIModel(id) : id;
+        }
+        const gsCvModelLabel = id => ((typeof window.textAIModelInfo === 'function' && window.textAIModelInfo(id)) || {}).label || id;
+        // the ghost under the rail: which models suit a text PDF / a scan; Luna 6 invents Thai text when it reads an image
+        function gsCvHint(id) {
+            if (id === 'gpt-6-luna') return { warn: true, text: '⚠️ GPT 6 Luna misreads Thai in scans / photos — fine for a text PDF only · อ่านภาษาไทยจากรูปไม่แม่น' };
+            return { warn: false, text: 'Text PDF: Sonnet 5.5 · Gemini 3.8 Flash are enough · Scan / photo: Opus 5.5 · GPT 6 Sol' };
+        }
+        function gsCvPickModel(btn) {
+            document.getElementById('gs-cv-model').value = btn.dataset.value;
+            btn.parentElement.querySelectorAll('button').forEach(b => { b.classList.toggle('active', b === btn); b.setAttribute('aria-pressed', String(b === btn)); });
+            try { localStorage.setItem('ai_text_gs-cv-model', btn.dataset.value); } catch (_) { /* storage may be blocked */ }
+            const h = document.getElementById('gs-cv-hint'), x = gsCvHint(btn.dataset.value);
+            if (h) { h.textContent = x.text; h.classList.toggle('warn', x.warn); }
+        }
         const GS_CV_FIELDS = [
             { key: 'fullName', id: 'gs-fullname-th', label: 'Full name (Thai)', sec: 'Personal', kind: 'text' },
             { key: 'nickname', id: 'gs-cert-nickname', label: 'Nickname', sec: 'Personal', kind: 'text' },
@@ -38187,7 +38210,17 @@ They can connect again from LINE.
             });
         }
         let _gsCvRows = [], _gsCvFilter = 'all', _gsCvFileRef = null, _gsCvKeep = true, _gsCvText = '', _gsCvReviewHtml = '';   // V102.295: + the CV text and the 2-model review, so a re-render keeps them   // V102.248: the CV file itself is kept with the user (admin-only) unless the admin unticks it
-        function gsCvOpen() { const f = document.getElementById('gs-cv-file'); if (f) { f.value = ''; f.click(); } }
+        function gsCvOpen() {
+            const sh = document.getElementById('gs-cv-sheet');
+            if (!sh || typeof window.providerModelRailHtml !== 'function') { gsCvChoose(); return; }
+            const id = gsCvModel(), x = gsCvHint(id);
+            sh.hidden = false;
+            sh.innerHTML = '<div class="cv-h"><b>📄 Import from CV</b><button type="button" class="cv-btn" onclick="gsCvClose()">Close</button></div>'
+                + '<div class="cv-pick"><div class="audit-toolbar lang-no-toggle">' + window.providerModelRailHtml('gs-cv-model', id, 'gsCvPickModel(this)') + '</div>'
+                + '<small class="cv-hint' + (x.warn ? ' warn' : '') + '" id="gs-cv-hint">' + escapeHtml(x.text) + '</small></div>'
+                + '<div class="cv-ft"><small>PDF · JPG · PNG · WEBP</small><span class="sp"></span><button type="button" class="cv-btn p" id="gs-cv-choose" onclick="gsCvChoose()">📄 Choose file</button></div>';
+        }
+        function gsCvChoose() { const f = document.getElementById('gs-cv-file'); if (f) { f.value = ''; f.click(); } }
         function gsCvClose() { const sh = document.getElementById('gs-cv-sheet'); if (sh) { sh.hidden = true; sh.innerHTML = ''; } _gsCvRows = []; _gsCvText = ''; _gsCvReviewHtml = ''; }
         function gsCvMsg(html, withClose) {
             const sh = document.getElementById('gs-cv-sheet'); if (!sh) return;
@@ -38223,6 +38256,7 @@ They can connect again from LINE.
         async function gsCvFile(input) {
             const file = input && input.files && input.files[0];
             if (!file) return;
+            const model = gsCvModel();   // V102.313: before gsCvMsg replaces the rail
             _gsCvFileRef = file;
             gsCvMsg('⏳ Reading <b>' + escapeHtml(file.name) + '</b>…', false);
             try {
@@ -38232,9 +38266,10 @@ They can connect again from LINE.
                 _gsCvText = useImage ? '' : text; _gsCvReviewHtml = '';   // V102.295: the review reads the same text; an image-only CV has none
                 const vision = useImage ? await gsCvImage(file, pdf) : null;
                 via = useImage ? '🖼 read as an image (vision model)' : '✓ text read from the PDF';
-                via += ' · 🤖 ' + GS_CV_MODEL_LABEL;
-                gsCvMsg('🤖 Asking ' + GS_CV_MODEL_LABEL + '… <small>' + via + '</small>', false);
-                const res = await window.callUniversalAI(GS_CV_MODEL, useImage ? GS_CV_PROMPT : GS_CV_PROMPT + '\n\nCV TEXT:\n' + text.slice(0, 12000), true, vision, '', { feature: 'cv_import' });
+                const label = escapeHtml(gsCvModelLabel(model));
+                via += ' · 🤖 ' + label;
+                gsCvMsg('🤖 Asking ' + label + '… <small>' + via + '</small>', false);
+                const res = await window.callUniversalAI(model, useImage ? GS_CV_PROMPT : GS_CV_PROMPT + '\n\nCV TEXT:\n' + text.slice(0, 12000), true, vision, '', { feature: 'cv_import' });
                 const data = window.safeJsonParse(res && res.text);
                 if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('The AI did not return usable JSON: ' + String(res && res.text || '').slice(0, 120));
                 const current = {};
