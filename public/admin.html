@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.325)</title>
+    <title>Nika Admin (V102.326)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -22836,7 +22836,6 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
             const presetCounts = {};
             history.forEach(l => { if (l.feedbackPreset) presetCounts[l.feedbackPreset] = (presetCounts[l.feedbackPreset] || 0) + 1; });
             if (typeof window.updateFocusPillBadges === 'function') window.updateFocusPillBadges(presetCounts);
-            const moodMap = { happy: '😊', normal: '😐', sad: '😔', tired: '😫' };
             const escapeHtml = (s) => String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
             countEl.textContent = `(${history.length})`;
             // V101.26: one-line pattern summary — average bonus, typical length, mood mix —
@@ -22847,7 +22846,7 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
                 const avgBonus = scored.length ? scored.reduce((s, l) => s + parseFloat(l.adminBonus), 0) / scored.length : null;
                 const avgLen = Math.round(history.reduce((s, l) => s + String(l.content || '').trim().length, 0) / history.length);
                 const moods = {};
-                history.forEach(l => { const m = moodMap[l.mood] || '📝'; moods[m] = (moods[m] || 0) + 1; });
+                history.forEach(l => { const m = window.reflectiveMoodEmoji(l.mood); moods[m] = (moods[m] || 0) + 1; });
                 const parts = [];
                 if (avgBonus !== null) parts.push(`avg <b>+${avgBonus.toFixed(2)}</b>`);
                 parts.push(`~${avgLen} chars each`);
@@ -22858,7 +22857,7 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
             }
             toggleReflectiveHistoryStrip(false);
             cards.innerHTML = history.map(log => {
-                const mood = moodMap[log.mood] || '📝';
+                const mood = window.reflectiveMoodEmoji(log.mood);
                 let date = '';
                 try {
                     if (log.timestamp?.toDate) date = log.timestamp.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -24873,6 +24872,15 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         };
     </script>
     <script>
+        // V102.326: the intern page saves a reflection's mood as the EMOJI itself (😊 😓 😍 … 30 of them); older logs saved one of
+        // four words. Show an emoji as saved, map an old word, and fall back only when there is nothing (was: 📝 for every emoji).
+        // On window so the module script (stats / Writing Profile) and this classic script both reach it.
+        window.reflectiveMoodEmoji = function (mood, fallback) {
+            const m = String(mood == null ? '' : mood).trim();
+            const legacy = { happy: '😊', normal: '😐', sad: '😔', tired: '😫' };
+            if (legacy[m.toLowerCase()]) return legacy[m.toLowerCase()];
+            return m && !/^[\x00-\x7F]+$/.test(m) ? m : (fallback || '📝');
+        };
         const ALLOWED_EMAIL = "medlifeplus@gmail.com";
         const ADMIN_LIFF_ID = "2008959998-yjcNpaGt"; // 
         const MY_URL = window.location.origin + window.location.pathname;
@@ -53468,7 +53476,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         adminComment: x.adminComment || "",
                         // [V93.36] carry Quill HTML so downstream render sites can show rich format
                         adminCommentHtml: x.adminCommentHtml || "",
-                        moodEmoji: { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[x.mood] || '📝'
+                        moodEmoji: window.reflectiveMoodEmoji(x.mood)
                     });
                     dash.logs += score;
                 });
@@ -58374,7 +58382,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const status = "Done";
                     cnt[status]++;
                     
-                    const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
+                    const moodEmoji = window.reflectiveMoodEmoji(log.mood);
                     const d = document.createElement('div');
                     d.className = `kanban-card card-${status} reflective-card lang-no-toggle`;
                     d.style.borderLeft = isPending ? "4px solid #d35400" : "4px solid #10b981";
@@ -63886,7 +63894,7 @@ Save it anyway?`;
                     const time = log.timestamp ? log.timestamp.toDate().toLocaleString('en-US') : 'Just now...';
                     const uImg = log.pictureUrl || 'https://via.placeholder.com/40';
                     const uName = log.userName || log.displayName || 'Unknown';
-                    const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
+                    const moodEmoji = window.reflectiveMoodEmoji(log.mood);
                     const isFinished = log.adminComment || log.adminBonus !== undefined;
                     
                     tbody.innerHTML += `
@@ -64205,7 +64213,7 @@ Save it anyway?`;
 
             container.innerHTML = filtered.map(log => {
                 const dateObj = log.timestamp?.toDate() || new Date();
-                const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📔';
+                const moodEmoji = window.reflectiveMoodEmoji(log.mood, '📔');
                 const user = (usersData || []).find(u => u.id === log.userId) || {};
                 // V101.78: lean card — one header row (name · date · mood · ✨ pts · ☐ · ⋯),
                 // feedback as a one-line 💬 peek, no footer.
@@ -67214,7 +67222,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             document.getElementById('reflective-review-uid').value = uid;
             document.getElementById('reflective-review-uname').value = name;
             
-            const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
+            const moodEmoji = window.reflectiveMoodEmoji(log.mood);
             document.getElementById('reflective-review-user-info').innerHTML = `
                 <div style="display:flex; align-items:flex-start; gap:10px;">
                     <img class="lt-avatar reflective-log-avatar" src="${log.pictureUrl || ''}" style="width:34px; height:34px; border:1px solid rgba(245,158,11,0.4); flex-shrink:0;">
