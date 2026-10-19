@@ -126,6 +126,9 @@ async function open(browser, o = {}) {
         ({ page, ctx, errors } = await open(browser, { counts: true }));
         assert.equal(await page.evaluate(() => document.getElementById('sch-goals-box').classList.contains('zero')), false);
         assert.equal(await page.locator('#sch-goalbars .sch-bar').count(), 3);
+        // V101.172: a regular intern (end date 30 days out) still sees the "Internship ends" row
+        assert.equal(await page.evaluate(() => schAgendaItems().filter(i => /^Internship ends/.test(i.title)).length), 1, 'regular account keeps the Internship ends item');
+        assert.match(await page.textContent('#sch-agenda'), /Internship ends/, 'and it is drawn in the list');
         await ctx.close();
 
         // ---- 6. open-ended account
@@ -137,6 +140,9 @@ async function open(browser, o = {}) {
             return { text: n.textContent.trim(), shown: !n.hidden && getComputedStyle(n).display !== 'none', sameLine: Math.abs(cy(n) - cy(h)) <= 6, w: n.getBoundingClientRect().width }; });
         assert.ok(on.text === '🌐 Open-ended' && on.shown && on.sameLine && on.w > 20, 'open-ended note inline with the Schedule title: ' + JSON.stringify(on));
         assert.ok(await page.locator('#sch-week .sch-rg-edit').isVisible(), '✎ still on the week row');
+        // V101.172: no "Internship ends · 15360d left" countdown for an open-ended account
+        assert.equal(await page.evaluate(() => schAgendaItems().filter(i => /^Internship ends/.test(i.title)).length), 0, 'open-ended account has no Internship ends item');
+        assert.doesNotMatch(await page.textContent('#sch-agenda'), /Internship ends/, 'and none is drawn in the list');
         if (process.env.QA_SHOT) await page.locator('#scheduleModal .modal-content').screenshot({ path: process.env.QA_SHOT + '/sch-open.png' });
         await page.evaluate(() => schEditDates()); await page.waitForTimeout(150);
         assert.deepEqual(await st(), ['open', '🌐 Open-ended account · no 182-day limit']);
