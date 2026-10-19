@@ -46,7 +46,7 @@ const MP4 = 'data:video/mp4;base64,AAAAIGZ0eXBpc29t';
 
         // 1. defaults: image intent, image chips only, Brief is the current step, 4 fields shown, textarea hidden
         assert.deepEqual(await page.$$eval('#gm-intent button.on', b => b.map(x => x.dataset.intent)), ['image']);
-        assert.deepEqual(await visibleChips(), ['as/gemini-nano-banana-2.1', 'or/openai/gpt-5.4-image-2'], 'image intent shows image engines only');
+        assert.deepEqual(await visibleChips(), ['as/gemini-nano-banana-2.1', 'or/openai/gpt-5.4-image-2', 'or/bytedance-seed/seedream-5-0-flash', 'or/openai/gpt-image-2.5-sunburst'], 'image intent shows image engines only (V102.315: + Seedream 5 · Sunburst)');
         assert.deepEqual(await steps(), ['✓Intent🖼 Image', '▶Brief', '·Style', '·Enhance', '·Createpaid', '·Review']);
         assert.equal(await page.isVisible('#gm-brief'), true); assert.equal(await page.isVisible('#design-prompt'), false);
         assert.match(await page.textContent('#gm-style-text'), /one piece anime pirate crew/, '🎨 line shows the default style');
