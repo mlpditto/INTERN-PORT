@@ -107,6 +107,39 @@ const cy = el => { const r = el.getBoundingClientRect(); return Math.round(r.top
         // answer type chip still sets the current question
         await page.click('#toolbar-q-type-toggle [data-value="ordering"]');
         assert.equal(await page.$eval('.quiz-q-item .q-type', e => e.value), 'ordering', 'answer type → current question');
+
+        // V102.323 (toolbar D): emoji on every chip, the word only on the chosen one; quiet AI tools icon-only; + and 🏷 without words
+        const words = sel => page.$$eval(sel, es => es.map(e => e.innerText.replace(/\s+/g, ' ').trim()));
+        assert.deepEqual(await words('#quiz-type-toggle .glass-toggle-item'), ['🎯 MCQ', '📖', '🩺'], 'quiz type: word on the chosen chip only');
+        assert.deepEqual(await words('#toolbar-q-type-toggle .glass-toggle-item'), ['✅', '📝', '🔢 Order', '⚡'], 'answer type: word on the chosen chip only');
+        assert.deepEqual(await words('.qe-timer-mode .glass-toggle-item'), ['⏱ Per Q', '⏲️'], 'timer: word on the chosen chip only');
+        assert.deepEqual(await page.$$eval('#toolbar-q-type-toggle .glass-toggle-item', es => es.map(e => e.getAttribute('aria-label'))), ['Multiple choice', 'Short answer', 'Ordering', 'Flashcard'], 'answer type chips keep their names for screen readers');
+        const quiet = await page.$$eval('#quiz-editor-review-actions .qe-tool.qe-quiet', bs => bs.map(b => [b.innerText.trim(), getComputedStyle(b).width, b.getAttribute('aria-label')]));
+        assert.deepEqual(quiet, [['', '34px', 'Import from PDF'], ['', '34px', 'Generate more questions'], ['✦', '34px', 'Curate a new set'], ['', '34px', 'Translate this question']], 'quiet tools icon-only: ' + JSON.stringify(quiet));
+        assert.equal(await page.$eval('#quiz-editor-review-actions .qe-tool-review', b => b.innerText.trim()), 'Review', 'Review keeps its word (the one accent)');
+        assert.deepEqual(await page.$$eval('.quiz-compact-navigation button[onclick="addQuestionUI()"], .quiz-compact-navigation button[onclick="openBulkTagModal()"]', bs => bs.map(b => b.innerText.trim())), ['', ''], '+ and 🏷 have no words');
+        // V102.323 (H2): one header row — ✍️ · quiz name · 👥 group · ⭐ points · ⚙️ · ×; ⚙️ opens the settings fields
+        await page.evaluate(() => { document.getElementById('quiz-editor-settings').open = false; document.getElementById('quiz-title').value = 'Lenacapavir ความหวังใหม่ในการกำจัด HIV'; document.getElementById('quiz-total-points').value = '2'; updateQuizEditorSummary(); });
+        const head = await page.evaluate(() => {
+            const cy = el => { const r = el.getBoundingClientRect(); return Math.round(r.top + r.height / 2); };
+            const parts = ['.qe-head-ic', '#quiz-manage-title', '#qe-head-group', '#qe-head-points', '#qe-head-settings', '.qe-head-x'].map(s => document.querySelector('#quizManageModal ' + s));
+            const d = document.getElementById('quiz-editor-settings');
+            return { name: parts[1].textContent, tip: parts[1].title, group: parts[2].textContent, pts: parts[3].textContent, ys: parts.map(cy),
+                     closed: getComputedStyle(d).display, summary: getComputedStyle(d.querySelector('summary')).display, oldTitle: /Quiz Editor/.test(document.querySelector('#quizManageModal .qe-head').innerText) };
+        });
+        assert.equal(head.name, 'Lenacapavir ความหวังใหม่ในการกำจัด HIV', 'the quiz name is the title');
+        assert.equal(head.tip, head.name, 'full name in the tooltip');
+        assert.ok(/^👥 \S/.test(head.group) && head.pts === '⭐ 2', 'group + points chips: ' + head.group + ' / ' + head.pts);
+        assert.ok(Math.max(...head.ys) - Math.min(...head.ys) <= 6, 'header is ONE row: ' + head.ys);
+        assert.equal(head.oldTitle, false, 'no "Quiz Editor" title row');
+        assert.deepEqual([head.closed, head.summary], ['none', 'none'], 'settings fold hidden while closed; its summary bar is gone');
+        if (process.env.QA_SHOT) await page.locator('#quizManageModal .modal-content').screenshot({ path: process.env.QA_SHOT + '/qe-desktop.png', clip: undefined });
+        await page.click('#qe-head-settings');
+        await page.waitForFunction(() => document.getElementById('qe-head-settings').getAttribute('aria-expanded') === 'true');
+        assert.equal(await page.$eval('#quiz-editor-settings', d => d.open && getComputedStyle(d).display !== 'none'), true, '⚙️ opens the settings fields');
+        await page.click('#qe-head-settings');
+        await page.waitForFunction(() => document.getElementById('qe-head-settings').getAttribute('aria-expanded') === 'false');
+        assert.equal(await page.$eval('#quiz-editor-settings', d => d.open), false, '⚙️ again closes them');
         assert.deepEqual(errs, [], 'no page errors');
         await page.close();
 
@@ -126,6 +159,13 @@ const cy = el => { const r = el.getBoundingClientRect(); return Math.round(r.top
         assert.ok(phone.inView, 'Q18 is scrolled into view');
         const bar = await page.$eval('#quiz-editor-toolbar', e => e.scrollWidth <= e.clientWidth + 1);
         assert.ok(bar, 'the tool strip wraps instead of overflowing');
+        const phoneHead = await page.evaluate(() => {
+            const cy = el => { const r = el.getBoundingClientRect(); return Math.round(r.top + r.height / 2); };
+            const h = document.querySelector('#quizManageModal .qe-head');
+            return { ys: ['.qe-head-ic', '#quiz-manage-title', '#qe-head-settings', '.qe-head-x'].map(s => cy(h.querySelector(s))), fits: h.scrollWidth <= h.clientWidth + 1 };
+        });
+        assert.ok(Math.max(...phoneHead.ys) - Math.min(...phoneHead.ys) <= 6 && phoneHead.fits, 'header stays one row on a phone: ' + JSON.stringify(phoneHead));
+        if (process.env.QA_SHOT) await page.locator('#quizManageModal .modal-content').screenshot({ path: process.env.QA_SHOT + '/qe-phone.png' });
         assert.deepEqual(errs, [], 'no page errors (phone)');
         console.log('quiz-editor-toolbar-lean-qa: all checks passed');
     } finally { await browser.close(); }
