@@ -17,12 +17,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const audience = new Set();
         root._resetInviteAudience=()=>{};
         root.append(header);
-        const privacy=document.createElement('p');privacy.className='invite-audience-hint';privacy.textContent='🔒 Visible to you and Admin';privacy.title='ผู้สร้างและ Admin เห็นก่อน Admin จะเลือกกลุ่มผู้ชมภายหลัง';
-        nodes.title.placeholder = 'What are you planning?'; nodes.title.setAttribute('aria-label', 'Event name'); nodes.title.required = true; root.append(nodes.title);
+        const privacy=document.createElement('p');privacy.className='invite-audience-hint';privacy.textContent=prefix==='sne'?'🔒 Only you and Admin see this · no one is notified':'🔒 Visible to you and Admin';privacy.title='ผู้สร้างและ Admin เห็นก่อน Admin จะเลือกกลุ่มผู้ชมภายหลัง';   // V101.168: the Schedule form says nobody is notified
+        nodes.title.placeholder = prefix === 'sne' ? 'e.g. Group meeting · Case presentation' : 'What are you planning?'; nodes.title.setAttribute('aria-label', 'Event name'); nodes.title.required = true; root.append(nodes.title);   // V101.168: a real example in the Schedule form
         const row = document.createElement('div'); row.className = 'invite-when';
         const wrap = (text, input) => { const label = document.createElement('label'); label.append(document.createTextNode(text), input); return label; };
         const display = document.createElement('input'); display.placeholder = 'DD/MM/YYYY'; display.inputMode = 'numeric'; display.maxLength = 10; display.setAttribute('aria-label', 'Date DD/MM/YYYY'); display.required = true;
         const dateLabel = wrap('Date * ', display); nodes.when.className = 'invite-weekday'; dateLabel.append(nodes.when);
+        const past = document.createElement('p'); past.className = 'invite-past'; past.hidden = true; past.textContent = '⚠️ That date has passed — still save?'; dateLabel.append(past); root._past = past;   // V101.168
         nodes.date.hidden = true; dateLabel.append(nodes.date);
         const sync = () => { const match = nodes.date.value.match(/^(\d{4})-(\d{2})-(\d{2})$/); display.value = match ? match[3] + '/' + match[2] + '/' + match[1] : ''; };
         display.addEventListener('input', () => {
@@ -39,13 +40,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const duration=document.createElement('p');duration.className='invite-audience-hint';root.append(duration);
         const updateDuration=()=>{const valid=t=>/^([01]\d|2[0-3]):[0-5]\d$/.test(t);const minutes=t=>Number(t.slice(0,2))*60+Number(t.slice(3));const diff=minutes(nodes.end.value)-minutes(nodes.start.value);duration.textContent=valid(nodes.start.value)&&valid(nodes.end.value)?diff<0?'End must be after start': 'Duration · '+Math.floor(diff/60)+' hr '+diff%60+' min':'';};
         nodes.start.addEventListener('input',updateDuration);nodes.end.addEventListener('input',updateDuration);
+        // V101.168: type digits only — 0930 becomes 09:30; on leaving the box 930 → 09:30 and 9 → 09:00
+        const fmtTime=(input,final)=>{let v=input.value.replace(/[^\d:]/g,'');const d=v.replace(/:/g,'');if(/^\d{4}$/.test(d))v=d.slice(0,2)+':'+d.slice(2);else if(final&&/^\d{3}$/.test(d))v='0'+d[0]+':'+d.slice(1);else if(final&&/^\d{1,2}$/.test(d)&&+d<24)v=d.padStart(2,'0')+':00';if(v!==input.value){input.value=v;updateDuration();window.schRenderInviteWhen(prefix);}};
+        [nodes.start,nodes.end].forEach(input=>{input.title='เวลา 24 ชั่วโมง เช่น 0930 → 09:30';input.addEventListener('input',()=>fmtTime(input,false));input.addEventListener('blur',()=>fmtTime(input,true));});
 
         const details = document.createElement('details'); const summary = document.createElement('summary'); summary.textContent = '📍 Location & 🔗 Join link'; details.append(summary);
         nodes.location.placeholder = 'Where?'; nodes.join.placeholder = 'https://';
-        details.append(wrap('Location', nodes.location), wrap('Join link', nodes.join)); root.append(details);
+        if (prefix === 'sne') { const two = document.createElement('div'); two.className = 'invite-two'; nodes.location.placeholder = 'e.g. Pharmacy room 2'; nodes.join.placeholder = 'https://…'; two.append(wrap('📍 Location', nodes.location), wrap('🔗 Join link · optional', nodes.join)); root.append(two); }   // V101.168
+        else { details.append(wrap('Location', nodes.location), wrap('Join link', nodes.join)); root.append(details); }
         root.append(privacy);
         if (nodes.msg) root.append(nodes.msg);
-        if (actions) { actions.classList.add('invite-actions'); root.append(actions); }
+        if (actions) {
+            const need = document.createElement('p'); need.className = 'invite-need'; need.textContent = '✍️ Add a title to save'; root.append(need);   // V101.168
+            actions.classList.add('invite-actions'); root.append(actions);
+            const save = actions.querySelector('button');
+            root._refreshInvite = () => { const off = !nodes.title.value.trim(); save.disabled = off; need.hidden = !off; };
+            nodes.title.addEventListener('input', root._refreshInvite); root._refreshInvite();
+        }
         root._syncInviteDate = sync; sync();
     });
     const original = window.schRenderInviteWhen;
@@ -59,6 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const value = document.getElementById(prefix + '-date').value;
             const date = value ? new Date(value + 'T12:00:00') : null;
             box.textContent = date ? date.toLocaleDateString('en-GB', {weekday:'long',day:'numeric',month:'long',year:'numeric'}) : '';
+            if (root._past) { const t = new Date(); t.setHours(12, 0, 0, 0); root._past.hidden = !(prefix === 'sne' && date && date < t); }   // V101.168
         }
     };
 });

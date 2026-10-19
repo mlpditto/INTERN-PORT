@@ -34,7 +34,7 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
         await open();
         const card = page.locator('#hub-view-design > div').first();
         // header: short title + ghost formula, no pill
-        assert.match(await card.locator('label').first().textContent(), /Vision\s+Context \+ Goal \+ Source \+ Expectations/);
+        assert.match(await card.locator('label:has(.gm-formula)').textContent(), /Brief\s+Context \+ Goal \+ Source \+ Expectations/);   // V102.316: Vision → Brief (+ Intent chips)
         assert.ok(await card.locator('.gm-formula').evaluate(e => /สูตร/.test(e.title) && /프롬프트/.test(e.title)), 'formula tooltip TH · KO');
         assert.equal(await card.locator('text=MASTER FORMULA').count(), 0);
         // one toolbar: ✒ rail · sep · engine chips · Create; nothing from the registry
