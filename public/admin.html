@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.323)</title>
+    <title>Nika Admin (V102.324)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -2638,6 +2638,7 @@
         .qa-ib.is-set { color:#15803d; border-color:#86efac; background:#f0fdf4; }
         .qa-n { position:absolute; top:-7px; right:-7px; min-width:17px; height:17px; padding:0 4px; border-radius:9px; background:#4361ee; color:#fff; font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center; line-height:1; }
         .qa-ib.is-set .qa-n { background:#16a34a; }
+        .qa-n.qa-n-act { right:auto; left:-7px; background:#16a34a; }   /* V102.324: 👥 green (active now) on the left, blue (everyone) on the right */
         .qa-pill { display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 10px; border-radius:9px; font-size:0.78em; font-weight:800; white-space:nowrap; border:1px solid transparent; }
         .qa-pill.is-off { background:#fff; color:#15803d; border-color:#86efac; }
         .qa-pill.is-live { background:#16a34a; color:#fff; }
@@ -33812,6 +33813,18 @@ ${JSON.stringify(sourceObj)}`;
             </div>`;
         };
 
+        // V102.324: { all, active } for the 👥 badges — all = people with a non-dismissed attempt, active = those inside their
+        // internship dates right now (hwIsActiveUser, the homework picker's "Active now" rule). null when nobody did it.
+        let _qpUsersRef = null, _qpUsersMap = null;
+        function quizPeopleCounts(qId) {
+            const set = (window.quizPeople || {})[qId];
+            if (!set || !set.size) return null;
+            if (_qpUsersRef !== usersData) { _qpUsersRef = usersData; _qpUsersMap = new Map((usersData || []).map(u => [u.id, u])); }
+            let active = 0;
+            set.forEach(id => { if (window.hwIsActiveUser(_qpUsersMap.get(id))) active++; });
+            return { all: set.size, active };
+        }
+
         function renderQuizzes() {
             clearTimeout(_renderQuizzesTimer);
             _renderQuizzesTimer = setTimeout(renderQuizzesNow, 120);
@@ -34037,6 +34050,7 @@ ${JSON.stringify(sourceObj)}`;
                 // Marking AS template stays in the "..." menu — only removal is one-click.
                 const templateLabel = q.isTemplate ? `<span class="badge" title="Template — click to remove Template status" data-th-title="คลิกเพื่อยกเลิกสถานะ Template" style="background:orange; color:white; font-size:0.75em; cursor:pointer;" onclick="event.stopPropagation(); toggleTemplateStatus('${q.id}', true)">📌 TEMPLATE</span>` : '';
                 const examStyleLabel = q.examStyle ? `<span class="badge" title="Exam style: ${escapeHtml(window.quizExamStyleLabel(q.examStyle))} — click to show only this style" onclick="event.stopPropagation(); setQuizStyleFilter('${escapeHtml(q.examStyle)}')" style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; margin-left:5px; cursor:pointer;">🧭 ${escapeHtml(window.quizExamStyleLabel(q.examStyle))}</span>` : ''; // V101.76
+                const _pc = quizPeopleCounts(q.id);   // V102.324: 👥 = people who did it (blue) + those active now (green)
                 const tGroup = q.targetGroup || "Public";
                 const targetGroupLabel = `<span class="badge" title="Target group: ${escapeHtml(tGroup)}" style="background:${tGroup === 'Public' ? '#94a3b8' : '#3b82f6'}; color:white; margin-left:5px;"><i class="fa-solid fa-users"></i> ${tGroup}</span>`;
                 // V95.18 Phase 3: flag score-gated quizzes so admin can see which are hidden
@@ -34141,7 +34155,7 @@ ${JSON.stringify(sourceObj)}`;
                             <div class="qa-rail">
                                 <span class="qa-livecol">${window.quizLivePillHtml(q)}${window.quizLastAttemptHtml ? window.quizLastAttemptHtml(_qAttempts) : ''}</span>
                                 <span class="qa-tools">
-                                <button type="button" class="qa-ib" onclick="event.stopPropagation(); showQuizParticipants('${q.id}')" title="Participants · ผู้เข้าร่วม" aria-label="Participants"><i class="fa-solid fa-users"></i>${(window.quizCounts && window.quizCounts[q.id]) ? `<span class="qa-n">${window.quizCounts[q.id]}</span>` : ''}</button>
+                                <button type="button" class="qa-ib" onclick="event.stopPropagation(); showQuizParticipants('${q.id}')" title="Participants · ผู้เข้าร่วม${_pc ? ` — ${_pc.all} ${_pc.all === 1 ? 'person' : 'people'} did it · ${_pc.active} active now · ทำแล้ว ${_pc.all} คน · ยังฝึกอยู่ ${_pc.active} คน` : ''}" aria-label="Participants${_pc ? `: ${_pc.all} did it, ${_pc.active} active now` : ''}"><i class="fa-solid fa-users"></i>${_pc ? (_pc.active ? `<span class="qa-n qa-n-act">${_pc.active}</span>` : '') + `<span class="qa-n">${_pc.all}</span>` : ''}</button>
                                 <button type="button" class="qa-ib${q.isHomework && (q.assignedUsers || []).length ? ' is-set' : ''}" onclick="event.stopPropagation(); openHomeworkAssignModal('${q.id}')" title="Homework · มอบหมายการบ้าน" aria-label="Assign homework"><i class="fa-solid fa-book"></i>${q.isHomework && (q.assignedUsers || []).length ? `<span class="qa-n">${q.assignedUsers.length}</span>` : ''}</button>
                                 ${_qaTools}
                                 </span>
@@ -36498,6 +36512,7 @@ RULES:
 
             db.collection("users").orderBy("score", "desc").onSnapshot(s => {
                 usersData = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderQuizzes();   // V102.324: the green "active now" 👥 badge reads usersData (debounced repaint)
                 if (typeof refreshHubHeaderIfOpen === 'function') refreshHubHeaderIfOpen(); // V98.45
                 if (typeof gsPicPaint === 'function') gsPicPaint();   // V102.197: the profile photo's Camp state follows the live user doc
                 renderUserGroupTabs();
@@ -37192,6 +37207,10 @@ RULES:
                     if (qId) counts[qId] = (counts[qId] || 0) + 1;
                 });
                 window.quizCounts = counts;
+                // V102.324: who did each quiz — PEOPLE, not attempts (repeats count once, dismissed attempts not at all). The 👥 badges read this.
+                const people = {};
+                allAttempts.forEach(att => { if (att.quizId && att.userId && !att.isDismissed) (people[att.quizId] = people[att.quizId] || new Set()).add(att.userId); });
+                window.quizPeople = people;
                 quizAttemptsAllCache = allAttempts; // 🔥 [Version: V88.50] Sync with Global Cache for immediate Participant Modal loading
 
                 // 3. Refresh UI

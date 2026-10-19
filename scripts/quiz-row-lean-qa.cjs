@@ -40,6 +40,7 @@ function grabTable(id) {
       var materialDisplayName = (m, i) => m.name || ('file ' + (i + 1));
       window.quizAuditBadgeHtml = (q) => '<span class="chip-audit">🧪 3.3</span>'; window.quizLivePillHtml = (q) => '<span class="qa-live">Live</span>';
       window.quizExamStyleLabel = (s) => s; window._matClickStats = { q2: { total: 5, users: new Set(['a', 'b']) } }; window.quizCounts = {};
+      var quizPeopleCounts = () => null;   // V102.324: generateRow reads the 👥 people / active counts (tested in quiz-row-active-done-qa)
       ${iconFlags}
       ${generateRow}
       window.__rows = {
