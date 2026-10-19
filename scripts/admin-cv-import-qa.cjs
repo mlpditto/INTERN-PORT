@@ -19,7 +19,7 @@ window.__toasts = []; window.__refresh = 0; window.__dirty = 0;
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function showToast(m){window.__toasts.push(m);}
 window.safeJsonParse = s => JSON.parse(s);
-window.textAIModelInfo = id => ({ 'claude-opus-5-5': { label: 'Claude Opus 5.5' } })[id];   // V102.312: the sheet labels the picked model via the registry
+window.textAIModelInfo = id => ({ 'claude-opus-5-5': { label: 'Claude Opus 5.5' } })[id];   // V102.313: the sheet labels the picked model via the registry
 window.callUniversalAI = async (model, prompt, isJson, vision) => { window.__ai = { model, prompt, isJson, vision }; return { text: window.__aiText }; };
 document.getElementById('gs-profile-body').oninput = () => { window.__dirty++; };
 window.__puts = []; window.__adds = [];

@@ -1,4 +1,4 @@
-// V102.312: 📄 Import CV — the 📄 button opens the sheet with a provider-first model rail (default Claude Opus 5.5) before any file
+// V102.313: 📄 Import CV — the 📄 button opens the sheet with a provider-first model rail (default Claude Opus 5.5) before any file
 // is picked; the pick is remembered (ai_text_gs-cv-model), the read uses it, the sheet names it, and GPT 6 Luna gets an amber hint.
 // The REAL admin.html in Chromium (network stubbed), the REAL providerModelRailHtml / browseAuditProvider; callUniversalAI stubbed.
 const fs = require('node:fs');
