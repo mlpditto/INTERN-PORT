@@ -1,5 +1,5 @@
 // V101.92: the home accordion that holds History is titled "History" (it was "Work 워크" over a second "History" title) and its header carries the totals — also while it is
-// folded. Inside, the duplicate title + totals are hidden; only the adjustments chip stays. The REAL public/index.html + history-lean/compact on a touch phone
+// folded. Inside, the duplicate title + totals are hidden; the header's pt pill is the adjustments control (V101.165). The REAL public/index.html + history-lean/compact on a touch phone
 // (file://, network blocked, Firebase stubbed). SHOT=<dir> writes PNGs.
 const path = require('node:path'), fs = require('node:fs'), assert = require('node:assert/strict');
 const { pathToFileURL } = require('node:url');
@@ -65,6 +65,7 @@ async function open(browser) {
             unifiedSubmissionsCache = [mk('q1', 'quiz', 'Allergic Rhinitis-2', 33, 1.2), mk('q2', 'quiz', 'CASP Checklist', 35, 0.6), mk('w1', 'work', 'A work item', 36, 0.5)];
             getUnifiedAllItems = () => unifiedSubmissionsCache; unifiedRenderedCount = 50;
             window.getReflectiveStreak = () => ({ current: 5, longest: 9 });
+            if (window.activityRewards) window.activityRewards.adjustmentsPoints = () => 3;   // V101.166: the ⚖ mark widens the pt pill (the overflow seen on a phone)
             try { renderUnifiedHistory(); } catch (e) { if (!/firebase\./.test(e.message)) throw e; }
         });
         await page.waitForTimeout(400);
@@ -74,36 +75,45 @@ async function open(browser) {
             const h = document.querySelector('#section-general-work .gl-minimal-header'), title = h.querySelector('h4'), sum = document.getElementById('work-section-sum'), chev = document.getElementById('work-section-icon');
             const r = h.getBoundingClientRect(), t = title.getBoundingClientRect(), s = sum.getBoundingClientRect(), c = chev.getBoundingClientRect();
             return { title: title.textContent.replace(/\s+/g, ' ').trim(), icon: title.querySelector('i').className, sum: sum.textContent.replace(/\s+/g, ' ').trim(), sumHtml: sum.innerHTML,
-                h: Math.round(r.height), oneLine: Math.abs(t.top - s.top) < 20 && Math.abs(t.top - c.top) < 20, noOverlap: t.right <= s.left + 1 && s.right <= c.left + 1, inside: r.right >= c.right && s.left >= r.left, overflow: h.scrollWidth - h.clientWidth };
+                h: Math.round(r.height), oneLine: Math.abs(t.top - s.top) < 20 && Math.abs(t.top - c.top) < 20, noOverlap: t.right <= s.left + 1 && s.right <= c.left + 1, inside: r.right >= c.right && s.left >= r.left, overflow: h.scrollWidth - h.clientWidth,
+                // V101.166: every pill (not just the shrinkable summary box) ends before the chevron and starts after the title
+                pills: [...sum.children].map(k => { const b = k.getBoundingClientRect(); return { c: k.className, l: Math.round(b.left), r: Math.round(b.right), top: Math.round(b.top) }; }), chevL: Math.round(c.left), titleR: Math.round(t.right),
+                pillsFit: [...sum.children].every(k => { const b = k.getBoundingClientRect(); return b.right <= c.left + 1 && b.left >= t.right - 1; }) };
         });
         let r = await hdr();
         assert.ok(/^History/.test(r.title) && !/Work/.test(r.title) && r.icon.includes('fa-clock-rotate-left'), 'header reads History with the history icon: ' + JSON.stringify(r.title));
-        assert.ok(/2\.3\s*pt/.test(r.sum) && r.sum.includes('🪙') && r.sum.includes('🔥'), 'totals (pt · 🪙 · 🔥) are in the header while folded: ' + r.sum);
-        assert.ok(r.oneLine && r.noOverlap && r.inside && r.overflow <= 0 && r.h <= 56, 'one line, nothing overlaps or overflows: ' + JSON.stringify(r));
-        for (const w of [363, 340]) {
+        assert.ok(/5\.3\s*pt/.test(r.sum) && r.sum.includes('⚖') && r.sum.includes('🪙') && r.sum.includes('🔥'), 'totals (pt ⚖ · 🪙 · 🔥) are in the header while folded: ' + r.sum);
+        assert.ok(r.oneLine && r.noOverlap && r.inside && r.overflow <= 0 && r.h <= 56 && r.pillsFit, 'one line, nothing overlaps or overflows: ' + JSON.stringify(r));
+        // the 2026-10-18 phone shot: a narrow phone and/or the LINE webview's larger text — the pills must stay left of the chevron, wrapping if they must
+        for (const [w, fs] of [[363, ''], [360, ''], [340, ''], [320, ''], [360, '19px'], [320, '19px']]) {
             await page.setViewportSize({ width: w, height: 900 });
+            await page.evaluate(fs => { document.documentElement.style.fontSize = fs; }, fs);
             await page.waitForTimeout(200);
             const x = await hdr();
-            assert.ok(x.oneLine && x.noOverlap && x.overflow <= 0, 'header fits @' + w + ': ' + JSON.stringify(x));
+            if (process.env.HH_DUMP) console.log(w, fs || 'base', JSON.stringify({ pills: x.pills, chevL: x.chevL, titleR: x.titleR, h: x.h }));
+            if (process.env.HH_SHOT2 && w === 320 && fs) await page.locator('#section-general-work .gl-minimal-header').screenshot({ path: process.env.HH_SHOT2 });   // the phone case, folded
+            assert.ok(x.noOverlap && x.overflow <= 0 && x.pillsFit && x.h <= 80, 'header fits @' + w + (fs ? ' / ' + fs : '') + ' (pills may wrap, never run under the chevron): ' + JSON.stringify(x));
         }
+        await page.evaluate(() => { document.documentElement.style.fontSize = ''; });
         await page.setViewportSize({ width: 390, height: 900 });
 
         // the totals follow the filter (they were the inner summary's numbers, now mirrored)
         await page.evaluate(() => filterUnifiedHistory('work'));
         await page.waitForTimeout(250);
         r = await hdr();
-        assert.ok(/0\.5\s*pt/.test(r.sum), 'header totals follow the active filter: ' + r.sum);
+        assert.ok(/3\.5\s*pt/.test(r.sum), 'header totals follow the active filter (0.5 + 3 adjustments): ' + r.sum);
         await page.evaluate(() => filterUnifiedHistory('all'));
 
-        // open: no second "History" title, no second copy of the totals; the adjustments chip is still there
+        // open: no second "History" title, no second copy of the totals; the pt pill in the header is the adjustments control now (V101.165)
         await page.locator('#section-general-work .gl-minimal-header').click();
         await page.waitForTimeout(400);
         const inner = await page.evaluate(() => {
             const pane = document.getElementById('work-pane-history'), vis = e => !!e && e.getClientRects().length > 0 && getComputedStyle(e).display !== 'none';
-            return { open: document.getElementById('work-section-content').style.display === 'block', h3: vis(pane.querySelector('.lr-header > h3')), sum: vis(pane.querySelector('.lr-header > .hc-summary')), chip: vis(document.getElementById('history-adjustments')), rail: vis(document.getElementById('unified-type-filters')), rows: pane.querySelectorAll('.hl-row').length, rotate: document.getElementById('work-section-icon').style.transform };
+            return { open: document.getElementById('work-section-content').style.display === 'block', h3: vis(pane.querySelector('.lr-header > h3')), sum: vis(pane.querySelector('.lr-header > .hc-summary')), chip: document.getElementById('history-adjustments') === null && vis(document.querySelector('#work-section-sum button.hl-tp')) && /stopPropagation/.test(document.querySelector('#work-section-sum button.hl-tp').getAttribute('onclick') || ''), rail: vis(document.getElementById('unified-type-filters')), rows: pane.querySelectorAll('.hl-row').length, rotate: document.getElementById('work-section-icon').style.transform };
         });
         assert.ok(inner.open && !inner.h3 && !inner.sum, 'inside: the duplicate title and totals are hidden: ' + JSON.stringify(inner));
-        assert.ok(inner.chip && inner.rail && inner.rows === 3 && /180/.test(inner.rotate), 'adjustments chip, chip rail and rows are still there; chevron turned: ' + JSON.stringify(inner));
+        if (process.env.HH_SHOT) await page.locator('#section-general-work').screenshot({ path: process.env.HH_SHOT });
+        assert.ok(inner.chip && inner.rail && inner.rows === 3 && /180/.test(inner.rotate), 'V101.165: no adjustments chip, the header pt pill is a tappable button that does not fold the accordion; chip rail and rows are still there; chevron turned: ' + JSON.stringify(inner));
         // folding again keeps the totals in the header
         await page.locator('#section-general-work .gl-minimal-header').click();
         await page.waitForTimeout(250);

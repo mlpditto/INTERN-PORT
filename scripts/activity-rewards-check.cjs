@@ -30,11 +30,15 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
   assert.match(await page.locator('[data-reward-key=drug]').innerText(),/0.50 pt/);
   assert.match(await page.locator('[data-reward-key=event]').textContent(),/requests/);
   assert.equal(await page.locator('#monthly-progress [data-reward-key=other]').count(),0);
-  assert.match(await page.locator('#history-adjustments').innerText(),/^⚖️ /);   // V101.84: a visible cue that this chip is the adjustments list
-  await page.locator('#history-adjustments').click();
+  // V101.165: no ⚖️ chip — the pt pill (history-lean.js) shows entries + adjustments and opens the list through this API
+  assert.equal(await page.locator('#history-adjustments').count(),0,'no separate adjustments chip');
+  assert.equal(await page.evaluate(()=>Number.isFinite(activityRewards.adjustmentsPoints())),true,'adjustments total is a number once rewards are ready');
+  await page.evaluate(()=>{const b=document.createElement('button');b.className='hl-tp';b.setAttribute('aria-expanded','false');b.onclick=()=>activityRewards.toggleAdjustments();document.querySelector('.lr-header').append(b);b.click();});
   assert.match(await page.locator('#history-adjustment-records').innerText(),/Manual adjustment/);
+  assert.equal(await page.locator('button.hl-tp').getAttribute('aria-expanded'),'true','the pill reads expanded while the list is open');
   await page.locator('#history-adjustment-records').getByRole('button',{name:'Close',exact:true}).click();
-  assert.equal(await page.locator('#history-adjustments').getAttribute('aria-expanded'),'false');
+  assert.equal(await page.locator('button.hl-tp').getAttribute('aria-expanded'),'false');
+  assert.equal(await page.locator('#history-adjustment-records').isHidden(),true);
   await quiz.click();assert.match(await page.locator('.mp-reward-detail').innerText(),/Quiz correction/);assert.match(await page.locator('.mp-reward-detail').innerText(),/-0.20 Points/);
   for(const width of [320,390,736,1100]){await page.setViewportSize({width,height:1400});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.equal(await page.locator('.mp-grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length),width<=600?4:8);}
   await page.evaluate(()=>listeners.beri_ledger.fail(new Error('denied')));assert.match(await page.locator('[data-reward-key=quiz]').innerText(),/unavailable/);

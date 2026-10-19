@@ -4,9 +4,16 @@
    Standalone overlay (z-index 150000) so it stays above any open editor modal. */
 (function () {
     'use strict';
-    var SEEN_KEY = 'adminGuideSeen', LANG_KEY = 'adminGuideLang', MD_URL = { en: 'admin-guide.en.md', th: 'admin-guide.md', ko: 'admin-guide.ko.md' };
-    var T = { en: { title: '📖 Admin guide', fail: 'Could not load the guide' }, th: { title: '📖 คู่มือ Admin', fail: 'โหลดคู่มือไม่สำเร็จ' }, ko: { title: '📖 관리자 가이드', fail: '가이드를 불러오지 못했습니다' } };
-    var docs = { en: null, th: null, ko: null }, sections = [], lang = getLang(), cur = 0, opened = false, loading = {}, overlay = null;
+    // V102.301: the same overlay serves two guide SETS — 'admin' (📖 header button, auto-opens once) and 'deck' (the 🏴‍☠️ Grand Line Deck
+    // badge: images · video · audio · research). Each set has its own three markdown files, title, first section and cursor.
+    var SETS = {
+        admin: { md: { en: 'admin-guide.en.md', th: 'admin-guide.md', ko: 'admin-guide.ko.md' }, title: { en: '📖 Admin guide', th: '📖 คู่มือ Admin', ko: '📖 관리자 가이드' }, aria: { en: 'Admin guide', th: 'คู่มือ Admin', ko: '관리자 가이드' }, first: 2 },
+        deck: { md: { en: 'grand-line-guide.en.md', th: 'grand-line-guide.md', ko: 'grand-line-guide.ko.md' }, title: { en: '🏴‍☠️ Grand Line Deck — how to', th: '🏴‍☠️ วิธีใช้ Grand Line Deck', ko: '🏴‍☠️ Grand Line Deck 사용법' }, aria: { en: 'Grand Line Deck guide', th: 'คู่มือ Grand Line Deck', ko: 'Grand Line Deck 안내' }, first: 0 }
+    };
+    var set = 'admin', docsBySet = { admin: { en: null, th: null, ko: null }, deck: { en: null, th: null, ko: null } }, curBySet = { admin: 0, deck: 0 }, openedBySet = { admin: false, deck: false };
+    var SEEN_KEY = 'adminGuideSeen', LANG_KEY = 'adminGuideLang';
+    var T = { en: { fail: 'Could not load the guide' }, th: { fail: 'โหลดคู่มือไม่สำเร็จ' }, ko: { title: '📖 관리자 가이드', fail: '가이드를 불러오지 못했습니다' } };
+    var sections = [], lang = getLang(), cur = 0, loading = {}, overlay = null;
 
     function getLang() { try { var l = localStorage.getItem(LANG_KEY); return l === 'th' || l === 'ko' ? l : 'en'; } catch (_) { return 'en'; } }
     function seen() { try { return localStorage.getItem(SEEN_KEY) === '1'; } catch (_) { return false; } }
@@ -58,14 +65,15 @@
     }
 
     function load(l) {
+        var key = set + ':' + l, docs = docsBySet[set];
         if (docs[l]) return Promise.resolve();
-        if (loading[l]) return loading[l];
+        if (loading[key]) return loading[key];
         var v = (document.title.match(/V\d+\.\d+/) || [''])[0];
-        loading[l] = fetch(MD_URL[l] + (v ? '?v=' + v : '')).then(function (r) {
+        loading[key] = fetch(SETS[set].md[l] + (v ? '?v=' + v : '')).then(function (r) {
             if (!r.ok) throw new Error('HTTP ' + r.status);
             return r.text();
-        }).then(function (t) { docs[l] = parse(t); }).finally(function () { loading[l] = null; });
-        return loading[l];
+        }).then(function (t) { docs[l] = parse(t); }).finally(function () { loading[key] = null; });
+        return loading[key];
     }
 
     function build() {
@@ -99,8 +107,9 @@
     }
 
     function paintLang() {
-        overlay.querySelector('.ag-title').textContent = T[lang].title;
-        overlay.setAttribute('aria-label', lang === 'th' ? 'คู่มือ Admin' : lang === 'ko' ? '관리자 가이드' : 'Admin guide');
+        overlay.querySelector('.ag-title').textContent = SETS[set].title[lang];
+        overlay.setAttribute('aria-label', SETS[set].aria[lang]);
+        overlay.dataset.set = set;
         overlay.querySelectorAll('.ag-l').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.l === lang)); });
     }
 
@@ -111,11 +120,11 @@
         lang = l;
         try { localStorage.setItem(LANG_KEY, l); } catch (_) { /* storage may be blocked */ }
         paintLang();
-        load(l).then(function () { sections = docs[l]; show(Math.min(cur, sections.length - 1)); }).catch(fail);
+        load(l).then(function () { sections = docsBySet[set][l]; show(Math.min(cur, sections.length - 1)); }).catch(fail);
     }
 
     function show(i) {
-        cur = i;
+        cur = i; curBySet[set] = i;
         overlay.querySelector('.ag-rail').innerHTML = sections.map(function (s, k) {
             return '<button type="button" class="ag-chip" data-i="' + k + '" aria-pressed="' + (k === i) + '">' + esc(s.chip) + '</button>';
         }).join('');
@@ -130,25 +139,30 @@
         overlay.querySelector('.ag-rail').classList.remove('ag-scrolled');
     }
 
-    function open() {
+    function open(which) {
         build();
+        set = SETS[which] ? which : 'admin';
+        cur = curBySet[set];
+        paintLang();
+        overlay.querySelector('.ag-rail').innerHTML = '';
         overlay.classList.add('open');
         overlay.querySelector('.ag-body').textContent = '…';
         load(lang).then(function () {
-            sections = docs[lang];
-            show(opened ? cur : (sections.length > 2 ? 2 : 0));   // first open lands on section 2 = the tab map
-            opened = true;
+            sections = docsBySet[set][lang];
+            show(openedBySet[set] ? Math.min(cur, sections.length - 1) : Math.min(SETS[set].first, sections.length - 1));   // admin: first open lands on section 2 = the tab map
+            openedBySet[set] = true;
         }).catch(fail);
     }
 
-    function close() { if (overlay) overlay.classList.remove('open'); markSeen(); }
+    function close() { if (overlay) overlay.classList.remove('open'); if (set === 'admin') markSeen(); }
 
-    window.openAdminGuide = open;
+    window.openAdminGuide = function () { open('admin'); };
+    window.openDeckGuide = function () { open('deck'); };   // V102.301
 
     // First login: the dashboard container flips from hidden to shown once auth succeeds.
     function maybeAutoOpen() {
         var d = document.getElementById('dashboard-container');
-        if (d && getComputedStyle(d).display !== 'none' && !seen()) { markSeen(); setTimeout(open, 600); return true; }
+        if (d && getComputedStyle(d).display !== 'none' && !seen()) { markSeen(); setTimeout(function () { open('admin'); }, 600); return true; }
         return false;
     }
     function watch() {

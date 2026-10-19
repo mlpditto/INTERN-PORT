@@ -839,6 +839,86 @@ exports.fetchLinkText = onRequest({ cors: true, timeoutSeconds: 60, memory: "256
     }
 });
 
+// === Grand Line Clips (admin V102.288): Gemini Omni Flash video through the Interactions API ===
+// One 9:16 teaching clip per call. Helpers are top-level so scripts/grand-line-clips-qa.cjs can
+// slice and run them without the functions' node_modules. Docs: ai.google.dev/gemini-api/docs/omni
+// (POST /v1beta/interactions, response_format {type:"video", aspect_ratio, resolution, delivery};
+// the MP4 comes back inline as base64 or, with delivery "uri", as a files/{id}:download URL).
+const OMNI_VIDEO_MODEL = "gemini-omni-1.1-flash";
+const OMNI_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
+function omniVideoBody(prompt, video) {
+    const v = video || {};
+    const aspect = v.aspectRatio === "16:9" ? "16:9" : "9:16";
+    const resolution = ["360p", "720p", "1080p"].includes(v.resolution) ? v.resolution : "720p";
+    const seconds = Math.min(10, Math.max(4, Math.round(Number(v.seconds) || 8)));
+    return {
+        model: OMNI_VIDEO_MODEL,
+        input: String(prompt || "").trim() + "\n\nLength: about " + seconds + " seconds. Vertical " + aspect + " video for a phone screen.",
+        response_format: { type: "video", aspect_ratio: aspect, resolution, delivery: "uri" },
+        generation_config: { video_config: { task: "text_to_video" } },
+        // background → the call returns at once with an id; the client polls (one 540 s request would
+        // die at peak latency). store must stay on for GET /interactions/{id} to find it.
+        background: !!v.background,
+        store: true
+    };
+}
+// Finds the first video part anywhere in an Interactions reply: {type:"video", data|uri, mime_type}
+// inside steps[].content[] / outputs[], or the SDK-style output_video {data|uri}.
+function omniFindVideo(node, depth) {
+    depth = depth || 0;
+    if (!node || typeof node !== "object" || depth > 8) return null;
+    if (Array.isArray(node)) {
+        for (const item of node) { const hit = omniFindVideo(item, depth + 1); if (hit) return hit; }
+        return null;
+    }
+    const mime = node.mime_type || node.mimeType || "";
+    const isVideo = node.type === "video" || mime.startsWith("video/");
+    if (isVideo && ((typeof node.data === "string" && node.data.length > 100) || typeof node.uri === "string")) {
+        return { data: typeof node.data === "string" ? node.data : "", uri: node.uri || "", mime: mime || "video/mp4" };
+    }
+    if (node.output_video && typeof node.output_video === "object") {
+        const ov = node.output_video;
+        if (ov.data || ov.uri) return { data: ov.data || "", uri: ov.uri || "", mime: ov.mime_type || ov.mimeType || "video/mp4" };
+    }
+    for (const key of Object.keys(node)) {
+        if (key === "usage") continue;
+        const hit = omniFindVideo(node[key], depth + 1);
+        if (hit) return hit;
+    }
+    return null;
+}
+// files/{id} out of "…/v1beta/files/abc123:download?alt=media" or a bare "files/abc123".
+function omniFileId(uri) {
+    const m = String(uri || "").match(/files\/([A-Za-z0-9_-]+)/);
+    return m ? m[1] : "";
+}
+function omniStatus(data) {
+    return String((data && (data.status || data.state)) || "").toLowerCase();
+}
+// === Grand Line Clips (admin V102.306): the same clip through OpenRouter's video API ===
+// POST /api/v1/videos → 202 { id, polling_url, status } · GET /api/v1/videos/{id} → { status, unsigned_urls[], usage.cost }
+// · GET /api/v1/videos/{id}/content?index=0 (Authorization) → the MP4. Only the four models the admin can pick.
+const OR_VIDEO_BASE = "https://openrouter.ai/api/v1/videos";
+const OR_VIDEO_MODELS = { "google/veo-3.1-lite": 8, "kwaivgi/kling-v3.0-std": 15, "heygen/heygen-video-1": 15, "bytedance/seedance-2.0-fast": 15 };
+function orVideoBody(model, prompt, video) {
+    const v = video || {};
+    const max = OR_VIDEO_MODELS[model] || 8;
+    const seconds = Math.min(max, Math.max(4, Math.round(Number(v.seconds) || 8)));
+    return {
+        model,
+        prompt: String(prompt || "").trim(),
+        duration: seconds,
+        resolution: ["480p", "720p", "1080p"].includes(v.resolution) ? v.resolution : "720p",
+        aspect_ratio: v.aspectRatio === "16:9" ? "16:9" : "9:16",
+        generate_audio: true
+    };
+}
+function orVideoStatus(data) { return String((data && data.status) || "").toLowerCase(); }
+function orVideoUrl(data, id) {
+    const u = data && Array.isArray(data.unsigned_urls) && data.unsigned_urls[0];
+    return u || (id ? `${OR_VIDEO_BASE}/${encodeURIComponent(id)}/content?index=0` : "");
+}
+
 /**
  * 🤖 AI Proxy Function (V89.19)
  * Handles: Gemini, OpenAI, Anthropic, OpenRouter, AI Studio, ThaiLLM, Typhoon, Cloud TTS
@@ -858,9 +938,10 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 'gemini-2.5-flash': 'gemini-3.6-flash',
                 'gemini-3.5-flash': 'gemini-3.6-flash',
                 'gemini-2.5-flash-lite': 'gemini-3.6-flash',
-                'gemini-2.5-flash-image': 'gemini-3.1-flash-image',
-                'gemini-2.5-flash-image-preview': 'gemini-3.1-flash-image',
-                'gemini-3.1-flash-image-preview': 'gemini-3.1-flash-image'
+                'gemini-2.5-flash-image': 'gemini-nano-banana-2.1',
+                'gemini-2.5-flash-image-preview': 'gemini-nano-banana-2.1',
+                'gemini-3.1-flash-image-preview': 'gemini-nano-banana-2.1',
+                'gemini-3.1-flash-image': 'gemini-nano-banana-2.1'   // V102.293: Nano Banana 2 deprecated 2026-10-06 → 2.1 (GA, cheaper)
             };
             model = googleModelAliases[model] || model;
         }
@@ -1214,6 +1295,113 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             });
         }
 
+        // --- 🎬 Grand Line Clips: OpenRouter video (admin V102.306) — Veo 3.1 Lite · Kling 3.0 Std · HeyGen Video 1 · Seedance 2.0 Fast ---
+        // Same two calls as Omni below: submit → { pending, interactionId } · poll → { pending } or the clip. Submit is a plain
+        // axios.post (a retried submit would be a second paid render); the MP4 is fetched here because the content URL needs the key.
+        if (provider === "openrouter" && generationOptions && generationOptions.video && OR_VIDEO_MODELS[String(model || "")]) {
+            const apiKey = process.env.OPENROUTER_API_KEY;
+            if (!apiKey) return res.status(500).json({ error: "OPENROUTER_API_KEY is not configured on server." });
+            const video = generationOptions.video || {};
+            const orHeaders = { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" };
+            const startedAt = Date.now();
+            let data;
+            try {
+                if (video.state === "poll") {
+                    if (!video.interactionId) return res.status(400).json({ error: "Missing interactionId for the clip poll." });
+                    data = (await axios.get(`${OR_VIDEO_BASE}/${encodeURIComponent(video.interactionId)}`, { headers: orHeaders, timeout: 30000 })).data;
+                } else {
+                    data = (await axios.post(OR_VIDEO_BASE, orVideoBody(model, prompt, video), { headers: orHeaders, timeout: 60000 })).data;
+                }
+            } catch (err) {
+                const head = JSON.stringify(err.response?.data || err.message || "").slice(0, 300);
+                return res.status(err.response?.status === 400 ? 400 : 502).json({ error: `OpenRouter video ${video.state === "poll" ? "poll" : "submit"} failed (${err.response?.status || "no response"}): ${head}`, model });
+            }
+            const status = orVideoStatus(data);
+            if (status !== "completed") {
+                if (/fail|cancel|expire|error/.test(status) || data?.error) {
+                    return res.status(502).json({ error: `OpenRouter video ${status || "error"}: ${JSON.stringify(data?.error || data).slice(0, 300)}`, model, interactionId: data?.id || video.interactionId || null });
+                }
+                return _sendJson({ pending: true, status: status || "pending", interactionId: data?.id || video.interactionId || null, model });
+            }
+            const bin = await axios.get(orVideoUrl(data, data.id || video.interactionId), { headers: { Authorization: `Bearer ${apiKey}` }, responseType: "arraybuffer", timeout: 120000, maxContentLength: 60 * 1024 * 1024 });
+            const mime = String(bin.headers["content-type"] || "video/mp4").split(";")[0];
+            const cost = Number(data.usage && data.usage.cost);
+            return res.json({
+                videoDataUrl: `data:${mime};base64,${Buffer.from(bin.data).toString("base64")}`,
+                seconds: Math.min(OR_VIDEO_MODELS[model] || 8, Math.max(4, Math.round(Number(video.seconds) || 8))),
+                costUsd: Number.isFinite(cost) ? cost : null,
+                tokens: 0,
+                usage: { inputTokens: null, outputTokens: null, totalTokens: null },
+                latencyMs: Date.now() - startedAt,
+                interactionId: data.id || video.interactionId || null,
+                model
+            });
+        }
+
+        // --- 🎬 Grand Line Clips: Gemini Omni Flash video (admin V102.288) ---
+        // Admin-only by the role gate above. Two short calls instead of one long one:
+        //   generationOptions.video = { aspectRatio, resolution, seconds, state: "submit" }  → { pending, interactionId } or the clip
+        //   generationOptions.video = { state: "poll", interactionId }                       → { pending } or the clip
+        // The submit is a plain axios.post, NOT postWithRetry: a retried submit would be a second paid render.
+        if (provider === "gemini-aistudio" && /^gemini-omni/.test(String(model || ""))) {
+            const apiKey = process.env.GEMINI_API_KEY;
+            if (!apiKey) return res.status(500).json({ error: "GEMINI_API_KEY is not configured on server." });
+            const video = (generationOptions && generationOptions.video) || {};
+            const omniHeaders = { "x-goog-api-key": apiKey, "Content-Type": "application/json" };
+            const startedAt = Date.now();
+            let data;
+            try {
+                if (video.state === "poll") {
+                    if (!video.interactionId) return res.status(400).json({ error: "Missing interactionId for the clip poll." });
+                    data = (await axios.get(`${OMNI_API_BASE}/interactions/${encodeURIComponent(video.interactionId)}`, { headers: omniHeaders, timeout: 30000 })).data;
+                } else {
+                    data = (await axios.post(`${OMNI_API_BASE}/interactions`, omniVideoBody(prompt, { ...video, background: true }), { headers: omniHeaders, timeout: 120000 })).data;
+                }
+            } catch (err) {
+                const head = JSON.stringify(err.response?.data || err.message || "").slice(0, 300);
+                return res.status(err.response?.status === 400 ? 400 : 502).json({ error: `Omni video ${video.state === "poll" ? "poll" : "submit"} failed (${err.response?.status || "no response"}): ${head}`, model: OMNI_VIDEO_MODEL });
+            }
+            const status = omniStatus(data);
+            const found = omniFindVideo(data);
+            if (!found) {
+                if (/fail|cancel|error|reject|block/.test(status) || data?.error) {
+                    return res.status(502).json({ error: `Omni video ${status || "error"}: ${JSON.stringify(data?.error || data).slice(0, 300)}`, model: OMNI_VIDEO_MODEL, interactionId: data?.id || video.interactionId || null });
+                }
+                // Not done yet — no usage row for a poll tick (bypass the res.json interception).
+                return _sendJson({ pending: true, status: status || "in_progress", interactionId: data?.id || video.interactionId || null, model: OMNI_VIDEO_MODEL });
+            }
+            let b64 = found.data || "";
+            let mime = found.mime || "video/mp4";
+            if (!b64 && found.uri) {
+                const fileId = omniFileId(found.uri);
+                if (!fileId) return res.status(502).json({ error: `Omni video returned an unreadable file uri: ${String(found.uri).slice(0, 200)}`, model: OMNI_VIDEO_MODEL });
+                // Files API: wait for ACTIVE (bounded), then download the MP4 and hand it over as base64 —
+                // the browser cannot fetch it itself because the download needs the API key.
+                let fileState = "";
+                for (let i = 0; i < 30; i++) {
+                    const meta = (await axios.get(`${OMNI_API_BASE}/files/${fileId}`, { headers: { "x-goog-api-key": apiKey }, timeout: 20000 })).data || {};
+                    fileState = String(meta.state || "ACTIVE").toUpperCase();
+                    if (fileState === "ACTIVE") { mime = meta.mimeType || mime; break; }
+                    if (fileState === "FAILED") return res.status(502).json({ error: "Omni video file processing FAILED.", model: OMNI_VIDEO_MODEL });
+                    await new Promise(r => setTimeout(r, 5000));
+                }
+                if (fileState !== "ACTIVE") return _sendJson({ pending: true, status: "file_" + fileState.toLowerCase(), interactionId: data?.id || video.interactionId || null, model: OMNI_VIDEO_MODEL });
+                const bin = await axios.get(`${OMNI_API_BASE}/files/${fileId}:download?alt=media`, { headers: { "x-goog-api-key": apiKey }, responseType: "arraybuffer", timeout: 120000, maxContentLength: 40 * 1024 * 1024 });
+                b64 = Buffer.from(bin.data).toString("base64");
+            }
+            const u = data.usage || {};
+            const totalTokens = Number(u.total_tokens ?? u.totalTokens ?? u.total_token_count) || 0;
+            return res.json({
+                videoDataUrl: `data:${mime};base64,${b64}`,
+                seconds: Math.min(10, Math.max(4, Math.round(Number(video.seconds) || 8))),
+                tokens: totalTokens,
+                usage: { inputTokens: Number(u.input_tokens ?? u.inputTokens) || null, outputTokens: Number(u.output_tokens ?? u.outputTokens) || null, totalTokens: totalTokens || null },
+                latencyMs: Date.now() - startedAt,
+                interactionId: data.id || video.interactionId || null,
+                model: OMNI_VIDEO_MODEL
+            });
+        }
+
         // --- 🟡 Google AI Studio (Gemini Generative Language API — image gen via Nano Banana) ---
         // V92.70: New default for Case Card + Goldenweek after OpenRouter started returning 500.
         // Uses GEMINI_API_KEY from https://aistudio.google.com/api-keys (project-bound to intern-port-edfa7).
@@ -1221,8 +1409,8 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             const apiKey = process.env.GEMINI_API_KEY;
             if (!apiKey) return res.status(500).json({ error: "GEMINI_API_KEY is not configured on server." });
 
-            const asModel = geminiApiModel || model || "gemini-3.1-flash-image";
-            const isImageRequest = /image/i.test(asModel);
+            const asModel = geminiApiModel || model || "gemini-nano-banana-2.1";
+            const isImageRequest = /image|nano-banana/i.test(asModel);   // V102.293: the 2.1 id has no "image" in it
             const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${asModel}:generateContent?key=${apiKey}`;
 
             // V96.01: image-to-image editing — when visionData carries a base image,

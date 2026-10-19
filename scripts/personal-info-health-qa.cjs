@@ -37,7 +37,7 @@ const profileHtml = adm.slice(bodyStart, adm.indexOf('</section>', healthStart) 
 const exportStart = adm.indexOf('<div id="piExportModal"');
 const exportHtml = adm.slice(exportStart, adm.indexOf('        <div id="groupSelectModal"', exportStart));
 const admCss = adm.split('\n').filter(l => /^\s*#(groupSelectModal|piExportModal) /.test(l)).join('\n');
-const admFns = ['function gsFoldCards(', 'function gsBodyClick(', 'function gsEditProfileCard(', 'function gsRefreshProfileCards(', 'function gsNewFieldWrites(', 'function pixRows(', 'function pixStatusChip(', 'function pixVisible(', 'function pixRender(',
+const admFns = ['function gsFoldCards(', 'function gsBodyClick(', 'function gsEditProfileCard(', 'function gsAgeText(', 'function gsRefreshProfileCards(', 'function gsNewFieldWrites(', 'function pixRows(', 'function pixStatusChip(', 'function pixVisible(', 'function pixRender(',
     'function pixFilter(', 'function openPiExport(', 'async function pixCopy(', 'function pixCsvCell(', 'function pixCsv('].map(m => grab(adm, m)).join('\n')
     + '\nconst PIX_STATE = { filter: "all" };'
     + '\n' + ['const PIX_HEAD', 'const pixStatusText', 'const pixLine'].map(m => adm.slice(adm.indexOf(m), adm.indexOf('\n', adm.indexOf(m)))).join('\n');
@@ -210,16 +210,16 @@ const admFns = ['function gsFoldCards(', 'function gsBodyClick(', 'function gsEd
             assert.equal(await page.$eval('.gs-card-social .gs-prev-line', e => e.textContent), 'Not provided', 'no socials → "Not provided"');
             assert.equal(await shown('.gs-card-basic .gs-copy-card') && await shown('.gs-card-basic .gs-edit-card'), true, 'header keeps 📋 and ✏️ so a copy needs no unfolding');
             await page.click('.gs-card-contact > header h3');
-            assert.deepEqual(await folded(), [true, false, true, true, true], 'header click opens that card only');
+            assert.deepEqual(await folded(), [true, false, true, true, true], 'header click opens that card');
             assert.equal(await shown('.gs-card-contact .gs-prev-line'), false, 'preview hides while open');
             await page.click('.gs-card-basic > header h3');
-            assert.deepEqual(await folded(), [false, true, true, true, true], 'opening another folds the first');
-            await page.click('.gs-card-basic > header h3');
-            assert.deepEqual(await folded(), [true, true, true, true, true], 'clicking the open header folds it');
+            assert.deepEqual(await folded(), [false, false, true, true, true], 'V102.296: opening another keeps the first open (no accordion)');
+            await page.click('.gs-card-basic > header h3'); await page.click('.gs-card-contact > header h3');
+            assert.deepEqual(await folded(), [true, true, true, true, true], 'clicking an open header folds that card');
             await page.click('.gs-card-contact .gs-copy-card');
             assert.deepEqual(await folded(), [true, true, true, true, true], 'a header BUTTON does not toggle');
             await page.click('.gs-card-health .gs-edit-card');
-            assert.deepEqual(await folded(), [true, true, true, true, false], '✏️ unfolds its card (and folds the rest)');
+            assert.deepEqual(await folded(), [true, true, true, true, false], '✏️ unfolds its card, nothing else moves');
             await page.click('.gs-card-health .gs-edit-card');   // done editing
 
             // Health chip + empty fields listed

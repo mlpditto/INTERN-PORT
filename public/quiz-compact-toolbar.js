@@ -16,13 +16,17 @@ document.addEventListener('DOMContentLoaded', function () {
     const navRow = nav.parentElement;
     navRow.classList.add('quiz-compact-navigation');
     oldRow.prepend(navRow);
-    const typeRow = document.createElement('div');
-    typeRow.className = 'quiz-compact-answer-type lang-no-toggle';
-    const label = document.createElement('span');
-    label.textContent = 'Answer type';
-    typeRow.append(label, type);
-    oldRow.append(typeRow);
+    // V102.321 (lean A): the Answer type chips open the tool strip, ahead of the this-question buttons.
+    const bar = document.getElementById('quiz-editor-toolbar');
+    type.setAttribute('aria-label', 'Answer type');
+    if (bar) bar.prepend(type);
+    else oldRow.append(type);
     const names = {choice:'Multiple choice',short_answer:'Short answer',ordering:'Ordering',flashcard:'Flashcard'};
+    document.querySelectorAll('.qe-timer-mode [data-value]').forEach(el => {
+        el.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
+        });
+    });
     type.querySelectorAll('[data-value]').forEach(el => {
         el.textContent = names[el.dataset.value] || el.title;
         el.setAttribute('role', 'button');

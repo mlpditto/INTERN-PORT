@@ -1,4 +1,4 @@
-// V102.291: Dashboard "Access Requests" — ONE surface. The pending request used to show twice: the table
+// V102.322: Dashboard "Access Requests" — ONE surface. The pending request used to show twice: the table
 // (#access-request-section) and a "New Access" card in the 👀 Review Kanban column with its own Approve / Reject.
 // Option A (owner's pick): the table stays, the Kanban duplicate is gone (same call as V96.77 for Reflective logs).
 // Runs the REAL #access-request-section markup + renderAccessRequests() from admin.html; drawKanban is checked at source.

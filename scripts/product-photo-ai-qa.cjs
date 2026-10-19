@@ -11,8 +11,8 @@ vm.createContext(ctx);
 vm.runInContext(html.slice(html.indexOf('        const PRODUCT_PHOTO_AI_MODEL'), html.indexOf('        async function ppBlobToVision(')), ctx);
 vm.runInContext('this.model = PRODUCT_PHOTO_AI_MODEL;', ctx);
 
-// V100.51 retired the `-preview` id (aliased to gemini-3.1-flash-image in admin.html and functions/index.js).
-assert.equal(ctx.model, 'as/gemini-3.1-flash-image', 'goes through the AI Studio image branch');
+// V100.51 retired the `-preview` id (aliased to gemini-nano-banana-2.1 in admin.html and functions/index.js).
+assert.equal(ctx.model, 'as/gemini-nano-banana-2.1', 'goes through the AI Studio image branch');
 
 const prompt = ctx.buildProductPhotoCleanupPrompt();
 for (const must of ['square 1:1', '#FFFFFF', 'every word, number and symbol', 'Do not add, remove, translate, retype or invent any text', 'watermarks', 'leave it cut off']) {
