@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.316)</title>
+    <title>Nika Admin (V102.318)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -23859,7 +23859,9 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             if (idx < items.length) {
                 const item = items[idx];
                 const hidden = item.querySelector('.q-type');
-                if (hidden) hidden.value = qtype;
+                // V102.318: re-picking the type the question already has must not rebuild it (flashcard would wipe its options).
+                if (!hidden || hidden.value === qtype) return;
+                hidden.value = qtype;
                 // Also update per-question toggle
                 const toggle = item.querySelector('.q-type-toggle');
                 if (toggle) {
@@ -23868,9 +23870,10 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                         else i.classList.remove('active');
                     });
                 }
-                if (typeof selectQTypeToggle === 'function') {
-                    // Trigger any UI changes associated with type change
-                }
+                // V102.318: redraw the answer area and save, as the per-question toggle (selectQTypeToggle) does —
+                // this block used to be empty, so only the hidden value changed.
+                toggleQType(hidden);
+                triggerAutoSave();
             }
         };
 
@@ -23908,8 +23911,9 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 addQuestionUI(data);
                 showToast("Question Cloned!");
                 
-                if (btn) {
-                    const icon = btn.querySelector('i');
+                // V102.318: the 🐑 button is an emoji with no <i> — the icon swap threw after every clone.
+                const icon = btn && btn.querySelector('i');
+                if (icon) {
                     const oldIcon = icon.className;
                     icon.className = 'fa-solid fa-check';
                     btn.style.color = '#2ecc71';
