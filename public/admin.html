@@ -7717,7 +7717,7 @@
      popover, so the button+menu markup below and both files are gone, not just
      hidden. -->
 <link rel="stylesheet" href="quiz-cover.css?v=V102.262">
-<script src="quiz-cover.js?v=V102.262"></script>
+<script src="quiz-cover.js?v=V102.315"></script>
 <script src="holidays-admin.js?v=V102.277"></script>
 <link rel="stylesheet" href="quiz-qimage.css?v=V101.03">
 <script src="quiz-qimage.js?v=V101.03"></script>
@@ -8964,6 +8964,9 @@
                                         <div class="alabasta-genmage-quick-rail" role="radiogroup" aria-label="Engine quick switch">
                                             <button type="button" class="alabasta-genmage-quick-chip active" data-value="as/gemini-nano-banana-2.1" onclick="selectDesignEngine(this)" title="Google AI Studio — Gemini Nano Banana 2.1 · $0.034 per 1K image · default." aria-label="Nano Banana 2.1 via Google AI Studio">Nano Banana 2.1<small class="gm-ghost">$0.03</small></button>
                                             <button type="button" class="alabasta-genmage-quick-chip" data-value="or/openai/gpt-5.4-image-2" onclick="selectDesignEngine(this)" title="OpenRouter — OpenAI GPT-5.4 Image 2 · latest GPT image model." aria-label="OpenAI GPT-5.4 Image 2 via OpenRouter"><span class="text-ai-logo" data-owner="openai" aria-hidden="true"></span>Image 2<small class="gm-ghost">$0.04–0.08</small></button>
+                                            <!-- V102.315: two image-only models through OpenRouter's Image API (POST /api/v1/images, generationOptions.imageApi — the Quiz cover path) -->
+                                            <button type="button" class="alabasta-genmage-quick-chip" data-value="or/bytedance-seed/seedream-5-0-flash" onclick="selectDesignEngine(this)" title="OpenRouter — ByteDance Seedream 5.0 Flash · $0.018 per image · cheapest; strong at text and diagrams (Thai text untested)" aria-label="Seedream 5.0 Flash via OpenRouter">Seedream 5<small class="gm-ghost">$0.02</small></button>
+                                            <button type="button" class="alabasta-genmage-quick-chip" data-value="or/openai/gpt-image-2.5-sunburst" onclick="selectDesignEngine(this)" title="OpenRouter — OpenAI GPT Image 2.5 Sunburst · newest OpenAI image model · billed per token at Image 2's rate (≈ $0.04–0.08 per image, estimate)" aria-label="GPT Image 2.5 Sunburst via OpenRouter"><span class="text-ai-logo" data-owner="openai" aria-hidden="true"></span>Sunburst<small class="gm-ghost">≈ $0.04–0.08</small></button>
                                             <!-- V102.291: Grand Line Clips — Gemini Omni Flash renders a vertical 9:16 teaching clip (audio on) through the same proxy key. -->
                                             <button type="button" class="alabasta-genmage-quick-chip" data-value="as/gemini-omni-1.1-flash" onclick="selectDesignEngine(this)" title="Google AI Studio — Gemini Omni Flash · 9:16 vertical clip with audio · about $0.10 per second (8 s ≈ $0.80)" aria-label="Clip 9:16 via Gemini Omni Flash">🎬 Clip 9:16<small class="gm-ghost">8 s · $0.80</small></button>
                                             <!-- V102.306: four more clip engines through OpenRouter (proxy route in callAIProxy); the ghost = clip length · price per clip -->
@@ -21315,8 +21318,10 @@ RULES:
         // V92.56: Goldenweek 2-model selector (GPT-5.4 + Nano Banana 2.1 only) — single inline rail next to Create button.
         // Canonical state lives in hidden input #design-engine; the rail syncs to it via data-value.
         window.DESIGN_ENGINE_PREF_KEY = 'design_engine_model_pref';
+        // V102.315: image-only models on OpenRouter's Image API (not chat completions) — the proxy takes them with generationOptions.imageApi
+        window.DESIGN_IMAGE_API_ENGINES = ['or/bytedance-seed/seedream-5-0-flash', 'or/openai/gpt-image-2.5-sunburst'];
         // V92.70: AI Studio Nano Banana added as new default; OpenRouter chips kept as fallback options.
-        window.DESIGN_ENGINE_VALID = ['as/gemini-nano-banana-2.1', 'or/openai/gpt-5.4-image-2', 'as/gemini-omni-1.1-flash', 'or/google/veo-3.1-lite', 'or/kwaivgi/kling-v3.0-std', 'or/heygen/heygen-video-1', 'or/bytedance/seedance-2.0-fast']; // V102.291: + 🎬 Clip 9:16 · V102.306: + four OpenRouter clip engines
+        window.DESIGN_ENGINE_VALID = ['as/gemini-nano-banana-2.1', 'or/openai/gpt-5.4-image-2', 'or/bytedance-seed/seedream-5-0-flash', 'or/openai/gpt-image-2.5-sunburst', 'as/gemini-omni-1.1-flash', 'or/google/veo-3.1-lite', 'or/kwaivgi/kling-v3.0-std', 'or/heygen/heygen-video-1', 'or/bytedance/seedance-2.0-fast']; // V102.291: + 🎬 Clip 9:16 · V102.306: + four OpenRouter clip engines
 
         window.selectDesignEngine = function(btn) {
             if (!btn) return;
@@ -21388,8 +21393,10 @@ RULES:
 
             if (!promptInput.value.trim()) return alert("Please describe what to generate.");
 
+            let stopBusy = function() {};   // V102.315: declared outside try so finally can reach it (inside, finally threw ReferenceError and the button stayed busy)
+
             try {
-                let stopBusy = window.gmBusy(btn, 'Refining…');   // V102.303: with a seconds counter
+                stopBusy = window.gmBusy(btn, 'Refining…');   // V102.303: with a seconds counter
                 
                 // Step 1: AI Translation & Enhancement (Refinement)
                 let enhancerPrompt = `You are an expert AI Prompt Engineer.
@@ -21461,7 +21468,7 @@ RULES:
                     </div>
                 `;
 
-                const { text: imageUrl } = await callUniversalAI(engine, finalPrompt, false, null, '', { feature: 'design_image' });
+                const { text: imageUrl } = await callUniversalAI(engine, finalPrompt, false, null, '', { feature: 'design_image', ...(window.DESIGN_IMAGE_API_ENGINES.includes(engine) ? { imageApi: true } : {}) });   // V102.315
 
                 previewContainer.innerHTML = `<img src="${imageUrl}" id="generated-image" style="max-width:100%; max-height:100%; border-radius:15px; box-shadow:0 10px 40px rgba(0,0,0,0.15);">`;
                 actions.style.display = "flex";
