@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.313)</title>
+    <title>Nika Admin (V102.314)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.131">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.136">
@@ -675,6 +675,7 @@
         #tab-ai-hub .deck-guide-btn:hover .deck-guide-hint, #tab-ai-hub .deck-guide-btn:focus-visible .deck-guide-hint { opacity:1; }
         #hub-view-design .gm-ghost { display:block; font-size:0.62em; font-weight:600; color:#94a3b8; letter-spacing:.1px; line-height:1.1; margin-top:1px; }   /* V102.306: price · time beside every engine chip */
         #hub-view-design .alabasta-genmage-quick-chip.active .gm-ghost { color:rgba(255,255,255,.75); }
+        #hub-view-design .gm-create .gm-ghost { color:rgba(255,255,255,.85); }   /* V102.314: "free · text only" under Plan 10 episodes */
         #hub-view-design .gm-elapsed { font-weight:600; opacity:.8; margin-left:2px; font-size:.85em; }   /* V102.303: the busy counter */
         #hub-view-design .gm-formula { font-size:0.68em; font-weight:600; color:#b4b9c9; letter-spacing:0.2px; margin-left:4px; }
         #hub-view-design .gm-bar { display:flex; align-items:center; gap:10px; padding:8px 12px; background:#f8fafc; border:1px solid #edf2f7; border-radius:16px; flex-wrap:wrap; }
@@ -755,6 +756,10 @@
         .glc-ep .glc-ask { display:inline-flex; align-items:center; gap:6px; font-size:0.74em; font-weight:800; color:#9a3412; background:#fff7ed; border:1px solid #fdba74; border-radius:999px; padding:3px 6px 3px 10px; }
         .glc-ep .glc-ask button { padding:3px 8px; border-radius:8px; }
         .glc-cost { font-size:0.74em; font-weight:800; color:#9a3412; background:#fff7ed; border:1px solid #fdba74; padding:2px 10px; border-radius:999px; white-space:nowrap; }
+        /* V102.314: the two tiers of a series — ① plan (free) · ② render (paid, one ▶ at a time) · what the series costs */
+        .glc-steps { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+        .glc-step { font-size:0.74em; font-weight:800; padding:2px 10px; border-radius:999px; background:#f1f5f9; color:#475569; white-space:nowrap; }
+        .glc-step.done { background:#ecfdf5; color:#047857; }
         .glc-video { max-height:480px; max-width:100%; aspect-ratio:9/16; border-radius:24px; background:#0f172a; box-shadow:0 20px 50px rgba(15,23,42,0.35); }
 
         /* V94.32: Phase 3 escalation — HTML overlay composite container.
@@ -8989,6 +8994,7 @@
                                         <button type="button" id="glc-replan-btn" onclick="glcPlanEpisodes()" title="Plan the 10 episodes again with the Enhancer model (text only, no clip cost)" aria-label="Re-plan" style="padding:7px 12px; border-radius:12px; border:1px solid #e2e8f0; background:#fff; cursor:pointer; font-size:0.85em;">🔁</button>
                                     </div>
                                 </div>
+                                <div id="glc-steps" class="glc-steps"></div>
                                 <div id="glc-episodes-list" style="margin-top:14px;"></div>
                             </div>
 
@@ -9032,11 +9038,11 @@
                                             <option value="disease">🩺 Disease (Pathophysiology)</option>
                                             <option value="drug">💊 Drug (ADMET / PK)</option>
                                         </select>
-                                        <button id="mgw-gallery-load-btn" onclick="mgwLoadCodexGallery()" style="padding:7px 16px; border-radius:12px; border:none; background:linear-gradient(45deg,#4361ee,#4895ef); color:white; font-weight:800; cursor:pointer; font-size:0.85em;">Load gallery</button>
+                                        <button id="mgw-gallery-load-btn" onclick="mgwLoadCodexGallery()" style="white-space:nowrap; padding:7px 16px; border-radius:12px; border:none; background:linear-gradient(45deg,#4361ee,#4895ef); color:white; font-weight:800; cursor:pointer; font-size:0.85em;">Load gallery</button>
                                     </div>
                                 </div>
                                 <div id="mgw-gallery-grid" style="margin-top:18px; display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:16px;">
-                                    <div id="mgw-gallery-empty" style="grid-column:1/-1; text-align:center; color:#94a3b8; padding:30px; font-size:0.9em;">⏳ Loading the pathophysiology + PK images saved in the codex…</div>
+                                    <div id="mgw-gallery-empty" style="grid-column:1/-1; text-align:center; color:#94a3b8; padding:30px; font-size:0.9em;">🖼 The pathophysiology + PK images saved in the codex show here.</div>
                                 </div>
                             </div>
                         </div>
@@ -21273,15 +21279,29 @@ RULES:
             el.classList.add('active');
             const style = el.dataset.style;
             document.getElementById('selected-design-style').value = style;
+            try { localStorage.setItem(window.DESIGN_STYLE_PREF_KEY, style); } catch (e) {}   // V102.314: the pick survives a reload
             
             // 🔥 [Version: V87.18] Infographic Requirement
             const promptInput = document.getElementById('design-prompt');
-            if (style.toLowerCase().includes('infographic')) {
-                promptInput.placeholder = "💡 [Infographic Mode] Enter: Task, Context, Core Instruction, Constraint, Output (or describe your idea and AI will structure it!)";
-            } else {
-                promptInput.placeholder = "Describe the image you want to create...";
-            }
+            const ph = style.toLowerCase().includes('infographic')
+                ? "💡 [Infographic Mode] Enter: Task, Context, Core Instruction, Constraint, Output (or describe your idea and AI will structure it!)"
+                : "[Context + Goal + Source + Expectations] Describe the image, object, or location you want AI to generate...";   // V102.314: the Master Formula hint stays
+            // V102.314: in clip mode the series placeholder stays; this one waits until an image engine is picked again
+            if (promptInput.dataset.glcPlaceholder) promptInput.dataset.glcPlaceholder = ph; else promptInput.placeholder = ph;
         };
+        window.DESIGN_STYLE_PREF_KEY = 'design_style_pref';
+        (function restoreDesignStylePref() {
+            const apply = function() {
+                try {
+                    const saved = localStorage.getItem(window.DESIGN_STYLE_PREF_KEY);
+                    if (!saved) return;
+                    const tile = Array.from(document.querySelectorAll('.style-option')).find(el => el.dataset.style === saved);
+                    if (tile) window.selectDesignStyle(tile); else localStorage.removeItem(window.DESIGN_STYLE_PREF_KEY);   // a tile that is gone → back to the default
+                } catch (e) {}
+            };
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply);
+            else apply();
+        })();
 
         // V92.56: Goldenweek 2-model selector (GPT-5.4 + Nano Banana 2.1 only) — single inline rail next to Create button.
         // Canonical state lives in hidden input #design-engine; the rail syncs to it via data-value.
@@ -21478,6 +21498,23 @@ RULES:
         window.glcSeconds = function(id) { const E = window.glcEngineOf(id || window.glcEngine()); return E ? E.seconds : window.GLC_SECONDS; };
         window.glcUsd = function(id) { const E = window.glcEngineOf(id || window.glcEngine()); return E ? E.usd : window.GLC_USD_PER_SECOND; };
         window.glcGhost = function(id) { const E = window.glcEngineOf(id); return E ? E.seconds + ' s · $' + (E.seconds * E.usd).toFixed(2) : ''; };
+        // V102.314: the clip chips' ghost (8 s · $0.40) is written from GLC_ENGINES, so a price change is one edit; image chips keep their own
+        window.glcPaintGhosts = function() {
+            document.querySelectorAll('.alabasta-genmage-quick-rail[aria-label="Engine quick switch"] .alabasta-genmage-quick-chip').forEach(chip => {
+                const g = window.glcGhost(chip.dataset.value), el = chip.querySelector('.gm-ghost');
+                if (g && el) el.textContent = g;
+            });
+        };
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', window.glcPaintGhosts); else window.glcPaintGhosts();
+        // V102.314: ① the plan is text only (free) · ② every ▶ is a paid render · 💰 what the whole series costs, before any click
+        window.glcStepsHtml = function(s) {
+            const E = window.glcEngineOf(window.glcEngine()) || { seconds: window.GLC_SECONDS, usd: window.GLC_USD_PER_SECOND };
+            const n = s.episodes.length, done = s.episodes.filter(e => e.status === 'done');
+            const spent = done.reduce((t, e) => t + Number(e.costUsd || 0), 0);
+            return '<span class="glc-step done" title="The Enhancer model wrote the plan — text only, no clip cost">① Plan · free ✓</span>'
+                + '<span class="glc-step' + (done.length === n ? ' done' : '') + '" title="Each ▶ asks first, then renders ONE clip — you pay per clip that comes back">② ▶ Render one at a time · paid' + (done.length ? ' · ' + done.length + '/' + n : '') + '</span>'
+                + '<span class="glc-step" title="Rendered so far / the whole series at this engine\'s price">💰 $' + spent.toFixed(2) + ' / ≈ $' + (E.seconds * E.usd * n).toFixed(2) + ' series</span>';
+        };
         window._glcSeries = null;           // { id, topic, model, episodes: [...] }
         window._glcClip = null;             // the clip in the preview: { n, dataUrl, seconds, model, ms }
 
@@ -21497,7 +21534,7 @@ RULES:
             const card = document.getElementById('glc-episodes-card');
             const promptInput = document.getElementById('design-prompt');
             if (btn && !btn.disabled) {
-                btn.innerHTML = clip ? '<i class="fa-solid fa-clapperboard"></i> Plan 10 episodes' : '<i class="fa-solid fa-wand-magic-sparkles"></i> Create';
+                btn.innerHTML = clip ? '<i class="fa-solid fa-clapperboard"></i> Plan 10 episodes<small class="gm-ghost">free · text only</small>' : '<i class="fa-solid fa-wand-magic-sparkles"></i> Create';   // V102.314: + the free tier, said on the button
                 btn.title = clip ? 'Step 1 · the Enhancer model plans the series (text only); nothing is rendered or paid yet' : 'Create Masterpiece · สร้างภาพ · 이미지 생성';   // V102.292: the image-mode tooltip carries the full name
             }
             if (promptInput) {
@@ -21512,6 +21549,8 @@ RULES:
             if (card) card.style.display = clip && window._glcSeries ? 'block' : 'none';
             const pill = document.getElementById('glc-cost-pill');
             if (pill && clip && window._glcSeries) pill.textContent = window.glcCostText(window._glcSeries.episodes.length);   // V102.306: per-engine price
+            const steps = document.getElementById('glc-steps');
+            if (steps && clip && window._glcSeries) steps.innerHTML = window.glcStepsHtml(window._glcSeries);   // V102.314: the series total follows the engine
         };
 
         // Step 1 — the Enhancer model writes the plan as JSON ({"episodes":[…]} — an object, never a bare array).
@@ -21585,6 +21624,8 @@ Exactly 10 episodes, n = 1..10, in a sensible learning order. Keep drug names, d
             if (cnt) cnt.textContent = s.episodes.length + (done ? ' · ' + done + ' done' : '') + (rendering ? ' · ' + rendering + ' rendering' : '');
             const pill = document.getElementById('glc-cost-pill');
             if (pill) pill.textContent = window.glcCostText(s.episodes.length);
+            const steps = document.getElementById('glc-steps');
+            if (steps) steps.innerHTML = window.glcStepsHtml(s);
             list.innerHTML = s.episodes.map(e => {
                 const busy = e.status === 'rendering';
                 const row = '<div class="glc-no">EP' + String(e.n).padStart(2, '0') + '</div>'
@@ -21686,7 +21727,7 @@ Exactly 10 episodes, n = 1..10, in a sensible learning order. Keep drug names, d
             const t0 = Date.now();
             let timer = null;
             if (previewContainer) {
-                previewContainer.innerHTML = '<div style="text-align:center;"><i class="fa-solid fa-clapperboard fa-beat" style="font-size:4em; color:#e67e22; margin-bottom:20px;"></i><h3>Rendering EP' + String(n).padStart(2, '0') + '…</h3><p style="color:#888;">Gemini Omni Flash · 9:16 · ' + window.GLC_SECONDS + ' s · <span id="glc-elapsed">0</span> s</p></div>';
+                previewContainer.innerHTML = '<div style="text-align:center;"><i class="fa-solid fa-clapperboard fa-beat" style="font-size:4em; color:#e67e22; margin-bottom:20px;"></i><h3>Rendering EP' + String(n).padStart(2, '0') + '…</h3><p style="color:#888;">' + ((window.glcEngineOf(window.glcEngine()) || { label: 'Omni Flash' }).label) + ' · 9:16 · ' + window.glcSeconds() + ' s · <span id="glc-elapsed">0</span> s</p></div>';   // V102.314: the engine actually rendering
                 timer = setInterval(() => { const el = document.getElementById('glc-elapsed'); if (el) el.textContent = Math.round((Date.now() - t0) / 1000); }, 1000);
             }
             try {
