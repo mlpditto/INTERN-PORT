@@ -133,7 +133,7 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
             out.rows = document.querySelectorAll('#glc-episodes-list .glc-ep').length;
             out.cardAfterPlan = $('#glc-episodes-card').style.display;
             out.statuses = [...document.querySelectorAll('#glc-episodes-list .glc-ep')].map(e => e.dataset.status);
-            out.count = txt($('#glc-episodes-count')); out.cost = txt($('#glc-cost-pill'));
+            out.count = txt($('#glc-episodes-count')); out.cost = txt($('#glc-cost-pill')); out.steps = [...document.querySelectorAll('#glc-steps .glc-step')].map(txt);   // V102.314
             out.row3 = txt($('#glc-ep-3 .glc-t')); out.row3chips = [...document.querySelectorAll('#glc-ep-3 .glc-f span')].map(txt);
             out.btnAfterPlan = txt($('#btn-generate-design'));
             // V102.305: ⧉ copies one episode / the whole plan as text
@@ -193,20 +193,20 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
         assert.equal(r.clipChipLabel, '🎬 Clip 9:168 s · $0.80'); assert.match(r.clipChipTitle, /9:16 vertical clip with audio · about \$0\.10 per second/);
         assert.deepEqual(r.valid, r.chips, 'pref restore accepts every chip, nothing else');
         assert.deepEqual([r.btnBefore, r.cardBefore], ['Create', 'none'], 'image mode untouched before the pick');
-        assert.deepEqual([r.engine, r.clipMode, r.btnClip, r.cardClipNoPlan], ['as/gemini-omni-1.1-flash', true, 'Plan 10 episodes', 'none'], 'Clip mode: button relabelled, no card until a plan exists');
+        assert.deepEqual([r.engine, r.clipMode, r.btnClip, r.cardClipNoPlan], ['as/gemini-omni-1.1-flash', true, 'Plan 10 episodesfree · text only', 'none'], 'Clip mode: button relabelled, no card until a plan exists');
         assert.match(r.btnTitle, /nothing is rendered or paid yet/); assert.match(r.placeholderClip, /10-episode 9:16 series/);
         assert.deepEqual(r.planCall, { model: r.enhancer, isJson: true, feature: 'clip_plan', asksObject: true, tenAsked: true, hasTopic: true }, 'the Enhancer plans as a JSON object');
-        assert.deepEqual([r.rows, r.cardAfterPlan, r.btnAfterPlan], [10, 'block', 'Plan 10 episodes'], '10 rows in the Episodes card');
+        assert.deepEqual([r.rows, r.cardAfterPlan, r.btnAfterPlan], [10, 'block', 'Plan 10 episodesfree · text only'], '10 rows in the Episodes card');
         assert.equal(r.copyBtns, '10/1', '⧉ on every row + one for the plan');
         assert.ok(/^EP01 · /.test(r.copyEp) && /\n🎯 /.test(r.copyEp) && /\n💡 /.test(r.copyEp) && /\n🗣 /.test(r.copyEp) && /\n🎨 /.test(r.copyEp), 'episode text: EP · title, then 🎯 💡 🗣 🎨 lines: ' + JSON.stringify(r.copyEp).slice(0, 120));
         assert.ok(/EP01 · /.test(r.copyPlan) && /EP10 · /.test(r.copyPlan) && (r.copyPlan.match(/\n\n/g) || []).length >= 9, 'plan text: all ten episodes separated by blank lines');
         assert.deepEqual(r.statuses, Array(10).fill('planned'));
-        assert.equal(r.count, '10'); assert.equal(r.cost, 'Omni Flash · 8 s · ≈ $0.80 / clip · $8.00 all', 'cost before any click');
+        assert.deepEqual(r.steps, ['① Plan · free ✓', '② ▶ Render one at a time · paid', '💰 $0.00 / ≈ $8.00 series'], 'V102.314: the two tiers + the series total before any click'); assert.equal(r.count, '10'); assert.equal(r.cost, 'Omni Flash · 8 s · ≈ $0.80 / clip · $8.00 all', 'cost before any click');
         assert.equal(r.row3, 'Episode 3 titleตอนที่ 3'); assert.deepEqual(r.row3chips, ['🎯 Objective 3', '💡 Fact 3', '🗣 Spoken line 3', '🎨 Visual 3 scene']);
         assert.deepEqual(r.editFields, ['title', 'titleTh', 'objective', 'fact', 'narration', 'captionTh', 'visual'], 'in-place edit has the 7 fields');
         assert.deepEqual([r.row3After, r.ep3Visual, r.editClosed], ['Missed dose ruleตอนที่ 3', 'Clock face flipping day to night', true], 'Done writes the row back');
         assert.equal(r.ask, '≈ $0.80 · 8 sRender✕', 'inline cost ask, no native dialog'); assert.ok(r.askHasRender);
-        assert.equal(r.duringStatus, 'rendering'); assert.match(r.duringPreview, /Rendering EP01/);
+        assert.equal(r.duringStatus, 'rendering'); assert.match(r.duringPreview, /Rendering EP01…Omni Flash · 9:16 · 8 s/);
         assert.deepEqual(r.renderCalls, [
             { model: 'as/gemini-omni-1.1-flash', video: { aspectRatio: '9:16', resolution: '720p', seconds: 8, state: 'submit' } },
             { model: 'as/gemini-omni-1.1-flash', video: { state: 'poll', interactionId: 'int-1' } }
