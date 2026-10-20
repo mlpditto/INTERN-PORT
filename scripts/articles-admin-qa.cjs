@@ -1,4 +1,4 @@
-// Admin 📰 Articles (V102.335): ➕ Create ▸ Article opens the Articles modal — status chips (All · Draft · Scheduled · Live · Ended), the editor
+// Admin 📰 Articles (V102.335; V102.338 editor blend — status line, wrong-language warning, folds, sticky bar): ➕ Create ▸ Article opens the Articles modal — status chips (All · Draft · Scheduled · Live · Ended), the editor
 // (cover · EN/TH/KO · title · markdown body · window · 🔁 later · audience chips · quiz / Codex links), the 📱 preview, and the save paths
 // (draft / schedule / back to draft / two-tap delete) into articles/{id}. The REAL public/articles-admin.js inside the REAL admin.html, with a fake
 // Firestore (nothing leaves the page). Also: the HTML wiring and the Firestore rule.
@@ -116,6 +116,7 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
       const add = writes[writes.length - 1];
       out.add = [add[0], add[1], add[3].status, add[3].title, add[3].audience, add[3].links.map(l => l.kind + ':' + l.id), add[3].rerun, add[3].startAt instanceof Date, add[3].createdAt, add[3].updatedAt, add[3].cover];
       out.afterAdd = [Articles._S.cur.id, qa('.art-row').length, qa('.art-btns button').map(b => b.textContent.trim())];
+      out.afterSave = q('#art-stl').textContent;
       // back to draft = update, same doc
       await Articles.save(false);
       const up = writes[writes.length - 1];
@@ -128,6 +129,27 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
       // a failed save shows the reason and keeps the editor
       Articles.edit('a1'); window.db.collection = () => ({ doc: () => ({ update: async () => { throw new Error('permission-denied'); } }) });
       await Articles.save(true); out.fail = [q('.art-err') && q('.art-err').textContent, !!q('.art-ed')];
+      // ---- V102.338 editor blend
+      Articles.edit('a1');
+      out.edge = qa('.art-row').map(b => (b.className.match(/st-(\w+)/) || [])[1]);
+      out.stLive = q('#art-stl').textContent;
+      out.secs = qa('details.art-sec').map(d => d.querySelector('summary b').textContent + ':' + d.open);
+      out.whenSum = qa('details.art-sec')[0].querySelector('summary').textContent;
+      out.coverFold = [qa('.art-emo').length]; Articles.coverPick(); out.coverFold.push(qa('.art-emo').length); Articles.cover('🦠'); out.coverFold.push(qa('.art-emo').length, Articles._S.cur.cover.emoji);
+      out.dirty = q('#art-stl').textContent.includes('● Unsaved');
+      out.pvBadge = q('.art-pvb').textContent;
+      // wrong language: Thai typed into EN → warning + Move to TH
+      Articles.edit(null);
+      out.newSecs = qa('details.art-sec').map(d => d.open);
+      out.stNew = q('#art-stl').textContent; out.pvNew = q('.art-pvb').textContent;
+      out.fb = qa('.art-ed > .art-ln:nth-child(2) .art-c').map(b => b.textContent.trim());
+      const t3 = q('#art-title'); t3.value = '“อดทนคืออวดตัว”'; t3.dispatchEvent(new Event('input'));
+      const b3 = q('#art-bodyta'); b3.value = 'ปัจจุบันคำว่า “อดทน (がまん)” ใช้ทั่วไปในความหมายว่า ทน อดกลั้น'; b3.dispatchEvent(new Event('input'));
+      out.warn = [q('#art-warn').textContent, !!q('#art-warn button'), q('#art-stl').textContent.includes('● Unsaved')];
+      q('#art-warn button').click();
+      out.moved = [Articles._S.lang, Articles._S.cur.title.en, Articles._S.cur.title.th, (Articles._S.cur.body.th || '').startsWith('ปัจจุบัน'), q('#art-warn').textContent, q('#art-title').value];
+      Articles.lang('en'); const t4 = q('#art-title'); t4.value = 'Patience is pride'; t4.dispatchEvent(new Event('input'));
+      out.enOk = q('#art-warn').textContent;
       Articles.close(); out.closed = document.getElementById('articlesModal').style.display;
       return out;
     }, { D });
@@ -137,7 +159,7 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
     assert.deepEqual(r.rows, ['live:Live one', 'draft:Draft one', 'ended:Old one'], 'list order: live → scheduled → draft → ended');
     assert.equal(r.langsLive, 1, 'the missing KO version is struck through');
     assert.deepEqual(r.liveOnly, ['Live one'], 'the Live chip filters');
-    assert.deepEqual(r.def.slice(0, 2), [true, true], '＋ New fills a window'); assert.deepEqual(r.def[2], ['Discard', 'Save draft', '📅 Schedule']);
+    assert.deepEqual(r.def.slice(0, 2), [true, true], '＋ New fills a window'); assert.deepEqual(r.def[2], ['🗑', 'Save draft', '📅 Schedule'], 'V102.338: 🗑 is a quiet icon (two taps), Schedule is the primary');
     assert.equal(r.preview[0], '3 inhaler mistakes', 'the preview follows the title'); assert.ok(r.preview[1], 'and renders the markdown body'); assert.match(r.preview[2], /^26 \/ 2000 · ~1 min$/);
     assert.ok(r.caretKept, 'typing does not re-render the textarea (the caret stays)');
     assert.deepEqual(r.thaiShown, ['“อดทนคืออวดตัว”', true, 0, true, false], 'Thai in the preview is not hidden by the EN-mode language switch: ' + JSON.stringify(r.thaiShown));
@@ -150,12 +172,27 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
     assert.deepEqual(r.add.slice(0, 3), ['add', 'articles', 'scheduled'], '📅 Schedule adds an articles doc with status scheduled');
     assert.deepEqual(r.add[3], { en: '3 inhaler mistakes' }); assert.deepEqual(r.add[4], { divisions: ['RSU'], groups: ['INTERN 1'] }); assert.deepEqual(r.add[5], ['quiz:q1', 'codex:d1']);
     assert.equal(r.add[6], 'any'); assert.equal(r.add[7], true); assert.deepEqual([r.add[8], r.add[9]], ['TS', 'TS'], 'createdAt + updatedAt are server timestamps'); assert.deepEqual(r.add[10], { emoji: '🫁' });
-    assert.equal(r.afterAdd[0], 'new1'); assert.equal(r.afterAdd[1], 4, 'the new article joins the list'); assert.deepEqual(r.afterAdd[2], ['🗑', '↩ Back to draft', '💾 Save']);
+    assert.equal(r.afterAdd[0], 'new1'); assert.match(r.afterSave, /Saved/, 'after 📅 Schedule the status line says Saved: ' + r.afterSave); assert.equal(r.afterAdd[1], 4, 'the new article joins the list'); assert.deepEqual(r.afterAdd[2], ['🗑', '↩ Back to draft', '💾 Save']);
     assert.deepEqual(r.update, ['update', 'new1', 'draft', false], '↩ Back to draft updates the same doc (createdAt untouched)');
     assert.deepEqual(r.thDraft, { en: 'Draft one', th: 'ร่าง' }, 'a draft may be saved with any language');
     assert.deepEqual(r.armed, ['Delete?', true], 'the first 🗑 tap only arms the button'); assert.deepEqual(r.deleted, ['delete', 'a3', false, false], 'the second deletes and closes the editor');
     assert.match(r.fail[0] || '', /permission-denied/, 'a failed save shows the error'); assert.equal(r.fail[1], true, 'and keeps the editor open');
     assert.equal(r.closed, 'none');
+    // V102.338 editor blend
+    assert.deepEqual([...new Set(r.edge)].sort(), ['draft', 'ended', 'live'], 'list rows are edged by status: ' + r.edge);
+    assert.match(r.stLive, /^Live\s*Showing now · ends /, 'one status line: Live + what happens next: ' + r.stLive);
+    assert.deepEqual(r.secs, ['When & who:false', 'Links:false'], 'an existing article folds When & who and an empty Links');
+    assert.match(r.whenSum, /📅 .+ · 🔁 new interns · 👥 RSU ~1/, 'the fold says when, 🔁, who and how many: ' + r.whenSum);
+    assert.deepEqual(r.coverFold, [1, 10, 1, '🦠'], 'the cover is one chip; a tap opens the ten, a pick folds it again');
+    assert.ok(r.dirty, 'a change shows ● Unsaved');
+    assert.match(r.pvBadge, /^Live\s*Interns see it /, 'the preview says when interns see it');
+    assert.deepEqual(r.newSecs, [true, false], 'a new article opens When & who');
+    assert.match(r.stNew, /^Draft\s*Not live yet · 📅 Schedule when ready/); assert.match(r.pvNew, /Interns do not see drafts/);
+    assert.deepEqual(r.fb, ['EN', 'TH → EN', 'KO → EN'], 'empty TH / KO say they fall back to EN');
+    assert.match(r.warn[0], /looks like Thai, not English/, 'Thai typed into EN is flagged inline'); assert.ok(r.warn[1], 'with a Move to TH button'); assert.ok(r.warn[2], 'and the status line says ● Unsaved');
+    assert.deepEqual(r.moved, ['th', '', '“อดทนคืออวดตัว”', true, '', '“อดทนคืออวดตัว”'], 'Move to TH moves title + body into TH and switches to it');
+    assert.equal(r.enOk, '', 'English in EN = no warning');
+    assert.match(r.afterSave || 'Saved', /Saved/);
     const bad = errors.filter(e => /Articles|articles-admin|art-/.test(e));
     assert.deepEqual(bad, [], 'no page errors from the module: ' + bad.join(' | '));
     console.log('PASS: admin 📰 Articles — Create ▸ Article row, status chips + list, editor (EN/TH/KO, markdown, window, 🔁, audience, quiz/Codex links), 📱 preview, draft / schedule / back to draft / two-tap delete → articles/{id}, rule');
