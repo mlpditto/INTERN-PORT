@@ -900,15 +900,20 @@ function omniStatus(data) {
 // · GET /api/v1/videos/{id}/content?index=0 (Authorization) → the MP4. Only the four models the admin can pick.
 const OR_VIDEO_BASE = "https://openrouter.ai/api/v1/videos";
 const OR_VIDEO_MODELS = { "google/veo-3.1-lite": 8, "kwaivgi/kling-v3.0-std": 15, "heygen/heygen-video-1": 15, "bytedance/seedance-2.0-fast": 15 };
+// Per-model limits from the OpenRouter model pages (checked 2026-10-21): HeyGen Video 1 renders 480p / 768p / 2K only — no
+// 720p, which it rejected — and 5–15 s. Everyone else keeps 480p / 720p / 1080p and a 4 s floor.
+const OR_VIDEO_RES = { "heygen/heygen-video-1": ["480p", "768p", "2K"] };
+const OR_VIDEO_MIN = { "heygen/heygen-video-1": 5 };
 function orVideoBody(model, prompt, video) {
     const v = video || {};
-    const max = OR_VIDEO_MODELS[model] || 8;
-    const seconds = Math.min(max, Math.max(4, Math.round(Number(v.seconds) || 8)));
+    const max = OR_VIDEO_MODELS[model] || 8, min = OR_VIDEO_MIN[model] || 4;
+    const seconds = Math.min(max, Math.max(min, Math.round(Number(v.seconds) || 8)));
+    const res = OR_VIDEO_RES[model] || ["480p", "720p", "1080p"];
     return {
         model,
         prompt: String(prompt || "").trim(),
         duration: seconds,
-        resolution: ["480p", "720p", "1080p"].includes(v.resolution) ? v.resolution : "720p",
+        resolution: res.includes(v.resolution) ? v.resolution : (res.includes("720p") ? "720p" : "768p"),
         aspect_ratio: v.aspectRatio === "16:9" ? "16:9" : "9:16",
         generate_audio: true
     };

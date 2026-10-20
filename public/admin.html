@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.349)</title>
+    <title>Nika Admin (V102.350)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -9103,7 +9103,7 @@
                                             <!-- V102.306: four more clip engines through OpenRouter (proxy route in callAIProxy); the ghost = clip length · price per clip -->
                                             <button type="button" class="alabasta-genmage-quick-chip" data-value="or/google/veo-3.1-lite" onclick="selectDesignEngine(this)" title="OpenRouter — Veo 3.1 Lite · 9:16 with audio · $0.05 per second (8 s ≈ $0.40) · cheapest" aria-label="Clip via Veo 3.1 Lite"><span class="text-ai-logo" data-owner="gemini" aria-hidden="true"></span>Veo Lite<small class="gm-ghost">8 s · $0.40</small></button>
                                             <button type="button" class="alabasta-genmage-quick-chip" data-value="or/kwaivgi/kling-v3.0-std" onclick="selectDesignEngine(this)" title="OpenRouter — Kling 3.0 Std · 9:16 with audio · $0.126 per second (8 s ≈ $1.01) · up to 15 s" aria-label="Clip via Kling 3.0 Std"><span class="text-ai-logo" data-owner="kling" aria-hidden="true"></span>Kling<small class="gm-ghost">8 s · $1.01</small></button>
-                                            <button type="button" class="alabasta-genmage-quick-chip" data-value="or/heygen/heygen-video-1" onclick="selectDesignEngine(this)" title="OpenRouter — HeyGen Video 1 · avatar presenter, 9:16 with audio · about $0.10 per second at 2K (8 s ≈ $0.80)" aria-label="Clip via HeyGen Video 1"><span class="text-ai-logo" data-owner="heygen" aria-hidden="true"></span>HeyGen<small class="gm-ghost">8 s · $0.80</small></button>
+                                            <button type="button" class="alabasta-genmage-quick-chip" data-value="or/heygen/heygen-video-1" onclick="selectDesignEngine(this)" title="OpenRouter — HeyGen Video 1 · avatar presenter, 9:16 with audio, 768p · $0.01–0.05 per second (8 s ≤ $0.40)" aria-label="Clip via HeyGen Video 1"><span class="text-ai-logo" data-owner="heygen" aria-hidden="true"></span>HeyGen<small class="gm-ghost">8 s · $0.40</small></button>
                                             <button type="button" class="alabasta-genmage-quick-chip" data-value="or/bytedance/seedance-2.0-fast" onclick="selectDesignEngine(this)" title="OpenRouter — Seedance 2.0 Fast · 9:16 with audio · from $0.04 per second (8 s ≈ $0.32)" aria-label="Clip via Seedance 2.0 Fast"><span class="text-ai-logo" data-owner="bytedance" aria-hidden="true"></span>Seedance<small class="gm-ghost">8 s · $0.32</small></button>
                                         </div>
                                         <input type="hidden" id="design-engine" value="as/gemini-nano-banana-2.1">
@@ -17891,6 +17891,7 @@
                 || (proxyProvider === 'gemini-aistudio' && /image/i.test(modelName))
                 || (proxyProvider === 'openrouter' && /image/i.test(modelName))
                 || (proxyProvider === 'gemini-aistudio' && /^gemini-omni/i.test(modelName)) // V102.291: Omni video (Grand Line Clips) — the server is its only path
+                || (proxyProvider === 'openrouter' && !!(generationOptions && generationOptions.video)) // V102.350: OpenRouter video too — a proxy error fell back to chat/completions and hid it ("cannot be used with the chat/completions endpoint")
                 || (proxyProvider === 'openai' && /^gpt-image-/.test(modelName));
             // V101.72: the proxy's own error when it DID answer (non-2xx). Without it a definite answer
             // such as OpenRouter's "No endpoints found that support image input" (DeepSeek V4 Pro + an
@@ -21677,7 +21678,7 @@ RULES:
             'as/gemini-omni-1.1-flash':      { label: 'Omni Flash',       short: 'Clip 9:16', seconds: 8, usd: 0.10,  max: 10, vendor: 'gemini',  note: 'Google AI Studio' },
             'or/google/veo-3.1-lite':        { label: 'Veo 3.1 Lite',     short: 'Veo Lite',  seconds: 8, usd: 0.05,  max: 8,  vendor: 'gemini',  note: 'OpenRouter · cheapest' },
             'or/kwaivgi/kling-v3.0-std':     { label: 'Kling 3.0 Std',    short: 'Kling',     seconds: 8, usd: 0.126, max: 15, vendor: 'kling',   note: 'OpenRouter · up to 15 s' },
-            'or/heygen/heygen-video-1':      { label: 'HeyGen Video 1',   short: 'HeyGen',    seconds: 8, usd: 0.10,  max: 15, vendor: 'heygen',  note: 'OpenRouter · avatar presenter' },
+            'or/heygen/heygen-video-1':      { label: 'HeyGen Video 1',   short: 'HeyGen',    seconds: 8, usd: 0.05,  max: 15, vendor: 'heygen',  note: 'OpenRouter · 768p · avatar presenter' },   // V102.350: $0.01–0.05/s (480p–2K), upper bound
             'or/bytedance/seedance-2.0-fast':{ label: 'Seedance 2.0 Fast', short: 'Seedance', seconds: 8, usd: 0.04,  max: 15, vendor: 'seedance', note: 'OpenRouter · fast' }
         };
         window.glcEngineOf = function(id) { return window.GLC_ENGINES[id] || null; };
@@ -21977,7 +21978,7 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
                 + '<video id="generated-clip" class="glc-video" controls playsinline src="' + c.dataUrl + '"></video>'
                 + '<div style="font-size:0.82em; color:#64748b; max-width:260px; line-height:1.6;">'
                 + '<div style="font-weight:900; color:#334155; font-size:1.05em;">EP' + String(c.n).padStart(2, '0') + ' · ' + esc(e.title || '') + '</div>'
-                + c.seconds + ' s · 720p · 9:16 · audio on<br>' + esc(String(c.model).replace(/^as\//, '')) + ' · ' + Math.round(c.ms / 1000) + ' s · $' + Number(e.costUsd || 0).toFixed(2)
+                + c.seconds + ' s · ' + (/heygen/i.test(String(c.model)) ? '768p' : '720p') + ' · 9:16 · audio on<br>' /* V102.350: HeyGen has no 720p */ + esc(String(c.model).replace(/^as\//, '')) + ' · ' + Math.round(c.ms / 1000) + ' s · $' + Number(e.costUsd || 0).toFixed(2)
                 + (e.captionTh ? '<div style="margin-top:8px; color:#334155;">' + esc(e.captionTh) + '</div>' : '')
                 + '<div id="glc-clip-actions" style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; align-items:center;">'
                 + '<button type="button" class="btn-sm" onclick="glcDownloadClip()" title="Download MP4" style="background:#2c3e50; border-radius:20px; padding:9px 16px; font-weight:bold;"><i class="fa-solid fa-download"></i> MP4</button>'
