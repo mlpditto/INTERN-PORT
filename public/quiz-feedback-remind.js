@@ -95,7 +95,7 @@
         var go = document.getElementById('fbr-go'); if (go) go.focus();
     }
     function busy() {
-        if (document.getElementById('fbr-back')) return true;
+        if (document.getElementById('fbr-back') || document.getElementById('art-back')) return true;   // V101.176: + the 📰 article popup (articles.js calls check() when it closes)
         return Array.prototype.some.call(document.querySelectorAll('.modal'), function (m) { return m.style.display === 'flex' || m.classList.contains('open') || m.classList.contains('show'); });
     }
     function check() {
