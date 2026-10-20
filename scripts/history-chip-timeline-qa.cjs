@@ -45,7 +45,9 @@ vm.runInContext('var historyCache = [];\n'
     + 'this.setCache = c => { historyCache = c; };', ctx);
 
 const VmDate = vm.runInContext("Date", ctx);   // instanceof Date must hold inside the vm
-const now = Date.now(), H = 3600e3, D = 86400e3, t = ms => new VmDate(now - ms);
+// anchored at 12:00 today (local), so "Today" / "Yesterday" hold at any hour the test runs
+const noon = new Date(); noon.setHours(12, 0, 0, 0);
+const now = noon.getTime(), H = 3600e3, D = 86400e3, t = ms => new VmDate(now - ms);
 // Shaped like Bew's 15 logs on 2026-10-20 (sample, not real data)
 const logs = [
     { t: t(3 * H - 60e3), type: 'beri', beriAmount: 5, text: '⏱️ Beat deadline (48h+) · PRETEST-1.3' },

@@ -157,12 +157,13 @@ const QuizCover = (() => {
 <button type="button" data-badge-toggle class="quiz-cover-plus" title="ป้ายมุมปก เช่น ICD-11 6B00 (ไม่บังคับ) · ใช้กับปกที่สร้างด้วย AI" aria-label="Add corner badge" aria-expanded="false">🏷️</button>
 <button type="button" data-ref-toggle class="quiz-cover-plus" title="Style reference: pick covers of other quizzes (optional)" aria-label="Style reference from other quiz covers" aria-expanded="false">🧬</button>
 <button type="button" data-generate class="quiz-cover-generate" title="สร้างปกด้วย AI" aria-label="Generate cover with AI">✨ Generate</button>
-<div class="quiz-cover-style-row"><span class="quiz-cover-style-label" aria-hidden="true">🎨</span><div class="quiz-cover-style-rail" role="group" aria-label="Cover style">${STYLES.map((s, i) => `<button type="button" data-style-chip data-value="${s.id}" class="${i === 0 ? 'active' : ''}" aria-pressed="${i === 0}" aria-label="${s.label}" title="${s.label} · ${s.titleTh}"><span aria-hidden="true">${s.emoji}</span><span class="quiz-cover-style-name"> ${s.label}</span></button>`).join('')}</div><span class="quiz-cover-lock" title="กรอบคงที่ทุกสไตล์: แนวตั้ง 3:4 · ภาพหลักด้านบน · แถบชื่อด้านล่าง" aria-label="Fixed frame for every style: portrait 3:4, title band" role="img">🔒</span></div>
+<div class="quiz-cover-style-row"><span class="quiz-cover-style-label" aria-hidden="true">🎨</span><div class="quiz-cover-style-rail" role="group" aria-label="Cover style">${STYLES.map((s, i) => `<button type="button" data-style-chip data-value="${s.id}" class="${i === 0 ? 'active' : ''}" aria-pressed="${i === 0}" aria-label="${s.label}" title="${s.label} · ${s.titleTh}"><span aria-hidden="true">${s.emoji}</span><span class="quiz-cover-style-name"> ${s.label}</span></button>`).join('')}</div><span class="quiz-cover-lock" title="กรอบคงที่ทุกสไตล์: แนวตั้ง 3:4 · ภาพหลักด้านบน · แถบชื่อด้านล่าง" aria-label="Fixed frame for every style: portrait 3:4, title band" role="img"><i aria-hidden="true"></i>3:4</span></div>
 <div class="quiz-cover-refs" data-refs hidden></div>
 <input type="text" data-prompt maxlength="300" placeholder="Optional detail — e.g. blue tones, a heart as the hero" title="แนวภาพเพิ่มเติม (ไม่บังคับ)" hidden>
 <input type="text" data-badge maxlength="${BADGE_MAX}" placeholder="Corner badge — e.g. ICD-11 6B00 · empty = none" title="ป้ายมุมปก · เว้นว่าง = ไม่มีป้าย · ระวังอย่าใส่สิ่งที่เป็นคำตอบของข้อสอบ" aria-label="Corner badge text" hidden>
 <div class="quiz-cover-ai-preview" hidden><img alt="AI cover candidate"><div><button type="button" data-apply title="ใช้ปกนี้" aria-label="Apply this cover">✓</button><button type="button" data-discard title="ยกเลิกภาพนี้" aria-label="Discard this candidate">✕</button></div></div>
-<small role="status" aria-live="polite"></small>`;
+<small role="status" aria-live="polite"></small>
+<div class="quiz-cover-sum"><img alt="Quiz cover"><span><b>Cover</b><small data-sum-text></small></span><button type="button" data-unfold title="เปลี่ยนหรือสร้างปกใหม่" aria-label="Change cover">✏️ Change</button></div>`;
         document.getElementById('quiz-title').parentElement.parentElement.after(el);
         el.querySelectorAll('img').forEach(img => img.tabIndex = 0);
         const input = el.querySelector('[type=file]');
@@ -217,6 +218,7 @@ const QuizCover = (() => {
         el.querySelector('[data-remove]').onclick = () => set('');
         el.querySelector('[data-generate]').onclick = generate;
         el.querySelector('[data-apply]').onclick = applyGenerated;
+        el.querySelector('[data-unfold]').onclick = () => el.classList.remove('is-folded');
         el.querySelector('[data-discard]').onclick = () => { clearCandidate(); el.querySelector('[role=status]').textContent = ''; };
         input.onchange = async () => {
             const file = input.files[0]; input.value = '';
@@ -448,6 +450,7 @@ const QuizCover = (() => {
         clearCandidate();
         editor().querySelector('[data-prompt]').value = '';
         const el = editor(), url = safeUrl(value), img = el.querySelector('img');
+        el.classList.remove('is-folded'); // fold() folds again when a quiz is opened
         el.querySelector('[type=hidden]').value = url;
         img.hidden = !url; if (url) img.src = url; else img.removeAttribute('src');
         const uploadBtn = el.querySelector('[data-upload]');
@@ -462,6 +465,21 @@ const QuizCover = (() => {
     function setStyle(value) {
         style = STYLES.some(s => s.id === value) ? value : STYLES[0].id;
         editor().querySelectorAll('[data-style-chip]').forEach(c => { const on = c.dataset.value === style; c.classList.toggle('active', on); c.setAttribute('aria-pressed', String(on)); });
+        paintSummary();
+    }
+    // V102.344: a quiz opened WITH a cover shows one line — thumbnail · style · 3:4 · ✏️ Change (unfolds the
+    // generator). No model name: the model that made a cover is not saved, the chip is only the last pick.
+    function paintSummary() {
+        const el = editor(), s = STYLES.find(x => x.id === style) || STYLES[0], url = el.querySelector('[type=hidden]').value;
+        el.querySelector('[data-sum-text]').textContent = `${s.emoji} ${s.label} · 3:4`;
+        const img = el.querySelector('.quiz-cover-sum img');
+        if (url) img.src = url; else img.removeAttribute('src');
+    }
+    function fold() {
+        const el = editor();
+        if (!el.querySelector('[type=hidden]').value) return;
+        paintSummary();
+        el.classList.add('is-folded');
     }
     function setBadge(value) {
         const el = editor(), input = el.querySelector('[data-badge]'), text = String(value || '').trim().slice(0, BADGE_MAX);
@@ -518,5 +536,5 @@ const QuizCover = (() => {
         const escaped = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, '&#39;');
         return `<span class="quiz-admin-cover" title="Quiz นี้มีปกแล้ว" data-th-title="Quiz นี้มีปกแล้ว"><img src="${escaped}" alt="Quiz cover" loading="lazy" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span hidden role="img" aria-label="Cover set; preview unavailable" title="มีปกแล้ว แต่โหลดภาพตัวอย่างไม่ได้">🖼️</span></span>`;
     }
-    return { set, setStyle, style: () => style, setBadge, badge: badgeText, decorate, adminThumbnail, quickInsert, isBusy: () => busy, value: () => editor().querySelector('[type=hidden]').value, _cropToCover: cropToCover /* tests */ };
+    return { set, setStyle, fold, style: () => style, setBadge, badge: badgeText, decorate, adminThumbnail, quickInsert, isBusy: () => busy, value: () => editor().querySelector('[type=hidden]').value, _cropToCover: cropToCover /* tests */ };
 })();
