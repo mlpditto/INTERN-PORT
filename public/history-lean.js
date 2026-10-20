@@ -3,9 +3,10 @@
 window.historyLean = (() => {
     const T = {
         case: { e: '🩺', n: 'Case' }, work: { e: '📝', n: 'Work' }, quiz: { e: '🧠', n: 'Quiz' }, quest: { e: '⭐', n: 'Quest' },
-        reflective: { e: '😊', n: 'Journal' }, learning_note: { e: '🎓', n: 'Note' }, product: { e: '🛒', n: 'Product' }, explore_link: { e: '🔗', n: 'Link' }, content_review: { e: 'Ⓐ', n: 'Review' }
+        reflective: { e: '😊', n: 'Journal' }, learning_note: { e: '🎓', n: 'Note' }, product: { e: '🛒', n: 'Product' }, explore_link: { e: '🔗', n: 'Link' }, content_review: { e: 'Ⓐ', n: 'Review' },
+        article: { e: '📰', n: 'Article' }   // V101.176: articles.js historyItems()
     };
-    const ORDER = ['case', 'quiz', 'explore_link', 'work', 'reflective', 'learning_note', 'product', 'quest', 'content_review'];
+    const ORDER = ['case', 'quiz', 'explore_link', 'work', 'reflective', 'learning_note', 'product', 'quest', 'content_review', 'article'];
     const esc = s => escapeUnifiedHtml(s);
     const hueOf = s => { let h = 0; for (const c of String(s)) h = (h * 31 + c.codePointAt(0)) >>> 0; return h % 360; };
     const pending = s => s.status === 'pending' || s.status === 'รอตรวจ';
@@ -65,6 +66,7 @@ window.historyLean = (() => {
             const k = caseKey(s), h = hueOf(k);
             return '<span class="hl-lead"><span class="hl-disc" title="' + esc(sysName(k)) + ' · case ' + ctx.nth.get(s.id) + '" style="background:hsl(' + h + ',85%,92%);border:1px solid hsl(' + h + ',60%,82%)">' + sysEmoji(k) + '<b class="hl-nb">' + ctx.nth.get(s.id) + '</b></span></span>';
         }
+        if (type === 'article') return '<span class="hl-lead"><span class="hl-disc" style="background:#e0e7ff;border:1px solid #c7d2fe">' + esc((s.metadata && s.metadata.emoji) || '📰') + '</span></span>';   // V101.176: the article's cover emoji
         const emoji = type === 'reflective' && s.metadata && s.metadata.moodEmoji ? s.metadata.moodEmoji : (type === 'content_review' && s.metadata ? (s.metadata.verdict === 'approve' ? 'Ⓐ' : '↩') : t.e);   // V101.124: a filed review shows its verdict
         const h = hueOf(type);
         return '<span class="hl-lead"><span class="hl-disc" style="background:hsl(' + h + ',85%,93%);border:1px solid hsl(' + h + ',60%,84%)">' + esc(emoji) + '</span></span>';
@@ -80,6 +82,7 @@ window.historyLean = (() => {
             (b ? '<span class="hl-br" title="Beri">🪙 <b>' + (b > 0 ? '+' : '−') + Math.abs(b) + '</b></span>' : '') + '</span>';
     }
     function pillHtml(s) {
+        if (s.submissionType === 'article') return window.internArticles ? internArticles.pillHtml(s) : '';   // V101.176: ✓ Read · 👁 Closed · 📰 New
         if (s.submissionType === 'content_review') { const m = s.metadata || {}; return m.verdict === 'approve' ? '<span class="hl-pill">Ⓐ OK' + (Number(m.suggested) ? ' · +' + Number(m.suggested) : '') + '</span>' : '<span class="hl-pill hl-warn">↩ Changes</span>'; }   // V101.124
         if (pending(s)) return '<span class="hl-pill hl-warn">⏳ Pending</span>';
         if (s.status === 'rejected') return '<span class="hl-pill hl-bad">✕ Rejected</span>';
@@ -140,6 +143,8 @@ window.historyLean = (() => {
         if (type === 'case') {
             const rows = [['Patient', m.customer], ['Symptoms', m.symptoms], ['Notes', m.notes]].filter(r => r[1]);
             if (rows.length) body = '<div class="hl-facts">' + rows.map(r => '<span>' + r[0] + '</span><span>' + esc(r[1]) + '</span>').join('') + '</div>';
+        } else if (type === 'article') {
+            body = window.internArticles ? internArticles.detailHtml(s) : '';   // V101.176: the article itself, read in place
         } else if (type !== 'quiz' && type !== 'work' && type !== 'explore_link' && type !== 'content_review') {
             body = renderTypeDetailHtml(s);   // journal / quest / note / product keep their own detail
         }
