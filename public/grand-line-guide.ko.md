@@ -1,6 +1,6 @@
 # Grand Line Deck — 이미지·영상·오디오 만들기
 
-탭 **🏴‍☠️ Grand Line Deck** → 상단 세 모드: 🏴 Miss Goldenweek · 🧭 Research Log · 🐳 Laboon. 세 모드 왼쪽의 📖 를 누르면 언제든 이 안내를 다시 엽니다.
+탭 **🏴‍☠️ Grand Line Deck** → 상단 세 모드: 🏴 Miss Goldenweek · 🧭 Log Pose · 🐳 Laboon. 세 모드 왼쪽의 📖 를 누르면 언제든 이 안내를 다시 엽니다.
 
 ---
 
@@ -48,9 +48,9 @@
 
 ---
 
-## 4. 🧭 Research Log
+## 4. 🧭 Log Pose
 
-**위치:** 🧭 Research Log — 지식 베이스 위의 리서치 모델 채팅
+**위치:** 🧭 Log Pose — 지식 베이스 위의 리서치 모델 채팅
 
 - **Query Brain**에 질문(같은 Context + Goal + Source + Expectations 공식) 후 전송; **Suggest Prompts**가 시작점을 제안.
 - 📎 **Attach Image for Vision Analysis** — 슬라이드·라벨·차트 이미지를 질문과 함께 전송.

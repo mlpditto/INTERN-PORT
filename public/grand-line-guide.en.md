@@ -1,6 +1,6 @@
 # Grand Line Deck — how to make images, video and audio
 
-Tab: **🏴‍☠️ Grand Line Deck** → the three modes at the top: 🏴 Miss Goldenweek · 🧭 Research Log · 🐳 Laboon. Click 📖 (left of the three modes) any time to reopen this guide.
+Tab: **🏴‍☠️ Grand Line Deck** → the three modes at the top: 🏴 Miss Goldenweek · 🧭 Log Pose · 🐳 Laboon. Click 📖 (left of the three modes) any time to reopen this guide.
 
 ---
 
@@ -48,9 +48,9 @@ Tab: **🏴‍☠️ Grand Line Deck** → the three modes at the top: 🏴 Miss
 
 ---
 
-## 4. 🧭 Research Log
+## 4. 🧭 Log Pose
 
-**Where:** 🧭 Research Log — a chat with the research model over the knowledge base.
+**Where:** 🧭 Log Pose — a chat with the research model over the knowledge base.
 
 - Type the question in **Query Brain** (same Context + Goal + Source + Expectations recipe) and press send; **Suggest Prompts** offers starting points.
 - 📎 **Attach Image for Vision Analysis** sends a picture with the question (a slide, a label, a chart).
