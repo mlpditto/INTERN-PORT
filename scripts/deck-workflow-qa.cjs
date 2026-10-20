@@ -49,7 +49,7 @@ const MP4 = 'data:video/mp4;base64,AAAAIGZ0eXBpc29t';
         assert.deepEqual(await visibleChips(), ['as/gemini-nano-banana-2.1', 'or/openai/gpt-5.4-image-2', 'or/bytedance-seed/seedream-5-0-flash', 'or/openai/gpt-image-2.5-sunburst'], 'image intent shows image engines only (V102.315: + Seedream 5 · Sunburst)');
         assert.deepEqual(await steps(), ['✓Intent🖼 Image', '▶Brief', '·Style', '·Enhance', '·Createpaid', '·Review']);
         assert.equal(await page.isVisible('#gm-brief'), true); assert.equal(await page.isVisible('#design-prompt'), false);
-        assert.match(await page.textContent('#gm-style-text'), /friendly Thai pharmacist in a white coat/, '🎨 line shows the default style (V102.332: Pharmacist explainer)');
+        assert.match(await page.textContent('#gm-style-text'), /friendly Thai pharmacist in a white coat/, '🎨 line shows the default style (V102.333: Pharmacist explainer)');
 
         // 2. Brief fields → one prompt
         await page.fill('#gm-brief input[data-k="Context"]', 'Community pharmacy, new warfarin patients');
@@ -59,7 +59,7 @@ const MP4 = 'data:video/mp4;base64,AAAAIGZ0eXBpc29t';
         assert.deepEqual(await page.$$eval('#gm-brief .gm-f.ok', e => e.map(x => x.dataset.f)), ['Context', 'Goal']);
         assert.deepEqual(await steps(), ['✓Intent🖼 Image', '✓Brief', '✓Style', '▶Enhance', '·Createpaid', '·Review']);
         await page.evaluate(() => selectDesignStyle(document.querySelectorAll('.style-option')[3]));
-        assert.match(await page.textContent('#gm-style-text'), /flat vector infographic/i, '🎨 line follows the chip (V102.332: the 4th chip is 💊 Clean infographic)');
+        assert.match(await page.textContent('#gm-style-text'), /flat vector infographic/i, '🎨 line follows the chip (V102.333: the 4th chip is 💊 Clean infographic)');
 
         // 3. ⇄ Free text and back: labelled lines go to their field, other lines to Context; the mode survives a reload
         await page.click('#gm-brief-toggle');

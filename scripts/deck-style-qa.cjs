@@ -1,4 +1,4 @@
-// V102.332: Visual Style lives in the Brief. The REAL admin.html in Chromium (network stubbed), callUniversalAI stubbed.
+// V102.333: Visual Style lives in the Brief. The REAL admin.html in Chromium (network stubbed), callUniversalAI stubbed.
 // Miss Goldenweek has no left column (Research Log keeps it) · eight pharmacy chips first, default 🧑‍⚕️ Pharmacist explainer ·
 // the six One Piece styles behind one chip (a saved One Piece pick still restores and opens its group) · the 🛡️ line rides on
 // the enhancer prompt, the image prompt, the clip planner and every clip prompt.
