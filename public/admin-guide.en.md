@@ -32,7 +32,7 @@ The **Admin Portal** page has 3 ways in — use any one:
 | 📥 **Archive** | See archived items (Quests, Tasks, etc.) |
 | 📱 **UI** | Preview the intern's screen (LIFF Preview) without LINE |
 | 🔮 | AI Engine settings (keys / models) — if it says "not loaded yet", refresh the page |
-| ⚓ | Toggle the One Piece theme for AI Digital Lab + Laugh Tale |
+| ⚓ | Toggle the One Piece theme for Grand Line Deck + Laugh Tale |
 | **EN** | Label language — each tap cycles EN → KR → TH → K·T |
 | 🌓 | Switch light / dark mode |
 | 👋 **Logout** | Sign out |
@@ -46,7 +46,7 @@ The **Admin Portal** page has 3 ways in — use any one:
 | 📊 **Dashboard** | Home: work queue + Kanban + stats | Look at the numbers on the chip bar at the top — any chip that is not 0 means work is waiting |
 | 📦 **Assignments** | Manage Quizzes, exams, restaurant-review links, the reward shop | A **red badge** on the tab = Quizzes waiting to be reviewed |
 | 👥 **User Hub** | Intern list, scores, ranking, groups | Search an intern → see their history and scores |
-| 🤖 **AI Digital Lab** | AI tools for the team (chat, image generation, Podcast Studio) | Use when needed — nothing waiting here |
+| 🏴‍☠️ **Grand Line Deck** | AI tools for the team (chat, image generation, Podcast Studio) | Use when needed — nothing waiting here |
 | 🏝️ **Laugh Tale** | Review interns' **Reflections** and **Quiz feedback** | Open the feedback the AI marked "Needs a fix" |
 | 🏜️ **Alabasta** | Review queue for **Case** (patient cases) and **Product** (product listings) | Filter Pending → review one by one |
 | 🪨 **Poneglyph** | Codex (**Drug** / **Disease**), My Path, Memories | Review Drug/Disease drafts that interns submitted |

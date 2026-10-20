@@ -1,6 +1,6 @@
 # Grand Line Deck — วิธีทำภาพ วิดีโอ และเสียง
 
-แท็บ **AI Digital Lab** → โหมด 3 อย่างด้านบน: 🏴 Miss Goldenweek · 🧭 Research Log · 🐳 Laboon กดป้าย 🏴‍☠️ เมื่อไรก็ได้เพื่อเปิดคู่มือนี้อีก
+แท็บ **🏴‍☠️ Grand Line Deck** → โหมด 3 อย่างด้านบน: 🏴 Miss Goldenweek · 🧭 Research Log · 🐳 Laboon กด 📖 (ซ้ายของ 3 โหมด) เมื่อไรก็ได้เพื่อเปิดคู่มือนี้อีก
 
 ---
 
