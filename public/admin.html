@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.348)</title>
+    <title>Nika Admin (V102.349)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -32713,9 +32713,18 @@ ${JSON.stringify(sourceObj)}`;
             try {
                 let sourceText = "No context provided/Use general knowledge.";
                 let hasContext = false;
+                let kbLabel = null;   // V102.349: what the answer was built on, shown above it
                 if (useGrounding && knowledgeBaseCache.length > 0) {
-                    sourceText = queryKnowledgeBaseLocal(question);
-                    hasContext = true;
+                    const hit = kbFindPassages(question);
+                    if (hit.matched) {
+                        sourceText = hit.text;
+                        hasContext = true;
+                        kbLabel = '📎 ' + hit.sources.map(x => (typeof escapeHtml === 'function' ? escapeHtml : String)(x.name) + (x.passages > 1 ? ' ×' + x.passages : '')).join(' · ');
+                    } else {
+                        // no silent "first 3 files" any more — the model and the reader both know nothing matched
+                        sourceText = 'No passage in the knowledge base matched this question. Say so in one short line, then answer from general knowledge.';
+                        kbLabel = '📎 No match in the knowledge base — general knowledge';
+                    }
                 }
 
                 const systemPrompt = `You are the MedLifePlus Research Assistant. 
@@ -32758,7 +32767,7 @@ ${JSON.stringify(sourceObj)}`;
                 const lowerQ = question.toLowerCase();
                 const isQuizIntent = lowerQ.includes('quiz') || lowerQ.includes('exam') || lowerQ.includes('ข้อสอบ') || lowerQ.includes('แบบทดสอบ');
                 
-                appendResearchMessage('ai', aiResponse, hasContext ? "Knowledge Base Source Used" : null, question, false, isQuizIntent);
+                appendResearchMessage('ai', aiResponse, kbLabel, question, false, isQuizIntent);
                 
                 // 💾 Auto-Save
                 saveResearchToHistory(question, aiResponse, selectedModel);
@@ -32770,28 +32779,64 @@ ${JSON.stringify(sourceObj)}`;
             }
         }
 
-        function queryKnowledgeBaseLocal(query) {
+        // V102.349 (Log Pose A): the old search split the question on spaces — Thai has none, so a Thai question was ONE
+        // "keyword", rarely matched, and the first 3 files were sent instead (first 2,000 characters each). Now: the
+        // browser's word segmenter splits Thai, every document is cut into overlapping passages, passages are ranked by
+        // how many question words they hold, and the best ones go in up to a 20,000-character budget.
+        const KB_STOP = new Set(['ที่', 'และ', 'หรือ', 'ของ', 'ใน', 'การ', 'ความ', 'คือ', 'เป็น', 'มี', 'ได้', 'ให้', 'ว่า', 'กับ', 'จาก', 'ไม่', 'อย่างไร', 'อะไร', 'ไหม', 'บ้าง',
+            'ช่วย', 'หน่อย', 'ครับ', 'ค่ะ', 'คะ', 'นี้', 'นั้น', 'ซึ่ง', 'แล้ว', 'ก็', 'จะ', 'ต้อง', 'ควร', 'สรุป', 'อธิบาย', 'เกี่ยวกับ', 'ยังไง', 'แบบ',
+            'the', 'and', 'for', 'with', 'what', 'how', 'why', 'does', 'this', 'that', 'from', 'are', 'is', 'was', 'were', 'can', 'you', 'please', 'about',
+            'tell', 'explain', 'summarize', 'summary', 'of', 'to', 'in', 'on', 'a', 'an', 'me', 'it', 'its', 'be', 'or']);
+        function kbQueryTerms(query) {
+            const q = String(query || '').toLowerCase();
+            let words = [];
+            if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+                for (const seg of new Intl.Segmenter('th', { granularity: 'word' }).segment(q)) if (seg.isWordLike) words.push(seg.segment);
+            } else words = q.split(/\s+/);
+            words = words.map(w => w.trim()).filter(Boolean);
+            // a Thai segmenter cuts compounds (ผลข้างเคียง → ผล | ข้าง | เคียง): neighbouring Thai words are also joined in pairs and triples,
+            // so a passage holding the whole phrase ranks above one that only shares a short piece
+            const thai = w => /[\u0E00-\u0E7F]/.test(w), joined = [];
+            for (let k = 0; k < words.length; k++) for (let n = 2; n <= 3 && k + n <= words.length; n++) { const run = words.slice(k, k + n); if (run.every(thai)) joined.push(run.join('')); }
+            return Array.from(new Set(words.concat(joined).filter(w => w.length >= 2 && !KB_STOP.has(w))));
+        }
+        function kbFindPassages(query, opts) {
+            const o = Object.assign({ size: 1200, step: 1000, budget: 20000, max: 16 }, opts || {});
             const filterEl = document.getElementById('kb-filter-sidebar');
             const activeFolder = filterEl ? filterEl.value : 'all';
-            
-            let pool = knowledgeBaseCache;
-            if (activeFolder !== 'all') {
-                pool = knowledgeBaseCache.filter(d => (d.folder || 'General') === activeFolder);
-            }
-
-            // Simple RAG: Find docs that contain keywords from query
-            const keywords = query.toLowerCase().split(/\s+/).filter(k => k.length > 2);
-            let relevantDocs = pool.filter(doc => {
-                const content = (doc.content || "").toLowerCase();
-                return keywords.some(k => content.includes(k));
+            const pool = activeFolder === 'all' ? knowledgeBaseCache : knowledgeBaseCache.filter(d => (d.folder || 'General') === activeFolder);
+            const terms = kbQueryTerms(query);
+            const hits = [];
+            pool.forEach(doc => {
+                const content = String(doc.content || '');
+                if (!content || !terms.length) return;
+                for (let i = 0; i < content.length; i += o.step) {
+                    const chunk = content.slice(i, i + o.size), low = chunk.toLowerCase();
+                    let score = 0, distinct = 0;
+                    terms.forEach(t => {
+                        let n = 0, p = low.indexOf(t);
+                        while (p >= 0 && n < 20) { n++; p = low.indexOf(t, p + t.length); }
+                        if (n) { distinct++; score += n * Math.min(t.length, 8); }
+                    });
+                    if (score) hits.push({ doc, at: i, chunk, score: score + distinct * 10 });
+                    if (i + o.size >= content.length) break;
+                }
             });
-
-            if (relevantDocs.length === 0) {
-                relevantDocs = pool.slice(0, 3);
+            hits.sort((a, b) => b.score - a.score);
+            const picked = [];
+            let used = 0;
+            for (const h of hits) {
+                if (picked.length >= o.max || used + h.chunk.length > o.budget) continue;
+                if (picked.some(x => x.doc === h.doc && Math.abs(x.at - h.at) < o.size)) continue;   // overlapping neighbour
+                picked.push(h); used += h.chunk.length;
             }
-
-            return relevantDocs.map(d => `SOURCE: [${d.folder || 'General'}] ${d.name}\nCONTENT: ${d.content.substring(0, 2000)}`).join('\n\n---\n\n');
+            const byDoc = new Map();
+            picked.forEach(h => { if (!byDoc.has(h.doc)) byDoc.set(h.doc, []); byDoc.get(h.doc).push(h); });
+            const text = Array.from(byDoc.entries()).map(([d, hs]) => hs.sort((a, b) => a.at - b.at).map(h =>
+                'SOURCE: [' + (d.folder || 'General') + '] ' + d.name + ' (from character ' + h.at + ')\nCONTENT: ' + h.chunk).join('\n\n')).join('\n\n---\n\n');
+            return { matched: picked.length > 0, text, terms, sources: Array.from(byDoc.entries()).map(([d, hs]) => ({ name: d.name, folder: d.folder || 'General', passages: hs.length })) };
         }
+        function queryKnowledgeBaseLocal(query) { return kbFindPassages(query).text; }
 
         // 💾 [Version: V87.61] Firestore History Management (Firebase v8 Compatible)
         async function saveResearchToHistory(q, a, model) {
