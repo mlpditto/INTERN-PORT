@@ -148,6 +148,11 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
             $('#glc-ep-3 .glc-edit [data-f="visual"]').value = 'Clock face flipping day to night';
             glcSaveEdit(3);
             out.row3After = txt($('#glc-ep-3 .glc-t')); out.ep3Visual = window._glcSeries.episodes[2].visual; out.editClosed = !$('#glc-ep-3 .glc-edit');
+            // V102.345: a render saves itself → Storage + series doc stubs go in BEFORE the render (nothing leaves the page)
+            const io = {};
+            window.firebase = { app: () => ({ storage: () => ({ ref: p => ({ put: async (blob, meta) => { io.put = { path: p, type: blob.type, size: blob.size, meta }; return { ref: { getDownloadURL: async () => 'https://storage.test/' + p } }; } }) }) }), firestore: { FieldValue: { serverTimestamp: () => 'TS' } } };
+            window.adminApp = null;
+            window.db = { collection: name => ({ doc: id => ({ id: id || 'S1', set: async (d, o) => { io.set = { name, id: id || 'S1', d, o }; } }) }) };
             // 5. ▶ EP01 → inline cost ask → Render (two proxy calls: submit, poll)
             glcAskRender(1);
             out.ask = txt($('#glc-a-1 .glc-ask')); out.askHasRender = !!$('#glc-a-1 .glc-ask button[aria-label="Confirm render episode 1"]');
@@ -165,12 +170,6 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
             out.clipActions = [...document.querySelectorAll('#design-preview-container button')].map(b => b.title);
             out.designActionsHidden = $('#design-actions').style.display;
             out.previewText = txt($('#design-preview-container'));
-            // 6. 💾 Save → Storage path + series doc (stubs; nothing leaves the page)
-            const io = {};
-            window.firebase = { app: () => ({ storage: () => ({ ref: p => ({ put: async (blob, meta) => { io.put = { path: p, type: blob.type, size: blob.size, meta }; return { ref: { getDownloadURL: async () => 'https://storage.test/' + p } }; } }) }) }), firestore: { FieldValue: { serverTimestamp: () => 'TS' } } };
-            window.adminApp = null;
-            window.db = { collection: name => ({ doc: id => ({ id: id || 'S1', set: async (d, o) => { io.set = { name, id: id || 'S1', d, o }; } }) }) };
-            await glcSaveClip();
             out.put = io.put; out.set = io.set && { name: io.set.name, id: io.set.id, merge: io.set.o && io.set.o.merge, topic: io.set.d.topic, n: io.set.d.episodes.length, ep1: io.set.d.episodes[0], ep3Title: io.set.d.episodes[2].title, createdAt: io.set.d.createdAt, updatedAt: io.set.d.updatedAt, aspect: io.set.d.aspectRatio };
             out.saveBtn = txt($('#glc-save-btn'));
             // 7. back to Nano Banana → the pane is the image pane again
@@ -215,14 +214,14 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
         assert.deepEqual(r.ep1, { status: 'done', dotTitle: 'Rendered · 8 s · $0.80', btn: '🔁' }, 'EP01 done, re-render offered');
         assert.equal(r.countAfter, '10 · 1 done');
         assert.deepEqual(r.video, { tag: 'VIDEO', src: 'data:video/mp4;base6', controls: true, playsinline: true }, 'portrait <video> in the preview');
-        assert.deepEqual(r.clipActions, ['Download MP4', 'Save to Clips — Storage teach-clips/ + Firestore clip_series', 'Discard this render (nothing saved)'], 'MP4 · Save · 🗑️');
+        assert.deepEqual(r.clipActions, ['Download MP4', 'Delete this clip — MP4 + gallery entry (asks first)'], 'V102.345: MP4 · ✓ In gallery (a chip, not a button) · 🗑 = delete');
         assert.equal(r.designActionsHidden, 'none', 'the image pill stays hidden for a clip');
         assert.match(r.previewText, /EP01 · Episode 1 title8 s · 720p · 9:16 · audio ongemini-omni-1\.1-flash · \d+ s · \$0\.80คำบรรยาย 1/, 'preview meta + Thai caption');
         assert.deepEqual(r.put, { path: 'teach-clips/S1/EP01.mp4', type: 'video/mp4', size: 12, meta: { contentType: 'video/mp4' } }, 'MP4 lands in teach-clips/{seriesId}/EP01.mp4');
         assert.equal(r.set.name, 'clip_series'); assert.equal(r.set.id, 'S1'); assert.equal(r.set.merge, true); assert.equal(r.set.n, 10); assert.equal(r.set.aspect, '9:16');
         assert.equal(r.set.topic, 'warfarin counselling for new patients'); assert.equal(r.set.ep3Title, 'Missed dose rule', 'the edited row is what gets saved');
         assert.deepEqual([r.set.ep1.status, r.set.ep1.clipUrl, r.set.ep1.storagePath, r.set.ep1.seconds, r.set.ep1.costUsd, r.set.ep1.captionTh], ['done', 'https://storage.test/teach-clips/S1/EP01.mp4', 'teach-clips/S1/EP01.mp4', 8, 0.8, 'คำบรรยาย 1']);
-        assert.deepEqual([r.set.createdAt, r.set.updatedAt], ['TS', 'TS']); assert.equal(r.saveBtn, '✅ Saved');
+        assert.deepEqual([r.set.createdAt, r.set.updatedAt], ['TS', 'TS']); assert.equal(r.saveBtn, '✓ In gallery', 'saved by the render itself');
         assert.deepEqual([r.btnBack, r.cardBack], ['Create', 'none'], 'image mode restored'); assert.match(r.placeholderBack, /Describe the image, object, or location/);
         assert.deepEqual(r.veo, { engine: 'or/google/veo-3.1-lite', clip: true, card: 'block', cost: 'Veo 3.1 Lite · 8 s · ≈ $0.40 / clip · $4.00 all', secs: 8, usd: 0.05, ghost: '8 s · $1.01' }, 'Veo chip: clip mode, the plan is back, the pill follows the engine');
         assert.equal(r.veoAsk, '≈ $0.40 · 8 sRender✕', 'the ask shows Veo\'s price');

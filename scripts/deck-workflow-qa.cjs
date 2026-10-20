@@ -3,6 +3,7 @@
 // C — step strip, Intent (engine family + hidden chips + last engine per family), 4-field Brief ⇄ free text, 🎨 style line,
 //     🎞 One clip plans ONE episode. D — ☑ episodes, the bar's count + total, confirm, render one at a time, ⏹ stop after
 //     the current one, every clip kept in memory (👁), 💾 Save all, a new plan refused while clips are unsaved.
+// V102.345: a render saves itself; the "not saved" bar + 💾 Save all now cover uploads that FAILED (the test makes Storage fail).
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
@@ -101,6 +102,10 @@ const MP4 = 'data:video/mp4;base64,AAAAIGZ0eXBpc29t';
         // 6. D — Series ×10 plan, ☑ EP03–05, the bar, confirm, render one at a time with ⏹ after the first
         const d = await page.evaluate(async (MP4) => {
             gmSetIntent('series');
+            // V102.345: a render saves itself — here every upload FAILS (offline Storage), the case the "not saved" bar + 💾 Save all exist for
+            window.firebase = { app: () => ({ storage: () => ({ ref: () => ({ put: async () => { throw new Error('offline'); } }) }) }), firestore: { FieldValue: { serverTimestamp: () => 'TS' } } };
+            window.adminApp = null;
+            window.db = { collection: () => ({ doc: id => ({ id: id || 'S1', set: async () => {} }) }) };
             const plan = { episodes: Array.from({ length: 10 }, (_, i) => ({ title: 'T' + (i + 1), objective: 'o', fact: 'f', narration: 'n', visual: 'v' })) };
             window.callUniversalAI = async () => ({ text: JSON.stringify(plan) });
             await glcPlanEpisodes();
