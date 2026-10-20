@@ -28,7 +28,7 @@
 | 버튼 | 기능 |
 |---|---|
 | ☀️ **Nika V…** | 페이지 이름 + 현재 실행 중인 버전 (이름 아래에 로그인한 이메일 표시) |
-| ➕ **Create** | 새로 만들기 — **Task** (칸반 카드) · **Quest** (일일 퀘스트) · **Event** (공지) · **Quiz** · **Goals** · **Certificates** |
+| ➕ **Create** | 새로 만들기 — **Task** (칸반 카드) · **Quest** (일일 퀘스트) · **Event** (공지) · **Article** (인턴이 앱을 열 때 뜨는 짧은 글) · **Quiz** · **Goals** · **Certificates** |
 | 📥 **Archive** | 보관된 항목 보기 (Quests, Tasks 등) |
 | 📱 **UI** | LINE 없이 인턴 화면 미리보기 (LIFF Preview) |
 | 🔮 | AI Engine 설정 (키 / 모델) — "not loaded yet" 이라고 나오면 페이지를 새로고침하세요 |
