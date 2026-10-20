@@ -28,7 +28,7 @@ The **Admin Portal** page has 3 ways in — use any one:
 | Button | What it does |
 |---|---|
 | ☀️ **Nika V…** | Page name + the version you are running (the logged-in email is under the name) |
-| ➕ **Create** | Make something new — **Task** (Kanban card) · **Quest** (daily quest) · **Event** (announcement) · **Quiz** · **Goals** · **Certificates** |
+| ➕ **Create** | Make something new — **Task** (Kanban card) · **Quest** (daily quest) · **Event** (announcement) · **Article** (a short read that pops up when interns open the app) · **Quiz** · **Goals** · **Certificates** |
 | 📥 **Archive** | See archived items (Quests, Tasks, etc.) |
 | 📱 **UI** | Preview the intern's screen (LIFF Preview) without LINE |
 | 🔮 | AI Engine settings (keys / models) — if it says "not loaded yet", refresh the page |

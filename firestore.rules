@@ -232,6 +232,16 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // 📰 Articles (V102.335) — a short read that pops up when an intern opens the app; admins write
+    // them in ➕ Create ▸ Article (articles-admin.js). Interns may read published ones only
+    // (status 'scheduled'), so their query must say where('status', '==', 'scheduled') — rules are
+    // not filters. The window and the audience are applied in the app, like events: an article is
+    // not a secret. Each intern's seen / read state lives on their own users/{uid} doc, not here.
+    match /articles/{articleId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.status == 'scheduled');
+      allow write: if isAdmin();
+    }
+
     // Announcements with a date — a webinar, a training day (V98.61). Read by any
     // eligible audience; new social events start private to the creator and admin.
     // Older audience rules described targetGroups as presentation, not
