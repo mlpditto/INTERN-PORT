@@ -10,8 +10,9 @@ const deck = { en: fs.readFileSync('public/grand-line-guide.en.md', 'utf8'), th:
 const adm = { en: fs.readFileSync('public/admin-guide.en.md', 'utf8'), th: fs.readFileSync('public/admin-guide.md', 'utf8'), ko: fs.readFileSync('public/admin-guide.ko.md', 'utf8') };
 
 // static: wiring + the three deck files agree + every named control exists in admin.html
-assert.ok(/<button type="button" class="deck-guide-btn" onclick="openDeckGuide\(\)"[^>]*>/.test(admin), 'the badge is a button that opens the deck guide');
-assert.ok(/class="deck-guide-btn"[^>]*title="[^"]*วิธี[^"]*·[^"]*만들기/.test(admin), 'badge tooltip EN · TH · KO');
+assert.ok(/<button type="button" class="deck-guide-btn deck-guide-mini" onclick="openDeckGuide\(\)"[^>]*>\s*<span class="deck-guide-hint" aria-hidden="true">📖<\/span>\s*<\/button>/.test(admin), 'V102.331: a 📖 icon button opens the deck guide (the name moved to the tab)');
+assert.ok(admin.includes(`onclick="switchTab('tab-ai-hub')"`) && /switchTab\('tab-ai-hub'\)"[^>]*>🏴‍☠️ Grand Line Deck<\/button>/.test(admin) && !admin.includes('AI Digital Lab'), 'the top tab is "🏴‍☠️ Grand Line Deck" — "AI Digital Lab" is gone everywhere');
+assert.ok(/class="deck-guide-btn deck-guide-mini"[^>]*title="[^"]*วิธี[^"]*·[^"]*만들기/.test(admin), '📖 tooltip EN · TH · KO');
 assert.ok(/<script src="admin-guide\.js\?v=V102\.\d+" defer><\/script>/.test(admin) && !admin.includes('admin-guide.js?v=V102.226'), 'script cache-busted');
 const secs = m => m.split(/\r?\n/).filter(l => /^## /.test(l));
 assert.equal(secs(deck.en).length, 4, 'four sections: images · video · audio · research');
@@ -25,7 +26,7 @@ assert.ok(js.includes("window.openDeckGuide = function () { open('deck'); }") &&
 
 const harness = `<!doctype html><meta charset="utf-8"><title>Nika Admin (V9.9)</title>
 <style>:root{--bg-card:#fff;--text-main:#1e293b;--text-sub:#64748b;--border-color:#e2e8f0;--col-bg:#f1f5f9;--primary:#4361ee}body{margin:0;font-family:sans-serif}</style>
-<div id="dashboard-container" style="display:block"><button id="btn-admin-guide" onclick="openAdminGuide()">📖</button><button type="button" class="deck-guide-btn" onclick="openDeckGuide()">🏴‍☠️ Grand Line Deck</button></div>
+<div id="dashboard-container" style="display:block"><button id="btn-admin-guide" onclick="openAdminGuide()">📖</button><button type="button" class="deck-guide-btn deck-guide-mini" onclick="openDeckGuide()" aria-label="Grand Line Deck guide">📖</button></div>
 <script>try{localStorage.setItem('adminGuideSeen','1')}catch(e){}window.marked={parse:function(t){return t.split('\\n').map(function(l){var m=/^### (.+)/.exec(l);return m?'<h3>'+m[1]+'</h3>':'<p>'+l+'</p>';}).join('')}};window.DOMPurify={sanitize:function(h){return h}};</script>
 <script src="/admin-guide.js" defer></script>`;
 (async () => {

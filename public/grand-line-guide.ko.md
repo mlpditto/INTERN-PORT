@@ -1,6 +1,6 @@
 # Grand Line Deck — 이미지·영상·오디오 만들기
 
-탭 **AI Digital Lab** → 상단 세 모드: 🏴 Miss Goldenweek · 🧭 Research Log · 🐳 Laboon. 🏴‍☠️ 배지를 누르면 언제든 이 안내를 다시 엽니다.
+탭 **🏴‍☠️ Grand Line Deck** → 상단 세 모드: 🏴 Miss Goldenweek · 🧭 Research Log · 🐳 Laboon. 세 모드 왼쪽의 📖 를 누르면 언제든 이 안내를 다시 엽니다.
 
 ---
 

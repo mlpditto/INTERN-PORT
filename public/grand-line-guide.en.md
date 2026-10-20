@@ -1,6 +1,6 @@
 # Grand Line Deck — how to make images, video and audio
 
-Tab: **AI Digital Lab** → the three modes at the top: 🏴 Miss Goldenweek · 🧭 Research Log · 🐳 Laboon. Click the 🏴‍☠️ badge any time to reopen this guide.
+Tab: **🏴‍☠️ Grand Line Deck** → the three modes at the top: 🏴 Miss Goldenweek · 🧭 Research Log · 🐳 Laboon. Click 📖 (left of the three modes) any time to reopen this guide.
 
 ---
 
