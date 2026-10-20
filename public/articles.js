@@ -1,3 +1,5 @@
+// V101.177: lean sheet (owner pick) — the header is the cover emoji ("Article · n min" moved into its tooltip), no grab handle; one footer row:
+// 🔖 🔕 small grey on the left, Read more + a green 👍 Got it on the right (design G4).
 // V101.176: 📰 Articles — intern side. Admins write them in admin ➕ Create ▸ Article (articles-admin.js); this file shows them.
 // • Popup (bottom sheet, the owner's pick "A") when the app opens: at most ONE article a day, and the same article comes back on a later day
 //   until it is read (✓ Got it, a link opened, or read in History). ✕ / backdrop / Esc = closed without reading.
@@ -129,21 +131,20 @@
         if (document.getElementById('art-css')) return;
         var s = document.createElement('style'); s.id = 'art-css';
         s.textContent = '#art-back{position:fixed;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);z-index:10040;animation:artFade .15s ease-out}' +
-            '#art-sheet{position:fixed;left:0;right:0;bottom:0;z-index:10041;max-width:560px;margin:0 auto;background:#fff;border-radius:22px 22px 0 0;box-shadow:0 -10px 30px rgba(15,23,42,.18);padding:10px 18px calc(16px + env(safe-area-inset-bottom));max-height:86vh;overflow:auto;box-sizing:border-box;font-family:Kanit,sans-serif;text-align:left;animation:artUp .2s ease-out}' +
+            '#art-sheet{position:fixed;left:0;right:0;bottom:0;z-index:10041;max-width:560px;margin:0 auto;background:#fff;border-radius:22px 22px 0 0;box-shadow:0 -10px 30px rgba(15,23,42,.18);padding:14px 18px calc(14px + env(safe-area-inset-bottom));max-height:86vh;overflow:auto;box-sizing:border-box;font-family:Kanit,sans-serif;text-align:left;animation:artUp .2s ease-out}' +
             '@keyframes artUp{from{transform:translateY(30px);opacity:0}to{transform:none;opacity:1}}@keyframes artFade{from{opacity:0}to{opacity:1}}@media (prefers-reduced-motion: reduce){#art-sheet,#art-back{animation:none}}' +
-            '#art-sheet .g{width:40px;height:5px;border-radius:9px;background:#e2e8f0;margin:0 auto 10px}#art-sheet .band{display:flex;align-items:center;gap:12px;margin-bottom:6px}' +
-            '#art-sheet .tile{width:54px;height:54px;border-radius:16px;background:linear-gradient(135deg,#dbeafe,#e0f2fe);display:grid;place-items:center;font-size:30px;flex:none}' +
-            '#art-sheet .kick{flex:1;min-width:0;font-weight:700;font-size:12px;color:#4361ee}#art-sheet .x{width:34px;height:34px;min-height:0;margin:0;padding:0;border:0;border-radius:50%;background:#f1f5f9;color:#64748b;font-size:15px;cursor:pointer;flex:none}' +
+            '#art-sheet .band{display:flex;align-items:center;gap:10px;margin:2px 0 2px}#art-sheet .cov{flex:1;min-width:0;font-size:26px;line-height:1}#art-sheet .cov small{font-size:13px;margin-left:4px;vertical-align:middle}' +
+            '#art-sheet .x{width:34px;height:34px;min-height:0;margin:0;padding:0;border:0;border-radius:50%;background:#f1f5f9;color:#64748b;font-size:15px;cursor:pointer;flex:none}' +
             '#art-sheet .lng{display:inline-flex;gap:2px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:999px;padding:2px}#art-sheet .lng button{min-height:0;margin:0;width:auto;border:0;background:transparent;font:800 11px/1 Kanit,sans-serif;color:#64748b;padding:6px 9px;border-radius:999px;cursor:pointer}#art-sheet .lng button.on{background:#4361ee;color:#fff}' +
             '#art-sheet h3{font:800 19px/1.3 Kanit,sans-serif;color:#1e293b;margin:6px 0 8px;word-break:keep-all;overflow-wrap:anywhere}' +
             '.art-md{font:400 14.5px/1.6 Kanit,sans-serif;color:#334155;word-break:keep-all;overflow-wrap:anywhere}.art-md p,.art-md ul,.art-md ol{margin:0 0 8px}.art-md ul,.art-md ol{padding-left:20px}.art-md a{color:#4361ee}' +
             '#art-sheet .art-md.clamp{max-height:6.4em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 65%,transparent);mask-image:linear-gradient(#000 65%,transparent)}' +   // 4 lines × 1.6; line-clamp left half a line showing when the body has several paragraphs
-            '#art-sheet .more{min-height:0;margin:0;width:auto;border:0;background:none;font:700 13px/1 Kanit,sans-serif;color:#4361ee;padding:4px 0 10px;cursor:pointer}' +
+            '#art-sheet .more{min-height:0;margin:0 0 0 auto;width:auto;border:0;background:none;font:700 13px/1 Kanit,sans-serif;color:#4361ee;padding:12px 4px;cursor:pointer;white-space:nowrap}' +
             '.art-links{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 12px}.art-link{min-height:0;margin:0;width:auto;display:inline-flex;align-items:center;gap:6px;font:600 12.5px/1 Kanit,sans-serif;padding:8px 11px;border-radius:999px;border:1px solid #c7d2fe;background:#eef2ff;color:#3730a3;cursor:pointer}' +
             '.art-link.codex{border-color:#bfdbfe;background:#eff6ff;color:#1d4ed8}.art-link b{font-weight:800;color:#b45309}' +
-            '#art-sheet .foot{display:flex;align-items:center;gap:8px}#art-sheet .bm{width:46px;height:46px;min-height:0;margin:0;padding:0;border-radius:14px;border:1px solid #e2e8f0;background:#fff;font-size:20px;cursor:pointer;flex:none}#art-sheet .bm[aria-pressed="true"]{background:#fef3c7;border-color:#fde68a}' +
-            '#art-sheet .ok{flex:1;height:46px;min-height:0;margin:0;border-radius:14px;border:0;background:#4361ee;color:#fff;font:800 15px/1 Kanit,sans-serif;cursor:pointer}#art-sheet button:focus{outline:none}#art-sheet button:focus-visible{outline:2px solid #a5b4fc;outline-offset:2px}' +
-            '#art-sheet .mute{display:block;margin:10px auto 0;min-height:0;width:auto;border:0;background:none;font:500 12px/1 Kanit,sans-serif;color:#94a3b8;cursor:pointer}' +
+            '#art-sheet .foot{display:flex;align-items:center;gap:8px;margin-top:6px}#art-sheet .bm{width:44px;height:44px;min-height:0;margin:0;padding:0;border-radius:12px;border:0;background:#f1f5f9;font-size:17px;cursor:pointer;flex:none}#art-sheet .bm[aria-pressed="true"]{background:#fef3c7}#art-sheet .bm.mute{opacity:.8}' +
+            '#art-sheet .ok{flex:none;width:auto;height:44px;min-height:0;margin:0;padding:0 18px;border-radius:999px;border:0;background:#16a34a;color:#fff;font:800 14px/1 Kanit,sans-serif;cursor:pointer;box-shadow:0 4px 10px rgba(22,163,74,.25);white-space:nowrap}#art-sheet button:focus{outline:none}#art-sheet button:focus-visible{outline:2px solid #a5b4fc;outline-offset:2px}' +
+            
             '.hl-pill.art-ok{background:#dcfce7;color:#166534}.hl-pill.art-new{background:#eef2ff;color:#4361ee}.art-hist{padding:2px 0 6px}.art-hist .art-links{margin:8px 0 2px}';
         document.head.appendChild(s);
     }
@@ -162,19 +163,19 @@
     function render() {
         var c = S.cur, a = c.a, tx = textOf(a, S.lang), t = T[S.lang] || T.en, have = langs(a), saved = !!((me().articleSeen || {})[a.id] || {}).saved;
         var sh = document.getElementById('art-sheet'); if (!sh) return;
-        sh.innerHTML = '<div class="g"></div><div class="band"><div class="tile" aria-hidden="true">' + esc((a.cover && a.cover.emoji) || '📰') + '</div>' +
-            '<div class="kick">' + (c.kind === 'rerun' ? '🔁 ' + t.rerun : '📰 ' + t.kicker) + ' · ' + (a.readMin || 1) + ' ' + t.min + '</div>' +
+        var info = (c.kind === 'rerun' ? '🔁 ' + t.rerun : t.kicker) + ' · ' + (a.readMin || 1) + ' ' + t.min;
+        sh.innerHTML = '<div class="band"><span class="cov" title="' + esc(info) + '" aria-label="' + esc(info) + '">' + esc((a.cover && a.cover.emoji) || '📰') + (c.kind === 'rerun' ? '<small>🔁</small>' : '') + '</span>' +
             (have.length > 1 ? '<span class="lng" role="group" aria-label="Language">' + have.map(function (l) { return '<button type="button" class="' + (l === tx.lang ? 'on' : '') + '" aria-pressed="' + (l === tx.lang) + '" onclick="internArticles.lang(\'' + l + '\')">' + l.toUpperCase() + '</button>'; }).join('') + '</span>' : '') +
             '<button type="button" class="x" onclick="internArticles.close(\'x\')" aria-label="' + t.close + '">✕</button></div>' +
             '<h3 id="art-title">' + esc(tx.title) + '</h3><div class="art-md' + (S.more ? '' : ' clamp') + '" id="art-text">' + md(tx.body) + '</div>' +
-            '<button type="button" class="more" id="art-more" onclick="internArticles.toggleMore()">' + (S.more ? t.less + ' ▴' : t.more + ' ▾') + '</button>' +
             linksHtml(a) +
             '<div class="foot"><button type="button" class="bm" onclick="internArticles.save()" aria-pressed="' + saved + '" title="' + (saved ? t.saved : t.save) + '" aria-label="' + (saved ? t.saved : t.save) + '">🔖</button>' +
-            '<button type="button" class="ok" onclick="internArticles.close(\'ok\')">✓ ' + t.got + '</button></div>' +
-            '<button type="button" class="mute" onclick="internArticles.mute()">🔕 ' + t.mute + '</button>';
+            '<button type="button" class="bm mute" onclick="internArticles.mute()" title="' + t.mute + '" aria-label="' + t.mute + '">🔕</button>' +
+            '<button type="button" class="more" id="art-more" onclick="internArticles.toggleMore()">' + (S.more ? t.less + ' ▴' : t.more + ' ▾') + '</button>' +
+            '<button type="button" class="ok" onclick="internArticles.close(\'ok\')">👍 ' + t.got + '</button></div>';
         // a short body needs no "Read more"
         var el = document.getElementById('art-text'), mb = document.getElementById('art-more');
-        if (el && mb && !S.more && el.scrollHeight <= el.clientHeight + 2) mb.hidden = true;
+        if (el && mb && !S.more && el.scrollHeight <= el.clientHeight + 2) mb.style.visibility = 'hidden';
     }
     function show(c) {
         css();
