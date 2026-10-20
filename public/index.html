@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.178)</title>
+    <title>Internship Portfolio (V101.179)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.171">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -11606,19 +11606,13 @@
             document.getElementById('section-assignments').scrollIntoView({ behavior: 'smooth' });
         }
 
-        // V94.70 PR 2c: module-level cache for quiz-avatar user profiles so it survives
-        // across renderAssignments/pagination calls instead of being rebuilt every time.
-        let _quizAvatarUserCache = {};
-
         // 🔥 V91.47: Populate Quiz Avatar Stacks
+        // V101.179: a "👥 n" count of the people who did this quiz (+ your own avatar when you are one of them).
+        // Other people's faces are gone on purpose: the users rule lets an intern read only their own doc
+        // (since 2026-04-23), so the old users/{id} read per completer was permission-denied for everyone else.
         async function populateQuizAvatarStacks() {
             const stacks = document.querySelectorAll('.quiz-avatar-stack');
             if (!stacks.length) return;
-
-            // V94.70 PR 2c: alias the module-level cache (was `{}` rebuilt per call → N
-            // users/{id} reads on every renderAssignments/pagination). Profiles change
-            // rarely, so a session-lived cache is fine; a stale avatar self-heals on reload.
-            const userCache = _quizAvatarUserCache;
 
             for (const stackEl of stacks) {
                 const quizId = stackEl.dataset.quizId;
@@ -11632,68 +11626,18 @@
                         .limit(100)
                         .get();
 
-                    const completedUsers = [];
                     const userIds = new Set();
-
                     attemptsSnap.forEach(doc => {
                         const attempt = doc.data();
-                        if (attempt.userId && !userIds.has(attempt.userId)) {
-                            userIds.add(attempt.userId);
-                            completedUsers.push({
-                                userId: attempt.userId,
-                                timestamp: attempt.timestamp
-                            });
-                        }
+                        if (attempt.userId) userIds.add(attempt.userId);
                     });
 
-                    // Sort by most recent first
-                    completedUsers.sort((a, b) => {
-                        const timeA = a.timestamp ? (a.timestamp.toMillis ? a.timestamp.toMillis() : new Date(a.timestamp).getTime()) : 0;
-                        const timeB = b.timestamp ? (b.timestamp.toMillis ? b.timestamp.toMillis() : new Date(b.timestamp).getTime()) : 0;
-                        return timeB - timeA;
-                    });
-
-                    // Fetch user profile data
-                    const usersWithData = [];
-                    for (const user of completedUsers.slice(0, 10)) { // Limit to 10 for performance
-                        if (userCache[user.userId]) {
-                            usersWithData.push(userCache[user.userId]);
-                        } else {
-                            try {
-                                const userDoc = await db.collection('users').doc(user.userId).get();
-                                if (userDoc.exists) {
-                                    const userData = userDoc.data();
-                                    const userWithPhoto = {
-                                        userId: user.userId,
-                                        pictureUrl: userData.pictureUrl || 'https://via.placeholder.com/28',
-                                        displayName: userData.displayName || 'User'
-                                    };
-                                    userCache[user.userId] = userWithPhoto;
-                                    usersWithData.push(userWithPhoto);
-                                }
-                            } catch (err) {
-                                console.warn(`Failed to fetch user ${user.userId}:`, err);
-                            }
-                        }
-                    }
-
-                    // Render avatar stack
-                    const maxAvatars = 5;
-                    const displayUsers = usersWithData.slice(0, maxAvatars);
-                    const remaining = usersWithData.length - maxAvatars;
-
-                    if (displayUsers.length > 0) {
-                        // Has completions - show avatar stack
-                        stackEl.innerHTML = displayUsers.map(user => `
-                            <img src="${user.pictureUrl}" 
-                                 title="${user.displayName}" 
-                                 class="avatar-circle"
-                                 onerror="this.src='https://via.placeholder.com/28'">
-                        `).join('');
-
-                        if (remaining > 0) {
-                            stackEl.innerHTML += `<div class="avatar-more" title="${remaining} more users">+${remaining}</div>`;
-                        }
+                    const n = userIds.size;
+                    if (n > 0) {
+                        const mine = userIds.has(userId) ? ((window.myUserDoc && window.myUserDoc.pictureUrl) || (userProfile && userProfile.pictureUrl) || '') : '';
+                        const label = attemptsSnap.size >= 100 ? n + '+' : String(n);   // the query stops at 100 attempts
+                        stackEl.innerHTML = (mine ? `<img src="${escapeHtml(mine)}" title="You did this quiz" class="avatar-circle quiz-done-me" style="width:22px; height:22px; margin-right:-6px; position:relative; z-index:1;" onerror="this.remove()">` : '')
+                            + `<span class="quiz-done-count" title="${label} ${n === 1 ? 'person has' : 'people have'} done this quiz" style="font-size:0.75em; color:#555; background:#f0f0f0; padding:2px 8px 2px ${mine ? 10 : 8}px; border-radius:6px; white-space:nowrap;">👥 ${label}</span>`;
                     } else {
                         // V95.91 lean: no completions yet → render nothing (the grey
                         // person-placeholder was noise on every fresh quiz card).
