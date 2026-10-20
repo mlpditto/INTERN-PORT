@@ -35,9 +35,9 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
 
         // 1. style: default, pick, survives a reload, keeps the Master Formula hint
         const tiles = await page.$$eval('.style-option', els => els.map(e => e.dataset.style));
-        assert.equal(tiles.length, 6, 'six tiles');
+        assert.equal(tiles.length, 14, 'V102.332: eight pharmacy styles + the six One Piece ones');
         const def = await page.inputValue('#selected-design-style');
-        assert.equal(def, tiles[0], 'default = Pirate Crew Life');
+        assert.equal(def, tiles[0], 'default = 🧑‍⚕️ Pharmacist explainer (V102.332)');
         await page.evaluate(() => selectDesignStyle(document.querySelectorAll('.style-option')[4]));
         assert.match(await page.$eval('#design-prompt', e => e.placeholder), /^\[Context \+ Goal \+ Source \+ Expectations\]/, 'a style pick keeps the formula hint');
         assert.equal(await page.evaluate(() => localStorage.getItem('design_style_pref')), tiles[4], 'pick saved');
