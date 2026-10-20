@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.331)</title>
+    <title>Nika Admin (V102.332)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -5921,6 +5921,15 @@
         #applicantDocsModal .apd-tab { width:auto; min-height:0; margin:0; padding:5px 10px; border:0; border-bottom:2px solid transparent; border-radius:0; background:none; color:#64748b; font-weight:700; cursor:pointer; }
         #applicantDocsModal .apd-tab.on { color:#1e293b; border-bottom-color:#1e293b; }
         #applicantDocsModal .apd-tab small { font-weight:600; color:#7c3aed; }
+        /* V102.331 (round 1): dot legend · ⇄ swap · same-vendor hint · suggestions progress */
+        #applicantDocsModal .apd-legend { float:right; display:inline-flex; gap:10px; align-items:center; font-weight:600; font-size:0.92em; color:#64748b; }
+        #applicantDocsModal .apd-swap { display:block; width:22px; height:22px; min-height:0; margin:-14px 0 -12px 2px; padding:0; border-radius:50%; border:1px solid #cbd5e1; background:#fff; color:#475569; font-size:12px; line-height:1; cursor:pointer; position:relative; z-index:2; }
+        #applicantDocsModal .apd-swap:hover { border-color:#94a3b8; background:#f8fafc; }
+        #applicantDocsModal .apd-vwarn { margin:2px 0 6px 34px; font-size:0.72em; color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:3px 10px; display:inline-block; }
+        #applicantDocsModal .apd-vwarn[hidden] { display:none; }
+        #applicantDocsModal .apd-prog { display:flex; align-items:center; gap:8px; margin:0 0 8px; font-size:0.72em; color:#475569; }
+        #applicantDocsModal .apd-prog i { flex:0 0 160px; height:6px; border-radius:99px; background:#e2e8f0; overflow:hidden; display:block; }
+        #applicantDocsModal .apd-prog i b { display:block; height:100%; background:#16a34a; transition:width .2s; }
         #applicantDocsModal .apd-sum { border:1px solid #e2e8f0; border-radius:12px; padding:10px 12px; font-size:0.74em; color:#334155; line-height:1.5; }
         #applicantDocsModal .apd-sum h5 { margin:0 0 6px; font-size:1em; }
         #applicantDocsModal .apd-sum ul { margin:0; padding-left:18px; }
@@ -62472,12 +62481,35 @@ Save it anyway?`;
                 const selected = typeof window.resolveTrialTextAIModel === 'function' ? window.resolveTrialTextAIModel(saved || def) : (saved || def);
                 const lb = i ? 'B' : 'A';
                 return `<div class="apd-ab-row"><span class="apd-ab-lbl" title="Review model ${lb} · โมเดลตรวจ ${lb} · 검토 모델 ${lb}">${lb}</span><div class="audit-toolbar lang-no-toggle">${window.providerModelRailHtml(id, selected, `apdPickModel(this,'${id}')`, extra)}</div></div>`;
-            }).join('');
+            }).join('<button type="button" class="apd-swap" onclick="apdSwapModels()" title="Swap A ↔ B · สลับ A ↔ B · A ↔ B 교체" aria-label="Swap models A and B">⇄</button>');   // V102.331
+            apdVendorHint();
+        }
+        // V102.331: ⇄ swaps the two picks (saved the same way as a tap), then redraws both rails
+        function apdSwapModels() {
+            const a = (document.getElementById('apd-model-a') || {}).value, b = (document.getElementById('apd-model-b') || {}).value;
+            if (!a || !b) return;
+            try { localStorage.setItem('ai_text_apd-model-a', b); localStorage.setItem('ai_text_apd-model-b', a); } catch (_) { /* storage may be blocked */ }
+            const box = document.getElementById('apd-ab'); if (box) box.innerHTML = '';
+            apdInitModelRows();
+            renderApplicantDocs();   // the 🤖 dots follow A / B
+        }
+        // V102.331: A and B from one vendor = a weaker second opinion (and both dots get one colour) — say so, never block
+        function apdVendorHint() {
+            const box = document.getElementById('apd-ab'); if (!box) return;
+            let el = document.getElementById('apd-vwarn');
+            if (!el) { el = document.createElement('div'); el.id = 'apd-vwarn'; el.className = 'apd-vwarn lang-no-toggle';   // both languages in one line, like the rest of the sheet
+            el.setAttribute('role', 'note'); box.after(el); }
+            const a = (document.getElementById('apd-model-a') || {}).value, b = (document.getElementById('apd-model-b') || {}).value;
+            const same = !!(a && b) && apdVendor(a) === apdVendor(b);
+            el.hidden = !same;
+            el.textContent = same ? (a === b ? '⚠️ A and B are the same model — only one review will run · เลือกโมเดลเดียวกัน จะรีวิวแค่ครั้งเดียว'
+                : '⚠️ A and B are the same vendor — pick another vendor for a second opinion · เลือกคนละค่ายเพื่อได้มุมมองที่ต่างกัน') : '';
         }
         function apdPickModel(btn, id) {
             document.getElementById(id).value = btn.dataset.value;
             btn.parentElement.querySelectorAll('button').forEach(b => { b.classList.toggle('active', b === btn); b.setAttribute('aria-pressed', String(b === btn)); });
             try { localStorage.setItem('ai_text_' + id, btn.dataset.value); } catch (_) { /* storage may be blocked */ }
+            apdVendorHint();   // V102.331
         }
         function openApplicantDocs(preUserId) {
             apdTargetId = preUserId;
@@ -62497,6 +62529,17 @@ Save it anyway?`;
             apdLoadReviews(preUserId);   // V102.298: the saved opinions, latest first
         }
 
+        // V102.331: a stored name that is a long opaque code (a LINE / Google download keeps no real name) shows as "CV #n",
+        // numbered by upload order; the real name stays in the tooltip. A readable name (CV_Natt.pdf) is shown as it is.
+        function apdDocLabel(docId, name) {
+            name = String(name || '');
+            if (!looksLikeOpaqueMaterialName(name)) return name;
+            const ms = d => (d.uploadedAt && d.uploadedAt.toMillis ? d.uploadedAt.toMillis() : 0);
+            const order = (applicantDocsCache[apdTargetId] || []).map((d, k) => [d, k]).sort((a, b) => (ms(a[0]) - ms(b[0])) || (a[1] - b[1])).map(x => x[0]);
+            const at = order.findIndex(d => d.id === docId);
+            return at >= 0 ? 'CV #' + (at + 1) : 'CV';
+        }
+
         function renderApplicantDocs() {
             const box = document.getElementById('apd-list');
             if (!box) return;
@@ -62506,7 +62549,7 @@ Save it anyway?`;
             box.innerHTML = docs.map(d => `
                 <div class="apd-row">
                     <span class="apd-ic" aria-hidden="true">${d.contentType === 'application/pdf' ? '📄' : '🖼'}</span>
-                    <span class="apd-name">${escapeHtml(d.name)}</span>
+                    <span class="apd-name" title="${escapeHtml(d.name)}">${escapeHtml(apdDocLabel(d.id, d.name))}</span>
                     <small class="apd-kb">${kb(d.size || 0)}</small>
                     ${d.contentType === 'application/pdf' ? apdAiBtnHtml(d) : ''}
                     <button type="button" class="apd-ib" onclick="openApplicantDoc('${d.id}')" title="Open in-app · เปิดดู · 열기" aria-label="Open">↗</button>
@@ -62973,11 +63016,18 @@ Save it anyway?`;
             catch (e) { if (typeof showToast === 'function') showToast('Copy failed · คัดลอกไม่สำเร็จ'); }
         }
         // a tick is the only field that may change on a saved run (rules: update → `done` only)
+        // V102.331: the Suggestions tab's thin bar — ticked / all suggestions of the run
+        function apdSugProgHtml(run) {
+            const total = apdEff(run).reduce((n, r) => n + ((r.data && r.data.suggestions) || []).length, 0);
+            if (!total) return '';
+            const done = Object.values(run.done || {}).filter(Boolean).length, en = run.lang === 'en';
+            return `<div class="apd-prog" id="apd-sug-prog"><i><b style="width:${Math.round(100 * Math.min(done, total) / total)}%"></b></i><span>${done} / ${total} ${en ? 'done' : 'ทำแล้ว'}</span></div>`;
+        }
         async function apdTickSuggestion(runId, i, j, on) {
             const run = _apdReviews.find(r => r.id === runId); if (!run) return;
             run.done = run.done || {}; run.done[i + '_' + j] = !!on;
             document.querySelectorAll(`#apd-ai input[onchange*="'${runId}',${i},${j},"]`).forEach(el => el.closest('li').classList.toggle('done', !!on));
-            const run2 = _apdReviews[0]; if (run2 && run2.id === runId) { const t = document.querySelector('.apd-tabs'); if (t) t.outerHTML = apdTabsHtml(run2, _apdTab || (run2.summary ? 'sum' : 'cmp')); }
+            const run2 = _apdReviews[0]; if (run2 && run2.id === runId) { const t = document.querySelector('.apd-tabs'); if (t) t.outerHTML = apdTabsHtml(run2, _apdTab || (run2.summary ? 'sum' : 'cmp')); const pg = document.getElementById('apd-sug-prog'); if (pg) pg.outerHTML = apdSugProgHtml(run2); }
             try { await db.collection('applicant_reviews').doc(runId).update({ ['done.' + i + '_' + j]: !!on }); }
             catch (e) { console.warn('[applicant_reviews] tick not saved:', e); if (typeof showToast === 'function') showToast('⚠️ Tick not saved: ' + (e.message || e)); }
         }
@@ -63122,11 +63172,11 @@ Save it anyway?`;
             const latest = _apdReviews[0], older = _apdReviews.slice(1);
             const who = r => escapeHtml(String(r.by || '').split('@')[0]);
             const tag = r => (r.mode && APD_MODES[r.mode] ? ' · ' + APD_MODES[r.mode].e : '') + (r.lang === 'en' ? ' · EN' : '');
-            const olderHtml = older.map(r => apdHeadHtml(apdEff(r), `${escapeHtml(apdReviewDate(r))} · ${escapeHtml(r.docName || '')} · ${who(r)}${tag(r)}`, 0) + apdReviewHtml(apdEff(r), apdRunOpts(r))).join('');
+            const olderHtml = older.map(r => apdHeadHtml(apdEff(r), `${escapeHtml(apdReviewDate(r))} · ${escapeHtml(apdDocLabel(r.docId, r.docName))} · ${who(r)}${tag(r)}`, 0) + apdReviewHtml(apdEff(r), apdRunOpts(r))).join('');
             // V102.304: three tabs on the latest run — สรุปรวม (first, when the run has a summary) · เทียบ A|B · ข้อเสนอแนะ  (+ V102.319 ฉบับสรุป)
             const tab = _apdTab || (latest.summary ? 'sum' : 'cmp');
             const hist = document.getElementById('apd-hist'), histOpen = !!(hist && !hist.hidden);   // V102.319: a ✓ / ✎ / ↻ re-render keeps History open
-            box.innerHTML = apdHeadHtml(apdEff(latest), `💬 ${escapeHtml(apdReviewDate(latest))} · ${escapeHtml(latest.docName || '')} · ${who(latest)}${tag(latest)}`, older.length)
+            box.innerHTML = apdHeadHtml(apdEff(latest), `💬 ${escapeHtml(apdReviewDate(latest))} · ${escapeHtml(apdDocLabel(latest.docId, latest.docName))} · ${who(latest)}${tag(latest)}`, older.length)
                 + apdTabsHtml(latest, tab) + apdTabBody(latest, tab)
                 + (older.length ? `<div id="apd-hist"${histOpen ? '' : ' hidden'}>${olderHtml}</div>` : '');
             if (histOpen) { const hb = box.querySelector('.apd-hist-btn'); if (hb) hb.setAttribute('aria-expanded', 'true'); }
@@ -63148,12 +63198,13 @@ Save it anyway?`;
                 if (!run.summary) return `<div class="apd-sum"><p class="apd-sum-empty">${en ? 'No summary yet for this run.' : 'รีวิวนี้ยังไม่มีสรุปรวม'} <button type="button" class="apd-sum-btn" onclick="apdSummariseRun('${run.id}')">✨ ${en ? 'Summarise · 1 call' : 'สรุป · 1 call'}</button></p></div>`;
                 const S = run.summary, dots = apdDotsHtml(run.results || []);
                 const src = p => p.from === 'AB' ? ` <span class="apd-both" title="Both models · ทั้งสองโมเดล">${dots}</span>` : ` <span class="apd-src">${p.from}</span>`;
-                return `<div class="apd-sum"><h5>📋 ${en ? 'Summary of both models' : 'สรุปจาก 2 โมเดล'}${M ? ' · ' + M.e + ' ' + (en ? M.en : M.th) : ''}</h5><ul>${S.points.map(p => `<li>${escapeHtml(p.text)}${src(p)}</li>`).join('')}</ul>`
+                const legend = `<span class="apd-legend"><span>${dots} ${en ? 'both models' : 'ทั้งสองโมเดล'}</span><span><span class="apd-src">A</span>/<span class="apd-src">B</span> ${en ? 'one model' : 'โมเดลเดียว'}</span></span>`;   // V102.331
+                return `<div class="apd-sum"><h5>📋 ${en ? 'Summary of both models' : 'สรุปจาก 2 โมเดล'}${M ? ' · ' + M.e + ' ' + (en ? M.en : M.th) : ''}${legend}</h5><ul>${S.points.map(p => `<li>${escapeHtml(p.text)}${src(p)}</li>`).join('')}</ul>`
                     + (S.verdict ? `<div class="apd-verdict">${M ? M.e + ' ' : ''}${escapeHtml(S.verdict)} <span class="apd-dim">· ${en ? 'AI advice, not a hiring decision' : 'AI = ข้อเสนอแนะ ไม่ใช่การตัดสินรับเข้าทำงาน'}</span></div>` : '') + '</div>';
             }
             if (tab === 'sug') {
                 const done = run.done || {};
-                return '<div class="apd-sug-all">' + apdEff(run).map((r, i) => {
+                return apdSugProgHtml(run) + '<div class="apd-sug-all">' + apdEff(run).map((r, i) => {
                     const list = (r.data && r.data.suggestions) || [];
                     return `<div class="apd-sec s-sug"><h5><span class="ic">☐</span>${'AB'[i] || ''} · ${escapeHtml(window.aiModelShortName ? window.aiModelShortName(r.model) : r.model)}</h5><ul>`
                         + (list.length ? list.map((x, j) => { const on = !!done[i + '_' + j]; return `<li class="${on ? 'done' : ''}"><label><input type="checkbox" ${on ? 'checked ' : ''}onchange="apdTickSuggestion('${run.id}',${i},${j},this.checked)" aria-label="Done"><span>${escapeHtml(String(x))}</span></label></li>`; }).join('') : '<li class="apd-none">—</li>') + '</ul></div>';
@@ -63198,7 +63249,8 @@ Save it anyway?`;
         }
         function apdAiBtnTitle() {
             const mode = apdMode(), lang = apdLang(), M = APD_MODES[mode] || {};
-            return 'AI review ×2 · ' + apdReviewModels().map(apdAiShort).join(' + ') + ' · ' + (M.e || '') + ' ' + (M.th || '') + ' · ' + lang.toUpperCase() + ' · รีวิวด้วย AI 2 ตัว';
+            return 'AI review ×2 · ' + apdReviewModels().map(apdAiShort).join(' + ') + ' · ' + (M.e || '') + ' ' + (M.th || '') + ' · ' + lang.toUpperCase() + ' · รีวิวด้วย AI 2 ตัว'
+                + '\nChanging the models / role / language applies to the NEXT review — saved ones keep theirs · การเปลี่ยนจะใช้กับการรีวิวครั้งถัดไป';   // V102.331
         }
         function apdAiBtnHtml(d) {
             const n = _apdReviews.filter(r => r.docId === d.id).length;
