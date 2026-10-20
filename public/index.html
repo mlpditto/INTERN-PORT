@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.174)</title>
+    <title>Internship Portfolio (V101.175)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.171">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -7606,8 +7606,21 @@
             if (typeof showToast === 'function') showToast(msg);
         }
 
-        function handleFirestoreListenerError(contextLabel, error) {
+        // V101.175: `reattach` (optional) starts the listener again. A listen that
+        // lands while Firebase Auth has no user (desktop Firefox, now and then)
+        // fails with permission-denied and Firestore never retries it — so wait
+        // for a user, attach once more, and only show the toast if that fails too.
+        function handleFirestoreListenerError(contextLabel, error, reattach) {
             console.error(`[Firestore:${contextLabel}]`, error);
+            if (error && error.code === 'permission-denied' && typeof reattach === 'function') {
+                ensureFirebaseAuthReady(5000).then((authUser) => {
+                    if (authUser) { reattach(); return; }
+                    notifyMissingFirebaseAuth(contextLabel);
+                    updateStatus(`⚠ Firestore auth missing (${contextLabel})`);
+                    revealBootActions();
+                });
+                return;
+            }
             if (error && error.code === 'permission-denied') {
                 notifyMissingFirebaseAuth(contextLabel);
                 ensureFirebaseAuthReady(5000).then((authUser) => {
@@ -10246,7 +10259,7 @@
             return colors[tag] || '#6b7280';
         }
         function loadAllQuests() { db.collection("quests").orderBy("createdAt", "desc").limit(20).onSnapshot(s => { questsCache = s.docs.map(doc => ({ id: doc.id, ...doc.data() })); renderAssignments(); renderHistory(); updateGrandLineDashboard(); }, e => handleFirestoreListenerError('quests listener', e)); }
-        function loadMySubmissions() { db.collection("quest_submissions").where("userId", "==", userId).onSnapshot(s => { mySubmissionsCache = {}; s.forEach(doc => { mySubmissionsCache[doc.data().questId] = { id: doc.id, ...doc.data() }; }); renderAssignments(); renderHistory(); updateGrandLineDashboard(); achievementSourceReady('quests'); }, e => handleFirestoreListenerError('quest submissions listener', e)); }
+        function loadMySubmissions(isRetry) { db.collection("quest_submissions").where("userId", "==", userId).onSnapshot(s => { mySubmissionsCache = {}; s.forEach(doc => { mySubmissionsCache[doc.data().questId] = { id: doc.id, ...doc.data() }; }); renderAssignments(); renderHistory(); updateGrandLineDashboard(); achievementSourceReady('quests'); }, e => handleFirestoreListenerError('quest submissions listener', e, isRetry ? null : () => loadMySubmissions(true))); }
 
         // --- Quiz System ---
         // (Variables declared globally)
