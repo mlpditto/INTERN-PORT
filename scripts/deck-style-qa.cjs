@@ -28,24 +28,27 @@ const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA
             return r.fulfill({ status: 200, contentType: /\.css/.test(u) ? 'text/css' : 'application/javascript', body: '' });
         });
         await page.addInitScript(() => { window.firebase = new Proxy(function () {}, { get: () => window.firebase, apply: () => window.firebase }); });
-        const load = async () => {
+        const load = async (fresh) => {
             await page.goto('file:///' + PUB + '/admin.html');
             await page.waitForFunction(() => typeof window.gmToggleOnePiece === 'function' && document.readyState === 'complete', null, { timeout: 30000 });
             await page.waitForTimeout(400);
-            await page.evaluate(() => {
+            await page.evaluate((fresh) => {
                 const hub = document.getElementById('tab-ai-hub');
                 document.querySelectorAll('.tab-content').forEach(t => { t.style.display = t === hub ? 'block' : 'none'; });
                 let el = hub.parentElement; while (el && el !== document.body) { if (getComputedStyle(el).display === 'none') el.style.display = 'block'; el = el.parentElement; }
-                switchHubMode('design');
+                if (!fresh) switchHubMode('design');   // V102.334: fresh = the page as it opens, no mode switch (V102.333 showed an empty AI ARCHITECTURE card there)
                 document.querySelectorAll('body *').forEach(x => { if (getComputedStyle(x).position === 'fixed' && !hub.contains(x)) x.style.display = 'none'; });
-            });
+            }, !!fresh);
         };
-        await load();
+        const cols = () => page.evaluate(() => [document.getElementById('hub-sidebar-main').style.display, document.getElementById('hub-grid-container').style.gridTemplateColumns]);
+        // 0. V102.334: as the page opens (no mode switch yet) — no left column, no empty card
+        await load(true);
+        assert.deepEqual(await cols(), ['none', '1fr'], 'fresh load: Miss Goldenweek opens full width');
+        assert.equal(await page.isVisible('#hub-sidebar-main'), false, 'no empty AI ARCHITECTURE card on open');
         await page.evaluate(() => { localStorage.removeItem('design_style_pref'); localStorage.removeItem('design_engine_model_pref'); });
         await load();
 
         // 1. no left column in Miss Goldenweek; Research Log keeps it
-        const cols = () => page.evaluate(() => [document.getElementById('hub-sidebar-main').style.display, document.getElementById('hub-grid-container').style.gridTemplateColumns]);
         assert.deepEqual(await cols(), ['none', '1fr'], 'design: full width');
         await page.evaluate(() => switchHubMode('research'));
         assert.deepEqual(await cols(), ['block', '350px 1fr'], 'research keeps its column');
