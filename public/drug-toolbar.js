@@ -55,11 +55,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const choices = window.TEXT_AI_MODELS;
     const oldRail = byId('dca-ai-chip-rail');
+    // V102.328: the AI Auto-Draft panel gets the same folded chip — ONE line  name · [logo Model ⌄] · ✨ Generate;
+    // the chip opens the vendor-first rail under the line. Same value (#dca-ai-model-val) and pick handler as the form header.
+    oldRail.style.setProperty('display', 'none', 'important');   // kept (hidden) for the batch label + QA
+    const adChip = document.createElement('button'); adChip.type = 'button'; adChip.id = 'dca-ai-model-toggle'; adChip.className = 'dt-model dca-ai-model';
+    adChip.setAttribute('aria-expanded', 'false'); adChip.setAttribute('aria-controls', 'dca-ai-models');
+    adChip.title = 'Model for Auto-Draft — click to change'; adChip.dataset.thTitle = 'โมเดลที่ใช้ร่างข้อมูลยา — กดเพื่อเปลี่ยน'; adChip.dataset.krTitle = '초안 작성 모델 — 눌러서 변경';
+    adChip.innerHTML = '<span class="dt-model-logo" aria-hidden="true"></span><span class="dca-ai-model-name"></span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>';
+    byId('dca-ai-name').after(adChip);
+    const adRail = document.createElement('div'); adRail.id = 'dca-ai-models'; adRail.className = 'dt-rail audit-toolbar lang-no-toggle'; adRail.hidden = true;
+    adRail.setAttribute('role', 'group'); adRail.setAttribute('aria-label', 'AI model for Auto-Draft');
+    byId('dca-ai-name').parentElement.after(adRail);
+    adChip.addEventListener('click', () => toggle(adRail, adChip));
     function drawRail(selected) {
         const action = 'dcaSelectAutoDraftModel(this)';
-        rail.innerHTML = window.providerModelRailHtml
-            ? window.providerModelRailHtml('dt-model-pick', selected, action)
+        const html = id => window.providerModelRailHtml
+            ? window.providerModelRailHtml(id, selected, action)
             : '<div class="text-ai-chips" role="group" aria-label="AI model">' + window.textAIChipContents(selected, action) + '</div>';
+        rail.innerHTML = html('dt-model-pick');
+        adRail.innerHTML = html('dca-ai-model-pick');
     }
     function render(selected) {
         // V101.50: same lean chips as every other text rail (ai-model-ui.js generator).
@@ -69,6 +83,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const chosen = choices.find(m => m.id === selected);
         byId('dt-model-name').textContent = chosen ? (chosen.short || chosen.label) : selected;
         model.querySelector('.dt-model-logo').innerHTML = window.aiModelLogoHtml ? window.aiModelLogoHtml(selected) : '';
+        adChip.querySelector('.dca-ai-model-name').textContent = byId('dt-model-name').textContent;
+        adChip.querySelector('.dt-model-logo').innerHTML = model.querySelector('.dt-model-logo').innerHTML;
     }
     window.dcaSelectedToolbarModel = () => byId('dca-ai-model-val').value || DCA_AI_FALLBACK_MODEL;
     window.dcaSelectAutoDraftModel = el => {
@@ -76,6 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try { localStorage.setItem(DCA_AI_LS_KEY, el.dataset.value); } catch (_) {}
         render(el.dataset.value);
         toggle(rail, model, false);   // a pick closes the rail
+        toggle(adRail, adChip, false);
     };
     window.dcaSyncAutoDraftChipFromStorage = () => {
         let saved;
