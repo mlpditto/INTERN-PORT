@@ -20,7 +20,7 @@ function grab(src, marker) {
 const a = html.indexOf('let _apdLastResults = [];'), b = html.indexOf('// ---- V98.61: events');
 assert.ok(a > 0 && b > a, 'apd review block found');
 const modes = html.slice(html.indexOf('        const APD_MODES = {'), html.indexOf('        };', html.indexOf('        const APD_MODES = {')) + 10);   // V102.304: the mode table
-const code = modes + '\n' + html.slice(a, b) + '\n' + ['function apdPref(', 'function apdMode(', 'function apdLang(', 'function apdSetMode(', 'function apdSetLang(', 'function apdPaintModeRow(', 'function apdReviewPrompt(', 'function apdSummaryPrompt(', 'async function apdSummarise(', 'function openApplicantDocs(', 'function renderApplicantDocs('].map(m => grab(html, m)).join('\n');
+const code = modes + '\n' + html.slice(a, b) + '\n' + ['function apdPref(', 'function apdMode(', 'function apdLang(', 'function apdSetMode(', 'function apdSetLang(', 'function apdPaintModeRow(', 'function apdReviewPrompt(', 'function apdSummaryPrompt(', 'async function apdSummarise(', 'function openApplicantDocs(', 'function apdDocLabel(', 'function looksLikeOpaqueMaterialName(', 'function renderApplicantDocs('].map(m => grab(html, m)).join('\n');
 const page_html = `<!doctype html><meta charset="utf-8">${styles}<body style="font-size:16px">
 <div id="applicantDocsModal" style="display:block"><div class="modal-content" style="max-width:420px; width:92%; margin:auto; padding:14px 16px; border-radius:16px; border:none;"><span id="apd-who"></span><div id="apd-list"></div><div id="apd-msg"></div><div class="apd-ab" id="apd-ab"></div><div class="apd-mode lang-no-toggle" id="apd-mode"></div><div id="apd-ai" class="lang-no-toggle"></div></div></div>
 <script>
