@@ -1,3 +1,6 @@
+// V102.338: editor blend (owner pick) — one status line (Draft · Scheduled · Live · Ended + what happens next, ● Unsaved / Saved n min ago), ⚠️ wrong-language warning with
+// one-tap Move to TH/KO, TH/KO show "→ EN" when empty, the cover folds to one chip, When & who / Links fold into summary lines (with ~reach), sticky action bar,
+// list rows edged by status, preview says when interns see it. Same data, same writes.
 // V102.335: 📰 Articles — admin side (V102.336: the modal is lang-no-toggle so Thai shows in EN mode; bodies up to 2000 characters). A short read that pops up once a day when an intern opens the app (the intern popup is a later PR).
 // ➕ Create ▸ Article opens one modal: the list (status chips All · Draft · Scheduled · Live · Ended) on the left, the editor in the middle
 // (cover emoji · EN/TH/KO · title · markdown body · window · 🔁 new interns · audience chips · quiz / DD Codex links), and a 📱 preview of the
@@ -10,7 +13,7 @@
     var FILTERS = [['all', 'All'], ['draft', 'Draft'], ['scheduled', 'Scheduled'], ['live', 'Live'], ['ended', 'Ended']];
     var RERUN = [['off', 'Off', 'Interns who join after it ends never get it'], ['any', 'All new interns', 'Interns who join after it ends get it too, oldest first, one a day']];
     var MAX_BODY = 2000, MAX_TITLE = 90, BKK = 7 * 3600e3;
-    var S = { list: [], loaded: false, loading: false, err: '', filter: 'all', cur: null, lang: 'en', saving: false, del: false, pick: '', q: '', codex: null };
+    var S = { list: [], loaded: false, loading: false, err: '', filter: 'all', cur: null, lang: 'en', saving: false, del: false, pick: '', q: '', codex: null, base: '', savedAt: 0, open: {} };
     var esc = function (v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
     var msOf = function (t) { return t == null ? null : typeof t === 'number' ? t : t.toMillis ? t.toMillis() : t instanceof Date ? t.getTime() : Date.parse(t) || null; };
 
@@ -59,6 +62,24 @@
             rerun: a.rerun === 'off' ? 'off' : 'any', readMin: readMin(body.en || body.th || body.ko || '')
         };
     }
+    // which script a text is mostly written in (Thai · Hangul · Latin) — catches Thai typed into the EN slot
+    function scriptOf(t) {
+        t = String(t || '');
+        var th = (t.match(/[\u0E00-\u0E7F]/g) || []).length, ko = (t.match(/[\uAC00-\uD7AF\u1100-\u11FF]/g) || []).length, la = (t.match(/[A-Za-z]/g) || []).length;
+        var top = Math.max(th, ko, la);
+        return top < 8 ? '' : top === th ? 'th' : top === ko ? 'ko' : 'en';
+    }
+    function mismatch(a, lang) {
+        var sc = scriptOf(((a.title || {})[lang] || '') + ' ' + ((a.body || {})[lang] || ''));
+        return sc && sc !== lang ? sc : '';
+    }
+    // interns this audience reaches now (active only), via admin.html's userInScope
+    function reach(a) {
+        var us = (typeof usersData !== 'undefined' && Array.isArray(usersData)) ? usersData.filter(function (u) { return !u.isIgnored; }) : [];
+        var keys = (a.audience.divisions || []).concat(a.audience.groups || []);
+        if (!keys.length) return us.length;
+        return us.filter(function (u) { return keys.some(function (k) { try { return typeof userInScope === 'function' ? userInScope(u, k) : false; } catch (e) { return false; } }); }).length;
+    }
     function blank(now) {
         var w = defaultWindow(now);
         return { id: null, title: {}, body: {}, cover: { emoji: '📰' }, status: 'draft', startAt: w.start, endAt: w.end, audience: { divisions: [], groups: [] }, links: [], rerun: 'any' };
@@ -98,7 +119,7 @@
         var p = a.id ? db.collection('articles').doc(a.id).update(doc) : (doc.createdAt = ts, doc.createdBy = doc.updatedBy, db.collection('articles').add(doc));
         return p.then(function (ref) {
             if (!a.id && ref) a.id = ref.id;
-            a.status = st;
+            a.status = st; S.base = JSON.stringify(a); S.savedAt = Date.now();
             var i = S.list.findIndex(function (x) { return x.id === a.id; });
             var copy = fromDoc(a.id, Object.assign({}, doc, { startAt: a.startAt, endAt: a.endAt }));
             if (i >= 0) S.list[i] = copy; else S.list.push(copy);
@@ -174,10 +195,18 @@
             '.art-err{color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:6px 10px;font-size:12.5px;font-weight:700}' +
             '.art-btns{display:flex;gap:8px;align-items:center}.art-btns button{min-height:0;margin:0;width:auto;padding:8px 14px;border-radius:12px;font-weight:800;font-size:13px;border:1px solid #e2e8f0;color:#475569;background:#fff;cursor:pointer}' +
             '.art-btns .p{background:#4361ee;color:#fff;border-color:#4361ee}.art-btns .del{margin-right:auto;color:#b91c1c}.art-btns .del.arm{background:#dc2626;color:#fff;border-color:#dc2626}.art-btns button:disabled{opacity:.55;cursor:default}' +
+            '.art-row{border-left-width:4px}.art-row.st-live{border-left-color:#22c55e}.art-row.st-scheduled{border-left-color:#3b82f6}.art-row.st-draft{border-left-color:#cbd5e1}.art-row.st-ended{border-left-color:#e2e8f0}.art-rr{font-size:14px}' +
+            '.art-stl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:2px 0 4px;font-size:12.5px;color:#475569}.art-stl .art-st{font-size:12.5px;padding:3px 11px}.art-save{margin-left:auto;font-size:11.5px;color:#94a3b8}.art-save.dirty{color:#b45309;font-weight:800}' +
+            '.art-fb{font-size:10.5px;color:#94a3b8;font-weight:600}.art-c.on .art-fb{color:#e0e7ff}' +
+            '.art-warn{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:5px 8px}.art-warn button{min-height:0;margin:0 0 0 auto;width:auto;padding:4px 10px;border-radius:8px;border:1px solid #f59e0b;background:#fff;color:#92400e;font-weight:800;font-size:12px;cursor:pointer}' +
+            '.art-sec{border-top:1px solid #f1f5f9;padding-top:6px}.art-sec>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:12.5px;color:#334155;padding:3px 0}.art-sec>summary::-webkit-details-marker{display:none}' +
+            '.art-sec>summary b{font-size:11px;color:#94a3b8;min-width:64px;font-weight:800}.art-sec>summary .chev{margin-left:auto;color:#94a3b8;transition:transform .15s}.art-sec[open]>summary .chev{transform:rotate(180deg)}.art-sec>.in{display:flex;flex-direction:column;gap:9px;padding:6px 0 2px}' +
+            '.art-btns{position:sticky;bottom:-16px;background:#fff;border-top:1px solid #f1f5f9;margin:4px -14px -12px;padding:10px 14px 12px;border-radius:0 0 16px 16px;z-index:2}.art-btns .del{width:36px!important;padding:0!important;height:36px;border-color:transparent!important;background:transparent!important;opacity:.7}.art-btns .del.arm{width:auto!important;padding:8px 12px!important;opacity:1;background:#dc2626!important}' +
+            '.art-pvb{display:flex;align-items:center;gap:6px;font-size:11.5px;color:#64748b}' +
             '.art-pv{display:flex;flex-direction:column;gap:8px;position:sticky;top:0}.art-pvh{display:flex;align-items:center;gap:6px;font-weight:800;font-size:12.5px;color:#475569}' +
             '.art-phone{width:270px;height:500px;border-radius:30px;border:7px solid #1e293b;background:#eef1f6;position:relative;overflow:hidden;align-self:center}.art-phone .home{padding:14px 10px;opacity:.55;filter:blur(1px)}.art-phone .home div{height:42px;border-radius:12px;background:#fff;margin-bottom:9px}.art-phone .home div:first-child{height:76px}' +
             '.art-sh{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:18px 18px 0 0;padding:8px 13px 12px;box-shadow:0 -8px 20px rgba(15,23,42,.15);max-height:84%;overflow:hidden}.art-sh .g{width:32px;height:4px;border-radius:9px;background:#e2e8f0;margin:0 auto 8px}' +
-            '.art-sh .k{font-size:10px;font-weight:700;color:#4361ee}.art-sh .tt{font-size:14px;font-weight:800;line-height:1.3;margin:5px 0;color:#1e293b;word-break:keep-all;overflow-wrap:anywhere}.art-sh .b{font-size:11.5px;line-height:1.5;color:#334155;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;word-break:keep-all;overflow-wrap:anywhere}' +
+            '.art-sh .k{font-size:10px;font-weight:700;color:#4361ee}.art-sh .tt{font-size:14px;font-weight:800;line-height:1.3;margin:5px 0;color:#1e293b;word-break:keep-all;overflow-wrap:anywhere}.art-sh .b{font-size:11.5px;line-height:1.5;color:#334155;max-height:6em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 65%,transparent);mask-image:linear-gradient(#000 65%,transparent);word-break:keep-all;overflow-wrap:anywhere}' +
             '.art-sh .b p,.art-sh .b ul,.art-sh .b ol{margin:0 0 4px}.art-sh .m{font-size:11px;color:#4361ee;font-weight:700;margin:5px 0 7px}.art-sh .ok{height:34px;border-radius:11px;background:#4361ee;color:#fff;font-weight:800;font-size:12.5px;display:grid;place-items:center;flex:1}' +
             '.art-sh .bm{width:34px;height:34px;border-radius:11px;border:1px solid #e2e8f0;display:grid;place-items:center}.art-sh .lks{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}.art-sh .lks span{font-size:10px;padding:3px 7px;border-radius:999px;background:#eef2ff;color:#3730a3;font-weight:600}';
         document.head.appendChild(s);
@@ -198,10 +227,10 @@
     }
     function rowHtml(a, now) {
         var st = status(a, now), have = langsOf(a), aud = (a.audience.divisions || []).concat(a.audience.groups || []);
-        return '<button type="button" class="art-row' + (S.cur && S.cur.id === a.id ? ' sel' : '') + (st === 'ended' ? ' ended' : '') + '" onclick="Articles.edit(\'' + esc(a.id) + '\')">' +
+        return '<button type="button" class="art-row st-' + st + (S.cur && S.cur.id === a.id ? ' sel' : '') + (st === 'ended' ? ' ended' : '') + '" onclick="Articles.edit(\'' + esc(a.id) + '\')">' +
             '<span class="art-tile">' + esc(a.cover.emoji) + '</span><span style="min-width:0"><span class="art-t">' + esc(title(a)) + '</span><span class="art-meta"><span class="art-st ' + st + '">' + esc(stLabel(a, now)) + '</span>' +
             LANGS.map(function (l) { return '<span class="art-lg' + (have.indexOf(l[0]) < 0 ? ' off' : '') + '">' + l[1] + '</span>'; }).join('') +
-            (aud.length ? '<span title="Audience">' + esc(aud.join(' · ')) + '</span>' : '') + (a.rerun === 'off' ? '' : '<span title="Also sent to interns who join later">🔁</span>') + '</span></span></button>';
+            (aud.length ? '<span title="Audience">' + esc(aud.join(' · ')) + '</span>' : '') + (a.rerun === 'off' ? '' : '<span class="art-rr" title="Also sent to interns who join later">🔁</span>') + '</span></span></button>';
     }
     function chip(label, on, click, extra, cls) { return '<button type="button" class="art-c' + (cls || '') + (on ? ' on' : '') + '" aria-pressed="' + !!on + '" onclick="' + click + '"' + (extra || '') + '>' + label + '</button>'; }
     function audienceHtml(a) {
@@ -233,23 +262,49 @@
         return '<div class="art-pk"><input type="search" id="art-pk-q" placeholder="' + (S.pick === 'quiz' ? '🧪 Find a quiz…' : '💊 Find a drug…') + '" value="' + esc(S.q) + '" oninput="Articles.pickQ(this.value)">' +
             '<div class="opts">' + (opts.length ? opts.map(function (o) { return '<button type="button" onclick="Articles.addLink(\'' + o.kind + '\',' + esc(JSON.stringify(o.id)) + ')">' + (o.kind === 'quiz' ? '🧪 ' : '💊 ') + esc(o.label) + '</button>'; }).join('') : '<span style="color:#94a3b8;font-size:12.5px;padding:4px 8px">' + empty + '</span>') + '</div></div>';
     }
+    function dateLong(ms) { return ms == null ? '' : new Date(ms + BKK).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }); }
+    function statusLine(a, now) {
+        var st = status(a, now), dirty = JSON.stringify(a) !== S.base;
+        var msg = { draft: 'Not live yet · 📅 Schedule when ready', scheduled: 'Goes live ' + dateLong(a.startAt), live: 'Showing now · ends ' + dateLong(a.endAt), ended: 'Ended ' + dateLong(a.endAt) + (a.rerun === 'off' ? '' : ' · 🔁 still reaches new interns') }[st];
+        var mins = S.savedAt ? Math.max(0, Math.round((now - S.savedAt) / 60000)) : -1;
+        var save = dirty ? '<span class="art-save dirty">● Unsaved</span>' : mins >= 0 ? '<span class="art-save">Saved' + (mins ? ' · ' + mins + ' min ago' : '') + '</span>' : '';
+        return '<div class="art-stl" id="art-stl"><span class="art-st ' + st + '">' + { draft: 'Draft', scheduled: 'Scheduled', live: 'Live', ended: 'Ended' }[st] + '</span><span>' + msg + '</span>' + save + '</div>';
+    }
+    function whenWhoSummary(a) {
+        var aud = a.audience.divisions.concat(a.audience.groups);
+        return '📅 ' + dateLong(a.startAt) + ' – ' + dateLong(a.endAt) + ' · ' + (a.rerun === 'off' ? '🔁 off' : '🔁 new interns') + ' · 👥 ' + (aud.length ? esc(aud.join(', ')) : 'Everyone') + ' <span style="color:#94a3b8">~' + reach(a) + '</span>';
+    }
+    function linksSummary(a) {
+        var q = (a.links || []).filter(function (l) { return l.kind === 'quiz'; }).length, c = (a.links || []).length - q;
+        return (q || c) ? (q ? '🧪 ' + q : '') + (q && c ? ' · ' : '') + (c ? '💊 ' + c : '') : '<span style="color:#94a3b8">＋ quiz or drug</span>';
+    }
+    function sec(key, label, summary, inner, openByDefault) {
+        var open = S.open[key] != null ? S.open[key] : openByDefault;
+        return '<details class="art-sec"' + (open ? ' open' : '') + ' ontoggle="Articles.sec(\'' + key + '\', this.open)"><summary><b>' + label + '</b><span>' + summary + '</span><span class="chev">▾</span></summary><div class="in">' + inner + '</div></details>';
+    }
     function editorHtml(now) {
-        var a = S.cur, L = S.lang, t = (a.title || {})[L] || '', b = (a.body || {})[L] || '', have = langsOf(a), st = status(a, now);
+        var a = S.cur, L = S.lang, t = (a.title || {})[L] || '', b = (a.body || {})[L] || '', have = langsOf(a), st = status(a, now), mm = mismatch(a, L);
+        var NAME = { en: 'English', th: 'Thai', ko: 'Korean' };
         var lines = [
-            '<div class="art-ln"><span class="art-ml">Cover</span>' + COVERS.map(function (e) { return '<button type="button" class="art-emo' + (a.cover.emoji === e ? ' on' : '') + '" onclick="Articles.cover(\'' + e + '\')" aria-label="Cover ' + e + '">' + e + '</button>'; }).join('') + '</div>',
-            '<div class="art-ln"><span class="art-ml">Language</span>' + LANGS.map(function (l) { return chip('<i class="d' + (have.indexOf(l[0]) >= 0 ? ' ok' : '') + '"></i>' + l[1], L === l[0], 'Articles.lang(\'' + l[0] + '\')', ' title="' + (l[0] === 'en' ? 'Required to schedule' : 'Optional — interns see EN when this is empty') + '"'); }).join('') + '</div>',
+            statusLine(a, now),
+            '<div class="art-ln">' + LANGS.map(function (l) { var ok = have.indexOf(l[0]) >= 0; return chip('<i class="d' + (ok ? ' ok' : '') + '"></i>' + l[1] + (!ok && l[0] !== 'en' ? ' <span class="art-fb">→ EN</span>' : ''), L === l[0], 'Articles.lang(\'' + l[0] + '\')', ' title="' + (l[0] === 'en' ? 'Required to schedule' : ok ? NAME[l[0]] + ' version' : 'Empty — interns see EN') + '"'); }).join('') +
+                '<span style="margin-left:auto;display:inline-flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">' + (S.coverOpen ? COVERS.map(function (e) { return '<button type="button" class="art-emo' + (a.cover.emoji === e ? ' on' : '') + '" onclick="Articles.cover(\'' + e + '\')" aria-label="Cover ' + e + '" title="Cover">' + e + '</button>'; }).join('')
+                    : '<button type="button" class="art-emo on" onclick="Articles.coverPick()" aria-label="Change the cover" title="Cover · tap to change">' + esc(a.cover.emoji) + '</button>') + '</span></div>',
             '<input class="art-in" id="art-title" maxlength="' + MAX_TITLE + '" placeholder="Title (' + L.toUpperCase() + ')" value="' + esc(t) + '" oninput="Articles.text(\'title\',this.value)">',
             '<div class="art-md"><div class="art-tb"><button type="button" title="Bold" onclick="Articles.wrap(\'**\',\'**\')">B</button><button type="button" title="Italic" onclick="Articles.wrap(\'*\',\'*\')"><i>I</i></button>' +
             '<button type="button" title="Bullet list" onclick="Articles.wrap(\'\\n- \',\'\')">•</button><button type="button" title="Numbered list" onclick="Articles.wrap(\'\\n1. \',\'\')">1.</button><button type="button" title="Link" onclick="Articles.wrap(\'[\',\'](https://)\')">🔗</button></div>' +
             '<textarea class="art-ta" id="art-bodyta" placeholder="A short read: 3–5 lines. Markdown works." oninput="Articles.text(\'body\',this.value)">' + esc(b) + '</textarea>' +
             '<div class="art-ft"><span>Markdown</span><span id="art-count" style="margin-left:auto"' + (b.length > MAX_BODY ? ' class="over"' : '') + '>' + b.length + ' / ' + MAX_BODY + ' · ~' + readMin(b) + ' min</span></div></div>',
-            '<div class="art-ln"><span class="art-ml">Window</span><input type="datetime-local" class="art-dt" id="art-start" value="' + (a.startAt != null ? toLocal(a.startAt) : '') + '" onchange="Articles.when(\'startAt\',this.value)"> → <input type="datetime-local" class="art-dt" id="art-end" value="' + (a.endAt != null ? toLocal(a.endAt) : '') + '" onchange="Articles.when(\'endAt\',this.value)"><span style="font-size:11.5px;color:#94a3b8">Bangkok time</span></div>',
-            '<div class="art-ln"><span class="art-ml">🔁 Later</span>' + RERUN.map(function (r) { return chip(r[1], a.rerun === r[0], 'Articles.rerun(\'' + r[0] + '\')', ' title="' + esc(r[2]) + '"'); }).join('') + '</div>',
-            '<div class="art-ln"><span class="art-ml">Audience</span>' + audienceHtml(a) + '</div>',
-            '<div class="art-ln"><span class="art-ml">Links</span>' + (a.links || []).map(function (l, i) { return '<span class="art-lk ' + l.kind + '">' + (l.kind === 'quiz' ? '🧪 ' : '💊 ') + esc(l.label) + '<button type="button" aria-label="Remove link" onclick="Articles.dropLink(' + i + ')">✕</button></span>'; }).join('') +
-            chip('＋ Quiz', S.pick === 'quiz', 'Articles.openPick(\'quiz\')', '', ' art-add') + chip('＋ Codex', S.pick === 'codex', 'Articles.openPick(\'codex\')', '', ' art-add') + '</div>' + pickerHtml(),
+            '<div id="art-warn">' + (mm ? '<div class="art-warn" role="status">⚠️ This looks like ' + NAME[mm] + ', not ' + NAME[L] + (((a.title || {})[mm] || (a.body || {})[mm]) ? '' : '<button type="button" onclick="Articles.moveLang(\'' + L + '\',\'' + mm + '\')">Move to ' + mm.toUpperCase() + '</button>') + '</div>' : '') + '</div>',
+            sec('when', 'When & who', whenWhoSummary(a),
+                '<div class="art-ln"><span class="art-ml">Window</span><input type="datetime-local" class="art-dt" id="art-start" value="' + (a.startAt != null ? toLocal(a.startAt) : '') + '" onchange="Articles.when(\'startAt\',this.value)"> → <input type="datetime-local" class="art-dt" id="art-end" value="' + (a.endAt != null ? toLocal(a.endAt) : '') + '" onchange="Articles.when(\'endAt\',this.value)"><span style="font-size:11.5px;color:#94a3b8">Bangkok time</span></div>' +
+                '<div class="art-ln"><span class="art-ml">🔁 Later</span>' + RERUN.map(function (r) { return chip(r[1], a.rerun === r[0], 'Articles.rerun(\'' + r[0] + '\')', ' title="' + esc(r[2]) + '"'); }).join('') + '</div>' +
+                '<div class="art-ln"><span class="art-ml">Audience</span>' + audienceHtml(a) + '</div>', !a.id),
+            sec('links', 'Links', linksSummary(a),
+                '<div class="art-ln">' + (a.links || []).map(function (l, i) { return '<span class="art-lk ' + l.kind + '">' + (l.kind === 'quiz' ? '🧪 ' : '💊 ') + esc(l.label) + '<button type="button" aria-label="Remove link" onclick="Articles.dropLink(' + i + ')">✕</button></span>'; }).join('') +
+                chip('＋ Quiz', S.pick === 'quiz', 'Articles.openPick(\'quiz\')', '', ' art-add') + chip('＋ Codex', S.pick === 'codex', 'Articles.openPick(\'codex\')', '', ' art-add') + '</div>' + pickerHtml(), (a.links || []).length > 0 || !!S.pick),
             S.err ? '<div class="art-err" role="alert">⚠️ ' + esc(S.err) + '</div>' : '',
-            '<div class="art-btns"><button type="button" class="del' + (S.del ? ' arm' : '') + '" onclick="Articles.remove()">' + (S.del ? 'Delete?' : (a.id ? '🗑' : 'Discard')) + '</button>' +
+            '<div class="art-btns"><button type="button" class="del' + (S.del ? ' arm' : '') + '" onclick="Articles.remove()" title="' + (a.id ? 'Delete (tap twice)' : 'Discard') + '" aria-label="Delete">' + (S.del ? 'Delete?' : '🗑') + '</button>' +
             (a.status === 'scheduled' ? '<button type="button" onclick="Articles.save(false)"' + (S.saving ? ' disabled' : '') + '>↩ Back to draft</button>' : '<button type="button" onclick="Articles.save(false)"' + (S.saving ? ' disabled' : '') + '>Save draft</button>') +
             '<button type="button" class="p" onclick="Articles.save(true)"' + (S.saving ? ' disabled' : '') + '>' + (S.saving ? 'Saving…' : a.status === 'scheduled' ? '💾 Save' : '📅 Schedule') + '</button></div>'
         ];
@@ -258,7 +313,9 @@
     function previewHtml() {
         var a = S.cur, L = S.lang, t = (a.title || {})[L] || (a.title || {}).en || '', b = (a.body || {})[L] || (a.body || {}).en || '';
         var md = typeof window.renderMd === 'function' ? window.renderMd(b) : esc(b);
+        var st = status(a, Date.now());
         return '<div class="art-pv"><div class="art-pvh">📱 Preview <span style="font-weight:600;color:#94a3b8">' + L.toUpperCase() + ((a.title || {})[L] ? '' : ' → EN') + '</span></div>' +
+            '<div class="art-pvb"><span class="art-st ' + st + '">' + { draft: 'Draft', scheduled: 'Scheduled', live: 'Live', ended: 'Ended' }[st] + '</span>' + (st === 'draft' ? 'Interns do not see drafts' : 'Interns see it ' + dateLong(a.startAt) + ' – ' + dateLong(a.endAt)) + '</div>' +
             '<div class="art-phone"><div class="home"><div></div><div></div><div></div><div></div></div><div class="art-sh" id="art-sheet"><div class="g"></div>' +
             '<div style="display:flex;gap:8px;align-items:center"><span class="art-tile" style="width:32px;height:32px;font-size:17px">' + esc(a.cover.emoji) + '</span><span class="k">📰 Article · ' + readMin(b) + ' min</span></div>' +
             '<div class="tt">' + esc(t || 'Title') + '</div><div class="b">' + (md || '<span style="color:#94a3b8">The body shows here.</span>') + '</div><div class="m">Read more ▾</div>' +
@@ -283,7 +340,9 @@
         var b = (a.body || {})[S.lang] || '', c = document.getElementById('art-count');
         if (c) { c.textContent = b.length + ' / ' + MAX_BODY + ' · ~' + readMin(b) + ' min'; c.className = b.length > MAX_BODY ? 'over' : ''; }
         var pv = document.querySelector('#art-body .art-pv'); if (pv) pv.outerHTML = previewHtml();
-        var dots = document.querySelectorAll('#art-body .art-ed .art-ln:nth-child(2) i.d'), have = langsOf(a);
+        var sl = document.getElementById('art-stl'); if (sl) sl.outerHTML = statusLine(a, Date.now());
+        var w = document.getElementById('art-warn'); if (w) { var mm = mismatch(a, S.lang), NAME = { en: 'English', th: 'Thai', ko: 'Korean' }; w.innerHTML = mm ? '<div class="art-warn" role="status">⚠️ This looks like ' + NAME[mm] + ', not ' + NAME[S.lang] + (((a.title || {})[mm] || (a.body || {})[mm]) ? '' : '<button type="button" onclick="Articles.moveLang(\'' + S.lang + '\',\'' + mm + '\')">Move to ' + mm.toUpperCase() + '</button>') + '</div>' : ''; }
+        var dots = document.querySelectorAll('#art-body .art-ed > .art-ln:nth-child(2) i.d'), have = langsOf(a);
         LANGS.forEach(function (l, i) { if (dots[i]) dots[i].className = 'd' + (have.indexOf(l[0]) >= 0 ? ' ok' : ''); });
     }
 
@@ -297,15 +356,22 @@
     function edit(id) {
         var a = id ? S.list.find(function (x) { return x.id === id; }) : null;
         S.cur = a ? fromDoc(a.id, Object.assign({}, a)) : blank(Date.now());
-        S.lang = 'en'; S.err = ''; S.del = false; S.pick = '';
+        S.lang = 'en'; S.err = ''; S.del = false; S.pick = ''; S.base = JSON.stringify(S.cur); S.savedAt = 0; S.open = {};
         render();
     }
     var api = {
         open: open, close: close, edit: edit, load: load, save: save, remove: remove, openPick: openPick,
         filter: function (f) { S.filter = f; render(); },
+        sec: function (k, open) { S.open[k] = open; },
+        // ⚠️ "Move to TH": the text typed into one language slot goes to the slot it is written in
+        moveLang: function (from, to) {
+            var a = S.cur; ['title', 'body'].forEach(function (k) { a[k][to] = a[k][from] || ''; a[k][from] = ''; });
+            S.lang = to; render();
+        },
         lang: function (l) { S.lang = l; S.del = false; render(); },
         text: function (k, v) { S.cur[k][S.lang] = v; paintLive(); },
-        cover: function (e) { S.cur.cover = { emoji: e }; render(); },
+        cover: function (e) { S.cur.cover = { emoji: e }; S.coverOpen = false; render(); },
+        coverPick: function () { S.coverOpen = true; render(); },
         when: function (k, v) { S.cur[k] = fromLocal(v); S.err = ''; render(); },
         rerun: function (r) { S.cur.rerun = r; render(); },
         aud: function (kind, name) { var l = S.cur.audience[kind], i = l.indexOf(name); if (i >= 0) l.splice(i, 1); else l.push(name); render(); },
