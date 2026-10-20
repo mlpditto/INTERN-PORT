@@ -3,11 +3,11 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.177)</title>
+    <title>Internship Portfolio (V101.178)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.171">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
     <!-- V96.69: LINE (and any other) link preview. This is a LIFF SPA on GitHub
          Pages — the crawler runs no JS, so the card can only ever be this one
@@ -163,7 +163,7 @@
             max-width: 600px;
             margin: 0 auto;
             position: relative;
-            padding-bottom: 80px;
+            padding-bottom: env(safe-area-inset-bottom, 0px); /* V101.178: was 80px; the footer row now holds the ＋ tab */
         }
 
         @media (min-width: 1024px) {
@@ -5231,35 +5231,40 @@
             </div>
 
             <!-- 🔥 Floating Action Button for Unified Submission -->
-            <button id="unified-fab-btn" onclick="(window.openSubmitFab||openUnifiedModal)()" 
-                    style="position:fixed; bottom:30px; right:30px; width:64px; height:64px; 
-                           border-radius:50%; background:linear-gradient(135deg, #4361ee, #3a56d4); 
-                           color:white; border:none; font-size:1.6em; cursor:pointer; 
-                           box-shadow:0 8px 25px rgba(67,97,238,0.4); z-index:9998; 
-                           transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                           display:flex; align-items:center; justify-content:center;
-                           animation: fabPulse 2s infinite;"
-                    onmouseover="this.style.transform='scale(1.1) rotate(90deg)'; this.style.boxShadow='0 12px 35px rgba(67,97,238,0.6)'; this.style.animation='none';"
-                    onmouseout="this.style.transform='scale(1) rotate(0deg)'; this.style.boxShadow='0 8px 25px rgba(67,97,238,0.4)'; this.style.animation='fabPulse 2s infinite';"
-                    onmousedown="this.style.transform='scale(0.95) rotate(90deg)';"
-                    onmouseup="this.style.transform='scale(1.1) rotate(90deg)';"
+            <!-- V101.178: a sunset tab on the right edge (was a 64px pulsing circle at bottom:30px that sat under
+                 the iPhone Safari bottom bar). It lifts by env(safe-area-inset-bottom) (needs viewport-fit=cover),
+                 slides into the edge while you scroll down and comes back on scroll up or at the end of the page. -->
+            <button id="unified-fab-btn" onclick="(window.openSubmitFab||openUnifiedModal)()"
                     title="Submit New" data-th-title="ส่งงานใหม่" data-kr-title="제출하기">
-                <i class="fa-solid fa-plus" style="transition:all 0.3s;"></i>
+                <i class="fa-solid fa-plus"></i>
             </button>
-
-            <!-- Pulse Animation CSS -->
             <style>
-            @keyframes fabPulse {
-                0%, 100% {
-                    box-shadow: 0 8px 25px rgba(67,97,238,0.4);
-                    transform: scale(1);
-                }
-                50% {
-                    box-shadow: 0 8px 35px rgba(67,97,238,0.6), 0 0 0 10px rgba(67,97,238,0.1);
-                    transform: scale(1.05);
-                }
+            #unified-fab-btn {
+                position: fixed; right: 0; bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+                width: 48px; height: 52px; border-radius: 16px 0 0 16px; border: none; padding: 0;
+                background: linear-gradient(135deg, #ffb347, #ff6b6b 55%, #ec4899);
+                box-shadow: -3px 5px 14px rgba(255,107,107,.38), inset 0 1px 0 rgba(255,255,255,.35);
+                color: #fff; font-size: 1.35em; cursor: pointer; z-index: 9998;
+                display: flex; align-items: center; justify-content: center;
+                transition: transform .25s ease, filter .15s;
             }
+            #unified-fab-btn > i { text-shadow: 0 1px 2px rgba(0,0,0,.25); }
+            #unified-fab-btn:active { filter: brightness(.94); }
+            #unified-fab-btn.fab-away { transform: translateX(calc(100% + 8px)); }
+            @media (prefers-reduced-motion: reduce) { #unified-fab-btn { transition: none; } }
             </style>
+            <script>
+            (function(){
+                var btn = document.getElementById('unified-fab-btn'), lastY = window.scrollY;
+                window.addEventListener('scroll', function(){
+                    var y = window.scrollY, dy = y - lastY;
+                    var atEnd = window.innerHeight + y >= document.documentElement.scrollHeight - 8;
+                    if (atEnd || dy < -8) btn.classList.remove('fab-away');
+                    else if (dy > 8 && y > 120) btn.classList.add('fab-away');
+                    if (Math.abs(dy) > 8 || atEnd) lastY = y;
+                }, { passive: true });
+            })();
+            </script>
 
             <!-- Tooltip for FAB -->
             <div id="unified-fab-tooltip" 
@@ -5273,7 +5278,6 @@
                            background:#2d3436; transform:rotate(45deg);"></div>
             </div>
 
-            <div style="height:50px;"></div>
             <!-- V96.47: was a hand-maintained 1,165-character changelog of six entries. It was
                  written in developer language for an audience of student interns on a phone, it
                  named a closed exam loophole in front of the people who sit the exams, and it had
@@ -5283,11 +5287,13 @@
                  the old hardcoded "V94.04" fallback showed a two-major-version lie whenever that
                  script did not run. Colour was #ccc, about 1.6:1 on white - far under the 4.5:1
                  minimum on the page background (#f4f6f9) and unreadable on a phone outdoors. #475569 measures
-                 7.4:1 there. -->
-            <div style="text-align:center; font-size:0.8em; color:#475569; margin-top:30px; padding-bottom:20px;">
-                <span id="intern-app-name">LINE LIFF Internship Management System</span><span id="intern-version-current"></span>   <!-- V101.121: cafe-content.js gives the Content (CAFE) UI its own name here -->
+                 7.4:1 there.
+                 V101.178: only the version shows, small, on the ＋ tab's row (the 50px spacer and 30px margin above it are gone);
+                 the app name stays in the DOM, hidden, because cafe-content.js swaps it. -->
+            <div id="intern-footer-line" style="display:flex; align-items:center; min-height:52px; margin-top:12px; padding-left:4px; font-size:11px; color:#475569;">
+                <span id="intern-app-name" style="display:none;">LINE LIFF Internship Management System</span><span id="intern-version-current"></span>   <!-- V101.121: cafe-content.js gives the Content (CAFE) UI its own name here -->
             </div>
-            <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=' · '+m[0];})();</script>
+            <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
     </div>
 
