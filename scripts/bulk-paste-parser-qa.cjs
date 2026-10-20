@@ -43,4 +43,20 @@ const single = parse('Which drug?\nA. one\nB. two\nC. three'); assert.equal(sing
 // a lone numbered-option question with blank lines between OPTIONS only (not enough numbered stems to be a sequence) is left to the old rules
 assert.equal(parse('').length, 0); assert.equal(parse('   ').length, 0);
 
-console.log('PASS: Bulk Paste parser — one-option-per-paragraph pastes (Thai ก./ข./ค./ง. and Latin A./B./C./D.) give 15/3 whole questions; blank-line, Google-Forms and single-question pastes unchanged');
+// 4 · V102.343: the source dropped the FIRST option's letter (owner's Google Forms paste, 2026-10-20) — the unlabelled
+// line belongs to the options, not to the end of the stem
+const noA = parse('4. ผู้ป่วยโรคไตเรื้อรัง เภสัชกรควรดำเนินการอย่างไรเหมาะสมที่สุด\n1 point\nเลือกสูตรพลังงานสูงที่สุด\nข. สูตรเบาหวาน\nค. จำกัดโปรตีนเอง\nง. ประเมินภาวะโภชนาการร่วมกับทีม\n5. ผู้ป่วยเบาหวาน เภสัชกรควรแนะนำอย่างไร\n1 point\nก. ใช้แทนทุกมื้อ\nข. อธิบายข้อจำกัด\nค. หยุดทุกชนิด\nง. ใช้ต่อได้เลย');
+assert.deepEqual(shape(noA), [4, 4], 'Q4 gets its unlabelled first option back: ' + JSON.stringify(shape(noA)));
+assert.equal(noA[0].q, 'ผู้ป่วยโรคไตเรื้อรัง เภสัชกรควรดำเนินการอย่างไรเหมาะสมที่สุด', 'Q4 stem no longer ends with an answer');
+assert.equal(noA[0].options[0], 'เลือกสูตรพลังงานสูงที่สุด', 'the unlabelled line is option 1');
+const noALatin = parse('Which drug?\nThe first one\nB. two\nC. three\nD. four');
+assert.equal(noALatin[0].q, 'Which drug?'); assert.deepEqual(noALatin[0].options, ['The first one', 'two', 'three', 'four'], 'same with A. missing');
+const twoLineStem = parse('A 60-year-old man on warfarin.\nWhich drug interacts?\nA. one\nB. two\nC. three');
+assert.equal(twoLineStem[0].q, 'A 60-year-old man on warfarin.\nWhich drug interacts?', 'a real two-line stem with options from A. stays whole');
+
+// 5 · V102.343: ONE pasted numbered question drops its own "4. " (the editor numbers it: was "4. 4. …"); "2.5 mg …" is not a number prefix
+assert.equal(parse('4. Which is right?\nก. หนึ่ง\nข. สอง\nค. สาม')[0].q, 'Which is right?', 'single "4. " stripped');
+assert.equal(parse('(7) Which is right?\nA. one\nB. two\nC. three')[0].q, 'Which is right?', 'single "(7) " stripped');
+assert.equal(parse('2.5 mg of drug X is given. Which is right?\nA. one\nB. two\nC. three')[0].q, '2.5 mg of drug X is given. Which is right?', 'a decimal is kept');
+
+console.log('PASS: Bulk Paste parser — one-option-per-paragraph pastes (Thai ก./ข./ค./ง. and Latin A./B./C./D.) give 15/3 whole questions; a dropped first-option letter goes back to the options; a single "4. " question is not numbered twice; blank-line, Google-Forms and single-question pastes unchanged');
