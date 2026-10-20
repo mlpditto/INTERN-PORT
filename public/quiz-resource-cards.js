@@ -54,12 +54,9 @@ window.quizResourceCards = (() => {
     function update() {
         document.getElementById('quiz-resource-count').textContent = count();
         track();
-        if (!count()) {
-            const empty = document.createElement('p');
-            empty.className = 'resource-empty';
-            empty.textContent = 'No materials yet. Add a link to slides, a video, or a reference.';
-            grid().replaceChildren(empty);
-        }
+        // V102.344: empty = just the header line and ＋ Add link (no hint box, no subtitle)
+        grid().closest('.quiz-resources')?.classList.toggle('is-empty', !count());
+        if (!count()) grid().replaceChildren();
     }
     function fitNote(note) { note.style.height = 'auto'; note.style.height = note.scrollHeight + 'px'; }
     // Row state: a valid link not being edited shows the chip; otherwise the URL field.
@@ -83,7 +80,7 @@ window.quizResourceCards = (() => {
         }
     }
     function add(material = {}) {
-        grid().querySelector('.resource-empty')?.remove();
+        grid().closest('.quiz-resources')?.classList.remove('is-empty');
         const card = document.createElement('article');
         card.className = 'res-row';
         card.innerHTML = '<div class="res-line">'

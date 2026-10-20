@@ -119,9 +119,11 @@ const markup = html.slice(html.indexOf('<header><div><strong>📚 Materials'), h
         assert.equal(await st.evaluate(e => getComputedStyle(e).animationName), 'none', 'reduced motion: no bounce');
         await page.emulateMedia({ reducedMotion: 'no-preference' });
 
-        // delete down to empty → the empty hint returns
+        // V102.344: delete down to empty → no hint box; the section is one header line (subtitle hidden)
         for (let i = 0; i < 3; i++) await rows.first().locator('.res-del').click();
-        assert.equal(await page.locator('.resource-empty').isVisible(), true);
+        assert.equal(await page.locator('.resource-empty').count(), 0, 'no empty hint box');
+        assert.equal(await page.locator('.quiz-resources').evaluate(e => e.classList.contains('is-empty')), true, 'section marked empty');
+        assert.equal(await page.locator('.quiz-resources header p').isVisible(), false, 'subtitle hidden while empty');
         assert.equal(await page.locator('#quiz-resource-count').innerText(), '0');
         assert.deepEqual(errors, []);
         console.log('PASS: resource rows — chip opens in one click (a, _blank, noopener), site colour/icon, no labels, note fold/keep multi-line, schema round-trip, paste-a-link → chip, ✎ edit, invalid shown on read, delete/empty, 1000/390 px layout, save state 💾 dim / bounce / pop');
