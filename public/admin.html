@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.342)</title>
+    <title>Nika Admin (V102.343)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -31737,6 +31737,13 @@ ${JSON.stringify(sourceObj)}`;
                     const nb = lines.filter(l => l.trim() !== '');
                     if (nb.length >= 3 && (bk.numbered || nb.length <= 7)) { stemLines = [nb[0]]; optLines = nb.slice(1); }
                 }
+                // V102.343: the source dropped the FIRST option's letter (a Google Forms copy gave "เลือก…" ⏎ "ข. …" ⏎ "ค. …"),
+                // so that unlabelled line was read as the stem's last line — the stem grew an answer and the question lost one.
+                // When the options start at the SECOND letter (ข / B / b / 2), the last stem line is the missing first option.
+                if (optLines.length > 0 && stemLines.length >= 2) {
+                    const fm = optLines[0].trim().match(optPrefixRe);
+                    if (fm && ['ข', 'B', 'b', '2'].includes(fm[1])) optLines.unshift(stemLines.pop());
+                }
                 let q = stemLines.join('\n').trim();
                 // Numbered-sequence mode: the pasted running number ("5.") would
                 // duplicate the editor's own numbering — strip it from the stem.
@@ -31773,6 +31780,10 @@ ${JSON.stringify(sourceObj)}`;
             const nums = out.map(x => { const m = x.q.match(stemNumRe); return m ? parseInt(m[1], 10) : null; });
             if (out.length >= 2 && nums.every((n, i) => n !== null && (i === 0 || n > nums[i - 1]))) {
                 out.forEach(x => { x.q = x.q.replace(stemNumRe, ''); });
+            } else if (out.length === 1) {
+                // V102.343: ONE pasted question kept its own "4. " and the editor numbered it again ("4. 4. …").
+                // Only with a space after the delimiter and a non-digit next, so a stem like "2.5 mg …" stays whole.
+                out[0].q = out[0].q.replace(/^\(?\d{1,3}[\.\)][ \t]+(?=\D)/, '');
             }
             return out;
         }
