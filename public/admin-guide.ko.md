@@ -32,7 +32,7 @@
 | 📥 **Archive** | 보관된 항목 보기 (Quests, Tasks 등) |
 | 📱 **UI** | LINE 없이 인턴 화면 미리보기 (LIFF Preview) |
 | 🔮 | AI Engine 설정 (키 / 모델) — "not loaded yet" 이라고 나오면 페이지를 새로고침하세요 |
-| ⚓ | AI Digital Lab + Laugh Tale 의 One Piece 테마 켜기/끄기 |
+| ⚓ | Grand Line Deck + Laugh Tale 의 One Piece 테마 켜기/끄기 |
 | **EN** | 라벨 언어 — 누를 때마다 EN → KR → TH → K·T 순으로 바뀝니다 |
 | 🌓 | 라이트 / 다크 모드 전환 |
 | 👋 **Logout** | 로그아웃 |
@@ -46,7 +46,7 @@
 | 📊 **Dashboard** | 홈: 작업 대기열 + 칸반 + 통계 | 맨 위 칩 바의 숫자를 확인하세요 — 0이 아닌 칩은 처리할 일이 있다는 뜻입니다 |
 | 📦 **Assignments** | Quiz, 시험, 맛집 리뷰 링크, 보상 상점 관리 | 탭의 **빨간 배지** = 검토 대기 중인 Quiz |
 | 👥 **User Hub** | 인턴 목록, 점수, 순위, 그룹 | 인턴을 검색하면 기록과 점수를 볼 수 있습니다 |
-| 🤖 **AI Digital Lab** | 팀용 AI 도구 (채팅, 이미지 생성, Podcast Studio) | 필요할 때 사용 — 대기 중인 작업 없음 |
+| 🏴‍☠️ **Grand Line Deck** | 팀용 AI 도구 (채팅, 이미지 생성, Podcast Studio) | 필요할 때 사용 — 대기 중인 작업 없음 |
 | 🏝️ **Laugh Tale** | 인턴의 **Reflections** 와 **Quiz feedback** 검토 | AI가 "Needs a fix" 로 표시한 피드백을 여세요 |
 | 🏜️ **Alabasta** | **Case** (환자 사례)와 **Product** (제품 등록) 검토 대기열 | Pending 필터 → 하나씩 검토 |
 | 🪨 **Poneglyph** | Codex (**Drug** / **Disease**), My Path, Memories | 인턴이 제출한 Drug/Disease 초안을 검토하세요 |

@@ -32,7 +32,7 @@
 | 📥 **Archive** | ดูของที่เก็บเข้าคลังแล้ว (Quest, Task ฯลฯ) |
 | 📱 **UI** | พรีวิวหน้าของ intern (LIFF Preview) โดยไม่ต้องใช้ LINE |
 | 🔮 | ตั้งค่า AI Engine (คีย์/โมเดล) — ถ้าขึ้นว่า "not loaded yet" ให้รีเฟรชหน้า |
-| ⚓ | สลับธีม One Piece ของ AI Digital Lab + Laugh Tale |
+| ⚓ | สลับธีม One Piece ของ Grand Line Deck + Laugh Tale |
 | **EN** | สลับภาษาของป้ายกำกับ — แตะแต่ละครั้งวน EN → KR → TH → K·T |
 | 🌓 | สลับโหมดสว่าง/มืด |
 | 👋 **Logout** | ออกจากระบบ |
@@ -46,7 +46,7 @@
 | 📊 **Dashboard** | หน้าแรก: คิวงานรอจัดการ + Kanban + สถิติ | ดูตัวเลขบนแถบชิปด้านบน ตัวไหนไม่ใช่ 0 = มีงานรอ |
 | 📦 **Assignments** | จัดการ Quiz, สอบ, ลิงก์รีวิวร้านอาหาร, ร้านรางวัล | ถ้าแท็บมี **badge แดง** = มี Quiz รอตรวจ |
 | 👥 **User Hub** | รายชื่อ intern, คะแนน, อันดับ, กลุ่ม | ค้นชื่อ intern → ดูประวัติและคะแนนรายคน |
-| 🤖 **AI Digital Lab** | เครื่องมือ AI สำหรับทีม (แชท, สร้างภาพ, Podcast Studio) | ใช้เมื่อต้องการ ไม่มีงานรอ |
+| 🏴‍☠️ **Grand Line Deck** | เครื่องมือ AI สำหรับทีม (แชท, สร้างภาพ, Podcast Studio) | ใช้เมื่อต้องการ ไม่มีงานรอ |
 | 🏝️ **Laugh Tale** | ตรวจ **Reflections** และ **Quiz feedback** ของ intern | เปิดดู feedback ที่ AI จัดว่า "Needs a fix" |
 | 🏜️ **Alabasta** | คิวตรวจ **Case** (เคสผู้ป่วย) และ **Product** (รายการสินค้า) | กรอง Pending → ตรวจทีละเคส |
 | 🪨 **Poneglyph** | Codex (**Drug** / **Disease**), My Path, Memories | ตรวจ Drug/Disease draft ที่ intern ส่งมา |
