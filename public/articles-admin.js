@@ -241,7 +241,7 @@
             '.art-warn{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:5px 8px}.art-warn button{min-height:0;margin:0 0 0 auto;width:auto;padding:4px 10px;border-radius:8px;border:1px solid #f59e0b;background:#fff;color:#92400e;font-weight:800;font-size:12px;cursor:pointer}' +
             '.art-sec{border-top:1px solid #f1f5f9;padding-top:6px}.art-sec>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:12.5px;color:#334155;padding:3px 0}.art-sec>summary::-webkit-details-marker{display:none}' +
             '.art-sec>summary b{font-size:11px;color:#94a3b8;min-width:64px;font-weight:800}.art-sec>summary .chev{margin-left:auto;color:#94a3b8;transition:transform .15s}.art-sec[open]>summary .chev{transform:rotate(180deg)}.art-sec>.in{display:flex;flex-direction:column;gap:9px;padding:6px 0 2px}' +
-            '.art-btns{position:sticky;bottom:-16px;background:#fff;border-top:1px solid #f1f5f9;margin:4px -14px -12px;padding:10px 14px 12px;border-radius:0 0 16px 16px;z-index:2}.art-btns .del{width:36px!important;padding:0!important;height:36px;border-color:transparent!important;background:transparent!important;opacity:.7}.art-btns .del.arm{width:auto!important;padding:8px 12px!important;opacity:1;background:#dc2626!important}' +
+            '.art-btns{position:sticky;bottom:-16px;background:#fff;border-top:1px solid #f1f5f9;margin:4px -14px -12px;padding:10px 14px 12px;border-radius:0 0 16px 16px;z-index:2}.art-btns .del{flex:none;width:36px!important;height:36px;padding:0!important;border-color:#fecaca!important;background:#fff5f5!important;opacity:1;font-size:17px}.art-btns .del:hover{background:#fee2e2!important}.art-btns .del.arm{width:auto!important;padding:8px 12px!important;opacity:1;background:#dc2626!important;border-color:#dc2626!important;font-size:13px}' +
             '.art-pvb{display:flex;align-items:center;gap:6px;font-size:11.5px;color:#64748b}' +
             '.u-art{display:inline-flex;align-items:center;padding:0 6px;border-radius:6px;font-weight:800;font-size:.92em;line-height:1.5;white-space:nowrap;margin-left:4px;background:#f1f5f9;color:#64748b}.u-art.ok{background:#dcfce7;color:#166534}.u-art.warn{background:#fef3c7;color:#92400e}.u-art.bad{background:#fee2e2;color:#991b1b}' +
             '.art-stats{border:1px solid #e2e8f0;border-radius:14px;padding:10px 12px;font-size:12.5px}.art-stats .hd{display:flex;justify-content:space-between;font-weight:800}.art-stats .bar{height:8px;border-radius:9px;background:#f1f5f9;overflow:hidden;margin:6px 0 8px}.art-stats .bar i{display:block;height:100%;background:#22c55e}' +
@@ -252,7 +252,7 @@
             '.art-wl{max-height:56vh;overflow:auto}.art-ai{margin-left:auto;display:inline-flex;align-items:center;gap:4px}.art-tb .art-ai button{width:auto;padding:0 9px;font-size:12px}.art-tb .art-ai .go{background:#fef3c7;color:#92400e}.art-tb .art-ai .go:disabled{opacity:.6}.art-tb .art-ai .mdl{color:#64748b;font-weight:700}' +
             '.art-mrail{padding:6px 8px;border-bottom:1px solid #e2e8f0;background:#fcfcfd}.art-mrail .audit-model-row{margin:0;padding:0;border:0;gap:6px;flex-wrap:nowrap;overflow-x:auto}.art-mrail .audit-providers{flex-wrap:nowrap;gap:4px;padding-right:6px;border-right:1px solid #e2e8f0}.art-mrail .text-ai-chips{display:flex;flex-wrap:nowrap;gap:4px}.art-mrail .text-ai-chips>button[hidden]{display:none!important}.art-mrail .audit-provider{width:30px;height:30px;min-height:0;margin:0;padding:0;border:1px solid transparent;border-radius:8px;background:transparent;box-shadow:none;display:grid;place-items:center;cursor:pointer}.art-mrail .audit-provider[aria-pressed="true"]{background:#eef2ff;border-color:#c7d2fe}.art-mrail .text-ai-chips>button{min-height:0;margin:0;padding:4px 10px;font-size:12px}' +   // V102.341: only the picked vendor's models show (the shared rail marks the rest [hidden]); one line
             '.art-ft .ai{color:#b45309;font-weight:700}' +
-            '.art-sh .cv{font-size:20px;line-height:1}.art-sh .x2{width:22px;height:22px;border-radius:50%;background:#f1f5f9;display:grid;place-items:center;font-size:10px;color:#64748b}.art-sh .gb{width:30px;height:30px;border-radius:9px;background:#f1f5f9;display:grid;place-items:center;font-size:12px}.art-sh .rm{margin-left:auto;font-size:10.5px;color:#4361ee;font-weight:700}.art-sh .ok2{height:30px;padding:0 12px;border-radius:999px;background:#16a34a;color:#fff;font-weight:800;font-size:11.5px;display:grid;place-items:center}' +
+            '.art-sh .cv{font-size:20px;line-height:1}.art-sh .x2{width:22px;height:22px;border-radius:50%;background:#f1f5f9;display:grid;place-items:center;font-size:10px;color:#64748b}.art-sh .gb{width:30px;height:30px;border-radius:9px;background:#f1f5f9;display:grid;place-items:center;font-size:12px}.art-sh .rm{margin-left:auto;font-size:10.5px;color:#4361ee;font-weight:700;border:none;background:none;padding:2px 0;font-family:inherit;cursor:pointer}.art-sh.more{overflow:auto}.art-sh.more .b{max-height:none;-webkit-mask-image:none;mask-image:none}.art-sh .ok2{height:30px;padding:0 12px;border-radius:999px;background:#16a34a;color:#fff;font-weight:800;font-size:11.5px;display:grid;place-items:center}' +
             '.art-pv{display:flex;flex-direction:column;gap:8px;position:sticky;top:0}.art-pvh{display:flex;align-items:center;gap:6px;font-weight:800;font-size:12.5px;color:#475569}' +
             '.art-phone{width:270px;height:500px;border-radius:30px;border:7px solid #1e293b;background:#eef1f6;position:relative;overflow:hidden;align-self:center}.art-phone .home{padding:14px 10px;opacity:.55;filter:blur(1px)}.art-phone .home div{height:42px;border-radius:12px;background:#fff;margin-bottom:9px}.art-phone .home div:first-child{height:76px}' +
             '.art-sh{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:18px 18px 0 0;padding:8px 13px 12px;box-shadow:0 -8px 20px rgba(15,23,42,.15);max-height:84%;overflow:hidden}.art-sh .g{width:32px;height:4px;border-radius:9px;background:#e2e8f0;margin:0 auto 8px}' +
@@ -382,11 +382,11 @@
         var st = status(a, Date.now());
         return '<div class="art-pv"><div class="art-pvh">📱 Preview <span style="font-weight:600;color:#94a3b8">' + L.toUpperCase() + ((a.title || {})[L] ? '' : ' → EN') + '</span></div>' +
             '<div class="art-pvb"><span class="art-st ' + st + '">' + { draft: 'Draft', scheduled: 'Scheduled', live: 'Live', ended: 'Ended' }[st] + '</span>' + (st === 'draft' ? 'Interns do not see drafts' : 'Interns see it ' + dateLong(a.startAt) + ' – ' + dateLong(a.endAt)) + '</div>' +
-            '<div class="art-phone"><div class="home"><div></div><div></div><div></div><div></div></div><div class="art-sh" id="art-sheet">' +
+            '<div class="art-phone"><div class="home"><div></div><div></div><div></div><div></div></div><div class="art-sh' + (S.pvMore ? ' more' : '') + '" id="art-sheet">' +
             '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px"><span class="cv" title="Article · ' + readMin(b) + ' min">' + esc(a.cover.emoji) + '</span><span class="x2" style="margin-left:auto">✕</span></div>' +
             '<div class="tt">' + esc(t || 'Title') + '</div><div class="b">' + (md || '<span style="color:#94a3b8">The body shows here.</span>') + '</div>' +
             ((a.links || []).length ? '<div class="lks">' + a.links.map(function (l) { return '<span>' + (l.kind === 'quiz' ? '🧪 ' : '💊 ') + esc(l.label) + (l.kind === 'quiz' ? ' · 🪙 +1' : '') + '</span>'; }).join('') + '</div>' : '') +
-            '<div style="display:flex;gap:5px;align-items:center;margin-top:6px"><span class="gb">🔖</span><span class="gb">🔕</span><span class="rm">Read more ▾</span><span class="ok2">👍 Got it</span></div></div></div>' + statsHtml(a) + '</div>';
+            '<div style="display:flex;gap:5px;align-items:center;margin-top:6px"><span class="gb">🔖</span><span class="gb">🔕</span><button type="button" class="rm" id="art-pv-more" onclick="Articles.pvMore()" aria-expanded="' + !!S.pvMore + '">' + (S.pvMore ? 'Show less ▴' : 'Read more ▾') + '</button><span class="ok2">👍 Got it</span></div></div></div>' + statsHtml(a) + '</div>';
     }
     // 👥 read counts under the preview (published articles only)
     function statsHtml(a) {
@@ -432,13 +432,21 @@
         var left = '<div class="art-list">' + (S.loading && !S.loaded ? '<div class="art-empty">Loading…</div>' : list.length ? list.map(function (a) { return rowHtml(a, now); }).join('') : '<div class="art-empty">' + (S.list.length ? 'Nothing here.' : 'No articles yet — ＋ New') + '</div>') + '</div>';
         var mid = S.cur ? editorHtml(now) : '<div class="art-empty">' + (S.err && !S.loaded ? '⚠️ ' + esc(S.err) : 'Pick an article, or ＋ New.') + '</div>';
         host.innerHTML = head + '<div class="art-g">' + left + (S.cur && S.who ? whoHtml(S.cur) : mid + (S.cur ? previewHtml() : '<div class="art-pv"></div>')) + '</div>';
+        fitPv();
     }
+    // V102.346: like the intern sheet, a body that fits needs no Read more
+    function fitPv() {
+        var b = document.querySelector('#art-sheet .b'), m = document.getElementById('art-pv-more');
+        if (b && m && !S.pvMore) m.style.visibility = b.scrollHeight <= b.clientHeight + 2 ? 'hidden' : '';
+    }
+    function pvMore() { S.pvMore = !S.pvMore; var pv = document.querySelector('#art-body .art-pv'); if (pv) pv.outerHTML = previewHtml(); fitPv(); }
     // typing repaints only the preview + counter, so the caret stays where it is
     function paintLive() {
         var a = S.cur; if (!a) return;
         var b = (a.body || {})[S.lang] || '', c = document.getElementById('art-count');
         if (c) { c.textContent = b.length + ' / ' + MAX_BODY + ' · ~' + readMin(b) + ' min'; c.className = b.length > MAX_BODY ? 'over' : ''; }
         var pv = document.querySelector('#art-body .art-pv'); if (pv) pv.outerHTML = previewHtml();
+        fitPv();
         var sl = document.getElementById('art-stl'); if (sl) sl.outerHTML = statusLine(a, Date.now());
         var w = document.getElementById('art-warn'); if (w) { var mm = mismatch(a, S.lang), NAME = { en: 'English', th: 'Thai', ko: 'Korean' }; w.innerHTML = mm ? '<div class="art-warn" role="status">⚠️ This looks like ' + NAME[mm] + ', not ' + NAME[S.lang] + (((a.title || {})[mm] || (a.body || {})[mm]) ? '' : '<button type="button" onclick="Articles.moveLang(\'' + S.lang + '\',\'' + mm + '\')">Move to ' + mm.toUpperCase() + '</button>') + '</div>' : ''; }
         var dots = document.querySelectorAll('#art-body .art-ed > .art-ln:nth-child(2) i.d'), have = langsOf(a);
@@ -455,11 +463,11 @@
     function edit(id) {
         var a = id ? S.list.find(function (x) { return x.id === id; }) : null;
         S.cur = a ? fromDoc(a.id, Object.assign({}, a)) : blank(Date.now());
-        S.lang = 'en'; S.err = ''; S.del = false; S.pick = ''; S.base = JSON.stringify(S.cur); S.savedAt = 0; S.open = {}; S.who = false; S.whoF = 'all'; S.aiNote = ''; S.modelOpen = false;
+        S.lang = 'en'; S.err = ''; S.del = false; S.pick = ''; S.base = JSON.stringify(S.cur); S.savedAt = 0; S.open = {}; S.who = false; S.whoF = 'all'; S.aiNote = ''; S.modelOpen = false; S.pvMore = false;
         render();
     }
     var api = {
-        open: open, close: close, edit: edit, load: load, save: save, remove: remove, openPick: openPick, userChip: userChip,
+        open: open, close: close, edit: edit, pvMore: pvMore, load: load, save: save, remove: remove, openPick: openPick, userChip: userChip,
         // after admin sign-in: load the list quietly so the User Hub 📰 chips have data, then repaint the Users table once if it is open
         boot: function () {
             css();
