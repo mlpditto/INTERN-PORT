@@ -28,8 +28,8 @@
 4. 한 에피소드의 **▶** — 먼저 비용 확인 **≈ $0.80 · 8 s**. Gemini Omni Flash가 세로 9:16 720p, 오디오 포함 클립을 렌더링합니다 (보통 1분 이내, 최대 12분).
 5. 미리보기 카드에서 재생(EP 번호, 모델, 렌더 시간, 비용) 후 선택:
    - **⬇ Download** — MP4 (720×1280, H.264 + AAC)
-   - **💾 Save** — 유일한 저장: Storage `teach-clips/{series}/EPnn.mp4` + `clip_series` 문서
-   - **✕ Discard** — 아무것도 저장하지 않음
+   - **자동 저장** — 렌더가 끝나면 바로: Storage `teach-clips/{series}/EPnn.mp4` + `clip_series` 문서, **Codex Gallery → 🎬 Clips**에 표시 (업로드 실패 시 **↻ Retry save**)
+   - **🗑** — 클립을 영구 삭제 (MP4 + 갤러리 항목), 먼저 확인; 카드 또는 Codex Gallery에서. 에피소드는 planned로 돌아감
 6. 다음 에피소드는 그 행의 ▶로. 일부러 "전체 렌더링"은 없습니다 — 클립마다 확인.
 
 > Omni Flash의 태국어 음성 품질은 아직 검증 중 — 게시 전 들어보세요. 더 저렴한 engine(Veo 3.1 Lite ≈ $0.40/클립)은 proxy 수정이 먼저 필요합니다.

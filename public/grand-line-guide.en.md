@@ -28,8 +28,8 @@ Tab: **🏴‍☠️ Grand Line Deck** → the three modes at the top: 🏴 Miss
 4. Press **▶** on one episode. A cost line asks first — **≈ $0.80 · 8 s** — confirm it. Gemini Omni Flash renders a vertical 9:16, 720p clip with audio; a timer shows the wait (usually under a minute, up to 12 are allowed).
 5. The clip plays in the preview card with EP number, model, render time and cost. Then choose:
    - **⬇ Download** — the MP4 (720×1280, H.264 + AAC).
-   - **💾 Save** — the only write: MP4 to Storage `teach-clips/{series}/EPnn.mp4` plus the series record in `clip_series`.
-   - **✕ Discard** — nothing is kept.
+   - **Saved automatically** as soon as it renders: MP4 to Storage `teach-clips/{series}/EPnn.mp4` plus the series record in `clip_series`, and it shows in **Codex Gallery → 🎬 Clips** (a failed upload shows **↻ Retry save**).
+   - **🗑** — deletes the clip for good (MP4 + gallery entry), asking first; on the card or in Codex Gallery. The episode goes back to planned.
 6. Render the next episode with its own ▶. There is no "render all" on purpose — one confirmation per clip.
 
 > Thai speech quality of Omni Flash is still being judged; listen before publishing. A cheaper engine (Veo 3.1 Lite ≈ $0.40 / clip) needs a proxy change first.
