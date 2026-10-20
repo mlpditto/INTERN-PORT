@@ -50,7 +50,7 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Nika Admin (V9.9)</
         assert.equal(await page.$eval('#adminGuideOverlay', e => e.dataset.set), 'deck');
         assert.match(await page.$eval('#adminGuideOverlay .ag-title', e => e.textContent), /Grand Line Deck — how to/);
         const chips = await page.$$eval('#adminGuideOverlay .ag-chip', els => els.map(e => ({ t: e.textContent, on: e.getAttribute('aria-pressed') })));
-        assert.deepEqual(chips.map(c => c.t), ['🖼 Images', '🎬 Video', '🐳 Audio', '🧭 Research Log']);
+        assert.deepEqual(chips.map(c => c.t), ['🖼 Images', '🎬 Video', '🐳 Audio', '🧭 Log Pose']);
         assert.equal(chips[0].on, 'true', 'opens on Images (not the admin guide\'s tab map)');
         const body = () => page.$eval('#adminGuideOverlay .ag-body', e => e.innerText);
         assert.ok(/Visual Style Collection/.test(await body()) && /Nano Banana 2\.1/.test(await body()));
@@ -61,7 +61,7 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Nika Admin (V9.9)</
         // the title repaints at once, the body after the TH file loads — wait for the body (CI is slow)
         await page.waitForFunction(() => /วิธีใช้ Grand Line Deck/.test(document.querySelector('#adminGuideOverlay .ag-title').textContent) && /ยืนยัน/.test(document.querySelector('#adminGuideOverlay .ag-body').innerText));
         assert.ok(/Plan 10 episodes/.test(await body()) && /ยืนยัน/.test(await body()), 'TH video section, same index');
-        assert.deepEqual(await page.$$eval('#adminGuideOverlay .ag-chip', els => els.map(e => e.textContent)), ['🖼 ภาพ', '🎬 วิดีโอ', '🐳 เสียง', '🧭 Research Log']);
+        assert.deepEqual(await page.$$eval('#adminGuideOverlay .ag-chip', els => els.map(e => e.textContent)), ['🖼 ภาพ', '🎬 วิดีโอ', '🐳 เสียง', '🧭 Log Pose']);
         // close, open the ADMIN guide → its own title, its own chips (not the deck's), lands on the tab map; the deck remembers its page
         await page.keyboard.press('Escape');
         await page.click('#btn-admin-guide');

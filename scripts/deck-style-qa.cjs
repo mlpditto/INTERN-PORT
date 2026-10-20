@@ -1,5 +1,5 @@
 // V102.333: Visual Style lives in the Brief. The REAL admin.html in Chromium (network stubbed), callUniversalAI stubbed.
-// Miss Goldenweek has no left column (Research Log keeps it) · eight pharmacy chips first, default 🧑‍⚕️ Pharmacist explainer ·
+// Miss Goldenweek has no left column (Log Pose keeps it) · eight pharmacy chips first, default 🧑‍⚕️ Pharmacist explainer ·
 // the six One Piece styles behind one chip (a saved One Piece pick still restores and opens its group) · the 🛡️ line rides on
 // the enhancer prompt, the image prompt, the clip planner and every clip prompt.
 const fs = require('node:fs');
@@ -48,7 +48,7 @@ const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA
         await page.evaluate(() => { localStorage.removeItem('design_style_pref'); localStorage.removeItem('design_engine_model_pref'); });
         await load();
 
-        // 1. no left column in Miss Goldenweek; Research Log keeps it
+        // 1. no left column in Miss Goldenweek; Log Pose keeps it
         assert.deepEqual(await cols(), ['none', '1fr'], 'design: full width');
         await page.evaluate(() => switchHubMode('research'));
         assert.deepEqual(await cols(), ['block', '350px 1fr'], 'research keeps its column');

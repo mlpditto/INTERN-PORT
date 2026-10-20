@@ -1,6 +1,6 @@
 # Grand Line Deck — วิธีทำภาพ วิดีโอ และเสียง
 
-แท็บ **🏴‍☠️ Grand Line Deck** → โหมด 3 อย่างด้านบน: 🏴 Miss Goldenweek · 🧭 Research Log · 🐳 Laboon กด 📖 (ซ้ายของ 3 โหมด) เมื่อไรก็ได้เพื่อเปิดคู่มือนี้อีก
+แท็บ **🏴‍☠️ Grand Line Deck** → โหมด 3 อย่างด้านบน: 🏴 Miss Goldenweek · 🧭 Log Pose · 🐳 Laboon กด 📖 (ซ้ายของ 3 โหมด) เมื่อไรก็ได้เพื่อเปิดคู่มือนี้อีก
 
 ---
 
@@ -48,9 +48,9 @@
 
 ---
 
-## 4. 🧭 Research Log
+## 4. 🧭 Log Pose
 
-**ที่ไหน:** 🧭 Research Log แชตกับโมเดลวิจัยบนฐานความรู้
+**ที่ไหน:** 🧭 Log Pose แชตกับโมเดลวิจัยบนฐานความรู้
 
 - พิมพ์คำถามใน **Query Brain** (สูตร Context + Goal + Source + Expectations เหมือนกัน) แล้วส่ง **Suggest Prompts** ให้ตัวอย่างคำถาม
 - 📎 **Attach Image for Vision Analysis** แนบรูปไปกับคำถาม (สไลด์ ฉลาก กราฟ)

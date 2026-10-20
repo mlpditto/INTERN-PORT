@@ -51,7 +51,7 @@ assert.ok(/toggleAttribute\('hidden', id !== 'tab-ai-hub'\)/.test(html), 'switch
       assert.deepEqual(r.btns.map(b => b.split('|')[0]), ['🏴', '🧭', '🐳', '📖'], 'icon chips: modes + guide' + tag);
       assert.ok(r.btns.every(b => b.split('|')[1] && b.split('|')[2] === 'true'), 'every chip has an aria-label and a tooltip' + tag);
       assert.equal(r.noBar, true, 'no mode bar left inside the deck' + tag);
-      assert.deepEqual(r.research, [true, false, 'flex'], '🧭 switches the deck to Research Log' + tag);
+      assert.deepEqual(r.research, [true, false, 'flex'], '🧭 switches the deck to Log Pose' + tag);
       assert.equal(r.activeBg, true, 'One Piece theme: the active mode is the orange gradient' + tag);
       assert.equal(r.guide, 1, '📖 opens the deck guide' + tag);
       const bad = errors.filter(e => /deck-modes|switchTab|switchHubMode/.test(e));
