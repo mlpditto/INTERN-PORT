@@ -5,7 +5,7 @@
 (function () {
     'use strict';
     var COUNTRIES = [['TH', '🇹🇭', 'Thailand'], ['JP', '🇯🇵', 'Japan'], ['KR', '🇰🇷', 'South Korea'], ['SG', '🇸🇬', 'Singapore']];
-    var KIND = { h: { bg: '#fff1f2', bd: '#fecdd3', fg: '#9f1239', ic: '🎌', name: 'Public holidays' }, m: { bg: '#ecfdf5', bd: '#a7f3d0', fg: '#065f46', ic: '🩺', name: 'Health days' }, c: { bg: '#fffbeb', bd: '#fde68a', fg: '#92400e', ic: '🐱', name: 'Cat days' } };
+    var KIND = { h: { bg: '#fff1f2', bd: '#fecdd3', fg: '#9f1239', ic: '🎌', name: 'Public holidays' }, m: { bg: '#ecfdf5', bd: '#a7f3d0', fg: '#065f46', ic: '🩺', name: 'Health days' }, c: { bg: '#fffbeb', bd: '#fde68a', fg: '#92400e', ic: '🐱', name: 'Cat days' }, b: { bg: '#fdf2f8', bd: '#fbcfe8', fg: '#9d174d', ic: '🎂', name: 'Birthdays' } };
     var BACK = 3, AHEAD = 14;
     var S = { cc: 'TH', year: 0, list: [], ticked: [], from: '', dirty: false, state: 'idle', err: '', saved: {}, obs: {}, obsList: [], loaded: false, loading: false, hide: {} };
     var esc = function (v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
@@ -33,8 +33,16 @@
         expandObs(obsList, [y]).forEach(function (o) { if (o.d.indexOf(pre) !== 0) return; var a = (obsApproved[String(y)] || []).some(function (x) { return x.d === o.d && x.k === o.k; }); items.push({ d: o.d, k: o.k, f: KIND[o.k].ic, t: o.t, on: a }); });
         return items.sort(function (a, b) { return a.d.localeCompare(b.d) || 'hmc'.indexOf(a.k) - 'hmc'.indexOf(b.k); });
     }
+    // V102.330: 🎂 birthdays of one month (m = 1–12) from usersData via birthdayInMonth (admin.html) — everyone not hidden; admin only.
+    function birthdays(y, m) {
+        var list = (typeof usersData !== 'undefined' && Array.isArray(usersData)) ? usersData : [];
+        if (typeof window.birthdayInMonth !== 'function') return [];
+        return list.map(function (u) { var b = window.birthdayInMonth(u, y, m); return b ? { d: b.d, k: 'b', f: '🎂', t: u.displayName || u.fullName || '', uid: u.id } : null; })
+            .filter(Boolean).sort(function (a, b) { return a.d.localeCompare(b.d) || a.t.localeCompare(b.t); });
+    }
     // ✓ = shown to interns: a public holiday is always ✓ (ticked in 🎌 Holidays), a health / cat day is a button (👁 = not shown yet)
     function okHtml(i) {
+        if (i.k === 'b') return '<button type="button" class="hol-ok" onclick="openUserHub(\'' + i.uid + '\')" title="Open in the User Hub">↗</button>';   // admin only, never shown to interns
         return i.k === 'h' ? '<span class="hol-ok on fixed" title="Interns see this day (ticked in 🎌 Holidays)">✓</span>' : '<button type="button" class="hol-ok' + (i.on ? ' on' : '') + '" onclick="Holidays.toggleObs(\'' + i.d + '\',\'' + i.k + '\')" aria-pressed="' + !!i.on + '" title="' + (i.on ? 'Shown to interns — tap to hide' : 'Not shown to interns — tap to show') + '">' + (i.on ? '✓' : '👁') + '</button>';
     }
 
@@ -61,7 +69,7 @@
             '.hol-cg{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}.hol-dn{font-size:11px;text-align:center;color:#94a3b8}.hol-dn.we{color:#be185d}' +
             '.hol-c{display:flex;align-items:center;justify-content:space-between;gap:2px;width:auto;min-height:0;margin:0;padding:3px 6px;border-radius:7px;border:1px solid #f1f5f9;background:#f8fafc;font-size:12px;cursor:default;font-family:inherit;color:#475569}.hol-c.we{background:#f1f5f9}.hol-c.e{background:transparent;border-color:transparent}' +
             '.hol-c b{font-weight:600}.hol-c span{white-space:nowrap}.hol-c.has{cursor:pointer;font-weight:700}.hol-c.today b{background:#7c3aed;color:#fff;border-radius:999px;padding:0 6px}.hol-c.past{opacity:.55}.hol-c.sel{box-shadow:0 0 0 2px #c4b5fd}' +
-            '.k-h{background:#fff1f2;border-color:#fecdd3;color:#9f1239}.k-m{background:#ecfdf5;border-color:#a7f3d0;color:#065f46}.k-c{background:#fffbeb;border-color:#fde68a;color:#92400e}' +
+            '.k-h{background:#fff1f2;border-color:#fecdd3;color:#9f1239}.k-m{background:#ecfdf5;border-color:#a7f3d0;color:#065f46}.k-c{background:#fffbeb;border-color:#fde68a;color:#92400e}.k-b{background:#fdf2f8;border-color:#fbcfe8;color:#9d174d}' +
             '.hol-det{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;font-size:12px}.hol-cd{font-weight:700;color:#64748b}.hol-cr{display:inline-flex;align-items:center;gap:6px;padding:2px 4px 2px 10px;border:1px solid #e2e8f0;border-radius:999px;font-size:12px}.hol-cr .hol-ok{margin:0}';
         document.head.appendChild(c);
     }
@@ -140,11 +148,16 @@
         if (!el) { el = document.createElement('div'); el.id = 'hol-strip'; el.className = 'lang-no-toggle'; host.insertBefore(el, host.firstChild); }
         var today = bkkToday(), all = windowItems(S.saved, S.obsList, S.obs, today), items = all.filter(function (i) { return !S.hide[i.k]; });
         el.hidden = false;
-        var pills = items.slice(0, 12).map(function (i) {
+        var bd = S.hide.b ? [] : birthdays(Number(today.slice(0, 4)), Number(today.slice(5, 7)));
+        var bdPills = bd.map(function (i) {
+            var diff = dayNum(i.d) - dayNum(today), tail = diff === 0 ? 'today' : diff > 0 ? '+' + diff : String(diff), on = diff === 0;
+            return '<span class="hol-pill" style="cursor:pointer;background:' + (on ? '#db2777' : KIND.b.bg) + ';border-color:' + KIND.b.bd + ';color:' + (on ? '#fff' : KIND.b.fg) + ';opacity:' + (diff < 0 ? 0.5 : 1) + '" title="Birthday · วันเกิด · 생일 — open in the User Hub" onclick="openUserHub(\'' + i.uid + '\')">🎂 ' + shortDate(i.d) + ' <span style="font-weight:600;opacity:.9">' + esc(i.t) + '</span> <em>' + tail + '</em></span>';
+        }).join('');
+        var pills = bdPills + items.slice(0, 12).map(function (i) {
             var k = KIND[i.k], diff = dayNum(i.d) - dayNum(today), tail = diff === 0 ? 'today' : diff > 0 ? '+' + diff : String(diff);
             return '<span class="hol-pill" style="cursor:pointer;background:' + k.bg + ';border-color:' + k.bd + ';color:' + k.fg + ';opacity:' + (diff < 0 ? 0.5 : 1) + '" title="' + esc(i.t) + '" onclick="Holidays.openDay(\'' + i.d + '\', event)">' + i.f + ' ' + shortDate(i.d) + ' <span style="font-weight:600;opacity:.85">' + esc(i.t.length > 24 ? i.t.slice(0, 23) + '…' : i.t) + '</span> <em>' + tail + '</em>' + okHtml(i) + '</span>';
         }).join('');
-        var kinds = ['h', 'm', 'c'].map(function (k) { var x = KIND[k]; return '<button type="button" aria-pressed="' + !S.hide[k] + '" title="' + x.name + '" style="background:' + x.bg + ';border-color:' + x.bd + '" onclick="Holidays.toggleKind(\'' + k + '\')">' + x.ic + '</button>'; }).join('');
+        var kinds = ['h', 'm', 'c', 'b'].map(function (k) { var x = KIND[k]; return '<button type="button" aria-pressed="' + !S.hide[k] + '" title="' + x.name + '" style="background:' + x.bg + ';border-color:' + x.bd + '" onclick="Holidays.toggleKind(\'' + k + '\')">' + x.ic + '</button>'; }).join('');
         var open = !!(S.cal && S.cal.open);
         el.innerHTML = '<button type="button" class="hol-calbtn" onclick="Holidays.toggleCal()" aria-expanded="' + open + '" aria-controls="hol-cal" title="Month view">🗓 ' + (open ? '▴' : '▾') + '</button>' + pills + '<span class="hol-kinds">' + kinds + '</span>';
         renderCal();
@@ -157,7 +170,8 @@
         if (!strip) return;
         if (!el) { el = document.createElement('div'); el.id = 'hol-cal'; el.className = 'lang-no-toggle'; strip.parentNode.insertBefore(el, strip.nextSibling); }
         el.hidden = !c.open; if (!c.open) return;
-        var today = bkkToday(), items = monthItems(S.saved, S.obsList, S.obs, c.y, c.m).filter(function (i) { return !S.hide[i.k]; }), by = {}, n = { h: 0, m: 0, c: 0 };
+        var today = bkkToday(), items = monthItems(S.saved, S.obsList, S.obs, c.y, c.m).concat(birthdays(c.y, c.m + 1)).filter(function (i) { return !S.hide[i.k]; }), by = {}, n = { h: 0, m: 0, c: 0, b: 0 };
+        items.sort(function (a, b) { return a.d.localeCompare(b.d) || 'hmcb'.indexOf(a.k) - 'hmcb'.indexOf(b.k); });
         items.forEach(function (i) { (by[i.d] = by[i.d] || []).push(i); n[i.k]++; });
         var pad = (new Date(Date.UTC(c.y, c.m, 1)).getUTCDay() + 6) % 7, dim = new Date(Date.UTC(c.y, c.m + 1, 0)).getUTCDate(), cells = '';
         for (var p = 0; p < pad; p++) cells += '<span class="hol-c e"></span>';
@@ -166,7 +180,7 @@
             cells += '<button type="button" class="hol-c' + (it.length ? ' has k-' + it[0].k : '') + (col ? ' we' : '') + (key === today ? ' today' : '') + (key === c.sel ? ' sel' : '') + (key < today ? ' past' : '') + '" onclick="Holidays.pickDay(\'' + key + '\')"><b>' + d + '</b><span>' + it.map(function (i) { return i.f; }).join('') + '</span></button>';
         }
         var title = new Date(Date.UTC(c.y, c.m, 1)).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-        var counts = ['h', 'm', 'c'].filter(function (k) { return n[k]; }).map(function (k) { return '<span class="hol-n k-' + k + '" title="' + KIND[k].name + '">' + KIND[k].ic + ' ' + n[k] + '</span>'; }).join('');
+        var counts = ['h', 'm', 'c', 'b'].filter(function (k) { return n[k]; }).map(function (k) { return '<span class="hol-n k-' + k + '" title="' + KIND[k].name + '">' + KIND[k].ic + ' ' + n[k] + '</span>'; }).join('');
         var sel = c.sel ? (by[c.sel] || []) : [], list = '';
         if (c.sel) list = '<div class="hol-det"><span class="hol-cd">' + shortDate(c.sel) + ' ' + c.sel.slice(0, 4) + '</span>' + (sel.length ? sel.map(function (i) { return '<span class="hol-cr k-' + i.k + '"><span>' + i.f + '</span><span>' + esc(i.t) + '</span>' + okHtml(i) + '</span>'; }).join('') : '<span class="hol-cr">Nothing on this day</span>') + '</div>';
         el.innerHTML = '<div class="hol-ch"><button type="button" onclick="Holidays.calMove(-1)" aria-label="Previous month">‹</button><b>' + title + '</b><button type="button" onclick="Holidays.calMove(1)" aria-label="Next month">›</button><button type="button" onclick="Holidays.calToday()">Today</button><span class="hol-ns">' + counts + '</span></div>'

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.329)</title>
+    <title>Nika Admin (V102.330)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -6939,6 +6939,13 @@
         .u-qjc { display: inline-flex; gap: 3px; font-weight: 700; }
         .u-qjc > * { width: auto; min-height: 0; margin: 0; padding: 0 5px; border: 0; border-radius: 6px; background: #f1f5f9; color: #94a3b8; font: inherit; font-weight: 700; line-height: 1.5; cursor: default; }
         .u-qjc > button { cursor: pointer; }
+        /* V102.330: 🎂 birthday this month — past faded, today solid */
+        .u-bday { display: inline-flex; align-items: center; gap: 3px; padding: 0 8px; border-radius: 999px; background: #fdf2f8; border: 1px solid #fbcfe8; color: #9d174d; font-weight: 700; line-height: 1.5; white-space: nowrap; }
+        .u-bday.today { background: #db2777; border-color: #db2777; color: #fff; }
+        .u-bday.past { opacity: .55; }
+        .u-bday-filter { width: auto; min-height: 0; margin: 0 0 0 6px; padding: 0 8px; border-radius: 999px; background: #fdf2f8; border: 1px solid #fbcfe8; color: #9d174d; font: inherit; font-size: 0.8em; font-weight: 800; cursor: pointer; }
+        .u-bday-filter[aria-pressed="true"] { background: #db2777; border-color: #db2777; color: #fff; }
+        .u-bday-filter[hidden] { display: none; }
         .u-qjc > .ok { background: #dcfce7; color: #15803d; }
         .u-seen { display: inline-flex; align-items: center; gap: 3px; font-weight: 600; white-space: nowrap; }
         .u-seen-fresh { color: #16a34a; } .u-seen-stale { color: #f97316; }
@@ -7796,7 +7803,7 @@
      hidden. -->
 <link rel="stylesheet" href="quiz-cover.css?v=V102.262">
 <script src="quiz-cover.js?v=V102.315"></script>
-<script src="holidays-admin.js?v=V102.277"></script>
+<script src="holidays-admin.js?v=V102.330"></script>
 <link rel="stylesheet" href="quiz-qimage.css?v=V101.03">
 <script src="quiz-qimage.js?v=V101.03"></script>
 <link rel="stylesheet" href="quiz-more-popover.css?v=V100.47">
@@ -8784,7 +8791,7 @@
                     <thead>
                         <tr>
                             <th style="width:40px;" title="Rank">#</th>
-                            <th>User <span id="user-sec-count" style="margin-left:4px; font-size:0.72em; font-weight:800; color:var(--text-sub); white-space:nowrap;"></span><button type="button" id="user-badge-sort" onclick="toggleUserBadgeSort()" aria-pressed="false" title="Sort by badges" style="width:auto; min-height:0; margin:0 0 0 6px; padding:0 4px; background:none; border:none; font:inherit; font-weight:inherit; color:inherit; cursor:pointer;">🏅↕</button><button type="button" id="user-seen-sort" onclick="toggleUserSeenSort()" aria-pressed="false" title="Sort by last seen" style="width:auto; min-height:0; margin:0 0 0 2px; padding:0 4px; background:none; border:none; font:inherit; font-weight:inherit; color:inherit; cursor:pointer;">🕓↕</button><button type="button" id="user-copy-all" onclick="copyAllUserRows()" title="Copy every row shown — name · Quiz/Journal/Case · pts · Beri, one line each" aria-label="Copy all rows" class="u-copy-all"><i class="fa-regular fa-copy"></i> all</button></th>
+                            <th>User <span id="user-sec-count" style="margin-left:4px; font-size:0.72em; font-weight:800; color:var(--text-sub); white-space:nowrap;"></span><button type="button" id="user-badge-sort" onclick="toggleUserBadgeSort()" aria-pressed="false" title="Sort by badges" style="width:auto; min-height:0; margin:0 0 0 6px; padding:0 4px; background:none; border:none; font:inherit; font-weight:inherit; color:inherit; cursor:pointer;">🏅↕</button><button type="button" id="user-seen-sort" onclick="toggleUserSeenSort()" aria-pressed="false" title="Sort by last seen" style="width:auto; min-height:0; margin:0 0 0 2px; padding:0 4px; background:none; border:none; font:inherit; font-weight:inherit; color:inherit; cursor:pointer;">🕓↕</button><button type="button" id="user-copy-all" onclick="copyAllUserRows()" title="Copy every row shown — name · Quiz/Journal/Case · pts · Beri, one line each" aria-label="Copy all rows" class="u-copy-all"><i class="fa-regular fa-copy"></i> all</button><button type="button" id="user-bday-filter" class="u-bday-filter" onclick="toggleUserBdayFilter()" aria-pressed="false" hidden title="Birthdays this month — tap to show only them · วันเกิดเดือนนี้ · 이번 달 생일"></button></th>
                             <th style="width:70px;" title="Score">⭐</th>
                             <th style="width:60px;" title="Beri">🪙</th>
                             <th title="Internship period">⏳</th>
@@ -40437,6 +40444,30 @@ They can connect again from LINE.
         }
 
         // V102.182: 🕓↕ sorts the active section by last seen (latest first); ⧉ copies one row / every row shown (text lives on tr[data-copy]).
+        // V102.330: 🎂 birthday this month, from users.birthday (YYYY-MM-DD) on the Bangkok calendar. Everyone who is not hidden
+        // (isIgnored) and not a pre-registration; no year or age is shown. Also read by holidays-admin.js for the Dashboard strip.
+        window.birthdayInMonth = function (u, y, m) {   // m = 1–12 → { d, md, label } or null
+            const b = String((u && u.birthday) || '');
+            if (!u || u.isIgnored || u.isPreReg || !/^\d{4}-\d{2}-\d{2}$/.test(b) || Number(b.slice(5, 7)) !== m) return null;
+            let md = b.slice(5);
+            const label = new Date('2000-' + md + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+            if (md === '02-29' && !(y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0))) md = '02-28';   // celebrated on 28 Feb in a common year
+            return { d: y + '-' + md, md, label };
+        };
+        window.birthdayThisMonth = function (u) {
+            const t = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+            const b = window.birthdayInMonth(u, Number(t.slice(0, 4)), Number(t.slice(5, 7)));
+            if (!b) return null;
+            return Object.assign(b, { state: b.d === t ? 'today' : b.d < t ? 'past' : 'soon' });
+        };
+        function userBirthdayChipHtml(u) {
+            const b = window.birthdayThisMonth(u);
+            return b ? `<span class="u-bday ${b.state}" title="Birthday ${b.label} · วันเกิด · 생일">🎂 ${b.state === 'today' ? 'Today' : b.label}</span>` : '';
+        }
+        function toggleUserBdayFilter() {
+            window._userBdayOnly = !window._userBdayOnly;
+            renderTable('users');
+        }
         function toggleUserSeenSort() {
             window._userSeenSort = !window._userSeenSort;
             const btn = document.getElementById('user-seen-sort');
@@ -52470,6 +52501,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     // pre-reg rows are left out, so the table shows exactly the number tapped.
                     data = data.filter(u => !u.isIgnored && !u.isPreReg && userBadgeTier(u, bf.id) === bf.tier);
                 }
+                // V102.330: 🎂 n in the header = birthdays this month among the rows above; tapping it shows only them (hidden when 0).
+                {
+                    const bdBtn = document.getElementById('user-bday-filter');
+                    const nBd = data.filter(u => window.birthdayThisMonth(u)).length;
+                    if (!nBd) window._userBdayOnly = false;
+                    if (window._userBdayOnly) data = data.filter(u => window.birthdayThisMonth(u));
+                    if (bdBtn) { bdBtn.hidden = !nBd; bdBtn.textContent = '🎂 ' + nBd; bdBtn.setAttribute('aria-pressed', String(!!window._userBdayOnly)); }
+                }
 
                 // 🔥 Period Calculation & Sorting ([Version: V86.96])
                 if (hasRange) {
@@ -52530,6 +52569,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 // V102.115: the Active label lives in the table header ("Active 7"), not in its own row.
                 const secCount = document.getElementById('user-sec-count');
                 if (secCount) secCount.textContent = campView ? `Hidden ${secIgn.length}` : `Active ${secAct.length}`;
+                if (window.Holidays && Holidays.renderStrip) Holidays.renderStrip();   // V102.330: the 🎂 pills on the Dashboard strip read usersData
                 if (secIgn.length) usersHeads.set(secIgn[0], secHead(`${secLabel('🙈 Camp', secIgn.length, 'var(--text-sub)')}<span style="font-size:0.72em; color:var(--text-sub);">not ranked · ⋯ → Show on boards</span>`));
             }
 
@@ -52730,7 +52770,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const _seenAge = _seenMs ? Date.now() - _seenMs : 0;
                     const _seenHtml = _seenMs ? `<span class="u-seen${_seenAge < 86400000 ? ' u-seen-fresh' : _seenAge > 7 * 86400000 ? ' u-seen-stale' : ''}" title="Last seen ${new Date(_seenMs).toLocaleString('th-TH')}"><i class="fa-regular fa-clock" aria-hidden="true"></i> ${escapeHtml(userSeenAgo(d.lastSeen))}</span>` : '';
                     const _qjcHtml = `<span class="u-qjc" title="Quiz ${_qN} · Journal ${logsN} · Case ${_cN}"><button type="button" class="${_qN ? 'ok' : ''}" onclick="userRowQuick('${d.id}', 'history')" title="Approved quizzes — open the score history" aria-label="Quizzes ${_qN}">Q${_qN}</button><button type="button" class="${logsN ? 'ok' : ''}" onclick="setReflectiveSearch('${(d.displayName || d.id).replace(/'/g, "\\'")}', '${d.id}')" title="All submitted journals, pending and reviewed" data-th-title="Journal ที่ส่งทั้งหมด รวมรายการที่รอตรวจและตรวจแล้ว" aria-label="Journals ${logsN}">J${logsN}</button><span class="${_cN ? 'ok' : ''}" title="Cases" aria-label="Cases ${_cN}">C${_cN}</span></span>`;
-                    const _logsHtml = _qjcHtml + _seenHtml;
+                    const _logsHtml = _qjcHtml + _seenHtml + userBirthdayChipHtml(d);   // V102.330: 🎂 this month
                     const _copyText = `${d.fullName || d.displayName || d.id} — Quiz ${_qN} · Journal ${logsN} · Case ${_cN} · ${parseFloat((d.score || 0).toFixed(2))} pts · 🪙${Math.round(d.beri || 0)}`;
                     tbody.innerHTML += `<tr class="${ignored ? 'u-ignored' : ''}" data-copy="${escapeHtml(_copyText)}">
                             <td style="text-align:center;">${rankDisplay}</td>

@@ -36,6 +36,7 @@ const helpers = ['function toggleUserSeenSort(', 'function copyUserRow(', 'funct
             "var __toasts = [], __clip = []; var showToast = m => __toasts.push(m); var renders = 0; var renderTable = () => { renders++; };",
             "Object.defineProperty(navigator, 'clipboard', { value: { writeText: t => { __clip.push(t); return Promise.resolve(); } } });",
             "var userBadgesCellHtml = () => '';",
+            "var userBirthdayChipHtml = () => '';",   // V102.330: 🎂 chip (tested in birthday-this-month-qa)
             "var alabastaAgo = ts => { const min = Math.floor((Date.now() - ts.toMillis()) / 60000); return min < 60 ? min + ' min' : Math.floor(min / 1440) + ' d'; };",
             "var userSeenAgo = ts => { const min = Math.floor((Date.now() - ts.toMillis()) / 60000); return min < 60 ? min + 'm' : Math.floor(min / 1440) + 'd'; };",   // V102.188: the row uses userSeenAgo
             "var reflectiveLogsCache = [{ userId: 'u1' }, { userId: 'u1', isArchived: true }], quizAttemptsAllCache = [{ userId: 'u1', status: 'approved' }, { userId: 'u1', status: 'approved' }, { userId: 'u1', status: 'pending' }], casesData = [{ userId: 'u1' }];",
