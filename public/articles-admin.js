@@ -1,3 +1,6 @@
+// V102.341 (PR 3): 👥 who read it — Read r/n · ✓ 👁 ⏳ 🔖 🧪 🔁 under the preview + a readers panel (filters, CSV); 📰 r/n chip per intern in the User Hub (userChip);
+// ✨ AI draft in the toolbar (draft from the title in this language, or translate EN → TH/KO; fills the editor, never saves) via callUniversalAI.
+// The preview now matches the intern sheet (V101.177: cover emoji header, 🔖 🔕, Read more, green 👍 Got it).
 // V102.338: editor blend (owner pick) — one status line (Draft · Scheduled · Live · Ended + what happens next, ● Unsaved / Saved n min ago), ⚠️ wrong-language warning with
 // one-tap Move to TH/KO, TH/KO show "→ EN" when empty, the cover folds to one chip, When & who / Links fold into summary lines (with ~reach), sticky action bar,
 // list rows edged by status, preview says when interns see it. Same data, same writes.
@@ -13,7 +16,8 @@
     var FILTERS = [['all', 'All'], ['draft', 'Draft'], ['scheduled', 'Scheduled'], ['live', 'Live'], ['ended', 'Ended']];
     var RERUN = [['off', 'Off', 'Interns who join after it ends never get it'], ['any', 'All new interns', 'Interns who join after it ends get it too, oldest first, one a day']];
     var MAX_BODY = 2000, MAX_TITLE = 90, BKK = 7 * 3600e3;
-    var S = { list: [], loaded: false, loading: false, err: '', filter: 'all', cur: null, lang: 'en', saving: false, del: false, pick: '', q: '', codex: null, base: '', savedAt: 0, open: {} };
+    var S = { list: [], loaded: false, loading: false, err: '', filter: 'all', cur: null, lang: 'en', saving: false, del: false, pick: '', q: '', codex: null, base: '', savedAt: 0, open: {}, who: false, whoF: 'all', model: '', modelOpen: false, aiBusy: false, aiNote: '' };
+    var DONE = ['ok', 'quiz', 'codex', 'hist'];   // what counts as read (articles.js); 'x' = closed without reading
     var esc = function (v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
     var msOf = function (t) { return t == null ? null : typeof t === 'number' ? t : t.toMillis ? t.toMillis() : t instanceof Date ? t.getTime() : Date.parse(t) || null; };
 
@@ -79,6 +83,42 @@
         var keys = (a.audience.divisions || []).concat(a.audience.groups || []);
         if (!keys.length) return us.length;
         return us.filter(function (u) { return keys.some(function (k) { try { return typeof userInScope === 'function' ? userInScope(u, k) : false; } catch (e) { return false; } }); }).length;
+    }
+    function activeUsers() { return (typeof usersData !== 'undefined' && Array.isArray(usersData)) ? usersData.filter(function (u) { return u && !u.isIgnored; }) : []; }
+    function joinedMs(u) { var t = Date.parse(String(u.startDate || '').slice(0, 10) + 'T00:00:00+07:00'); return isNaN(t) ? msOf(u.createdAt) : t; }
+    function audienceHas(a, u) {
+        var keys = (a.audience.divisions || []).concat(a.audience.groups || []);
+        if (!keys.length) return true;
+        return keys.some(function (k) { try { return typeof userInScope === 'function' && userInScope(u, k); } catch (e) { return false; } });
+    }
+    // is this published article meant for this intern: '' · 'live' (joined before it ended) · 'rerun' (joined after, rerun on) — same rule as articles.js
+    function forUser(a, u, now) {
+        var st = status(a, now);
+        if (st === 'draft' || st === 'scheduled' || !audienceHas(a, u)) return '';
+        var j = joinedMs(u);
+        if (j == null || j <= a.endAt) return 'live';
+        return a.rerun === 'off' ? '' : 'rerun';
+    }
+    function readers(a, now) {
+        return activeUsers().map(function (u) {
+            var k = forUser(a, u, now); if (!k) return null;
+            var sn = (u.articleSeen || {})[a.id] || null;
+            return { u: u, kind: k, s: sn, st: sn && DONE.indexOf(sn.act) >= 0 ? 'read' : sn && sn.act === 'x' ? 'closed' : 'wait' };
+        }).filter(Boolean);
+    }
+    function stats(a, now) {
+        var c = { n: 0, read: 0, closed: 0, wait: 0, saved: 0, quiz: 0, rerun: 0 };
+        readers(a, now).forEach(function (x) { c.n++; c[x.st]++; if (x.s && x.s.saved) c.saved++; if (x.s && x.s.act === 'quiz') c.quiz++; if (x.kind === 'rerun') c.rerun++; });
+        return c;
+    }
+    // User Hub: 📰 read/for-them per intern; nothing when no published article is for them (no data = no chip)
+    function userChip(u) {
+        if (!S.loaded || !u) return '';
+        var now = Date.now(), n = 0, r = 0, cl = 0;
+        S.list.forEach(function (a) { if (!forUser(a, u, now)) return; n++; var sn = (u.articleSeen || {})[a.id]; if (sn && DONE.indexOf(sn.act) >= 0) r++; else if (sn && sn.act === 'x') cl++; });
+        if (!n) return '';
+        var w = n - r, cls = !w ? 'ok' : w >= 2 ? 'bad' : 'warn';
+        return '<span class="u-art ' + cls + '" title="📰 Articles: read ' + r + ' of ' + n + (cl ? ' · closed ' + cl + ' without reading' : '') + (w - cl > 0 ? ' · ' + (w - cl) + ' not seen yet' : '') + '" aria-label="Articles read ' + r + ' of ' + n + '">📰 ' + r + '/' + n + '</span>';
     }
     function blank(now) {
         var w = defaultWindow(now);
@@ -203,6 +243,16 @@
             '.art-sec>summary b{font-size:11px;color:#94a3b8;min-width:64px;font-weight:800}.art-sec>summary .chev{margin-left:auto;color:#94a3b8;transition:transform .15s}.art-sec[open]>summary .chev{transform:rotate(180deg)}.art-sec>.in{display:flex;flex-direction:column;gap:9px;padding:6px 0 2px}' +
             '.art-btns{position:sticky;bottom:-16px;background:#fff;border-top:1px solid #f1f5f9;margin:4px -14px -12px;padding:10px 14px 12px;border-radius:0 0 16px 16px;z-index:2}.art-btns .del{width:36px!important;padding:0!important;height:36px;border-color:transparent!important;background:transparent!important;opacity:.7}.art-btns .del.arm{width:auto!important;padding:8px 12px!important;opacity:1;background:#dc2626!important}' +
             '.art-pvb{display:flex;align-items:center;gap:6px;font-size:11.5px;color:#64748b}' +
+            '.u-art{display:inline-flex;align-items:center;padding:0 6px;border-radius:6px;font-weight:800;font-size:.92em;line-height:1.5;white-space:nowrap;margin-left:4px;background:#f1f5f9;color:#64748b}.u-art.ok{background:#dcfce7;color:#166534}.u-art.warn{background:#fef3c7;color:#92400e}.u-art.bad{background:#fee2e2;color:#991b1b}' +
+            '.art-stats{border:1px solid #e2e8f0;border-radius:14px;padding:10px 12px;font-size:12.5px}.art-stats .hd{display:flex;justify-content:space-between;font-weight:800}.art-stats .bar{height:8px;border-radius:9px;background:#f1f5f9;overflow:hidden;margin:6px 0 8px}.art-stats .bar i{display:block;height:100%;background:#22c55e}' +
+            '.art-stats .n{display:flex;gap:12px;flex-wrap:wrap;color:#475569;font-weight:700}.art-stats .who{all:unset;cursor:pointer;display:block;margin-top:8px;color:#4361ee;font-weight:800;font-size:12.5px}' +
+            '.art-whop{border:1px solid #e2e8f0;border-radius:16px;padding:12px 14px;min-width:0;grid-column:2 / -1}.art-x{min-height:0;margin:0;width:30px;height:30px;padding:0;border:0;border-radius:50%;background:#f1f5f9;color:#64748b;cursor:pointer;flex:none}.art-whop .h{display:flex;align-items:center;gap:8px;margin-bottom:8px}.art-whop .h b{font-size:15px}.art-whop .h .sub{font-size:12px;color:#64748b;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+            '.art-wr{display:flex;align-items:center;gap:9px;padding:7px 4px;border-bottom:1px solid #f1f5f9}.art-wr .av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:12px;color:#334155;flex:none;overflow:hidden;background:#e2e8f0}.art-wr .av img{width:100%;height:100%;object-fit:cover}' +
+            '.art-wr .nm{flex:1;min-width:0}.art-wr .nm b{font-size:13px}.art-wr .nm small{display:block;font-size:11.5px;color:#64748b}.art-wr .pill{padding:2px 9px;border-radius:999px;font-weight:800;font-size:12px;white-space:nowrap}.art-wr .pill.read{background:#dcfce7;color:#166534}.art-wr .pill.closed{background:#fef3c7;color:#92400e}.art-wr .pill.wait{background:#f1f5f9;color:#64748b}.art-wr .tm{font-size:11px;color:#94a3b8;text-align:right;min-width:86px}' +
+            '.art-wl{max-height:56vh;overflow:auto}.art-ai{margin-left:auto;display:inline-flex;align-items:center;gap:4px}.art-tb .art-ai button{width:auto;padding:0 9px;font-size:12px}.art-tb .art-ai .go{background:#fef3c7;color:#92400e}.art-tb .art-ai .go:disabled{opacity:.6}.art-tb .art-ai .mdl{color:#64748b;font-weight:700}' +
+            '.art-mrail{padding:6px 8px;border-bottom:1px solid #e2e8f0;background:#fcfcfd}.art-mrail .audit-model-row{margin:0;padding:0;border:0;gap:6px;flex-wrap:nowrap;overflow-x:auto}.art-mrail .audit-providers{flex-wrap:nowrap;gap:4px;padding-right:6px;border-right:1px solid #e2e8f0}.art-mrail .text-ai-chips{display:flex;flex-wrap:nowrap;gap:4px}.art-mrail .text-ai-chips>button[hidden]{display:none!important}.art-mrail .audit-provider{width:30px;height:30px;min-height:0;margin:0;padding:0;border:1px solid transparent;border-radius:8px;background:transparent;box-shadow:none;display:grid;place-items:center;cursor:pointer}.art-mrail .audit-provider[aria-pressed="true"]{background:#eef2ff;border-color:#c7d2fe}.art-mrail .text-ai-chips>button{min-height:0;margin:0;padding:4px 10px;font-size:12px}' +   // V102.341: only the picked vendor's models show (the shared rail marks the rest [hidden]); one line
+            '.art-ft .ai{color:#b45309;font-weight:700}' +
+            '.art-sh .cv{font-size:20px;line-height:1}.art-sh .x2{width:22px;height:22px;border-radius:50%;background:#f1f5f9;display:grid;place-items:center;font-size:10px;color:#64748b}.art-sh .gb{width:30px;height:30px;border-radius:9px;background:#f1f5f9;display:grid;place-items:center;font-size:12px}.art-sh .rm{margin-left:auto;font-size:10.5px;color:#4361ee;font-weight:700}.art-sh .ok2{height:30px;padding:0 12px;border-radius:999px;background:#16a34a;color:#fff;font-weight:800;font-size:11.5px;display:grid;place-items:center}' +
             '.art-pv{display:flex;flex-direction:column;gap:8px;position:sticky;top:0}.art-pvh{display:flex;align-items:center;gap:6px;font-weight:800;font-size:12.5px;color:#475569}' +
             '.art-phone{width:270px;height:500px;border-radius:30px;border:7px solid #1e293b;background:#eef1f6;position:relative;overflow:hidden;align-self:center}.art-phone .home{padding:14px 10px;opacity:.55;filter:blur(1px)}.art-phone .home div{height:42px;border-radius:12px;background:#fff;margin-bottom:9px}.art-phone .home div:first-child{height:76px}' +
             '.art-sh{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:18px 18px 0 0;padding:8px 13px 12px;box-shadow:0 -8px 20px rgba(15,23,42,.15);max-height:84%;overflow:hidden}.art-sh .g{width:32px;height:4px;border-radius:9px;background:#e2e8f0;margin:0 auto 8px}' +
@@ -282,6 +332,22 @@
         var open = S.open[key] != null ? S.open[key] : openByDefault;
         return '<details class="art-sec"' + (open ? ' open' : '') + ' ontoggle="Articles.sec(\'' + key + '\', this.open)"><summary><b>' + label + '</b><span>' + summary + '</span><span class="chev">▾</span></summary><div class="in">' + inner + '</div></details>';
     }
+    // ---- ✨ AI draft
+    function modelId() {
+        if (S.model) return S.model;
+        var m = ''; try { m = localStorage.getItem('articleDraftModel') || ''; } catch (e) { /* none */ }
+        var sel = document.getElementById('ai-model-selector');
+        if (!m && sel) m = sel.value;
+        return (m && window.textAIModelInfo && window.textAIModelInfo(m)) ? m : 'gpt-6-luna';
+    }
+    function modelName(id) { var i = window.textAIModelInfo ? window.textAIModelInfo(id) : null; return (i && (i.short || i.label)) || id; }
+    function modelRail() { try { return window.providerModelRailHtml('art-model-pick', modelId(), 'Articles.model(this.dataset.value)'); } catch (e) { return ''; } }
+    function aiMode(a) { var L = S.lang; return L !== 'en' && String((a.body || {}).en || '').trim() && !String((a.body || {})[L] || '').trim() ? 'translate' : 'draft'; }
+    function aiHtml(a) {
+        var tr = aiMode(a) === 'translate';
+        return '<span class="art-ai"><button type="button" class="go" onclick="Articles.ai()"' + (S.aiBusy ? ' disabled' : '') + ' title="' + (tr ? 'Translate the EN version into ' + S.lang.toUpperCase() + ' (fills the editor — check, then save)' : 'Draft the body from the title in ' + S.lang.toUpperCase() + ' (fills the editor — check, then save)') + '">' + (S.aiBusy ? '✨ …' : tr ? '✨ From EN' : '✨ Draft') + '</button>' +
+            '<button type="button" class="mdl" onclick="Articles.modelPick()" title="AI model — tap to change">' + esc(modelName(modelId())) + ' ' + (S.modelOpen ? '▴' : '▾') + '</button></span>';
+    }
     function editorHtml(now) {
         var a = S.cur, L = S.lang, t = (a.title || {})[L] || '', b = (a.body || {})[L] || '', have = langsOf(a), st = status(a, now), mm = mismatch(a, L);
         var NAME = { en: 'English', th: 'Thai', ko: 'Korean' };
@@ -292,9 +358,9 @@
                     : '<button type="button" class="art-emo on" onclick="Articles.coverPick()" aria-label="Change the cover" title="Cover · tap to change">' + esc(a.cover.emoji) + '</button>') + '</span></div>',
             '<input class="art-in" id="art-title" maxlength="' + MAX_TITLE + '" placeholder="Title (' + L.toUpperCase() + ')" value="' + esc(t) + '" oninput="Articles.text(\'title\',this.value)">',
             '<div class="art-md"><div class="art-tb"><button type="button" title="Bold" onclick="Articles.wrap(\'**\',\'**\')">B</button><button type="button" title="Italic" onclick="Articles.wrap(\'*\',\'*\')"><i>I</i></button>' +
-            '<button type="button" title="Bullet list" onclick="Articles.wrap(\'\\n- \',\'\')">•</button><button type="button" title="Numbered list" onclick="Articles.wrap(\'\\n1. \',\'\')">1.</button><button type="button" title="Link" onclick="Articles.wrap(\'[\',\'](https://)\')">🔗</button></div>' +
+            '<button type="button" title="Bullet list" onclick="Articles.wrap(\'\\n- \',\'\')">•</button><button type="button" title="Numbered list" onclick="Articles.wrap(\'\\n1. \',\'\')">1.</button><button type="button" title="Link" onclick="Articles.wrap(\'[\',\'](https://)\')">🔗</button>' + aiHtml(a) + '</div>' + (S.modelOpen ? '<div class="art-mrail">' + modelRail() + '</div>' : '') +
             '<textarea class="art-ta" id="art-bodyta" placeholder="A short read: 3–5 lines. Markdown works." oninput="Articles.text(\'body\',this.value)">' + esc(b) + '</textarea>' +
-            '<div class="art-ft"><span>Markdown</span><span id="art-count" style="margin-left:auto"' + (b.length > MAX_BODY ? ' class="over"' : '') + '>' + b.length + ' / ' + MAX_BODY + ' · ~' + readMin(b) + ' min</span></div></div>',
+            '<div class="art-ft">' + (S.aiNote ? '<span class="ai">' + esc(S.aiNote) + '</span>' : '<span>Markdown</span>') + '<span id="art-count" style="margin-left:auto"' + (b.length > MAX_BODY ? ' class="over"' : '') + '>' + b.length + ' / ' + MAX_BODY + ' · ~' + readMin(b) + ' min</span></div></div>',
             '<div id="art-warn">' + (mm ? '<div class="art-warn" role="status">⚠️ This looks like ' + NAME[mm] + ', not ' + NAME[L] + (((a.title || {})[mm] || (a.body || {})[mm]) ? '' : '<button type="button" onclick="Articles.moveLang(\'' + L + '\',\'' + mm + '\')">Move to ' + mm.toUpperCase() + '</button>') + '</div>' : '') + '</div>',
             sec('when', 'When & who', whenWhoSummary(a),
                 '<div class="art-ln"><span class="art-ml">Window</span><input type="datetime-local" class="art-dt" id="art-start" value="' + (a.startAt != null ? toLocal(a.startAt) : '') + '" onchange="Articles.when(\'startAt\',this.value)"> → <input type="datetime-local" class="art-dt" id="art-end" value="' + (a.endAt != null ? toLocal(a.endAt) : '') + '" onchange="Articles.when(\'endAt\',this.value)"><span style="font-size:11.5px;color:#94a3b8">Bangkok time</span></div>' +
@@ -316,11 +382,44 @@
         var st = status(a, Date.now());
         return '<div class="art-pv"><div class="art-pvh">📱 Preview <span style="font-weight:600;color:#94a3b8">' + L.toUpperCase() + ((a.title || {})[L] ? '' : ' → EN') + '</span></div>' +
             '<div class="art-pvb"><span class="art-st ' + st + '">' + { draft: 'Draft', scheduled: 'Scheduled', live: 'Live', ended: 'Ended' }[st] + '</span>' + (st === 'draft' ? 'Interns do not see drafts' : 'Interns see it ' + dateLong(a.startAt) + ' – ' + dateLong(a.endAt)) + '</div>' +
-            '<div class="art-phone"><div class="home"><div></div><div></div><div></div><div></div></div><div class="art-sh" id="art-sheet"><div class="g"></div>' +
-            '<div style="display:flex;gap:8px;align-items:center"><span class="art-tile" style="width:32px;height:32px;font-size:17px">' + esc(a.cover.emoji) + '</span><span class="k">📰 Article · ' + readMin(b) + ' min</span></div>' +
-            '<div class="tt">' + esc(t || 'Title') + '</div><div class="b">' + (md || '<span style="color:#94a3b8">The body shows here.</span>') + '</div><div class="m">Read more ▾</div>' +
+            '<div class="art-phone"><div class="home"><div></div><div></div><div></div><div></div></div><div class="art-sh" id="art-sheet">' +
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px"><span class="cv" title="Article · ' + readMin(b) + ' min">' + esc(a.cover.emoji) + '</span><span class="x2" style="margin-left:auto">✕</span></div>' +
+            '<div class="tt">' + esc(t || 'Title') + '</div><div class="b">' + (md || '<span style="color:#94a3b8">The body shows here.</span>') + '</div>' +
             ((a.links || []).length ? '<div class="lks">' + a.links.map(function (l) { return '<span>' + (l.kind === 'quiz' ? '🧪 ' : '💊 ') + esc(l.label) + (l.kind === 'quiz' ? ' · 🪙 +1' : '') + '</span>'; }).join('') + '</div>' : '') +
-            '<div style="display:flex;gap:6px"><span class="bm">🔖</span><span class="ok">✓ Got it</span></div></div></div></div>';
+            '<div style="display:flex;gap:5px;align-items:center;margin-top:6px"><span class="gb">🔖</span><span class="gb">🔕</span><span class="rm">Read more ▾</span><span class="ok2">👍 Got it</span></div></div></div>' + statsHtml(a) + '</div>';
+    }
+    // 👥 read counts under the preview (published articles only)
+    function statsHtml(a) {
+        var now = Date.now(), st = status(a, now);
+        if (!a.id || st === 'draft' || st === 'scheduled') return '';
+        var c = stats(a, now), pct = c.n ? Math.round(c.read * 100 / c.n) : 0;
+        return '<div class="art-stats" id="art-stats"><div class="hd"><span>Read</span><span>' + c.read + ' / ' + c.n + ' · ' + pct + '%</span></div><div class="bar"><i style="width:' + pct + '%"></i></div>' +
+            '<div class="n"><span title="Read">✓ ' + c.read + '</span><span title="Closed without reading">👁 ' + c.closed + '</span><span title="Not seen yet">⏳ ' + c.wait + '</span>' +
+            (c.saved ? '<span title="Saved 🔖">🔖 ' + c.saved + '</span>' : '') + (c.quiz ? '<span title="Opened the quiz">🧪 ' + c.quiz + '</span>' : '') + (c.rerun ? '<span title="New interns (re-run)">🔁 ' + c.rerun + '</span>' : '') + '</div>' +
+            '<button type="button" class="who" onclick="Articles.who(true)">👥 Who read it ›</button></div>';
+    }
+    var ACT = { ok: 'Got it', quiz: '🧪 opened the quiz', codex: '💊 opened Codex', hist: 'read in History', x: 'closed ✕ without reading' };
+    function whenStr(ms) { return ms == null ? '' : new Date(ms + BKK).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' }); }
+    function whoRows(a) {
+        var rank = { read: 0, closed: 1, wait: 2 };
+        return readers(a, Date.now()).filter(function (x) { return S.whoF === 'all' || (S.whoF === 'rerun' ? x.kind === 'rerun' : x.st === S.whoF); })
+            .sort(function (x, y) { return rank[x.st] - rank[y.st] || ((msOf(y.s && y.s.at) || 0) - (msOf(x.s && x.s.at) || 0)) || String(x.u.displayName || '').localeCompare(String(y.u.displayName || '')); });
+    }
+    function whoHtml(a) {
+        var c = stats(a, Date.now()), rows = whoRows(a);
+        var F = [['all', 'All', c.n], ['read', '✓', c.read], ['closed', '👁', c.closed], ['wait', '⏳', c.wait]].concat(c.rerun ? [['rerun', '🔁', c.rerun]] : []);
+        var name = function (u) { return u.displayName || u.fullName || u.id; };
+        return '<div class="art-whop" id="art-who"><div class="h"><b>👥 Who read it</b><span class="sub">' + esc(title(a)) + '</span><button type="button" class="art-x" onclick="Articles.who(false)" aria-label="Back to the editor" title="Back">✕</button></div>' +
+            '<div class="art-rail" role="group" aria-label="Filter readers" style="margin-bottom:8px">' + F.map(function (f) { return '<button type="button" class="' + (S.whoF === f[0] ? 'on' : '') + '" aria-pressed="' + (S.whoF === f[0]) + '" data-who="' + f[0] + '" onclick="Articles.whoF(\'' + f[0] + '\')">' + f[1] + '<b>' + f[2] + '</b></button>'; }).join('') + '</div>' +
+            '<div class="art-wl">' + (rows.length ? rows.map(function (x) {
+                var u = x.u, pic = u.pictureUrl && /^https:\/\//.test(u.pictureUrl) ? '<img src="' + esc(u.pictureUrl) + '" alt="" referrerpolicy="no-referrer">' : esc(String(name(u)).charAt(0).toUpperCase());
+                var div = typeof userDivisionOf === 'function' ? userDivisionOf(u) : u.division;
+                var how = x.s && x.s.act ? ACT[x.s.act] || x.s.act : x.s ? 'popup waiting' : 'not opened the app since it went live';
+                return '<div class="art-wr" data-st="' + x.st + '"' + (typeof openUserHub === 'function' ? ' style="cursor:pointer" onclick="Articles.close();openUserHub(\'' + esc(u.id) + '\')"' : '') + '><span class="av">' + pic + '</span>' +
+                    '<span class="nm"><b>' + esc(name(u)) + '</b>' + (div ? ' <span style="font-size:11px;color:#64748b">· ' + esc(div) + '</span>' : '') + '<small>' + (x.kind === 'rerun' ? '🔁 ' : '') + esc(how) + (x.s && x.s.saved ? ' · 🔖' : '') + '</small></span>' +
+                    '<span class="pill ' + x.st + '">' + { read: '✓ Read', closed: '👁 Closed', wait: '⏳ Not yet' }[x.st] + '</span><span class="tm">' + (x.s && x.s.at ? whenStr(msOf(x.s.at)) : '') + '</span></div>';
+            }).join('') : '<div class="art-empty">Nobody here.</div>') + '</div>' +
+            '<div class="art-btns" style="position:static;margin:8px 0 0;padding:8px 0 0"><button type="button" onclick="Articles.csv()">⬇ CSV</button></div></div>';
     }
     function render() {
         var host = document.getElementById('art-body'); if (!host) return;
@@ -332,7 +431,7 @@
         }).join('') + '</div><button type="button" class="art-new" onclick="Articles.edit(null)">＋ New</button></div>';
         var left = '<div class="art-list">' + (S.loading && !S.loaded ? '<div class="art-empty">Loading…</div>' : list.length ? list.map(function (a) { return rowHtml(a, now); }).join('') : '<div class="art-empty">' + (S.list.length ? 'Nothing here.' : 'No articles yet — ＋ New') + '</div>') + '</div>';
         var mid = S.cur ? editorHtml(now) : '<div class="art-empty">' + (S.err && !S.loaded ? '⚠️ ' + esc(S.err) : 'Pick an article, or ＋ New.') + '</div>';
-        host.innerHTML = head + '<div class="art-g">' + left + mid + (S.cur ? previewHtml() : '<div class="art-pv"></div>') + '</div>';
+        host.innerHTML = head + '<div class="art-g">' + left + (S.cur && S.who ? whoHtml(S.cur) : mid + (S.cur ? previewHtml() : '<div class="art-pv"></div>')) + '</div>';
     }
     // typing repaints only the preview + counter, so the caret stays where it is
     function paintLive() {
@@ -356,19 +455,65 @@
     function edit(id) {
         var a = id ? S.list.find(function (x) { return x.id === id; }) : null;
         S.cur = a ? fromDoc(a.id, Object.assign({}, a)) : blank(Date.now());
-        S.lang = 'en'; S.err = ''; S.del = false; S.pick = ''; S.base = JSON.stringify(S.cur); S.savedAt = 0; S.open = {};
+        S.lang = 'en'; S.err = ''; S.del = false; S.pick = ''; S.base = JSON.stringify(S.cur); S.savedAt = 0; S.open = {}; S.who = false; S.whoF = 'all'; S.aiNote = ''; S.modelOpen = false;
         render();
     }
     var api = {
-        open: open, close: close, edit: edit, load: load, save: save, remove: remove, openPick: openPick,
+        open: open, close: close, edit: edit, load: load, save: save, remove: remove, openPick: openPick, userChip: userChip,
+        // after admin sign-in: load the list quietly so the User Hub 📰 chips have data, then repaint the Users table once if it is open
+        boot: function () {
+            css();
+            if (S.loaded || S.loading) return Promise.resolve();
+            return load().then(function () {
+                var t = document.getElementById('tab-users');
+                if (t && t.classList.contains('active') && typeof renderTable === 'function') { try { renderTable('users'); } catch (e) { /* the table repaints on its own next time */ } }
+            });
+        },
         filter: function (f) { S.filter = f; render(); },
+        who: function (on) { S.who = !!on; render(); },
+        whoF: function (f) { S.whoF = f; render(); },
+        csv: function () {
+            var a = S.cur; if (!a) return;
+            var q = function (v) { v = String(v == null ? '' : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+            var lines = [['name', 'division', 'group', 'state', 'how', 'when (Bangkok)', 'saved', 'new intern (re-run)'].join(',')].concat(whoRows(Object.assign({}, a)).map(function (x) {
+                return [x.u.displayName || x.u.fullName || x.u.id, typeof userDivisionOf === 'function' ? userDivisionOf(x.u) : x.u.division, x.u.group || '', x.st, x.s && x.s.act ? x.s.act : '', x.s && x.s.at ? whenStr(msOf(x.s.at)) : '', x.s && x.s.saved ? 'yes' : '', x.kind === 'rerun' ? 'yes' : ''].map(q).join(',');
+            }));
+            var blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8' }), url = URL.createObjectURL(blob), el = document.createElement('a');
+            el.href = url; el.download = 'article-readers-' + (a.id || 'new') + '.csv'; document.body.appendChild(el); el.click(); el.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        },
+        modelPick: function () { S.modelOpen = !S.modelOpen; render(); },
+        model: function (id) { S.model = id; S.modelOpen = false; try { localStorage.setItem('articleDraftModel', id); } catch (e) { /* none */ } render(); },
+        // ✨ fills the editor only — the admin reads it and saves; never published by the AI
+        ai: function () {
+            var a = S.cur; if (!a || S.aiBusy) return Promise.resolve();
+            var L = S.lang, NAME = { en: 'English', th: 'Thai', ko: 'Korean' }, tr = aiMode(a) === 'translate', model = modelId();
+            var topic = String(a.title[L] || a.title.en || '').trim(), notes = String(a.body[L] || '').trim();
+            if (!tr && !topic) { S.err = '✨ needs a title (a few words are enough) to draft from.'; render(); return Promise.resolve(); }
+            var prompt = tr
+                ? 'Translate this short article for pharmacy interns into ' + NAME[L] + '. Keep the markdown, emoji, line breaks and drug names (keep drug names in English). Reply with the translated title on the first line, then a line with only ---, then the translated article. Nothing else.\n\n' + String(a.title.en || '').trim() + '\n---\n' + String(a.body.en || '').trim()
+                : 'Write a short article for pharmacy interns in Thailand, in ' + NAME[L] + ', to show as a popup when they open the app (under 900 characters). Topic: ' + topic + '. ' + (notes ? 'Build on these notes: ' + notes + '. ' : '') + '3 to 5 short lines: one practical point, one example from the pharmacy counter, one takeaway. Markdown: **bold** and short lists only, no headings. Reply with the article only.';
+            S.aiBusy = true; S.err = ''; S.aiNote = ''; render();
+            var t0 = Date.now();
+            return Promise.resolve().then(function () {
+                if (typeof window.callUniversalAI !== 'function') throw new Error('AI is not available on this page.');
+                return window.callUniversalAI(model, prompt, false, null, '', { feature: 'article_draft' });
+            }).then(function (resp) {
+                var txt = String(resp && typeof resp === 'object' ? (resp.text || resp.outputText || resp.response || '') : (resp || '')).replace(/^```[a-z]*\n?/i, '').replace(/\n?```\s*$/, '').trim();
+                if (!txt) throw new Error('the model sent back nothing.');
+                if (tr) {
+                    var m = txt.match(/^([^\n]*)\n\s*-{3,}\s*\n([\s\S]*)$/);
+                    if (m) { a.title[L] = m[1].replace(/^#+\s*/, '').trim(); a.body[L] = m[2].trim(); } else a.body[L] = txt;
+                } else a.body[L] = txt;
+                S.aiNote = '✨ ' + modelName(model) + ' · ' + Math.max(1, Math.round((Date.now() - t0) / 1000)) + ' s — read it, then save';
+            }).catch(function (e) { S.err = '✨ ' + ((e && e.message) || 'AI draft failed'); }).then(function () { S.aiBusy = false; render(); });
+        },
         sec: function (k, open) { S.open[k] = open; },
         // ⚠️ "Move to TH": the text typed into one language slot goes to the slot it is written in
         moveLang: function (from, to) {
             var a = S.cur; ['title', 'body'].forEach(function (k) { a[k][to] = a[k][from] || ''; a[k][from] = ''; });
             S.lang = to; render();
         },
-        lang: function (l) { S.lang = l; S.del = false; render(); },
+        lang: function (l) { S.lang = l; S.del = false; S.aiNote = ''; render(); },
         text: function (k, v) { S.cur[k][S.lang] = v; paintLive(); },
         cover: function (e) { S.cur.cover = { emoji: e }; S.coverOpen = false; render(); },
         coverPick: function () { S.coverOpen = true; render(); },
@@ -386,7 +531,7 @@
             ta.focus(); ta.setSelectionRange(s + pre.length, e + pre.length);
             api.text('body', ta.value);
         },
-        _S: S, _status: status, _defaultWindow: defaultWindow, _validate: validate, _toDoc: toDoc, _toLocal: toLocal, _fromLocal: fromLocal, _readMin: readMin, _langsOf: langsOf
+        _S: S, _stats: stats, _forUser: forUser, _status: status, _defaultWindow: defaultWindow, _validate: validate, _toDoc: toDoc, _toLocal: toLocal, _fromLocal: fromLocal, _readMin: readMin, _langsOf: langsOf
     };
     window.Articles = api;
 })();

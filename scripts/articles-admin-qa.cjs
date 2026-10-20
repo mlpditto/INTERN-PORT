@@ -1,4 +1,4 @@
-// Admin 📰 Articles (V102.335; V102.338 editor blend — status line, wrong-language warning, folds, sticky bar): ➕ Create ▸ Article opens the Articles modal — status chips (All · Draft · Scheduled · Live · Ended), the editor
+// Admin 📰 Articles (V102.341 PR 3: read counts, 👥 who read it + CSV, User Hub 📰 chip, ✨ AI draft / translate, one-line model rail; V102.335; V102.338 editor blend — status line, wrong-language warning, folds, sticky bar): ➕ Create ▸ Article opens the Articles modal — status chips (All · Draft · Scheduled · Live · Ended), the editor
 // (cover · EN/TH/KO · title · markdown body · window · 🔁 later · audience chips · quiz / Codex links), the 📱 preview, and the save paths
 // (draft / schedule / back to draft / two-tap delete) into articles/{id}. The REAL public/articles-admin.js inside the REAL admin.html, with a fake
 // Firestore (nothing leaves the page). Also: the HTML wiring and the Firestore rule.
@@ -9,6 +9,8 @@ const html = fs.readFileSync('public/admin.html', 'utf8').replace(/\r\n/g, '\n')
 assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(html));
 assert.ok(/<script src="articles-admin\.js\?v=V102\.\d+"><\/script>/.test(html), 'the module is loaded');
 assert.ok(/onclick="createMenuPick\(\(\) => Articles\.open\(\)\)" class="create-menu-row"/.test(html), 'the ➕ Create menu has an Article row');
+assert.ok(/_qjcHtml \+ \(window\.Articles \? Articles\.userChip\(d\) : ''\)/.test(html), 'User Hub rows carry the 📰 chip');
+assert.ok(/if \(window\.Articles\) Articles\.boot\(\);/.test(html), 'the list loads after sign-in (for the chips)');
 assert.ok(/match \/articles\/\{articleId\} \{\s*allow read: if isAdmin\(\) \|\| \(isSignedIn\(\) && resource\.data\.status == 'scheduled'\);\s*allow write: if isAdmin\(\);\s*\}/.test(rules), 'rule: interns read scheduled only, admin writes');
 
 const H = 3600e3, D = 24 * H, BKK = 7 * H;
@@ -19,10 +21,16 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
   try {
     const page = await browser.newPage({ viewport: { width: 1360, height: 950 } });
     const errors = []; page.on('pageerror', e => errors.push(e.message));
-    await page.route('**/*', r => r.request().url().startsWith('file:') ? r.continue() : r.fulfill({ status: 200, contentType: 'application/javascript', body: '' }));
+    await page.route('**/*', r => {
+      const u = r.request().url();
+      if (u.startsWith('file:')) return r.continue();
+      // admin's module script (providerModelRailHtml, renderMd) only runs when its importmap target resolves
+      if (/generative-ai/.test(u)) return r.fulfill({ contentType: 'application/javascript', body: 'export class GoogleGenerativeAI{constructor(){}getGenerativeModel(){return {}}} export default {};' });
+      return r.fulfill({ status: 200, contentType: 'application/javascript', body: '' });
+    });
     await page.addInitScript(() => { window.firebase = new Proxy(function () {}, { get: (t, k) => k === 'firestore' ? Object.assign(() => ({}), { FieldValue: { serverTimestamp: () => 'TS' } }) : window.firebase, apply: () => window.firebase }); });
     await page.goto(require('url').pathToFileURL(process.cwd() + '/public/admin.html').href);
-    await page.waitForFunction(() => window.Articles && typeof openCreateMenu === 'function' && document.readyState === 'complete');
+    await page.waitForFunction(() => window.Articles && typeof openCreateMenu === 'function' && typeof window.providerModelRailHtml === 'function' && document.readyState === 'complete');
 
     // ---- pure helpers
     const p = await page.evaluate(({ H, D, BKK }) => {
@@ -193,6 +201,92 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
     assert.deepEqual(r.moved, ['th', '', '“อดทนคืออวดตัว”', true, '', '“อดทนคืออวดตัว”'], 'Move to TH moves title + body into TH and switches to it');
     assert.equal(r.enOk, '', 'English in EN = no warning');
     assert.match(r.afterSave || 'Saved', /Saved/);
+    // ---- V102.341 PR 3: readers, chip, ✨
+    const r3 = await page.evaluate(async ({ D }) => {
+      const out = {}, writes = [], now = Date.now(), wait = ms => new Promise(res => setTimeout(res, ms));
+      const T = ms => ({ toMillis: () => ms });
+      const docs = {
+        b1: { title: { en: 'Inhaler mistakes' }, body: { en: 'Shake it.' }, cover: { emoji: '🫁' }, status: 'scheduled', startAt: T(now - D), endAt: T(now + D), audience: { divisions: [], groups: [] }, links: [], rerun: 'any' },
+        b2: { title: { en: 'Old one' }, body: { en: 'Old.' }, cover: { emoji: '🦠' }, status: 'scheduled', startAt: T(now - 30 * D), endAt: T(now - 20 * D), audience: { divisions: [], groups: [] }, links: [], rerun: 'any' },
+        b3: { title: { en: 'Old, no rerun' }, body: { en: 'Old.' }, cover: { emoji: '🧊' }, status: 'scheduled', startAt: T(now - 30 * D), endAt: T(now - 20 * D), audience: { divisions: [], groups: [] }, links: [], rerun: 'off' }
+      };
+      window.db = { collection: name => ({ get: async () => ({ docs: Object.keys(docs).map(id => ({ id, data: () => docs[id] })) }), add: async v => { writes.push(['add', v]); return { id: 'n' }; }, doc: id => ({ update: async v => { writes.push(['update', id, v]); }, delete: async () => { writes.push(['delete', id]); } }) }) };
+      db = window.db;
+      const day = d => new Date(now + d * D + 7 * 3600e3).toISOString().slice(0, 10);
+      usersData = [
+        { id: 'v1', displayName: 'Patra', group: 'EXTERN', division: 'RSU', startDate: day(-60), articleSeen: { b1: { act: 'ok', at: T(now - 3600e3), saved: true } } },
+        { id: 'v2', displayName: 'NATT', group: 'EXTERN', division: 'RSU', startDate: day(-60), articleSeen: { b1: { act: 'x', at: T(now - 7200e3) } } },
+        { id: 'v3', displayName: 'Gap', group: 'EXTERN', division: 'RSU', startDate: day(-60), articleSeen: {} },
+        { id: 'v4', displayName: 'Ploy', group: 'EXTERN', division: 'RSU', startDate: day(-5), articleSeen: { b1: { act: 'quiz', at: T(now - 600e3) } } },
+        { id: 'v5', displayName: 'Hidden', group: 'EXTERN', division: 'RSU', startDate: day(-60), isIgnored: true, articleSeen: { b1: { act: 'ok' } } }
+      ];
+      const S = Articles._S; S.loaded = false; S.loading = false; S.list = [];
+      await Articles.boot();
+      out.loaded = [S.loaded, S.list.length];
+      const st = Articles._stats(S.list.find(a => a.id === 'b1'), now);
+      out.stats = [st.n, st.read, st.closed, st.wait, st.saved, st.quiz, st.rerun];
+      const b2 = S.list.find(a => a.id === 'b2'), b3 = S.list.find(a => a.id === 'b3');
+      out.forUser = [Articles._forUser(b2, usersData[3], now), Articles._forUser(b2, usersData[0], now), Articles._forUser(b3, usersData[3], now)];
+      out.chips = usersData.slice(0, 4).map(u => (Articles.userChip(u).match(/class="u-art (\w+)"[^>]*>📰 ([\d/]+)/) || []).slice(1).join(' '));
+      out.noChip = Articles.userChip({ id: 'z', group: 'EXTERN', startDate: day(-60), articleSeen: {} }) !== '' ;
+      // the modal: counts under the preview, who read it, CSV
+      Articles.open(); await wait(50); Articles.edit('b1');
+      const q = sel => document.querySelector('#articlesModal ' + sel), qa = sel => [...document.querySelectorAll('#articlesModal ' + sel)];
+      out.card = q('#art-stats') && q('#art-stats').textContent.replace(/\s+/g, ' ');
+      out.previewG4 = [!!q('#art-sheet .ok2'), q('#art-sheet .ok2') && q('#art-sheet .ok2').textContent];
+      Articles.who(true);
+      out.who = [qa('.art-wr').length, qa('.art-wr .pill').map(p => p.textContent), qa('[data-who]').map(b => b.dataset.who + ':' + b.querySelector('b').textContent)];
+      Articles.whoF('closed'); out.closedOnly = qa('.art-wr b').map(b => b.textContent);
+      Articles.whoF('all');
+      let csv = ''; const oc = URL.createObjectURL; URL.createObjectURL = b => { b.text().then(t => { csv = t; }); b.arrayBuffer().then(x => { out.bom = [...new Uint8Array(x).slice(0, 3)]; }); return 'blob:x'; };
+      Articles.csv(); await wait(50); URL.createObjectURL = oc;
+      out.csv = csv.split('\n').map(l => l.split(',').slice(0, 4).join(','));
+      Articles.who(false); out.back = !!q('.art-ed');
+      // ✨ translate EN → TH, then draft in EN; never writes
+      const calls = []; let reply = 'หัวข้อไทย\n---\nเขย่าก่อนใช้ **ทุกครั้ง**';
+      window.callUniversalAI = async (...a) => { calls.push(a); return { text: reply }; };
+      Articles.lang('th');
+      out.trBtn = q('.art-ai .go').textContent;
+      await Articles.ai();
+      out.tr = [S.cur.title.th, S.cur.body.th, S.aiNote.includes('read it, then save'), calls[0][2], calls[0][5] && calls[0][5].feature, /Translate .* into Thai/.test(calls[0][1]), q('#art-stl').textContent.includes('● Unsaved')];
+      Articles.lang('en'); out.drBtn = q('.art-ai .go').textContent;
+      reply = '```markdown\n**Shake** the inhaler first.\n```';
+      await Articles.ai();
+      out.dr = [S.cur.body.en, /Write a short article .* in English/.test(calls[1][1]) && /Topic: Inhaler mistakes/.test(calls[1][1])];
+      window.callUniversalAI = async () => { throw new Error('quota'); };
+      await Articles.ai(); out.err = q('.art-err') && q('.art-err').textContent;
+      out.writes = writes.length;
+      // the one-line model rail
+      Articles.modelPick();
+      const chips = qa('.art-mrail .text-ai-chips > button'), shown = chips.filter(b => getComputedStyle(b).display !== 'none');
+      const tops = shown.concat(qa('.art-mrail .audit-provider')).map(b => Math.round(b.getBoundingClientRect().top + b.getBoundingClientRect().height / 2));
+      out.rail = [chips.length, shown.length, Math.max(...tops) - Math.min(...tops), shown.every(b => /^GPT /.test(b.getAttribute('aria-label')))];
+      Articles.model(shown[1].dataset.value); out.picked = [q('.art-ai .mdl').textContent.trim(), localStorage.getItem('articleDraftModel'), !q('.art-mrail')];
+      Articles.close();
+      return out;
+    }, { D });
+    assert.deepEqual(r3.loaded, [true, 3], 'boot() loads the list quietly');
+    assert.deepEqual(r3.stats, [4, 2, 1, 1, 1, 1, 0], 'b1: 4 for (the hidden one does not count) · ✓2 👁1 ⏳1 · 🔖1 🧪1: ' + r3.stats);
+    assert.deepEqual(r3.forUser, ['rerun', 'live', ''], 'an old article reaches an intern who joined after it ended (rerun any), not when rerun is off');
+    assert.deepEqual(r3.chips, ['bad 1/3', 'bad 0/3', 'bad 0/3', 'warn 1/2'], 'User Hub chip: read / for them (old articles count for interns who were here; a newcomer gets only the re-runs), coloured by how many are left: ' + r3.chips);
+    assert.equal(r3.noChip, true, 'an intern with articles for them gets a chip');
+    assert.match(r3.card || '', /Read\s*2 \/ 4 · 50%\s*✓ 2\s*👁 1\s*⏳ 1\s*🔖 1\s*🧪 1\s*👥 Who read it/, 'the read card under the preview: ' + r3.card);
+    assert.deepEqual(r3.previewG4, [true, '👍 Got it'], 'the preview is the V101.177 intern sheet');
+    assert.deepEqual(r3.who[0], 4, 'who read it lists everyone it is for'); assert.deepEqual(r3.who[1], ['✓ Read', '✓ Read', '👁 Closed', '⏳ Not yet'], 'read first, then closed, then not yet');
+    assert.deepEqual(r3.who[2], ['all:4', 'read:2', 'closed:1', 'wait:1'], 'filters with counts (no 🔁 chip when nobody is a re-run)');
+    assert.deepEqual(r3.closedOnly, ['NATT'], 'the 👁 filter');
+    assert.deepEqual(r3.csv.slice(0, 2), ['name,division,group,state', 'Ploy,RSU,EXTERN,read'], 'CSV export: ' + r3.csv.slice(0, 2)); assert.equal(r3.csv.length, 5);
+    assert.deepEqual(r3.bom, [239, 187, 191], 'with a UTF-8 BOM so Excel reads Thai names');
+    assert.equal(r3.back, true, '✕ goes back to the editor');
+    assert.equal(r3.trBtn, '✨ From EN', 'an empty TH next to a filled EN offers a translation');
+    assert.deepEqual(r3.tr, ['หัวข้อไทย', 'เขย่าก่อนใช้ **ทุกครั้ง**', true, false, 'article_draft', true, true], 'translation fills TH title + body, notes the model, logs feature article_draft, leaves it unsaved');
+    assert.equal(r3.drBtn, '✨ Draft');
+    assert.deepEqual(r3.dr, ['**Shake** the inhaler first.', true], 'a draft writes the body from the title (code fences stripped)');
+    assert.match(r3.err || '', /✨ quota/, 'an AI error shows in the editor');
+    assert.equal(r3.writes, 0, '✨ never saves — nothing was written');
+    assert.ok(r3.rail[0] >= 10 && r3.rail[1] >= 1 && r3.rail[1] < r3.rail[0] && r3.rail[3], 'the model rail shows only the picked vendor’s models: ' + r3.rail);
+    assert.ok(r3.rail[2] <= 3, 'logos and chips sit on one line (centres within 3 px), got ' + r3.rail[2]);
+    assert.ok(r3.picked[0] && r3.picked[1] && r3.picked[2], 'picking a model folds the rail and remembers it: ' + r3.picked);
     const bad = errors.filter(e => /Articles|articles-admin|art-/.test(e));
     assert.deepEqual(bad, [], 'no page errors from the module: ' + bad.join(' | '));
     console.log('PASS: admin 📰 Articles — Create ▸ Article row, status chips + list, editor (EN/TH/KO, markdown, window, 🔁, audience, quiz/Codex links), 📱 preview, draft / schedule / back to draft / two-tap delete → articles/{id}, rule');
