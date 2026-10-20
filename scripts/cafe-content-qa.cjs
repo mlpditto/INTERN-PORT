@@ -63,7 +63,7 @@ assert.ok(/getMyDivision\(\)/.test(index) && /return "General Division"/.test(in
     assert.ok(/content_review: \{ e: 'Ⓐ', n: 'Review' \}/.test(hl) && /'content_review', 'article'\];/.test(hl), 'History knows the Review type (chip + order)');
     assert.ok(/if \(!item \|\| item\.noDelete\) return;/.test(dr), 'a filed review has no delete menu');
     assert.ok(/explore_link: 0, content_review: 0, article: 0 \}/.test(index), 'type counts include content_review');
-    assert.ok(/id="intern-app-name">LINE LIFF Internship Management System<\/span><span id="intern-version-current">/.test(index), 'the footer name has its own span (the version stays)');
+    assert.ok(/id="intern-app-name"[^>]*>LINE LIFF Internship Management System<\/span><span id="intern-version-current">/.test(index), 'the footer name has its own span (the version stays)');
     assert.ok(/No content history yet/.test(index) && /Posted pieces and their review scores appear here/.test(index), 'Content UI gets its own empty History text');
     assert.ok(/isContentCreator && window\.isContentCreator\(\)\) \?/.test(fs.readFileSync('public/history-lean.js', 'utf8')), 'the journal streak pill is hidden in the Content UI');
 }
