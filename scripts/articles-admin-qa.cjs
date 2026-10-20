@@ -37,7 +37,7 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
         st: [A._status(sched, bkk(2026, 10, 19, 12)), A._status(sched, bkk(2026, 10, 22, 12)), A._status(sched, bkk(2026, 10, 27, 0, 1)), A._status(Object.assign({}, sched, { status: 'draft' }), bkk(2026, 10, 22, 12)), A._status({}, now)],
         local: [A._toLocal(bkk(2026, 10, 26, 8)), A._fromLocal('2026-10-26T08:00') === bkk(2026, 10, 26, 8), A._fromLocal('')],
         v: [A._validate({ title: {}, body: {} }, false), A._validate({ title: { th: 'ไทย' }, body: {} }, false), A._validate({ title: { th: 'ไทย' }, body: { th: 'x' } }, true),
-          A._validate(Object.assign({}, ok, { endAt: now - 1 }), true), A._validate(Object.assign({}, ok, { body: { en: 'x'.repeat(601) } }), false), A._validate(ok, true)],
+          A._validate(Object.assign({}, ok, { endAt: now - 1 }), true), A._validate(Object.assign({}, ok, { body: { en: 'x'.repeat(2001) } }), false), A._validate(ok, true)],
         doc: { title: doc.title, bodyKeys: Object.keys(doc.body), date: doc.startAt instanceof Date && doc.startAt.getTime() === now, rerun: doc.rerun, links: doc.links, read: doc.readMin, cover: doc.cover, st: doc.status },
         langs: A._langsOf({ title: { en: 'a', th: 'b' }, body: { en: 'x', ko: 'y' } }), readMin: [A._readMin(''), A._readMin('x'.repeat(2000))]
       };
@@ -47,7 +47,7 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
     assert.deepEqual(p.st, ['scheduled', 'live', 'ended', 'draft', 'draft'], 'status: before → scheduled · inside → live · after → ended · not published → draft');
     assert.deepEqual(p.local, ['2026-10-26T08:00', true, null], 'datetime-local is Bangkok time');
     assert.match(p.v[0], /title/); assert.equal(p.v[1], '', 'a draft needs only some title (any language)');
-    assert.match(p.v[2], /EN/, 'scheduling needs the EN version'); assert.match(p.v[3], /after the start/); assert.match(p.v[4], /600/); assert.equal(p.v[5], '');
+    assert.match(p.v[2], /EN/, 'scheduling needs the EN version'); assert.match(p.v[3], /after the start/); assert.match(p.v[4], /2000/, 'bodies up to 2000 characters (V102.336)'); assert.equal(p.v[5], '');
     assert.deepEqual(p.doc.title, { en: 'Hi', ko: 'K' }, 'empty languages are left out, text is trimmed'); assert.deepEqual(p.doc.bodyKeys, ['en']);
     assert.ok(p.doc.date, 'dates go to Firestore as Date (→ Timestamp)'); assert.equal(p.doc.rerun, 'any', 'rerun is off | any'); assert.deepEqual(p.doc.links, [{ kind: 'quiz', id: 'q1', label: 'Q' }]);
     assert.equal(p.doc.read, 2); assert.deepEqual(p.doc.cover, { emoji: '🫁' }); assert.equal(p.doc.st, 'scheduled');
@@ -88,6 +88,12 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
       const ta = q('#art-bodyta'); ta.value = 'Most patients **shake** it'; ta.dispatchEvent(new Event('input'));
       out.preview = [q('#art-sheet .tt').textContent, q('#art-sheet .b').innerHTML.includes('<strong>shake</strong>') || q('#art-sheet .b').textContent.includes('shake'), q('#art-count').textContent];
       out.caretKept = q('#art-bodyta') === ta && q('#art-title') === ti;
+      // V102.336: Thai typed in the editor stays visible in the preview while the admin UI is in EN mode (the language switch must not wrap / hide it)
+      const keep = [ti.value, ta.value];
+      ti.value = '“อดทนคืออวดตัว”'; ti.dispatchEvent(new Event('input')); ta.value = 'ปัจจุบันคำว่า “อดทน (がまん)”'; ta.dispatchEvent(new Event('input'));
+      await wait(150);
+      out.thaiShown = [q('#art-sheet .tt').innerText, q('#art-sheet .b').innerText.includes('ปัจจุบัน'), document.querySelectorAll('#articlesModal .lang-th, #articlesModal .lang-kr').length, document.getElementById('articlesModal').classList.contains('lang-no-toggle'), document.body.classList.contains('lang-th-on')];
+      ti.value = keep[0]; ti.dispatchEvent(new Event('input')); ta.value = keep[1]; ta.dispatchEvent(new Event('input'));
       // TH empty → preview falls back to EN
       Articles.lang('th'); out.thFallback = [q('#art-title').value, q('#art-sheet .tt').textContent, q('.art-pvh').textContent.includes('→ EN')];
       Articles.lang('en');
@@ -132,8 +138,9 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
     assert.equal(r.langsLive, 1, 'the missing KO version is struck through');
     assert.deepEqual(r.liveOnly, ['Live one'], 'the Live chip filters');
     assert.deepEqual(r.def.slice(0, 2), [true, true], '＋ New fills a window'); assert.deepEqual(r.def[2], ['Discard', 'Save draft', '📅 Schedule']);
-    assert.equal(r.preview[0], '3 inhaler mistakes', 'the preview follows the title'); assert.ok(r.preview[1], 'and renders the markdown body'); assert.match(r.preview[2], /^26 \/ 600 · ~1 min$/);
+    assert.equal(r.preview[0], '3 inhaler mistakes', 'the preview follows the title'); assert.ok(r.preview[1], 'and renders the markdown body'); assert.match(r.preview[2], /^26 \/ 2000 · ~1 min$/);
     assert.ok(r.caretKept, 'typing does not re-render the textarea (the caret stays)');
+    assert.deepEqual(r.thaiShown, ['“อดทนคืออวดตัว”', true, 0, true, false], 'Thai in the preview is not hidden by the EN-mode language switch: ' + JSON.stringify(r.thaiShown));
     assert.deepEqual(r.thFallback, ['', '3 inhaler mistakes', true], 'an empty TH shows EN in the preview, marked "→ EN"');
     assert.ok(r.audChips[0] === 'Everyone' && r.audChips.some(c => /RSU/.test(c)) && r.audChips.some(c => /INTERN 1/.test(c)), 'audience = Everyone + division chips + group chips: ' + r.audChips);
     assert.deepEqual(r.quizOpts, ['🧪 Bronchodilators', '🧪 Antibiotics'], 'the quiz picker skips templates and the --group-style-- doc'); assert.equal(r.quizFiltered, 1, 'and searches');
