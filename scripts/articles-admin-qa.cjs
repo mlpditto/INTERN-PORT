@@ -234,6 +234,21 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
       const q = sel => document.querySelector('#articlesModal ' + sel), qa = sel => [...document.querySelectorAll('#articlesModal ' + sel)];
       out.card = q('#art-stats') && q('#art-stats').textContent.replace(/\s+/g, ' ');
       out.previewG4 = [!!q('#art-sheet .ok2'), q('#art-sheet .ok2') && q('#art-sheet .ok2').textContent];
+      // V102.346: the preview's Read more really opens the body (and stays open while typing); a short body hides it
+      {
+        const t = q('textarea'), sheet = () => q('#art-sheet'), bh = () => Math.round(q('#art-sheet .b').getBoundingClientRect().height), btn = () => q('#art-pv-more');
+        t.value = Array.from({ length: 14 }, (_, i) => 'Line ' + (i + 1) + ' of a long body that needs Read more.').join('\n\n'); t.dispatchEvent(new Event('input', { bubbles: true }));
+        const closedH = bh();
+        btn().click();
+        const open = [sheet().classList.contains('more'), btn().textContent, btn().getAttribute('aria-expanded'), bh() > closedH * 2];
+        t.value += '\n\nOne more.'; t.dispatchEvent(new Event('input', { bubbles: true }));
+        const typed = [sheet().classList.contains('more'), btn().textContent];
+        btn().click();
+        const closed = [sheet().classList.contains('more'), btn().textContent, bh() === closedH];
+        t.value = 'Short.'; t.dispatchEvent(new Event('input', { bubbles: true }));
+        out.readMore = { open, typed, closed, shortHidden: btn().style.visibility };
+        Articles.edit('b1');
+      }
       Articles.who(true);
       out.who = [qa('.art-wr').length, qa('.art-wr .pill').map(p => p.textContent), qa('[data-who]').map(b => b.dataset.who + ':' + b.querySelector('b').textContent)];
       Articles.whoF('closed'); out.closedOnly = qa('.art-wr b').map(b => b.textContent);
@@ -272,6 +287,10 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
     assert.equal(r3.noChip, true, 'an intern with articles for them gets a chip');
     assert.match(r3.card || '', /Read\s*2 \/ 4 · 50%\s*✓ 2\s*👁 1\s*⏳ 1\s*🔖 1\s*🧪 1\s*👥 Who read it/, 'the read card under the preview: ' + r3.card);
     assert.deepEqual(r3.previewG4, [true, '👍 Got it'], 'the preview is the V101.177 intern sheet');
+    assert.deepEqual(r3.readMore.open, [true, 'Show less ▴', 'true', true], 'preview Read more opens the whole body');
+    assert.deepEqual(r3.readMore.typed, [true, 'Show less ▴'], 'typing keeps it open');
+    assert.deepEqual(r3.readMore.closed, [false, 'Read more ▾', true], 'Show less closes it');
+    assert.equal(r3.readMore.shortHidden, 'hidden', 'a short body needs no Read more');
     assert.deepEqual(r3.who[0], 4, 'who read it lists everyone it is for'); assert.deepEqual(r3.who[1], ['✓ Read', '✓ Read', '👁 Closed', '⏳ Not yet'], 'read first, then closed, then not yet');
     assert.deepEqual(r3.who[2], ['all:4', 'read:2', 'closed:1', 'wait:1'], 'filters with counts (no 🔁 chip when nobody is a re-run)');
     assert.deepEqual(r3.closedOnly, ['NATT'], 'the 👁 filter');
