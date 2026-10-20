@@ -1,4 +1,4 @@
-// V102.335: 📰 Articles — admin side. A short read that pops up once a day when an intern opens the app (the intern popup is a later PR).
+// V102.335: 📰 Articles — admin side (V102.336: the modal is lang-no-toggle so Thai shows in EN mode; bodies up to 2000 characters). A short read that pops up once a day when an intern opens the app (the intern popup is a later PR).
 // ➕ Create ▸ Article opens one modal: the list (status chips All · Draft · Scheduled · Live · Ended) on the left, the editor in the middle
 // (cover emoji · EN/TH/KO · title · markdown body · window · 🔁 new interns · audience chips · quiz / DD Codex links), and a 📱 preview of the
 // intern popup (bottom sheet) on the right. Firestore: articles/{id} (admin writes; interns read status 'scheduled' only — see firestore.rules).
@@ -9,7 +9,7 @@
     var COVERS = ['📰', '🫁', '💊', '🧪', '🩺', '🦠', '🧊', '🌡️', '⚠️', '💡'];
     var FILTERS = [['all', 'All'], ['draft', 'Draft'], ['scheduled', 'Scheduled'], ['live', 'Live'], ['ended', 'Ended']];
     var RERUN = [['off', 'Off', 'Interns who join after it ends never get it'], ['any', 'All new interns', 'Interns who join after it ends get it too, oldest first, one a day']];
-    var MAX_BODY = 600, MAX_TITLE = 90, BKK = 7 * 3600e3;
+    var MAX_BODY = 2000, MAX_TITLE = 90, BKK = 7 * 3600e3;
     var S = { list: [], loaded: false, loading: false, err: '', filter: 'all', cur: null, lang: 'en', saving: false, del: false, pick: '', q: '', codex: null };
     var esc = function (v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
     var msOf = function (t) { return t == null ? null : typeof t === 'number' ? t : t.toMillis ? t.toMillis() : t instanceof Date ? t.getTime() : Date.parse(t) || null; };
@@ -185,7 +185,7 @@
     function shell() {
         var m = document.getElementById('articlesModal');
         if (m) return m;
-        m = document.createElement('div'); m.id = 'articlesModal'; m.className = 'modal';
+        m = document.createElement('div'); m.id = 'articlesModal'; m.className = 'modal lang-no-toggle';   // V102.336: Thai / Korean text must never be hidden by the EN-mode language switch here
         m.innerHTML = '<div class="modal-content"><span class="close-modal" onclick="Articles.close()">&times;</span><div id="art-body"></div></div>';
         document.body.appendChild(m);
         return m;
