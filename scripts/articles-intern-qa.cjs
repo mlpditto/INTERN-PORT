@@ -1,4 +1,4 @@
-// Intern 📰 Articles (V101.176): the REAL public/articles.js inside the REAL index.html on a 390 px touch phone, with a fake Firestore (nothing
+// Intern 📰 Articles (V101.176; V101.177 lean sheet: cover emoji header, one footer row, green 👍 Got it): the REAL public/articles.js inside the REAL index.html on a 390 px touch phone, with a fake Firestore (nothing
 // leaves the page). Checks: who gets which article (live · audience · rerun for interns who joined later · once a day · until read · 🔕), the
 // bottom sheet (title, 4-line body + Read more, EN/TH/KO, quiz/Codex links, 🔖, ✓ Got it, Esc), what is written to users/{uid}, the +1 Beri
 // transaction for the linked quiz (once), waiting for another popup, the feedback reminder's turn after it closes, and the History rows.
@@ -107,7 +107,7 @@ const D = 864e5, BKK = 7 * 3600e3;
       out.shown = !!sh;
       if (!sh) return out;
       const rect = sh.getBoundingClientRect();
-      out.sheet = { bottom: Math.round(window.innerHeight - rect.bottom), w: Math.round(rect.width), title: sh.querySelector('h3').textContent, kicker: sh.querySelector('.kick').textContent,
+      out.sheet = { bottom: Math.round(window.innerHeight - rect.bottom), w: Math.round(rect.width), title: sh.querySelector('h3').textContent, kicker: sh.querySelector('.cov').getAttribute('title'), cover: sh.querySelector('.cov').textContent, foot: [...sh.querySelectorAll('.foot > button')].map(b => b.textContent.trim()), okBg: getComputedStyle(sh.querySelector('.ok')).backgroundColor, okW: Math.round(sh.querySelector('.ok').getBoundingClientRect().width), noOld: !sh.querySelector('.g, .tile, .kick, .mute:not(.bm)'),
         clamp: sh.querySelector('.art-md').classList.contains('clamp'), moreHidden: document.getElementById('art-more').hidden, lng: [...sh.querySelectorAll('.lng button')].map(b => b.textContent + (b.classList.contains('on') ? '*' : '')),
         links: [...sh.querySelectorAll('.art-link')].map(b => b.textContent), bold: sh.querySelector('.art-md').innerHTML === window.renderMd(docs.a1.body.en), okH: Math.round(sh.querySelector('.ok').getBoundingClientRect().height),
         bmH: Math.round(sh.querySelector('.bm').getBoundingClientRect().height), noToggle: sh.classList.contains('lang-no-toggle'), focus: document.activeElement === sh.querySelector('.ok') };
@@ -152,7 +152,8 @@ const D = 864e5, BKK = 7 * 3600e3;
     assert.deepEqual(r.waited, [false, ['articles', 'status', '==', 'scheduled']], 'loads only status == scheduled (the rule), and waits while another popup is open');
     assert.equal(r.shown, true, 'the sheet opens once the other popup has closed');
     assert.ok(r.sheet.bottom === 0 && r.sheet.w === 390, 'a bottom sheet across the phone: ' + JSON.stringify(r.sheet));
-    assert.equal(r.sheet.title, '3 inhaler mistakes we see every week'); assert.match(r.sheet.kicker, /📰 Article · 1 min/);
+    assert.equal(r.sheet.title, '3 inhaler mistakes we see every week'); assert.equal(r.sheet.kicker, 'Article · 1 min', 'V101.177: "Article · n min" is the cover tooltip'); assert.equal(r.sheet.cover, '🫁', 'the header is the cover emoji');
+    assert.deepEqual(r.sheet.foot, ['🔖', '🔕', 'Read more ▾', '👍 Got it'], 'one footer row: 🔖 🔕 left, Read more + Got it right'); assert.equal(r.sheet.okBg, 'rgb(22, 163, 74)', 'Got it is the green pill (G4)'); assert.ok(r.sheet.okW < 160, 'Got it is small, not full width: ' + r.sheet.okW); assert.ok(r.sheet.noOld, 'no grab handle, tile, kicker line or text mute line');
     assert.ok(r.sheet.clamp && !r.sheet.moreHidden, 'a long body is clamped with Read more'); assert.ok(r.sheet.bold, 'the body goes through the app’s renderMd (marked + DOMPurify in the app; the CDN is blocked here)');
     assert.deepEqual(r.sheet.lng, ['EN*', 'TH'], 'language chips only for the versions the article has (no KO here)');
     assert.deepEqual(r.sheet.links, ['🧪 Bronchodilators 🪙 +1', '💊 Salbutamol'], 'quiz (+1 Beri) and Codex links');
