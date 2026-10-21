@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.352)</title>
+    <title>Nika Admin (V102.353)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -850,6 +850,23 @@
         .mgw-clip-tile .bt button { border:none; background:#f1f5f9; border-radius:8px; padding:3px 9px; cursor:pointer; font-size:0.78em; }
         .mgw-clip-tile .bt button.del { color:#b91c1c; }
         .mgw-clip-tile .meta { font-size:0.66em; color:#94a3b8; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        /* V102.353: Thai caption band (bottom, owner's pick) + CC + ⬇ MP4 + ซับ + the gallery's in-app player */
+        .glc-vwrap { position:relative; display:inline-block; line-height:0; }
+        .glc-cc-band { position:absolute; left:0; right:0; bottom:52px; padding:8px 14px 9px; background:rgba(15,23,42,0.72); color:#fff; font:600 17px/1.45 Sarabun, "Noto Sans Thai", "Leelawadee UI", Tahoma, sans-serif; text-align:center; pointer-events:none; }
+        .glc-cc { display:inline-flex; align-items:center; gap:6px; padding:8px 13px; border-radius:20px; border:1.5px solid #cbd5e1; background:#fff; color:#64748b; font-weight:800; font-size:0.85em; cursor:pointer; }
+        .glc-cc.on { background:#0f172a; border-color:#0f172a; color:#fff; }
+        .glc-burn { display:inline-flex; align-items:center; gap:6px; padding:9px 15px; border-radius:20px; background:#fff; color:#334155; border:1.5px solid #cbd5e1; font-weight:800; font-size:0.85em; cursor:pointer; }
+        .glc-burn:disabled { opacity:0.75; cursor:progress; }
+        .glc-burn-st { display:block; margin-top:6px; font-size:0.85em; color:#64748b; }
+        .glc-player { position:fixed; inset:0; z-index:10050; background:rgba(15,23,42,0.6); display:flex; align-items:center; justify-content:center; padding:16px; }
+        .glc-player[hidden] { display:none; }
+        .glc-player-box { background:#fff; border-radius:20px; padding:14px; max-width:min(440px, 100%); max-height:100%; overflow:auto; text-align:center; }
+        .glc-player-hd { display:flex; align-items:center; gap:10px; margin-bottom:10px; text-align:left; }
+        .glc-player-hd b { flex:1; min-width:0; font-size:0.9em; color:#334155; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .glc-player-hd .x { border:none; background:#f1f5f9; border-radius:50%; width:32px; height:32px; cursor:pointer; }
+        .glc-player .glc-video { max-height:70vh; }
+        .glc-player-ft { display:flex; gap:8px; justify-content:center; align-items:center; flex-wrap:wrap; margin-top:10px; }
+        .glc-player-ft .glc-burn-st { width:100%; }
         .glc-video { max-height:480px; max-width:100%; aspect-ratio:9/16; border-radius:24px; background:#0f172a; box-shadow:0 20px 50px rgba(15,23,42,0.35); }
 
         /* V94.32: Phase 3 escalation — HTML overlay composite container.
@@ -7886,6 +7903,7 @@
      hidden. -->
 <link rel="stylesheet" href="quiz-cover.css?v=V102.344">
 <script src="quiz-cover.js?v=V102.344"></script>
+<script src="clip-captions.js?v=V102.353"></script>
 <script src="holidays-admin.js?v=V102.330"></script>
 <script src="articles-admin.js?v=V102.346"></script>
 <link rel="stylesheet" href="quiz-qimage.css?v=V101.03">
@@ -21976,16 +21994,30 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
             if (actions) actions.style.display = 'none';
             // lang-no-toggle: the Thai caption under the player would otherwise be blanked under the EN-default body (lang-toggle.js).
             previewContainer.innerHTML = '<div class="lang-no-toggle" style="display:flex; gap:28px; align-items:center; justify-content:center; flex-wrap:wrap; width:100%;">'
-                + '<video id="generated-clip" class="glc-video" controls playsinline src="' + c.dataUrl + '"></video>'
+                + '<span class="glc-vwrap"><video id="generated-clip" class="glc-video" controls playsinline src="' + c.dataUrl + '"></video><div class="glc-cc-band" id="glc-cc-band" hidden></div></span>'   /* V102.353: Thai caption band */
                 + '<div style="font-size:0.82em; color:#64748b; max-width:260px; line-height:1.6;">'
                 + '<div style="font-weight:900; color:#334155; font-size:1.05em;">EP' + String(c.n).padStart(2, '0') + ' · ' + esc(e.title || '') + '</div>'
                 + c.seconds + ' s · ' + (/heygen/i.test(String(c.model)) ? '768p' : '720p') + ' · 9:16 · audio on<br>' /* V102.350: HeyGen has no 720p */ + esc(String(c.model).replace(/^as\//, '')) + ' · ' + Math.round(c.ms / 1000) + ' s · $' + Number(e.costUsd || 0).toFixed(2)
                 + (e.captionTh ? '<div style="margin-top:8px; color:#334155;">' + esc(e.captionTh) + '</div>' : '')
                 + '<div id="glc-clip-actions" style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; align-items:center;">'
+                + (e.captionTh && window.GlcCaptions ? '<button type="button" class="glc-cc" id="glc-cc-btn" aria-pressed="true" title="Thai captions on / off">CC ไทย</button>' : '')
                 + '<button type="button" class="btn-sm" onclick="glcDownloadClip()" title="Download MP4" style="background:#2c3e50; border-radius:20px; padding:9px 16px; font-weight:bold;"><i class="fa-solid fa-download"></i> MP4</button>'
+                + (e.captionTh && window.GlcCaptions ? '<button type="button" class="glc-burn" id="glc-burn-btn" onclick="glcBurnCaptions()" title="Download the MP4 with the Thai captions burned in (for LINE / TikTok)">⬇ MP4 + ซับ</button>' : '')
                 + window.glcSaveStateHtml(e)
                 + '<button type="button" class="btn-sm" onclick="glcDiscardClip()" title="' + (e.clipUrl ? 'Delete this clip — MP4 + gallery entry (asks first)' : 'Discard this render (nothing saved)') + '" aria-label="' + (e.clipUrl ? 'Delete clip' : 'Discard') + '" style="background:#f1f5f9; color:#475569; border-radius:20px; padding:9px 12px; font-weight:bold;">🗑️</button>'
-                + '</div></div></div>';
+                + '</div>' + (e.captionTh && window.GlcCaptions ? '<small class="glc-burn-st" id="glc-burn-st" role="status"></small>' : '') + '</div></div>';
+            // V102.353: the band follows the player; the text is the episode's Thai caption (edit in ✏️, no re-render)
+            if (e.captionTh && window.GlcCaptions) {
+                window.GlcCaptions.ensureFont();
+                window.GlcCaptions.attach(document.getElementById('generated-clip'), document.getElementById('glc-cc-band'), window.GlcCaptions.cues(e.captionTh, c.seconds), document.getElementById('glc-cc-btn'));
+            }
+        };
+        // V102.353: ⬇ MP4 + ซับ — the clip with the Thai caption band burned in (recorded in the browser; nothing uploaded)
+        window.glcBurnCaptions = function() {
+            const c = window._glcClip, e = c && window._glcSeries && window._glcSeries.episodes[c.n - 1];
+            if (!c || !e || !e.captionTh || !window.GlcCaptions) return;
+            window.GlcCaptions.burnButton(document.getElementById('glc-burn-btn'), document.getElementById('glc-burn-st'), c.dataUrl || e.clipUrl,
+                window.GlcCaptions.cues(e.captionTh, c.seconds), window.glcEp(c.n));
         };
         window.glcDownloadClip = function() {
             const c = window._glcClip;
@@ -51766,7 +51798,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const meta = [String(it.model || '').replace(/^(as|or)\//, '').replace(/^google\//, ''), it.seconds ? it.seconds + ' s' : '', it.costUsd ? '$' + it.costUsd.toFixed(2) : '',
                 it.renderedAt ? new Date(it.renderedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : ''].filter(Boolean).join(' · ');
             return '<div class="mgw-clip-tile" data-clip="' + dxaEscapeHtml(it.id) + '">'
-                + '<a class="pv" href="' + dxaEscapeHtml(it.url) + '" target="_blank" rel="noopener noreferrer" title="Play in a new tab">'
+                + '<a class="pv" href="' + dxaEscapeHtml(it.url) + '" target="_blank" rel="noopener noreferrer" title="Play" onclick="return mgwPlayClip(event, ' + i + ')">'
                 + '<video src="' + dxaEscapeHtml(it.url) + '#t=0.1" preload="metadata" muted playsinline tabindex="-1"></video>'
                 + '<span class="ar">9:16</span><span class="play" aria-hidden="true">▶</span>' + (it.seconds ? '<span class="dur">0:' + String(it.seconds).padStart(2, '0') + '</span>' : '') + '</a>'
                 + '<div class="bd"><div class="nm" title="' + dxaEscapeHtml(it.name) + '">' + dxaEscapeHtml(it.name) + '</div>'
@@ -51774,6 +51806,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 + '<div class="rw"><span class="bg">🎬 Clip</span><span class="bt"><button type="button" onclick="mgwDownloadGalleryItem(' + i + ')" title="Download MP4">⬇</button>'
                 + '<button type="button" class="del" onclick="mgwAskDeleteClip(' + i + ')" title="Delete clip — MP4 + gallery entry" aria-label="Delete clip">🗑</button></span></div>'
                 + (meta ? '<div class="meta">' + dxaEscapeHtml(meta) + '</div>' : '') + '</div></div>';
+        }
+        // V102.353: ▶ opens the in-app player with the Thai caption band (falls back to the new tab without clip-captions.js)
+        function mgwPlayClip(ev, i) {
+            const it = (window._mgwGalleryRendered || [])[i];
+            if (!it || !window.GlcCaptions || (ev && (ev.ctrlKey || ev.metaKey || ev.button === 1))) return true;
+            window.GlcCaptions.openPlayer({ url: it.url, caption: it.caption, seconds: it.seconds || 8, name: it.name, fileBase: 'EP' + String(it.n).padStart(2, '0') });
+            return false;
         }
         // V102.345: delete asks inside the tile (not a browser popup), then glcDeleteSavedClip removes the MP4 + gallery entry
         function mgwAskDeleteClip(i) {

@@ -218,7 +218,7 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
         assert.deepEqual(r.ep1, { status: 'done', dotTitle: 'Rendered · 8 s · $0.80', btn: '🔁' }, 'EP01 done, re-render offered');
         assert.equal(r.countAfter, '10 · 1 done');
         assert.deepEqual(r.video, { tag: 'VIDEO', src: 'data:video/mp4;base6', controls: true, playsinline: true }, 'portrait <video> in the preview');
-        assert.deepEqual(r.clipActions, ['Download MP4', 'Delete this clip — MP4 + gallery entry (asks first)'], 'V102.345: MP4 · ✓ In gallery (a chip, not a button) · 🗑 = delete');
+        assert.deepEqual(r.clipActions, ['Thai captions on / off', 'Download MP4', 'Download the MP4 with the Thai captions burned in (for LINE / TikTok)', 'Delete this clip — MP4 + gallery entry (asks first)'], 'V102.353: CC ไทย · MP4 · ⬇ MP4 + ซับ · ✓ In gallery (a chip) · 🗑 = delete');
         assert.equal(r.designActionsHidden, 'none', 'the image pill stays hidden for a clip');
         assert.match(r.previewText, /EP01 · Episode 1 title8 s · 720p · 9:16 · audio ongemini-omni-1\.1-flash · \d+ s · \$0\.80คำบรรยาย 1/, 'preview meta + Thai caption');
         assert.deepEqual(r.put, { path: 'teach-clips/S1/EP01.mp4', type: 'video/mp4', size: 12, meta: { contentType: 'video/mp4' } }, 'MP4 lands in teach-clips/{seriesId}/EP01.mp4');
