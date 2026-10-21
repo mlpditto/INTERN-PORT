@@ -26,6 +26,11 @@ const long = plain(C.cues('ปกติร่างกายจะดูดน�
 assert.ok(long.length >= 2 && long.every(c => c.text.length <= 46), 'a space-less run is cut word-safe into ≤ 46-char parts: ' + long.map(c => c.text.length));
 assert.equal(long.map(c => c.text).join(''), 'ปกติร่างกายจะดูดน้ำดีกลับที่ปลายลำไส้เล็กยานี้ช่วยให้น้ำดีไหลไปถึงลำไส้ใหญ่มากขึ้นน้ำดีจะดึงน้ำเข้าลำไส้ทำให้อุจจาระนุ่ม', 'nothing lost or doubled');
 assert.equal(C.cueAt(th, 1), th[0].text); assert.equal(C.cueAt(th, 6), th[1].text); assert.equal(C.cueAt(th, 9), '');
+// V102.354: a voice is sped up only when longer than the clip, never past ×1.35
+assert.equal(C.fitRate(7.8, 8), 1, 'a voice that fits plays at ×1');
+assert.ok(Math.abs(C.fitRate(9.5, 8) - 9.5 / 7.85) < 1e-9, 'a slightly long voice is sped up just enough');
+assert.equal(C.fitRate(20, 8), 1.35, 'never faster than ×1.35');
+const VOICE_B64 = fs.readFileSync('scripts/fixtures/thai-voice-sample.mp3').toString('base64');   // real Gemini TTS output, 7.8 s
 
 (async () => {
     const browser = await chromium.launch();
@@ -75,15 +80,37 @@ assert.equal(C.cueAt(th, 1), th[0].text); assert.equal(C.cueAt(th, 6), th[1].tex
             window._glcClips = { 1: { n: 1, dataUrl: 'data:video/mp4;base64,AAAA', seconds: 8, model: 'google/veo-3.1-lite', ms: 70000 }, 2: { n: 2, dataUrl: 'data:video/mp4;base64,AAAA', seconds: 8, model: 'google/veo-3.1-lite', ms: 70000 } };
             glcShowClip(1);
             const q = s => document.querySelector('#design-preview-container ' + s);
-            const out = { wrap: !!q('.glc-vwrap #generated-clip'), band: q('#glc-cc-band') && q('#glc-cc-band').textContent, cc: q('#glc-cc-btn') && q('#glc-cc-btn').textContent, burn: q('#glc-burn-btn') && q('#glc-burn-btn').textContent, st: !!q('#glc-burn-st'),
+            const out = { wrap: !!q('.glc-vwrap #generated-clip'), band: q('#glc-cc-band') && q('#glc-cc-band').textContent, cc: q('#glc-cc-btn') && q('#glc-cc-btn').textContent, voice: q('#glc-voice-btn') && q('#glc-voice-btn').textContent, burn: q('#glc-burn-btn') && q('#glc-burn-btn').textContent, st: !!q('#glc-burn-st'),
                 bandPos: (() => { const b = q('#glc-cc-band'), w = q('.glc-vwrap'); if (!b || !w) return null; const rb = b.getBoundingClientRect(), rw = w.getBoundingClientRect(); return Math.round(rw.bottom - rb.bottom); })() };
             glcShowClip(2);
-            out.noCaption = [!!q('#glc-cc-btn'), !!q('#glc-burn-btn'), !!q('#glc-cc-band')];
+            out.noCaption = [!!q('#glc-cc-btn'), !!q('#glc-burn-btn'), !!q('#glc-cc-band'), !!q('#glc-voice-btn')];
+            glcShowClip(1);
             return out;
         });
-        assert.deepEqual([card.wrap, card.band, card.cc, card.burn, card.st], [true, 'ทานยา Elobixibat วันละครั้งก่อนอาหารเช้า', 'CC ไทย', '⬇ MP4 + ซับ', true], 'card: band over the player, CC, ⬇ MP4 + ซับ');
+        assert.deepEqual([card.wrap, card.band, card.cc, card.voice, card.burn, card.st], [true, 'ทานยา Elobixibat วันละครั้งก่อนอาหารเช้า', 'CC ไทย', '🔊 เสียงไทย', '⬇ MP4 + ซับ', true], 'card: band over the player, CC, 🔊 เสียงไทย, ⬇ MP4 + ซับ');
         assert.ok(card.bandPos >= 40 && card.bandPos <= 70, 'band sits above the player controls: ' + card.bandPos);
-        assert.deepEqual(card.noCaption, [false, false, true], 'no Thai caption → no CC / ⬇ MP4 + ซับ buttons (the band stays empty)');
+        assert.deepEqual(card.noCaption, [false, false, true, false], 'no Thai caption → no CC / 🔊 / ⬇ MP4 + ซับ buttons (the band stays empty)');
+
+        // ---- V102.354: 🔊 Thai voice on the card — one cloud_tts call (th-TH, the caption), clip muted, export gets + 🔊; off again
+        const voice = await page.evaluate(async b64 => {
+            const calls = [];
+            window.callTtsProxy = async p => { calls.push(p); return { audioContent: b64, mimeType: 'audio/mpeg' }; };
+            const q = id => document.getElementById(id);
+            const v = q('generated-clip'), btn = q('glc-voice-btn');
+            btn.click();
+            for (let i = 0; i < 60 && !btn.classList.contains('on'); i++) await new Promise(r => setTimeout(r, 50));
+            const on = { on: btn.classList.contains('on'), pressed: btn.getAttribute('aria-pressed'), muted: v.muted, burn: q('glc-burn-btn').textContent, st: q('glc-burn-st').textContent };
+            btn.click();
+            const off = { on: btn.classList.contains('on'), muted: v.muted, burn: q('glc-burn-btn').textContent, st: q('glc-burn-st').textContent };
+            btn.click();
+            for (let i = 0; i < 60 && !btn.classList.contains('on'); i++) await new Promise(r => setTimeout(r, 50));
+            return { calls: calls.map(c => ({ provider: c.provider, model: c.model, lang: c.ttsConfig.voice.languageCode, name: c.ttsConfig.voice.name, text: c.ttsConfig.input.text, enc: c.ttsConfig.audioConfig.audioEncoding })), on, off, again: btn.classList.contains('on') };
+        }, VOICE_B64);
+        assert.deepEqual(voice.calls, [{ provider: 'cloud_tts', model: 'gemini-2.5-flash-tts', lang: 'th-TH', name: 'Kore', text: 'ทานยา Elobixibat วันละครั้งก่อนอาหารเช้า', enc: 'MP3' }], 'one Cloud TTS call with the Thai caption (the second "on" reuses it)');
+        assert.deepEqual([voice.on.on, voice.on.pressed, voice.on.muted, voice.on.burn], [true, 'true', true, '⬇ MP4 + ซับ + 🔊'], 'voice on: the clip is muted, the export carries the voice');
+        assert.match(voice.on.st, /^🔊 Thai voice 7\.8 s$/, 'status says how long the voice is: ' + voice.on.st);
+        assert.deepEqual([voice.off.on, voice.off.muted, voice.off.burn, voice.off.st], [false, false, '⬇ MP4 + ซับ', ''], 'voice off: the clip\'s own audio is back');
+        assert.equal(voice.again, true, 'on again (cached, no second call)');
 
         // ---- the export frame: the band is drawn at the bottom, ≤ 2 lines
         const frame = await page.evaluate(() => {
@@ -104,14 +131,14 @@ assert.equal(C.cueAt(th, 1), th[0].text); assert.equal(C.cueAt(th, 6), th[1].tex
             const keepTab = mgwPlayClip({ ctrlKey: true }, 0);
             const r = mgwPlayClip({}, 0);
             const m = document.getElementById('glc-player');
-            const out = { keepTab, r, shown: !!m && !m.hidden, src: m.querySelector('video').getAttribute('src'), name: m.querySelector('.glc-player-hd b').textContent, cc: !!m.querySelector('.glc-cc'), burn: !!m.querySelector('.glc-burn'), band: m.querySelector('.glc-cc-band').textContent };
+            const out = { keepTab, r, shown: !!m && !m.hidden, src: m.querySelector('video').getAttribute('src'), name: m.querySelector('.glc-player-hd b').textContent, cc: !!m.querySelector('.glc-cc'), voice: !!m.querySelector('.glc-voice'), burn: !!m.querySelector('.glc-burn'), band: m.querySelector('.glc-cc-band').textContent };
             m.querySelector('.x').click(); out.closed = m.hidden;
             return out;
         });
         assert.deepEqual([pl.keepTab, pl.r, pl.shown], [true, false, true], '▶ opens the in-app player (ctrl-click keeps the new tab)');
-        assert.deepEqual([pl.src, pl.name, pl.cc, pl.burn, pl.band, pl.closed], ['https://storage.test/EP01.mp4', 'EP01 · T', true, true, 'ทานยา Elobixibat วันละครั้งก่อนอาหารเช้า', true], 'player: the clip, its name, CC, ⬇ MP4 + ซับ, the band; ✕ closes');
+        assert.deepEqual([pl.src, pl.name, pl.cc, pl.voice, pl.burn, pl.band, pl.closed], ['https://storage.test/EP01.mp4', 'EP01 · T', true, true, true, 'ทานยา Elobixibat วันละครั้งก่อนอาหารเช้า', true], 'player: the clip, its name, CC, 🔊, ⬇ MP4 + ซับ, the band; ✕ closes');
 
         assert.deepEqual(errs, []);
-        console.log('PASS: Thai captions — phrase-first cues (word-safe, ≤ 46 chars, time ∝ length), band follows the playhead, CC remembered, card + gallery player carry CC + ⬇ MP4 + ซับ, export frame band at the bottom (≤ 2 lines)');
+        console.log('PASS: Thai captions + 🔊 Thai voice (one cached cloud_tts call, clip muted, export + 🔊, ×1.35 cap) — phrase-first cues (word-safe, ≤ 46 chars, time ∝ length), band follows the playhead, CC remembered, card + gallery player carry CC + ⬇ MP4 + ซับ, export frame band at the bottom (≤ 2 lines)');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
