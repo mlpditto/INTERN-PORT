@@ -1,7 +1,7 @@
 // V101.185: lean quiz runner (mockup C, picked 2026-10-21). The REAL public/index.html renderQuizStep on a phone
 // (file://, network blocked, Firebase stubbed): one progress row (position · answered · skipped | language capsule) over a
 // tap-to-jump segment bar (no answered count — the green segments say it); capsule in each language's own script without a duplicate of the quiz's own language;
-// type tag only for non-choice questions; ⏱ pill faint → deep orange as time runs out, red in the last 30 s; ‹ Previous; ≤360px the short "5/15 · 1 skipped" with nothing overlapping.
+// type tag only for non-choice questions; ⏱ pill green → yellow → orange → pink, red in the last 30 s; ‹ Previous; ≤360px the short "5/15 · 1 skipped" with nothing overlapping.
 const path = require('node:path'), fs = require('node:fs'), assert = require('node:assert/strict');
 const { pathToFileURL } = require('node:url');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -80,15 +80,17 @@ const answers = Array(15).fill(null); answers[0] = 2; answers[2] = 0; answers[3]
             el.style.transition = 'none';   // read the end colour, not a frame of the fade
             const cv = document.createElement('canvas'); cv.width = cv.height = 1; const g = cv.getContext('2d', { willReadFrequently: true });
             const rgb = c => { g.clearRect(0, 0, 1, 1); g.fillStyle = '#000'; g.fillStyle = c; g.fillRect(0, 0, 1, 1); const d = g.getImageData(0, 0, 1, 1).data; return `rgb(${d[0]}, ${d[1]}, ${d[2]})`; };
-            for (const t of [3600, 1800, 360, 31, 30]) { timeLeftForStep = t; updateTimerUI(); const cs = getComputedStyle(el); out.push({ t, urge: el.style.getPropertyValue('--tl-urge'), urgent: el.hasAttribute('data-urgent'), color: rgb(cs.color), bg: rgb(cs.backgroundColor) }); }
+            for (const t of [3600, 1800, 900, 360, 31, 30]) { timeLeftForStep = t; updateTimerUI(); const cs = getComputedStyle(el); out.push({ t, urge: el.style.getPropertyValue('--tl-urge'), urgent: el.hasAttribute('data-urgent'), color: rgb(cs.color), bg: rgb(cs.backgroundColor) }); }
             return out;
         });
-        const sat = c => { const m = c.match(/[\d.]+/g).map(Number); const [r, g, b] = m; return Math.max(r, g, b) - Math.min(r, g, b); };
-        assert.deepEqual(tl.map(x => x.urge), ['0.000', '0.500', '0.900', '0.991', '0.992'], 'urge follows time used');
-        assert.ok(sat(tl[0].color) < sat(tl[1].color) && sat(tl[1].color) < sat(tl[2].color), 'text colour deepens as time runs out: ' + tl.map(x => x.color).join(' → '));
-        assert.ok(sat(tl[0].bg) < sat(tl[2].bg), 'pill background deepens: ' + tl.map(x => x.bg).join(' → '));
-        assert.deepEqual(tl.map(x => x.urgent), [false, false, false, false, true], 'red only in the last 30 s');
-        assert.equal(tl[4].color, 'rgb(220, 38, 38)', 'last 30 s = red');
+        const ch = c => c.match(/\d+/g).map(Number);   // [r, g, b]
+        const hue = c => { const [r, g, b] = ch(c); return g > r && g > b ? 'green' : (b > g + 20 ? 'pink' : (g > 0.55 * r ? 'yellow' : (g > 0.25 * r ? 'orange' : 'red'))); };
+        assert.deepEqual(tl.map(x => x.urge), ['0.000', '0.500', '0.750', '0.900', '0.991', '0.992'], 'urge follows time used');
+        assert.deepEqual(tl.slice(0, 4).map(x => hue(x.color)), ['green', 'yellow', 'orange', 'pink'], 'green → yellow → orange → pink: ' + tl.map(x => x.color).join(' → '));
+        assert.deepEqual(tl.map(x => x.urgent), [false, false, false, false, false, true], 'red only in the last 30 s');
+        assert.equal(tl[5].color, 'rgb(220, 38, 38)', 'last 30 s = red');
+        const lum = c => { const [r, g, b] = ch(c); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+        assert.ok(lum(tl[0].color) > lum(tl[3].color), 'starts soft, ends strong');
         // tap targets: a segment is at least 22px tall
         assert.ok(await page.evaluate(() => document.querySelector('.qz-seg button').getBoundingClientRect().height >= 22), 'segment tap height ≥ 22px');
         await ctx.close();
