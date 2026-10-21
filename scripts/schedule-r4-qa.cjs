@@ -1,4 +1,4 @@
-// V101.183: Schedule round 4 (mockup picked 2026-10-21). The REAL public/index.html on a touch phone (file://, network blocked,
+// V101.184: Schedule round 4 (mockup picked 2026-10-21). The REAL public/index.html on a touch phone (file://, network blocked,
 // Firebase stubbed): This week / Next week follow the strip's Mon–Sun weeks · Next week folds to its header like Missed (reset on
 // every open) · no legend under the strip · 3px ring, pale = 20 %, 20px day count · under 24 h left in orange · ▶ keeps its size
 // but gets a 42px tap area that never covers the time or the title · a Journal / Case already done today stays as a faded tile

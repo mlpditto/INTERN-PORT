@@ -1,7 +1,7 @@
 // V101.169: Schedule S2 (mockup picked 2026-10-19). The REAL public/index.html on a touch phone (file://, network blocked,
 // Firebase stubbed), clock pinned to Thu 22 Oct 2026 10:00 Bangkok.
 // "Day N / M" + a thin bar + "K days left" under it · a count on a day with 2+ things due · an orange bar under a past day that
-// still has an overdue quiz / quest (a Missed item drew nothing before) · the marks are explained in the ⓘ sheet (V101.183: the legend line under the strip is gone) ·
+// still has an overdue quiz / quest (a Missed item drew nothing before) · the marks are explained in the ⓘ sheet (V101.184: the legend line under the strip is gone) ·
 // no sideways scroll on a 360 / 412 px phone.
 const path = require('node:path'), fs = require('node:fs'), assert = require('node:assert/strict');
 const { pathToFileURL } = require('node:url');
@@ -73,7 +73,7 @@ async function open(browser, width) {
         assert.deepEqual([tue.over, wed.over, thu.over, fri.over], [true, true, false, false], 'orange bar only under past days with an overdue item');
         assert.match(wed.label, /· 1 overdue/, 'screen readers hear it too');
 
-        // ---- 3. V101.183: no legend under the strip — the ⓘ sheet explains ⭐, the count and the overdue bar
+        // ---- 3. V101.184: no legend under the strip — the ⓘ sheet explains ⭐, the count and the overdue bar
         assert.equal(await page.locator('#sch-week .sch-legend').count(), 0, 'no legend under the strip');
         const marks = await page.evaluate(() => { internshipProgress.showHelp(null); const d = document.getElementById('ip-help-dialog'), m = d.querySelector('.ip-help-marks'); const r = { text: m ? m.textContent : '', cnt: !!d.querySelector('.ip-hcnt'), over: d.querySelector('.ip-hover') ? getComputedStyle(d.querySelector('.ip-hover')).backgroundColor : '' }; d.close(); return r; });
         assert.ok(marks.text.includes('⭐') && marks.cnt && marks.over === 'rgb(249, 115, 22)', 'ⓘ explains ⭐ / the count / the orange overdue bar: ' + JSON.stringify(marks));
