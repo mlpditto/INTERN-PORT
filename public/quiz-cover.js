@@ -499,6 +499,7 @@ const QuizCover = (() => {
         if (canStart) {
             cover.type = 'button'; cover.title = 'กดรูปเพื่อเริ่มทำ Quiz';
             cover.setAttribute('aria-label', 'Start quiz: ' + (quiz.title || 'Quiz'));
+            cover.dataset.quizTitle = quiz.title || 'Quiz';
             cover.onclick = event => { event.stopPropagation(); start.click(); };
         }
         icon.replaceWith(cover); cover.append(icon);
@@ -509,6 +510,14 @@ const QuizCover = (() => {
         }
         if (canStart) {
             const play = document.createElement('span'); play.className = 'quiz-cover-play'; play.textContent = '▶'; play.setAttribute('aria-hidden', 'true'); cover.append(play);
+            // V101.181: corner fold marks a quiz the intern has not started (only that branch renders the 👥 stack).
+            // It stays hidden until settleFresh() knows the 👥 count, so it appears once, already in its final colour.
+            if (card.querySelector('.quiz-avatar-stack')) {
+                const fold = document.createElement('span'); fold.className = 'quiz-cover-fold'; fold.setAttribute('aria-hidden', 'true'); cover.prepend(fold);
+                card.classList.add('quiz-cover-fresh');
+                labelFresh(cover, 'new');
+                pulseOnFirstView(play);
+            }
             const footer = start.parentElement;
             if (footer.children.length === 1) {
                 card.classList.add('quiz-cover-startable');
@@ -525,6 +534,40 @@ const QuizCover = (() => {
             }
         }
     }
+    // V101.181: EN · TH · KR. The cover button's aria-label carries the state too — tooltips never show on a phone.
+    const FRESH_LABEL = {
+        new: ['New · not started', 'ใหม่ · ยังไม่ได้ทำ', '새 퀴즈 · 아직 안 풀었어요'],
+        first: ['Be the first to clear this', 'ยังไม่มีใครทำ — เป็นคนแรกเลย', '아직 아무도 안 풀었어요 — 첫 번째가 되어 보세요'],
+    };
+    function labelFresh(cover, kind) {
+        const [en, th, kr] = FRESH_LABEL[kind], t = cover.dataset.quizTitle;
+        cover.title = en; cover.dataset.thTitle = th; cover.dataset.krTitle = kr;
+        cover.setAttribute('aria-label', `Start quiz: ${t} — ${en}`);
+        cover.dataset.thAriaLabel = `เริ่ม Quiz: ${t} — ${th}`; cover.dataset.krAriaLabel = `퀴즈 시작: ${t} — ${kr}`;
+    }
+    // V101.181: ▶ pulses twice the first time its card is on screen, then stays still.
+    function pulseOnFirstView(play) {
+        if (!('IntersectionObserver' in window)) return;
+        const io = new IntersectionObserver(entries => {
+            if (!entries.some(e => e.isIntersecting)) return;
+            io.disconnect(); play.classList.add('quiz-cover-pulse');
+        }, { threshold: 0.6 });
+        io.observe(play);
+    }
+    // V101.181: called once every 👥 count on the page is known ([{ card, n }], n = null when the count failed).
+    // Folds fade in together. Nobody-yet quizzes get the gold fold + ★; only the two with the nearest deadline
+    // also get the gold frame, so a fresh batch of quizzes does not turn the whole page gold.
+    function settleFresh(results) {
+        const first = [];
+        results.forEach(({ card, n }) => {
+            const cover = card && card.querySelector('.quiz-cover-fresh .quiz-cover-thumb');
+            if (!cover) return;
+            if (n === 0) { card.classList.add('quiz-first'); labelFresh(cover, 'first'); first.push(card); }
+            card.classList.add('quiz-fold-ready');
+        });
+        const due = c => Number(c.querySelector('[data-dead]')?.dataset.dead) || Infinity;
+        first.sort((a, b) => due(a) - due(b)).slice(0, 2).forEach(c => c.classList.add('quiz-first-challenge'));
+    }
     function adminThumbnail(value, id) {
         if (id) {
             const encoded = String(id).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, '&#39;');
@@ -536,5 +579,5 @@ const QuizCover = (() => {
         const escaped = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, '&#39;');
         return `<span class="quiz-admin-cover" title="Quiz นี้มีปกแล้ว" data-th-title="Quiz นี้มีปกแล้ว"><img src="${escaped}" alt="Quiz cover" loading="lazy" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span hidden role="img" aria-label="Cover set; preview unavailable" title="มีปกแล้ว แต่โหลดภาพตัวอย่างไม่ได้">🖼️</span></span>`;
     }
-    return { set, setStyle, fold, style: () => style, setBadge, badge: badgeText, decorate, adminThumbnail, quickInsert, isBusy: () => busy, value: () => editor().querySelector('[type=hidden]').value, _cropToCover: cropToCover /* tests */ };
+    return { set, setStyle, fold, style: () => style, setBadge, badge: badgeText, decorate, settleFresh, adminThumbnail, quickInsert, isBusy: () => busy, value: () => editor().querySelector('[type=hidden]').value, _cropToCover: cropToCover /* tests */ };
 })();
