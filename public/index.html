@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.184)</title>
+    <title>Internship Portfolio (V101.185)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.171">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -2413,7 +2413,7 @@
 <script src="internship-progress.js?v=V101.184"></script><link rel="stylesheet" href="internship-progress.css?v=V101.184">
 <script src="monthly-progress.js?v=V101.79"></script><link rel="stylesheet" href="monthly-progress.css?v=V101.39">
 <script src="assigned-goals.js?v=V100.30"></script><link rel="stylesheet" href="assigned-goals.css?v=V100.30">
-<link rel="stylesheet" href="quiz-user-focus.css?v=V101.96"><script defer src="quiz-feedback-lang.js?v=V101.96"></script><script defer src="quiz-feedback-ai.js?v=V101.96"></script><script defer src="quiz-feedback-remind.js?v=V101.176"></script>
+<link rel="stylesheet" href="quiz-user-focus.css?v=V101.185"><script defer src="quiz-feedback-lang.js?v=V101.96"></script><script defer src="quiz-feedback-ai.js?v=V101.96"></script><script defer src="quiz-feedback-remind.js?v=V101.176"></script>
 <link rel="stylesheet" href="quiz-cover.css?v=V101.181">
 <link rel="stylesheet" href="case-insight-rail.css?v=V101.59">
 <script src="quiz-cover.js?v=V101.181"></script>
@@ -5677,7 +5677,7 @@
             </div>
             <div id="quiz-run-footer" style="margin-top:25px; display:flex; gap:12px;">
                 <button id="btn-quiz-prev" class="btn-sm btn-dark" onclick="prevQuizStep()"
-                    style="display:none; flex:1; height:45px; font-weight:bold;">Previous</button>
+                    style="display:none; flex:1; height:45px; font-weight:bold;" aria-label="Previous question" title="Previous question" data-th-title="ข้อก่อนหน้า" data-kr-title="이전 문제">‹</button>
                 <button id="btn-quiz-next" class="btn-sm btn-primary" onclick="nextQuizStep()"
                     style="flex:1; height:45px; font-weight:bold;">Next</button>
                 <button id="btn-quiz-submit" class="btn-sm btn-success" onclick="submitQuiz()"
@@ -12108,7 +12108,10 @@
                 }
             });
 
-            document.getElementById('quiz-run-title').innerText = currentQuiz.quizType === 'read_only' ? currentQuiz.title : (isPracticeMode ? 'Practice quiz' : 'Quiz in progress');
+            // V101.185: the header names the quiz (was "Quiz in progress"); the full title rides in the tooltip
+            const _qrTitle = document.getElementById('quiz-run-title');
+            _qrTitle.innerText = currentQuiz.quizType === 'read_only' ? currentQuiz.title : (currentQuiz.shortTitle || currentQuiz.title || 'Quiz') + (isPracticeMode ? ' · Practice' : '');
+            _qrTitle.title = currentQuiz.title || '';
             // [V94.62] Defensive reset of nav button disabled state. Belt-and-suspenders with
             // the submitQuiz success-path fix — covers any other path that might leave
             // buttons disabled between quizzes (e.g. safety timeout misfires, future code).
@@ -13145,6 +13148,17 @@
             { code: 'zh',   label: '🇨🇳',       title: 'Chinese (Simplified) / 中文' }
         ];
         const QT_LANG_NAMES = { th: 'Thai', en: 'English', ko: 'Korean', ja: 'Japanese', zh: 'Simplified Chinese' };
+        // V101.185: capsule labels, each in its own script (escaped: "ไทย", "한", "日", "中")
+        const QT_LANG_SHORT = { en: 'EN', th: '\u0E44\u0E17\u0E22', ko: '\uD55C', ja: '\u65E5', zh: '\u4E2D' };
+        // The language the quiz is written in (first question), same rule as the admin translator.
+        function qtQuizSourceLang() {
+            const t = (currentQuiz && currentQuiz.questions && currentQuiz.questions[0] && (currentQuiz.questions[0].q || currentQuiz.questions[0].content)) || (currentQuiz && currentQuiz.caseContent) || '';
+            if (/[\u0E00-\u0E7F]/.test(t)) return 'th';
+            if (/[\uAC00-\uD7AF]/.test(t)) return 'ko';
+            if (/[\u3040-\u30FF]/.test(t)) return 'ja';
+            if (/[\u4E00-\u9FFF]/.test(t)) return 'zh';
+            return 'en';
+        }
         const qtBackgroundQueue = new Set();
 
         function qtGetSelectedLang() { return localStorage.getItem('quizUiLang') || 'orig'; }
@@ -13402,9 +13416,13 @@
             // QT_LANG_NAMES text). No <label for> element anymore, so this bar no longer
             // contributes a stray <label> for renderQuizStepUIOnly's choice-option query
             // to miscount (see V100.71 fix note there).
-            const chips = QT_LANGS.map(l => {
+            // V101.185: a capsule (same shape as the feedback sheet's EN | 한 | ไทย) with each language in its own script.
+            // The quiz's source language IS the original, so its own chip is dropped and the original chip wears its label.
+            const qtSrc = qtQuizSourceLang();
+            const chips = QT_LANGS.filter(l => l.code !== qtSrc).map(l => {
                 const on = currentLang === l.code;
                 const name = l.code === 'orig' ? 'Original' : QT_LANG_NAMES[l.code];
+                const label = QT_LANG_SHORT[l.code === 'orig' ? qtSrc : l.code] || l.label;
                 // #4361ee, not var(--primary): that custom property is never defined
                 // anywhere reachable by this page (checked index.html + every linked
                 // .css) — every existing var(--primary) use on this page is silently
@@ -13412,12 +13430,10 @@
                 // call sites clearly intended (e.g. the rgba(67,97,238,...) shadow paired
                 // with one of them), and matches the literal already used for the choice
                 // options' own selected-state highlight a few hundred lines down.
-                return `<button type="button" onclick="qtApplyTranslation('${l.code}')" title="${l.title}" aria-label="${name}"
-                    style="width:auto; min-height:0; padding:4px 9px; border-radius:999px; border:1.5px solid ${on ? '#4361ee' : '#cbd5e1'}; background:${on ? '#4361ee' : '#fff'}; color:${on ? '#fff' : '#475569'}; font-size:1.05em; line-height:1; cursor:pointer;">${l.label}</button>`;
+                return `<button type="button" class="${on ? 'on' : ''}" onclick="qtApplyTranslation('${l.code}')" title="${l.code === 'orig' ? 'Original — ' + (QT_LANG_NAMES[qtSrc] || 'English') : l.title}" aria-label="${name}" aria-pressed="${on}">${label}</button>`;
             }).join('');
-            return `<div class="qt-bar quiz-focus-language lang-no-toggle" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                <span style="font-size:0.8em; color:#666; font-weight:700;">Language</span>
-                <div role="group" aria-label="Question language" style="display:flex; gap:5px; flex-wrap:wrap;">${chips}</div>
+            return `<div class="qt-bar quiz-focus-language lang-no-toggle">
+                <div class="qz-cap" role="group" aria-label="Question language">${chips}</div>
                 <span id="qt-status" role="status">${status}</span></div>`;
         }
 
@@ -13445,19 +13461,21 @@
         // answered = green, unanswered = outline. Read-only (Learning) quizzes
         // never reach this — renderQuizStep() returns early for those before
         // this is called.
-        function renderQuizStepBullets() {
+        // V101.185: one progress row — position · answered · skipped (left) and the language capsule (right) — over a bar with
+        // one segment per question (blue = here, green = answered, grey = not yet; tap = jump). Replaces the "Questions" map.
+        // "Skipped" = a question BEHIND you with no answer. ≤360px the left side shortens to "5/15 · 3✓ · 1 skipped" (CSS).
+        function renderQuizStepBullets(question) {
             if (!currentQuiz || !currentQuiz.questions || !currentQuiz.questions.length) return '';
-            const bullets = currentQuiz.questions.map((_, idx) => {
-                const isCurrent = idx === currentStep;
-                const isAnswered = quizStepIsAnswered(idx);
-                const bg = isCurrent ? '#4361ee' : (isAnswered ? '#d1fae5' : '#fff');
-                const color = isCurrent ? '#fff' : (isAnswered ? '#047857' : '#94a3b8');
-                const border = isCurrent ? '#4361ee' : (isAnswered ? '#6ee7b7' : '#e2e8f0');
-                const title = isAnswered ? 'Answered / ตอบแล้ว' : 'Not answered / ยังไม่ตอบ';
-                return `<button type="button" onclick="jumpToQuizStep(${idx})" title="${title}"
-                    style="width:30px; height:30px; flex:0 0 auto; border-radius:50%; border:2px solid ${border}; background:${bg}; color:${color}; font-weight:800; font-size:0.78em; cursor:pointer; padding:0; min-height:0;">${idx + 1}</button>`;
+            const n = currentQuiz.questions.length;
+            const done = currentQuiz.questions.filter((_, i) => quizStepIsAnswered(i)).length;
+            const skipped = currentQuiz.questions.filter((_, i) => i < currentStep && !quizStepIsAnswered(i)).length;
+            const skip = skipped ? ` · <span class="qz-skip">${skipped} skipped</span>` : '';
+            const segs = currentQuiz.questions.map((_, idx) => {
+                const cls = idx === currentStep ? 'cur' : (quizStepIsAnswered(idx) ? 'ok' : '');
+                const state = idx === currentStep ? 'current' : (cls ? 'answered' : 'not answered');
+                return `<button type="button" class="${cls}" onclick="jumpToQuizStep(${idx})" title="Question ${idx + 1} · ${state}" aria-label="Question ${idx + 1}, ${state}"${idx === currentStep ? ' aria-current="step"' : ''}></button>`;
             }).join('');
-            return `<div class="quiz-focus-progress"><span>Question ${currentStep + 1} of ${currentQuiz.questions.length}</span><span>${currentQuiz.questions.filter((_, i) => quizStepIsAnswered(i)).length} answered</span></div><details class="quiz-focus-map"><summary title="Open the question map to pick a question" data-th-title="เปิดแผนผังเพื่อเลือกข้อสอบ" data-kr-title="지도를 열어 시험 선택">Questions</summary><div>${bullets}</div></details>`;
+            return `<div class="qz-prog"><div class="qz-count"><span class="qz-long">Question <b>${currentStep + 1}</b> / ${n}</span><span class="qz-long">${done} answered${skip}</span><span class="qz-short"><b>${currentStep + 1}</b>/${n} · ${done}✓${skip}</span></div>${qtRenderBar(question)}</div><div class="qz-seg" role="group" aria-label="Questions">${segs}</div>`;
         }
 
         function renderQuizStep(useExistingTime = false) {
@@ -13654,13 +13672,12 @@
                 // timer (top-right) instead of a full "Q X/Y (TYPE)" row — the
                 // "X/Y" part duplicated the position already shown by the
                 // answered/current bullets below, so only the type moved.
-                document.getElementById('quiz-q-type-badge').innerText = qType.toUpperCase();
+                document.getElementById('quiz-q-type-badge').innerText = qType === 'choice' ? '' : qType.toUpperCase();   // V101.185: plain choice needs no tag
 
                 quizRunContainer.innerHTML = `
                 <div class="lang-no-toggle">
                     <div style="margin-bottom:15px;">
-                        ${renderQuizStepBullets()}
-                        ${qtRenderBar(question)}
+                        ${renderQuizStepBullets(question)}
                         <div class="md-render" style="font-weight:bold; font-size:1.1em; color:#333;">${window.renderMd(question.q)}</div>
                     </div>
                     ${inputHtml}
