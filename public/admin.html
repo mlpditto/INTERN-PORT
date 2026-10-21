@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.356)</title>
+    <title>Nika Admin (V102.357)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -7906,7 +7906,7 @@
 <link rel="stylesheet" href="quiz-compare-cleanup.css?v=V100.02">
 <link rel="stylesheet" href="learning-review.css?v=V100.13">
 <link rel="stylesheet" href="delete-requests.css?v=V100.40">
-<link rel="stylesheet" href="quiz-feedback.css?v=V102.260">
+<link rel="stylesheet" href="quiz-feedback.css?v=V102.357">
 <script src="assigned-goals.js?v=V100.30"></script><link rel="stylesheet" href="assigned-goals.css?v=V100.30">
 <!-- V100.82: hub-progress-menu.js/.css retired — its only 2 items (Goals,
      Certificates) moved into the global ➕ Create menu; nothing else used this
@@ -71335,6 +71335,7 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
         // module-level state (_qfpAttempts) and global qfp* helpers.
         function qfpCardHtml(f) {
                 const dateStr = qfpFormatAbsolute(f.timestamp);
+                const dateShort = dateStr.replace(/^\d{4}-(\d\d)-(\d\d) /, (m, mo, d) => +d + '/' + +mo + ' ');   // V102.357: 21/10 19:58 on the row, the full date in the tooltip
                 const mins = Math.floor((f.timeUsedSeconds || 0) / 60);
                 const secs = (f.timeUsedSeconds || 0) % 60;
                 // V92.88: route comment through qfpNormalizeTopic so invisible-only
@@ -71375,34 +71376,35 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
                 }
                 // V102.259: three rows — who · facts · actions / the comment / next topic + AI. The green "Bonus +x" badge was the QUIZ score the feedback copied (pointsEarned), so it is now 📝.
                 const sig = qfpSignal(f);
-                const mkPill = (t, bg, fg, tip) => `<span title="${tip}" style="display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;background:${bg};color:${fg};white-space:nowrap;cursor:help;">${t}</span>`;
+                // V102.357: facts (⭐ 📝 🎁) are grey pills, warnings (⚠️ ✂️ ⏰ 🕒) keep their colour as an outline only (owner's review, points 3-4)
+                const mkPill = (t, bg, fg, tip, warn) => `<span title="${tip}" style="display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;background:${warn ? 'transparent' : bg};color:${fg};${warn ? 'border:1px solid currentColor;opacity:.8;' : ''}white-space:nowrap;cursor:help;">${t}</span>`;
                 const mkBtn = (idAttr, emoji, tip, onclick, extra) => `<button ${idAttr} type="button" class="qfp-ib" title="${tip}" aria-label="${tip}" onclick="${onclick}" ${extra || ''}>${emoji}</button>`;
                 const addOnOn = qfpAddOnQualifies(f);
                 const credited = Number(f.addOnCredited) > 0;
                 const legacy = !credited && typeof f.adminExtraScore === 'number' && f.adminExtraScore > 0;
                 const pills = [
-                    typeof f.rating === 'number' ? mkPill('⭐ ' + f.rating + (rawComment ? '' : ' 👍'), '#fef3c7', '#92400e', 'Rating ' + f.rating + '/10') : '',
-                    typeof f.pointsEarned === 'number' && f.pointsEarned > 0 ? mkPill('📝 +' + f.pointsEarned.toFixed(1), '#dcfce7', '#166534', 'Quiz points this user earned on this quiz (copied when the feedback was sent). It is NOT a bonus.') : '',
-                    credited ? mkPill('🎁 +' + Number(f.addOnCredited).toFixed(2), '#ccfbf1', '#0f766e', 'Feedback add-on credited to this user') : '',
-                    legacy ? mkPill('⚠️ ' + f.adminExtraScore, '#fee2e2', '#991b1b', 'A bonus of ' + f.adminExtraScore + ' was recorded before the add-on rules and never credited. Press 🎁 and save a number within the cap to credit it.') : '',
-                    rawComment && !meetsMin ? mkPill('✂️ ' + commentLength, '#ffedd5', '#9a3412', 'Below 100 characters (' + commentLength + ')') : '',
+                    typeof f.rating === 'number' ? mkPill('⭐ ' + f.rating + (rawComment ? '' : ' 👍'), '#f8fafc', '#475569', 'Rating ' + f.rating + '/10') : '',
+                    typeof f.pointsEarned === 'number' && f.pointsEarned > 0 ? mkPill('📝 +' + f.pointsEarned.toFixed(1), '#f8fafc', '#475569', 'Quiz points this user earned on this quiz (copied when the feedback was sent). It is NOT a bonus.') : '',
+                    credited ? mkPill('🎁 +' + Number(f.addOnCredited).toFixed(2), '#f8fafc', '#475569', 'Feedback add-on credited to this user') : '',
+                    legacy ? mkPill('⚠️ ' + f.adminExtraScore, '#fee2e2', '#991b1b', 'A bonus of ' + f.adminExtraScore + ' was recorded before the add-on rules and never credited. Press 🎁 and save a number within the cap to credit it.', true) : '',
+                    rawComment && !meetsMin ? mkPill('✂️ ' + commentLength, '#ffedd5', '#9a3412', 'Below 100 characters (' + commentLength + ')', true) : '',
                     sig ? (sig.kind === 'ended'
-                        ? mkPill('⏰ ' + sig.days + 'd', '#fee2e2', '#991b1b', `Signal — training ended ${sig.end} · feedback given ${sig.given} (${sig.days} days ago) · no add-on credited. It can still be credited (max 1.0 and at most the quiz points), or ignored.`)
-                        : mkPill('🕒 ' + sig.days + 'd', '#f1f5f9', '#475569', `Feedback given ${sig.days} days ago · no add-on credited yet`)) : '',
+                        ? mkPill('⏰ ' + sig.days + 'd', '#fee2e2', '#991b1b', `Signal — training ended ${sig.end} · feedback given ${sig.given} (${sig.days} days ago) · no add-on credited. It can still be credited (max 1.0 and at most the quiz points), or ignored.`, true)
+                        : mkPill('🕒 ' + sig.days + 'd', '#f1f5f9', '#64748b', `Feedback given ${sig.days} days ago · no add-on credited yet`, true)) : '',
                 ].filter(Boolean).join('');
                 const nt = qfpNormalizeTopic(f.nextTopic);
                 return `
-                    <div data-fb-user="${f.userId || ''}" style="background:#fff;border:1px solid #fbcfe8;border-left:4px solid ${sig && sig.kind === 'ended' ? '#ef4444' : '#ec4899'};border-radius:12px;padding:8px 12px;">
-                        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0;">
-                            <span style="font-weight:800;font-size:0.9em;color:#1e293b;">${qfpEscapeHtml(f.displayName || 'Anonymous')}</span>${fbTriageChip(f)}${pills}
+                    <div data-fb-user="${f.userId || ''}" style="background:#fff;border:1px solid #eef0f3;border-left:2px solid ${sig && sig.kind === 'ended' ? '#fca5a5' : '#f9a8d4'};border-radius:14px;padding:14px 18px;">
+                        <div class="qfp-card-row">
+                            <span class="qfp-card-name">${qfpEscapeHtml(f.displayName || 'Anonymous')}</span>${fbTriageChip(f)}${pills}
                             <span style="flex:1;"></span>
-                            <span style="font-size:0.72em;color:#94a3b8;white-space:nowrap;" title="${dateStr} · time used ${mins}:${String(secs).padStart(2,'0')}">🕒 ${dateStr} · ⏱ ${mins}:${String(secs).padStart(2,'0')}</span>
-                            ${f.userId && f.userId !== 'anon' ? mkBtn('', '📜', 'Score history and sources', `showUserScoreAudit('${f.userId}', ${qfpEscapeHtml(JSON.stringify(f.displayName || ''))})`) : ''}
+                            <span class="qfp-meta"><span style="font-size:0.72em;color:#94a3b8;white-space:nowrap;" title="${dateStr} · time used ${mins}:${String(secs).padStart(2,'0')}">${dateShort} · ⏱ ${mins}:${String(secs).padStart(2,'0')}</span>
+                            <span class="qfp-acts">${f.userId && f.userId !== 'anon' ? mkBtn('', '📜', 'Score history and sources', `showUserScoreAudit('${f.userId}', ${qfpEscapeHtml(JSON.stringify(f.displayName || ''))})`) : ''}
                             <button id="qfp-bonus-btn-${f.id}" type="button" class="qfp-ib"${addOnOn ? '' : ' disabled'} onclick="qfpToggleBonus('${f.id}')" title="${addOnOn ? 'Credit a feedback add-on to this user (max ' + qfpAddOnCap(f) + ' — never more than the quiz points, never 1.0+; once per quiz)' : 'No add-on: needs a rating or a comment (a 10/10 with no comment does not count)'}" aria-label="Feedback add-on">🎁${adminScoreValue !== '' ? ' ' + adminScoreValue : ''}</button>
                             <button id="qfp-ai-btn-${f.id}" type="button" class="qfp-ib" onclick="runAIFeedbackScoring('${f.id}')" ${!rawComment ? 'disabled title="No comment to evaluate" data-th-title="ไม่มีข้อความให้ประเมิน"' : 'title="AI-score this comment"'} aria-label="AI score">🗡️</button>
-                            <button type="button" class="qfp-ib qfp-ib-del" onclick="deleteQuizFeedbackItem('${f.id}')" title="Delete this feedback (asks to confirm)" data-th-title="ลบผลตอบรับนี้ โดยจะขอยืนยัน" aria-label="Delete feedback">🗑</button>
+                            <button type="button" class="qfp-ib qfp-ib-del" onclick="deleteQuizFeedbackItem('${f.id}')" title="Delete this feedback (asks to confirm)" data-th-title="ลบผลตอบรับนี้ โดยจะขอยืนยัน" aria-label="Delete feedback">🗑</button></span></span>
                         </div>
-                        ${rawComment ? `<div class="lang-no-toggle" style="margin-top:6px;font-size:0.85em;color:#475569;background:#f8fafc;padding:6px 10px;border-radius:8px;border-left:3px solid #cbd5e1;white-space:pre-wrap;">${safeComment}</div>` : '<p title="No comment provided" data-th-title="ผู้ตอบไม่ได้กรอกความคิดเห็น" style="color:#80566a;margin:6px 0 0;font-size:0.85em;">No comment provided</p>'}
+                        ${rawComment ? `<div class="lang-no-toggle" style="margin-top:6px;font-size:0.85em;color:#475569;background:#fdf8f1;padding:8px 12px;border-radius:8px;border-left:3px solid #e7d8c4;white-space:pre-wrap;">${safeComment}</div>` : '<p title="No comment provided" data-th-title="ผู้ตอบไม่ได้กรอกความคิดเห็น" style="color:#80566a;margin:6px 0 0;font-size:0.85em;">No comment provided</p>'}
                         ${quizResultHtml}
                         ${(nt || hasAiReview) ? `<div style="margin-top:5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:0.82em;">${nt ? `<span class="lang-no-toggle" style="color:#6d28d9;font-weight:700;" title="Next topic requested">🎯 ${qfpEscapeHtml(nt)}</span>` : ''}<span style="flex:1;"></span>${hasAiReview ? `<span onclick="var e=document.getElementById('qfp-ai-review-${f.id}');e.style.display=e.style.display==='none'?'block':'none'" title="🗡️ ${aiScoreText} — tap to show the issue and the suggestion" style="font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;background:#e0e7ff;color:#3730a3;cursor:pointer;">🗡️ ${f.aiFeedbackScore.toFixed(1)} · 💡</span>` : ''}</div>` : ''}
                         <div id="qfp-ai-review-${f.id}" style="margin-top:6px; font-size:0.8em; color:#334155; background:#eef2ff; border:1px solid #c7d2fe; border-radius:8px; padding:8px 10px; line-height:1.5; display:none;">
@@ -71479,9 +71481,10 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
             };
             counts.signal = _qfpFeedbacks.filter(f => { const g = qfpSignal(f); return g && g.kind === 'ended'; }).length;   // V102.259
             const chipTips = { all: 'All', fix: 'Reported bugs still open', unscored: 'Not AI-scored yet', short: 'Shorter than 100 characters', low: 'Low rating (5 or less)', praise: '10/10 with no comment (kept out of All; never gets an add-on)', signal: 'Signal — the training is over and no add-on was credited' };
+            // V102.357: quiet grey chips, the picked one light coral (owner's review, point 2)
             const chip = (key, label, count) => {
                 const active = _qfpFilter === key;
-                return `<button onclick="qfpSetFilter('${key}')" title="${chipTips[key] || label}" aria-label="${chipTips[key] || label}" style="padding:3px 10px;border-radius:20px;font-size:0.72em;font-weight:800;cursor:pointer;transition:0.2s;border:1.5px solid ${active ? '#f59e0b' : '#e2e8f0'};background:${active ? '#f59e0b' : 'transparent'};color:${active ? 'white' : '#64748b'};">${label} ${count}</button>`;
+                return `<button onclick="qfpSetFilter('${key}')" title="${chipTips[key] || label}" aria-label="${chipTips[key] || label}" style="padding:2px 9px;border-radius:20px;font-size:0.68em;font-weight:800;cursor:pointer;transition:0.2s;border:1px solid ${active ? '#fecaca' : 'transparent'};background:${active ? '#ffe4e1' : '#f1f5f9'};color:${active ? '#c2410c' : '#64748b'};">${label} ${count}</button>`;
             };
             rail.innerHTML = `
                 <div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;">
@@ -71494,7 +71497,7 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
                     ${nPraise > 0 || _qfpFilter === 'praise' ? chip('praise', '👍', nPraise) : ''}
                     ${counts.signal > 0 || _qfpFilter === 'signal' ? chip('signal', '⏰', counts.signal) : ''}
                     <span style="flex:1;"></span>
-                    <button type="button" onclick="qfpSetSort('${_qfpSort === 'recent' ? 'rating' : 'recent'}')" title="Sort: ${_qfpSort === 'recent' ? 'Recent — tap for Rating ↑' : 'Rating ↑ — tap for Recent'}" aria-label="Sort" style="padding:3px 10px;border-radius:20px;font-size:0.72em;font-weight:800;cursor:pointer;border:1.5px solid #1d4ed8;background:#eff6ff;color:#1d4ed8;">${_qfpSort === 'recent' ? '🕒' : '⭐'} ↕</button>
+                    <button type="button" onclick="qfpSetSort('${_qfpSort === 'recent' ? 'rating' : 'recent'}')" title="Sort: ${_qfpSort === 'recent' ? 'Recent — tap for Rating ↑' : 'Rating ↑ — tap for Recent'}" aria-label="Sort" style="padding:2px 9px;border-radius:20px;font-size:0.68em;font-weight:800;cursor:pointer;border:1px solid transparent;background:#f1f5f9;color:#64748b;">${_qfpSort === 'recent' ? '🕒' : '⭐'} ↕</button>
                     ${counts.unscored > 0 ? `<button id="qfp-bulk-score-btn" onclick="qfpScoreAllUnscored()" title="🗡️ Score the ${counts.unscored} unrated comments with the selected model, one by one" data-th-title="ตรวจข้อความที่ยังไม่ได้ประเมินด้วยโมเดลที่เลือก ทีละรายการ" style="margin-left:auto;padding:3px 12px;border-radius:20px;font-size:0.72em;font-weight:800;cursor:pointer;transition:0.2s;border:1.5px solid #1d4ed8;background:#1d4ed8;color:white;" aria-label="Score unreviewed">🗡️ ${counts.unscored}</button>` : ''}
                 </div>`;
         }
