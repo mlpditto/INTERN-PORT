@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.359)</title>
+    <title>Nika Admin (V102.360)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -5884,6 +5884,11 @@
         .qe-quiet.qe-tool-gen > i:first-child { color:#fbbf24; }
         .qe-quiet.qe-tool-curate > i { color:#c084fc; } /* V102.344: funnel (was ✦, read as a twin of 🪄 Generate more) */
         .qe-quiet.qe-tool-translate > i:first-child { color:#34d399; }
+        /* V102.360: Read first replace panel — Current | New side by side, rendered markdown (stacks under ~560px) */
+        .q-primer-cmp { flex:1 1 260px; min-width:0; display:flex; flex-direction:column; }
+        .q-primer-cmp > .q-primer-cmp-body { flex:1; padding:8px 10px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; max-height:280px; overflow:auto; line-height:1.5; }
+        .q-primer-cmp p { margin:0 0 6px; } .q-primer-cmp p:last-child { margin-bottom:0; }
+        .q-primer-cmp ul, .q-primer-cmp ol { margin:0 0 6px 18px; padding:0; } .q-primer-cmp li { margin:2px 0; }
         /* V102.323 (toolbar D, mockup pick): in each toggle only the CHOSEN chip shows its word (.qe-w), the rest are emoji.
            V102.358: the quiet tools show their word again next to the icon (owner: the row has room) — Review stays the one accent. */
         #quizManageModal .glass-toggle-item:not(.active) > .qe-w { display:none; }
@@ -24974,8 +24979,11 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 const existing = (ta.value || '').trim();
                 if (!existing) { ta.value = text; if (!silent) showToast('✨ Read first drafted' + warn); return leaks.length ? 'leak' : 'ok'; }
                 const applyFn = () => { ta.value = text; showToast('✨ Read first replaced' + warn); };
-                let html = '<div style="margin-bottom:6px;"><strong>📖 There is already a Read first text — replace it?</strong>' + (leaks.length ? ' <span style="color:#b45309;">⚠️ the new one repeats a correct option</span>' : '') + '</div>';
-                html += '<div style="color:#64748b; margin-bottom:4px;">The new one:</div><div style="padding:6px 8px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; white-space:pre-wrap; margin-bottom:8px;">' + escapeHtml(text) + '</div>';
+                // V102.360: Current | New side by side, both rendered (the raw **term** markdown was hard to compare)
+                const md = s => (typeof window.renderMd === 'function') ? window.renderMd(s) : '<div style="white-space:pre-wrap;">' + escapeHtml(s) + '</div>';
+                const col = (label, c, body) => '<div class="q-primer-cmp"><div style="font-size:0.78em; font-weight:800; color:' + c + '; margin-bottom:4px;">' + label + '</div><div class="q-primer-cmp-body">' + body + '</div></div>';
+                let html = '<div style="margin-bottom:8px;"><strong>📖 There is already a Read first text — replace it?</strong>' + (leaks.length ? ' <span style="color:#b45309;">⚠️ the new one repeats a correct option</span>' : '') + '</div>';
+                html += '<div style="display:flex; gap:10px; flex-wrap:wrap; align-items:stretch;">' + col('Current', '#64748b', md(existing)) + col('✨ New', '#d97706', md(text)) + '</div>';
                 html += window._qImproveActionBar('✅ แทนที่');
                 window._qImproveShowPanel(item, html, '#d97706', applyFn);
             } catch (err) {
