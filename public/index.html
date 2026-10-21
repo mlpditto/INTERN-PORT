@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.182)</title>
+    <title>Internship Portfolio (V101.183)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.171">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -13154,6 +13154,28 @@
         // that were poisoned by the en-only sourceLanguage bug (Thai text cached
         // as "translated" because en→en is identity).
         function qtCacheKey(quizId, qIdx, lang) { return `qt2_${quizId}_${qIdx}_${lang}`; }
+        // V101.183: fingerprint of the source question a translation was made from (same function in admin.html).
+        // A translation — stored on the quiz or cached in this browser — is only used while it still matches.
+        function qtSrcSig(q) {
+            const s = [(q && q.q) || '', ...((q && q.options) || []), (q && q.content) || ''].join('\u0001');
+            let h = 5381;
+            for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+            return (h >>> 0).toString(36);
+        }
+        // The admin-built translation for one question, or null when it no longer fits the quiz: made from a version
+        // with a different number of questions, a different source text (`src`), or missing / empty choices.
+        // (PRETEST-1.3, 2026-10-21: a 10-question Thai set with ONE choice each showed "undefined" for the rest.)
+        function qtPrebuiltFor(lang, qIdx, baseQ) {
+            const set = currentQuiz.translations && currentQuiz.translations[lang];
+            const qs = set && set.questions;
+            if (!Array.isArray(qs) || qs.length !== currentQuiz.questions.length) return null;
+            const pre = qs[qIdx];
+            if (!pre || !pre.q) return null;
+            if (pre.src && pre.src !== qtSrcSig(baseQ)) return null;
+            const n = (baseQ.options || []).length;
+            if (n && !(Array.isArray(pre.options) && pre.options.length === n && pre.options.every(o => typeof o === 'string' && o.trim()))) return null;
+            return pre;
+        }
         function qtGetCached(quizId, qIdx, lang) {
             try { const raw = localStorage.getItem(qtCacheKey(quizId, qIdx, lang)); return raw ? JSON.parse(raw) : null; }
             catch (_) { return null; }
@@ -13225,11 +13247,12 @@
 
         async function qtTranslateQuestion(qIdx, targetLang) {
             if (!currentQuiz || !currentQuiz.questions[qIdx] || targetLang === 'orig') return null;
+            const q = currentQuiz.questions[qIdx];
             const cached = qtGetCached(currentQuiz.id, qIdx, targetLang);
             // V94.57: cache without `content` is from pre-V94.57 (q+options only) — keep it,
             // but missing content will fall through to `baseQ.content` in qtGetEffectiveQuestion.
-            if (cached) return { ...cached, source: 'cached' };
-            const q = currentQuiz.questions[qIdx];
+            // V101.183: and only while it was made from this exact question (`src`).
+            if (cached && cached.src === qtSrcSig(q)) return { ...cached, source: 'cached' };
             const opts = q.options || [];
             // V94.57: translate q.content too (read-only Learn mode long-form body).
             // Parallel with q + options — no extra wall-clock cost.
@@ -13242,7 +13265,8 @@
                 q: qResult.text,
                 options: optResults.map(r => r.text),
                 content: contentResult.text,
-                source: qResult.source
+                source: qResult.source,
+                src: qtSrcSig(q)
             };
             qtSetCached(currentQuiz.id, qIdx, targetLang, translated);
             return translated;
@@ -13258,11 +13282,9 @@
             // Present → instant return, no Typhoon RTT, no localStorage seed needed.
             // Missing per-question (e.g. admin added a question after translating) → falls
             // through to the runtime Typhoon path below for that index only.
-            const pre = currentQuiz.translations
-                && currentQuiz.translations[lang]
-                && currentQuiz.translations[lang].questions
-                && currentQuiz.translations[lang].questions[qIdx];
-            if (pre && pre.q) {
+            // V101.183: only while it still fits this version of the quiz (qtPrebuiltFor).
+            const pre = qtPrebuiltFor(lang, qIdx, baseQ);
+            if (pre) {
                 // V94.57: pre.content may be undefined for translations docs written
                 // before V93.15 admin — fall back to original baseQ.content.
                 return { ...baseQ, q: pre.q, options: pre.options || baseQ.options, content: pre.content || baseQ.content, _translationSource: 'prebuilt' };
@@ -13274,7 +13296,7 @@
             let trans = currentQuiz._translations[lang][qIdx];
             if (!trans) {
                 const cached = qtGetCached(currentQuiz.id, qIdx, lang);
-                if (cached) { trans = cached; currentQuiz._translations[lang][qIdx] = trans; }
+                if (cached && cached.src === qtSrcSig(baseQ)) { trans = cached; currentQuiz._translations[lang][qIdx] = trans; }
             }
             if (trans) return { ...baseQ, q: trans.q, options: trans.options || baseQ.options, content: trans.content || baseQ.content, _translationSource: trans.source };
             // Not cached — kick off background translate, return original for now

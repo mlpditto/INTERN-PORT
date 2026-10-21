@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.354)</title>
+    <title>Nika Admin (V102.355)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -28908,6 +28908,16 @@ async function ensureAuthForQuizWrite(timeoutMs = 6000) {
         const QT_ADMIN_TARGET_LANGS = ['th', 'en', 'ko', 'ja', 'zh'];
         const QT_ADMIN_LANG_NAMES = { th: 'Thai', en: 'English', ko: 'Korean', ja: 'Japanese', zh: 'Simplified Chinese' };
 
+        // V102.355: fingerprint of a source question (same function in index.html). Stored as `src` on every
+        // translated question, so the intern page can tell a translation of an older version of the quiz.
+        function qtSrcSig(q) {
+            const s = [(q && q.q) || '', ...((q && q.options) || []), (q && q.content) || ''].join('\u0001');
+            let h = 5381;
+            for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+            return (h >>> 0).toString(36);
+        }
+        window.qtSrcSig = qtSrcSig;
+
         function qtAdminDetectSourceLang(text) {
             if (/[฀-๿]/.test(text)) return 'th';
             if (/[가-힯]/.test(text)) return 'ko';
@@ -28971,7 +28981,19 @@ ${JSON.stringify(sourceObj)}`;
                     continue;
                 }
 
-                const out = { questions: parsed.questions };
+                // V102.355: every question keeps all its choices — a Thai set once came back with ONE option each,
+                // passed the count check above and showed "undefined" choices to interns.
+                const bad = parsed.questions.findIndex((t, i) => {
+                    const n = (questions[i].options || []).length;
+                    return !t || typeof t.q !== 'string' || !t.q.trim()
+                        || (n > 0 && !(Array.isArray(t.options) && t.options.length === n && t.options.every(o => typeof o === 'string' && o.trim())));
+                });
+                if (bad >= 0) {
+                    lastErr = `Question ${bad + 1}: choices do not match the source (attempt ${attempt})`;
+                    continue;
+                }
+
+                const out = { questions: parsed.questions.map((t, i) => ({ ...t, src: qtSrcSig(questions[i]) })) };
                 if (parsed.caseContent) out.caseContent = parsed.caseContent;
                 return out;
             }
@@ -29283,6 +29305,13 @@ ${JSON.stringify(sourceObj)}`;
                         const toMs = (d) => (d && typeof d.toMillis === 'function') ? d.toMillis() : null;
                         if (toMs(prevQuiz.deadline) !== toMs(data.deadline)) {
                             data.deadlineFloor = firebase.firestore.FieldValue.delete();
+                        }
+                        // V102.355: questions changed → the stored translations describe the OLD quiz. Drop them; the
+                        // background translate below writes fresh ones, and until it succeeds interns get the live
+                        // translation instead of old questions (PRETEST-1.3 showed its 10-question version in Thai).
+                        const sigOf = qs => (qs || []).map(window.qtSrcSig).join('.');
+                        if (prevQuiz.translations && sigOf(prevQuiz.questions) !== sigOf(data.questions)) {
+                            data.translations = firebase.firestore.FieldValue.delete();
                         }
                     }
                     Object.assign(data, window.quizSystemFieldsFromEditor(true)); // V101.08
