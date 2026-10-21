@@ -11,6 +11,9 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
 async function open(browser, doneToday) {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 1400 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, timezoneId: 'Asia/Bangkok' });
     const page = await ctx.newPage();
+    // V102.358: pin the page clock (Wed 21 Oct 2026 12:00 Bangkok). The 'under 24 h' fixture is now + 20 h and must land on TOMORROW (a week-list
+    // row, orange); before 04:00 it was still today (a today tile, grey by design) and the run went red every night, on CI too.
+    await page.clock.setFixedTime(new Date('2026-10-21T12:00:00+07:00'));
     await page.addInitScript(() => {
         window.firebase = { auth: () => ({ currentUser: null, onAuthStateChanged: () => () => {}, signInAnonymously: () => Promise.resolve() }), functions: () => ({ httpsCallable: () => () => Promise.resolve({ data: {} }) }), firestore: Object.assign(() => ({ collection: () => ({ doc: () => ({ get: () => Promise.resolve({ exists: false, data: () => ({}) }), onSnapshot: () => () => {} }), where: () => ({ get: () => Promise.resolve({ docs: [] }), onSnapshot: () => () => {} }), get: () => Promise.resolve({ docs: [] }), orderBy: () => ({ get: () => Promise.resolve({ docs: [] }) }) }) }), { FieldValue: { serverTimestamp: () => 0, delete: () => 0 } }) };
     });
