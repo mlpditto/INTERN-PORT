@@ -114,8 +114,9 @@ const cy = el => { const r = el.getBoundingClientRect(); return Math.round(r.top
         assert.deepEqual(await words('#toolbar-q-type-toggle .glass-toggle-item'), ['✅', '📝', '🔢 Order', '⚡'], 'answer type: word on the chosen chip only');
         assert.deepEqual(await words('.qe-timer-mode .glass-toggle-item'), ['⏱ Per Q', '⏲️'], 'timer: word on the chosen chip only');
         assert.deepEqual(await page.$$eval('#toolbar-q-type-toggle .glass-toggle-item', es => es.map(e => e.getAttribute('aria-label'))), ['Multiple choice', 'Short answer', 'Ordering', 'Flashcard'], 'answer type chips keep their names for screen readers');
-        const quiet = await page.$$eval('#quiz-editor-review-actions .qe-tool.qe-quiet', bs => bs.map(b => [b.innerText.trim(), getComputedStyle(b).width, b.getAttribute('aria-label')]));
-        assert.deepEqual(quiet, [['', '34px', 'Import from PDF'], ['', '34px', 'Generate more questions'], ['', '34px', 'Curate a new set'], ['', '34px', 'Translate this question']], 'quiet tools icon-only: ' + JSON.stringify(quiet));
+        // V102.358: the quiet tools show their word again (owner: the row has room) — still slate, name also in aria-label
+        const quiet = await page.$$eval('#quiz-editor-review-actions .qe-tool.qe-quiet', bs => bs.map(b => [b.innerText.replace(/\s+/g, ' ').trim(), parseFloat(getComputedStyle(b).width) > 40, b.getAttribute('aria-label')]));
+        assert.deepEqual(quiet, [['PDF', true, 'Import from PDF'], ['Generate', true, 'Generate more questions'], ['Curate', true, 'Curate a new set'], ['Translate', true, 'Translate this question']], 'quiet tools icon + word: ' + JSON.stringify(quiet));
         // V102.344: Curate is a funnel icon (✦ read as a twin of 🪄 Generate more)
         assert.equal(await page.$eval('#quiz-editor-review-actions .qe-tool-curate > i', i => i.className), 'fa-solid fa-filter', 'Curate = funnel');
         assert.equal(await page.$eval('#quiz-editor-review-actions .qe-tool-review', b => b.innerText.trim()), 'Review', 'Review keeps its word (the one accent)');
