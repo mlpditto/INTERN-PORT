@@ -20,6 +20,7 @@ const fbMarkup = html.slice(fbStart,fbEnd);
   await page.evaluate(()=>{
    window.currentQuiz={questions:[{},{}]};window.currentStep=0;window.userAnswers=[0,null];
    window.QT_LANGS=[{code:'orig'},{code:'th'},{code:'en'}];window.QT_LANG_NAMES={th:'Thai',en:'English'};
+   window.QT_LANG_SHORT={en:'EN',th:'ไทย'};window.qtQuizSourceLang=()=>'en'; // V101.185: capsule labels + source language (defined next to QT_LANG_NAMES)
    window.qtGetSelectedLang=()=> 'orig';window.qtApplyTranslation=lang=>window.selectedLanguage=lang;
    window.jumpToQuizStep=step=>window.jumpedStep=step;
    window.quizzesCache=[{tags:'Drug interactions,drug interactions,Pharmacology'}];
@@ -39,7 +40,7 @@ const fbMarkup = html.slice(fbStart,fbEnd);
    ['        async function submitFeedback()', '        async function openFeedbackForPastAttempt(']
   ]) await page.addScriptTag({content:take(a,b)});
   await page.evaluate(()=>{
-   document.getElementById('quiz-run-container').innerHTML=renderQuizStepBullets()+qtRenderBar({})+'<div class="md-render">A patient asks about a recently started medicine. Which detail should be clarified?</div><label style="display:flex;border:1px solid #ddd;border-radius:8px"><input style="width:auto;flex:0 0 auto" type="radio" name="q-opt"><span style="min-width:0;text-align:left">Current medicines and supplements, including any recently started treatment.</span></label>';
+   document.getElementById('quiz-run-container').innerHTML=renderQuizStepBullets({})+'<div class="md-render">A patient asks about a recently started medicine. Which detail should be clarified?</div><label style="display:flex;border:1px solid #ddd;border-radius:8px"><input style="width:auto;flex:0 0 auto" type="radio" name="q-opt"><span style="min-width:0;text-align:left">Current medicines and supplements, including any recently started treatment.</span></label>';
    renderFeedbackTopicChips();setFbRating(null);
   });
   assert.equal(await page.locator('#fb-rating').inputValue(),'');

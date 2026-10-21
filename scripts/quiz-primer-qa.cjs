@@ -34,7 +34,7 @@ const setup = `
         const errors = []; page.on('pageerror', e => errors.push(e.message));
         await page.setContent('<style>' + css + '</style>' + quizModal);
         await page.addScriptTag({ content: setup });
-        await page.addScriptTag({ content: [fn('function quizStepIsAnswered('), fn('function renderQuizStepBullets('), fn('function updateTimerUI('), fn('function startQuizQuestionAfterPrimer('), fn('function renderQuizStep(')].join('\n') });
+        await page.addScriptTag({ content: [fn('function quizStepIsAnswered('), fn('function renderQuizStepBullets('), take('        const QZ_TIMER_STOPS', '        function quizTimerColors('), fn('function quizTimerColors('), fn('function updateTimerUI('), fn('function startQuizQuestionAfterPrimer('), fn('function renderQuizStep(')].join('\n') });
         const state = () => page.evaluate(() => ({
             text: document.getElementById('quiz-run-container').innerText, timer: document.getElementById('quiz-q-timer').innerText, badge: document.getElementById('quiz-q-type-badge').innerText,
             prev: getComputedStyle(document.getElementById('btn-quiz-prev')).display, next: getComputedStyle(document.getElementById('btn-quiz-next')).display, submit: getComputedStyle(document.getElementById('btn-quiz-submit')).display,
