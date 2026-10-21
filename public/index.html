@@ -13461,13 +13461,13 @@
         // answered = green, unanswered = outline. Read-only (Learning) quizzes
         // never reach this — renderQuizStep() returns early for those before
         // this is called.
-        // V101.185: one progress row — position · answered · skipped (left) and the language capsule (right) — over a bar with
-        // one segment per question (blue = here, green = answered, grey = not yet; tap = jump). Replaces the "Questions" map.
-        // "Skipped" = a question BEHIND you with no answer. ≤360px the left side shortens to "5/15 · 3✓ · 1 skipped" (CSS).
+        // V101.185: one progress row — position · skipped (left) and the language capsule (right) — over a bar with one
+        // segment per question (blue = here, green = answered, grey = not yet; tap = jump). Replaces the "Questions" map.
+        // No answered count: the green segments already say it. "Skipped" = a question BEHIND you with no answer.
+        // ≤360px the left side shortens to "5/15 · 1 skipped" (CSS).
         function renderQuizStepBullets(question) {
             if (!currentQuiz || !currentQuiz.questions || !currentQuiz.questions.length) return '';
             const n = currentQuiz.questions.length;
-            const done = currentQuiz.questions.filter((_, i) => quizStepIsAnswered(i)).length;
             const skipped = currentQuiz.questions.filter((_, i) => i < currentStep && !quizStepIsAnswered(i)).length;
             const skip = skipped ? ` · <span class="qz-skip">${skipped} skipped</span>` : '';
             const segs = currentQuiz.questions.map((_, idx) => {
@@ -13475,7 +13475,7 @@
                 const state = idx === currentStep ? 'current' : (cls ? 'answered' : 'not answered');
                 return `<button type="button" class="${cls}" onclick="jumpToQuizStep(${idx})" title="Question ${idx + 1} · ${state}" aria-label="Question ${idx + 1}, ${state}"${idx === currentStep ? ' aria-current="step"' : ''}></button>`;
             }).join('');
-            return `<div class="qz-prog"><div class="qz-count"><span class="qz-long">Question <b>${currentStep + 1}</b> / ${n}</span><span class="qz-long">${done} answered${skip}</span><span class="qz-short"><b>${currentStep + 1}</b>/${n} · ${done}✓${skip}</span></div>${qtRenderBar(question)}</div><div class="qz-seg" role="group" aria-label="Questions">${segs}</div>`;
+            return `<div class="qz-prog"><div class="qz-count"><span class="qz-long">Question <b>${currentStep + 1}</b> / ${n}</span>${skipped ? `<span class="qz-long qz-skip">${skipped} skipped</span>` : ''}<span class="qz-short"><b>${currentStep + 1}</b>/${n}${skip}</span></div>${qtRenderBar(question)}</div><div class="qz-seg" role="group" aria-label="Questions">${segs}</div>`;
         }
 
         function renderQuizStep(useExistingTime = false) {

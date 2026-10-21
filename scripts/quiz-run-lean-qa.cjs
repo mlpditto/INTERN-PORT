@@ -1,7 +1,7 @@
 // V101.185: lean quiz runner (mockup C, picked 2026-10-21). The REAL public/index.html renderQuizStep on a phone
 // (file://, network blocked, Firebase stubbed): one progress row (position · answered · skipped | language capsule) over a
-// tap-to-jump segment bar; capsule in each language's own script without a duplicate of the quiz's own language;
-// type tag only for non-choice questions; ‹ Previous; ≤360px the short "5/15 · 3✓ · 1 skipped" with nothing overlapping.
+// tap-to-jump segment bar (no answered count — the green segments say it); capsule in each language's own script without a duplicate of the quiz's own language;
+// type tag only for non-choice questions; ‹ Previous; ≤360px the short "5/15 · 1 skipped" with nothing overlapping.
 const path = require('node:path'), fs = require('node:fs'), assert = require('node:assert/strict');
 const { pathToFileURL } = require('node:url');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -58,7 +58,7 @@ const answers = Array(15).fill(null); answers[0] = 2; answers[2] = 0; answers[3]
             };
         });
         assert.equal(r.map, 0, 'old counter + "Questions" map gone');
-        assert.deepEqual(r.long, ['Question 5 / 15', '3 answered · 1 skipped'], 'position · answered · skipped: ' + JSON.stringify(r.long));
+        assert.deepEqual(r.long, ['Question 5 / 15', '1 skipped'], 'position, then skipped on its own line; no answered count (the bar shows it): ' + JSON.stringify(r.long));
         assert.equal(r.segs, 'ok,-,ok,ok,cur,' + Array(10).fill('-').join(','), 'segments: answered green, current blue');
         assert.equal(r.cur, 4, 'aria-current on the current segment');
         assert.deepEqual(r.cap, ['EN*', 'ไทย', '한', '日', '中'], 'capsule in each script, original first: ' + r.cap);
@@ -86,7 +86,7 @@ const answers = Array(15).fill(null); answers[0] = 2; answers[2] = 0; answers[3]
                 countRight: g('.qz-count').right, capLeft: g('.qz-cap').left, capRight: g('.qz-cap').right, rowRight: g('.qz-prog').right, countH: g('.qz-count').height,
                 over: document.querySelector('#quizModal .modal-content').scrollWidth - document.querySelector('#quizModal .modal-content').clientWidth };
         });
-        assert.equal(n.short, '5/15 · 3✓ · 1 skipped', 'short form: ' + n.short);
+        assert.equal(n.short, '5/15 · 1 skipped', 'short form: ' + n.short);
         assert.ok(n.shortShown !== 'none' && n.longShown === 'none', 'short form shown, long hidden: ' + n.shortShown + '/' + n.longShown);
         assert.ok(n.countRight <= n.capLeft + 0.5 && n.capRight <= n.rowRight + 0.5, 'text and capsule side by side, no overlap: ' + JSON.stringify(n));
         assert.ok(n.countH < 22, 'one line: ' + n.countH);
