@@ -52,7 +52,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.ok(/Recent/.test(m.sortTitle), 'ONE sort button: ' + m.sortTitle);
         assert.equal(m.cards, 3, 'the 10/10-no-comment entry stays out of All'); assert.equal(m.details, 0, 'no Details / Manage fold'); assert.ok(!m.bonusWord, 'the green badge no longer says "Bonus +x"');
         assert.ok(/📝 \+2\.4/.test(m.c1) && /⏰ 179d/.test(m.c1) && /🎯 ชุดข้อสอบ/.test(m.c1) && /🗡️ 8\.0/.test(m.c1), 'kaen: 📝 +2.4 (the quiz score), ⏰ 179d, 🎯 topic, 🗡️ 8.0: ' + m.c1);
-        assert.ok(/ef4444|rgb\(239, 68, 68\)/.test(m.c1Edge) && /training ended \d{4}-\d{2}-\d{2} · feedback given \d{4}-\d{2}-\d{2} \(179 days ago\) · no add-on credited/.test(m.c1Tip), 'red edge + the tooltip says why: ' + m.c1Edge + ' / ' + m.c1Tip);
+        assert.ok(/fca5a5|rgb\(252, 165, 165\)/.test(m.c1Edge) && /training ended \d{4}-\d{2}-\d{2} · feedback given \d{4}-\d{2}-\d{2} \(179 days ago\) · no add-on credited/.test(m.c1Tip), 'thin red edge (V102.357) + the tooltip says why: ' + m.c1Edge + ' / ' + m.c1Tip);
         assert.ok(/🕒 45d/.test(m.c2 + ' ') || /🕒 45d/.test(m.c2), 'still in training + old: a grey 🕒 45d: ' + m.c2); assert.ok(!/⏰/.test(m.c2));
         assert.ok(/🎁 \+0\.50/.test(m.c3) && m.c3NoSig, 'credited: shows 🎁 +0.50 and no signal: ' + m.c3);
         assert.ok(!m.over, 'nothing overflows');
