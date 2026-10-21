@@ -107,7 +107,7 @@ assert.match((await page.textContent('#sch-week .sch-rg h4')).trim(), /^\d{1,2}[
     assert.equal(await page.evaluate(() => new Set(Object.values(SCH_KIND_COL)).size), 5, 'five distinct kind colours');
     const ring = n => page.evaluate(n => { const e = document.querySelector('#sch-week [data-schday="' + __key(n) + '"] .sch-n'); return e ? getComputedStyle(e).backgroundImage : null; }, n);
     await goTo(page, 0); const rToday = await ring(0);
-    for (const c of ['rgba(245, 158, 11, 0.3)', 'rgba(20, 184, 166, 0.3)', 'rgba(148, 163, 184, 0.3)']) assert.ok(rToday.includes(c), 'today ring has the pale ' + c + ': ' + rToday);
+    for (const c of ['rgba(245, 158, 11, 0.2)', 'rgba(20, 184, 166, 0.2)', 'rgba(148, 163, 184, 0.2)'])   // V101.183: pale 30 % → 20 % assert.ok(rToday.includes(c), 'today ring has the pale ' + c + ': ' + rToday);
     assert.ok(!rToday.includes('rgb(245, 158, 11)'), 'nothing is done today, so no dark journal segment');
     await goTo(page, -1); const rYest = await ring(-1);
     assert.ok(rYest.includes('rgb(99, 102, 241)') && !rYest.includes('rgba(99'), 'yesterday: ONE full dark quiz ring: ' + rYest);
@@ -266,7 +266,7 @@ assert.match((await page.textContent('#sch-week .sch-rg h4')).trim(), /^\d{1,2}[
     for (const w of ['Quiz', 'Journal', 'Case', 'Event', 'วงแหวน', 'ทำแล้ว', 'ยังต้องทำ', '✎', 'Goals', 'Heatmap', 'Missed']) assert.ok(help.includes(w), 'help mentions ' + w);
     const legend = await page.locator('#ip-help-dialog .ip-help-dots .ip-hdot').evaluateAll(d => d.map(x => getComputedStyle(x).backgroundColor));
     assert.equal(new Set(legend).size, 5, 'the legend carries the five dot colours: ' + legend.join(' '));
-    assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('#ip-help-dialog .ip-light')).backgroundColor), 'rgba(100, 116, 139, 0.3)', 'the pale sample = the to-do segment');
+    assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('#ip-help-dialog .ip-light')).backgroundColor), 'rgba(100, 116, 139, 0.2)', 'the pale sample = the to-do segment (V101.183: 20 %)');
     const hb = await page.locator('#ip-help-dialog').boundingBox();
     assert.ok(hb.height < 620 && hb.width <= 412, 'short card that fits a phone: ' + JSON.stringify(hb));
     assert.ok(help.length < 600, 'about half the old text: ' + help.length);
