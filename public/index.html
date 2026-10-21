@@ -13717,17 +13717,24 @@
         function updateTimerUI() {
             const el = document.getElementById('quiz-q-timer');
             if (!el) return;
+            // V101.185: the pill fades in as time runs out — --tl-urge 0 (all the time left: faint) → 1 (none left: deep orange);
+            // the last 30 s (whole quiz) / 10 s (per question) turn red (data-urgent). Colours live in quiz-user-focus.css.
+            const totalTime = currentQuiz && currentQuiz.timerMode === 'total_time';
+            const q = currentQuiz && currentQuiz.questions ? currentQuiz.questions[currentStep] : null;
+            const full = totalTime ? (Number(currentQuiz.totalTimer) || 300) : ((q && Number(q.timer)) || 60) + (lastBonusTime || 0);
+            el.style.setProperty('--tl-urge', Math.max(0, Math.min(1, 1 - timeLeftForStep / full)).toFixed(3));
+            el.style.color = '';
             // 🔥 V78.1: Format differently for total time mode
-            if (currentQuiz && currentQuiz.timerMode === 'total_time') {
+            if (totalTime) {
                 const mins = Math.floor(timeLeftForStep / 60);
                 const secs = timeLeftForStep % 60;
                 el.innerText = `⏱ ${mins}:${secs.toString().padStart(2, '0')}`;
-                el.style.color = timeLeftForStep <= 30 ? '#ef233c' : '#e67e22';
+                el.toggleAttribute('data-urgent', timeLeftForStep <= 30);
                 el.style.fontSize = '1.3em';
             } else {
                 const bonusText = lastBonusTime > 0 ? ` (+${lastBonusTime}s)` : "";
                 el.innerHTML = `⏱ ${timeLeftForStep}s${bonusText ? `<span style="font-size:0.6em; color:#2ec4b6; margin-left:3px; vertical-align:middle;">${bonusText}</span>` : ""}`;
-                el.style.color = timeLeftForStep <= 10 ? '#ef233c' : '';
+                el.toggleAttribute('data-urgent', timeLeftForStep <= 10);
                 el.style.fontSize = '1.2em';
             }
         }
