@@ -61,7 +61,7 @@ const answers = Array(15).fill(null); answers[0] = 2; answers[2] = 0; answers[3]
         assert.deepEqual(r.long, ['Question 5 / 15', '1 skipped'], 'position, then skipped on its own line; no answered count (the bar shows it): ' + JSON.stringify(r.long));
         assert.equal(r.segs, 'ok,-,ok,ok,cur,' + Array(10).fill('-').join(','), 'segments: answered green, current blue');
         assert.equal(r.cur, 4, 'aria-current on the current segment');
-        assert.deepEqual(r.cap, ['EN*', 'ไทย', '한', '日', '中'], 'capsule in each script, original first: ' + r.cap);
+        assert.deepEqual(r.cap, ['🇺🇸*', '🇹🇭', '🇰🇷', '🇯🇵', '🇨🇳'], 'capsule = flags only, original (source) first: ' + r.cap);   // V101.186
         assert.ok(!r.capNames.includes('English'), 'no duplicate English chip on an English quiz');
         assert.ok(!r.langLabel, 'no "Language" word');
         assert.equal(r.badge, '', 'no CHOICE tag on a choice question');
@@ -114,8 +114,8 @@ const answers = Array(15).fill(null); answers[0] = 2; answers[2] = 0; answers[3]
         // a Thai quiz: the original chip says ไทย and there is no separate Thai chip
         ({ page, ctx } = await open(browser, 390, TH, 0, [null, null]));
         const th = await page.evaluate(() => [...document.querySelectorAll('.qz-cap button')].map(b => b.textContent));
-        assert.deepEqual(th, ['ไทย', 'EN', '한', '日', '中'], 'Thai quiz capsule: ' + th);
+        assert.deepEqual(th, ['🇹🇭', '🇺🇸', '🇰🇷', '🇯🇵', '🇨🇳'], 'Thai quiz capsule: ' + th);
         await ctx.close();
-        console.log('PASS: quiz-run lean C — one progress row + language capsule (own scripts, no duplicate), tap-to-jump segments, skipped count, CHOICE tag hidden, ‹ Previous, 320px short form without overlap');
+        console.log('PASS: quiz-run lean C — one progress row + language capsule (flags, no duplicate), tap-to-jump segments, skipped count, CHOICE tag hidden, ‹ Previous, 320px short form without overlap');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

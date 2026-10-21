@@ -19,8 +19,8 @@ const fbMarkup = html.slice(fbStart,fbEnd);
   await page.setContent('<style>'+css+'</style>'+quiz+fbMarkup);
   await page.evaluate(()=>{
    window.currentQuiz={questions:[{},{}]};window.currentStep=0;window.userAnswers=[0,null];
-   window.QT_LANGS=[{code:'orig'},{code:'th'},{code:'en'}];window.QT_LANG_NAMES={th:'Thai',en:'English'};
-   window.QT_LANG_SHORT={en:'EN',th:'ไทย'};window.qtQuizSourceLang=()=>'en'; // V101.185: capsule labels + source language (defined next to QT_LANG_NAMES)
+   window.QT_LANGS=[{code:'orig',label:'⭕'},{code:'th',label:'🇹🇭'},{code:'en',label:'🇺🇸'}];window.QT_LANG_NAMES={th:'Thai',en:'English'};
+   window.qtQuizSourceLang=()=>'en'; // V101.185: source language (defined next to QT_LANG_NAMES); V101.186: labels are the QT_LANGS flags
    window.qtGetSelectedLang=()=> 'orig';window.qtApplyTranslation=lang=>window.selectedLanguage=lang;
    window.jumpToQuizStep=step=>window.jumpedStep=step;
    window.quizzesCache=[{tags:'Drug interactions,drug interactions,Pharmacology'}];
