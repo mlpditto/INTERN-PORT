@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.360)</title>
+    <title>Nika Admin (V102.361)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -18896,8 +18896,37 @@
             { key: 'clinicalDepth', label: 'Clinical Depth', dupRank: 3, tieShort: 'Clinical', example: 5,
               desc: 'Clinical reasoning required: 1 = pure factoid, 3 = single-step clinical inference, 5 = multi-step synthesis (diagnose + plan)' },
             { key: 'languageConsistency', label: 'Language Consistency', dupLabel: 'Language', dupRank: 7, example: 5,
-              desc: 'Polish and consistency: 1 = mixed languages / typos / jargon errors, 5 = clean polished prose throughout' }
+              desc: 'Polish and consistency: 1 = mixed languages / typos / jargon errors, 5 = clean polished prose throughout' },
+            // V102.361: the Read first page (questions[i].primer) is read BEFORE the timer, and its ✨ draft never saw the key —
+            // the audit is the one reader that does see the key, so it is the place to catch a page that hints at the answer.
+            // Optional: a question without a Read first gets null (never a 1) and the average runs over the scored dimensions.
+            { key: 'readFirst', label: 'Read first', suggestLabel: 'Read first (pre-question page: prepares without hinting)', dupLabel: '📖', dupRank: 8, tieShort: 'อ่านก่อน', example: 4, optional: true,
+              desc: ['The READ FIRST page shown before this question. null when the question has none — never score a missing one.',
+                     '1 = gives the answer away, hints which option is right, or is off-topic,',
+                     '3 = relevant but thin — misses a term or concept the stem relies on, or too long (over ~120 words),',
+                     '5 = exactly the background + terms needed to attempt the question, with no hint at the key'] }
         ];
+
+        // V102.361: free checks on a question's Read first for the Scorecard 📖 badge (no model needed):
+        // none · leak (a correct option repeated verbatim) · hint (answer-giving words) · short (< 40 chars) · ok.
+        window.auditPrimerCheck = function(question) {
+            const text = String((question && question.primer) || '').trim();
+            if (!text) return { kind: 'none', label: '—', color: '#94a3b8', tip: 'No Read first for this question' };
+            const low = text.toLowerCase();
+            const correct = Array.isArray(question.correct) ? question.correct : [question.correct];
+            const leak = correct.map(i => String((question.options || [])[i] || '').trim()).find(o => o.length >= 4 && low.includes(o.toLowerCase()));
+            if (leak) return { kind: 'leak', label: '⚠ leak', color: '#b91c1c', tip: 'Repeats a correct option verbatim: "' + leak.slice(0, 60) + '"' };
+            if (/คำตอบ(ที่ถูก|คือ)|ถูกต้องคือ|เฉลย|the answer is|correct (option|answer) is/i.test(text)) return { kind: 'hint', label: '⚠ hint', color: '#b91c1c', tip: 'Uses answer-giving words (คำตอบ / เฉลย / the answer is)' };
+            if (text.length < 40) return { kind: 'short', label: '✂ short', color: '#a16207', tip: 'Shorter than 40 characters (' + text.length + ')' };
+            return { kind: 'ok', label: '✓', color: '#15803d', tip: text.length + ' characters · no verbatim correct option, no answer-giving words' };
+        };
+        // V102.361: the model echoes the JSON keys in its Thai rationale ("bloomLevel/clinicalDepth ต่ำสุด (2)") — show the
+        // dimension names instead. Display-side, so it holds for every model and for audits saved before this.
+        window.auditHumanizeRationale = function(text) {
+            let s = String(text || '');
+            (window.AUDIT_DIMS || []).forEach(d => { s = s.replace(new RegExp('\\b' + d.key + '\\b', 'g'), d.label); });
+            return s;
+        };
 
         // Numbered rubric block for the audit prompt. Keys are padded to a fixed column so
         // every description starts in the same place, and a multi-line desc continues under
@@ -19491,11 +19520,15 @@
             const rows = result && result.perQuestionAudit;
             const dims = window.AUDIT_DIMS.map(d => d.key);
             if (!Array.isArray(rows) || rows.length !== questionCount || !rows.length) throw new Error('Audit must include every question.');
+            const optional = new Set(window.AUDIT_DIMS.filter(d => d.optional).map(d => d.key));   // V102.361: readFirst may be null
             rows.forEach((row, index) => {
-                if (row.qNumber !== index + 1 || !row.scores || dims.some(key => !Number.isInteger(row.scores[key]) || row.scores[key] < 1 || row.scores[key] > 5)) {
+                const blank = key => row.scores[key] === null || row.scores[key] === undefined || row.scores[key] === '';
+                if (row.qNumber !== index + 1 || !row.scores || dims.some(key => (optional.has(key) && blank(key)) ? false : (!Number.isInteger(row.scores[key]) || row.scores[key] < 1 || row.scores[key] > 5))) {
                     throw new Error('Audit contains missing or invalid question scores.');
                 }
-                row.averageScore = Math.round(dims.reduce((sum, key) => sum + row.scores[key], 0) / dims.length * 10) / 10;
+                optional.forEach(key => { if (blank(key)) row.scores[key] = null; });
+                const scored = dims.filter(key => !blank(key));
+                row.averageScore = Math.round(scored.reduce((sum, key) => sum + row.scores[key], 0) / scored.length * 10) / 10;
             });
             result.overallScore = Math.round(rows.reduce((sum, row) => sum + row.averageScore, 0) / rows.length * 10) / 10;
         };
@@ -19769,7 +19802,8 @@
                         const optsList = (q.options || []).map((o, oi) => `    ${String.fromCharCode(65 + oi)}. ${o}`).join('\n');
                         const correctIdx = Array.isArray(q.correct) ? q.correct : [q.correct];
                         const correctLabels = correctIdx.map(c => String.fromCharCode(65 + c)).join(',');
-                        return `Q${i + 1} (${q.type}): ${q.q}\n${optsList}\n  correct: ${correctLabels}`;
+                        const primerLine = q.primer && String(q.primer).trim() ? `\n  read first: ${String(q.primer).replace(/\s+/g, ' ').trim().slice(0, 900)}` : '\n  read first: (none)';   // V102.361
+                        return `Q${i + 1} (${q.type}): ${q.q}\n${optsList}\n  correct: ${correctLabels}${primerLine}`;
                     }).join('\n\n');
 
                     const prompt = `You are a Quality Auditor for medical-education multiple-choice questions.
@@ -19796,7 +19830,7 @@ OUTPUT FORMAT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
 
 RULES:
 - "rationale" MUST be in Thai (admin-facing).
-- Scores are INTEGERS 1-5 only. averageScore = mean of the ${window.AUDIT_DIMS.length} scores rounded to 1 decimal.
+- Scores are INTEGERS 1-5 only, except "readFirst": null when the question has no "read first:" text (candidates with no such line → null). averageScore = mean of the scored dimensions rounded to 1 decimal.
 - overallScore = mean of all perQuestionAudit[].averageScore rounded to 1 decimal.
 - "detectedBloomName" is one of: Remember, Understand, Apply, Analyze, Evaluate, Create (descriptive label of the bloomLevel score).
 - If you score "keyDefensibility" 1 or 2, the rationale MUST name the option letter you believe is correct and why — a bare "the key looks wrong" is not actionable.
@@ -19829,7 +19863,7 @@ RULES:
                 result.perQuestionAudit.forEach(a => {
                     const scores = a.scores || {};
                     let weakestDim = null, weakestVal = 99;
-                    Object.keys(scores).forEach(k => { const v = Number(scores[k]); if (!isNaN(v) && v < weakestVal) { weakestVal = v; weakestDim = k; } });
+                    Object.keys(scores).forEach(k => { if (scores[k] === null || scores[k] === undefined || scores[k] === '') return; const v = Number(scores[k]); if (!isNaN(v) && v < weakestVal) { weakestVal = v; weakestDim = k; } });
                     window._lastAuditByQ[a.qNumber] = { rationale: a.rationale || '', weakestDim, weakestVal: weakestVal === 99 ? null : weakestVal };
                 });
                 // V97.14: also stash the FULL per-question scores (all 5 dims), tagged
@@ -20030,6 +20064,7 @@ RULES:
                 return '<span style="color:#fbbf24; letter-spacing:1px;">' + '★'.repeat(v) + '<span style="color:#cbd5e1;">' + '☆'.repeat(5 - v) + '</span></span>';
             };
             const dimLabel = window.auditDimLabels('label');
+            const optionalDims = new Set((window.AUDIT_DIMS || []).filter(d => d.optional).map(d => d.key));   // V102.361
             const overall = Number(result.overallScore || 0).toFixed(1);
             const overallColor = result.overallScore >= 4 ? '#15803d' : result.overallScore >= 3 ? '#a16207' : '#b91c1c';
 
@@ -20053,12 +20088,18 @@ RULES:
                             : ` <span style="color:#b91c1c; font-weight:700; font-size:0.85em;" title="blueprint expected ${escapeHtml(blueprintBloom)}, detected ${escapeHtml(q.detectedBloomName)}">⚠</span>`;
                     } else if (k === 'bloomLevel' && q.detectedBloomName) {
                         badge = ` <span style="color:#64748b; font-size:0.8em;">(${escapeHtml(q.detectedBloomName)})</span>`;
+                    } else if (k === 'readFirst' && questions && questions[q.qNumber - 1]) {
+                        // V102.361: the free rule check (none · leak · hint · short · ok) sits beside the model's score
+                        const pc = window.auditPrimerCheck(questions[q.qNumber - 1]);
+                        badge = ` <span class="audit-primer-${pc.kind}" style="color:${pc.color}; font-weight:700; font-size:0.85em; cursor:help;" title="${escapeHtml(pc.tip)}">${pc.label}</span>`;
                     }
                     return `<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid #f1f5f9; font-size:0.85em;">
                         <span style="color:#475569; font-weight:500;">${dimLabel[k]}${badge}</span>
                         ${scored
                             ? `<span>${stars(v)} <span style="color:#475569; font-weight:700; margin-left:6px;">${v}</span></span>`
-                            : `<span style="color:#94a3b8; font-size:0.9em;" title="This audit ran before the ${escapeHtml(dimLabel[k])} dimension existed — re-run ✅ Audit to score it.">— not in this audit</span>`}
+                            : optionalDims.has(k)
+                                ? `<span style="color:#94a3b8; font-size:0.9em;" title="Not scored — this question has no Read first (or this audit ran before the dimension existed)">— no Read first</span>`
+                                : `<span style="color:#94a3b8; font-size:0.9em;" title="This audit ran before the ${escapeHtml(dimLabel[k])} dimension existed — re-run ✅ Audit to score it.">— not in this audit</span>`}
                     </div>`;
                 }).join('');
                 const avg = Number(q.averageScore || 0).toFixed(1);
@@ -20102,7 +20143,7 @@ RULES:
                     ${dupChipsHtml}
                     ${previewHtml}
                     ${dimRows}
-                    ${q.rationale ? `<div class="lang-no-toggle" style="margin-top:10px; padding:8px 12px; background:#f8fafc; border-left:3px solid #0891b2; border-radius:6px; font-size:0.85em; color:#334155; line-height:1.55;"><i class="fa-solid fa-message" style="color:#0891b2; margin-right:6px;"></i>${escapeHtml(q.rationale)}</div>` : ''}
+                    ${q.rationale ? `<div class="lang-no-toggle" style="margin-top:10px; padding:8px 12px; background:#f8fafc; border-left:3px solid #0891b2; border-radius:6px; font-size:0.85em; color:#334155; line-height:1.55;"><i class="fa-solid fa-message" style="color:#0891b2; margin-right:6px;"></i>${escapeHtml(window.auditHumanizeRationale(q.rationale))}</div>` : ''}
                     ${Number(q.averageScore) < 4 ? `<div style="margin-top:10px; text-align:right;">
                         ${auditFixButtonHtml(Number(q.qNumber) || 0)}
                     </div>` : ''}
@@ -20203,7 +20244,7 @@ RULES:
             full.result.perQuestionAudit.forEach(a => {
                 const scores = a.scores || {};
                 let weakestDim = null, weakestVal = 99;
-                Object.keys(scores).forEach(k => { const v = Number(scores[k]); if (!isNaN(v) && v < weakestVal) { weakestVal = v; weakestDim = k; } });
+                Object.keys(scores).forEach(k => { if (scores[k] === null || scores[k] === undefined || scores[k] === '') return; const v = Number(scores[k]); if (!isNaN(v) && v < weakestVal) { weakestVal = v; weakestDim = k; } });
                 window._lastAuditByQ[a.qNumber] = { rationale: a.rationale || '', weakestDim, weakestVal: weakestVal === 99 ? null : weakestVal };
                 window._lastAuditScoresByQ[a.qNumber] = scores;
             });
@@ -21423,7 +21464,7 @@ OUTPUT FORMAT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
 
 RULES:
 - "rationale" MUST be in Thai (admin-facing).
-- Scores are INTEGERS 1-5 only. averageScore = mean of the ${window.AUDIT_DIMS.length} scores rounded to 1 decimal.
+- Scores are INTEGERS 1-5 only, except "readFirst": null when the question has no "read first:" text (candidates with no such line → null). averageScore = mean of the scored dimensions rounded to 1 decimal.
 - "detectedBloomName" is one of: Remember, Understand, Apply, Analyze, Evaluate, Create.
 - A question may have more than one correct option (all listed after "correct:"); judge the key as a set.
 - If you score "keyDefensibility" 1 or 2, the rationale MUST name the option letter you believe is correct and why.
@@ -21464,7 +21505,7 @@ RULES:
                     <summary style="cursor:pointer; color:#475569; font-weight:600;">${keys.length} dimensions · lowest ${escapeHtml(dims[low])} ${Number(scores[low])}</summary>
                     <div style="margin-top:6px;">${rows}</div>
                 </details>
-                ${entry.rationale ? `<div style="margin:-4px 0 12px; padding:8px 12px; background:#f8fafc; border-left:3px solid #0891b2; border-radius:6px; font-size:0.85em; color:#334155; line-height:1.55;">💬 ${escapeHtml(entry.rationale)}</div>` : ''}`;
+                ${entry.rationale ? `<div style="margin:-4px 0 12px; padding:8px 12px; background:#f8fafc; border-left:3px solid #0891b2; border-radius:6px; font-size:0.85em; color:#334155; line-height:1.55;">💬 ${escapeHtml(window.auditHumanizeRationale(entry.rationale))}</div>` : ''}`;
             return true;
         };
 

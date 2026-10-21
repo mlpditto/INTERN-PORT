@@ -126,7 +126,7 @@ const rail = slice('        window.browseAuditProvider = function', '        win
         assert.match((await page.locator('#ai-sugg-score-all').textContent()).replace(/\s+/g, ' '), /Score again · Sol 6/);
         const call = await page.evaluate(() => ({ model: calls[0][0], isJson: calls[0][2], feature: calls[0][5].feature, prompt: calls[0][1], n: calls.length }));
         assert.equal(call.n, 1); assert.equal(call.model, 'gpt-6-sol'); assert.equal(call.isJson, true); assert.equal(call.feature, 'quiz_suggest_score');
-        assert.match(call.prompt, /RUBRIC — score each question on 7 dimensions/);
+        assert.match(call.prompt, /RUBRIC — score each question on 8 dimensions/);   // V102.361: + readFirst (null for candidates)
         assert.match(call.prompt, /Q2 \(choice\): Q two stem — choose TWO[\s\S]*correct: A,C/);
         assert.match(call.prompt, /"perQuestionAudit"/);
         assert.match(await page.locator('#ai-sugg-avg-0').innerText(), /4\.0/);
