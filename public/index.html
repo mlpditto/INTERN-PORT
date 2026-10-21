@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.180)</title>
+    <title>Internship Portfolio (V101.181)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.171">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -2418,9 +2418,9 @@
 <script src="monthly-progress.js?v=V101.79"></script><link rel="stylesheet" href="monthly-progress.css?v=V101.39">
 <script src="assigned-goals.js?v=V100.30"></script><link rel="stylesheet" href="assigned-goals.css?v=V100.30">
 <link rel="stylesheet" href="quiz-user-focus.css?v=V101.96"><script defer src="quiz-feedback-lang.js?v=V101.96"></script><script defer src="quiz-feedback-ai.js?v=V101.96"></script><script defer src="quiz-feedback-remind.js?v=V101.176"></script>
-<link rel="stylesheet" href="quiz-cover.css?v=V100.57">
+<link rel="stylesheet" href="quiz-cover.css?v=V101.181">
 <link rel="stylesheet" href="case-insight-rail.css?v=V101.59">
-<script src="quiz-cover.js?v=V101.09"></script>
+<script src="quiz-cover.js?v=V101.181"></script>
 <script src="activity-rewards.js?v=V101.84"></script><link rel="stylesheet" href="activity-rewards.css?v=V101.43">
 <script src="peds-dosing.js?v=V101.62"></script><script src="flood-watch.js?v=V101.150"></script><script src="history-news.js?v=V101.137"></script><link rel="stylesheet" href="flood-watch.css?v=V101.148">
 </head>
@@ -11631,9 +11631,11 @@
             const stacks = document.querySelectorAll('.quiz-avatar-stack');
             if (!stacks.length) return;
 
-            for (const stackEl of stacks) {
+            // V101.181: counts load in parallel and the cover folds are settled once all are known (QuizCover.settleFresh).
+            const results = await Promise.all(Array.from(stacks, async stackEl => {
                 const quizId = stackEl.dataset.quizId;
-                if (!quizId) continue;
+                if (!quizId) return null;
+                const card = stackEl.closest('.assignment-card');
 
                 try {
                     // Fetch completed attempts for this quiz
@@ -11660,12 +11662,15 @@
                         // person-placeholder was noise on every fresh quiz card).
                         stackEl.innerHTML = '';
                     }
+                    return { card, n };
 
                 } catch (error) {
                     console.error(`Error loading avatars for quiz ${quizId}:`, error);
                     stackEl.innerHTML = '';
+                    return { card, n: null };
                 }
-            }
+            }));
+            QuizCover.settleFresh(results.filter(Boolean));
         }
 
         let quizTimerInterval = null;
