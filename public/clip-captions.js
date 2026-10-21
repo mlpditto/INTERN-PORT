@@ -3,6 +3,9 @@
 // chunks timed across the clip. In the app the band follows the player (CC on/off, remembered); "⬇ MP4 + ซับ" burns
 // the same band into a new file in the browser: the clip plays once into a canvas (+ its own audio), MediaRecorder
 // writes MP4 where the browser can, WebM otherwise. Nothing is uploaded; the saved clip is untouched.
+// V102.354 · 🔊 Thai voice: Gemini TTS (the proxy's cloud_tts — Google Cloud Text-to-Speech, th-TH) reads the same Thai
+// caption; it replaces the clip's own audio in the app (in sync with the player) and in the export. A voice longer than
+// the clip is sped up to ×1.35 at most (pitch kept); the caption cues follow the voice's length.
 (function () {
     'use strict';
     const CC_KEY = 'glc_cc';
@@ -66,8 +69,9 @@
 
     // the in-app band: follows the player; CC toggles it (remembered)
     function attach(video, band, list, ccBtn) {
-        if (!video || !band) return;
-        const paint = () => { const t = ccOn() ? cueAt(list, video.currentTime || 0) : ''; band.textContent = t; band.hidden = !t; };
+        if (!video || !band) return null;
+        const get = typeof list === 'function' ? list : () => list;
+        const paint = () => { const t = ccOn() ? cueAt(get(), video.currentTime || 0) : ''; band.textContent = t; band.hidden = !t; };
         ['timeupdate', 'seeked', 'loadedmetadata', 'play'].forEach(ev => video.addEventListener(ev, paint));
         if (ccBtn) {
             const mark = () => { const on = ccOn(); ccBtn.classList.toggle('on', on); ccBtn.setAttribute('aria-pressed', String(on)); };
@@ -75,6 +79,7 @@
             mark();
         }
         paint();
+        return { paint };
     }
 
     // wrap lines inside `maxW` without splitting a word
@@ -116,8 +121,9 @@
         return want.find(t => MediaRecorder.isTypeSupported(t)) || '';
     }
 
-    // ⬇ MP4 + ซับ: play the clip once into a canvas with the band, record it with the clip's own audio
-    async function burn(src, list, fileBase, onProgress) {
+    // ⬇ MP4 + ซับ: play the clip once into a canvas with the band, record it with the clip's own audio — or, with
+    // `voice` ({url, rate}), with the Thai voice instead
+    async function burn(src, list, fileBase, onProgress, voice) {
         if (typeof MediaRecorder === 'undefined') throw new Error('This browser cannot record video — try Chrome or Edge on a computer');
         let url = src, made = null;
         if (!/^(data|blob):/.test(String(src))) {   // a Storage URL: same-origin blob, so the canvas is not tainted
@@ -134,13 +140,18 @@
         canvas.width = W; canvas.height = H;
         const g = canvas.getContext('2d');
         const stream = canvas.captureStream(30);
-        let ac = null;
-        try {   // the clip's audio goes to the recording only (not the speakers)
+        let ac = null, va = null;
+        if (voice && voice.url) {
+            va = new Audio(); va.src = voice.url; va.preload = 'auto'; va.playbackRate = voice.rate || 1; va.preservesPitch = true;
+            await new Promise((res, rej) => { va.onloadedmetadata = res; va.onerror = () => rej(new Error('Could not read the Thai voice')); });
+        }
+        try {   // the chosen audio goes to the recording only (not the speakers)
             ac = new (window.AudioContext || window.webkitAudioContext)();
             const dest = ac.createMediaStreamDestination();
-            ac.createMediaElementSource(v).connect(dest);
+            ac.createMediaElementSource(va || v).connect(dest);
             dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
         } catch (e) { ac = null; }
+        if (va) v.muted = true;
         const type = recType();
         const rec = new MediaRecorder(stream, Object.assign({ videoBitsPerSecond: 6000000 }, type ? { mimeType: type } : {}));
         const parts = [];
@@ -154,25 +165,108 @@
         drawFrame(g, v, W, H, cueAt(list, 0));
         rec.start(250);
         await v.play();
+        if (va) va.play().catch(() => {});
         step();
         await new Promise(r => { v.onended = r; });
         drawFrame(g, v, W, H, cueAt(list, (v.duration || 0) - 0.01));
         await new Promise(r => setTimeout(r, 120));
         rec.stop();
         await stopped;
+        if (va) va.pause();
         if (ac) ac.close().catch(() => {});
         if (made) URL.revokeObjectURL(made);
         const blob = new Blob(parts, { type: (rec.mimeType || type || 'video/webm').split(';')[0] });
         const ext = /mp4/.test(blob.type) ? 'mp4' : 'webm';
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = (fileBase || 'clip') + '-th.' + ext;
+        a.download = (fileBase || 'clip') + (voice ? '-th-voice.' : '-th.') + ext;
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => URL.revokeObjectURL(a.href), 4000);
         return { ext, size: blob.size, width: W, height: H };
     }
 
-    // the gallery's ▶: a player inside the app with the same band + CC + ⬇ MP4 + ซับ
+    // ---- 🔊 Thai voice: Gemini TTS through the proxy's cloud_tts (server-side, admin-only), cached per caption text
+    const VOICE = { model: 'gemini-2.5-flash-tts', name: 'Kore', prompt: 'อ่านด้วยน้ำเสียงอบอุ่น เป็นกันเอง ชัดเจน แบบเภสัชกรอธิบายผู้ป่วย จังหวะกระชับ' };
+    const MAX_RATE = 1.35;
+    const voiceCache = new Map();
+    function makeVoice(text) {
+        const key = String(text || '').trim();
+        if (!key) return Promise.reject(new Error('No Thai caption to read'));
+        if (voiceCache.has(key)) return voiceCache.get(key);
+        const p = (async () => {
+            if (typeof window.callTtsProxy !== 'function') throw new Error('Thai voice needs the admin AI proxy');
+            const r = await window.callTtsProxy({ provider: 'cloud_tts', model: VOICE.model, ttsConfig: {
+                input: { prompt: VOICE.prompt, text: key },
+                voice: { languageCode: 'th-TH', name: VOICE.name, modelName: VOICE.model },
+                audioConfig: { audioEncoding: 'MP3', sampleRateHertz: 24000 } } });
+            if (!r || !r.audioContent) throw new Error('No audio came back from Cloud Text-to-Speech');
+            const bin = atob(r.audioContent), bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            const url = URL.createObjectURL(new Blob([bytes], { type: 'audio/mpeg' }));
+            const a = new Audio(); a.preload = 'metadata'; a.src = url;
+            await new Promise((res, rej) => { a.onloadedmetadata = res; a.onerror = () => rej(new Error('Could not read the Thai voice')); });
+            return { url, duration: a.duration };
+        })();
+        voiceCache.set(key, p);
+        p.catch(() => voiceCache.delete(key));
+        return p;
+    }
+    // speed a voice up (pitch kept) only when it is longer than the clip; never past MAX_RATE
+    const fitRate = (voiceSec, clipSec) => Math.min(MAX_RATE, Math.max(1, Number(voiceSec) / Math.max(1, Number(clipSec) - 0.15)));
+
+    // one controller for a player: CC band, 🔊 Thai voice (preview in sync, clip muted), ⬇ MP4 + ซับ (+ 🔊)
+    function mount(o) {
+        const st = { on: false, voice: null, rate: 1, audio: null };
+        const clipSec = () => (o.video && o.video.duration && isFinite(o.video.duration) ? o.video.duration : (Number(o.seconds) || 8));
+        let list = cues(o.caption, o.seconds);
+        const band = attach(o.video, o.band, () => list, o.ccBtn);
+        const say = t => { if (o.statusEl) o.statusEl.textContent = t; };
+        const mark = () => {
+            if (o.voiceBtn) { o.voiceBtn.classList.toggle('on', st.on); o.voiceBtn.setAttribute('aria-pressed', String(st.on)); }
+            if (o.burnBtn && !o.burnBtn.disabled) o.burnBtn.textContent = st.on ? '⬇ MP4 + ซับ + 🔊' : '⬇ MP4 + ซับ';
+        };
+        const sync = () => {   // the voice follows the player: play / pause / seek
+            if (!st.on || !st.audio) return;
+            st.audio.playbackRate = st.rate; st.audio.preservesPitch = true;
+            const want = (o.video.currentTime || 0) * st.rate;
+            if (want >= (st.audio.duration || 0)) { st.audio.pause(); return; }
+            if (Math.abs(st.audio.currentTime - want) > 0.25) st.audio.currentTime = want;
+            if (!o.video.paused && st.audio.paused) st.audio.play().catch(() => {});
+        };
+        if (o.video) {
+            ['play', 'seeked', 'timeupdate'].forEach(ev => o.video.addEventListener(ev, sync));
+            ['pause', 'ended'].forEach(ev => o.video.addEventListener(ev, () => { if (st.audio) st.audio.pause(); }));
+        }
+        if (o.voiceBtn) o.voiceBtn.onclick = async () => {
+            if (o.voiceBtn.disabled) return;
+            if (st.on) { st.on = false; if (st.audio) st.audio.pause(); o.video.muted = false; list = cues(o.caption, o.seconds); if (band) band.paint(); say(''); mark(); return; }
+            o.voiceBtn.disabled = true;
+            const label = o.voiceBtn.textContent;
+            o.voiceBtn.textContent = '⏳ เสียงไทย…';
+            try {
+                st.voice = await makeVoice(o.caption);
+                st.rate = fitRate(st.voice.duration, clipSec());
+                if (!st.audio || st.audio.src !== st.voice.url) { if (st.audio) st.audio.pause(); st.audio = new Audio(st.voice.url); }
+                list = cues(o.caption, Math.min(clipSec(), st.voice.duration / st.rate));
+                st.on = true; o.video.muted = true;
+                const tooLong = st.voice.duration / MAX_RATE > clipSec() + 0.05;
+                say('🔊 Thai voice ' + st.voice.duration.toFixed(1) + ' s' + (st.rate > 1.001 ? ' · ×' + st.rate.toFixed(2) : '') + (tooLong ? ' · longer than the clip — shorten the Thai caption in ✏️' : ''));
+                if (band) band.paint();
+                sync();
+            } catch (e) {
+                say('⚠️ ' + ((e && e.message) || e));
+            } finally {
+                o.voiceBtn.disabled = false;
+                o.voiceBtn.textContent = label;
+                mark();
+            }
+        };
+        if (o.burnBtn) o.burnBtn.onclick = () => burnButton(o.burnBtn, o.statusEl, o.src, list, o.fileBase, st.on && st.voice ? { url: st.voice.url, rate: st.rate } : null).then(mark);
+        mark();
+        return { state: st, cues: () => list };
+    }
+
+    // the gallery's ▶: a player inside the app with the same band + CC + 🔊 + ⬇ MP4 + ซับ
     function openPlayer(item) {
         const list = cues(item.caption, item.seconds);
         let m = document.getElementById('glc-player');
@@ -187,25 +281,24 @@
         const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
         m.innerHTML = '<div class="glc-player-box"><div class="glc-player-hd"><b>' + esc(item.name) + '</b><button type="button" class="x" aria-label="Close">✕</button></div>'
             + '<span class="glc-vwrap"><video class="glc-video" controls playsinline autoplay src="' + esc(item.url) + '"></video><div class="glc-cc-band" hidden></div></span>'
-            + (list.length ? '<div class="glc-player-ft"><button type="button" class="glc-cc" aria-pressed="true" title="Thai captions on / off">CC ไทย</button><button type="button" class="glc-burn" title="Download the MP4 with the Thai captions burned in (for LINE / TikTok)">⬇ MP4 + ซับ</button><small class="glc-burn-st" role="status"></small></div>' : '')
+            + (list.length ? '<div class="glc-player-ft"><button type="button" class="glc-cc" aria-pressed="true" title="Thai captions on / off">CC ไทย</button><button type="button" class="glc-voice" aria-pressed="false" title="Thai voice (Gemini TTS) instead of the clip\'s own audio">🔊 เสียงไทย</button><button type="button" class="glc-burn" title="Download the MP4 with the Thai captions burned in (for LINE / TikTok)">⬇ MP4 + ซับ</button><small class="glc-burn-st" role="status"></small></div>' : '')
             + '</div>';
         m.hidden = false;
         const video = m.querySelector('video');
-        attach(video, m.querySelector('.glc-cc-band'), list, m.querySelector('.glc-cc'));
-        const b = m.querySelector('.glc-burn');
-        if (b) b.onclick = () => burnButton(b, m.querySelector('.glc-burn-st'), item.url, list, item.fileBase);
+        const ctl = mount({ video, band: m.querySelector('.glc-cc-band'), ccBtn: m.querySelector('.glc-cc'), voiceBtn: m.querySelector('.glc-voice'), burnBtn: m.querySelector('.glc-burn'),
+            statusEl: m.querySelector('.glc-burn-st'), src: item.url, caption: item.caption, seconds: item.seconds, fileBase: item.fileBase });
         m.querySelector('.x').onclick = close;
-        function close() { video.pause(); m.hidden = true; m.innerHTML = ''; }
+        function close() { video.pause(); if (ctl.state.audio) ctl.state.audio.pause(); m.hidden = true; m.innerHTML = ''; }
         return m;
     }
 
     // shared button behaviour: busy text with progress, a result line, the button back
-    async function burnButton(btn, statusEl, src, list, fileBase) {
+    async function burnButton(btn, statusEl, src, list, fileBase, voice) {
         if (btn.disabled) return;
         const label = btn.textContent;
         btn.disabled = true;
         try {
-            const r = await burn(src, list, fileBase, (t, d) => { btn.textContent = '⏳ ' + Math.min(Math.round(t), Math.round(d)) + ' / ' + Math.round(d) + ' s'; });
+            const r = await burn(src, list, fileBase, (t, d) => { btn.textContent = '⏳ ' + Math.min(Math.round(t), Math.round(d)) + ' / ' + Math.round(d) + ' s'; }, voice);
             if (statusEl) statusEl.textContent = '✓ ' + r.ext.toUpperCase() + ' · ' + (r.size / 1048576).toFixed(1) + ' MB' + (r.ext === 'webm' ? ' (this browser records WebM)' : '');
         } catch (e) {
             if (statusEl) statusEl.textContent = '⚠️ ' + ((e && e.message) || e);
@@ -215,5 +308,5 @@
         }
     }
 
-    window.GlcCaptions = { cues, cueAt, attach, drawFrame, burn, burnButton, openPlayer, recType, ensureFont, ccOn, setCc };
+    window.GlcCaptions = { cues, cueAt, attach, mount, makeVoice, fitRate, drawFrame, burn, burnButton, openPlayer, recType, ensureFont, ccOn, setCc };
 })();
