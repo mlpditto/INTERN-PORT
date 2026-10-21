@@ -192,7 +192,7 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
             return out;
         });
         assert.deepEqual(r.chips, ['as/gemini-nano-banana-2.1', 'or/openai/gpt-5.4-image-2', 'or/bytedance-seed/seedream-5-0-flash', 'or/openai/gpt-image-2.5-sunburst', 'as/gemini-omni-1.1-flash', 'or/google/veo-3.1-lite', 'or/kwaivgi/kling-v3.0-std', 'or/heygen/heygen-video-1', 'or/bytedance/seedance-2.0-fast'], 'V102.306: seven engine chips · V102.315: + Seedream 5 · Sunburst');
-        assert.deepEqual(r.ghosts, ['$0.03', '$0.04–0.08', '$0.02', '≈ $0.04–0.08', '8 s · $0.80', '8 s · $0.40', '8 s · $1.01', '8 s · $0.40', '8 s · $0.32'], 'ghost price · time beside every chip (V102.350: HeyGen $0.05/s upper bound)');
+        assert.deepEqual(r.ghosts, ['$0.03', '$0.04–0.08', '$0.02', '≈ $0.04–0.08', '8 s · $0.80', '8 s · $0.40', '8 s · $1.01', '8 s · $0.40', '8 s · $0.73'], 'ghost price · time beside every chip (V102.350: HeyGen $0.05/s upper bound)');
         assert.equal(r.clipChipLabel, 'Clip 9:168 s · $0.80', 'V102.348: Gemini spark logo instead of 🎬'); assert.match(r.clipChipTitle, /9:16 vertical clip with audio · about \$0\.10 per second/);
         assert.deepEqual(r.valid, r.chips, 'pref restore accepts every chip, nothing else');
         assert.deepEqual([r.btnBefore, r.cardBefore], ['Create', 'none'], 'image mode untouched before the pick');
