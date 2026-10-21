@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.350)</title>
+    <title>Nika Admin (V102.351)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -4486,6 +4486,7 @@
         .hub-tl-pv { font-weight:500; color:#475569; }
         .hub-tl-meta { font-size:11px; font-weight:800; margin-left:6px; }
         .hub-tl-time { font-size:12px; color:#94a3b8; flex-shrink:0; }
+        .hub-tl-wait { flex-shrink:0; font-size:11px; font-weight:800; color:#b45309; background:#fffbeb; border:1px solid #fde68a; border-radius:999px; padding:1px 7px; white-space:nowrap; }
         .hub-tl-amt { font-weight:900; font-variant-numeric:tabular-nums; min-width:52px; text-align:right; flex-shrink:0; }
         .hub-tl-del { width:28px; flex-shrink:0; border:none; background:none; color:#ef4444; cursor:pointer; padding:4px; opacity:0; }
         .hub-tl-row:hover .hub-tl-del, .hub-tl-del:focus-visible { opacity:1; }
@@ -55909,13 +55910,18 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             reflectiveBaseAbsorbedCount++;
                         }
                     }
-                    const totalScore = adminBonus + baseScore;
+                    // V102.351: the review bonus joins the score only when the intern claims it in the app (pointsClaimed),
+                    // so History counts it then too; until then it shows as "⏳ +x" (Bew 10-21: Σ 2.55 vs score 2.15 = 2 unclaimed × 0.20)
+                    const claimedBonus = x.pointsClaimed === true ? adminBonus : 0;
+                    const waitingBonus = adminBonus - claimedBonus;
+                    const totalScore = claimedBonus + baseScore;
                     allLogs.push({
                         t: tDate,
                         type: 'reflective_log',
                         text: `📔 Reflective Log: ${x.content?.substring(0, 50)}...`,
                         score: totalScore,
-                        scoreBreakdown: { receive: baseScore, review: adminBonus },
+                        scoreBreakdown: { receive: baseScore, review: claimedBonus },
+                        waitingBonus,
                         isReflective: true,
                         docId: doc.id,
                         fullContent: x.content,
@@ -55928,8 +55934,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     });
                     // dash.logs total stays correct: the absorbed base score was already in dash.logs
                     // (added by checkin_logs loop), we just add the adminBonus here.
-                    dash.logs += adminBonus;
-                    dash.logsDR += adminBonus;
+                    dash.logs += claimedBonus;
+                    dash.logsDR += claimedBonus;
                     dash.lc++;
                     dash.lcDR++;
                 });
@@ -56889,7 +56895,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const ok = nowScore !== null && Math.abs(sigma - nowScore) < 0.005;
                 const sumPill = `<span class="hub-tl-sum ${nowScore === null ? '' : (ok ? 'ok' : 'off')}" title="Sum of the score rows below vs the score in the header. Recalculate Score is under ⋯">Σ ${sigma.toFixed(2)} pts${nowScore === null ? '' : (ok ? ' ✓' : ` ≠ Now ${nowScore.toFixed(2)}`)}</span>`;
                 const clear = mode === 'all' ? '' : `<button type="button" class="hub-tl-clear" onclick="setHubHistoryFilter('all')" title="Show all">${names[mode] || mode} ${filteredLogs.length}/${historyCache.length} ✕</button>`;
-                summaryEl.innerHTML = `<span class="hub-tl-n">${historyCache.length} logs</span>${historyCache.length ? sumPill : ''}${clear}`;
+                const waiting = historyCache.reduce((a, e) => a + (Number(e.waitingBonus) || 0), 0);
+                const waitPill = waiting > 0 ? `<span class="hub-tl-wait" title="Review bonuses the intern has not claimed yet — they join the score when claimed">⏳ +${waiting.toFixed(2)} to claim</span>` : '';
+                summaryEl.innerHTML = `<span class="hub-tl-n">${historyCache.length} logs</span>${historyCache.length ? sumPill : ''}${waitPill}${clear}`;
             }
 
             if (filteredLogs.length === 0) {
@@ -56965,7 +56973,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const rowAccent = (HUB_LOG_STYLE[bucket] || HUB_LOG_STYLE.other).accent;
                 const timeOfDay = e.t instanceof Date ? e.t.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
 
-                const rowHtml = `<div class="hub-tl-row" style="--a:${rowAccent};${isClickable ? ' cursor:pointer;' : ''}" ${onClickAttr}><span class="hub-tl-seq">#${seqNum}</span><span class="hub-tl-tx">${lead}${text}${extra}</span><span class="hub-tl-time">${timeOfDay}</span><b class="hub-tl-amt" style="color:${amtColor};${e.scoreBreakdown && e.scoreBreakdown.review > 0 ? ' cursor:help; border-bottom:1px dotted currentColor;' : ''}" title="${e.scoreBreakdown ? `Receive +${e.scoreBreakdown.receive.toFixed(2)} · Review +${e.scoreBreakdown.review.toFixed(2)}` : ''}">${amtText}</b>${delBtn}</div>`;
+                const rowHtml = `<div class="hub-tl-row" style="--a:${rowAccent};${isClickable ? ' cursor:pointer;' : ''}" ${onClickAttr}><span class="hub-tl-seq">#${seqNum}</span><span class="hub-tl-tx">${lead}${text}${extra}</span><span class="hub-tl-time">${timeOfDay}</span>${e.waitingBonus > 0 ? `<span class="hub-tl-wait" title="Review bonus — joins the score when the intern claims it in the app">⏳ +${Number(e.waitingBonus).toFixed(2)}</span>` : ''}<b class="hub-tl-amt" style="color:${amtColor};${e.scoreBreakdown && e.scoreBreakdown.review > 0 ? ' cursor:help; border-bottom:1px dotted currentColor;' : ''}" title="${e.scoreBreakdown ? `Receive +${e.scoreBreakdown.receive.toFixed(2)} · Review +${e.scoreBreakdown.review.toFixed(2)}` : ''}">${amtText}</b>${delBtn}</div>`;
                 items.push({ e, t: e.t, html: rowHtml, checkin: mode === 'all' && bucket === 'checkin' });
             });
 

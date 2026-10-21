@@ -93,6 +93,18 @@ assert.ok(/🪙 \+5<\/b>/.test(list) && /—<\/span><\/b>/.test(list), 'coin row
 assert.ok(/onclick="event\.stopPropagation\(\); deleteHubHistoryLog\('q3', 1\.5\)"/.test(list), '🗑 does not also open the quiz behind it');
 assert.ok(list.indexOf('PRETEST-1.3 · 15/15') < list.indexOf('PRETEST-1.1 · 9/10'), 'newest first');
 
+// ---- V102.351: an unclaimed review bonus is not in Σ; it shows as ⏳ on the row and beside Σ ----
+{
+    const withWait = logs.map(l => l.docId === 'r2' ? { ...l, waitingBonus: 0.2 } : l.docId === 'r1' ? { ...l, waitingBonus: 0.2 } : l);
+    ctx.setCache(withWait); render('all');
+    const sm = dom['hub-history-summary'].innerHTML, li = dom['hub-history-list'].innerHTML;
+    assert.ok(/Σ 2\.55 pts/.test(sm) && /⏳ \+0\.40 to claim/.test(sm), 'Σ counts received points only; the waiting total sits beside it: ' + sm.replace(/<[^>]+>/g, ' '));
+    assert.equal((li.match(/class="hub-tl-wait"[^>]*>⏳ \+0\.20</g) || []).length, 2, 'each reflection with an unclaimed bonus shows ⏳ +0.20');
+    ctx.setCache(logs);
+}
+html.includes('const claimedBonus = x.pointsClaimed === true ? adminBonus : 0;') || assert.fail('loader counts only a claimed review bonus');
+assert.ok(html.includes('const totalScore = claimedBonus + baseScore;') && html.includes('dash.logs += claimedBonus;'), 'row score + Overview totals use the claimed bonus only');
+
 // ---- header score agrees → green ✓ ----
 ctx.usersData[0].score = 2.55; render('all');
 assert.ok(/hub-tl-sum ok/.test(dom['hub-history-summary'].innerHTML) && /2\.55 pts ✓/.test(dom['hub-history-summary'].innerHTML), 'green ✓ when Σ = Now');
