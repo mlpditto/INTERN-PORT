@@ -56,7 +56,7 @@ const admFns = ['function gsFoldCards(', 'function gsBodyClick(', 'function gsEd
                 "var db = { collection: () => ({ doc: () => ({ get: async () => ({ exists: !!DOC, data: () => DOC }), update: async d => { UPDATES.push(d); } }) }) };",
                 "window.alert = m => { ALERTS.push(m); };",
                 "function internshipDatesProblem() { return ''; } async function saveMyDates() { SAVED_DATES++; }",
-                "function renderGoogleLinkRow() {} function renderBucketList() {} function showToast() {} function updatePersonalBirthday() {}",
+                "function renderGoogleLinkRow() {} function renderBucketList() {} function showToast() {} function updatePersonalBirthday() {} function ipHoursRender() {}",   // V101.192: hours bar on the Period card (own QA)
                 "window._bucketItems = [];",
                 "window.__focused = []; const __f = HTMLElement.prototype.focus; HTMLElement.prototype.focus = function () { __focused.push(this.id); return __f.apply(this, arguments); };",
                 tabsJs,
