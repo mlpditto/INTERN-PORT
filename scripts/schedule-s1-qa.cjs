@@ -58,7 +58,7 @@ async function open(browser, o = {}) {
     try {
         // ---- 1. month card
         let { page, ctx, errors } = await open(browser);
-        assert.equal((await page.textContent('#sch-gb-month')).trim(), '📊 Oct 2026 · this month');
+        assert.equal((await page.textContent('#sch-gb-month')).trim().slice(0, 11), '📊 Oct 2026', 'V101.191: no "· this month"; holiday chips may follow');
         assert.equal(await page.evaluate(() => document.getElementById('sch-goals-box').classList.contains('zero')), true, 'all zero → one line');
         assert.equal((await page.textContent('#sch-goalbars')).trim(), 'Quiz 0/30 · Journal 0/12 · Case 0/8');
         assert.equal(await page.isVisible('#sch-goals-btn') && await page.isVisible('#sch-heat-btn') && await page.isVisible('#sch-fin-btn'), true, 'Goals 💰 Heatmap stay');
