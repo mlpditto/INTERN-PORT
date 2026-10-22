@@ -152,15 +152,16 @@ assert.match((await page.textContent('#sch-week .sch-rg h4')).trim(), /^\d{1,2}[
     // ---- 4. tap a day: its rows; tap again closes; focus stays on the day
     await goTo(page, -1);
     await page.locator('#sch-week [data-schday="' + (await page.evaluate(() => __key(-1))) + '"]').click();
-    const det = await page.textContent('#sch-week-day');
-    assert.ok(det.includes('Pharmacology quiz') && det.includes('done'), 'yesterday shows the done quiz: ' + det);
-    assert.ok(!/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d/.test(det), 'V101.194: the panel has no date line of its own: ' + det);
+    // V101.195: the done quiz sits inside the 📚 Quiz month cell (no panel when nothing else is on that day); the other cells stay plain
+    const det = await page.evaluate(() => ({ panel: !!document.querySelector('#sch-week-day'), cell: (document.querySelector('#sch-goalbars .sch-bar.q .sch-day-done') || {}).textContent, others: ['j', 'c'].map(k => !!document.querySelector('#sch-goalbars .sch-bar.' + k + ' .sch-day-done')) }));
+    assert.deepEqual([det.panel, det.cell, det.others], [false, '✓ Pharmacology quiz', [false, false]], 'yesterday\'s done quiz is in the Quiz cell, no panel: ' + JSON.stringify(det));
     assert.equal(await page.textContent('#sch-gb-month .sch-sel'), await page.evaluate(() => new Date(__key(-1) + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })), 'the date is a chip on the month line');
     assert.equal(await page.evaluate(() => document.querySelectorAll('#sch-week [aria-pressed="true"]').length), 1, 'one day pressed');
     assert.equal(await page.evaluate(() => document.activeElement && document.activeElement.dataset.schday), await page.evaluate(() => __key(-1)), 'focus stays on the tapped day');
     await page.locator('#sch-week [data-schday="' + (await page.evaluate(() => __key(-1))) + '"]').click();
     assert.equal(await page.locator('#sch-week-day').count(), 0, 'second tap closes the day');
     assert.equal(await page.locator('#sch-gb-month .sch-sel').count(), 0, 'second tap takes the date chip off the month line');
+    assert.equal(await page.locator('#sch-goalbars .sch-day-done').count(), 0, 'V101.195: second tap clears the cells too');
     await goTo(page, 0);
     await page.locator('#sch-week .sch-wd.today').click();
     const today = await page.evaluate(() => (document.querySelector('#sch-week-day') || { textContent: '' }).textContent + ' | ' + document.querySelector('#sch-gb-month .sch-sel').textContent);
