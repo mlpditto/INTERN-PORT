@@ -108,6 +108,13 @@
         return setSeen(id, { act: act });
     }
     function find(id) { return (S.list || []).find(function (a) { return a.id === id; }); }
+    // V101.197/198: the articles "about" a Codex entry (pred) that this intern can see now, or has read; newest first
+    function aboutCodex(pred) {
+        var m = me(), now = Date.now(), seen = m.articleSeen || {}, L = uiLang();
+        return (S.list || []).filter(function (a) { return pred(a) && (kindOf(a, m, now) || isDone(seen[a.id])); })
+            .sort(function (x, y) { return msOf(y.startAt) - msOf(x.startAt); })
+            .map(function (a) { return { id: a.id, title: textOf(a, L).title, read: isDone(seen[a.id]) }; });
+    }
 
     // ---- +1 Beri for opening the linked quiz (once per article; the deterministic ledger id is the dedupe)
     function awardQuizBeri(articleId) {
@@ -275,16 +282,16 @@
         // V101.197 (owner's pick 2): the articles about a Disease Codex entry — drafted from it (dx.publishedId) or linked by hand (＋ Disease) —
         // that this intern can see now, or has already read; newest first
         forDisease: function (diseaseId) {
-            var m = me(), now = Date.now(), seen = m.articleSeen || {}, L = uiLang();
-            return (S.list || []).filter(function (a) {
-                var about = (a.dx && a.dx.publishedId === diseaseId) || (a.links || []).some(function (l) { return l.kind === 'disease' && l.id === diseaseId; });
-                return about && (kindOf(a, m, now) || isDone(seen[a.id]));
-            }).sort(function (x, y) { return msOf(y.startAt) - msOf(x.startAt); })
-                .map(function (a) { return { id: a.id, title: textOf(a, L).title, read: isDone(seen[a.id]) }; });
+            return aboutCodex(function (a) { return (a.dx && a.dx.publishedId === diseaseId) || (a.links || []).some(function (l) { return l.kind === 'disease' && l.id === diseaseId; }); });
         },
-        openArticle: function (id) {   // from the Disease Codex entry: the sheet opens on top; closing it = read, as always
+        // V101.198: the articles linked to a Drug Codex entry with ＋ Codex (links[kind=codex])
+        forDrug: function (drugId) {
+            return aboutCodex(function (a) { return (a.links || []).some(function (l) { return l.kind === 'codex' && l.id === drugId; }); });
+        },
+        openArticle: function (id) {   // from a Codex entry: the sheet opens on top; closing it = read, as always
             var a = find(id); if (!a || S.cur) return;
             if (typeof dxCloseDetail === 'function') dxCloseDetail();
+            if (typeof dcCloseDetail === 'function') dcCloseDetail();   // V101.198: the Drug Codex entry too
             show({ a: a, kind: kindOf(a, me(), Date.now()) || 'rerun' });
         },
         openDx: function (articleId, diseaseId) {   // V101.196: the 🩺 Disease Codex entry
