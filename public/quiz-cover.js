@@ -566,7 +566,22 @@ const QuizCover = (() => {
             card.classList.add('quiz-fold-ready');
         });
         const due = c => Number(c.querySelector('[data-dead]')?.dataset.dead) || Infinity;
-        first.sort((a, b) => due(a) - due(b)).slice(0, 2).forEach(c => c.classList.add('quiz-first-challenge'));
+        first.sort((a, b) => due(a) - due(b)).slice(0, 2).forEach(c => {
+            c.classList.add('quiz-first-challenge');
+            // V101.188: the frame alone said nothing — a small "✦ Be the first" call in the meta row, with a breathing shadow.
+            const meta = c.querySelector('.quiz-mission-meta') || c.querySelector('.assign-info');
+            if (meta && !c.querySelector('.quiz-first-call')) {
+                const call = document.createElement('span');
+                call.className = 'quiz-first-call lang-no-toggle';
+                call.textContent = '✦ Be the first';
+                call.title = FRESH_LABEL.first[0]; call.dataset.thTitle = FRESH_LABEL.first[1]; call.dataset.krTitle = FRESH_LABEL.first[2];
+                // the blink gets quicker as the deadline nears: 3 s (3 days+) · 2 s (1-3 days) · 1.2 s (6-24 h) · 0.7 s (under 6 h)
+                const H = 3600e3, left = due(c) - Date.now();
+                const period = left < 6 * H ? 0.7 : left < 24 * H ? 1.2 : left < 72 * H ? 2 : 3;
+                call.style.setProperty('--call-period', period + 's');
+                meta.append(call);
+            }
+        });
     }
     function adminThumbnail(value, id) {
         if (id) {
