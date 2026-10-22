@@ -206,7 +206,7 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
         assert.deepEqual(r.statuses, Array(10).fill('planned'));
         assert.deepEqual(r.steps, ['① Plan · free ✓', '② ▶ Render one at a time · paid', '💰 $0.00 / ≈ $8.00 series'], 'V102.314: the two tiers + the series total before any click'); assert.equal(r.count, '10'); assert.equal(r.cost, 'Omni Flash · 8 s · ≈ $0.80 / clip · $8.00 all', 'cost before any click');
         assert.equal(r.row3, 'Episode 3 titleตอนที่ 3'); assert.deepEqual(r.row3chips, ['🎯 Objective 3', '💡 Fact 3', '🗣 Spoken line 3', '🎨 Visual 3 scene']);
-        assert.deepEqual(r.editFields, ['title', 'titleTh', 'objective', 'fact', 'narration', 'captionTh', 'visual'], 'in-place edit has the 7 fields');
+        assert.deepEqual(r.editFields, ['title', 'titleTh', 'objective', 'fact', 'narration', 'captionTh', 'readingTh', 'visual'], 'in-place edit has the 8 fields (V102.366: + readingTh)');
         assert.deepEqual([r.row3After, r.ep3Visual, r.editClosed], ['Missed dose ruleตอนที่ 3', 'Clock face flipping day to night', true], 'Done writes the row back');
         assert.equal(r.ask, '≈ $0.80 · 8 sRender✕', 'inline cost ask, no native dialog'); assert.ok(r.askHasRender);
         assert.equal(r.duringStatus, 'rendering'); assert.match(r.duringPreview, /Rendering EP01…Omni Flash · 9:16 · 8 s/);
@@ -218,7 +218,7 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
         assert.deepEqual(r.ep1, { status: 'done', dotTitle: 'Rendered · 8 s · $0.80', btn: '🔁' }, 'EP01 done, re-render offered');
         assert.equal(r.countAfter, '10 · 1 done');
         assert.deepEqual(r.video, { tag: 'VIDEO', src: 'data:video/mp4;base6', controls: true, playsinline: true }, 'portrait <video> in the preview');
-        assert.deepEqual(r.clipActions, ['Thai captions on / off', 'Download MP4', "Thai voice (Gemini TTS) instead of the clip's own audio", 'Download the MP4 with the Thai captions burned in (for LINE / TikTok)', 'Delete this clip — MP4 + gallery entry (asks first)'], 'V102.354: CC ไทย · MP4 · 🔊 เสียงไทย · ⬇ MP4 + ซับ · ✓ In gallery (a chip) · 🗑 = delete');
+        assert.deepEqual(r.clipActions, ['Thai captions on / off', 'Download MP4', "Thai voice (Gemini TTS) instead of the clip's own audio", 'Kore · เล่าเรื่อง', 'Charon · สงบ', 'Achird · เป็นกันเอง', 'Download the MP4 with the Thai captions burned in (for LINE / TikTok)', 'Delete this clip — MP4 + gallery entry (asks first)'], 'V102.354: CC ไทย · MP4 · 🔊 เสียงไทย · V102.366: 3 voice chips · ⬇ MP4 + ซับ · ✓ In gallery (a chip) · 🗑 = delete');
         assert.equal(r.designActionsHidden, 'none', 'the image pill stays hidden for a clip');
         assert.match(r.previewText, /EP01 · Episode 1 title8 s · 720p · 9:16 · audio ongemini-omni-1\.1-flash · \d+ s · \$0\.80คำบรรยาย 1/, 'preview meta + Thai caption');
         assert.deepEqual(r.put, { path: 'teach-clips/S1/EP01.mp4', type: 'video/mp4', size: 12, meta: { contentType: 'video/mp4' } }, 'MP4 lands in teach-clips/{seriesId}/EP01.mp4');

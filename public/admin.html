@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.365)</title>
+    <title>Nika Admin (V102.366)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -857,6 +857,12 @@
         .glc-voice { display:inline-flex; align-items:center; gap:6px; padding:8px 13px; border-radius:20px; border:1.5px solid #c4b5fd; background:#f5f3ff; color:#6d28d9; font-weight:800; font-size:0.85em; cursor:pointer; }
         .glc-voice.on { background:#6d28d9; border-color:#6d28d9; color:#fff; }
         .glc-voice:disabled { opacity:0.75; cursor:progress; }
+        /* V102.366: voice chips beside 🔊; the ≈ seconds line under the Thai caption in ✏️ */
+        .glc-voice-rail { display:inline-flex; gap:4px; align-items:center; }
+        .glc-vchip { border:1px solid #ddd6fe; background:#fff; color:#6d28d9; border-radius:999px; padding:4px 9px; font-size:0.72em; font-weight:800; cursor:pointer; line-height:1.2; }
+        .glc-vchip[aria-pressed="true"] { background:#ede9fe; border-color:#a78bfa; }
+        .glc-ep .glc-cap-count { grid-column:1 / -1; font-size:0.72em; color:#64748b; margin:-2px 0 0 2px; }
+        .glc-ep .glc-cap-count.warn { color:#b45309; font-weight:700; }
         .glc-burn { display:inline-flex; align-items:center; gap:6px; padding:9px 15px; border-radius:20px; background:#fff; color:#334155; border:1.5px solid #cbd5e1; font-weight:800; font-size:0.85em; cursor:pointer; }
         .glc-burn:disabled { opacity:0.75; cursor:progress; }
         .glc-burn-st { display:block; margin-top:6px; font-size:0.85em; color:#64748b; }
@@ -7924,7 +7930,7 @@
      hidden. -->
 <link rel="stylesheet" href="quiz-cover.css?v=V102.344">
 <script src="quiz-cover.js?v=V102.344"></script>
-<script src="clip-captions.js?v=V102.354"></script>
+<script src="clip-captions.js?v=V102.366"></script>
 <script src="holidays-admin.js?v=V102.330"></script>
 <script src="articles-admin.js?v=V102.363"></script>
 <link rel="stylesheet" href="quiz-qimage.css?v=V101.03">
@@ -21951,10 +21957,24 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
                 + '<input data-f="objective" value="' + esc(e.objective) + '" placeholder="🎯 Objective" aria-label="Objective">'
                 + '<input data-f="fact" value="' + esc(e.fact) + '" placeholder="💡 Key fact" aria-label="Key fact">'
                 + '<input data-f="narration" value="' + esc(e.narration) + '" placeholder="🗣 Narration (spoken, EN)" aria-label="Narration">'
-                + '<input data-f="captionTh" value="' + esc(e.captionTh) + '" placeholder="คำบรรยายไทย" aria-label="Thai caption">'
+                + '<input data-f="captionTh" value="' + esc(e.captionTh) + '" placeholder="คำบรรยายไทย" aria-label="Thai caption" oninput="glcCapCount(this,' + n + ')">'
+                + '<input data-f="readingTh" value="' + esc(e.readingTh || '') + '" placeholder="คำอ่านชื่อยา (เฉพาะเสียง) Warfarin=วอร์ฟาริน, INR=ไอเอ็นอาร์" aria-label="Drug-name readings for the Thai voice" title="Only the 🔊 Thai voice uses these — the caption on screen keeps the English names">'
+                + '<small class="glc-cap-count" role="status"></small>'
                 + '<textarea data-f="visual" placeholder="🎨 Visual prompt" aria-label="Visual prompt">' + esc(e.visual) + '</textarea>'
                 + '<div style="grid-column:1 / -1; display:flex; justify-content:flex-end; gap:6px;"><button type="button" onclick="glcSaveEdit(' + n + ')" style="border:none; background:#10b981; color:#fff; border-radius:10px; padding:5px 12px; cursor:pointer; font-size:0.8em; font-weight:800;">Done</button></div>';
             row.appendChild(box);
+            window.glcCapCount(box.querySelector('[data-f="captionTh"]'), n);
+        };
+        // V102.366: ≈ seconds the Thai voice needs for the caption, against the clip (×1.35 is the most the voice is sped up)
+        window.glcCapCount = function(inp, n) {
+            const out = inp && inp.closest('.glc-edit') && inp.closest('.glc-edit').querySelector('.glc-cap-count');
+            if (!out || !window.GlcCaptions) return;
+            const text = inp.value.trim(), sec = GlcCaptions.estimate(text);
+            const clip = Number(window._glcClips && window._glcClips[n] && window._glcClips[n].seconds) || window.GLC_SECONDS || 8, room = clip * 1.35;
+            if (!text) { out.textContent = ''; out.classList.remove('warn'); return; }
+            const over = sec > room + 0.05;
+            out.textContent = '🔊 ≈ ' + sec.toFixed(1) + ' s (' + text.replace(/\s+/g, '').length + ' ตัวอักษร) · คลิป ' + clip + ' s' + (over ? ' — ยาวเกิน ' + room.toFixed(1) + ' s แม้เร่ง ×1.35 ตัดให้สั้นลง' : sec > clip ? ' — จะเร่ง ×' + (sec / Math.max(1, clip - 0.15)).toFixed(2) : ' — พอดี');
+            out.classList.toggle('warn', over);
         };
         window.glcSaveEdit = function(n) {
             const row = document.getElementById('glc-ep-' + n);
@@ -22058,7 +22078,7 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
                 + '<div id="glc-clip-actions" style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; align-items:center;">'
                 + (e.captionTh && window.GlcCaptions ? '<button type="button" class="glc-cc" id="glc-cc-btn" aria-pressed="true" title="Thai captions on / off">CC ไทย</button>' : '')
                 + '<button type="button" class="btn-sm" onclick="glcDownloadClip()" title="Download MP4" style="background:#2c3e50; border-radius:20px; padding:9px 16px; font-weight:bold;"><i class="fa-solid fa-download"></i> MP4</button>'
-                + (e.captionTh && window.GlcCaptions ? '<button type="button" class="glc-voice" id="glc-voice-btn" aria-pressed="false" title="Thai voice (Gemini TTS) instead of the clip\'s own audio">🔊 เสียงไทย</button><button type="button" class="glc-burn" id="glc-burn-btn" title="Download the MP4 with the Thai captions burned in (for LINE / TikTok)">⬇ MP4 + ซับ</button>' : '')
+                + (e.captionTh && window.GlcCaptions ? '<button type="button" class="glc-voice" id="glc-voice-btn" aria-pressed="false" title="Thai voice (Gemini TTS) instead of the clip\'s own audio">🔊 เสียงไทย</button><span class="glc-voice-rail" id="glc-voice-rail"></span><button type="button" class="glc-burn" id="glc-burn-btn" title="Download the MP4 with the Thai captions burned in (for LINE / TikTok)">⬇ MP4 + ซับ</button>' : '')
                 + window.glcSaveStateHtml(e)
                 + '<button type="button" class="btn-sm" onclick="glcDiscardClip()" title="' + (e.clipUrl ? 'Delete this clip — MP4 + gallery entry (asks first)' : 'Discard this render (nothing saved)') + '" aria-label="' + (e.clipUrl ? 'Delete clip' : 'Discard') + '" style="background:#f1f5f9; color:#475569; border-radius:20px; padding:9px 12px; font-weight:bold;">🗑️</button>'
                 + '</div>' + (e.captionTh && window.GlcCaptions ? '<small class="glc-burn-st" id="glc-burn-st" role="status"></small>' : '') + '</div></div>';
@@ -22068,7 +22088,7 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
                 window.GlcCaptions.ensureFont();
                 const $ = id => document.getElementById(id);
                 window.GlcCaptions.mount({ video: $('generated-clip'), band: $('glc-cc-band'), ccBtn: $('glc-cc-btn'), voiceBtn: $('glc-voice-btn'), burnBtn: $('glc-burn-btn'),
-                    statusEl: $('glc-burn-st'), src: c.dataUrl || e.clipUrl, caption: e.captionTh, seconds: c.seconds, fileBase: window.glcEp(c.n) });
+                    statusEl: $('glc-burn-st'), src: c.dataUrl || e.clipUrl, caption: e.captionTh, reading: e.readingTh || '', seconds: c.seconds, fileBase: window.glcEp(c.n), voiceRail: $('glc-voice-rail') });   // V102.366: + readings, voice chips
             }
         };
         window.glcDownloadClip = function() {
@@ -51834,7 +51854,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         const n = Number(e.n) || i + 1;
                         clips.push({ type: 'clip', id: doc.id + '#' + n, seriesId: doc.id, n: n,
                             name: 'EP' + String(n).padStart(2, '0') + ' · ' + (e.title || d.topic || ''), url: e.clipUrl,
-                            caption: e.captionTh || '', seconds: Number(e.seconds) || 0, costUsd: Number(e.costUsd) || 0,
+                            caption: e.captionTh || '', reading: e.readingTh || '', seconds: Number(e.seconds) || 0, costUsd: Number(e.costUsd) || 0,
                             model: d.clipModel || '', renderedAt: e.renderedAt || '' });
                     });
                 });
@@ -51907,7 +51927,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function mgwPlayClip(ev, i) {
             const it = (window._mgwGalleryRendered || [])[i];
             if (!it || !window.GlcCaptions || (ev && (ev.ctrlKey || ev.metaKey || ev.button === 1))) return true;
-            window.GlcCaptions.openPlayer({ url: it.url, caption: it.caption, seconds: it.seconds || 8, name: it.name, fileBase: 'EP' + String(it.n).padStart(2, '0') });
+            window.GlcCaptions.openPlayer({ url: it.url, caption: it.caption, reading: it.reading || '', seconds: it.seconds || 8, name: it.name, fileBase: 'EP' + String(it.n).padStart(2, '0') });
             return false;
         }
         // V102.345: delete asks inside the tile (not a browser popup), then glcDeleteSavedClip removes the MP4 + gallery entry
