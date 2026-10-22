@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.200)</title>
+    <title>Internship Portfolio (V101.201)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.171">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -3459,14 +3459,14 @@
                 }
                 .dc-sec-chip:hover { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
                 /* V101.199: lean drug entry — sticky compact head, one-row rail pinned under it, the section in view lit, TH ⌄ | ✨ pill */
-                #drugCodexDetailModal .dc-detail-shell { overflow: hidden; }   /* only the body scrolls — dcLeanHead() sizes it */
-                #drugCodexDetailModal .dc-detail-head.is-compact { padding-top: 8px; padding-bottom: 8px; }
-                #drugCodexDetailModal .dc-detail-head.is-compact #dc-detail-chips { display: none; }
-                #drugCodexDetailModal .dc-detail-head.is-compact .dc-detail-name { font-size: 0.98em; line-height: 1.2; }   /* shrinks, never cut to … */
-                #drugCodexDetailModal .dc-detail-body { padding-top: 0; }   /* the rail pins flush under the head */
-                #drugCodexDetailModal .dc-sec-rail { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
-                #drugCodexDetailModal .dc-sec-rail::-webkit-scrollbar { display: none; }
-                #drugCodexDetailModal .dc-detail-section { scroll-margin-top: var(--dc-head-h, 120px); }
+                #drugCodexDetailModal .dc-detail-shell, #diseaseCodexDetailModal .dc-detail-shell { overflow: hidden; }   /* only the body scrolls — codexLeanHead() sizes it (V101.201: both entries) */
+                #drugCodexDetailModal .dc-detail-head.is-compact, #diseaseCodexDetailModal .dc-detail-head.is-compact { padding-top: 8px; padding-bottom: 8px; }
+                #drugCodexDetailModal .dc-detail-head.is-compact #dc-detail-chips, #diseaseCodexDetailModal .dc-detail-head.is-compact #dx-detail-chips { display: none; }
+                #drugCodexDetailModal .dc-detail-head.is-compact .dc-detail-name, #diseaseCodexDetailModal .dc-detail-head.is-compact .dc-detail-name { font-size: 0.98em; line-height: 1.2; }   /* shrinks, never cut to … */
+                #drugCodexDetailModal .dc-detail-body, #diseaseCodexDetailModal .dc-detail-body { padding-top: 0; }   /* the rail pins flush under the head */
+                #drugCodexDetailModal .dc-sec-rail, #diseaseCodexDetailModal .dc-sec-rail { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+                #drugCodexDetailModal .dc-sec-rail::-webkit-scrollbar, #diseaseCodexDetailModal .dc-sec-rail::-webkit-scrollbar { display: none; }
+                #drugCodexDetailModal .dc-detail-section, #diseaseCodexDetailModal .dc-detail-section { scroll-margin-top: var(--dc-head-h, 120px); }
                 .dc-sec-chip.active { background: #3b82f6; border-color: #3b82f6; color: #fff; }
                 .dc-head-grp { display: inline-flex; align-items: stretch; height: 34px; }
                 .dc-head-grp .dc-lang-chip { height: 100%; border-radius: 999px 0 0 999px; border-color: #c7d2fe; background: #eef2ff; }
@@ -5473,15 +5473,16 @@
                 <div class="dc-detail-head-row">
                     <div style="flex:1; min-width:0;">
                         <div id="dx-detail-name" class="dc-detail-name">Disease name</div>
-                        <div id="dx-detail-chips" class="dc-detail-chips lang-no-toggle"></div>
                     </div>
                     <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
-                        <!-- V101.03: 🌐 language chip + its popover, filled by dxRenderLangChip(); replaces the 6-flag bar. -->
-                        <div id="dx-detail-lang" class="dc-lang-wrap lang-no-toggle"></div>
-                        <button type="button" class="dc-detail-suggest-btn" onclick="dxSuggestEdit()" title="Suggest edit — send an edit request to the admin" data-th-title="ส่งคำขอแก้ไขให้ admin" data-kr-title="관리자에게 수정 요청 보내기" aria-label="Suggest edit">✨</button>
+                        <!-- V101.03: 🌐 language chip + its popover, filled by dxRenderLangChip(); replaces the 6-flag bar.
+                             V101.201: one pill with ✨ (as on the Drug entry, V101.199). -->
+                        <span class="dc-head-grp lang-no-toggle"><div id="dx-detail-lang" class="dc-lang-wrap lang-no-toggle"></div><button type="button" class="dc-detail-suggest-btn" onclick="dxSuggestEdit()" title="Suggest edit — send an edit request to the admin" data-th-title="ส่งคำขอแก้ไขให้ admin" data-kr-title="관리자에게 수정 요청 보내기" aria-label="Suggest edit">✨</button></span>
                         <button type="button" class="dc-detail-close" onclick="dxCloseDetail()" aria-label="Close">×</button>
                     </div>
                 </div>
+                <!-- V101.201: full-width chips row under the name (was in the name's column); folds away while the head is compact -->
+                <div id="dx-detail-chips" class="dc-detail-chips lang-no-toggle"></div>
             </div>
             <!-- V101.197: 📰 the articles about this disease (articles.js forDisease), painted by dxPaintArticles() -->
             <div id="dx-detail-articles" class="lang-no-toggle" hidden style="margin:10px 16px 0; padding:10px 12px; border:1px solid #c7d2fe; background:#eef2ff; border-radius:14px;"></div>
@@ -18371,12 +18372,12 @@
             }).join('\n');
         }
         // V101.199: the head is sticky; past 40px it folds to the name + the pill, the rail pins under it, the section in view lights its chip
-        function dcLeanHead() {
+        function codexLeanHead(modalId, bodyId, artsId) {   // V101.199 drug · V101.201 both entries
             // the BODY is the scroller (max-height 70vh) — the head stays above it. The body gets the room left under the head so the modal
             // itself never scrolls; past 40px the head folds; the rail (sticky at the body's top) lights the section in view.
-            const modal = document.getElementById('drugCodexDetailModal'), head = modal && modal.querySelector('.dc-detail-head'), body = document.getElementById('dc-detail-body');
+            const modal = document.getElementById(modalId), head = modal && modal.querySelector('.dc-detail-head'), body = document.getElementById(bodyId);
             if (!modal || !head || !body) return;
-            const rail = body.querySelector('.dc-sec-rail'), arts = document.getElementById('dc-detail-articles');
+            const rail = body.querySelector('.dc-sec-rail'), arts = document.getElementById(artsId);
             const place = () => {
                 const above = head.offsetHeight + ((arts && !arts.hidden) ? arts.offsetHeight + 10 : 0);
                 body.style.maxHeight = 'calc(80vh - ' + above + 'px)';
@@ -18389,7 +18390,7 @@
             const secs = [...body.querySelectorAll('.dc-detail-section')];
             const mark = key => { if (!rail) return; rail.querySelectorAll('.dc-sec-chip').forEach(c => c.classList.toggle('active', c.getAttribute('data-target') === key)); const on = rail.querySelector('.dc-sec-chip.active'); if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest', inline: 'nearest' }); };
             const first = secs.find(x => x.open) || secs[0]; if (first) mark(first.getAttribute('data-section-key') || '');
-            // dcRenderDetail runs before dcOpenDetail shows the modal, so the heights are 0 now — measure on the next frame (and again once shown)
+            // the detail renders before the modal shows, so the heights are 0 now — measure on the next frame (and again once shown)
             const start = () => {
                 head.classList.toggle('is-compact', body.scrollTop > 40); place();
                 if (!rail || typeof IntersectionObserver !== 'function') return;
@@ -18404,6 +18405,8 @@
             };
             start(); requestAnimationFrame(start);
         }
+        function dcLeanHead() { codexLeanHead('drugCodexDetailModal', 'dc-detail-body', 'dc-detail-articles'); }
+        function dxLeanHead() { codexLeanHead('diseaseCodexDetailModal', 'dx-detail-body', 'dx-detail-articles'); }   // V101.201
         function dcRenderLangBar(eff) {   // V101.199: no longer drawn (the chip in the head replaced it); kept for the Disease entry's sibling code paths
             const selected = dcGetSelectedLang();
             // V95.03 Phase 3: badge rendered as a colored pill — text/bg tint
@@ -18842,16 +18845,12 @@
             const selected = dxGetSelectedLang();
             const cur = DC_LANGS.find(l => l.code === selected) || DC_LANGS[0];
             const short = { orig: 'Orig', th: 'TH', en: 'EN', ko: 'KO', ja: 'JA', zh: 'ZH' }[cur.code] || cur.code.toUpperCase();
-            let status = '';
-            if (eff && eff._translationPending) {
-                status = '<span class="dc-lang-status" style="color:#475569; background:#e2e8f0;">⏳</span>';
-            } else if (selected !== 'orig' && eff && eff._translationSource) {
-                const src = eff._translationSource;
-                const pal = DC_SOURCE_COLORS[src] || { c: '#475569', bg: '#f1f5f9' };
-                status = `<span class="dc-lang-status" style="color:${pal.c}; background:${pal.bg};" title="${escapeHtml(DC_SOURCE_BADGES[src] || src)}">${escapeHtml(DC_SOURCE_BADGES[src] || src)}</span>`;
-            }
+            // V101.201: lean like the Drug entry's chip — the code and a chevron only; the translation source lives in the tooltip
+            let src = '';
+            if (eff && eff._translationPending) src = ' · ⏳ translating';
+            else if (selected !== 'orig' && eff && eff._translationSource) src = ' · ' + (DC_SOURCE_BADGES[eff._translationSource] || eff._translationSource);
             const opts = DC_LANGS.map(l => `<button type="button" class="${l.code === selected ? 'active' : ''}" onclick="dxApplyLang('${l.code}')" title="${l.title}" aria-label="${l.title}">${l.label}</button>`).join('');
-            host.innerHTML = `${status}<button type="button" class="dc-lang-chip" onclick="dxToggleLangPop()" aria-expanded="false" aria-controls="dx-lang-pop" title="Language · ${cur.title} — tap to change">🌐 ${short} <span class="dc-lang-chev" aria-hidden="true">⌄</span></button><div id="dx-lang-pop" class="dc-lang-pop" hidden>${opts}</div>`;
+            host.innerHTML = `<button type="button" class="dc-lang-chip" onclick="dxToggleLangPop()" aria-expanded="false" aria-controls="dx-lang-pop" title="Language · ${escapeHtml(cur.title + src)} — tap to change" data-src="${escapeHtml((eff && eff._translationSource) || '')}">${short} <span class="dc-lang-chev" aria-hidden="true">⌄</span></button><div id="dx-lang-pop" class="dc-lang-pop" hidden>${opts}</div>`;
         }
         function dxToggleLangPop(force) {
             const pop = document.getElementById('dx-lang-pop'), chip = document.querySelector('#dx-detail-lang .dc-lang-chip');
@@ -18996,6 +18995,7 @@
             const creditHtml = codexContributorCreditHtml(disease.submittedByName, disease.submittedByPictureUrl);
             body.innerHTML = (html || '<div class="dc-empty-state" style="padding:20px;">No details for this disease yet — the entry may still be in draft โรคนี้ยังไม่มีรายละเอียด</div>') + creditHtml;
             codexBuildSectionRail(body, { iconOnly: true }); // V95.79: sticky jump-rail + auto-open first · V101.03: icons only
+            dxLeanHead();   // V101.201: compact head on scroll, rail under it, the section in view lit
             body.scrollTop = 0;
         }
 
