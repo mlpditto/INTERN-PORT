@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.372)</title>
+    <title>Nika Admin (V102.373)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -23468,12 +23468,21 @@ Respond ONLY with valid JSON (no markdown, no code fences, no preamble):
             return ops.reverse();
         }
 
+        // V102.373: consecutive tokens of one kind render as ONE run — Intl.Segmenter gives a Thai phrase one token per word, and a padded
+        // span per word read as "จ่ายยา ให้ คนไข้" in the Edited preview. Merging keeps the word-level diff but shows the phrase whole.
+        function diffRuns(ops) {
+            const runs = [];
+            ops.forEach(op => { const last = runs[runs.length - 1]; if (last && last.type === op.type) last.text += op.text; else runs.push({ type: op.type, text: op.text }); });
+            return runs;
+        }
         function renderWordDiff(original, improved) {
-            return diffWords(original, improved).map(op => {
+            return diffRuns(diffWords(original, improved)).map(op => {
                 const txt = escapeHtml(op.text);
                 if (op.type === 'eq') return txt;
-                if (op.type === 'add') return `<span style="background:#dcfce7; color:#166534; padding:0 3px; border-radius:3px; font-weight:600;">${txt}</span>`;
-                return `<span style="background:#fee2e2; color:#991b1b; padding:0 3px; border-radius:3px; text-decoration:line-through; opacity:0.65;">${txt}</span>`;
+                if (!op.text.trim()) return op.type === 'add' ? txt : '';   // a changed space is just a space (a padded green blob read as a word)
+                const pad = /^[฀-๿]|[฀-๿]$/.test(op.text) ? '0' : '0 3px';   // no side padding inside a Thai phrase — the colour is the mark
+                if (op.type === 'add') return `<span style="background:#dcfce7; color:#166534; padding:${pad}; border-radius:3px; font-weight:600;">${txt}</span>`;
+                return `<span style="background:#fee2e2; color:#991b1b; padding:${pad}; border-radius:3px; text-decoration:line-through; opacity:0.65;">${txt}</span>`;
             }).join('');
         }
 
