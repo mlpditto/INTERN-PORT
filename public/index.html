@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.189)</title>
+    <title>Internship Portfolio (V101.190)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.171">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -1649,6 +1649,27 @@
         }
 
         .case-card.is-reviewed { background: #f0fdf4; border-color: #bbf7d0; }
+        /* V101.190 (PR B, owner's pick: A on desktop, the cards on phones): from 701px a case is a timeline row — disc (emoji + nth) on the
+           left, HN · patient · date · tags on one line, a green dot for reviewed, the note clamped to two lines, no green card and no group head. */
+        @media (min-width: 701px) {
+            .case-group-block { margin: 0; }
+            .case-group-head { display: none; }
+            .case-card, .case-card.is-reviewed { position: relative; display: grid; grid-template-columns: 44px auto minmax(0, 1fr); grid-template-areas: "disc top chips" "disc note note"; column-gap: 12px; row-gap: 2px; align-items: center; margin: 0; padding: 10px 6px; background: transparent; border: 0; border-top: 1px solid #f1f5f9; border-radius: 0; box-shadow: none; }
+            .case-group-block:first-child .case-card:first-of-type { border-top: 0; }
+            .case-card > .case-card-top { grid-area: top; justify-content: flex-start; gap: 10px; }
+            .case-card > .case-chip-group { grid-area: chips; }
+            .case-card > .case-card-note { grid-area: note; }
+            .case-card::before { content: attr(data-emoji); grid-area: disc; align-self: start; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; background: hsl(var(--h, 210), 85%, 93%); border: 1px solid hsl(var(--h, 210), 60%, 84%); }
+            .case-card::after { content: attr(data-n); position: absolute; left: 38px; top: 42px; width: 18px; height: 18px; border-radius: 50%; background: #1e293b; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+            .case-card-top { margin: 0; align-items: center; }
+            .case-card-line { align-items: center; gap: 4px 10px; }
+            .case-card-id { font-size: 15px; }
+            .case-card-pre { display: none; }
+            .case-card.is-reviewed .case-card-id::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #16a34a; margin-right: 8px; vertical-align: middle; }
+            .case-card .case-chip-group { margin: 0 !important; }
+            .case-card .case-card-note { border-top: 0 !important; padding-top: 0 !important; font-size: 13px !important; color: #475569 !important; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }   /* !important: the note keeps its inline card styles for phones */
+            .case-card .case-card-note strong { display: none; }
+        }
 
         .case-card-top {
             display: flex;
@@ -26546,6 +26567,9 @@ async function archiveDoneCard(cardId) {
 
             // V101.59: a system is its emoji (+ count); the name stays in the tooltip / aria-label.
             const sysEmoji = sys => { const c0 = groups[sys][0]; return CASE_SYSTEM_EMOJI[c0.diseaseSystemKey || c0.diseaseSystem || 'other'] || '📋'; };
+            // V101.190: on a desktop each card is drawn as a timeline row — the disc (system emoji + nth case of that system) comes from
+            // data-emoji / data-n via CSS, the hue from the system key (same hash as the History disc). Phones keep the cards.
+            const sysHue = sys => { const c0 = groups[sys][0], k = String(c0.diseaseSystemKey || c0.diseaseSystem || 'other'); let h = 0; for (const ch of k) h = (h * 31 + ch.codePointAt(0)) >>> 0; return h % 360; };
             statsContainer.innerHTML =
                 `<button type="button" class="case-filter-pill ${activeFilter === 'all' ? 'active' : ''}" onclick="setCaseSystemFilter('all')">All (${cases.length})</button>` +
                 orderedSystems.map(sys => `<button type="button" class="case-filter-pill ${activeFilter === sys ? 'active' : ''}" title="${escapeHtml(sys)}" aria-label="${escapeHtml(sys)} (${groups[sys].length})" onclick='setCaseSystemFilter(${JSON.stringify(sys)})'>${sysEmoji(sys)} ${groups[sys].length}</button>`).join('');
@@ -26560,7 +26584,7 @@ async function archiveDoneCard(cardId) {
                     <div class="case-group-head">
                         <div class="case-group-title" title="${escapeHtml(sys)}" aria-label="${escapeHtml(sys)} (${groups[sys].length})"><span style="font-size:1.25em; line-height:1;">${sysEmoji(sys)}</span></div>
                     </div>
-                    ${groups[sys].map(c => {
+                    ${groups[sys].map((c, ci) => {
                 const status = (c.status || '').toLowerCase();
                 const isPending = status === 'pending' || c.status === 'รอตรวจ';
                 const symptoms = Array.isArray(c.symptomTags) ? c.symptomTags : [];
@@ -26568,10 +26592,10 @@ async function archiveDoneCard(cardId) {
                     ? window.formatUiDate(c.timestamp, c.timestamp.toDate().getFullYear() === new Date().getFullYear() ? {} : { year: '2-digit' })   // V101.189: same short date as the timeline
                     : '';
                 return `
-                            <div class="case-card${isPending ? '' : ' is-reviewed'}">
+                            <div class="case-card${isPending ? '' : ' is-reviewed'}" data-emoji="${sysEmoji(sys)}" data-n="${ci + 1}" style="--h:${sysHue(sys)}">
                                 <div class="case-card-top">
                                     <div class="case-card-line">
-                                        <div class="case-card-id">HN / Ref: ${c.caseId}</div>
+                                        <div class="case-card-id"><span class="case-card-pre">HN / Ref: </span>${c.caseId}</div>
                                         <div class="case-card-meta">
                                             ${c.customer ? `<span class="lang-no-toggle"><i class="fa-solid fa-user"></i> ${c.customer}</span>` : '<span><i class="fa-solid fa-user"></i> Unnamed patient</span>'}
                                             ${dateText ? `<span><i class="fa-solid fa-calendar"></i> ${dateText}</span>` : ''}
@@ -26580,7 +26604,7 @@ async function archiveDoneCard(cardId) {
                                     ${isPending ? '<span class="case-status-badge pending">Pending Review</span>' : ''}
                                 </div>
                                 ${symptoms.length ? `<div class="case-chip-group" style="margin:0 0 8px;">${symptoms.map(tag => `<span class="case-chip case-chip-neutral">${tag}</span>`).join('')}</div>` : ''}
-                                ${c.note ? `<div class="lang-no-toggle" style="font-size:0.82em; color:#6b7280; line-height:1.55; border-top:1px dashed #edf2f7; padding-top:8px;"><strong style="color:#475569;">Note:</strong> ${c.note}</div>` : ''}
+                                ${c.note ? `<div class="lang-no-toggle case-card-note" style="font-size:0.82em; color:#6b7280; line-height:1.55; border-top:1px dashed #edf2f7; padding-top:8px;"><strong style="color:#475569;">Note:</strong> ${c.note}</div>` : ''}
                             </div>
                         `;
             }).join('')}
