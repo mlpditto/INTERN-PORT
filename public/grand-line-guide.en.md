@@ -20,19 +20,19 @@ Tab: **🏴‍☠️ Grand Line Deck** → the three modes at the top: 🏴 Miss
 
 ## 2. 🎬 Video
 
-**Where:** 🏴 Miss Goldenweek → the **Clip 9:16** chip in the engine row.
+**Where:** 🏴 Miss Goldenweek. The step strip on the card shows where you are: ① Intent ② Brief ③ Style ④ Plan (free) ⑤ Render (paid) ⑥ Review.
 
-1. Pick a style and write the **series topic** in Vision (e.g. "warfarin counselling for new patients", Thai is fine).
-2. Click **🎬 Clip 9:16**. The button becomes **Plan 10 episodes** and the box switches to series mode.
-3. Press **Plan 10 episodes**. The ✒ enhancer model (text only, no video cost) plans 10 clips: English / Thai title, learning objective, the one key fact, one spoken line, one picture. The **Episodes** card appears; ✏️ edits any row in place.
-4. Press **▶** on one episode. A cost line asks first — **≈ $0.80 · 8 s** — confirm it. Gemini Omni Flash renders a vertical 9:16, 720p clip with audio; a timer shows the wait (usually under a minute, up to 12 are allowed).
-5. The clip plays in the preview card with EP number, model, render time and cost. Then choose:
-   - **⬇ Download** — the MP4 (720×1280, H.264 + AAC).
-   - **Saved automatically** as soon as it renders: MP4 to Storage `teach-clips/{series}/EPnn.mp4` plus the series record in `clip_series`, and it shows in **Codex Gallery → 🎬 Clips** (a failed upload shows **↻ Retry save**).
-   - **🗑** — deletes the clip for good (MP4 + gallery entry), asking first; on the card or in Codex Gallery. The episode goes back to planned.
-6. Render the next episode with its own ▶. There is no "render all" on purpose — one confirmation per clip.
+1. **Intent**: the chips top right, **🖼 Image** · **🎬 Series ×10** · **🎞 One clip**. The engine row below switches to that family; the pick is remembered.
+2. **Brief**: four fields, 📄 Context · 🎯 Goal · 📚 Source · ⭐ Expectations (Thai is fine); they become one prompt. **⇄ Free text** swaps them for a single box.
+3. **Style**: one chip (pharmacy styles first, **Easy to see** for older patients, the six One Piece styles behind the **🏴‍☠️ One Piece** chip). The style text is appended to every prompt, with the 🛡️ Always added line (original characters, no logos); the pick is remembered.
+4. **Plan** (free): the bottom-left rail is the text model (logo tabs pick the vendor, chips the version). Press **Plan 10 episodes** (or **Plan 1 clip**) → the **Episodes** card: EN/TH title, objective, key fact, one spoken line, one picture, Thai caption. ✏️ edits a row in place.
+5. **Render** (paid): pick the engine chip (the 8-s price sits under the name): **Clip 9:16** Gemini Omni Flash ≈ $0.80 · **Veo Lite** ≈ $0.40 · **Kling** ≈ $1.01 · **HeyGen** ≈ $0.40 (avatar presenter) · **Seedance** ≈ $0.73. Then:
+   - **▶** on one episode → the row asks **≈ $ · 8 s → Render**; confirm and it renders a 9:16 720p clip with audio.
+   - **☑** several episodes → the bar shows the count and the total, **▶ Render n · one at a time**; one confirmation, the clips render one after another, **⏹ Stop after this one** stops.
+   - Every finished clip saves itself: MP4 to Storage `teach-clips/{series}/EPnn.mp4` + the `clip_series` record, and it shows in **Codex Gallery → 🎬 Clips**. A failed upload → **💾 Save all (n)** in the bar.
+6. **Review**: the clip plays in the card with EP, model, render time and cost: **⬇ Download** MP4 (720×1280) · **CC ไทย / 🔊 เสียงไทย** (section 3) · **🗑** deletes for good (asks first; the episode goes back to planned).
 
-> Thai speech quality of Omni Flash is still being judged; listen before publishing. A cheaper engine (Veo 3.1 Lite ≈ $0.40 / clip) needs a proxy change first.
+> You pay per clip that comes back; there is no unconfirmed "render all". Thai speech from the engines is still uneven, so make the Thai voice as in section 3.
 
 ---
 

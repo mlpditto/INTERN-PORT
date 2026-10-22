@@ -20,19 +20,19 @@
 
 ## 2. 🎬 영상
 
-**위치:** 🏴 Miss Goldenweek → engine 줄의 **Clip 9:16** 칩
+**위치:** 🏴 Miss Goldenweek. 카드 위 단계 띠가 현재 위치를 보여줍니다: ① Intent ② Brief ③ Style ④ Plan (free) ⑤ Render (paid) ⑥ Review.
 
-1. 스타일을 고르고 Vision에 **시리즈 주제**를 씁니다 (예: 신규 환자 warfarin 상담).
-2. **🎬 Clip 9:16** 클릭 → 버튼이 **Plan 10 episodes**로 바뀌고 시리즈 모드가 됩니다.
-3. **Plan 10 episodes** — ✒ enhancer 모델(텍스트만, 영상 비용 없음)이 10개 에피소드를 계획: 영/태 제목, 학습 목표, 핵심 사실 1개, 대사 1줄, 그림 1장. **Episodes** 카드가 나타나고 ✏️로 행을 바로 수정합니다.
-4. 한 에피소드의 **▶** — 먼저 비용 확인 **≈ $0.80 · 8 s**. Gemini Omni Flash가 세로 9:16 720p, 오디오 포함 클립을 렌더링합니다 (보통 1분 이내, 최대 12분).
-5. 미리보기 카드에서 재생(EP 번호, 모델, 렌더 시간, 비용) 후 선택:
-   - **⬇ Download** — MP4 (720×1280, H.264 + AAC)
-   - **자동 저장** — 렌더가 끝나면 바로: Storage `teach-clips/{series}/EPnn.mp4` + `clip_series` 문서, **Codex Gallery → 🎬 Clips**에 표시 (업로드 실패 시 **↻ Retry save**)
-   - **🗑** — 클립을 영구 삭제 (MP4 + 갤러리 항목), 먼저 확인; 카드 또는 Codex Gallery에서. 에피소드는 planned로 돌아감
-6. 다음 에피소드는 그 행의 ▶로. 일부러 "전체 렌더링"은 없습니다 — 클립마다 확인.
+1. **Intent**: 오른쪽 위 칩 **🖼 Image** · **🎬 Series ×10** · **🎞 One clip**. 아래 engine 줄이 그 계열로 바뀌고 선택은 기억됩니다.
+2. **Brief**: 네 칸 📄 Context · 🎯 Goal · 📚 Source · ⭐ Expectations (태국어 가능); 한 프롬프트로 합쳐집니다. **⇄ Free text**로 한 칸 입력으로 전환.
+3. **Style**: 칩 하나 (약국 스타일 먼저, 고령 환자용 **Easy to see**, One Piece 여섯 스타일은 **🏴‍☠️ One Piece** 칩 뒤에). 스타일 문구가 모든 프롬프트 끝에 붙고 🛡️ Always added 줄(원작 캐릭터, 로고 없음)도 함께; 선택은 기억됩니다.
+4. **Plan** (free): 왼쪽 아래 줄이 텍스트 모델(로고 탭 = 회사, 칩 = 버전). **Plan 10 episodes** (또는 **Plan 1 clip**) → **Episodes** 카드: 영/태 제목, 목표, 핵심 사실, 대사 1줄, 그림 1장, 태국어 자막. ✏️로 행을 바로 수정합니다.
+5. **Render** (paid): engine 칩 선택(이름 아래 8초 가격): **Clip 9:16** Gemini Omni Flash ≈ $0.80 · **Veo Lite** ≈ $0.40 · **Kling** ≈ $1.01 · **HeyGen** ≈ $0.40 (아바타 진행자) · **Seedance** ≈ $0.73. 그다음:
+   - 에피소드 하나의 **▶** → 그 행에서 **≈ $ · 8 s → Render** 확인 후 9:16 720p 오디오 포함 클립을 렌더링.
+   - 여러 에피소드 **☑** → 바에 개수와 합계, **▶ Render n · one at a time**; 확인 한 번, 클립을 차례로 렌더링, **⏹ Stop after this one**으로 중단.
+   - 끝난 클립은 자동 저장: Storage `teach-clips/{series}/EPnn.mp4` + `clip_series` 문서, **Codex Gallery → 🎬 Clips**에 표시. 업로드 실패 → 바의 **💾 Save all (n)**.
+6. **Review**: 카드에서 재생(EP, 모델, 렌더 시간, 비용): **⬇ Download** MP4 (720×1280) · **CC ไทย / 🔊 เสียงไทย** (3절) · **🗑** 영구 삭제(먼저 확인; 에피소드는 planned로).
 
-> Omni Flash의 태국어 음성 품질은 아직 검증 중 — 게시 전 들어보세요. 더 저렴한 engine(Veo 3.1 Lite ≈ $0.40/클립)은 proxy 수정이 먼저 필요합니다.
+> 돌아온 클립마다 과금; 확인 없는 "전체 렌더링"은 없습니다. engine의 태국어 음성은 아직 고르지 않으니 태국어 음성은 3절대로 만드세요.
 
 ---
 

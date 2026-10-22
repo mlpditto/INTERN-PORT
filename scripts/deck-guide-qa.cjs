@@ -17,7 +17,7 @@ assert.ok(/<script src="admin-guide\.js\?v=V102\.\d+" defer><\/script>/.test(adm
 const secs = m => m.split(/\r?\n/).filter(l => /^## /.test(l));
 assert.equal(secs(deck.en).length, 5, 'five sections: images · video · Thai clip (V102.369) · audio · research');
 assert.equal(secs(deck.th).length, 5); assert.equal(secs(deck.ko).length, 5);
-for (const label of ['Plan 10 episodes', 'Clip 9:16', 'Nano Banana 2.1', 'Image 2', 'Visual Style Collection', 'Polish', 'Query Brain', 'Suggest Prompts', 'Focus on KB Only', 'Manage Documents', 'Codex Gallery', 'Clear Chat', 'Send to Podcast', 'Target Length', 'Performance Direction', 'CC ไทย', '🔊 เสียงไทย']) {
+for (const label of ['Plan 10 episodes', 'Clip 9:16', 'Nano Banana 2.1', 'Image 2', 'Visual Style Collection', 'Polish', 'Query Brain', 'Suggest Prompts', 'Focus on KB Only', 'Manage Documents', 'Codex Gallery', 'Clear Chat', 'Send to Podcast', 'Target Length', 'Performance Direction', 'CC ไทย', '🔊 เสียงไทย', 'Series ×10', 'One clip', '⇄ Free text', 'Easy to see', 'Stop after this one', 'Save all']) {   // V102.370: the Video section names the stepper's controls
     assert.ok(admin.includes(label), 'admin.html has "' + label + '"');
     for (const l of ['en', 'th', 'ko']) assert.ok(deck[l].split('**').join('').includes(label), l.toUpperCase() + ' deck guide names "' + label + '"');
 }
@@ -55,7 +55,7 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Nika Admin (V9.9)</
         const body = () => page.$eval('#adminGuideOverlay .ag-body', e => e.innerText);
         assert.ok(/Visual Style Collection/.test(await body()) && /Nano Banana 2\.1/.test(await body()));
         await page.click('#adminGuideOverlay .ag-chip[data-i="1"]');
-        assert.ok(/Plan 10 episodes/.test(await body()) && /\$0\.80/.test(await body()) && /teach-clips/.test(await body()), 'video section');
+        assert.ok(/Plan 10 episodes/.test(await body()) && /\$0\.80/.test(await body()) && /teach-clips/.test(await body()) && /Intent.*Brief.*Style.*Plan.*Render.*Review/s.test(await body()) && /Series ×10/.test(await body()) && /Stop after this one/.test(await body()), 'video section = the stepper (V102.370)');
         await page.click('#adminGuideOverlay .ag-chip[data-i="2"]');
         assert.ok(/CC ไทย/.test(await body()) && /🔊 เสียงไทย/.test(await body()) && /Kore \/ Charon \/ Achird/.test(await body()) && /EPnn-th-voice\.mp4/.test(await body()), 'Thai clip section (V102.369)');
         await page.click('#adminGuideOverlay .ag-chip[data-i="1"]');
