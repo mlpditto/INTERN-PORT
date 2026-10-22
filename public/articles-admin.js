@@ -523,7 +523,8 @@
             if (!tr && !topic) { S.err = '✨ needs a title (a few words are enough) to draft from.'; render(); return Promise.resolve(); }
             var prompt = tr
                 ? 'Translate this short article for pharmacy interns into ' + NAME[L] + '. Keep the markdown, emoji, line breaks and drug names (keep drug names in English). Reply with the translated title on the first line, then a line with only ---, then the translated article. Nothing else.\n\n' + String(a.title.en || '').trim() + '\n---\n' + String(a.body.en || '').trim()
-                : 'Write a short article for pharmacy interns in Thailand, in ' + NAME[L] + ', to show as a popup when they open the app (under 900 characters). Topic: ' + topic + '. ' + (notes ? 'Build on these notes: ' + notes + '. ' : '') + '3 to 5 short lines: one practical point, one example from the pharmacy counter, one takeaway. Markdown: **bold** and short lists only, no headings. Reply with the article only.';
+                // V102.363 (owner): emoji carry the meaning so the words stay few; a closing 💊 line names the drugs to read up on
+                : 'Write a short article for pharmacy interns in Thailand, in ' + NAME[L] + ', to show as a popup when they open the app (under 700 characters). Topic: ' + topic + '. ' + (notes ? 'Build on these notes: ' + notes + '. ' : '') + '3 to 5 short lines, each starting with one fitting emoji instead of a label (for example 💡 the practical point, 🏪 a pharmacy-counter example, ⚠️ a red flag, ✅ the takeaway) — the emoji says what the line is, so keep the words few. End with one line starting with 💊 that lists 2 to 4 related drug names to read up on (generic names in English, comma-separated). Markdown: **bold** on the key words only, no headings, no numbered lists. Reply with the article only.';
             S.aiBusy = true; S.err = ''; S.aiNote = ''; render();
             var t0 = Date.now();
             return Promise.resolve().then(function () {
