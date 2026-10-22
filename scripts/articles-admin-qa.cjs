@@ -271,6 +271,40 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
       window.callUniversalAI = async () => { throw new Error('quota'); };
       await Articles.ai(); out.err = q('.art-err') && q('.art-err').textContent;
       out.writes = writes.length;
+      // ---- V102.362: 🌐 Translate all — the header button before ＋ New; every missing TH / KO from EN, saved as title.<L> / body.<L>
+      Articles.close();
+      S.list = [
+        { id: 'a1', title: { en: 'Acromegaly: Spotting the Subtle Signs 🔍' }, body: { en: 'Body one' }, cover: { emoji: '📰' }, status: 'scheduled', startAt: Date.now(), endAt: Date.now() + 864e5, audience: { divisions: [], groups: [] }, links: [], rerun: 'any' },
+        { id: 'a2', title: { en: 'Two', th: 'สอง' }, body: { en: 'Body two', th: 'เนื้อสอง' }, cover: { emoji: '📰' }, status: 'scheduled', startAt: Date.now(), endAt: Date.now() + 864e5, audience: { divisions: [], groups: [] }, links: [], rerun: 'any' },
+        { id: 'a3', title: { en: 'Three', th: 'สาม', ko: '셋' }, body: { en: 'B3', th: 'B3', ko: 'B3' }, cover: { emoji: '📰' }, status: 'draft', startAt: 0, endAt: 0, audience: { divisions: [], groups: [] }, links: [], rerun: 'any' },
+      ];
+      S.cur = null; Articles.filter('all');
+      const hd = qa('.art-h > *').map(e => e.className.split(' ')[0]);
+      out.trHead = [hd.indexOf('art-tr-all') > -1 && hd.indexOf('art-tr-all') < hd.indexOf('art-new'), q('.art-tr-all').textContent.replace(/\s+/g, ' ').trim(), q('.art-tr-all').disabled];
+      const trCalls = []; window.callUniversalAI = async (...a) => { trCalls.push(a); const L = /into Korean/.test(a[1]) ? 'ko' : 'th'; return { text: (L === 'ko' ? '제목' : 'หัวข้อ') + '\n---\n' + (L === 'ko' ? '본문' : 'เนื้อหา') }; };
+      const toasts = []; window.showToast = m => toasts.push(m);
+      window.confirm = () => false; await Articles.translateAll(); out.trCancel = [trCalls.length, writes.length];
+      out.trHead2 = [q('.art-tr-all').textContent.replace(/\s+/g, ' ').trim(), S.list.map(a => a.id + ':' + Object.keys(a.body).sort().join('')).join(' ')];
+      window.confirm = msg => { if (!out.trConfirm) out.trConfirm = msg; return true; };   // the stop test below confirms again
+      const w0 = writes.length; await Articles.translateAll();
+      out.trJobs = trCalls.map(a => (a[1].match(/into (\w+)\./) || [])[1] + ':' + (a[1].split('\n\n')[1] || '').split('\n')[0]);
+      out.trWrites = writes.slice(w0).map(w => [w[0], w[1], Object.keys(w[2]).sort().join(','), w[2]['body.th'] || w[2]['body.ko'], w[2]['title.th'] || w[2]['title.ko']]);
+      out.trList = S.list.map(a => a.id + ':' + Object.keys(a.body).sort().join(''));
+      out.trAfter = [q('.art-tr-all').textContent.replace(/\s+/g, ' ').trim(), q('.art-tr-all').disabled, toasts[toasts.length - 1]];
+      // a second click while running = stop after the current one
+      S.list[0].body = { en: 'Body one' }; S.list[0].title = { en: 'Acromegaly: Spotting the Subtle Signs 🔍' }; Articles.filter('all');
+      let during = null; window.callUniversalAI = async (...a) => { if (!during) { during = q('.art-tr-all').textContent.replace(/\s+/g, ' ').trim(); Articles.translateAll(); } return { text: 'x\n---\ny' }; };
+      const w1 = writes.length; await Articles.translateAll(); out.trStop = [during, writes.length - w1, /stopped/.test(toasts[toasts.length - 1])];
+      // ---- 🩺 Disease Codex: the saved article's topic lands in the Codex AI Auto-Draft name box; an unsaved edit is refused
+      let opened = 0; window.openDiseaseCodexAdmin = () => { opened++; };
+      const row = document.getElementById('dxa-ai-input-row'), nm = document.getElementById('dxa-ai-name');   // the real Disease Codex elements in admin.html
+      row.style.display = 'none'; nm.value = '';
+      window.dxaAutoDraftToggle = () => { row.style.display = 'block'; };
+      Articles.edit('a1'); out.dxChip = !!qa('.art-c.art-add').find(b => /Disease Codex/.test(b.textContent));
+      S.cur.title.en = 'Acromegaly: edited'; Articles.toCodex(); out.dxDirty = [q('.art-err') && q('.art-err').textContent, opened];
+      S.cur.title.en = 'Acromegaly: Spotting the Subtle Signs 🔍'; S.base = JSON.stringify(S.cur); Articles.toCodex(); await wait(250);
+      out.dx = [opened, nm.value, row.style.display, document.getElementById('articlesModal').style.display];
+      Articles.open(); Articles.edit('a1');
       // the one-line model rail
       Articles.modelPick();
       const chips = qa('.art-mrail .text-ai-chips > button'), shown = chips.filter(b => getComputedStyle(b).display !== 'none');
@@ -298,6 +332,18 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
     assert.deepEqual(r3.bom, [239, 187, 191], 'with a UTF-8 BOM so Excel reads Thai names');
     assert.equal(r3.back, true, '✕ goes back to the editor');
     assert.equal(r3.trBtn, '✨ From EN', 'an empty TH next to a filled EN offers a translation');
+    // V102.362
+    assert.deepEqual(r3.trHead, [true, '🌐 Translate all 3', false], '🌐 sits before ＋ New and counts the missing versions (a1 th+ko, a2 ko): ' + JSON.stringify(r3.trHead));
+    assert.deepEqual(r3.trCancel, [0, 0], 'Cancel on the confirm sends nothing');
+    assert.match(r3.trConfirm, /Translate 3 missing version\(s\) of 2 article\(s\)/, 'the confirm counts versions and articles: ' + r3.trConfirm + ' | ' + JSON.stringify(r3.trHead2));
+    assert.deepEqual(r3.trJobs, ['Thai:Acromegaly: Spotting the Subtle Signs 🔍', 'Korean:Acromegaly: Spotting the Subtle Signs 🔍', 'Korean:Two'], 'one prompt per missing version, from the EN title: ' + JSON.stringify(r3.trJobs));
+    assert.deepEqual(r3.trWrites, [['update', 'a1', 'body.th,title.th,updatedAt,updatedBy', 'เนื้อหา', 'หัวข้อ'], ['update', 'a1', 'body.ko,title.ko,updatedAt,updatedBy', '본문', '제목'], ['update', 'a2', 'body.ko,title.ko,updatedAt,updatedBy', '본문', '제목']], 'each version is saved on its own, only that language: ' + JSON.stringify(r3.trWrites));
+    assert.deepEqual(r3.trList, ['a1:enkoth', 'a2:enkoth', 'a3:enkoth'], 'the list rows pick up the new languages');
+    assert.deepEqual(r3.trAfter, ['🌐 Translate all', true, '🌐 Translated 3/3'], 'afterwards the button has nothing left to do: ' + JSON.stringify(r3.trAfter));
+    assert.deepEqual(r3.trStop, ['🌐 1/2 · stop', 1, true], 'a second click stops after the current one: ' + JSON.stringify(r3.trStop));
+    assert.equal(r3.dxChip, true, '🩺 Disease Codex chip in the Links line');
+    assert.deepEqual(r3.dxDirty, ['⚠️ 🩺 Save the article first, then open the Disease Codex.', 0], 'an unsaved edit is refused (the error line carries the ⚠️)');
+    assert.deepEqual(r3.dx, [1, 'Acromegaly', 'block', 'none'], 'the Codex opens with the bare topic in the AI Auto-Draft box, the Articles modal closed: ' + JSON.stringify(r3.dx));
     assert.deepEqual(r3.tr, ['หัวข้อไทย', 'เขย่าก่อนใช้ **ทุกครั้ง**', true, false, 'article_draft', true, true], 'translation fills TH title + body, notes the model, logs feature article_draft, leaves it unsaved');
     assert.equal(r3.drBtn, '✨ Draft');
     assert.deepEqual(r3.dr, ['**Shake** the inhaler first.', true], 'a draft writes the body from the title (code fences stripped)');
