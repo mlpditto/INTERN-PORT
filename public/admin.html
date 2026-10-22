@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.373)</title>
+    <title>Nika Admin (V102.374)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -7932,7 +7932,7 @@
 <script src="quiz-cover.js?v=V102.344"></script>
 <script src="clip-captions.js?v=V102.366"></script>
 <script src="holidays-admin.js?v=V102.330"></script>
-<script src="articles-admin.js?v=V102.372"></script>
+<script src="articles-admin.js?v=V102.374"></script>
 <link rel="stylesheet" href="quiz-qimage.css?v=V101.03">
 <script src="quiz-qimage.js?v=V101.03"></script>
 <link rel="stylesheet" href="quiz-more-popover.css?v=V100.47">
@@ -45661,6 +45661,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 </div>
                                 <div class="dca-row-meta dca-t2">
                                     ${drug.atcCode ? `<span class="dca-row-meta-chip">${dcaEscapeHtml(drug.atcCode)}</span>` : addBtn('atcCode', 'ATC', 'dca-row-meta-chip')}
+                                    ${drug.sourceArticleId ? dxaArticleChipHtml(drug) : ''}
                                     ${drug.class ? `<span class="dca-cls">${dcaEscapeHtml(drug.class)}</span>` : addBtn('class', 'class', 'dca-cls')}
                                 </div>
                                 <div class="dca-t3">
@@ -45790,7 +45791,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 ${notesSnippet}
                             </div>
                             <div class="dca-draft-actions">
-                                ${target}
+                                ${draft.sourceArticleId ? dxaArticleChipHtml(draft) : ''}${target}
                                 <button type="button" class="dca-draft-review-btn" onclick="dcaReviewDraft('${dcaEscapeHtml(draft._id)}')">Review & Edit</button>
                                 <button type="button" class="dca-draft-approve-btn" onclick="dcaApproveDraft('${dcaEscapeHtml(draft._id)}', this)">✓ Approve</button>
                                 <button type="button" class="dca-draft-reject-btn" onclick="dcaRejectDraft('${dcaEscapeHtml(draft._id)}', this)">✗ Reject</button>
@@ -47484,7 +47485,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     // (arrayUnion sentinel is invalid in set without merge).
                     const draftDoc = (dcaState.drafts || []).find(d => d._id === dcaState.editingId);
                     const draftContribs = [];
-                    if (draftDoc && draftDoc.submittedBy) draftContribs.push('intern:' + draftDoc.submittedBy);
+                    if (draftDoc && draftDoc.submittedBy && !draftDoc.sourceArticleId) draftContribs.push('intern:' + draftDoc.submittedBy);   // V102.374
                     draftContribs.push('admin:' + reviewerEmail);
                     // V95.93: append admin-curated contributor credits.
                     // V95.99: role-prefixed (helper:/author:).
@@ -47504,6 +47505,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const _dcaEditBonus = await dcaPromptContributorBonus(payload.genericName);
                     const batch = db.batch();
                     const newRef = db.collection('drug_codex').doc();
+                    dcaLinkArticleOnPublish(batch, draftDoc, payload, newRef.id);   // V102.374
                     batch.set(newRef, Object.assign({ createdAt: nowTs }, payload));
                     const draftRef = db.collection('drug_codex_drafts').doc(dcaState.editingId);
                     batch.update(draftRef, { status: 'approved', approvedAt: nowTs, approvedBy: reviewerEmail, publishedId: newRef.id });
@@ -47740,7 +47742,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // V94.46: approve-as-is path — seed contributors[] with both the intern
             // submitter and the approving admin. Literal array (set() can't use arrayUnion).
             const approveContribs = [];
-            if (draft.submittedBy) approveContribs.push('intern:' + draft.submittedBy);
+            if (draft.submittedBy && !draft.sourceArticleId) approveContribs.push('intern:' + draft.submittedBy);   // V102.374: an article-sourced draft was made by the admin
             approveContribs.push('admin:' + reviewerEmail);
             payload.contributors = approveContribs;
             // V95.45: carry intern submitter name + picture onto the published doc so
@@ -47753,6 +47755,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             try {
                 const batch = db.batch();
                 const newRef = db.collection('drug_codex').doc();
+                dcaLinkArticleOnPublish(batch, draft, payload, newRef.id);   // V102.374
                 batch.set(newRef, payload);
                 const draftRef = db.collection('drug_codex_drafts').doc(draftId);
                 batch.update(draftRef, { status: 'approved', approvedAt: nowTs, approvedBy: reviewerEmail, publishedId: newRef.id });
@@ -48864,6 +48867,39 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
         }
 
+        // V102.374 (owner: "กระจกยา"): 💊 in the Articles editor drafts a Drug Codex entry from the article with the Auto-Draft model and files it
+        // as a PENDING draft (drug_codex_drafts: submittedBy = the admin, sourceArticleId); the article remembers it (articles/{id}.dc =
+        // {draftId, publishedId, name}); approving (both paths) fills dc.publishedId. The mirror of dxaDraftFromArticle (V102.371).
+        window.dcaDraftFromArticle = async function (art) {
+            if (typeof window.callUniversalAI !== 'function') throw new Error('AI core not loaded yet — try again in a moment.');
+            const user = (window.adminApp && window.adminApp.auth && window.adminApp.auth().currentUser) || (typeof auth !== 'undefined' && auth && auth.currentUser) || null;
+            if (!user || typeof user.uid !== 'string') throw new Error('Sign in as admin first.');
+            const name = String(art.name || '').trim();
+            if (!name) throw new Error('No drug name.');
+            const dup = (dcaState.codex || []).find(d => (d.genericName || '').toLowerCase() === name.toLowerCase());
+            if (dup) throw new Error('"' + name + '" is already in the Drug Codex (id ' + dup._id + ') — link it with ＋ Codex instead.');
+            const modelEl = document.getElementById('dca-ai-model-val');
+            const model = (modelEl && modelEl.value) || DCA_AI_FALLBACK_MODEL;
+            const prompt = dcaBuildAutoDraftPrompt(name, art.source || '');
+            const ask = async () => { const r = await window.callUniversalAI(model, prompt, true, null, '', { feature: 'drug_autodraft' }); return [r, dcaParseAutoDraftResponse((r && r.text) ? r.text : (typeof r === 'string' ? r : ''))]; };
+            let [resp, parsed] = await ask();
+            if (!parsed) { [resp, parsed] = await ask(); if (!parsed) throw new Error('AI returned invalid JSON after retry.'); }
+            const doc = {};
+            DCA_FIELD_KEYS.forEach(key => { const v = parsed[key]; doc[key] = DCA_ARRAY_FIELDS[key] ? (Array.isArray(v) ? v.filter(Boolean) : []) : (v == null ? '' : String(v)); });
+            doc.genericName = name;
+            const nowTs = firebase.firestore.FieldValue.serverTimestamp();
+            Object.assign(doc, { status: 'pending', createdAt: nowTs, submittedBy: user.uid, submittedByName: user.email || 'admin', sourceArticleId: String(art.id), sourceArticleTitle: String(art.title || name), aiDrafted: true, aiDraftedModel: (resp && resp.model) || model });
+            const ref = await db.collection('drug_codex_drafts').add(doc);
+            await db.collection('articles').doc(String(art.id)).update({ dc: { draftId: ref.id, publishedId: '', name: name } });
+            return { draftId: ref.id, model: (resp && resp.model) || model };
+        };
+        function dcaLinkArticleOnPublish(batch, draft, payload, publishedId) {   // V102.374: the drug twin of dxaLinkArticleOnPublish
+            if (!draft || !draft.sourceArticleId) return;
+            payload.sourceArticleId = draft.sourceArticleId;
+            payload.sourceArticleTitle = draft.sourceArticleTitle || '';
+            batch.update(db.collection('articles').doc(draft.sourceArticleId), { 'dc.publishedId': publishedId });
+        }
+
         function dcaParseAutoDraftResponse(rawText) {
             if (!rawText) return null;
             try {
@@ -48878,7 +48914,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
         }
 
-        function dcaBuildAutoDraftPrompt(drugName) {
+        function dcaBuildAutoDraftPrompt(drugName, source) {   // V102.374: source = the article text when drafting from an article
             // FORMAT CONTRACT leads (feedback_ai_prose_mode_recovery).
             // LANGUAGE RULE explicit per-field (feedback_ai_prompt_language_neutral).
             // Neutral markers in template to avoid English few-shot bias.
@@ -48940,7 +48976,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 'If any check fails, regenerate before sending.',
                 '',
                 'DRUG TO DRAFT: <<<' + drugName + '>>>'
-            ].join('\n');
+            ].join('\n') + (source ? '\n\nSOURCE ARTICLE (already published to the interns by the admin — stay true to its facts and emphasis; fill the other fields from standard references; still English/Thai per the language rules):\n<<<' + String(source).slice(0, 6000) + '>>>' : '');
         }
 
         // V93.99 Phase 5.1: AI fill empty fields — augments an intern's partial draft

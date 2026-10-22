@@ -79,7 +79,7 @@ const D = 864e5, BKK = 7 * 3600e3;
     const r = await page.evaluate(async ({ D }) => {
       const out = {}, writes = [], txs = [], wait = ms => new Promise(res => setTimeout(res, ms)), now = Date.now();
       const docs = {
-        a1: { status: 'scheduled', dx: { draftId: 'd1', publishedId: 'dx1', name: 'Inhaler technique' }, title: { en: '3 inhaler mistakes we see every week', th: '“อดทนคืออวดตัว”' }, body: { en: '**Most patients** who say their inhaler doesn’t work are not breathing in with it.\n\nBefore you hand over a salbutamol MDI, check three things: shake it, breathe out fully first, then press as a slow deep breath starts. Hold for 10 seconds.\n\nAsk them to show you — don’t just tell them. A spacer fixes most timing problems.', th: 'ปัจจุบันคำว่า “อดทน (がまん)” ใช้ทั่วไปในความหมายว่า ทน อดกลั้น' },
+        a1: { status: 'scheduled', dx: { draftId: 'd1', publishedId: 'dx1', name: 'Inhaler technique' }, dc: { draftId: 'c1', publishedId: 'dc1', name: 'Salbutamol MDI' }, title: { en: '3 inhaler mistakes we see every week', th: '“อดทนคืออวดตัว”' }, body: { en: '**Most patients** who say their inhaler doesn’t work are not breathing in with it.\n\nBefore you hand over a salbutamol MDI, check three things: shake it, breathe out fully first, then press as a slow deep breath starts. Hold for 10 seconds.\n\nAsk them to show you — don’t just tell them. A spacer fixes most timing problems.', th: 'ปัจจุบันคำว่า “อดทน (がまん)” ใช้ทั่วไปในความหมายว่า ทน อดกลั้น' },
           cover: { emoji: '🫁' }, startAt: { toMillis: () => now - D }, endAt: { toMillis: () => now + D }, audience: { divisions: [], groups: [] }, links: [{ kind: 'quiz', id: 'q1', label: 'Bronchodilators' }, { kind: 'codex', id: 'd1', label: 'Salbutamol' }], rerun: 'any', readMin: 1 }
       };
       const ledger = {};
@@ -166,7 +166,7 @@ const D = 864e5, BKK = 7 * 3600e3;
     assert.deepEqual(r.sheet.foot, ['🔖', '🔕', 'Read more ▾', '👍 Got it'], 'one footer row: 🔖 🔕 left, Read more + Got it right'); assert.equal(r.sheet.okBg, 'rgb(22, 163, 74)', 'Got it is the green pill (G4)'); assert.ok(r.sheet.okW < 160, 'Got it is small, not full width: ' + r.sheet.okW); assert.ok(r.sheet.noOld, 'no grab handle, tile, kicker line or text mute line');
     assert.ok(r.sheet.clamp && !r.sheet.moreHidden, 'a long body is clamped with Read more'); assert.ok(r.sheet.bold, 'the body goes through the app’s renderMd (marked + DOMPurify in the app; the CDN is blocked here)');
     assert.deepEqual(r.sheet.lng, ['EN*', 'TH'], 'language chips only for the versions the article has (no KO here)');
-    assert.deepEqual(r.sheet.links, ['🩺 Inhaler technique', '🧪 Bronchodilators 🪙 +1', '💊 Salbutamol'], 'the 🩺 Disease Codex entry (V101.196) first, then quiz (+1 Beri) and Codex links');
+    assert.deepEqual(r.sheet.links, ['🩺 Inhaler technique', '💊 Salbutamol MDI', '🧪 Bronchodilators 🪙 +1', '💊 Salbutamol'], 'the 🩺 Disease Codex entry (V101.196), the 💊 Drug Codex entry drafted from it (V101.200), then quiz (+1 Beri) and Codex links');
     assert.ok(r.sheet.okH >= 44 && r.sheet.bmH >= 44, 'touch targets ≥ 44 px'); assert.ok(r.sheet.noToggle, 'lang-no-toggle: Thai is never hidden'); assert.ok(r.sheet.focus, '✓ Got it has focus');
     assert.deepEqual([r.showWrite[0], r.showWrite[1], typeof r.showWrite[2].articlePopDay, r.showWrite[2].articleSeen.a1.day === r.showWrite[2].articlePopDay, r.showWrite[3]], ['users', 'U1', 'string', true, { merge: true }], 'showing it records today on users/{uid} (merge)');
     assert.deepEqual(r.more, [false, 'Show less ▴'], 'Read more opens the whole body');
@@ -178,7 +178,7 @@ const D = 864e5, BKK = 7 * 3600e3;
     assert.deepEqual(r.beri, ['users/U1:{"inc":1}', 'beri_ledger/article_quiz__a1_U1:"article_quiz/1/a1_U1"'], '+1 Beri with a ledger row, only once: ' + JSON.stringify(r.beri));
     assert.ok(r.hist, 'the article is a History row');
     assert.deepEqual(r.hist, ['3 inhaler mistakes we see every week', '👁 Closed', false, true], 'History row: title, 👁 Closed, no 🗑 menu, a 📰 chip');
-    assert.deepEqual(r.histRead, ['true', '✓ Read', 'hist', true, 3], 'opening the row reads it in place (pill → ✓ Read, act hist, body + 🩺/quiz/Codex links)');
+    assert.deepEqual(r.histRead, ['true', '✓ Read', 'hist', true, 4], 'opening the row reads it in place (pill → ✓ Read, act hist, body + 🩺/💊/quiz/Codex links)');
     assert.deepEqual(r.histLng, ['EN:true', 'TH:false'], 'V101.193: the row carries the EN / TH chips (a1 has no ko), EN on');
     assert.deepEqual(r.histLngTh, ['EN:false TH:true', true, 'true', 0], 'TH tap: Thai body in place, row still open, no write');
     assert.deepEqual(r.histLngBack, ['EN:true TH:false', true], 'EN tap: back to the English body');
