@@ -3794,9 +3794,9 @@
                 #sch-goals-box .sch-bar .sch-tr { height: 3px; border-radius: 9px; background: #e2e8f0; margin-top: 4px; overflow: hidden; }
                 #sch-goals-box .sch-bar .sch-tr i { display: block; height: 100%; border-radius: 9px; }
                 #sch-goals-box .sch-bar.q i { background: #6366f1; } #sch-goals-box .sch-bar.j i { background: #f59e0b; } #sch-goals-box .sch-bar.c i { background: #14b8a6; }
-                /* V101.195: the picked day's done Quiz / Journal / Case titles sit inside their month cell (owner: merge the row into the cell) */
-                #sch-goals-box .sch-bar .sch-day-done { margin-top: 3px; font-size: 0.66em; font-weight: 700; color: #166534; line-height: 1.3; }
-                #sch-goals-box .sch-bar .sch-day-done span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }   /* two lines, the cell is narrow */
+                /* V101.195 (owner's pick A1): a "+n" pill in the kind's colour beside the month number = that kind done on the picked day */
+                #sch-goals-box .sch-bar b .sch-day-n { font-size: 0.5em; font-weight: 800; color: #fff; border-radius: 999px; padding: 1px 6px; margin-left: 5px; vertical-align: middle; }
+                #sch-goals-box .sch-bar.q .sch-day-n { background: #6366f1; } #sch-goals-box .sch-bar.j .sch-day-n { background: #f59e0b; } #sch-goals-box .sch-bar.c .sch-day-n { background: #14b8a6; }
                 #sch-goals-box .sch-gb-row { display: flex; align-items: center; }
                 #sch-goals-box .sch-gb-fin { width: auto; min-height: 36px; margin: 0 0 0 -4px; padding: 4px 5px; border: none; border-radius: 8px; background: transparent; font-size: 0.95em; line-height: 1; cursor: pointer; }
                 #sch-goals-box .sch-gb-links { flex: 0 0 96px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 2px; padding: 0 6px 0 12px; }
@@ -16640,14 +16640,13 @@
             const d = schParseDay(key);
             if (!d) return '';
             const now = new Date();
-            const doneAll = (schBuildDayMap()[key] || []).filter(it => it.submissionType !== 'checkin');   // V101.151: the check-in is the ⭐ on the day circle, not a row
-            // V101.195 (owner): a done Quiz / Journal / Case of the picked day sits inside its month cell (📚 Quiz · 📝 Journal · 🩺 Case) instead of
-            // a row above the card; the rest (articles, quests, notes…) still list here. schPaintDayDone() draws the cells and says which took titles.
+            const done = (schBuildDayMap()[key] || []).filter(it => it.submissionType !== 'checkin');   // V101.151: the check-in is the ⭐ on the day circle, not a row
+            // V101.195 (owner's pick A1): the rows stay here; the month card's 📚 Quiz · 📝 Journal · 🩺 Case cells get a "+n" pill for what the
+            // picked day added. schPaintDayDone() draws the pills from _schDayDone.
             const DAY_CELL = { quiz: 'q', reflective: 'j', case: 'c' };
             window._schDayDone = {};
-            doneAll.forEach(it => { const k = DAY_CELL[it.submissionType]; if (k) (window._schDayDone[k] = window._schDayDone[k] || []).push(it.title || 'Untitled ไม่มีชื่อ'); });
-            const placed = schPaintDayDone();
-            const done = doneAll.filter(it => !(DAY_CELL[it.submissionType] && placed[DAY_CELL[it.submissionType]]));
+            done.forEach(it => { const k = DAY_CELL[it.submissionType]; if (k) window._schDayDone[k] = (window._schDayDone[k] || 0) + 1; });
+            schPaintDayDone();
             const events = schEventsOn(key);
             const todoAll = items.filter(it => it.kind !== 'e' && schItemDayKey(it, now) === key);
             // V101.149: a to-do that the list below already shows is not repeated here; only the collapsed Missed ones are (this panel is the one place they show).
@@ -16949,20 +16948,18 @@
                     + (r.target && r.n !== null ? '<em>/' + r.target + '</em>' : '') + '</b>'
                     + (r.target && r.n !== null ? '<div class="sch-tr"><i style="width:' + pct + '%"></i></div>' : '') + '</div>';
             }).join('');
-            schPaintDayDone();   // V101.195: a re-render keeps the picked day's done titles in the cells
+            schPaintDayDone();   // V101.195: a re-render keeps the picked day's +n pills
         }
         window.schRenderGoalBars = schRenderGoalBars;
-        // V101.195: draw the picked day's done titles into the month cells (q / j / c); returns which cells took them
+        // V101.195 (A1): a "+n" pill beside the month number of each cell (q / j / c) for what the picked day added; none → no pill
         function schPaintDayDone() {
-            const placed = {}, dd = window._schDayDone || {};
+            const dd = window._schDayDone || {};
             document.querySelectorAll('#sch-goalbars .sch-bar').forEach(cell => {
-                const old = cell.querySelector('.sch-day-done'); if (old) old.remove();
-                const k = ['q', 'j', 'c'].find(x => cell.classList.contains(x)), titles = k && dd[k];
-                if (!titles || !titles.length) return;
-                cell.insertAdjacentHTML('beforeend', '<div class="sch-day-done">' + titles.map(t => '<span title="' + escapeHtml(t) + '">✓ ' + escapeHtml(t) + '</span>').join('') + '</div>');
-                placed[k] = true;
+                const old = cell.querySelector('.sch-day-n'); if (old) old.remove();
+                const k = ['q', 'j', 'c'].find(x => cell.classList.contains(x)), n = k && dd[k], b = cell.querySelector('b');
+                if (!n || !b) return;
+                b.insertAdjacentHTML('beforeend', '<span class="sch-day-n" title="' + n + ' on the picked day">+' + n + '</span>');
             });
-            return placed;
         }
 
         function schModalOpen() {
