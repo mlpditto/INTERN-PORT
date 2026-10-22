@@ -124,6 +124,7 @@ For multi-step tasks, state a brief plan:
 - **New Collections**: Use consistent naming, include timestamps, user references
 
 ### Testing & Verification
+- **Feature map**: `docs/features/README.md` — one file per feature area: what exists, how a user reaches it, which `scripts/*-qa.cjs` drive it, what usually lies. Read the area file for the change under test; keep its script list current in the same PR.
 - **Manual Testing**: Always test in both LIFF and browser environments
 - **Mobile Testing**: Verify on actual mobile devices when possible
 - **Data Integrity**: Ensure no data loss during schema changes
