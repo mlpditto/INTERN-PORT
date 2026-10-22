@@ -295,15 +295,12 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
       S.list[0].body = { en: 'Body one' }; S.list[0].title = { en: 'Acromegaly: Spotting the Subtle Signs 🔍' }; Articles.filter('all');
       let during = null; window.callUniversalAI = async (...a) => { if (!during) { during = q('.art-tr-all').textContent.replace(/\s+/g, ' ').trim(); Articles.translateAll(); } return { text: 'x\n---\ny' }; };
       const w1 = writes.length; await Articles.translateAll(); out.trStop = [during, writes.length - w1, /stopped/.test(toasts[toasts.length - 1])];
-      // ---- 🩺 Disease Codex: the saved article's topic lands in the Codex AI Auto-Draft name box; an unsaved edit is refused
-      let opened = 0; window.openDiseaseCodexAdmin = () => { opened++; };
-      const row = document.getElementById('dxa-ai-input-row'), nm = document.getElementById('dxa-ai-name');   // the real Disease Codex elements in admin.html
-      row.style.display = 'none'; nm.value = '';
-      window.dxaAutoDraftToggle = () => { row.style.display = 'block'; };
-      Articles.edit('a1'); out.dxChip = !!qa('.art-c.art-add').find(b => /Disease Codex/.test(b.textContent));
-      S.cur.title.en = 'Acromegaly: edited'; Articles.toCodex(); out.dxDirty = [q('.art-err') && q('.art-err').textContent, opened];
-      S.cur.title.en = 'Acromegaly: Spotting the Subtle Signs 🔍'; S.base = JSON.stringify(S.cur); Articles.toCodex(); await wait(250);
-      out.dx = [opened, nm.value, row.style.display, document.getElementById('articlesModal').style.display];
+      // ---- 🩺 Disease Codex (V102.371): the saved article → an AI Pending Draft through dxaDraftFromArticle (the full flow is in articles-codex-draft-qa); an unsaved edit is refused
+      const dxCalls = []; window.dxaDraftFromArticle = async a => { dxCalls.push(a.name); return { draftId: 'd9', model: 'm' }; };
+      Articles.edit('a1'); out.dxChip = !!qa('.art-c.art-add').find(b => /🩺 Disease Codex/.test(b.textContent));
+      S.cur.title.en = 'Acromegaly: edited'; Articles.toCodex(); out.dxDirty = [q('.art-err') && q('.art-err').textContent, dxCalls.length];
+      S.cur.title.en = 'Acromegaly: Spotting the Subtle Signs 🔍'; S.base = JSON.stringify(S.cur); Articles.toCodex(); await wait(100);
+      out.dx = [dxCalls, S.cur.dx && S.cur.dx.draftId, (qa('.art-c.art-add').find(b => /🩺/.test(b.textContent)) || {}).textContent];
       Articles.open(); Articles.edit('a1');
       // the one-line model rail
       Articles.modelPick();
@@ -342,8 +339,8 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
     assert.deepEqual(r3.trAfter, ['🌐 Translate all', true, '🌐 Translated 3/3'], 'afterwards the button has nothing left to do: ' + JSON.stringify(r3.trAfter));
     assert.deepEqual(r3.trStop, ['🌐 1/2 · stop', 1, true], 'a second click stops after the current one: ' + JSON.stringify(r3.trStop));
     assert.equal(r3.dxChip, true, '🩺 Disease Codex chip in the Links line');
-    assert.deepEqual(r3.dxDirty, ['⚠️ 🩺 Save the article first, then open the Disease Codex.', 0], 'an unsaved edit is refused (the error line carries the ⚠️)');
-    assert.deepEqual(r3.dx, [1, 'Acromegaly', 'block', 'none'], 'the Codex opens with the bare topic in the AI Auto-Draft box, the Articles modal closed: ' + JSON.stringify(r3.dx));
+    assert.deepEqual(r3.dxDirty, ['⚠️ 🩺 Save the article first, then send it to the Disease Codex.', 0], 'an unsaved edit is refused (the error line carries the ⚠️)');
+    assert.deepEqual(r3.dx, [['Acromegaly'], 'd9', '🩺 Codex draft pending'], 'the bare topic goes to dxaDraftFromArticle, the article remembers the draft, the chip says pending: ' + JSON.stringify(r3.dx));
     assert.deepEqual(r3.tr, ['หัวข้อไทย', 'เขย่าก่อนใช้ **ทุกครั้ง**', true, false, 'article_draft', true, true], 'translation fills TH title + body, notes the model, logs feature article_draft, leaves it unsaved');
     assert.equal(r3.drBtn, '✨ Draft');
     assert.deepEqual(r3.dr, ['**Shake** the inhaler first.', true, true], 'a draft writes the body from the title (code fences stripped); V102.363 prompt: emoji-led lines, 💊 drug names, under 700');

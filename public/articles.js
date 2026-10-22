@@ -154,7 +154,9 @@
         return Array.prototype.some.call(document.querySelectorAll('.modal'), function (m) { var d = m.style.display; return d === 'flex' || d === 'block' || m.classList.contains('open') || m.classList.contains('show'); });
     }
     function linksHtml(a) {
-        return (a.links || []).length ? '<div class="art-links">' + a.links.map(function (l) {
+        // V101.196: the Disease Codex entry drafted from this article (articles/{id}.dx.publishedId, set when the admin approves it)
+        var dx = a.dx && a.dx.publishedId ? '<button type="button" class="art-link codex" onclick="internArticles.openDx(' + esc(JSON.stringify(a.id)) + ',' + esc(JSON.stringify(a.dx.publishedId)) + ')">🩺 ' + esc(a.dx.name || 'Disease Codex') + '</button>' : '';
+        return ((a.links || []).length || dx) ? '<div class="art-links">' + dx + (a.links || []).map(function (l) {
             return l.kind === 'quiz' ? '<button type="button" class="art-link" onclick="internArticles.openQuiz(' + esc(JSON.stringify(a.id)) + ',' + esc(JSON.stringify(l.id)) + ')">🧪 ' + esc(l.label) + ' <b>🪙 +1</b></button>'
                 : '<button type="button" class="art-link codex" onclick="internArticles.openCodex(' + esc(JSON.stringify(a.id)) + ',' + esc(JSON.stringify(l.id)) + ')">💊 ' + esc(l.label) + '</button>';
         }).join('') + '</div>' : '';
@@ -268,6 +270,10 @@
             if (S.cur) close('quiz'); else markRead(articleId, 'quiz');
             awardQuizBeri(articleId);
             if (typeof applyTabDeepLink === 'function') applyTabDeepLink(new URLSearchParams({ quiz: String(quizId) }));
+        },
+        openDx: function (articleId, diseaseId) {   // V101.196: the 🩺 Disease Codex entry
+            if (S.cur) close('codex'); else markRead(articleId, 'codex');
+            if (typeof dxOpenDetail === 'function') dxOpenDetail(diseaseId);
         },
         openCodex: function (articleId, drugId) {
             if (S.cur) close('codex'); else markRead(articleId, 'codex');

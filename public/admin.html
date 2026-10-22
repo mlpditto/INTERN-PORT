@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.370)</title>
+    <title>Nika Admin (V102.371)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -7932,7 +7932,7 @@
 <script src="quiz-cover.js?v=V102.344"></script>
 <script src="clip-captions.js?v=V102.366"></script>
 <script src="holidays-admin.js?v=V102.330"></script>
-<script src="articles-admin.js?v=V102.363"></script>
+<script src="articles-admin.js?v=V102.371"></script>
 <link rel="stylesheet" href="quiz-qimage.css?v=V101.03">
 <script src="quiz-qimage.js?v=V101.03"></script>
 <link rel="stylesheet" href="quiz-more-popover.css?v=V100.47">
@@ -49962,6 +49962,33 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
         }
 
+        // V102.371 (owner: "ทำแบบ 2 + 3"): 🩺 in the Articles editor drafts a Disease Codex entry from the article with the Auto-Draft model
+        // and files it as a PENDING draft (disease_codex_drafts: submittedBy = the admin, sourceArticleId) — approved in Pending Drafts like any
+        // other. The article remembers it (articles/{id}.dx = {draftId, publishedId, name}); approving fills dx.publishedId (both approve paths).
+        window.dxaDraftFromArticle = async function (art) {
+            if (typeof window.callUniversalAI !== 'function') throw new Error('AI core not loaded yet — try again in a moment.');
+            const user = (window.adminApp && window.adminApp.auth && window.adminApp.auth().currentUser) || (typeof auth !== 'undefined' && auth && auth.currentUser) || null;
+            if (!user || typeof user.uid !== 'string') throw new Error('Sign in as admin first.');
+            const name = String(art.name || '').trim();
+            if (!name) throw new Error('No disease name.');
+            const dup = (dxaState.codex || []).find(d => (d.diseaseName || '').toLowerCase() === name.toLowerCase());
+            if (dup) throw new Error('"' + name + '" is already in the Codex (id ' + dup._id + ') — open it there instead.');
+            const modelEl = document.getElementById('dxa-ai-model-val');
+            const model = (modelEl && modelEl.value) || DXA_AI_FALLBACK_MODEL;
+            const prompt = dxaBuildAutoDraftPrompt(name, art.source || '');
+            const ask = async () => { const r = await window.callUniversalAI(model, prompt, true, null, '', { feature: 'disease_autodraft' }); return [r, dxaParseAutoDraftResponse((r && r.text) ? r.text : (typeof r === 'string' ? r : ''))]; };
+            let [resp, parsed] = await ask();
+            if (!parsed) { [resp, parsed] = await ask(); if (!parsed) throw new Error('AI returned invalid JSON after retry.'); }   // one silent retry, as Auto-Draft does
+            const doc = {};
+            DXA_FIELD_KEYS.forEach(key => { const v = parsed[key]; doc[key] = DXA_ARRAY_FIELDS[key] ? (Array.isArray(v) ? v.filter(Boolean) : []) : (v == null ? '' : String(v)); });
+            doc.diseaseName = name;   // the model may "correct" it
+            const nowTs = firebase.firestore.FieldValue.serverTimestamp();
+            Object.assign(doc, { status: 'pending', createdAt: nowTs, submittedBy: user.uid, submittedByName: user.email || 'admin', sourceArticleId: String(art.id), sourceArticleTitle: String(art.title || name), aiDrafted: true, aiDraftedModel: (resp && resp.model) || model });
+            const ref = await db.collection('disease_codex_drafts').add(doc);
+            await db.collection('articles').doc(String(art.id)).update({ dx: { draftId: ref.id, publishedId: '', name: name } });
+            return { draftId: ref.id, model: (resp && resp.model) || model };
+        };
+
         function dxaParseAutoDraftResponse(rawText) {
             if (!rawText) return null;
             try {
@@ -49975,7 +50002,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
         }
 
-        function dxaBuildAutoDraftPrompt(diseaseName) {
+        function dxaBuildAutoDraftPrompt(diseaseName, source) {   // V102.371: source = the article text when drafting from an article
             // FORMAT CONTRACT leads (feedback_ai_prose_mode_recovery).
             // LANGUAGE RULE explicit per-field (feedback_ai_prompt_language_neutral).
             // Neutral <<<markers>>> avoid English few-shot bias.
@@ -50038,7 +50065,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 'If any check fails, regenerate before sending.',
                 '',
                 'DISEASE TO DRAFT: <<<' + diseaseName + '>>>'
-            ].join('\n');
+            ].join('\n') + (source ? '\n\nSOURCE ARTICLE (already published to the interns by the admin — stay true to its facts and emphasis; fill the other fields from standard references; still English/Thai per the LANGUAGE RULE):\n<<<' + String(source).slice(0, 6000) + '>>>' : '');
         }
 
         function dxaUpdateCounts() {
@@ -50146,6 +50173,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const chips = [];
                     if (disease.icd10) chips.push(`<span class="dca-row-meta-chip">${dxaEscapeHtml(disease.icd10)}</span>`);
                     if (disease.category) chips.push(`<span style="color:#475569;">${dxaEscapeHtml(disease.category)}</span>`);
+                    if (disease.sourceArticleId) chips.push(dxaArticleChipHtml(disease));   // V102.371
                     const updatedAbs = dxaFormatAbsolute(disease.updatedAt || disease.createdAt);
                     return `
                         <div class="dca-row">
@@ -51308,7 +51336,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     // intern's "→ See in Codex" link resolves via publishedId.
                     const draftDoc = (dxaState.drafts || []).find(d => d._id === dxaState.editingId);
                     const draftContribs = [];
-                    if (draftDoc && draftDoc.submittedBy) draftContribs.push('intern:' + draftDoc.submittedBy);
+                    if (draftDoc && draftDoc.submittedBy && !draftDoc.sourceArticleId) draftContribs.push('intern:' + draftDoc.submittedBy);   // V102.371
                     draftContribs.push('admin:' + reviewerEmail);
                     payload.contributors = draftContribs;
                     // V95.45: carry intern submitter name + picture onto the published
@@ -51321,6 +51349,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const _dxaEditBonus = await dcaPromptContributorBonus(payload.diseaseName);
                     const batch = db.batch();
                     const newRef = db.collection('disease_codex').doc();
+                    dxaLinkArticleOnPublish(batch, draftDoc, payload, newRef.id);   // V102.371
                     batch.set(newRef, Object.assign({ createdAt: nowTs }, payload));
                     const draftRef = db.collection('disease_codex_drafts').doc(dxaState.editingId);
                     batch.update(draftRef, { status: 'approved', approvedAt: nowTs, approvedBy: reviewerEmail, publishedId: newRef.id });
@@ -52195,7 +52224,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 ${notesSnippet}
                             </div>
                             <div class="dca-draft-actions">
-                                ${target}
+                                ${draft.sourceArticleId ? dxaArticleChipHtml(draft) : ''}${target}
                                 <button type="button" class="dca-draft-review-btn" onclick="dxaReviewDraft('${dxaEscapeHtml(draft._id)}')">Review & Edit</button>
                                 <button type="button" class="dca-draft-approve-btn" onclick="dxaApproveDraft('${dxaEscapeHtml(draft._id)}', this)">✓ Approve</button>
                                 <button type="button" class="dca-draft-reject-btn" onclick="dxaRejectDraft('${dxaEscapeHtml(draft._id)}', this)">✗ Reject</button>
@@ -52235,7 +52264,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // Seed contributors[] with both the intern submitter and the approving
             // admin. Literal array (set() can't use the arrayUnion sentinel).
             const approveContribs = [];
-            if (draft.submittedBy) approveContribs.push('intern:' + draft.submittedBy);
+            if (draft.submittedBy && !draft.sourceArticleId) approveContribs.push('intern:' + draft.submittedBy);   // V102.371: an article-sourced draft was made by the admin
             approveContribs.push('admin:' + reviewerEmail);
             payload.contributors = approveContribs;
             // V95.45: carry the intern submitter's display name + picture onto the
@@ -52249,6 +52278,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             try {
                 const batch = db.batch();
                 const newRef = db.collection('disease_codex').doc();
+                dxaLinkArticleOnPublish(batch, draft, payload, newRef.id);   // V102.371
                 batch.set(newRef, payload);
                 const draftRef = db.collection('disease_codex_drafts').doc(draftId);
                 batch.update(draftRef, { status: 'approved', approvedAt: nowTs, approvedBy: reviewerEmail, publishedId: newRef.id });
@@ -52399,6 +52429,21 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return `<span class="dca-contributor-chip dca-contrib-unknown">${dxaEscapeHtml(s)}</span>`;
         }
 
+        // V102.371: 📰 chip = the article this entry was drafted from; tap → that article in the Articles editor
+        function dxaArticleChipHtml(d) {
+            const t = String(d.sourceArticleTitle || 'article');
+            return `<button type="button" class="dca-row-meta-chip dxa-art-chip" onclick="dxaOpenArticle('${dxaEscapeHtml(d.sourceArticleId)}')" title="Drafted from the article “${dxaEscapeHtml(t)}” — open it" style="cursor:pointer; margin:0; min-height:0; width:auto; padding:2px 8px; border:1px solid #c7d2fe; border-radius:999px; background:#eef2ff; color:#3730a3; font-size:0.72em; font-weight:700; line-height:1.5; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">📰 ${dxaEscapeHtml(t)}</button>`;
+        }
+        window.dxaOpenArticle = function (id) {
+            if (!window.Articles) return;
+            Promise.resolve(Articles.load()).then(() => { Articles.open(); Articles.edit(id); });
+        };
+        function dxaLinkArticleOnPublish(batch, draft, payload, publishedId) {
+            if (!draft || !draft.sourceArticleId) return;
+            payload.sourceArticleId = draft.sourceArticleId;
+            payload.sourceArticleTitle = draft.sourceArticleTitle || '';
+            batch.update(db.collection('articles').doc(draft.sourceArticleId), { 'dx.publishedId': publishedId });
+        }
         function dxaListMetaTrailHtml(disease) {
             if (!disease) return '';
             const parts = [];
