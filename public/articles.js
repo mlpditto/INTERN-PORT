@@ -135,7 +135,7 @@
             '@keyframes artUp{from{transform:translateY(30px);opacity:0}to{transform:none;opacity:1}}@keyframes artFade{from{opacity:0}to{opacity:1}}@media (prefers-reduced-motion: reduce){#art-sheet,#art-back{animation:none}}' +
             '#art-sheet .band{display:flex;align-items:center;gap:10px;margin:2px 0 2px}#art-sheet .cov{flex:1;min-width:0;font-size:26px;line-height:1}#art-sheet .cov small{font-size:13px;margin-left:4px;vertical-align:middle}' +
             '#art-sheet .x{width:34px;height:34px;min-height:0;margin:0;padding:0;border:0;border-radius:50%;background:#f1f5f9;color:#64748b;font-size:15px;cursor:pointer;flex:none}' +
-            '#art-sheet .lng{display:inline-flex;gap:2px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:999px;padding:2px}#art-sheet .lng button{min-height:0;margin:0;width:auto;border:0;background:transparent;font:800 11px/1 Kanit,sans-serif;color:#64748b;padding:6px 9px;border-radius:999px;cursor:pointer}#art-sheet .lng button.on{background:#4361ee;color:#fff}' +
+            '#art-sheet .lng,.art-hist .lng{display:inline-flex;gap:2px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:999px;padding:2px}#art-sheet .lng button,.art-hist .lng button{min-height:0;margin:0;width:auto;border:0;background:transparent;font:800 11px/1 Kanit,sans-serif;color:#64748b;padding:6px 9px;border-radius:999px;cursor:pointer}#art-sheet .lng button.on,.art-hist .lng button.on{background:#4361ee;color:#fff}' +
             '#art-sheet h3{font:800 19px/1.3 Kanit,sans-serif;color:#1e293b;margin:6px 0 8px;word-break:keep-all;overflow-wrap:anywhere}' +
             '.art-md{font:400 14.5px/1.6 Kanit,sans-serif;color:#334155;word-break:keep-all;overflow-wrap:anywhere}.art-md p,.art-md ul,.art-md ol{margin:0 0 8px}.art-md ul,.art-md ol{padding-left:20px}.art-md a{color:#4361ee}' +
             '#art-sheet .art-md.clamp{max-height:6.4em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 65%,transparent);mask-image:linear-gradient(#000 65%,transparent)}' +   // 4 lines × 1.6; line-clamp left half a line showing when the body has several paragraphs
@@ -145,7 +145,7 @@
             '#art-sheet .foot{display:flex;align-items:center;gap:8px;margin-top:6px}#art-sheet .bm{width:44px;height:44px;min-height:0;margin:0;padding:0;border-radius:12px;border:0;background:#f1f5f9;font-size:17px;cursor:pointer;flex:none}#art-sheet .bm[aria-pressed="true"]{background:#fef3c7}#art-sheet .bm.mute{opacity:.8}' +
             '#art-sheet .ok{flex:none;width:auto;height:44px;min-height:0;margin:0;padding:0 18px;border-radius:999px;border:0;background:#16a34a;color:#fff;font:800 14px/1 Kanit,sans-serif;cursor:pointer;box-shadow:0 4px 10px rgba(22,163,74,.25);white-space:nowrap}#art-sheet button:focus{outline:none}#art-sheet button:focus-visible{outline:2px solid #a5b4fc;outline-offset:2px}' +
             
-            '.hl-pill.art-ok{background:#dcfce7;color:#166534}.hl-pill.art-new{background:#eef2ff;color:#4361ee}.art-hist{padding:2px 0 6px}.art-hist .art-links{margin:8px 0 2px}';
+            '.hl-pill.art-ok{background:#dcfce7;color:#166534}.hl-pill.art-new{background:#eef2ff;color:#4361ee}.art-hist{padding:2px 0 6px}.art-hist .art-top{display:flex;justify-content:flex-end;margin:0 0 6px}.art-hist .art-links{margin:8px 0 2px}';
         document.head.appendChild(s);
     }
     function busy() {
@@ -227,7 +227,15 @@
     function detailHtml(s) {
         var a = find((s.metadata || {}).articleId); if (!a) return '';
         css();
-        return '<div class="art-hist lang-no-toggle"><div class="art-md">' + md(textOf(a, uiLang()).body) + '</div>' + linksHtml(a) + '</div>';
+        var tx = textOf(a, uiLang()), have = langs(a);
+        // V101.193: the sheet's EN / TH / KO chips here too when the article has more than one language — a tap swaps the body in place
+        var lng = have.length > 1 ? '<div class="art-top"><span class="lng" role="group" aria-label="Language">' + have.map(function (l) { return '<button type="button" class="' + (l === tx.lang ? 'on' : '') + '" aria-pressed="' + (l === tx.lang) + '" onclick="internArticles.histLang(this, \'' + l + '\')">' + l.toUpperCase() + '</button>'; }).join('') + '</span></div>' : '';
+        return '<div class="art-hist lang-no-toggle" data-art="' + esc(a.id) + '">' + lng + '<div class="art-md">' + md(tx.body) + '</div>' + linksHtml(a) + '</div>';
+    }
+    function histLang(btn, l) {
+        var box = btn.closest('.art-hist'), a = box && find(box.dataset.art); if (!a) return;
+        box.querySelector('.art-md').innerHTML = md(textOf(a, l).body);
+        box.querySelectorAll('.lng button').forEach(function (b) { var on = b.textContent === l.toUpperCase(); b.className = on ? 'on' : ''; b.setAttribute('aria-pressed', String(on)); });
     }
     // tapping an article row open in History = read (the row stays open: the pill is patched in place, no re-render)
     document.addEventListener('click', function (e) {
@@ -246,7 +254,7 @@
             else refreshHistory(false);
         },
         historyItems: function () { return historyItems(S.list, me(), Date.now()); },
-        detailHtml: detailHtml, pillHtml: pillHtml, close: close,
+        detailHtml: detailHtml, pillHtml: pillHtml, close: close, histLang: histLang,
         lang: function (l) { S.lang = l; render(); },
         toggleMore: function () { S.more = !S.more; render(); },
         save: function () {
