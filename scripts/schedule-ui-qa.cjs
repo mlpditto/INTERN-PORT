@@ -143,24 +143,27 @@ assert.match((await page.textContent('#sch-week .sch-rg h4')).trim(), /^\d{1,2}[
     await page.locator('#sch-week [data-schday="' + (await page.evaluate(() => __key(-2))) + '"]').click();
     await page.evaluate(() => { schCheckinDays = new Set(); schRenderAgenda(); });
 
-    // ---- 3c. V101.152: an empty day is ONE line — "Wed 14 Oct · Nothing on this day"
-    const emptyHtml = await page.evaluate(() => schWeekDayHtml('2030-01-02', []));
-    assert.ok(/^<div id="sch-week-day"[^>]*><div[^>]*>[^<]*<span[^>]*>· Nothing on this day<\/span><\/div><\/div>$/.test(emptyHtml), 'empty day = date + words on one line: ' + emptyHtml);
-    assert.ok(/margin-bottom:0px/.test(emptyHtml), 'no gap under the one-line header');
+    // ---- 3c. V101.194: an empty day = the date chip on the month line alone — no panel, no "Nothing on this day"
+    const emptyDay = await page.evaluate(() => [schWeekDayHtml('2030-01-02', []), window._schSelHtml]);
+    assert.equal(emptyDay[0], '', 'empty day: no panel');
+    assert.equal(emptyDay[1], '<div class="sch-hol sch-sel lang-no-toggle" title="Wednesday 2 January"><span>Wed 2 Jan</span></div>', 'the chip is the date alone: ' + emptyDay[1]);
 
     // ---- 4. tap a day: its rows; tap again closes; focus stays on the day
     await goTo(page, -1);
     await page.locator('#sch-week [data-schday="' + (await page.evaluate(() => __key(-1))) + '"]').click();
     const det = await page.textContent('#sch-week-day');
     assert.ok(det.includes('Pharmacology quiz') && det.includes('done'), 'yesterday shows the done quiz: ' + det);
+    assert.ok(!/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d/.test(det), 'V101.194: the panel has no date line of its own: ' + det);
+    assert.equal(await page.textContent('#sch-gb-month .sch-sel'), await page.evaluate(() => new Date(__key(-1) + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })), 'the date is a chip on the month line');
     assert.equal(await page.evaluate(() => document.querySelectorAll('#sch-week [aria-pressed="true"]').length), 1, 'one day pressed');
     assert.equal(await page.evaluate(() => document.activeElement && document.activeElement.dataset.schday), await page.evaluate(() => __key(-1)), 'focus stays on the tapped day');
     await page.locator('#sch-week [data-schday="' + (await page.evaluate(() => __key(-1))) + '"]').click();
     assert.equal(await page.locator('#sch-week-day').count(), 0, 'second tap closes the day');
+    assert.equal(await page.locator('#sch-gb-month .sch-sel').count(), 0, 'second tap takes the date chip off the month line');
     await goTo(page, 0);
     await page.locator('#sch-week .sch-wd.today').click();
-    const today = await page.textContent('#sch-week-day');
-    assert.ok(/3 to do ↓/.test(today) && !today.includes('Journal') && !today.includes('Daily check-in'), 'V101.149: today does not repeat what the list below shows (3 ↓): ' + today);
+    const today = await page.evaluate(() => (document.querySelector('#sch-week-day') || { textContent: '' }).textContent + ' | ' + document.querySelector('#sch-gb-month .sch-sel').textContent);
+    assert.ok(/3 to do ↓/.test(today) && !today.includes('Journal') && !today.includes('Daily check-in'), 'V101.149: today does not repeat what the list below shows (3 ↓, on the chip since V101.194): ' + today);
     // V101.161: today's circle pings (a ring scales out and fades, 2 s loop); with reduced motion it stands still
     const ping = async () => page.$eval('#sch-week .sch-wd.today .sch-n', e => { const c = getComputedStyle(e, '::after'); return [c.animationName, c.animationDuration, c.animationIterationCount]; });
     assert.deepEqual(await ping(), ['schTodayPing', '2s', 'infinite'], 'today pings');
@@ -175,6 +178,7 @@ assert.match((await page.textContent('#sch-week .sch-rg h4')).trim(), /^\d{1,2}[
     await page.evaluate(() => { schWeekShift(1); closeScheduleModal(); openScheduleModal(); });
     assert.equal(await page.evaluate(() => schWeekOffset), 0, 'reopen = this week');
     assert.equal(await page.locator('#sch-week-day').count(), 0, 'reopen = no day picked');
+    assert.equal(await page.locator('#sch-gb-month .sch-sel').count(), 0, 'reopen = no date chip');
     assert.equal(await page.locator('#sch-week .sch-rg-today').count(), 0, 'reopen = no Today › link');
 
     // ---- 6. phone layout: 44 px targets, no sideways scroll, strip above the list
