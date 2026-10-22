@@ -38,7 +38,7 @@ const { chromium } = require('playwright');
         for (const id of ['ai-audit-popup', 'ai-analysis-popup']) {
             const popup = page.locator('#' + id);
             // V101.05 added Qwen/DeepSeek chips; V101.21 gave them provider tabs; V101.52 adds the Grok trial chip here only.
-            assert.equal(await popup.locator('.text-ai-chips button').count(), 18); // V102.268: + Muse Spark Open; V102.242: + Gemma 4 26B A4B; V101.64: + Claude Opus 5.5; V102.76: + local Ollama trial chip
+            assert.equal(await popup.locator('.text-ai-chips button').count(), 19); // V102.365: + Gemini 4 Argon; V102.268: + Muse Spark Open; V102.242: + Gemma 4 26B A4B; V101.64: + Claude Opus 5.5; V102.76: + local Ollama trial chip
             assert.equal(await popup.locator('.text-ai-chips button:visible').count(), 4);
             // V101.65: provider tabs are logos named by aria-label; the chips next to them carry no logo.
             assert.deepEqual(await popup.locator('.audit-provider').evaluateAll(ns => ns.map(n => n.getAttribute('aria-label'))), ['Gemini', 'GPT', 'Claude', 'Qwen', 'DeepSeek', 'Muse', 'Grok', 'Ollama']);
@@ -76,21 +76,21 @@ const { chromium } = require('playwright');
                 }
             }
         }
-        await page.locator('#ai-audit-popup [data-value="gpt-6-sol"]').click();
+        await page.locator('#ai-audit-popup [data-value="gpt-6.1-sol"]').click();
         await page.locator('#ai-audit-popup .audit-run').click();
-        assert.equal(await page.evaluate(() => auditRequest.model), 'gpt-6-sol');
+        assert.equal(await page.evaluate(() => auditRequest.model), 'gpt-6.1-sol');
         await page.locator('#ai-analysis-popup [data-provider="Claude"]').click();
-        assert.equal(await page.locator('#ai-analysis-popup .text-ai-chips button:visible').count(), 4); // Claude: Haiku 4.5, Sonnet 5.5, Opus 5.5, Fable 5.1
+        assert.equal(await page.locator('#ai-analysis-popup .text-ai-chips button:visible').count(), 4); // Claude: Haiku 5.5, Sonnet 5.5, Opus 5.5, Fable 5.1
         assert.equal(await page.locator('#rewrite-ai-model').inputValue(), 'gpt-6-luna');
-        await page.locator('#ai-analysis-popup [data-value="claude-haiku-4-5"]').click();
+        await page.locator('#ai-analysis-popup [data-value="claude-haiku-5-5"]').click();
         await page.locator('#ai-analysis-popup .audit-run').click();
-        assert.equal(await page.evaluate(() => rewriteRequest), 'claude-haiku-4-5');
+        assert.equal(await page.evaluate(() => rewriteRequest), 'claude-haiku-5-5');
         // V101.52 Grok trial: kept for the run, never saved as the Settings analyzer default.
         await page.locator('#ai-analysis-popup [data-provider="Grok"]').click();
         await page.locator('#ai-analysis-popup [data-value="or/x-ai/grok-4.7"]').click();
         await page.locator('#ai-analysis-popup .audit-run').click();
         assert.equal(await page.evaluate(() => rewriteRequest), 'or/x-ai/grok-4.7');
-        assert.equal(await page.locator('#ai-analyzer-model-val').inputValue(), 'claude-haiku-4-5');
+        assert.equal(await page.locator('#ai-analyzer-model-val').inputValue(), 'claude-haiku-5-5');
         assert.notEqual(await page.evaluate(() => localStorage.getItem('ai_default_analyzer_model')), 'or/x-ai/grok-4.7');
         await page.locator('#ai-audit-popup [data-provider="Grok"]').click();
         await page.locator('#ai-audit-popup [data-value="or/x-ai/grok-4.7"]').click();

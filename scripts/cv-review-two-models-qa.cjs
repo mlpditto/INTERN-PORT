@@ -26,12 +26,12 @@ function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':
 window.safeJsonParse = s => JSON.parse(s);
 window.__calls = []; window.__answers = {};
 window.callUniversalAI = async (model, prompt, isJson, vision, sys, opts) => { window.__calls.push({ model, prompt, isJson, opts }); const a = window.__answers[model]; if (a instanceof Error) throw a; return { text: a }; };
-window.apdReviewModels = () => ['gpt-6-luna', 'claude-haiku-4-5'];
+window.apdReviewModels = () => ['gpt-6-luna', 'claude-haiku-5-5'];
 window.__init = 0; window.apdInitModelRows = () => { window.__init++; };
 var APD_REVIEW_KEYS = ['strengths', 'gaps', 'questions', 'suggestions'];   // V102.299: the diff helpers read it
 var APD_MODES = { pharmacy: { e: '🏪', th: 'ร้านยา', en: 'Community pharmacy', ko: '약국', role: 'ROLE-PHARMACY' } };   // V102.304
 var APD_VENDOR_COLOR = { gemini: '#4285f4', openai: '#10a37f', claude: '#d97757', qwen: '#7c3aed', deepseek: '#2563eb', grok: '#111827', meta: '#0668e1', ollama: '#475569', ai: '#64748b' };
-window.aiModelShortName = id => ({ 'gpt-6-luna': 'Luna 6', 'claude-haiku-4-5': 'Haiku 4.5' })[id] || id;
+window.aiModelShortName = id => ({ 'gpt-6-luna': 'Luna 6', 'claude-haiku-5-5': 'Haiku 5.5' })[id] || id;
 var _APPLICANT_EXT = { 'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
 ${code}
 </script>`;
@@ -55,15 +55,15 @@ ${code}
         // two models answer → two cards A / B with short names, two calls with the CV text
         await page.evaluate(() => { window.__answers = {
             'gpt-6-luna': 'Sure: {"summary":"ผู้สมัครมีพื้นฐานร้านยา","strengths":["ให้คำปรึกษา OTC"],"gaps":["ไม่ระบุใบอนุญาต"],"questions":["เคยจ่ายยาเองไหม"],"suggestions":["ใส่เลขใบอนุญาต"]}',
-            'claude-haiku-4-5': '{"summary":"GPA ดี ประสบการณ์ค่ายสุขภาพ","strengths":["จิตอาสา"],"gaps":[],"questions":[],"suggestions":["เพิ่มรายละเอียดฝึกงาน"]}' }; });
+            'claude-haiku-5-5': '{"summary":"GPA ดี ประสบการณ์ค่ายสุขภาพ","strengths":["จิตอาสา"],"gaps":[],"questions":[],"suggestions":["เพิ่มรายละเอียดฝึกงาน"]}' }; });
         await page.evaluate(() => gsCvReview());
         await page.waitForFunction(() => document.querySelectorAll('#gs-cv-review .apd-cmp > div').length === 2);
         const calls = await page.evaluate(() => window.__calls);
-        assert.deepEqual(calls.map(c => c.model), ['gpt-6-luna', 'claude-haiku-4-5']);
+        assert.deepEqual(calls.map(c => c.model), ['gpt-6-luna', 'claude-haiku-5-5']);
         assert.ok(calls.every(c => c.isJson === true && c.opts.feature === 'resume_review' && c.prompt.includes('GPA 3.21')), 'both calls carry the CV text as resume_review');
         assert.equal(await page.evaluate(() => window.__init), 1, 'the Documents model rows are built first (the picks live there)');
         const heads = await page.$$eval('#gs-cv-review .apd-cmp .apd-name', es => es.map(e => e.textContent));   // V102.298: the title row also carries ⧉
-        assert.deepEqual(heads, ['A · Luna 6', 'B · Haiku 4.5'], 'cards named by slot + short name');
+        assert.deepEqual(heads, ['A · Luna 6', 'B · Haiku 5.5'], 'cards named by slot + short name');
         assert.ok(await page.$eval('#gs-cv-review', e => /ผู้สมัครมีพื้นฐานร้านยา/.test(e.textContent) && /ให้คำปรึกษา OTC/.test(e.textContent) && /Not a hiring decision/.test(e.textContent)));
         assert.equal(await page.locator('#gs-cv-review').isVisible(), true);
         if (process.env.CVR_SHOT) await page.locator('#gs-cv-sheet').screenshot({ path: process.env.CVR_SHOT });
@@ -74,11 +74,11 @@ ${code}
         assert.equal(await page.locator('#gs-cv-review .apd-cmp > div').count(), 2, 'review kept after re-render');
         assert.equal(await page.locator('#gs-cv-review').isVisible(), true);
         // a model that fails is shown as an error card, the other still renders
-        await page.evaluate(() => { window.__calls = []; window.__answers['claude-haiku-4-5'] = new Error('Provider unavailable'); });
+        await page.evaluate(() => { window.__calls = []; window.__answers['claude-haiku-5-5'] = new Error('Provider unavailable'); });
         await page.evaluate(() => gsCvReview());
         await page.waitForFunction(() => /Provider unavailable/.test(document.getElementById('gs-cv-review').textContent));
         assert.equal(await page.locator('#gs-cv-review .apd-cmp > div').count(), 2);
-        assert.ok(await page.$eval('#gs-cv-review', e => /B · Haiku 4.5/.test(e.textContent) && /ผู้สมัครมีพื้นฐานร้านยา/.test(e.textContent)));
+        assert.ok(await page.$eval('#gs-cv-review', e => /B · Haiku 5.5/.test(e.textContent) && /ผู้สมัครมีพื้นฐานร้านยา/.test(e.textContent)));
         // image-only CV → message, no call
         await page.evaluate(() => { window.__calls = []; _gsCvText = ''; _gsCvReviewHtml = ''; gsCvRender('scan.jpg', '🖼 read as an image (vision model)'); });
         await page.evaluate(() => gsCvReview());
@@ -88,8 +88,8 @@ ${code}
         await page.evaluate(() => gsCvClose());
         assert.deepEqual(await page.evaluate(() => [_gsCvText, _gsCvReviewHtml, _gsCvRows.length]), ['', '', 0]);
         // the Documents sheet renderer still fills #apd-ai with the same cards
-        await page.evaluate(() => apdRenderReview([{ model: 'gpt-6-luna', data: { summary: 'ok' } }, { model: 'claude-haiku-4-5', error: 'x' }]));
-        assert.deepEqual(await page.$$eval('#apd-ai .apd-cmp .apd-name', es => es.map(e => e.textContent)), ['A · Luna 6', 'B · Haiku 4.5']);
+        await page.evaluate(() => apdRenderReview([{ model: 'gpt-6-luna', data: { summary: 'ok' } }, { model: 'claude-haiku-5-5', error: 'x' }]));
+        assert.deepEqual(await page.$$eval('#apd-ai .apd-cmp .apd-name', es => es.map(e => e.textContent)), ['A · Luna 6', 'B · Haiku 5.5']);
         assert.deepEqual(errs, []);
         console.log('cv-review-two-models-qa: all passed');
     } finally { await browser.close(); }

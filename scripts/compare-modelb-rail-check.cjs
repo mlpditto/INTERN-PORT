@@ -51,7 +51,7 @@ const modelB = cut('        window._compareModelB = function', '        window.g
         assert.equal(luna.vendor, 'openai');
         assert.match(luna.img, /rgba\(13, 13, 13, 0\.05\)/, 'GPT ink tint');
         assert.deepEqual([luna.border, luna.bar.split('|')[0]], ['rgb(13, 13, 13)', 'rgb(13, 13, 13)'], 'GPT ink border + bar');
-        const haiku = await look('#b button[aria-label="Claude Haiku 4.5"]');
+        const haiku = await look('#b button[aria-label="Claude Haiku 5.5"]');
         assert.deepEqual([haiku.vendor, haiku.border, haiku.bar.split('|')[0]], ['claude', 'rgb(227, 165, 140)', 'rgb(217, 119, 87)'], 'Claude clay border + bar');
         const flash = await look('#b button[aria-label="Gemini 3.8 Flash"]');
         assert.deepEqual([flash.vendor, flash.border], ['gemini', 'rgb(174, 203, 250)'], 'Gemini blue border');
@@ -80,7 +80,7 @@ const modelB = cut('        window._compareModelB = function', '        window.g
         await page.evaluate(() => { document.getElementById('b').innerHTML = window._compareModelBPickerHtml(); });
         assert.equal(await page.locator('#b .text-ai-chips > button[aria-pressed="true"]').getAttribute('aria-label'), 'Grok 4.7', 'reopened rail shows Grok picked');
         await page.evaluate(() => localStorage.setItem('ai_default_2model_b', 'gpt-5.6-sol'));
-        assert.equal(await page.evaluate(() => window._compareModelB()), 'gpt-6-sol', 'retired ids still move to their successor');
+        assert.equal(await page.evaluate(() => window._compareModelB()), 'gpt-6.1-sol', 'retired ids still move to their successor');
 
         // Qwen / DeepSeek logos also show on other flat rails (settings etc.)
         assert.equal(await page.evaluate(() => (textAIChipsHtml('', 'gpt-6-luna', '').match(/data-owner="(qwen|deepseek)"/g) || []).length), 4);

@@ -17,7 +17,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
             const old = document.getElementById('ai-compare-overlay'); if (old) old.remove();
             const q = { q: 'Which dose is right for an eGFR of 50 ml/min?', type: 'choice', options: ['keep', 'halve', 'stop', 'switch'], correct: [1] };
             const imp = sameQ ? q : { q: 'Which metformin dose is right when eGFR is 50 ml/min/1.73m²?', type: 'choice', options: ['keep it', 'halve it', 'stop', 'switch'], correct: [2] };
-            window.getQuizFormData = () => ({ questions: [q, q, q] }); window._aiAnalysisModel = 'gpt-6-sol';
+            window.getQuizFormData = () => ({ questions: [q, q, q] }); window._aiAnalysisModel = 'gpt-6.1-sol';
             window._aiAnalysisItems = Array.from({ length: 12 }, () => ({ improvedQuestion: imp }));
             previewAiFix(0, ai);
             const box = document.getElementById('ai-compare-overlay').firstElementChild, h = box.children[0];

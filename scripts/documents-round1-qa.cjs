@@ -72,7 +72,7 @@ const LONG2 = 'ACFrOgBBzz9i8NjUNJW3VtEluwlmOs7aqVf945_7_wARdTEYhqjliAFtqaRbWuLcX
 
         // ④ same vendor → hint; same model → its own hint; another vendor → gone
         const pickB = id => page.evaluate(id => { const row = document.querySelectorAll('#apd-ab .apd-ab-row')[1]; const tab = row.querySelector('.audit-provider[data-provider="GPT"]'); if (tab) browseAuditProvider(tab); row.querySelector(`.text-ai-chips button[data-value="${id}"]`).click(); }, id);
-        await pickB('gpt-6-sol');
+        await pickB('gpt-6.1-sol');
         assert.equal(await page.$eval('#apd-vwarn', e => e.hidden), false); assert.match(await page.$eval('#apd-vwarn', e => e.innerText), /same vendor.*เลือกคนละค่าย/, 'both languages visible');
         await pickB('gpt-6-luna');
         assert.match(await page.$eval('#apd-vwarn', e => e.textContent), /same model — only one review/);

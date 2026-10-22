@@ -44,14 +44,14 @@ with sync_playwright() as p:
     chip.click()
     assert page.locator('#bp-model-rail').is_visible() and chip.get_attribute('aria-expanded') == 'true'
     page.locator('#bp-model-rail .audit-provider[data-provider="Claude"]').click()
-    page.locator('#bp-model-rail [data-value="claude-haiku-4-5"]').click()
+    page.locator('#bp-model-rail [data-value="claude-haiku-5-5"]').click()
     assert not page.locator('#bp-model-rail').is_visible()
-    assert page.evaluate("localStorage.getItem('ai_text_bp-ai-model')") == 'claude-haiku-4-5'
-    assert chip.get_attribute('data-model') == 'Haiku 4.5'
+    assert page.evaluate("localStorage.getItem('ai_text_bp-ai-model')") == 'claude-haiku-5-5'
+    assert chip.get_attribute('data-model') == 'Haiku 5.5'
     chip.click(); page.keyboard.press('Escape')
     assert not page.locator('#bp-model-rail').is_visible(), 'Esc closes the rail'
     load()
-    assert select.input_value() == 'claude-haiku-4-5' and chip.get_attribute('data-model') == 'Haiku 4.5'
+    assert select.input_value() == 'claude-haiku-5-5' and chip.get_attribute('data-model') == 'Haiku 5.5'
     page.evaluate('''() => {
         window._bulkPasteParsed=Array.from({length:10},()=>({include:true,q:'Test',options:['A','B'],correct:[]}));
         window.requestModels=[];window.disabledDuringRun=[];window.callUniversalAI=()=>{};

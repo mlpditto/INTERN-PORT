@@ -57,9 +57,9 @@ const cut = (from, to) => { const a = html.indexOf(from), b = html.indexOf(to, a
         assert.equal(await page.locator('#dxa-form-model-rail .audit-provider').count() > 3, true, 'provider logo tabs');
         assert.equal(await page.locator('#dxa-form-model-rail .text-ai-chips > button').count(), await page.evaluate(() => TEXT_AI_MODELS.length), 'every model reachable');
         await page.locator('#dxa-form-model-rail .audit-provider[data-provider="Claude"]').click();
-        await page.locator('#dxa-form-model-rail .text-ai-chips > button[data-value="claude-haiku-4-5"]').click();
-        assert.equal(await page.locator('#dxa-ai-model-val').inputValue(), 'claude-haiku-4-5');
-        assert.equal(await page.locator('#dxa-form-model-name').innerText(), 'Haiku 4.5');
+        await page.locator('#dxa-form-model-rail .text-ai-chips > button[data-value="claude-haiku-5-5"]').click();
+        assert.equal(await page.locator('#dxa-ai-model-val').inputValue(), 'claude-haiku-5-5');
+        assert.equal(await page.locator('#dxa-form-model-name').innerText(), 'Haiku 5.5');
         assert.equal(await page.locator('#dxa-form-model-rail').isVisible(), false, 'a pick closes the rail');
         assert.equal(await page.locator('#dxa-form-model-toggle').getAttribute('aria-expanded'), 'false');
         await page.locator('#dxa-form-model-toggle').click();

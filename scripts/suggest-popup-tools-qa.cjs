@@ -36,7 +36,7 @@ const rail = slice('        window.browseAuditProvider = function', '        win
             window.copied = []; window.unifiedCopyToClipboard = (text) => copied.push(text);
             window.getQuizFormData = () => ({ title: 'Contraception', blueprint: {} });
             window.auditFixModel = () => 'gpt-6-luna';
-            window.aiModelShortName = id => ({ 'gpt-6-luna': 'Luna 6', 'gpt-6-sol': 'Sol 6', 'claude-sonnet-5': 'Sonnet 5' })[id] || id;
+            window.aiModelShortName = id => ({ 'gpt-6-luna': 'Luna 6', 'gpt-6.1-sol': 'Sol 6', 'claude-sonnet-5': 'Sonnet 5' })[id] || id;
             window.safeJsonParse = JSON.parse;
         });
         await page.addScriptTag({ path: 'public/ai-model-ui.js' });
@@ -117,15 +117,15 @@ const rail = slice('        window.browseAuditProvider = function', '        win
         assert.equal(await page.evaluate(() => calls.length), 0);
         // arm again, switch to Sol 6 (GPT tab already open), run with it; the pick is remembered
         await page.locator('#ai-sugg-score-all').click();
-        await page.locator('#ai-sugg-score-rail [data-value="gpt-6-sol"]').click();
+        await page.locator('#ai-sugg-score-rail [data-value="gpt-6.1-sol"]').click();
         assert.equal(await page.locator('#ai-sugg-score-all').innerText(), '▶ Score with Sol 6');
-        assert.equal(await page.evaluate(() => localStorage.getItem('ai_sugg_score_model')), 'gpt-6-sol');
+        assert.equal(await page.evaluate(() => localStorage.getItem('ai_sugg_score_model')), 'gpt-6.1-sol');
         await page.locator('#ai-sugg-score-all').click();
         await page.waitForFunction(() => /Score again/.test(document.getElementById('ai-sugg-score-all').textContent));
         assert.equal(await page.locator('#ai-sugg-score-rail').isVisible(), false, 'rail closes when it runs');
         assert.match((await page.locator('#ai-sugg-score-all').textContent()).replace(/\s+/g, ' '), /Score again · Sol 6/);
         const call = await page.evaluate(() => ({ model: calls[0][0], isJson: calls[0][2], feature: calls[0][5].feature, prompt: calls[0][1], n: calls.length }));
-        assert.equal(call.n, 1); assert.equal(call.model, 'gpt-6-sol'); assert.equal(call.isJson, true); assert.equal(call.feature, 'quiz_suggest_score');
+        assert.equal(call.n, 1); assert.equal(call.model, 'gpt-6.1-sol'); assert.equal(call.isJson, true); assert.equal(call.feature, 'quiz_suggest_score');
         assert.match(call.prompt, /RUBRIC — score each question on 8 dimensions/);   // V102.361: + readFirst (null for candidates)
         assert.match(call.prompt, /Q2 \(choice\): Q two stem — choose TWO[\s\S]*correct: A,C/);
         assert.match(call.prompt, /"perQuestionAudit"/);
@@ -157,7 +157,7 @@ const rail = slice('        window.browseAuditProvider = function', '        win
         await page.evaluate(() => finishScore({ text: JSON.stringify({ perQuestionAudit: [{ qNumber: 1, scores: { clarity: 5 }, averageScore: 5 }] }) }));
         await page.waitForTimeout(100);
         assert.equal(await page.locator('#ai-sugg-avg-0').innerText(), '', 'stale scores not painted on the new set');
-        assert.equal(await page.locator('#ai-sugg-score-rail [data-value="gpt-6-sol"]').getAttribute('aria-pressed'), 'true', 'a new popup opens on the remembered model');
+        assert.equal(await page.locator('#ai-sugg-score-rail [data-value="gpt-6.1-sol"]').getAttribute('aria-pressed'), 'true', 'a new popup opens on the remembered model');
 
         for (const width of [390, 1000]) {
             await page.setViewportSize({ width, height: 900 });

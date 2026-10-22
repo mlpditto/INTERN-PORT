@@ -36,7 +36,7 @@ assert.ok(at('_compareModelBPickerHtml') < at('generateAiProposalB') && at('gene
         assert.ok(Math.max(...ys) - Math.min(...ys) <= 8, 'B · vendors · models are ONE row: ' + ys);
         // pick another vendor → its models; picking a chip keeps ONE pressed chip and saves the choice
         await page.locator('#b .cmp-vendor[data-provider="Claude"]').click();
-        assert.deepEqual(await shown(), ['Claude Haiku 4.5', 'Claude Sonnet 5.5', 'Claude Opus 5.5', 'Claude Fable 5.1']);
+        assert.deepEqual(await shown(), ['Claude Haiku 5.5', 'Claude Sonnet 5.5', 'Claude Opus 5.5', 'Claude Fable 5.1']);
         assert.equal(await page.locator('#b .cmp-vendor[aria-pressed="true"]').count(), 1);
         await page.locator('#b button[aria-label="Claude Opus 5.5"]').click();
         assert.equal(await page.evaluate(() => localStorage.getItem('ai_default_2model_b')), 'claude-opus-5-5');

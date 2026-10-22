@@ -43,7 +43,7 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
         const ids = await page.evaluate(g => [...TEXT_AI_MODELS.map(m => m.id), ...g], grok);
         const providers = await page.evaluate(() => [...new Set([...TEXT_AI_MODELS, ...TEXT_AI_TRIAL_MODELS.filter(m => /grok/i.test(m.id))].map(m => m.label.split(' ')[0]))]);
         assert.ok(providers.includes('Grok'), 'Grok tab');
-        for (const [row, id, def] of [[0, 'apd-model-a', 'gpt-6-luna'], [1, 'apd-model-b', 'claude-haiku-4-5']]) {
+        for (const [row, id, def] of [[0, 'apd-model-a', 'gpt-6-luna'], [1, 'apd-model-b', 'claude-haiku-5-5']]) {
             const r = page.locator('#apd-ab .apd-ab-row').nth(row);
             assert.equal(await r.locator(`#${id}`).count(), 1, id + ' hidden input lives in its row');
             assert.equal(await page.locator('#' + id).inputValue(), def, id + ' default');
@@ -57,7 +57,7 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
             assert.equal(await r.locator('.text-ai-chips > button.active').getAttribute('data-value'), def, id + ' default chip active');
         }
         // review runs both models, de-duplicated
-        assert.deepEqual(await page.evaluate(() => apdReviewModels()), ['gpt-6-luna', 'claude-haiku-4-5']);
+        assert.deepEqual(await page.evaluate(() => apdReviewModels()), ['gpt-6-luna', 'claude-haiku-5-5']);
         // row A: switch to the Claude tab → Claude chips; pick Opus → input + localStorage, B untouched
         const A = page.locator('#apd-ab .apd-ab-row').nth(0);
         await A.locator('.audit-provider[data-provider="Claude"]').evaluate(b => b.click());
@@ -66,8 +66,8 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
         assert.equal(await page.locator('#apd-model-a').inputValue(), 'claude-opus-5-5');
         assert.equal(await A.locator('.text-ai-chips > button[aria-pressed="true"]').count(), 1);
         assert.equal(await page.evaluate(() => localStorage.getItem('ai_text_apd-model-a')), 'claude-opus-5-5', 'pick persisted under the registry key');
-        assert.equal(await page.locator('#apd-model-b').inputValue(), 'claude-haiku-4-5', 'B untouched');
-        assert.deepEqual(await page.evaluate(() => apdReviewModels()), ['claude-opus-5-5', 'claude-haiku-4-5']);
+        assert.equal(await page.locator('#apd-model-b').inputValue(), 'claude-haiku-5-5', 'B untouched');
+        assert.deepEqual(await page.evaluate(() => apdReviewModels()), ['claude-opus-5-5', 'claude-haiku-5-5']);
         // same model on both sides → one review, not two
         const B = page.locator('#apd-ab .apd-ab-row').nth(1);
         await B.locator('.text-ai-chips > button[data-value="claude-opus-5-5"]').evaluate(b => b.click());
