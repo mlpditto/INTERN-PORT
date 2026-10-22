@@ -199,7 +199,10 @@ assert.match((await page.textContent('#sch-week .sch-rg h4')).trim(), /^\d{1,2}[
     assert.ok(lay.above, 'strip sits above the list');
 
     // ---- 7. the list below and the tabs are untouched
+    // the fixture's Journal club (+3 d) and Vitamin B quiz (+2 d) fall into the FOLDED Next week bucket from Friday on (Mon–Sun weeks, V101.184) — open it to read them, then fold it back
+    await page.evaluate(() => { window._schNextExpanded = true; schRenderAgenda(); });
     const list = await page.textContent('#sch-agenda');
+    await page.evaluate(() => { window._schNextExpanded = false; schRenderAgenda(); });
     assert.ok(/Today/.test(list) && /Journal/.test(list) && /Case/.test(list) && /Vitamin B quiz/.test(list) && /Journal club/.test(list), 'Agenda list still there: ' + list.slice(0, 160));
     assert.ok(/Missed[^0-9]*2/i.test(list) && !/Show 2 missed/.test(list), 'Missed is ONE collapsed header line (no separate Show-N row)');
     // V101.81: Today = upright tiles, side by side, left → right
