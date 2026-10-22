@@ -20,6 +20,7 @@
     var DONE = ['ok', 'quiz', 'codex', 'hist'];   // what counts as read (articles.js); 'x' = closed without reading
     // V102.362: 🌐 Translate all — one click fills every missing TH / KO from the EN version and saves, one at a time
     var TR = { busy: false, stop: false, prog: '' };
+    var DA = { busy: false, stop: false, prog: '' };   // V102.375: 🩺 Draft all — the Disease Codex twin of Translate all
     var esc = function (v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
     var msOf = function (t) { return t == null ? null : typeof t === 'number' ? t : t.toMillis ? t.toMillis() : t instanceof Date ? t.getTime() : Date.parse(t) || null; };
 
@@ -255,6 +256,7 @@
             '.art-rail{display:inline-flex;gap:3px;background:#f1f5f9;border-radius:999px;padding:3px;flex-wrap:wrap}.art-rail button{min-height:0;margin:0;width:auto;border:0;background:transparent;padding:5px 11px;border-radius:999px;font-size:12.5px;font-weight:700;color:#475569;cursor:pointer}' +
             '.art-rail button b{opacity:.65;margin-left:4px}.art-rail button.on{background:#4361ee;color:#fff}' +
             '.art-new{margin:0 0 0 6px!important;width:auto!important;min-height:0!important;background:#4361ee;color:#fff;border:0;border-radius:12px;padding:8px 14px;font-weight:800;cursor:pointer}' +
+            '.art-da-all{margin-left:8px!important;background:#fff7ed!important;color:#c2410c!important;border-color:#fdba74!important}' +
             '.art-tr-all{margin:0 0 0 auto!important;width:auto!important;min-height:0!important;background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;border-radius:12px;padding:8px 12px;font-weight:800;cursor:pointer;white-space:nowrap}.art-tr-all:disabled{opacity:.6;cursor:not-allowed}.art-tr-all.busy{background:#fef3c7;color:#92400e;border-color:#fde68a}' +
             '.art-g{display:grid;grid-template-columns:300px minmax(0,1fr) 290px;gap:14px;align-items:start}@media(max-width:1100px){.art-g{grid-template-columns:260px minmax(0,1fr)}.art-g>.art-pv{display:none}}@media(max-width:760px){.art-g{grid-template-columns:1fr}}' +
             '.art-list{display:flex;flex-direction:column;gap:6px;max-height:70vh;overflow:auto}.art-row{all:unset;box-sizing:border-box;cursor:pointer;border:1px solid #e2e8f0;border-radius:14px;padding:9px 10px;display:grid;grid-template-columns:36px 1fr;gap:8px;background:#fff}' +
@@ -420,6 +422,23 @@
         });
         return jobs;
     }
+    // V102.375 (owner's pick 3): the bare topic of an article (the title before ":" / "–" / "(", emoji stripped) — the Codex entry name
+    function codexNameOf(a) { return String((a.title || {}).en || (a.title || {}).th || (a.title || {}).ko || '').replace(/[\p{Extended_Pictographic}️]/gu, '').split(/[:–—(]/)[0].trim(); }
+    // the articles 🩺 Draft all would send: saved, titled, in neither Codex (no dx / dc draft or entry) and linked to neither (no 🩺 / 💊 link)
+    function daJobs() {
+        return (S.list || []).filter(function (a) {
+            if (!a.id || !codexNameOf(a)) return false;
+            if (a.dx && (a.dx.draftId || a.dx.publishedId)) return false;
+            if (a.dc && (a.dc.draftId || a.dc.publishedId)) return false;
+            return !(a.links || []).some(function (l) { return l.kind === 'disease' || l.kind === 'codex'; });
+        });
+    }
+    function daAllHtml() {
+        var n = daJobs().length;
+        if (DA.busy) return '<button type="button" class="art-tr-all art-da-all busy" onclick="Articles.draftAll()" title="Drafting — press to stop after the current one">🩺 ' + esc(DA.prog) + ' · stop</button>';
+        if (!S.list.length) return '';
+        return '<button type="button" class="art-tr-all art-da-all" onclick="Articles.draftAll()"' + (n ? '' : ' disabled') + ' title="' + (n ? 'Draft a Disease Codex entry from each of the ' + n + ' article(s) in neither Codex (AI, one at a time) → Pending Drafts' : 'Every article is already in a Codex or linked to one') + '">🩺 Draft all' + (n ? ' <b>' + n + '</b>' : '') + '</button>';
+    }
     function trAllHtml() {
         var n = trJobs().length;
         if (TR.busy) return '<button type="button" class="art-tr-all busy" onclick="Articles.translateAll()" title="Translating — press to stop after the current one">🌐 ' + esc(TR.prog) + ' · stop</button>';
@@ -511,7 +530,7 @@
         var list = sorted(now);
         var head = '<div class="art-h"><h2>📰 Articles</h2><div class="art-rail" role="group" aria-label="Filter by status">' + FILTERS.map(function (f) {
             return '<button type="button" class="' + (S.filter === f[0] ? 'on' : '') + '" aria-pressed="' + (S.filter === f[0]) + '" data-filter="' + f[0] + '" onclick="Articles.filter(\'' + f[0] + '\')">' + f[1] + '<b>' + (counts[f[0]] || 0) + '</b></button>';
-        }).join('') + '</div>' + trAllHtml() + '<button type="button" class="art-new" onclick="Articles.edit(null)">＋ New</button></div>';
+        }).join('') + '</div>' + trAllHtml() + daAllHtml() + '<button type="button" class="art-new" onclick="Articles.edit(null)">＋ New</button></div>';
         var left = '<div class="art-list">' + (S.loading && !S.loaded ? '<div class="art-empty">Loading…</div>' : list.length ? list.map(function (a) { return rowHtml(a, now); }).join('') : '<div class="art-empty">' + (S.list.length ? 'Nothing here.' : 'No articles yet — ＋ New') + '</div>') + '</div>';
         var mid = S.cur ? editorHtml(now) : '<div class="art-empty">' + (S.err && !S.loaded ? '⚠️ ' + esc(S.err) : 'Pick an article, or ＋ New.') + '</div>';
         host.innerHTML = head + '<div class="art-g">' + left + (S.cur && S.who ? whoHtml(S.cur) : mid + (S.cur ? previewHtml() : '<div class="art-pv"></div>')) + '</div>';
@@ -600,6 +619,30 @@
             }).catch(function (e) { S.err = '✨ ' + ((e && e.message) || 'AI draft failed'); }).then(function () { S.aiBusy = false; render(); });
         },
         // 🌐 one click: every missing TH / KO from EN, saved straight into articles/{id} (title.<L> + body.<L>); a second click stops after the current one
+        // 🩺 V102.375: Draft all — dxaDraftFromArticle (#1982) for every article in neither Codex, one at a time; press again to stop
+        draftAll: function () {
+            if (DA.busy) { DA.stop = true; render(); return Promise.resolve(); }
+            var jobs = daJobs(); if (!jobs.length) return Promise.resolve();
+            if (!confirm('Draft Disease Codex entries from ' + jobs.length + ' article(s) with AI → Pending Drafts?\n\nOne at a time — keep this window open. Press the button again to stop. Articles about a drug or about a disease already in the Codex are skipped automatically.')) return Promise.resolve();
+            if (typeof window.dxaDraftFromArticle !== 'function') { S.err = '🩺 The Disease Codex is not available on this page.'; render(); return Promise.resolve(); }
+            DA.busy = true; DA.stop = false; var done = 0, skipped = 0, i = 0;
+            var step = function () {
+                if (i >= jobs.length || DA.stop) return Promise.resolve();
+                var a = jobs[i], name = codexNameOf(a), title = a.title.en || a.title.th || a.title.ko || name, body = a.body.en || a.body.th || a.body.ko || '';
+                DA.prog = (i + 1) + '/' + jobs.length; render();
+                return Promise.resolve().then(function () { return window.dxaDraftFromArticle({ id: a.id, name: name, title: title, source: 'Title: ' + title + '\n' + body }); }).then(function (r) {
+                    a.dx = { draftId: r.draftId, publishedId: '', name: name };
+                    if (S.cur && S.cur.id === a.id) { S.cur.dx = a.dx; S.base = JSON.stringify(S.cur); }
+                    done++;
+                }).catch(function () { skipped++; }).then(function () { i++; return step(); });
+            };
+            return step().then(function () {
+                DA.busy = false; DA.stop = false; DA.prog = '';
+                var msg = '🩺 Drafted ' + done + '/' + jobs.length + (skipped ? ' (' + skipped + ' skipped)' : '') + (i < jobs.length ? ' — stopped' : '') + (done ? ' — approve them in Disease Codex ▸ Pending Drafts' : '');
+                if (typeof showToast === 'function') showToast(msg); else S.err = msg;
+                render();
+            });
+        },
         translateAll: function () {
             if (TR.busy) { TR.stop = true; render(); return Promise.resolve(); }
             var jobs = trJobs(); if (!jobs.length) return Promise.resolve();
@@ -703,7 +746,7 @@
             ta.focus(); ta.setSelectionRange(s + pre.length, e + pre.length);
             api.text('body', ta.value);
         },
-        _S: S, _stats: stats, _forUser: forUser, _status: status, _defaultWindow: defaultWindow, _validate: validate, _toDoc: toDoc, _toLocal: toLocal, _fromLocal: fromLocal, _readMin: readMin, _langsOf: langsOf
+        _S: S, _daJobs: daJobs, _codexNameOf: codexNameOf, _stats: stats, _forUser: forUser, _status: status, _defaultWindow: defaultWindow, _validate: validate, _toDoc: toDoc, _toLocal: toLocal, _fromLocal: fromLocal, _readMin: readMin, _langsOf: langsOf
     };
     window.Articles = api;
 })();
