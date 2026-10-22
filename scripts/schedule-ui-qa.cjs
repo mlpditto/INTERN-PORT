@@ -144,9 +144,10 @@ assert.match((await page.textContent('#sch-week .sch-rg h4')).trim(), /^\d{1,2}[
     await page.evaluate(() => { schCheckinDays = new Set(); schRenderAgenda(); });
 
     // ---- 3c. V101.194: an empty day = the date chip on the month line alone — no panel, no "Nothing on this day"
-    const emptyDay = await page.evaluate(() => [schWeekDayHtml('2030-01-02', []), window._schSelHtml]);
+    // the date text comes from toLocaleDateString — "Wed 2 Jan" on Windows ICU, "Wed, 2 Jan" on Linux (CI) — so the expectation is built in the page
+    const emptyDay = await page.evaluate(() => [schWeekDayHtml('2030-01-02', []), window._schSelHtml, new Date(2030, 0, 2).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }), new Date(2030, 0, 2).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })]);
     assert.equal(emptyDay[0], '', 'empty day: no panel');
-    assert.equal(emptyDay[1], '<div class="sch-hol sch-sel lang-no-toggle" title="Wednesday 2 January"><span>Wed 2 Jan</span></div>', 'the chip is the date alone: ' + emptyDay[1]);
+    assert.equal(emptyDay[1], '<div class="sch-hol sch-sel lang-no-toggle" title="' + emptyDay[3] + '"><span>' + emptyDay[2] + '</span></div>', 'the chip is the date alone: ' + emptyDay[1]);
 
     // ---- 4. tap a day: its rows; tap again closes; focus stays on the day
     await goTo(page, -1);
