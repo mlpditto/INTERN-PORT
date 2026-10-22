@@ -36,7 +36,23 @@ Tab: **🏴‍☠️ Grand Line Deck** → the three modes at the top: 🏴 Miss
 
 ---
 
-## 3. 🐳 Audio
+## 3. 🗣️ Thai clip
+
+**Where:** 🏴 Miss Goldenweek → the **Episodes** card after planning, and **Codex Gallery → 🎬 Clips → ▶**
+
+Thai speech from the video engines is not reliable yet. The route that works: the engine draws the picture only, and the app lays Thai captions and a Thai voice from Gemini TTS on top (the clip's own sound is muted).
+
+1. **Plan** gives every episode a one-line **Thai caption**. In the Episodes card press ✏️ and make it the sentence you want spoken. The counter under the field shows ≈ how many seconds the voice needs against the clip; if it says too long even at ×1.35, shorten it.
+2. The **drug-name readings (voice only)** field: `Warfarin=วอร์ฟาริน, INR=ไอเอ็นอาร์`, comma-separated. Used only when the voice is made; the caption keeps the original spelling.
+3. **▶ Render** with any engine (Veo Lite is cheapest, ≈ $0.40). Put "no on-screen text, no speech" in Expectations so the picture does not fight the captions and the voice.
+4. In the clip card (or the gallery ▶ player): **CC ไทย** shows / hides the caption band · **🔊 เสียงไทย** makes the Gemini TTS voice and plays it in sync (the clip is muted); the status line shows the voice length and any speed-up · the **Kore / Charon / Achird** chips pick the voice (narrator / calm / friendly) and the pick is remembered.
+5. **⬇ MP4 + ซับ + 🔊** saves a vertical MP4 with the captions and the Thai voice burned in (without 🔊 the button reads **⬇ MP4 + ซับ**); the file is `EPnn-th-voice.mp4`.
+
+> TTS is billed per character, a few satang per clip. A voice is cached per voice × text, so switching chips does not pay twice. Listen to the three voices on one real sentence before doing a whole series.
+
+---
+
+## 4. 🐳 Audio
 
 **Where:** 🐳 Laboon — the podcast / voice studio ("Brook, Soul King").
 
@@ -48,7 +64,7 @@ Tab: **🏴‍☠️ Grand Line Deck** → the three modes at the top: 🏴 Miss
 
 ---
 
-## 4. 🧭 Log Pose
+## 5. 🧭 Log Pose
 
 **Where:** 🧭 Log Pose — a chat with the research model over the knowledge base.
 

@@ -15,9 +15,9 @@ assert.ok(admin.includes(`onclick="switchTab('tab-ai-hub')"`) && /switchTab\('ta
 assert.ok(/class="deck-guide-btn deck-guide-mini"[^>]*title="[^"]*วิธี[^"]*·[^"]*만들기/.test(admin), '📖 tooltip EN · TH · KO');
 assert.ok(/<script src="admin-guide\.js\?v=V102\.\d+" defer><\/script>/.test(admin) && !admin.includes('admin-guide.js?v=V102.226'), 'script cache-busted');
 const secs = m => m.split(/\r?\n/).filter(l => /^## /.test(l));
-assert.equal(secs(deck.en).length, 4, 'four sections: images · video · audio · research');
-assert.equal(secs(deck.th).length, 4); assert.equal(secs(deck.ko).length, 4);
-for (const label of ['Plan 10 episodes', 'Clip 9:16', 'Nano Banana 2.1', 'Image 2', 'Visual Style Collection', 'Polish', 'Query Brain', 'Suggest Prompts', 'Focus on KB Only', 'Manage Documents', 'Codex Gallery', 'Clear Chat', 'Send to Podcast', 'Target Length', 'Performance Direction']) {
+assert.equal(secs(deck.en).length, 5, 'five sections: images · video · Thai clip (V102.369) · audio · research');
+assert.equal(secs(deck.th).length, 5); assert.equal(secs(deck.ko).length, 5);
+for (const label of ['Plan 10 episodes', 'Clip 9:16', 'Nano Banana 2.1', 'Image 2', 'Visual Style Collection', 'Polish', 'Query Brain', 'Suggest Prompts', 'Focus on KB Only', 'Manage Documents', 'Codex Gallery', 'Clear Chat', 'Send to Podcast', 'Target Length', 'Performance Direction', 'CC ไทย', '🔊 เสียงไทย']) {
     assert.ok(admin.includes(label), 'admin.html has "' + label + '"');
     for (const l of ['en', 'th', 'ko']) assert.ok(deck[l].split('**').join('').includes(label), l.toUpperCase() + ' deck guide names "' + label + '"');
 }
@@ -46,22 +46,25 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Nika Admin (V9.9)</
         assert.equal(await page.locator('#adminGuideOverlay.open').count(), 0, 'seen flag set → no auto-open');
         // the badge → deck guide, English, first section (images), four chips
         await page.click('.deck-guide-btn');
-        await page.waitForFunction(() => document.querySelector('#adminGuideOverlay.open') && document.querySelectorAll('#adminGuideOverlay .ag-chip').length === 4);
+        await page.waitForFunction(() => document.querySelector('#adminGuideOverlay.open') && document.querySelectorAll('#adminGuideOverlay .ag-chip').length === 5);
         assert.equal(await page.$eval('#adminGuideOverlay', e => e.dataset.set), 'deck');
         assert.match(await page.$eval('#adminGuideOverlay .ag-title', e => e.textContent), /Grand Line Deck — how to/);
         const chips = await page.$$eval('#adminGuideOverlay .ag-chip', els => els.map(e => ({ t: e.textContent, on: e.getAttribute('aria-pressed') })));
-        assert.deepEqual(chips.map(c => c.t), ['🖼 Images', '🎬 Video', '🐳 Audio', '🧭 Log Pose']);
+        assert.deepEqual(chips.map(c => c.t), ['🖼 Images', '🎬 Video', '🗣️ Thai clip', '🐳 Audio', '🧭 Log Pose']);
         assert.equal(chips[0].on, 'true', 'opens on Images (not the admin guide\'s tab map)');
         const body = () => page.$eval('#adminGuideOverlay .ag-body', e => e.innerText);
         assert.ok(/Visual Style Collection/.test(await body()) && /Nano Banana 2\.1/.test(await body()));
         await page.click('#adminGuideOverlay .ag-chip[data-i="1"]');
         assert.ok(/Plan 10 episodes/.test(await body()) && /\$0\.80/.test(await body()) && /teach-clips/.test(await body()), 'video section');
+        await page.click('#adminGuideOverlay .ag-chip[data-i="2"]');
+        assert.ok(/CC ไทย/.test(await body()) && /🔊 เสียงไทย/.test(await body()) && /Kore \/ Charon \/ Achird/.test(await body()) && /EPnn-th-voice\.mp4/.test(await body()), 'Thai clip section (V102.369)');
+        await page.click('#adminGuideOverlay .ag-chip[data-i="1"]');
         // Thai switch stays on the deck set
         await page.click('#adminGuideOverlay .ag-l[data-l="th"]');
         // the title repaints at once, the body after the TH file loads — wait for the body (CI is slow)
         await page.waitForFunction(() => /วิธีใช้ Grand Line Deck/.test(document.querySelector('#adminGuideOverlay .ag-title').textContent) && /ยืนยัน/.test(document.querySelector('#adminGuideOverlay .ag-body').innerText));
         assert.ok(/Plan 10 episodes/.test(await body()) && /ยืนยัน/.test(await body()), 'TH video section, same index');
-        assert.deepEqual(await page.$$eval('#adminGuideOverlay .ag-chip', els => els.map(e => e.textContent)), ['🖼 ภาพ', '🎬 วิดีโอ', '🐳 เสียง', '🧭 Log Pose']);
+        assert.deepEqual(await page.$$eval('#adminGuideOverlay .ag-chip', els => els.map(e => e.textContent)), ['🖼 ภาพ', '🎬 วิดีโอ', '🗣️ คลิปไทย', '🐳 เสียง', '🧭 Log Pose']);
         // close, open the ADMIN guide → its own title, its own chips (not the deck's), lands on the tab map; the deck remembers its page
         await page.keyboard.press('Escape');
         await page.click('#btn-admin-guide');
@@ -71,7 +74,7 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Nika Admin (V9.9)</
         assert.ok(!(await page.$$eval('#adminGuideOverlay .ag-chip', els => els.map(e => e.textContent))).includes('🎬 วิดีโอ'), 'admin chips, not deck chips');
         await page.keyboard.press('Escape');
         await page.click('.deck-guide-btn');
-        await page.waitForFunction(() => document.querySelector('#adminGuideOverlay').dataset.set === 'deck' && document.querySelectorAll('#adminGuideOverlay .ag-chip').length === 4);
+        await page.waitForFunction(() => document.querySelector('#adminGuideOverlay').dataset.set === 'deck' && document.querySelectorAll('#adminGuideOverlay .ag-chip').length === 5);
         assert.equal(await page.$eval('#adminGuideOverlay .ag-chip[aria-pressed="true"]', e => e.dataset.i), '1', 'deck guide reopens where it was (video)');
         // KO
         await page.click('#adminGuideOverlay .ag-l[data-l="ko"]');
