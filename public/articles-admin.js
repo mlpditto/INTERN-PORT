@@ -129,7 +129,7 @@
     function fromDoc(id, d) {
         return { id: id, title: Object.assign({}, d.title), body: Object.assign({}, d.body), cover: Object.assign({ emoji: '📰' }, d.cover), status: d.status === 'scheduled' ? 'scheduled' : 'draft',
             startAt: msOf(d.startAt), endAt: msOf(d.endAt), audience: { divisions: ((d.audience || {}).divisions || []).slice(), groups: ((d.audience || {}).groups || []).slice() },
-            links: (d.links || []).slice(), rerun: d.rerun === 'off' ? 'off' : 'any', createdAt: msOf(d.createdAt) };
+            links: (d.links || []).slice(), rerun: d.rerun === 'off' ? 'off' : 'any', createdAt: msOf(d.createdAt), dx: d.dx || null };   // V102.371: dx = {draftId, publishedId, name} once sent to the Disease Codex
     }
 
     // ---- data
@@ -163,7 +163,7 @@
             if (!a.id && ref) a.id = ref.id;
             a.status = st; S.base = JSON.stringify(a); S.savedAt = Date.now();
             var i = S.list.findIndex(function (x) { return x.id === a.id; });
-            var copy = fromDoc(a.id, Object.assign({}, doc, { startAt: a.startAt, endAt: a.endAt }));
+            var copy = fromDoc(a.id, Object.assign({}, doc, { startAt: a.startAt, endAt: a.endAt, dx: a.dx }));
             if (i >= 0) S.list[i] = copy; else S.list.push(copy);
             if (typeof showToast === 'function') showToast(schedule ? '📅 Scheduled' : '💾 Saved as draft');
         }).catch(function (e) { S.err = (e && e.message) || 'Save failed.'; }).then(function () { S.saving = false; render(); });
@@ -285,6 +285,14 @@
             LANGS.map(function (l) { return '<span class="art-lg' + (have.indexOf(l[0]) < 0 ? ' off' : '') + '">' + l[1] + '</span>'; }).join('') +
             (aud.length ? '<span title="Audience">' + esc(aud.join(' · ')) + '</span>' : '') + (a.rerun === 'off' ? '' : '<span class="art-rr" title="Also sent to interns who join later">🔁</span>') + '</span></span></button>';
     }
+    // V102.371: the 🩺 chip says where the article stands in the Disease Codex
+    function dxChipHtml(a) {
+        var dx = a.dx || {};
+        if (S.dxBusy) return chip('⏳ Drafting Codex entry…', false, '', ' disabled', ' art-add');
+        if (dx.publishedId) return chip('🩺 In Disease Codex', true, 'Articles.toCodex()', ' title="Published in the Disease Codex — open it"', ' art-add');
+        if (dx.draftId) return chip('🩺 Codex draft pending', false, 'Articles.toCodex()', ' title="Waiting in the Disease Codex ▸ Pending Drafts — open it"', ' art-add');
+        return chip('🩺 Disease Codex', false, 'Articles.toCodex()', ' title="Draft a Disease Codex entry from this article with AI → Pending Drafts (save the article first)"', ' art-add');
+    }
     function chip(label, on, click, extra, cls) { return '<button type="button" class="art-c' + (cls || '') + (on ? ' on' : '') + '" aria-pressed="' + !!on + '" onclick="' + click + '"' + (extra || '') + '>' + label + '</button>'; }
     function audienceHtml(a) {
         var dv = divisions(), gs = groups(a.audience.groups), all = !a.audience.divisions.length && !a.audience.groups.length;
@@ -392,7 +400,7 @@
                 '<div class="art-ln"><span class="art-ml">Audience</span>' + audienceHtml(a) + '</div>', !a.id),
             sec('links', 'Links', linksSummary(a),
                 '<div class="art-ln">' + (a.links || []).map(function (l, i) { return '<span class="art-lk ' + l.kind + '">' + (l.kind === 'quiz' ? '🧪 ' : '💊 ') + esc(l.label) + '<button type="button" aria-label="Remove link" onclick="Articles.dropLink(' + i + ')">✕</button></span>'; }).join('') +
-                chip('＋ Quiz', S.pick === 'quiz', 'Articles.openPick(\'quiz\')', '', ' art-add') + chip('＋ Codex', S.pick === 'codex', 'Articles.openPick(\'codex\')', '', ' art-add') + chip('🩺 Disease Codex', false, 'Articles.toCodex()', ' title="Open the Disease Codex with this article\'s topic in 🤖 AI Auto-Draft (save the article first)"', ' art-add') + '</div>' + pickerHtml(), (a.links || []).length > 0 || !!S.pick),
+                chip('＋ Quiz', S.pick === 'quiz', 'Articles.openPick(\'quiz\')', '', ' art-add') + chip('＋ Codex', S.pick === 'codex', 'Articles.openPick(\'codex\')', '', ' art-add') + dxChipHtml(a) + '</div>' + pickerHtml(), (a.links || []).length > 0 || !!S.pick),
             S.err ? '<div class="art-err" role="alert">⚠️ ' + esc(S.err) + '</div>' : '',
             '<div class="art-btns"><button type="button" class="del' + (S.del ? ' arm' : '') + '" onclick="Articles.remove()" title="' + (a.id ? 'Delete (tap twice)' : 'Discard') + '" aria-label="Delete">' + (S.del ? 'Delete?' : '🗑') + '</button>' +
             (a.status === 'scheduled' ? '<button type="button" onclick="Articles.save(false)"' + (S.saving ? ' disabled' : '') + '>↩ Back to draft</button>' : '<button type="button" onclick="Articles.save(false)"' + (S.saving ? ' disabled' : '') + '>Save draft</button>') +
@@ -570,18 +578,29 @@
                 render();
             });
         },
-        // 🩺 the article's topic goes to the Disease Codex: open it with the name in the 🤖 AI Auto-Draft row — the admin generates, verifies and saves there
+        // 🩺 V102.371 (owner: "ทำแบบ 2 + 3"): the saved article becomes a Disease Codex PENDING draft — AI Auto-Draft with the article as the
+        // source (window.dxaDraftFromArticle in admin.html) — and the article remembers it in `dx`. Once linked, the chip opens it in the Codex.
         toCodex: function () {
-            var a = S.cur; if (!a) return;
-            if (JSON.stringify(a) !== S.base) { S.err = '🩺 Save the article first, then open the Disease Codex.'; render(); return; }
-            if (typeof openDiseaseCodexAdmin !== 'function') { S.err = '🩺 The Disease Codex is not available on this page.'; render(); return; }
-            var name = String(a.title.en || a.title[S.lang] || '').replace(/[\p{Extended_Pictographic}\uFE0F]/gu, '').split(/[:–—(]/)[0].trim();
-            api.close(); openDiseaseCodexAdmin();
-            setTimeout(function () {
-                var row = document.getElementById('dxa-ai-input-row');
-                if (row && row.style.display === 'none' && typeof dxaAutoDraftToggle === 'function') dxaAutoDraftToggle();
-                var el = document.getElementById('dxa-ai-name'); if (el) { el.value = name; el.focus(); }
-            }, 150);
+            var a = S.cur; if (!a || S.dxBusy) return;
+            if (JSON.stringify(a) !== S.base) { S.err = '🩺 Save the article first, then send it to the Disease Codex.'; render(); return; }
+            var dx = a.dx || {};
+            if (dx.publishedId || dx.draftId) {
+                if (typeof openDiseaseCodexAdmin !== 'function') { S.err = '🩺 The Disease Codex is not available on this page.'; render(); return; }
+                api.close(); openDiseaseCodexAdmin();
+                setTimeout(function () { if (dx.publishedId && typeof dxaEdit === 'function') dxaEdit(dx.publishedId); else if (typeof dxaSwitchView === 'function') dxaSwitchView('drafts'); }, 150);
+                return;
+            }
+            if (typeof window.dxaDraftFromArticle !== 'function') { S.err = '🩺 The Disease Codex is not available on this page.'; render(); return; }
+            var name = String(a.title.en || a.title[S.lang] || '').replace(/[\p{Extended_Pictographic}️]/gu, '').split(/[:–—(]/)[0].trim();
+            if (!name) { S.err = '🩺 Give the article a title first.'; render(); return; }
+            var title = a.title.en || a.title.th || a.title.ko || name, body = a.body.en || a.body.th || a.body.ko || '';
+            S.dxBusy = true; S.err = ''; S.aiNote = '🩺 Drafting a Disease Codex entry from this article…'; render();
+            window.dxaDraftFromArticle({ id: a.id, name: name, title: title, source: 'Title: ' + title + '\n' + body }).then(function (r) {
+                a.dx = { draftId: r.draftId, publishedId: '', name: name }; S.base = JSON.stringify(a);
+                var i = S.list.findIndex(function (x) { return x.id === a.id; }); if (i >= 0) S.list[i].dx = a.dx;
+                S.aiNote = '🩺 "' + name + '" is in the Disease Codex ▸ Pending Drafts' + (r.model ? ' · ' + r.model : '') + ' — approve it there';
+                if (typeof showToast === 'function') showToast('🩺 Codex draft created · pending approval');
+            }).catch(function (e) { S.err = '🩺 ' + ((e && e.message) || 'Could not draft the Codex entry.'); S.aiNote = ''; }).then(function () { S.dxBusy = false; render(); });
         },
         sec: function (k, open) { S.open[k] = open; },
         // ⚠️ "Move to TH": the text typed into one language slot goes to the slot it is written in

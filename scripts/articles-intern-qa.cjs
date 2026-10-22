@@ -79,7 +79,7 @@ const D = 864e5, BKK = 7 * 3600e3;
     const r = await page.evaluate(async ({ D }) => {
       const out = {}, writes = [], txs = [], wait = ms => new Promise(res => setTimeout(res, ms)), now = Date.now();
       const docs = {
-        a1: { status: 'scheduled', title: { en: '3 inhaler mistakes we see every week', th: '“อดทนคืออวดตัว”' }, body: { en: '**Most patients** who say their inhaler doesn’t work are not breathing in with it.\n\nBefore you hand over a salbutamol MDI, check three things: shake it, breathe out fully first, then press as a slow deep breath starts. Hold for 10 seconds.\n\nAsk them to show you — don’t just tell them. A spacer fixes most timing problems.', th: 'ปัจจุบันคำว่า “อดทน (がまん)” ใช้ทั่วไปในความหมายว่า ทน อดกลั้น' },
+        a1: { status: 'scheduled', dx: { draftId: 'd1', publishedId: 'dx1', name: 'Inhaler technique' }, title: { en: '3 inhaler mistakes we see every week', th: '“อดทนคืออวดตัว”' }, body: { en: '**Most patients** who say their inhaler doesn’t work are not breathing in with it.\n\nBefore you hand over a salbutamol MDI, check three things: shake it, breathe out fully first, then press as a slow deep breath starts. Hold for 10 seconds.\n\nAsk them to show you — don’t just tell them. A spacer fixes most timing problems.', th: 'ปัจจุบันคำว่า “อดทน (がまん)” ใช้ทั่วไปในความหมายว่า ทน อดกลั้น' },
           cover: { emoji: '🫁' }, startAt: { toMillis: () => now - D }, endAt: { toMillis: () => now + D }, audience: { divisions: [], groups: [] }, links: [{ kind: 'quiz', id: 'q1', label: 'Bronchodilators' }, { kind: 'codex', id: 'd1', label: 'Salbutamol' }], rerun: 'any', readMin: 1 }
       };
       const ledger = {};
@@ -95,6 +95,7 @@ const D = 864e5, BKK = 7 * 3600e3;
       const spy = { deep: [], codex: [], fb: 0 };
       window.applyTabDeepLink = p => spy.deep.push(String(p.get('quiz')));
       window.dxOpenLinkedDrug = id => spy.codex.push(id);
+      window.dxOpenDetail = id => spy.codex.push('dx:' + id);   // V101.196: the 🩺 Disease Codex entry drafted from the article
       if (window.fbRemind) window.fbRemind.check = () => { spy.fb++; };
       // another popup is open → the article waits
       const enroll = document.getElementById('enrollModal'); enroll.style.display = 'flex';
@@ -152,7 +153,8 @@ const D = 864e5, BKK = 7 * 3600e3;
         out.histLngBack = [chips().join(' '), row.querySelector('.art-md').innerHTML === window.renderMd(docs.a1.body.en)];
         internArticles.onUserDoc(); await wait(50);
         out.stillOpen = document.querySelector('[data-delete-type="article"]').getAttribute('aria-expanded');
-        row.querySelector('.art-link').click(); out.histQuiz = spy.deep.slice();
+        row.querySelector('.art-link:not(.codex)').click(); out.histQuiz = spy.deep.slice();
+        row.querySelector('.art-link.codex').click(); out.histDx = spy.codex.slice();   // V101.196
       }
       out.writeTargets = [...new Set(writes.map(w => w[0] + '/' + w[1] + ':' + (w[3] && w[3].merge)))];
       return out;
@@ -164,7 +166,7 @@ const D = 864e5, BKK = 7 * 3600e3;
     assert.deepEqual(r.sheet.foot, ['🔖', '🔕', 'Read more ▾', '👍 Got it'], 'one footer row: 🔖 🔕 left, Read more + Got it right'); assert.equal(r.sheet.okBg, 'rgb(22, 163, 74)', 'Got it is the green pill (G4)'); assert.ok(r.sheet.okW < 160, 'Got it is small, not full width: ' + r.sheet.okW); assert.ok(r.sheet.noOld, 'no grab handle, tile, kicker line or text mute line');
     assert.ok(r.sheet.clamp && !r.sheet.moreHidden, 'a long body is clamped with Read more'); assert.ok(r.sheet.bold, 'the body goes through the app’s renderMd (marked + DOMPurify in the app; the CDN is blocked here)');
     assert.deepEqual(r.sheet.lng, ['EN*', 'TH'], 'language chips only for the versions the article has (no KO here)');
-    assert.deepEqual(r.sheet.links, ['🧪 Bronchodilators 🪙 +1', '💊 Salbutamol'], 'quiz (+1 Beri) and Codex links');
+    assert.deepEqual(r.sheet.links, ['🩺 Inhaler technique', '🧪 Bronchodilators 🪙 +1', '💊 Salbutamol'], 'the 🩺 Disease Codex entry (V101.196) first, then quiz (+1 Beri) and Codex links');
     assert.ok(r.sheet.okH >= 44 && r.sheet.bmH >= 44, 'touch targets ≥ 44 px'); assert.ok(r.sheet.noToggle, 'lang-no-toggle: Thai is never hidden'); assert.ok(r.sheet.focus, '✓ Got it has focus');
     assert.deepEqual([r.showWrite[0], r.showWrite[1], typeof r.showWrite[2].articlePopDay, r.showWrite[2].articleSeen.a1.day === r.showWrite[2].articlePopDay, r.showWrite[3]], ['users', 'U1', 'string', true, { merge: true }], 'showing it records today on users/{uid} (merge)');
     assert.deepEqual(r.more, [false, 'Show less ▴'], 'Read more opens the whole body');
@@ -176,12 +178,13 @@ const D = 864e5, BKK = 7 * 3600e3;
     assert.deepEqual(r.beri, ['users/U1:{"inc":1}', 'beri_ledger/article_quiz__a1_U1:"article_quiz/1/a1_U1"'], '+1 Beri with a ledger row, only once: ' + JSON.stringify(r.beri));
     assert.ok(r.hist, 'the article is a History row');
     assert.deepEqual(r.hist, ['3 inhaler mistakes we see every week', '👁 Closed', false, true], 'History row: title, 👁 Closed, no 🗑 menu, a 📰 chip');
-    assert.deepEqual(r.histRead, ['true', '✓ Read', 'hist', true, 2], 'opening the row reads it in place (pill → ✓ Read, act hist, body + links)');
+    assert.deepEqual(r.histRead, ['true', '✓ Read', 'hist', true, 3], 'opening the row reads it in place (pill → ✓ Read, act hist, body + 🩺/quiz/Codex links)');
     assert.deepEqual(r.histLng, ['EN:true', 'TH:false'], 'V101.193: the row carries the EN / TH chips (a1 has no ko), EN on');
     assert.deepEqual(r.histLngTh, ['EN:false TH:true', true, 'true', 0], 'TH tap: Thai body in place, row still open, no write');
     assert.deepEqual(r.histLngBack, ['EN:true TH:false', true], 'EN tap: back to the English body');
     assert.equal(r.stillOpen, 'true', 'the next users snapshot does not collapse the open row');
     assert.deepEqual(r.histQuiz, ['q1'], 'the quiz link works from History too');
+    assert.deepEqual(r.histDx, ['dx:dx1'], 'the 🩺 button opens the Disease Codex entry (V101.196)');
     assert.deepEqual(r.writeTargets, ['users/U1:true'], 'the only write target is the intern’s own users doc, always merge');
     const bad = errors.filter(e => /internArticles|articles\.js|art-/.test(e));
     assert.deepEqual(bad, [], 'no page errors from the module: ' + bad.join(' | '));
