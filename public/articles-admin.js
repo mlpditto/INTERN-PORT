@@ -195,11 +195,22 @@
         var live = (typeof dcaState !== 'undefined' && dcaState && Array.isArray(dcaState.codex) && dcaState.codex.length) ? dcaState.codex : S.codex;
         return (live || []).filter(function (d) { return d && d.genericName; }).map(function (d) { return { kind: 'codex', id: d._id || d.id, label: String(d.genericName) }; });
     }
+    // V102.372 (owner's pick 1): ＋ Disease = a published Disease Codex entry, picked by hand (no AI); the intern gets the same 🩺 button as a drafted one
+    function diseases() {
+        var live = (typeof dxaState !== 'undefined' && dxaState && Array.isArray(dxaState.codex) && dxaState.codex.length) ? dxaState.codex : S.dz;
+        return (live || []).filter(function (d) { return d && d.diseaseName; }).map(function (d) { return { kind: 'disease', id: d._id || d.id, label: String(d.diseaseName) + (d.thaiName ? ' · ' + d.thaiName : '') }; });
+    }
+    function linkSrc(kind) { return kind === 'quiz' ? quizzes() : kind === 'disease' ? diseases() : codex(); }
+    var LINK_ICON = { quiz: '🧪 ', codex: '💊 ', disease: '🩺 ' };
     function openPick(kind) {
         S.pick = S.pick === kind ? '' : kind; S.q = ''; render();
         if (kind === 'codex' && !codex().length && S.codex == null) {
             S.codex = [];
             db.collection('drug_codex').get().then(function (snap) { S.codex = snap.docs.map(function (d) { return Object.assign({ _id: d.id }, d.data()); }); render(); }).catch(function () { S.codex = null; });
+        }
+        if (kind === 'disease' && !diseases().length && S.dz == null) {
+            S.dz = [];
+            db.collection('disease_codex').get().then(function (snap) { S.dz = snap.docs.map(function (d) { return Object.assign({ _id: d.id }, d.data()); }); render(); }).catch(function () { S.dz = null; });
         }
     }
 
@@ -317,11 +328,11 @@
     function pickerHtml() {
         if (!S.pick) return '';
         var q = S.q.trim().toLowerCase(), have = (S.cur.links || []).map(function (l) { return l.kind + ':' + l.id; });
-        var src = S.pick === 'quiz' ? quizzes() : codex();
+        var src = linkSrc(S.pick);
         var opts = src.filter(function (o) { return have.indexOf(o.kind + ':' + o.id) < 0 && (!q || o.label.toLowerCase().indexOf(q) >= 0); }).slice(0, 40);
-        var empty = S.pick === 'codex' && S.codex && !S.codex.length && !codex().length ? 'Loading DD Codex…' : 'Nothing matches.';
-        return '<div class="art-pk"><input type="search" id="art-pk-q" placeholder="' + (S.pick === 'quiz' ? '🧪 Find a quiz…' : '💊 Find a drug…') + '" value="' + esc(S.q) + '" oninput="Articles.pickQ(this.value)">' +
-            '<div class="opts">' + (opts.length ? opts.map(function (o) { return '<button type="button" onclick="Articles.addLink(\'' + o.kind + '\',' + esc(JSON.stringify(o.id)) + ')">' + (o.kind === 'quiz' ? '🧪 ' : '💊 ') + esc(o.label) + '</button>'; }).join('') : '<span style="color:#94a3b8;font-size:12.5px;padding:4px 8px">' + empty + '</span>') + '</div></div>';
+        var empty = S.pick === 'codex' && S.codex && !S.codex.length && !codex().length ? 'Loading DD Codex…' : S.pick === 'disease' && S.dz && !S.dz.length && !diseases().length ? 'Loading Disease Codex…' : 'Nothing matches.';
+        return '<div class="art-pk"><input type="search" id="art-pk-q" placeholder="' + (S.pick === 'quiz' ? '🧪 Find a quiz…' : S.pick === 'disease' ? '🩺 Find a disease…' : '💊 Find a drug…') + '" value="' + esc(S.q) + '" oninput="Articles.pickQ(this.value)">' +
+            '<div class="opts">' + (opts.length ? opts.map(function (o) { return '<button type="button" onclick="Articles.addLink(\'' + o.kind + '\',' + esc(JSON.stringify(o.id)) + ')">' + (LINK_ICON[o.kind] || '') + esc(o.label) + '</button>'; }).join('') : '<span style="color:#94a3b8;font-size:12.5px;padding:4px 8px">' + empty + '</span>') + '</div></div>';
     }
     function dateLong(ms) { return ms == null ? '' : new Date(ms + BKK).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }); }
     function statusLine(a, now) {
@@ -399,8 +410,8 @@
                 '<div class="art-ln"><span class="art-ml">🔁 Later</span>' + RERUN.map(function (r) { return chip(r[1], a.rerun === r[0], 'Articles.rerun(\'' + r[0] + '\')', ' title="' + esc(r[2]) + '"'); }).join('') + '</div>' +
                 '<div class="art-ln"><span class="art-ml">Audience</span>' + audienceHtml(a) + '</div>', !a.id),
             sec('links', 'Links', linksSummary(a),
-                '<div class="art-ln">' + (a.links || []).map(function (l, i) { return '<span class="art-lk ' + l.kind + '">' + (l.kind === 'quiz' ? '🧪 ' : '💊 ') + esc(l.label) + '<button type="button" aria-label="Remove link" onclick="Articles.dropLink(' + i + ')">✕</button></span>'; }).join('') +
-                chip('＋ Quiz', S.pick === 'quiz', 'Articles.openPick(\'quiz\')', '', ' art-add') + chip('＋ Codex', S.pick === 'codex', 'Articles.openPick(\'codex\')', '', ' art-add') + dxChipHtml(a) + '</div>' + pickerHtml(), (a.links || []).length > 0 || !!S.pick),
+                '<div class="art-ln">' + (a.links || []).map(function (l, i) { return '<span class="art-lk ' + l.kind + '">' + (LINK_ICON[l.kind] || '💊 ') + esc(l.label) + '<button type="button" aria-label="Remove link" onclick="Articles.dropLink(' + i + ')">✕</button></span>'; }).join('') +
+                chip('＋ Quiz', S.pick === 'quiz', 'Articles.openPick(\'quiz\')', '', ' art-add') + chip('＋ Codex', S.pick === 'codex', 'Articles.openPick(\'codex\')', '', ' art-add') + chip('＋ Disease', S.pick === 'disease', 'Articles.openPick(\'disease\')', ' title="Link a published Disease Codex entry"', ' art-add') + dxChipHtml(a) + '</div>' + pickerHtml(), (a.links || []).length > 0 || !!S.pick),
             S.err ? '<div class="art-err" role="alert">⚠️ ' + esc(S.err) + '</div>' : '',
             '<div class="art-btns"><button type="button" class="del' + (S.del ? ' arm' : '') + '" onclick="Articles.remove()" title="' + (a.id ? 'Delete (tap twice)' : 'Discard') + '" aria-label="Delete">' + (S.del ? 'Delete?' : '🗑') + '</button>' +
             (a.status === 'scheduled' ? '<button type="button" onclick="Articles.save(false)"' + (S.saving ? ' disabled' : '') + '>↩ Back to draft</button>' : '<button type="button" onclick="Articles.save(false)"' + (S.saving ? ' disabled' : '') + '>Save draft</button>') +
@@ -617,7 +628,7 @@
         aud: function (kind, name) { var l = S.cur.audience[kind], i = l.indexOf(name); if (i >= 0) l.splice(i, 1); else l.push(name); render(); },
         audAll: function () { S.cur.audience = { divisions: [], groups: [] }; render(); },
         pickQ: function (v) { S.q = v; render(); var i = document.getElementById('art-pk-q'); if (i) { i.focus(); i.setSelectionRange(v.length, v.length); } },
-        addLink: function (kind, id) { var o = (kind === 'quiz' ? quizzes() : codex()).find(function (x) { return x.id === id; }); if (o) S.cur.links.push(o); S.pick = ''; render(); },
+        addLink: function (kind, id) { var o = linkSrc(kind).find(function (x) { return x.id === id; }); if (o) S.cur.links.push({ kind: o.kind, id: o.id, label: o.label }); S.pick = ''; render(); },
         dropLink: function (i) { S.cur.links.splice(i, 1); render(); },
         wrap: function (pre, post) {
             var ta = document.getElementById('art-bodyta'); if (!ta) return;

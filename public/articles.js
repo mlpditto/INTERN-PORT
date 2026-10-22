@@ -158,6 +158,7 @@
         var dx = a.dx && a.dx.publishedId ? '<button type="button" class="art-link codex" onclick="internArticles.openDx(' + esc(JSON.stringify(a.id)) + ',' + esc(JSON.stringify(a.dx.publishedId)) + ')">🩺 ' + esc(a.dx.name || 'Disease Codex') + '</button>' : '';
         return ((a.links || []).length || dx) ? '<div class="art-links">' + dx + (a.links || []).map(function (l) {
             return l.kind === 'quiz' ? '<button type="button" class="art-link" onclick="internArticles.openQuiz(' + esc(JSON.stringify(a.id)) + ',' + esc(JSON.stringify(l.id)) + ')">🧪 ' + esc(l.label) + ' <b>🪙 +1</b></button>'
+                : l.kind === 'disease' ? '<button type="button" class="art-link codex" onclick="internArticles.openDx(' + esc(JSON.stringify(a.id)) + ',' + esc(JSON.stringify(l.id)) + ')">🩺 ' + esc(l.label) + '</button>'   // V101.197: ＋ Disease link
                 : '<button type="button" class="art-link codex" onclick="internArticles.openCodex(' + esc(JSON.stringify(a.id)) + ',' + esc(JSON.stringify(l.id)) + ')">💊 ' + esc(l.label) + '</button>';
         }).join('') + '</div>' : '';
     }
@@ -270,6 +271,21 @@
             if (S.cur) close('quiz'); else markRead(articleId, 'quiz');
             awardQuizBeri(articleId);
             if (typeof applyTabDeepLink === 'function') applyTabDeepLink(new URLSearchParams({ quiz: String(quizId) }));
+        },
+        // V101.197 (owner's pick 2): the articles about a Disease Codex entry — drafted from it (dx.publishedId) or linked by hand (＋ Disease) —
+        // that this intern can see now, or has already read; newest first
+        forDisease: function (diseaseId) {
+            var m = me(), now = Date.now(), seen = m.articleSeen || {}, L = uiLang();
+            return (S.list || []).filter(function (a) {
+                var about = (a.dx && a.dx.publishedId === diseaseId) || (a.links || []).some(function (l) { return l.kind === 'disease' && l.id === diseaseId; });
+                return about && (kindOf(a, m, now) || isDone(seen[a.id]));
+            }).sort(function (x, y) { return msOf(y.startAt) - msOf(x.startAt); })
+                .map(function (a) { return { id: a.id, title: textOf(a, L).title, read: isDone(seen[a.id]) }; });
+        },
+        openArticle: function (id) {   // from the Disease Codex entry: the sheet opens on top; closing it = read, as always
+            var a = find(id); if (!a || S.cur) return;
+            if (typeof dxCloseDetail === 'function') dxCloseDetail();
+            show({ a: a, kind: kindOf(a, me(), Date.now()) || 'rerun' });
         },
         openDx: function (articleId, diseaseId) {   // V101.196: the 🩺 Disease Codex entry
             if (S.cur) close('codex'); else markRead(articleId, 'codex');
