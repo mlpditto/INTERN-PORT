@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.366)</title>
+    <title>Nika Admin (V102.368)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -23598,7 +23598,9 @@ Respond ONLY with valid JSON (no markdown, no extra text):
   "issues": [
     {"issue": "concise issue (1 sentence)", "severity": "high" or "medium" or "low"}
   ],
-  "suggestions": ["practical suggestion (max 3 items)"],
+  "suggestions": [
+    {"text": "practical suggestion (max 3 items), in the language the contract asks for", "en": "the same suggestion in English", "kind": "structure" or "cycle" or "specific" or "clarity" or "wording"}
+  ],
   "improved": "improved rewrite",
   "changes": [
     {"from": "exact substring from the original", "to": "exact replacement substring in the improved version", "reason": "the writing principle behind this edit (clarity, specificity, grammar, tone, conciseness, etc.) — 1 short sentence"}
@@ -23610,6 +23612,8 @@ V94.19: Severity criteria for "issues" — judge how much each issue hurts the r
 - "medium" = awkward wording, run-on, or style issue that is understandable but slows the reader down.
 - "low"    = minor polish — preference, redundancy, or small word choice that doesn't affect meaning.
 Max 5 items in "issues". Sort by severity DESC inside the array (high first). Every entry MUST be an object with non-empty "issue" string + a valid "severity" value.
+
+"kind" names the writing principle behind a suggestion: "structure" = order the reflection (what happened → so what → now what); "cycle" = close the loop (evaluate, conclude, plan the next step); "specific" = name the concrete case, drug, number or action instead of a generality; "clarity" = shorter sentences, plain words; "wording" = the professional term instead of a loose word. "en" is the same suggestion in English (even when "text" is Thai).
 
 If you have nothing concrete to flag, return empty arrays for issues/suggestions — NEVER include empty strings, single punctuation marks, or placeholder text. Each item must be a real, actionable sentence. Keep suggestions kind and constructive.
 
@@ -23791,7 +23795,11 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             };
             const cleanIssues = (data.issues || []).map(normalizeIssue).filter(Boolean)
                 .sort((a, b) => SEV_ORDER[a.severity] - SEV_ORDER[b.severity]);
-            const cleanSuggestions = (data.suggestions || []).filter(x => qfpNormalizeTopic(x));
+            // V102.368: a suggestion is a string (older answers) or {text, en, kind}; the card shows `text`, the ➕ chip reads `en` for an English reply
+            const sugOf = x => (x && typeof x === 'object') ? { text: qfpNormalizeTopic(x.text), en: qfpNormalizeTopic(x.en), kind: String(x.kind || '').trim().toLowerCase() } : { text: qfpNormalizeTopic(x), en: '', kind: '' };
+            const cleanSuggestions = (data.suggestions || []).map(sugOf).filter(s => s.text);
+            const tipLogId = getGrammarCurrentLogId();
+            if (tipLogId) { if (!window._grammarSuggestionsByLog) window._grammarSuggestionsByLog = {}; window._grammarSuggestionsByLog[tipLogId] = cleanSuggestions; }
 
             if (cleanIssues.length > 0) {
                 html += `<div style="margin-bottom:8px;">
@@ -23805,8 +23813,8 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
 
             if (cleanSuggestions.length > 0) {
                 html += `<div style="margin-bottom:8px;">
-                    <div style="font-size:0.7em; font-weight:900; color:#b45309; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:5px;">💡 Writing suggestions คำแนะนำการเขียน</div>
-                    ${cleanSuggestions.map(s => `<div style="font-size:0.8em; color:#78350f; background:#fffbeb; border-left:3px solid #f59e0b; padding:5px 9px; border-radius:0 8px 8px 0; margin-bottom:4px; line-height:1.5;">${escapeHtml(s)}</div>`).join('')}
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:5px;"><div style="font-size:0.7em; font-weight:900; color:#b45309; text-transform:uppercase; letter-spacing:0.05em;">💡 Writing suggestions คำแนะนำการเขียน</div>${tipLogId ? rrWritingTipChipHtml(tipLogId) : ''}</div>
+                    ${cleanSuggestions.map(s => `<div style="font-size:0.8em; color:#78350f; background:#fffbeb; border-left:3px solid #f59e0b; padding:5px 9px; border-radius:0 8px 8px 0; margin-bottom:4px; line-height:1.5;">${escapeHtml(s.text)}</div>`).join('')}
                 </div>`;
             }
 
@@ -23912,6 +23920,44 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         function getGrammarCurrentLogId() {
             return (document.getElementById('reflective-review-id') || {}).value || '';
         }
+
+        // V102.368 (owner, mockup A-2): one click puts the first writing suggestion into the reply draft — in the reply language — with the
+        // example edit (first "Why these changes" entry) and a reference. The references live here with checked links (Google Books by ISBN,
+        // digital.gov); the model only names the kind. An unknown kind → the tip and example, no reference. Once per log (the chip turns ✓).
+        const RR_WRITING_REFS = {
+            structure: { frame: 'What? · So what? · Now what?', short: 'Rolfe, Freshwater & Jasper, 2001', url: 'https://books.google.com/books?vid=ISBN9780333777954' },
+            cycle: { frame: "Gibbs' cycle: describe → feelings → evaluate → analyse → conclude → plan", short: 'Gibbs, 1988', url: 'https://books.google.com/books?vid=ISBN1853380717' },
+            specific: { frame: 'start from one concrete case, then reflect on it', short: 'Kolb, 1984', url: 'https://books.google.com/books?vid=ISBN0132952610' },
+            clarity: { frame: 'one idea per sentence, plain words', short: 'Plain language guidelines, digital.gov', url: 'https://digital.gov/guides/plain-language' }
+        };
+        function rrWritingTipChipHtml(logId) {
+            const added = !!((window._rrTipAdded || {})[logId]);
+            return added
+                ? `<button type="button" id="rr-tip-chip" disabled style="background:#dcfce7; color:#15803d; border:1px solid #86efac; padding:3px 9px; border-radius:8px; font-size:0.72em; font-weight:800; cursor:default; text-transform:none; letter-spacing:0; white-space:nowrap; flex-shrink:0;">✓ Added to reply</button>`
+                : `<button type="button" id="rr-tip-chip" onclick="rrAddWritingTip()" title="Adds the first suggestion to the reply draft, in the reply language, with the example edit and a reference" style="background:#fff; color:#b45309; border:1px solid #f59e0b; padding:3px 9px; border-radius:8px; font-size:0.72em; font-weight:800; cursor:pointer; text-transform:none; letter-spacing:0; white-space:nowrap; flex-shrink:0;">➕ Add tip to reply</button>`;
+        }
+        window.rrAddWritingTip = function() {
+            const logId = getGrammarCurrentLogId();
+            const sug = ((window._grammarSuggestionsByLog || {})[logId] || [])[0];
+            if (!logId || !sug || ((window._rrTipAdded || {})[logId])) return;
+            const lang = (document.getElementById('ai-lang-review') || {}).value || 'English';
+            const thai = lang === 'Thai';
+            const tipText = thai ? sug.text : (sug.en || sug.text);
+            const ch = ((window._grammarChangesByLog || {})[logId] || [])[0];
+            const ref = RR_WRITING_REFS[sug.kind];
+            const L = thai ? { tip: '✍️ คำแนะนำการเขียน: ', eg: 'ตัวอย่าง: ', next: 'ครั้งหน้าลองตามแนว ' } : { tip: '✍️ Writing tip: ', eg: 'For example: ', next: 'Next time try ' };
+            const lines = [L.tip + tipText];
+            if (ch) lines.push(L.eg + '“' + ch.from + '” → “' + ch.to + '”');
+            if (ref) lines.push(L.next + ref.frame + ' (' + ref.short + ') · ' + ref.url);
+            const cur = (typeof getReflectiveQuillContent === 'function' ? getReflectiveQuillContent().plain : (document.getElementById('reflective-review-comment') || {}).value) || '';
+            setReflectiveQuillText((cur.trim() ? cur.trim() + '\n\n' : '') + lines.join('\n'));
+            if (!window._rrTipAdded) window._rrTipAdded = {};
+            window._rrTipAdded[logId] = true;
+            const chip = document.getElementById('rr-tip-chip');
+            if (chip) chip.outerHTML = rrWritingTipChipHtml(logId);
+            if (typeof setReflectiveReviewStatus === 'function') setReflectiveReviewStatus('✍️ Writing tip added' + (ref ? ' · ref: ' + ref.short : ''), 'success');
+            if (typeof updateReflectiveRewriteChipsState === 'function') updateReflectiveRewriteChipsState();
+        };
 
         window.grammarApplyChange = function(idx) {
             const logId = getGrammarCurrentLogId();
