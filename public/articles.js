@@ -221,7 +221,8 @@
     }
     function pillHtml(s) {
         var m = s.metadata || {};
-        return m.state === 'read' ? '<span class="hl-pill art-ok">✓ Read' + (m.saved ? ' · 🔖' : '') + '</span>' : m.state === 'closed' ? '<span class="hl-pill">👁 Closed' + (m.saved ? ' · 🔖' : '') + '</span>' : '<span class="hl-pill art-new">📰 New</span>';
+        var P = { en: { read: 'Read', closed: 'Closed', fresh: 'New' }, th: { read: 'อ่านแล้ว', closed: 'ปิดไป', fresh: 'ใหม่' }, ko: { read: '읽음', closed: '닫음', fresh: '새 글' } }[uiLang()];   // V101.189
+        return m.state === 'read' ? '<span class="hl-pill art-ok">✓ ' + P.read + (m.saved ? ' · 🔖' : '') + '</span>' : m.state === 'closed' ? '<span class="hl-pill">👁 ' + P.closed + (m.saved ? ' · 🔖' : '') + '</span>' : '<span class="hl-pill art-new">📰 ' + P.fresh + '</span>';
     }
     function detailHtml(s) {
         var a = find((s.metadata || {}).articleId); if (!a) return '';

@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.188)</title>
+    <title>Internship Portfolio (V101.189)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.171">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -2414,7 +2414,7 @@
 <link rel="stylesheet" href="invite-ticket.css?v=V101.168">
 <script defer src="invite-ticket.js?v=V101.168"></script>
 <link rel="stylesheet" href="learning-review.css?v=V99.81">
-<link rel="stylesheet" href="history-compact.css?v=V101.182"><link rel="stylesheet" href="delete-requests.css?v=V100.40">
+<link rel="stylesheet" href="history-compact.css?v=V101.189"><link rel="stylesheet" href="delete-requests.css?v=V100.40">
 <link rel="stylesheet" href="case-compact.css?v=V99.88">
 <script src="internship-progress.js?v=V101.184"></script><link rel="stylesheet" href="internship-progress.css?v=V101.184">
 <script src="monthly-progress.js?v=V101.79"></script><link rel="stylesheet" href="monthly-progress.css?v=V101.39">
@@ -6674,7 +6674,7 @@
     <script src="case-taxonomy.js?v=V94.53"></script>
     <script src="codex-vision.js?v=V100.88"></script>
     <!-- V94.29 fix: walker now skips q-text-preview / md-render / lang-no-toggle subtrees so user content (markdown previews, quiz content) displays as-typed -->
-    <script src="lang-toggle.js?v=V101.27"></script>
+    <script src="lang-toggle.js?v=V101.189"></script>
 
     <script>
         const USER_LIFF_ID = "2008959998-yjcNpaGt"; // ✅ Updated ID
@@ -10312,6 +10312,24 @@
             if (opts.time) s += ` ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
             return s;
         }
+        // V101.189: the UI language (TH wins over KR, as the feedback sheet does) and ONE short date for History + My Cases:
+        // EN "20 Oct" · TH "20 ต.ค." (Buddhist year) · KR "10월 20일". Same opts as formatThaiDate; 2-digit year = CE for EN/KR.
+        const EN_MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        window.uiLang = function() { const b = document.body; return b && b.classList.contains('lang-th-on') ? 'th' : b && b.classList.contains('lang-kr-on') ? 'kr' : 'en'; };
+        // uiText('EN|ไทย|한국어') — one literal holding all three, so the Korean-gap scanner sees the Korean beside the Thai; (en, th, kr) also works.
+        window.uiText = function(en, th, kr) { if (th === undefined && typeof en === 'string' && en.includes('|')) [en, th, kr] = en.split('|'); const l = window.uiLang(); return l === 'th' ? th : l === 'kr' ? kr : en; };
+        window.formatUiDate = function(dateObj, opts) {
+            opts = opts || {};
+            const lang = window.uiLang();
+            if (lang === 'th') return formatThaiDate(dateObj, opts);
+            const d = (dateObj instanceof Date) ? dateObj : (dateObj && typeof dateObj.toDate === 'function') ? dateObj.toDate() : null;
+            if (!d || isNaN(d.getTime())) return '-';
+            let s = lang === 'kr' ? `${d.getMonth() + 1}월 ${d.getDate()}일` : `${d.getDate()} ${EN_MONTHS_SHORT[d.getMonth()]}`;
+            if (opts.year === 'numeric') s += ` ${d.getFullYear()}`;
+            else if (opts.year === '2-digit') s += ` ${String(d.getFullYear() % 100).padStart(2, '0')}`;
+            if (opts.time) s += ` ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+            return s;
+        };
 
         function loadQuizzes() {
             db.collection("quizzes").onSnapshot(s => {
@@ -24793,12 +24811,13 @@ async function archiveDoneCard(cardId) {
             const yesterdayMs = todayMs - 86400000;
             const last7Ms = todayMs - 7 * 86400000;
             const last30Ms = todayMs - 30 * 86400000;
+            const L = window.uiText || function (s) { return String(s).split('|')[0]; };   // V101.189: one language at a time (was "Today / วันนี้" beside "Last 7 days"); EN when cut into a vm
             const buckets = {
-                today:     { label: 'Today / วันนี้',      items: [] },
-                yesterday: { label: 'Yesterday / เมื่อวาน',  items: [] },
-                last7:     { label: 'Last 7 days',         items: [] },
-                last30:    { label: 'Last 30 days',        items: [] },
-                older:     { label: 'Older',               items: [] }
+                today:     { label: L('Today|วันนี้|오늘'),              items: [] },
+                yesterday: { label: L('Yesterday|เมื่อวาน|어제'),        items: [] },
+                last7:     { label: L('Last 7 days|7 วันล่าสุด|최근 7일'),   items: [] },
+                last30:    { label: L('Last 30 days|30 วันล่าสุด|최근 30일'), items: [] },
+                older:     { label: L('Older|ก่อนหน้านั้น|이전'),         items: [] }
             };
             items.forEach(item => {
                 const ts = (item.timestamp && item.timestamp.toMillis) ? item.timestamp.toMillis() : 0;
@@ -26038,7 +26057,7 @@ async function archiveDoneCard(cardId) {
                     <div class="case-rail-row"><span title="Common symptoms" data-th-title="อาการที่พบบ่อย" data-kr-title="자주 나타나는 증상" aria-label="Common symptoms" data-th-aria-label="อาการที่พบบ่อย" data-kr-aria-label="자주 나타나는 증상">🔬</span><div class="case-rail-values">${symptomHtml || '—'}</div></div>
                     <div class="case-rail-row"><span title="Current streak in weeks, from all cases" data-th-title="จำนวนสัปดาห์ต่อเนื่องปัจจุบัน คำนวณจากทุกเคส" data-kr-title="현재 연속 주 수 (모든 사례 기준)">🔥 ${curStreak}w</span><span title="Longest streak in weeks, from all cases" data-th-title="จำนวนสัปดาห์ต่อเนื่องสูงสุด คำนวณจากทุกเคส" data-kr-title="최장 연속 주 수 (모든 사례 기준)">🏆 ${longest}w</span></div>
                     <div class="case-rail-row"><span title="Cases over the last 6 months — not affected by the period filter" data-th-title="จำนวนเคสย้อนหลัง 6 เดือน ไม่เปลี่ยนตามตัวกรองช่วงเวลา" data-kr-title="최근 6개월 사례 수 (기간 필터와 무관)" aria-label="Activity over the last 6 months" data-th-aria-label="กิจกรรมย้อนหลัง 6 เดือน" data-kr-aria-label="최근 6개월 활동">📈</span><div class="case-rail-months">${months.map(m => `<span><b>${monthCount[m.key] || 0}</b>${m.label}</span>`).join('')}</div></div>
-                    <details><summary title="Systems not yet logged in the selected period" data-th-title="ระบบที่ยังไม่บันทึกในช่วงเวลาที่เลือก" data-kr-title="선택한 기간에 기록되지 않은 계통">🗺️ ${missing.length} not logged ▾</summary><div class="case-rail-missing">${missing.map(s => escapeHtml(s.label)).join(' · ') || 'All systems covered'}</div></details>
+                    <details><summary title="Systems not yet logged in the selected period" data-th-title="ระบบที่ยังไม่บันทึกในช่วงเวลาที่เลือก" data-kr-title="선택한 기간에 기록되지 않은 계통">🗺️ ${window.uiText('{n} systems not logged yet|ยังไม่ได้บันทึก {n} ระบบ|미기록 계통 {n}').replace(/\{n\}/g, missing.length)} ▾</summary><div class="case-rail-missing">${missing.map(s => escapeHtml(s.label)).join(' · ') || 'All systems covered'}</div></details>
                 </div>`;
         }
 
@@ -26546,7 +26565,7 @@ async function archiveDoneCard(cardId) {
                 const isPending = status === 'pending' || c.status === 'รอตรวจ';
                 const symptoms = Array.isArray(c.symptomTags) ? c.symptomTags : [];
                 const dateText = c.timestamp && typeof c.timestamp.toDate === 'function'
-                    ? c.timestamp.toDate().toLocaleDateString('en-US')
+                    ? window.formatUiDate(c.timestamp, c.timestamp.toDate().getFullYear() === new Date().getFullYear() ? {} : { year: '2-digit' })   // V101.189: same short date as the timeline
                     : '';
                 return `
                             <div class="case-card${isPending ? '' : ' is-reviewed'}">
@@ -26799,9 +26818,9 @@ async function archiveDoneCard(cardId) {
 <script src="history-review.js?v=V99.81"></script>
 <script src="daily-canvas.js?v=V101.171"></script>
 <script src="intern-guide.js?v=V101.136" defer></script>
-<script src="articles.js?v=V101.177" defer></script>
+<script src="articles.js?v=V101.189" defer></script>
 <script src="cafe-content.js?v=V101.140" defer></script>
-<script src="history-lean.js?v=V101.176"></script><script src="history-compact.js?v=V101.55"></script><script src="delete-requests.js?v=V101.114"></script>
+<script src="history-lean.js?v=V101.189"></script><script src="history-compact.js?v=V101.189"></script><script src="delete-requests.js?v=V101.114"></script>
 </body>
 
 </html>

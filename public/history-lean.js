@@ -8,6 +8,8 @@ window.historyLean = (() => {
     };
     const ORDER = ['case', 'quiz', 'explore_link', 'work', 'reflective', 'learning_note', 'product', 'quest', 'content_review', 'article'];
     const esc = s => escapeUnifiedHtml(s);
+    // V101.189: lang-toggle.js announces a change; the list's dates / bucket labels / pills are plain text, so redraw them
+    if (typeof document.addEventListener === 'function') document.addEventListener('lang-changed', () => { const tl = document.getElementById('unified-timeline'); if (tl && tl.querySelector('.hl-row') && typeof renderUnifiedHistory === 'function') { try { renderUnifiedHistory(); } catch (e) { /* mid-load */ } } });   // only once rows exist (applyState fires at page load too)
     const hueOf = s => { let h = 0; for (const c of String(s)) h = (h * 31 + c.codePointAt(0)) >>> 0; return h % 360; };
     const pending = s => s.status === 'pending' || s.status === 'รอตรวจ';
     const https = u => /^https:\/\//i.test(String(u || '').trim());
@@ -42,6 +44,7 @@ window.historyLean = (() => {
             case 'case': return 'HN ' + (m.caseId || 'N/A');
             case 'reflective': return 'Reflective Log - ' + (m.mood || 'Unknown');
             case 'learning_note': return s.title || 'Untitled Note';
+            case 'article': { const t = String(s.title || ''); const bare = t.replace(/^[\s\p{Extended_Pictographic}\uFE0F]+|[\s\p{Extended_Pictographic}\uFE0F]+$/gu, '').trim(); return bare || t || 'Article'; }   // V101.189
             default: return s.title || 'Untitled';
         }
     }
@@ -64,7 +67,7 @@ window.historyLean = (() => {
         }
         if (type === 'case') {
             const k = caseKey(s), h = hueOf(k);
-            return '<span class="hl-lead"><span class="hl-disc" title="' + esc(sysName(k)) + ' · case ' + ctx.nth.get(s.id) + '" style="background:hsl(' + h + ',85%,92%);border:1px solid hsl(' + h + ',60%,82%)">' + sysEmoji(k) + '<b class="hl-nb">' + ctx.nth.get(s.id) + '</b></span></span>';
+            return '<span class="hl-lead"><span class="hl-disc" role="img" aria-label="' + esc(sysName(k)) + ' · case ' + ctx.nth.get(s.id) + '" title="' + esc(sysName(k)) + ' · case ' + ctx.nth.get(s.id) + '" style="background:hsl(' + h + ',85%,92%);border:1px solid hsl(' + h + ',60%,82%)">' + sysEmoji(k) + '<b class="hl-nb">' + ctx.nth.get(s.id) + '</b></span></span>';
         }
         if (type === 'article') return '<span class="hl-lead"><span class="hl-disc" style="background:#e0e7ff;border:1px solid #c7d2fe">' + esc((s.metadata && s.metadata.emoji) || '📰') + '</span></span>';   // V101.176: the article's cover emoji
         const emoji = type === 'reflective' && s.metadata && s.metadata.moodEmoji ? s.metadata.moodEmoji : (type === 'content_review' && s.metadata ? (s.metadata.verdict === 'approve' ? 'Ⓐ' : '↩') : t.e);   // V101.124: a filed review shows its verdict
@@ -84,8 +87,9 @@ window.historyLean = (() => {
     function pillHtml(s) {
         if (s.submissionType === 'article') return window.internArticles ? internArticles.pillHtml(s) : '';   // V101.176: ✓ Read · 👁 Closed · 📰 New
         if (s.submissionType === 'content_review') { const m = s.metadata || {}; return m.verdict === 'approve' ? '<span class="hl-pill">Ⓐ OK' + (Number(m.suggested) ? ' · +' + Number(m.suggested) : '') + '</span>' : '<span class="hl-pill hl-warn">↩ Changes</span>'; }   // V101.124
-        if (pending(s)) return '<span class="hl-pill hl-warn">⏳ Pending</span>';
-        if (s.status === 'rejected') return '<span class="hl-pill hl-bad">✕ Rejected</span>';
+        const U = window.uiText || (en => en);   // V101.189
+        if (pending(s)) return '<span class="hl-pill hl-warn">⏳ ' + U('Pending|รอตรวจ|검토 대기') + '</span>';
+        if (s.status === 'rejected') return '<span class="hl-pill hl-bad">✕ ' + U('Rejected|ไม่ผ่าน|반려') + '</span>';
         return '';
     }
     function materials(ctx, s) {
@@ -117,7 +121,7 @@ window.historyLean = (() => {
         const list = mats.map((m, i) => matLink(m, i, q, 'hl-matitem' + (matSeen(m.url) ? ' hl-seen' : '')) + '<span style="color:' + materialKind(m.url).color + '">●</span> ' + esc(materialDisplayName(m, i)) + (matSeen(m.url) ? ' <small>✓</small>' : '') + '</a>').join('');
         const allSeen = mats.every(m => matSeen(m.url));
         const badge = mats.length <= 4 && !big ? kindDots(mats) : '<i>' + mats.length + '</i>';
-        return '<details class="hl-matpick" onclick="event.stopPropagation()"><summary class="' + cls + (allSeen ? ' hl-seen' : '') + '" style="--mk:' + k.color + '" title="' + mats.length + ' files' + (allSeen ? ' · all opened' : '') + '">📎' + badge + '</summary><div class="hl-matlist">' + list + '</div></details>';
+        return '<details class="hl-matpick" onclick="event.stopPropagation()"><summary class="' + cls + (allSeen ? ' hl-seen' : '') + '" style="--mk:' + k.color + '" aria-label="' + mats.length + ' files' + (allSeen ? ', downloaded' : ' to download') + '" title="' + mats.length + ' files' + (allSeen ? ' · all opened' : '') + '">📎' + badge + '</summary><div class="hl-matlist">' + list + '</div></details>';
     }
     function actionsHtml(s, ctx) {
         const m = s.metadata || {};
@@ -154,7 +158,8 @@ window.historyLean = (() => {
     function rowHtml(s, ctx) {
         // V101.113: the year shows only on rows outside the current year ("20 มิ.ย. 68"); this year's rows stay short.
         const _d = s.timestamp && s.timestamp.toDate ? s.timestamp.toDate() : null, _sameYear = !_d || _d.getFullYear() === new Date().getFullYear();
-        const date = formatThaiDate(s.timestamp, _sameYear ? {} : { year: '2-digit' }), full = formatThaiDate(s.timestamp, { time: true });
+        const fmt = window.formatUiDate || formatThaiDate;   // V101.189: EN "20 Oct" · TH "20 ต.ค." · KR "10월 20일"
+        const date = fmt(s.timestamp, _sameYear ? {} : { year: '2-digit' }), full = fmt(s.timestamp, { time: true });
         const time = full.split(' ').pop();
         const m = s.metadata || {};
         const extra = s.submissionType === 'quiz' && m.correctCount != null && m.totalQuestions ? ' · ' + (typeof formatQuizCount === 'function' ? formatQuizCount(m.correctCount) : m.correctCount) + '/' + m.totalQuestions : '';
@@ -223,7 +228,9 @@ window.historyLean = (() => {
             let html = chip('all', '<b>All</b> ' + counts.all, 'All', unifiedCurrentFilter === 'all', "filterUnifiedHistory('all')");
             ORDER.forEach(k => {
                 if (!counts[k] && unifiedCurrentFilter !== k) return;
-                html += chip(k, T[k].e + ' <b>' + (counts[k] || 0) + '</b>', T[k].n, unifiedCurrentFilter === k, "filterUnifiedHistory('" + k + "')");
+                // V101.189: the chosen type shows its name beside the emoji (the others stay emoji + count)
+                const onK = unifiedCurrentFilter === k;
+                html += chip(k, T[k].e + (onK ? ' ' + T[k].n : '') + ' <b>' + (counts[k] || 0) + '</b>', T[k].n, onK, "filterUnifiedHistory('" + k + "')");
             });
             const pend = all.filter(pending).length;
             if (pend || unifiedCurrentStatus === 'pending') {
@@ -240,8 +247,8 @@ window.historyLean = (() => {
             sub.hidden = false;
             sub.innerHTML = Object.keys(per).sort((x, y) => per[y] - per[x]).map(k => {
                 const on = window.unifiedCaseSystem === k, h = hueOf(k);
-                return '<button type="button" class="hl-chip hl-sys' + (on ? ' on' : '') + '" aria-pressed="' + on + '" title="' + esc(sysName(k)) + '" style="--sh:' + h + '" onclick="filterCaseSystem(\'' + esc(k) + '\')">' + sysEmoji(k) + ' <b>' + per[k] + '</b></button>';
-            }).join('') + '<button type="button" class="hl-chip" title="Case stats" aria-label="Case stats" onclick="openCaseInsights()">📊</button>';
+                return '<button type="button" class="hl-chip hl-sys' + (on ? ' on' : '') + '" aria-pressed="' + on + '" title="' + esc(sysName(k)) + '" style="--sh:' + h + '" onclick="filterCaseSystem(\'' + esc(k) + '\')">' + sysEmoji(k) + ' ' + esc(sysName(k)) + ' <b>' + per[k] + '</b></button>';   // V101.189: name beside the emoji (owner: the expanded row needs words)
+            }).join('') + '<button type="button" class="hl-chip" title="Case stats" aria-label="Case stats" onclick="openCaseInsights()">📊 Stats</button>';
         }
     }
 

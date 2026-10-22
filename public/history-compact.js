@@ -26,6 +26,12 @@ document.addEventListener('DOMContentLoaded', () => {
     more.className = 'hl-more';
     more.innerHTML = '<summary class="hl-ib" title="Period · Review" aria-label="Period and review">⋯</summary><div class="hl-pop"><small id="hl-range">📅 All time</small></div>';
     more.querySelector('.hl-pop').append(dates, review);
+    // V101.189: a direct way into My Cases (it used to be reachable only through 🩺 ▸ 📊)
+    const cases = document.createElement('button');
+    cases.type = 'button'; cases.className = 'hl-pop-cases'; cases.textContent = '📊 My Cases';
+    cases.title = 'Case stats and the cases you logged'; cases.dataset.thTitle = 'สถิติและเคสที่บันทึกไว้'; cases.dataset.krTitle = '사례 통계와 기록한 사례';
+    cases.onclick = () => { more.open = false; if (typeof openCaseInsights === 'function') openCaseInsights(); };
+    more.querySelector('.hl-pop').append(cases);
     tools.append(magnifier, more);
     filters.append(tools);
     filters.after(search);
