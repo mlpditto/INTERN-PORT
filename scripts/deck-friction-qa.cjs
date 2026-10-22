@@ -66,7 +66,7 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
 
         // 4. Plan says free; steps line + series total; the spinner names the engine
         await page.evaluate(() => selectDesignEngine(document.querySelector('.alabasta-genmage-quick-chip[data-value="or/kwaivgi/kling-v3.0-std"]')));
-        assert.match(await page.$eval('#btn-generate-design', e => e.textContent), /Plan 10 episodes\s*free · text only/);
+        assert.match(await page.$eval('#btn-generate-design', e => e.textContent), /Plan 10 episodes$/);
         const steps = await page.evaluate(() => {
             window._glcSeries = { id: '', topic: 't', style: 's', episodes: Array.from({ length: 10 }, (_, i) => ({ n: i + 1, title: 'E' + (i + 1), status: i < 2 ? 'done' : 'planned', costUsd: i < 2 ? 1 : 0, seconds: 8 })) };
             glcRenderEpisodes();

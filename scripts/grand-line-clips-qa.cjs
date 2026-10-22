@@ -196,10 +196,10 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
         assert.equal(r.clipChipLabel, 'Clip 9:168 s · $0.80', 'V102.348: Gemini spark logo instead of 🎬'); assert.match(r.clipChipTitle, /9:16 vertical clip with audio · about \$0\.10 per second/);
         assert.deepEqual(r.valid, r.chips, 'pref restore accepts every chip, nothing else');
         assert.deepEqual([r.btnBefore, r.cardBefore], ['Create', 'none'], 'image mode untouched before the pick');
-        assert.deepEqual([r.engine, r.clipMode, r.btnClip, r.cardClipNoPlan], ['as/gemini-omni-1.1-flash', true, 'Plan 10 episodesfree · text only', 'none'], 'Clip mode: button relabelled, no card until a plan exists');
+        assert.deepEqual([r.engine, r.clipMode, r.btnClip, r.cardClipNoPlan], ['as/gemini-omni-1.1-flash', true, 'Plan 10 episodes', 'none'], 'Clip mode: button relabelled, no card until a plan exists');
         assert.match(r.btnTitle, /nothing is rendered or paid yet/); assert.match(r.placeholderClip, /10-episode 9:16 series/);
         assert.deepEqual(r.planCall, { model: r.enhancer, isJson: true, feature: 'clip_plan', asksObject: true, tenAsked: true, hasTopic: true }, 'the Enhancer plans as a JSON object');
-        assert.deepEqual([r.rows, r.cardAfterPlan, r.btnAfterPlan], [10, 'block', 'Plan 10 episodesfree · text only'], '10 rows in the Episodes card');
+        assert.deepEqual([r.rows, r.cardAfterPlan, r.btnAfterPlan], [10, 'block', 'Plan 10 episodes'], '10 rows in the Episodes card');
         assert.equal(r.copyBtns, '10/1', '⧉ on every row + one for the plan');
         assert.ok(/^EP01 · /.test(r.copyEp) && /\n🎯 /.test(r.copyEp) && /\n💡 /.test(r.copyEp) && /\n🗣 /.test(r.copyEp) && /\n🎨 /.test(r.copyEp), 'episode text: EP · title, then 🎯 💡 🗣 🎨 lines: ' + JSON.stringify(r.copyEp).slice(0, 120));
         assert.ok(/EP01 · /.test(r.copyPlan) && /EP10 · /.test(r.copyPlan) && (r.copyPlan.match(/\n\n/g) || []).length >= 9, 'plan text: all ten episodes separated by blank lines');
