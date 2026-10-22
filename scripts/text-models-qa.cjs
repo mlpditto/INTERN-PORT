@@ -58,7 +58,7 @@ const { chromium } = require('playwright');
             }
         }
         const ids = await page.evaluate(() => TEXT_AI_MODELS.map(m => m.id));
-        assert.equal(ids.length, 16); // V102.268: + Muse Spark Open; V101.05: + Qwen 3.8 Flash/Max, DeepSeek V4.1 Flash/V4 Pro; V101.64: + Claude Opus 5.5; V102.61: Sonnet 5 → 5.5; V102.242: + Gemma 4 26B A4B
+        assert.equal(ids.length, 17); // V102.365: + Gemini 4 Argon; // V102.268: + Muse Spark Open; V101.05: + Qwen 3.8 Flash/Max, DeepSeek V4.1 Flash/V4 Pro; V101.64: + Claude Opus 5.5; V102.61: Sonnet 5 → 5.5; V102.242: + Gemma 4 26B A4B
         const controls = ['toolbar-ai-translate-model', 'ai-tagging-model-val', 'ai-model-grammar', 'dxa-ai-model-val', 'ai-model-review', 'research-model-select', 'tts-polish-model', 'laughtale-ai-model', 'storyteller-model-select', 'lp-ai-model', 'case-note-ai-model', 'default-translate-model', 'default-analyzer-model', 'default-review-model', 'default-qfp-model'];
         assert.equal(await page.locator('#ai-model-review').inputValue(), 'gpt-6-luna');
         for (const id of controls) {
@@ -86,8 +86,8 @@ const { chromium } = require('playwright');
         }
         for (const chips of ['#dt-models .text-ai-chips > button', '#dca-ai-chip-rail button']) {
             assert.equal(await page.locator(chips).count(), ids.length);
-            await page.locator(`${chips}[data-value="claude-haiku-4-5"]`).evaluate(b => b.click());
-            assert.equal(await page.locator('#dca-ai-model-val').inputValue(), 'claude-haiku-4-5');
+            await page.locator(`${chips}[data-value="claude-haiku-5-5"]`).evaluate(b => b.click());
+            assert.equal(await page.locator('#dca-ai-model-val').inputValue(), 'claude-haiku-5-5');
         }
         await page.evaluate(() => initRegistryModelSelectors());
         assert.equal(await page.locator('[data-model-input]').count(), controls.length);
@@ -113,21 +113,21 @@ const { chromium } = require('playwright');
         assert.equal(await page.locator('#img-quiz-model-rail button[onclick*="deepseek-v4-pro"]').count(), 0);
         assert.equal(await page.locator('#img-quiz-model-rail button[onclick*="deepseek-v4.1-flash"]').count(), 1);
         // V101.69: image → quiz defaults to GPT-6 Sol — Luna 6 cannot transcribe Thai from images.
-        assert.deepEqual(await page.locator('#img-quiz-model-rail button[aria-pressed="true"]').evaluateAll(bs => bs.map(b => b.getAttribute('onclick'))), ["imageQuizToggleModel('gpt-6-sol')"]);
-        await page.locator('#dynamic-model-tests .text-ai-chips').first().locator('[data-value="claude-haiku-4-5"]').evaluate(b => b.click());
-        assert.equal(await page.locator('#quality-audit-model').inputValue(), 'claude-haiku-4-5');
-        await page.locator('#dynamic-model-tests .text-ai-chips').last().locator('[data-value="gpt-6-sol"]').evaluate(b => b.click());
-        assert.equal(await page.evaluate(() => _compareModelB()), 'gpt-6-sol');
+        assert.deepEqual(await page.locator('#img-quiz-model-rail button[aria-pressed="true"]').evaluateAll(bs => bs.map(b => b.getAttribute('onclick'))), ["imageQuizToggleModel('gpt-6.1-sol')"]);
+        await page.locator('#dynamic-model-tests .text-ai-chips').first().locator('[data-value="claude-haiku-5-5"]').evaluate(b => b.click());
+        assert.equal(await page.locator('#quality-audit-model').inputValue(), 'claude-haiku-5-5');
+        await page.locator('#dynamic-model-tests .text-ai-chips').last().locator('[data-value="gpt-6.1-sol"]').evaluate(b => b.click());
+        assert.equal(await page.evaluate(() => _compareModelB()), 'gpt-6.1-sol');
         const lpStart = html.indexOf('        window.generateWeeklySummary =');
         await page.addScriptTag({ content: html.slice(lpStart, html.indexOf('        window.lpAppendAiToContent =', lpStart)) });
         await page.evaluate(async () => {
             window._lp = { ownerId: 'fixture', entries: [{ date: new Date().toISOString().slice(0, 10), title: 'Practice', contentMarkdown: 'Test entry' }] };
             window.callUniversalAI = async (...args) => { window.testAIArgs = args; return { text: 'Fixture summary' }; };
-            document.getElementById('lp-ai-model').value = 'gpt-6-sol';
+            document.getElementById('lp-ai-model').value = 'gpt-6.1-sol';
             await generateWeeklySummary();
         });
         assert.equal(await page.locator('#lp-ai-output').inputValue(), 'Fixture summary');
-        assert.equal(await page.evaluate(() => testAIArgs[0]), 'gpt-6-sol');
+        assert.equal(await page.evaluate(() => testAIArgs[0]), 'gpt-6.1-sol');
         assert.equal(await page.evaluate(() => typeof testAIArgs[1]), 'string');
         await page.evaluate(async () => { document.getElementById('lp-entry-content').value = 'Fixture entry'; await aiEnhanceLpEntry(); });
         assert.equal(await page.locator('#lp-ai-output').inputValue(), 'Fixture summary');

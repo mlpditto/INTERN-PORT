@@ -55,7 +55,7 @@ assert.ok(/\} finally \{ apdAiBtnState\(docId, ok \? 'done' : 'idle'\); \}/.test
         await page.evaluate(() => {
             window.adminApp = { storage: () => ({ ref: () => ({ getDownloadURL: async () => 'blob:x' }) }) };
             window.apdExtractPdfText = async () => 'x'.repeat(300);
-            window.__go = null; window.apdRunReview = () => new Promise(res => { window.__go = () => res([{ model: 'gpt-6-luna', data: { summary: 'A', strengths: [], gaps: [], questions: [], suggestions: [] } }, { model: 'claude-haiku-4-5', data: { summary: 'B', strengths: [], gaps: [], questions: [], suggestions: [] } }]); });
+            window.__go = null; window.apdRunReview = () => new Promise(res => { window.__go = () => res([{ model: 'gpt-6-luna', data: { summary: 'A', strengths: [], gaps: [], questions: [], suggestions: [] } }, { model: 'claude-haiku-5-5', data: { summary: 'B', strengths: [], gaps: [], questions: [], suggestions: [] } }]); });
             window.apdSummarise = async () => null;
             window.apdSaveReview = async (d, results, extra) => { _apdReviews.unshift({ id: 'r4', docId: d.id, results, mode: extra.mode, lang: extra.lang }); return true; };
             window.__run = aiReviewApplicantDoc('d1');

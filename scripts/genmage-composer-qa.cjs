@@ -79,7 +79,7 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
         assert.equal(await bar.locator('.audit-provider[aria-pressed="true"]').getAttribute('data-provider'), 'Claude');
         await page.evaluate(() => localStorage.setItem('ai_default_design_enhancer_model', 'gpt-5.6-sol'));
         await open();
-        assert.equal(await page.locator('#ai-model-design-enhancer').inputValue(), 'gpt-6-sol', 'retired id normalised');
+        assert.equal(await page.locator('#ai-model-design-enhancer').inputValue(), 'gpt-6.1-sol', 'retired id normalised');
         await page.evaluate(() => localStorage.setItem('ai_default_design_enhancer_model', 'no-such-model'));
         await open();
         assert.equal(await page.locator('#ai-model-design-enhancer').inputValue(), 'gpt-6-luna', 'unknown id → default');

@@ -76,10 +76,10 @@ const cut = (from, to) => { const a = html.indexOf(from), b = html.indexOf(to, a
         assert.equal(await page.locator('#dt-model-toggle').getAttribute('aria-expanded'), 'true');
         assert.equal(await page.locator('#dt-models .audit-provider').count() > 3, true, 'provider logo tabs');
         await page.locator('#dt-models .audit-provider[data-provider="Claude"]').click();
-        await page.locator('#dt-models .text-ai-chips > button[data-value="claude-haiku-4-5"]').click();
-        assert.equal(await page.locator('#dca-ai-model-val').inputValue(), 'claude-haiku-4-5');
-        assert.equal(await page.evaluate(() => localStorage.getItem('ai_default_drug_codex_model')), 'claude-haiku-4-5');
-        assert.equal(await page.locator('#dt-model-name').innerText(), 'Haiku 4.5');
+        await page.locator('#dt-models .text-ai-chips > button[data-value="claude-haiku-5-5"]').click();
+        assert.equal(await page.locator('#dca-ai-model-val').inputValue(), 'claude-haiku-5-5');
+        assert.equal(await page.evaluate(() => localStorage.getItem('ai_default_drug_codex_model')), 'claude-haiku-5-5');
+        assert.equal(await page.locator('#dt-model-name').innerText(), 'Haiku 5.5');
         assert.equal(await page.locator('#dt-models').isVisible(), false, 'a pick closes the rail');
         assert.equal(await page.locator('#dt-model-toggle').getAttribute('aria-expanded'), 'false');
         await page.locator('#dt-model-toggle').click();

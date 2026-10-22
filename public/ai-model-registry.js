@@ -149,6 +149,24 @@ window.AI_MODEL_REGISTRY = {
       "rollout": "trial-only-defaults-unchanged"
     },
     {
+      "id": "claude-haiku-5-5",
+      "label": "Claude Haiku 5.5",
+      "provider": "anthropic",
+      "adapter": "messages",
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text",
+        "json"
+      ],
+      "selectable": true,
+      "access": "verified-2026-10-22",
+      "validation": "text-json-vision-pass",
+      "rollout": "trial-only-defaults-unchanged"
+    },
+    {
       "id": "claude-opus-5",
       "label": "Claude Opus 5",
       "provider": "anthropic",
@@ -197,8 +215,26 @@ window.AI_MODEL_REGISTRY = {
         "text",
         "json"
       ],
-      "selectable": true,
+      "selectable": false,
       "access": "verified-2026-09-25",
+      "validation": "text-json-vision-pass",
+      "rollout": "quiz-feedback"
+    },
+    {
+      "id": "gpt-6.1-sol",
+      "label": "GPT-6.1 Sol",
+      "provider": "openai",
+      "adapter": "responses",
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text",
+        "json"
+      ],
+      "selectable": true,
+      "access": "verified-2026-10-22",
       "validation": "text-json-vision-pass",
       "rollout": "quiz-feedback"
     },

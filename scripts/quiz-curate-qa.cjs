@@ -71,11 +71,11 @@ const { chromium } = require('playwright');
         assert.equal(await page.locator('#curate-models .audit-provider').count(), await page.evaluate(() => new Set(TEXT_AI_MODELS.map(m => m.label.split(' ')[0])).size));
         assert.equal(await page.locator('#curate-models .audit-provider[aria-pressed="true"]').getAttribute('data-provider'), 'GPT');
         assert(await page.locator('[data-model="gpt-6-luna"]').isVisible());
-        assert(!(await page.locator('[data-model="claude-haiku-4-5"]').isVisible()));
+        assert(!(await page.locator('[data-model="claude-haiku-5-5"]').isVisible()));
         await page.locator('#curate-models .audit-provider[data-provider="Claude"]').click();
-        await page.locator('[data-model="claude-haiku-4-5"]').click();
+        await page.locator('[data-model="claude-haiku-5-5"]').click();
         // V101.94: the header pill is gone; #curate-model is the short name on the folded-rail chip, full name in its aria-label.
-        assert.match(await page.locator('#curate-model').textContent(), /^Haiku 4\.5$/);
+        assert.match(await page.locator('#curate-model').textContent(), /^Haiku 5\.5$/);
         assert.match(await page.locator('#curate-model-chip').getAttribute('aria-label'), /Claude Haiku/);
         // − / + stepper (no native spinner): clamps to 1..total and marks the proposal stale like typing does.
         await page.locator('#curate-target').fill('13');
@@ -110,7 +110,7 @@ const { chromium } = require('playwright');
         await page.evaluate(() => document.getElementById('curate-suggest').onclick());
         assert.equal(await page.evaluate(() => calls.length), 1, 'duplicate generation blocked');
         const request = await page.evaluate(() => calls[0]);
-        assert.equal(request[0], 'claude-haiku-4-5');
+        assert.equal(request[0], 'claude-haiku-5-5');
         assert.match(await page.locator('#curate-suggest').innerText(), /Processing · 00:00/);
         assert.equal(await page.locator('#curate-progress').count(), 0);
         await page.waitForTimeout(1100);

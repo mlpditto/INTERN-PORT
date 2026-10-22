@@ -78,17 +78,17 @@ for (const h of ['saveAIKeys()', 'parseAndFillKeys()', 'exportAIKeys()', 'import
                 assert.ok(g.chipsTop >= g.nameBottom, 'on a phone the open rail drops below the name');
                 assert.ok(g.w > 250, 'and uses the full width: ' + g.w);
             }
-            await tr.locator('.text-ai-chips > button[data-value="claude-haiku-4-5"]').click();
-            assert.equal(await page.locator('#default-translate-model').inputValue(), 'claude-haiku-4-5', 'pick changes the select @' + vw);
-            assert.equal(await page.evaluate(() => localStorage.getItem('ai_default_translate_model')), 'claude-haiku-4-5', 'and the stored default');
+            await tr.locator('.text-ai-chips > button[data-value="claude-haiku-5-5"]').click();
+            assert.equal(await page.locator('#default-translate-model').inputValue(), 'claude-haiku-5-5', 'pick changes the select @' + vw);
+            assert.equal(await page.evaluate(() => localStorage.getItem('ai_default_translate_model')), 'claude-haiku-5-5', 'and the stored default');
             assert.ok(!(await tr.evaluate(r => r.classList.contains('open'))), 'a pick folds the row');
-            assert.equal(await tr.locator('.text-ai-chips > button').evaluateAll(bs => bs.filter(b => b.offsetParent !== null).map(b => b.dataset.value)).then(a => a.join()), 'claude-haiku-4-5', 'row now shows the new pick');
+            assert.equal(await tr.locator('.text-ai-chips > button').evaluateAll(bs => bs.filter(b => b.offsetParent !== null).map(b => b.dataset.value)).then(a => a.join()), 'claude-haiku-5-5', 'row now shows the new pick');
             // ▾ opens too; tapping the already-chosen chip while open folds it
             await tr.locator('.ais-more').click();
             assert.ok(await tr.evaluate(r => r.classList.contains('open')), '▾ opens');
             await tr.locator('.text-ai-chips > button.active').click();
             assert.ok(!(await tr.evaluate(r => r.classList.contains('open'))), 'tapping the chosen chip while open folds it');
-            assert.equal(await page.locator('#default-translate-model').inputValue(), 'claude-haiku-4-5', 'folding keeps the pick');
+            assert.equal(await page.locator('#default-translate-model').inputValue(), 'claude-haiku-5-5', 'folding keeps the pick');
 
             // Saved key = green ring (set programmatically, like Quick Paste / open do); empty = not green
             const ring = id => page.locator(`.ais-row:has(#${id}) .ais-logo`).evaluate(e => getComputedStyle(e).borderTopColor);

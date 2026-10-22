@@ -1454,7 +1454,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             const textConfig = {
                 ...(isJson ? { responseMimeType: "application/json" } : {}),
                 maxOutputTokens: Math.min(32768, Math.max(1, Number(generationOptions?.maxOutputTokens) || 8192)),
-                ...(asModel === "gemini-3.8-flash" ? { thinkingConfig: { thinkingLevel: "low" } } : {})
+                ...((asModel === "gemini-3.8-flash" || asModel === "gemini-4-argon") ? { thinkingConfig: { thinkingLevel: "low" } } : {})   // V102.365: Argon defaults to medium — keep the same low effort
             };
             const body = {
                 contents: [{ parts: asParts }],

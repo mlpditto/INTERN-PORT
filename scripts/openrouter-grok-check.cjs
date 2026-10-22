@@ -146,8 +146,8 @@ const ok = (content, finish = 'stop', usage = { prompt_tokens: 100, completion_t
         const a = admin.indexOf('            const explainProxyError = (raw, chipName) =>');
         const b = admin.indexOf('                    : raw;', a) + '                    : raw;'.length;
         const helper = new Function(`${admin.slice(a, b)} return explainProxyError;`)();
-        const w = { aiModelShortName: id => ({ 'claude-opus-5-5': 'Opus 5.5', 'gpt-6-sol': 'Sol 6' })[id] || id };
-        const run = error => helper(error, w.aiModelShortName(error.includes('gpt') ? 'gpt-6-sol' : 'claude-opus-5-5'));
+        const w = { aiModelShortName: id => ({ 'claude-opus-5-5': 'Opus 5.5', 'gpt-6.1-sol': 'Sol 6' })[id] || id };
+        const run = error => helper(error, w.aiModelShortName(error.includes('gpt') ? 'gpt-6.1-sol' : 'claude-opus-5-5'));
         check('T11 registry path (Opus/Sonnet/Fable 5, GPT-6) uses the rewrite', admin.includes("throw new Error(data.error ? explainProxyError(String(data.error), window.aiModelShortName ? window.aiModelShortName(modelName) : modelName)"), true);
         check('T11 generic proxy path uses the rewrite', admin.includes('proxyAnsweredError = explainProxyError(raw, chipName);'), true);
         const refusal = run('Model returned incomplete or invalid output. claude-opus-5-5: stopped with refusal; 0 output tokens of 32768.');
@@ -157,7 +157,7 @@ const ok = (content, finish = 'stop', usage = { prompt_tokens: 100, completion_t
         check('T11 proxy-only models throw the rewritten message', /const definitive = new Error\(proxyAnsweredError \|\| primaryError\?\.error/.test(admin), true);
     }
     check('T10 the message names the chip (or/ prefix restored before aiModelShortName)', admin.includes("window.aiModelShortName(proxyProvider === 'openrouter' && !modelName.startsWith('or/') ? 'or/' + modelName : modelName)"), true);
-    check('T8 retired ids follow their successor', `${win.normalizeTextAIModel('gpt-5.6-luna')}|${win.normalizeTextAIModel('gpt-5.6-sol')}|${win.normalizeTextAIModel('or/deepseek/deepseek-v4-pro')}|${win.normalizeTextAIModel('claude-sonnet-5')}`, 'gpt-6-luna|gpt-6-sol|or/deepseek/deepseek-v4-pro-0813|claude-sonnet-5-5');
+    check('T8 retired ids follow their successor', `${win.normalizeTextAIModel('gpt-5.6-luna')}|${win.normalizeTextAIModel('gpt-5.6-sol')}|${win.normalizeTextAIModel('or/deepseek/deepseek-v4-pro')}|${win.normalizeTextAIModel('claude-sonnet-5')}`, 'gpt-6-luna|gpt-6.1-sol|or/deepseek/deepseek-v4-pro-0813|claude-sonnet-5-5');   // V102.365: 5.6 Sol now lands on 6.1 Sol
     check('T8 an explicit trial pick is kept, others normalise as before', `${win.resolveTrialTextAIModel(grok)}|${win.resolveTrialTextAIModel('claude-sonnet-5-5')}|${win.resolveTrialTextAIModel('nope')}`, 'or/x-ai/grok-4.7|claude-sonnet-5-5|gpt-6-luna');
     check('T8 default chip rail has no Grok', /grok/i.test(win.textAIChipContents('gpt-6-luna')), false);
     const withTrial = win.textAIChipContents('gpt-6-luna', '', null, win.TEXT_AI_TRIAL_MODELS);

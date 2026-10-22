@@ -31,8 +31,8 @@ window.__clip = []; Object.defineProperty(navigator, 'clipboard', { value: { wri
 var apdTargetId = null, preRegData = [{ id: 'PRE1', fullName: 'Test Applicant' }], usersData = [];
 var applicantDocsCache = { PRE1: [{ id: 'd1', name: 'CV_a.pdf', path: 'applicant-docs/PRE1/a.pdf', size: 1024, contentType: 'application/pdf' }] };
 window.apdInitModelRows = () => {};
-window.apdReviewModels = () => ['gpt-6-luna', 'claude-haiku-4-5'];
-window.aiModelShortName = id => ({ 'gpt-6-luna': 'Luna 6', 'claude-haiku-4-5': 'Haiku 4.5' })[id] || id;
+window.apdReviewModels = () => ['gpt-6-luna', 'claude-haiku-5-5'];
+window.aiModelShortName = id => ({ 'gpt-6-luna': 'Luna 6', 'claude-haiku-5-5': 'Haiku 5.5' })[id] || id;
 window.apdExtractPdfText = async () => 'x'.repeat(300);
 var adminApp = { storage: () => ({ ref: () => ({ getDownloadURL: async () => 'https://x/a.pdf' }) }) };
 var auth = { currentUser: { email: 'admin@x.com' } };
@@ -70,7 +70,7 @@ ${code}
         // 2. run a review → two cards with ⧉, saved as ONE run doc, then shown as "Last review"
         await page.evaluate(() => { __answers = {
             'gpt-6-luna': '{"summary":"สรุป A","strengths":["s1","s2"],"gaps":["g1"],"questions":[],"suggestions":["x"]}',
-            'claude-haiku-4-5': '{"summary":"สรุป B","strengths":[],"gaps":[],"questions":["q1"],"suggestions":[]}',
+            'claude-haiku-5-5': '{"summary":"สรุป B","strengths":[],"gaps":[],"questions":["q1"],"suggestions":[]}',
             summary: '{"points":[{"text":"ประเด็นร่วม","from":"AB"},{"text":"เฉพาะ B","from":"B"}],"verdict":"เหมาะนัดสัมภาษณ์ ยืนยันระยะเวลาฝึกก่อน"}' }; });
         // the diff itself, on a realistic pair: same point in different words = not marked; a point only one raised = marked
         assert.deepEqual(await page.evaluate(() => {
@@ -78,16 +78,16 @@ ${code}
                        { model: 'b', data: { strengths: ['มีประสบการณ์ร้านยาจริงที่ Boots ทั้งจ่ายยา ให้คำปรึกษา'], gaps: ['ไม่ระบุชั้นปีปัจจุบันและระดับภาษาอังกฤษ', 'ข้อมูลไม่พอเรื่องกิจกรรม'], questions: [], suggestions: [] } }];
             const o = apdOnlyMap(r); return [o[0].strengths, o[0].gaps, o[1].strengths, o[1].gaps];
         }), [[false, false], [false], [false], [false, true]], 'shared points unmarked (both A strengths overlap the one Boots line of B), the unique gap marked');
-        assert.equal(await page.evaluate(() => { const r = [{ model: 'gpt-6-luna', data: { strengths: ['ไม่ระบุชั้นปีที่กำลังศึกษา'], gaps: [], questions: [], suggestions: [] } }, { model: 'claude-haiku-4-5', data: { strengths: ['ไม่ระบุชั้นปีปัจจุบันและระดับภาษาอังกฤษ', 'ข้อมูลไม่พอเรื่องกิจกรรม'], gaps: [], questions: [], suggestions: [] } }]; const d = document.createElement('div'); d.innerHTML = apdReviewHtml(r); return d.querySelectorAll('.apd-both .apd-dots i').length; }), 4, '●● (two dots) on each of the two shared bullets, none on the unique one');
+        assert.equal(await page.evaluate(() => { const r = [{ model: 'gpt-6-luna', data: { strengths: ['ไม่ระบุชั้นปีที่กำลังศึกษา'], gaps: [], questions: [], suggestions: [] } }, { model: 'claude-haiku-5-5', data: { strengths: ['ไม่ระบุชั้นปีปัจจุบันและระดับภาษาอังกฤษ', 'ข้อมูลไม่พอเรื่องกิจกรรม'], gaps: [], questions: [], suggestions: [] } }]; const d = document.createElement('div'); d.innerHTML = apdReviewHtml(r); return d.querySelectorAll('.apd-both .apd-dots i').length; }), 4, '●● (two dots) on each of the two shared bullets, none on the unique one');
         await page.evaluate(() => aiReviewApplicantDoc('d1'));
         await page.waitForFunction(() => window.__store.length === 1 && document.querySelector('#apd-ai .apd-saved-head .apd-copy-sug'));
         const saved = await page.evaluate(() => __store[0].data);
         assert.equal(saved.preUserId, 'PRE1'); assert.equal(saved.docId, 'd1'); assert.equal(saved.docName, 'CV_a.pdf'); assert.equal(saved.by, 'admin@x.com'); assert.equal(saved.at, 'SERVER_TS');
-        assert.deepEqual(saved.models, ['gpt-6-luna', 'claude-haiku-4-5']);
+        assert.deepEqual(saved.models, ['gpt-6-luna', 'claude-haiku-5-5']);
         assert.deepEqual(saved.results[0], { model: 'gpt-6-luna', data: { summary: 'สรุป A', strengths: ['s1', 's2'], gaps: ['g1'], questions: [], suggestions: ['x'] } });
         // V102.304: two reviews, then one summary call on model A; mode / lang / summary saved on the run; Summary tab first
         const calls = await page.evaluate(() => window.__calls);
-        assert.deepEqual(calls.map(c => c.model + ':' + c.opts.feature), ['gpt-6-luna:resume_review', 'claude-haiku-4-5:resume_review', 'gpt-6-luna:resume_summary']);
+        assert.deepEqual(calls.map(c => c.model + ':' + c.opts.feature), ['gpt-6-luna:resume_review', 'claude-haiku-5-5:resume_review', 'gpt-6-luna:resume_summary']);
         assert.ok(calls.slice(0, 2).every(c => /ร้านยาชุมชน/.test(c.prompt) && /ตอบเป็นภาษาไทย/.test(c.prompt) && /ตัวอย่างประโยค/.test(c.prompt)), 'review prompts carry the 🏪 role, Thai, and the example-sentence ask');
         assert.ok(/"model":"A"/.test(calls[2].prompt) && /ร้านยา/.test(calls[2].prompt), 'the summary prompt carries both opinions and the context');
         assert.equal(saved.mode, 'pharmacy'); assert.equal(saved.lang, 'th');
@@ -132,11 +132,11 @@ ${code}
         await page.click('#apd-ai .apd-card .apd-copy >> nth=1');
         await page.waitForFunction(() => window.__clip.length === 1);
         const txt = await page.evaluate(() => __clip[0]);
-        assert.equal(txt, 'B · Haiku 4.5\nสรุป B\nควรถามตอนสัมภาษณ์\n- q1', 'copy text of card B: ' + JSON.stringify(txt));
+        assert.equal(txt, 'B · Haiku 5.5\nสรุป B\nควรถามตอนสัมภาษณ์\n- q1', 'copy text of card B: ' + JSON.stringify(txt));
         // ⧉ suggestions in the head → only the suggestions of both models, as a checklist
         await page.click('#apd-ai .apd-copy-sug');
         await page.waitForFunction(() => window.__clip.length === 2);
-        assert.equal(await page.evaluate(() => __clip[1]), 'A · Luna 6\n☐ x\n\nB · Haiku 4.5\n', 'suggestions-only text');
+        assert.equal(await page.evaluate(() => __clip[1]), 'A · Luna 6\n☐ x\n\nB · Haiku 5.5\n', 'suggestions-only text');
         await page.evaluate(() => { window.__clip.pop(); });
         await page.click('#apd-ai .apd-card .apd-copy >> nth=0');
         await page.waitForFunction(() => window.__clip.length === 2);
@@ -185,7 +185,7 @@ ${code}
         assert.deepEqual(Object.keys(await page.evaluate(() => __updates[0].patch)), ['summary'], 'only `summary` written');
         assert.ok(await page.$eval('#apd-ai .apd-sum', e => /เหมาะนัดสัมภาษณ์/.test(e.textContent)), 'summary rendered after the call');
         // EN + hospital: the chips persist and the next run's prompts and section titles follow
-        await page.evaluate(() => { apdSetMode('hospital'); apdSetLang('en'); __calls = []; __store.length = 0; __answers['gpt-6-luna'] = '{"summary":"A en","strengths":["en-s"],"gaps":[],"questions":[],"suggestions":[]}'; __answers['claude-haiku-4-5'] = '{"summary":"B en","strengths":[],"gaps":[],"questions":[],"suggestions":[]}'; });
+        await page.evaluate(() => { apdSetMode('hospital'); apdSetLang('en'); __calls = []; __store.length = 0; __answers['gpt-6-luna'] = '{"summary":"A en","strengths":["en-s"],"gaps":[],"questions":[],"suggestions":[]}'; __answers['claude-haiku-5-5'] = '{"summary":"B en","strengths":[],"gaps":[],"questions":[],"suggestions":[]}'; });
         assert.equal(await page.evaluate(() => localStorage.getItem('apd_review_mode') + '/' + localStorage.getItem('apd_review_lang')), 'hospital/en');
         assert.deepEqual(await page.$$eval('#apd-mode .on, #apd-mode .apd-lang', es => es.map(e => e.textContent)), ['EN', '🏥']);
         await page.evaluate(() => aiReviewApplicantDoc('d1'));
@@ -201,7 +201,7 @@ ${code}
         // V102.319 (Phase 3): ✓ / ✕ / ✎ per point and ↻ per section are an overlay (`pick` / `edits` / `regen`); `results` is never written
         await page.evaluate(() => { firebase.firestore.FieldValue.delete = () => 'DELETE'; __calls = []; __store.length = 0; __updates.length = 0; _apdTab = '';
             __answers['gpt-6-luna'] = '{"summary":"A","strengths":["s-a1","s-a2"],"gaps":["g-a1"],"questions":[],"suggestions":["x-a1"]}';
-            __answers['claude-haiku-4-5'] = '{"summary":"B","strengths":["s-b1"],"gaps":[],"questions":["q-b1"],"suggestions":[]}'; });
+            __answers['claude-haiku-5-5'] = '{"summary":"B","strengths":["s-b1"],"gaps":[],"questions":["q-b1"],"suggestions":[]}'; });
         await page.evaluate(() => aiReviewApplicantDoc('d1'));
         await page.waitForFunction(() => window.__store.length === 1 && document.querySelector('#apd-ai .apd-tabs'));
         const rid = await page.evaluate(() => _apdReviews[0].id);
