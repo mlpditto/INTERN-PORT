@@ -214,6 +214,8 @@
         var thOn = isLangOn('th');
         body.classList.toggle('lang-kr-on', krOn);
         body.classList.toggle('lang-th-on', thOn);
+        // V101.189: text that is rebuilt by script (History dates, bucket labels, pills) listens for this
+        try { document.dispatchEvent(new CustomEvent('lang-changed', { detail: { kr: krOn, th: thOn } })); } catch (e) { /* old WebView */ }
         var krBtn = document.getElementById('lang-toggle-kr');
         var thBtn = document.getElementById('lang-toggle-th');
         if (krBtn) {
