@@ -267,7 +267,7 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
       Articles.lang('en'); out.drBtn = q('.art-ai .go').textContent;
       reply = '```markdown\n**Shake** the inhaler first.\n```';
       await Articles.ai();
-      out.dr = [S.cur.body.en, /Write a short article .* in English/.test(calls[1][1]) && /Topic: Inhaler mistakes/.test(calls[1][1])];
+      out.dr = [S.cur.body.en, /Write a short article .* in English/.test(calls[1][1]) && /Topic: Inhaler mistakes/.test(calls[1][1]), /under 700 characters/.test(calls[1][1]) && /each starting with one fitting emoji instead of a label/.test(calls[1][1]) && /one line starting with 💊 that lists 2 to 4 related drug names/.test(calls[1][1]) && !/one practical point, one example/.test(calls[1][1])];   // V102.363: emoji-led lines + 💊 drugs line
       window.callUniversalAI = async () => { throw new Error('quota'); };
       await Articles.ai(); out.err = q('.art-err') && q('.art-err').textContent;
       out.writes = writes.length;
@@ -346,7 +346,7 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
     assert.deepEqual(r3.dx, [1, 'Acromegaly', 'block', 'none'], 'the Codex opens with the bare topic in the AI Auto-Draft box, the Articles modal closed: ' + JSON.stringify(r3.dx));
     assert.deepEqual(r3.tr, ['หัวข้อไทย', 'เขย่าก่อนใช้ **ทุกครั้ง**', true, false, 'article_draft', true, true], 'translation fills TH title + body, notes the model, logs feature article_draft, leaves it unsaved');
     assert.equal(r3.drBtn, '✨ Draft');
-    assert.deepEqual(r3.dr, ['**Shake** the inhaler first.', true], 'a draft writes the body from the title (code fences stripped)');
+    assert.deepEqual(r3.dr, ['**Shake** the inhaler first.', true, true], 'a draft writes the body from the title (code fences stripped); V102.363 prompt: emoji-led lines, 💊 drug names, under 700');
     assert.match(r3.err || '', /✨ quota/, 'an AI error shows in the editor');
     assert.equal(r3.writes, 0, '✨ never saves — nothing was written');
     assert.ok(r3.rail[0] >= 10 && r3.rail[1] >= 1 && r3.rail[1] < r3.rail[0] && r3.rail[3], 'the model rail shows only the picked vendor’s models: ' + r3.rail);
