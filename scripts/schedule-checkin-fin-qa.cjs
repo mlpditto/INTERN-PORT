@@ -96,7 +96,7 @@ async function open(browser) {
             return { kids, headText: head.textContent.replace(/\s+/g, ' ').trim(), tileH: Math.round(tr.height), hasReward };
         });
         assert.deepEqual(lean.kids, ['label', 'pill'], 'TODAY header = label + pill, no count badge: ' + JSON.stringify(lean));
-        assert.ok(lean.tileH >= 56 && lean.tileH <= 90, 'tile as tall as its content (was 116): ' + lean.tileH);
+        assert.ok(lean.tileH >= 44 && lean.tileH <= 90, 'tile as tall as its content (V101.191 compact ~50; was 116): ' + lean.tileH);
         assert.equal(lean.hasReward, false, 'V101.161: the +0.1 reward pill is gone from the tile: ' + JSON.stringify(lean));
         // streak 0 + checked in → no pill (and no lonely TODAY label when nothing else is due)
         await page.evaluate(() => { window.computeEngagementStreak = () => ({ streak: 0, doneToday: true }); schRenderAgenda(); });

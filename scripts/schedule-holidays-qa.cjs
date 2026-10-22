@@ -30,7 +30,7 @@ assert.ok(/getElementById\('pi-nationality'\)\.value = d\.nationality/.test(idx)
         openScheduleModal();
     });
     await page.waitForTimeout(300);
-    const read = () => page.evaluate(() => ({ lines: [...document.querySelectorAll('#sch-week .sch-hol')].map(x => x.textContent), cls: document.querySelector('#sch-week [data-schday="' + __t + '"]').className }));
+    const read = () => page.evaluate(() => ({ lines: [...document.querySelectorAll('#sch-gb-month .sch-hol')].map(x => x.textContent), cls: document.querySelector('#sch-week [data-schday="' + __t + '"]').className }));
     let r = await read();
     assert.ok(r.lines.some(l => l.includes('🇹🇭') && l.includes('Sample TH day') && l.includes('วันทดสอบ')), 'no nationality = Thai list: ' + r.lines);
     assert.ok(r.lines.some(l => l.includes('🩺') && l.includes('Sample health day')), 'approved health day shows: ' + r.lines);
