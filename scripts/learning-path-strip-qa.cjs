@@ -39,7 +39,8 @@ for (const id of ['lp-gen-btn', 'lp-path-toggle-btn', 'lp-path-subtitle', 'lp-pa
         const visibleChips = p => p.evaluate(() => [...document.querySelectorAll('#lp-model-row .text-ai-chips > button')].filter(b => !b.hidden).map(b => b.textContent.trim()));
 
         // ---- desktop ----
-        let p = await open(900);
+        // V102.365: 960, not 900 — with "Sol 6.1" the GPT row is two characters wider and CI's Linux fonts (wider than Segoe UI) wrapped the strip at 900 (90 px); Windows did not.
+        let p = await open(960);
         assert.deepEqual(await p.locator('#lp-providers .audit-provider').evaluateAll(ns => ns.map(n => n.getAttribute('aria-label'))), ['Gemini', 'GPT', 'Claude', 'Qwen', 'DeepSeek', 'Muse', 'Grok', 'Ollama']);
         assert.equal(await p.locator('#lp-providers .audit-provider[data-provider="Ollama"] .text-ai-logo').evaluate(n => getComputedStyle(n).backgroundImage.includes('ollama-white.svg')), true, 'Ollama tab is a logo');
         assert.equal(await p.locator('#lp-providers .audit-provider[aria-pressed="true"]').getAttribute('data-provider'), 'GPT');
