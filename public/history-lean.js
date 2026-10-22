@@ -223,7 +223,9 @@ window.historyLean = (() => {
             let html = chip('all', '<b>All</b> ' + counts.all, 'All', unifiedCurrentFilter === 'all', "filterUnifiedHistory('all')");
             ORDER.forEach(k => {
                 if (!counts[k] && unifiedCurrentFilter !== k) return;
-                html += chip(k, T[k].e + ' <b>' + (counts[k] || 0) + '</b>', T[k].n, unifiedCurrentFilter === k, "filterUnifiedHistory('" + k + "')");
+                // V101.189: the chosen type shows its name beside the emoji (the others stay emoji + count)
+                const onK = unifiedCurrentFilter === k;
+                html += chip(k, T[k].e + (onK ? ' ' + T[k].n : '') + ' <b>' + (counts[k] || 0) + '</b>', T[k].n, onK, "filterUnifiedHistory('" + k + "')");
             });
             const pend = all.filter(pending).length;
             if (pend || unifiedCurrentStatus === 'pending') {
@@ -240,8 +242,8 @@ window.historyLean = (() => {
             sub.hidden = false;
             sub.innerHTML = Object.keys(per).sort((x, y) => per[y] - per[x]).map(k => {
                 const on = window.unifiedCaseSystem === k, h = hueOf(k);
-                return '<button type="button" class="hl-chip hl-sys' + (on ? ' on' : '') + '" aria-pressed="' + on + '" title="' + esc(sysName(k)) + '" style="--sh:' + h + '" onclick="filterCaseSystem(\'' + esc(k) + '\')">' + sysEmoji(k) + ' <b>' + per[k] + '</b></button>';
-            }).join('') + '<button type="button" class="hl-chip" title="Case stats" aria-label="Case stats" onclick="openCaseInsights()">📊</button>';
+                return '<button type="button" class="hl-chip hl-sys' + (on ? ' on' : '') + '" aria-pressed="' + on + '" title="' + esc(sysName(k)) + '" style="--sh:' + h + '" onclick="filterCaseSystem(\'' + esc(k) + '\')">' + sysEmoji(k) + ' ' + esc(sysName(k)) + ' <b>' + per[k] + '</b></button>';   // V101.189: name beside the emoji (owner: the expanded row needs words)
+            }).join('') + '<button type="button" class="hl-chip" title="Case stats" aria-label="Case stats" onclick="openCaseInsights()">📊 Stats</button>';
         }
     }
 
