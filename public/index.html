@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.187)</title>
+    <title>Internship Portfolio (V101.188)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.171">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -1009,6 +1009,12 @@
         .quiz-mat-box { position:absolute; left:-7px; top:8px; z-index:3; }
         /* V101.64: under the 🔗 share button — a 32px tile, same footprint as the button above it */
         .quiz-side { display:flex; flex-direction:column; align-items:center; gap:6px; flex:none; }
+        /* V101.188: "Details" is a ▾ under the ☁️ download (or under 🔗 when there is nothing to download); the <summary> is hidden */
+        .quiz-mission-details > summary { display:none !important; }   /* beats quiz-cover.css's startable summary rule */
+        .quiz-details-toggle { width:32px; height:32px; min-height:auto; padding:0; border-radius:9px; border:1px solid #e2e8f0; background:#f1f5f9; color:#64748b; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+        .quiz-details-toggle svg { width:16px; height:16px; transition:transform .18s ease; }
+        .quiz-details-toggle[aria-expanded="true"] { background:#e0e7ff; color:#3730a3; border-color:#c7d2fe; }
+        .quiz-details-toggle[aria-expanded="true"] svg { transform:rotate(180deg); }
         .quiz-side .quiz-mat-box { position:static; }
         .quiz-side .quiz-mat-ribbon { box-sizing:border-box; width:32px; height:32px; padding:0; justify-content:center; gap:2px; border-radius:9px; font-size:11px; box-shadow:none; }
         .quiz-side .quiz-mat-ribbon::before { display:none; }
@@ -2414,9 +2420,9 @@
 <script src="monthly-progress.js?v=V101.79"></script><link rel="stylesheet" href="monthly-progress.css?v=V101.39">
 <script src="assigned-goals.js?v=V100.30"></script><link rel="stylesheet" href="assigned-goals.css?v=V100.30">
 <link rel="stylesheet" href="quiz-user-focus.css?v=V101.187"><script defer src="quiz-term-highlight.js?v=V101.187"></script><script defer src="quiz-feedback-lang.js?v=V101.96"></script><script defer src="quiz-feedback-ai.js?v=V101.96"></script><script defer src="quiz-feedback-remind.js?v=V101.176"></script>
-<link rel="stylesheet" href="quiz-cover.css?v=V101.181">
+<link rel="stylesheet" href="quiz-cover.css?v=V101.188">
 <link rel="stylesheet" href="case-insight-rail.css?v=V101.59">
-<script src="quiz-cover.js?v=V101.181"></script>
+<script src="quiz-cover.js?v=V101.188"></script>
 <script src="activity-rewards.js?v=V101.84"></script><link rel="stylesheet" href="activity-rewards.css?v=V101.43">
 <script src="peds-dosing.js?v=V101.62"></script><script src="flood-watch.js?v=V101.150"></script><script src="history-news.js?v=V101.137"></script><link rel="stylesheet" href="flood-watch.css?v=V101.148">
 </head>
@@ -11593,6 +11599,7 @@
 
                 if (item.type === 'quiz') QuizCover.decorate(card, item.data, card.querySelector('.assign-header[onclick]') !== null);
                 if (card._materialRibbon) attachQuizMaterialRibbon(card, card._materialRibbon); // V102.21
+                attachQuizDetailsToggle(card); // V101.188
                 assignmentContainer.appendChild(card);
             });
 
@@ -12418,16 +12425,39 @@
             return `<details class="quiz-mat-box" onclick="event.stopPropagation()" ontoggle="qzMaterialPick(this)"><summary class="quiz-mat-ribbon" style="--mk:${first.color}" title="เลือกเอกสาร ${mats.length} ไฟล์ก่อนทำ Quiz" aria-label="Download: pick one of ${mats.length} files"><i class="${first.icon}" aria-hidden="true"></i>${mats.length}</summary><div class="quiz-material-list">${list}</div></details>`;
         }
         // V102.21: the ribbon sits on the cover (or the plain icon) — wrap the header's first child so it can anchor.
+        // V101.188: the column under the 🔗 share button (🔗 · ☁️ · ▾). Built once; null on a collapsed card (no share button).
+        function quizSideColumn(card) {
+            const header = card.querySelector('.assign-header');
+            let side = header && header.querySelector(':scope > .quiz-side');
+            if (side) return side;
+            const share = header && header.querySelector(':scope > button[onclick*="qzShareLink"]');
+            if (!share) return null;
+            side = document.createElement('span');
+            side.className = 'quiz-side';
+            share.replaceWith(side); side.append(share);
+            return side;
+        }
+        // V101.188: "Details" was a text line in the body. Now a ▾ button at the bottom of the side column toggles the
+        // same <details> (its <summary> is hidden by CSS); the description still unfolds in the body.
+        function attachQuizDetailsToggle(card) {
+            const details = card.querySelector('.assign-body > .quiz-mission-details');
+            const side = details && quizSideColumn(card);
+            if (!side) return;
+            const btn = document.createElement('button');
+            btn.type = 'button'; btn.className = 'quiz-details-toggle';
+            btn.title = 'Details'; btn.dataset.thTitle = 'ดูรายละเอียดและแหล่งที่มาของข้อสอบ'; btn.dataset.krTitle = '시험 상세 및 출처 보기';
+            btn.setAttribute('aria-label', 'Quiz details'); btn.setAttribute('aria-expanded', 'false');
+            btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+            btn.onclick = event => { event.stopPropagation(); details.open = !details.open; btn.setAttribute('aria-expanded', details.open ? 'true' : 'false'); };
+            side.append(btn);
+        }
         function attachQuizMaterialRibbon(card, html) {
             const header = html && card.querySelector('.assign-header'), first = header && header.firstElementChild;
             if (!first) return;
             // V101.64: on an open card the download tile sits in a column under the 🔗 share button; a collapsed card
             // (no share button) keeps the cover ribbon.
-            const share = header.querySelector(':scope > button[onclick*="qzShareLink"]');
-            if (share) {
-                const side = document.createElement('span');
-                side.className = 'quiz-side';
-                share.replaceWith(side); side.append(share);
+            const side = quizSideColumn(card);
+            if (side) {
                 side.insertAdjacentHTML('beforeend', html);
                 return;
             }
