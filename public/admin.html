@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.366)</title>
+    <title>Nika Admin (V102.367)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -23810,15 +23810,12 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 </div>`;
             }
 
-            if (data.improved) {
-                const improvedHtml = (originalText && String(originalText).trim().length > 0)
-                    ? renderWordDiff(originalText, data.improved)
-                    : escapeHtml(data.improved);
-                html += `<div style="margin-bottom:8px;">
-                    <div style="font-size:0.7em; font-weight:900; color:#15803d; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:5px;">✏ Improved sample ตัวอย่างประโยคที่ดีขึ้น</div>
-                    <div style="font-size:0.82em; color:#14532d; background:#f0fdf4; border:1px solid #bbf7d0; padding:9px 11px; border-radius:10px; line-height:1.6;">${improvedHtml}</div>
-                </div>`;
-            }
+            // V102.367 (owner, PR 2): the improved sample is a folded plain sentence at the END — the word-level diff split Thai words and read
+            // badly, and it repeated what "Why these changes" + the edited preview already show. Those two carry the edit now.
+            const improvedFold = data.improved ? `<details class="rr-improved" style="margin-top:8px;">
+                    <summary style="font-size:0.74em; font-weight:800; color:#15803d; cursor:pointer;">✏ Edited sample ตัวอย่างที่แก้แล้ว</summary>
+                    <div style="font-size:0.82em; color:#14532d; background:#f0fdf4; border:1px solid #bbf7d0; padding:9px 11px; border-radius:10px; line-height:1.6; margin-top:5px;">${escapeHtml(data.improved)}</div>
+                </details>` : '';
 
             const cleanChanges = (data.changes || []).filter(c => c && qfpNormalizeTopic(c.from) && qfpNormalizeTopic(c.to) && qfpNormalizeTopic(c.reason));
 
@@ -23831,13 +23828,13 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 if (!window._grammarChangesByLog) window._grammarChangesByLog = {};
                 window._grammarChangesByLog[logIdNow] = cleanChanges;
             }
-            if (logIdNow && cleanChanges.length > 0) {
-                html += renderGrammarSandboxPanel(logIdNow, originalText, cleanChanges);
-            }
-
             if (cleanChanges.length > 0) {
+                // V102.367: "Why these changes" is the main view; until something is applied, Apply all sits on its heading (the preview panel is not drawn yet)
+                const sb0 = logIdNow ? getGrammarSandbox(logIdNow, originalText) : null;
+                const applied0 = sb0 ? Object.values(sb0.applied).filter(Boolean).length : 0;
+                const applyAllHead = logIdNow && applied0 === 0 ? `<button type="button" onclick="grammarApplyAll()" title="Apply every change — the edited preview appears below" style="background:#0ea5e9; color:white; border:0; padding:3px 9px; border-radius:8px; font-size:0.72em; font-weight:800; cursor:pointer;">Apply all</button>` : '';
                 html += `<div>
-                    <div style="font-size:0.7em; font-weight:900; color:#0e7490; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:5px;">📚 Why these changes ทำไมถึงปรับ</div>
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:5px;"><div style="font-size:0.7em; font-weight:900; color:#0e7490; text-transform:uppercase; letter-spacing:0.05em;">📚 Why these changes ทำไมถึงปรับ</div>${applyAllHead}</div>
                     ${cleanChanges.map((c, idx) => {
                         const sandbox = logIdNow ? getGrammarSandbox(logIdNow, originalText) : null;
                         const applied = sandbox && sandbox.applied[idx];
@@ -23858,6 +23855,10 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                     }).join('')}
                 </div>`;
             }
+
+            // V102.367: the edited preview only once a change is applied (renderGrammarSandboxPanel returns '' before that); the folded sample last
+            if (logIdNow && cleanChanges.length > 0) html += renderGrammarSandboxPanel(logIdNow, originalText, cleanChanges);
+            html += improvedFold;
 
             content.innerHTML = html || `<div style="font-size:0.82em; color:#15803d;">✅ Writing looks good — no issues to fix การเขียนดี ไม่พบจุดที่ต้องแก้ไข</div>`;
             card.style.display = '';
@@ -23882,6 +23883,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const total = cleanChanges.length;
             const appliedCount = Object.values(sandbox.applied).filter(Boolean).length;
             const isEmpty = appliedCount === 0;
+            if (isEmpty) return '';   // V102.367: nothing applied yet → no panel (Apply all lives on the "Why these changes" heading until then)
             const previewBody = isEmpty
                 ? `<div style="font-size:0.82em; color:#64748b; font-style:italic;">Click <b>Apply</b> on individual changes below to build a polished version here. Original learner content is not modified.</div>`
                 : `<div style="font-size:0.85em; color:#1e293b; line-height:1.6;">${renderWordDiff(sandbox.original, sandbox.text)}</div>`;
