@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.196)</title>
+    <title>Internship Portfolio (V101.197)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.171">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -5468,6 +5468,8 @@
                     </div>
                 </div>
             </div>
+            <!-- V101.197: 📰 the articles about this disease (articles.js forDisease), painted by dxPaintArticles() -->
+            <div id="dx-detail-articles" class="lang-no-toggle" hidden style="margin:10px 16px 0; padding:10px 12px; border:1px solid #c7d2fe; background:#eef2ff; border-radius:14px;"></div>
             <div id="dx-detail-body" class="dc-detail-body lang-no-toggle">
                 <!-- Sections injected by dxRenderDetail() -->
             </div>
@@ -18600,6 +18602,18 @@
             if (list) list.scrollTop = 0;
         }
 
+        // V101.197 (owner's pick 2): "📰 Articles about this" at the top of the entry — the articles drafted from it or linked to it that this
+        // intern can see; ✓ read / new; a tap opens the article sheet (closing the sheet counts as read, like any article)
+        function dxPaintArticles(diseaseId) {
+            const box = document.getElementById('dx-detail-articles');
+            if (!box) return;
+            const list = (window.internArticles && typeof internArticles.forDisease === 'function') ? internArticles.forDisease(diseaseId) : [];
+            box.hidden = !list.length;
+            if (!list.length) { box.innerHTML = ''; return; }
+            const btn = 'type="button" style="width:auto; min-height:0; margin:0; display:inline-flex; align-items:center; gap:6px; font:600 12.5px/1 Kanit, sans-serif; padding:8px 12px; border-radius:999px; border:1px solid #c7d2fe; background:#fff; color:#3730a3; cursor:pointer;"';
+            box.innerHTML = '<div style="font-weight:800; color:#3730a3; font-size:0.82em; margin-bottom:8px;">📰 บทความเกี่ยวกับโรคนี้ · Articles about this</div><div style="display:flex; flex-wrap:wrap; gap:6px;">'
+                + list.map(a => `<button class="dx-art" ${btn} data-id="${escapeHtml(a.id)}" onclick="internArticles.openArticle(this.dataset.id)">📰 ${escapeHtml(a.title)} <b style="color:${a.read ? '#166534' : '#4361ee'}">${a.read ? '✓ read' : 'new'}</b></button>`).join('') + '</div>';
+        }
         function dxOpenDetail(diseaseId) {
             const disease = dxState.codex.find(d => d._id === diseaseId);
             if (!disease) { console.warn('[disease-codex intern] detail: not found', diseaseId); return; }
@@ -18800,6 +18814,7 @@
             dxRenderLangChip(eff); // V101.03: 🌐 chip in the header row (was a 6-flag bar at the top of the body)
             const body = document.getElementById('dx-detail-body');
             if (!body) return;
+            dxPaintArticles(disease._id || disease.id);   // V101.197
             const sections = [
                 { key: 'epi',  title: '📈 Epidemiology', open: false, fields: [['Epidemiology', eff.epidemiology]] },
                 { key: 'etio', title: '🧬 Etiology & Patho', open: false, fields: [['Etiology', eff.etiology], ['Pathophysiology', eff.pathophysiology]] },
@@ -26883,7 +26898,7 @@ async function archiveDoneCard(cardId) {
 <script src="history-review.js?v=V99.81"></script>
 <script src="daily-canvas.js?v=V101.171"></script>
 <script src="intern-guide.js?v=V101.136" defer></script>
-<script src="articles.js?v=V101.196" defer></script>
+<script src="articles.js?v=V101.197" defer></script>
 <script src="cafe-content.js?v=V101.140" defer></script>
 <script src="history-lean.js?v=V101.189"></script><script src="history-compact.js?v=V101.189"></script><script src="delete-requests.js?v=V101.114"></script>
 </body>
