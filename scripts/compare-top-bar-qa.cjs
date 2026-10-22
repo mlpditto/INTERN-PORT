@@ -49,7 +49,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         const chipText = r.l3Chips.map(c => c.t);
         assert.ok(chipText.some(t => t === '✍️') && chipText.some(t => t === '🔢') && chipText.some(t => t === '🎯'), 'status chips are icons: ' + JSON.stringify(chipText));
         assert.ok(r.l3Chips.find(c => c.t === '🎯').title.startsWith('Logical fix'), 'icon chip keeps its meaning in the tooltip');
-        assert.ok(chipText.some(t => /^✦ Sol 6$/.test(t)), 'model chip is short ("Sol 6"): ' + JSON.stringify(chipText));
+        assert.ok(chipText.some(t => /^✦ Sol 6\.1$/.test(t)), 'model chip is short ("Sol 6.1"): ' + JSON.stringify(chipText));
         const dup = r.l3Chips.filter(c => /^⚠ Q\d+$/.test(c.t)); assert.ok(dup.length >= 1 && dup.every(c => /\d+%/.test(c.title)), '⚠ Qn chips carry the % in the tooltip: ' + JSON.stringify(r.l3Chips));
         assert.ok(!/Text Reworded|Options Balanced|Logical Fix|GPT 6|ซ้ำ|Add New|Apply &/.test(r.header), 'the long words are gone from the header: ' + r.header);
         assert.equal(r.addTxt, '➕'); assert.ok(!/[✅✓✔]/.test(r.header), 'no check marks anywhere in the header');
