@@ -75,7 +75,7 @@ const { chromium } = require('playwright');
         await page.locator('#curate-models .audit-provider[data-provider="Claude"]').click();
         await page.locator('[data-model="claude-haiku-5-5"]').click();
         // V101.94: the header pill is gone; #curate-model is the short name on the folded-rail chip, full name in its aria-label.
-        assert.match(await page.locator('#curate-model').textContent(), /^Haiku 4\.5$/);
+        assert.match(await page.locator('#curate-model').textContent(), /^Haiku 5\.5$/);
         assert.match(await page.locator('#curate-model-chip').getAttribute('aria-label'), /Claude Haiku/);
         // − / + stepper (no native spinner): clamps to 1..total and marks the proposal stale like typing does.
         await page.locator('#curate-target').fill('13');

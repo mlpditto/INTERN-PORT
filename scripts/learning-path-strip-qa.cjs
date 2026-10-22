@@ -43,7 +43,7 @@ for (const id of ['lp-gen-btn', 'lp-path-toggle-btn', 'lp-path-subtitle', 'lp-pa
         assert.deepEqual(await p.locator('#lp-providers .audit-provider').evaluateAll(ns => ns.map(n => n.getAttribute('aria-label'))), ['Gemini', 'GPT', 'Claude', 'Qwen', 'DeepSeek', 'Muse', 'Grok', 'Ollama']);
         assert.equal(await p.locator('#lp-providers .audit-provider[data-provider="Ollama"] .text-ai-logo').evaluate(n => getComputedStyle(n).backgroundImage.includes('ollama-white.svg')), true, 'Ollama tab is a logo');
         assert.equal(await p.locator('#lp-providers .audit-provider[aria-pressed="true"]').getAttribute('data-provider'), 'GPT');
-        assert.deepEqual(await visibleChips(p), ['Luna 6', 'Terra 5.6', 'Sol 6', 'Astra 6'], 'only the picked provider\'s chips');
+        assert.deepEqual(await visibleChips(p), ['Luna 6', 'Terra 5.6', 'Sol 6.1', 'Astra 6'], 'only the picked provider\'s chips');
         const box = await p.evaluate(() => { const r = s => document.querySelector(s).getBoundingClientRect(); return { strip: r('#lp-path-strip').height, title: r('.lp-strip-title'), tabs: r('#lp-providers'), act: r('.lp-strip-actions'), gen: r('#lp-gen-btn') }; });
         assert.ok(box.strip < 75, 'one row, strip is ' + box.strip + ' px (was ~140+ with two chip rows)');
         assert.ok(Math.abs((box.title.top + box.title.height / 2) - (box.act.top + box.act.height / 2)) < 12, 'title and actions share the row');
@@ -65,7 +65,7 @@ for (const id of ['lp-gen-btn', 'lp-path-toggle-btn', 'lp-path-subtitle', 'lp-pa
         await p.locator('#lp-providers .audit-provider[data-provider="Claude"]').click();
         await p.locator('#lp-model-row .text-ai-chips > button:not([hidden])', { hasText: 'Sonnet 5.5' }).click();
         assert.equal(await p.evaluate(() => resolveTrialTextAIModel(document.getElementById('lp-ai-model').value)), await p.evaluate(() => TEXT_AI_MODELS.find(m => /Sonnet 5.5/.test(m.label)).id));
-        assert.equal(await p.evaluate(() => document.querySelectorAll('#lp-model-row .text-ai-chips > button').length), 16 + 2, '16 catalogue chips (V102.268: + Muse Spark Open; V102.242: + Gemma 4 26B A4B) + Grok + Ollama trial chips');
+        assert.equal(await p.evaluate(() => document.querySelectorAll('#lp-model-row .text-ai-chips > button').length), 17 + 2, '17 catalogue chips (V102.365: + Gemini 4 Argon; V102.268: + Muse Spark Open; V102.242: + Gemma 4 26B A4B) + Grok + Ollama trial chips');
         assert.equal(await p.evaluate(() => localStorage.getItem('ai_lp_trial_model')), null, 'a catalogue pick clears the trial pick');
         await p.locator('#lp-providers .audit-provider[data-provider="Ollama"]').click();
         await p.locator('#lp-model-row .text-ai-chips > button:not([hidden])').click();
