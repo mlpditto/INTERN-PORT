@@ -142,6 +142,14 @@ const D = 864e5, BKK = 7 * 3600e3;
       if (row) {
         row.click(); await wait(50);
         out.histRead = [row.getAttribute('aria-expanded'), row.querySelector('.hl-pill').textContent, writes[writes.length - 1][2].articleSeen.a1.act, row.querySelector('.art-md').innerHTML === window.renderMd(docs.a1.body.en), row.querySelectorAll('.art-link').length];
+        // V101.193: EN / TH chips in the row (a1 has en + th); a tap swaps the body in place — the row stays open, nothing is written
+        const chips = () => [...row.querySelectorAll('.art-hist .lng button')].map(b => b.textContent + ':' + b.getAttribute('aria-pressed'));
+        const wBefore = writes.length;
+        out.histLng = chips();
+        row.querySelectorAll('.art-hist .lng button')[1].click(); await wait(20);
+        out.histLngTh = [chips().join(' '), row.querySelector('.art-md').innerHTML === window.renderMd(docs.a1.body.th), row.getAttribute('aria-expanded'), writes.length - wBefore];
+        row.querySelectorAll('.art-hist .lng button')[0].click(); await wait(20);
+        out.histLngBack = [chips().join(' '), row.querySelector('.art-md').innerHTML === window.renderMd(docs.a1.body.en)];
         internArticles.onUserDoc(); await wait(50);
         out.stillOpen = document.querySelector('[data-delete-type="article"]').getAttribute('aria-expanded');
         row.querySelector('.art-link').click(); out.histQuiz = spy.deep.slice();
@@ -169,6 +177,9 @@ const D = 864e5, BKK = 7 * 3600e3;
     assert.ok(r.hist, 'the article is a History row');
     assert.deepEqual(r.hist, ['3 inhaler mistakes we see every week', '👁 Closed', false, true], 'History row: title, 👁 Closed, no 🗑 menu, a 📰 chip');
     assert.deepEqual(r.histRead, ['true', '✓ Read', 'hist', true, 2], 'opening the row reads it in place (pill → ✓ Read, act hist, body + links)');
+    assert.deepEqual(r.histLng, ['EN:true', 'TH:false'], 'V101.193: the row carries the EN / TH chips (a1 has no ko), EN on');
+    assert.deepEqual(r.histLngTh, ['EN:false TH:true', true, 'true', 0], 'TH tap: Thai body in place, row still open, no write');
+    assert.deepEqual(r.histLngBack, ['EN:true TH:false', true], 'EN tap: back to the English body');
     assert.equal(r.stillOpen, 'true', 'the next users snapshot does not collapse the open row');
     assert.deepEqual(r.histQuiz, ['q1'], 'the quiz link works from History too');
     assert.deepEqual(r.writeTargets, ['users/U1:true'], 'the only write target is the intern’s own users doc, always merge');
