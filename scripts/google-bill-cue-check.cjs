@@ -12,7 +12,7 @@ const assert = require('node:assert/strict'), { chromium } = require('playwright
         document.getElementById('rail').innerHTML = textAIChipsHtml('', 'gpt-6-luna', '');
         return [...document.querySelectorAll('#rail button[data-bill="google"]')].map(b => b.dataset.value);
     });
-    assert.deepEqual(billed, ['as/gemini-3.5-flash-lite', 'gemini-3.8-flash']);
+    assert.deepEqual(billed, ['as/gemini-3.5-flash-lite', 'gemini-3.8-flash', 'as/gemini-4-argon']);   // V102.365: + Argon (AI Studio, Google-billed)
     assert.equal(await page.evaluate(() => isGoogleBilledModel('or/google/gemini-3.1-flash-image-preview')), false);
     // V101.59: the spark names the owner (no "Gemini" in the chip text), the Thai tooltip explains the bar,
     // and the rail has no legend line.

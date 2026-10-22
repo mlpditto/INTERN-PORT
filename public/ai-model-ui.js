@@ -6,7 +6,7 @@
         { id: 'as/gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', short: 'Lite 3.5', hint: 'Gemini รุ่นประหยัด สำหรับงานสั้น' },
         { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', short: 'Flash 3.8', hint: 'Gemini สำหรับวิเคราะห์และสรุปข้อมูล' },
         // V102.365: Gemini 4 Argon (GA 2026-10-13) via AI Studio — intro $2/$10 per MTok to 2026-11-30, then $4/$20; the proxy sends thinkingLevel low.
-        { id: 'as/gemini-4-argon', label: 'Gemini 4 Argon', short: 'Argon 4', hint: 'Gemini รุ่นใหญ่ล่าสุด สำหรับงานวิเคราะห์ซับซ้อน (ราคาแนะนำตัวถึง 30 พ.ย.)' },
+        { id: 'as/gemini-4-argon', label: 'Gemini 4 Argon', short: 'Argon 4', hint: 'Gemini รุ่นใหญ่ล่าสุด สำหรับงานวิเคราะห์ซับซ้อน (ราคาแนะนำตัวถึง 30 พ.ย.) · 최신 대형 Gemini, 복잡한 분석용' },
         // V102.242: Gemma 4 26B A4B (Google open weights, MoE with 4B active) via OpenRouter — grouped under the Gemini tab (the tab = the first word of `label`),
         // billed by OpenRouter (isGoogleBilledModel is false for or/google/). Phase 0 probe 2026-10-15: Thai from an image exact, JSON + Thai quiz JSON + Thai translation pass, ~4 s, ~$0.00005 per quiz item.
         { id: 'or/google/gemma-4-26b-a4b-it', label: 'Gemini Gemma 4 26B A4B', short: 'Gemma 4 26B', hint: 'Gemma 4 ของ Google เร็วและประหยัดมาก อ่านภาษาไทยจากรูปได้ ผ่าน OpenRouter 구글 Gemma 4, 매우 빠르고 저렴, OpenRouter 경유' },
