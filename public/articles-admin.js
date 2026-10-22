@@ -18,6 +18,8 @@
     var MAX_BODY = 2000, MAX_TITLE = 90, BKK = 7 * 3600e3;
     var S = { list: [], loaded: false, loading: false, err: '', filter: 'all', cur: null, lang: 'en', saving: false, del: false, pick: '', q: '', codex: null, base: '', savedAt: 0, open: {}, who: false, whoF: 'all', model: '', modelOpen: false, aiBusy: false, aiNote: '' };
     var DONE = ['ok', 'quiz', 'codex', 'hist'];   // what counts as read (articles.js); 'x' = closed without reading
+    // V102.362: 🌐 Translate all — one click fills every missing TH / KO from the EN version and saves, one at a time
+    var TR = { busy: false, stop: false, prog: '' };
     var esc = function (v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
     var msOf = function (t) { return t == null ? null : typeof t === 'number' ? t : t.toMillis ? t.toMillis() : t instanceof Date ? t.getTime() : Date.parse(t) || null; };
 
@@ -209,7 +211,8 @@
             '.art-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 34px 12px 0}.art-h h2{margin:0;font-size:1.25em}' +
             '.art-rail{display:inline-flex;gap:3px;background:#f1f5f9;border-radius:999px;padding:3px;flex-wrap:wrap}.art-rail button{min-height:0;margin:0;width:auto;border:0;background:transparent;padding:5px 11px;border-radius:999px;font-size:12.5px;font-weight:700;color:#475569;cursor:pointer}' +
             '.art-rail button b{opacity:.65;margin-left:4px}.art-rail button.on{background:#4361ee;color:#fff}' +
-            '.art-new{margin:0 0 0 auto!important;width:auto!important;min-height:0!important;background:#4361ee;color:#fff;border:0;border-radius:12px;padding:8px 14px;font-weight:800;cursor:pointer}' +
+            '.art-new{margin:0 0 0 6px!important;width:auto!important;min-height:0!important;background:#4361ee;color:#fff;border:0;border-radius:12px;padding:8px 14px;font-weight:800;cursor:pointer}' +
+            '.art-tr-all{margin:0 0 0 auto!important;width:auto!important;min-height:0!important;background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;border-radius:12px;padding:8px 12px;font-weight:800;cursor:pointer;white-space:nowrap}.art-tr-all:disabled{opacity:.6;cursor:not-allowed}.art-tr-all.busy{background:#fef3c7;color:#92400e;border-color:#fde68a}' +
             '.art-g{display:grid;grid-template-columns:300px minmax(0,1fr) 290px;gap:14px;align-items:start}@media(max-width:1100px){.art-g{grid-template-columns:260px minmax(0,1fr)}.art-g>.art-pv{display:none}}@media(max-width:760px){.art-g{grid-template-columns:1fr}}' +
             '.art-list{display:flex;flex-direction:column;gap:6px;max-height:70vh;overflow:auto}.art-row{all:unset;box-sizing:border-box;cursor:pointer;border:1px solid #e2e8f0;border-radius:14px;padding:9px 10px;display:grid;grid-template-columns:36px 1fr;gap:8px;background:#fff}' +
             '.art-row:hover{border-color:#c7d2fe}.art-row.sel{border-color:#4361ee;box-shadow:0 0 0 2px rgba(67,97,238,.15);background:#f8faff}.art-row.ended{opacity:.6}' +
@@ -343,6 +346,27 @@
     function modelName(id) { var i = window.textAIModelInfo ? window.textAIModelInfo(id) : null; return (i && (i.short || i.label)) || id; }
     function modelRail() { try { return window.providerModelRailHtml('art-model-pick', modelId(), 'Articles.model(this.dataset.value)'); } catch (e) { return ''; } }
     function aiMode(a) { var L = S.lang; return L !== 'en' && String((a.body || {}).en || '').trim() && !String((a.body || {})[L] || '').trim() ? 'translate' : 'draft'; }
+    var NAMES = { en: 'English', th: 'Thai', ko: 'Korean' };
+    function trPrompt(a, L) {
+        return 'Translate this short article for pharmacy interns into ' + NAMES[L] + '. Keep the markdown, emoji, line breaks and drug names (keep drug names in English). Reply with the translated title on the first line, then a line with only ---, then the translated article. Nothing else.\n\n' + String(a.title.en || '').trim() + '\n---\n' + String(a.body.en || '').trim();
+    }
+    function trParse(txt) { var m = txt.match(/^([^\n]*)\n\s*-{3,}\s*\n([\s\S]*)$/); return m ? { title: m[1].replace(/^#+\s*/, '').trim(), body: m[2].trim() } : { title: '', body: txt }; }
+    function aiText(resp) { return String(resp && typeof resp === 'object' ? (resp.text || resp.outputText || resp.response || '') : (resp || '')).replace(/^```[a-z]*\n?/i, '').replace(/\n?```\s*$/, '').trim(); }
+    // every (article, language) still missing: EN present, TH / KO empty — only saved articles (an unsaved ＋ New has no id)
+    function trJobs() {
+        var jobs = [];
+        S.list.forEach(function (a) {
+            if (!a.id || !String((a.body || {}).en || '').trim()) return;
+            ['th', 'ko'].forEach(function (L) { if (!String((a.body || {})[L] || '').trim()) jobs.push({ a: a, L: L }); });
+        });
+        return jobs;
+    }
+    function trAllHtml() {
+        var n = trJobs().length;
+        if (TR.busy) return '<button type="button" class="art-tr-all busy" onclick="Articles.translateAll()" title="Translating — press to stop after the current one">🌐 ' + esc(TR.prog) + ' · stop</button>';
+        if (!S.list.length) return '';
+        return '<button type="button" class="art-tr-all" onclick="Articles.translateAll()"' + (n ? '' : ' disabled') + ' title="' + (n ? 'Translate the ' + n + ' missing TH / KO version(s) from EN with ' + esc(modelName(modelId())) + ' and save them — one at a time' : 'Every article already has EN, TH and KO') + '">🌐 Translate all' + (n ? ' <b>' + n + '</b>' : '') + '</button>';
+    }
     function aiHtml(a) {
         var tr = aiMode(a) === 'translate';
         return '<span class="art-ai"><button type="button" class="go" onclick="Articles.ai()"' + (S.aiBusy ? ' disabled' : '') + ' title="' + (tr ? 'Translate the EN version into ' + S.lang.toUpperCase() + ' (fills the editor — check, then save)' : 'Draft the body from the title in ' + S.lang.toUpperCase() + ' (fills the editor — check, then save)') + '">' + (S.aiBusy ? '✨ …' : tr ? '✨ From EN' : '✨ Draft') + '</button>' +
@@ -368,7 +392,7 @@
                 '<div class="art-ln"><span class="art-ml">Audience</span>' + audienceHtml(a) + '</div>', !a.id),
             sec('links', 'Links', linksSummary(a),
                 '<div class="art-ln">' + (a.links || []).map(function (l, i) { return '<span class="art-lk ' + l.kind + '">' + (l.kind === 'quiz' ? '🧪 ' : '💊 ') + esc(l.label) + '<button type="button" aria-label="Remove link" onclick="Articles.dropLink(' + i + ')">✕</button></span>'; }).join('') +
-                chip('＋ Quiz', S.pick === 'quiz', 'Articles.openPick(\'quiz\')', '', ' art-add') + chip('＋ Codex', S.pick === 'codex', 'Articles.openPick(\'codex\')', '', ' art-add') + '</div>' + pickerHtml(), (a.links || []).length > 0 || !!S.pick),
+                chip('＋ Quiz', S.pick === 'quiz', 'Articles.openPick(\'quiz\')', '', ' art-add') + chip('＋ Codex', S.pick === 'codex', 'Articles.openPick(\'codex\')', '', ' art-add') + chip('🩺 Disease Codex', false, 'Articles.toCodex()', ' title="Open the Disease Codex with this article\'s topic in 🤖 AI Auto-Draft (save the article first)"', ' art-add') + '</div>' + pickerHtml(), (a.links || []).length > 0 || !!S.pick),
             S.err ? '<div class="art-err" role="alert">⚠️ ' + esc(S.err) + '</div>' : '',
             '<div class="art-btns"><button type="button" class="del' + (S.del ? ' arm' : '') + '" onclick="Articles.remove()" title="' + (a.id ? 'Delete (tap twice)' : 'Discard') + '" aria-label="Delete">' + (S.del ? 'Delete?' : '🗑') + '</button>' +
             (a.status === 'scheduled' ? '<button type="button" onclick="Articles.save(false)"' + (S.saving ? ' disabled' : '') + '>↩ Back to draft</button>' : '<button type="button" onclick="Articles.save(false)"' + (S.saving ? ' disabled' : '') + '>Save draft</button>') +
@@ -428,7 +452,7 @@
         var list = sorted(now);
         var head = '<div class="art-h"><h2>📰 Articles</h2><div class="art-rail" role="group" aria-label="Filter by status">' + FILTERS.map(function (f) {
             return '<button type="button" class="' + (S.filter === f[0] ? 'on' : '') + '" aria-pressed="' + (S.filter === f[0]) + '" data-filter="' + f[0] + '" onclick="Articles.filter(\'' + f[0] + '\')">' + f[1] + '<b>' + (counts[f[0]] || 0) + '</b></button>';
-        }).join('') + '</div><button type="button" class="art-new" onclick="Articles.edit(null)">＋ New</button></div>';
+        }).join('') + '</div>' + trAllHtml() + '<button type="button" class="art-new" onclick="Articles.edit(null)">＋ New</button></div>';
         var left = '<div class="art-list">' + (S.loading && !S.loaded ? '<div class="art-empty">Loading…</div>' : list.length ? list.map(function (a) { return rowHtml(a, now); }).join('') : '<div class="art-empty">' + (S.list.length ? 'Nothing here.' : 'No articles yet — ＋ New') + '</div>') + '</div>';
         var mid = S.cur ? editorHtml(now) : '<div class="art-empty">' + (S.err && !S.loaded ? '⚠️ ' + esc(S.err) : 'Pick an article, or ＋ New.') + '</div>';
         host.innerHTML = head + '<div class="art-g">' + left + (S.cur && S.who ? whoHtml(S.cur) : mid + (S.cur ? previewHtml() : '<div class="art-pv"></div>')) + '</div>';
@@ -514,6 +538,49 @@
                 } else a.body[L] = txt;
                 S.aiNote = '✨ ' + modelName(model) + ' · ' + Math.max(1, Math.round((Date.now() - t0) / 1000)) + ' s — read it, then save';
             }).catch(function (e) { S.err = '✨ ' + ((e && e.message) || 'AI draft failed'); }).then(function () { S.aiBusy = false; render(); });
+        },
+        // 🌐 one click: every missing TH / KO from EN, saved straight into articles/{id} (title.<L> + body.<L>); a second click stops after the current one
+        translateAll: function () {
+            if (TR.busy) { TR.stop = true; render(); return Promise.resolve(); }
+            var jobs = trJobs(); if (!jobs.length) return Promise.resolve();
+            var arts = {}; jobs.forEach(function (j) { arts[j.a.id] = 1; });
+            var model = modelId();
+            if (!confirm('Translate ' + jobs.length + ' missing version(s) of ' + Object.keys(arts).length + ' article(s) into TH / KO with ' + modelName(model) + ' and save them?\n\nOne at a time — keep this window open. Press the button again to stop.')) return Promise.resolve();
+            if (typeof window.callUniversalAI !== 'function') { S.err = '🌐 AI is not available on this page.'; render(); return Promise.resolve(); }
+            TR.busy = true; TR.stop = false; var done = 0, failed = 0, i = 0;
+            var step = function () {
+                if (i >= jobs.length || TR.stop) return Promise.resolve();
+                var j = jobs[i], a = j.a, L = j.L; TR.prog = (i + 1) + '/' + jobs.length; render();
+                return Promise.resolve().then(function () { return window.callUniversalAI(model, trPrompt(a, L), false, null, '', { feature: 'article_draft' }); }).then(function (resp) {
+                    var t = trParse(aiText(resp)); if (!t.body) throw new Error('empty');
+                    var doc = {}; doc['title.' + L] = t.title || String(a.title.en || ''); doc['body.' + L] = t.body;
+                    doc.updatedAt = firebase.firestore.FieldValue.serverTimestamp(); doc.updatedBy = editorEmail();
+                    return db.collection('articles').doc(a.id).update(doc).then(function () {
+                        a.title[L] = doc['title.' + L]; a.body[L] = t.body;
+                        if (S.cur && S.cur.id === a.id) { S.cur.title[L] = a.title[L]; S.cur.body[L] = t.body; S.base = JSON.stringify(S.cur); }
+                        done++;
+                    });
+                }).catch(function () { failed++; }).then(function () { i++; return step(); });
+            };
+            return step().then(function () {
+                TR.busy = false; TR.stop = false; TR.prog = '';
+                var msg = '🌐 Translated ' + done + '/' + jobs.length + (failed ? ' (' + failed + ' failed)' : '') + (i < jobs.length ? ' — stopped' : '');
+                if (typeof showToast === 'function') showToast(msg); else S.err = msg;
+                render();
+            });
+        },
+        // 🩺 the article's topic goes to the Disease Codex: open it with the name in the 🤖 AI Auto-Draft row — the admin generates, verifies and saves there
+        toCodex: function () {
+            var a = S.cur; if (!a) return;
+            if (JSON.stringify(a) !== S.base) { S.err = '🩺 Save the article first, then open the Disease Codex.'; render(); return; }
+            if (typeof openDiseaseCodexAdmin !== 'function') { S.err = '🩺 The Disease Codex is not available on this page.'; render(); return; }
+            var name = String(a.title.en || a.title[S.lang] || '').replace(/[\p{Extended_Pictographic}\uFE0F]/gu, '').split(/[:–—(]/)[0].trim();
+            api.close(); openDiseaseCodexAdmin();
+            setTimeout(function () {
+                var row = document.getElementById('dxa-ai-input-row');
+                if (row && row.style.display === 'none' && typeof dxaAutoDraftToggle === 'function') dxaAutoDraftToggle();
+                var el = document.getElementById('dxa-ai-name'); if (el) { el.value = name; el.focus(); }
+            }, 150);
         },
         sec: function (k, open) { S.open[k] = open; },
         // ⚠️ "Move to TH": the text typed into one language slot goes to the slot it is written in
