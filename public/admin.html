@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.377)</title>
+    <title>Nika Admin (V102.378)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -366,6 +366,8 @@
         .reflective-rewrite-chip { border:1px solid rgba(203,213,225,0.85); background:rgba(255,255,255,0.62); color:#475569; padding:5px 11px; border-radius:999px; font-size:0.72em; font-weight:800; cursor:pointer; transition:transform 0.15s ease, background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease; display:inline-flex; align-items:center; gap:5px; }
         .reflective-rewrite-chip:hover:not(:disabled) { background:rgba(255,255,255,0.95); border-color:rgba(124,58,237,0.5); color:#5b21b6; transform:translateY(-1px); box-shadow:0 4px 10px rgba(124,58,237,0.14); }
         .reflective-rewrite-chip:disabled { opacity:0.4; cursor:not-allowed; }
+        .reflective-rewrite-chip.rr-has-q:disabled { opacity:1; color:#15803d; cursor:default; }   /* V102.378: the draft already ends with a question */
+        #reflectiveReviewModal #btn-ai-suggest .rr-suggest-lang { font-weight:900; margin-left:3px; opacity:0.9; }
         .reflective-rewrite-chip.loading { background:linear-gradient(135deg, rgba(237,233,254,0.95) 0%, rgba(221,214,254,0.85) 100%); border-color:rgba(124,58,237,0.6); color:#5b21b6; }
         /* --- [V91.43] Smart bonus suggestion banner --- */
         .reflective-bonus-suggestion { display:none; align-items:center; gap:6px; margin-top:8px; padding:7px 9px; border-radius:10px; background:linear-gradient(135deg, rgba(237,233,254,0.78) 0%, rgba(221,214,254,0.55) 100%); border:1px solid rgba(196,181,253,0.55); font-size:0.7em; color:#5b21b6; line-height:1.3; box-shadow:0 4px 10px rgba(124,58,237,0.08); }
@@ -22486,14 +22488,87 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
 
         // V92.15: TH/EN/KR segmented pills replace the language <select>. Hidden input keeps id "ai-lang-review"
         // so existing readers (getAISuggestion, applyReflectiveFocusLanguage caller) work unchanged.
-        window.selectReflectiveReviewLang = function(btn) {
+        window.selectReflectiveReviewLang = function(btn, opts) {
             if (!btn) return;
             const hiddenInput = document.getElementById('ai-lang-review');
+            const prev = hiddenInput ? hiddenInput.value : 'Thai';
             document.querySelectorAll('.reflective-review-lang-chip').forEach(chip => chip.classList.remove('active'));
             btn.classList.add('active');
             const value = btn.dataset.value || 'Thai';
             if (hiddenInput) hiddenInput.value = value;
             if (typeof applyReflectiveFocusLanguage === 'function') applyReflectiveFocusLanguage(value);
+            if (typeof rrPaintSuggestBtn === 'function') rrPaintSuggestBtn();
+            // V102.378 (owner's idea 1): a switch REWRITES the draft, not only the labels — silent = open / programmatic
+            if (!(opts && opts.silent) && value !== prev && typeof rrTranslateDraft === 'function') rrTranslateDraft(prev, value);
+        };
+
+        // V102.378 (owner's idea 1): the reply language follows the text — Thai / Korean / English by script, ties go to Thai
+        window.rrGuessReplyLang = function(text) {
+            const s = String(text || ''); let th = 0, ko = 0, la = 0;
+            for (let i = 0; i < s.length; i++) {
+                const c = s.charCodeAt(i);
+                if (c >= 0x0E00 && c <= 0x0E7F) th++;
+                else if ((c >= 0xAC00 && c <= 0xD7AF) || (c >= 0x1100 && c <= 0x11FF) || (c >= 0x3130 && c <= 0x318F)) ko++;
+                else if ((c >= 0x41 && c <= 0x5A) || (c >= 0x61 && c <= 0x7A)) la++;
+            }
+            if (!th && !ko && !la) return 'Thai';
+            return th >= ko && th >= la ? 'Thai' : ko >= la ? 'Korean' : 'English';
+        };
+        // set chip + hidden input + labels from code (no translation)
+        window.rrSetReplyLang = function(lang) {
+            const chip = document.querySelector('.reflective-review-lang-chip[data-value="' + lang + '"]') || document.querySelector('.reflective-review-lang-chip[data-value="Thai"]');
+            if (chip) selectReflectiveReviewLang(chip, { silent: true });
+        };
+        // the ✨ button names the language it will reply in
+        window.rrPaintSuggestBtn = function(btn) {
+            btn = btn || document.getElementById('btn-ai-suggest');
+            if (!btn || btn.disabled) return;
+            const lang = (document.getElementById('ai-lang-review') || {}).value || 'Thai';
+            const code = ({ Thai: 'TH', English: 'EN', Korean: 'KO' })[lang] || lang.slice(0, 2).toUpperCase();
+            btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> <span class="btn-text">AI Suggest</span> <b class="rr-suggest-lang">' + code + '</b>';
+            btn.title = 'AI Suggest — reply in ' + lang + ' (Ctrl/⌘ + /)';
+        };
+        // who wrote the current draft and in which language: AI paths note it, a keystroke in the editor clears byAI
+        window.rrNoteDraft = function(lang, byAI) { window._rrDraft = { lang: lang || '', byAI: !!byAI }; };
+        window.rrMarkDraftHandEdited = function() { window._rrDraft = { lang: (window._rrDraft || {}).lang || '', byAI: false }; };
+        // translate the existing draft into the newly picked language — at once when AI wrote it, after a confirm when the admin did
+        window.rrTranslateDraft = async function(from, to) {
+            const textarea = document.getElementById('reflective-review-comment');
+            const draft = textarea ? textarea.value.trim() : '';
+            if (!draft || draft.length < 5) { setReflectiveReviewStatus('Reply language: ' + to, 'success'); return; }
+            const d = window._rrDraft || {};
+            const src = d.lang || from;
+            if (!d.byAI && !confirm('Translate the current reply to ' + to + '?\n\nCancel keeps the text and only switches the language for the next AI Suggest.')) {
+                setReflectiveReviewStatus('Reply language: ' + to + ' · text unchanged', 'success'); return;
+            }
+            const modelSelect = document.getElementById('ai-model-review');
+            const modelName = modelSelect ? modelSelect.value : 'gpt-4o';
+            const chips = document.querySelectorAll('.reflective-review-lang-chip');
+            try {
+                chips.forEach(c => { c.disabled = true; });
+                setReflectiveReviewStatus('Translating ' + src + ' → ' + to + '…', 'success');
+                const prompt = `Translate this mentor reply to a learner's reflective log.
+
+Reply:
+"${draft}"
+
+Rules:
+- Output language MUST be: ${to}
+- Keep the meaning, the warmth and any question exactly; add nothing, drop nothing
+- Output only the translated reply. No explanation, no quotes, no preamble.`;
+                const result = await window.callUniversalAI(modelName, prompt, false, null, '', { feature: 'reflective_feedback' });
+                const cleaned = result && result.text ? result.text.trim().replace(/^["']+|["']+$/g, '') : '';
+                if (!cleaned) throw new Error('empty reply');
+                if (typeof setReflectiveQuillText === 'function') setReflectiveQuillText(cleaned); else if (textarea) textarea.value = cleaned;
+                rrNoteDraft(to, true);
+                setReflectiveReviewStatus('Translated ' + src + ' → ' + to, 'success');
+            } catch (err) {
+                console.error('Translate error:', err);
+                setReflectiveReviewStatus('Translate failed: ' + (err && err.message ? err.message : 'Unknown error') + ' · text unchanged', 'error');
+            } finally {
+                chips.forEach(c => { c.disabled = false; });
+                if (typeof updateReflectiveRewriteChipsState === 'function') updateReflectiveRewriteChipsState();
+            }
         };
 
         window.setReflectiveReviewStatus = function(message, tone) {
@@ -22661,19 +22736,55 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
         window.applyReflectiveRewriteChipsLanguage = function(lang) {
             const useThai = (lang === 'Thai' || lang === 'th' || lang === 'TH');
             document.querySelectorAll('#reflective-rewrite-chips .reflective-rewrite-chip').forEach(chip => {
+                if (chip.classList.contains('rr-has-q')) return;   // V102.378: painted by rrPaintQuestionChip
                 const label = useThai ? chip.dataset.th : chip.dataset.en;
                 const span = chip.querySelector('span');
                 if (label && span) span.textContent = label;
             });
+            if (typeof rrPaintQuestionChip === 'function') rrPaintQuestionChip(((document.getElementById('reflective-review-comment') || {}).value || ''));
         };
 
         window.updateReflectiveRewriteChipsState = function() {
             const textarea = document.getElementById('reflective-review-comment');
             const chips = document.querySelectorAll('#reflective-rewrite-chips .reflective-rewrite-chip');
-            const hasContent = textarea && textarea.value.trim().length >= 5;
+            const text = textarea ? textarea.value.trim() : '';
+            const hasContent = text.length >= 5;
             chips.forEach(c => {
                 if (!c.classList.contains('loading')) c.disabled = !hasContent;
             });
+            if (typeof rrPaintQuestionChip === 'function') rrPaintQuestionChip(text);
+        };
+
+        // V102.378 (owner's idea 6): a draft that already ends with a question — "?" or a Thai / Korean question ending
+        window.rrDraftEndsWithQuestion = function(text) {
+            const t = String(text || '').trim().replace(/[\s"'”’)\]\p{Extended_Pictographic}️]+$/u, '');
+            if (!t) return false;
+            if (/[?？]$/.test(t)) return true;
+            const clause = t.split(/[.!。\n]/).pop().trim();                       // the last sentence only
+            if (/(ไหม|มั้ย|หรือไม่|หรือเปล่า|หรือยัง)\s*(ครับ|คะ|ค่ะ|นะคะ|นะครับ)?$/.test(clause)) return true;
+            // a Thai question word anywhere in the last sentence + a question-form ending ("คะ", never the statement "ค่ะ")
+            if (!/ก็ได้|ก็ตาม|ไม่ว่า/.test(clause) && /(อะไร|ไหน|อย่างไร|ยังไง|ทำไม|เมื่อไร|เมื่อไหร่|กี่|ใคร|แค่ไหน|บ้าง)/.test(clause)
+                && /(อะไร|ไหน|อย่างไร|ยังไง|ทำไม|เมื่อไร|เมื่อไหร่|บ้าง|แค่ไหน|คะ|ครับ)$/.test(clause)) return true;
+            return /(까요|나요|습니까|ㄴ가요|을까|ㄹ까)$/.test(clause);
+        };
+        // "Add a question" ↔ "Has a question ✓" (disabled, green) — label in the reply language
+        window.rrPaintQuestionChip = function(text) {
+            const chip = document.querySelector('#reflective-rewrite-chips .reflective-rewrite-chip[data-intent="question"]');
+            if (!chip || chip.classList.contains('loading')) return;
+            const has = rrDraftEndsWithQuestion(text);
+            const thai = ((document.getElementById('ai-lang-review') || {}).value || 'Thai') === 'Thai';
+            const span = chip.querySelector('span'), ic = chip.querySelector('i');
+            chip.classList.toggle('rr-has-q', has);
+            if (has) {
+                chip.disabled = true;
+                if (span) span.textContent = thai ? 'มีคำถามแล้ว ✓' : 'Has a question ✓';
+                if (ic) ic.className = 'fa-solid fa-circle-check';
+                chip.title = 'The reply already ends with a question';
+            } else {
+                if (span) span.textContent = thai ? chip.dataset.th : chip.dataset.en;
+                if (ic) ic.className = 'fa-solid ' + (chip.dataset.icon || 'fa-circle-question');
+                chip.title = '';
+            }
         };
 
         // [V93.35] Quill rich-text editor for Reflective Review comment.
@@ -22727,7 +22838,8 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
                 console.warn('[V93.38] Quill image handler override failed:', e);
             }
             // Sync hidden textarea on every change so legacy .value reads keep working.
-            window.quillReflective.on('text-change', function() {
+            window.quillReflective.on('text-change', function(delta, oldDelta, source) {
+                if (source === 'user' && typeof rrMarkDraftHandEdited === 'function') rrMarkDraftHandEdited();   // V102.378
                 const textarea = document.getElementById('reflective-review-comment');
                 if (textarea) {
                     textarea.value = window.quillReflective.getText().trim();
@@ -23267,6 +23379,7 @@ Rules:
                     } else {
                         textarea.value = cleaned;
                     }
+                    if (typeof rrNoteDraft === 'function') rrNoteDraft(targetLang, true);   // V102.378
                     setReflectiveReviewStatus('✨ Rewritten — ' + intent, 'success');
                 }
             } catch (err) {
@@ -23305,7 +23418,7 @@ Rules:
 
                 let feedbackPrompt;
                 const baseTask = (existingDraft && existingDraft.length >= 3)
-                    ? `The admin wrote a draft feedback in Thai:\n"${existingDraft}"\n\nRefine and polish it into a warm, professional mentor reply (2-3 sentences max).`
+                    ? `The admin wrote a draft feedback:\n"${existingDraft}"\n\nRefine and polish it into a warm, professional mentor reply (2-3 sentences max).`
                     : `Write a short, warm mentor reply (2-3 sentences max) showing empathy and encouragement.`;
 
                 feedbackPrompt = `You are a kind expert Mentor reviewing a learner's reflective log.
@@ -23378,8 +23491,9 @@ Respond ONLY with valid JSON (no markdown, no code fences, no preamble):
                         if (typeof setReflectiveQuillText === 'function') setReflectiveQuillText(fb);
                         else textarea.value = fb;
                     }
+                    if (typeof rrNoteDraft === 'function') rrNoteDraft(targetLang, true);   // V102.378
                     setReflectiveReviewStatus(existingDraft ? `AI refined your draft in ${targetLang}.` : `AI suggestion ready in ${targetLang}.`, 'success');
-                    showToast(existingDraft ? "✨ AI refined your Thai draft → " + targetLang : "✨ AI suggested feedback!");
+                    showToast(existingDraft ? "✨ AI refined your draft → " + targetLang : "✨ AI suggested feedback!");
                     if (typeof updateReflectiveRewriteChipsState === 'function') updateReflectiveRewriteChipsState();
                 } else {
                     throw feedbackResult.reason;
@@ -23424,6 +23538,7 @@ Respond ONLY with valid JSON (no markdown, no code fences, no preamble):
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> <span class="btn-text">AI Suggest</span>';
+                if (typeof rrPaintSuggestBtn === 'function') rrPaintSuggestBtn(btn);   // V102.378: the language code comes back
             }
         };
 
@@ -68030,6 +68145,9 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 document.getElementById('reflective-review-comment').value = log.adminComment || "";
             }
             document.getElementById('reflective-review-raw-content').value = log.content || '';
+            // V102.378 (owner's idea 1): the reply language follows the text — the admin's own draft when there is one, else the intern's reflection
+            if (typeof rrSetReplyLang === 'function') rrSetReplyLang(rrGuessReplyLang((log.adminComment || '').trim() || log.content || ''));
+            if (typeof rrNoteDraft === 'function') rrNoteDraft((log.adminComment || '').trim() ? rrGuessReplyLang(log.adminComment) : '', false);
             const grammarCard = document.getElementById('reflective-grammar-card');
             if (grammarCard) { grammarCard.style.display = 'none'; document.getElementById('reflective-grammar-content').innerHTML = ''; document.getElementById('reflective-grammar-score').textContent = ''; }
             setReflectiveReviewStatus('');
