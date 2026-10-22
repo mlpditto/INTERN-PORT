@@ -6,9 +6,27 @@
 // V102.354 · 🔊 Thai voice: Gemini TTS (the proxy's cloud_tts — Google Cloud Text-to-Speech, th-TH) reads the same Thai
 // caption; it replaces the clip's own audio in the app (in sync with the player) and in the export. A voice longer than
 // the clip is sped up to ×1.35 at most (pitch kept); the caption cues follow the voice's length.
+// V102.366 · three Gemini voices to pick from (remembered), drug-name readings used by the voice only (✏️ "Warfarin=วอร์ฟาริน"),
+// an ≈ seconds estimate for a caption (≈ 10 characters a second at Kore's pace), and the export label no longer sticks on ⏳.
 (function () {
     'use strict';
     const CC_KEY = 'glc_cc';
+    const VOICE_KEY = 'glc_voice';   // V102.366: the picked Gemini voice
+    const VOICES = [{ id: 'Kore', th: 'Kore · เล่าเรื่อง' }, { id: 'Charon', th: 'Charon · สงบ' }, { id: 'Achird', th: 'Achird · เป็นกันเอง' }];
+    function voiceName() { try { const v = localStorage.getItem(VOICE_KEY); return VOICES.some(x => x.id === v) ? v : VOICES[0].id; } catch (e) { return VOICES[0].id; } }
+    function setVoiceName(v) { try { localStorage.setItem(VOICE_KEY, v); } catch (e) {} }
+    // "Warfarin=วอร์ฟาริน, INR=ไอเอ็นอาร์" → the text the voice reads; the caption on screen keeps the English names
+    function speechText(caption, reading) {
+        let t = String(caption || '');
+        String(reading || '').split(/[,\n]/).forEach(pair => {
+            const m = pair.split(/[=:：]/); if (m.length < 2) return;
+            const en = m[0].trim(), th = m.slice(1).join('=').trim(); if (!en || !th) return;
+            t = t.replace(new RegExp(en.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), th);
+        });
+        return t;
+    }
+    // ≈ seconds the Thai voice takes: about 10.5 characters a second (Kore: 7.8 s for 84 characters, 9.2 s for 95)
+    const estimate = text => Math.round(String(text || '').replace(/\s+/g, '').length / 10.5 * 10) / 10;
     const MAX_CHARS = 46;            // ≈ two lines on a 9:16 frame (the band shrinks its font if not)
     const FONT = 'Sarabun, "Noto Sans Thai", "Leelawadee UI", Tahoma, sans-serif';
     let fontLink = null;
@@ -157,7 +175,9 @@
         const parts = [];
         rec.ondataavailable = e => { if (e.data && e.data.size) parts.push(e.data); };
         const stopped = new Promise(r => { rec.onstop = r; });
+        let done = false;   // V102.366: a frame callback can land after `ended` — it must not repaint the button
         const step = () => {
+            if (done) return;
             drawFrame(g, v, W, H, cueAt(list, v.currentTime));
             if (onProgress) onProgress(v.currentTime, v.duration || 0);
             if (!v.ended) (v.requestVideoFrameCallback ? v.requestVideoFrameCallback(step) : requestAnimationFrame(step));
@@ -168,6 +188,7 @@
         if (va) va.play().catch(() => {});
         step();
         await new Promise(r => { v.onended = r; });
+        done = true;
         drawFrame(g, v, W, H, cueAt(list, (v.duration || 0) - 0.01));
         await new Promise(r => setTimeout(r, 120));
         rec.stop();
@@ -186,18 +207,18 @@
     }
 
     // ---- 🔊 Thai voice: Gemini TTS through the proxy's cloud_tts (server-side, admin-only), cached per caption text
-    const VOICE = { model: 'gemini-2.5-flash-tts', name: 'Kore', prompt: 'อ่านด้วยน้ำเสียงอบอุ่น เป็นกันเอง ชัดเจน แบบเภสัชกรอธิบายผู้ป่วย จังหวะกระชับ' };
+    const VOICE = { model: 'gemini-2.5-flash-tts', name: 'Kore', prompt: 'อ่านด้วยน้ำเสียงอบอุ่น เป็นกันเอง ชัดเจน แบบเภสัชกรอธิบายผู้ป่วย จังหวะกระชับ ชื่อยาและคำภาษาอังกฤษให้อ่านทับศัพท์เป็นเสียงไทยแบบที่เภสัชกรไทยพูด เช่น Warfarin อ่านว่า วอร์ฟาริน' };   // V102.366: + how to read English drug names
     const MAX_RATE = 1.35;
     const voiceCache = new Map();
-    function makeVoice(text) {
-        const key = String(text || '').trim();
-        if (!key) return Promise.reject(new Error('No Thai caption to read'));
+    function makeVoice(text, voice) {
+        const name = voice || voiceName(), spoken = String(text || '').trim(), key = name + '|' + spoken;   // V102.366: one cache entry per voice × text
+        if (!spoken) return Promise.reject(new Error('No Thai caption to read'));
         if (voiceCache.has(key)) return voiceCache.get(key);
         const p = (async () => {
             if (typeof window.callTtsProxy !== 'function') throw new Error('Thai voice needs the admin AI proxy');
             const r = await window.callTtsProxy({ provider: 'cloud_tts', model: VOICE.model, ttsConfig: {
-                input: { prompt: VOICE.prompt, text: key },
-                voice: { languageCode: 'th-TH', name: VOICE.name, modelName: VOICE.model },
+                input: { prompt: VOICE.prompt, text: spoken },
+                voice: { languageCode: 'th-TH', name: name, modelName: VOICE.model },
                 audioConfig: { audioEncoding: 'MP3', sampleRateHertz: 24000 } } });
             if (!r || !r.audioContent) throw new Error('No audio came back from Cloud Text-to-Speech');
             const bin = atob(r.audioContent), bytes = new Uint8Array(bin.length);
@@ -216,7 +237,7 @@
 
     // one controller for a player: CC band, 🔊 Thai voice (preview in sync, clip muted), ⬇ MP4 + ซับ (+ 🔊)
     function mount(o) {
-        const st = { on: false, voice: null, rate: 1, audio: null };
+        const st = { on: false, voice: null, rate: 1, audio: null, voiceName: voiceName() };
         const clipSec = () => (o.video && o.video.duration && isFinite(o.video.duration) ? o.video.duration : (Number(o.seconds) || 8));
         let list = cues(o.caption, o.seconds);
         const band = attach(o.video, o.band, () => list, o.ccBtn);
@@ -244,13 +265,13 @@
             const label = o.voiceBtn.textContent;
             o.voiceBtn.textContent = '⏳ เสียงไทย…';
             try {
-                st.voice = await makeVoice(o.caption);
+                st.voice = await makeVoice(speechText(o.caption, o.reading), st.voiceName);   // V102.366: readings + the picked voice
                 st.rate = fitRate(st.voice.duration, clipSec());
                 if (!st.audio || st.audio.src !== st.voice.url) { if (st.audio) st.audio.pause(); st.audio = new Audio(st.voice.url); }
                 list = cues(o.caption, Math.min(clipSec(), st.voice.duration / st.rate));
                 st.on = true; o.video.muted = true;
                 const tooLong = st.voice.duration / MAX_RATE > clipSec() + 0.05;
-                say('🔊 Thai voice ' + st.voice.duration.toFixed(1) + ' s' + (st.rate > 1.001 ? ' · ×' + st.rate.toFixed(2) : '') + (tooLong ? ' · longer than the clip — shorten the Thai caption in ✏️' : ''));
+                say('🔊 Thai voice ' + st.voice.duration.toFixed(1) + ' s · ' + st.voiceName + (st.rate > 1.001 ? ' · ×' + st.rate.toFixed(2) : '') + (tooLong ? ' · longer than the clip — shorten the Thai caption in ✏️' : ''));
                 if (band) band.paint();
                 sync();
             } catch (e) {
@@ -262,6 +283,17 @@
             }
         };
         if (o.burnBtn) o.burnBtn.onclick = () => burnButton(o.burnBtn, o.statusEl, o.src, list, o.fileBase, st.on && st.voice ? { url: st.voice.url, rate: st.rate } : null).then(mark);
+        // V102.366: voice chips — the pick is remembered; while the voice is on, picking another makes it again (cached per voice)
+        if (o.voiceRail) {
+            o.voiceRail.innerHTML = VOICES.map(v => '<button type="button" class="glc-vchip" data-v="' + v.id + '" title="' + v.th + '">' + v.id + '</button>').join('');
+            const paintRail = () => o.voiceRail.querySelectorAll('.glc-vchip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === st.voiceName)));
+            o.voiceRail.onclick = async e => {
+                const b = e.target.closest('.glc-vchip'); if (!b || b.dataset.v === st.voiceName) return;
+                st.voiceName = b.dataset.v; setVoiceName(st.voiceName); paintRail();
+                if (st.on && o.voiceBtn) { st.on = false; if (st.audio) st.audio.pause(); o.voiceBtn.onclick(); }
+            };
+            paintRail();
+        }
         mark();
         return { state: st, cues: () => list };
     }
@@ -281,12 +313,12 @@
         const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
         m.innerHTML = '<div class="glc-player-box"><div class="glc-player-hd"><b>' + esc(item.name) + '</b><button type="button" class="x" aria-label="Close">✕</button></div>'
             + '<span class="glc-vwrap"><video class="glc-video" controls playsinline autoplay src="' + esc(item.url) + '"></video><div class="glc-cc-band" hidden></div></span>'
-            + (list.length ? '<div class="glc-player-ft"><button type="button" class="glc-cc" aria-pressed="true" title="Thai captions on / off">CC ไทย</button><button type="button" class="glc-voice" aria-pressed="false" title="Thai voice (Gemini TTS) instead of the clip\'s own audio">🔊 เสียงไทย</button><button type="button" class="glc-burn" title="Download the MP4 with the Thai captions burned in (for LINE / TikTok)">⬇ MP4 + ซับ</button><small class="glc-burn-st" role="status"></small></div>' : '')
+            + (list.length ? '<div class="glc-player-ft"><button type="button" class="glc-cc" aria-pressed="true" title="Thai captions on / off">CC ไทย</button><button type="button" class="glc-voice" aria-pressed="false" title="Thai voice (Gemini TTS) instead of the clip\'s own audio">🔊 เสียงไทย</button><span class="glc-voice-rail"></span><button type="button" class="glc-burn" title="Download the MP4 with the Thai captions burned in (for LINE / TikTok)">⬇ MP4 + ซับ</button><small class="glc-burn-st" role="status"></small></div>' : '')
             + '</div>';
         m.hidden = false;
         const video = m.querySelector('video');
         const ctl = mount({ video, band: m.querySelector('.glc-cc-band'), ccBtn: m.querySelector('.glc-cc'), voiceBtn: m.querySelector('.glc-voice'), burnBtn: m.querySelector('.glc-burn'),
-            statusEl: m.querySelector('.glc-burn-st'), src: item.url, caption: item.caption, seconds: item.seconds, fileBase: item.fileBase });
+            statusEl: m.querySelector('.glc-burn-st'), src: item.url, caption: item.caption, reading: item.reading, seconds: item.seconds, fileBase: item.fileBase, voiceRail: m.querySelector('.glc-voice-rail') });
         m.querySelector('.x').onclick = close;
         function close() { video.pause(); if (ctl.state.audio) ctl.state.audio.pause(); m.hidden = true; m.innerHTML = ''; }
         return m;
@@ -308,5 +340,5 @@
         }
     }
 
-    window.GlcCaptions = { cues, cueAt, attach, mount, makeVoice, fitRate, drawFrame, burn, burnButton, openPlayer, recType, ensureFont, ccOn, setCc };
+    window.GlcCaptions = { cues, cueAt, attach, mount, makeVoice, fitRate, drawFrame, burn, burnButton, openPlayer, recType, ensureFont, ccOn, setCc, speechText, estimate, VOICES, voiceName };
 })();

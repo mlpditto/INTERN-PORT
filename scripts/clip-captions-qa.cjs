@@ -30,6 +30,13 @@ assert.equal(C.cueAt(th, 1), th[0].text); assert.equal(C.cueAt(th, 6), th[1].tex
 assert.equal(C.fitRate(7.8, 8), 1, 'a voice that fits plays at ×1');
 assert.ok(Math.abs(C.fitRate(9.5, 8) - 9.5 / 7.85) < 1e-9, 'a slightly long voice is sped up just enough');
 assert.equal(C.fitRate(20, 8), 1.35, 'never faster than ×1.35');
+// V102.366: readings for the voice only · ≈ seconds · three voices (Kore by default)
+assert.equal(C.speechText('Warfarin สามมิลลิกรัม INR สองถึงสาม', 'Warfarin=วอร์ฟาริน, INR = ไอเอ็นอาร์'), 'วอร์ฟาริน สามมิลลิกรัม ไอเอ็นอาร์ สองถึงสาม', 'readings replace the English names in the spoken text only');
+assert.equal(C.speechText('ทานยา Elobixibat', ''), 'ทานยา Elobixibat', 'no readings → unchanged');
+assert.equal(C.speechText('warfarin 3 mg', 'Warfarin=วอร์ฟาริน'), 'วอร์ฟาริน 3 mg', 'case does not matter');
+assert.ok(Math.abs(C.estimate('ทานยา Elobixibat วันละครั้งก่อนอาหารเช้า ช่วยให้น้ำดีกระตุ้นการขับถ่ายอย่างเป็นธรรมชาติ') - 7.8) < 0.4, '≈ 10.5 characters a second (7.8 s measured for 84 characters): ' + C.estimate('ทานยา Elobixibat วันละครั้งก่อนอาหารเช้า ช่วยให้น้ำดีกระตุ้นการขับถ่ายอย่างเป็นธรรมชาติ'));
+assert.equal(C.estimate(''), 0);
+assert.deepEqual(plain(C.VOICES.map(v => v.id)), ['Kore', 'Charon', 'Achird']); assert.equal(C.voiceName(), 'Kore', 'nothing remembered → Kore');
 const VOICE_B64 = fs.readFileSync('scripts/fixtures/thai-voice-sample.mp3').toString('base64');   // real Gemini TTS output, 7.8 s
 
 (async () => {
@@ -90,6 +97,8 @@ const VOICE_B64 = fs.readFileSync('scripts/fixtures/thai-voice-sample.mp3').toSt
         assert.deepEqual([card.wrap, card.band, card.cc, card.voice, card.burn, card.st], [true, 'ทานยา Elobixibat วันละครั้งก่อนอาหารเช้า', 'CC ไทย', '🔊 เสียงไทย', '⬇ MP4 + ซับ', true], 'card: band over the player, CC, 🔊 เสียงไทย, ⬇ MP4 + ซับ');
         assert.ok(card.bandPos >= 40 && card.bandPos <= 70, 'band sits above the player controls: ' + card.bandPos);
         assert.deepEqual(card.noCaption, [false, false, true, false], 'no Thai caption → no CC / 🔊 / ⬇ MP4 + ซับ buttons (the band stays empty)');
+const rail = await page.evaluate(() => [...document.querySelectorAll('#glc-voice-rail .glc-vchip')].map(b => b.textContent + ':' + b.getAttribute('aria-pressed')));
+        assert.deepEqual(rail, ['Kore:true', 'Charon:false', 'Achird:false'], 'V102.366: three voice chips beside 🔊, Kore picked');
 
         // ---- V102.354: 🔊 Thai voice on the card — one cloud_tts call (th-TH, the caption), clip muted, export gets + 🔊; off again
         const voice = await page.evaluate(async b64 => {
@@ -108,9 +117,47 @@ const VOICE_B64 = fs.readFileSync('scripts/fixtures/thai-voice-sample.mp3').toSt
         }, VOICE_B64);
         assert.deepEqual(voice.calls, [{ provider: 'cloud_tts', model: 'gemini-2.5-flash-tts', lang: 'th-TH', name: 'Kore', text: 'ทานยา Elobixibat วันละครั้งก่อนอาหารเช้า', enc: 'MP3' }], 'one Cloud TTS call with the Thai caption (the second "on" reuses it)');
         assert.deepEqual([voice.on.on, voice.on.pressed, voice.on.muted, voice.on.burn], [true, 'true', true, '⬇ MP4 + ซับ + 🔊'], 'voice on: the clip is muted, the export carries the voice');
-        assert.match(voice.on.st, /^🔊 Thai voice 7\.8 s$/, 'status says how long the voice is: ' + voice.on.st);
+        assert.match(voice.on.st, /^🔊 Thai voice 7\.8 s · Kore$/, 'status says how long the voice is and which voice (V102.366): ' + voice.on.st);
         assert.deepEqual([voice.off.on, voice.off.muted, voice.off.burn, voice.off.st], [false, false, '⬇ MP4 + ซับ', ''], 'voice off: the clip\'s own audio is back');
         assert.equal(voice.again, true, 'on again (cached, no second call)');
+
+        // ---- V102.366: pick Charon while the voice is on → made again with Charon (one call), remembered; readings reach the voice only
+        const pick = await page.evaluate(async b64 => {
+            const calls = [];
+            window.callTtsProxy = async p => { calls.push(p); return { audioContent: b64, mimeType: 'audio/mpeg' }; };
+            const q = id => document.getElementById(id), btn = q('glc-voice-btn');
+            q('glc-voice-rail').querySelector('[data-v="Charon"]').click();
+            for (let i = 0; i < 80 && !(btn.classList.contains('on') && /Charon/.test(q('glc-burn-st').textContent)); i++) await new Promise(r => setTimeout(r, 50));
+            const out = { charon: [calls.length, calls[0] && calls[0].ttsConfig.voice.name, q('glc-burn-st').textContent, localStorage.getItem('glc_voice'), [...q('glc-voice-rail').querySelectorAll('[aria-pressed="true"]')].map(b => b.dataset.v)] };
+            window._glcSeries.episodes[0].readingTh = 'Elobixibat=อีโลบิซิแบต';
+            glcShowClip(1);
+            const b2 = q('glc-voice-btn'); b2.click();
+            for (let i = 0; i < 80 && !b2.classList.contains('on'); i++) await new Promise(r => setTimeout(r, 50));
+            out.reading = [calls.length, calls[1] && calls[1].ttsConfig.input.text, calls[1] && calls[1].ttsConfig.voice.name, q('glc-cc-band').textContent, /ทับศัพท์/.test(calls[1] && calls[1].ttsConfig.input.prompt)];
+            localStorage.removeItem('glc_voice');
+            return out;
+        }, VOICE_B64);
+        assert.deepEqual(pick.charon, [1, 'Charon', '🔊 Thai voice 7.8 s · Charon', 'Charon', ['Charon']], 'picking a voice while on makes it again with that voice and remembers it: ' + JSON.stringify(pick.charon));
+        assert.deepEqual(pick.reading, [2, 'ทานยา อีโลบิซิแบต วันละครั้งก่อนอาหารเช้า', 'Charon', 'ทานยา Elobixibat วันละครั้งก่อนอาหารเช้า', true], 'readings go to the voice only; the prompt says how to read English names: ' + JSON.stringify(pick.reading));
+
+        // ---- V102.366: ✏️ shows ≈ seconds under the Thai caption, amber when even ×1.35 cannot fit the clip; the readings field sits beside it
+        const edit = await page.evaluate(() => {
+            glcRenderEpisodes();
+            glcToggleEdit(1);
+            const row = document.getElementById('glc-ep-1'), inp = row.querySelector('[data-f="captionTh"]'), cnt = row.querySelector('.glc-cap-count'), rd = row.querySelector('[data-f="readingTh"]');
+            const fire = () => inp.dispatchEvent(new Event('input', { bubbles: true }));
+            const out = { init: cnt.textContent, warn0: cnt.classList.contains('warn'), readingField: !!rd && /Warfarin=วอร์ฟาริน/.test(rd.placeholder), readingValue: rd && rd.value };
+            inp.value = 'ก'.repeat(130); fire(); out.long = [cnt.textContent, cnt.classList.contains('warn')];
+            inp.value = 'ก'.repeat(90); fire(); out.mid = [cnt.textContent, cnt.classList.contains('warn')];
+            inp.value = ''; fire(); out.empty = cnt.textContent;
+            glcToggleEdit(1);
+            return out;
+        });
+        assert.match(edit.init, /^🔊 ≈ 3\.6 s \(38 ตัวอักษร\) · คลิป 8 s — พอดี$/, 'the counter opens with the caption: ' + edit.init); assert.equal(edit.warn0, false);
+        assert.deepEqual([edit.readingField, edit.readingValue], [true, 'Elobixibat=อีโลบิซิแบต'], 'the readings field carries the episode value');
+        assert.ok(/^🔊 ≈ 12\.4 s \(130 ตัวอักษร\) · คลิป 8 s — ยาวเกิน 10\.8 s แม้เร่ง ×1\.35/.test(edit.long[0]) && edit.long[1] === true, 'too long even at ×1.35 → amber: ' + edit.long[0]);
+        assert.ok(/^🔊 ≈ 8\.6 s \(90 ตัวอักษร\) · คลิป 8 s — จะเร่ง ×1\.10$/.test(edit.mid[0]) && edit.mid[1] === false, 'a little long → says the rate: ' + edit.mid[0]);
+        assert.equal(edit.empty, '', 'empty caption → no counter');
 
         // ---- the export frame: the band is drawn at the bottom, ≤ 2 lines
         const frame = await page.evaluate(() => {
@@ -139,6 +186,6 @@ const VOICE_B64 = fs.readFileSync('scripts/fixtures/thai-voice-sample.mp3').toSt
         assert.deepEqual([pl.src, pl.name, pl.cc, pl.voice, pl.burn, pl.band, pl.closed], ['https://storage.test/EP01.mp4', 'EP01 · T', true, true, true, 'ทานยา Elobixibat วันละครั้งก่อนอาหารเช้า', true], 'player: the clip, its name, CC, 🔊, ⬇ MP4 + ซับ, the band; ✕ closes');
 
         assert.deepEqual(errs, []);
-        console.log('PASS: Thai captions + 🔊 Thai voice (one cached cloud_tts call, clip muted, export + 🔊, ×1.35 cap) — phrase-first cues (word-safe, ≤ 46 chars, time ∝ length), band follows the playhead, CC remembered, card + gallery player carry CC + ⬇ MP4 + ซับ, export frame band at the bottom (≤ 2 lines)');
+        console.log('PASS: Thai captions + 🔊 Thai voice (one cached cloud_tts call, clip muted, export + 🔊, ×1.35 cap; V102.366: voice chips, readings for the voice, ≈ s counter in ✏️) — phrase-first cues (word-safe, ≤ 46 chars, time ∝ length), band follows the playhead, CC remembered, card + gallery player carry CC + ⬇ MP4 + ซับ, export frame band at the bottom (≤ 2 lines)');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
