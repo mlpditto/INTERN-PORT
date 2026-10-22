@@ -2288,7 +2288,7 @@ exports.notifyOnAdminEdit = onCall(
 //     id via the intern LIFF's ?lgid=1 screen.)
 // ============================================================
 exports.notifyAdminOnNewCase = onCall(
-    { secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID'] },
+    { secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID', 'GMAIL_APP_PASSWORD'] },   // 2026-10-22: + the mail
     async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'Login required');
@@ -2318,25 +2318,19 @@ exports.notifyAdminOnNewCase = onCall(
     const adminLineId = process.env.ADMIN_LINE_USER_ID;
     const adminGroupId = process.env.ADMIN_LINE_GROUP_ID;
 
-    if (!accessToken) {
-        console.warn(`[notifyAdminOnNewCase] LINE_CHANNEL_ACCESS_TOKEN secret missing — skipping push for case=${caseDocId}`);
-        return { skipped: true, reason: 'token-missing' };
-    }
+    // 2026-10-22: the mail below does not need LINE — a missing token or target only drops the LINE push.
+    if (!accessToken) console.warn(`[notifyAdminOnNewCase] LINE_CHANNEL_ACCESS_TOKEN secret missing — no LINE push for case=${caseDocId} (mail still goes)`);
     // V95.66 track: push to the admin 1:1 AND the team group when configured.
-    // Either target alone is enough to proceed; both missing = skip.
     const targets = [];
-    if (adminLineId && typeof adminLineId === 'string' && adminLineId.startsWith('U')) {
+    if (accessToken && adminLineId && typeof adminLineId === 'string' && adminLineId.startsWith('U')) {
         targets.push({ to: adminLineId, label: 'admin-1on1' });
     } else {
         console.warn(`[notifyAdminOnNewCase] ADMIN_LINE_USER_ID missing or invalid — no 1:1 push for case=${caseDocId}`);
     }
-    if (adminGroupId && typeof adminGroupId === 'string' && /^[CR]/.test(adminGroupId)) {
+    if (accessToken && adminGroupId && typeof adminGroupId === 'string' && /^[CR]/.test(adminGroupId)) {
         targets.push({ to: adminGroupId, label: 'group' });
     }
-    if (!targets.length) {
-        console.warn(`[notifyAdminOnNewCase] no valid push target — skipping push for case=${caseDocId}`);
-        return { skipped: true, reason: 'admin-id-missing' };
-    }
+    if (!targets.length) console.warn(`[notifyAdminOnNewCase] no valid LINE push target for case=${caseDocId} — mail only`);
 
     // Sanitize + truncate fields for the Flex Message.
     const displayName = String(caseData.displayName || 'Unknown').slice(0, 60);
@@ -2436,8 +2430,26 @@ exports.notifyAdminOnNewCase = onCall(
         }
     }
 
-    const pushedCount = results.filter(r => r.ok).length;
-    return { ok: pushedCount > 0, pushed: pushedCount > 0, pushedCount, results, caseDocId };
+    // 2026-10-22 (owner): the same case lands in the admin mailbox at once — plain text, the same fields as the LINE bubble, the admin
+    // link; sent through the Gmail transport the flood alert uses. Best effort: a mail failure never undoes a LINE push.
+    let mailed = false;
+    try {
+        const lines = [`${displayName} ส่ง Case ใหม่`, ''];
+        if (caseRef) lines.push(`HN / Ref: ${caseRef}`);
+        if (customer) lines.push(`ผู้ป่วย: ${customer}`);
+        if (disease) lines.push(`โรค: ${disease}`);
+        if (systemLabel) lines.push(`ระบบ: ${systemLabel}`);
+        lines.push(`Note: ${noteText}`, '', `เปิดหน้า admin: ${adminUri}`, '', 'ส่งอัตโนมัติจาก INTERN-PORT เมื่อ intern ส่ง Case');
+        await sendAdminMail('INTERN-PORT Cases', `🩺 Case ใหม่ · ${displayName} · ${caseRef || disease || 'Untitled'}`.slice(0, 200), lines.join('\n'));
+        mailed = true;
+        console.log(`[notifyAdminOnNewCase] MAILED  case=${caseDocId}  user=${displayName}`);
+    } catch (err) {
+        console.error(`[notifyAdminOnNewCase] MAIL_FAILED  case=${caseDocId}  message=${JSON.stringify((err && err.message) || 'unknown')}`);
+    }
+    results.push({ target: 'mail', ok: mailed });
+
+    const pushedCount = results.filter(r => r.ok && r.target !== 'mail').length;
+    return { ok: pushedCount > 0 || mailed, pushed: pushedCount > 0, pushedCount, mailed, results, caseDocId };
 });
 
 // ============================================================
@@ -4663,6 +4675,16 @@ function floodEarlyMail(w, s, lat, lon, river, wx) {
         subject: `${FLOOD_TIER_ICON[tier]} น้ำระดับ ${tier}${c ? `: ${c.name} ${f(c.wl)} ม.` : ''}${etaH != null ? ` · ถึงเฝ้าระวังใน ~${etaH} ชม.` : ''}`,
         text: lines.join('\n')
     };
+}
+
+// 2026-10-22: admin mail for other notices (the new-case mail) — the same Gmail App Password transport, the account is both the
+// sender and the recipient. The flood mail below keeps its own copy so that path stays untouched.
+async function sendAdminMail(fromName, subject, text) {
+    const pass = process.env.GMAIL_APP_PASSWORD;
+    if (!pass) throw new Error('GMAIL_APP_PASSWORD not set');
+    const nodemailer = require('nodemailer');
+    const tx = nodemailer.createTransport({ host: 'smtp.gmail.com', port: 465, secure: true, auth: { user: FLOOD_MAIL, pass } });
+    await tx.sendMail({ from: `"${fromName}" <${FLOOD_MAIL}>`, to: FLOOD_MAIL, subject, text });
 }
 
 async function sendFloodMail(subject, text) {
