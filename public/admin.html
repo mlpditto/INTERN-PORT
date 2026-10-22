@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.377)</title>
+    <title>Nika Admin (V102.379)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -50218,7 +50218,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const chips = [];
                     if (disease.icd10) chips.push(`<span class="dca-row-meta-chip">${dxaEscapeHtml(disease.icd10)}</span>`);
                     if (disease.category) chips.push(`<span style="color:#475569;">${dxaEscapeHtml(disease.category)}</span>`);
-                    if (disease.sourceArticleId) chips.push(dxaArticleChipHtml(disease));   // V102.371
+                    if (disease.sourceArticleId || disease.articleId) chips.push(dxaArticleChipHtml(disease));   // V102.371 drafted from · V102.379 written to
                     const updatedAbs = dxaFormatAbsolute(disease.updatedAt || disease.createdAt);
                     return `
                         <div class="dca-row">
@@ -50232,6 +50232,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 ${updatedAbs ? `<div class="dca-row-updated-abs" title="Last updated">🕒 ${dxaEscapeHtml(updatedAbs)}</div>` : ''}
                                 <div class="dca-row-actions">
                                     ${dxaMatBtnHtml(disease)}
+                                    <button type="button" class="dca-row-copy-btn dxa-art-btn" onclick="dxaWriteArticle('${dxaEscapeHtml(disease._id)}', this)" title="${disease.articleId ? 'Write another short article from this entry (AI) — the current one is the 📰 chip' : '📰 Write a short teaching article from this entry (AI) → Articles draft, opens for review'}">📰</button>
                                     <button type="button" class="dca-row-edit-btn" onclick="dxaEdit('${dxaEscapeHtml(disease._id)}')">Edit</button>
                                     <button type="button" class="dca-row-copy-btn" onclick="dxaCopyRow('${dxaEscapeHtml(disease._id)}', this)" title="Copy as Markdown">📋</button>
                                     <button type="button" class="dca-row-del-btn" onclick="dxaDelete('${dxaEscapeHtml(disease._id)}', this)" title="Delete">🗑️</button>
@@ -52474,15 +52475,90 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return `<span class="dca-contributor-chip dca-contrib-unknown">${dxaEscapeHtml(s)}</span>`;
         }
 
-        // V102.371: 📰 chip = the article this entry was drafted from; tap → that article in the Articles editor
+        // V102.371: 📰 chip = the article this entry was drafted from · V102.379: or the article written FROM this entry; tap → the Articles editor
         function dxaArticleChipHtml(d) {
-            const t = String(d.sourceArticleTitle || 'article');
-            return `<button type="button" class="dca-row-meta-chip dxa-art-chip" onclick="dxaOpenArticle('${dxaEscapeHtml(d.sourceArticleId)}')" title="Drafted from the article “${dxaEscapeHtml(t)}” — open it" style="cursor:pointer; margin:0; min-height:0; width:auto; padding:2px 8px; border:1px solid #c7d2fe; border-radius:999px; background:#eef2ff; color:#3730a3; font-size:0.72em; font-weight:700; line-height:1.5; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">📰 ${dxaEscapeHtml(t)}</button>`;
+            const written = !!d.articleId;
+            const t = String((written ? d.articleTitle : d.sourceArticleTitle) || 'article');
+            const id = written ? d.articleId : d.sourceArticleId;
+            return `<button type="button" class="dca-row-meta-chip dxa-art-chip" onclick="dxaOpenArticle('${dxaEscapeHtml(id)}')" title="${written ? 'Article written from this entry' : 'Drafted from the article'} “${dxaEscapeHtml(t)}” — open it" style="cursor:pointer; margin:0; min-height:0; width:auto; padding:2px 8px; border:1px solid #c7d2fe; border-radius:999px; background:#eef2ff; color:#3730a3; font-size:0.72em; font-weight:700; line-height:1.5; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">📰 ${dxaEscapeHtml(t)}</button>`;
         }
         window.dxaOpenArticle = function (id) {
             if (!window.Articles) return;
             Promise.resolve(Articles.load()).then(() => { Articles.open(); Articles.edit(id); });
         };
+        // V102.379 (owner's pick 5): 📰 Write article — AI condenses this entry into a 3–5 line teaching article (EN / TH / KO), saved as an
+        // Articles DRAFT linked back to the entry (dx.publishedId + a disease link, never scheduled here); the entry remembers it and the
+        // editor opens on it for review. A second press on an entry that has one asks first, Cancel opens the existing article.
+        window.dxaWriteArticle = async function (id, btn) {
+            const d = (dxaState.codex || []).find(x => x._id === id);
+            if (!d) return;
+            if (typeof window.callUniversalAI !== 'function') { showToast('AI core not loaded yet — try again in a moment.'); return; }
+            if (d.articleId) { if (!confirm('“' + d.diseaseName + '” already has an article (“' + (d.articleTitle || '') + '”). Write another one?\n\nCancel opens the existing article.')) { dxaOpenArticle(d.articleId); return; } }
+            else if (!confirm('Write a short teaching article from “' + d.diseaseName + '” with AI?\n\nIt is saved as a DRAFT in Articles (nothing is scheduled) and opens for review.')) return;
+            const model = dxaTextModel();
+            const prompt = dxaBuildArticlePrompt(d);
+            const old = btn ? btn.innerHTML : '';
+            try {
+                if (btn) { btn.disabled = true; btn.innerHTML = '⏳'; }
+                const ask = async () => { const r = await window.callUniversalAI(model, prompt, true, null, '', { feature: 'disease_article' }); return [r, dxaParseAutoDraftResponse((r && r.text) ? r.text : (typeof r === 'string' ? r : ''))]; };
+                const ok = x => x && x.title && x.body && typeof x.title === 'object' && typeof x.body === 'object';
+                let [resp, parsed] = await ask();
+                if (!ok(parsed)) { [resp, parsed] = await ask(); if (!ok(parsed)) throw new Error('AI returned invalid JSON after retry.'); }
+                const str = v => (v == null ? '' : String(v)).trim();
+                const title = { en: str(parsed.title.en) || d.diseaseName, th: str(parsed.title.th), ko: str(parsed.title.ko) };
+                const body = { en: str(parsed.body.en), th: str(parsed.body.th), ko: str(parsed.body.ko) };
+                if (!body.en && !body.th) throw new Error('AI returned an empty article.');
+                Object.keys(title).forEach(k => { if (!title[k]) delete title[k]; }); Object.keys(body).forEach(k => { if (!body[k]) delete body[k]; });
+                const user = (window.adminApp && window.adminApp.auth && window.adminApp.auth().currentUser) || (typeof auth !== 'undefined' && auth && auth.currentUser) || null;
+                const email = (user && user.email) || 'admin';
+                const win = (window.Articles && typeof Articles._defaultWindow === 'function') ? Articles._defaultWindow(Date.now()) : { start: Date.now() + 864e5, end: Date.now() + 7 * 864e5 };
+                const ts = firebase.firestore.FieldValue.serverTimestamp();
+                const doc = {
+                    title: title, body: body, cover: { emoji: str(parsed.emoji) || '🩺' }, status: 'draft',
+                    startAt: new Date(win.start), endAt: new Date(win.end), audience: { divisions: [], groups: [] }, rerun: 'any',
+                    readMin: Math.max(1, Math.round(String(body.en || body.th || '').length / 700)),
+                    links: [{ kind: 'disease', id: d._id, label: d.diseaseName }],
+                    dx: { draftId: '', publishedId: d._id, name: d.diseaseName },
+                    aiDrafted: true, aiDraftedModel: (resp && resp.model) || model, codexSource: 'disease_codex/' + d._id,
+                    createdAt: ts, updatedAt: ts, createdBy: email, updatedBy: email
+                };
+                const ref = await db.collection('articles').add(doc);
+                await db.collection('disease_codex').doc(d._id).update({ articleId: ref.id, articleTitle: title.en || d.diseaseName });
+                d.articleId = ref.id; d.articleTitle = title.en || d.diseaseName;
+                dxaRenderPublishedList();
+                showToast('📰 Draft article “' + d.articleTitle + '” — review it in Articles, then schedule');
+                dxaOpenArticle(ref.id);
+            } catch (e) {
+                showToast('📰 ' + ((e && e.message) || 'Could not write the article'));
+                if (btn) { btn.disabled = false; btn.innerHTML = old; }
+            }
+        };
+        function dxaBuildArticlePrompt(d) {
+            // FORMAT CONTRACT leads · explicit LANGUAGE RULE per slot · neutral <<<markers>>> · SELF-CHECK last (same recipe as Auto-Draft)
+            const str = v => Array.isArray(v) ? v.filter(Boolean).join(', ') : (v == null ? '' : String(v));
+            const facts = DXA_FIELD_KEYS.filter(k => !['diseaseName', 'thaiName', 'synonyms', 'icd10', 'category', 'references'].includes(k))
+                .map(k => [k, str(d[k]).trim()]).filter(x => x[1]).map(x => x[0] + ': ' + x[1].slice(0, 700));
+            return [
+                'ROLE: medical educator writing a SHORT teaching article for Thai medical interns, condensed from the disease monograph below.',
+                '',
+                'FORMAT CONTRACT — RESPOND WITH PURE JSON ONLY. NO MARKDOWN FENCE. NO PROSE OUTSIDE JSON.',
+                'Root object with EXACTLY these keys:',
+                '{',
+                '  "title": { "en": "<<<teaching title · English · at most 60 characters · may end with one emoji>>>", "th": "<<<the same title in Thai>>>", "ko": "<<<the same title in Korean>>>" },',
+                '  "body":  { "en": "<<<3 to 5 short lines · English · markdown · one idea per line · **bold** the key term once · no heading>>>", "th": "<<<the same article in Thai · ภาษาไทย>>>", "ko": "<<<the same article in Korean · 한국어>>>" },',
+                '  "emoji": "<<<one emoji for the cover that fits the organ system>>>"',
+                '}',
+                '',
+                'LANGUAGE RULE: body.en English only · body.th Thai only (drug and disease names may stay in English) · body.ko Korean only.',
+                'CONTENT RULE: pick the 3–5 facts an intern must remember (a red flag, the first-line treatment, one pearl); no line longer than 25 words; do not copy the monograph; no patient-identifying content.',
+                '',
+                'DISEASE: ' + str(d.diseaseName) + (d.thaiName ? ' (' + str(d.thaiName) + ')' : '') + (d.icd10 ? ' · ICD-10 ' + str(d.icd10) : '') + (d.category ? ' · ' + str(d.category) : ''),
+                'MONOGRAPH:',
+                facts.length ? facts.join('\n') : '(no detail yet — write from general knowledge, conservatively)',
+                '',
+                'SELF-CHECK before answering: title.en ≤ 60 characters · each body has 3–5 lines · each slot in its own language · valid JSON.'
+            ].join('\n');
+        }
         function dxaLinkArticleOnPublish(batch, draft, payload, publishedId) {
             if (!draft || !draft.sourceArticleId) return;
             payload.sourceArticleId = draft.sourceArticleId;
