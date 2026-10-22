@@ -198,7 +198,7 @@ assert.match((await page.textContent('#sch-week .sch-rg h4')).trim(), /^\d{1,2}[
     assert.equal(tiles.length, 3, 'three Today tiles (check-in, Journal, Case): ' + JSON.stringify(tiles));
     assert.ok(tiles.every(t => Math.abs(t.t - tiles[0].t) < 2), 'one row');
     assert.ok(tiles[0].l < tiles[1].l && tiles[1].l < tiles[2].l, 'left → right');
-    assert.ok(tiles.every(t => t.h >= 56 && t.h <= 90 && t.w >= 100), 'cards (V101.93: as tall as their content, ~64px), not thin rows: ' + tiles.map(t => t.w + 'x' + t.h).join(' '));
+    assert.ok(tiles.every(t => t.h >= 44 && t.h <= 90 && t.w >= 70), 'cards (V101.191: smaller, wrapping, ~50px; V101.93: as tall as their content), not thin rows: ' + tiles.map(t => t.w + 'x' + t.h).join(' '));
     assert.match(tiles.map(t => t.txt).join('|'), /Check-in.*\|.*Journal.*\|.*Case/, 'check-in · Journal · Case');
     assert.ok(!tiles.some(t => /\+0\.1/.test(t.txt)), 'V101.161: no +0.1 reward pill on the Today tiles'); 
     assert.equal(await page.locator('#sch-agenda .sch-tile .ti').first().evaluate(e => getComputedStyle(e).fontSize), '23.712px'.replace('23.712px', await page.locator('#sch-agenda .sch-tile .ti').first().evaluate(e => getComputedStyle(e).fontSize)), 'icon sized');
