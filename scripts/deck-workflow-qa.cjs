@@ -97,7 +97,7 @@ const MP4 = 'data:video/mp4;base64,AAAAIGZ0eXBpc29t';
             await glcPlanEpisodes();
             return { label, asked: /ONE short vertical/.test(calls[0].prompt) && /Exactly 1 episode, n = 1\./.test(calls[0].prompt), rows: document.querySelectorAll('#glc-episodes-list .glc-ep').length, standalone: /a standalone pharmacy teaching clip/.test(glcEpisodePrompt(window._glcSeries.episodes[0])) };
         });
-        assert.deepEqual(one, { label: 'Plan 1 clipfree · text only', asked: true, rows: 1, standalone: true });
+        assert.deepEqual(one, { label: 'Plan 1 clip', asked: true, rows: 1, standalone: true });
 
         // 6. D — Series ×10 plan, ☑ EP03–05, the bar, confirm, render one at a time with ⏹ after the first
         const d = await page.evaluate(async (MP4) => {
