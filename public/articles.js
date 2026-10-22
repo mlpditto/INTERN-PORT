@@ -163,7 +163,9 @@
     function linksHtml(a) {
         // V101.196: the Disease Codex entry drafted from this article (articles/{id}.dx.publishedId, set when the admin approves it)
         var dx = a.dx && a.dx.publishedId ? '<button type="button" class="art-link codex" onclick="internArticles.openDx(' + esc(JSON.stringify(a.id)) + ',' + esc(JSON.stringify(a.dx.publishedId)) + ')">🩺 ' + esc(a.dx.name || 'Disease Codex') + '</button>' : '';
-        return ((a.links || []).length || dx) ? '<div class="art-links">' + dx + (a.links || []).map(function (l) {
+        // V101.200: the Drug Codex entry drafted from this article (articles/{id}.dc.publishedId) — same handler as a ＋ Codex link
+        var dc = a.dc && a.dc.publishedId ? '<button type="button" class="art-link codex" onclick="internArticles.openCodex(' + esc(JSON.stringify(a.id)) + ',' + esc(JSON.stringify(a.dc.publishedId)) + ')">💊 ' + esc(a.dc.name || 'Drug Codex') + '</button>' : '';
+        return ((a.links || []).length || dx || dc) ? '<div class="art-links">' + dx + dc + (a.links || []).map(function (l) {
             return l.kind === 'quiz' ? '<button type="button" class="art-link" onclick="internArticles.openQuiz(' + esc(JSON.stringify(a.id)) + ',' + esc(JSON.stringify(l.id)) + ')">🧪 ' + esc(l.label) + ' <b>🪙 +1</b></button>'
                 : l.kind === 'disease' ? '<button type="button" class="art-link codex" onclick="internArticles.openDx(' + esc(JSON.stringify(a.id)) + ',' + esc(JSON.stringify(l.id)) + ')">🩺 ' + esc(l.label) + '</button>'   // V101.197: ＋ Disease link
                 : '<button type="button" class="art-link codex" onclick="internArticles.openCodex(' + esc(JSON.stringify(a.id)) + ',' + esc(JSON.stringify(l.id)) + ')">💊 ' + esc(l.label) + '</button>';

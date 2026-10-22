@@ -129,7 +129,7 @@
     function fromDoc(id, d) {
         return { id: id, title: Object.assign({}, d.title), body: Object.assign({}, d.body), cover: Object.assign({ emoji: '📰' }, d.cover), status: d.status === 'scheduled' ? 'scheduled' : 'draft',
             startAt: msOf(d.startAt), endAt: msOf(d.endAt), audience: { divisions: ((d.audience || {}).divisions || []).slice(), groups: ((d.audience || {}).groups || []).slice() },
-            links: (d.links || []).slice(), rerun: d.rerun === 'off' ? 'off' : 'any', createdAt: msOf(d.createdAt), dx: d.dx || null };   // V102.371: dx = {draftId, publishedId, name} once sent to the Disease Codex
+            links: (d.links || []).slice(), rerun: d.rerun === 'off' ? 'off' : 'any', createdAt: msOf(d.createdAt), dx: d.dx || null, dc: d.dc || null };   // V102.374: dc = the Drug Codex twin of dx   // V102.371: dx = {draftId, publishedId, name} once sent to the Disease Codex
     }
 
     // ---- data
@@ -163,10 +163,42 @@
             if (!a.id && ref) a.id = ref.id;
             a.status = st; S.base = JSON.stringify(a); S.savedAt = Date.now();
             var i = S.list.findIndex(function (x) { return x.id === a.id; });
-            var copy = fromDoc(a.id, Object.assign({}, doc, { startAt: a.startAt, endAt: a.endAt, dx: a.dx }));
+            var copy = fromDoc(a.id, Object.assign({}, doc, { startAt: a.startAt, endAt: a.endAt, dx: a.dx, dc: a.dc }));
             if (i >= 0) S.list[i] = copy; else S.list.push(copy);
             if (typeof showToast === 'function') showToast(schedule ? '📅 Scheduled' : '💾 Saved as draft');
+            if (!S.hintOff[a.id]) loadDz().then(function () { if (S.cur === a) { S.hint = findHint(a); if (S.hint) render(); } });   // V102.374: "… is in the Disease Codex — link it?"
         }).catch(function (e) { S.err = (e && e.message) || 'Save failed.'; }).then(function () { S.saving = false; render(); });
+    }
+    // V102.374 (owner's pick 4): after Save, if the article's title or body names a published disease (name, Thai name or a synonym of
+    // 4+ characters) and the article is not linked to or drafted into the Disease Codex yet, a banner offers the link — no AI, no click
+    // needed to find it. "Not this one" is remembered for the session.
+    function dzDocs() { return (typeof dxaState !== 'undefined' && dxaState && Array.isArray(dxaState.codex) && dxaState.codex.length) ? dxaState.codex : (S.dz || []); }
+    function loadDz() {
+        if (dzDocs().length || S.dz != null) return Promise.resolve();
+        S.dz = [];
+        return db.collection('disease_codex').get().then(function (snap) { S.dz = snap.docs.map(function (d) { return Object.assign({ _id: d.id }, d.data()); }); }).catch(function () { S.dz = null; });
+    }
+    function findHint(a) {
+        if (!a || (a.links || []).some(function (l) { return l.kind === 'disease'; }) || (a.dx && (a.dx.draftId || a.dx.publishedId))) return null;
+        var t = (a.title || {}), b = (a.body || {}), text = [t.en, t.th, t.ko, b.en, b.th, b.ko].filter(Boolean).join(' ').toLowerCase();
+        if (!text.trim()) return null;
+        var best = null;
+        dzDocs().forEach(function (d) {
+            if (!d || !d.diseaseName) return;
+            [d.diseaseName, d.thaiName].concat(Array.isArray(d.synonyms) ? d.synonyms : []).forEach(function (term) {
+                term = String(term || '').trim();
+                if (term.length < 4) return;
+                var lo = term.toLowerCase(), latin = /^[a-z0-9 .'-]+$/i.test(term);
+                var hit = latin ? new RegExp('(^|[^a-z0-9])' + lo.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&') + '([^a-z0-9]|$)').test(text) : text.indexOf(lo) >= 0;   // Latin terms match whole words only
+                if (!hit) return;
+                if (!best || term.length > best.term.length) best = { id: d._id || d.id, name: String(d.diseaseName), label: String(d.diseaseName) + (d.thaiName ? ' · ' + d.thaiName : ''), meta: [d.icd10, d.category].filter(Boolean).join(' · '), term: term };
+            });
+        });
+        return best;
+    }
+    function hintHtml() {
+        if (!S.hint) return '';
+        return '<div class="art-warn art-hint" role="status" style="background:#eef2ff;color:#3730a3;border-color:#c7d2fe">🩺 Saved · <b>' + esc(S.hint.name) + '</b> is in the Disease Codex' + (S.hint.meta ? ' (' + esc(S.hint.meta) + ')' : '') + ' — link this article to it?<button type="button" onclick="Articles.hintLink()">Link 🩺</button><button type="button" style="background:#fff;color:#64748b" onclick="Articles.hintDismiss()">Not this one</button></div>';
     }
     // Two taps: 🗑 arms the button, the second tap deletes (no confirm() — it is blocked after awaits in some browsers).
     function remove() {
@@ -304,6 +336,14 @@
         if (dx.draftId) return chip('🩺 Codex draft pending', false, 'Articles.toCodex()', ' title="Waiting in the Disease Codex ▸ Pending Drafts — open it"', ' art-add');
         return chip('🩺 Disease Codex', false, 'Articles.toCodex()', ' title="Draft a Disease Codex entry from this article with AI → Pending Drafts (save the article first)"', ' art-add');
     }
+    // V102.374: the 💊 chip — the Drug Codex twin of dxChipHtml
+    function dcChipHtml(a) {
+        var dc = a.dc || {};
+        if (S.dcBusy) return chip('⏳ Drafting Drug Codex entry…', false, '', ' disabled', ' art-add');
+        if (dc.publishedId) return chip('💊 In Drug Codex', true, 'Articles.toDrug()', ' title="Published in the Drug Codex — open it"', ' art-add');
+        if (dc.draftId) return chip('💊 Drug draft pending', false, 'Articles.toDrug()', ' title="Waiting in the Drug Codex ▸ Pending Drafts — open it"', ' art-add');
+        return chip('💊 Drug Codex', false, 'Articles.toDrug()', ' title="Draft a Drug Codex entry from this article with AI → Pending Drafts (save the article first)"', ' art-add');
+    }
     function chip(label, on, click, extra, cls) { return '<button type="button" class="art-c' + (cls || '') + (on ? ' on' : '') + '" aria-pressed="' + !!on + '" onclick="' + click + '"' + (extra || '') + '>' + label + '</button>'; }
     function audienceHtml(a) {
         var dv = divisions(), gs = groups(a.audience.groups), all = !a.audience.divisions.length && !a.audience.groups.length;
@@ -404,14 +444,14 @@
             '<button type="button" title="Bullet list" onclick="Articles.wrap(\'\\n- \',\'\')">•</button><button type="button" title="Numbered list" onclick="Articles.wrap(\'\\n1. \',\'\')">1.</button><button type="button" title="Link" onclick="Articles.wrap(\'[\',\'](https://)\')">🔗</button>' + aiHtml(a) + '</div>' + (S.modelOpen ? '<div class="art-mrail">' + modelRail() + '</div>' : '') +
             '<textarea class="art-ta" id="art-bodyta" placeholder="A short read: 3–5 lines. Markdown works." oninput="Articles.text(\'body\',this.value)">' + esc(b) + '</textarea>' +
             '<div class="art-ft">' + (S.aiNote ? '<span class="ai">' + esc(S.aiNote) + '</span>' : '<span>Markdown</span>') + '<span id="art-count" style="margin-left:auto"' + (b.length > MAX_BODY ? ' class="over"' : '') + '>' + b.length + ' / ' + MAX_BODY + ' · ~' + readMin(b) + ' min</span></div></div>',
-            '<div id="art-warn">' + (mm ? '<div class="art-warn" role="status">⚠️ This looks like ' + NAME[mm] + ', not ' + NAME[L] + (((a.title || {})[mm] || (a.body || {})[mm]) ? '' : '<button type="button" onclick="Articles.moveLang(\'' + L + '\',\'' + mm + '\')">Move to ' + mm.toUpperCase() + '</button>') + '</div>' : '') + '</div>',
+            '<div id="art-warn">' + hintHtml() + (mm ? '<div class="art-warn" role="status">⚠️ This looks like ' + NAME[mm] + ', not ' + NAME[L] + (((a.title || {})[mm] || (a.body || {})[mm]) ? '' : '<button type="button" onclick="Articles.moveLang(\'' + L + '\',\'' + mm + '\')">Move to ' + mm.toUpperCase() + '</button>') + '</div>' : '') + '</div>',
             sec('when', 'When & who', whenWhoSummary(a),
                 '<div class="art-ln"><span class="art-ml">Window</span><input type="datetime-local" class="art-dt" id="art-start" value="' + (a.startAt != null ? toLocal(a.startAt) : '') + '" onchange="Articles.when(\'startAt\',this.value)"> → <input type="datetime-local" class="art-dt" id="art-end" value="' + (a.endAt != null ? toLocal(a.endAt) : '') + '" onchange="Articles.when(\'endAt\',this.value)"><span style="font-size:11.5px;color:#94a3b8">Bangkok time</span></div>' +
                 '<div class="art-ln"><span class="art-ml">🔁 Later</span>' + RERUN.map(function (r) { return chip(r[1], a.rerun === r[0], 'Articles.rerun(\'' + r[0] + '\')', ' title="' + esc(r[2]) + '"'); }).join('') + '</div>' +
                 '<div class="art-ln"><span class="art-ml">Audience</span>' + audienceHtml(a) + '</div>', !a.id),
             sec('links', 'Links', linksSummary(a),
                 '<div class="art-ln">' + (a.links || []).map(function (l, i) { return '<span class="art-lk ' + l.kind + '">' + (LINK_ICON[l.kind] || '💊 ') + esc(l.label) + '<button type="button" aria-label="Remove link" onclick="Articles.dropLink(' + i + ')">✕</button></span>'; }).join('') +
-                chip('＋ Quiz', S.pick === 'quiz', 'Articles.openPick(\'quiz\')', '', ' art-add') + chip('＋ Codex', S.pick === 'codex', 'Articles.openPick(\'codex\')', '', ' art-add') + chip('＋ Disease', S.pick === 'disease', 'Articles.openPick(\'disease\')', ' title="Link a published Disease Codex entry"', ' art-add') + dxChipHtml(a) + '</div>' + pickerHtml(), (a.links || []).length > 0 || !!S.pick),
+                chip('＋ Quiz', S.pick === 'quiz', 'Articles.openPick(\'quiz\')', '', ' art-add') + chip('＋ Codex', S.pick === 'codex', 'Articles.openPick(\'codex\')', '', ' art-add') + chip('＋ Disease', S.pick === 'disease', 'Articles.openPick(\'disease\')', ' title="Link a published Disease Codex entry"', ' art-add') + dxChipHtml(a) + dcChipHtml(a) + '</div>' + pickerHtml(), (a.links || []).length > 0 || !!S.pick),
             S.err ? '<div class="art-err" role="alert">⚠️ ' + esc(S.err) + '</div>' : '',
             '<div class="art-btns"><button type="button" class="del' + (S.del ? ' arm' : '') + '" onclick="Articles.remove()" title="' + (a.id ? 'Delete (tap twice)' : 'Discard') + '" aria-label="Delete">' + (S.del ? 'Delete?' : '🗑') + '</button>' +
             (a.status === 'scheduled' ? '<button type="button" onclick="Articles.save(false)"' + (S.saving ? ' disabled' : '') + '>↩ Back to draft</button>' : '<button type="button" onclick="Articles.save(false)"' + (S.saving ? ' disabled' : '') + '>Save draft</button>') +
@@ -506,7 +546,7 @@
     function edit(id) {
         var a = id ? S.list.find(function (x) { return x.id === id; }) : null;
         S.cur = a ? fromDoc(a.id, Object.assign({}, a)) : blank(Date.now());
-        S.lang = 'en'; S.err = ''; S.del = false; S.pick = ''; S.base = JSON.stringify(S.cur); S.savedAt = 0; S.open = {}; S.who = false; S.whoF = 'all'; S.aiNote = ''; S.modelOpen = false; S.pvMore = false;
+        S.lang = 'en'; S.err = ''; S.del = false; S.pick = ''; S.base = JSON.stringify(S.cur); S.savedAt = 0; S.hint = null; S.hintOff = S.hintOff || {}; S.open = {}; S.who = false; S.whoF = 'all'; S.aiNote = ''; S.modelOpen = false; S.pvMore = false;
         render();
     }
     var api = {
@@ -613,6 +653,32 @@
                 if (typeof showToast === 'function') showToast('🩺 Codex draft created · pending approval');
             }).catch(function (e) { S.err = '🩺 ' + ((e && e.message) || 'Could not draft the Codex entry.'); S.aiNote = ''; }).then(function () { S.dxBusy = false; render(); });
         },
+        // 💊 V102.374: the drug twin of toCodex — dcaDraftFromArticle in admin.html, the article remembers it in `dc`
+        toDrug: function () {
+            var a = S.cur; if (!a || S.dcBusy) return;
+            if (JSON.stringify(a) !== S.base) { S.err = '💊 Save the article first, then send it to the Drug Codex.'; render(); return; }
+            var dc = a.dc || {};
+            if (dc.publishedId || dc.draftId) {
+                if (typeof openDrugCodexAdmin !== 'function') { S.err = '💊 The Drug Codex is not available on this page.'; render(); return; }
+                api.close(); openDrugCodexAdmin();
+                setTimeout(function () { if (dc.publishedId && typeof dcaEdit === 'function') dcaEdit(dc.publishedId); else if (typeof dcaSwitchView === 'function') dcaSwitchView('drafts'); }, 150);
+                return;
+            }
+            if (typeof window.dcaDraftFromArticle !== 'function') { S.err = '💊 The Drug Codex is not available on this page.'; render(); return; }
+            var name = String(a.title.en || a.title[S.lang] || '').replace(/[\p{Extended_Pictographic}️]/gu, '').split(/[:–—(]/)[0].trim();
+            if (!name) { S.err = '💊 Give the article a title first.'; render(); return; }
+            var title = a.title.en || a.title.th || a.title.ko || name, body = a.body.en || a.body.th || a.body.ko || '';
+            S.dcBusy = true; S.err = ''; S.aiNote = '💊 Drafting a Drug Codex entry from this article…'; render();
+            window.dcaDraftFromArticle({ id: a.id, name: name, title: title, source: 'Title: ' + title + '\n' + body }).then(function (r) {
+                a.dc = { draftId: r.draftId, publishedId: '', name: name }; S.base = JSON.stringify(a);
+                var i = S.list.findIndex(function (x) { return x.id === a.id; }); if (i >= 0) S.list[i].dc = a.dc;
+                S.aiNote = '💊 "' + name + '" is in the Drug Codex ▸ Pending Drafts' + (r.model ? ' · ' + r.model : '') + ' — approve it there';
+                if (typeof showToast === 'function') showToast('💊 Drug Codex draft created · pending approval');
+            }).catch(function (e) { S.err = '💊 ' + ((e && e.message) || 'Could not draft the Drug Codex entry.'); S.aiNote = ''; }).then(function () { S.dcBusy = false; render(); });
+        },
+        // V102.374: the hint after Save
+        hintLink: function () { var a = S.cur, h = S.hint; if (!a || !h) return; S.hint = null; a.links.push({ kind: 'disease', id: h.id, label: h.label }); save(a.status === 'scheduled'); },
+        hintDismiss: function () { var a = S.cur; if (a && a.id) S.hintOff[a.id] = true; S.hint = null; render(); },
         sec: function (k, open) { S.open[k] = open; },
         // ⚠️ "Move to TH": the text typed into one language slot goes to the slot it is written in
         moveLang: function (from, to) {
