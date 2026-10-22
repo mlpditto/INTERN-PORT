@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.194)</title>
+    <title>Internship Portfolio (V101.195)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.171">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -3794,6 +3794,9 @@
                 #sch-goals-box .sch-bar .sch-tr { height: 3px; border-radius: 9px; background: #e2e8f0; margin-top: 4px; overflow: hidden; }
                 #sch-goals-box .sch-bar .sch-tr i { display: block; height: 100%; border-radius: 9px; }
                 #sch-goals-box .sch-bar.q i { background: #6366f1; } #sch-goals-box .sch-bar.j i { background: #f59e0b; } #sch-goals-box .sch-bar.c i { background: #14b8a6; }
+                /* V101.195 (owner's pick A1): a "+n" pill in the kind's colour beside the month number = that kind done on the picked day */
+                #sch-goals-box .sch-bar b .sch-day-n { font-size: 0.5em; font-weight: 800; color: #fff; border-radius: 999px; padding: 1px 6px; margin-left: 5px; vertical-align: middle; }
+                #sch-goals-box .sch-bar.q .sch-day-n { background: #6366f1; } #sch-goals-box .sch-bar.j .sch-day-n { background: #f59e0b; } #sch-goals-box .sch-bar.c .sch-day-n { background: #14b8a6; }
                 #sch-goals-box .sch-gb-row { display: flex; align-items: center; }
                 #sch-goals-box .sch-gb-fin { width: auto; min-height: 36px; margin: 0 0 0 -4px; padding: 4px 5px; border: none; border-radius: 8px; background: transparent; font-size: 0.95em; line-height: 1; cursor: pointer; }
                 #sch-goals-box .sch-gb-links { flex: 0 0 96px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 2px; padding: 0 6px 0 12px; }
@@ -16638,6 +16641,12 @@
             if (!d) return '';
             const now = new Date();
             const done = (schBuildDayMap()[key] || []).filter(it => it.submissionType !== 'checkin');   // V101.151: the check-in is the ⭐ on the day circle, not a row
+            // V101.195 (owner's pick A1): the rows stay here; the month card's 📚 Quiz · 📝 Journal · 🩺 Case cells get a "+n" pill for what the
+            // picked day added. schPaintDayDone() draws the pills from _schDayDone.
+            const DAY_CELL = { quiz: 'q', reflective: 'j', case: 'c' };
+            window._schDayDone = {};
+            done.forEach(it => { const k = DAY_CELL[it.submissionType]; if (k) window._schDayDone[k] = (window._schDayDone[k] || 0) + 1; });
+            schPaintDayDone();
             const events = schEventsOn(key);
             const todoAll = items.filter(it => it.kind !== 'e' && schItemDayKey(it, now) === key);
             // V101.149: a to-do that the list below already shows is not repeated here; only the collapsed Missed ones are (this panel is the one place they show).
@@ -16786,7 +16795,9 @@
             html += '</div>';
             window._schHolHtml = holLines.join('');   // V101.191: the holiday / health-day chips ride on the month line (one line saved)
             window._schSelHtml = '';
+            window._schDayDone = null;   // V101.195: no day picked → the month cells show their counts only
             const dayHtml = schWeekSel ? schWeekDayHtml(schWeekSel, items) : '';   // V101.194: also sets _schSelHtml (the picked day's chip)
+            if (!schWeekSel) schPaintDayDone();
             schPaintMonthHead();
             html += dayHtml;
             box.innerHTML = html;
@@ -16937,8 +16948,19 @@
                     + (r.target && r.n !== null ? '<em>/' + r.target + '</em>' : '') + '</b>'
                     + (r.target && r.n !== null ? '<div class="sch-tr"><i style="width:' + pct + '%"></i></div>' : '') + '</div>';
             }).join('');
+            schPaintDayDone();   // V101.195: a re-render keeps the picked day's +n pills
         }
         window.schRenderGoalBars = schRenderGoalBars;
+        // V101.195 (A1): a "+n" pill beside the month number of each cell (q / j / c) for what the picked day added; none → no pill
+        function schPaintDayDone() {
+            const dd = window._schDayDone || {};
+            document.querySelectorAll('#sch-goalbars .sch-bar').forEach(cell => {
+                const old = cell.querySelector('.sch-day-n'); if (old) old.remove();
+                const k = ['q', 'j', 'c'].find(x => cell.classList.contains(x)), n = k && dd[k], b = cell.querySelector('b');
+                if (!n || !b) return;
+                b.insertAdjacentHTML('beforeend', '<span class="sch-day-n" title="' + n + ' on the picked day">+' + n + '</span>');
+            });
+        }
 
         function schModalOpen() {
             const m = document.getElementById('scheduleModal');
