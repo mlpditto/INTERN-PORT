@@ -5,6 +5,7 @@
 // one-tap Move to TH/KO, TH/KO show "→ EN" when empty, the cover folds to one chip, When & who / Links fold into summary lines (with ~reach), sticky action bar,
 // list rows edged by status, preview says when interns see it. Same data, same writes.
 // V102.385 (owner): readable lines — the draft and translate prompts keep every line one short sentence that fits a phone line (~60 EN / ~45 TH·KO characters); the body placeholder says so too.
+// V102.386: the Who-read-it CSV guards formula-looking cells (= + @ -) with a leading ' — a name typed as =HYPERLINK(...) never runs in Excel.
 // V102.335: 📰 Articles — admin side (V102.336: the modal is lang-no-toggle so Thai shows in EN mode; bodies up to 2000 characters). A short read that pops up once a day when an intern opens the app (the intern popup is a later PR).
 // ➕ Create ▸ Article opens one modal: the list (status chips All · Draft · Scheduled · Live · Ended) on the left, the editor in the middle
 // (cover emoji · EN/TH/KO · title · markdown body · window · 🔁 new interns · audience chips · quiz / DD Codex links), and a 📱 preview of the
@@ -607,7 +608,8 @@
         whoF: function (f) { S.whoF = f; render(); },
         csv: function () {
             var a = S.cur; if (!a) return;
-            var q = function (v) { v = String(v == null ? '' : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+            // V102.386: a cell that starts with = + @ (or - followed by more) gets a leading ' so a spreadsheet never runs it as a formula (same rule as pixCsvCell / toCsvField)
+            var q = function (v) { v = String(v == null ? '' : v); var g = /^[=+@]/.test(v) || /^-.+/.test(v); if (g) v = "'" + v; return (g || /[",\n]/.test(v)) ? '"' + v.replace(/"/g, '""') + '"' : v; };
             var lines = [['name', 'division', 'group', 'state', 'how', 'when (Bangkok)', 'saved', 'new intern (re-run)'].join(',')].concat(whoRows(Object.assign({}, a)).map(function (x) {
                 return [x.u.displayName || x.u.fullName || x.u.id, typeof userDivisionOf === 'function' ? userDivisionOf(x.u) : x.u.division, x.u.group || '', x.st, x.s && x.s.act ? x.s.act : '', x.s && x.s.at ? whenStr(msOf(x.s.at)) : '', x.s && x.s.saved ? 'yes' : '', x.kind === 'rerun' ? 'yes' : ''].map(q).join(',');
             }));
