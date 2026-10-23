@@ -168,7 +168,7 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.equal(await page.evaluate(() => document.getElementById('u-case-system').value), 'gi');
         assert.equal(await page.evaluate(() => document.getElementById('u-case-symptoms-section').style.display), 'block', 'symptoms follow the pick');
 
-        // ---- V101.132: optional details — the tiles fold blocks open, only what is filled is collected, rights has an "other" box (V101.203: 5 tiles, + ⚠️ ADR)
+        // ---- V101.132: optional details — the tiles fold blocks open, only what is filled is collected, rights has an "other" box (V101.204: 5 tiles, + ⚠️ ADR)
         assert.equal(await page.evaluate(() => caseExtrasCollect()), null, 'nothing filled → nothing sent');
         const opt = await page.evaluate(() => {
             const o = {}; const hidden = id => document.getElementById(id).hidden;
@@ -202,7 +202,7 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.ok(/\.\.\.caseExtras,\s*status: "pending"/.test(idx) && /\.\.\.caseExtras,\s*sourceType: 'cases'/.test(idx), 'the extras are written to the cases doc AND its submissions mirror');
         await page.selectOption('#u-case-system', '');
 
-        // ---- V101.203: ⚠️ ADR / Naranjo — 5th tile, 10 questions as Yes / No / ? chips, live score + category, saved as one `adr` field
+        // ---- V101.204: ⚠️ ADR / Naranjo — 5th tile, 10 questions as Yes / No / ? chips, live score + category, saved as one `adr` field
         const adr = await page.evaluate(() => {
             const o = {}, $ = id => document.getElementById(id), q = (n, a) => document.querySelector('#u-opt-adr .u-nq button[data-q="' + n + '"][data-a="' + a + '"]').click();
             o.tiles = [...document.querySelectorAll('#u-case-opt .u-opt-tile')].map(t => t.dataset.opt);

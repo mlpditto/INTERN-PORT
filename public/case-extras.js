@@ -1,4 +1,4 @@
-// V101.203: + ⚠️ ADR / Naranjo — suspected drug + reaction, the 10 Naranjo questions as Yes / No / ? chips (? = 0), live score + category; saved as `adr` only when something was answered or typed.
+// V101.204: + ⚠️ ADR / Naranjo — suspected drug + reaction, the 10 Naranjo questions as Yes / No / ? chips (? = 0), live score + category; saved as `adr` only when something was answered or typed.
 // V101.132: Submit New → Case — optional details (all skippable): 💊 medications · 🧪 lab results · 🛡 treatment rights · 📅 appointment.
 // The tiles fold a block open; only what is filled in is sent. submitUnifiedCase calls caseExtrasCollect() → window.caseExtras → spread into the
 // cases doc + its submissions mirror (fields: medications, labResults, treatmentRights, appointment); caseExtrasReset() clears the form after a send.
