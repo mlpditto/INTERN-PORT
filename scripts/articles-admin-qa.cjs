@@ -267,7 +267,7 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
       Articles.lang('en'); out.drBtn = q('.art-ai .go').textContent;
       reply = '```markdown\n**Shake** the inhaler first.\n```';
       await Articles.ai();
-      out.dr = [S.cur.body.en, /Write a short article .* in English/.test(calls[1][1]) && /Topic: Inhaler mistakes/.test(calls[1][1]), /under 700 characters/.test(calls[1][1]) && /each starting with one fitting emoji instead of a label/.test(calls[1][1]) && /one line starting with 💊 that lists 2 to 4 related drug names/.test(calls[1][1]) && !/one practical point, one example/.test(calls[1][1])];   // V102.363: emoji-led lines + 💊 drugs line
+      out.dr = [S.cur.body.en, /Write a short article .* in English/.test(calls[1][1]) && /Topic: Inhaler mistakes/.test(calls[1][1]), /under 700 characters/.test(calls[1][1]) && /each starting with one fitting emoji instead of a label/.test(calls[1][1]) && /one line starting with 💊 that lists 2 to 4 related drug names/.test(calls[1][1]) && !/one practical point, one example/.test(calls[1][1]) && /fits a phone line without wrapping: at most about 60 characters in English, 45 in Thai or Korean/.test(calls[1][1])];   // V102.363: emoji-led lines + 💊 drugs line · V102.385: one short sentence per line
       window.callUniversalAI = async () => { throw new Error('quota'); };
       await Articles.ai(); out.err = q('.art-err') && q('.art-err').textContent;
       out.writes = writes.length;
