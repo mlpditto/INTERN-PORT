@@ -15,7 +15,8 @@ Admin: Dashboard ▸ 📰 Articles. Intern: the daily popup, History row, Codex 
 - `articles-disease-link-qa` — ＋ Disease link by hand; the intern Disease entry lists its articles
 - `articles-drug-codex-block-qa` — the intern Drug entry lists its linked articles
 - `articles-link-hint-qa` — after Save, a "… is in the Disease Codex — link?" banner
-- `articles-draft-all-qa` — 🩺 Draft all: one draft per article in neither Codex, press again to stop (arrives with PR #1989)
+- `articles-draft-all-qa` — 🩺 Draft all: one draft per article in neither Codex, press again to stop
+- `articles-tags-qa` — 🏷 tags: editor chip field with suggestions, row chips (3 + n), tap a chip to filter the list, saved as `tags[]`
 
 ## What usually lies
 
