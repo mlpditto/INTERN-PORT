@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.383)</title>
+    <title>Nika Admin (V102.384)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -686,6 +686,7 @@
         #hub-view-design .gm-bar .audit-provider { width:30px; height:28px; min-height:0; padding:0; border-radius:7px; background:transparent; border:1px solid transparent; cursor:pointer; }
         #hub-view-design .gm-bar .audit-provider[aria-pressed="true"] { background:#e2e8f0; border-color:#cbd5e1; }
         #hub-view-design .gm-bar .audit-provider .text-ai-logo { width:16px; height:16px; margin:0; vertical-align:middle; }
+        #hub-view-design .gm-create.gm-now { margin-left:6px; padding:10px 14px; background:linear-gradient(45deg, #f59e0b, #f97316); box-shadow:0 10px 20px rgba(249,115,22,0.25); }   /* V102.384 */
         #hub-view-design .gm-create { margin-left:auto; border-radius:50px; padding:10px 24px; font-size:0.95em; background:linear-gradient(45deg, #4361ee, #4895ef); box-shadow:0 10px 20px rgba(67,97,238,0.25); border:none; color:#fff; font-weight:800; display:flex; align-items:center; gap:8px; height:44px; }
         /* V102.364: on a desktop the bar is ONE line — nothing wraps; the Plan 10 episodes button says "free · text only" in its tooltip; a too-narrow window scrolls the engine rail sideways (no scrollbar drawn) */
         @media (min-width: 601px) {
@@ -9156,7 +9157,7 @@
                                             <button type="button" class="alabasta-genmage-quick-chip" data-value="or/bytedance/seedance-2.0-fast" onclick="selectDesignEngine(this)" title="OpenRouter — Seedance 2.0 Fast · 9:16 with audio, 720p · about $0.09 per second (8 s ≈ $0.73, measured) · renders in ~4 min" aria-label="Clip via Seedance 2.0 Fast"><span class="text-ai-logo" data-owner="bytedance" aria-hidden="true"></span>Seedance<small class="gm-ghost">8 s · $0.73</small></button>
                                         </div>
                                         <input type="hidden" id="design-engine" value="as/gemini-nano-banana-2.1">
-                                        <button class="magic-btn gm-create" id="btn-generate-design" title="Create Masterpiece · สร้างภาพ · 이미지 생성" aria-label="Create Masterpiece" onclick="generateAIDesign()"><i class="fa-solid fa-wand-magic-sparkles"></i> Create</button>
+                                        <button class="magic-btn gm-create" id="btn-generate-design" title="Create Masterpiece · สร้างภาพ · 이미지 생성" aria-label="Create Masterpiece" onclick="generateAIDesign()"><i class="fa-solid fa-wand-magic-sparkles"></i> Create</button><button type="button" class="magic-btn gm-create gm-now" id="btn-generate-now" title="⚡ Create now — skip AI Refined Prompt and send the Brief as is" aria-label="Create now, skip AI Refined Prompt" onclick="generateAIDesign({ skipEnhance: true })">⚡</button><!-- V102.384 -->
                                     </div>
                                 </div>
                             </div>
@@ -21663,7 +21664,13 @@ RULES:
             showToast('📋 Prompt copied');
         };
 
-        window.generateAIDesign = async function() {
+        // V102.384 (owner): a Brief that is already a structured prompt — [TASK] plus at least two of CONTEXT / CORE INSTRUCTION / CONSTRAINT / OUTPUT
+        window.gmIsStructuredPrompt = function (text) {
+            const t = String(text || '');
+            if (!/\[TASK\]/i.test(t)) return false;
+            return ['CONTEXT', 'CORE INSTRUCTION', 'CONSTRAINT', 'OUTPUT'].filter(h => new RegExp('\\[' + h + '\\]', 'i').test(t)).length >= 2;
+        };
+        window.generateAIDesign = async function(opts) {   // V102.384: opts.skipEnhance = ⚡ Create now
             if (window.glcIsClipMode && window.glcIsClipMode()) return window.glcPlanEpisodes(); // V102.291
             const promptInput = document.getElementById('design-prompt');
             const style = document.getElementById('selected-design-style').value;
@@ -21677,7 +21684,10 @@ RULES:
             let stopBusy = function() {};   // V102.315: declared outside try so finally can reach it (inside, finally threw ReferenceError and the button stayed busy)
 
             try {
-                stopBusy = window.gmBusy(btn, 'Refining…');   // V102.303: with a seconds counter
+                const rawPrompt = promptInput.value.trim();
+                // V102.384: a structured Brief, or ⚡ Create now, skips AI Refined Prompt — the Brief is sent as is
+                const skipEnhance = !!(opts && opts.skipEnhance) || window.gmIsStructuredPrompt(rawPrompt);
+                stopBusy = window.gmBusy(btn, skipEnhance ? 'Sending…' : 'Refining…');   // V102.303: with a seconds counter
                 
                 // Step 1: AI Translation & Enhancement (Refinement)
                 let enhancerPrompt = `You are an expert AI Prompt Engineer.
@@ -21712,10 +21722,11 @@ RULES:
                 
                 // V102.292: enhancer model from the composer rail (#ai-model-design-enhancer).
                 const enhancerModel = getAIDesignEnhancerModel();
-                const { text: enhancedPrompt } = await callUniversalAI(enhancerModel, enhancerPrompt, false, null, '', { feature: 'design_enhance' });
+                const enhancedPrompt = skipEnhance ? '' : (await callUniversalAI(enhancerModel, enhancerPrompt, false, null, '', { feature: 'design_enhance' })).text;   // V102.384: no enhancer when skipping
                 
                 // Step 2: Show Prompt Editor Modal ([Version: V87.17])
-                const finalPrompt = await new Promise((resolve) => {
+                if (skipEnhance) showToast(opts && opts.skipEnhance ? '⚡ Sent as is — no AI Refined Prompt' : '⚡ Structured Brief — sent as is, no AI Refined Prompt');
+                const finalPrompt = skipEnhance ? rawPrompt : await new Promise((resolve) => {
                     const modal = document.getElementById('aiDesignPromptModal');
                     const textArea = document.getElementById('ai-design-refined-text');
                     const proceedBtn = document.getElementById('btn-design-proceed');
