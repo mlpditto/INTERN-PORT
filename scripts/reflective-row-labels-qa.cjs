@@ -6,7 +6,7 @@ const path = require('node:path');
 const assert = require('node:assert/strict');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const html = fs.readFileSync('public/admin.html', 'utf8').replace(/\r\n/g, '\n');
-assert.match(html, /<title>Nika Admin \(V102\.(?:38[1-9]|39\d|[4-9]\d\d)\)<\/title>/, 'admin V102.381+');
+assert.match(html, /<title>Nika Admin \(V102\.(?:379|38\d|39\d|[4-9]\d\d)\)<\/title>/, 'admin V102.379+ (bumped down from 381 when merged third)');
 assert.ok(html.includes('<span class="rr-mini-label" title="The model that writes the reply — the Writing Analysis column picks its own">Reply model</span>'), 'the reply row label');
 assert.ok(html.includes('<span class="rr-mini-label" title="The model that analyses the intern\'s writing — separate from the reply model">Analysis model</span>'), 'the analysis row label');
 assert.ok(!html.includes('<span class="rr-mini-label">Model</span>'), 'the bare "Model" label is gone');
