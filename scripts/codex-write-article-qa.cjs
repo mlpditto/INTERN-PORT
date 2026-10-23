@@ -65,7 +65,7 @@ assert.ok(!/\$\{dxaMatBtnHtml\(disease\)\}\s*<button type="button" class="dca-ro
       return out;
     });
     assert.deepEqual(r.rows, [2, true, true, 'Drafted from the article “Hordeolum: the 3-day rule” — open it'], 'every row has 📰; the source-article chip is unchanged; a fresh entry has no chip: ' + JSON.stringify(r.rows));
-    assert.deepEqual(r.order.slice(-4), ['📰', 'Edit', '📋', '🗑️'], 'row actions: … 📰 · Edit · 📋 · 🗑️: ' + JSON.stringify(r.order));
+    assert.deepEqual(r.order.slice(-5), ['📰', 'Edit', '🧪', '📋', '🗑️'], 'row actions: … 📰 · Edit · 🧪 (V102.381) · 📋 · 🗑️: ' + JSON.stringify(r.order));
     assert.deepEqual(r.cancel, [0, 0, 0], 'Cancel writes nothing');
     assert.deepEqual([r.run.prompts, r.run.feature, r.run.isJson, r.run.promptHas, r.run.refsOut], [1, 'disease_article', true, [true, true, true, true, true, true], true], 'one JSON call with the monograph (references left out): ' + JSON.stringify([r.run.prompts, r.run.feature, r.run.promptHas, r.run.refsOut]));
     assert.deepEqual(r.run.add, ['articles', 'draft', { en: 'Acromegaly: the subtle signs 🔍', th: 'อะโครเมกาลี: สัญญาณที่มองข้าม', ko: '말단비대증: 놓치기 쉬운 징후' }, 3, { emoji: '🧠' }, [{ kind: 'disease', id: 'd1', label: 'Acromegaly' }], { draftId: '', publishedId: 'd1', name: 'Acromegaly' }, true, 'a@x.test', true, 1, 'TS'],
