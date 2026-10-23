@@ -14747,6 +14747,7 @@
                         <div style="display:flex; align-items:center; gap:8px;">
                             <!-- V94.18: Phase 3 model picker. Applies to the next grammar call (AI Suggest or Retry).
                                  V102.118: same vendor-first row as the Model row above (tabs + the registry rail, which replaces the two chips below). -->
+                            <span class="rr-mini-label" title="The model that analyses the intern's writing — separate from the reply model">Analysis model</span><!-- V102.381 -->
                             <div class="audit-model-row rr-model-row" id="rr-grammar-model-row"><div class="audit-providers" id="rr-grammar-providers" role="group" aria-label="Browse model providers"></div><div class="reflective-grammar-model-rail lang-no-toggle" role="group" aria-label="Grammar Model">
                                 <button type="button" class="reflective-grammar-model-chip active" data-value="gemini-3.6-flash" onclick="selectGrammarModel(this)" title="Gemini 3.6 Flash">3.6</button>
                             </div><input type="hidden" id="ai-model-grammar" value="gemini-3.6-flash"></div>
@@ -14781,7 +14782,7 @@
                         <input type="hidden" id="ai-preset-review" value="encourage">
                     </div>
                     <div class="rr-row">
-                        <span class="rr-mini-label">Model</span>
+                        <span class="rr-mini-label" title="The model that writes the reply — the Writing Analysis column picks its own">Reply model</span><!-- V102.381 (owner's idea 3): say what each model row is for -->
                         <!-- V102.118: vendor-first picker on one row — provider logo tabs, then only that provider's chips
                              (the Learning Path strip's parts, V102.83). ai-model-ui.js builds the chip rail after the hidden
                              select; rrInitModelRow() fills the tabs and appends the trial chips (Grok, Ollama). The V101.25
@@ -22721,6 +22722,8 @@ Rules:
             document.querySelectorAll('#reflective-focus-pills .reflective-focus-pill').forEach(pill => {
                 const n = window._reflectiveFocusPresetCounts[pill.dataset.value] || 0;
                 let badge = pill.querySelector('.focus-pill-badge');
+                // V102.381 (owner's idea 4): the badge says what it counts
+                const why = n + '× in this intern\'s last 5 reflections — try another focus for variety';
                 if (n > 0) {
                     if (!badge) {
                         badge = document.createElement('span');
@@ -22728,8 +22731,11 @@ Rules:
                         pill.appendChild(badge);
                     }
                     badge.textContent = n;
-                } else if (badge) {
-                    badge.remove();
+                    badge.setAttribute('aria-label', why);
+                    pill.title = why;
+                } else {
+                    if (badge) badge.remove();
+                    pill.removeAttribute('title');
                 }
             });
         };
