@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const { pathToFileURL } = require('node:url');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const admin = fs.readFileSync('public/admin.html', 'utf8'), aj = fs.readFileSync('public/articles-admin.js', 'utf8'), idx = fs.readFileSync('public/index.html', 'utf8'), ij = fs.readFileSync('public/articles.js', 'utf8');
-assert.ok(/<script src="articles-admin\.js\?v=V102\.37[2-9]"><\/script>/.test(admin) && /<script src="articles\.js\?v=V101\.(?:19[7-9]|[2-9]\d\d)" defer><\/script>/.test(idx), 'cache-busters bumped');
+assert.ok(/<script src="articles-admin\.js\?v=V102\.3[7-9]\d"><\/script>/.test(admin) && /<script src="articles\.js\?v=V101\.(?:19[7-9]|[2-9]\d\d)" defer><\/script>/.test(idx), 'cache-busters bumped');
 assert.ok(aj.includes("function diseases() {") && aj.includes("chip('＋ Disease', S.pick === 'disease'"), 'admin: the disease source + chip');
 assert.ok(ij.includes('forDisease: function (diseaseId) {') && ij.includes("l.kind === 'disease'"), 'intern: forDisease + the 🩺 link');
 assert.ok(idx.includes('id="dx-detail-articles"') && idx.includes('function dxPaintArticles(diseaseId) {') && idx.includes('dxPaintArticles(disease._id || disease.id);'), 'index: the articles block is painted on every detail render');

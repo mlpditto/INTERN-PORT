@@ -16,7 +16,7 @@
     var FILTERS = [['all', 'All'], ['draft', 'Draft'], ['scheduled', 'Scheduled'], ['live', 'Live'], ['ended', 'Ended']];
     var RERUN = [['off', 'Off', 'Interns who join after it ends never get it'], ['any', 'All new interns', 'Interns who join after it ends get it too, oldest first, one a day']];
     var MAX_BODY = 2000, MAX_TITLE = 90, BKK = 7 * 3600e3;
-    var S = { list: [], loaded: false, loading: false, err: '', filter: 'all', cur: null, lang: 'en', saving: false, del: false, pick: '', q: '', codex: null, base: '', savedAt: 0, open: {}, who: false, whoF: 'all', model: '', modelOpen: false, aiBusy: false, aiNote: '' };
+    var S = { list: [], loaded: false, loading: false, err: '', filter: 'all', tag: '', cur: null, lang: 'en', saving: false, del: false, pick: '', q: '', codex: null, base: '', savedAt: 0, open: {}, who: false, whoF: 'all', model: '', modelOpen: false, aiBusy: false, aiNote: '' };
     var DONE = ['ok', 'quiz', 'codex', 'hist'];   // what counts as read (articles.js); 'x' = closed without reading
     // V102.362: 🌐 Translate all — one click fills every missing TH / KO from the EN version and saves, one at a time
     var TR = { busy: false, stop: false, prog: '' };
@@ -66,7 +66,7 @@
             startAt: new Date(msOf(a.startAt)), endAt: new Date(msOf(a.endAt)),
             audience: { divisions: (a.audience && a.audience.divisions || []).slice(), groups: (a.audience && a.audience.groups || []).slice() },
             links: (a.links || []).map(function (l) { return { kind: l.kind, id: l.id, label: l.label }; }),
-            rerun: a.rerun === 'off' ? 'off' : 'any', readMin: readMin(body.en || body.th || body.ko || '')
+            tags: tagsOf(a.tags), rerun: a.rerun === 'off' ? 'off' : 'any', readMin: readMin(body.en || body.th || body.ko || '')
         };
     }
     // which script a text is mostly written in (Thai · Hangul · Latin) — catches Thai typed into the EN slot
@@ -125,12 +125,12 @@
     }
     function blank(now) {
         var w = defaultWindow(now);
-        return { id: null, title: {}, body: {}, cover: { emoji: '📰' }, status: 'draft', startAt: w.start, endAt: w.end, audience: { divisions: [], groups: [] }, links: [], rerun: 'any' };
+        return { id: null, title: {}, body: {}, cover: { emoji: '📰' }, status: 'draft', startAt: w.start, endAt: w.end, audience: { divisions: [], groups: [] }, links: [], tags: [], rerun: 'any' };
     }
     function fromDoc(id, d) {
         return { id: id, title: Object.assign({}, d.title), body: Object.assign({}, d.body), cover: Object.assign({ emoji: '📰' }, d.cover), status: d.status === 'scheduled' ? 'scheduled' : 'draft',
             startAt: msOf(d.startAt), endAt: msOf(d.endAt), audience: { divisions: ((d.audience || {}).divisions || []).slice(), groups: ((d.audience || {}).groups || []).slice() },
-            links: (d.links || []).slice(), rerun: d.rerun === 'off' ? 'off' : 'any', createdAt: msOf(d.createdAt), dx: d.dx || null, dc: d.dc || null };   // V102.374: dc = the Drug Codex twin of dx   // V102.371: dx = {draftId, publishedId, name} once sent to the Disease Codex
+            links: (d.links || []).slice(), tags: tagsOf(d.tags), rerun: d.rerun === 'off' ? 'off' : 'any', createdAt: msOf(d.createdAt), dx: d.dx || null, dc: d.dc || null };   // V102.374: dc = the Drug Codex twin of dx   // V102.371: dx = {draftId, publishedId, name} once sent to the Disease Codex
     }
 
     // ---- data
@@ -144,7 +144,7 @@
     }
     function sorted(now) {
         var rank = { live: 0, scheduled: 1, draft: 2, ended: 3 };
-        return S.list.filter(function (a) { return S.filter === 'all' || status(a, now) === S.filter; }).sort(function (x, y) {
+        return S.list.filter(function (a) { return (S.filter === 'all' || status(a, now) === S.filter) && (!S.tag || (a.tags || []).indexOf(S.tag) >= 0); }).sort(function (x, y) {
             var a = status(x, now), b = status(y, now);
             return rank[a] - rank[b] || (a === 'ended' ? (y.endAt || 0) - (x.endAt || 0) : (x.startAt || 0) - (y.startAt || 0));
         });
@@ -278,6 +278,9 @@
             '.art-dt{border:1px solid #e2e8f0;border-radius:9px;padding:5px 8px;font:inherit;font-size:12.5px;font-weight:700;color:#334155;margin:0;width:auto}' +
             '.art-lk{display:inline-flex;align-items:center;gap:5px;padding:4px 6px 4px 10px;border-radius:999px;font-size:12px;font-weight:700;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe}.art-lk.codex{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}' +
             '.art-lk button{min-height:0;margin:0;width:20px;height:20px;padding:0;border:0;border-radius:50%;background:transparent;color:inherit;cursor:pointer}.art-add{border-style:dashed!important}' +
+            '.art-lk.tag{background:#f1f5f9;color:#334155;border-color:#e2e8f0}.art-tin{min-width:0;width:112px;border:1px dashed #cbd5e1;border-radius:999px;padding:4px 10px;font:inherit;font-size:12px;font-weight:700;color:#334155;margin:0;background:#fff}' +
+            '.art-tg{display:inline-flex;align-items:center;padding:1px 7px;border-radius:999px;background:#f1f5f9;color:#475569;font-size:10.5px;font-weight:800;cursor:pointer;border:1px solid transparent}.art-tg:hover{border-color:#94a3b8}.art-tg.on{background:#1e293b;color:#fff}.art-tg.more{cursor:default;color:#94a3b8}' +
+            '.art-tagf{min-height:0!important;margin:0 0 0 8px!important;width:auto!important;padding:5px 10px;border-radius:999px;border:1px solid #1e293b;background:#1e293b;color:#fff;font-size:12px;font-weight:800;cursor:pointer}' +
             '.art-pk{border:1px solid #e2e8f0;border-radius:12px;padding:8px;background:#fff}.art-pk input{width:100%;box-sizing:border-box;margin:0 0 6px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font:inherit}' +
             '.art-pk .opts{max-height:170px;overflow:auto;display:flex;flex-direction:column}.art-pk .opts button{all:unset;cursor:pointer;padding:5px 8px;border-radius:7px;font-size:13px}.art-pk .opts button:hover{background:#eef2ff}' +
             '.art-err{color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:6px 10px;font-size:12.5px;font-weight:700}' +
@@ -319,6 +322,19 @@
     }
     function shortDate(ms) { return ms == null ? '' : new Date(ms + BKK).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }); }
     function title(a) { var t = a.title || {}; return t.en || t.th || t.ko || 'Untitled'; }
+    // V102.382: 🏷 tags — short lowercase labels (≤ 8 per article, ≤ 24 chars), shown on the rows; tap one to filter the list
+    var MAX_TAGS = 8, MAX_TAG = 24;
+    function normTag(t) { return String(t || '').trim().toLowerCase().replace(/^#/, '').replace(/['"<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, MAX_TAG); }
+    function tagsOf(v) { var seen = {}; return (Array.isArray(v) ? v : []).map(normTag).filter(function (t) { if (!t || seen[t]) return false; seen[t] = true; return true; }).slice(0, MAX_TAGS); }
+    function allTags() { var n = {}; S.list.forEach(function (a) { (a.tags || []).forEach(function (t) { n[t] = (n[t] || 0) + 1; }); }); return Object.keys(n).sort(function (x, y) { return n[y] - n[x] || x.localeCompare(y); }); }
+    function tagChipHtml(t) { return '<span class="art-tg' + (S.tag === t ? ' on' : '') + '" role="button" tabindex="0" title="Show only articles tagged “' + esc(t) + '”" onclick="event.stopPropagation();Articles.tag(\'' + esc(t) + '\')">' + esc(t) + '</span>'; }
+    function rowTagsHtml(a) { var ts = a.tags || []; return ts.slice(0, 3).map(tagChipHtml).join('') + (ts.length > 3 ? '<span class="art-tg more" title="' + esc(ts.slice(3).join(' · ')) + '">+' + (ts.length - 3) + '</span>' : ''); }
+    function tagsFieldHtml(a) {
+        var mine = a.tags || [];
+        var sug = allTags().concat((a.links || []).map(function (l) { return normTag(l.label); })).filter(function (t, i, arr) { return t && mine.indexOf(t) < 0 && arr.indexOf(t) === i; });
+        return '<div class="art-ln art-tags"><span class="art-ml">🏷 Tags</span>' + mine.map(function (t, i) { return '<span class="art-lk tag">' + esc(t) + '<button type="button" aria-label="Remove tag" onclick="Articles.dropTag(' + i + ')">✕</button></span>'; }).join('') +
+            (mine.length < MAX_TAGS ? '<input class="art-tin" id="art-tag-in" list="art-tag-dl" maxlength="' + MAX_TAG + '" placeholder="add tag ⏎" aria-label="Add a tag" onkeydown="Articles.tagKey(event)" onchange="Articles.tagKey(event)"><datalist id="art-tag-dl">' + sug.slice(0, 30).map(function (t) { return '<option value="' + esc(t) + '">'; }).join('') + '</datalist>' : '<span class="art-ml" style="min-width:0">max ' + MAX_TAGS + '</span>') + '</div>';
+    }
     function stLabel(a, now) {
         var st = status(a, now);
         return { live: 'Live · ' + shortDate(a.startAt) + '–' + shortDate(a.endAt), scheduled: 'Scheduled · ' + shortDate(a.startAt), draft: 'Draft', ended: 'Ended · ' + shortDate(a.endAt) }[st];
@@ -327,7 +343,7 @@
         var st = status(a, now), have = langsOf(a), aud = (a.audience.divisions || []).concat(a.audience.groups || []);
         return '<button type="button" class="art-row st-' + st + (S.cur && S.cur.id === a.id ? ' sel' : '') + (st === 'ended' ? ' ended' : '') + '" onclick="Articles.edit(\'' + esc(a.id) + '\')">' +
             '<span class="art-tile">' + esc(a.cover.emoji) + '</span><span style="min-width:0"><span class="art-t">' + esc(title(a)) + '</span><span class="art-meta"><span class="art-st ' + st + '">' + esc(stLabel(a, now)) + '</span>' +
-            LANGS.map(function (l) { return '<span class="art-lg' + (have.indexOf(l[0]) < 0 ? ' off' : '') + '">' + l[1] + '</span>'; }).join('') +
+            LANGS.map(function (l) { return '<span class="art-lg' + (have.indexOf(l[0]) < 0 ? ' off' : '') + '">' + l[1] + '</span>'; }).join('') + rowTagsHtml(a) +
             (aud.length ? '<span title="Audience">' + esc(aud.join(' · ')) + '</span>' : '') + (a.rerun === 'off' ? '' : '<span class="art-rr" title="Also sent to interns who join later">🔁</span>') + '</span></span></button>';
     }
     // V102.371: the 🩺 chip says where the article stands in the Disease Codex
@@ -464,6 +480,7 @@
             '<textarea class="art-ta" id="art-bodyta" placeholder="A short read: 3–5 lines. Markdown works." oninput="Articles.text(\'body\',this.value)">' + esc(b) + '</textarea>' +
             '<div class="art-ft">' + (S.aiNote ? '<span class="ai">' + esc(S.aiNote) + '</span>' : '<span>Markdown</span>') + '<span id="art-count" style="margin-left:auto"' + (b.length > MAX_BODY ? ' class="over"' : '') + '>' + b.length + ' / ' + MAX_BODY + ' · ~' + readMin(b) + ' min</span></div></div>',
             '<div id="art-warn">' + hintHtml() + (mm ? '<div class="art-warn" role="status">⚠️ This looks like ' + NAME[mm] + ', not ' + NAME[L] + (((a.title || {})[mm] || (a.body || {})[mm]) ? '' : '<button type="button" onclick="Articles.moveLang(\'' + L + '\',\'' + mm + '\')">Move to ' + mm.toUpperCase() + '</button>') + '</div>' : '') + '</div>',
+            tagsFieldHtml(a),   // V102.382
             sec('when', 'When & who', whenWhoSummary(a),
                 '<div class="art-ln"><span class="art-ml">Window</span><input type="datetime-local" class="art-dt" id="art-start" value="' + (a.startAt != null ? toLocal(a.startAt) : '') + '" onchange="Articles.when(\'startAt\',this.value)"> → <input type="datetime-local" class="art-dt" id="art-end" value="' + (a.endAt != null ? toLocal(a.endAt) : '') + '" onchange="Articles.when(\'endAt\',this.value)"><span style="font-size:11.5px;color:#94a3b8">Bangkok time</span></div>' +
                 '<div class="art-ln"><span class="art-ml">🔁 Later</span>' + RERUN.map(function (r) { return chip(r[1], a.rerun === r[0], 'Articles.rerun(\'' + r[0] + '\')', ' title="' + esc(r[2]) + '"'); }).join('') + '</div>' +
@@ -525,12 +542,12 @@
     }
     function render() {
         var host = document.getElementById('art-body'); if (!host) return;
-        var now = Date.now(), counts = { all: S.list.length };
-        S.list.forEach(function (a) { var st = status(a, now); counts[st] = (counts[st] || 0) + 1; });
+        var now = Date.now(), counts = { all: 0 };
+        S.list.forEach(function (a) { if (S.tag && (a.tags || []).indexOf(S.tag) < 0) return; counts.all++; var st = status(a, now); counts[st] = (counts[st] || 0) + 1; });   // V102.382: counts follow the tag filter
         var list = sorted(now);
         var head = '<div class="art-h"><h2>📰 Articles</h2><div class="art-rail" role="group" aria-label="Filter by status">' + FILTERS.map(function (f) {
             return '<button type="button" class="' + (S.filter === f[0] ? 'on' : '') + '" aria-pressed="' + (S.filter === f[0]) + '" data-filter="' + f[0] + '" onclick="Articles.filter(\'' + f[0] + '\')">' + f[1] + '<b>' + (counts[f[0]] || 0) + '</b></button>';
-        }).join('') + '</div>' + trAllHtml() + daAllHtml() + '<button type="button" class="art-new" onclick="Articles.edit(null)">＋ New</button></div>';
+        }).join('') + '</div>' + (S.tag ? '<button type="button" class="art-tagf" onclick="Articles.tag(\'\')" title="Showing only this tag — tap to clear">🏷 ' + esc(S.tag) + ' ✕</button>' : '') + trAllHtml() + daAllHtml() + '<button type="button" class="art-new" onclick="Articles.edit(null)">＋ New</button></div>';
         var left = '<div class="art-list">' + (S.loading && !S.loaded ? '<div class="art-empty">Loading…</div>' : list.length ? list.map(function (a) { return rowHtml(a, now); }).join('') : '<div class="art-empty">' + (S.list.length ? 'Nothing here.' : 'No articles yet — ＋ New') + '</div>') + '</div>';
         var mid = S.cur ? editorHtml(now) : '<div class="art-empty">' + (S.err && !S.loaded ? '⚠️ ' + esc(S.err) : 'Pick an article, or ＋ New.') + '</div>';
         host.innerHTML = head + '<div class="art-g">' + left + (S.cur && S.who ? whoHtml(S.cur) : mid + (S.cur ? previewHtml() : '<div class="art-pv"></div>')) + '</div>';
@@ -580,6 +597,11 @@
             });
         },
         filter: function (f) { S.filter = f; render(); },
+        // V102.382: 🏷 tags
+        tag: function (t) { t = normTag(t); S.tag = S.tag === t ? '' : t; render(); },
+        addTag: function (v) { var a = S.cur; if (!a) return; a.tags = tagsOf((a.tags || []).concat(String(v || '').split(','))); render(); var i = document.getElementById('art-tag-in'); if (i) i.focus(); },
+        dropTag: function (i) { var a = S.cur; if (!a) return; a.tags = (a.tags || []).filter(function (_, k) { return k !== i; }); render(); },
+        tagKey: function (e) { var el = e && e.target; if (!el) return; if (e.type === 'keydown') { if (e.key !== 'Enter' && e.key !== ',') return; e.preventDefault(); } if (!String(el.value || '').trim()) return; var v = el.value; el.value = ''; api.addTag(v); },
         who: function (on) { S.who = !!on; render(); },
         whoF: function (f) { S.whoF = f; render(); },
         csv: function () {
@@ -746,7 +768,7 @@
             ta.focus(); ta.setSelectionRange(s + pre.length, e + pre.length);
             api.text('body', ta.value);
         },
-        _S: S, _daJobs: daJobs, _codexNameOf: codexNameOf, _stats: stats, _forUser: forUser, _status: status, _defaultWindow: defaultWindow, _validate: validate, _toDoc: toDoc, _toLocal: toLocal, _fromLocal: fromLocal, _readMin: readMin, _langsOf: langsOf
+        _S: S, _daJobs: daJobs, _codexNameOf: codexNameOf, _stats: stats, _forUser: forUser, _status: status, _defaultWindow: defaultWindow, _validate: validate, _toDoc: toDoc, _tagsOf: tagsOf, _allTags: allTags, _toLocal: toLocal, _fromLocal: fromLocal, _readMin: readMin, _langsOf: langsOf
     };
     window.Articles = api;
 })();
