@@ -109,7 +109,7 @@ const D = 864e5, BKK = 7 * 3600e3;
       if (!sh) return out;
       const rect = sh.getBoundingClientRect();
       out.sheet = { bottom: Math.round(window.innerHeight - rect.bottom), w: Math.round(rect.width), title: sh.querySelector('h3').textContent, kicker: sh.querySelector('.cov').getAttribute('title'), cover: sh.querySelector('.cov').textContent, foot: [...sh.querySelectorAll('.foot > button')].map(b => b.textContent.trim()), okBg: getComputedStyle(sh.querySelector('.ok')).backgroundColor, okW: Math.round(sh.querySelector('.ok').getBoundingClientRect().width), noOld: !sh.querySelector('.g, .tile, .kick, .mute:not(.bm)'),
-        clamp: sh.querySelector('.art-md').classList.contains('clamp'), moreHidden: document.getElementById('art-more').hidden, lng: [...sh.querySelectorAll('.lng button')].map(b => b.textContent + (b.classList.contains('on') ? '*' : '')),
+        clamp: sh.querySelector('.art-md').classList.contains('clamp'), moreHidden: document.getElementById('art-more').hidden, lng: [...sh.querySelectorAll('.lng')].map(b => b.textContent + '|' + b.getAttribute('aria-label')),
         links: [...sh.querySelectorAll('.art-link')].map(b => b.textContent), bold: sh.querySelector('.art-md').innerHTML === window.renderMd(docs.a1.body.en), okH: Math.round(sh.querySelector('.ok').getBoundingClientRect().height),
         bmH: Math.round(sh.querySelector('.bm').getBoundingClientRect().height), noToggle: sh.classList.contains('lang-no-toggle'), focus: document.activeElement === sh.querySelector('.ok') };
       out.showWrite = writes[writes.length - 1];
@@ -118,6 +118,8 @@ const D = 864e5, BKK = 7 * 3600e3;
       internArticles.lang('th'); await wait(150);
       out.th = [sh.querySelector('h3').innerText, sh.querySelector('.art-md').innerText.includes('ปัจจุบัน'), sh.querySelectorAll('.lang-th').length];
       internArticles.lang('en');
+      // V101.202: a tap on the pill (no argument) cycles through the versions the article has
+      internArticles.lang(); out.cyc = [sh.querySelector('.lng').textContent, sh.querySelector('.art-md').innerHTML === window.renderMd(docs.a1.body.th)]; internArticles.lang(); out.cyc.push(sh.querySelector('.lng').textContent, sh.querySelector('.lng').getAttribute('aria-label'));
       internArticles.save(); out.saved = [sh.querySelector('.bm').getAttribute('aria-pressed'), writes[writes.length - 1][2].articleSeen.a1.saved];
       // Esc = closed without reading
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); await wait(450);
@@ -143,13 +145,13 @@ const D = 864e5, BKK = 7 * 3600e3;
       if (row) {
         row.click(); await wait(50);
         out.histRead = [row.getAttribute('aria-expanded'), row.querySelector('.hl-pill').textContent, writes[writes.length - 1][2].articleSeen.a1.act, row.querySelector('.art-md').innerHTML === window.renderMd(docs.a1.body.en), row.querySelectorAll('.art-link').length];
-        // V101.193: EN / TH chips in the row (a1 has en + th); a tap swaps the body in place — the row stays open, nothing is written
-        const chips = () => [...row.querySelectorAll('.art-hist .lng button')].map(b => b.textContent + ':' + b.getAttribute('aria-pressed'));
+        // V101.193: the language pill in the row (a1 has en + th); a tap swaps the body in place — the row stays open, nothing is written (V101.202: one pill, cycles)
+        const chips = () => [...row.querySelectorAll('.art-hist .lng')].map(b => b.textContent + ':' + b.dataset.lang);
         const wBefore = writes.length;
         out.histLng = chips();
-        row.querySelectorAll('.art-hist .lng button')[1].click(); await wait(20);
+        row.querySelector('.art-hist .lng').click(); await wait(20);
         out.histLngTh = [chips().join(' '), row.querySelector('.art-md').innerHTML === window.renderMd(docs.a1.body.th), row.getAttribute('aria-expanded'), writes.length - wBefore];
-        row.querySelectorAll('.art-hist .lng button')[0].click(); await wait(20);
+        row.querySelector('.art-hist .lng').click(); await wait(20);
         out.histLngBack = [chips().join(' '), row.querySelector('.art-md').innerHTML === window.renderMd(docs.a1.body.en)];
         internArticles.onUserDoc(); await wait(50);
         out.stillOpen = document.querySelector('[data-delete-type="article"]').getAttribute('aria-expanded');
@@ -165,7 +167,8 @@ const D = 864e5, BKK = 7 * 3600e3;
     assert.equal(r.sheet.title, '3 inhaler mistakes we see every week'); assert.equal(r.sheet.kicker, 'Article · 1 min', 'V101.177: "Article · n min" is the cover tooltip'); assert.equal(r.sheet.cover, '🫁', 'the header is the cover emoji');
     assert.deepEqual(r.sheet.foot, ['🔖', '🔕', 'Read more ▾', '👍 Got it'], 'one footer row: 🔖 🔕 left, Read more + Got it right'); assert.equal(r.sheet.okBg, 'rgb(22, 163, 74)', 'Got it is the green pill (G4)'); assert.ok(r.sheet.okW < 160, 'Got it is small, not full width: ' + r.sheet.okW); assert.ok(r.sheet.noOld, 'no grab handle, tile, kicker line or text mute line');
     assert.ok(r.sheet.clamp && !r.sheet.moreHidden, 'a long body is clamped with Read more'); assert.ok(r.sheet.bold, 'the body goes through the app’s renderMd (marked + DOMPurify in the app; the CDN is blocked here)');
-    assert.deepEqual(r.sheet.lng, ['EN*', 'TH'], 'language chips only for the versions the article has (no KO here)');
+    assert.deepEqual(r.sheet.lng, ['EN|Language: EN (tap for TH)'], 'V101.202: one language pill showing the language on screen; it offers only the versions the article has (no KO here)');
+    assert.deepEqual(r.cyc, ['TH', true, 'EN', 'Language: EN (tap for TH)'], 'a tap on the pill cycles EN → TH → EN with the body swapped (a1 has no ko)');
     assert.deepEqual(r.sheet.links, ['🩺 Inhaler technique', '💊 Salbutamol MDI', '🧪 Bronchodilators 🪙 +1', '💊 Salbutamol'], 'the 🩺 Disease Codex entry (V101.196), the 💊 Drug Codex entry drafted from it (V101.200), then quiz (+1 Beri) and Codex links');
     assert.ok(r.sheet.okH >= 44 && r.sheet.bmH >= 44, 'touch targets ≥ 44 px'); assert.ok(r.sheet.noToggle, 'lang-no-toggle: Thai is never hidden'); assert.ok(r.sheet.focus, '✓ Got it has focus');
     assert.deepEqual([r.showWrite[0], r.showWrite[1], typeof r.showWrite[2].articlePopDay, r.showWrite[2].articleSeen.a1.day === r.showWrite[2].articlePopDay, r.showWrite[3]], ['users', 'U1', 'string', true, { merge: true }], 'showing it records today on users/{uid} (merge)');
@@ -179,9 +182,9 @@ const D = 864e5, BKK = 7 * 3600e3;
     assert.ok(r.hist, 'the article is a History row');
     assert.deepEqual(r.hist, ['3 inhaler mistakes we see every week', '👁 Closed', false, true], 'History row: title, 👁 Closed, no 🗑 menu, a 📰 chip');
     assert.deepEqual(r.histRead, ['true', '✓ Read', 'hist', true, 4], 'opening the row reads it in place (pill → ✓ Read, act hist, body + 🩺/💊/quiz/Codex links)');
-    assert.deepEqual(r.histLng, ['EN:true', 'TH:false'], 'V101.193: the row carries the EN / TH chips (a1 has no ko), EN on');
-    assert.deepEqual(r.histLngTh, ['EN:false TH:true', true, 'true', 0], 'TH tap: Thai body in place, row still open, no write');
-    assert.deepEqual(r.histLngBack, ['EN:true TH:false', true], 'EN tap: back to the English body');
+    assert.deepEqual(r.histLng, ['EN:en'], 'V101.202: the row carries one language pill (a1 has no ko), EN on');
+    assert.deepEqual(r.histLngTh, ['TH:th', true, 'true', 0], 'a tap: Thai body in place, pill → TH, row still open, no write');
+    assert.deepEqual(r.histLngBack, ['EN:en', true], 'a second tap: back to the English body');
     assert.equal(r.stillOpen, 'true', 'the next users snapshot does not collapse the open row');
     assert.deepEqual(r.histQuiz, ['q1'], 'the quiz link works from History too');
     assert.deepEqual(r.histDx, ['dx:dx1'], 'the 🩺 button opens the Disease Codex entry (V101.196)');

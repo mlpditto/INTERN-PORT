@@ -59,6 +59,9 @@
         var have = langs(a), l = have.indexOf(lang) >= 0 ? lang : have.indexOf('en') >= 0 ? 'en' : (have[0] || 'en');
         return { lang: l, title: (a.title || {})[l] || (a.title || {}).en || '', body: (a.body || {})[l] || (a.body || {}).en || '' };
     }
+    // V101.202 (owner): one language pill, like the app's EN / KR / TH button — it shows the language on screen; a tap moves to the next one the article has
+    function nextLang(have, l) { return have[(have.indexOf(l) + 1) % have.length]; }
+    function langBtn(have, l, onclick) { return '<button type="button" class="lng" data-lang="' + l + '" aria-label="Language: ' + l.toUpperCase() + ' (tap for ' + nextLang(have, l).toUpperCase() + ')" onclick="' + onclick + '">' + l.toUpperCase() + '</button>'; }
     function uiLang() { var b = document.body; return b && b.classList.contains('lang-th-on') ? 'th' : b && b.classList.contains('lang-kr-on') ? 'ko' : 'en'; }
     // History rows: every article this intern can see now (live / rerun) or has already seen
     function historyItems(list, me, now) {
@@ -142,7 +145,7 @@
             '@keyframes artUp{from{transform:translateY(30px);opacity:0}to{transform:none;opacity:1}}@keyframes artFade{from{opacity:0}to{opacity:1}}@media (prefers-reduced-motion: reduce){#art-sheet,#art-back{animation:none}}' +
             '#art-sheet .band{display:flex;align-items:center;gap:10px;margin:2px 0 2px}#art-sheet .cov{flex:1;min-width:0;font-size:26px;line-height:1}#art-sheet .cov small{font-size:13px;margin-left:4px;vertical-align:middle}' +
             '#art-sheet .x{width:34px;height:34px;min-height:0;margin:0;padding:0;border:0;border-radius:50%;background:#f1f5f9;color:#64748b;font-size:15px;cursor:pointer;flex:none}' +
-            '#art-sheet .lng,.art-hist .lng{display:inline-flex;gap:2px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:999px;padding:2px}#art-sheet .lng button,.art-hist .lng button{min-height:0;margin:0;width:auto;border:0;background:transparent;font:800 11px/1 Kanit,sans-serif;color:#64748b;padding:6px 9px;border-radius:999px;cursor:pointer}#art-sheet .lng button.on,.art-hist .lng button.on{background:#4361ee;color:#fff}' +
+            '#art-sheet .lng,.art-hist .lng{min-height:0;margin:0;width:auto;border:1px solid #c7d2fe;background:#eef2ff;color:#4361ee;font:800 11px/1 Kanit,sans-serif;padding:6px 10px;border-radius:999px;cursor:pointer}' +
             '#art-sheet h3{font:800 19px/1.3 Kanit,sans-serif;color:#1e293b;margin:6px 0 8px;word-break:keep-all;overflow-wrap:anywhere}' +
             '.art-md{font:400 14.5px/1.6 Kanit,sans-serif;color:#334155;word-break:keep-all;overflow-wrap:anywhere}.art-md p,.art-md ul,.art-md ol{margin:0 0 8px}.art-md ul,.art-md ol{padding-left:20px}.art-md a{color:#4361ee}' +
             '#art-sheet .art-md.clamp{max-height:6.4em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 65%,transparent);mask-image:linear-gradient(#000 65%,transparent)}' +   // 4 lines × 1.6; line-clamp left half a line showing when the body has several paragraphs
@@ -177,7 +180,7 @@
         var sh = document.getElementById('art-sheet'); if (!sh) return;
         var info = (c.kind === 'rerun' ? '🔁 ' + t.rerun : t.kicker) + ' · ' + (a.readMin || 1) + ' ' + t.min;
         sh.innerHTML = '<div class="band"><span class="cov" title="' + esc(info) + '" aria-label="' + esc(info) + '">' + esc((a.cover && a.cover.emoji) || '📰') + (c.kind === 'rerun' ? '<small>🔁</small>' : '') + '</span>' +
-            (have.length > 1 ? '<span class="lng" role="group" aria-label="Language">' + have.map(function (l) { return '<button type="button" class="' + (l === tx.lang ? 'on' : '') + '" aria-pressed="' + (l === tx.lang) + '" onclick="internArticles.lang(\'' + l + '\')">' + l.toUpperCase() + '</button>'; }).join('') + '</span>' : '') +
+            (have.length > 1 ? langBtn(have, tx.lang, 'internArticles.lang()') : '') +
             '<button type="button" class="x" onclick="internArticles.close(\'x\')" aria-label="' + t.close + '">✕</button></div>' +
             '<h3 id="art-title">' + esc(tx.title) + '</h3><div class="art-md' + (S.more ? '' : ' clamp') + '" id="art-text">' + md(tx.body) + '</div>' +
             linksHtml(a) +
@@ -240,14 +243,15 @@
         var a = find((s.metadata || {}).articleId); if (!a) return '';
         css();
         var tx = textOf(a, uiLang()), have = langs(a);
-        // V101.193: the sheet's EN / TH / KO chips here too when the article has more than one language — a tap swaps the body in place
-        var lng = have.length > 1 ? '<div class="art-top"><span class="lng" role="group" aria-label="Language">' + have.map(function (l) { return '<button type="button" class="' + (l === tx.lang ? 'on' : '') + '" aria-pressed="' + (l === tx.lang) + '" onclick="internArticles.histLang(this, \'' + l + '\')">' + l.toUpperCase() + '</button>'; }).join('') + '</span></div>' : '';
+        // V101.193: the sheet's language pill here too when the article has more than one language — a tap swaps the body in place (V101.202: one pill, cycles)
+        var lng = have.length > 1 ? '<div class="art-top">' + langBtn(have, tx.lang, 'internArticles.histLang(this)') + '</div>' : '';
         return '<div class="art-hist lang-no-toggle" data-art="' + esc(a.id) + '">' + lng + '<div class="art-md">' + md(tx.body) + '</div>' + linksHtml(a) + '</div>';
     }
     function histLang(btn, l) {
         var box = btn.closest('.art-hist'), a = box && find(box.dataset.art); if (!a) return;
-        box.querySelector('.art-md').innerHTML = md(textOf(a, l).body);
-        box.querySelectorAll('.lng button').forEach(function (b) { var on = b.textContent === l.toUpperCase(); b.className = on ? 'on' : ''; b.setAttribute('aria-pressed', String(on)); });
+        var have = langs(a), tx = textOf(a, l || nextLang(have, btn.dataset.lang));
+        box.querySelector('.art-md').innerHTML = md(tx.body);
+        btn.outerHTML = langBtn(have, tx.lang, 'internArticles.histLang(this)');
     }
     // tapping an article row open in History = read (the row stays open: the pill is patched in place, no re-render)
     document.addEventListener('click', function (e) {
@@ -267,7 +271,7 @@
         },
         historyItems: function () { return historyItems(S.list, me(), Date.now()); },
         detailHtml: detailHtml, pillHtml: pillHtml, close: close, histLang: histLang,
-        lang: function (l) { S.lang = l; render(); },
+        lang: function (l) { var a = S.cur && S.cur.a, have = a ? langs(a) : []; S.lang = l || (have.length ? nextLang(have, textOf(a, S.lang).lang) : S.lang); render(); },
         toggleMore: function () { S.more = !S.more; render(); },
         save: function () {
             var c = S.cur; if (!c) return;
