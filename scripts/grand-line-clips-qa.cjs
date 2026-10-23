@@ -17,7 +17,7 @@ assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(html));
 assert.ok(html.includes('data-value="as/gemini-omni-1.1-flash" onclick="selectDesignEngine(this)"'), 'Clip chip in the engine rail');
 assert.ok(/\|\| \(proxyProvider === 'gemini-aistudio' && \/\^gemini-omni\/i\.test\(modelName\)\)/.test(html), 'Omni is proxy-only (no local text fallback)');
 // V102.303: the Plan / Refine / Manifest buttons count the seconds they wait (gmBusy), the counter is stopped before the label is restored
-assert.ok(html.includes("const stopBusy = window.gmBusy(btn, 'Planning…');") && html.includes("stopBusy = window.gmBusy(btn, 'Refining…');") && html.includes('let stopBusy = function() {};') && html.includes("stopBusy = window.gmBusy(btn, 'Manifesting…');"), 'all three busy labels go through gmBusy');
+assert.ok(html.includes("const stopBusy = window.gmBusy(btn, 'Planning…');") && html.includes("stopBusy = window.gmBusy(btn, skipEnhance ? 'Sending…' : 'Refining…');") && html.includes('let stopBusy = function() {};') && html.includes("stopBusy = window.gmBusy(btn, 'Manifesting…');"), 'all three busy labels go through gmBusy');
 assert.equal((html.match(/stopBusy\(\);/g) || []).length, 4, 'every path stops the counter (plan finally, editor cancel, before Manifesting, create finally)');
 assert.ok(/if \(window\.GLC_ENGINES && window\.GLC_ENGINES\[engine\]\) engine = 'as\/gemini-nano-banana-2\.1';/.test(html), 'Bulk Paste illustrations never go to a video engine');
 assert.ok(!/(?:^|[^.\w])confirm\(\s*['"`]/.test(html.slice(html.indexOf('window.GLC_ENGINE ='), html.indexOf('window.downloadDesign = function'))), 'no native confirm() in the clips block');
