@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const html = fs.readFileSync('public/admin.html', 'utf8').replace(/\r\n/g, '\n'), aj = fs.readFileSync('public/articles-admin.js', 'utf8'), rules = fs.readFileSync('firestore.rules', 'utf8');
 assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(html));
-assert.ok(/<script src="articles-admin\.js\?v=V102\.37\d"><\/script>/.test(html), 'articles-admin.js cache-busted');
+assert.ok(/<script src="articles-admin\.js\?v=V102\.3[7-9]\d"><\/script>/.test(html), 'articles-admin.js cache-busted');
 assert.ok(html.includes("window.dcaDraftFromArticle = async function (art) {") && html.includes("dcaBuildAutoDraftPrompt(drugName, source)"), 'the article → drug draft path');
 assert.ok(aj.includes('function dcChipHtml(a) {') && aj.includes('toDrug: function () {'), 'the 💊 chip reads dc');
 // the rule the admin's draft create must satisfy: submittedBy = own uid, status pending, a disease name
