@@ -4,6 +4,7 @@
 // V102.338: editor blend (owner pick) — one status line (Draft · Scheduled · Live · Ended + what happens next, ● Unsaved / Saved n min ago), ⚠️ wrong-language warning with
 // one-tap Move to TH/KO, TH/KO show "→ EN" when empty, the cover folds to one chip, When & who / Links fold into summary lines (with ~reach), sticky action bar,
 // list rows edged by status, preview says when interns see it. Same data, same writes.
+// V102.385 (owner): readable lines — the draft and translate prompts keep every line one short sentence that fits a phone line (~60 EN / ~45 TH·KO characters); the body placeholder says so too.
 // V102.335: 📰 Articles — admin side (V102.336: the modal is lang-no-toggle so Thai shows in EN mode; bodies up to 2000 characters). A short read that pops up once a day when an intern opens the app (the intern popup is a later PR).
 // ➕ Create ▸ Article opens one modal: the list (status chips All · Draft · Scheduled · Live · Ended) on the left, the editor in the middle
 // (cover emoji · EN/TH/KO · title · markdown body · window · 🔁 new interns · audience chips · quiz / DD Codex links), and a 📱 preview of the
@@ -425,7 +426,7 @@
     function aiMode(a) { var L = S.lang; return L !== 'en' && String((a.body || {}).en || '').trim() && !String((a.body || {})[L] || '').trim() ? 'translate' : 'draft'; }
     var NAMES = { en: 'English', th: 'Thai', ko: 'Korean' };
     function trPrompt(a, L) {
-        return 'Translate this short article for pharmacy interns into ' + NAMES[L] + '. Keep the markdown, emoji, line breaks and drug names (keep drug names in English). Reply with the translated title on the first line, then a line with only ---, then the translated article. Nothing else.\n\n' + String(a.title.en || '').trim() + '\n---\n' + String(a.body.en || '').trim();
+        return 'Translate this short article for pharmacy interns into ' + NAMES[L] + '. Keep the markdown, emoji, line breaks and drug names (keep drug names in English). Keep every line about as short as the source so it still fits one phone line (about 45 Thai or Korean characters): reword a long line shorter, do not split it. Reply with the translated title on the first line, then a line with only ---, then the translated article. Nothing else.\n\n' + String(a.title.en || '').trim() + '\n---\n' + String(a.body.en || '').trim();
     }
     function trParse(txt) { var m = txt.match(/^([^\n]*)\n\s*-{3,}\s*\n([\s\S]*)$/); return m ? { title: m[1].replace(/^#+\s*/, '').trim(), body: m[2].trim() } : { title: '', body: txt }; }
     function aiText(resp) { return String(resp && typeof resp === 'object' ? (resp.text || resp.outputText || resp.response || '') : (resp || '')).replace(/^```[a-z]*\n?/i, '').replace(/\n?```\s*$/, '').trim(); }
@@ -477,7 +478,7 @@
             '<input class="art-in" id="art-title" maxlength="' + MAX_TITLE + '" placeholder="Title (' + L.toUpperCase() + ')" value="' + esc(t) + '" oninput="Articles.text(\'title\',this.value)">',
             '<div class="art-md"><div class="art-tb"><button type="button" title="Bold" onclick="Articles.wrap(\'**\',\'**\')">B</button><button type="button" title="Italic" onclick="Articles.wrap(\'*\',\'*\')"><i>I</i></button>' +
             '<button type="button" title="Bullet list" onclick="Articles.wrap(\'\\n- \',\'\')">•</button><button type="button" title="Numbered list" onclick="Articles.wrap(\'\\n1. \',\'\')">1.</button><button type="button" title="Link" onclick="Articles.wrap(\'[\',\'](https://)\')">🔗</button>' + aiHtml(a) + '</div>' + (S.modelOpen ? '<div class="art-mrail">' + modelRail() + '</div>' : '') +
-            '<textarea class="art-ta" id="art-bodyta" placeholder="A short read: 3–5 lines. Markdown works." oninput="Articles.text(\'body\',this.value)">' + esc(b) + '</textarea>' +
+            '<textarea class="art-ta" id="art-bodyta" placeholder="A short read: 3–5 lines, one idea per line, short enough to fit a phone line. Markdown works." oninput="Articles.text(\'body\',this.value)">' + esc(b) + '</textarea>' +
             '<div class="art-ft">' + (S.aiNote ? '<span class="ai">' + esc(S.aiNote) + '</span>' : '<span>Markdown</span>') + '<span id="art-count" style="margin-left:auto"' + (b.length > MAX_BODY ? ' class="over"' : '') + '>' + b.length + ' / ' + MAX_BODY + ' · ~' + readMin(b) + ' min</span></div></div>',
             '<div id="art-warn">' + hintHtml() + (mm ? '<div class="art-warn" role="status">⚠️ This looks like ' + NAME[mm] + ', not ' + NAME[L] + (((a.title || {})[mm] || (a.body || {})[mm]) ? '' : '<button type="button" onclick="Articles.moveLang(\'' + L + '\',\'' + mm + '\')">Move to ' + mm.toUpperCase() + '</button>') + '</div>' : '') + '</div>',
             tagsFieldHtml(a),   // V102.382
@@ -622,9 +623,9 @@
             var topic = String(a.title[L] || a.title.en || '').trim(), notes = String(a.body[L] || '').trim();
             if (!tr && !topic) { S.err = '✨ needs a title (a few words are enough) to draft from.'; render(); return Promise.resolve(); }
             var prompt = tr
-                ? 'Translate this short article for pharmacy interns into ' + NAME[L] + '. Keep the markdown, emoji, line breaks and drug names (keep drug names in English). Reply with the translated title on the first line, then a line with only ---, then the translated article. Nothing else.\n\n' + String(a.title.en || '').trim() + '\n---\n' + String(a.body.en || '').trim()
+                ? trPrompt(a, L)   // V102.385: the one translate prompt (shared with 🌐 Translate all)
                 // V102.363 (owner): emoji carry the meaning so the words stay few; a closing 💊 line names the drugs to read up on
-                : 'Write a short article for pharmacy interns in Thailand, in ' + NAME[L] + ', to show as a popup when they open the app (under 700 characters). Topic: ' + topic + '. ' + (notes ? 'Build on these notes: ' + notes + '. ' : '') + '3 to 5 short lines, each starting with one fitting emoji instead of a label (for example 💡 the practical point, 🏪 a pharmacy-counter example, ⚠️ a red flag, ✅ the takeaway) — the emoji says what the line is, so keep the words few. End with one line starting with 💊 that lists 2 to 4 related drug names to read up on (generic names in English, comma-separated). Markdown: **bold** on the key words only, no headings, no numbered lists. Reply with the article only.';
+                : 'Write a short article for pharmacy interns in Thailand, in ' + NAME[L] + ', to show as a popup when they open the app (under 700 characters). Topic: ' + topic + '. ' + (notes ? 'Build on these notes: ' + notes + '. ' : '') + '3 to 5 short lines, each starting with one fitting emoji instead of a label (for example 💡 the practical point, 🏪 a pharmacy-counter example, ⚠️ a red flag, ✅ the takeaway) — the emoji says what the line is, so keep the words few. Each line is one short sentence that fits a phone line without wrapping: at most about 60 characters in English, 45 in Thai or Korean; put a second idea on its own line rather than chain clauses. End with one line starting with 💊 that lists 2 to 4 related drug names to read up on (generic names in English, comma-separated). Markdown: **bold** on the key words only, no headings, no numbered lists. Reply with the article only.';
             S.aiBusy = true; S.err = ''; S.aiNote = ''; render();
             var t0 = Date.now();
             return Promise.resolve().then(function () {
