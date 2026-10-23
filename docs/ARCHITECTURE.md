@@ -179,7 +179,7 @@ sequenceDiagram
     Note over A,FS: batch = status:'approved' + users.score += pts<br/>+ checkin_logs {type:'quiz'}
     A->>FN: awardQuizSpeedBeri(quizId, userId)  (best-effort, post-commit)
     FN->>FS: rank by submit time → beri_ledger quiz_early_bird / quiz_deadline_buffer<br/>+ users.beri increment  (deterministic id → re-approve safe)
-    Note over I: 16:00 cron digest later reports "done today"
+    Note over I: 16:00 / 22:00 cron digests later report "done today"
 ```
 
 `applyCheckinDecay` (daily cron) writes `checkin_logs {type:'daily_decay'}` + decrements
@@ -212,7 +212,7 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    cron["notifyQuizDigest<br/>schedule 16:00 Asia/Bangkok"] --> run
+    cron["notifyQuizDigest 16:00 (window 22:00→16:00)<br/>notifyQuizDigestEvening 22:00 (window 16:00→22:00)<br/>Asia/Bangkok"] --> run
     manualP["admin: Preview digest → previewQuizDigest"] --> run
     manualS["admin: Send this now → sendQuizDigestNow"] --> run
     run["runQuizDigest(kind)"]

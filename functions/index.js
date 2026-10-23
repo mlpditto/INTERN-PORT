@@ -3450,7 +3450,13 @@ async function runQuizDigest(kind, options) {
 
     const db = admin.firestore();
     const now = admin.firestore.Timestamp.now();
-    const cutoff = admin.firestore.Timestamp.fromMillis(now.toMillis() - 24 * 60 * 60 * 1000);
+    // Activity window. The two scheduled runs split the day between them
+    // (16:00 looks back 18h to 22:00 yesterday, 22:00 looks back 6h to 16:00)
+    // so a submission is reported exactly once; manual/preview keep the full
+    // 24h since they are an explicit "what happened today" ask.
+    const windowHours = Number(options && options.windowHours) || 24;
+    const windowLabel = String((options && options.windowLabel) || '');
+    const cutoff = admin.firestore.Timestamp.fromMillis(now.toMillis() - windowHours * 60 * 60 * 1000);
 
     // --- users: name lookup + eligibility source ---
     // V97.51 (A): `users` (all docs) still backs the name lookup, but only
@@ -4021,7 +4027,7 @@ async function runQuizDigest(kind, options) {
                     type: 'box', layout: 'vertical', backgroundColor: '#0f766e', paddingAll: '12px',
                     contents: [
                         { type: 'text', text: '📊 Daily Quiz Digest', weight: 'bold', size: 'sm', color: '#ffffff' },
-                        { type: 'text', text: new Date(now.toMillis()).toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', weekday: 'short', day: '2-digit', month: 'short' }), size: 'xs', color: '#ccfbf1', margin: 'xs' },
+                        { type: 'text', text: new Date(now.toMillis()).toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', weekday: 'short', day: '2-digit', month: 'short' }) + (windowLabel ? ` · ${windowLabel}` : ''), size: 'xs', color: '#ccfbf1', margin: 'xs' },
                         // The whole state in one line, so the bubble answers "is
                         // there anything for me today" before it is scrolled. Every
                         // figure here is one the body already prints, so the two can
@@ -4128,13 +4134,26 @@ async function runQuizDigest(kind, options) {
     };
 }
 
+// Two scheduled rounds a day. Their windows are contiguous and disjoint
+// (22:00 → 16:00, then 16:00 → 22:00), so each submission lands in exactly
+// one bubble. Both carry the same tag, so the line_usage quota counter and
+// the digest_runs day marker see them as the one scheduled digest.
 exports.notifyQuizDigest = onSchedule({
     schedule: '0 16 * * *',
     timeZone: 'Asia/Bangkok',
     region: 'us-central1',
     secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID']
 }, async (event) => {
-    await runQuizDigest('scheduled');
+    await runQuizDigest('scheduled', { windowHours: 18, windowLabel: '22:00 → 16:00' });
+});
+
+exports.notifyQuizDigestEvening = onSchedule({
+    schedule: '0 22 * * *',
+    timeZone: 'Asia/Bangkok',
+    region: 'us-central1',
+    secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID']
+}, async (event) => {
+    await runQuizDigest('scheduled', { windowHours: 6, windowLabel: '16:00 → 22:00' });
 });
 
 // Preview for the admin send flow. A separate endpoint rather than a flag on
