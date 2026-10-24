@@ -3506,6 +3506,20 @@
         #upnext-card .un-go { width: 30px; min-height: 30px; height: 30px; margin-left: auto; padding: 0; border: none; border-radius: 50%; background: linear-gradient(135deg, #22c55e, #16a34a); color: #fff; font-size: 0.8em; line-height: 1; cursor: pointer; }
         #upnext-card .un-go.un-new { background: linear-gradient(135deg, #6366f1, #4f46e5); font-size: 1.05em; }
 
+        /* V102.389: Disease Codex form — which model filled (🤖) / checked (🔍) the entry; 🔁 in the AI Review panel = check again with another model (dxa-ai-trail.js) */
+        #dxa-form-ai-trail[hidden] { display: none; }
+        #dxa-form-ai-trail { display: flex; flex-wrap: wrap; gap: 6px; margin: -2px 0 8px; }
+        #dxa-form-ai-trail .at-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border: 1px solid #e2e8f0; border-radius: 999px; background: #fff; color: #475569; font-size: 0.76em; font-weight: 800; }
+        #dxa-form-ai-trail .at-chip.warn { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+        .dxa-at-other { margin-left: auto; width: auto; min-height: 0; padding: 2px 9px; border: 1px solid #bfdbfe; border-radius: 8px; background: #eff6ff; color: #1d4ed8; font-size: 0.9em; cursor: pointer; }
+        .dca-review-results-head .dxa-at-other + .dca-review-dismiss { margin-left: 4px; }
+        /* V102.390: Drug Codex form — which model filled (🤖) / checked (🔍) the entry; 🔁 in the AI Review panel = check again with another model (dca-ai-trail.js) */
+        #dca-form-ai-trail[hidden] { display: none; }
+        #dca-form-ai-trail { display: flex; flex-wrap: wrap; gap: 6px; margin: -2px 0 8px; }
+        #dca-form-ai-trail .at-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border: 1px solid #e2e8f0; border-radius: 999px; background: #fff; color: #475569; font-size: 0.76em; font-weight: 800; }
+        #dca-form-ai-trail .at-chip.warn { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+        .dca-at-other { margin-left: auto; width: auto; min-height: 0; padding: 2px 9px; border: 1px solid #bfdbfe; border-radius: 8px; background: #eff6ff; color: #1d4ed8; font-size: 0.9em; cursor: pointer; }
+        .dca-review-results-head .dca-at-other + .dca-review-dismiss { margin-left: 4px; }
         .case-score-chip:hover,
         .case-score-chip.active {
             background: linear-gradient(135deg, #f59e0b, #ea580c);
@@ -7920,6 +7934,8 @@
     <script src="ai-model-registry.js?v=V102.365"></script>
     <script src="ai-model-ui.js?v=V102.365"></script>
     <script src="ollama-local.js?v=V102.109"></script>
+<script src="dca-ai-trail.js?v=V102.390"></script>
+<script src="dxa-ai-trail.js?v=V102.389"></script>
 <script src="case-review-ai.js?v=V102.387"></script>
 <script src="up-next.js?v=V102.388"></script>
     <script src="peds-dosing.js?v=V102.80"></script>
@@ -16083,6 +16099,7 @@
                      has aiDrafted=true. Mirrors the model name in the pill so admin can
                      also see it after the toast disappears. Cleared on save / form reopen. -->
                 <div id="dca-form-ai-subtitle" style="display:none; font-size:0.78em; color:#64748b; margin:-4px 0 4px 2px;"></div>
+                <div id="dca-form-ai-trail" class="lang-no-toggle" hidden></div>
 
                 <!-- V94.46: audit-trail metadata strip — last updated relative time +
                      contributors role pills. Shown for existing docs (Edit/Review paths)
@@ -16440,6 +16457,7 @@
                         <button type="button" id="dxa-form-info-toggle" class="dxa-form-info" onclick="dxaToggleFormMore()" aria-expanded="false" aria-controls="dxa-form-more" title="Updated · contributors · who wrote which field">ⓘ</button>
                     </div>
                     <!-- ai-model-ui chips, rendered by dxaRenderFormModelRail(); same hidden input (#dxa-ai-model-val) as Auto-Draft. -->
+                    <div id="dxa-form-ai-trail" class="lang-no-toggle" hidden></div>
                     <div id="dxa-form-model-rail" class="audit-toolbar lang-no-toggle dxa-form-model-rail" role="group" aria-label="Text model for AI fill, AI Review and AI ICD" hidden></div>
                 </div>
 
@@ -47058,6 +47076,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // formAiDrafted gates the whole tracker; verified starts empty so the
             // admin must re-confirm each AI-filled tab every time the form opens.
             dcaState.formAiDrafted = showAiBadge;
+            if (window.dcaAiTrail) window.dcaAiTrail.load(data);   // V102.390: 🤖 filled by · 🔍 checked by
             dcaState.verified = {};
             // V94.38: refresh tab badges after form re-fill (Add/Edit/Review/AI auto-draft/AI fill empty all flow through here)
             dcaUpdateSectionBadges();
@@ -47686,6 +47705,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // The badge is therefore a session-scoped "needs verification" marker
             // that disappears the moment an admin commits the draft.
             payload.aiDrafted = false;
+            if (window.dcaAiTrail) Object.assign(payload, window.dcaAiTrail.payload());   // V102.390: keep which model filled / checked it
 
             try {
                 if (dcaState.isDraftEdit) {
@@ -47951,6 +47971,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             payload.lastReviewedAt = nowTs;
             payload.reviewedBy = reviewerEmail;
             payload.aiDrafted = false;
+            if (draft.aiDraftedModel) payload.aiDraftedModel = draft.aiDraftedModel;   // V102.390: the published entry still says which model filled it
+            if (Array.isArray(draft.aiReviewedModels) && draft.aiReviewedModels.length) payload.aiReviewedModels = draft.aiReviewedModels;
             // V94.46: approve-as-is path — seed contributors[] with both the intern
             // submitter and the approving admin. Literal array (set() can't use arrayUnion).
             const approveContribs = [];
@@ -49260,6 +49282,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 merged.aiDrafted = true;          // surface the badge until first human save
                 // V94.45: stamp the model so the pill + subtitle can name it.
                 merged.aiDraftedModel = (resp && resp.model) ? resp.model : selectedModel;
+                merged.aiReviewedModels = window.dcaAiTrail ? window.dcaAiTrail.state().review : [];   // V102.390: the fill replaces the filler, not the checkers
                 let filledCount = 0;
                 // V94.50: track which Edu fields got new content so we only
                 // re-translate those — admin's existing i18n for already-filled
@@ -49404,7 +49427,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             ].filter(Boolean).join('\n');
         }
 
-        async function dcaAiReviewDraft() {
+        async function dcaAiReviewDraft(opts) {
             const btn = document.getElementById('dca-form-ai-review-btn');
             const errEl = document.getElementById('dca-form-error');
             if (typeof window.callUniversalAI !== 'function') {
@@ -49445,7 +49468,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 internContext = String(banner.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 500);
             }
 
-            const selectedModel = window.dcaSelectedToolbarModel?.() || DCA_AI_FALLBACK_MODEL;
+            // V102.390: { other: true } = the 🔁 in the review panel → a model from a different provider than the filler / earlier checkers (the toolbar is left alone)
+            const selectedModel = (opts && opts.other && window.dcaAiTrail && window.dcaAiTrail.other()) || window.dcaSelectedToolbarModel?.() || DCA_AI_FALLBACK_MODEL;
 
             if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
             if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
@@ -49526,6 +49550,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 dcaState.formAiDrafted = true;
                 dcaUpdateSectionBadges();
                 dcaRefreshVerifyStrip();
+                if (window.dcaAiTrail) window.dcaAiTrail.addReview((resp && resp.model) || selectedModel);   // V102.390
                 dcaRenderReviewResults(findings, overallNote, suggestedScore);
 
                 // V96.05 Evaluation pillar: record the suggestion signal + remember the
@@ -49579,6 +49604,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 '<div class="dca-review-results-head">' +
                     '<span>🔍 AI Review · ' + findings.length + ' finding' + (findings.length === 1 ? '' : 's') + '</span>' +
                     '<span class="dca-review-disclaimer">advisory · model knowledge, not live sources</span>' +
+                    (window.dcaAiTrail ? window.dcaAiTrail.panelHtml() : '') +
                     '<button type="button" class="dca-review-dismiss" onclick="dcaDismissReviewResults()" title="Dismiss">✕</button>' +
                 '</div>'
             );
@@ -51026,6 +51052,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const merged = Object.assign({}, current);
                 merged._id = dxaState.editingId;
                 merged.aiDrafted = true;
+                merged.aiReviewedModels = window.dxaAiTrail ? window.dxaAiTrail.state().review : [];   // V102.389: the fill replaces the filler, not the checkers
                 merged.aiDraftedModel = (resp && resp.model) ? resp.model : selectedModel;
                 let filledCount = 0;
                 const eduFieldsFilled = [];
@@ -51106,7 +51133,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             ].filter(Boolean).join('\n');
         }
 
-        async function dxaAiReviewDraft() {
+        async function dxaAiReviewDraft(opts) {
             const btn = document.getElementById('dxa-form-ai-review-btn');
             const errEl = document.getElementById('dxa-form-error');
             if (typeof window.callUniversalAI !== 'function') {
@@ -51142,7 +51169,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (banner && banner.style.display !== 'none') {
                 internContext = String(banner.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 500);
             }
-            const selectedModel = dxaTextModel(); // V101.35: the visible rail, not a silent localStorage read
+            // V102.389: { other: true } = the 🔁 in the review panel → a model from a different provider than the filler / earlier checkers (the rail is left alone)
+            const selectedModel = (opts && opts.other && window.dxaAiTrail && window.dxaAiTrail.other()) || dxaTextModel(); // V101.35: the visible rail, not a silent localStorage read
             if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
             if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
             const prompt = dxaBuildReviewPrompt(current, filledLines, internContext);
@@ -51178,6 +51206,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 dxaState.formAiDrafted = true;
                 dxaUpdateSectionBadges();
                 dxaRefreshVerifyStrip();
+                if (window.dxaAiTrail) window.dxaAiTrail.addReview((resp && resp.model) || selectedModel);   // V102.389
                 dxaRenderReviewResults(findings, overallNote);
                 if (typeof showToast === 'function') {
                     const ml = (typeof dxaFormatModelLabel === 'function') ? dxaFormatModelLabel((resp && resp.model) || selectedModel) : ((resp && resp.model) || selectedModel);
@@ -51202,6 +51231,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 '<div class="dca-review-results-head">' +
                     '<span>🔍 AI Review · ' + findings.length + ' finding' + (findings.length === 1 ? '' : 's') + '</span>' +
                     '<span class="dca-review-disclaimer">advisory · model knowledge, not live sources</span>' +
+                    (window.dxaAiTrail ? window.dxaAiTrail.panelHtml() : '') +
                     '<button type="button" class="dca-review-dismiss" onclick="dxaDismissReviewResults()" title="Dismiss">✕</button>' +
                 '</div>'
             );
@@ -51365,6 +51395,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (err) { err.style.display = 'none'; err.textContent = ''; }
             // V95.65: reset the per-tab verify tracker for this fresh form fill.
             dxaState.formAiDrafted = !!(data && data.aiDrafted);
+            if (window.dxaAiTrail) window.dxaAiTrail.load(data);   // V102.389: 🤖 filled by · 🔍 checked by
             dxaState.verified = {};
             dxaUpdateSectionBadges();
             dxaRefreshVerifyStrip();
@@ -51585,6 +51616,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             payload.reviewedBy = reviewerEmail;
             payload.updatedAt = nowTs;
             payload.materials = drugMaterials.read(document.getElementById('dxa-mat-list'));   // V102.130: download files [{name,url}]
+            if (window.dxaAiTrail) Object.assign(payload, window.dxaAiTrail.payload());   // V102.389: keep which model filled / checked it
 
             try {
                 if (dxaState.isDraftEdit) {
@@ -52521,6 +52553,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             payload.lastReviewedAt = nowTs;
             payload.reviewedBy = reviewerEmail;
             payload.aiDrafted = false;
+            if (draft.aiDraftedModel) payload.aiDraftedModel = draft.aiDraftedModel;   // V102.389: the published entry still says which model filled it
+            if (Array.isArray(draft.aiReviewedModels) && draft.aiReviewedModels.length) payload.aiReviewedModels = draft.aiReviewedModels;
             // Seed contributors[] with both the intern submitter and the approving
             // admin. Literal array (set() can't use the arrayUnion sentinel).
             const approveContribs = [];

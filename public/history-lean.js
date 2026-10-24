@@ -69,7 +69,7 @@ window.historyLean = (() => {
             const k = caseKey(s), h = hueOf(k);
             return '<span class="hl-lead"><span class="hl-disc" role="img" aria-label="' + esc(sysName(k)) + ' · case ' + ctx.nth.get(s.id) + '" title="' + esc(sysName(k)) + ' · case ' + ctx.nth.get(s.id) + '" style="background:hsl(' + h + ',85%,92%);border:1px solid hsl(' + h + ',60%,82%)">' + sysEmoji(k) + '<b class="hl-nb">' + ctx.nth.get(s.id) + '</b></span></span>';
         }
-        if (type === 'article') return '<span class="hl-lead"><span class="hl-disc" style="background:#e0e7ff;border:1px solid #c7d2fe">' + esc((s.metadata && s.metadata.emoji) || '📰') + '</span></span>';   // V101.176: the article's cover emoji
+        if (type === 'article') return (window.internArticles && internArticles.discHtml ? internArticles.discHtml(s) : '') || '<span class="hl-lead"><span class="hl-disc" style="background:#e0e7ff;border:1px solid #c7d2fe">' + esc((s.metadata && s.metadata.emoji) || '📰') + '</span></span>';   // V101.176: the article's cover emoji
         const emoji = type === 'reflective' && s.metadata && s.metadata.moodEmoji ? s.metadata.moodEmoji : (type === 'content_review' && s.metadata ? (s.metadata.verdict === 'approve' ? 'Ⓐ' : '↩') : t.e);   // V101.124: a filed review shows its verdict
         const h = hueOf(type);
         return '<span class="hl-lead"><span class="hl-disc" style="background:hsl(' + h + ',85%,93%);border:1px solid hsl(' + h + ',60%,84%)">' + esc(emoji) + '</span></span>';
@@ -85,7 +85,7 @@ window.historyLean = (() => {
             (b ? '<span class="hl-br" title="Beri">🪙 <b>' + (b > 0 ? '+' : '−') + Math.abs(b) + '</b></span>' : '') + '</span>';
     }
     function pillHtml(s) {
-        if (s.submissionType === 'article') return window.internArticles ? internArticles.pillHtml(s) : '';   // V101.176: ✓ Read · 👁 Closed · 📰 New
+        if (s.submissionType === 'article') return window.internArticles && !internArticles.discHtml ? internArticles.pillHtml(s) : '';   // V101.206: the icon disc carries read / listen — no pill   // V101.176: ✓ Read · 👁 Closed · 📰 New
         if (s.submissionType === 'content_review') { const m = s.metadata || {}; return m.verdict === 'approve' ? '<span class="hl-pill">Ⓐ OK' + (Number(m.suggested) ? ' · +' + Number(m.suggested) : '') + '</span>' : '<span class="hl-pill hl-warn">↩ Changes</span>'; }   // V101.124
         const U = window.uiText || (en => en);   // V101.189
         if (pending(s)) return '<span class="hl-pill hl-warn">⏳ ' + U('Pending|รอตรวจ|검토 대기') + '</span>';
