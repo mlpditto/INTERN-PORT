@@ -86,12 +86,12 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return d.to
         assert.equal(await page.locator('#lp-queue .lpq-c, #lp-queue .lpq-row').count(), 0, 'no big cards any more');
         const strip = await page.evaluate(() => { const e = document.getElementById('lp-path-strip'), r = e.getBoundingClientRect(), s = getComputedStyle(e); return { bg: s.backgroundColor, h: r.height, img: s.backgroundImage }; });
         assert.ok(strip.bg === 'rgb(255, 255, 255)' && strip.img === 'none' && strip.h < 60, 'the AI strip is a quiet light row (not the dark banner): ' + JSON.stringify(strip));
-        // nothing to do → green-framed chips, never a "0"
+        // nothing to do → no chips at all (V102.391), never a "0"
         await page.evaluate(d => { window._lp.entries = [{ id: 'c', title: 'x', date: d, nextReviewDate: d }]; casesData.length = 0; computeLpStats(); }, day(5));
         assert.equal(await page.locator('#lp-queue .lpq-p.hot').count(), 0);
         const quiet = await txt('#lp-queue');
-        assert.ok(quiet.includes('✓ nothing due') && quiet.includes('✓ none waiting'), quiet); assert.doesNotMatch(quiet, /\b0 due\b|0 waiting/);
-        assert.equal(await page.locator('#lp-queue .lpq-ok').first().evaluate(e => getComputedStyle(e).borderTopColor), 'rgb(134, 239, 172)');
+        assert.ok(!/nothing due|none waiting|every drug|✓/.test(quiet), 'V102.391: all-clear states show no chip at all: ' + quiet); assert.doesNotMatch(quiet, /\b0 due\b|0 waiting/);
+        assert.equal(await page.locator('#lp-queue .lpq-ok').count(), 0, 'no green "ok" pills any more');
 
         // ---- ＋ New from a drug / disease / memory ----
         assert.deepEqual(await page.locator('#lp-newrow .lpn-chip').allInnerTexts(), ['💊', '🩺', '🎟️'], 'New from = three icon chips');
