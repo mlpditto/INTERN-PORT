@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.394)</title>
+    <title>Nika Admin (V102.398)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -2487,7 +2487,10 @@
 
         .alabasta-action-btn.is-edit { background: #f59e0b; }
         .alabasta-action-btn.is-laboon { background: linear-gradient(135deg, #0ea5e9, #2563eb); }
-        .alabasta-action-btn.is-case-card { background: linear-gradient(135deg, #a855f7, #7c3aed); }
+        .alabasta-action-btn.is-case-card { background: linear-gradient(135deg, #a855f7, #7c3aed); box-shadow: 0 3px 10px rgba(124, 58, 237, .4); }   /* V102.395: the main "make" action — icon only, a glow */
+        .alabasta-action-btn.is-case-article { background: linear-gradient(135deg, #0ea5e9, #0284c7); }
+        .alabasta-action-btn.is-case-article.is-done { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #22c55e; }   /* ok = a green frame (the case already has an article) */
+        .alabasta-go-btn.is-icon { width: 34px; padding: 0; justify-content: center; font-size: 0.95em; }   /* V102.395: Review on a case = icon only */
         .alabasta-action-btn.is-poneglyph { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
         .alabasta-action-btn.is-review { background: #16a34a; }
         .alabasta-action-btn.is-reopen { background: #334155; }
@@ -2527,7 +2530,7 @@
         .alabasta-inbox-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 10px; }
         .alabasta-inbox-card { background: #fff; border: 1.5px solid #bae6fd; border-radius: 12px; padding: 10px 12px; min-width: 0; }
         .alabasta-inbox-card .ib-note { font-size: 0.82em; color: #334155; margin: 6px 0 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        /* V102.394: New Cases — a case the same intern sent twice (case-dup.js): ⚠️ chip → the earlier one + ยุบ (ซ้ำ) / ไม่ซ้ำ; same HN with a different note = a quiet follow-up chip */
+        /* V102.398: New Cases — a case the same intern sent twice (case-dup.js): ⚠️ chip → the earlier one + ยุบ (ซ้ำ) / ไม่ซ้ำ; same HN with a different note = a quiet follow-up chip */
         .cdup-chip { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; border: 1px solid #fde68a; background: #fffbeb; color: #92400e; border-radius: 999px; padding: 2px 10px; font-size: 0.76em; font-weight: 800; cursor: pointer; width: auto; min-height: 0; font-family: inherit; }
         .cdup-chip i { font-style: normal; opacity: .6; }
         .cdup-chip.soft { border-color: #e2e8f0; background: #f8fafc; color: #64748b; cursor: default; }
@@ -7947,7 +7950,8 @@
     <script src="ai-model-registry.js?v=V102.365"></script>
     <script src="ai-model-ui.js?v=V102.365"></script>
     <script src="ollama-local.js?v=V102.109"></script>
-<script src="case-dup.js?v=V102.394"></script>
+<script src="case-dup.js?v=V102.398"></script>
+<script src="case-article.js?v=V102.395"></script>
 <script src="dca-ai-trail.js?v=V102.390"></script>
 <script src="dxa-ai-trail.js?v=V102.389"></script>
 <script src="case-review-ai.js?v=V102.387"></script>
@@ -41588,20 +41592,20 @@ They can connect again from LINE.
                 // Alabasta lean (Phase 2): the visible actions are the primary one only — Review + Reject while
                 // pending, Reopen once reviewed. Edit / Delete and the AI tools all live behind ⋯.
                 const mainActions = isPending
-                    ? `<button type="button" class="alabasta-go-btn" title="Mark reviewed" onclick="updateCaseStatus('${c.id}', 'reviewed')">✅ Review</button><button type="button" class="btn-sm alabasta-action-btn is-reject" title="Reject" aria-label="Reject case" onclick="openAlabastaRejectModal('${c.id}')"><span class="alabasta-emoji">❌</span></button>`
+                    ? `<button type="button" class="alabasta-go-btn is-icon" title="Review" aria-label="Review" onclick="updateCaseStatus('${c.id}', 'reviewed')">✅</button><button type="button" class="btn-sm alabasta-action-btn is-reject" title="Reject" aria-label="Reject case" onclick="openAlabastaRejectModal('${c.id}')"><span class="alabasta-emoji">❌</span></button>`
                     : `<button type="button" class="btn-sm alabasta-action-btn is-reopen" title="Reopen case" aria-label="Reopen case" onclick="updateCaseStatus('${c.id}', 'pending')"><span class="alabasta-emoji">↩️</span></button>`;
                 const moreBtn = `<details class="alabasta-more-menu">
                     <summary class="btn-sm alabasta-action-btn is-more" title="More actions"><span class="alabasta-emoji">⋯</span></summary>
                     <div class="alabasta-more-menu-body" role="menu">
                         <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); editCaseNote('${c.id}');"><span class="alabasta-emoji">✏️</span> Edit case</button>
                         <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); openAlabastaLaboon('${c.id}');"><span class="alabasta-emoji">🐳</span> Ask Laboon</button>
-                        <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); openAlabastaCaseCard('${c.id}');"><span class="alabasta-emoji">🖼️</span> Generate Case Card</button>
                         <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); openAlabastaPoneglyph('${c.id}');"><span class="alabasta-emoji">🪨</span> ${hasPoneglyphLink ? 'Open Poneglyph draft' : 'Promote to Poneglyph'}</button>
                         <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); generateQuizFromCase('${c.id}');"><span class="alabasta-emoji">📝</span> Generate Quiz from Case</button>
                         <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); deleteCaseSubmission('${c.id}');"><span class="alabasta-emoji">🗑️</span> Delete case</button>
                     </div>
                 </details>`;
-                const actionBtn = `<div class="alabasta-action-row">${mainActions}${moreBtn}</div>`;
+                const makeBtns = window.caseArticle ? caseArticle.btns(c) : '';   // V102.395: 🖼️ Case Card + 📰 Article, icon only
+                const actionBtn = `<div class="alabasta-action-row">${mainActions.replace('<button type="button" class="btn-sm alabasta-action-btn is-reject"', makeBtns + '<button type="button" class="btn-sm alabasta-action-btn is-reject"')}${isPending ? '' : makeBtns}${moreBtn}</div>`;
 
                 const isSelected = window.alabastaSelectedIds.has(c.id);
                 const initials = alabastaInitials(c.customer);
@@ -53070,7 +53074,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 if (previousReviewLogId) {
                     reopenUpdate.reviewLogId = firebase.firestore.FieldValue.delete();
                 }
-                if (caseItem.duplicateOf) { reopenUpdate.duplicateOf = firebase.firestore.FieldValue.delete(); reopenUpdate.duplicateMarkedAt = firebase.firestore.FieldValue.delete(); }   // V102.394: reopening a folded duplicate clears the mark
+                if (caseItem.duplicateOf) { reopenUpdate.duplicateOf = firebase.firestore.FieldValue.delete(); reopenUpdate.duplicateMarkedAt = firebase.firestore.FieldValue.delete(); }   // V102.398: reopening a folded duplicate clears the mark
                 reopenBatch.update(caseRef, reopenUpdate);
 
                 if (previousBonus > 0 && reopenUserId) {
@@ -53195,13 +53199,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         </div>
                         <div style="font-weight:700; color:#7c2d12; margin-top:6px;">${safe(c.disease || '—')}</div>
                         <div class="alabasta-case-sub">${c.diseaseSystemLabel ? '🏥 ' + safe(c.diseaseSystemLabel) : ''}${initials ? (c.diseaseSystemLabel ? ' · ' : '') + safe(initials) : ''}</div>
-                        ${window.caseDup ? caseDup.html(c) /* V102.394: duplicate / follow-up chip */ : ''}
+                        ${window.caseDup ? caseDup.html(c) : ''}   <!-- V102.398: duplicate / follow-up chip -->
                         <div class="ib-note" title="${safe(c.note || '')}">${safe(c.note || '')}</div>
                         <div class="ib-actions">
-                            <button type="button" class="alabasta-go-btn" onclick="updateCaseStatus('${c.id}', 'reviewed')" title="Mark reviewed">✅ Review</button>
+                            <button type="button" class="alabasta-go-btn is-icon" onclick="updateCaseStatus('${c.id}', 'reviewed')" title="Review" aria-label="Review">✅</button>
                             <button type="button" class="btn-sm alabasta-action-btn is-reject" onclick="openAlabastaRejectModal('${c.id}')" title="Reject" aria-label="Reject case"><span class="alabasta-emoji">❌</span></button>
                             <button type="button" class="btn-sm alabasta-action-btn is-edit" onclick="editCaseNote('${c.id}')" title="Open case" aria-label="Open case"><span class="alabasta-emoji">👁</span></button>
-                            <button type="button" class="btn-sm alabasta-action-btn is-case-card" onclick="openAlabastaCaseCard('${c.id}')" title="Generate case card" aria-label="Generate case card"><span class="alabasta-emoji">🖼️</span></button>
+                            ${window.caseArticle ? caseArticle.btns(c) : ''}
                         </div>
                     </div>`;
             }).join('');

@@ -35,6 +35,7 @@ function grabDiv(id) {
     const fns = ['alabastaInitials', 'alabastaAgo', 'renderAlabastaInbox', 'toggleAlabastaInbox', 'renderAlabastaSystemFilterPills', 'renderAlabastaCases', 'toggleAlabastaSearch', 'setAlabastaSubtab', 'syncAlabastaDateTriggerLabel', 'setAlabastaStatusFilter', 'setAlabastaSystemFilter', 'closeAlabastaMoreMenus', 'syncAlabastaSubtabCounts']
       .map(grabFn).join('\n');
     const ts = (n) => ({ toDate: () => new Date(Date.now() - n * 3600e3), toMillis: () => Date.now() - n * 3600e3 });
+    await page.addScriptTag({ path: 'public/case-article.js' });   // V102.395: the 🖼️ / 📰 icon buttons come from this module
     await page.addScriptTag({
       content: `
       window.alabastaSelectedIds = new Set(); window.alabastaSystemFilter = 'all'; window.alabastaStatusFilter = 'all';
@@ -75,6 +76,16 @@ function grabDiv(id) {
     assert.equal(await page.locator('#alabastaCaseTable tr.alabasta-row-pending .alabasta-go-btn').count(), 2);
     assert.equal(await page.locator('#alabastaCaseTable tr:not(.alabasta-row-pending) .is-reopen').count(), 1);
     assert.equal(await page.locator('#alabastaCaseTable details.alabasta-more-menu .alabasta-more-menu-item', { hasText: 'Delete case' }).count(), 3);
+    // V102.395: icon-only actions — ✅ Review, 🖼️ Case Card (main, purple) and 📰 Article beside it; the ⋯ menu keeps the rest
+    assert.equal(await page.locator('#alabastaCaseTable tr.alabasta-row-pending .alabasta-go-btn.is-icon').evaluateAll(n => n.map(x => x.textContent.trim()).join()), '✅,✅', 'Review = the ✅ icon alone');
+    assert.equal(await page.locator('#alabastaCaseTable tbody tr .is-case-card').count(), 3, '🖼️ on every row, reviewed ones too');
+    assert.equal(await page.locator('#alabastaCaseTable tbody tr .is-case-article').count(), 3, '📰 on every row');
+    assert.deepEqual(await page.locator('#alabastaCaseTable tr.alabasta-row-pending').first().locator('.alabasta-action-row > *').evaluateAll(n => n.map(x => x.className.replace(/btn-sm|alabasta-action-btn/g, '').trim().split(/\s+/)[0])), ['alabasta-go-btn', 'is-case-card', 'is-case-article', 'is-reject', 'alabasta-more-menu'], 'order: ✅ 🖼️ 📰 ❌ ⋯');
+    assert.equal(await page.locator('#alabastaCaseTable details.alabasta-more-menu .alabasta-more-menu-item', { hasText: 'Generate Case Card' }).count(), 0, 'the Case Card left the ⋯ menu');
+    assert.equal(await page.locator('#alabastaCaseTable details.alabasta-more-menu .alabasta-more-menu-item', { hasText: 'Generate Quiz from Case' }).count(), 3, '…the rest stays');
+    const geo = await page.locator('#alabastaCaseTable tr.alabasta-row-pending').first().locator('.alabasta-go-btn, .is-case-card, .is-case-article, .is-reject').evaluateAll(n => n.map(x => Math.round(x.getBoundingClientRect().width)));
+    assert.deepEqual(geo, [34, 34, 34, 34], 'four square icon buttons');
+
 
     // header: maintenance buttons are inside the tools menu only
     assert.equal(await page.locator('#alabasta-tools-menu #alabasta-reconcile-btn').count(), 1);
