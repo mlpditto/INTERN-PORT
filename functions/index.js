@@ -394,6 +394,7 @@ exports.adjustQuizDeadline = onCall(async (request) => {
 });
 const { GoogleAuth } = require("google-auth-library");
 const axios = require("axios");
+const { PLAIN, plainBody } = require("./plain-http");   // no Brotli for admin-typed URLs (CVE-2026-111497)
 
 
 // Configuration
@@ -797,6 +798,7 @@ exports.fetchLinkText = onRequest({ cors: true, timeoutSeconds: 60, memory: "256
             maxContentLength: 3 * 1024 * 1024,
             maxRedirects: 3,
             validateStatus: () => true,
+            decompress: PLAIN.decompress,   // never hand the body to the Brotli decoder (plain-http.js)
             httpAgent: new http.Agent({ lookup: linkSafeLookup }),
             httpsAgent: new https.Agent({ lookup: linkSafeLookup }),
             beforeRedirect: (opts) => {
@@ -805,7 +807,8 @@ exports.fetchLinkText = onRequest({ cors: true, timeoutSeconds: 60, memory: "256
             },
             headers: {
                 "User-Agent": "Mozilla/5.0 (compatible; INTERN-PORT LinkReader/1.0)",
-                "Accept": "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.1"
+                "Accept": "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.1",
+                ...PLAIN.headers
             }
         });
         if (resp.status >= 400) return res.status(502).json({ error: `The site answered HTTP ${resp.status}.` });
@@ -814,7 +817,7 @@ exports.fetchLinkText = onRequest({ cors: true, timeoutSeconds: 60, memory: "256
         if (!isHtml && !/^text\/plain/.test(type)) {
             return res.status(415).json({ error: `Only web pages can be read (this link is ${type.split(";")[0] || "an unknown type"}).` });
         }
-        const bytes = new Uint8Array(resp.data);
+        const bytes = new Uint8Array(plainBody(resp, 3 * 1024 * 1024));   // gzip / deflate unpacked here, br refused
         let decoder;
         try { decoder = new TextDecoder(linkCharset(type, bytes)); } catch (e) { decoder = new TextDecoder("utf-8"); }
         const body = decoder.decode(bytes);
@@ -833,7 +836,8 @@ exports.fetchLinkText = onRequest({ cors: true, timeoutSeconds: 60, memory: "256
         console.error("[fetchLinkText] failed:", target, err.code || "", err.message);
         if (blocked) return res.status(403).json({ error: "That address is not allowed." });
         if (err.code === "ECONNABORTED" || /timeout/i.test(err.message)) return res.status(504).json({ error: "The site took too long to answer." });
-        if (/maxContentLength/i.test(err.message)) return res.status(413).json({ error: "The page is too large (over 3 MB)." });
+        if (/maxContentLength/i.test(err.message) || err.code === "ERR_BUFFER_TOO_LARGE") return res.status(413).json({ error: "The page is too large (over 3 MB)." });
+        if (err.code === "ENCODING_REFUSED") return res.status(415).json({ error: err.message });
         if (err.code === "ENOTFOUND") return res.status(502).json({ error: "That site could not be found." });
         return res.status(502).json({ error: "Couldn't read the link: " + (err.message || "unknown error") });
     }

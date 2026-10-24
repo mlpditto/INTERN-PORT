@@ -13,6 +13,7 @@ const net = require('net');
 const http = require('http');
 const https = require('https');
 const axios = require('axios');
+const { PLAIN, plainBody } = require('./plain-http');   // no Brotli for admin-typed URLs (CVE-2026-111497)
 
 const UA = 'Mozilla/5.0 (compatible; INTERN-PORT-logo-fetch/1.0; +https://github.com/mlpditto/INTERN-PORT)';
 const MAX_HTML = 1.5 * 1024 * 1024;
@@ -65,14 +66,15 @@ async function getBytes(raw, maxBytes) {
         const u = assertPublicUrl(current);
         const res = await axios.get(u.toString(), {
             responseType: 'arraybuffer', timeout: 10000, maxRedirects: 0, maxContentLength: maxBytes, maxBodyLength: maxBytes,
-            validateStatus: () => true, httpAgent, httpsAgent, headers: { 'User-Agent': UA, Accept: 'text/html,image/*;q=0.9,*/*;q=0.5' },
+            validateStatus: () => true, httpAgent, httpsAgent, decompress: PLAIN.decompress,
+            headers: { 'User-Agent': UA, Accept: 'text/html,image/*;q=0.9,*/*;q=0.5', ...PLAIN.headers },
         });
         if (res.status >= 300 && res.status < 400 && res.headers.location) {
             current = new URL(res.headers.location, u).toString();
             continue;
         }
         if (res.status < 200 || res.status >= 300) throw new Error('The page answered ' + res.status);
-        return { buf: Buffer.from(res.data), type: String(res.headers['content-type'] || '').split(';')[0].trim(), url: u.toString() };
+        return { buf: plainBody(res, maxBytes), type: String(res.headers['content-type'] || '').split(';')[0].trim(), url: u.toString() };
     }
     throw new Error('Too many redirects');
 }
