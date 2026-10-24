@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.386)</title>
+    <title>Nika Admin (V102.387)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -3474,6 +3474,21 @@
             cursor: pointer;
             transition: all 0.18s ease;
         }
+
+        /* V102.387: Case Review — local-AI findings (case-review-ai.js). One icon per row, chips, no headings. */
+        #case-review-ai[hidden] { display: none; }
+        .crai-head { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+        .crai-model { display: inline-flex; align-items: center; border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 3px 9px; font-size: 0.78em; font-weight: 700; color: #475569; }
+        .crai-head .dca-ai-review-btn { font-size: 1em; padding: 6px 10px; line-height: 1; }
+        .crai-msg { margin-top: 6px; font-size: 0.82em; color: #78716c; }
+        .crai-finds { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+        .crai-f { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 10px; background: #f8fafc; border: 1px solid #e2e8f0; font-size: 0.82em; color: #334155; }
+        .crai-f i { font-style: normal; flex: none; }
+        .crai-f > span { flex: 1; }
+        .crai-f.bad { background: #fef2f2; border-color: #fecaca; }
+        .crai-c { display: flex; flex-wrap: wrap; gap: 4px; }
+        .crai-c u { text-decoration: none; background: #fff; border: 1px solid #cbd5e1; border-radius: 999px; padding: 1px 8px; font-size: 0.92em; font-weight: 600; }
+        .case-score-chip.ai::after { content: " ✨"; font-size: 0.9em; }
 
         .case-score-chip:hover,
         .case-score-chip.active {
@@ -7889,6 +7904,7 @@
     <script src="ai-model-registry.js?v=V102.365"></script>
     <script src="ai-model-ui.js?v=V102.365"></script>
     <script src="ollama-local.js?v=V102.109"></script>
+<script src="case-review-ai.js?v=V102.387"></script>
     <script src="peds-dosing.js?v=V102.80"></script>
     <script src="bronchodilator-seed.js?v=V102.220"></script>
     <link rel="stylesheet" href="text-ai-chips.css?v=V102.348">
@@ -16818,6 +16834,8 @@
                 </div>
                 <button type="button" onclick="closeCaseReviewScoreModal(false)" style="border:none; background:transparent; color:#475569; font-size:1.45em; line-height:1; cursor:pointer;">&times;</button>
             </div>
+
+            <div id="case-review-ai" hidden></div>
 
             <div class="case-score-chip-row">
                 <button type="button" class="case-score-chip" data-score="0.1" onclick="setCaseReviewScoreValue(0.1)">0.1</button>
@@ -52873,6 +52891,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const rawValue = inputEl ? String(inputEl.value || '').trim() : '';
 
             window.caseReviewScoreModalState = { resolver: null };
+            if (window.caseReviewAi) window.caseReviewAi.hide();
             forceHideModal('caseReviewScoreModal');
 
             if (resolver) resolver(shouldSubmit ? rawValue : null);
@@ -52892,6 +52911,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     syncCaseReviewScoreChips();
                     setTimeout(() => inputEl.focus(), 40);
                 }
+                if (window.caseReviewAi) window.caseReviewAi.start(caseItem);   // V102.387: local-AI check as the modal opens
                 forceShowModal('caseReviewScoreModal');
             });
         }
