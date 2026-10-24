@@ -141,10 +141,18 @@ const D = 864e5, BKK = 7 * 3600e3;
       window.myUserDoc.articleSeen = { a1: { act: 'x', at: now } };
       renderUnifiedHistory(); await wait(100);
       const row = document.querySelector('[data-delete-type="article"]');
-      out.hist = row ? [row.querySelector('.hl-tt').textContent, row.querySelector('.hl-pill').textContent, !!row.querySelector('.dr-menu'), !!document.querySelector('#unified-type-filters [data-filter="article"]')] : null;
+      out.hist = row ? [row.querySelector('.hl-tt').textContent, [...row.querySelector('.art-d').classList].filter(c => /^art-(new|closed|read)$/.test(c)).join(), !!row.querySelector('.dr-menu'), !!document.querySelector('#unified-type-filters [data-filter="article"]')] : null;
       if (row) {
         row.click(); await wait(50);
-        out.histRead = [row.getAttribute('aria-expanded'), row.querySelector('.hl-pill').textContent, writes[writes.length - 1][2].articleSeen.a1.act, row.querySelector('.art-md').innerHTML === window.renderMd(docs.a1.body.en), row.querySelectorAll('.art-link').length];
+        out.histRead = [row.getAttribute('aria-expanded'), [...row.querySelector('.art-d').classList].filter(c => /^art-(new|closed|read)$/.test(c)).join(), writes[writes.length - 1][2].articleSeen.a1.act, row.querySelector('.art-md').innerHTML === window.renderMd(docs.a1.body.en), row.querySelectorAll('.art-link').length];
+      // V101.206: the icon disc is the listen button (voice stubbed): tap = speaks + ring/bars, the row stays as it was, a second tap stops
+      { const said = []; window.SpeechSynthesisUtterance = function (t) { this.text = t; }; Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: { getVoices: () => [], cancel: () => {}, speak: u => said.push(u) } });
+        const d = row.querySelector('.art-d'); d.click(); await wait(10);
+        const on = [d.classList.contains('playing'), d.getAttribute('aria-pressed'), row.getAttribute('aria-expanded')];
+        said[0].onboundary({ charIndex: Math.floor(said[0].text.length / 2) });
+        const mid = [d.style.getPropertyValue('--p') !== '', /^\d+:\d\d$/.test(d.querySelector('.art-tm').textContent), getComputedStyle(d.querySelector('.art-bars')).display !== 'none'];
+        d.click(); await wait(10);
+        out.listen = { on, mid, off: [d.classList.contains('playing'), d.getAttribute('aria-pressed')], said: said.length >= 1, lang: said[0].lang, tm: /^\d+m$/.test(d.querySelector('.art-tm').textContent) }; }
         // V101.193: the language pill in the row (a1 has en + th); a tap swaps the body in place — the row stays open, nothing is written (V101.202: one pill, cycles)
         const chips = () => [...row.querySelectorAll('.art-hist .lng')].map(b => b.textContent + ':' + b.dataset.lang);
         const wBefore = writes.length;
@@ -180,8 +188,9 @@ const D = 864e5, BKK = 7 * 3600e3;
     assert.deepEqual(r.got, ['ok', false], '✓ Got it = read'); assert.equal(r.afterRead, false, 'a read article never pops up again');
     assert.deepEqual(r.beri, ['users/U1:{"inc":1}', 'beri_ledger/article_quiz__a1_U1:"article_quiz/1/a1_U1"'], '+1 Beri with a ledger row, only once: ' + JSON.stringify(r.beri));
     assert.ok(r.hist, 'the article is a History row');
-    assert.deepEqual(r.hist, ['3 inhaler mistakes we see every week', '👁 Closed', false, true], 'History row: title, 👁 Closed, no 🗑 menu, a 📰 chip');
-    assert.deepEqual(r.histRead, ['true', '✓ Read', 'hist', true, 4], 'opening the row reads it in place (pill → ✓ Read, act hist, body + 🩺/💊/quiz/Codex links)');
+    assert.deepEqual(r.hist, ['3 inhaler mistakes we see every week', 'art-closed', false, true], 'History row: title, the icon disc carries the state (closed), no 🗑 menu, a 📰 chip');
+    assert.deepEqual(r.histRead, ['true', 'art-read', 'hist', true, 4], 'opening the row reads it in place (disc → green ring, act hist, body + 🩺/💊/quiz/Codex links)');
+    assert.deepEqual(r.listen, { on: [true, 'true', 'true'], mid: [true, true, true], off: [false, 'false'], said: true, lang: 'en-US', tm: true }, 'V101.206: tapping the disc speaks (ring fills, bars, countdown) without toggling the row; a second tap stops and restores the time badge: ' + JSON.stringify(r.listen));
     assert.deepEqual(r.histLng, ['EN:en'], 'V101.202: the row carries one language pill (a1 has no ko), EN on');
     assert.deepEqual(r.histLngTh, ['TH:th', true, 'true', 0], 'a tap: Thai body in place, pill → TH, row still open, no write');
     assert.deepEqual(r.histLngBack, ['EN:en', true], 'a second tap: back to the English body');

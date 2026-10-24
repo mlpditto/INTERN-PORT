@@ -94,7 +94,7 @@ async function open(browser) {
         assert.deepEqual(r.labelsTh, ['วันนี้', 'เมื่อวาน', '7 วันล่าสุด', '30 วันล่าสุด'], 'TH bucket labels after the change event: ' + r.labelsTh);
         assert.deepEqual(r.labelsKr, ['오늘', '어제', '최근 7일', '최근 30일'], 'KR bucket labels: ' + r.labelsKr);
         assert.ok(r.titles.includes('Acromegaly: Spotting the Subtle Signs'), 'the admin emoji at the end of the article title stays out of the list: ' + r.titles);
-        assert.deepEqual(r.pillsEn, ['📰 New', '⏳ Pending'], 'EN pills: ' + r.pillsEn); assert.deepEqual(r.pillsTh, ['📰 ใหม่', '⏳ รอตรวจ'], 'TH pills: ' + r.pillsTh);
+        assert.deepEqual(r.pillsEn, ['⏳ Pending'], 'EN pills (V101.206: the article row has no pill — its disc carries the state): ' + r.pillsEn); assert.deepEqual(r.pillsTh, ['⏳ รอตรวจ'], 'TH pills: ' + r.pillsTh);
         assert.ok(/^\d{1,2} [A-Z][a-z]{2}$/.test(r.dateEn[0]) && /ต\.ค\.|พ\.ย\.|ก\.ย\./.test(r.dateTh[0]) && /월 \d{1,2}일/.test(r.dateKr[0]), 'row dates follow the language: ' + [r.dateEn[0], r.dateTh[0], r.dateKr[0]]);
         assert.equal(r.discAria, 'Cardiovascular · case 1', 'the case disc has a real accessible name: ' + r.discAria);
         assert.equal(r.matAria, '2 files to download', '📎 says what it is: ' + r.matAria);
