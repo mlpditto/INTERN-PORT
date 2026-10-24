@@ -50,15 +50,13 @@
         var q = $('lp-queue'); if (!q) { q = document.createElement('div'); q.id = 'lp-queue'; strip.insertBefore(q, strip.firstChild); }
         var chips = [], due = dueList(), dl = drugList(), cases = pendingCases(), mem = memories()[0];
         if (due.length) { var late = daysLate(due[0].nextReviewDate); chips.push(pill('hot', '📖 <b>' + due.length + ' due</b> <small>' + esc((due[0].title || '(untitled)').slice(0, 30)) + (late > 0 ? ' · ' + late + ' d late' : '') + '</small> ›', 'review', 'Start the oldest review')); }
-        else chips.push(pill('', '📖 ✓ nothing due', '', 'No entry is due for review today'));
+        // V102.391: all-clear states show nothing (owner): no due chip, no ✓ every drug, no ✓ none waiting
         if (dl === null) chips.push('<span class="lpq-p lpq-wait">💊 …</span>');
         else {
             var inc = dl.map(function (d) { return { d: d, p: pctOf(d) }; }).filter(function (x) { return x.p < 90; }).sort(function (a, b) { return a.p - b.p; });
             if (inc.length) chips.push(pill('', '💊 <b>' + inc.length + ' incomplete</b> <small>lowest: ' + esc(inc[0].d.genericName || '') + ' ' + inc[0].p + '%</small> ›', 'drugs', 'Open the Drug Codex'));
-            else if (dl.length) chips.push(pill('', '💊 ✓ every drug ≥ 90%', '', ''));
         }
         if (cases.length) chips.push(pill('', '📥 <b>' + cases.length + ' waiting</b> ›', 'cases', 'New cases for review in Alabasta'));
-        else chips.push(pill('', '📥 ✓ none waiting', '', 'No new cases'));
         if (mem) chips.push(pill('', '🎟️ <small>' + esc(String(mem.title || '').slice(0, 26)) + '</small> ›', 'memories', 'Latest memory · ' + (mem.eventDate || '')));
         var g = function (id) { var e = $(id); return e ? e.textContent : '0'; };
         q.innerHTML = '<div class="lpq-line"><div class="lpq-top"><span>🔥 ' + g('lp-stat-streak') + ' day streak</span><span>' + g('lp-stat-total') + ' entries</span><span>' + g('lp-stat-weeks') + ' weeks active</span></div><div class="lpq-chips">' + chips.join('') + '</div></div>';
