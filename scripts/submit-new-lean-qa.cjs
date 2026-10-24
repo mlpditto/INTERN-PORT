@@ -168,11 +168,11 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.equal(await page.evaluate(() => document.getElementById('u-case-system').value), 'gi');
         assert.equal(await page.evaluate(() => document.getElementById('u-case-symptoms-section').style.display), 'block', 'symptoms follow the pick');
 
-        // ---- V101.132: optional details — 4 tiles fold blocks open, only what is filled is collected, rights has an "other" box
+        // ---- V101.132: optional details — the tiles fold blocks open, only what is filled is collected, rights has an "other" box (V101.204: 5 tiles, + ⚠️ ADR)
         assert.equal(await page.evaluate(() => caseExtrasCollect()), null, 'nothing filled → nothing sent');
         const opt = await page.evaluate(() => {
             const o = {}; const hidden = id => document.getElementById(id).hidden;
-            o.start = ['meds', 'labs', 'rights', 'appt'].map(k => hidden('u-opt-' + k));
+            o.start = ['meds', 'labs', 'rights', 'appt', 'adr'].map(k => hidden('u-opt-' + k));
             document.querySelector('.u-opt-tile[data-opt="meds"]').click();
             o.medsOpen = !hidden('u-opt-meds'); o.medsRows = document.querySelectorAll('#u-opt-meds .u-opt-row').length;
             const r = document.querySelector('#u-opt-meds .u-opt-row').querySelectorAll('input'); r[0].value = ' Metformin '; r[1].value = '500 mg 2x/day'; r[0].dispatchEvent(new Event('input', { bubbles: true }));
@@ -188,19 +188,60 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
             document.querySelector('.u-opt-tile[data-opt="appt"]').click(); document.getElementById('u-opt-appt-date').value = '2026-10-26'; document.getElementById('u-opt-appt-place').value = 'อายุรกรรม';
             o.collected = JSON.parse(JSON.stringify(caseExtrasCollect()));
             document.querySelector('#u-opt-rights .u-opt-chip[data-v="other"]').click(); o.toggledOff = JSON.parse(JSON.stringify(caseExtrasCollect())).treatmentRights || null;   // tapping the chip again clears it
-            caseExtrasReset(); o.afterReset = caseExtrasCollect(); o.resetClosed = ['meds', 'labs', 'rights', 'appt'].map(k => hidden('u-opt-' + k));
+            caseExtrasReset(); o.afterReset = caseExtrasCollect(); o.resetClosed = ['meds', 'labs', 'rights', 'appt', 'adr'].map(k => hidden('u-opt-' + k));
             return o;
         });
-        assert.deepEqual(opt.start, [true, true, true, true], 'all four blocks start folded');
+        assert.deepEqual(opt.start, [true, true, true, true, true], 'all five blocks start folded');
         assert.ok(opt.medsOpen && opt.medsRows === 1, 'opening Medications adds the first row'); assert.equal(opt.medsRows2, 2);
         assert.deepEqual(opt.badge, ['1', true], 'badge counts filled rows only');
         assert.deepEqual(opt.chips.map(c => c.replace(/\s*[가-힯].*$/, '')), ['Gold card (UCS) บัตรทอง', 'Social Security (SSS) ประกันสังคม', 'Civil servant (CSMBS) ข้าราชการ', 'Private insurance ประกันเอกชน', 'Other อื่นๆ'], 'the five rights (V101.155: EN first, + Social Security)');
         assert.deepEqual(opt.chipsVisibleEn, ['Gold card (UCS)', 'Social Security (SSS)', 'Civil servant (CSMBS)', 'Private insurance', 'Other'], 'English mode shows a whole English label on every chip (no "(UCS)(UCS)" / blank chip): ' + JSON.stringify(opt.chipsVisibleEn));
         assert.ok(opt.otherHidden0 && !opt.otherHidden1, 'อื่นๆ shows a box to specify');
         assert.deepEqual(opt.collected, { medications: [{ name: 'Metformin', dose: '500 mg 2x/day' }], labResults: [{ test: 'HbA1c', value: '8.2 %' }], treatmentRights: { type: 'other', other: 'ประกันสังคม' }, appointment: { date: '2026-10-26', place: 'อายุรกรรม' } }, 'only filled things, trimmed');
-        assert.equal(opt.toggledOff, null, 'a second tap clears the rights choice'); assert.equal(opt.afterReset, null, 'reset empties everything'); assert.deepEqual(opt.resetClosed, [true, true, true, true]);
+        assert.equal(opt.toggledOff, null, 'a second tap clears the rights choice'); assert.equal(opt.afterReset, null, 'reset empties everything'); assert.deepEqual(opt.resetClosed, [true, true, true, true, true]);
         assert.ok(/\.\.\.caseExtras,\s*status: "pending"/.test(idx) && /\.\.\.caseExtras,\s*sourceType: 'cases'/.test(idx), 'the extras are written to the cases doc AND its submissions mirror');
         await page.selectOption('#u-case-system', '');
+
+        // ---- V101.204: ⚠️ ADR / Naranjo — 5th tile, 10 questions as Yes / No / ? chips, live score + category, saved as one `adr` field
+        const adr = await page.evaluate(() => {
+            const o = {}, $ = id => document.getElementById(id), q = (n, a) => document.querySelector('#u-opt-adr .u-nq button[data-q="' + n + '"][data-a="' + a + '"]').click();
+            o.tiles = [...document.querySelectorAll('#u-case-opt .u-opt-tile')].map(t => t.dataset.opt);
+            o.hidden0 = $('u-opt-adr').hidden;
+            document.querySelector('.u-opt-tile[data-opt="adr"]').click(); o.hidden1 = $('u-opt-adr').hidden;
+            o.rows = document.querySelectorAll('#u-opt-adr .u-nq').length;
+            o.oneLine = [...document.querySelectorAll('#u-opt-adr .u-nq .t')].map(t => [t.textContent.slice(0, 14), t.scrollWidth, t.clientWidth, Math.round(t.getBoundingClientRect().height)]);
+            o.default = [$('u-opt-adr-score').querySelector('em').textContent, $('u-opt-adr-score').dataset.lv, [...document.querySelectorAll('#u-opt-adr .u-nq button[aria-pressed="true"]')].map(b => b.dataset.a).join('')];
+            o.chipText = [...document.querySelectorAll('#u-opt-adr .u-nq:nth-child(3) button, #u-opt-adr .u-nq:nth-child(6) button')].map(b => b.textContent + '|' + b.getAttribute('aria-label'));
+            o.nothingYet = caseExtrasCollect();            // the block open with every answer ? and nothing typed sends nothing
+            q(0, 'y'); q(1, 'y'); q(2, 'y'); q(4, 'n');
+            document.querySelector('.u-opt-tile[data-opt="meds"]').click(); const r = document.querySelector('#u-opt-meds .u-opt-row').querySelectorAll('input'); r[0].value = 'Amoxicillin'; r[0].dispatchEvent(new Event('input', { bubbles: true }));
+            o.datalist = [...$('u-opt-adr-list').options].map(x => x.value);
+            $('u-opt-adr-drug').value = ' Amoxicillin '; $('u-opt-adr-rx').value = 'ผื่นลมพิษ'; $('u-opt-adr-drug').dispatchEvent(new Event('input', { bubbles: true }));
+            o.score = [$('u-opt-adr-score').querySelector('em').textContent, $('u-opt-adr-score').dataset.lv, $('u-opt-adr-score').querySelector('.lv').textContent, getComputedStyle($('u-opt-adr-score')).backgroundColor];
+            o.badge = [document.querySelector('.u-opt-tile[data-opt="adr"] .u-opt-n').textContent, document.querySelector('.u-opt-tile[data-opt="adr"]').classList.contains('has')];
+            r[0].value = ''; r[0].dispatchEvent(new Event('input', { bubbles: true }));   // drop the drug row so only ADR is filled
+            o.collected = JSON.parse(JSON.stringify(caseExtrasCollect()));
+            q(0, 'u'); o.scoreBack = $('u-opt-adr-score').querySelector('em').textContent;
+            caseExtrasReset(); o.afterReset = [caseExtrasCollect(), $('u-opt-adr').hidden, $('u-opt-adr-score').querySelector('em').textContent, $('u-opt-adr-drug').value, document.querySelector('.u-opt-tile[data-opt="adr"] .u-opt-n').hidden];
+            return o;
+        });
+        assert.deepEqual(adr.tiles, ['meds', 'labs', 'rights', 'appt', 'adr'], 'five tiles, ⚠️ ADR last');
+        assert.ok(adr.hidden0 && !adr.hidden1 && adr.rows === 10, 'the ADR block folds open with the 10 Naranjo questions');
+        assert.ok(adr.oneLine.every(x => x[1] <= x[2] + 1 && x[3] < 24), 'every question fits one line on the phone: ' + JSON.stringify(adr.oneLine));
+        assert.deepEqual(adr.default, ['0', 'doubtful', 'uuuuuuuuuu'], 'every answer starts at ? (0) → 0 Doubtful');
+        assert.deepEqual(adr.chipText, ['+2|Yes +2', '−1|No −1', '?|Unknown (0)', '−1|Yes −1', '+2|No +2', '?|Unknown (0)'], 'chips carry the per-question Naranjo points under one Yes · No · ? header (Q2, Q5)');
+        assert.equal(adr.nothingYet, null, 'an open block with no answer and nothing typed sends nothing');
+        assert.deepEqual(adr.datalist, ['Amoxicillin'], 'the suspected-drug list offers the Medications rows');
+        assert.deepEqual(adr.score, ['6', 'probable', 'Probable · น่าจะใช่ · 가능성 높음', 'rgb(255, 251, 235)'], 'Q1 yes, Q2 yes, Q3 yes, Q5 no → 6 Probable, amber bar (the mockup sample)');
+        assert.deepEqual(adr.badge, ['6', true], 'the tile badge shows the score');
+        assert.deepEqual(adr.collected, { adr: { drug: 'Amoxicillin', reaction: 'ผื่นลมพิษ', answers: ['y', 'y', 'y', 'u', 'n', 'u', 'u', 'u', 'u', 'u'], score: 6, category: 'probable' } }, 'saved as one `adr` field, trimmed, nothing else');
+        assert.equal(adr.scoreBack, '5', 'a chip tap re-scores at once');
+        assert.deepEqual(adr.afterReset, [null, true, '0', '', true], 'reset folds the block and clears answers, score, drug and badge');
+        if (process.env.SHOT) {   // the ADR block open with the mockup sample (for before/after bundles), then reset again
+            await page.evaluate(() => { const q = (n, a) => document.querySelector('#u-opt-adr .u-nq button[data-q="' + n + '"][data-a="' + a + '"]').click(); document.querySelector('.u-opt-tile[data-opt="adr"]').click(); q(0, 'y'); q(1, 'y'); q(2, 'y'); q(4, 'n'); document.getElementById('u-opt-adr-drug').value = 'Amoxicillin'; document.getElementById('u-opt-adr-rx').value = 'ผื่นลมพิษ'; document.getElementById('u-opt-adr-drug').dispatchEvent(new Event('input', { bubbles: true })); });
+            await page.locator('#u-case-opt').screenshot({ path: path.join(process.env.SHOT, 'case_adr_open.png') });
+            await page.evaluate(() => caseExtrasReset());
+        }
 
         // ---- required fields: red frame + scrolled into view, cleared when touched
         await page.evaluate(() => { document.getElementById('u-case-id').value = ''; document.getElementById('u-case-system').value = ''; });
@@ -239,6 +280,6 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.equal(await page.evaluate(() => document.getElementById('unified-submit-modal').style.display), 'none', '✕ closes the dialog');
         assert.deepEqual(errors.filter(e => !/firebase\./.test(e)), [], 'no page errors');
         await ctx.close();
-        console.log('PASS: Submit New lean — no header/label, ✕ in the launchers row, inline HN + patient, one-line note, Disease System = one unbiased dropdown, required = pale green / optional = pale, optional details (meds / labs / rights / appointment), red frame on a missing field, Submit pinned (no Cancel)');
+        console.log('PASS: Submit New lean — no header/label, ✕ in the launchers row, inline HN + patient, one-line note, Disease System = one unbiased dropdown, required = pale green / optional = pale, optional details (meds / labs / rights / appointment / ⚠️ ADR Naranjo: 10 questions, live score, saved as `adr`), red frame on a missing field, Submit pinned (no Cancel)');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
