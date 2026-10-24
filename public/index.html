@@ -26243,6 +26243,13 @@ async function archiveDoneCard(cardId) {
             renderCaseStats(window.myCasesCache || []);
         }
 
+        // V101.203: every cell quoted; one that starts with = + @ (or - followed by more) gets a leading '
+        // so a spreadsheet never runs a note typed as =HYPERLINK(...) as a formula (same rule as the admin exports).
+        function csvCell(v) {
+            let s = String(v == null ? '' : v);
+            if (/^[=+@]/.test(s) || /^-.+/.test(s)) s = "'" + s;
+            return `"${s.replace(/"/g, '""')}"`;
+        }
         function exportCaseStatsCsv() {
             const all = window.myCasesCache || [];
             if (!all.length) return;
@@ -26253,7 +26260,7 @@ async function archiveDoneCard(cardId) {
             const rows = (winDays ? all.filter(c => tsOf(c) >= cutoff) : all).slice().sort((a, b) => tsOf(b) - tsOf(a));
             if (!rows.length) { if (typeof showToast === 'function') showToast('No cases in this window · 이 기간에 케이스 없음'); return; }
             // PII (patient name / tel) intentionally excluded — portfolio-safe export.
-            const esc = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+            const esc = csvCell;
             const lines = [['Date', 'Case No', 'System', 'Symptoms', 'Note', 'Points'].map(esc).join(',')];
             rows.forEach(c => {
                 const ts = tsOf(c);

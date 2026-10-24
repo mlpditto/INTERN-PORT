@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.385)</title>
+    <title>Nika Admin (V102.386)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -7936,7 +7936,7 @@
 <script src="quiz-cover.js?v=V102.344"></script>
 <script src="clip-captions.js?v=V102.366"></script>
 <script src="holidays-admin.js?v=V102.330"></script>
-<script src="articles-admin.js?v=V102.385"></script>
+<script src="articles-admin.js?v=V102.386"></script>
 <link rel="stylesheet" href="quiz-qimage.css?v=V101.03">
 <script src="quiz-qimage.js?v=V101.03"></script>
 <link rel="stylesheet" href="quiz-more-popover.css?v=V100.47">
@@ -42325,9 +42325,13 @@ They can connect again from LINE.
         // RFC-4180: quote any field carrying a comma, quote or newline, and
         // double the internal quotes. A product description is free text, so all
         // three show up in practice.
+        // V102.386: a cell that starts with = + @ (or - followed by more) gets a leading ' so a
+        // spreadsheet never runs it as a formula (same rule as pixCsvCell); such a cell is quoted too.
         function toCsvField(v) {
-            const s = (v === null || v === undefined) ? '' : String(v);
-            return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+            let s = (v === null || v === undefined) ? '' : String(v);
+            const guarded = /^[=+@]/.test(s) || /^-.+/.test(s);
+            if (guarded) s = "'" + s;
+            return (guarded || /[",\r\n]/.test(s)) ? `"${s.replace(/"/g, '""')}"` : s;
         }
 
         function syncProductExportButton(count) {
