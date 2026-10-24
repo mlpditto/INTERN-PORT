@@ -9,8 +9,8 @@ const backend = fs.readFileSync('functions/index.js', 'utf8');
 
 // static pins
 assert.ok(backend.includes("{ secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID', 'GMAIL_APP_PASSWORD'] }"), 'the callable declares the Gmail secret');
-assert.ok(backend.includes('async function sendAdminMail(fromName, subject, text) {') && backend.includes('async function sendFloodMail(subject, text) {'), 'sendAdminMail beside the untouched sendFloodMail');
-assert.ok(/async function sendAdminMail[\s\S]*?to: FLOOD_MAIL, subject, text \}\);\r?\n\}/.test(backend), 'sendAdminMail mails the account itself (medlifeplus@gmail.com)');
+assert.ok(backend.includes('async function sendAdminMail(fromName, subject, text, html) {') && backend.includes('async function sendFloodMail(subject, text) {'), 'sendAdminMail beside the untouched sendFloodMail');
+assert.ok(/async function sendAdminMail[\s\S]*?to: FLOOD_MAIL, subject, text(?:, \.\.\.\(html \? \{ html \} : \{\}\))? \}\);\r?\n\}/.test(backend), 'sendAdminMail mails the account itself (medlifeplus@gmail.com)');
 const start = backend.indexOf('exports.notifyAdminOnNewCase = onCall(');
 const src = backend.slice(start, backend.indexOf('\n});', start) + 4);
 assert.ok(!src.includes("reason: 'token-missing'") && !src.includes("reason: 'admin-id-missing'"), 'a missing LINE token / target no longer returns before the mail (the product notifier keeps its own early returns)');
@@ -22,7 +22,7 @@ const context = {
     admin: { firestore: () => ({ collection: () => ({ doc: () => ({ get: async () => ({ exists: !!CASE, data: () => CASE }) }) }) }) },
     process: { env: {} },
     axios: { post: async (url, body, opts) => { pushes.push({ to: body.to, alt: body.messages[0].altText }); return { data: {} }; } },
-    sendAdminMail: async (fromName, subject, text) => { mails.push({ fromName, subject, text }); if (mailFail) throw new Error('smtp down'); }
+    sendAdminMail: async (fromName, subject, text, html) => { mails.push({ fromName, subject, text, html }); if (mailFail) throw new Error('smtp down'); }
 };
 vm.createContext(context);
 vm.runInContext(src, context);
@@ -42,6 +42,8 @@ const LINE = { LINE_CHANNEL_ACCESS_TOKEN: 't', ADMIN_LINE_USER_ID: 'U123', ADMIN
     assert.equal(mails[0].subject, '🩺 Case ใหม่ · สมชาย ใจดี · 26-26870');
     for (const s of ['สมชาย ใจดี ส่ง Case ใหม่', 'HN / Ref: 26-26870', 'ผู้ป่วย: นางสาว ก', 'โรค: Hypertension', 'ระบบ: Cardiovascular / ระบบหัวใจ', 'Note: Amlodipine 5 mg · BP 150/95', 'เปิดหน้า admin: https://mlpditto.github.io/INTERN-PORT/admin.html']) assert.ok(mails[0].text.includes(s), 'mail says: ' + s);
     assert.ok(!/undefined/.test(mails[0].text + mails[0].subject), 'nothing undefined in the mail');
+    assert.ok(mails[0].html.includes('<a href="https://mlpditto.github.io/INTERN-PORT/admin.html">เปิดหน้า admin</a>') && !mails[0].html.includes('>https://'), 'HTML part: short link, no visible long URL');
+    assert.ok(mails[0].html.includes('Amlodipine 5 mg · BP 150/95'), 'HTML part keeps the note');
 
     // 2. a sparse case: empty fields are left out, the subject falls back to the disease / Untitled
     r = await call(LINE, { displayName: 'B', disease: 'Asthma' });

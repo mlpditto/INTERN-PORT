@@ -2444,7 +2444,11 @@ exports.notifyAdminOnNewCase = onCall(
         if (disease) lines.push(`โรค: ${disease}`);
         if (systemLabel) lines.push(`ระบบ: ${systemLabel}`);
         lines.push(`Note: ${noteText}`, '', `เปิดหน้า admin: ${adminUri}`, '', 'ส่งอัตโนมัติจาก INTERN-PORT เมื่อ intern ส่ง Case');
-        await sendAdminMail('INTERN-PORT Cases', `🩺 Case ใหม่ · ${displayName} · ${caseRef || disease || 'Untitled'}`.slice(0, 200), lines.join('\n'));
+        // HTML part: the long admin URL becomes a short "เปิดหน้า admin" link; the plain-text part keeps the full URL as a fallback.
+        const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const html = '<div style="white-space:pre-wrap;font-family:sans-serif">' +
+            lines.map(l => l.startsWith('เปิดหน้า admin:') ? `<a href="${adminUri}">เปิดหน้า admin</a>` : esc(l)).join('\n') + '</div>';
+        await sendAdminMail('INTERN-PORT Cases', `🩺 Case ใหม่ · ${displayName} · ${caseRef || disease || 'Untitled'}`.slice(0, 200), lines.join('\n'), html);
         mailed = true;
         console.log(`[notifyAdminOnNewCase] MAILED  case=${caseDocId}  user=${displayName}`);
     } catch (err) {
@@ -4702,12 +4706,12 @@ function floodEarlyMail(w, s, lat, lon, river, wx) {
 
 // 2026-10-22: admin mail for other notices (the new-case mail) — the same Gmail App Password transport, the account is both the
 // sender and the recipient. The flood mail below keeps its own copy so that path stays untouched.
-async function sendAdminMail(fromName, subject, text) {
+async function sendAdminMail(fromName, subject, text, html) {
     const pass = process.env.GMAIL_APP_PASSWORD;
     if (!pass) throw new Error('GMAIL_APP_PASSWORD not set');
     const nodemailer = require('nodemailer');
     const tx = nodemailer.createTransport({ host: 'smtp.gmail.com', port: 465, secure: true, auth: { user: FLOOD_MAIL, pass } });
-    await tx.sendMail({ from: `"${fromName}" <${FLOOD_MAIL}>`, to: FLOOD_MAIL, subject, text });
+    await tx.sendMail({ from: `"${fromName}" <${FLOOD_MAIL}>`, to: FLOOD_MAIL, subject, text, ...(html ? { html } : {}) });
 }
 
 async function sendFloodMail(subject, text) {
