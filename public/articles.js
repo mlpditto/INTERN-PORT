@@ -239,6 +239,82 @@
         var P = { en: { read: 'Read', closed: 'Closed', fresh: 'New' }, th: { read: 'อ่านแล้ว', closed: 'ปิดไป', fresh: 'ใหม่' }, ko: { read: '읽음', closed: '닫음', fresh: '새 글' } }[uiLang()];   // V101.189
         return m.state === 'read' ? '<span class="hl-pill art-ok">✓ ' + P.read + (m.saved ? ' · 🔖' : '') + '</span>' : m.state === 'closed' ? '<span class="hl-pill">👁 ' + P.closed + (m.saved ? ' · 🔖' : '') + '</span>' : '<span class="hl-pill art-new">📰 ' + P.fresh + '</span>';
     }
+    // V101.206 (owner's pick "2 · one point = the icon disc"): in History an article's icon disc is its ONE control — green ring = read, a small
+    // reading-time badge, tap = read it aloud with the browser's own voice (nothing is sent anywhere); while it speaks the ring fills, bars move in the
+    // middle and the badge counts down. Tapping the row still opens the article in place (the disc is a <button>, which the row handlers skip).
+    function plain(md) { return String(md || '').replace(/```[\s\S]*?```/g, ' ').replace(/!\[[^\]]*\]\([^)]*\)/g, ' ').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[#*_>`~|]/g, ' ').replace(/\s+/g, ' ').trim(); }
+    function secs(text) { var th = (text.match(/[\u0E00-\u0E7F]/g) || []).length, w = (text.replace(/[\u0E00-\u0E7F]/g, ' ').match(/\S+/g) || []).length; return Math.max(30, Math.round((w + th / 5) / 160 * 60)); }
+    function fmt(n) { return Math.floor(n / 60) + ':' + ('0' + (n % 60)).slice(-2); }
+    function discCss() {
+        if (document.getElementById('art-disc-css')) return;
+        var s = document.createElement('style'); s.id = 'art-disc-css';
+        s.textContent = '.history-compact .hl-disc.art-d{position:relative;padding:0;margin:0;font:inherit;cursor:pointer;background:#e0e7ff;border:1px solid #c7d2fe;overflow:visible}' +
+            '.hl-disc.art-d.art-read{border:2.5px solid #22c55e;background:#f0fdf4}' +
+            '.hl-disc.art-d.art-new::after{content:"";position:absolute;right:-2px;top:-2px;width:10px;height:10px;border-radius:50%;background:#6366f1;border:2px solid #fff}' +
+            '.hl-disc.art-d .art-tm{position:absolute;right:-10px;bottom:-6px;font-style:normal;font-size:.58rem;font-weight:800;color:#64748b;background:#fff;border:1.5px solid #cbd5e1;border-radius:999px;padding:0 5px;line-height:1.5;white-space:nowrap}' +
+            '.hl-disc.art-d.art-read .art-tm{border-color:#22c55e;color:#15803d}' +
+            '.hl-disc.art-d .art-bars{display:none;align-items:flex-end;gap:2px;height:14px;position:relative}.hl-disc.art-d .art-bars i{width:3px;height:4px;border-radius:2px;background:#16a34a;animation:artBar 1s ease-in-out infinite}' +
+            '.hl-disc.art-d .art-bars i:nth-child(2){animation-delay:.15s}.hl-disc.art-d .art-bars i:nth-child(3){animation-delay:.3s}.hl-disc.art-d .art-bars i:nth-child(4){animation-delay:.45s}' +
+            '.hl-disc.art-d.playing{border:none;background:conic-gradient(#22c55e calc(var(--p,0) * 1%),#dcfce7 0);animation:artPulse 1.6s ease-out infinite}' +
+            '.hl-disc.art-d.playing::before{content:"";position:absolute;inset:3px;border-radius:50%;background:#f0fdf4}.hl-disc.art-d.playing::after{display:none}' +
+            '.hl-disc.art-d.playing .g{display:none}.hl-disc.art-d.playing .art-bars{display:inline-flex}.hl-disc.art-d.playing .art-tm{border-color:#22c55e;color:#15803d}' +
+            '@keyframes artBar{0%,100%{height:4px}50%{height:14px}}@keyframes artPulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.45)}70%,100%{box-shadow:0 0 0 9px rgba(34,197,94,0)}}' +
+            '@media (prefers-reduced-motion: reduce){.hl-disc.art-d.playing,.hl-disc.art-d .art-bars i{animation:none}.hl-disc.art-d .art-bars i{height:10px}}';
+        document.head.appendChild(s);
+    }
+    function discHtml(s) {
+        discCss();
+        var m = s.metadata || {}, a = find(m.articleId), st = m.state === 'read' ? 'read' : m.state === 'closed' ? 'closed' : 'new';
+        var tx = a ? textOf(a, uiLang()) : null, sec = tx ? secs(plain(tx.title + '. ' + tx.body)) : 0, mn = sec ? Math.max(1, Math.round(sec / 60)) : 0;
+        var T = { en: 'Listen', th: 'ฟัง', ko: '듣기' }[uiLang()];
+        return '<span class="hl-lead"><button type="button" class="hl-disc art-d art-' + st + '" data-art-listen="' + esc(m.articleId || '') + '" aria-pressed="false" aria-label="' + T + (mn ? ' · ' + mn + ' min' : '') + '" title="' + T + '">'
+            + '<span class="g">' + esc(m.emoji || '📰') + '</span><span class="art-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>' + (mn ? '<i class="art-tm" data-t="' + mn + 'm">' + mn + 'm</i>' : '') + '</button></span>';
+    }
+    var LS = { btn: null, tok: null };
+    function stopListen() {
+        if (window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch (e) { /* nothing speaking */ } }
+        var b = LS.btn; LS = { btn: null, tok: null };
+        if (!b) return;
+        b.classList.remove('playing'); b.setAttribute('aria-pressed', 'false'); b.style.removeProperty('--p');
+        var t = b.querySelector('.art-tm'); if (t && t.dataset.t) t.textContent = t.dataset.t;
+    }
+    function listen(btn) {
+        var synth = window.speechSynthesis;
+        if (!btn || !synth || typeof SpeechSynthesisUtterance !== 'function') return;
+        var was = LS.btn === btn; stopListen(); if (was) return;
+        var id = btn.getAttribute('data-art-listen'), a = find(id); if (!a) return;
+        var tx = textOf(a, uiLang()), text = plain(tx.title + '. ' + tx.body); if (!text) return;
+        var pieces = text.match(/[^.!?。\n]+[.!?。]?\s*/g) || [text], chunks = [], cur = '';
+        pieces.forEach(function (p) { if ((cur + p).length > 220 && cur) { chunks.push(cur); cur = p; } else cur += p; });
+        if (cur) chunks.push(cur);
+        var total = text.length, total_s = secs(text), done = 0, tok = {}, lang = { en: 'en-US', th: 'th-TH', ko: 'ko-KR' }[tx.lang] || 'en-US';
+        var voice = (synth.getVoices() || []).filter(function (v) { return String(v.lang || '').toLowerCase().indexOf(tx.lang) === 0; })[0];
+        LS = { btn: btn, tok: tok };
+        btn.classList.add('playing'); btn.setAttribute('aria-pressed', 'true');
+        function paint(n) {
+            if (LS.tok !== tok) return;
+            if (!document.contains(btn)) { stopListen(); return; }   // the row was re-drawn
+            var p = Math.min(100, Math.round(n / total * 100)); btn.style.setProperty('--p', p);
+            var t = btn.querySelector('.art-tm'); if (t) t.textContent = fmt(Math.max(0, Math.round(total_s * (1 - p / 100))));
+        }
+        paint(0);
+        chunks.forEach(function (c, i) {
+            var u = new SpeechSynthesisUtterance(c); u.lang = lang; if (voice) u.voice = voice;
+            u.onboundary = function (e) { paint(done + (e.charIndex || 0)); };
+            u.onend = function () {
+                if (LS.tok !== tok) return;
+                done += c.length; paint(done);
+                if (i === chunks.length - 1) {   // heard to the end = read
+                    var b = btn; stopListen();
+                    markRead(id, 'hist').then(function () { b.classList.remove('art-new', 'art-closed'); b.classList.add('art-read'); });
+                }
+            };
+            u.onerror = function () { if (LS.tok === tok) stopListen(); };
+            synth.speak(u);
+        });
+    }
+    document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('[data-art-listen]'); if (b) { e.stopPropagation(); listen(b); } });
+    document.addEventListener('visibilitychange', function () { if (document.hidden) stopListen(); });
     function detailHtml(s) {
         var a = find((s.metadata || {}).articleId); if (!a) return '';
         css();
@@ -260,6 +336,7 @@
         var id = String(row.dataset.deleteItem || '').replace(/^art_/, ''), s = (me().articleSeen || {})[id];
         if (!find(id) || isDone(s)) return;
         markRead(id, 'hist').then(function () { });
+        var disc = row.querySelector('.art-d'); if (disc) { disc.classList.remove('art-new', 'art-closed'); disc.classList.add('art-read'); }   // V101.206: the disc carries the state
         var pill = row.querySelector('.hl-pill'); if (pill) pill.outerHTML = pillHtml({ metadata: { state: 'read', saved: !!(s && s.saved) } });
     });
 
@@ -270,7 +347,7 @@
             else refreshHistory(false);
         },
         historyItems: function () { return historyItems(S.list, me(), Date.now()); },
-        detailHtml: detailHtml, pillHtml: pillHtml, close: close, histLang: histLang,
+        detailHtml: detailHtml, pillHtml: pillHtml, discHtml: discHtml, listen: listen, stopListen: stopListen, close: close, histLang: histLang,
         lang: function (l) { var a = S.cur && S.cur.a, have = a ? langs(a) : []; S.lang = l || (have.length ? nextLang(have, textOf(a, S.lang).lang) : S.lang); render(); },
         toggleMore: function () { S.more = !S.more; render(); },
         save: function () {
