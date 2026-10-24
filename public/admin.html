@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.393)</title>
+    <title>Nika Admin (V102.395)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -2487,7 +2487,10 @@
 
         .alabasta-action-btn.is-edit { background: #f59e0b; }
         .alabasta-action-btn.is-laboon { background: linear-gradient(135deg, #0ea5e9, #2563eb); }
-        .alabasta-action-btn.is-case-card { background: linear-gradient(135deg, #a855f7, #7c3aed); }
+        .alabasta-action-btn.is-case-card { background: linear-gradient(135deg, #a855f7, #7c3aed); box-shadow: 0 3px 10px rgba(124, 58, 237, .4); }   /* V102.395: the main "make" action — icon only, a glow */
+        .alabasta-action-btn.is-case-article { background: linear-gradient(135deg, #0ea5e9, #0284c7); }
+        .alabasta-action-btn.is-case-article.is-done { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #22c55e; }   /* ok = a green frame (the case already has an article) */
+        .alabasta-go-btn.is-icon { width: 34px; padding: 0; justify-content: center; font-size: 0.95em; }   /* V102.395: Review on a case = icon only */
         .alabasta-action-btn.is-poneglyph { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
         .alabasta-action-btn.is-review { background: #16a34a; }
         .alabasta-action-btn.is-reopen { background: #334155; }
@@ -7936,6 +7939,7 @@
     <script src="ai-model-registry.js?v=V102.365"></script>
     <script src="ai-model-ui.js?v=V102.365"></script>
     <script src="ollama-local.js?v=V102.109"></script>
+<script src="case-article.js?v=V102.395"></script>
 <script src="dca-ai-trail.js?v=V102.390"></script>
 <script src="dxa-ai-trail.js?v=V102.389"></script>
 <script src="case-review-ai.js?v=V102.387"></script>
@@ -41576,20 +41580,20 @@ They can connect again from LINE.
                 // Alabasta lean (Phase 2): the visible actions are the primary one only — Review + Reject while
                 // pending, Reopen once reviewed. Edit / Delete and the AI tools all live behind ⋯.
                 const mainActions = isPending
-                    ? `<button type="button" class="alabasta-go-btn" title="Mark reviewed" onclick="updateCaseStatus('${c.id}', 'reviewed')">✅ Review</button><button type="button" class="btn-sm alabasta-action-btn is-reject" title="Reject" aria-label="Reject case" onclick="openAlabastaRejectModal('${c.id}')"><span class="alabasta-emoji">❌</span></button>`
+                    ? `<button type="button" class="alabasta-go-btn is-icon" title="Review" aria-label="Review" onclick="updateCaseStatus('${c.id}', 'reviewed')">✅</button><button type="button" class="btn-sm alabasta-action-btn is-reject" title="Reject" aria-label="Reject case" onclick="openAlabastaRejectModal('${c.id}')"><span class="alabasta-emoji">❌</span></button>`
                     : `<button type="button" class="btn-sm alabasta-action-btn is-reopen" title="Reopen case" aria-label="Reopen case" onclick="updateCaseStatus('${c.id}', 'pending')"><span class="alabasta-emoji">↩️</span></button>`;
                 const moreBtn = `<details class="alabasta-more-menu">
                     <summary class="btn-sm alabasta-action-btn is-more" title="More actions"><span class="alabasta-emoji">⋯</span></summary>
                     <div class="alabasta-more-menu-body" role="menu">
                         <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); editCaseNote('${c.id}');"><span class="alabasta-emoji">✏️</span> Edit case</button>
                         <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); openAlabastaLaboon('${c.id}');"><span class="alabasta-emoji">🐳</span> Ask Laboon</button>
-                        <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); openAlabastaCaseCard('${c.id}');"><span class="alabasta-emoji">🖼️</span> Generate Case Card</button>
                         <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); openAlabastaPoneglyph('${c.id}');"><span class="alabasta-emoji">🪨</span> ${hasPoneglyphLink ? 'Open Poneglyph draft' : 'Promote to Poneglyph'}</button>
                         <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); generateQuizFromCase('${c.id}');"><span class="alabasta-emoji">📝</span> Generate Quiz from Case</button>
                         <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); deleteCaseSubmission('${c.id}');"><span class="alabasta-emoji">🗑️</span> Delete case</button>
                     </div>
                 </details>`;
-                const actionBtn = `<div class="alabasta-action-row">${mainActions}${moreBtn}</div>`;
+                const makeBtns = window.caseArticle ? caseArticle.btns(c) : '';   // V102.395: 🖼️ Case Card + 📰 Article, icon only
+                const actionBtn = `<div class="alabasta-action-row">${mainActions.replace('<button type="button" class="btn-sm alabasta-action-btn is-reject"', makeBtns + '<button type="button" class="btn-sm alabasta-action-btn is-reject"')}${isPending ? '' : makeBtns}${moreBtn}</div>`;
 
                 const isSelected = window.alabastaSelectedIds.has(c.id);
                 const initials = alabastaInitials(c.customer);
@@ -53184,10 +53188,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         <div class="alabasta-case-sub">${c.diseaseSystemLabel ? '🏥 ' + safe(c.diseaseSystemLabel) : ''}${initials ? (c.diseaseSystemLabel ? ' · ' : '') + safe(initials) : ''}</div>
                         <div class="ib-note" title="${safe(c.note || '')}">${safe(c.note || '')}</div>
                         <div class="ib-actions">
-                            <button type="button" class="alabasta-go-btn" onclick="updateCaseStatus('${c.id}', 'reviewed')" title="Mark reviewed">✅ Review</button>
+                            <button type="button" class="alabasta-go-btn is-icon" onclick="updateCaseStatus('${c.id}', 'reviewed')" title="Review" aria-label="Review">✅</button>
                             <button type="button" class="btn-sm alabasta-action-btn is-reject" onclick="openAlabastaRejectModal('${c.id}')" title="Reject" aria-label="Reject case"><span class="alabasta-emoji">❌</span></button>
                             <button type="button" class="btn-sm alabasta-action-btn is-edit" onclick="editCaseNote('${c.id}')" title="Open case" aria-label="Open case"><span class="alabasta-emoji">👁</span></button>
-                            <button type="button" class="btn-sm alabasta-action-btn is-case-card" onclick="openAlabastaCaseCard('${c.id}')" title="Generate case card" aria-label="Generate case card"><span class="alabasta-emoji">🖼️</span></button>
+                            ${window.caseArticle ? caseArticle.btns(c) : ''}
                         </div>
                     </div>`;
             }).join('');
