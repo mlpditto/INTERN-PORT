@@ -58,10 +58,11 @@ async function open(browser, o = {}) {
     try {
         // ---- 1. month card
         let { page, ctx, errors } = await open(browser);
-        assert.equal((await page.textContent('#sch-gb-month')).trim().slice(0, 11), '📊 Oct 2026', 'V101.191: no "· this month"; holiday chips may follow');
+        assert.equal(await page.evaluate(() => [document.getElementById('sch-cal-m').textContent, document.getElementById('sch-cal-d').textContent].join(' ')), await page.evaluate(() => new Date().toLocaleDateString('en-GB', { month: 'short', timeZone: 'Asia/Bangkok' }).toUpperCase() + ' ' + new Date().toLocaleDateString('en-GB', { day: 'numeric', timeZone: 'Asia/Bangkok' })), 'V101.205: the month/day header is the calendar tile inside the card (no "📊 Oct 2026" line)');
+        assert.ok(!(await page.textContent('#sch-gb-month')).includes('📊'), 'V101.205: the month line carries chips only');
         assert.equal(await page.evaluate(() => document.getElementById('sch-goals-box').classList.contains('zero')), true, 'all zero → one line');
         assert.equal((await page.textContent('#sch-goalbars')).trim(), 'Quiz 0/30 · Journal 0/12 · Case 0/8');
-        assert.equal(await page.isVisible('#sch-goals-btn') && await page.isVisible('#sch-heat-btn') && await page.isVisible('#sch-fin-btn'), true, 'Goals 💰 Heatmap stay');
+        assert.equal(await page.isVisible('#sch-goals-btn') && await page.isVisible('#sch-heat-btn') && await page.isVisible('#sch-fin-btn'), true, 'V101.205: 🎯 💰 and the calendar tile (Heatmap) stay'); assert.equal(await page.isVisible('#sch-play-btn'), true, 'V101.205: ▶ beside them');
 
         // ---- 2. MISSED: last 30 days, older behind a button, reset on reopen
         const missedHead = () => page.evaluate(() => { const h = Array.from(document.querySelectorAll('#sch-agenda [role="button"]')).find(e => /missed/i.test(e.textContent)); return h ? h.textContent.replace(/\s+/g, ' ').trim() : null; });
