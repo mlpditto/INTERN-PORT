@@ -96,6 +96,12 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
       const ta = q('#art-bodyta'); ta.value = 'Most patients **shake** it'; ta.dispatchEvent(new Event('input'));
       out.preview = [q('#art-sheet .tt').textContent, q('#art-sheet .b').innerHTML.includes('<strong>shake</strong>') || q('#art-sheet .b').textContent.includes('shake'), q('#art-count').textContent];
       out.caretKept = q('#art-bodyta') === ta && q('#art-title') === ti;
+      // V102.397: a strikethrough button (GFM ~~text~~ — the renderer the interns' sheet uses) beside B / I
+      const tb = qa('.art-tb button').map(b => b.title + ':' + b.textContent.trim());
+      ta.focus(); ta.setSelectionRange(ta.value.indexOf('patients'), ta.value.indexOf('patients') + 'patients'.length);
+      qa('.art-tb button').find(b => b.title === 'Strikethrough').click();
+      out.strike = [tb.slice(0, 3), q('#art-bodyta').value];
+      { const t2 = q('#art-bodyta'); t2.value = 'Most patients **shake** it'; t2.dispatchEvent(new Event('input')); }   // back to the text the next checks expect
       // V102.336: Thai typed in the editor stays visible in the preview while the admin UI is in EN mode (the language switch must not wrap / hide it)
       const keep = [ti.value, ta.value];
       ti.value = '“อดทนคืออวดตัว”'; ti.dispatchEvent(new Event('input')); ta.value = 'ปัจจุบันคำว่า “อดทน (がまん)”'; ta.dispatchEvent(new Event('input'));
@@ -170,6 +176,7 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
     assert.deepEqual(r.def.slice(0, 2), [true, true], '＋ New fills a window'); assert.deepEqual(r.def[2], ['🗑', 'Save draft', '📅 Schedule'], 'V102.338: 🗑 is a quiet icon (two taps), Schedule is the primary');
     assert.equal(r.preview[0], '3 inhaler mistakes', 'the preview follows the title'); assert.ok(r.preview[1], 'and renders the markdown body'); assert.match(r.preview[2], /^26 \/ 2000 · ~1 min$/);
     assert.ok(r.caretKept, 'typing does not re-render the textarea (the caret stays)');
+    assert.deepEqual(r.strike, [['Bold:B', 'Italic:I', 'Strikethrough:S'], 'Most ~~patients~~ **shake** it'], 'V102.397: the toolbar has a Strikethrough button that wraps the selection in ~~ ~~');
     assert.deepEqual(r.thaiShown, ['“อดทนคืออวดตัว”', true, 0, true, false], 'Thai in the preview is not hidden by the EN-mode language switch: ' + JSON.stringify(r.thaiShown));
     assert.deepEqual(r.thFallback, ['', '3 inhaler mistakes', true], 'an empty TH shows EN in the preview, marked "→ EN"');
     assert.ok(r.audChips[0] === 'Everyone' && r.audChips.some(c => /RSU/.test(c)) && r.audChips.some(c => /INTERN 1/.test(c)), 'audience = Everyone + division chips + group chips: ' + r.audChips);
