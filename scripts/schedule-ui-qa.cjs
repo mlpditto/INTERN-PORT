@@ -147,7 +147,7 @@ assert.match((await page.textContent('#sch-week .sch-rg h4')).trim(), /^\d{1,2}[
     // the date text comes from toLocaleDateString — "Wed 2 Jan" on Windows ICU, "Wed, 2 Jan" on Linux (CI) — so the expectation is built in the page
     const emptyDay = await page.evaluate(() => [schWeekDayHtml('2030-01-02', []), window._schSelHtml, new Date(2030, 0, 2).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }), new Date(2030, 0, 2).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })]);
     assert.equal(emptyDay[0], '', 'empty day: no panel');
-    assert.equal(emptyDay[1], '<div class="sch-hol sch-sel lang-no-toggle" title="' + emptyDay[3] + '"><span>' + emptyDay[2] + '</span></div>', 'the chip is the date alone: ' + emptyDay[1]);
+    assert.equal(emptyDay[1], '<i hidden></i>', 'V101.205: the date is the calendar tile now; a day with no holiday / to-do leaves an empty marker, not a chip: ' + emptyDay[1]);
 
     // ---- 4. tap a day: its rows; tap again closes; focus stays on the day
     await goTo(page, -1);
@@ -158,7 +158,7 @@ assert.match((await page.textContent('#sch-week .sch-rg h4')).trim(), /^\d{1,2}[
     // V101.195 (A1): the 📚 Quiz month cell gets a "+1" pill in the kind's colour beside its number; the other cells none
     const pill = await page.evaluate(() => ({ q: (document.querySelector('#sch-goalbars .sch-bar.q b .sch-day-n') || {}).textContent, bg: getComputedStyle(document.querySelector('#sch-goalbars .sch-bar.q .sch-day-n')).backgroundColor, others: ['j', 'c'].map(k => !!document.querySelector('#sch-goalbars .sch-bar.' + k + ' .sch-day-n')) }));
     assert.deepEqual([pill.q, pill.bg, pill.others], ['+1', 'rgb(99, 102, 241)', [false, false]], 'a +1 pill in the Quiz cell (indigo), none elsewhere: ' + JSON.stringify(pill));
-    assert.equal(await page.textContent('#sch-gb-month .sch-sel'), await page.evaluate(() => new Date(__key(-1) + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })), 'the date is a chip on the month line');
+    assert.deepEqual(await page.evaluate(() => ['sch-cal-m', 'sch-cal-d', 'sch-cal-w'].map(id => document.getElementById(id).textContent)), await page.evaluate(() => { const d = new Date(__key(-1) + 'T12:00:00'); return [d.toLocaleDateString('en-GB', { month: 'short' }).toUpperCase(), d.toLocaleDateString('en-GB', { day: 'numeric' }), d.toLocaleDateString('en-GB', { weekday: 'short' })]; }), 'V101.205: the picked day is the calendar tile');
     assert.equal(await page.evaluate(() => document.querySelectorAll('#sch-week [aria-pressed="true"]').length), 1, 'one day pressed');
     assert.equal(await page.evaluate(() => document.activeElement && document.activeElement.dataset.schday), await page.evaluate(() => __key(-1)), 'focus stays on the tapped day');
     await page.locator('#sch-week [data-schday="' + (await page.evaluate(() => __key(-1))) + '"]').click();
@@ -264,9 +264,16 @@ assert.match((await page.textContent('#sch-week .sch-rg h4')).trim(), /^\d{1,2}[
     // V101.81: grey month card — three columns + Goals / Heatmap stacked as plain links, no title row
     assert.ok(!/THIS MONTH/i.test(await page.textContent('#sch-goals-box .sch-gb-main')), 'no "This month" heading');
     
-    const mc = await page.evaluate(() => { const g = document.getElementById('sch-goals-btn').getBoundingClientRect(), h = document.getElementById('sch-heat-btn').getBoundingClientRect(), b = [...document.querySelectorAll('#sch-goalbars .sch-bar')].map(x => x.getBoundingClientRect()); return { g: [g.left, g.top, g.right, g.bottom].map(Math.round), h: [h.left, h.top, h.right, h.bottom].map(Math.round), stacked: h.top > g.bottom - 2 && Math.abs(h.left - g.left) < 4, cols: b.every((r, i) => !i || (r.left > b[i - 1].left && Math.abs(r.top - b[0].top) < 2)), bg: getComputedStyle(document.getElementById('sch-goals-box')).backgroundColor, icons: document.getElementById('sch-goals-btn').textContent + document.getElementById('sch-heat-btn').textContent }; });
-    assert.ok(mc.stacked && mc.cols, 'links stacked, stats in columns: ' + JSON.stringify(mc));
-    assert.equal(mc.bg, 'rgb(248, 250, 252)', 'neutral grey card'); assert.equal(mc.icons, 'GoalsHeatmap', 'text links, no arrows or 🔥');
+    const mc = await page.evaluate(() => { const g = document.getElementById('sch-goals-btn').getBoundingClientRect(), h = document.getElementById('sch-heat-btn').getBoundingClientRect(), b = [...document.querySelectorAll('#sch-goalbars .sch-bar')].map(x => x.getBoundingClientRect()); return { g: [g.left, g.top, g.right, g.bottom].map(Math.round), h: [h.left, h.top, h.right, h.bottom].map(Math.round), stacked: h.right <= b[0].left + 1 && g.left >= b[b.length - 1].right - 1, cols: b.every((r, i) => !i || (r.left > b[i - 1].left && Math.abs(r.top - b[0].top) < 2)), bg: getComputedStyle(document.getElementById('sch-goals-box')).backgroundColor, icons: document.getElementById('sch-goals-btn').textContent + document.getElementById('sch-heat-btn').textContent }; });
+    assert.ok(mc.stacked && mc.cols, 'V101.205: calendar tile left, stats in columns, 🎯 right: ' + JSON.stringify(mc));
+    assert.equal(mc.bg, 'rgb(248, 250, 252)', 'neutral grey card'); assert.ok(mc.icons.startsWith('🎯'), 'V101.205: Goals is the 🎯 icon button, no arrows or 🔥: ' + mc.icons);
+    // V101.205: ▶ reads the month aloud (the browser's voice, stubbed here); the animation lives on the same button; a second tap stops it
+    const play = await page.evaluate(() => { const said = []; let cancelled = 0; window.SpeechSynthesisUtterance = function (t) { this.text = t; }; Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: { getVoices: () => [], cancel: () => { cancelled++; }, speak: u => { said.push(u); window.__u = u; } } });
+        const b = document.getElementById('sch-play-btn'); b.click(); const during = { cls: b.classList.contains('playing'), pressed: b.getAttribute('aria-pressed'), bars: getComputedStyle(b.querySelector('.p-b')).display, tri: getComputedStyle(b.querySelector('.p-i')).display, anim: getComputedStyle(b.querySelector('.p-b i')).animationName };
+        window.__u.onend(); const ended = b.classList.contains('playing'); b.click(); b.click(); return { during, ended, text: said[0].text, said: said.length, stopped: !b.classList.contains('playing'), cancelled }; });
+    assert.deepEqual([play.during.cls, play.during.pressed, play.during.bars, play.during.tri, play.during.anim], [true, 'true', 'flex', 'none', 'schPlayBar'], 'V101.205: playing = bars animate inside the same ▶ button: ' + JSON.stringify(play));
+    assert.ok(play.ended === false && play.stopped === true && play.said === 2, 'V101.205: the voice ending / a second tap resets the button: ' + JSON.stringify(play));
+    assert.ok(/^\w+ \d{4}\. Quiz \d+ of 30\. Journal \d+\. Case \d+\.$/.test(play.text), 'V101.205: it reads the month and the three counts: ' + play.text);
     // V101.80: ⓘ sits inline right after the title as an icon only — no footer link, no "How Schedule works" text
     assert.equal(await page.locator('.sch-foot').count(), 0, 'no footer link');
     assert.ok(!(await page.textContent('#scheduleModal')).includes('How Schedule works'), 'no long help label');

@@ -137,14 +137,14 @@ async function open(browser) {
         const box = await page.evaluate(() => {
             const g = document.getElementById('sch-goals-btn').getBoundingClientRect(), f = document.getElementById('sch-fin-btn').getBoundingClientRect(), h = document.getElementById('sch-heat-btn').getBoundingClientRect();
             const links = document.querySelector('#sch-goals-box .sch-gb-links');
-            return { text: document.getElementById('sch-fin-btn').textContent.trim(), sameRow: Math.abs((g.top + g.bottom) / 2 - (f.top + f.bottom) / 2) < 6, right: f.left >= g.right - 12, stacked: h.top >= g.bottom - 1,
+            return { text: document.getElementById('sch-fin-btn').textContent.trim(), sameRow: Math.abs((g.top + g.bottom) / 2 - (f.top + f.bottom) / 2) < 6, right: f.left >= g.right - 12, stacked: h.right <= g.left + 1,
                 fits: links.scrollWidth <= links.clientWidth + 1, aria: document.getElementById('sch-fin-btn').getAttribute('aria-label'),
                 goalsText: document.getElementById('sch-goals-btn').textContent.trim(), heatText: document.getElementById('sch-heat-btn').textContent.trim() };
         });
         assert.equal(box.text, '💰', 'icon only');
         assert.ok(box.sameRow && box.right, '💰 on the Goals row: ' + JSON.stringify(box));
-        assert.ok(box.stacked && box.fits, 'Heatmap stays under, nothing clipped: ' + JSON.stringify(box));
-        assert.equal(box.goalsText + box.heatText, 'GoalsHeatmap', 'Goals / Heatmap labels untouched');
+        assert.ok(box.stacked && box.fits, 'V101.205: the Heatmap calendar tile sits left of the 🎯 💰 column, nothing clipped: ' + JSON.stringify(box));
+        assert.equal(box.goalsText, '🎯', 'V101.205: Goals is an icon button'); assert.ok(/^[A-Z]{3}\d{1,2}[A-Za-z]{3}$/.test(box.heatText), 'V101.205: the Heatmap button is the calendar tile (MON + day + weekday): ' + box.heatText);
         assert.ok(/FIN/.test(box.aria));
         await page.locator('#sch-goals-btn').click();
         assert.equal(await page.evaluate(() => document.getElementById('sch-pane-goals').style.display !== 'none'), true, 'Goals still expands');
