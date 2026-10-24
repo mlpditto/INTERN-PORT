@@ -5,7 +5,7 @@
 // Pure matching lives in window.upNextBuild so it can be tested without a page. The ▶ asks first, then reuses toggleQuizStatus().
 (function () {
     const MAX = 5;
-    const norm = (s) => String(s == null ? '' : s).toLowerCase().replace(/[\s​]+/g, ' ').replace(/[^\p{L}\p{N} ]/gu, '').trim();
+    const norm = (s) => String(s == null ? '' : s).toLowerCase().replace(/[\s​]+/g, ' ').replace(/[^\p{L}\p{M}\p{N} ]/gu, '').trim();
     const tagsOf = (q) => String(q.tags || '').split(',').map(norm).filter(t => t.length >= 3);
     const ms = (t) => (t && t.toMillis ? t.toMillis() : (t && t.seconds ? t.seconds * 1000 : 0));
 
