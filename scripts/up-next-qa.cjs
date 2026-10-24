@@ -13,7 +13,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
 // static pins
 assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(admin));
-assert.ok(admin.includes('<div id="upnext-card" hidden></div>'), 'strip host on the Dashboard');
+assert.ok(admin.includes('<div id="upnext-card" class="lang-no-toggle" hidden></div>'), 'strip host on the Dashboard — lang-no-toggle, or lang-toggle.js hides every Thai topic title (found live 2026-10-24)');
 assert.ok(admin.indexOf('id="chip-alabasta"') < admin.indexOf('id="upnext-card"') && admin.indexOf('id="upnext-card"') < admin.indexOf('id="general-work-review-section"'), 'sits under the chip row');
 assert.ok(/<script src="up-next\.js\?v=V102\.\d+"><\/script>/.test(admin), 'script loaded');
 assert.ok(/db\.collection\("quizzes"\)\.onSnapshot\(s => \{[\s\S]{0,400}window\.upNext\.refresh\(\)/.test(admin), 'refresh follows the quiz list');
@@ -67,7 +67,8 @@ assert.equal(build(many, []).all.length, 5);
     const browser = await chromium.launch();
     for (const [name, width, expectCols] of [['desktop', 1200, 5], ['phone', 380, 2]]) {
         const page = await browser.newPage({ viewport: { width, height: 800 } });
-        await page.setContent(`<!doctype html><meta charset="utf-8"><style>${css}</style><div style="padding:12px"><div id="upnext-card" hidden></div></div>`);
+        await page.goto(require('node:url').pathToFileURL(require('node:path').resolve('public/lang-toggle.js')).href);   // a real (file) origin so localStorage works for lang-toggle.js
+        await page.setContent(`<!doctype html><meta charset="utf-8"><style>${css}</style><div style="padding:12px"><div id="upnext-card" class="lang-no-toggle" hidden></div></div>`);
         await page.evaluate(() => {
             window.escapeHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
             window.calls = []; window.confirmAnswer = true;
@@ -77,6 +78,9 @@ assert.equal(build(many, []).all.length, 5);
             window.showToast = (m) => window.calls.push(['toast', m]);
             window.db = { collection: () => ({ orderBy: () => ({ limit: () => ({ get: () => Promise.resolve({ docs: [] }) }) }) }) };
         });
+        await page.evaluate(() => { localStorage.setItem('uiLangTH', '0'); localStorage.setItem('uiLangKR', '0'); });   // admin's default: EN only
+
+        await page.addScriptTag({ path: 'public/lang-toggle.js' });
         await page.addScriptTag({ content: js });
         await page.evaluate(([q, f]) => {
             const t = (v) => ({ toMillis: () => v * 1000 });
@@ -114,6 +118,17 @@ assert.equal(build(many, []).all.length, 5);
             // text is escaped
             await page.evaluate(() => { window.quizzesData.push(window.hy({ id: 'x', title: '<img src=x onerror=window.pwned=1>', isActive: false, createdAt: 9e9 })); window.upNext.render(); });
             assert.equal(await page.evaluate(() => window.pwned), undefined, 'quiz titles are escaped');
+            // Thai topic / quiz titles must survive admin's lang-toggle.js (it wraps Thai runs in .lang-th and hides them under an EN-default body unless an
+            // ancestor has .lang-no-toggle — the strip went live with blank Thai titles on 2026-10-24)
+            await page.evaluate(() => { window.quizzesData.push(window.hy({ id: 'th', title: 'ยาคุมกำเนิด', isActive: false, createdAt: 9e9 + 1 })); window.upNext.render(); });
+            await page.waitForTimeout(250);
+            const thai = () => page.evaluate(() => { const b = [...document.querySelectorAll('#upnext-card .un-tile b')].find(x => x.textContent.includes('ยาคุม')); return b ? [b.textContent, !!b.querySelector('.lang-th'), b.getBoundingClientRect().width > 0 && getComputedStyle(b).visibility !== 'hidden'] : null; });
+            assert.deepEqual(await thai(), ['ยาคุมกำเนิด', false, true], 'a Thai title is shown as typed (not wrapped / hidden by lang-toggle)');
+            await page.evaluate(() => { document.getElementById('upnext-card').classList.remove('lang-no-toggle'); window.upNext.render(); });
+            await page.waitForTimeout(250);
+            const hid = await thai();
+            assert.ok(hid && hid[1] === true, 'proof the guard matters: without .lang-no-toggle lang-toggle.js wraps the Thai title: ' + JSON.stringify(hid));
+            await page.evaluate(() => document.getElementById('upnext-card').classList.add('lang-no-toggle'));
         }
         await page.close();
     }
