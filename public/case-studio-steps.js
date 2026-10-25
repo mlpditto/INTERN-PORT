@@ -30,8 +30,17 @@ document.addEventListener('DOMContentLoaded', () => {
     model.id = 'case-studio-image-model';
     model.title = 'เลือกโมเดลสร้างภาพ';
     chips.forEach(chip => model.add(new Option(chip.textContent, chip.dataset.value)));
-    settings.innerHTML = '<h4>Set up your image</h4><div class="case-studio-selects"><label>Mode<select id="case-studio-mode" title="เลือกภาพจาก AI หรือภาพประกอบพร้อมข้อความ HTML"><option value="ai">AI image</option><option value="html-overlay">Illustration + HTML</option></select></label><label>Image model</label></div>';
-    settings.querySelector('label:last-child').append(model);
+    settings.innerHTML = '<h4>Set up your image</h4><div class="case-studio-selects"><label>Mode<select id="case-studio-mode" title="เลือกภาพจาก AI หรือภาพประกอบพร้อมข้อความ HTML"><option value="ai">AI image</option><option value="html-overlay">Illustration + HTML</option></select></label></div><div class="case-studio-models"><span class="cs-lbl" id="cs-model-lbl">Image model</span><div class="cs-rail" role="radiogroup" aria-labelledby="cs-model-lbl"></div></div>';
+    // V102.407: the model is a chip rail (house style); the <select> stays as the hidden value holder every other line reads
+    model.hidden = true; settings.append(model);
+    const rail = settings.querySelector('.cs-rail');
+    chips.forEach(chip => {
+        const c = document.createElement('button');
+        c.type = 'button'; c.className = 'cs-mchip'; c.textContent = chip.textContent.trim(); c.dataset.value = chip.dataset.value; c.title = chip.dataset.value;
+        c.setAttribute('role', 'radio');
+        c.onclick = () => { if (busy || model.value === c.dataset.value) return; model.value = c.dataset.value; model.onchange(); };
+        rail.append(c);
+    });
     const mode = find('#case-studio-mode');
     model.onchange = () => { switchAndRegenerateAlabastaCaseCard(model.value, false); render(); };
     mode.onchange = () => { selectCaseCardCompositeMode(mode.value); render(); };
@@ -58,6 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
             button.disabled = busy || target > reached || (target === 3 && (!generated || stale));
             if (target === step) button.setAttribute('aria-current', 'step'); else button.removeAttribute('aria-current');
         });
+        rail.querySelectorAll('.cs-mchip').forEach(c => { const on = c.dataset.value === model.value; c.setAttribute('aria-checked', on ? 'true' : 'false'); c.classList.toggle('active', on); c.disabled = busy; });
         back.hidden = step === 1; next.hidden = step !== 1;
         generate.hidden = step !== 2; save.hidden = step !== 3;
         [back, next, generate, save].forEach(button => button.disabled = busy);
