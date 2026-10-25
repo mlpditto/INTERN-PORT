@@ -2,6 +2,8 @@
 //   • both cards of the pair share a soft amber tint + a left bar + a "⛓ 1/2" / "⛓ 2/2" chip (the HN is bold on every card);
 //   • the chip opens a side-by-side SCORECARD: for each thing that differs (note length, what one adds, symptoms, drugs, extras, a generated Case Card…) a ✔ on the
 //     fuller side, and each button says how many it wins — "เก็บใบที่ 2 · ดีกว่า 2 ข้อ ★". Time is only a row, not the reason;
+//   • "รวมที่ ✔" (when BOTH sides win some row): the stronger one is the base; the other side's ✔ structured fields (symptoms / drugs / appointment · ADR · labs) move in, the whole note
+//     comes from the side that wins it, the other is folded away — the base keeps its old values in `mergePrev`, so Undo (and Reopen of the folded one) put them back;
 //   • "เก็บใบนี้" folds the OTHER one away: reviewed with 0 points + duplicateOf, kept (never deleted), an Undo toast; a case that is already reviewed can't be folded;
 //   • "ไม่ซ้ำ" dismisses the pair (this browser). Same HN with a very different note = a quiet follow-up chip, no buttons. Never automatic.
 // Pair rule: same intern + same HN + the earlier case ≤ 7 days older + notes ≥ 90% alike (bigram Dice).
@@ -87,6 +89,35 @@
         return { rows, same, winsA, winsB, star: winsA === winsB ? null : (winsA > winsB ? 'a' : 'b') };
     }
 
+    // ---- "รวมที่ ✔": what a merge would do (pure). null = no merge worth offering.
+    const EXTRA_KEYS = ['appointment', 'adr', 'labs'];
+    const unionOf = (x, y) => { const out = []; [].concat(Array.isArray(x) ? x : [], Array.isArray(y) ? y : []).forEach(v => { if (v && !out.some(o => JSON.stringify(o) === JSON.stringify(v))) out.push(v); }); return out; };
+    const hasCard = (c) => !!(c.caseVisualGeneratedAt || c.caseVisualGenerationStatus === 'generated');
+    function plan(a, b) {
+        const cmp = compare(a, b);
+        if (!(cmp.winsA > 0 && cmp.winsB > 0)) return null;
+        let side = cmp.winsA === cmp.winsB ? 'b' : (cmp.winsA > cmp.winsB ? 'a' : 'b');   // the stronger one; a tie → the newer
+        if (hasCard(a) !== hasCard(b)) side = hasCard(a) ? 'a' : 'b';                      // the one with a generated Case Card stays the base
+        const base = side === 'a' ? a : b, other = side === 'a' ? b : a, os = side === 'a' ? 'b' : 'a';
+        if (reviewed(base) || reviewed(other)) return null;                                  // a reviewed case is never edited or folded
+        const win = (k) => (cmp.rows.find(r => r.key === k) || {}).win;
+        const set = {}, prev = {}, parts = [];
+        [['symptomTags', 'sym', 'อาการ'], ['medications', 'med', 'ยา']].forEach(([key, row, label]) => {
+            if (win(row) !== os) return;
+            const u = unionOf(base[key], other[key]);
+            if (u.length > count(base[key])) { prev[key] = Array.isArray(base[key]) ? base[key] : []; set[key] = u; parts.push(label + ' ' + u.length); }
+        });
+        if (win('ext') === os) {
+            const moved = EXTRA_KEYS.filter(k => !has(base, k) && has(other, k));
+            moved.forEach(k => { prev[k] = base[k] === undefined ? null : base[k]; set[k] = other[k]; });
+            if (moved.length) parts.push('นัด/ADR/แล็บ');
+        }
+        const nw = win('add') || win('len');
+        if (nw === os && !hasCard(base) && String(other.note || '').trim() !== String(base.note || '').trim()) { prev.note = base.note || ''; set.note = other.note; parts.push('ข้อความใบ ' + (os === 'a' ? 1 : 2)); }
+        if (!Object.keys(set).length) return null;
+        return { base, other, baseSide: side, set, prev, parts };
+    }
+
     // ---- the chip on a card (+ the tint class the card root takes)
     const dismissed = (id) => { try { return localStorage.getItem(dismissKey(id)) === '1'; } catch (_) { return false; } };
     function cls(c) {
@@ -111,10 +142,12 @@
         const body = cmp.rows.map(r => `<tr><td>${r.icon} ${esc(r.label)}</td>${cell(r, 'a')}${cell(r, 'b')}</tr>`).join('');
         const lock = (other) => reviewed(other);
         const btn = (side, keep, fold, wins, other) => `<button type="button" class="cdup-keep${cmp.star === side ? ' rec' : ' alt'}" ${lock(other) ? 'disabled title="The other one is already reviewed — it cannot be folded"' : ''} onclick="caseDup.keep('${esc(keep.id)}', '${esc(fold.id)}')"><span>เก็บใบที่ ${side === 'a' ? 1 : 2}</span><small>ดีกว่า ${wins} ข้อ${cmp.star === side ? ' ★' : ''}</small></button>`;
+        const pl = plan(a, b);
+        const mergeBtn = pl ? `<button type="button" class="cdup-merge" onclick="caseDup.merge('${esc(a.id)}', '${esc(b.id)}')" title="Keep the stronger one as the base, move the other one's ✔ parts in, fold the other away — Undo puts the old values back"><span>รวมที่ ✔</span><small>เก็บใบที่ ${pl.baseSide === 'a' ? 1 : 2} เป็นหลัก · จะได้: ${esc(pl.parts.join(' · '))}</small></button>` : '';
         return `<div class="cdup-win" role="dialog" aria-label="Compare duplicate cases"><div class="cdup-hd">⛓ <span class="cdup-hn">${esc(a.caseId)}</span><span class="cdup-sim">${Math.round(sim * 100)}%</span><span class="cdup-sp"></span><button type="button" class="cdup-x" onclick="caseDup.close()" aria-label="Close">✕</button></div>`
             + `<table class="cdup-sc"><thead><tr><th></th><th>ใบที่ 1</th><th>ใบที่ 2</th></tr></thead><tbody>${body}</tbody></table>`
             + (cmp.same.length ? `<div class="cdup-same" title="Same on both · เหมือนกัน">${cmp.same.join(' ')} เหมือนกัน</div>` : '')
-            + `<div class="cdup-pick">${btn('a', a, b, cmp.winsA, b)}${btn('b', b, a, cmp.winsB, a)}</div>`
+            + `<div class="cdup-pick">${btn('a', a, b, cmp.winsA, b)}${btn('b', b, a, cmp.winsB, a)}</div>${mergeBtn}`
             + `<div class="cdup-ft"><button type="button" class="cdup-no" onclick="caseDup.dismiss('${esc(a.id)}', '${esc(b.id)}')">ไม่ซ้ำ</button></div></div>`;
     }
     function open(aId, bId) {
@@ -134,7 +167,7 @@
         if (typeof showToast === 'function') showToast(msg);
         const x = document.getElementById('toast'); if (!x || !undoId) return;
         const b = document.createElement('button'); b.type = 'button'; b.className = 'toast-undo'; b.textContent = '↩ Undo';
-        b.onclick = () => { x.classList.remove('show'); undo(undoId); };
+        b.onclick = () => { x.classList.remove('show'); if (typeof undoId === 'object') undoMerge(undoId.id, undoId.baseId); else undo(undoId); };
         x.insertBefore(b, x.querySelector('.toast-close'));
         clearTimeout(toast._t); toast._t = setTimeout(() => x.classList.remove('show'), 10000);
     }
@@ -164,7 +197,40 @@
             if (typeof showToast === 'function') showToast('↩ Back in the queue');
         } catch (e) { console.error('[case-dup] undo failed', e); if (typeof showToast === 'function') showToast('Could not undo: ' + (e && e.message ? e.message : 'error')); }
     }
+    // merge = ONE batch: the base gets the ✔ parts (+ its old values in mergePrev, the id it absorbed in mergedFrom), the other is folded (mergedInto)
+    async function merge(aId, bId) {
+        const all = cases(), a = all.find(c => c.id === aId), b = all.find(c => c.id === bId), pl = a && b && plan(a, b);
+        if (!pl) { if (typeof showToast === 'function') showToast('Nothing to merge here.'); return; }
+        close();
+        try {
+            const F = firebase.firestore.FieldValue, ts = F.serverTimestamp(), batch = db.batch();
+            batch.update(db.collection('cases').doc(pl.base.id), Object.assign({}, pl.set, { mergePrev: pl.prev, mergedFrom: pl.other.id, mergedAt: ts, adminUpdatedAt: ts }));
+            batch.update(db.collection('cases').doc(pl.other.id), { status: 'reviewed', isArchived: true, archivedAt: ts, reviewedAt: ts, adminBonus: 0, adminUpdatedAt: ts, adminReviewedBy: (typeof ALLOWED_EMAIL !== 'undefined' && ALLOWED_EMAIL) || 'admin', duplicateOf: pl.base.id, duplicateMarkedAt: ts, mergedInto: pl.base.id });
+            if (typeof stageSubmissionMirror === 'function') await stageSubmissionMirror(batch, pl.other.id, typeof submissionReviewedFields === 'function' ? submissionReviewedFields(0) : { status: 'reviewed', score: 0, adminBonus: 0, pointsAwarded: false, pointsAmount: 0 });
+            await batch.commit();
+            toast('⛓ Merged into ' + pl.base.caseId + ' — ' + pl.parts.join(' · '), { id: pl.other.id, baseId: pl.base.id });
+        } catch (e) { console.error('[case-dup] merge failed', e); if (typeof showToast === 'function') showToast('Could not merge: ' + (e && e.message ? e.message : 'error')); }
+    }
+    // stage "put the base back as it was" onto a batch (Undo, and Reopen of the folded case): the old values come back, the marks go
+    function stageRestore(batch, baseId) {
+        const base = cases().find(c => c.id === baseId), D = firebase.firestore.FieldValue;
+        if (!base || !base.mergePrev) return false;
+        const upd = { mergePrev: D.delete(), mergedFrom: D.delete(), mergedAt: D.delete(), adminUpdatedAt: D.serverTimestamp() };
+        Object.keys(base.mergePrev).forEach(k => { const v = base.mergePrev[k]; upd[k] = v === null ? D.delete() : v; });
+        batch.update(db.collection('cases').doc(baseId), upd);
+        return true;
+    }
+    async function undoMerge(foldedId, baseId) {
+        try {
+            const D = firebase.firestore.FieldValue, batch = db.batch();
+            stageRestore(batch, baseId);
+            batch.update(db.collection('cases').doc(foldedId), { status: 'pending', isArchived: false, adminBonus: 0, adminUpdatedAt: D.serverTimestamp(), duplicateOf: D.delete(), duplicateMarkedAt: D.delete(), mergedInto: D.delete() });
+            if (typeof stageSubmissionMirror === 'function') await stageSubmissionMirror(batch, foldedId, { status: 'pending', score: 0, adminBonus: 0, pointsAwarded: false, pointsAmount: 0 });
+            await batch.commit();
+            if (typeof showToast === 'function') showToast('↩ Both cases are back as they were');
+        } catch (e) { console.error('[case-dup] undo merge failed', e); if (typeof showToast === 'function') showToast('Could not undo: ' + (e && e.message ? e.message : 'error')); }
+    }
     function dismiss(aId, bId) { try { localStorage.setItem(dismissKey(aId), '1'); localStorage.setItem(dismissKey(bId), '1'); } catch (_) { /* private mode */ } close(); repaint(); }
 
-    window.caseDup = { find, pair, compare, similarity, html, cls, open, close, keep, fold, undo, dismiss };
+    window.caseDup = { find, pair, compare, plan, similarity, html, cls, open, close, keep, fold, merge, stageRestore, undo, undoMerge, dismiss };
 })();
