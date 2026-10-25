@@ -29,7 +29,9 @@ const payload = { primarySystemLabel: 'GI', symptomTags: ['Abdominal Pain', 'Dia
 // ---- infographic (default)
 ctx.layout = 'infographic';
 let p = ctx.build(payload);
-assert.ok(p.includes('Main title: "Patient Presentation". Subtitle under it: "GI Case Brief: Abdominal Pain / Diarrhea".'), 'title + subtitle are named');
+assert.ok(p.includes('Main title: "Patient Presentation". Subtitle under it: "Abdominal Pain / Diarrhea".') && !p.includes('GI Case Brief'), 'title + tags-only subtitle; no "GI Case Brief" line');
+assert.ok(p.includes('NO REPEATED TEXT'), 'each fact appears once');
+assert.ok(ctx.build({ ...payload, textContent: { title: 'Medical Case Brief', subtitle: '' } }).includes('No subtitle.'), 'no tags -> no subtitle, never "Medical Case Brief"');
 assert.ok(/History of Presenting Illness/.test(p) && /"Symptoms"/.test(p) && /"Recommendations"/.test(p) && /educational purposes only/.test(p), 'the infographic sections');
 assert.ok(/NEVER draw a portrait, a face, a photograph or an avatar of any person/.test(p), 'no person drawn');
 assert.ok(/faceless human body silhouette/.test(p), 'a faceless body is allowed');
@@ -87,7 +89,7 @@ assert.ok(!ctx.build({ ...payload, textContent: { title: 'Medical Case Brief', s
     ctx.layout = 'infographic';
     const out = await ctx.rebuild({ quiet: true });
     assert.equal(out, ctx.els['alabasta-case-card-prompt'].value, 'the prompt box is filled');
-    assert.ok(out.includes('"GI Case Brief: Abdominal Pain / Diarrhea"'), 'rebuild: real title + subtitle (English tags only): ' + out.split('\n').find(l => /Subtitle under it/.test(l)));
+    assert.ok(out.includes('Subtitle under it: "Abdominal Pain / Diarrhea"'), 'rebuild: tags-only subtitle (English tags only): ' + out.split('\n').find(l => /Subtitle under it/.test(l)));
     assert.ok(!/[฀-๿가-힣]/.test(out), 'no Thai / Korean glyph reaches the prompt');
     ctx.layout = 'minimal';
     assert.ok((await ctx.rebuild({ quiet: true })).includes('title "GI Case Brief" and subtitle "Abdominal Pain / Diarrhea"'), 'rebuild: minimal layout too');
