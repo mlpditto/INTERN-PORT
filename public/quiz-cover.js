@@ -9,7 +9,7 @@ const QuizCover = (() => {
         { id: 'or/openai/gpt-5.4-image-2', logo: 'openai', label: 'Image 2', ariaLabel: 'GPT Image 2 via OpenRouter', titleTh: 'GPT-5.4 Image 2 · ผ่าน OpenRouter' },
         { id: 'or/bytedance-seed/seedream-5-0-lite', label: 'Seedream 5.0 Lite', imageApi: true, ariaLabel: 'ByteDance Seedream 5.0 Lite via OpenRouter', titleTh: 'ByteDance Seed: Seedream 5.0 Lite · ผ่าน OpenRouter' },
         // V102.419: Grok Imagine 2.0 (the Beri reward picture already uses it) — the Image API, about a minute; like Seedream it can be asked for 3:4 and the cover is cropped to the collection's 3:4; `fallback:false` = it is never tried AUTOMATICALLY when another model is content-blocked (slow, needs OpenRouter credit) — only when picked
-        { id: 'or/x-ai/grok-imagine-image-2.0', logo: 'grok', label: 'Grok Imagine 2.0', imageApi: true, fallback: false, ariaLabel: 'xAI Grok Imagine 2.0 via OpenRouter', titleTh: 'xAI Grok Imagine 2.0 · ผ่าน OpenRouter · ราว 1 นาที' }
+        { id: 'or/x-ai/grok-imagine-image-2.0', logo: 'grok', label: 'Grok Imagine 2.0', imageApi: true, fallback: false, ariaLabel: 'xAI Grok Imagine 2.0 via OpenRouter', titleTh: 'xAI Grok Imagine 2.0 · ผ่าน OpenRouter · ราว 1 นาที · OpenRouter 경유 · 약 1분' }
         // V102.315: Muse Image left — OpenRouter lists no provider for meta/muse-image (endpoints: []), so every call failed; a saved Muse pick falls back to the first chip
     ];
     const MODEL_PREF_KEY = 'quiz_cover_ai_model';
