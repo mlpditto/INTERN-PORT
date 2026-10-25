@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.406)</title>
+    <title>Nika Admin (V102.407)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -7984,8 +7984,8 @@
     <link rel="stylesheet" href="text-ai-chips.css?v=V102.348">
     <link rel="stylesheet" href="ai-settings-ui.css?v=V102.147">
     <link rel="stylesheet" href="quiz-resource-cards.css?v=V102.344">
-    <link rel="stylesheet" href="case-split-studio.css?v=V100.40">
-    <script src="case-studio-steps.js?v=V100.40" defer></script>
+    <link rel="stylesheet" href="case-split-studio.css?v=V100.41">
+    <script src="case-studio-steps.js?v=V100.41" defer></script>
     <script src="quiz-term-ai.js?v=V102.405" defer></script>
     <link rel="stylesheet" href="reflection-compact.css?v=V101.83">
     <script src="reflection-compact.js?v=V99.68"></script>
@@ -43119,6 +43119,11 @@ They can connect again from LINE.
             };
         }
 
+        // V102.407: the poster's own words are English only and category only — Thai / Korean in a label ("GI / ระบบทางเดินอาหาร") would be drawn as garbled glyphs
+        function alabastaEnglishOnly(s) {
+            return String(s == null ? '' : s).replace(/[^\x00-\x7F]+/g, ' ').replace(/\s+/g, ' ').replace(/\s*[\/·|-]\s*(?=[\/·|-]|$)/g, '').replace(/^\s*[\/·|-]\s*/, '').trim();
+        }
+
         function buildSafeAlabastaCaseVisualPayload(caseItem = {}) {
             const taxonomy = getAlabastaCaseTaxonomy(caseItem);
             const rawNote = String(caseItem.note || '').trim();
@@ -43126,12 +43131,10 @@ They can connect again from LINE.
             const safeSummary = safeNote
                 ? `Educational case summary: ${safeNote}`
                 : `Educational case summary for ${taxonomy.primarySystemLabel} with tags: ${taxonomy.symptomTags.join(', ') || 'not specified'}.`;
-            const title = taxonomy.primarySystemLabel && taxonomy.primarySystemLabel !== 'Other'
-                ? `${taxonomy.primarySystemLabel} Case Brief`
-                : 'Medical Case Brief';
-            const subtitle = taxonomy.symptomTags.length
-                ? taxonomy.symptomTags.slice(0, 3).join(' / ')
-                : 'Privacy-safe clinical learning summary';
+            const systemEn = alabastaEnglishOnly(taxonomy.primarySystemLabel);
+            const title = systemEn && systemEn !== 'Other' ? `${systemEn} Case Brief` : 'Medical Case Brief';
+            const tagsEn = taxonomy.symptomTags.map(alabastaEnglishOnly).filter(Boolean);
+            const subtitle = tagsEn.length ? tagsEn.slice(0, 3).join(' / ') : 'Privacy-safe clinical learning summary';
 
             return {
                 visualMode: 'educational_case_card',
@@ -43203,6 +43206,8 @@ They can connect again from LINE.
                 '- DO NOT add column headers, section titles, footer captions, watermarks, page numbers, fake URLs, fake dates, signatures, or sample paragraphs.',
                 '- DO NOT include any sample / lorem-ipsum / placeholder text blocks under the illustration.',
                 '- If a word cannot be rendered with 100% spelling accuracy, omit it entirely rather than guessing.',
+                `- The ONLY text allowed on the poster, written exactly as given: title "${title}"${subtitle ? ` and subtitle "${subtitle}"` : ''}. Write nothing else.`,
+                '- NEVER write the patient\'s age, sex, occupation, nationality or any other personal descriptor as text (for example no "50yo male driver"). Such details may shape the illustration only.',
                 '',
                 'Reference content (use ONLY to inform the illustration — do NOT render verbatim on the poster):',
                 `- Topic / system: ${payload.primarySystemLabel}`,

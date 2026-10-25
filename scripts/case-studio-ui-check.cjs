@@ -62,7 +62,7 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         assert.equal(await page.evaluate(()=>rebuilds),0);
         await page.locator('#alabasta-case-card-step-2 summary').click();
         await page.locator('#alabasta-case-card-prompt').fill('My custom prompt');
-        await page.locator('#case-studio-image-model').selectOption('gpt-image-2.5-flare');
+        await page.locator('.cs-mchip[data-value="gpt-image-2.5-flare"]').click();
         for (const width of [1440,768,390,320]) {
             await page.setViewportSize({width,height:1000});
             const overflow = await page.locator('.case-studio-grid').evaluate(el=>el.scrollWidth>el.clientWidth+1);
@@ -75,7 +75,7 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         await page.waitForFunction(()=>writes.some(w=>w.caseVisualPrompt==='My custom prompt'));
         assert.equal(await page.evaluate(()=>rebuilds),0,'save must preserve custom prompt');
         await page.getByRole('button',{name:'Edit settings',exact:true}).click();
-        await page.locator('#case-studio-image-model').selectOption('as/gemini-3-pro-image');
+        await page.locator('.cs-mchip[data-value="as/gemini-3-pro-image"]').click();
         assert.equal(await page.locator('.case-studio-workflow button[data-step="3"]').isDisabled(),true);
         const previous = await page.locator('#alabasta-case-card-image-preview').getAttribute('src');
         await page.evaluate(()=>failImage=true);
@@ -150,6 +150,11 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         await page.evaluate(() => { document.getElementById('alabasta-case-card-original').value = Array.from({ length: 30 }, (_, i) => 'line ' + i).join('\n'); renderCaseCardAdvanced(); });
         const hOrig = await page.locator('#alabasta-case-card-original').evaluate(el => parseFloat(el.style.height));
         assert.ok(hOrig > 200 && hOrig <= 362, 'the Original note grows with its text, capped: ' + hOrig);
+        // V102.407: the image model is a chip rail; the select is only the hidden value holder
+        assert.equal(await page.locator('.cs-mchip').count(), 5);
+        assert.equal(await page.locator('#case-studio-image-model').isVisible(), false, 'no dropdown');
+        assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('.cs-mchip[aria-checked=true]')].map(c => c.dataset.value)), await page.evaluate(() => [document.getElementById('case-studio-image-model').value]), 'exactly the active model is checked');
+        await page.evaluate(() => resetCaseStudioSteps());
         assert.deepEqual(errors,[]);
         console.log('PASS: 4 widths, steps/back/reset, stale image gating, edited prompt generation/save, model selection, summary rebuild, failure recovery. AI and Firestore stubbed.');
         if (process.env.STUDIO_SCREENSHOT) {
