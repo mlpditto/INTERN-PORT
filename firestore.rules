@@ -389,7 +389,16 @@ service cloud.firestore {
     // 13. Reflective Logs
     match /reflective_logs/{docId} {
       allow read, create: if isSignedIn();
-      allow update, delete: if isAdmin();
+      // An intern collects the mentor's bonus by flipping pointsClaimed on THEIR OWN entry (claimReflectivePoints in index.html). The update is pinned
+      // to those three fields, only false -> true, so nothing else on the entry (comment, adminBonus, text) can be touched. Before this rule
+      // update was admin-only, so every กดรับ ended in "Missing or insufficient permissions".
+      allow update: if isAdmin()
+        || (isSignedIn()
+            && isSelfOrLinked(resource.data.userId)
+            && resource.data.get('pointsClaimed', false) != true
+            && request.resource.data.pointsClaimed == true
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pointsClaimed', 'claimedAt', 'adminAcknowledged']));
+      allow delete: if isAdmin();
     }
 
     // 🔥 14. Knowledge Base (เพิ่มใหม่สำหรับระบบวิจัย V86.35)
