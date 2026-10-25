@@ -35,7 +35,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const feed = document.createElement('section');
     feed.id = 'dc-feed'; feed.className = 'dc-panel dc-feed lang-no-toggle';   // entries + the กดรับ button are Thai
     feed.innerHTML = '<div class="dc-sec-t lang-no-toggle">💬 Feedback</div>'
-        + hint('Your last 7 entries. Your mentor’s comments appear under each one — tap “กดรับ” to collect a bonus', 'ความเห็นพี่เลี้ยงขึ้นใต้บันทึก · มีโบนัสกดรับได้');
     const historyArea = byId('rl-history-area');
     if (historyArea) { feed.append(historyArea); historyArea.style.display = 'block'; }
     pane.append(feed);
