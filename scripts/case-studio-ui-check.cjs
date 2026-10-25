@@ -71,7 +71,17 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         assert.equal(await page.locator('#cs-model-lbl + .cs-seg button').count(),6,'five Gemini / GPT chips + Grok Imagine');
         assert.equal(await page.locator('#cs-model-lbl + .cs-seg button[data-value="or/x-ai/grok-imagine-image-2.0"] .cs-logo[data-owner="grok"]').count(),1,'Grok chip + its logo');
         // layout rail: Infographic (default) | Minimal; the HTML-overlay mode forces minimal and locks the rail
-        assert.equal(await page.locator('#cs-layout-lbl + .cs-seg button').count(),2);
+        assert.equal(await page.locator('#cs-layout-lbl').innerText(),'Template');
+        assert.deepEqual(await page.locator('#cs-layout-lbl + .cs-seg button').evaluateAll(els=>els.map(e=>e.dataset.value)),['infographic','lifestyle','symptoms','selfcare','minimal'],'five templates');
+        assert.equal(await page.locator('#cs-layout-lbl + .cs-seg button[aria-checked=true]').getAttribute('data-value'),'infographic','the case infographic is the default');
+        for (const t of ['lifestyle','symptoms','selfcare']) {
+            await page.locator('#cs-layout-lbl + .cs-seg button[data-value="'+t+'"]').click();
+            await page.waitForFunction(()=>!document.getElementById('alabastaCaseCardModal').classList.contains('case-studio-busy'));
+            assert.equal(await page.evaluate(()=>localStorage.getItem('test-layout')),t,'the '+t+' chip drives the template');
+            assert.equal(await page.locator('#cs-layout-lbl + .cs-seg button[aria-checked=true]').getAttribute('data-value'),t);
+        }
+        await page.locator('#cs-layout-lbl + .cs-seg button[data-value="infographic"]').click();
+        await page.waitForFunction(()=>!document.getElementById('alabastaCaseCardModal').classList.contains('case-studio-busy'));
         assert.equal(await page.locator('#cs-layout-lbl + .cs-seg button[aria-checked=true]').getAttribute('data-value'),'infographic','infographic is the default');
         await page.locator('#cs-layout-lbl + .cs-seg button[data-value="minimal"]').click();
         assert.equal(await page.evaluate(()=>localStorage.getItem('test-layout')),'minimal');

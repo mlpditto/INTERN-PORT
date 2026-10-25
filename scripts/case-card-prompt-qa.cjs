@@ -38,6 +38,29 @@ assert.ok(/Case context: A man in his late 40s/.test(p), 'the summary still info
 assert.ok(!/≤ 12 words/.test(p), 'the icon-only word cap is not in the infographic');
 assert.ok(p.indexOf('### TEXT') < p.indexOf('Case context (the ONLY source of facts)'), 'the text rules come first');
 
+// ---- the three new templates: tiles come FROM THE CASE; teal / amber on white; no person; no personal descriptors at all
+for (const kind of ['lifestyle', 'symptoms', 'selfcare']) {
+    ctx.layout = kind;
+    const t = ctx.build(payload);
+    assert.ok(/flat vector illustration style, suitable for editing in Canva and PowerPoint\. Landscape 16:9/.test(t), kind + ': Canva / 16:9');
+    assert.ok(t.includes('Small subtitle: "GI Case Brief: Abdominal Pain / Diarrhea".'), kind + ': the real heading');
+    assert.ok(/muted teal \(#0D9488\), warm gray, soft amber\/orange accent \(#F59E0B\), white or very light background; colour-blind safe; no alarming red/.test(t), kind + ': the template palette');
+    assert.ok(/NEVER draw a person, portrait, face, photograph or avatar\. Do NOT write the patient's age, sex, occupation, nationality or any personal descriptor\./.test(t), kind + ': nothing personal');
+    assert.ok(/workplace name or date anywhere/.test(t), kind + ': no workplace / date');
+    assert.ok(/Case context \(the ONLY source of facts\):[\s\S]*Case context: A man in his late 40s/.test(t), kind + ': the summary is the only source');
+    assert.ok(!/Patient Presentation|History of Presenting Illness/.test(t), kind + ': not the infographic');
+}
+ctx.layout = 'lifestyle';
+let t = ctx.build(payload);
+assert.ok(/Title: "Lifestyle triggers"/.test(t) && /4 tiles in a 2x2 grid, or 5-6 tiles in a 3x2 grid/.test(t) && /ONLY the triggers and lifestyle factors the case context names/.test(t) && /never invent one/.test(t), 'lifestyle: tiles from the case, 2x2 / 3x2');
+ctx.layout = 'symptoms';
+t = ctx.build(payload);
+assert.ok(/Title: "Symptoms"/.test(t) && /faceless torso silhouette/.test(t) && /one per symptom named in the case context/.test(t) && /right third of the canvas EMPTY/.test(t), 'symptoms: body focus, callouts, empty right third');
+ctx.layout = 'selfcare';
+t = ctx.build(payload);
+assert.ok(/Title: "What can help"/.test(t) && /Six equal tiles in a 3x2 grid/.test(t) && /general counselling only/.test(t) && /"See a doctor if it persists"/.test(t), 'self-care: 3x2, general counselling, doctor tile');
+ctx.layout = 'infographic';
+
 // ---- minimal (the earlier card)
 ctx.layout = 'minimal';
 p = ctx.build(payload);
@@ -58,7 +81,8 @@ assert.ok(!ctx.build({ ...payload, textContent: { title: 'Medical Case Brief', s
     assert.ok((await ctx.rebuild({ quiet: true })).includes('title "GI Case Brief" and subtitle "Abdominal Pain / Diarrhea"'), 'rebuild: minimal layout too');
     // wiring
     assert.ok(/function getCaseCardLayout\(\) \{\s*\n\s*if \(getCaseCardCompositeMode\(\) === 'html-overlay'\) return 'minimal';/.test(html), 'the HTML-overlay mode is always minimal');
-    assert.ok(html.includes('grok-imagine/.test(selectedModel)') && html.includes("imageApi: true, aspectRatio: '4:3'"), 'Grok Imagine goes through the Image API at 4:3');
+    assert.ok(html.includes('grok-imagine/.test(selectedModel)') && html.includes("aspectRatio: _CASECARD_WIDE.includes(getCaseCardLayout()) ? '16:9' : '4:3'"), 'Grok Imagine goes through the Image API: 16:9 for the wide templates, 4:3 otherwise');
+    assert.ok(html.includes("const _CASECARD_WIDE = ['lifestyle', 'symptoms', 'selfcare'];") && html.includes("const _CASECARD_TEMPLATES = ['infographic', 'lifestyle', 'symptoms', 'selfcare', 'minimal'];"), 'the template lists');
     assert.ok(html.includes('data-value="or/x-ai/grok-imagine-image-2.0"') && html.includes("'gpt-image-2.5-sunburst', 'or/x-ai/grok-imagine-image-2.0']"), 'the Grok chip is a valid saved model');
     console.log('PASS: Case Card — infographic (default) / minimal; no person, no age / occupation text, English only; the real rebuild path; Grok Imagine wiring.');
 })().catch(e => { console.error(e); process.exit(1); });
