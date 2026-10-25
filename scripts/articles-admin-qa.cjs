@@ -203,7 +203,7 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
     assert.match(r.pvBadge, /^Live\s*Interns see it /, 'the preview says when interns see it');
     assert.deepEqual(r.newSecs, [true, false], 'a new article opens When & who');
     assert.match(r.stNew, /^Draft\s*Not live yet · 📅 Schedule when ready/); assert.match(r.pvNew, /Interns do not see drafts/);
-    assert.deepEqual(r.fb, ['EN', 'TH → EN', 'KO → EN'], 'empty TH / KO say they fall back to EN');
+    assert.deepEqual(r.fb, ['🇬🇧', '🇹🇭 → 🇬🇧', '🇰🇷 → 🇬🇧'], 'empty TH / KO say they fall back to EN');
     assert.match(r.warn[0], /looks like Thai, not English/, 'Thai typed into EN is flagged inline'); assert.ok(r.warn[1], 'with a Move to TH button'); assert.ok(r.warn[2], 'and the status line says ● Unsaved');
     assert.deepEqual(r.moved, ['th', '', '“อดทนคืออวดตัว”', true, '', '“อดทนคืออวดตัว”'], 'Move to TH moves title + body into TH and switches to it');
     assert.equal(r.enOk, '', 'English in EN = no warning');
