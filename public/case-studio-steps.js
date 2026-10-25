@@ -27,9 +27,9 @@ document.addEventListener('DOMContentLoaded', () => {
     model.hidden = mode.hidden = true;
     const layout = document.createElement('select');
     layout.id = 'case-studio-layout';
-    [['infographic', 'Infographic'], ['minimal', 'Minimal']].forEach(([value, label]) => layout.add(new Option(label, value)));
+    [['infographic', 'Case infographic'], ['lifestyle', 'Lifestyle triggers'], ['symptoms', 'Symptoms + body'], ['selfcare', 'Self-care'], ['minimal', 'Minimal']].forEach(([value, label]) => layout.add(new Option(label, value)));
     layout.hidden = true;
-    settings.innerHTML = '<h4>Image</h4><div class="cs-grp"><span class="cs-lbl" id="cs-layout-lbl">Layout</span><div class="cs-seg" role="radiogroup" aria-labelledby="cs-layout-lbl"></div></div><div class="cs-grp"><span class="cs-lbl" id="cs-mode-lbl">Mode</span><div class="cs-seg" role="radiogroup" aria-labelledby="cs-mode-lbl"></div></div><div class="cs-grp"><span class="cs-lbl" id="cs-model-lbl">Image model</span><div class="cs-seg" role="radiogroup" aria-labelledby="cs-model-lbl"></div></div>';
+    settings.innerHTML = '<h4>Image</h4><div class="cs-grp"><span class="cs-lbl" id="cs-layout-lbl">Template</span><div class="cs-seg" role="radiogroup" aria-labelledby="cs-layout-lbl"></div></div><div class="cs-grp"><span class="cs-lbl" id="cs-mode-lbl">Mode</span><div class="cs-seg" role="radiogroup" aria-labelledby="cs-mode-lbl"></div></div><div class="cs-grp"><span class="cs-lbl" id="cs-model-lbl">Image model</span><div class="cs-seg" role="radiogroup" aria-labelledby="cs-model-lbl"></div></div>';
     settings.append(layout, mode, model);
     const [layoutRail, modeRail, modelRail] = settings.querySelectorAll('.cs-seg');
     const ownerOf = id => (/gemini|nano/i.test(id) ? 'gemini' : /gpt|openai/i.test(id) ? 'openai' : /grok/i.test(id) ? 'grok' : '');
@@ -42,7 +42,13 @@ document.addEventListener('DOMContentLoaded', () => {
         b.onclick = () => { if (busy || pick.sel.value === value) return; pick.sel.value = value; pick.sel.onchange(); };
         rail.append(b);
     });
-    seg(layoutRail, [['infographic', '📊 Infographic', 'Title, history, symptoms, callouts and recommendations as real text; no person drawn'], ['minimal', '✨ Minimal', 'Icons and a short title only']], { sel: layout });
+    seg(layoutRail, [
+        ['infographic', '📊 Case infographic', 'Title, history, symptoms, callouts and recommendations as real text; no person drawn'],
+        ['lifestyle', '🍽️ Lifestyle triggers', 'A grid of 4-6 tiles: one trigger from the case per tile, icon + short label (teal / amber, white)'],
+        ['symptoms', '🫃 Symptoms + body', 'A body-area schematic with callouts to the symptoms; the right third left empty for your text'],
+        ['selfcare', '✅ Self-care', 'Six plain-language self-care tiles (3x2); the advice is written by the model — review it'],
+        ['minimal', '✨ Minimal', 'Icons and a short title only']
+    ], { sel: layout });
     seg(modeRail, [['ai', '🖼️ AI image', 'AI draws the whole image'], ['html-overlay', '🧩 Illustration + HTML', 'AI draws the illustration; the title and tags are real HTML text']], { sel: mode });
     seg(modelRail, chips.map(chip => [chip.dataset.value, chip.textContent.trim(), chip.dataset.value]), { sel: model, logos: true });
     model.onchange = () => { switchAndRegenerateAlabastaCaseCard(model.value, false); render(); };
