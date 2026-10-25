@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.424)</title>
+    <title>Nika Admin (V102.425)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -461,6 +461,8 @@
             overflow:hidden;
         }
 
+        .alabasta-genmage-idbadge { position:absolute; top:10px; right:12px; z-index:3; padding:3px 11px; border-radius:999px; background:rgba(15,23,42,0.86); color:#fff; font:800 .82rem/1.3 ui-monospace,Consolas,monospace; letter-spacing:.03em; pointer-events:none; }
+        .alabasta-genmage-idbadge[hidden] { display:none; }
         .alabasta-genmage-stage::after {
             content:'';
             position:absolute;
@@ -17404,6 +17406,7 @@
                 <label class="alabasta-visual-label">Generated Image · 생성된 이미지</label>
                 <div class="alabasta-genmage-gallery">
                     <div id="alabasta-case-card-image-stage" class="alabasta-genmage-stage">
+                        <span id="alabasta-case-card-id-badge" class="alabasta-genmage-idbadge lang-no-toggle" hidden></span>
                         <div class="alabasta-genmage-skeleton" aria-hidden="true">
                             <div class="alabasta-genmage-skeleton-topbar"></div>
                             <div class="alabasta-genmage-skeleton-line one"></div>
@@ -43773,6 +43776,7 @@ They can connect again from LINE.
             if (imageWrap) imageWrap.style.display = 'none';
             if (imageStageEl) imageStageEl.classList.remove('is-loading');
             if (imageEl) imageEl.src = '';
+            const idBadgeEl = document.getElementById('alabasta-case-card-id-badge'); if (idBadgeEl) { idBadgeEl.textContent = ''; idBadgeEl.hidden = true; }
             if (dlEl) {
                 dlEl.href = '#';
                 dlEl.style.pointerEvents = 'auto';
@@ -43938,6 +43942,33 @@ They can connect again from LINE.
         // as the top-section background + disease/system/tags in the bottom text panel,
         // then html2canvas the whole node and resolves to a fresh PNG data URL.
         // caseItem fields: disease, diseaseSystemKey/Label, symptomTags[].
+        // V102.425: the case id sits in the top-right corner of every card — on the preview (a badge) and burnt into the downloaded PNG (this).
+        // Drawn here, never asked of the AI model, so the "no identifiers in the prompt" rule still holds. Any failure → the plain image.
+        function stampCaseIdOnImage(dataUrl, caseId) {
+            const id = String(caseId == null ? '' : caseId).trim().slice(0, 24);
+            if (!id) return Promise.resolve(dataUrl);
+            return new Promise(resolve => {
+                const img = new Image();
+                img.onload = () => {
+                    try {
+                        const w = img.naturalWidth, h = img.naturalHeight;
+                        const c = document.createElement('canvas'); c.width = w; c.height = h;
+                        const g = c.getContext('2d'); g.drawImage(img, 0, 0, w, h);
+                        const fs = Math.max(14, Math.round(w * 0.022)), padX = Math.round(fs * 0.7), padY = Math.round(fs * 0.4), m = Math.round(w * 0.015);
+                        g.font = '800 ' + fs + 'px ui-monospace, Consolas, monospace';
+                        const tw = Math.ceil(g.measureText(id).width), bw = tw + padX * 2, bh = fs + padY * 2, x = w - m - bw, y = m;
+                        g.fillStyle = 'rgba(15,23,42,0.86)'; g.beginPath();
+                        if (g.roundRect) g.roundRect(x, y, bw, bh, bh / 2); else g.rect(x, y, bw, bh);
+                        g.fill();
+                        g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.fillText(id, x + padX, y + bh / 2 + 1);
+                        resolve(c.toDataURL('image/png'));
+                    } catch (_) { resolve(dataUrl); }
+                };
+                img.onerror = () => resolve(dataUrl);
+                img.src = dataUrl;
+            });
+        }
+
         async function _renderCaseCardHtmlComposite(imageDataUrl, caseItem) {
             if (typeof html2canvas !== 'function') {
                 throw new Error('html2canvas is not loaded');
@@ -44062,7 +44093,12 @@ They can connect again from LINE.
                 }
 
                 if (imageEl) imageEl.src = finalDataUrl;
-                if (dlEl) dlEl.href = finalDataUrl;
+                if (dlEl) {
+                    dlEl.href = await stampCaseIdOnImage(finalDataUrl, caseItem.caseId);
+                    dlEl.download = caseItem.caseId ? 'case-' + String(caseItem.caseId).replace(/[^\w.-]+/g, '_') + '.png' : 'alabasta-case-card.png';
+                }
+                const idBadge = document.getElementById('alabasta-case-card-id-badge');
+                if (idBadge) { idBadge.textContent = caseItem.caseId ? '#' + caseItem.caseId : ''; idBadge.hidden = !caseItem.caseId; }
                 if (imageWrap) imageWrap.style.display = 'block';
                 setAlabastaCaseCardImageLoadingState(false, model || selectedModel);
                 if (imageMetaEl) imageMetaEl.textContent = `Generated with ${model || selectedModel}${compositedNote}`;

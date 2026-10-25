@@ -57,6 +57,7 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         for (const [start,end] of [
             ['        function setAlabastaCaseCardImageLoadingState(', '        async function populateAlabastaCaseCardModal('],
             ['        async function saveAlabastaCaseCardScaffold()', '        // V94.32 Phase 3 escalation: HTML overlay'],
+            ['        // V102.425: the case id sits', '        async function _renderCaseCardHtmlComposite('],
             ['        async function generateAlabastaCaseCardImage()', '        function buildAlabastaPoneglyphDraft']
         ]) await page.addScriptTag({content:extract(start,end)});
         await page.addScriptTag({content:fs.readFileSync(path.join(dir,'case-studio-steps.js'),'utf8')});
