@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.419)</title>
+    <title>Nika Admin (V102.420)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -53665,8 +53665,22 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     document.querySelectorAll('details.alabasta-more-menu[open]').forEach(d => {
                         if (d !== t) d.removeAttribute('open');
                     });
+                    // V102.420: the case table sits in an overflow-x:auto wrapper, which also clips vertically — the menu of the LAST rows opened
+                    // out of sight ("⋯ does nothing"). Pin the menu to the viewport under the button (above it when there is no room below).
+                    const body = t.querySelector('.alabasta-more-menu-body'), sum = t.querySelector('summary');
+                    if (body && sum) {
+                        const r = sum.getBoundingClientRect();
+                        body.style.position = 'fixed'; body.style.right = 'auto';
+                        body.style.left = Math.max(8, Math.min(r.right - body.offsetWidth, window.innerWidth - body.offsetWidth - 8)) + 'px';   // right edge under the button, kept on screen
+                        body.style.top = (r.bottom + 6) + 'px'; body.style.bottom = 'auto';
+                        const h = body.offsetHeight;
+                        if (r.bottom + 6 + h > window.innerHeight - 8 && r.top - 6 - h > 8) { body.style.top = 'auto'; body.style.bottom = (window.innerHeight - r.top + 6) + 'px'; }
+                    }
                 }
             }, true);
+            // a pinned menu would float away from its button when the page moves
+            window.addEventListener('scroll', (e) => { if (!(e.target && e.target.closest && e.target.closest('.alabasta-more-menu-body'))) closeAlabastaMoreMenus(); }, true);
+            window.addEventListener('resize', closeAlabastaMoreMenus);
         })();
 
         // V93.25 PR #13 Phase 2A — coordinate the per-row ⋯ More menus on Quiz Engine
