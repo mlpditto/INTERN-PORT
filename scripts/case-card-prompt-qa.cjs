@@ -64,6 +64,15 @@ t = ctx.build(payload);
 assert.ok(/Title: "What can help"/.test(t) && /Six equal tiles in a 3x2 grid/.test(t) && /general counselling only/.test(t) && /"See a doctor if it persists"/.test(t), 'self-care: 3x2, general counselling, doctor tile');
 ctx.layout = 'infographic';
 
+// ---- V102.422: no invented slogans / logos / brand marks — in the case infographic AND in the three templates
+for (const kind of ['infographic', 'lifestyle', 'symptoms', 'selfcare']) {
+    ctx.layout = kind;
+    const t = ctx.build(payload);
+    assert.ok(/NO slogans, taglines, logos or brand marks anywhere \(no invented mottos, app \/ clinic \/ hospital names or logo-like badges\)\. Only the text listed/.test(t), kind + ': the rule in the text block');
+    assert.ok(/- Slogans, taglines, logos, brand marks, invented organisation names/.test(t), kind + ': and in the avoid list');
+}
+ctx.layout = 'infographic';
+
 // ---- minimal (the earlier card)
 ctx.layout = 'minimal';
 p = ctx.build(payload);
