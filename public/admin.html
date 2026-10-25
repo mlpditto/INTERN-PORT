@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.425)</title>
+    <title>Nika Admin (V102.426)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -13321,6 +13321,7 @@
                                             <button type="button" data-filter="all" class="on" aria-pressed="true" onclick="mgwSetGalleryFilter('all')">All</button>
                                             <button type="button" data-filter="disease" aria-pressed="false" onclick="mgwSetGalleryFilter('disease')" title="Pathophysiology images">🩺 Disease</button>
                                             <button type="button" data-filter="drug" aria-pressed="false" onclick="mgwSetGalleryFilter('drug')" title="ADMET / PK images">💊 Drug</button>
+                                            <button type="button" data-filter="case" aria-pressed="false" onclick="mgwSetGalleryFilter('case')" title="Case Cards (saved when generated)">📋 Cases</button>
                                             <button type="button" data-filter="clip" aria-pressed="false" onclick="mgwSetGalleryFilter('clip')" title="Teaching clips (9:16)">🎬 Clips</button>
                                         </div>
                                         <button id="mgw-gallery-load-btn" onclick="mgwLoadCodexGallery()" style="white-space:nowrap; padding:7px 16px; border-radius:12px; border:none; background:linear-gradient(45deg,#4361ee,#4895ef); color:white; font-weight:800; cursor:pointer; font-size:0.85em;">Load gallery</button>
@@ -43969,6 +43970,33 @@ They can connect again from LINE.
             });
         }
 
+        // V102.426: auto-save — the stamped PNG → Storage patho-visuals/case-<sha256>.png (admin-only path, content-addressed) and cases/{id}.caseCardImage
+        // (one per case: a new card replaces the old file). Resolves true / false, never throws.
+        async function saveCaseCardToGallery(caseDocId, caseItem, dataUrl, model, template) {
+            try {
+                const blob = await (await fetch(dataUrl)).blob();
+                const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()))).map(x => x.toString(16).padStart(2, '0')).join('');
+                const storagePath = 'patho-visuals/case-' + hash + '.png';
+                const ref = adminApp.storage().ref(storagePath);
+                let downloadUrl;
+                try { downloadUrl = await ref.getDownloadURL(); }
+                catch (probe) {
+                    if (probe && probe.code !== 'storage/object-not-found') throw probe;
+                    downloadUrl = await (await ref.put(blob, { contentType: 'image/png' })).ref.getDownloadURL();
+                }
+                const rec = { storagePath, downloadUrl, model: String(model || ''), template: String(template || ''), caseId: String(caseItem.caseId || ''), disease: String(caseItem.disease || ''),
+                    savedAt: firebase.firestore.FieldValue.serverTimestamp(), savedBy: ALLOWED_EMAIL || 'admin' };
+                await db.collection('cases').doc(caseDocId).update({ caseCardImage: rec });
+                const prev = caseItem.caseCardImage && caseItem.caseCardImage.storagePath;
+                syncAlabastaCaseBridgeMarker(caseDocId, { caseCardImage: Object.assign({}, rec, { savedAt: new Date() }) });
+                if (prev && prev !== storagePath && /^patho-visuals\/case-/.test(prev)) { try { await adminApp.storage().ref(prev).delete(); } catch (_) { } }
+                return true;
+            } catch (e) {
+                console.warn('[case card] gallery save failed:', e && e.message);
+                return false;
+            }
+        }
+
         async function _renderCaseCardHtmlComposite(imageDataUrl, caseItem) {
             if (typeof html2canvas !== 'function') {
                 throw new Error('html2canvas is not loaded');
@@ -44093,8 +44121,9 @@ They can connect again from LINE.
                 }
 
                 if (imageEl) imageEl.src = finalDataUrl;
+                const stampedUrl = await stampCaseIdOnImage(finalDataUrl, caseItem.caseId);
                 if (dlEl) {
-                    dlEl.href = await stampCaseIdOnImage(finalDataUrl, caseItem.caseId);
+                    dlEl.href = stampedUrl;
                     dlEl.download = caseItem.caseId ? 'case-' + String(caseItem.caseId).replace(/[^\w.-]+/g, '_') + '.png' : 'alabasta-case-card.png';
                 }
                 const idBadge = document.getElementById('alabasta-case-card-id-badge');
@@ -44102,6 +44131,12 @@ They can connect again from LINE.
                 if (imageWrap) imageWrap.style.display = 'block';
                 setAlabastaCaseCardImageLoadingState(false, model || selectedModel);
                 if (imageMetaEl) imageMetaEl.textContent = `Generated with ${model || selectedModel}${compositedNote}`;
+                // V102.426: every card is kept in the Codex Gallery at once (a failed upload only says so — the image + PNG are unaffected)
+                if (typeof saveCaseCardToGallery === 'function') {
+                    saveCaseCardToGallery(caseDocId, caseItem, stampedUrl, model || selectedModel, getCaseCardLayout()).then(ok => {
+                        if (imageMetaEl) imageMetaEl.textContent += ok ? ' · saved to gallery ✓' : ' · gallery save failed';
+                    });
+                }
                 // V92.42: removed redundant "Generated image is ready" footer line —
                 // the READY pill in the toolbar already conveys this. Keep footer meta as
                 // the static privacy reminder so users always see why this modal exists.
@@ -52572,10 +52607,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
             if (btn) { btn.disabled = true; btn.textContent = '⏳ Loading…'; }
             try {
-                const [dxSnap, dcSnap, csSnap] = await Promise.all([
+                const [dxSnap, dcSnap, csSnap, ccSnap] = await Promise.all([
                     db.collection('disease_codex').get(),
                     db.collection('drug_codex').get(),
-                    db.collection('clip_series').get()   // V102.345: kept teaching clips
+                    db.collection('clip_series').get(),   // V102.345: kept teaching clips
+                    (async function () { return db.collection('cases').orderBy('caseCardImage.savedAt', 'desc').limit(80).get(); })().catch(function () { return { forEach: function () { } }; })   // V102.426: Case Cards (a failed query only hides them)
                 ]);
                 const items = [];
                 dxSnap.forEach(function (doc) {
@@ -52607,7 +52643,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     });
                 });
                 clips.sort(function (a, b) { return String(b.renderedAt).localeCompare(String(a.renderedAt)); });
-                window._mgwGallery = clips.concat(items);
+                const cards = [];
+                ccSnap.forEach(function (doc) {
+                    const d = doc.data() || {}, c = d.caseCardImage || {};
+                    if (!c.downloadUrl) return;
+                    cards.push({ type: 'case', id: doc.id, name: '#' + (c.caseId || d.caseId || doc.id) + (c.disease || d.disease ? ' · ' + (c.disease || d.disease) : ''),
+                        url: c.downloadUrl, style: c.template || '', model: c.model || '', fileBase: 'case-' + String(c.caseId || d.caseId || doc.id).replace(/[^\w.-]+/g, '_') });
+                });
+                window._mgwGallery = clips.concat(cards, items);
                 mgwRenderCodexGallery();
             } catch (err) {
                 console.error('[miss-goldenweek gallery] load failed:', err);
@@ -52633,8 +52676,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
             grid.innerHTML = items.map(function (it, i) {
                 if (it.type === 'clip') return mgwClipTileHtml(it, i);
-                const badge = it.type === 'disease' ? '🩺 Disease' : '💊 Drug';
-                const badgeColor = it.type === 'disease' ? '#6d28d9' : '#0369a1';
+                const badge = it.type === 'disease' ? '🩺 Disease' : it.type === 'case' ? '📋 Case' : '💊 Drug';
+                const badgeColor = it.type === 'disease' ? '#6d28d9' : it.type === 'case' ? '#0f766e' : '#0369a1';
                 const meta = [it.style, String(it.model || '').replace(/^(as|or)\//, '')].filter(Boolean).join(' · ');
                 return '<div style="border:1px solid #e2e8f0; border-radius:16px; overflow:hidden; background:#fff; box-shadow:0 2px 8px rgba(15,23,42,0.06);">'
                     + '<a href="' + dxaEscapeHtml(it.url) + '" target="_blank" rel="noopener noreferrer" title="Open full size in a new tab" style="display:block;">'
@@ -52705,7 +52748,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                           : blob.type === 'image/webp' ? 'webp'
                           : blob.type === 'image/gif'  ? 'gif' : 'png';
                 const slug = String(it.name || it.type).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || it.type;
-                const fname = it.type + '-' + slug + '.' + ext;
+                const fname = it.fileBase ? it.fileBase + '.' + ext : it.type + '-' + slug + '.' + ext;
                 const u = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = u; a.download = fname;

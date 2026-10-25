@@ -73,7 +73,7 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
             return out;
         });
         assert.equal(g.select, false, 'no dropdown any more');
-        assert.deepEqual(g.chips, ['All*', '🩺 Disease', '💊 Drug', '🎬 Clips'], 'filter chips, All on');
+        assert.deepEqual(g.chips, ['All*', '🩺 Disease', '💊 Drug', '📋 Cases', '🎬 Clips'], 'filter chips, All on');
         assert.deepEqual([g.count, g.firstIsClip, g.tiles], ['2 images · 1 clip', true, 3], 'the kept clip leads; EP02 (no clipUrl) has no tile');
         assert.equal(g.name, 'EP01 · Elobixibat for Chronic Constipation');
         assert.equal(g.cap, 'อีโลบิกซิแบท &lt;ยาใหม่&gt;', 'Thai caption, escaped');
