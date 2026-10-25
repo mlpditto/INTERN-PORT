@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     layout.id = 'case-studio-layout';
     [['infographic', 'Case infographic'], ['lifestyle', 'Lifestyle triggers'], ['symptoms', 'Symptoms + body'], ['selfcare', 'Self-care'], ['minimal', 'Minimal']].forEach(([value, label]) => layout.add(new Option(label, value)));
     layout.hidden = true;
-    settings.innerHTML = '<h4>Image</h4><div class="cs-grp"><span class="cs-lbl" id="cs-layout-lbl">Template</span><div class="cs-seg" role="radiogroup" aria-labelledby="cs-layout-lbl"></div></div><div class="cs-grp"><span class="cs-lbl" id="cs-mode-lbl">Mode</span><div class="cs-seg" role="radiogroup" aria-labelledby="cs-mode-lbl"></div></div><div class="cs-grp"><span class="cs-lbl" id="cs-model-lbl">Image model</span><div class="cs-seg" role="radiogroup" aria-labelledby="cs-model-lbl"></div></div>';
+    settings.innerHTML = '<h4>Set up image</h4><div class="cs-grp"><span class="cs-lbl" id="cs-layout-lbl">Template</span><div class="cs-seg" role="radiogroup" aria-labelledby="cs-layout-lbl"></div></div><div class="cs-grp"><span class="cs-lbl" id="cs-mode-lbl">Mode</span><div class="cs-seg" role="radiogroup" aria-labelledby="cs-mode-lbl"></div></div><div class="cs-grp"><span class="cs-lbl" id="cs-model-lbl">Image model</span><div class="cs-seg" role="radiogroup" aria-labelledby="cs-model-lbl"></div></div>';
     settings.append(layout, mode, model);
     const [layoutRail, modeRail, modelRail] = settings.querySelectorAll('.cs-seg');
     const ownerOf = id => (/gemini|nano/i.test(id) ? 'gemini' : /gpt|openai/i.test(id) ? 'openai' : /grok/i.test(id) ? 'grok' : '');
@@ -50,9 +50,9 @@ document.addEventListener('DOMContentLoaded', () => {
         ['minimal', '✨ Minimal', 'Icons and a short title only']
     ], { sel: layout });
     seg(modeRail, [['ai', '🖼️ AI image', 'AI draws the whole image'], ['html-overlay', '🧩 Illustration + HTML', 'AI draws the illustration; the title and tags are real HTML text']], { sel: mode });
-    // V102.417 lean: one row of short names (the logo says the family; the full name is the tooltip)
+    // V102.417 lean: one single line of short names (the logo says the family — Gemini ◆ 2.1 · 2 Lite · Pro, OpenAI Flare · Sunburst, Grok; the full name is the tooltip)
     const fullName = Object.fromEntries(chips.map(chip => [chip.dataset.value, chip.textContent.trim()]));
-    const SHORT = { 'as/gemini-nano-banana-2.1': 'Banana 2.1', 'as/gemini-3.1-flash-lite-image': 'Banana 2 Lite', 'as/gemini-3-pro-image': 'Banana Pro', 'gpt-image-2.5-flare': 'GPT Flare', 'gpt-image-2.5-sunburst': 'GPT Sunburst', 'or/x-ai/grok-imagine-image-2.0': 'Grok 2.0' };
+    const SHORT = { 'as/gemini-nano-banana-2.1': '2.1', 'as/gemini-3.1-flash-lite-image': '2 Lite', 'as/gemini-3-pro-image': 'Pro', 'gpt-image-2.5-flare': 'Flare', 'gpt-image-2.5-sunburst': 'Sunburst', 'or/x-ai/grok-imagine-image-2.0': 'Grok 2.0' };
     seg(modelRail, chips.map(chip => [chip.dataset.value, SHORT[chip.dataset.value] || chip.textContent.trim(), chip.textContent.trim() + ' (' + chip.dataset.value + ')']), { sel: model, logos: true });
     modeRail.parentElement.classList.add('cs-mode-inline');   // the Mode switch sits on the "Image" heading row
     // only one fold open at a time (Prompt | Source & advanced details) — opening one closes the other, so the left column never doubles in height
@@ -108,6 +108,8 @@ document.addEventListener('DOMContentLoaded', () => {
     status.className = 'case-studio-workflow-status'; status.setAttribute('role', 'status');
     preview.prepend(settings);
     settings.after(status);
+    // V102.418: the three things to do, in order, as numbers on the headings (a guide on ONE page — nothing to switch)
+    byId('step-1').querySelector('label').dataset.n = '1'; settings.querySelector('h4').dataset.n = '2'; status.dataset.n = '3';
     let busy = false, generated = '', reviewed = '';
     const snapshot = () => JSON.stringify([summary.value, prompt.value, model.value, mode.value, layout.value]);
     function render() {
@@ -128,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
         save.hidden = !generated;
         generate.disabled = busy; save.disabled = busy || !!stale;
         if (!busy) { generate.textContent = generated ? 'Regenerate image' : 'Generate image'; save.textContent = 'Save draft'; }
-        status.textContent = busy ? 'Working…' : stale ? 'Settings changed — generate a new image.' : generated ? 'Ready for review' : 'Image preview';
+        status.textContent = busy ? 'Working…' : stale ? 'Settings changed — generate a new image.' : generated ? 'Ready for review' : 'Generate & review';
         root.classList.toggle('case-studio-busy', busy);
     }
     async function run(task) {
@@ -197,13 +199,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const taxLabel = root.querySelector('label[for="alabasta-case-card-taxonomy"]'), payLabel = root.querySelector('label[for="alabasta-case-card-safe-payload"]');
     taxEl.hidden = payEl.hidden = true;
     taxLabel.textContent = 'Category'; payLabel.textContent = 'What the image will follow';
-    const koBtn = document.createElement('button');
-    koBtn.type = 'button'; koBtn.className = 'cs-ko-btn'; koBtn.textContent = '한'; koBtn.title = 'Show / hide the Korean labels · 한국어 표시';
-    taxLabel.after(koBtn);
-    const setKo = on => { root.classList.toggle('cs-ko-on', on); koBtn.setAttribute('aria-pressed', on ? 'true' : 'false'); };
-    let koSaved = false; try { koSaved = localStorage.getItem('caseStudioKo') === '1'; } catch (e) {}
-    setKo(koSaved);
-    koBtn.onclick = () => { const on = !root.classList.contains('cs-ko-on'); setKo(on); try { localStorage.setItem('caseStudioKo', on ? '1' : '0'); } catch (e) {} };
+    // V102.418: ONE flag chip cycles the Category language EN -> TH -> KR (English first); the saved taxonomy value is never touched.
+    // Only the system name has three names (CASE_SYSTEM_BY_KEY); the symptom tags exist in English only.
+    const LANGS = [['en', '\uD83C\uDDFA\uD83C\uDDF8', 'English'], ['th', '\uD83C\uDDF9\uD83C\uDDED', 'ไทย'], ['kr', '\uD83C\uDDF0\uD83C\uDDF7', '한국어']];
+    let lang = 'en'; try { const s = localStorage.getItem('caseStudioLang'); if (LANGS.some(l => l[0] === s)) lang = s; } catch (e) {}
+    const langBtn = document.createElement('button');
+    langBtn.type = 'button'; langBtn.className = 'cs-lang-btn';
+    const paintLang = () => {
+        const i = LANGS.findIndex(l => l[0] === lang), nx = LANGS[(i + 1) % 3];
+        langBtn.textContent = LANGS[i][1]; langBtn.dataset.lang = lang;
+        langBtn.title = 'Category language: ' + LANGS[i][2] + ' — click for ' + nx[2]; langBtn.setAttribute('aria-label', langBtn.title);
+    };
+    paintLang();
+    taxLabel.after(langBtn);
     const chipBox = document.createElement('div'); chipBox.className = 'cs-chips'; chipBox.setAttribute('aria-label', 'Category');
     taxEl.after(chipBox);
     const ing = document.createElement('ul'); ing.className = 'cs-ing';
@@ -214,11 +222,14 @@ document.addEventListener('DOMContentLoaded', () => {
     payEl.before(ing, techBtn);
     const count = document.createElement('span'); count.className = 'cs-count';
     byId('step-1').querySelector('label').append(count);
-    const chip = (text, ko, sys) => {
-        const s = document.createElement('span'); s.className = 'cs-chip' + (sys ? ' sys' : ''); s.textContent = text;
-        if (ko) { const k = document.createElement('span'); k.className = 'cs-ko'; k.textContent = ko; s.append(' ', k); }
-        return s;
+    const chip = (text, sys) => { const s = document.createElement('span'); s.className = 'cs-chip' + (sys ? ' sys' : ''); s.textContent = text; return s; };
+    let chipState = { head: '', tags: [], key: '' };
+    const sysName = () => {
+        const names = ((window.CASE_SYSTEM_BY_KEY || {})[chipState.key] || {}).label || {};
+        return (lang === 'th' ? names.th : lang === 'kr' ? (names.ko || (chipState.head.match(KO) || []).join(' ')) : names.en) || noKo(chipState.head) || chipState.head;
     };
+    const renderChips = () => { const n = sysName(); chipBox.replaceChildren(...[n ? chip(n, true) : null, ...chipState.tags.map(t => chip(t))].filter(Boolean)); };
+    langBtn.onclick = () => { lang = LANGS[(LANGS.findIndex(l => l[0] === lang) + 1) % 3][0]; try { localStorage.setItem('caseStudioLang', lang); } catch (e) {} paintLang(); renderChips(); };
     let edited = false;   // true once the admin types in the summary (programmatic fills fire no input event); a fresh case resets it
     const words = () => { const n = summary.value.trim().split(/\s+/).filter(Boolean).length; count.textContent = n ? n + (n === 1 ? ' word' : ' words') + (edited ? ' · edited' : '') : ''; };
     const origEl = byId('original');
@@ -229,8 +240,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const raw = String(taxEl.value || '').trim(), cut = raw.indexOf(' - ');
         const head = cut < 0 ? raw : raw.slice(0, cut);
         const tags = cut < 0 ? [] : raw.slice(cut + 3).split(',').map(x => x.trim()).filter(Boolean);
-        chipBox.replaceChildren(...[noKo(head) || (head.match(KO) || []).length ? chip(noKo(head) || head, (head.match(KO) || []).join(' '), true) : null, ...tags.map(t => chip(t))].filter(Boolean));
         let p = {}; try { p = JSON.parse(payEl.value || '{}') || {}; } catch (e) {}
+        chipState = { head, tags, key: String(p.primarySystemKey || '') }; renderChips();
         const rows = [];
         if (p.textContent && p.textContent.title) rows.push(['Title', noKo(p.textContent.title)]);
         if (Array.isArray(p.symptomTags) && p.symptomTags.length) rows.push(['Focus', p.symptomTags.join(' · ')]);
