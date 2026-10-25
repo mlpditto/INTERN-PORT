@@ -42,6 +42,15 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         await page.waitForFunction(() => document.querySelector('[data-model-chip][data-value="or/openai/gpt-5.4-image-2"]').title.includes('👍 2/3'));
         assert.equal((await page.locator('[data-model-chip][data-value="as/gemini-nano-banana-2.1"]').getAttribute('title')).includes('👍'), false, 'no votes → no tally');
 
+        // V102.412: the hint is a faint note to the RIGHT of 👍 / 👎 (inside the candidate row), not a line of its own under it
+        await page.locator('[data-model-chip][data-value="or/openai/gpt-5.4-image-2"]').click();
+        await gen();
+        assert.equal(await page.locator('.quiz-cover-ai-preview .quiz-cover-hint').innerText(), 'Check the image and text, then 👍 to apply it — or 👎 / Generate again to retry');
+        const bx = async sel => page.locator(sel).first().boundingBox();
+        const down = await bx('[data-discard]'), hint = await bx('.quiz-cover-hint');
+        assert.ok(hint.x >= down.x + down.width && Math.abs((hint.y + hint.height / 2) - (down.y + down.height / 2)) < 60, 'the hint sits to the right of the buttons, beside them');
+        assert.equal((await page.locator('[role=status]').innerText()).trim(), '', 'no extra status line when nothing was blocked');
+        assert.ok(hint.width <= 232, 'a narrow note: ' + hint.width);
         // 👍 = counted for the model AND the style, then applied
         await page.locator('[data-model-chip][data-value="or/openai/gpt-5.4-image-2"]').click();
         await gen();

@@ -198,7 +198,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         await page.waitForFunction(() => !QuizCover.isBusy());
         assert.deepEqual(await page.evaluate(() => calls), ['or/bytedance-seed/seedream-5-0-lite', 'as/gemini-nano-banana-2.1']);
         assert.equal(await page.locator('.quiz-cover-ai-preview').isVisible(), true, 'Fallback image shown as a preview');
-        assert.match(await page.locator('#quiz-cover-editor [role=status]').innerText(), /Seedream 5\.0 Lite blocked this topic \(content filter\) — made with Nano Banana 2.1\. Check/);
+        assert.match(await page.locator('#quiz-cover-editor [role=status]').innerText(), /Seedream 5\.0 Lite blocked this topic \(content filter\) — made with Nano Banana 2.1\.$/);   // V102.412: the usual hint moved beside 👍 / 👎
         assert.equal(await page.evaluate(() => uploads), 1, 'Fallback preview does not upload');
         await page.locator('[data-discard]').click();
         await page.evaluate(() => { window.calls = []; window.callUniversalAI = async model => { calls.push(model); throw new Error('network down'); }; });
