@@ -43103,7 +43103,9 @@ They can connect again from LINE.
             const MONTH = 'Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|ม\\.ค\\.|ก\\.พ\\.|มี\\.ค\\.|เม\\.ย\\.|พ\\.ค\\.|มิ\\.ย\\.|ก\\.ค\\.|ส\\.ค\\.|ก\\.ย\\.|ต\\.ค\\.|พ\\.ย\\.|ธ\\.ค\\.|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม';
             safeText = safeText
                 .replace(/^\s*\d{1,3}\s*[.)]\s*Case\b\s*/i, '')                       // "2. Case ช อายุ…" → the list number of the intern's own note
-                .replace(/^\s*Case\s*\d*\s*[:.\-]\s*/i, '')
+                .replace(/^\s*Case\s*\d*\s*[:.\-]\s*/i, '');
+            // V102.414: the day + month stay only when the patient agreed (cases/{id}.privacyConsent.details, set by the Studio checkbox)
+            if (!(caseItem && caseItem.privacyConsent && caseItem.privacyConsent.details)) safeText = safeText
                 .replace(/\b\d{1,2}\s*[\/.\-]\s*\d{1,2}\s*[\/.\-]\s*\d{2,4}\b/g, '[date]')                  // 23/6/69
                 .replace(new RegExp('\\b\\d{1,2}\\s*(?:' + MONTH + ')(?![A-Za-z])\\s*((?:19|20|25)\\d{2})?', 'gi'), (all, year) => year || '[date]')   // 12 มิ.ย. 2530 → 2530 (the year stays)
                 .replace(new RegExp('\\b(?:' + MONTH + ')\\s+\\d{1,2}(?:\\s*,\\s*((?:19|20|25)\\d{2}))?\\b', 'g'), (all, year) => year || '[date]');   // June 12, 1990 (capitalised only: a lower-case 'may 2 tablets' is not a date)
@@ -43299,7 +43301,11 @@ They can connect again from LINE.
                 `- Case context: ${payload.safeSummary}`,
                 '',
                 'Privacy and accuracy:',
-                '- Do NOT write the patient\'s age, sex, occupation, nationality or any personal descriptor (no "man", "late 40s", "driver"). Describe the case only by its history and symptoms.',
+                '- Do NOT write the patient\'s name, sex, nationality or any other personal descriptor (no "man", "woman", "male").',
+                '- The FIRST History bullet may state the age (or age band) and the occupation, for example "Late 40s, car mechanic". Do not put them anywhere else on the poster.',
+                payload.allowDetails
+                    ? '- The patient agreed to share details: a workplace name and exact dates from the case context may appear in History.'
+                    : '- Do not write a workplace / employer name or the day and month of any date.',
                 '- No HN, Ref No., case number, customer name, patient name, user name, LINE name, phone, email, or any identifier anywhere on the poster.',
                 '- Do not invent test results, doses, diagnoses or patient facts; the recommendations stay general.',
                 '',
@@ -43448,7 +43454,7 @@ They can connect again from LINE.
             }
         };
 
-        async function translateAlabastaSummaryToEnglish(summary, taxonomyLabel = '') {
+        async function translateAlabastaSummaryToEnglish(summary, taxonomyLabel = '', consent = false) {
             const cleanSummary = String(summary || '').trim();
             if (!cleanSummary) return '';
             try {
@@ -43456,7 +43462,10 @@ They can connect again from LINE.
                     'Translate the anonymized medical case summary into concise natural English.',
                     'Keep it privacy-safe and educational.',
                     'KEEP the patient\'s age (or age band), year of birth and occupation / job title.',
-                    'REMOVE: the day and month of any date (a year alone is fine); names of employers, companies, workplaces, hospitals, clinics and schools (say the kind of job instead, e.g. "works in a car factory"); names, phone numbers, ids; list numbers or labels such as "Case 2:".',
+                    'REMOVE: names, phone numbers, ids; list numbers or labels such as "Case 2:".',
+                    consent
+                        ? 'The patient agreed to share details, so a workplace / employer name and exact dates from the note MAY stay.'
+                        : 'ALSO REMOVE: the day and month of any date (a year alone is fine); names of employers, companies, workplaces, hospitals, clinics and schools (say the kind of job instead, e.g. "works in a car factory").',
                     'Write plain text only — no markdown, no asterisks.',
                     'Do not add identifiers, do not add extra facts, do not explain your work.',
                     taxonomyLabel ? `Medical context: ${taxonomyLabel}` : '',
@@ -43484,8 +43493,9 @@ They can connect again from LINE.
                 return '';
             }
             if (metaEl && !options.quiet) metaEl.textContent = 'Converting anonymized summary to English for GenMage prompt...';
-            const englishSummary = await translateAlabastaSummaryToEnglish(currentSummary, taxonomyLabel);
-            if (englishSummary) safeSummaryEl.value = englishSummary;
+            const consent = !!(document.getElementById('alabasta-case-card-consent') || {}).checked;   // V102.414
+            const englishSummary = await translateAlabastaSummaryToEnglish(currentSummary, taxonomyLabel, consent);
+            if (englishSummary) { safeSummaryEl.value = englishSummary; safeSummaryEl.dataset.auto = englishSummary; }
             // V102.409: "GI 소화기 - Abdominal Pain, Diarrhea" → system "GI" + tags; the poster's title / subtitle are English only
             const cutAt = taxonomyLabel.indexOf(' - ');
             const systemEn = alabastaEnglishOnly(cutAt < 0 ? taxonomyLabel : taxonomyLabel.slice(0, cutAt));
@@ -43494,6 +43504,7 @@ They can connect again from LINE.
                 primarySystemLabel: systemEn || 'General medicine',
                 symptomTags: tagsEn,
                 safeSummary: englishSummary || currentSummary,
+                allowDetails: consent,
                 textContent: {
                     title: systemEn && systemEn !== 'Other' ? `${systemEn} Case Brief` : 'Medical Case Brief',
                     subtitle: tagsEn.slice(0, 3).join(' / ')
@@ -43610,6 +43621,28 @@ They can connect again from LINE.
             }
         }
 
+        // V102.414: "Patient agreed — workplace and exact dates may appear". Saved on the case (privacyConsent), then the summary is rebuilt from the
+        // original note under the new rule. Returns false when nothing changed (the checkbox then flips back).
+        window.onCaseCardConsentChange = async function(checked) {
+            const id = document.getElementById('alabasta-case-card-id')?.value || '';
+            const caseItem = getAlabastaCaseById(id);
+            const el = document.getElementById('alabasta-case-card-safe-summary');
+            if (!caseItem || !el) return false;
+            if (el.dataset.auto && el.value !== el.dataset.auto && !confirm('Rebuild the summary from the original note? Your edits to the summary will be replaced.')) return false;
+            try {
+                await db.collection('cases').doc(id).update({
+                    privacyConsent: checked ? { details: true, by: ALLOWED_EMAIL || 'admin', at: firebase.firestore.FieldValue.serverTimestamp() } : firebase.firestore.FieldValue.delete(),
+                    adminUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            } catch (e) { alert('Could not save the consent: ' + e.message); return false; }
+            if (checked) caseItem.privacyConsent = { details: true }; else delete caseItem.privacyConsent;
+            const payload = buildSafeAlabastaCaseVisualPayload(caseItem);
+            el.value = payload.safeSummary; el.dataset.auto = payload.safeSummary;
+            if (typeof window.renderCaseCardAdvanced === 'function') window.renderCaseCardAdvanced();
+            await rebuildAlabastaCaseCardPromptFromInputs({ quiet: true });
+            return true;
+        };
+
         async function populateAlabastaCaseCardModal(caseItem) {
             const payload = buildSafeAlabastaCaseVisualPayload(caseItem);
             const ids = {
@@ -43639,7 +43672,9 @@ They can connect again from LINE.
                 negativePrompt: payload.negativePrompt
             }, null, 2);
             if (ids.original) ids.original.value = String(caseItem.note || '');
-            if (ids.safeSummary) ids.safeSummary.value = payload.safeSummary;
+            if (ids.safeSummary) { ids.safeSummary.value = payload.safeSummary; ids.safeSummary.dataset.auto = payload.safeSummary; }
+            const consentEl = document.getElementById('alabasta-case-card-consent');   // V102.414
+            if (consentEl) consentEl.checked = !!(caseItem.privacyConsent && caseItem.privacyConsent.details);
             if (window.renderCaseCardAdvanced) window.renderCaseCardAdvanced();   // V102.403: Category chips + readable brief
             if (ids.prompt) ids.prompt.value = '';
             if (ids.meta) ids.meta.textContent = 'Converting anonymized summary to English for GenMage prompt...';

@@ -141,7 +141,21 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         assert.equal(await page.locator('#alabasta-case-card-save-btn').isHidden(),true,'a new case: no Save until an image exists');
         assert.equal(await page.locator('#alabasta-case-card-generate-btn').innerText(),'Generate image');
         // V102.403: Category chips (Korean = own toggle), readable image brief, technical payload on a button, summary size + count
-        assert.ok(/ids\.safeSummary\.value = payload\.safeSummary;\s*\n\s*if \(window\.renderCaseCardAdvanced\) window\.renderCaseCardAdvanced\(\)/.test(html), 'populate refreshes the Category / brief view');
+        assert.ok(/ids\.safeSummary\.value = payload\.safeSummary;[\s\S]{0,420}if \(window\.renderCaseCardAdvanced\) window\.renderCaseCardAdvanced\(\)/.test(html), 'populate refreshes the Category / brief view');
+        // V102.414: the "patient agreed" box — saved on the case, the summary is rebuilt; a failed / cancelled change flips the box back
+        assert.ok(/ids\.safeSummary\.dataset\.auto = payload\.safeSummary;[\s\S]{0,300}consentEl\.checked = !!\(caseItem\.privacyConsent && caseItem\.privacyConsent\.details\)/.test(html), 'populate mirrors privacyConsent on the box');
+        assert.equal(await page.locator('#alabasta-case-card-step-1 #alabasta-case-card-consent').count(), 1, 'the box sits in the summary card');
+        assert.match(await page.locator('.cs-consent').innerText(), /Patient agreed/);
+        await page.evaluate(() => { window.consentCalls = []; window.onCaseCardConsentChange = async v => { consentCalls.push(v); return v; }; });
+        await page.locator('#alabasta-case-card-consent').check();
+        await page.waitForFunction(() => consentCalls.length === 1);
+        assert.equal(await page.evaluate(() => consentCalls[0]), true);
+        assert.equal(await page.locator('#alabasta-case-card-consent').isChecked(), true, 'kept when the change went through');
+        await page.evaluate(() => { window.onCaseCardConsentChange = async () => false; });
+        await page.evaluate(() => document.getElementById('alabasta-case-card-consent').click());   // (a refused change flips the box back at once, so Playwright's uncheck() would see "no change")
+        await page.waitForFunction(() => document.getElementById('alabasta-case-card-consent').checked === true);
+        assert.equal(await page.locator('#alabasta-case-card-consent').isChecked(), true, 'flipped back when the change was refused');
+        await page.evaluate(() => { document.getElementById('alabasta-case-card-consent').checked = false; });
         await page.evaluate(() => {
             document.getElementById('alabasta-case-card-taxonomy').value = 'Skin \uD53C\uBD80 - Rash, Redness, Itching, Lesion';
             document.getElementById('alabasta-case-card-safe-payload').value = JSON.stringify({ privacyStatus: 'patient_safe_anonymized', symptomTags: ['Rash', 'Redness'], stylePreset: 'clean medical infographic', textContent: { title: 'Skin \uD53C\uBD80 Case Brief' }, negativePrompt: ['no real patient photo', 'no ID card', 'no hospital form', 'no tiny unreadable text', 'no crowded poster', 'no graphic or scary medical imagery'] });
