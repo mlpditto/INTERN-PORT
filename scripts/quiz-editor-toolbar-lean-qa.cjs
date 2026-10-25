@@ -64,6 +64,10 @@ const cy = el => { const r = el.getBoundingClientRect(); return Math.round(r.top
         assert.deepEqual(layout.after, ['openBulkPasteModal()', 'openImageQuizModal()', 'openImportQuizModal()', 'openBulkTagModal()'], 'the add-question tools sit right after + Add, then Tags');
         assert.ok(layout.spread <= 8, 'the tool strip is ONE line on desktop: ' + layout.spread);
         assert.deepEqual(layout.thisQ, ['toolbarCopyQ(this)', 'toolbarCloneQ(this)', 'toggleQuizSelectMode()', 'toolbarDeleteQ()'], 'this-question group');
+        // V102.406: the copy-as-text tile carries a small blue C badge; the tile keeps its size and the badge never takes the click
+        const cb = await page.evaluate(() => { const t = document.querySelector('#quizManageModal .qe-ib[onclick="toolbarCopyQ(this)"]'), c = t && t.querySelector('.qe-c'); if (!c) return null; const cs = getComputedStyle(c), r = t.getBoundingClientRect(); return { text: c.textContent, pos: cs.position, pe: cs.pointerEvents, w: Math.round(r.width), size: Math.round(c.getBoundingClientRect().width), bg: cs.backgroundColor, emoji: t.firstChild.nodeValue }; });
+        assert.deepEqual(cb && [cb.text, cb.pos, cb.pe, cb.size, cb.bg, cb.emoji], ['C', 'absolute', 'none', 15, 'rgb(37, 99, 235)', '\u{1F4D1}'], 'the C badge on the copy tile: ' + JSON.stringify(cb));
+        assert.ok(cb.w >= 34 && cb.w <= 44, 'the tile keeps its size: ' + cb.w);
         assert.deepEqual(layout.whole, ['setAllQuestionTimers()', 'openExportQuizPdfModal()', 'openBulkExportModal()'], 'whole-quiz group');
         assert.equal(layout.selectShown, 'none', 'the timer select is a hidden value holder');
 
