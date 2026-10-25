@@ -118,7 +118,9 @@
         const item = itemOf(btn); if (!item) return;
         const src = sourceText(item), all = [src.stem, ...src.options, src.explanation].join('\n');
         if (src.stem.trim().length < 10) { toast('Write the question first.'); return; }
-        const label = btn.textContent; btn.disabled = true; btn.classList.remove('bad'); btn.textContent = '…';
+        const label = btn.textContent; btn.disabled = true; btn.classList.remove('bad');
+        const t0 = Date.now(), tick = () => { btn.textContent = '… ' + Math.round((Date.now() - t0) / 1000) + 's'; };   // a 9B local model needs 1-2 minutes: show it is working
+        tick(); const timer = setInterval(tick, 1000);
         try {
             const r = await window.callUniversalAI(MODEL, buildPrompt(src), true, null, '', { feature: 'quiz_terms', temperature: 0.1, maxTokens: 900 });
             const d = parse(r && r.text);
@@ -132,7 +134,7 @@
         } catch (e) {
             console.warn('[quiz-term-ai]', e); btn.classList.add('bad');
             toast('Local AI is not reachable — start Ollama (OLLAMA_ORIGINS must allow this site). ' + (e && e.message ? e.message : ''));
-        } finally { btn.disabled = false; btn.textContent = label; }
+        } finally { clearInterval(timer); btn.disabled = false; btn.textContent = label; }
     }
 
     // ---- change one term
