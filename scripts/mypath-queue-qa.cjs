@@ -70,7 +70,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return d.to
         // ---- V102.138: the header is ONE rail; the queue is ONE line; the AI strip is quiet ----
         assert.ok(!(await page.textContent('#tab-poneglyph')).includes('Learning Path · Daily Reflections'), 'the subtitle is gone');
         assert.equal(await page.locator('.dca-poneglyph-gear').count(), 0, 'the two big Codex buttons are gone');
-        assert.deepEqual(await page.locator('.lp-rail button').evaluateAll(b => b.map(x => x.id)), ['lp-btn-my', 'lp-btn-drugs', 'lp-btn-diseases', 'lp-btn-interns', 'lp-btn-memories'], 'one rail, in this order');
+        assert.deepEqual(await page.locator('.lp-rail button').evaluateAll(b => b.map(x => x.id)), ['lp-btn-my', 'lp-btn-drugs', 'lp-btn-diseases', 'lp-btn-interns', 'lp-btn-memories', 'lp-btn-gallery'], 'one rail, in this order');
         assert.equal((await txt('#lp-btn-my')), '🧭 My Path'); assert.equal((await txt('#lp-btn-drugs')), '💊 Drugs'); assert.equal((await txt('#lp-btn-diseases')), '🩺 Diseases'); assert.equal((await txt('#lp-btn-memories')), '🎟️ Memories');
         assert.equal(await page.locator('#lp-btn-my').evaluate(e => getComputedStyle(e).backgroundColor), 'rgb(29, 78, 216)', 'My Path is the active one');
         await page.evaluate(() => { window.__calls.length = 0; });
