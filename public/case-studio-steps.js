@@ -98,6 +98,17 @@ document.addEventListener('DOMContentLoaded', () => {
     byId('refine-btn').onclick = () => run(() => refineAlabastaCaseCardPromptWithSelectedModel());
     summary.removeAttribute('onblur');
     summary.addEventListener('input', render); prompt.addEventListener('input', render);
+    // V102.414: "the patient agreed" — saved on the case by admin.html; the summary is rebuilt under the looser rule
+    const consentRow = document.createElement('label');
+    consentRow.className = 'cs-consent';
+    consentRow.title = 'Tick only when the patient agreed to share the workplace name and exact dates. Saved on this case; the summary is rebuilt from the original note.';
+    consentRow.innerHTML = '<input type="checkbox" id="alabasta-case-card-consent"><span>Patient agreed — workplace and exact dates may appear</span>';
+    byId('step-1').querySelector('.alabasta-casecard-note').after(consentRow);
+    const consentBox = consentRow.querySelector('input');
+    consentBox.onchange = () => {
+        const want = consentBox.checked;
+        run(async () => { const done = typeof window.onCaseCardConsentChange === 'function' ? await window.onCaseCardConsentChange(want) : false; if (done === false) consentBox.checked = !want; else reviewed = ''; });
+    };
     window.resetCaseStudioSteps = () => {
         generated = ''; reviewed = summary.value;
         model.value = byId('model').value; mode.value = getCaseCardCompositeMode(); layout.value = getCaseCardLayout();

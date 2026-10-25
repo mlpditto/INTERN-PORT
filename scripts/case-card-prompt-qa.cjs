@@ -33,7 +33,10 @@ assert.ok(p.includes('Main title: "Patient Presentation". Subtitle under it: "GI
 assert.ok(/History of Presenting Illness/.test(p) && /"Symptoms"/.test(p) && /"Recommendations"/.test(p) && /educational purposes only/.test(p), 'the infographic sections');
 assert.ok(/NEVER draw a portrait, a face, a photograph or an avatar of any person/.test(p), 'no person drawn');
 assert.ok(/faceless human body silhouette/.test(p), 'a faceless body is allowed');
-assert.ok(/Do NOT write the patient's age, sex, occupation, nationality/.test(p) && /no "man", "late 40s", "driver"/.test(p), 'personal descriptors are banned as text');
+assert.ok(/Do NOT write the patient's name, sex, nationality/.test(p) && /no "man", "woman", "male"/.test(p), 'sex / name / nationality are banned as text');
+assert.ok(/FIRST History bullet may state the age \(or age band\) and the occupation, for example "Late 40s, car mechanic"/.test(p), 'age + occupation may sit in the first History bullet');
+assert.ok(/Do not write a workplace \/ employer name or the day and month of any date/.test(p), 'no workplace / day+month without consent');
+assert.ok(/The patient agreed to share details: a workplace name and exact dates/.test(ctx.build({ ...payload, allowDetails: true })) && !/Do not write a workplace/.test(ctx.build({ ...payload, allowDetails: true })), 'with consent the workplace / dates may appear');
 assert.ok(/Case context: A man in his late 40s/.test(p), 'the summary still informs the case');
 assert.ok(!/≤ 12 words/.test(p), 'the icon-only word cap is not in the infographic');
 assert.ok(p.indexOf('### TEXT') < p.indexOf('Case context (the ONLY source of facts)'), 'the text rules come first');
@@ -48,7 +51,7 @@ assert.ok(!ctx.build({ ...payload, textContent: { title: 'Medical Case Brief', s
 
 // ---- the REAL rebuild path: "GI 소화기 - Abdominal Pain, Diarrhea" → English system + tags, title / subtitle built from them
 (async () => {
-    ctx.els = { 'alabasta-case-card-safe-summary': { value: payload.safeSummary }, 'alabasta-case-card-taxonomy': { value: 'GI 소화기 - Abdominal Pain, Diarrhea, ปวดท้อง' }, 'alabasta-case-card-prompt': { value: '' }, 'alabasta-case-card-meta': { textContent: '' } };
+    ctx.els = { 'alabasta-case-card-safe-summary': { value: payload.safeSummary, dataset: {} }, 'alabasta-case-card-taxonomy': { value: 'GI 소화기 - Abdominal Pain, Diarrhea, ปวดท้อง' }, 'alabasta-case-card-prompt': { value: '' }, 'alabasta-case-card-meta': { textContent: '' } };
     ctx.layout = 'infographic';
     const out = await ctx.rebuild({ quiet: true });
     assert.equal(out, ctx.els['alabasta-case-card-prompt'].value, 'the prompt box is filled');
