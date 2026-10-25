@@ -62,6 +62,8 @@ document.addEventListener('DOMContentLoaded', () => {
         generate.hidden = step !== 2; save.hidden = step !== 3;
         [back, next, generate, save].forEach(button => button.disabled = busy);
         if (!busy) { generate.textContent = generated ? 'Regenerate image' : 'Generate image'; save.textContent = 'Save draft'; }
+        const meta = byId('meta');   // V102.404: the footer hint follows the step (it used to say "continue to set up image" while already there)
+        if (meta) { const READY = 'Ready — review the summary, then continue to set up image.', PICK = 'Pick a model, then generate the image.'; if (step === 2 && meta.textContent === READY) meta.textContent = PICK; else if (step === 1 && meta.textContent === PICK) meta.textContent = READY; }
         status.textContent = busy ? 'Working…' : stale ? 'Settings changed — generate a new image.' : generated ? 'Ready for review' : 'Image preview';
         root.classList.toggle('case-studio-busy', busy);
     }
@@ -151,8 +153,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (ko) { const k = document.createElement('span'); k.className = 'cs-ko'; k.textContent = ko; s.append(' ', k); }
         return s;
     };
-    const words = () => { const n = summary.value.trim().split(/\s+/).filter(Boolean).length; count.textContent = n ? n + (n === 1 ? ' word' : ' words') : ''; };
+    let edited = false;   // true once the admin types in the summary (programmatic fills fire no input event); a fresh case resets it
+    const words = () => { const n = summary.value.trim().split(/\s+/).filter(Boolean).length; count.textContent = n ? n + (n === 1 ? ' word' : ' words') + (edited ? ' · edited' : '') : ''; };
+    const origEl = byId('original');
+    const fit = () => { origEl.style.height = 'auto'; origEl.style.height = Math.min(origEl.scrollHeight + 2, 360) + 'px'; };
+    find('.alabasta-casecard-details').addEventListener('toggle', fit);
     window.renderCaseCardAdvanced = () => {
+        edited = false;
         const raw = String(taxEl.value || '').trim(), cut = raw.indexOf(' - ');
         const head = cut < 0 ? raw : raw.slice(0, cut);
         const tags = cut < 0 ? [] : raw.slice(cut + 3).split(',').map(x => x.trim()).filter(Boolean);
@@ -164,11 +171,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (p.stylePreset) rows.push(['Style', String(p.stylePreset)]);
         if (p.privacyStatus === 'patient_safe_anonymized') rows.push(['Privacy', 'Anonymized · patient-safe']);
         const no = (Array.isArray(p.negativePrompt) ? p.negativePrompt : []).map(x => String(x).replace(/^no\s+/i, ''));
-        if (no.length) rows.push(['Avoids', no.slice(0, 4).join(', ') + (no.length > 4 ? ' +' + (no.length - 4) + ' more' : '')]);
-        ing.replaceChildren(...rows.map(([k, v]) => { const li = document.createElement('li'), s = document.createElement('b'); s.textContent = k + ': '; li.append(s, v); return li; }));
-        words();
+        if (no.length) rows.push(['Avoids', no.slice(0, 4).join(', '), no.slice(4)]);
+        ing.replaceChildren(...rows.map(([k, v, rest]) => {
+            const li = document.createElement('li'), s = document.createElement('b'); s.textContent = k + ': '; li.append(s, v);
+            if (rest && rest.length) {
+                const more = document.createElement('span'), btn = document.createElement('button'), label = '+' + rest.length + ' more';
+                more.textContent = ', ' + rest.join(', '); more.hidden = true;
+                btn.type = 'button'; btn.className = 'cs-more'; btn.textContent = label; btn.setAttribute('aria-expanded', 'false');
+                btn.onclick = () => { more.hidden = !more.hidden; btn.textContent = more.hidden ? label : 'show less'; btn.setAttribute('aria-expanded', more.hidden ? 'false' : 'true'); };
+                li.append(more, ' ', btn);
+            }
+            return li;
+        }));
+        words(); fit();
     };
-    summary.addEventListener('input', words);
+    summary.addEventListener('input', () => { edited = true; words(); });
     const close = actions.querySelector('[onclick="closeAlabastaCaseCardModal()"]');
     close.textContent = 'Close'; close.title = 'ปิดหน้าต่าง';
     find('.close-modal').title = 'ปิดหน้าต่าง';

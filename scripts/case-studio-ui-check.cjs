@@ -123,6 +123,33 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         assert.equal((await page.locator('.cs-count').innerText()).trim(), '9 words');
         assert.equal(await page.locator('#alabasta-case-card-safe-summary').evaluate(el => parseFloat(getComputedStyle(el).minHeight)), 220, 'the summary is the big box');
         assert.ok(/Ready \u2014 review the summary, then continue to set up image\./.test(html), 'status line says what to do next');
+        // V102.404: footer hint follows the step · "edited" mark · "+N more" opens in place · Original note grows to its text
+        const READY = 'Ready \u2014 review the summary, then continue to set up image.', PICK = 'Pick a model, then generate the image.';
+        await page.evaluate(r => { document.getElementById('alabasta-case-card-meta').textContent = r; }, READY);
+        await page.getByRole('button', { name: 'Continue', exact: true }).click();
+        await page.waitForFunction(() => !document.getElementById('alabastaCaseCardModal').classList.contains('case-studio-busy'));
+        assert.equal(await page.locator('.case-studio-panel:not([hidden])').getAttribute('data-step'), '2');
+        assert.equal(await page.locator('#alabasta-case-card-meta').innerText(), PICK, 'step 2 does not say "continue to set up image"');
+        await page.getByRole('button', { name: 'Back', exact: true }).click();
+        assert.equal(await page.locator('#alabasta-case-card-meta').innerText(), READY, 'back on step 1 the original hint returns');
+        await page.evaluate(() => { document.querySelector('.alabasta-casecard-details').open = true; renderCaseCardAdvanced(); });
+        assert.equal((await page.locator('.cs-count').innerText()).includes('edited'), false, 'a fresh case is not "edited"');
+        await page.locator('#alabasta-case-card-safe-summary').fill('Male boxer with an itchy rash on the back, edited');
+        assert.match(await page.locator('.cs-count').innerText(), /words · edited$/, 'typing marks the summary as edited');
+        await page.evaluate(() => renderCaseCardAdvanced());
+        assert.equal((await page.locator('.cs-count').innerText()).includes('edited'), false, 'a new case clears it');
+        const avoids = page.locator('.cs-ing li', { hasText: 'Avoids' });
+        assert.equal(await avoids.locator('.cs-more').innerText(), '+2 more');
+        assert.equal(await avoids.innerText().then(t => t.includes('crowded poster')), false, 'collapsed: only the first four');
+        await avoids.locator('.cs-more').click();
+        assert.equal(await avoids.innerText().then(t => t.includes('graphic or scary medical imagery')), true, 'expanded in place, nothing else opens');
+        assert.equal(await avoids.locator('.cs-more').getAttribute('aria-expanded'), 'true');
+        assert.equal(await avoids.locator('.cs-more').innerText(), 'show less');
+        await avoids.locator('.cs-more').click();
+        assert.equal(await avoids.locator('.cs-more').innerText(), '+2 more');
+        await page.evaluate(() => { document.getElementById('alabasta-case-card-original').value = Array.from({ length: 30 }, (_, i) => 'line ' + i).join('\n'); renderCaseCardAdvanced(); });
+        const hOrig = await page.locator('#alabasta-case-card-original').evaluate(el => parseFloat(el.style.height));
+        assert.ok(hOrig > 200 && hOrig <= 362, 'the Original note grows with its text, capped: ' + hOrig);
         assert.deepEqual(errors,[]);
         console.log('PASS: 4 widths, steps/back/reset, stale image gating, edited prompt generation/save, model selection, summary rebuild, failure recovery. AI and Firestore stubbed.');
         if (process.env.STUDIO_SCREENSHOT) {
