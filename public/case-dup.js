@@ -16,6 +16,14 @@
     const dismissKey = (id) => 'caseDupNo:' + id;
     const cases = () => window.casesData || (typeof casesData !== 'undefined' ? casesData : []);
     const ago = (t) => (typeof alabastaAgo === 'function' ? alabastaAgo(t) : '');
+    // the real send time (Bangkok) + how long ago: "24 ต.ค. 14:32 · 21 hr"
+    const when = (t) => {
+        const m = ms(t); if (!m) return ago(t);
+        const d = new Date(m), z = { timeZone: 'Asia/Bangkok' };
+        const day = d.toLocaleDateString('th-TH', Object.assign({ day: 'numeric', month: 'short' }, z));
+        const hm = d.toLocaleTimeString('en-GB', Object.assign({ hour: '2-digit', minute: '2-digit', hour12: false }, z));
+        return day + ' ' + hm + ' · ' + ago(t);
+    };
     const reviewed = (c) => !!c && (c.isArchived || c.status === 'reviewed');
 
     function bigrams(s) { const m = new Map(); for (let i = 0; i < s.length - 1; i++) { const g = s.slice(i, i + 2); m.set(g, (m.get(g) || 0) + 1); } return m; }
@@ -84,7 +92,7 @@
         // ⏳ status · 🕒 sent
         const st = (c) => (reviewed(c) ? 'ตรวจแล้ว' + ((parseFloat(c.adminBonus) || 0) > 0 ? ' +' + (parseFloat(c.adminBonus) || 0).toFixed(2) : '') : 'รอตรวจ');
         if (st(a) !== st(b)) push('st', '⏳', 'สถานะ', st(a), st(b), null);
-        push('time', '🕒', 'ส่งเมื่อ', ago(a.timestamp), ago(b.timestamp), null);
+        push('time', '🕒', 'ส่งเมื่อ', when(a.timestamp), when(b.timestamp), null);
         const winsA = rows.filter(r => r.win === 'a').length, winsB = rows.filter(r => r.win === 'b').length;
         return { rows, same, winsA, winsB, star: winsA === winsB ? null : (winsA > winsB ? 'a' : 'b') };
     }

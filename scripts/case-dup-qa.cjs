@@ -58,6 +58,7 @@ let sc = j(ctx.caseDup.compare(a, C({ id: 'b', timestamp: at(-4), note: NEW })))
 const row = (k) => sc.rows.find(r => r.key === k);
 assert.deepEqual([row('len').win, row('add').win, sc.winsA, sc.winsB, sc.star], ['b', 'b', 0, 2, 'b'], JSON.stringify(sc.rows.map(r => [r.key, r.win])));
 assert.ok(/ไม่เคยแพ้ยา/.test(row('add').b) && /20/.test(row('add').a), 'what each side adds is shown');
+assert.match(row('time').a, /^24 ต\.ค\. 05:00 · /, 'the real send time (Bangkok), not only "21 hr": ' + row('time').a);
 assert.equal(row('time').win, null, 'time is a row, never a reason'); assert.ok(sc.same.length >= 1, 'equal things are summarised, not listed');
 sc = j(ctx.caseDup.compare(C({ id: 'a', symptomTags: ['คัน'], medications: ['x'] }), C({ id: 'b', symptomTags: ['คัน', 'ตกขาว', 'ปวด'], medications: [], appointment: '2026-10-30', caseVisualGeneratedAt: 1 })));
 assert.deepEqual([row2(sc, 'sym').win, row2(sc, 'med').win, row2(sc, 'ext').win, row2(sc, 'card').win], ['b', 'a', 'b', 'b'], 'symptoms / drugs / extras / a generated Case Card');
