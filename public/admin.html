@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.404)</title>
+    <title>Nika Admin (V102.405)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -7986,6 +7986,7 @@
     <link rel="stylesheet" href="quiz-resource-cards.css?v=V102.344">
     <link rel="stylesheet" href="case-split-studio.css?v=V100.40">
     <script src="case-studio-steps.js?v=V100.40" defer></script>
+    <script src="quiz-term-ai.js?v=V102.405" defer></script>
     <link rel="stylesheet" href="reflection-compact.css?v=V101.83">
     <script src="reflection-compact.js?v=V99.68"></script>
     <script src="storyteller-insights.js?v=V99.68"></script>
@@ -26831,7 +26832,8 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 // V102.222: per-question "Read first" page (shown before the timer starts); the key is left out when empty so old quizzes stay byte-identical
                 const qPrimerEl = item.querySelector('.q-primer');
                 const qPrimer = qPrimerEl ? (qPrimerEl.value || '').trim() : '';
-                questions.push({ q: qText, content: qContent, type: qType, options: opts, correct, timer, tags: qTags, explanation: qExplanation, ...(qPrimer ? { primer: qPrimer } : {}) });
+                const qTerms = window.QuizTermAI ? window.QuizTermAI.read(item) : [];   // V102.405: AI-marked drug / disease / lab terms (quiz-term-ai.js)
+                questions.push({ q: qText, content: qContent, type: qType, options: opts, correct, timer, tags: qTags, explanation: qExplanation, ...(qPrimer ? { primer: qPrimer } : {}), ...(qTerms.length ? { terms: qTerms } : {}) });
             });
 
             // V98.27: per-quiz Beri speed rewards. '' (blank) → null = use global
@@ -27143,7 +27145,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                             <textarea class="q-text" onpaste="handleQuestionPaste(event, this)" oninput="renderQTextPreview(this)" placeholder="Type question (Markdown supported: **bold**, *italic*, - list, [link](url))..." style="width:100%; height:140px; font-size:1.05em; border-radius:16px; border:1.5px solid #334155; padding:15px; background:#0f172a; color:#f1f5f9; box-shadow:inset 0 2px 4px rgba(0,0,0,0.2); line-height:1.6; box-sizing:border-box;"></textarea>
                         </div>
                         <div class="q-text-pane">
-                            <div class="q-text-pane-label">👁️ Preview</div>
+                            <div class="q-text-pane-label">👁️ Preview<button type="button" class="qta-btn" onclick="QuizTermAI.run(this)" title="Local AI marks the drug / disease / lab terms of this question (the text is not changed)">✨ Mark terms</button><span class="qta-count"></span><input type="hidden" class="q-terms" value="${data && Array.isArray(data.terms) && data.terms.length ? JSON.stringify(data.terms).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;') : ''}"></div>
                             <div class="q-text-preview"></div>
                         </div>
                     </div>
