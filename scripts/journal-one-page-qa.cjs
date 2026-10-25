@@ -44,7 +44,7 @@ assert.ok(!/role="tab"|dc-tabs/.test(js), 'no tab bar in daily-canvas.js');
         // ---- 2. the shadow hints: one per part, EN · TH, Thai NOT hidden by lang-toggle (page is EN)
         await page.evaluate(() => { document.getElementById('dc-note').open = true; document.getElementById('dc-feedback').open = true; });   // a closed fold renders nothing
         const hints = await page.$$eval('#rl-reflection-pane .dc-hint', es => es.map(e => ({ t: e.innerText.trim(), c: getComputedStyle(e).color, part: e.closest('[id^="dc-"]').id })));
-        assert.deepEqual(hints.map(h => h.part), ['dc-day', 'dc-day', 'dc-note', 'dc-feed', 'dc-feedback'], 'mood · writing · Note · Feedback · Message admin');
+        assert.deepEqual(hints.map(h => h.part), ['dc-day', 'dc-day', 'dc-note', 'dc-feedback'], 'mood · writing · Note · Message admin (Feedback has no hint line — V101.208)');
         for (const h of hints) assert.ok(/ · /.test(h.t) && /[฀-๿]/.test(h.t), 'hint shows EN · TH (Thai visible): ' + h.t);
         assert.match(hints[1].t, /what you learned, what was hard, what you’ll do next/);
         assert.equal(await page.locator('#rl-reflection-pane .dc-hint .lang-th').count(), 0, 'no Thai run wrapped by lang-toggle');
@@ -60,16 +60,26 @@ assert.ok(!/role="tab"|dc-tabs/.test(js), 'no tab bar in daily-canvas.js');
             renderReflectiveLogs();
         });
         const feed = await page.evaluate(() => {
-            const area = document.getElementById('rl-history-area'), btn = [...area.querySelectorAll('button')].find(b => /กดรับ/.test(b.innerText));
+            const area = document.getElementById('rl-history-area'), btn = [...area.querySelectorAll('button.rl-pill')].find(b => /รับ/.test(b.innerText));
             btn.scrollIntoView({ block: 'center' });
             const r = btn.getBoundingClientRect(), hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
             return { inFeed: !!area.closest('#dc-feed'), inDay: !!area.closest('#dc-day'), shown: getComputedStyle(area).display, btn: btn.innerText.trim(), clickable: btn.contains(hit),
                      comment: /ดีมาก ลองเพิ่มเรื่องการปรับยา/.test(area.innerText), dayDim: document.getElementById('dc-day').style.opacity };
         });
         assert.deepEqual([feed.inFeed, feed.inDay, feed.shown], [true, false, 'block'], 'history lives in 💬 Feedback, visible without a submit');
-        assert.ok(feed.comment && /กดรับ \+0\.2/.test(feed.btn), 'mentor comment + กดรับ +0.2 (Thai visible): ' + feed.btn);
+        assert.ok(feed.comment && /^🎁 รับ$/.test(feed.btn), 'mentor comment + the inline 🎁 รับ pill (Thai visible): ' + feed.btn);
+        const chip = await page.evaluate(() => ({ all: (document.getElementById('rl-claim-all') || {}).innerText, foot: document.querySelector('#rl-history-list .rl-ft').innerText.replace(/\s+/g, ' '), full: !!document.querySelector('#rl-history-list button:not(.rl-pill)'), glow: !!document.querySelector('#rl-history-list .rl-glow'), dot: (document.getElementById('rl-claim-dot') || {}).innerText }));
+        assert.equal(chip.all, '🎁 +0.2 · รับ · 받기', 'one waiting → the title chip says the amount'); assert.match(chip.foot, /\+0\.2/); assert.equal(chip.full, false, 'no full-width button any more'); assert.equal(chip.glow, true);
+        assert.equal(chip.dot, '🎁 +0.2', 'the Mission header cue');
         assert.equal(feed.dayDim, '0.5', 'today done → the entry panel dims (unchanged rule)');
-        assert.ok(feed.clickable, 'the กดรับ button is NOT under the dimmed, click-blocked panel');
+        assert.ok(feed.clickable, 'the 🎁 รับ pill is NOT under the dimmed, click-blocked panel');
+        // two waiting → "รับทั้งหมด" with the SUM; collected → a quiet ✓, the chip and the cue are gone
+        await page.evaluate(() => { reflectiveLogsCache = reflectiveLogsCache.concat([{ id: 'r2', content: 'x', mood: 'happy', timestamp: { toDate: () => new Date(Date.now() - 2 * 86400000) }, adminComment: 'ok', adminBonus: 0.1, pointsClaimed: false }]); renderReflectiveLogs(); });
+        assert.equal(await page.evaluate(() => document.getElementById('rl-claim-all').innerText), '🎁 +0.3 · รับทั้งหมด · 모두 받기');
+        if (process.env.QA_SHOT) await page.locator('#dc-feed').screenshot({ path: process.env.QA_SHOT + '/journal-bonus.png' });
+        await page.evaluate(() => { reflectiveLogsCache.forEach(l => { if (l.adminBonus) l.pointsClaimed = true; }); renderReflectiveLogs(); });
+        const after = await page.evaluate(() => ({ chip: !!document.getElementById('rl-claim-all'), pills: document.querySelectorAll('#rl-history-list .rl-pill').length, ok: document.querySelectorAll('#rl-history-list .rl-ok').length, dot: getComputedStyle(document.getElementById('rl-claim-dot')).display }));
+        assert.deepEqual(after, { chip: false, pills: 0, ok: 2, dot: 'none' }, 'collected: ✓ +x on each, nothing left to press');
 
         // ---- 4. the old "tab" callers open the matching fold
         await page.evaluate(() => toggleJournalNoteFields());

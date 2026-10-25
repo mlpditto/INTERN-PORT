@@ -3,8 +3,8 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.207)</title>
-    <link rel="stylesheet" href="daily-canvas.css?v=V101.171">
+    <title>Internship Portfolio (V101.208)</title>
+    <link rel="stylesheet" href="daily-canvas.css?v=V101.208">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -4196,6 +4196,7 @@
                                 style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; min-height:auto; padding:0; border-radius:50%; border:1.5px solid #c7d2fe; background:linear-gradient(135deg,#eff6ff,#e0e7ff); color:#4338ca; cursor:pointer; flex-shrink:0;">
                                 <i class="fa-solid fa-magnifying-glass" style="font-size:0.85em;"></i>
                             </button>
+                            <span id="rl-claim-dot" class="rl-claim-dot lang-no-toggle" style="display:none;" title="Bonus waiting in Journal ▸ Feedback"></span>
                             <span id="rl-today-status" style="font-size:0.8em; color:#999;"></span>
                             <span class="gl-minimal-hide"
                                 style="font-size:0.7em; color:#999; font-weight:bold; background:#eee; padding:2px 8px; border-radius:10px;">KANBAN</span>
@@ -22382,16 +22383,10 @@
                     const canClaim = hasBonus && log.pointsClaimed !== true;
                     const alreadyClaimed = hasBonus && log.pointsClaimed === true;
 
-                    const claimBtn = canClaim ? `
-                        <button onclick="claimReflectivePoints('${log.id}')" 
-                            style="margin-top:8px; width:100%; padding:10px; background:linear-gradient(135deg, #00b894, #55efc4); color:white; border:none; border-radius:10px; font-weight:bold; font-size:0.95em; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 15px rgba(0,184,148,0.3); animation: pulse 2s infinite;">
-                            <i class="fa-solid fa-gift"></i> กดรับ +${log.adminBonus} Points
-                        </button>` : '';
-
-                    const claimedBadge = alreadyClaimed ? `
-                        <div style="margin-top:8px; text-align:center; padding:6px; background:#e6fffa; border-radius:8px; font-size:0.85em; color:#00b894; font-weight:bold;">
-                            ✅ รับแล้ว +${log.adminBonus} pts
-                        </div>` : '';
+                    const bonusFoot = canClaim
+                        ? `<span class="rl-ft"><b>+${log.adminBonus}</b><button type="button" class="rl-pill" title="รับโบนัส · 보너스 받기" onclick="claimReflectivePoints('${log.id}')">🎁 รับ</button></span>`
+                        : (alreadyClaimed ? `<span class="rl-ft rl-ok">✓ +${log.adminBonus}</span>` : '');
+                    if (canClaim) item.classList.add('rl-glow');
 
                     item.innerHTML = `
                         <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
@@ -22399,13 +22394,24 @@
                             <span style="color:#28a745; font-size:0.85em;">+0.1 pts</span>
                         </div>
                         <div class="lang-no-toggle" style="color:#555; white-space:pre-wrap;">${log.content}</div>
-                        ${(log.adminComment || log.adminCommentHtml) ? `<div class="lang-no-toggle" style="margin-top:8px; padding:8px; background:#f0f7ff; border-radius:8px; font-size:0.9em; color:#0056b3; border-left:3px solid #0056b3;"><i class="fa-solid fa-reply"></i> <b>Admin:</b> ${renderAdminCommentSafe(log)} ${log.adminBonus ? `<span style="font-weight:bold;">(+${log.adminBonus})</span>` : ''}</div>` : ''}
-                        ${claimBtn}
-                        ${claimedBadge}
+                        ${(log.adminComment || log.adminCommentHtml) ? `<div class="lang-no-toggle" style="margin-top:8px; padding:8px; background:#f0f7ff; border-radius:8px; font-size:0.9em; color:#0056b3; border-left:3px solid #0056b3;"><i class="fa-solid fa-reply"></i> <b>Admin:</b> ${renderAdminCommentSafe(log)} ${bonusFoot}</div>` : ''}
                     `;
                     list.appendChild(item);
                 }
             });
+
+            // V101.208: a bonus waiting to be collected shows on the Feedback title (collect all) and on the Mission header (cue)
+            const rlPend = sortedLogs.filter(l => l.adminBonus > 0 && l.adminComment && l.pointsClaimed !== true);
+            const rlSum = Math.round(rlPend.reduce((s, l) => s + Number(l.adminBonus || 0), 0) * 100) / 100;
+            const rlTitle = document.querySelector('#dc-feed .dc-sec-t');
+            let rlAll = document.getElementById('rl-claim-all');
+            if (rlTitle && rlPend.length) {
+                if (!rlAll) { rlAll = document.createElement('button'); rlAll.id = 'rl-claim-all'; rlAll.type = 'button'; rlTitle.append(rlAll); }
+                rlAll.textContent = '🎁 +' + rlSum + (rlPend.length > 1 ? ' · รับทั้งหมด · 모두 받기' : ' · รับ · 받기'); rlAll.title = 'รับโบนัส · 보너스 받기';
+                rlAll.onclick = () => claimReflectivePoints(rlPend.map(l => l.id));
+            } else if (rlAll) rlAll.remove();
+            const rlDot = document.getElementById('rl-claim-dot');
+            if (rlDot) { rlDot.textContent = rlPend.length ? '🎁 +' + rlSum : ''; rlDot.style.display = rlPend.length ? 'inline-block' : 'none'; }
 
             if (metrics.currentStreak > 0) {
                 streakBadge.innerText = `🔥 ${metrics.currentStreak} วัน`;
@@ -23720,24 +23726,34 @@
             modal.style.display = 'flex';
         }
 
-        async function claimReflectivePoints(logId) {
-            const log = (window.myReflectiveLogsCache || []).find(l => l.id === logId);
-            if (!log) return alert("Data not found — please refresh the page and try again.");
-            if (log.pointsClaimed) return alert("Points already claimed.");
-            if (!log.adminBonus || log.adminBonus <= 0) return;
+        async function claimReflectivePoints(idOrIds) {
+            const ids = Array.isArray(idOrIds) ? idOrIds : [idOrIds];
+            const logs = ids.map(id => (window.myReflectiveLogsCache || []).find(l => l.id === id));
+            if (!logs.length || logs.some(l => !l)) return alert("Data not found — please refresh the page and try again.");
+            const todo = logs.filter(l => !l.pointsClaimed && l.adminBonus > 0);
+            if (!todo.length) return alert("Points already claimed.");
 
-            const bonus = log.adminBonus;
+            const bonus = Math.round(todo.reduce((s, l) => s + Number(l.adminBonus || 0), 0) * 100) / 100;
 
             try {
                 const b = db.batch();
-                const logRef = db.collection("reflective_logs").doc(logId);
                 const userRef = db.collection("users").doc(userId);
 
-                // 1. Mark as claimed
-                b.update(logRef, {
-                    pointsClaimed: true,
-                    claimedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    adminAcknowledged: false // 🔥 Notify admin
+                todo.forEach(log => {
+                    // 1. Mark as claimed
+                    b.update(db.collection("reflective_logs").doc(log.id), {
+                        pointsClaimed: true,
+                        claimedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        adminAcknowledged: false // 🔥 Notify admin
+                    });
+                    // 3. Log the score change
+                    b.set(db.collection("checkin_logs").doc(), {
+                        userId: userId,
+                        type: 'reflective_bonus',
+                        amount: Number(log.adminBonus),
+                        note: 'Daily log bonus โบนัสบันทึกรายวัน: ' + (log.adminComment || '').substring(0, 50),
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
                 });
 
                 // 2. Add score to user
@@ -23745,18 +23761,9 @@
                     score: firebase.firestore.FieldValue.increment(bonus)
                 });
 
-                // 3. Log the score change
-                const scoreLogRef = db.collection("checkin_logs").doc();
-                b.set(scoreLogRef, {
-                    userId: userId,
-                    type: 'reflective_bonus',
-                    amount: bonus,
-                    note: 'Daily log bonus โบนัสบันทึกรายวัน: ' + (log.adminComment || '').substring(0, 50),
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                });
-
                 await b.commit();
-                document.getElementById('reflectiveFeedbackModal').style.display = 'none';
+                const modal = document.getElementById('reflectiveFeedbackModal');
+                if (modal) modal.style.display = 'none';
                 alert(`✨ +${bonus} points claimed`);
             } catch (e) {
                 console.error(e);
@@ -27053,7 +27060,7 @@ async function archiveDoneCard(cardId) {
          Same reason admin.html shields its toast (V96.89). -->
     <div id="toast" class="lang-no-toggle"></div>
 <script src="history-review.js?v=V99.81"></script>
-<script src="daily-canvas.js?v=V101.171"></script>
+<script src="daily-canvas.js?v=V101.208"></script>
 <script src="intern-guide.js?v=V101.136" defer></script>
 <script src="articles.js?v=V101.206" defer></script>
 <script src="cafe-content.js?v=V101.140" defer></script>
