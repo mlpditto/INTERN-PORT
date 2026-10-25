@@ -69,6 +69,28 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         assert.equal(await page.evaluate(()=>rebuilds),0);
         // chip rails (quiz-cover look): 2 modes, 5 models; the selects are hidden value holders; the active chip is amber
         assert.equal(await page.locator('#cs-mode-lbl + .cs-seg button').count(),2);
+        // V102.417 lean: one row of short template names, the Mode switch on the heading row, only one fold open, the footer always in view
+        await page.setViewportSize({width:1440,height:640});
+        const lean = await page.evaluate(()=>{
+            const q = s => document.querySelector(s), r = el => el.getBoundingClientRect();
+            const tpl = q('#cs-layout-lbl + .cs-seg'), mode = q('.cs-mode-inline'), h4 = q('.case-studio-settings h4'), foot = q('.alabasta-casecard-footer');
+            return { tplH: Math.round(r(tpl).height), modeAbs: getComputedStyle(mode).position, modeOnHeading: r(mode).top < r(tpl).top && Math.abs(r(mode).top - r(h4).top) < 12, tplLabels: [...tpl.querySelectorAll('button')].map(e => e.textContent.trim()), footPos: getComputedStyle(foot).position, footInView: r(foot).bottom <= innerHeight + 1 };
+        });
+        assert.ok(lean.tplH <= 44, 'the template rail is ONE row: ' + lean.tplH);
+        assert.equal(lean.modeAbs, 'absolute'); assert.equal(lean.modeOnHeading, true, 'Mode sits on the Image heading row');
+        assert.deepEqual(lean.tplLabels, ['📊 Case', '🍽️ Lifestyle', '🫃 Symptoms', '✅ Self-care', '✨ Minimal'], 'short labels');
+        assert.equal(lean.footPos, 'sticky'); assert.equal(lean.footInView, true, 'Generate stays in view without scrolling');
+        assert.deepEqual(await page.locator('#cs-model-lbl + .cs-seg button').evaluateAll(els=>els.map(e=>e.textContent.trim().replace(/\s*★$/,''))),['Banana 2.1','Banana 2 Lite','Banana Pro','GPT Flare','GPT Sunburst','Grok 2.0'],'short model names');
+        assert.ok((await page.locator('#cs-model-lbl + .cs-seg button[data-value="as/gemini-nano-banana-2.1"]').getAttribute('title')).includes('Nano Banana 2.1'),'the full name stays in the tooltip');
+        await page.evaluate(()=>{ document.getElementById('alabasta-case-card-step-2').open = true; });
+        await page.waitForFunction(()=>document.getElementById('alabasta-case-card-step-2').open);
+        await page.evaluate(()=>{ document.querySelector('.alabasta-casecard-details').open = true; });
+        await page.waitForFunction(()=>document.querySelector('.alabasta-casecard-details').open);
+        assert.equal(await page.evaluate(()=>document.getElementById('alabasta-case-card-step-2').open),false,'opening the source details closes the prompt fold');
+        await page.evaluate(()=>{ document.getElementById('alabasta-case-card-step-2').open = true; });
+        await page.waitForFunction(()=>document.getElementById('alabasta-case-card-step-2').open);
+        assert.equal(await page.evaluate(()=>document.querySelector('.alabasta-casecard-details').open),false,'and the other way round');
+        await page.evaluate(()=>{ document.getElementById('alabasta-case-card-step-2').open = false; });
         assert.equal(await page.locator('#cs-model-lbl + .cs-seg button').count(),6,'five Gemini / GPT chips + Grok Imagine');
         assert.equal(await page.locator('#cs-model-lbl + .cs-seg button[data-value="or/x-ai/grok-imagine-image-2.0"] .cs-logo[data-owner="grok"]').count(),1,'Grok chip + its logo');
         // layout rail: Infographic (default) | Minimal; the HTML-overlay mode forces minimal and locks the rail

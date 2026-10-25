@@ -43,14 +43,21 @@ document.addEventListener('DOMContentLoaded', () => {
         rail.append(b);
     });
     seg(layoutRail, [
-        ['infographic', '📊 Case infographic', 'Title, history, symptoms, callouts and recommendations as real text; no person drawn'],
-        ['lifestyle', '🍽️ Lifestyle triggers', 'A grid of 4-6 tiles: one trigger from the case per tile, icon + short label (teal / amber, white)'],
-        ['symptoms', '🫃 Symptoms + body', 'A body-area schematic with callouts to the symptoms; the right third left empty for your text'],
+        ['infographic', '📊 Case', 'Title, history, symptoms, callouts and recommendations as real text; no person drawn'],
+        ['lifestyle', '🍽️ Lifestyle', 'A grid of 4-6 tiles: one trigger from the case per tile, icon + short label (teal / amber, white)'],
+        ['symptoms', '🫃 Symptoms', 'A body-area schematic with callouts to the symptoms; the right third left empty for your text'],
         ['selfcare', '✅ Self-care', 'Six plain-language self-care tiles (3x2); the advice is written by the model — review it'],
         ['minimal', '✨ Minimal', 'Icons and a short title only']
     ], { sel: layout });
     seg(modeRail, [['ai', '🖼️ AI image', 'AI draws the whole image'], ['html-overlay', '🧩 Illustration + HTML', 'AI draws the illustration; the title and tags are real HTML text']], { sel: mode });
-    seg(modelRail, chips.map(chip => [chip.dataset.value, chip.textContent.trim(), chip.dataset.value]), { sel: model, logos: true });
+    // V102.417 lean: one row of short names (the logo says the family; the full name is the tooltip)
+    const fullName = Object.fromEntries(chips.map(chip => [chip.dataset.value, chip.textContent.trim()]));
+    const SHORT = { 'as/gemini-nano-banana-2.1': 'Banana 2.1', 'as/gemini-3.1-flash-lite-image': 'Banana 2 Lite', 'as/gemini-3-pro-image': 'Banana Pro', 'gpt-image-2.5-flare': 'GPT Flare', 'gpt-image-2.5-sunburst': 'GPT Sunburst', 'or/x-ai/grok-imagine-image-2.0': 'Grok 2.0' };
+    seg(modelRail, chips.map(chip => [chip.dataset.value, SHORT[chip.dataset.value] || chip.textContent.trim(), chip.textContent.trim() + ' (' + chip.dataset.value + ')']), { sel: model, logos: true });
+    modeRail.parentElement.classList.add('cs-mode-inline');   // the Mode switch sits on the "Image" heading row
+    // only one fold open at a time (Prompt | Source & advanced details) — opening one closes the other, so the left column never doubles in height
+    const folds = [byId('step-2'), find('.alabasta-casecard-details')];
+    folds.forEach(f => f.addEventListener('toggle', () => { if (f.open) folds.forEach(o => { if (o !== f) o.open = false; }); }));
     model.onchange = () => { switchAndRegenerateAlabastaCaseCard(model.value, false); render(); };
     const rebuildNow = () => run(async () => { await rebuildAlabastaCaseCardPromptFromInputs({ quiet: true }); reviewed = summary.value; });   // the prompt differs per layout: rebuilt now, so an edit made after the switch is kept
     mode.onchange = () => { selectCaseCardCompositeMode(mode.value); layout.value = getCaseCardLayout(); render(); rebuildNow(); };
@@ -113,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modelRail.querySelectorAll('button').forEach(b => {
             const id = b.dataset.value, sug = SUGGEST[layout.value] === id, v = votes(id);
             b.classList.toggle('cs-sug', sug);
-            b.title = id + (HINTS[id] ? ' — ' + HINTS[id] : '') + (sug ? ' · ★ suggested for this template' : '') + (v.up + v.down ? ' · 👍 ' + v.up + '/' + (v.up + v.down) + ' here' : '');
+            b.title = (fullName[id] || id) + (HINTS[id] ? ' — ' + HINTS[id] : '') + (sug ? ' · ★ suggested for this template' : '') + (v.up + v.down ? ' · 👍 ' + v.up + '/' + (v.up + v.down) + ' here' : '');
         });
         const cur = votes(model.value);
         hintEl.textContent = (HINTS[model.value] || '') + (SUGGEST[layout.value] === model.value ? ' · ★ suggested for this template' : '') + (cur.up + cur.down ? ' · 👍 ' + cur.up + '/' + (cur.up + cur.down) + ' here' : '');
