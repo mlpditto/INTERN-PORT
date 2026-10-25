@@ -1,10 +1,17 @@
-// V102.407: the Case Card's poster text is the CATEGORY only (English): title "GI Case Brief" + the symptom tags — never age / sex / occupation,
-// never Thai / Korean glyphs. The REAL helper + prompt builder are cut from public/admin.html.
+// V102.407 / V102.409: the Case Card poster text. Two layouts: 'infographic' (default; real short text, NO person drawn, no age / sex /
+// occupation as text) and 'minimal' (the earlier icon-only card: the category title only). English only, never Thai / Korean glyphs.
+// The REAL helper + prompt builders + rebuild function are cut from public/admin.html.
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm'), assert = require('node:assert/strict');
 const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'admin.html'), 'utf8');
 const cut = (a, b) => { const i = html.indexOf(a); assert.ok(i > 0, a); return html.slice(i, html.indexOf(b, i)); };
-const ctx = {}; vm.createContext(ctx);
-vm.runInContext(cut('        function alabastaEnglishOnly(', '        function buildSafeAlabastaCaseVisualPayload(') + cut('        function buildAlabastaCaseCardPrompt(', '        // V92.48: localStorage key') + '\nthis.eo = alabastaEnglishOnly; this.build = buildAlabastaCaseCardPrompt;', ctx);
+const ctx = { layout: 'infographic', translated: null, els: {} }; vm.createContext(ctx);
+ctx.getCaseCardLayout = () => ctx.layout;
+ctx.document = { getElementById: id => ctx.els[id] || null };
+ctx.translateAlabastaSummaryToEnglish = async s => s;
+vm.runInContext(cut('        function alabastaEnglishOnly(', '        function buildSafeAlabastaCaseVisualPayload(')
+    + cut('        function buildAlabastaCaseCardPrompt(', '        // V92.48: localStorage key')
+    + cut('        async function rebuildAlabastaCaseCardPromptFromInputs(', '        async function refineAlabastaCaseCardPromptWithSelectedModel(')
+    + '\nthis.eo = alabastaEnglishOnly; this.build = buildAlabastaCaseCardPrompt; this.rebuild = rebuildAlabastaCaseCardPromptFromInputs;', ctx);
 
 assert.equal(ctx.eo('GI / ระบบทางเดินอาหาร'), 'GI');
 assert.equal(ctx.eo('Skin 피부'), 'Skin');
@@ -17,10 +24,41 @@ assert.equal(ctx.eo(null), '');
 assert.ok(/const systemEn = alabastaEnglishOnly\(taxonomy\.primarySystemLabel\);\s*\n\s*const title = systemEn && systemEn !== 'Other' \? `\$\{systemEn\} Case Brief` : 'Medical Case Brief';/.test(html), 'title = English category');
 assert.ok(/const tagsEn = taxonomy\.symptomTags\.map\(alabastaEnglishOnly\)\.filter\(Boolean\);/.test(html), 'subtitle = English tags');
 
-const p = ctx.build({ primarySystemLabel: 'GI', symptomTags: ['Abdominal Pain', 'Diarrhea'], safeSummary: 'A 50-year-old male driver reports cramping.', textContent: { title: 'GI Case Brief', subtitle: 'Abdominal Pain / Diarrhea' }, imageBrief: {}, visualRequirements: [], negativePrompt: [] });
-assert.ok(p.includes('The ONLY text allowed on the poster, written exactly as given: title "GI Case Brief" and subtitle "Abdominal Pain / Diarrhea". Write nothing else.'), 'the allowed text is named');
-assert.ok(/NEVER write the patient's age, sex, occupation, nationality/.test(p) && /no "50yo male driver"/.test(p), 'personal descriptors are banned as text');
-assert.ok(p.indexOf('The ONLY text allowed') < p.indexOf('Reference content'), 'the rule comes before the reference content (weaker models read the top first)');
-assert.ok(p.includes('Case context: A 50-year-old male driver'), 'the summary still informs the illustration');
-assert.ok(!ctx.build({ primarySystemLabel: 'x', symptomTags: [], safeSummary: 's', textContent: { title: 'Medical Case Brief', subtitle: '' } }).includes(' and subtitle'), 'no subtitle → no subtitle clause');
-console.log('PASS: Case Card poster text = English category only; age / occupation banned as text.');
+const payload = { primarySystemLabel: 'GI', symptomTags: ['Abdominal Pain', 'Diarrhea'], safeSummary: 'A man in his late 40s taking magnesium, with 2-3 days of abdominal discomfort.', textContent: { title: 'GI Case Brief', subtitle: 'Abdominal Pain / Diarrhea' }, imageBrief: {}, visualRequirements: [], negativePrompt: [] };
+
+// ---- infographic (default)
+ctx.layout = 'infographic';
+let p = ctx.build(payload);
+assert.ok(p.includes('Main title: "Patient Presentation". Subtitle under it: "GI Case Brief: Abdominal Pain / Diarrhea".'), 'title + subtitle are named');
+assert.ok(/History of Presenting Illness/.test(p) && /"Symptoms"/.test(p) && /"Recommendations"/.test(p) && /educational purposes only/.test(p), 'the infographic sections');
+assert.ok(/NEVER draw a portrait, a face, a photograph or an avatar of any person/.test(p), 'no person drawn');
+assert.ok(/faceless human body silhouette/.test(p), 'a faceless body is allowed');
+assert.ok(/Do NOT write the patient's age, sex, occupation, nationality/.test(p) && /no "man", "late 40s", "driver"/.test(p), 'personal descriptors are banned as text');
+assert.ok(/Case context: A man in his late 40s/.test(p), 'the summary still informs the case');
+assert.ok(!/≤ 12 words/.test(p), 'the icon-only word cap is not in the infographic');
+assert.ok(p.indexOf('### TEXT') < p.indexOf('Case context (the ONLY source of facts)'), 'the text rules come first');
+
+// ---- minimal (the earlier card)
+ctx.layout = 'minimal';
+p = ctx.build(payload);
+assert.ok(p.includes('The ONLY text allowed on the poster, written exactly as given: title "GI Case Brief" and subtitle "Abdominal Pain / Diarrhea". Write nothing else.'), 'minimal: the allowed text is named');
+assert.ok(/NEVER write the patient's age, sex, occupation, nationality/.test(p) && /no "50yo male driver"/.test(p), 'minimal: descriptors banned as text');
+assert.ok(p.indexOf('The ONLY text allowed') < p.indexOf('Reference content'), 'minimal: the rule precedes the reference');
+assert.ok(!ctx.build({ ...payload, textContent: { title: 'Medical Case Brief', subtitle: '' } }).includes(' and subtitle'), 'no subtitle → no subtitle clause');
+
+// ---- the REAL rebuild path: "GI 소화기 - Abdominal Pain, Diarrhea" → English system + tags, title / subtitle built from them
+(async () => {
+    ctx.els = { 'alabasta-case-card-safe-summary': { value: payload.safeSummary }, 'alabasta-case-card-taxonomy': { value: 'GI 소화기 - Abdominal Pain, Diarrhea, ปวดท้อง' }, 'alabasta-case-card-prompt': { value: '' }, 'alabasta-case-card-meta': { textContent: '' } };
+    ctx.layout = 'infographic';
+    const out = await ctx.rebuild({ quiet: true });
+    assert.equal(out, ctx.els['alabasta-case-card-prompt'].value, 'the prompt box is filled');
+    assert.ok(out.includes('"GI Case Brief: Abdominal Pain / Diarrhea"'), 'rebuild: real title + subtitle (English tags only): ' + out.split('\n').find(l => /Subtitle under it/.test(l)));
+    assert.ok(!/[฀-๿가-힣]/.test(out), 'no Thai / Korean glyph reaches the prompt');
+    ctx.layout = 'minimal';
+    assert.ok((await ctx.rebuild({ quiet: true })).includes('title "GI Case Brief" and subtitle "Abdominal Pain / Diarrhea"'), 'rebuild: minimal layout too');
+    // wiring
+    assert.ok(/function getCaseCardLayout\(\) \{\s*\n\s*if \(getCaseCardCompositeMode\(\) === 'html-overlay'\) return 'minimal';/.test(html), 'the HTML-overlay mode is always minimal');
+    assert.ok(html.includes('grok-imagine/.test(selectedModel)') && html.includes("imageApi: true, aspectRatio: '4:3'"), 'Grok Imagine goes through the Image API at 4:3');
+    assert.ok(html.includes('data-value="or/x-ai/grok-imagine-image-2.0"') && html.includes("'gpt-image-2.5-sunburst', 'or/x-ai/grok-imagine-image-2.0']"), 'the Grok chip is a valid saved model');
+    console.log('PASS: Case Card — infographic (default) / minimal; no person, no age / occupation text, English only; the real rebuild path; Grok Imagine wiring.');
+})().catch(e => { console.error(e); process.exit(1); });

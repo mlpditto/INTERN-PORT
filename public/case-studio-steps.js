@@ -25,10 +25,14 @@ document.addEventListener('DOMContentLoaded', () => {
     mode.id = 'case-studio-mode';
     [['ai', 'AI image'], ['html-overlay', 'Illustration + HTML']].forEach(([value, label]) => mode.add(new Option(label, value)));
     model.hidden = mode.hidden = true;
-    settings.innerHTML = '<h4>Image</h4><div class="cs-grp"><span class="cs-lbl" id="cs-mode-lbl">Mode</span><div class="cs-seg" role="radiogroup" aria-labelledby="cs-mode-lbl"></div></div><div class="cs-grp"><span class="cs-lbl" id="cs-model-lbl">Image model</span><div class="cs-seg" role="radiogroup" aria-labelledby="cs-model-lbl"></div></div>';
-    settings.append(mode, model);
-    const [modeRail, modelRail] = settings.querySelectorAll('.cs-seg');
-    const ownerOf = id => (/gemini|nano/i.test(id) ? 'gemini' : /gpt|openai/i.test(id) ? 'openai' : '');
+    const layout = document.createElement('select');
+    layout.id = 'case-studio-layout';
+    [['infographic', 'Infographic'], ['minimal', 'Minimal']].forEach(([value, label]) => layout.add(new Option(label, value)));
+    layout.hidden = true;
+    settings.innerHTML = '<h4>Image</h4><div class="cs-grp"><span class="cs-lbl" id="cs-layout-lbl">Layout</span><div class="cs-seg" role="radiogroup" aria-labelledby="cs-layout-lbl"></div></div><div class="cs-grp"><span class="cs-lbl" id="cs-mode-lbl">Mode</span><div class="cs-seg" role="radiogroup" aria-labelledby="cs-mode-lbl"></div></div><div class="cs-grp"><span class="cs-lbl" id="cs-model-lbl">Image model</span><div class="cs-seg" role="radiogroup" aria-labelledby="cs-model-lbl"></div></div>';
+    settings.append(layout, mode, model);
+    const [layoutRail, modeRail, modelRail] = settings.querySelectorAll('.cs-seg');
+    const ownerOf = id => (/gemini|nano/i.test(id) ? 'gemini' : /gpt|openai/i.test(id) ? 'openai' : /grok/i.test(id) ? 'grok' : '');
     const seg = (rail, items, pick) => items.forEach(([value, label, title]) => {
         const b = document.createElement('button');
         b.type = 'button'; b.dataset.value = value; b.title = title || label; b.setAttribute('role', 'radio');
@@ -38,10 +42,13 @@ document.addEventListener('DOMContentLoaded', () => {
         b.onclick = () => { if (busy || pick.sel.value === value) return; pick.sel.value = value; pick.sel.onchange(); };
         rail.append(b);
     });
+    seg(layoutRail, [['infographic', '📊 Infographic', 'Title, history, symptoms, callouts and recommendations as real text; no person drawn'], ['minimal', '✨ Minimal', 'Icons and a short title only']], { sel: layout });
     seg(modeRail, [['ai', '🖼️ AI image', 'AI draws the whole image'], ['html-overlay', '🧩 Illustration + HTML', 'AI draws the illustration; the title and tags are real HTML text']], { sel: mode });
     seg(modelRail, chips.map(chip => [chip.dataset.value, chip.textContent.trim(), chip.dataset.value]), { sel: model, logos: true });
     model.onchange = () => { switchAndRegenerateAlabastaCaseCard(model.value, false); render(); };
-    mode.onchange = () => { selectCaseCardCompositeMode(mode.value); render(); };
+    const rebuildNow = () => run(async () => { await rebuildAlabastaCaseCardPromptFromInputs({ quiet: true }); reviewed = summary.value; });   // the prompt differs per layout: rebuilt now, so an edit made after the switch is kept
+    mode.onchange = () => { selectCaseCardCompositeMode(mode.value); layout.value = getCaseCardLayout(); render(); rebuildNow(); };
+    layout.onchange = () => { selectCaseCardLayout(layout.value); render(); rebuildNow(); };
     const actions = find('.alabasta-casecard-action-group.final');
     const generate = byId('generate-btn');
     const save = byId('save-btn');
@@ -50,12 +57,13 @@ document.addEventListener('DOMContentLoaded', () => {
     preview.prepend(settings);
     settings.after(status);
     let busy = false, generated = '', reviewed = '';
-    const snapshot = () => JSON.stringify([summary.value, prompt.value, model.value, mode.value]);
+    const snapshot = () => JSON.stringify([summary.value, prompt.value, model.value, mode.value, layout.value]);
     function render() {
         const stale = generated && generated !== snapshot();
-        [[modeRail, mode], [modelRail, model]].forEach(([rail, select]) => rail.querySelectorAll('button').forEach(b => {
+        const overlay = mode.value === 'html-overlay';   // illustration only → always the minimal layout
+        [[layoutRail, layout], [modeRail, mode], [modelRail, model]].forEach(([rail, select]) => rail.querySelectorAll('button').forEach(b => {
             const on = b.dataset.value === select.value;
-            b.setAttribute('aria-checked', on ? 'true' : 'false'); b.classList.toggle('active', on); b.disabled = busy;
+            b.setAttribute('aria-checked', on ? 'true' : 'false'); b.classList.toggle('active', on); b.disabled = busy || (select === layout && overlay);
         }));
         save.hidden = !generated;
         generate.disabled = busy; save.disabled = busy || !!stale;
@@ -92,7 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
     summary.addEventListener('input', render); prompt.addEventListener('input', render);
     window.resetCaseStudioSteps = () => {
         generated = ''; reviewed = summary.value;
-        model.value = byId('model').value; mode.value = getCaseCardCompositeMode();
+        model.value = byId('model').value; mode.value = getCaseCardCompositeMode(); layout.value = getCaseCardLayout();
         byId('step-2').open = false; find('.alabasta-casecard-details').open = false; payEl.hidden = true; techBtn.textContent = TECH; render();
     };
     find('.alabasta-casecard-subtitle').textContent = 'Review the summary, pick a model, then generate.';
