@@ -8024,7 +8024,7 @@
 <script src="quiz-cover.js?v=V102.344"></script>
 <script src="clip-captions.js?v=V102.366"></script>
 <script src="holidays-admin.js?v=V102.330"></script>
-<script src="articles-admin.js?v=V102.397"></script>
+<script src="articles-admin.js?v=V102.399"></script>
 <link rel="stylesheet" href="quiz-qimage.css?v=V101.03">
 <script src="quiz-qimage.js?v=V101.03"></script>
 <link rel="stylesheet" href="quiz-more-popover.css?v=V100.47">
@@ -49173,6 +49173,24 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             batch.update(db.collection('articles').doc(draft.sourceArticleId), { 'dc.publishedId': publishedId });
         }
 
+        // V102.399: 💊 twin of dxaStubFromArticle — an empty Drug Codex draft (just the name; "(…)" aliases go to the brand names)
+        window.dcaStubFromArticle = async function (art) {
+            const user = (window.adminApp && window.adminApp.auth && window.adminApp.auth().currentUser) || (typeof auth !== 'undefined' && auth && auth.currentUser) || null;
+            if (!user || typeof user.uid !== 'string') throw new Error('Sign in as admin first.');
+            const name = String(art.name || '').trim();
+            if (!name) throw new Error('No drug name.');
+            const dup = (dcaState.codex || []).find(d => (d.genericName || '').toLowerCase() === name.toLowerCase());
+            if (dup) throw new Error('"' + name + '" is already in the Drug Codex (id ' + dup._id + ') \u2014 open it there instead.');
+            const doc = {};
+            DCA_FIELD_KEYS.forEach(key => { doc[key] = DCA_ARRAY_FIELDS[key] ? [] : ''; });
+            doc.genericName = name;
+            if (Array.isArray(art.aliases) && art.aliases.length) doc.brandNames = art.aliases.map(String);
+            Object.assign(doc, { status: 'pending', createdAt: firebase.firestore.FieldValue.serverTimestamp(), submittedBy: user.uid, submittedByName: user.email || 'admin', sourceArticleId: String(art.id), sourceArticleTitle: String(art.title || name), aiDrafted: false, topicOnly: true });
+            const ref = await db.collection('drug_codex_drafts').add(doc);
+            await db.collection('articles').doc(String(art.id)).update({ dc: { draftId: ref.id, publishedId: '', name: name } });
+            return { draftId: ref.id };
+        };
+
         function dcaParseAutoDraftResponse(rawText) {
             if (!rawText) return null;
             try {
@@ -50309,6 +50327,26 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const ref = await db.collection('disease_codex_drafts').add(doc);
             await db.collection('articles').doc(String(art.id)).update({ dx: { draftId: ref.id, publishedId: '', name: name } });
             return { draftId: ref.id, model: (resp && resp.model) || model };
+        };
+
+        // V102.399: 🩺 chip in the Articles editor — ONE click, no AI: an EMPTY Disease Codex draft (just the topic) in Pending Drafts, to be filled later in Poneglyph
+        // (Review & Edit ▸ 🤖 fill). Same bookkeeping as dxaDraftFromArticle (sourceArticleId, articles/{id}.dx) and the same "already in the Codex" guard.
+        window.dxaStubFromArticle = async function (art) {
+            const user = (window.adminApp && window.adminApp.auth && window.adminApp.auth().currentUser) || (typeof auth !== 'undefined' && auth && auth.currentUser) || null;
+            if (!user || typeof user.uid !== 'string') throw new Error('Sign in as admin first.');
+            const name = String(art.name || '').trim();
+            if (!name) throw new Error('No disease name.');
+            const dup = (dxaState.codex || []).find(d => (d.diseaseName || '').toLowerCase() === name.toLowerCase());
+            if (dup) throw new Error('"' + name + '" is already in the Codex (id ' + dup._id + ') \u2014 open it there instead.');
+            const doc = {};
+            DXA_FIELD_KEYS.forEach(key => { doc[key] = DXA_ARRAY_FIELDS[key] ? [] : ''; });
+            doc.diseaseName = name;
+            if (art.thaiName) doc.thaiName = String(art.thaiName);
+            if (Array.isArray(art.aliases) && art.aliases.length) doc.synonyms = art.aliases.map(String);
+            Object.assign(doc, { status: 'pending', createdAt: firebase.firestore.FieldValue.serverTimestamp(), submittedBy: user.uid, submittedByName: user.email || 'admin', sourceArticleId: String(art.id), sourceArticleTitle: String(art.title || name), aiDrafted: false, topicOnly: true });
+            const ref = await db.collection('disease_codex_drafts').add(doc);
+            await db.collection('articles').doc(String(art.id)).update({ dx: { draftId: ref.id, publishedId: '', name: name } });
+            return { draftId: ref.id };
         };
 
         function dxaParseAutoDraftResponse(rawText) {

@@ -14,6 +14,7 @@
 (function () {
     'use strict';
     var LANGS = [['en', 'EN'], ['th', 'TH'], ['ko', 'KO']];
+    var FLAG = { en: '🇬🇧', th: '🇹🇭', ko: '🇰🇷' };   // V102.399: flags, not letters (the word stays in the tooltip / aria-label)
     var COVERS = ['📰', '🫁', '💊', '🧪', '🩺', '🦠', '🧊', '🌡️', '⚠️', '💡'];
     var FILTERS = [['all', 'All'], ['draft', 'Draft'], ['scheduled', 'Scheduled'], ['live', 'Live'], ['ended', 'Ended']];
     var RERUN = [['off', 'Off', 'Interns who join after it ends never get it'], ['any', 'All new interns', 'Interns who join after it ends get it too, oldest first, one a day']];
@@ -273,6 +274,9 @@
             '.art-c.on{background:#4361ee;color:#fff;border-color:#4361ee}.art-c i.d{width:7px;height:7px;border-radius:50%;background:#e2e8f0;display:inline-block}.art-c i.d.ok{background:#22c55e}' +
             '.art-emo{min-height:0!important;margin:0!important;width:34px!important;height:34px;padding:0;border-radius:10px;border:1px solid #e2e8f0;display:grid;place-items:center;font-size:18px;background:#fff;cursor:pointer}.art-emo.on{border:2px solid #4361ee;background:#eef2ff}' +
             '.art-in{flex:1;min-width:0;border:1px solid #e2e8f0;border-radius:10px;padding:8px 10px;font:inherit;font-size:15px;font-weight:700;color:#1e293b;margin:0}' +
+            '@font-face{font-family:"Twemoji Country Flags";unicode-range:U+1F1E6-1F1FF,U+1F3F4,U+E0062-E007F;src:url(https://cdn.jsdelivr.net/npm/country-flag-emoji-polyfill@0.1.8/dist/TwemojiCountryFlags.woff2) format("woff2");font-display:swap}' +
+            '.art-lg,.art-ln .art-c,.art-fb{font-family:"Twemoji Country Flags",Kanit,system-ui,sans-serif}' +
+            '.art-xr{display:flex;gap:6px;flex-wrap:wrap}.art-xc{min-height:0;margin:0;width:auto;padding:3px 11px;border:1.5px solid #e2e8f0;border-radius:999px;background:#fff;color:#475569;font:800 12px/1.4 inherit;cursor:pointer}.art-xc:hover{background:#f8fafc}.art-xc.ring{border-color:#f59e0b;background:#fffbeb;color:#92400e}.art-xc.ring.ok{border-color:#22c55e;background:#f0fdf4;color:#166534}.art-xc.busy{opacity:.6;cursor:wait}' +
             '.art-md{border:1px solid #e2e8f0;border-radius:12px;overflow:hidden}.art-tb{display:flex;align-items:center;gap:2px;padding:4px 6px;border-bottom:1px solid #e2e8f0;background:#f8fafc}' +
             '.art-tb button{min-height:0;margin:0;width:28px;height:26px;padding:0;border:0;border-radius:6px;background:transparent;color:#475569;font-weight:800;cursor:pointer}.art-tb button:hover{background:#e2e8f0}' +
             '.art-ta{display:block;width:100%;box-sizing:border-box;border:0;margin:0;padding:10px 12px;font:12.5px/1.55 ui-monospace,Consolas,monospace;color:#334155;min-height:160px;resize:vertical}' +
@@ -345,7 +349,7 @@
         var st = status(a, now), have = langsOf(a), aud = (a.audience.divisions || []).concat(a.audience.groups || []);
         return '<button type="button" class="art-row st-' + st + (S.cur && S.cur.id === a.id ? ' sel' : '') + (st === 'ended' ? ' ended' : '') + '" onclick="Articles.edit(\'' + esc(a.id) + '\')">' +
             '<span class="art-tile">' + esc(a.cover.emoji) + '</span><span style="min-width:0"><span class="art-t">' + esc(title(a)) + '</span><span class="art-meta"><span class="art-st ' + st + '">' + esc(stLabel(a, now)) + '</span>' +
-            LANGS.map(function (l) { return '<span class="art-lg' + (have.indexOf(l[0]) < 0 ? ' off' : '') + '">' + l[1] + '</span>'; }).join('') + rowTagsHtml(a) +
+            LANGS.map(function (l) { return '<span class="art-lg' + (have.indexOf(l[0]) < 0 ? ' off' : '') + '" title="' + l[1] + '">' + FLAG[l[0]] + '</span>'; }).join('') + rowTagsHtml(a) +
             (aud.length ? '<span title="Audience">' + esc(aud.join(' · ')) + '</span>' : '') + (a.rerun === 'off' ? '' : '<span class="art-rr" title="Also sent to interns who join later">🔁</span>') + '</span></span></button>';
     }
     // V102.371: the 🩺 chip says where the article stands in the Disease Codex
@@ -468,15 +472,30 @@
         return '<span class="art-ai"><button type="button" class="go" onclick="Articles.ai()"' + (S.aiBusy ? ' disabled' : '') + ' title="' + (tr ? 'Translate the EN version into ' + S.lang.toUpperCase() + ' (fills the editor — check, then save)' : 'Draft the body from the title in ' + S.lang.toUpperCase() + ' (fills the editor — check, then save)') + '">' + (S.aiBusy ? '✨ …' : tr ? '✨ From EN' : '✨ Draft') + '</button>' +
             '<button type="button" class="mdl" onclick="Articles.modelPick()" title="AI model — tap to change">' + esc(modelName(modelId())) + ' ' + (S.modelOpen ? '▴' : '▾') + '</button></span>';
     }
+    // V102.399 (owner's pick 4): 🩺 💊 🔗 chips under the title — always in view (they used to hide in the folded Links row). 🩺 / 💊 = ONE click sends the topic
+    // (no AI) into the Disease / Drug Codex ▸ Pending Drafts, to be filled in later in Poneglyph; the ring says where it stands (amber = waiting, green = in the Codex);
+    // tapping a ringed chip opens that entry. 🔗 = link a quiz (the picker opens). The old ✨ AI-draft chips stay inside Links.
+    function topicRowHtml(a) {
+        var cx = function (k, busy, ico, word, openTip) {
+            var o = a[k] || {}, state = busy ? ' busy' : o.publishedId ? ' ring ok' : o.draftId ? ' ring' : '';
+            var lab = busy ? '…' : o.publishedId ? 'In Codex' : o.draftId ? 'Draft' : word;
+            var tip = busy ? 'Sending…' : o.publishedId ? 'In the ' + word + ' Codex — open it' : o.draftId ? 'Waiting in ' + word + ' Codex ▸ Pending Drafts — open it' : 'Send this topic to the ' + word + ' Codex (an empty draft — fill it in later in Poneglyph)';
+            return '<button type="button" class="art-xc' + state + '" onclick="Articles.topicTo(' + String.fromCharCode(39) + k + String.fromCharCode(39) + ')" title="' + tip + '"' + (busy ? ' disabled' : '') + '>' + ico + ' ' + lab + '</button>';
+        };
+        var nq = (a.links || []).filter(function (l) { return l.kind === 'quiz'; }).length;
+        return '<div class="art-xr">' + cx('dx', S.dxBusy, '🩺', 'Disease') + cx('dc', S.dcBusy, '💊', 'Drug') +
+            '<button type="button" class="art-xc' + (nq ? ' ring ok' : '') + '" onclick="Articles.quizPick()" title="Link a quiz to this article">🔗 Quiz' + (nq ? ' ' + nq : '') + '</button></div>';
+    }
     function editorHtml(now) {
         var a = S.cur, L = S.lang, t = (a.title || {})[L] || '', b = (a.body || {})[L] || '', have = langsOf(a), st = status(a, now), mm = mismatch(a, L);
         var NAME = { en: 'English', th: 'Thai', ko: 'Korean' };
         var lines = [
             statusLine(a, now),
-            '<div class="art-ln">' + LANGS.map(function (l) { var ok = have.indexOf(l[0]) >= 0; return chip('<i class="d' + (ok ? ' ok' : '') + '"></i>' + l[1] + (!ok && l[0] !== 'en' ? ' <span class="art-fb">→ EN</span>' : ''), L === l[0], 'Articles.lang(\'' + l[0] + '\')', ' title="' + (l[0] === 'en' ? 'Required to schedule' : ok ? NAME[l[0]] + ' version' : 'Empty — interns see EN') + '"'); }).join('') +
+            '<div class="art-ln">' + LANGS.map(function (l) { var ok = have.indexOf(l[0]) >= 0; return chip('<i class="d' + (ok ? ' ok' : '') + '"></i>' + FLAG[l[0]] + (!ok && l[0] !== 'en' ? ' <span class="art-fb">→ ' + FLAG.en + '</span>' : ''), L === l[0], 'Articles.lang(\'' + l[0] + '\')', ' aria-label="' + NAME[l[0]] + '" title="' + (l[0] === 'en' ? 'Required to schedule' : ok ? NAME[l[0]] + ' version' : 'Empty — interns see EN') + '"'); }).join('') +
                 '<span style="margin-left:auto;display:inline-flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">' + (S.coverOpen ? COVERS.map(function (e) { return '<button type="button" class="art-emo' + (a.cover.emoji === e ? ' on' : '') + '" onclick="Articles.cover(\'' + e + '\')" aria-label="Cover ' + e + '" title="Cover">' + e + '</button>'; }).join('')
                     : '<button type="button" class="art-emo on" onclick="Articles.coverPick()" aria-label="Change the cover" title="Cover · tap to change">' + esc(a.cover.emoji) + '</button>') + '</span></div>',
             '<input class="art-in" id="art-title" maxlength="' + MAX_TITLE + '" placeholder="Title (' + L.toUpperCase() + ')" value="' + esc(t) + '" oninput="Articles.text(\'title\',this.value)">',
+            topicRowHtml(a),
             '<div class="art-md"><div class="art-tb"><button type="button" title="Bold" onclick="Articles.wrap(\'**\',\'**\')">B</button><button type="button" title="Italic" onclick="Articles.wrap(\'*\',\'*\')"><i>I</i></button><button type="button" title="Strikethrough" onclick="Articles.wrap(\'~~\',\'~~\')"><s>S</s></button>' +
             '<button type="button" title="Bullet list" onclick="Articles.wrap(\'\\n- \',\'\')">•</button><button type="button" title="Numbered list" onclick="Articles.wrap(\'\\n1. \',\'\')">1.</button><button type="button" title="Link" onclick="Articles.wrap(\'[\',\'](https://)\')">🔗</button>' + aiHtml(a) + '</div>' + (S.modelOpen ? '<div class="art-mrail">' + modelRail() + '</div>' : '') +
             '<textarea class="art-ta" id="art-bodyta" placeholder="A short read: 3–5 lines, one idea per line, short enough to fit a phone line. Markdown works." oninput="Articles.text(\'body\',this.value)">' + esc(b) + '</textarea>' +
@@ -744,6 +763,40 @@
                 if (typeof showToast === 'function') showToast('💊 Drug Codex draft created · pending approval');
             }).catch(function (e) { S.err = '💊 ' + ((e && e.message) || 'Could not draft the Drug Codex entry.'); S.aiNote = ''; }).then(function () { S.dcBusy = false; render(); });
         },
+        // V102.399: one click → an EMPTY Codex draft (just the topic) in Pending Drafts, finished later in Poneglyph. Saves the article first when it has unsaved edits
+        // (a scheduled one stays scheduled). A ringed chip opens the entry instead; a topic already in the Codex is never duplicated (the admin.html helper says so).
+        topicTo: function (k) {
+            var a = S.cur; if (!a || (k !== 'dx' && k !== 'dc')) return;
+            var cx = a[k] || {}, isDx = k === 'dx', busy = isDx ? 'dxBusy' : 'dcBusy', ico = isDx ? '🩺' : '💊', word = isDx ? 'Disease' : 'Drug';
+            if (S[busy]) return;
+            if (cx.publishedId || cx.draftId) {
+                var opener = isDx ? window.openDiseaseCodexAdmin : window.openDrugCodexAdmin;
+                if (typeof opener !== 'function') { S.err = ico + ' The ' + word + ' Codex is not available on this page.'; render(); return; }
+                api.close(); opener();
+                setTimeout(function () { var ed = isDx ? window.dxaEdit : window.dcaEdit, sw = isDx ? window.dxaSwitchView : window.dcaSwitchView; if (cx.publishedId && typeof ed === 'function') ed(cx.publishedId); else if (typeof sw === 'function') sw('drafts'); }, 150);
+                return;
+            }
+            var helper = isDx ? window.dxaStubFromArticle : window.dcaStubFromArticle;
+            if (typeof helper !== 'function') { S.err = ico + ' The ' + word + ' Codex is not available on this page.'; render(); return; }
+            var clean = function (s) { return String(s || '').replace(/[\p{Extended_Pictographic}\uFE0F]/gu, '').trim(); };
+            var en = clean(a.title.en || a.title[S.lang] || ''), name = en.split(/[:\u2013\u2014(]/)[0].trim();
+            if (!name) { S.err = ico + ' Give the article a title first.'; render(); return; }
+            var paren = (en.match(/\(([^)]+)\)/) || [])[1] || '', alias = paren ? paren.split(/[,;\/]/).map(function (x) { return x.trim(); }).filter(Boolean) : [];
+            var th = clean(a.title.th || '').split(/[:\u2013\u2014(]/)[0].trim();
+            S[busy] = true; S.err = ''; render();
+            var dirty = !a.id || JSON.stringify(a) !== S.base;
+            Promise.resolve(dirty ? save(a.status === 'scheduled') : null).then(function () {
+                var cur = S.cur;
+                if (!cur || !cur.id || JSON.stringify(cur) !== S.base) throw new Error(S.err ? S.err.replace(/^\u26a0\ufe0f\s*/, '') : 'Save the article first.');
+                return helper({ id: cur.id, name: name, thaiName: th, aliases: alias, title: cur.title.en || cur.title.th || cur.title.ko || name });
+            }).then(function (r) {
+                var cur = S.cur; cur[k] = { draftId: r.draftId, publishedId: '', name: name }; S.base = JSON.stringify(cur);
+                var i = S.list.findIndex(function (x) { return x.id === cur.id; }); if (i >= 0) S.list[i][k] = cur[k];
+                if (typeof showToast === 'function') showToast(ico + ' \u201c' + name + '\u201d is in the ' + word + ' Codex \u25b8 Pending Drafts \u2014 fill it in Poneglyph');
+            }).catch(function (e) { S.err = ico + ' ' + ((e && e.message) || 'Could not send the topic.'); }).then(function () { S[busy] = false; render(); });
+        },
+        // V102.399: 🔗 Quiz chip → the Links section opens on the quiz picker
+        quizPick: function () { S.open.links = true; S.pick = 'quiz'; S.q = ''; render(); },
         // V102.374: the hint after Save
         hintLink: function () { var a = S.cur, h = S.hint; if (!a || !h) return; S.hint = null; a.links.push({ kind: 'disease', id: h.id, label: h.label }); save(a.status === 'scheduled'); },
         hintDismiss: function () { var a = S.cur; if (a && a.id) S.hintOff[a.id] = true; S.hint = null; render(); },
