@@ -39,6 +39,7 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
             window.refineAlabastaCaseCardPromptWithSelectedModel = async () => { document.getElementById('alabasta-case-card-prompt').value = 'refined prompt'; };
             window.buildSafeAlabastaCaseVisualPayload = () => ({visualMode:'educational_case_card'});
             window.fbSets = [];
+            window.CASE_SYSTEM_BY_KEY = { skin: { label: { en: 'Skin', ko: '피부', th: 'ระบบผิวหนัง' } } };
             window.db = {collection:()=>({doc:()=>({update:async value=>writes.push(value), get:async()=>({exists:true,data:()=>({tally:{'gpt-image-2_5-flare':{infographic:{up:2,down:1}}}})}), set:async (data,opts)=>fbSets.push({data,opts})})})};
             window.firebase = {firestore:{FieldValue:{serverTimestamp:()=>123, increment:n=>({inc:n})}}};
             window.ALLOWED_EMAIL = 'test'; window.syncAlabastaCaseBridgeMarker = () => {};
@@ -69,6 +70,32 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         assert.equal(await page.evaluate(()=>rebuilds),0);
         // chip rails (quiz-cover look): 2 modes, 5 models; the selects are hidden value holders; the active chip is amber
         assert.equal(await page.locator('#cs-mode-lbl + .cs-seg button').count(),2);
+        // V102.417 lean: one row of short template names, the Mode switch on the heading row, only one fold open, the footer always in view
+        await page.setViewportSize({width:1440,height:640});
+        const lean = await page.evaluate(()=>{
+            const q = s => document.querySelector(s), r = el => el.getBoundingClientRect();
+            const tpl = q('#cs-layout-lbl + .cs-seg'), mode = q('.cs-mode-inline'), h4 = q('.case-studio-settings h4'), foot = q('.alabasta-casecard-footer');
+            return { tplH: Math.round(r(tpl).height), modeAbs: getComputedStyle(mode).position, modeOnHeading: r(mode).top < r(tpl).top && Math.abs(r(mode).top - r(h4).top) < 12, tplLabels: [...tpl.querySelectorAll('button')].map(e => e.textContent.trim()), footPos: getComputedStyle(foot).position, footInView: r(foot).bottom <= innerHeight + 1 };
+        });
+        assert.ok(lean.tplH <= 44, 'the template rail is ONE row: ' + lean.tplH);
+        assert.ok(await page.locator('#cs-model-lbl + .cs-seg').evaluate(el => el.getBoundingClientRect().height) <= 44, 'the model chips are ONE single line');
+        // V102.418: numbered steps on the headings, drawn by CSS (no text added → the labels stay as they were)
+        assert.deepEqual(await page.evaluate(() => ['#alabasta-case-card-step-1 > label', '.case-studio-settings h4', '.case-studio-workflow-status'].map(s => { const e = document.querySelector(s); return [e.dataset.n, getComputedStyle(e, '::before').content]; })), [['1', '"1"'], ['2', '"2"'], ['3', '"3"']], 'steps 1-2-3');
+        assert.equal(await page.locator('.case-studio-settings h4').innerText(), 'Set up image');
+        assert.equal(lean.modeAbs, 'absolute'); assert.equal(lean.modeOnHeading, true, 'Mode sits on the Image heading row');
+        assert.deepEqual(lean.tplLabels, ['📊 Case', '🍽️ Lifestyle', '🫃 Symptoms', '✅ Self-care', '✨ Minimal'], 'short labels');
+        assert.equal(lean.footPos, 'sticky'); assert.equal(lean.footInView, true, 'Generate stays in view without scrolling');
+        assert.deepEqual(await page.locator('#cs-model-lbl + .cs-seg button').evaluateAll(els=>els.map(e=>e.textContent.trim().replace(/\s*★$/,''))),['2.1','2 Lite','Pro','Flare','Sunburst','Grok 2.0'],'short model names');
+        assert.ok((await page.locator('#cs-model-lbl + .cs-seg button[data-value="as/gemini-nano-banana-2.1"]').getAttribute('title')).includes('Nano Banana 2.1'),'the full name stays in the tooltip');
+        await page.evaluate(()=>{ document.getElementById('alabasta-case-card-step-2').open = true; });
+        await page.waitForFunction(()=>document.getElementById('alabasta-case-card-step-2').open);
+        await page.evaluate(()=>{ document.querySelector('.alabasta-casecard-details').open = true; });
+        await page.waitForFunction(()=>document.querySelector('.alabasta-casecard-details').open);
+        assert.equal(await page.evaluate(()=>document.getElementById('alabasta-case-card-step-2').open),false,'opening the source details closes the prompt fold');
+        await page.evaluate(()=>{ document.getElementById('alabasta-case-card-step-2').open = true; });
+        await page.waitForFunction(()=>document.getElementById('alabasta-case-card-step-2').open);
+        assert.equal(await page.evaluate(()=>document.querySelector('.alabasta-casecard-details').open),false,'and the other way round');
+        await page.evaluate(()=>{ document.getElementById('alabasta-case-card-step-2').open = false; });
         assert.equal(await page.locator('#cs-model-lbl + .cs-seg button').count(),6,'five Gemini / GPT chips + Grok Imagine');
         assert.equal(await page.locator('#cs-model-lbl + .cs-seg button[data-value="or/x-ai/grok-imagine-image-2.0"] .cs-logo[data-owner="grok"]').count(),1,'Grok chip + its logo');
         // layout rail: Infographic (default) | Minimal; the HTML-overlay mode forces minimal and locks the rail
@@ -185,20 +212,30 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         await page.evaluate(() => { document.getElementById('alabasta-case-card-consent').checked = false; });
         await page.evaluate(() => {
             document.getElementById('alabasta-case-card-taxonomy').value = 'Skin \uD53C\uBD80 - Rash, Redness, Itching, Lesion';
-            document.getElementById('alabasta-case-card-safe-payload').value = JSON.stringify({ privacyStatus: 'patient_safe_anonymized', symptomTags: ['Rash', 'Redness'], stylePreset: 'clean medical infographic', textContent: { title: 'Skin \uD53C\uBD80 Case Brief' }, negativePrompt: ['no real patient photo', 'no ID card', 'no hospital form', 'no tiny unreadable text', 'no crowded poster', 'no graphic or scary medical imagery'] });
+            document.getElementById('alabasta-case-card-safe-payload').value = JSON.stringify({ primarySystemKey: 'skin', privacyStatus: 'patient_safe_anonymized', symptomTags: ['Rash', 'Redness'], stylePreset: 'clean medical infographic', textContent: { title: 'Skin \uD53C\uBD80 Case Brief' }, negativePrompt: ['no real patient photo', 'no ID card', 'no hospital form', 'no tiny unreadable text', 'no crowded poster', 'no graphic or scary medical imagery'] });
             document.getElementById('alabasta-case-card-safe-summary').value = 'Male boxer with an itchy rash on the back';
             renderCaseCardAdvanced();
         });
         await page.evaluate(() => { document.querySelector('.alabasta-casecard-details').open = true; });
         const vis = sel => page.locator(sel).first().isVisible();
         assert.deepEqual(await page.locator('.cs-chip').allInnerTexts(), ['Skin \uD53C\uBD80', 'Rash', 'Redness', 'Itching', 'Lesion'].map((t, i) => i === 0 ? 'Skin' : t).map(t => t), 'chips: the system first, then the symptoms (Korean hidden → not in the visible text)');
-        assert.equal(await vis('.cs-ko'), false, 'Korean is off by default');
-        await page.locator('.cs-ko-btn').click();
-        assert.equal(await vis('.cs-ko'), true, 'the 한 button shows the Korean');
-        assert.equal(await page.locator('.cs-ko-btn').getAttribute('aria-pressed'), 'true');
-        assert.equal(await page.evaluate(() => localStorage.getItem('caseStudioKo')), '1');
-        await page.locator('.cs-ko-btn').click();
-        assert.equal(await vis('.cs-ko'), false, 'and hides it again');
+        // V102.418: ONE flag chip cycles the Category language EN → TH → KR; only the system has three names; the saved taxonomy value is untouched
+        const sys = () => page.locator('.cs-chip.sys').innerText();
+        assert.equal(await page.locator('.cs-lang-btn').count(), 1, 'one chip');
+        assert.equal(await page.locator('.cs-lang-btn').innerText(), '\uD83C\uDDFA\uD83C\uDDF8', 'English first (US flag)');
+        assert.equal(await sys(), 'Skin');
+        await page.locator('.cs-lang-btn').click();
+        assert.equal(await page.locator('.cs-lang-btn').innerText(), '\uD83C\uDDF9\uD83C\uDDED', 'then Thai (TH flag)');
+        assert.equal(await sys(), 'ระบบผิวหนัง');
+        assert.equal(await page.evaluate(() => localStorage.getItem('caseStudioLang')), 'th');
+        assert.equal(await page.locator('.cs-chip:not(.sys)').first().innerText(), 'Rash', 'the symptom tags are English only');
+        await page.locator('.cs-lang-btn').click();
+        assert.equal(await page.locator('.cs-lang-btn').innerText(), '\uD83C\uDDF0\uD83C\uDDF7', 'then Korean (KR flag)');
+        assert.equal(await sys(), '피부');
+        assert.match(await page.locator('.cs-lang-btn').getAttribute('title'), /Category language: 한국어 — click for English/);
+        await page.locator('.cs-lang-btn').click();
+        assert.equal(await sys(), 'Skin', 'and round again to English');
+        assert.equal(await page.locator('.cs-lang-btn').evaluate(el => getComputedStyle(el).fontFamily.includes('Twemoji Country Flags')), true, 'flags render on Windows too (flag font)');
         const items = await page.locator('.cs-ing li').allInnerTexts();
         assert.deepEqual(items.map(t => t.replace(/^\W+/, '')), ['Title: Skin Case Brief', 'Focus: Rash \u00B7 Redness', 'Style: clean medical infographic', 'Privacy: Anonymized \u00B7 patient-safe', 'Avoids: real patient photo, ID card, hospital form, tiny unreadable text +2 more'], JSON.stringify(items));
         assert.equal(await vis('#alabasta-case-card-safe-payload'), false, 'raw JSON hidden by default');
