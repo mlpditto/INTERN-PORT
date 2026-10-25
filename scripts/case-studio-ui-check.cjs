@@ -57,43 +57,58 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         ]) await page.addScriptTag({content:extract(start,end)});
         await page.addScriptTag({content:fs.readFileSync(path.join(dir,'case-studio-steps.js'),'utf8')});
         await page.evaluate(()=>document.dispatchEvent(new Event('DOMContentLoaded')));
-        assert.equal(await page.locator('.case-studio-panel:not([hidden])').getAttribute('data-step'),'1');
-        await page.getByRole('button',{name:'Continue',exact:true}).click();
+        // ONE page (V102.408): no steps, no Continue / Back; summary + source + prompt on the left; image settings, preview and actions on the right
+        assert.equal(await page.locator('.case-studio-workflow, .case-studio-panel[data-step]').count(),0,'no step bar / step panels');
+        for (const name of ['Continue','Back','Edit settings']) assert.equal(await page.getByRole('button',{name,exact:true}).count(),0,name+' is gone');
+        assert.equal(await page.evaluate(()=>document.querySelectorAll('.case-studio-inputs #alabasta-case-card-safe-summary, .case-studio-inputs #alabasta-case-card-prompt, .case-studio-inputs .alabasta-casecard-details').length),3,'summary, prompt and source on the left');
+        assert.equal(await page.evaluate(()=>!!document.querySelector('.case-studio-preview > .case-studio-settings .cs-seg')),true,'image settings on the right, above the preview');
+        assert.equal(await page.locator('#alabasta-case-card-save-btn').isHidden(),true,'Save draft waits for an image');
         assert.equal(await page.evaluate(()=>rebuilds),0);
+        // chip rails (quiz-cover look): 2 modes, 5 models; the selects are hidden value holders; the active chip is amber
+        assert.equal(await page.locator('#cs-mode-lbl + .cs-seg button').count(),2);
+        assert.equal(await page.locator('#cs-model-lbl + .cs-seg button').count(),5);
+        assert.equal(await page.locator('#case-studio-image-model, #case-studio-mode').evaluateAll(els=>els.every(el=>el.offsetParent===null)),true,'no dropdowns');
+        assert.deepEqual(await page.evaluate(()=>[...document.querySelectorAll('#cs-model-lbl + .cs-seg button[aria-checked=true]')].map(c=>c.dataset.value)),await page.evaluate(()=>[document.getElementById('case-studio-image-model').value]),'exactly the active model is checked');
+        assert.equal(await page.locator('#cs-model-lbl + .cs-seg button[aria-checked=true]').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(242, 179, 90)','the active chip is amber');
+        assert.equal(await page.locator('#cs-model-lbl + .cs-seg button[data-value^="as/gemini"] .cs-logo').first().evaluate(el=>getComputedStyle(el).backgroundImage.includes('gemini-spark-color.svg')),true,'owner logo on the Nano Banana chips');
+        await page.locator('#cs-mode-lbl + .cs-seg button[data-value="html-overlay"]').click();
+        assert.equal(await page.evaluate(()=>localStorage.getItem('test-mode')),'html-overlay','the mode chip drives the mode');
+        await page.locator('#cs-mode-lbl + .cs-seg button[data-value="ai"]').click();
         await page.locator('#alabasta-case-card-step-2 summary').click();
         await page.locator('#alabasta-case-card-prompt').fill('My custom prompt');
-        await page.locator('.cs-mchip[data-value="gpt-image-2.5-flare"]').click();
+        await page.locator('#cs-model-lbl + .cs-seg button[data-value="gpt-image-2.5-flare"]').click();
         for (const width of [1440,768,390,320]) {
             await page.setViewportSize({width,height:1000});
             const overflow = await page.locator('.case-studio-grid').evaluate(el=>el.scrollWidth>el.clientWidth+1);
             assert.equal(overflow,false,'layout '+width);
         }
         await page.locator('#alabasta-case-card-generate-btn').click();
-        await page.waitForFunction(()=>document.querySelector('.case-studio-panel[data-step="3"]').hidden===false);
+        await page.waitForFunction(()=>!document.getElementById('alabasta-case-card-save-btn').hidden);
         assert.deepEqual(await page.evaluate(()=>requests[0]),{model:'gpt-image-2.5-flare',prompt:'My custom prompt'});
+        assert.equal(await page.evaluate(()=>rebuilds),0,'an unchanged summary does not rebuild the prompt');
         await page.locator('#alabasta-case-card-save-btn').click();
         await page.waitForFunction(()=>writes.some(w=>w.caseVisualPrompt==='My custom prompt'));
         assert.equal(await page.evaluate(()=>rebuilds),0,'save must preserve custom prompt');
-        await page.getByRole('button',{name:'Edit settings',exact:true}).click();
-        await page.locator('.cs-mchip[data-value="as/gemini-3-pro-image"]').click();
-        assert.equal(await page.locator('.case-studio-workflow button[data-step="3"]').isDisabled(),true);
+        await page.locator('#cs-model-lbl + .cs-seg button[data-value="as/gemini-3-pro-image"]').click();
+        assert.equal(await page.locator('.case-studio-workflow-status').innerText(),'Settings changed — generate a new image.');
+        assert.equal(await page.locator('#alabasta-case-card-save-btn').isDisabled(),true,'a stale image cannot be saved');
         const previous = await page.locator('#alabasta-case-card-image-preview').getAttribute('src');
         await page.evaluate(()=>failImage=true);
         await page.locator('#alabasta-case-card-generate-btn').click();
         await page.waitForFunction(()=>!document.getElementById('alabastaCaseCardModal').classList.contains('case-studio-busy'));
-        assert.equal(await page.locator('#alabasta-case-card-image-preview').getAttribute('src'),previous);
-        assert.equal(await page.locator('.case-studio-panel:not([hidden])').getAttribute('data-step'),'2');
+        assert.equal(await page.locator('#alabasta-case-card-image-preview').getAttribute('src'),previous,'a failed generation keeps the previous image');
+        assert.equal(await page.locator('#alabasta-case-card-save-btn').isDisabled(),true,'and it stays stale');
         await page.evaluate(()=>failImage=false);
         await page.locator('#alabasta-case-card-generate-btn').click();
-        await page.waitForFunction(()=>document.querySelector('.case-studio-panel[data-step="3"]').hidden===false);
-        await page.locator('.case-studio-workflow button[data-step="1"]').click();
-        await page.locator('#alabasta-case-card-safe-summary').fill('Changed summary');
-        await page.getByRole('button',{name:'Continue',exact:true}).click();
         await page.waitForFunction(()=>!document.getElementById('alabastaCaseCardModal').classList.contains('case-studio-busy'));
-        assert.equal(await page.evaluate(()=>rebuilds),1);
+        assert.equal(await page.locator('#alabasta-case-card-save-btn').isDisabled(),false,'a fresh image can be saved');
+        await page.locator('#alabasta-case-card-safe-summary').fill('Changed summary');
+        await page.locator('#alabasta-case-card-generate-btn').click();
+        await page.waitForFunction(()=>!document.getElementById('alabastaCaseCardModal').classList.contains('case-studio-busy'));
+        assert.equal(await page.evaluate(()=>rebuilds),1,'a changed summary rebuilds the prompt inside Generate');
         await page.evaluate(()=>resetCaseStudioSteps());
-        assert.equal(await page.locator('.case-studio-panel:not([hidden])').getAttribute('data-step'),'1');
-        assert.equal(await page.locator('.case-studio-workflow button[data-step="3"]').isDisabled(),true);
+        assert.equal(await page.locator('#alabasta-case-card-save-btn').isHidden(),true,'a new case: no Save until an image exists');
+        assert.equal(await page.locator('#alabasta-case-card-generate-btn').innerText(),'Generate image');
         // V102.403: Category chips (Korean = own toggle), readable image brief, technical payload on a button, summary size + count
         assert.ok(/ids\.safeSummary\.value = payload\.safeSummary;\s*\n\s*if \(window\.renderCaseCardAdvanced\) window\.renderCaseCardAdvanced\(\)/.test(html), 'populate refreshes the Category / brief view');
         await page.evaluate(() => {
@@ -122,16 +137,8 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         assert.equal(await vis('#alabasta-case-card-safe-payload'), false, 'reset hides it again');
         assert.equal((await page.locator('.cs-count').innerText()).trim(), '9 words');
         assert.equal(await page.locator('#alabasta-case-card-safe-summary').evaluate(el => parseFloat(getComputedStyle(el).minHeight)), 220, 'the summary is the big box');
-        assert.ok(/Ready \u2014 review the summary, then continue to set up image\./.test(html), 'status line says what to do next');
-        // V102.404: footer hint follows the step · "edited" mark · "+N more" opens in place · Original note grows to its text
-        const READY = 'Ready \u2014 review the summary, then continue to set up image.', PICK = 'Pick a model, then generate the image.';
-        await page.evaluate(r => { document.getElementById('alabasta-case-card-meta').textContent = r; }, READY);
-        await page.getByRole('button', { name: 'Continue', exact: true }).click();
-        await page.waitForFunction(() => !document.getElementById('alabastaCaseCardModal').classList.contains('case-studio-busy'));
-        assert.equal(await page.locator('.case-studio-panel:not([hidden])').getAttribute('data-step'), '2');
-        assert.equal(await page.locator('#alabasta-case-card-meta').innerText(), PICK, 'step 2 does not say "continue to set up image"');
-        await page.getByRole('button', { name: 'Back', exact: true }).click();
-        assert.equal(await page.locator('#alabasta-case-card-meta').innerText(), READY, 'back on step 1 the original hint returns');
+        assert.ok(/Ready \u2014 review the summary, pick a model, then generate\./.test(html), 'status line says what to do next');
+        // "edited" mark · "+N more" opens in place · Original note grows to its text
         await page.evaluate(() => { document.querySelector('.alabasta-casecard-details').open = true; renderCaseCardAdvanced(); });
         assert.equal((await page.locator('.cs-count').innerText()).includes('edited'), false, 'a fresh case is not "edited"');
         await page.locator('#alabasta-case-card-safe-summary').fill('Male boxer with an itchy rash on the back, edited');
@@ -150,10 +157,6 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         await page.evaluate(() => { document.getElementById('alabasta-case-card-original').value = Array.from({ length: 30 }, (_, i) => 'line ' + i).join('\n'); renderCaseCardAdvanced(); });
         const hOrig = await page.locator('#alabasta-case-card-original').evaluate(el => parseFloat(el.style.height));
         assert.ok(hOrig > 200 && hOrig <= 362, 'the Original note grows with its text, capped: ' + hOrig);
-        // V102.407: the image model is a chip rail; the select is only the hidden value holder
-        assert.equal(await page.locator('.cs-mchip').count(), 5);
-        assert.equal(await page.locator('#case-studio-image-model').isVisible(), false, 'no dropdown');
-        assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('.cs-mchip[aria-checked=true]')].map(c => c.dataset.value)), await page.evaluate(() => [document.getElementById('case-studio-image-model').value]), 'exactly the active model is checked');
         await page.evaluate(() => resetCaseStudioSteps());
         assert.deepEqual(errors,[]);
         console.log('PASS: 4 widths, steps/back/reset, stale image gating, edited prompt generation/save, model selection, summary rebuild, failure recovery. AI and Firestore stubbed.');
