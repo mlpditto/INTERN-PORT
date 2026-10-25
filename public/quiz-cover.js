@@ -219,7 +219,7 @@ const QuizCover = (() => {
 <div class="quiz-cover-refs" data-refs hidden></div>
 <input type="text" data-prompt maxlength="300" placeholder="Optional detail — e.g. blue tones, a heart as the hero" title="แนวภาพเพิ่มเติม (ไม่บังคับ)" hidden>
 <input type="text" data-badge maxlength="${BADGE_MAX}" placeholder="Corner badge — e.g. ICD-11 6B00 · empty = none" title="ป้ายมุมปก · เว้นว่าง = ไม่มีป้าย · ระวังอย่าใส่สิ่งที่เป็นคำตอบของข้อสอบ" aria-label="Corner badge text" hidden>
-<div class="quiz-cover-ai-preview" hidden><img alt="AI cover candidate"><div><button type="button" data-apply title="ชอบ — ใช้ปกนี้" aria-label="Like this cover and apply it">👍</button><button type="button" data-discard title="ไม่ชอบ — ทิ้งภาพนี้" aria-label="Dislike this cover">👎</button></div></div>
+<div class="quiz-cover-ai-preview" hidden><img alt="AI cover candidate"><div><button type="button" data-apply title="ชอบ — ใช้ปกนี้" aria-label="Like this cover and apply it">👍</button><button type="button" data-discard title="ไม่ชอบ — ทิ้งภาพนี้" aria-label="Dislike this cover">👎</button></div><small class="quiz-cover-hint">Check the image and text, then 👍 to apply it — or 👎 / Generate again to retry</small></div>
 <div class="quiz-cover-reasons" data-reasons hidden role="group" aria-label="What was off?"></div>
 <small role="status" aria-live="polite"></small>
 <div class="quiz-cover-sum"><img alt="Quiz cover"><span><b>Cover</b><small data-sum-text></small></span><button type="button" data-unfold title="เปลี่ยนหรือสร้างปกใหม่" aria-label="Change cover">✏️ Change</button></div>`;
@@ -462,7 +462,7 @@ const QuizCover = (() => {
                 await showCandidate(cropped);
                 if (token !== revision) return;
                 lastGen = { model: id, style };   // V102.410: the thumbs count against the model that really made this image
-                status.textContent = (tried.length ? tried[0] + ' blocked this topic (content filter) — made with ' + modelName(id) + '. ' : '') + 'Check the image and text, then 👍 to apply it — or 👎 / Generate again to retry';
+                status.textContent = tried.length ? tried[0] + ' blocked this topic (content filter) — made with ' + modelName(id) + '.' : '';   // V102.412: the usual hint lives beside the 👍 / 👎, not on its own line
                 return;
             }
         } catch (error) {
