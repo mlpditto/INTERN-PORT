@@ -33,7 +33,7 @@ const css = [...admin.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].slice(0, 2).
     });
     await page.addScriptTag({ path: 'public/lang-toggle.js' });   // the real language toggle: it wraps + hides Thai runs outside .lang-no-toggle
     await page.addScriptTag({ content: js });
-    const OK = { ask: ['ปวดสัมพันธ์มื้ออาหาร', '<img src=x onerror=window.pwned=1>'], ddx: ['GERD', 'Dyspepsia'], followUp: '2 สัปดาห์', meds: ['PPI', 'Antacid'], privacy: 'ทำงานเกี่ยวกับฮอนด้า', score: 0.2, scoreWhy: 'ครบ' };
+    const OK = { missing: ['ระยะเวลาอาการ', 'ประวัติแพ้ยา'], reply: 'Note ละเอียดดี ครั้งหน้าลองเพิ่ม ระยะเวลาอาการ และประวัติแพ้ยา เพื่อให้ครบ', ask: ['ปวดสัมพันธ์มื้ออาหาร', '<img src=x onerror=window.pwned=1>'], ddx: ['GERD', 'Dyspepsia'], followUp: '2 สัปดาห์', meds: ['PPI', 'Antacid'], privacy: 'ทำงานเกี่ยวกับฮอนด้า', score: 0.2, scoreWhy: 'ครบ' };
     const CASE = { id: 'c1', displayName: 'Bew', caseId: '26955', note: '2. Case ช อายุ 40ปลายๆ ทำงานเกี่ยวกับฮอนด้า มีลมในท้องเยอะ เป็นมา 2-3 วัน', disease: 'GI', diseaseSystemLabel: 'GI / ระบบทางเดินอาหาร' };
     const run = async (opts = {}) => {
         await page.evaluate(({ ok, hold }) => {
@@ -49,7 +49,7 @@ const css = [...admin.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].slice(0, 2).
     await run();
     await page.evaluate(c => window.caseReviewAi.start(c), CASE);
     await page.waitForSelector('#case-review-ai .crai-f');
-    assert.deepEqual(await page.$$eval('#case-review-ai .crai-f i', els => els.map(e => e.textContent)), ['❓', '🩺', '📅', '💊', '🔒']);
+    assert.deepEqual(await page.$$eval('#case-review-ai .crai-f i', els => els.map(e => e.textContent)), ['🔒', '📝', '❓', '🩺', '📅', '💊'], 'privacy first, then missing / ask, conditions + follow-up on ONE row, drugs');
     assert.equal(await page.$eval('#case-review-ai .crai-f.bad', e => e.textContent.includes('ฮอนด้า')), true);
     assert.equal(await page.$eval('.case-score-chip[data-score="0.2"]', e => e.classList.contains('ai')), true, '✨ on the suggested chip');
     assert.equal(await page.$eval('#case-review-score-input', e => e.value), '0.2', 'untouched field pre-filled');
@@ -68,10 +68,26 @@ const css = [...admin.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].slice(0, 2).
     await page.waitForTimeout(250);
     assert.ok(await page.$$eval('#case-review-ai .lang-th', e => e.length) > 0, 'proof the guard matters: without .lang-no-toggle the Thai is wrapped (and hidden under an EN-only body)');
     await page.evaluate(() => document.getElementById('case-review-ai').classList.add('lang-no-toggle'));
+    // 1c. V102.423: lean header — the chip + 🔍 sit on the title row; the model also drafts a reply for the intern, used only when ✨ Draft is pressed
+    assert.equal(await page.$eval('#case-review-ai-head', e => e.closest('.csr-head') !== null && !!e.querySelector('.crai-model') && !!e.querySelector('#case-review-ai-btn')), true, 'chip + 🔍 on the title row');
+    assert.equal(await page.$eval('#case-review-ai .crai-head', e => !!e).catch(() => false), false, 'no separate AI row any more');
+    assert.ok(call.prompt.includes('reply (string: a kind message to the INTERN') && call.prompt.includes('missing (array'), 'the prompt asks for the missing info + the reply');
+    assert.equal(await page.$eval('#case-review-reply-draft', e => e.disabled), false, '✨ Draft is available once the model answered');
+    assert.equal(await page.$eval('#case-review-reply-toggle', e => e.classList.contains('has-draft')), true, 'the 💬 chip shows a draft is ready');
+    assert.equal(await page.$eval('#case-review-reply-text', e => e.value), '', 'nothing is written into the reply by itself');
+    await page.evaluate(() => { document.getElementById('case-review-reply').hidden = false; });
+    await page.click('#case-review-reply-draft');
+    assert.ok((await page.$eval('#case-review-reply-text', e => e.value)).startsWith('Note ละเอียดดี'), '✨ Draft fills the reply');
+    await page.evaluate(() => { const t = document.getElementById('case-review-reply-text'); t.value = 'my own words'; window.confirmAsked = 0; window.confirm = () => { window.confirmAsked++; return false; }; });
+    await page.click('#case-review-reply-draft');
+    assert.equal(await page.evaluate(() => [window.confirmAsked, document.getElementById('case-review-reply-text').value]).then(v => v.join('|')), '1|my own words', 'asks before replacing what the admin typed; "no" keeps it');
+    await page.evaluate(() => { document.getElementById('case-review-reply-text').value = ''; document.getElementById('case-review-reply').hidden = true; });
     // 2. hide clears everything
     await page.evaluate(() => window.caseReviewAi.hide());
     assert.equal(await page.$eval('#case-review-ai', e => e.hidden && e.innerHTML === ''), true);
     assert.equal(await page.$$eval('.case-score-chip.ai', e => e.length), 0);
+    assert.equal(await page.$eval('#case-review-ai-head', e => e.innerHTML), '', 'the title-row chip is cleared');
+    assert.equal(await page.$eval('#case-review-reply-draft', e => e.disabled), true, 'and the draft is gone');
 
     // 3. a field the admin already typed is never overwritten
     await run();
@@ -84,12 +100,12 @@ const css = [...admin.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].slice(0, 2).
     await page.evaluate(() => window.caseReviewAi.hide());
     await run({ ok: 'fail' });
     await page.evaluate(c => window.caseReviewAi.start(c), CASE);
-    await page.waitForSelector('#case-review-ai .crai-msg:not(:has-text("กำลังตรวจ"))');
+    await page.waitForSelector('#case-review-ai .crai-msg');
     assert.ok((await page.$eval('#case-review-ai .crai-msg', e => e.textContent)).includes('ใช้ไม่ได้'));
     assert.equal(await page.$$eval('#case-review-ai .lang-th', e => e.length), 0, 'the Thai failure message is not hidden');
     assert.equal(await page.$eval('#case-review-ai .crai-msg', e => e.title), 'Ollama is not reachable', 'full error in the tooltip');
     assert.equal(await page.$eval('#case-review-ai-btn', e => e.disabled), false, 'retry available');
-    assert.equal(await page.$$eval('#caseReviewScoreModal button', b => b.some(x => /Save Score/.test(x.textContent))), true);
+    assert.equal(await page.$$eval('#caseReviewScoreModal button', b => b.some(x => x.textContent.trim() === 'Save')), true);
     await run();
     await page.click('#case-review-ai-btn');
     await page.waitForSelector('#case-review-ai .crai-f');
@@ -98,7 +114,7 @@ const css = [...admin.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].slice(0, 2).
     await page.evaluate(() => window.caseReviewAi.hide());
     await run({ hold: true });
     await page.evaluate(c => { window.caseReviewAi.start(c); }, CASE);   // not awaited: the held answer would never come back
-    assert.ok((await page.$eval('#case-review-ai', e => e.textContent)).includes('กำลังตรวจ'));
+    assert.ok((await page.$eval('#case-review-ai-head', e => e.textContent)).includes('checking'), 'the title-row chip says it is checking');
     await page.evaluate(() => window.caseReviewAi.hide());
     await page.evaluate(() => window.release());
     await page.waitForTimeout(200);

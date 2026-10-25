@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.422)</title>
+    <title>Nika Admin (V102.423)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -3526,6 +3526,33 @@
         .crai-c { display: flex; flex-wrap: wrap; gap: 4px; }
         .crai-c u { text-decoration: none; background: #fff; border: 1px solid #cbd5e1; border-radius: 999px; padding: 1px 8px; font-size: 0.92em; font-weight: 600; }
         .case-score-chip.ai::after { content: " ✨"; font-size: 0.9em; }
+        /* V102.423: Review Case Score, lean — the model chip + 🔍 on the title row; chips, Custom, 💬 Reply and Save on ONE row; the reply box opens on demand */
+        #caseReviewScoreModal .case-score-modal-shell { max-width: 580px; width: 94%; padding: 18px 22px 16px; }
+        .csr-head { display: flex; align-items: center; gap: 10px; }
+        .csr-title { color: #92400e; font-weight: 900; font-size: 1.08em; }
+        .csr-title span { color: #78716c; font-weight: 700; font-size: 0.86em; }
+        .csr-head #case-review-ai-head { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+        .csr-x { border: none; background: transparent; color: #475569; font-size: 1.5em; line-height: 1; cursor: pointer; padding: 0 2px; width: auto; min-height: 0; }
+        .csr-ctl { display: flex; align-items: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+        .csr-ctl .case-score-chip { padding: 8px 16px; }
+        .csr-cus { width: 92px; margin: 0; border-radius: 12px; padding: 8px 10px; min-height: 0; font-size: 0.9em; }
+        .csr-reply-btn { width: auto; min-height: 0; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 999px; background: #fff; color: #475569; font-weight: 800; font-size: 0.86em; cursor: pointer; }
+        .csr-reply-btn[aria-expanded="true"] { background: #fff7ed; border-color: #f59e0b; color: #c2410c; }
+        .csr-reply-btn.has-text::after, .csr-reply-btn.has-draft::after { content: " ●"; color: #f59e0b; font-size: 0.8em; }
+        .csr-reply-btn.has-draft:not(.has-text)::after { content: " ✨"; }
+        .csr-sp { flex: 1; }
+        .csr-save { width: auto; min-height: 0; min-width: 84px; background: linear-gradient(135deg, #f59e0b, #ea580c); color: #fff; border: none; border-radius: 12px; padding: 9px 18px; font-weight: 900; cursor: pointer; }
+        #case-review-reply { margin-top: 10px; }
+        #case-review-reply textarea { width: 100%; margin: 0; border-radius: 12px; padding: 8px 10px; font-size: 0.9em; resize: vertical; min-height: 0; }
+        .csr-reply-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+        .csr-reply-row button { width: auto; min-height: 0; padding: 4px 10px; border: 1px solid #c4b5fd; border-radius: 999px; background: #f5f3ff; color: #6d28d9; font-weight: 800; font-size: 0.8em; cursor: pointer; }
+        .csr-reply-row button:disabled { opacity: .45; cursor: default; }
+        .csr-hint { font-size: 0.75em; color: #94a3b8; }
+        .crai-dot { width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; margin-right: 6px; animation: crai-pulse 1s ease-in-out infinite; }
+        @keyframes crai-pulse { 50% { opacity: .25; } }
+        .crai-fu { flex: none !important; }
+        .crai-f > .crai-c + i { margin-left: auto; }
+        #caseReviewScoreModal .crai-finds { margin-top: 10px; }
         /* V102.388: Dashboard 🚀 Up next — five quizzes that could go live next (up-next.js). One grid, never scrolls sideways: 5 across, 2 columns on a phone. */
         #upnext-card[hidden] { display: none; }
         #upnext-card { margin: 10px 0 14px; padding: 10px 12px; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; }
@@ -7977,7 +8004,7 @@
 <script src="case-article.js?v=V102.395"></script>
 <script src="dca-ai-trail.js?v=V102.390"></script>
 <script src="dxa-ai-trail.js?v=V102.389"></script>
-<script src="case-review-ai.js?v=V102.396"></script>
+<script src="case-review-ai.js?v=V102.423"></script>
 <script src="up-next.js?v=V102.393"></script>
     <script src="peds-dosing.js?v=V102.80"></script>
     <script src="bronchodilator-seed.js?v=V102.220"></script>
@@ -16911,27 +16938,33 @@
     </div>
 
     <div id="caseReviewScoreModal" class="modal" style="z-index:4302;">
-        <div class="modal-content case-score-modal-shell">
-            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
-                <div>
-                    <div style="font-size:1.08em; color:#92400e; font-weight:900;">Review Case Score <span id="case-review-score-caseid" style="color:#78716c; font-weight:700; font-size:0.86em;"></span></div>
-                </div>
-                <button type="button" onclick="closeCaseReviewScoreModal(false)" style="border:none; background:transparent; color:#475569; font-size:1.45em; line-height:1; cursor:pointer;">&times;</button>
+        <div class="modal-content case-score-modal-shell" role="dialog" aria-label="Review Case Score">
+            <div class="csr-head">
+                <div class="csr-title">Review Case Score <span id="case-review-score-caseid"></span></div>
+                <span id="case-review-ai-head" class="lang-no-toggle"></span>
+                <button type="button" class="csr-x" onclick="closeCaseReviewScoreModal(false)" aria-label="Close" title="Close (Esc)">&times;</button>
             </div>
 
             <div id="case-review-ai" class="lang-no-toggle" hidden></div>
 
-            <div class="case-score-chip-row">
+            <div class="csr-ctl">
                 <button type="button" class="case-score-chip" data-score="0.1" onclick="setCaseReviewScoreValue(0.1)">0.1</button>
                 <button type="button" class="case-score-chip" data-score="0.2" onclick="setCaseReviewScoreValue(0.2)">0.2</button>
                 <button type="button" class="case-score-chip" data-score="0.5" onclick="setCaseReviewScoreValue(0.5)">0.5</button>
+                <input id="case-review-score-input" class="csr-cus" type="text" inputmode="decimal" aria-label="Custom score" placeholder="Custom" oninput="syncCaseReviewScoreChips()" onkeydown="if(event.key==='Enter'){event.preventDefault();closeCaseReviewScoreModal(true);}">
+                <button type="button" id="case-review-reply-toggle" class="csr-reply-btn" onclick="toggleCaseReviewReply()" aria-expanded="false" aria-controls="case-review-reply" title="Write a reply the intern will see in their History">💬 Reply</button>
+                <span class="csr-sp"></span>
+                <button type="button" class="csr-save" onclick="closeCaseReviewScoreModal(true)">Save</button>
             </div>
 
-            <input id="case-review-score-input" type="text" inputmode="decimal" aria-label="Custom score" placeholder="Custom score, e.g. 0.1" style="margin:0; border-radius:14px;" oninput="syncCaseReviewScoreChips()" onkeydown="if(event.key==='Enter'){event.preventDefault();closeCaseReviewScoreModal(true);}">
-
-            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:18px; flex-wrap:wrap;">
-                <button type="button" class="btn-sm" onclick="closeCaseReviewScoreModal(false)" style="min-width:96px; background:#e5e7eb; color:#374151; border:none; border-radius:12px; padding:10px 16px; font-weight:800;">Cancel</button>
-                <button type="button" class="btn-sm" onclick="closeCaseReviewScoreModal(true)" style="min-width:110px; background:linear-gradient(135deg,#f59e0b,#ea580c); color:#fff; border:none; border-radius:12px; padding:10px 18px; font-weight:900;">Save Score</button>
+            <div id="case-review-reply" class="lang-no-toggle" hidden>
+                <textarea id="case-review-reply-text" rows="2" maxlength="500" placeholder="Reply to the intern — e.g. what to add next time…" aria-label="Reply to the intern" oninput="syncCaseReviewReply()"></textarea>
+                <div class="csr-reply-row">
+                    <button type="button" id="case-review-reply-draft" disabled onclick="window.caseReviewAi && caseReviewAi.useDraft()" title="The AI had no draft yet">✨ Draft from AI</button>
+                    <span class="csr-hint">The intern sees this in History</span>
+                    <span class="csr-sp"></span>
+                    <span id="case-review-reply-count" class="csr-hint">0 / 500</span>
+                </div>
             </div>
         </div>
     </div>
@@ -44565,13 +44598,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // V95.97: build the reviewed mirror field-set from the awarded score/bonus. Intern
         // treats any status other than 'pending'/'รอตรวจ' as reviewed (index.html isReviewed
         // check), so 'reviewed' clears the banner + shows the ตรวจแล้ว badge.
-        function submissionReviewedFields(bonus) {
+        function submissionReviewedFields(bonus, comment) {
             return {
                 status: 'reviewed',
                 score: bonus,
                 adminBonus: bonus,
                 pointsAwarded: bonus > 0,
                 pointsAmount: bonus,
+                ...(comment ? { adminComment: String(comment) } : {}),   // V102.423: the intern's History shows adminComment (💬)
                 reviewedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
         }
@@ -53249,11 +53283,34 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             el.innerHTML = parts.join('<span class="dca-meta-sep">·</span>');
         }
 
+        window.toggleCaseReviewReply = function(force) {
+            const box = document.getElementById('case-review-reply'), btn = document.getElementById('case-review-reply-toggle');
+            if (!box) return;
+            const on = force === undefined ? box.hidden : !!force;
+            box.hidden = !on;
+            if (btn) btn.setAttribute('aria-expanded', on ? 'true' : 'false');
+            if (on) { const t = document.getElementById('case-review-reply-text'); if (t && force === undefined) t.focus(); }
+        };
+        window.syncCaseReviewReply = function() {
+            const t = document.getElementById('case-review-reply-text'), c = document.getElementById('case-review-reply-count'), btn = document.getElementById('case-review-reply-toggle');
+            const n = t ? t.value.length : 0;
+            if (c) c.textContent = n + ' / 500';
+            if (btn) btn.classList.toggle('has-text', !!(t && t.value.trim()));
+        };
+        // Esc closes the score modal (Cancel was dropped from the lean layout; × and Esc remain)
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            const m = document.getElementById('caseReviewScoreModal');
+            if (m && getComputedStyle(m).display !== 'none') closeCaseReviewScoreModal(false);
+        });
+
         function closeCaseReviewScoreModal(shouldSubmit) {
             const state = window.caseReviewScoreModalState || {};
             const inputEl = document.getElementById('case-review-score-input');
             const resolver = typeof state.resolver === 'function' ? state.resolver : null;
             const rawValue = inputEl ? String(inputEl.value || '').trim() : '';
+            const replyEl = document.getElementById('case-review-reply-text');
+            window.caseReviewLastReply = shouldSubmit && replyEl ? String(replyEl.value || '').trim().slice(0, 500) : '';   // V102.423: read by updateCaseStatus right after the modal resolves
 
             window.caseReviewScoreModalState = { resolver: null };
             if (window.caseReviewAi) window.caseReviewAi.hide();
@@ -53271,6 +53328,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 if (caseIdEl) {
                     caseIdEl.textContent = caseLabel ? `· ${caseLabel}` : '';
                 }
+                // V102.423: the reply to the intern — only for ONE case (bulk / product reviews pass no id + userId); a saved reply opens pre-filled
+                const canReply = !!(caseItem && caseItem.id && caseItem.userId);
+                const replyEl = document.getElementById('case-review-reply-text'), replyBtn = document.getElementById('case-review-reply-toggle');
+                if (replyEl) replyEl.value = canReply ? String(caseItem.adminComment || '') : '';
+                if (replyBtn) replyBtn.style.display = canReply ? '' : 'none';
+                toggleCaseReviewReply(canReply && !!(caseItem.adminComment));
+                syncCaseReviewReply();
                 if (inputEl) {
                     inputEl.value = Number(caseItem?.adminBonus || 0).toFixed(1);
                     syncCaseReviewScoreChips();
@@ -53296,12 +53360,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         return;
                     }
 
+                    const replyText = String(window.caseReviewLastReply || '').trim();   // V102.423: the admin's reply to the intern (empty = none; an old reply is kept)
                     const batch = db.batch();
                     batch.update(caseRef, {
                         status: 'reviewed',
                         isArchived: true,
                         archivedAt: firebase.firestore.FieldValue.serverTimestamp(),
                         reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        ...(replyText ? { adminComment: replyText, adminCommentAt: firebase.firestore.FieldValue.serverTimestamp(), adminCommentBy: ALLOWED_EMAIL || 'admin' } : {}),
                         adminBonus: bonus,
                         adminUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                         adminReviewedBy: ALLOWED_EMAIL || 'admin'
@@ -53332,10 +53398,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     }
 
                     // V95.97: sync the submissions mirror so the intern's pending banner clears.
-                    await stageSubmissionMirror(batch, caseDocId, submissionReviewedFields(bonus));
+                    await stageSubmissionMirror(batch, caseDocId, submissionReviewedFields(bonus, replyText));
 
                     await batch.commit();
-                    if (typeof showToast === 'function') showToast(`Archived +${bonus.toFixed(2)} pts`, 'success');
+                    if (typeof showToast === 'function') showToast(`Archived +${bonus.toFixed(2)} pts` + (replyText ? ' · reply sent' : ''), 'success');
                     return;
                 }
 
