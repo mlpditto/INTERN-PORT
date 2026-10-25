@@ -21,6 +21,8 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         await page.route('https://studio.test/**', r => r.fulfill({body:'<html></html>', contentType:'text/html'}));
         await page.goto('https://studio.test/');
         await page.setContent('<style>' + styles.join('\n') + '</style>' + modal);
+        // its own <style>, like the page's own <link>: an unclosed block at the end of another sheet must not swallow it
+        await page.addStyleTag({content: fs.readFileSync(path.join(dir, 'case-split-studio.css'), 'utf8')});
         await page.evaluate(() => {
             window.rebuilds = 0; window.requests = []; window.writes = []; window.failImage = false;
             window.getAlabastaCaseById = () => ({note:'sample'});
@@ -92,6 +94,35 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         await page.evaluate(()=>resetCaseStudioSteps());
         assert.equal(await page.locator('.case-studio-panel:not([hidden])').getAttribute('data-step'),'1');
         assert.equal(await page.locator('.case-studio-workflow button[data-step="3"]').isDisabled(),true);
+        // V102.403: Category chips (Korean = own toggle), readable image brief, technical payload on a button, summary size + count
+        assert.ok(/ids\.safeSummary\.value = payload\.safeSummary;\s*\n\s*if \(window\.renderCaseCardAdvanced\) window\.renderCaseCardAdvanced\(\)/.test(html), 'populate refreshes the Category / brief view');
+        await page.evaluate(() => {
+            document.getElementById('alabasta-case-card-taxonomy').value = 'Skin \uD53C\uBD80 - Rash, Redness, Itching, Lesion';
+            document.getElementById('alabasta-case-card-safe-payload').value = JSON.stringify({ privacyStatus: 'patient_safe_anonymized', symptomTags: ['Rash', 'Redness'], stylePreset: 'clean medical infographic', textContent: { title: 'Skin \uD53C\uBD80 Case Brief' }, negativePrompt: ['no real patient photo', 'no ID card', 'no hospital form', 'no tiny unreadable text', 'no crowded poster', 'no graphic or scary medical imagery'] });
+            document.getElementById('alabasta-case-card-safe-summary').value = 'Male boxer with an itchy rash on the back';
+            renderCaseCardAdvanced();
+        });
+        await page.evaluate(() => { document.querySelector('.alabasta-casecard-details').open = true; });
+        const vis = sel => page.locator(sel).first().isVisible();
+        assert.deepEqual(await page.locator('.cs-chip').allInnerTexts(), ['Skin \uD53C\uBD80', 'Rash', 'Redness', 'Itching', 'Lesion'].map((t, i) => i === 0 ? 'Skin' : t).map(t => t), 'chips: the system first, then the symptoms (Korean hidden → not in the visible text)');
+        assert.equal(await vis('.cs-ko'), false, 'Korean is off by default');
+        await page.locator('.cs-ko-btn').click();
+        assert.equal(await vis('.cs-ko'), true, 'the 한 button shows the Korean');
+        assert.equal(await page.locator('.cs-ko-btn').getAttribute('aria-pressed'), 'true');
+        assert.equal(await page.evaluate(() => localStorage.getItem('caseStudioKo')), '1');
+        await page.locator('.cs-ko-btn').click();
+        assert.equal(await vis('.cs-ko'), false, 'and hides it again');
+        const items = await page.locator('.cs-ing li').allInnerTexts();
+        assert.deepEqual(items.map(t => t.replace(/^\W+/, '')), ['Title: Skin Case Brief', 'Focus: Rash \u00B7 Redness', 'Style: clean medical infographic', 'Privacy: Anonymized \u00B7 patient-safe', 'Avoids: real patient photo, ID card, hospital form, tiny unreadable text +2 more'], JSON.stringify(items));
+        assert.equal(await vis('#alabasta-case-card-safe-payload'), false, 'raw JSON hidden by default');
+        await page.locator('.cs-tech-btn').click();
+        assert.equal(await vis('#alabasta-case-card-safe-payload'), true, 'the button opens the technical payload');
+        assert.equal(await page.locator('#alabasta-case-card-taxonomy').evaluate(el => el.value.includes('Skin \uD53C\uBD80 - Rash')), true, 'the saved taxonomy value (bilingual) is untouched');
+        await page.evaluate(() => resetCaseStudioSteps());
+        assert.equal(await vis('#alabasta-case-card-safe-payload'), false, 'reset hides it again');
+        assert.equal((await page.locator('.cs-count').innerText()).trim(), '9 words');
+        assert.equal(await page.locator('#alabasta-case-card-safe-summary').evaluate(el => parseFloat(getComputedStyle(el).minHeight)), 220, 'the summary is the big box');
+        assert.ok(/Ready \u2014 review the summary, then continue to set up image\./.test(html), 'status line says what to do next');
         assert.deepEqual(errors,[]);
         console.log('PASS: 4 widths, steps/back/reset, stale image gating, edited prompt generation/save, model selection, summary rebuild, failure recovery. AI and Firestore stubbed.');
         if (process.env.STUDIO_SCREENSHOT) {

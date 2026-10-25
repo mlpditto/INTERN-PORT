@@ -104,7 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.resetCaseStudioSteps = () => {
         step = reached = 1; generated = ''; reviewed = summary.value;
         model.value = byId('model').value; mode.value = getCaseCardCompositeMode();
-        byId('step-2').open = false; find('.alabasta-casecard-details').open = false; render();
+        byId('step-2').open = false; find('.alabasta-casecard-details').open = false; payEl.hidden = true; techBtn.textContent = TECH; render();
     };
     find('.alabasta-casecard-subtitle').textContent = 'Review the summary, set up an image, then review and save.';
     find('.alabasta-casecard-badge').textContent = 'Privacy checked';
@@ -121,6 +121,54 @@ document.addEventListener('DOMContentLoaded', () => {
     byId('regenerate-btn').hidden = true;
     byId('image-download').title = 'ดาวน์โหลดภาพเป็นไฟล์ PNG';
     generate.title = 'สร้างภาพจากสรุปและพรอมป์ต์ปัจจุบัน'; save.title = 'บันทึกสรุปและพรอมป์ต์ ส่วนไฟล์ภาพให้ดาวน์โหลด PNG';
+    // V102.403: Category chips (Korean = its own toggle, off by default) + a readable "what the image will follow" list.
+    // The two textareas stay the data source for every other function (hidden); the technical JSON opens on a button.
+    const KO = /[\u3131-\u318E\uAC00-\uD7A3]+/g;
+    const noKo = s => String(s || '').replace(KO, '').replace(/\s+/g, ' ').trim();
+    const taxEl = byId('taxonomy'), payEl = byId('safe-payload');
+    const taxLabel = root.querySelector('label[for="alabasta-case-card-taxonomy"]'), payLabel = root.querySelector('label[for="alabasta-case-card-safe-payload"]');
+    taxEl.hidden = payEl.hidden = true;
+    taxLabel.textContent = 'Category'; payLabel.textContent = 'What the image will follow';
+    const koBtn = document.createElement('button');
+    koBtn.type = 'button'; koBtn.className = 'cs-ko-btn'; koBtn.textContent = '한'; koBtn.title = 'Show / hide the Korean labels · 한국어 표시';
+    taxLabel.after(koBtn);
+    const setKo = on => { root.classList.toggle('cs-ko-on', on); koBtn.setAttribute('aria-pressed', on ? 'true' : 'false'); };
+    let koSaved = false; try { koSaved = localStorage.getItem('caseStudioKo') === '1'; } catch (e) {}
+    setKo(koSaved);
+    koBtn.onclick = () => { const on = !root.classList.contains('cs-ko-on'); setKo(on); try { localStorage.setItem('caseStudioKo', on ? '1' : '0'); } catch (e) {} };
+    const chipBox = document.createElement('div'); chipBox.className = 'cs-chips'; chipBox.setAttribute('aria-label', 'Category');
+    taxEl.after(chipBox);
+    const ing = document.createElement('ul'); ing.className = 'cs-ing';
+    const TECH = 'View technical payload ›';
+    const techBtn = document.createElement('button');
+    techBtn.type = 'button'; techBtn.className = 'cs-tech-btn'; techBtn.textContent = TECH; techBtn.title = 'The exact JSON sent with the prompt (read-only)';
+    techBtn.onclick = () => { payEl.hidden = !payEl.hidden; techBtn.textContent = payEl.hidden ? TECH : 'Hide technical payload ‹'; };
+    payEl.before(ing, techBtn);
+    const count = document.createElement('span'); count.className = 'cs-count';
+    byId('step-1').querySelector('label').append(count);
+    const chip = (text, ko, sys) => {
+        const s = document.createElement('span'); s.className = 'cs-chip' + (sys ? ' sys' : ''); s.textContent = text;
+        if (ko) { const k = document.createElement('span'); k.className = 'cs-ko'; k.textContent = ko; s.append(' ', k); }
+        return s;
+    };
+    const words = () => { const n = summary.value.trim().split(/\s+/).filter(Boolean).length; count.textContent = n ? n + (n === 1 ? ' word' : ' words') : ''; };
+    window.renderCaseCardAdvanced = () => {
+        const raw = String(taxEl.value || '').trim(), cut = raw.indexOf(' - ');
+        const head = cut < 0 ? raw : raw.slice(0, cut);
+        const tags = cut < 0 ? [] : raw.slice(cut + 3).split(',').map(x => x.trim()).filter(Boolean);
+        chipBox.replaceChildren(...[noKo(head) || (head.match(KO) || []).length ? chip(noKo(head) || head, (head.match(KO) || []).join(' '), true) : null, ...tags.map(t => chip(t))].filter(Boolean));
+        let p = {}; try { p = JSON.parse(payEl.value || '{}') || {}; } catch (e) {}
+        const rows = [];
+        if (p.textContent && p.textContent.title) rows.push(['Title', noKo(p.textContent.title)]);
+        if (Array.isArray(p.symptomTags) && p.symptomTags.length) rows.push(['Focus', p.symptomTags.join(' · ')]);
+        if (p.stylePreset) rows.push(['Style', String(p.stylePreset)]);
+        if (p.privacyStatus === 'patient_safe_anonymized') rows.push(['Privacy', 'Anonymized · patient-safe']);
+        const no = (Array.isArray(p.negativePrompt) ? p.negativePrompt : []).map(x => String(x).replace(/^no\s+/i, ''));
+        if (no.length) rows.push(['Avoids', no.slice(0, 4).join(', ') + (no.length > 4 ? ' +' + (no.length - 4) + ' more' : '')]);
+        ing.replaceChildren(...rows.map(([k, v]) => { const li = document.createElement('li'), s = document.createElement('b'); s.textContent = k + ': '; li.append(s, v); return li; }));
+        words();
+    };
+    summary.addEventListener('input', words);
     const close = actions.querySelector('[onclick="closeAlabastaCaseCardModal()"]');
     close.textContent = 'Close'; close.title = 'ปิดหน้าต่าง';
     find('.close-modal').title = 'ปิดหน้าต่าง';
@@ -128,5 +176,5 @@ document.addEventListener('DOMContentLoaded', () => {
     find('.casecard-inline-tools button:nth-child(2)').title = 'คัดลอกพรอมป์ต์';
     byId('refine-btn').title = 'ใช้ AI ปรับปรุงพรอมป์ต์';
     byId('refine-model').title = 'เลือกโมเดลสำหรับปรับปรุงพรอมป์ต์';
-    resetCaseStudioSteps();
+    resetCaseStudioSteps(); renderCaseCardAdvanced();
 });
