@@ -92,8 +92,13 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         await page.locator('[data-prompt]').fill('Blue pastel');
         assert.equal(await page.locator('#quiz-cover-editor.lang-no-toggle').count(), 1, 'Thai controls must bypass the language text splitter');
         // V100.86: model picker is an icon chip rail (one .active chip), not a <select>.
-        assert.equal(await page.locator('[data-model-chip]').count(), 3, 'Three supported image models are available');   // V102.315: Muse Image left (no OpenRouter provider) // V101.53: + Seedream 5.0 Lite, Muse Image; V101.61: OpenRouter Nano Banana 2.1 removed
+        assert.equal(await page.locator('[data-model-chip]').count(), 4, 'Four supported image models are available (V102.419: + Grok Imagine 2.0)');   // V102.315: Muse Image left (no OpenRouter provider) // V101.53: + Seedream 5.0 Lite, Muse Image; V101.61: OpenRouter Nano Banana 2.1 removed
         assert.equal(await page.locator('[data-model-chip].active').count(), 1);
+        // V102.419: Grok Imagine 2.0 is the last chip; it goes through the Image API like Seedream (3:4) and its mark is a logo, not a cell of text
+        assert.deepEqual(await page.locator('[data-model-chip]').evaluateAll(els => els.map(e => e.dataset.value)), ['as/gemini-nano-banana-2.1', 'or/openai/gpt-5.4-image-2', 'or/bytedance-seed/seedream-5-0-lite', 'or/x-ai/grok-imagine-image-2.0']);
+        assert.equal(await page.locator('[data-model-chip][data-value="or/x-ai/grok-imagine-image-2.0"] .text-ai-logo[data-owner="grok"]').count(), 1, 'Grok logo');
+        assert.ok(/fallback: false/.test(require('fs').readFileSync('public/quiz-cover.js', 'utf8')) && /filter\(m => m\.fallback !== false \|\| m\.id === model\)/.test(require('fs').readFileSync('public/quiz-cover.js', 'utf8')), 'Grok is never tried automatically as a fallback — only when picked');
+        assert.match(await page.locator('[data-model-chip][data-value="or/x-ai/grok-imagine-image-2.0"]').getAttribute('title'), /Grok Imagine 2\.0.*1 นาที/);
         assert.equal(await page.locator('[data-model-chip].active').getAttribute('data-value'), 'as/gemini-nano-banana-2.1');
         await page.locator('[data-model-chip][data-value="or/openai/gpt-5.4-image-2"]').click();
         assert.equal(await page.locator('[data-model-chip].active').getAttribute('data-value'), 'or/openai/gpt-5.4-image-2');

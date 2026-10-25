@@ -27,7 +27,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
             window.firebase = { firestore: { FieldValue: { increment: n => ({ inc: n }), serverTimestamp: () => 'TS' } } };
             window.adminApp = { storage: () => ({ ref: () => ({ put: async () => {}, getDownloadURL: async () => 'https://example.com/ai.webp' }) }) };
             const canvas = document.createElement('canvas'); canvas.width = 30; canvas.height = 40; window.aiImage = canvas.toDataURL('image/png');
-            window.callUniversalAI = async (model, prompt) => { prompts.push({ model, prompt }); return { raw: { imageDataUrl: aiImage } }; };
+            window.callUniversalAI = async (model, prompt, isJson, vision, key, opts) => { prompts.push({ model, prompt, opts }); return { raw: { imageDataUrl: aiImage } }; };
         });
         await page.addScriptTag({ content: fs.readFileSync('public/quiz-cover.js', 'utf8') });
         await page.evaluate(() => QuizCover.set(''));
@@ -85,6 +85,18 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         p = await page.evaluate(() => prompts[prompts.length - 1].prompt);
         assert.equal(p.includes('misspelled or garbled'), false, 'used once, then cleared');
 
+        // V102.419: Grok Imagine 2.0 — a chip of its own, the Image API at 3:4, and the vote counts for it (key = the id with / and . turned into _)
+        await page.locator('[data-model-chip][data-value="or/x-ai/grok-imagine-image-2.0"]').click();
+        await gen();
+        const gp = await page.evaluate(() => prompts[prompts.length - 1]);
+        assert.equal(gp.model, 'or/x-ai/grok-imagine-image-2.0');
+        assert.deepEqual(gp.opts, { feature: 'quiz_cover', imageApi: true, aspectRatio: '3:4' }, 'the Image API at the collection\'s 3:4');
+        await page.locator('[data-apply]').click();
+        await page.waitForFunction(() => QuizCover.value() === 'https://example.com/ai.webp');
+        assert.deepEqual(JSON.parse(JSON.stringify((await last()).data)).tally, { 'or_x-ai_grok-imagine-image-2_0': { up: { inc: 1 } } }, 'the vote is for Grok');
+        await page.evaluate(() => { QuizCover.set(''); });
+        await page.locator('[data-model-chip][data-value="or/openai/gpt-5.4-image-2"]').click();
+        await gen();
         // a failing save never breaks the editor
         await page.evaluate(() => { fail = true; });
         await page.locator('[data-discard]').click();
