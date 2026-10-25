@@ -4,6 +4,7 @@
 // Only text nodes are touched (spans built with textContent), never inputs, links, code or the progress / language rows.
 // The same rules run on every option, so no option is singled out. Terms = a built-in starter list + Drug / Disease Codex
 // names when the Codex lists are already loaded on the page (dcState / dxState) — no extra reads.
+// V101.207: `codex.terms` = the question's own saved list (admin "✨ Mark terms", local AI) — it wins over the lists; kind 'no' = leave that word plain.
 (function () {
     const SEED_DRUGS = ('acetaminophen paracetamol ibuprofen naproxen diclofenac celecoxib etoricoxib aspirin clopidogrel ticagrelor prasugrel warfarin apixaban rivaroxaban '
         + 'dabigatran edoxaban heparin enoxaparin metformin glipizide gliclazide glimepiride glibenclamide sitagliptin linagliptin empagliflozin dapagliflozin canagliflozin '
@@ -69,14 +70,24 @@
         return cache;
     }
 
-    // [start, end, kind] on one string; earlier kinds win overlaps (drug > class > condition > dose > lab)
+    // [start, end, kind] on one string; earlier kinds win overlaps (the question's own AI-marked terms first, then drug > class > condition > dose > lab).
+    // A term the admin marked "not a term" (kind 'no') still takes its range, so the built-in lists leave it alone, but it is never drawn.
     function ranges(text, R) {
         const out = [];
-        for (const kind of ['dr', 'dc', 'dx', 'ds', 'lb']) {
+        for (const kind of ['xdr', 'xdx', 'xlb', 'xno', 'dr', 'dc', 'dx', 'ds', 'lb']) {
             const re = R[kind]; if (!re) continue; re.lastIndex = 0; let m;
-            while ((m = re.exec(text))) { const s = m.index, e = s + m[0].length; if (e > s && !out.some(r => s < r[1] && e > r[0])) out.push([s, e, kind]); }
+            while ((m = re.exec(text))) { const s = m.index, e = s + m[0].length; if (e > s && !out.some(r => s < r[1] && e > r[0])) out.push([s, e, kind.replace(/^x/, '')]); }
         }
-        return out.sort((a, b) => a[0] - b[0]);
+        return out.filter(r => r[2] !== 'no').sort((a, b) => a[0] - b[0]);
+    }
+
+    // this question's saved terms [{t, k}] → one regex per kind
+    function withTerms(R, terms) {
+        const list = (Array.isArray(terms) ? terms : []).filter(x => x && typeof x.t === 'string' && x.t.trim().length >= 2 && /^(dr|dx|lb|no)$/.test(x.k));
+        if (!list.length) return R;
+        const R2 = Object.assign({}, R);
+        ['dr', 'dx', 'lb', 'no'].forEach(k => { R2['x' + k] = wordRe(list.filter(x => x.k === k).map(x => esc(x.t.trim())).sort((a, b) => b.length - a.length)); });
+        return R2;
     }
 
     function wrapNode(node, R) {
@@ -125,7 +136,7 @@
     window.quizTermHighlight = function (root, codex) {
         if (!root) return;
         try {
-            const R = rules((codex && codex.drugs) || [], (codex && codex.diseases) || []);
+            const R = withTerms(rules((codex && codex.drugs) || [], (codex && codex.diseases) || []), codex && codex.terms);
             const stem = root.querySelector('.md-render');
             if (stem) { liftRef(stem); markAsk(stem); }
             textNodes(root).forEach(n => wrapNode(n, R));
