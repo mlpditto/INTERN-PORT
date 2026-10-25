@@ -38,8 +38,9 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
             };
             window.refineAlabastaCaseCardPromptWithSelectedModel = async () => { document.getElementById('alabasta-case-card-prompt').value = 'refined prompt'; };
             window.buildSafeAlabastaCaseVisualPayload = () => ({visualMode:'educational_case_card'});
-            window.db = {collection:()=>({doc:()=>({update:async value=>writes.push(value)})})};
-            window.firebase = {firestore:{FieldValue:{serverTimestamp:()=>123}}};
+            window.fbSets = [];
+            window.db = {collection:()=>({doc:()=>({update:async value=>writes.push(value), get:async()=>({exists:true,data:()=>({tally:{'gpt-image-2_5-flare':{infographic:{up:2,down:1}}}})}), set:async (data,opts)=>fbSets.push({data,opts})})})};
+            window.firebase = {firestore:{FieldValue:{serverTimestamp:()=>123, increment:n=>({inc:n})}}};
             window.ALLOWED_EMAIL = 'test'; window.syncAlabastaCaseBridgeMarker = () => {};
             window.callUniversalAI = async (model, prompt) => {
                 requests.push({model,prompt});
@@ -80,6 +81,19 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
             assert.equal(await page.evaluate(()=>localStorage.getItem('test-layout')),t,'the '+t+' chip drives the template');
             assert.equal(await page.locator('#cs-layout-lbl + .cs-seg button[aria-checked=true]').getAttribute('data-value'),t);
         }
+        await page.locator('#cs-layout-lbl + .cs-seg button[data-value="infographic"]').click();
+        await page.waitForFunction(()=>!document.getElementById('alabastaCaseCardModal').classList.contains('case-studio-busy'));
+        // V102.416: the prompt sits right under the summary; the long source details come last
+        assert.deepEqual(await page.evaluate(()=>[...document.querySelector('.case-studio-inputs .case-studio-panel').children].map(e=>e.id||e.className.split(' ')[0])),['alabasta-case-card-step-1','alabasta-case-card-step-2','alabasta-casecard-details'],'summary → prompt → source details');
+        // a one-line hint for the chosen model, a ★ on the model suggested for the template (nothing switches by itself), our own votes
+        const rail = '#cs-model-lbl + .cs-seg button';
+        assert.equal(await page.locator('.cs-model-hint').innerText(),'Good all-round · fast enough','the hint of the chosen model');
+        assert.deepEqual(await page.locator(rail+'.cs-sug').evaluateAll(els=>els.map(e=>e.dataset.value)),['gpt-image-2.5-sunburst'],'★ on Sunburst for the case infographic');
+        assert.equal(await page.locator('#case-studio-image-model').inputValue(),'as/gemini-nano-banana-2.1','the model is NOT switched by the suggestion');
+        await page.locator('#cs-layout-lbl + .cs-seg button[data-value="selfcare"]').click();
+        await page.waitForFunction(()=>!document.getElementById('alabastaCaseCardModal').classList.contains('case-studio-busy'));
+        assert.deepEqual(await page.locator(rail+'.cs-sug').evaluateAll(els=>els.map(e=>e.dataset.value)),['gpt-image-2.5-flare'],'the ★ follows the template');
+        assert.ok((await page.locator(rail+'[data-value="gpt-image-2.5-flare"]').getAttribute('title')).includes('Fast drafts') && (await page.locator(rail+'[data-value="gpt-image-2.5-flare"]').getAttribute('title')).includes('👍 2/3 here'), 'the chip title: hint + the saved votes');
         await page.locator('#cs-layout-lbl + .cs-seg button[data-value="infographic"]').click();
         await page.waitForFunction(()=>!document.getElementById('alabastaCaseCardModal').classList.contains('case-studio-busy'));
         assert.equal(await page.locator('#cs-layout-lbl + .cs-seg button[aria-checked=true]').getAttribute('data-value'),'infographic','infographic is the default');
@@ -128,6 +142,15 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         await page.locator('#alabasta-case-card-generate-btn').click();
         await page.waitForFunction(()=>!document.getElementById('alabastaCaseCardModal').classList.contains('case-studio-busy'));
         assert.equal(await page.locator('#alabasta-case-card-save-btn').isDisabled(),false,'a fresh image can be saved');
+        // V102.416: 👍 / 👎 on the finished image: counted per model + template, once per image, shown as "👍 n/m here"
+        assert.equal(await page.locator('.cs-rate').isVisible(),true,'a finished image can be rated');
+        await page.locator('.cs-rate [data-vote="up"]').click();
+        await page.waitForFunction(()=>fbSets.length===1);
+        const fb = await page.evaluate(()=>JSON.parse(JSON.stringify(fbSets[0])));
+        assert.deepEqual(fb,{data:{tally:{'as_gemini-3-pro-image':{infographic:{up:{inc:1}}}},updatedAt:123},opts:{merge:true}},'counted for the model that made it, under the template');
+        assert.equal(await page.locator('.cs-rate').isVisible(),false,'one vote per image');
+        assert.ok((await page.locator('#cs-model-lbl + .cs-seg button[data-value="as/gemini-3-pro-image"]').getAttribute('title')).includes('👍 1/1 here'),'the tally shows at once');
+        assert.equal(await page.locator('.cs-model-hint').innerText(),'High quality · slower and pricier · 👍 1/1 here');
         const before = await page.evaluate(()=>rebuilds);
         await page.locator('#cs-layout-lbl + .cs-seg button[data-value="minimal"]').click();
         await page.waitForFunction(()=>!document.getElementById('alabastaCaseCardModal').classList.contains('case-studio-busy'));
@@ -137,6 +160,10 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         await page.locator('#alabasta-case-card-generate-btn').click();
         await page.waitForFunction(()=>!document.getElementById('alabastaCaseCardModal').classList.contains('case-studio-busy'));
         assert.equal(await page.evaluate(()=>rebuilds),before+2,'a changed summary rebuilds the prompt inside Generate (the layout switch above was the +1)');
+        assert.equal(await page.locator('.cs-rate').isVisible(),true,'a new image can be rated again');
+        await page.locator('.cs-rate [data-vote="down"]').click();
+        await page.waitForFunction(()=>fbSets.length===2);
+        assert.equal(await page.evaluate(()=>Object.keys(fbSets[1].data.tally['as_gemini-3-pro-image'])[0] && fbSets[1].data.tally['as_gemini-3-pro-image'][Object.keys(fbSets[1].data.tally['as_gemini-3-pro-image'])[0]].down.inc),1,'a 👎 is counted too');
         await page.evaluate(()=>resetCaseStudioSteps());
         assert.equal(await page.locator('#alabasta-case-card-save-btn').isHidden(),true,'a new case: no Save until an image exists');
         assert.equal(await page.locator('#alabasta-case-card-generate-btn').innerText(),'Generate image');
