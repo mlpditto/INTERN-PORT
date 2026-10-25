@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.411)</title>
+    <title>Nika Admin (V102.413)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -43098,9 +43098,18 @@ They can connect again from LINE.
                 safeText = safeText.replace(new RegExp(escaped, 'gi'), '[redacted]');
             });
 
+            // V102.413 policy (owner): the summary MAY say age, year of birth and occupation; it may NOT say a day + month (of birth or of any event)
+            // or an employer / workplace unless the patient agreed. Employers cannot be found by a regex — the translate prompt below handles those.
+            const MONTH = 'Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|ม\\.ค\\.|ก\\.พ\\.|มี\\.ค\\.|เม\\.ย\\.|พ\\.ค\\.|มิ\\.ย\\.|ก\\.ค\\.|ส\\.ค\\.|ก\\.ย\\.|ต\\.ค\\.|พ\\.ย\\.|ธ\\.ค\\.|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม';
+            safeText = safeText
+                .replace(/^\s*\d{1,3}\s*[.)]\s*Case\b\s*/i, '')                       // "2. Case ช อายุ…" → the list number of the intern's own note
+                .replace(/^\s*Case\s*\d*\s*[:.\-]\s*/i, '')
+                .replace(/\b\d{1,2}\s*[\/.\-]\s*\d{1,2}\s*[\/.\-]\s*\d{2,4}\b/g, '[date]')                  // 23/6/69
+                .replace(new RegExp('\\b\\d{1,2}\\s*(?:' + MONTH + ')(?![A-Za-z])\\s*((?:19|20|25)\\d{2})?', 'gi'), (all, year) => year || '[date]')   // 12 มิ.ย. 2530 → 2530 (the year stays)
+                .replace(new RegExp('\\b(?:' + MONTH + ')\\s+\\d{1,2}(?:\\s*,\\s*((?:19|20|25)\\d{2}))?\\b', 'g'), (all, year) => year || '[date]');   // June 12, 1990 (capitalised only: a lower-case 'may 2 tablets' is not a date)
             return safeText
                 .replace(/\b(?:HN|Ref|Case\s*No\.?)\s*[:#-]?\s*[A-Z0-9-]{3,}\b/gi, '[redacted-ref]')
-                .replace(/\b\d{4,}\b/g, '[redacted-number]')
+                .replace(/\b\d{4,}\b/g, n => (/^(?:19|20|25)\d{2}$/.test(n) ? n : '[redacted-number]'))   // a year of birth stays; bill / phone-like numbers go
                 .replace(/\b0\d{8,9}\b/g, '[redacted-phone]')
                 .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]')
                 .replace(/\s+/g, ' ')
@@ -43376,6 +43385,9 @@ They can connect again from LINE.
                 const prompt = [
                     'Translate the anonymized medical case summary into concise natural English.',
                     'Keep it privacy-safe and educational.',
+                    'KEEP the patient\'s age (or age band), year of birth and occupation / job title.',
+                    'REMOVE: the day and month of any date (a year alone is fine); names of employers, companies, workplaces, hospitals, clinics and schools (say the kind of job instead, e.g. "works in a car factory"); names, phone numbers, ids; list numbers or labels such as "Case 2:".',
+                    'Write plain text only — no markdown, no asterisks.',
                     'Do not add identifiers, do not add extra facts, do not explain your work.',
                     taxonomyLabel ? `Medical context: ${taxonomyLabel}` : '',
                     '',
