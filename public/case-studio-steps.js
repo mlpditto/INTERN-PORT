@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const left = document.createElement('div');
     left.className = 'case-studio-panel';
     inputs.append(left);
-    left.append(byId('step-1'), find('.alabasta-casecard-details'), byId('step-2'));
+    left.append(byId('step-1'), byId('step-2'), find('.alabasta-casecard-details'));   // V102.416: summary → prompt (the thing to edit before Generate) → source details
     const preview = find('.case-studio-preview');
     const settings = find('.case-studio-settings');
     const chips = [...settings.querySelectorAll('#alabasta-case-card-quick-rail button')];
@@ -55,6 +55,45 @@ document.addEventListener('DOMContentLoaded', () => {
     const rebuildNow = () => run(async () => { await rebuildAlabastaCaseCardPromptFromInputs({ quiet: true }); reviewed = summary.value; });   // the prompt differs per layout: rebuilt now, so an edit made after the switch is kept
     mode.onchange = () => { selectCaseCardCompositeMode(mode.value); layout.value = getCaseCardLayout(); render(); rebuildNow(); };
     layout.onchange = () => { selectCaseCardLayout(layout.value); render(); rebuildNow(); };
+    // V102.416: a one-line hint under the model rail, a ★ on the model suggested for the chosen template (never switches by itself), and
+    // 👍 / 👎 on the finished image → counted per model + template in _meta/case_card_feedback (admin-only doc, no rules change) and shown as "👍 n/m here".
+    // The hints / suggestions come from an outside model comparison — expectations, not measurements of ours; our own votes replace them over time.
+    const HINTS = {
+        'gpt-image-2.5-sunburst': 'Most accurate text · a little slower',
+        'gpt-image-2.5-flare': 'Fast drafts · quality close to Sunburst',
+        'as/gemini-3-pro-image': 'High quality · slower and pricier',
+        'as/gemini-nano-banana-2.1': 'Good all-round · fast enough',
+        'as/gemini-3.1-flash-lite-image': 'Fastest of the Google models · lower quality',
+        'or/x-ai/grok-imagine-image-2.0': 'About 1 minute · needs OpenRouter credit'
+    };
+    const SUGGEST = { infographic: 'gpt-image-2.5-sunburst', lifestyle: 'as/gemini-nano-banana-2.1', symptoms: 'as/gemini-3-pro-image', selfcare: 'gpt-image-2.5-flare', minimal: 'as/gemini-nano-banana-2.1' };
+    const hintEl = document.createElement('div');
+    hintEl.className = 'cs-model-hint'; hintEl.setAttribute('aria-live', 'polite');
+    modelRail.after(hintEl);
+    const fbKey = s => String(s).replace(/[^\w-]/g, '_');
+    const fbRef = () => (typeof db !== 'undefined' && db && typeof firebase !== 'undefined') ? db.collection('_meta').doc('case_card_feedback') : null;
+    let tally = {};
+    const votes = id => { const t = (tally.tally || {})[fbKey(id)] || {}; let up = 0, down = 0; Object.keys(t).forEach(k => { up += (t[k] || {}).up || 0; down += (t[k] || {}).down || 0; }); return { up, down }; };
+    const rateRow = document.createElement('div');
+    rateRow.className = 'cs-rate'; rateRow.hidden = true;
+    rateRow.innerHTML = '<span>Rate this image</span><button type="button" data-vote="up" title="Good — counted for this model" aria-label="Like this image">👍</button><button type="button" data-vote="down" title="Not good — counted for this model" aria-label="Dislike this image">👎</button>';
+    byId('image-wrap').after(rateRow);
+    let lastGen = null, voted = false;
+    async function loadTally() {
+        const ref = fbRef(); if (!ref) return;
+        try { const snap = await ref.get(); tally = (snap && snap.exists && snap.data()) || {}; render(); } catch (e) { console.warn('[case-card] feedback tally unavailable:', e && e.message); }
+    }
+    rateRow.onclick = async e => {
+        const btn = e.target.closest('[data-vote]');
+        if (!btn || voted || !lastGen) return;
+        voted = true; render();
+        const verdict = btn.dataset.vote, k = fbKey(lastGen.model);
+        tally.tally = tally.tally || {}; const m = tally.tally[k] = tally.tally[k] || {}; const l = m[lastGen.layout] = m[lastGen.layout] || {}; l[verdict] = (l[verdict] || 0) + 1;
+        render();
+        const ref = fbRef(); if (!ref) return;
+        try { await ref.set({ tally: { [k]: { [lastGen.layout]: { [verdict]: firebase.firestore.FieldValue.increment(1) } } }, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true }); }
+        catch (err) { console.warn('[case-card] feedback not saved:', err && err.message); }
+    };
     const actions = find('.alabasta-casecard-action-group.final');
     const generate = byId('generate-btn');
     const save = byId('save-btn');
@@ -71,6 +110,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const on = b.dataset.value === select.value;
             b.setAttribute('aria-checked', on ? 'true' : 'false'); b.classList.toggle('active', on); b.disabled = busy || (select === layout && overlay);
         }));
+        modelRail.querySelectorAll('button').forEach(b => {
+            const id = b.dataset.value, sug = SUGGEST[layout.value] === id, v = votes(id);
+            b.classList.toggle('cs-sug', sug);
+            b.title = id + (HINTS[id] ? ' — ' + HINTS[id] : '') + (sug ? ' · ★ suggested for this template' : '') + (v.up + v.down ? ' · 👍 ' + v.up + '/' + (v.up + v.down) + ' here' : '');
+        });
+        const cur = votes(model.value);
+        hintEl.textContent = (HINTS[model.value] || '') + (SUGGEST[layout.value] === model.value ? ' · ★ suggested for this template' : '') + (cur.up + cur.down ? ' · 👍 ' + cur.up + '/' + (cur.up + cur.down) + ' here' : '');
+        rateRow.hidden = !generated || !!stale || busy || !lastGen || voted;
         save.hidden = !generated;
         generate.disabled = busy; save.disabled = busy || !!stale;
         if (!busy) { generate.textContent = generated ? 'Regenerate image' : 'Generate image'; save.textContent = 'Save draft'; }
@@ -89,7 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const previousImage = byId('image-preview').getAttribute('src');
         const previousDownload = byId('image-download').getAttribute('href');
         const success = await generateAlabastaCaseCardImage();
-        if (success) generated = snapshot();
+        if (success) { generated = snapshot(); lastGen = { model: model.value, layout: layout.value }; voted = false; }
         else {
             if (previousImage) byId('image-preview').src = previousImage;
             else byId('image-wrap').style.display = 'none';
@@ -116,7 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
         run(async () => { const done = typeof window.onCaseCardConsentChange === 'function' ? await window.onCaseCardConsentChange(want) : false; if (done === false) consentBox.checked = !want; else reviewed = ''; });
     };
     window.resetCaseStudioSteps = () => {
-        generated = ''; reviewed = summary.value;
+        generated = ''; reviewed = summary.value; lastGen = null; voted = false;
         model.value = byId('model').value; mode.value = getCaseCardCompositeMode(); layout.value = getCaseCardLayout();
         byId('step-2').open = false; find('.alabasta-casecard-details').open = false; payEl.hidden = true; techBtn.textContent = TECH; render();
     };
@@ -205,5 +252,5 @@ document.addEventListener('DOMContentLoaded', () => {
     find('.casecard-inline-tools button:nth-child(2)').title = 'คัดลอกพรอมป์ต์';
     byId('refine-btn').title = 'ใช้ AI ปรับปรุงพรอมป์ต์';
     byId('refine-model').title = 'เลือกโมเดลสำหรับปรับปรุงพรอมป์ต์';
-    resetCaseStudioSteps(); renderCaseCardAdvanced();
+    resetCaseStudioSteps(); renderCaseCardAdvanced(); loadTally();
 });
