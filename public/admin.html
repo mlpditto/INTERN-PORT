@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.408)</title>
+    <title>Nika Admin (V102.409)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -7984,8 +7984,8 @@
     <link rel="stylesheet" href="text-ai-chips.css?v=V102.348">
     <link rel="stylesheet" href="ai-settings-ui.css?v=V102.147">
     <link rel="stylesheet" href="quiz-resource-cards.css?v=V102.344">
-    <link rel="stylesheet" href="case-split-studio.css?v=V100.42">
-    <script src="case-studio-steps.js?v=V100.42" defer></script>
+    <link rel="stylesheet" href="case-split-studio.css?v=V100.43">
+    <script src="case-studio-steps.js?v=V100.43" defer></script>
     <script src="quiz-term-ai.js?v=V102.405" defer></script>
     <link rel="stylesheet" href="reflection-compact.css?v=V101.83">
     <script src="reflection-compact.js?v=V99.68"></script>
@@ -17315,6 +17315,7 @@
                                 <button type="button" class="alabasta-genmage-quick-chip" data-value="as/gemini-3-pro-image" onclick="switchAndRegenerateAlabastaCaseCard('as/gemini-3-pro-image', false)" title="as/gemini-3-pro-image">Nano Banana Pro</button>
                                 <button type="button" class="alabasta-genmage-quick-chip" data-value="gpt-image-2.5-flare" onclick="switchAndRegenerateAlabastaCaseCard('gpt-image-2.5-flare', false)" title="gpt-image-2.5-flare">GPT Image 2.5 Flare</button>
                                 <button type="button" class="alabasta-genmage-quick-chip" data-value="gpt-image-2.5-sunburst" onclick="switchAndRegenerateAlabastaCaseCard('gpt-image-2.5-sunburst', false)" title="gpt-image-2.5-sunburst">GPT Image 2.5 Sunburst</button>
+                                <button type="button" class="alabasta-genmage-quick-chip" data-value="or/x-ai/grok-imagine-image-2.0" onclick="switchAndRegenerateAlabastaCaseCard('or/x-ai/grok-imagine-image-2.0', false)" title="or/x-ai/grok-imagine-image-2.0 (OpenRouter · about a minute)">Grok Imagine 2.0</button>
                             </div></section>
             <details class="alabasta-visual-card case-studio-prompt" id="alabasta-case-card-step-2" style="margin-bottom:12px; scroll-margin-top:80px;">
                 <summary>Prompt preview & edit</summary>
@@ -43184,7 +43185,59 @@ They can connect again from LINE.
             };
         }
 
+        // V102.409: two layouts. 'infographic' (default) = a full infographic with real, short text (title, history, symptoms, callouts,
+        // recommendations) and NO person drawn; 'minimal' = the earlier icon-only card (also forced by the HTML-overlay mode).
         function buildAlabastaCaseCardPrompt(payload) {
+            return getCaseCardLayout() === 'minimal' ? buildAlabastaCaseCardMinimalPrompt(payload) : buildAlabastaCaseCardInfographicPrompt(payload);
+        }
+
+        function buildAlabastaCaseCardInfographicPrompt(payload) {
+            const textContent = payload.textContent || {};
+            const imageBrief = payload.imageBrief || {};
+            const visualRequirements = Array.isArray(payload.visualRequirements) ? payload.visualRequirements : [];
+            const negativePrompt = Array.isArray(payload.negativePrompt) ? payload.negativePrompt : [];
+            const title = String(textContent.title || 'Medical Case Brief').trim();
+            const subtitle = String(textContent.subtitle || '').trim();
+            const heading = subtitle ? `${title}: ${subtitle}` : title;
+            return [
+                `Create a clean, modern medical infographic poster (landscape 4:3, warm cream background, navy headings, teal and orange accents) for a privacy-safe educational medical case.`,
+                '',
+                '### TEXT (real, readable English; every word spelled correctly; about 100 words in total; short phrases only) ###',
+                '- Main title: "Patient Presentation". Subtitle under it: "' + heading + '".',
+                '- Left panel "History of Presenting Illness": 3-5 short bullets taken from the case context.',
+                '- Right panel "Symptoms": each symptom in bold with one short plain-language line.',
+                '- Around the body: 4-6 small icon callouts (2-6 words each) for the triggers, supplements or habits named in the case.',
+                '- Bottom band "Recommendations": 3-4 short, general counselling points that fit the case (for example regular meals, limiting triggers, hydration, monitoring symptoms and when to follow up).',
+                '- Small footer line: "Note: This information is for educational purposes only and does not replace professional medical advice."',
+                '',
+                '### ILLUSTRATION ###',
+                '- Centre: a simple faceless human body silhouette (head and torso, no facial features) with the affected area softly highlighted, and arrows from the callouts toward it.',
+                '- NEVER draw a portrait, a face, a photograph or an avatar of any person, and no ID-style picture.',
+                '',
+                'Case context (the ONLY source of facts):',
+                `- Topic / system: ${payload.primarySystemLabel}`,
+                `- Symptom tags: ${payload.symptomTags.length ? payload.symptomTags.join(', ') : 'not specified'}`,
+                `- Case context: ${payload.safeSummary}`,
+                '',
+                'Privacy and accuracy:',
+                '- Do NOT write the patient\'s age, sex, occupation, nationality or any personal descriptor (no "man", "late 40s", "driver"). Describe the case only by its history and symptoms.',
+                '- No HN, Ref No., case number, customer name, patient name, user name, LINE name, phone, email, or any identifier anywhere on the poster.',
+                '- Do not invent test results, doses, diagnoses or patient facts; the recommendations stay general.',
+                '',
+                'Visual style:',
+                '- Flat vector medical infographic, clear hierarchy, generous spacing between panels',
+                `- ${imageBrief.layout || 'Landscape educational card'}`,
+                ...visualRequirements.map(item => `- ${item}`),
+                '',
+                'Avoid (negative prompt):',
+                '- Real people, portraits, faces, photographs, ID cards, hospital forms, prescription labels',
+                '- Garbled or misspelled text, tiny illegible text, lorem ipsum, watermarks, fake URLs',
+                '- Graphic surgical or scary medical imagery',
+                ...negativePrompt.map(item => `- ${item}`)
+            ].filter(Boolean).join('\n');
+        }
+
+        function buildAlabastaCaseCardMinimalPrompt(payload) {
             // V92.43: prompt strengthened after user testing showed Imagen 3 Fast
             // still added garbled anatomical labels and paragraph blocks despite
             // the V92.42 "no labels" rule. Tightened to: hard 12-word total cap,
@@ -43351,10 +43404,18 @@ They can connect again from LINE.
             if (metaEl && !options.quiet) metaEl.textContent = 'Converting anonymized summary to English for GenMage prompt...';
             const englishSummary = await translateAlabastaSummaryToEnglish(currentSummary, taxonomyLabel);
             if (englishSummary) safeSummaryEl.value = englishSummary;
+            // V102.409: "GI 소화기 - Abdominal Pain, Diarrhea" → system "GI" + tags; the poster's title / subtitle are English only
+            const cutAt = taxonomyLabel.indexOf(' - ');
+            const systemEn = alabastaEnglishOnly(cutAt < 0 ? taxonomyLabel : taxonomyLabel.slice(0, cutAt));
+            const tagsEn = (cutAt < 0 ? [] : taxonomyLabel.slice(cutAt + 3).split(',')).map(alabastaEnglishOnly).filter(Boolean);
             const payload = {
-                primarySystemLabel: taxonomyLabel || 'General medicine',
-                symptomTags: [],
-                safeSummary: englishSummary || currentSummary
+                primarySystemLabel: systemEn || 'General medicine',
+                symptomTags: tagsEn,
+                safeSummary: englishSummary || currentSummary,
+                textContent: {
+                    title: systemEn && systemEn !== 'Other' ? `${systemEn} Case Brief` : 'Medical Case Brief',
+                    subtitle: tagsEn.slice(0, 3).join(' / ')
+                }
             };
             const prompt = buildAlabastaCaseCardPrompt(payload);
             promptEl.value = prompt;
@@ -43521,7 +43582,7 @@ They can connect again from LINE.
                 // V95.91: deprecated `as/gemini-2.5-flash-image-preview` (removed from
                 // v1beta) joins the legacy native chips that get bumped to the stable
                 // `as/gemini-2.5-flash-image` Nano Banana ID.
-                const validImageModels = ['as/gemini-nano-banana-2.1', 'as/gemini-3.1-flash-lite-image', 'as/gemini-3-pro-image', 'gpt-image-2.5-flare', 'gpt-image-2.5-sunburst'];
+                const validImageModels = ['as/gemini-nano-banana-2.1', 'as/gemini-3.1-flash-lite-image', 'as/gemini-3-pro-image', 'gpt-image-2.5-flare', 'gpt-image-2.5-sunburst', 'or/x-ai/grok-imagine-image-2.0'];
                 if (!validImageModels.includes(savedModel)) {
                     savedModel = 'as/gemini-nano-banana-2.1';
                     localStorage.setItem(window.ALABASTA_CASECARD_MODEL_PREF_KEY, savedModel);
@@ -43698,6 +43759,16 @@ They can connect again from LINE.
             }
         }
 
+        // V102.409: 'infographic' (default) | 'minimal'; the HTML-overlay mode (illustration only) is always minimal
+        const _CASECARD_LAYOUT_KEY = 'alabasta_casecard_layout';
+        function getCaseCardLayout() {
+            if (getCaseCardCompositeMode() === 'html-overlay') return 'minimal';
+            try { return localStorage.getItem(_CASECARD_LAYOUT_KEY) === 'minimal' ? 'minimal' : 'infographic'; } catch (_) { return 'infographic'; }
+        }
+        function selectCaseCardLayout(layout) {
+            try { localStorage.setItem(_CASECARD_LAYOUT_KEY, layout === 'minimal' ? 'minimal' : 'infographic'); } catch (_) { }
+        }
+
         function _appendNoTextPromptSuffix(prompt) {
             const suffix = '\n\nCRITICAL: Illustration only. ABSOLUTELY NO text, NO words, NO letters, NO numbers, NO labels, NO captions, NO writing of any kind anywhere in the image. Pure visual illustration only — leave the bottom third of the canvas visually quiet so a separate text overlay can be added later.';
             return String(prompt || '').trim() + suffix;
@@ -43777,7 +43848,8 @@ They can connect again from LINE.
                     'as/gemini-3.1-flash-lite-image': 'Nano Banana 2 Lite',
                     'as/gemini-3-pro-image': 'Nano Banana Pro',
                     'gpt-image-2.5-flare': 'GPT Image 2.5 Flare',
-                    'gpt-image-2.5-sunburst': 'GPT Image 2.5 Sunburst'
+                    'gpt-image-2.5-sunburst': 'GPT Image 2.5 Sunburst',
+                    'or/x-ai/grok-imagine-image-2.0': 'Grok Imagine 2.0'
                 };
                 setAlabastaCaseCardImageLoadingState(true, modelLabelMap[selectedModel] || selectedModel);
                 if (metaEl) metaEl.textContent = `GenMage is generating via ${modelLabelMap[selectedModel] || selectedModel}...`;
@@ -43788,7 +43860,9 @@ They can connect again from LINE.
                     false,
                     null,
                     '',
-                    { size: '1024x1024', feature: 'casecard_image' }
+                    /^or\/x-ai\/grok-imagine/.test(selectedModel)
+                        ? { feature: 'casecard_image', imageApi: true, aspectRatio: '4:3', maxOutputTokens: 1024 }   // V102.409: the Image API, landscape for the infographic
+                        : { size: '1024x1024', feature: 'casecard_image' }
                 );
                 const { model } = imageResponse || {};
                 const rawImage = imageResponse?.text

@@ -28,6 +28,8 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
             window.getAlabastaCaseById = () => ({note:'sample'});
             window.getCaseCardCompositeMode = () => localStorage.getItem('test-mode') || 'ai';
             window.selectCaseCardCompositeMode = mode => localStorage.setItem('test-mode',mode);
+            window.getCaseCardLayout = () => (localStorage.getItem('test-mode')==='html-overlay' ? 'minimal' : (localStorage.getItem('test-layout') || 'infographic'));
+            window.selectCaseCardLayout = layout => localStorage.setItem('test-layout',layout);
             window.switchAndRegenerateAlabastaCaseCard = value => document.getElementById('alabasta-case-card-model').value = value;
             window.rebuildAlabastaCaseCardPromptFromInputs = async () => {
                 rebuilds++;
@@ -66,7 +68,19 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         assert.equal(await page.evaluate(()=>rebuilds),0);
         // chip rails (quiz-cover look): 2 modes, 5 models; the selects are hidden value holders; the active chip is amber
         assert.equal(await page.locator('#cs-mode-lbl + .cs-seg button').count(),2);
-        assert.equal(await page.locator('#cs-model-lbl + .cs-seg button').count(),5);
+        assert.equal(await page.locator('#cs-model-lbl + .cs-seg button').count(),6,'five Gemini / GPT chips + Grok Imagine');
+        assert.equal(await page.locator('#cs-model-lbl + .cs-seg button[data-value="or/x-ai/grok-imagine-image-2.0"] .cs-logo[data-owner="grok"]').count(),1,'Grok chip + its logo');
+        // layout rail: Infographic (default) | Minimal; the HTML-overlay mode forces minimal and locks the rail
+        assert.equal(await page.locator('#cs-layout-lbl + .cs-seg button').count(),2);
+        assert.equal(await page.locator('#cs-layout-lbl + .cs-seg button[aria-checked=true]').getAttribute('data-value'),'infographic','infographic is the default');
+        await page.locator('#cs-layout-lbl + .cs-seg button[data-value="minimal"]').click();
+        assert.equal(await page.evaluate(()=>localStorage.getItem('test-layout')),'minimal');
+        await page.locator('#cs-layout-lbl + .cs-seg button[data-value="infographic"]').click();
+        await page.locator('#cs-mode-lbl + .cs-seg button[data-value="html-overlay"]').click();
+        assert.equal(await page.locator('#cs-layout-lbl + .cs-seg button').evaluateAll(els=>els.every(e=>e.disabled)),true,'illustration-only mode locks the layout');
+        assert.equal(await page.locator('#cs-layout-lbl + .cs-seg button[aria-checked=true]').getAttribute('data-value'),'minimal','and shows minimal');
+        await page.locator('#cs-mode-lbl + .cs-seg button[data-value="ai"]').click();
+
         assert.equal(await page.locator('#case-studio-image-model, #case-studio-mode').evaluateAll(els=>els.every(el=>el.offsetParent===null)),true,'no dropdowns');
         assert.deepEqual(await page.evaluate(()=>[...document.querySelectorAll('#cs-model-lbl + .cs-seg button[aria-checked=true]')].map(c=>c.dataset.value)),await page.evaluate(()=>[document.getElementById('case-studio-image-model').value]),'exactly the active model is checked');
         assert.equal(await page.locator('#cs-model-lbl + .cs-seg button[aria-checked=true]').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(242, 179, 90)','the active chip is amber');
@@ -74,6 +88,8 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         await page.locator('#cs-mode-lbl + .cs-seg button[data-value="html-overlay"]').click();
         assert.equal(await page.evaluate(()=>localStorage.getItem('test-mode')),'html-overlay','the mode chip drives the mode');
         await page.locator('#cs-mode-lbl + .cs-seg button[data-value="ai"]').click();
+        await page.waitForFunction(()=>!document.getElementById('alabastaCaseCardModal').classList.contains('case-studio-busy'));
+        const r0 = await page.evaluate(()=>rebuilds);
         await page.locator('#alabasta-case-card-step-2 summary').click();
         await page.locator('#alabasta-case-card-prompt').fill('My custom prompt');
         await page.locator('#cs-model-lbl + .cs-seg button[data-value="gpt-image-2.5-flare"]').click();
@@ -85,10 +101,10 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         await page.locator('#alabasta-case-card-generate-btn').click();
         await page.waitForFunction(()=>!document.getElementById('alabasta-case-card-save-btn').hidden);
         assert.deepEqual(await page.evaluate(()=>requests[0]),{model:'gpt-image-2.5-flare',prompt:'My custom prompt'});
-        assert.equal(await page.evaluate(()=>rebuilds),0,'an unchanged summary does not rebuild the prompt');
+        assert.equal(await page.evaluate(()=>rebuilds),r0,'an unchanged summary / layout does not rebuild the prompt');
         await page.locator('#alabasta-case-card-save-btn').click();
         await page.waitForFunction(()=>writes.some(w=>w.caseVisualPrompt==='My custom prompt'));
-        assert.equal(await page.evaluate(()=>rebuilds),0,'save must preserve custom prompt');
+        assert.equal(await page.evaluate(()=>rebuilds),r0,'save must preserve custom prompt');
         await page.locator('#cs-model-lbl + .cs-seg button[data-value="as/gemini-3-pro-image"]').click();
         assert.equal(await page.locator('.case-studio-workflow-status').innerText(),'Settings changed — generate a new image.');
         assert.equal(await page.locator('#alabasta-case-card-save-btn').isDisabled(),true,'a stale image cannot be saved');
@@ -102,10 +118,15 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         await page.locator('#alabasta-case-card-generate-btn').click();
         await page.waitForFunction(()=>!document.getElementById('alabastaCaseCardModal').classList.contains('case-studio-busy'));
         assert.equal(await page.locator('#alabasta-case-card-save-btn').isDisabled(),false,'a fresh image can be saved');
+        const before = await page.evaluate(()=>rebuilds);
+        await page.locator('#cs-layout-lbl + .cs-seg button[data-value="minimal"]').click();
+        await page.waitForFunction(()=>!document.getElementById('alabastaCaseCardModal').classList.contains('case-studio-busy'));
+        assert.equal(await page.evaluate(()=>rebuilds),before+1,'a layout change rebuilds the prompt right away (an edit made afterwards is kept)');
+        assert.equal(await page.locator('.case-studio-workflow-status').innerText(),'Settings changed — generate a new image.','and makes the image stale');
         await page.locator('#alabasta-case-card-safe-summary').fill('Changed summary');
         await page.locator('#alabasta-case-card-generate-btn').click();
         await page.waitForFunction(()=>!document.getElementById('alabastaCaseCardModal').classList.contains('case-studio-busy'));
-        assert.equal(await page.evaluate(()=>rebuilds),1,'a changed summary rebuilds the prompt inside Generate');
+        assert.equal(await page.evaluate(()=>rebuilds),before+2,'a changed summary rebuilds the prompt inside Generate (the layout switch above was the +1)');
         await page.evaluate(()=>resetCaseStudioSteps());
         assert.equal(await page.locator('#alabasta-case-card-save-btn').isHidden(),true,'a new case: no Save until an image exists');
         assert.equal(await page.locator('#alabasta-case-card-generate-btn').innerText(),'Generate image');
