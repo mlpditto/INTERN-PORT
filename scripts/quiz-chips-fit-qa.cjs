@@ -22,6 +22,17 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
             for (let n = document.getElementById('quiz-list-card'); n && n !== document.body; n = n.parentElement) if (getComputedStyle(n).display === 'none') n.style.display = 'block';
             window.qaFitChips();
         });
+        // resize → the fit runs from a ResizeObserver + rAF, so wait for the expected state instead of a fixed sleep (a slow runner read the row before it re-fitted)
+        const settle = async (w, expectPlus) => {
+            await page.setViewportSize({ width: w, height: 900 });
+            if (expectPlus !== undefined) await page.waitForFunction(want => { const row = [...document.querySelectorAll('#quizzesTableInactive tbody tr')].find(t => t.querySelector('#fb-badge-busy')); return !!row.querySelector('.qa-plus') === want; }, expectPlus, { timeout: 10000 });
+            await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+        };
+        // the fit re-creates the "+n" button on every pass, so a real mouse click can land on a node that was just replaced — tap it from inside the page and wait for the new state
+        const tapPlus = async open => {
+            await page.evaluate(() => document.querySelector('#quizzesTableInactive .qa-plus').click());
+            await page.waitForFunction(want => { const b = document.querySelector('#quizzesTableInactive .qa-plus'); return !!b && (b.textContent === '−') === want; }, open, { timeout: 10000 });
+        };
         const snap = () => page.evaluate(() => {
             const rowOf = id => [...document.querySelectorAll('#quizzesTableInactive tbody tr')].find(t => t.querySelector('#fb-badge-' + id));
             const info = id => {
@@ -47,7 +58,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.equal(r.plain.plus, null, 'plain quiz: never a "+n"');
 
         // 2 · narrow (same page, resized): the lowest priorities fold, ⭐ and 🧪 stay, nothing overflows the line
-        await page.setViewportSize({ width: 390, height: 900 }); await page.waitForTimeout(400);
+        await settle(390, true);
         r = await snap();
         assert.ok(r.busy.plus && /^\+[IVXLCDM]+$/.test(r.busy.plus), 'phone: the "+n" button counts in Roman numerals: ' + r.busy.plus);
         const nHidden = await page.evaluate(() => [...document.querySelectorAll('#quizzesTableInactive .qa-l2')].map(l => [...l.children].filter(c => c.getAttribute('data-qp') && c.classList.contains('qa-hid')).length).find(x => x > 0));
@@ -59,19 +70,19 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
         for (const [n, roman] of [[1, 'I'], [4, 'IV'], [5, 'V'], [9, 'IX'], [11, 'XI'], [14, 'XIV'], [40, 'XL'], [1994, 'MCMXCIV']]) assert.equal(await page.evaluate(x => window.qaRoman(x), n), roman, 'qaRoman(' + n + ')');
         // 3 · tap unfolds every chip in place, tap again folds
-        await page.locator('#quizzesTableInactive .qa-plus').first().click();
+        await tapPlus(true);
         r = await snap();
         assert.equal(r.busy.visible, r.busy.total, 'unfolded: every chip visible'); assert.equal(r.busy.plus, '−', 'unfolded: the button becomes −'); assert.equal(r.busy.open, true);
-        await page.locator('#quizzesTableInactive .qa-plus').first().click();
+        await tapPlus(false);
         r = await snap();
         assert.ok(r.busy.visible < r.busy.total && /^\+[IVXLCDM]+$/.test(r.busy.plus), 'folded again');
 
         // 3b · tablet width (>480px, narrow card): Arabic digits again
-        await page.setViewportSize({ width: 640, height: 900 }); await page.waitForTimeout(400);
+        await settle(640); await page.waitForFunction(() => [...document.querySelectorAll('#quizzesTableInactive .qa-plus')].every(b => /^\+\d+$/.test(b.textContent)), null, { timeout: 10000 });
         r = await snap();
         if (r.busy.plus) assert.ok(/^\+\d+$/.test(r.busy.plus), 'above 480px the count is Arabic: ' + r.busy.plus);
         // 4 · wide again → back to everything, no "+n"
-        await page.setViewportSize({ width: 1600, height: 900 }); await page.waitForTimeout(400);
+        await settle(1600, false);
         r = await snap();
         assert.equal(r.busy.plus, null, 'back to wide: "+n" gone'); assert.equal(r.busy.visible, r.busy.total, 'back to wide: all chips shown');
         console.log('PASS: Quiz chips — all shown when the line has room (1600px), lowest priorities fold into "+n" only when they do not fit (390px: Roman numeral +V, Arabic above 480px; ⭐ 🧪 stay, hover lists, tap unfolds), plain quiz never folds, follows resize');
