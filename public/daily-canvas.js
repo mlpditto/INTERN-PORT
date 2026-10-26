@@ -15,7 +15,9 @@ document.addEventListener('DOMContentLoaded', function () {
     hero.id = 'dc-hero'; hero.className = 'dc-hero lang-no-toggle';
     hero.innerHTML = '<div class="dc-bar"><span class="dc-title">📓 Journal</span><span class="dc-fire" hidden></span><span class="dc-mdd" title="Today sent · ส่งแล้ววันนี้" hidden></span><span class="dc-date"></span></div>'
         + '<p class="dc-ask">How do you feel today?</p><div class="dc-quote" hidden></div><p class="dc-lock" hidden>🎓 Today’s +0.1 came from your Note · ส่ง Journal ได้อีกครั้งพรุ่งนี้</p><span class="dc-pts" hidden>+0.1</span>';
-    hero.querySelector('.dc-date').textContent = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Bangkok' }).format(new Date());
+    // "Mon 26 Oct" built from parts: ICU builds differ on the comma (Linux Chromium / LINE WebView give "Mon, 26 Oct")
+    const dp = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Bangkok' }).formatToParts(new Date()).map(p => [p.type, p.value]));
+    hero.querySelector('.dc-date').textContent = dp.weekday + ' ' + dp.day + ' ' + dp.month;
     pane.append(hero, day);
     const picker = byId('mood-picker');
     hero.querySelector('.dc-quote').before(picker);
