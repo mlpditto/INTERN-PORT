@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.431)</title>
+    <title>Nika Admin (V102.432)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -8000,7 +8000,7 @@
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <!-- V93.08: cache-bust on taxonomy.js for the LP Firestore overlay rollout -->
     <script src="ai-model-registry.js?v=V102.365"></script>
-    <script src="ai-model-ui.js?v=V102.365"></script>
+    <script src="ai-model-ui.js?v=V102.432"></script>
     <script src="ollama-local.js?v=V102.109"></script>
 <script src="case-dup.js?v=V102.401"></script>
 <script src="case-article.js?v=V102.395"></script>
@@ -18077,7 +18077,7 @@
             // response_format / max_tokens / reasoning, so it would not honour the server's contract.
             // V101.53: callers of OpenRouter's Image API (generationOptions.imageApi — Seedream, Muse) are
             // image-only models whose names need not contain "image"; the server is their only path.
-            const isProxyOnlyModel = (proxyProvider === 'openrouter' && /^x-ai\//i.test(modelName))
+            const isProxyOnlyModel = (proxyProvider === 'openrouter' && /^(x-ai|moonshotai)\//i.test(modelName))
                 || (proxyProvider === 'openrouter' && !!(generationOptions && generationOptions.imageApi))
                 || (proxyProvider === 'gemini-aistudio' && /image/i.test(modelName))
                 || (proxyProvider === 'openrouter' && /image/i.test(modelName))
@@ -19700,7 +19700,7 @@
         window.auditFixModel = () => resolveTrialTextAIModel((document.getElementById('quality-audit-model') || {}).value); // V101.52: keep a picked trial model
         // V101.84: owner logo for a model id (label's first word → assets/logos file via .text-ai-logo).
         window.aiModelLogoHtml = function(id) {
-            const owner = { Gemini: 'gemini', GPT: 'openai', Claude: 'claude', Qwen: 'qwen', DeepSeek: 'deepseek', Muse: 'meta', Grok: 'grok' }[((textAIModelInfo(id) || {}).label || '').split(' ')[0]];
+            const owner = { Gemini: 'gemini', GPT: 'openai', Claude: 'claude', Qwen: 'qwen', DeepSeek: 'deepseek', Muse: 'meta', Grok: 'grok', Kimi: 'kimi' }[((textAIModelInfo(id) || {}).label || '').split(' ')[0]];
             return owner ? `<span class="text-ai-logo" data-owner="${owner}" aria-hidden="true"></span>` : '';
         };
         // V101.84: ✦ Suggest fix is icon-only (✦ + model logo); the model name lives in the tooltip.
@@ -19793,7 +19793,7 @@
             // V101.52: trial models (Grok) are offered here only; picking one never becomes the Settings default.
             // V101.65: the provider tab carries the logo, so the chips here are names only.
             const chips = textAIChipContents(selected, action, null, extra).replace(/<span class="text-ai-provider"[^>]*>.*?<\/span>/g, '').replace(/<span class="text-ai-logo"[^>]*><\/span>/g, '').replace(/<button /g, '<button hidden ' ).replace(new RegExp('hidden ([^>]*aria-label="' + provider + ' )', 'g'), '$1');
-            const providerLogo = { Gemini: 'gemini', GPT: 'openai', Claude: 'claude', Qwen: 'qwen', DeepSeek: 'deepseek', Grok: 'grok', Ollama: 'ollama', Muse: 'meta' };   // V102.82: Ollama tab is a logo too
+            const providerLogo = { Gemini: 'gemini', GPT: 'openai', Claude: 'claude', Qwen: 'qwen', DeepSeek: 'deepseek', Grok: 'grok', Ollama: 'ollama', Muse: 'meta', Kimi: 'kimi' };   // V102.82: Ollama tab is a logo too
             // V101.21: tabs follow TEXT_AI_MODELS (first word of each label, in order) — the
             // hard-coded three left the Qwen / DeepSeek chips (V101.05) permanently hidden.
             const providers = [...new Set([...TEXT_AI_MODELS, ...extra].map(m => m.label.split(' ')[0]))];
@@ -64360,7 +64360,7 @@ Save it anyway?`;
         const APD_VENDOR_COLOR = { gemini: '#4285f4', openai: '#10a37f', claude: '#d97757', qwen: '#7c3aed', deepseek: '#2563eb', grok: '#111827', meta: '#0668e1', ollama: '#475569', ai: '#64748b' };
         function apdVendor(id) {
             id = String(id || '');
-            return /x-ai|grok/i.test(id) ? 'grok' : /meta|muse/i.test(id) ? 'meta' : /claude/i.test(id) ? 'claude' : /gemini|gemma/i.test(id) ? 'gemini' : /qwen/i.test(id) ? 'qwen' : /deepseek/i.test(id) ? 'deepseek' : /^ol\//.test(id) ? 'ollama' : /gpt|openai/i.test(id) ? 'openai' : 'ai';
+            return /x-ai|grok/i.test(id) ? 'grok' : /moonshot|kimi/i.test(id) ? 'kimi' : /meta|muse/i.test(id) ? 'meta' : /claude/i.test(id) ? 'claude' : /gemini|gemma/i.test(id) ? 'gemini' : /qwen/i.test(id) ? 'qwen' : /deepseek/i.test(id) ? 'deepseek' : /^ol\//.test(id) ? 'ollama' : /gpt|openai/i.test(id) ? 'openai' : 'ai';
         }
         function apdAgreeCounts(results) {
             const only = apdOnlyMap(results); let agree = 0, differ = 0;
@@ -69636,7 +69636,7 @@ ${window.clinicalAngleBlock ? window.clinicalAngleBlock() : ''}${steerBlock}
         };
         window._compareModelBPickerHtml = function() {
             const picked = window._compareModelB(), provider = ((textAIModelInfo(picked) || TEXT_AI_MODELS[0]).label || '').split(' ')[0];
-            const logo = { Gemini: 'gemini', GPT: 'openai', Claude: 'claude', Qwen: 'qwen', DeepSeek: 'deepseek', Muse: 'meta', Grok: 'grok', Ollama: 'ollama' };
+            const logo = { Gemini: 'gemini', GPT: 'openai', Claude: 'claude', Qwen: 'qwen', DeepSeek: 'deepseek', Muse: 'meta', Grok: 'grok', Ollama: 'ollama', Kimi: 'kimi' };
             const all = textAIChipsHtml('', window._compareModelB(), 'window.setCompareModelB(this)', TEXT_AI_TRIAL_MODELS);
             const providers = [...new Set([...all.matchAll(/<button [^>]*aria-label="([^"]*)"/g)].map(m => m[1].split(' ')[0]))];
             const chips = all.replace(/<button [^>]*>/g, tag => ((tag.match(/aria-label="([^"]*)"/) || [])[1] || '').split(' ')[0] === provider ? tag : tag.replace('<button ', '<button hidden ')); // V102.11: + Grok trial

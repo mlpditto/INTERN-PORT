@@ -28,10 +28,10 @@ assert.ok(at('_compareModelBPickerHtml') < at('generateAiProposalB') && at('gene
         await page.addScriptTag({ content: modelB });
         await page.evaluate(() => { localStorage.setItem('ai_default_2model_b', 'gpt-6-astra'); document.body.innerHTML = '<div id="b" style="background:#fff;padding:12px;width:860px">' + window._compareModelBPickerHtml() + '</div>'; });
         const vendors = await page.locator('#b .cmp-vendor').evaluateAll(ns => ns.map(n => [n.getAttribute('aria-label'), n.getAttribute('aria-pressed'), n.querySelector('.text-ai-logo')?.dataset.owner || '']));
-        assert.deepEqual(vendors, [['Gemini', 'false', 'gemini'], ['GPT', 'true', 'openai'], ['Claude', 'false', 'claude'], ['Qwen', 'false', 'qwen'], ['DeepSeek', 'false', 'deepseek'], ['Muse', 'false', 'meta'], ['Grok', 'false', 'grok'], ['Ollama', 'false', 'ollama']], 'eight vendor icons, the picked model\'s vendor pressed');
+        assert.deepEqual(vendors, [['Gemini', 'false', 'gemini'], ['GPT', 'true', 'openai'], ['Claude', 'false', 'claude'], ['Qwen', 'false', 'qwen'], ['DeepSeek', 'false', 'deepseek'], ['Muse', 'false', 'meta'], ['Grok', 'false', 'grok'], ['Kimi', 'false', 'kimi'], ['Ollama', 'false', 'ollama']], 'nine vendor icons, the picked model\'s vendor pressed');
         const shown = () => page.locator('#b .text-ai-chips > button:visible').evaluateAll(bs => bs.map(b => b.getAttribute('aria-label')));
         assert.deepEqual(await shown(), ['GPT 6 Luna', 'GPT 5.6 Terra', 'GPT 6.1 Sol', 'GPT 6 Astra'], 'only the picked vendor\'s models');
-        assert.equal(await page.locator('#b .text-ai-chips > button').count(), 19, 'every chip is still in the DOM (hidden), nothing duplicated');   // V102.365: + Gemini 4 Argon
+        assert.equal(await page.locator('#b .text-ai-chips > button').count(), 20, 'every chip is still in the DOM (hidden), nothing duplicated');   // V102.432: + Kimi K3.1 Pro; V102.365: + Gemini 4 Argon
         const ys = await page.locator('#b .cmp-b-lbl, #b .cmp-vendors, #b .text-ai-chips > button:visible').evaluateAll(ns => ns.map(n => { const r = n.getBoundingClientRect(); return Math.round(r.top + r.height / 2); }));
         assert.ok(Math.max(...ys) - Math.min(...ys) <= 8, 'B · vendors · models are ONE row: ' + ys);
         // pick another vendor → its models; picking a chip keeps ONE pressed chip and saves the choice

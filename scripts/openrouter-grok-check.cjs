@@ -46,6 +46,8 @@ const ok = (content, finish = 'stop', usage = { prompt_tokens: 100, completion_t
     check('T2 Grok: sent to OpenRouter chat/completions', g.url, 'https://openrouter.ai/api/v1/chat/completions');
     check('T2 Grok: model sent without the or/ prefix', g.body.model, 'x-ai/grok-4.7');
     check('T2 Grok: reasoning effort low (mandatory on OpenRouter, default high)', JSON.stringify(g.body.reasoning), '{"effort":"low","exclude":true}');
+    const kimi = await call({ model: 'moonshotai/kimi-k3.1-pro', isJson: true, maxOutputTokens: 8192, reply: ok('{}') });   // V102.432
+    check('T2 Kimi K3.1 Pro: OpenRouter, no or/ prefix, reasoning effort low, JSON mode', JSON.stringify([kimi.body.model, kimi.body.reasoning, kimi.body.response_format]), '["moonshotai/kimi-k3.1-pro",{"effort":"low","exclude":true},{"type":"json_object"}]');
     check('T2 Grok: JSON mode', JSON.stringify(g.body.response_format), '{"type":"json_object"}');
     check('T2 Grok: max_tokens follows the caller (32768)', g.body.max_tokens, 32768);
     check('T2 Grok: no image modalities on a text model', g.body.modalities, undefined);
@@ -120,7 +122,7 @@ const ok = (content, finish = 'stop', usage = { prompt_tokens: 100, completion_t
     check('T1 router: gpt-6-luna still openai', route('gpt-6-luna')[0], 'openai');
 
     // T7 — client: Grok is proxy-only and a proxy answer is not re-sent
-    check('T7 proxy-only includes openrouter x-ai/ models', /const isProxyOnlyModel = \(proxyProvider === 'openrouter' && \/\^x-ai\\\/\/i\.test\(modelName\)\)/.test(admin), true);
+    check('T7 proxy-only includes openrouter x-ai/ and moonshotai/ models (V102.432: + Kimi)', /const isProxyOnlyModel = \(proxyProvider === 'openrouter' && \/\^\(x-ai\|moonshotai\)\\\/\/i\.test\(modelName\)\)/.test(admin), true);
     check('T7 proxy-only still covers image models', /\|\| \(proxyProvider === 'gemini-aistudio' && \/image\/i\.test\(modelName\)\)\n\s*\|\| \(proxyProvider === 'openrouter' && \/image\/i\.test\(modelName\)\)/.test(admin), true);
     check('T7 a proxy answer is flagged final', /definitive\.proxyAnswered = true;\n\s*throw definitive;/.test(admin), true);
     check('T7 the catch does not re-send a final proxy answer', /\} catch \(e\) \{\n\s*if \(e\.proxyAnswered\) throw e;\n\s*console\.warn\('\[AI Proxy\] Link failed/.test(admin), true);
@@ -131,7 +133,9 @@ const ok = (content, finish = 'stop', usage = { prompt_tokens: 100, completion_t
     new Function('window', 'document', 'localStorage', fs.readFileSync(path.join(root, 'public', 'ai-model-ui.js'), 'utf8'))(win, doc, { getItem: () => null, setItem() {} });
     const grok = 'or/x-ai/grok-4.7';
     check('T8 Grok is NOT in TEXT_AI_MODELS (no other rail / select / QFP / Settings)', win.TEXT_AI_MODELS.some(m => m.id === grok), false);
-    check('T8 trial models are Grok, then local Ollama (V102.76)', JSON.stringify(win.TEXT_AI_TRIAL_MODELS.map(m => [m.id, m.short])), '[["or/x-ai/grok-4.7","Grok 4.7"],["ol/local","Ollama"]]');
+    check('T8 trial models are Grok, Kimi K3.1 Pro (V102.432), then local Ollama (V102.76)', JSON.stringify(win.TEXT_AI_TRIAL_MODELS.map(m => [m.id, m.short])), '[["or/x-ai/grok-4.7","Grok 4.7"],["or/moonshotai/kimi-k3.1-pro","Kimi K3.1 Pro"],["ol/local","Ollama"]]');
+    check('T8 Kimi is NOT in TEXT_AI_MODELS and never normalises into a default', win.TEXT_AI_MODELS.some(m => m.id === 'or/moonshotai/kimi-k3.1-pro') + '|' + win.normalizeTextAIModel('or/moonshotai/kimi-k3.1-pro'), 'false|gpt-6-luna');
+    check('T8 Kimi stays itself where a trial model is picked', win.resolveTrialTextAIModel('or/moonshotai/kimi-k3.1-pro'), 'or/moonshotai/kimi-k3.1-pro');
     check('T8 normaliser still maps Grok to the default (a saved default can never become Grok)', win.normalizeTextAIModel(grok), 'gpt-6-luna');
     // V101.72: a proxy that ANSWERED with an error must surface that error, not "proxy is unreachable".
     const uaStart = admin.indexOf('let proxyAnsweredError = \'\';');

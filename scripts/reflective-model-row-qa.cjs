@@ -49,7 +49,7 @@ for (const id of ['ai-model-review', 'ai-model-grammar', 'rr-providers', 'rr-gra
 
         // ---- desktop ----
         let p = await open(1000);
-        for (const row of ['rr-providers', 'rr-grammar-providers']) assert.deepEqual(await tabs(p, row), ['Gemini', 'GPT', 'Claude', 'Qwen', 'DeepSeek', 'Muse', 'Grok', 'Ollama'], row + ' tabs');
+        for (const row of ['rr-providers', 'rr-grammar-providers']) assert.deepEqual(await tabs(p, row), ['Gemini', 'GPT', 'Claude', 'Qwen', 'DeepSeek', 'Muse', 'Grok', 'Kimi', 'Ollama'], row + ' tabs');
         assert.equal(await openTab(p, 'rr-providers'), 'GPT', 'review default is Luna → GPT tab');
         assert.deepEqual(await visibleChips(p, 'rr-model-row'), ['Luna 6', 'Terra 5.6', 'Sol 6.1', 'Astra 6'], 'only GPT chips, names only');
         // the markup's stale `gemini-3.5-flash` default is not a catalogue id, so the registry normalises it to Luna (pre-existing, V94.18 → V101.64)

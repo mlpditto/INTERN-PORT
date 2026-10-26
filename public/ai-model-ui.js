@@ -32,12 +32,14 @@
     // the owner, so Gemini's `short` drops the word like GPT / Claude.
     // V102.11: Qwen / DeepSeek / Grok marks (assets/logos, already on the provider tabs) on every chip too — their
     // `short` keeps the name, since aiModelShortName shows it where no logo is drawn.
-    const LOGO_OWNERS = { GPT: 'openai', Claude: 'claude', Gemini: 'gemini', Qwen: 'qwen', DeepSeek: 'deepseek', Grok: 'grok', Muse: 'meta' };
+    const LOGO_OWNERS = { GPT: 'openai', Claude: 'claude', Gemini: 'gemini', Qwen: 'qwen', DeepSeek: 'deepseek', Grok: 'grok', Muse: 'meta', Kimi: 'kimi' };
     // V101.52: opt-in trial models. Only the audit toolbar offers them; they are NOT in
     // TEXT_AI_MODELS, so no other rail, select, Settings default or normaliser sees them.
     // Grok 4.7 trial (GROK_OPENROUTER_INTEGRATION_PLAN.md step C, 2026-09-24): Audit + Analyze.
     const trialModels = window.TEXT_AI_TRIAL_MODELS = [
         { id: 'or/x-ai/grok-4.7', label: 'Grok 4.7', short: 'Grok 4.7', hint: 'Grok 4.7 (SpaceXAI) รุ่นทดลอง สำหรับ Audit / Analyze ผ่าน OpenRouter' },
+        // V102.432: Kimi K3.1 Pro (Moonshot AI, open-weight reasoning, 1M context, text / image / video in) via OpenRouter — $2/$10 per MTok; trial like Grok, so only the audit toolbar offers it.
+        { id: 'or/moonshotai/kimi-k3.1-pro', label: 'Kimi K3.1 Pro', short: 'Kimi K3.1 Pro', hint: 'Kimi K3.1 Pro ของ Moonshot AI รุ่นทดลอง (reasoning, บริบท 1M, รับภาพ) ผ่าน OpenRouter Moonshot AI Kimi K3.1 Pro, 실험용 추론 모델, OpenRouter 경유' },
         // V102.76: Ollama on the admin's own computer (ollama-local.js; the browser calls localhost:11434 directly).
         { id: 'ol/local', label: 'Ollama local', short: 'Ollama', hint: 'Ollama บนเครื่องนี้ (localhost:11434) รุ่นทดลอง ใช้ได้เมื่อ Ollama เปิดอยู่และอนุญาตเว็บนี้ใน OLLAMA_ORIGINS — ไม่คิดค่าใช้จ่าย ช้ากว่าโมเดลออนไลน์' }
     ];
