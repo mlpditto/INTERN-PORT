@@ -19,8 +19,12 @@
     var FILTERS = [['all', 'All'], ['draft', 'Draft'], ['scheduled', 'Scheduled'], ['live', 'Live'], ['ended', 'Ended']];
     var RERUN = [['off', 'Off', 'Interns who join after it ends never get it'], ['any', 'All new interns', 'Interns who join after it ends get it too, oldest first, one a day']];
     var MAX_BODY = 2000, MAX_TITLE = 90, BKK = 7 * 3600e3;
-    var S = { list: [], loaded: false, loading: false, err: '', filter: 'all', tag: '', cur: null, lang: 'en', saving: false, del: false, pick: '', q: '', codex: null, base: '', savedAt: 0, open: {}, who: false, whoF: 'all', model: '', modelOpen: false, aiBusy: false, aiNote: '' };
+    var S = { list: [], loaded: false, loading: false, err: '', filter: 'all', tag: '', cur: null, lang: 'en', saving: false, del: false, pick: '', q: '', codex: null, base: '', savedAt: 0, open: {}, who: false, whoF: 'all', qs: false, qsF: 'open', qDraft: {}, qBusy: '', qErr: '', model: '', modelOpen: false, aiBusy: false, aiNote: '' };
     var DONE = ['ok', 'quiz', 'codex', 'hist'];   // what counts as read (articles.js); 'x' = closed without reading
+    // V102.430: 💬 Any Q? — interns' questions (article_questions, written by articles.js). Live; never shows who asked (authUid / userId
+    // are only for sending the reply back). Open ones count on the rows (💬 n · ⚠️ n) and on the Dashboard chip.
+    var Q = { list: [], unsub: null, err: '' };
+    var QKIND = { ask: ['❓', 'Question'], wrong: ['⚠️', 'Wrong / out of date'], add: ['💡', 'Please add'] }, QMAX_REPLY = 1000;
     // V102.362: 🌐 Translate all — one click fills every missing TH / KO from the EN version and saves, one at a time
     var TR = { busy: false, stop: false, prog: '' };
     var DA = { busy: false, stop: false, prog: '' };   // V102.375: 🩺 Draft all — the Disease Codex twin of Translate all
@@ -306,6 +310,13 @@
             '.art-whop{border:1px solid #e2e8f0;border-radius:16px;padding:12px 14px;min-width:0;grid-column:2 / -1}.art-x{min-height:0;margin:0;width:30px;height:30px;padding:0;border:0;border-radius:50%;background:#f1f5f9;color:#64748b;cursor:pointer;flex:none}.art-whop .h{display:flex;align-items:center;gap:8px;margin-bottom:8px}.art-whop .h b{font-size:15px}.art-whop .h .sub{font-size:12px;color:#64748b;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
             '.art-wr{display:flex;align-items:center;gap:9px;padding:7px 4px;border-bottom:1px solid #f1f5f9}.art-wr .av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:12px;color:#334155;flex:none;overflow:hidden;background:#e2e8f0}.art-wr .av img{width:100%;height:100%;object-fit:cover}' +
             '.art-wr .nm{flex:1;min-width:0}.art-wr .nm b{font-size:13px}.art-wr .nm small{display:block;font-size:11.5px;color:#64748b}.art-wr .pill{padding:2px 9px;border-radius:999px;font-weight:800;font-size:12px;white-space:nowrap}.art-wr .pill.read{background:#dcfce7;color:#166534}.art-wr .pill.closed{background:#fef3c7;color:#92400e}.art-wr .pill.wait{background:#f1f5f9;color:#64748b}.art-wr .tm{font-size:11px;color:#94a3b8;text-align:right;min-width:86px}' +
+            // V102.430 💬 Any Q?: row chips · the Questions panel (no names anywhere)
+            '.art-qc{display:inline-flex;align-items:center;padding:1px 7px;border-radius:999px;background:#eef2ff;color:#3730a3;font-size:10.5px;font-weight:800;cursor:pointer;border:1px solid #c7d2fe}.art-qc.w{background:#fffbeb;color:#92400e;border-color:#fcd34d}' +
+            '.art-ql{max-height:60vh;overflow:auto;display:flex;flex-direction:column;gap:8px}.art-q{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;background:#fff}.art-q.k-wrong{border-left:3px solid #f59e0b}.art-q.s-answered,.art-q.s-closed{background:#f8fafc}' +
+            '.art-q .top{display:flex;align-items:center;gap:8px;font-size:11.5px;color:#64748b}.art-q .kd{font-weight:800;color:#334155}.art-q.k-wrong .kd{color:#92400e}.art-q .tm{margin-left:auto}.art-q .tx{margin:5px 0 7px;font-size:13.5px;color:#1e293b;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}' +
+            '.art-q textarea{display:block;width:100%;box-sizing:border-box;margin:0;min-height:52px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:10px;font:inherit;font-size:13px;resize:vertical}.art-q .qa{display:flex;gap:6px;justify-content:flex-end;margin-top:6px}' +
+            '.art-q .qa button{width:auto;min-height:0;margin:0;padding:6px 12px;border-radius:999px;border:1px solid #e2e8f0;background:#fff;color:#475569;font-size:12.5px;font-weight:700;cursor:pointer}.art-q .qa .go{background:#4f46e5;border-color:#4f46e5;color:#fff}.art-q .qa button:disabled{opacity:.6;cursor:default}' +
+            '.art-q .rp{background:#ecfdf5;border-radius:4px 12px 12px 12px;padding:6px 10px;font-size:13px;color:#065f46;white-space:pre-wrap;overflow-wrap:anywhere}.art-q .rp.cl{background:#f1f5f9;color:#64748b}.art-q .rp small{display:block;font-size:11px;color:#94a3b8;margin-top:2px}' +
             '.art-wl{max-height:56vh;overflow:auto}.art-ai{margin-left:auto;display:inline-flex;align-items:center;gap:4px}.art-tb .art-ai button{width:auto;padding:0 9px;font-size:12px}.art-tb .art-ai .go{background:#fef3c7;color:#92400e}.art-tb .art-ai .go:disabled{opacity:.6}.art-tb .art-ai .mdl{color:#64748b;font-weight:700}' +
             '.art-mrail{padding:6px 8px;border-bottom:1px solid #e2e8f0;background:#fcfcfd}.art-mrail .audit-model-row{margin:0;padding:0;border:0;gap:6px;flex-wrap:nowrap;overflow-x:auto}.art-mrail .audit-providers{flex-wrap:nowrap;gap:4px;padding-right:6px;border-right:1px solid #e2e8f0}.art-mrail .text-ai-chips{display:flex;flex-wrap:nowrap;gap:4px}.art-mrail .text-ai-chips>button[hidden]{display:none!important}.art-mrail .audit-provider{width:30px;height:30px;min-height:0;margin:0;padding:0;border:1px solid transparent;border-radius:8px;background:transparent;box-shadow:none;display:grid;place-items:center;cursor:pointer}.art-mrail .audit-provider[aria-pressed="true"]{background:#eef2ff;border-color:#c7d2fe}.art-mrail .text-ai-chips>button{min-height:0;margin:0;padding:4px 10px;font-size:12px}' +   // V102.341: only the picked vendor's models show (the shared rail marks the rest [hidden]); one line
             '.art-ft .ai{color:#b45309;font-weight:700}' +
@@ -349,7 +360,7 @@
         var st = status(a, now), have = langsOf(a), aud = (a.audience.divisions || []).concat(a.audience.groups || []);
         return '<button type="button" class="art-row st-' + st + (S.cur && S.cur.id === a.id ? ' sel' : '') + (st === 'ended' ? ' ended' : '') + '" onclick="Articles.edit(\'' + esc(a.id) + '\')">' +
             '<span class="art-tile">' + esc(a.cover.emoji) + '</span><span style="min-width:0"><span class="art-t">' + esc(title(a)) + '</span><span class="art-meta"><span class="art-st ' + st + '">' + esc(stLabel(a, now)) + '</span>' +
-            LANGS.map(function (l) { return '<span class="art-lg' + (have.indexOf(l[0]) < 0 ? ' off' : '') + '" title="' + l[1] + '">' + FLAG[l[0]] + '</span>'; }).join('') + rowTagsHtml(a) +
+            LANGS.map(function (l) { return '<span class="art-lg' + (have.indexOf(l[0]) < 0 ? ' off' : '') + '" title="' + l[1] + '">' + FLAG[l[0]] + '</span>'; }).join('') + qChipsHtml(a) + rowTagsHtml(a) +
             (aud.length ? '<span title="Audience">' + esc(aud.join(' · ')) + '</span>' : '') + (a.rerun === 'off' ? '' : '<span class="art-rr" title="Also sent to interns who join later">🔁</span>') + '</span></span></button>';
     }
     // V102.371: the 🩺 chip says where the article stands in the Disease Codex
@@ -536,7 +547,62 @@
         return '<div class="art-stats" id="art-stats"><div class="hd"><span>Read</span><span>' + c.read + ' / ' + c.n + ' · ' + pct + '%</span></div><div class="bar"><i style="width:' + pct + '%"></i></div>' +
             '<div class="n"><span title="Read">✓ ' + c.read + '</span><span title="Closed without reading">👁 ' + c.closed + '</span><span title="Not seen yet">⏳ ' + c.wait + '</span>' +
             (c.saved ? '<span title="Saved 🔖">🔖 ' + c.saved + '</span>' : '') + (c.quiz ? '<span title="Opened the quiz">🧪 ' + c.quiz + '</span>' : '') + (c.rerun ? '<span title="New interns (re-run)">🔁 ' + c.rerun + '</span>' : '') + '</div>' +
-            '<button type="button" class="who" onclick="Articles.who(true)">👥 Who read it ›</button></div>';
+            '<button type="button" class="who" onclick="Articles.who(true)">👥 Who read it ›</button>' + (qOf(a.id).all.length ? '<button type="button" class="who" onclick="Articles.qs(\'' + esc(a.id) + '\')">💬 Questions (' + qOf(a.id).all.length + ') ›</button>' : '') + '</div>';
+    }
+    // ---- 💬 Any Q? (V102.430)
+    function qOf(id) {
+        var all = Q.list.filter(function (q) { return q.articleId === id; }), open = all.filter(function (q) { return q.status === 'open'; });
+        return { all: all, open: open, wrong: open.filter(function (q) { return q.kind === 'wrong'; }).length, other: open.filter(function (q) { return q.kind !== 'wrong'; }).length };
+    }
+    // a <span> (the row itself is a <button>): tap = open the article on its questions
+    function qChipsHtml(a) {
+        var c = qOf(a.id), go = 'event.stopPropagation();Articles.qs(\'' + esc(a.id) + '\')';
+        return (c.other ? '<span class="art-qc" role="button" tabindex="0" title="Open questions" onclick="' + go + '">💬 ' + c.other + '</span>' : '') +
+            (c.wrong ? '<span class="art-qc w" role="button" tabindex="0" title="Reported wrong / out of date" onclick="' + go + '">⚠️ ' + c.wrong + '</span>' : '');
+    }
+    function qsRows(a) {
+        var rank = { open: 0, answered: 1, closed: 2 };
+        return qOf(a.id).all.filter(function (q) { return S.qsF === 'all' || q.status === S.qsF; })
+            .sort(function (x, y) { return (rank[x.status] - rank[y.status]) || ((x.kind === 'wrong') - (y.kind === 'wrong')) * -1 || (msOf(x.createdAt) || 0) - (msOf(y.createdAt) || 0); });
+    }
+    function qsHtml(a) {
+        var all = qOf(a.id).all, n = function (st) { return all.filter(function (q) { return q.status === st; }).length; };
+        var F = [['open', '⏳ Open', n('open')], ['answered', '✓ Answered', n('answered')], ['closed', 'Closed', n('closed')], ['all', 'All', all.length]];
+        return '<div class="art-whop art-qp" id="art-qs"><div class="h"><b>💬 Questions</b><span class="sub">' + esc(title(a)) + ' · names are never shown</span><button type="button" class="art-x" onclick="Articles.qs(false)" aria-label="Back to the editor" title="Back">✕</button></div>' +
+            '<div class="art-rail" role="group" aria-label="Filter questions" style="margin-bottom:8px">' + F.map(function (f) { return '<button type="button" class="' + (S.qsF === f[0] ? 'on' : '') + '" aria-pressed="' + (S.qsF === f[0]) + '" data-qf="' + f[0] + '" onclick="Articles.qsF(\'' + f[0] + '\')">' + f[1] + '<b>' + f[2] + '</b></button>'; }).join('') + '</div>' +
+            '<div class="art-ql">' + (qsRows(a).map(function (q) {
+                var k = QKIND[q.kind] || QKIND.ask, busy = S.qBusy === q.id;
+                var foot = q.status === 'open'
+                    ? '<textarea id="art-qr-' + esc(q.id) + '" maxlength="' + QMAX_REPLY + '" rows="2" placeholder="Reply — the intern sees it in History" aria-label="Reply" oninput="Articles.qType(\'' + esc(q.id) + '\',this.value)"' + (busy ? ' disabled' : '') + '>' + esc(S.qDraft[q.id] || '') + '</textarea>' +
+                      '<div class="qa"><button type="button" class="go" onclick="Articles.qReply(\'' + esc(q.id) + '\')"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Saving…' : '↩ Reply') + '</button><button type="button" onclick="Articles.qClose(\'' + esc(q.id) + '\')"' + (busy ? ' disabled' : '') + ' title="Close without a reply — the intern sees nothing">Close</button></div>'
+                    : q.status === 'answered' ? '<div class="rp">↩ ' + esc(q.reply || '') + '<small>' + esc(whenStr(msOf(q.repliedAt))) + '</small></div>' : '<div class="rp cl">Closed without a reply<small>' + esc(whenStr(msOf(q.closedAt))) + '</small></div>';
+                return '<div class="art-q k-' + esc(q.kind) + ' s-' + esc(q.status) + '" data-q="' + esc(q.id) + '"><div class="top"><span class="kd">' + k[0] + ' ' + k[1] + '</span><span class="tm">' + esc(whenStr(msOf(q.createdAt))) + (q.lang ? ' · ' + (FLAG[q.lang] || '') : '') + '</span></div>' +
+                    '<div class="tx">“' + esc(q.text) + '”</div>' + foot + '</div>';
+            }).join('') || '<div class="art-empty">' + (Q.err ? '⚠️ ' + esc(Q.err) : 'Nothing here.') + '</div>') + '</div>' +
+            (S.qErr ? '<div class="art-warn" role="alert">⚠️ ' + esc(S.qErr) + '</div>' : '') + '</div>';
+    }
+    function paintQChip() {
+        var n = Q.list.filter(function (q) { return q.status === 'open'; }).length, c = document.getElementById('stat-artq-count'), chip = document.getElementById('chip-artq');
+        if (c) c.textContent = n;
+        if (chip) chip.style.display = n > 0 ? 'flex' : 'none';
+    }
+    function listenQs() {
+        if (Q.unsub || typeof db === 'undefined' || !db) return;
+        try {
+            Q.unsub = db.collection('article_questions').onSnapshot(function (snap) {
+                Q.list = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); }); Q.err = '';
+                paintQChip();
+                if (document.getElementById('art-body') && !document.activeElement.closest('#art-qs textarea')) render();
+            }, function (e) { Q.err = (e && e.message) || 'Could not load the questions.'; console.warn('[articles] questions:', Q.err); });
+        } catch (e) { console.warn('[articles] questions listener:', e && e.message); }
+    }
+    function qWrite(id, fields) {
+        if (S.qBusy) return Promise.resolve(false);
+        S.qBusy = id; S.qErr = ''; render();
+        return db.collection('article_questions').doc(id).update(fields).then(function () {
+            var q = Q.list.find(function (x) { return x.id === id; }); if (q) Object.assign(q, fields, { repliedAt: fields.repliedAt ? Date.now() : q.repliedAt, closedAt: fields.closedAt ? Date.now() : q.closedAt });
+            delete S.qDraft[id]; paintQChip(); return true;
+        }).catch(function (e) { S.qErr = 'Not saved: ' + ((e && e.message) || 'error') + ' — your text is kept.'; return false; }).then(function (ok) { S.qBusy = ''; render(); return ok; });
     }
     var ACT = { ok: 'Got it', quiz: '🧪 opened the quiz', codex: '💊 opened Codex', hist: 'read in History', x: 'closed ✕ without reading' };
     function whenStr(ms) { return ms == null ? '' : new Date(ms + BKK).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' }); }
@@ -571,7 +637,7 @@
         }).join('') + '</div>' + (S.tag ? '<button type="button" class="art-tagf" onclick="Articles.tag(\'\')" title="Showing only this tag — tap to clear">🏷 ' + esc(S.tag) + ' ✕</button>' : '') + trAllHtml() + daAllHtml() + '<button type="button" class="art-new" onclick="Articles.edit(null)">＋ New</button></div>';
         var left = '<div class="art-list">' + (S.loading && !S.loaded ? '<div class="art-empty">Loading…</div>' : list.length ? list.map(function (a) { return rowHtml(a, now); }).join('') : '<div class="art-empty">' + (S.list.length ? 'Nothing here.' : 'No articles yet — ＋ New') + '</div>') + '</div>';
         var mid = S.cur ? editorHtml(now) : '<div class="art-empty">' + (S.err && !S.loaded ? '⚠️ ' + esc(S.err) : 'Pick an article, or ＋ New.') + '</div>';
-        host.innerHTML = head + '<div class="art-g">' + left + (S.cur && S.who ? whoHtml(S.cur) : mid + (S.cur ? previewHtml() : '<div class="art-pv"></div>')) + '</div>';
+        host.innerHTML = head + '<div class="art-g">' + left + (S.cur && S.who ? whoHtml(S.cur) : S.cur && S.qs ? qsHtml(S.cur) : mid + (S.cur ? previewHtml() : '<div class="art-pv"></div>')) + '</div>';
         fitPv();
     }
     // V102.346: like the intern sheet, a body that fits needs no Read more
@@ -595,7 +661,7 @@
 
     // ---- actions
     function open() {
-        css(); shell().style.display = 'block';
+        css(); shell().style.display = 'block'; listenQs();
         render();
         if (!S.loaded) load();
     }
@@ -603,14 +669,14 @@
     function edit(id) {
         var a = id ? S.list.find(function (x) { return x.id === id; }) : null;
         S.cur = a ? fromDoc(a.id, Object.assign({}, a)) : blank(Date.now());
-        S.lang = 'en'; S.err = ''; S.del = false; S.pick = ''; S.base = JSON.stringify(S.cur); S.savedAt = 0; S.hint = null; S.hintOff = S.hintOff || {}; S.open = {}; S.who = false; S.whoF = 'all'; S.aiNote = ''; S.modelOpen = false; S.pvMore = false;
+        S.lang = 'en'; S.err = ''; S.del = false; S.pick = ''; S.base = JSON.stringify(S.cur); S.savedAt = 0; S.hint = null; S.hintOff = S.hintOff || {}; S.open = {}; S.who = false; S.whoF = 'all'; S.qs = false; S.qsF = 'open'; S.qErr = ''; S.aiNote = ''; S.modelOpen = false; S.pvMore = false;
         render();
     }
     var api = {
         open: open, close: close, edit: edit, pvMore: pvMore, load: load, save: save, remove: remove, openPick: openPick, userChip: userChip,
         // after admin sign-in: load the list quietly so the User Hub 📰 chips have data, then repaint the Users table once if it is open
         boot: function () {
-            css();
+            css(); listenQs();
             if (S.loaded || S.loading) return Promise.resolve();
             return load().then(function () {
                 var t = document.getElementById('tab-users');
@@ -623,7 +689,27 @@
         addTag: function (v) { var a = S.cur; if (!a) return; a.tags = tagsOf((a.tags || []).concat(String(v || '').split(','))); render(); var i = document.getElementById('art-tag-in'); if (i) i.focus(); },
         dropTag: function (i) { var a = S.cur; if (!a) return; a.tags = (a.tags || []).filter(function (_, k) { return k !== i; }); render(); },
         tagKey: function (e) { var el = e && e.target; if (!el) return; if (e.type === 'keydown') { if (e.key !== 'Enter' && e.key !== ',') return; e.preventDefault(); } if (!String(el.value || '').trim()) return; var v = el.value; el.value = ''; api.addTag(v); },
-        who: function (on) { S.who = !!on; render(); },
+        who: function (on) { S.who = !!on; S.qs = false; render(); },
+        // V102.430 💬 Any Q?: open an article on its questions (a row chip, the stats button or the Dashboard chip), filter, reply, close
+        qs: function (id) {
+            if (id === false) { S.qs = false; render(); return; }
+            if (id && (!S.cur || S.cur.id !== id)) edit(id);
+            S.qs = true; S.who = false; S.qsF = qOf(S.cur && S.cur.id).open.length ? 'open' : 'all'; render();
+        },
+        qsF: function (f) { S.qsF = f; render(); },
+        qType: function (id, v) { S.qDraft[id] = v; },
+        qReply: function (id) {
+            var t = String(S.qDraft[id] || '').trim().slice(0, QMAX_REPLY);
+            if (!t) { S.qErr = 'Write a reply first.'; render(); return Promise.resolve(false); }
+            return qWrite(id, { status: 'answered', reply: t, repliedAt: firebase.firestore.FieldValue.serverTimestamp(), repliedBy: editorEmail() || 'admin' });
+        },
+        qClose: function (id) { return qWrite(id, { status: 'closed', closedAt: firebase.firestore.FieldValue.serverTimestamp(), closedBy: editorEmail() || 'admin' }); },
+        // the Dashboard chip: the manager, on the article with the oldest open question
+        inbox: function () {
+            open();
+            var o = Q.list.filter(function (q) { return q.status === 'open'; }).sort(function (x, y) { return (msOf(x.createdAt) || 0) - (msOf(y.createdAt) || 0); })[0];
+            return Promise.resolve(S.loaded ? null : load()).then(function () { if (o && S.list.some(function (a) { return a.id === o.articleId; })) api.qs(o.articleId); });
+        },
         whoF: function (f) { S.whoF = f; render(); },
         csv: function () {
             var a = S.cur; if (!a) return;
@@ -824,7 +910,7 @@
             ta.focus(); ta.setSelectionRange(s + pre.length, e + pre.length);
             api.text('body', ta.value);
         },
-        _S: S, _daJobs: daJobs, _codexNameOf: codexNameOf, _stats: stats, _forUser: forUser, _status: status, _defaultWindow: defaultWindow, _validate: validate, _toDoc: toDoc, _tagsOf: tagsOf, _allTags: allTags, _toLocal: toLocal, _fromLocal: fromLocal, _readMin: readMin, _langsOf: langsOf
+        _S: S, _Q: Q, _qOf: qOf, _daJobs: daJobs, _codexNameOf: codexNameOf, _stats: stats, _forUser: forUser, _status: status, _defaultWindow: defaultWindow, _validate: validate, _toDoc: toDoc, _tagsOf: tagsOf, _allTags: allTags, _toLocal: toLocal, _fromLocal: fromLocal, _readMin: readMin, _langsOf: langsOf
     };
     window.Articles = api;
 })();
