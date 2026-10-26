@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     layout.id = 'case-studio-layout';
     [['infographic', 'Case infographic'], ['lifestyle', 'Lifestyle triggers'], ['symptoms', 'Symptoms + body'], ['selfcare', 'Self-care'], ['minimal', 'Minimal']].forEach(([value, label]) => layout.add(new Option(label, value)));
     layout.hidden = true;
-    settings.innerHTML = '<h4>Set up image</h4><div class="cs-grp"><span class="cs-lbl" id="cs-layout-lbl">Template</span><div class="cs-seg" role="radiogroup" aria-labelledby="cs-layout-lbl"></div></div><div class="cs-grp"><span class="cs-lbl" id="cs-mode-lbl">Mode</span><div class="cs-seg" role="radiogroup" aria-labelledby="cs-mode-lbl"></div></div><div class="cs-grp"><span class="cs-lbl" id="cs-model-lbl">Image model</span><div class="cs-seg" role="radiogroup" aria-labelledby="cs-model-lbl"></div></div>';
+    settings.innerHTML = '<h4>Image</h4><div class="cs-grp"><span class="cs-lbl" id="cs-layout-lbl">Template</span><div class="cs-seg" role="radiogroup" aria-labelledby="cs-layout-lbl"></div></div><div class="cs-grp"><span class="cs-lbl" id="cs-mode-lbl">Mode</span><div class="cs-seg" role="radiogroup" aria-labelledby="cs-mode-lbl"></div></div><div class="cs-grp"><span class="cs-lbl" id="cs-model-lbl" title="Image model">Model</span><div class="cs-seg" role="radiogroup" aria-labelledby="cs-model-lbl"></div></div>';
     settings.append(layout, mode, model);
     const [layoutRail, modeRail, modelRail] = settings.querySelectorAll('.cs-seg');
     const ownerOf = id => (/gemini|nano/i.test(id) ? 'gemini' : /gpt|openai/i.test(id) ? 'openai' : /grok/i.test(id) ? 'grok' : '');
@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const rateRow = document.createElement('div');
     rateRow.className = 'cs-rate'; rateRow.hidden = true;
     rateRow.innerHTML = '<span>Rate this image</span><button type="button" data-vote="up" title="Good — counted for this model" aria-label="Like this image">👍</button><button type="button" data-vote="down" title="Not good — counted for this model" aria-label="Dislike this image">👎</button>';
-    byId('image-wrap').after(rateRow);
+    byId('image-download').before(rateRow);   // V102.428: 👍 / 👎 sit in the bar on the image, beside ⬇ PNG
     let lastGen = null, voted = false;
     async function loadTally() {
         const ref = fbRef(); if (!ref) return;
@@ -107,9 +107,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const status = document.createElement('div');
     status.className = 'case-studio-workflow-status'; status.setAttribute('role', 'status');
     preview.prepend(settings);
-    settings.after(status);
-    // V102.418: the three things to do, in order, as numbers on the headings (a guide on ONE page — nothing to switch)
-    byId('step-1').querySelector('label').dataset.n = '1'; settings.querySelector('h4').dataset.n = '2'; status.dataset.n = '3';
+    // V102.428 (lean A, mockup pick 2026-10-26): ONE screen, no scroll. The header is one line (title · case # · privacy · Close /
+    // Save draft / Generate), so the footer goes; its message line moves under the summary. The status line lives in the bar on
+    // the image and only speaks when the image is stale (the pill already says Generating / Ready).
+    const header = find('.alabasta-casecard-header');
+    const idChip = document.createElement('span');
+    idChip.className = 'cs-idc'; idChip.hidden = true;
+    header.querySelector('.alabasta-casecard-title').after(idChip);
+    const idBadge = byId('id-badge');
+    const syncId = () => { idChip.textContent = idBadge.textContent; idChip.hidden = idBadge.hidden || !idBadge.textContent; };
+    new MutationObserver(syncId).observe(idBadge, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
+    header.append(actions);
+    inputs.append(byId('meta'));
+    byId('image-status').after(status);
+    // V102.418: the things to do, in order, as numbers on the headings (a guide on ONE page — nothing to switch)
+    byId('step-1').querySelector('label').dataset.n = '1'; settings.querySelector('h4').dataset.n = '2';
     let busy = false, generated = '', reviewed = '';
     const snapshot = () => JSON.stringify([summary.value, prompt.value, model.value, mode.value, layout.value]);
     function render() {
@@ -131,6 +143,8 @@ document.addEventListener('DOMContentLoaded', () => {
         generate.disabled = busy; save.disabled = busy || !!stale;
         if (!busy) { generate.textContent = generated ? 'Regenerate image' : 'Generate image'; save.textContent = 'Save draft'; }
         status.textContent = busy ? 'Working…' : stale ? 'Settings changed — generate a new image.' : generated ? 'Ready for review' : 'Generate & review';
+        status.dataset.state = busy ? 'busy' : stale ? 'stale' : generated ? 'ready' : 'idle';
+        promptPeek.textContent = prompt.value.trim().split('\n')[0];
         root.classList.toggle('case-studio-busy', busy);
     }
     async function run(task) {
@@ -164,7 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const consentRow = document.createElement('label');
     consentRow.className = 'cs-consent';
     consentRow.title = 'Tick only when the patient agreed to share the workplace name and exact dates. Saved on this case; the summary is rebuilt from the original note.';
-    consentRow.innerHTML = '<input type="checkbox" id="alabasta-case-card-consent"><span>Patient agreed — workplace and exact dates may appear</span>';
+    consentRow.innerHTML = '<input type="checkbox" id="alabasta-case-card-consent"><span>Patient agreed · workplace + dates may appear</span>';
     byId('step-1').querySelector('.alabasta-casecard-note').after(consentRow);
     const consentBox = consentRow.querySelector('input');
     consentBox.onchange = () => {
@@ -177,14 +191,18 @@ document.addEventListener('DOMContentLoaded', () => {
         byId('step-2').open = false; find('.alabasta-casecard-details').open = false; payEl.hidden = true; techBtn.textContent = TECH; render();
     };
     find('.alabasta-casecard-subtitle').textContent = 'Review the summary, pick a model, then generate.';
-    find('.alabasta-casecard-badge').textContent = 'Privacy checked';
-    find('.alabasta-casecard-badge').title = 'ตรวจข้อมูลระบุตัวบุคคลในสรุปและภาพอีกครั้งก่อนบันทึก';
+    find('.alabasta-casecard-badge').textContent = '🛡 Privacy ✓';
+    find('.alabasta-casecard-badge').title = 'Privacy checked · no identifiers should appear in the summary or image prompt · ตรวจข้อมูลระบุตัวบุคคลในสรุปและภาพอีกครั้งก่อนบันทึก';
     byId('step-1').querySelector('label').textContent = 'Anonymized summary';
     byId('step-1').querySelector('.alabasta-casecard-note').textContent = 'Check accuracy and remove identifying details before generating.';
-    byId('step-2').querySelector('summary').textContent = 'Prompt · View / edit';
+    // the two folds read as one-line rows: an icon, the name, then a peek at what is inside
+    const promptPeek = document.createElement('span');
+    promptPeek.className = 'cs-peek';
+    byId('step-2').querySelector('summary').replaceChildren('✎ Prompt', promptPeek);
     byId('step-2').querySelector('summary').title = 'เปิดดูหรือแก้ไขพรอมป์ต์';
     byId('step-2').querySelector('.alabasta-casecard-note').textContent = 'Optional: edit the prompt before generating.';
-    find('.alabasta-casecard-details-kicker span').textContent = 'Source & advanced details';
+    find('.alabasta-casecard-details-kicker span').textContent = 'Source';
+    find('.alabasta-casecard-details-kicker').insertAdjacentHTML('beforeend', '<span class="cs-peek">category · image brief · original note</span>');
     find('.alabasta-casecard-details-summary').title = 'ดูข้อมูลต้นฉบับ หมวดหมู่ และข้อมูลประกอบ';
     ['taxonomy', 'safe-payload', 'original'].forEach((id, i) => { root.querySelector(`label[for="alabasta-case-card-${id}"]`).textContent = ['Taxonomy summary', 'Safe payload', 'Original note'][i]; });
     find('#alabasta-case-card-image-wrap > label').textContent = 'Image preview';

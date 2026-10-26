@@ -75,17 +75,20 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         await page.setViewportSize({width:1440,height:640});
         const lean = await page.evaluate(()=>{
             const q = s => document.querySelector(s), r = el => el.getBoundingClientRect();
-            const tpl = q('#cs-layout-lbl + .cs-seg'), mode = q('.cs-mode-inline'), h4 = q('.case-studio-settings h4'), foot = q('.alabasta-casecard-footer');
-            return { tplH: Math.round(r(tpl).height), modeAbs: getComputedStyle(mode).position, modeOnHeading: r(mode).top < r(tpl).top && Math.abs(r(mode).top - r(h4).top) < 12, tplLabels: [...tpl.querySelectorAll('button')].map(e => e.textContent.trim()), footPos: getComputedStyle(foot).position, footInView: r(foot).bottom <= innerHeight + 1 };
+            const tpl = q('#cs-layout-lbl + .cs-seg'), mode = q('.cs-mode-inline'), h4 = q('.case-studio-settings h4'), gen = q('#alabasta-case-card-generate-btn'), shell = q('.alabasta-casecard-shell');
+            return { tplH: Math.round(r(tpl).height), modeAbs: getComputedStyle(mode).position, modeOnHeading: r(mode).top < r(tpl).top && Math.abs(r(mode).top - r(h4).top) < 12, tplLabels: [...tpl.querySelectorAll('button')].map(e => e.textContent.trim()), genInHeader: !!gen.closest('.alabasta-casecard-header'), genInView: r(gen).bottom <= innerHeight + 1, footShown: getComputedStyle(q('.alabasta-casecard-footer')).display !== 'none', shellScrolls: shell.scrollHeight > shell.clientHeight + 1 };
         });
         assert.ok(lean.tplH <= 44, 'the template rail is ONE row: ' + lean.tplH);
         assert.ok(await page.locator('#cs-model-lbl + .cs-seg').evaluate(el => el.getBoundingClientRect().height) <= 44, 'the model chips are ONE single line');
         // V102.418: numbered steps on the headings, drawn by CSS (no text added → the labels stay as they were)
-        assert.deepEqual(await page.evaluate(() => ['#alabasta-case-card-step-1 > label', '.case-studio-settings h4', '.case-studio-workflow-status'].map(s => { const e = document.querySelector(s); return [e.dataset.n, getComputedStyle(e, '::before').content]; })), [['1', '"1"'], ['2', '"2"'], ['3', '"3"']], 'steps 1-2-3');
-        assert.equal(await page.locator('.case-studio-settings h4').innerText(), 'Set up image');
+        // V102.428: two numbered headings — the status line moved into the bar on the image and only shows when the image is stale
+        assert.deepEqual(await page.evaluate(() => ['#alabasta-case-card-step-1 > label', '.case-studio-settings h4'].map(s => { const e = document.querySelector(s); return [e.dataset.n, getComputedStyle(e, '::before').content]; })), [['1', '"1"'], ['2', '"2"']], 'steps 1-2');
+        assert.equal(await page.evaluate(() => !!document.querySelector('.alabasta-genmage-toolbar-meta .case-studio-workflow-status') && getComputedStyle(document.querySelector('.case-studio-workflow-status')).display), 'none', 'the status sits in the image bar, quiet until stale');
+        assert.equal(await page.locator('.case-studio-settings h4').innerText(), 'Image');
         assert.equal(lean.modeAbs, 'absolute'); assert.equal(lean.modeOnHeading, true, 'Mode sits on the Image heading row');
         assert.deepEqual(lean.tplLabels, ['📊 Case', '🍽️ Lifestyle', '🫃 Symptoms', '✅ Self-care', '✨ Minimal'], 'short labels');
-        assert.equal(lean.footPos, 'sticky'); assert.equal(lean.footInView, true, 'Generate stays in view without scrolling');
+        // V102.428 lean A: Close · Save draft · Generate live on the one-line header (no footer); the modal fits the screen, nothing to scroll
+        assert.deepEqual([lean.genInHeader, lean.genInView, lean.footShown, lean.shellScrolls], [true, true, false, false], 'actions on the header, no footer, the modal does not scroll: ' + JSON.stringify(lean));
         assert.deepEqual(await page.locator('#cs-model-lbl + .cs-seg button').evaluateAll(els=>els.map(e=>e.textContent.trim().replace(/\s*★$/,''))),['2.1','2 Lite','Pro','Flare','Sunburst','Grok 2.0'],'short model names');
         assert.ok((await page.locator('#cs-model-lbl + .cs-seg button[data-value="as/gemini-nano-banana-2.1"]').getAttribute('title')).includes('Nano Banana 2.1'),'the full name stays in the tooltip');
         await page.evaluate(()=>{ document.getElementById('alabasta-case-card-step-2').open = true; });
@@ -246,7 +249,10 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         await page.evaluate(() => resetCaseStudioSteps());
         assert.equal(await vis('#alabasta-case-card-safe-payload'), false, 'reset hides it again');
         assert.equal((await page.locator('.cs-count').innerText()).trim(), '9 words');
-        assert.equal(await page.locator('#alabasta-case-card-safe-summary').evaluate(el => parseFloat(getComputedStyle(el).minHeight)), 220, 'the summary is the big box');
+        assert.equal(await page.locator('#alabasta-case-card-safe-summary').evaluate(el => parseFloat(getComputedStyle(el).minHeight)), 220, 'phone: the summary is the big box (the page scrolls as before)');
+        await page.setViewportSize({width:1440,height:860});
+        assert.equal(await page.locator('#alabasta-case-card-safe-summary').evaluate(el => parseFloat(getComputedStyle(el).minHeight)), 120, 'desktop: the summary grows into the left column (at least 120 px)');
+        await page.setViewportSize({width:320,height:1000});
         assert.ok(/Ready \u2014 review the summary, pick a model, then generate\./.test(html), 'status line says what to do next');
         // "edited" mark · "+N more" opens in place · Original note grows to its text
         await page.evaluate(() => { document.querySelector('.alabasta-casecard-details').open = true; renderCaseCardAdvanced(); });
