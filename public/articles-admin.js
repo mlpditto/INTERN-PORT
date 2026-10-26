@@ -19,7 +19,7 @@
     var FILTERS = [['all', 'All'], ['draft', 'Draft'], ['scheduled', 'Scheduled'], ['live', 'Live'], ['ended', 'Ended']];
     var RERUN = [['off', 'Off', 'Interns who join after it ends never get it'], ['any', 'All new interns', 'Interns who join after it ends get it too, oldest first, one a day']];
     var MAX_BODY = 2000, MAX_TITLE = 90, BKK = 7 * 3600e3;
-    var S = { list: [], loaded: false, loading: false, err: '', filter: 'all', tag: '', cur: null, lang: 'en', saving: false, del: false, pick: '', q: '', codex: null, base: '', savedAt: 0, open: {}, who: false, whoF: 'all', qs: false, qsF: 'open', qDraft: {}, qBusy: '', qErr: '', model: '', modelOpen: false, aiBusy: false, aiNote: '' };
+    var S = { list: [], loaded: false, loading: false, err: '', filter: 'all', tag: '', cur: null, lang: 'en', saving: false, del: false, pick: '', q: '', codex: null, base: '', savedAt: 0, open: {}, who: false, whoF: 'all', qs: false, qsF: 'open', qDraft: {}, qBusy: '', qErr: '', qModel: '', qGroups: {}, qChecks: {}, qAiBusy: '', qAiErr: '', model: '', modelOpen: false, aiBusy: false, aiNote: '' };
     var DONE = ['ok', 'quiz', 'codex', 'hist'];   // what counts as read (articles.js); 'x' = closed without reading
     // V102.430: 💬 Any Q? — interns' questions (article_questions, written by articles.js). Live; never shows who asked (authUid / userId
     // are only for sending the reply back). Open ones count on the rows (💬 n · ⚠️ n) and on the Dashboard chip.
@@ -317,6 +317,13 @@
             '.art-q textarea{display:block;width:100%;box-sizing:border-box;margin:0;min-height:52px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:10px;font:inherit;font-size:13px;resize:vertical}.art-q .qa{display:flex;gap:6px;justify-content:flex-end;margin-top:6px}' +
             '.art-q .qa button{width:auto;min-height:0;margin:0;padding:6px 12px;border-radius:999px;border:1px solid #e2e8f0;background:#fff;color:#475569;font-size:12.5px;font-weight:700;cursor:pointer}.art-q .qa .go{background:#4f46e5;border-color:#4f46e5;color:#fff}.art-q .qa button:disabled{opacity:.6;cursor:default}' +
             '.art-q .rp{background:#ecfdf5;border-radius:4px 12px 12px 12px;padding:6px 10px;font-size:13px;color:#065f46;white-space:pre-wrap;overflow-wrap:anywhere}.art-q .rp.cl{background:#f1f5f9;color:#64748b}.art-q .rp small{display:block;font-size:11px;color:#94a3b8;margin-top:2px}' +
+            // V102.431 ✨ AI: model chips + Group, the group card, the 🔎 check box
+            '.art-qai{display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin:0 0 8px}.art-qai .lb{font-size:11.5px;font-weight:800;color:#7c3aed;margin-right:2px}' +
+            '.art-qai button{width:auto;min-height:0;margin:0;padding:4px 10px;border-radius:999px;border:1px solid #e2e8f0;background:#fff;color:#4b4158;font-size:12px;font-weight:600;cursor:pointer}.art-qai button.on{background:#1e1b2e;border-color:#1e1b2e;color:#fff;font-weight:800}' +
+            '.art-qai .grp{margin-left:auto;background:#f5f3ff;border-color:#ddd6fe;color:#5b21b6;font-weight:800}.art-qai button:disabled{opacity:.55;cursor:default}' +
+            '.art-qg{border-color:#c4b5fd;background:#faf8ff}.art-qg .tx{margin:3px 0}.art-q .qa .dr{margin-right:auto;font-size:11px;color:#8b5cf6;align-self:center}.art-q .qa .ai{background:#fffbeb;border-color:#fcd34d;color:#92400e}' +
+            '.art-qck{margin:0 0 7px;padding:8px 10px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;font-size:12.5px;color:#334155}.art-qck .v{font-weight:800;margin-bottom:4px}.art-qck .v.ok{color:#b45309}.art-qck .v.pt{color:#a16207}.art-qck .v.no{color:#15803d}.art-qck .v.un{color:#64748b}' +
+            '.art-qck .r{margin:3px 0;overflow-wrap:anywhere}.art-qck .r b{display:block;font-size:11px;color:#94a3b8;font-weight:700}.art-qck .qa{justify-content:flex-start;margin-top:6px}' +
             '.art-wl{max-height:56vh;overflow:auto}.art-ai{margin-left:auto;display:inline-flex;align-items:center;gap:4px}.art-tb .art-ai button{width:auto;padding:0 9px;font-size:12px}.art-tb .art-ai .go{background:#fef3c7;color:#92400e}.art-tb .art-ai .go:disabled{opacity:.6}.art-tb .art-ai .mdl{color:#64748b;font-weight:700}' +
             '.art-mrail{padding:6px 8px;border-bottom:1px solid #e2e8f0;background:#fcfcfd}.art-mrail .audit-model-row{margin:0;padding:0;border:0;gap:6px;flex-wrap:nowrap;overflow-x:auto}.art-mrail .audit-providers{flex-wrap:nowrap;gap:4px;padding-right:6px;border-right:1px solid #e2e8f0}.art-mrail .text-ai-chips{display:flex;flex-wrap:nowrap;gap:4px}.art-mrail .text-ai-chips>button[hidden]{display:none!important}.art-mrail .audit-provider{width:30px;height:30px;min-height:0;margin:0;padding:0;border:1px solid transparent;border-radius:8px;background:transparent;box-shadow:none;display:grid;place-items:center;cursor:pointer}.art-mrail .audit-provider[aria-pressed="true"]{background:#eef2ff;border-color:#c7d2fe}.art-mrail .text-ai-chips>button{min-height:0;margin:0;padding:4px 10px;font-size:12px}' +   // V102.341: only the picked vendor's models show (the shared rail marks the rest [hidden]); one line
             '.art-ft .ai{color:#b45309;font-weight:700}' +
@@ -568,18 +575,102 @@
     function qsHtml(a) {
         var all = qOf(a.id).all, n = function (st) { return all.filter(function (q) { return q.status === st; }).length; };
         var F = [['open', '⏳ Open', n('open')], ['answered', '✓ Answered', n('answered')], ['closed', 'Closed', n('closed')], ['all', 'All', all.length]];
+        // V102.431 (PR 3): AI groups ask/add questions that ask the same thing (one reply to all) — groups whose questions are all still open
+        var byId = {}; all.forEach(function (q) { byId[q.id] = q; });
+        var groups = (S.qGroups[a.id] || []).map(function (g) { return Object.assign({}, g, { qs: g.ids.map(function (id) { return byId[id]; }).filter(function (q) { return q && q.status === 'open'; }) }); }).filter(function (g) { return g.qs.length >= 2; });
+        var grouped = {}; if (S.qsF === 'open' || S.qsF === 'all') groups.forEach(function (g) { g.qs.forEach(function (q) { grouped[q.id] = true; }); });
+        var rows = qsRows(a).filter(function (q) { return !grouped[q.id]; });
         return '<div class="art-whop art-qp" id="art-qs"><div class="h"><b>💬 Questions</b><span class="sub">' + esc(title(a)) + ' · names are never shown</span><button type="button" class="art-x" onclick="Articles.qs(false)" aria-label="Back to the editor" title="Back">✕</button></div>' +
             '<div class="art-rail" role="group" aria-label="Filter questions" style="margin-bottom:8px">' + F.map(function (f) { return '<button type="button" class="' + (S.qsF === f[0] ? 'on' : '') + '" aria-pressed="' + (S.qsF === f[0]) + '" data-qf="' + f[0] + '" onclick="Articles.qsF(\'' + f[0] + '\')">' + f[1] + '<b>' + f[2] + '</b></button>'; }).join('') + '</div>' +
-            '<div class="art-ql">' + (qsRows(a).map(function (q) {
+            qAiBarHtml(a) +
+            '<div class="art-ql">' + ((S.qsF === 'open' || S.qsF === 'all' ? groups.map(function (g, i) { return qGroupHtml(a, g, i); }).join('') : '') + rows.map(function (q) {
                 var k = QKIND[q.kind] || QKIND.ask, busy = S.qBusy === q.id;
                 var foot = q.status === 'open'
-                    ? '<textarea id="art-qr-' + esc(q.id) + '" maxlength="' + QMAX_REPLY + '" rows="2" placeholder="Reply — the intern sees it in History" aria-label="Reply" oninput="Articles.qType(\'' + esc(q.id) + '\',this.value)"' + (busy ? ' disabled' : '') + '>' + esc(S.qDraft[q.id] || '') + '</textarea>' +
-                      '<div class="qa"><button type="button" class="go" onclick="Articles.qReply(\'' + esc(q.id) + '\')"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Saving…' : '↩ Reply') + '</button><button type="button" onclick="Articles.qClose(\'' + esc(q.id) + '\')"' + (busy ? ' disabled' : '') + ' title="Close without a reply — the intern sees nothing">Close</button></div>'
+                    ? qCheckHtml(q) + '<textarea id="art-qr-' + esc(q.id) + '" maxlength="' + QMAX_REPLY + '" rows="2" placeholder="Reply — the intern sees it in History" aria-label="Reply" oninput="Articles.qType(\'' + esc(q.id) + '\',this.value)"' + (busy ? ' disabled' : '') + '>' + esc(S.qDraft[q.id] || '') + '</textarea>' +
+                      '<div class="qa">' + (q.kind === 'wrong' ? '<button type="button" class="ai" onclick="Articles.qCheck(\'' + esc(q.id) + '\')"' + (S.qAiBusy ? ' disabled' : '') + ' title="Check the report against the article text — a draft only, the article is never changed">' + (S.qAiBusy === q.id ? '⏳ Checking…' : '🔎 Check') + '</button>' : '') +
+                      '<button type="button" class="go" onclick="Articles.qReply(\'' + esc(q.id) + '\')"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Saving…' : '↩ Reply') + '</button><button type="button" onclick="Articles.qClose(\'' + esc(q.id) + '\')"' + (busy ? ' disabled' : '') + ' title="Close without a reply — the intern sees nothing">Close</button></div>'
                     : q.status === 'answered' ? '<div class="rp">↩ ' + esc(q.reply || '') + '<small>' + esc(whenStr(msOf(q.repliedAt))) + '</small></div>' : '<div class="rp cl">Closed without a reply<small>' + esc(whenStr(msOf(q.closedAt))) + '</small></div>';
                 return '<div class="art-q k-' + esc(q.kind) + ' s-' + esc(q.status) + '" data-q="' + esc(q.id) + '"><div class="top"><span class="kd">' + k[0] + ' ' + k[1] + '</span><span class="tm">' + esc(whenStr(msOf(q.createdAt))) + (q.lang ? ' · ' + (FLAG[q.lang] || '') : '') + '</span></div>' +
                     '<div class="tx">“' + esc(q.text) + '”</div>' + foot + '</div>';
-            }).join('') || '<div class="art-empty">' + (Q.err ? '⚠️ ' + esc(Q.err) : 'Nothing here.') + '</div>') + '</div>' +
+            }).join('') || (groups.length ? '' : '<div class="art-empty">' + (Q.err ? '⚠️ ' + esc(Q.err) : 'Nothing here.') + '</div>')) + '</div>' +
             (S.qErr ? '<div class="art-warn" role="alert">⚠️ ' + esc(S.qErr) + '</div>' : '') + '</div>';
+    }
+    // ---- 💬 Any Q? · AI (V102.431, PR 3). Only the article text and the questions' text are sent — never who asked. Every result is a
+    // draft the admin edits and sends; the AI never writes to Firestore and never changes the article.
+    var QMODELS = [['ol/local', 'Ollama · local', 'Runs on this computer — nothing leaves it'], ['claude-haiku-5-5', '⚡ Haiku', 'Claude Haiku 5.5 — fast'], ['claude-sonnet-5-5', '🎯 Sonnet', 'Claude Sonnet 5.5 — best for ⚠️ checks']];
+    function qModel() { if (!S.qModel) { try { S.qModel = localStorage.getItem('articleQModel') || ''; } catch (e) { /* none */ } } return QMODELS.some(function (m) { return m[0] === S.qModel; }) ? S.qModel : QMODELS[0][0]; }
+    function qAskable(a) { return qOf(a.id).open.filter(function (q) { return q.kind !== 'wrong'; }); }
+    function qAiBarHtml(a) {
+        var m = qModel(), n = qAskable(a).length;
+        return '<div class="art-qai" role="group" aria-label="AI model"><span class="lb">✨ AI</span>' + QMODELS.map(function (x) { return '<button type="button" class="' + (x[0] === m ? 'on' : '') + '" aria-pressed="' + (x[0] === m) + '" data-qm="' + esc(x[0]) + '" title="' + esc(x[2]) + '" onclick="Articles.qModel(\'' + esc(x[0]) + '\')">' + esc(x[1]) + '</button>'; }).join('') +
+            '<button type="button" class="grp" onclick="Articles.qGroup()"' + (n < 2 || S.qAiBusy ? ' disabled' : '') + ' title="' + (n < 2 ? 'Needs 2+ open questions (❓ / 💡)' : 'Find questions that ask the same thing and draft one reply') + '">' + (S.qAiBusy === 'group' ? '⏳ Grouping…' : '✨ Group similar') + '</button></div>' +
+            (S.qAiErr ? '<div class="art-warn" role="alert">⚠️ ' + esc(S.qAiErr) + '</div>' : '');
+    }
+    function qGroupHtml(a, g, i) {
+        var key = 'g:' + a.id + ':' + g.ids.join(','), busy = !!S.qBusy, n = g.qs.length;
+        var text = S.qDraft[key] != null ? S.qDraft[key] : g.reply || '';
+        return '<div class="art-q art-qg" data-g="' + i + '"><div class="top"><span class="kd">👥 ' + n + ' asked the same thing</span><span class="tm">' + esc(g.topic || '') + '</span></div>' +
+            g.qs.map(function (q) { return '<div class="tx">' + (QKIND[q.kind] || QKIND.ask)[0] + ' “' + esc(q.text) + '”</div>'; }).join('') +
+            '<textarea id="art-qg-' + i + '" maxlength="' + QMAX_REPLY + '" rows="3" aria-label="Reply to all" oninput="Articles.qType(\'' + esc(key) + '\',this.value)"' + (busy ? ' disabled' : '') + '>' + esc(text) + '</textarea>' +
+            '<div class="qa"><span class="dr">✨ AI draft — edit before sending</span><button type="button" onclick="Articles.qUngroup(\'' + esc(a.id) + '\',' + i + ')"' + (busy ? ' disabled' : '') + '>Ungroup</button>' +
+            '<button type="button" class="go" onclick="Articles.qReplyAll(\'' + esc(a.id) + '\',' + i + ')"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Saving…' : '↩ Reply to all ' + n) + '</button></div></div>';
+    }
+    var VERDICT = { right: ['The report looks right', 'ok'], partly: ['Partly right', 'pt'], wrong: ['The article looks right', 'no'], unclear: ['Not sure — check a source', 'un'] };
+    function qCheckHtml(q) {
+        var c = S.qChecks[q.id]; if (!c) return '';
+        var v = VERDICT[c.verdict] || VERDICT.unclear;
+        return '<div class="art-qck"><div class="v ' + v[1] + '">🔎 ' + v[0] + '</div>' +
+            (c.quote ? '<div class="r"><b>In the article</b>“' + esc(c.quote) + '”</div>' : '') + (c.fix ? '<div class="r"><b>Suggested fix</b>' + esc(c.fix) + '</div>' : '') +
+            (c.source ? '<div class="r"><b>Check with</b>' + esc(c.source) + '</div>' : '') +
+            '<div class="qa">' + (c.reply ? '<button type="button" onclick="Articles.qUseCheck(\'' + esc(q.id) + '\')">✍️ Use as reply</button>' : '') + '<button type="button" onclick="Articles.qs(false)" title="Back to the editor to change the text yourself">✏️ Edit article</button></div></div>';
+    }
+    function bodyOf(a, lang) { var b = a.body || {}; return String(b[lang] || b.en || b.th || b.ko || '').slice(0, 2500); }
+    function aiJson(prompt) {
+        if (typeof window.callUniversalAI !== 'function') return Promise.reject(new Error('AI is not available on this page.'));
+        return window.callUniversalAI(qModel(), prompt, true, null, '', { feature: 'article_questions', temperature: 0.2, maxTokens: 1200 }).then(function (r) {
+            var t = r && r.text, d = null;
+            try { d = typeof window.safeJsonParse === 'function' ? window.safeJsonParse(t) : JSON.parse(String(t).replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim()); } catch (e) { d = null; }
+            if (!d || typeof d !== 'object') throw new Error('The model did not return JSON.');
+            return d;
+        });
+    }
+    function groupPrompt(a, qs) {
+        return ['ROLE: you help the author of a short medical article answer interns\' questions about it.',
+            'Group the questions that ask about the SAME thing (2 or more per group). Leave a question out if nothing else asks the same.',
+            'For each group write one short reply (at most 3 sentences) in the language most of its questions use, based on the article and good clinical knowledge; say so if the article does not cover it.',
+            'Reply with PURE JSON only: {"groups":[{"items":[numbers],"topic":"3-6 words","reply":"..."}]}',
+            '', 'ARTICLE: ' + title(a), bodyOf(a, 'en'), '', 'QUESTIONS:'].concat(qs.map(function (q, i) { return (i + 1) + '. ' + String(q.text).slice(0, 300); })).join('\n');
+    }
+    function checkPrompt(a, q) {
+        return ['ROLE: clinical pharmacist checking a reader\'s report that a short medical article is wrong or out of date.',
+            'Find the sentence in the article the report is about. Judge the report against current guidelines. Do not invent facts; if unsure say "unclear".',
+            'Reply with PURE JSON only: {"quote":"the sentence from the article, copied","verdict":"right|partly|wrong|unclear","fix":"a corrected sentence, or \\"\\"","source":"where to verify, e.g. a guideline name","reply":"a short kind reply to the reader (at most 2 sentences) in the language of the report"}',
+            '', 'ARTICLE: ' + title(a), bodyOf(a, q.lang || 'en'), '', 'REPORT: ' + String(q.text).slice(0, 300)].join('\n');
+    }
+    function qGroupRun() {
+        var a = S.cur; if (!a || S.qAiBusy) return Promise.resolve(false);
+        var qs = qAskable(a); if (qs.length < 2) return Promise.resolve(false);
+        S.qAiBusy = 'group'; S.qAiErr = ''; render();
+        return aiJson(groupPrompt(a, qs)).then(function (d) {
+            var used = {};
+            var gs = (Array.isArray(d.groups) ? d.groups : []).map(function (g) {
+                var ids = (Array.isArray(g && g.items) ? g.items : []).map(function (n) { return qs[Number(n) - 1]; }).filter(function (q) { if (!q || used[q.id]) return false; used[q.id] = true; return true; }).map(function (q) { return q.id; });
+                return { ids: ids, topic: String((g && g.topic) || '').slice(0, 60), reply: String((g && g.reply) || '').trim().slice(0, QMAX_REPLY) };
+            }).filter(function (g) { return g.ids.length >= 2; });
+            S.qGroups[a.id] = gs;
+            if (!gs.length) S.qAiErr = 'No questions ask the same thing.';
+            return true;
+        }).catch(function (e) { S.qAiErr = 'AI: ' + ((e && e.message) || 'failed') + ' — try another model.'; return false; }).then(function (ok) { S.qAiBusy = ''; render(); return ok; });
+    }
+    function qCheckRun(id) {
+        var a = S.cur, q = Q.list.find(function (x) { return x.id === id; });
+        if (!a || !q || S.qAiBusy) return Promise.resolve(false);
+        S.qAiBusy = id; S.qAiErr = ''; render();
+        return aiJson(checkPrompt(a, q)).then(function (d) {
+            var t = function (v, n) { return String(v == null ? '' : v).trim().slice(0, n); };
+            S.qChecks[id] = { quote: t(d.quote, 400), verdict: VERDICT[d.verdict] ? d.verdict : 'unclear', fix: t(d.fix, 400), source: t(d.source, 120), reply: t(d.reply, QMAX_REPLY) };
+            return true;
+        }).catch(function (e) { S.qAiErr = 'AI: ' + ((e && e.message) || 'failed') + ' — try another model.'; return false; }).then(function (ok) { S.qAiBusy = ''; render(); return ok; });
     }
     function paintQChip() {
         var n = Q.list.filter(function (q) { return q.status === 'open'; }).length, c = document.getElementById('stat-artq-count'), chip = document.getElementById('chip-artq');
@@ -669,7 +760,7 @@
     function edit(id) {
         var a = id ? S.list.find(function (x) { return x.id === id; }) : null;
         S.cur = a ? fromDoc(a.id, Object.assign({}, a)) : blank(Date.now());
-        S.lang = 'en'; S.err = ''; S.del = false; S.pick = ''; S.base = JSON.stringify(S.cur); S.savedAt = 0; S.hint = null; S.hintOff = S.hintOff || {}; S.open = {}; S.who = false; S.whoF = 'all'; S.qs = false; S.qsF = 'open'; S.qErr = ''; S.aiNote = ''; S.modelOpen = false; S.pvMore = false;
+        S.lang = 'en'; S.err = ''; S.del = false; S.pick = ''; S.base = JSON.stringify(S.cur); S.savedAt = 0; S.hint = null; S.hintOff = S.hintOff || {}; S.open = {}; S.who = false; S.whoF = 'all'; S.qs = false; S.qsF = 'open'; S.qErr = ''; S.qAiErr = ''; S.aiNote = ''; S.modelOpen = false; S.pvMore = false;
         render();
     }
     var api = {
@@ -704,6 +795,26 @@
             return qWrite(id, { status: 'answered', reply: t, repliedAt: firebase.firestore.FieldValue.serverTimestamp(), repliedBy: editorEmail() || 'admin' });
         },
         qClose: function (id) { return qWrite(id, { status: 'closed', closedAt: firebase.firestore.FieldValue.serverTimestamp(), closedBy: editorEmail() || 'admin' }); },
+        // V102.431 (PR 3) ✨ AI
+        qModel: function (id) { S.qModel = id; try { localStorage.setItem('articleQModel', id); } catch (e) { /* none */ } render(); },
+        qGroup: function () { return qGroupRun(); },
+        qCheck: function (id) { return qCheckRun(id); },
+        qUseCheck: function (id) { var c = S.qChecks[id]; if (!c || !c.reply) return; if (S.qDraft[id] && S.qDraft[id].trim() && S.qDraft[id] !== c.reply && typeof confirm === 'function' && !confirm('Replace your reply with the AI draft?')) return; S.qDraft[id] = c.reply; render(); },
+        qUngroup: function (aid, i) { var gs = S.qGroups[aid] || []; gs.splice(i, 1); render(); },
+        // one reply to every OPEN question of the group, in one batch (all or nothing); a failure keeps the text
+        qReplyAll: function (aid, i) {
+            var g = (S.qGroups[aid] || [])[i]; if (!g || S.qBusy) return Promise.resolve(false);
+            var key = 'g:' + aid + ':' + g.ids.join(','), t = String(S.qDraft[key] != null ? S.qDraft[key] : g.reply || '').trim().slice(0, QMAX_REPLY);
+            var ids = g.ids.filter(function (id) { var q = Q.list.find(function (x) { return x.id === id; }); return q && q.status === 'open'; });
+            if (!t) { S.qErr = 'Write a reply first.'; render(); return Promise.resolve(false); }
+            S.qBusy = 'group'; S.qErr = ''; render();
+            var b = db.batch(), fields = { status: 'answered', reply: t, repliedAt: firebase.firestore.FieldValue.serverTimestamp(), repliedBy: editorEmail() || 'admin' };
+            ids.forEach(function (id) { b.update(db.collection('article_questions').doc(id), fields); });
+            return b.commit().then(function () {
+                ids.forEach(function (id) { var q = Q.list.find(function (x) { return x.id === id; }); if (q) Object.assign(q, fields, { repliedAt: Date.now() }); });
+                delete S.qDraft[key]; (S.qGroups[aid] || []).splice(i, 1); paintQChip(); return true;
+            }).catch(function (e) { S.qErr = 'Not saved: ' + ((e && e.message) || 'error') + ' — your text is kept.'; return false; }).then(function (ok) { S.qBusy = ''; render(); return ok; });
+        },
         // the Dashboard chip: the manager, on the article with the oldest open question
         inbox: function () {
             open();
