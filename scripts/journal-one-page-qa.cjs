@@ -1,23 +1,25 @@
-// V101.171: Journal design A (mockup pick 2026-10-19) — no tabs. The REAL public/index.html + daily-canvas.js on a touch phone
-// (file://, network blocked, Firebase stubbed). One page top to bottom: today's entry · 🎓 Note fold · 💬 recent entries with the
-// mentor's comments (always visible, outside the panel that dims once today is done) · ✉️ Message admin fold; faint EN · TH hints.
+// V101.211: Journal design C (mockup pick 2026-10-26) — no folds, one Send. The REAL public/index.html + daily-canvas.js on a touch
+// phone (file://, network blocked, Firebase stubbed; writes are recorded, never sent). A warm hero (title · 🔥 · date · mood), then
+// Learned · Hard · Next · 🎓 Note · ✉️ Message admin as borderless rows; Send appears once something is filled and sends only that;
+// today's entry then shows in the hero as a quote with green mood discs; 💬 timeline with the mentor's reply + 🎁 to collect.
 const path = require('node:path'), fs = require('node:fs'), assert = require('node:assert/strict');
 const { pathToFileURL } = require('node:url');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
 const idx = fs.readFileSync('public/index.html', 'utf8'), js = fs.readFileSync('public/daily-canvas.js', 'utf8');
 assert.ok(/<title>Internship Portfolio \(V101\.\d+\)<\/title>/.test(idx));
-assert.ok(!/role="tab"|dc-tabs/.test(js), 'no tab bar in daily-canvas.js');
+assert.ok(!/role="tab"|dc-tabs|createElement\('details'\)/.test(js), 'no tabs, no folds in daily-canvas.js');
 
 (async () => {
     const browser = await chromium.launch({ headless: true });
     try {
-        const ctx = await browser.newContext({ viewport: { width: 412, height: 900 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, timezoneId: 'Asia/Bangkok' });
+        const ctx = await browser.newContext({ viewport: { width: 390, height: 900 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, timezoneId: 'Asia/Bangkok' });
         const page = await ctx.newPage();
-        await page.clock.setFixedTime(new Date('2026-10-22T10:00:00+07:00'));
-        const errors = []; page.on('pageerror', e => errors.push(e.message));
+        await page.clock.setFixedTime(new Date('2026-10-26T10:00:00+07:00'));
+        const errors = [], dialogs = []; page.on('pageerror', e => errors.push(e.message));
+        page.on('dialog', d => { dialogs.push(d.message()); d.dismiss(); });
         await page.addInitScript(() => {
-            window.firebase = { auth: () => ({ currentUser: null, onAuthStateChanged: () => () => {}, signInAnonymously: () => Promise.resolve() }), functions: () => ({ httpsCallable: () => () => Promise.resolve({ data: {} }) }), firestore: Object.assign(() => ({ collection: () => ({ doc: () => ({ get: () => Promise.resolve({ exists: false, data: () => ({}) }), onSnapshot: () => () => {} }), where: () => ({ get: () => Promise.resolve({ docs: [] }), onSnapshot: () => () => {} }), get: () => Promise.resolve({ docs: [] }), orderBy: () => ({ get: () => Promise.resolve({ docs: [] }) }) }) }), { FieldValue: { serverTimestamp: () => 0, delete: () => 0 } }) };
+            window.firebase = { auth: () => ({ currentUser: null, onAuthStateChanged: () => () => {}, signInAnonymously: () => Promise.resolve() }), functions: () => ({ httpsCallable: () => () => Promise.resolve({ data: {} }) }), firestore: Object.assign(() => ({ collection: () => ({ doc: () => ({ get: () => Promise.resolve({ exists: false, data: () => ({}) }), onSnapshot: () => () => {} }), where: () => ({ get: () => Promise.resolve({ docs: [] }), onSnapshot: () => () => {} }), get: () => Promise.resolve({ docs: [] }), orderBy: () => ({ get: () => Promise.resolve({ docs: [] }) }) }) }), { FieldValue: { serverTimestamp: () => 0, delete: () => 0, increment: n => n } }) };
         });
         await page.route('**/*', r => (r.request().url().startsWith('file:') ? r.continue() : r.abort()));
         await page.goto(INDEX, { waitUntil: 'load' });
@@ -26,78 +28,149 @@ assert.ok(!/role="tab"|dc-tabs/.test(js), 'no tab bar in daily-canvas.js');
             const ov = document.getElementById('loading-overlay'); if (ov) ov.style.setProperty('display', 'none', 'important');
             document.getElementById('kanban-content').style.display = 'block';
             if (typeof switchMissionTab === 'function') switchMissionTab('reflection');
+            // a recording Firestore: adds are kept in window.__writes; a reflective log also lands in the caches, as the listener would
+            window.__writes = []; window.__fail = {};
+            const now = () => ({ toDate: () => new Date() });
+            db.collection = name => ({
+                add: data => {
+                    if (window.__fail[name]) return Promise.reject(new Error('offline'));
+                    window.__writes.push([name, data]);
+                    if (name === 'reflective_logs') { const log = { id: 'today', ...data, timestamp: now() }; reflectiveLogsCache = reflectiveLogsCache.concat([log]); window.myReflectiveLogsCache = (window.myReflectiveLogsCache || []).concat([log]); renderReflectiveLogs(); }
+                    return Promise.resolve({ id: name + window.__writes.length });
+                },
+                doc: () => ({ update: () => Promise.resolve(), get: () => Promise.resolve({ exists: false, data: () => ({}) }), set: () => Promise.resolve() }),
+                where: () => ({ get: () => Promise.resolve({ docs: [] }), onSnapshot: () => () => {} }),
+            });
+            ensureFirebaseAuthReady = async () => ({ uid: 'auth-u1' });
+            requireRegistered = () => true;
+            tryDailyCheckin = () => {}; renderDailyCheckinCard = () => {}; awardEngagementBonusIfDue = () => {};
+            userId = 'u1'; userProfile = { displayName: 'Intern A', pictureUrl: '' };
+            reflectiveLogsCache = []; window.myReflectiveLogsCache = []; window.myLpEntriesCache = [];
+            renderReflectiveLogs(); renderDRStatus();
         });
-        await page.waitForTimeout(500);
+        await page.waitForTimeout(300);
+        const state = () => page.evaluate(() => {
+            const vis = el => !!el && !el.closest('[hidden]') && getComputedStyle(el).display !== 'none';
+            const send = document.getElementById('dc-send');
+            return { bar: vis(send), send: send.textContent, disabled: send.disabled, what: document.querySelector('.dc-what').textContent,
+                need: document.getElementById('mood-picker').classList.contains('dc-need'), day: vis(document.getElementById('dc-day')),
+                done: document.getElementById('dc-hero').classList.contains('dc-done'), ask: vis(document.querySelector('.dc-ask')) };
+        });
 
-        // ---- 1. one page, in order, no tabs
+        // ---- 1. one page, no folds, in order
         const layout = await page.evaluate(() => {
             const pane = document.getElementById('rl-reflection-pane');
-            return { kids: [...pane.children].map(e => e.id || e.className), tabs: pane.querySelectorAll('[role="tab"]').length,
-                title: pane.querySelector('.dc-title').textContent, noteOpen: document.getElementById('dc-note').open, msgOpen: document.getElementById('dc-feedback').open,
-                hidden: ['dc-day', 'dc-note', 'dc-feed', 'dc-feedback'].filter(id => document.getElementById(id).hidden) };
+            return { kids: [...pane.children].map(e => e.id || e.className), folds: pane.querySelectorAll('details:not(#rl-note-fields details)').length, tabs: pane.querySelectorAll('[role="tab"]').length,
+                title: pane.querySelector('.dc-title').textContent, labels: [...pane.querySelectorAll('.dc-lb')].map(l => l.textContent),
+                pickerInHero: !!document.getElementById('mood-picker').closest('#dc-hero'), date: pane.querySelector('.dc-date').textContent };
         });
-        assert.deepEqual(layout.kids, ['dc-bar lang-no-toggle', 'dc-day', 'dc-note', 'dc-feed', 'dc-feedback'], 'entry · Note · Feedback · Message admin, top to bottom: ' + layout.kids);
-        assert.equal(layout.tabs, 0, 'no tabs');
-        assert.equal(layout.title, '📓 Journal');
-        assert.deepEqual([layout.noteOpen, layout.msgOpen, layout.hidden], [false, false, []], 'both folds start closed, no part is hidden');
+        assert.deepEqual(layout.kids, ['dc-hero', 'dc-day', 'dc-note', 'dc-feedback', 'dc-sendbar lang-no-toggle', 'dc-feed'], 'hero · Today · Note · Message · Send · 💬: ' + layout.kids);
+        assert.deepEqual([layout.folds, layout.tabs, layout.title], [0, 0, '📓 Journal'], 'no folds, no tabs');
+        assert.deepEqual(layout.labels, ['Learned', 'Hard', 'Next']);
+        assert.ok(layout.pickerInHero, 'the mood circles sit in the hero');
+        assert.equal(layout.date, 'Mon 26 Oct');
+        let s = await state();
+        assert.deepEqual([s.bar, s.ask, s.day, s.done], [false, true, true, false], 'empty: no Send at all, "How do you feel today?" shows');
 
-        // ---- 2. the shadow hints: one per part, EN · TH, Thai NOT hidden by lang-toggle (page is EN)
-        await page.evaluate(() => { document.getElementById('dc-note').open = true; document.getElementById('dc-feedback').open = true; });   // a closed fold renders nothing
-        const hints = await page.$$eval('#rl-reflection-pane .dc-hint', es => es.map(e => ({ t: e.innerText.trim(), c: getComputedStyle(e).color, part: e.closest('[id^="dc-"]').id })));
-        assert.deepEqual(hints.map(h => h.part), ['dc-day', 'dc-day', 'dc-note', 'dc-feedback'], 'mood · writing · Note · Message admin (Feedback has no hint line — V101.208)');
-        for (const h of hints) assert.ok(/ · /.test(h.t) && /[฀-๿]/.test(h.t), 'hint shows EN · TH (Thai visible): ' + h.t);
-        assert.match(hints[1].t, /what you learned, what was hard, what you’ll do next/);
-        assert.equal(await page.locator('#rl-reflection-pane .dc-hint .lang-th').count(), 0, 'no Thai run wrapped by lang-toggle');
-        await page.evaluate(() => { document.getElementById('dc-note').open = false; document.getElementById('dc-feedback').open = false; });
+        // ---- 2. Today without a mood → "Pick a mood"; a mood → "Send 1"; + a Note → "Send 2 📝🎓"
+        await page.fill('#dc-t-learned', 'คำนวณขนาดยาเด็กตามน้ำหนัก');
+        await page.fill('#dc-t-hard', 'การปัดเศษ mL');
+        s = await state();
+        assert.deepEqual([s.bar, s.send, s.disabled, s.need], [true, 'Pick a mood', true, true], 'Today filled, no mood → Send waits for one');
+        await page.click('#mood-picker .mood-btn[title="Tired"]');
+        await page.click('#mood-picker .mood-btn[title="Happy"]');
+        await page.waitForTimeout(50);
+        s = await state();
+        assert.deepEqual([s.send, s.disabled, s.need, s.what, s.ask], ['Send 1 ↗', false, false, '📝', false], 'mood picked → Send 1, the question goes away');
+        await page.fill('#dc-note-content', 'Paracetamol syrup 10–15 mg/kg q4–6h');
+        s = await state();
+        assert.deepEqual([s.send, s.what], ['Send 2 ↗', '📝🎓'], 'Today + Note → Send 2, both named');
+        assert.ok(await page.locator('#lp-note-title').isVisible(), 'the Note title · tags open under the Note row while it is in use');
+        if (process.env.QA_SHOT) await page.locator('#rl-reflection-pane').screenshot({ path: process.env.QA_SHOT + '/journal-c2.png' });
 
-        // ---- 3. the mentor's comment + กดรับ show without a submit, and stay clickable after today's entry is done
+        // ---- 3. Send: Today first (+0.1), then the Note (no second +0.1); the hero turns into today's quote with green discs
+        await page.click('#dc-send');
+        await page.waitForFunction(() => !document.getElementById('dc-send').disabled || document.querySelector('.dc-sendbar').hidden);
+        await page.waitForTimeout(100);
+        const sent = await page.evaluate(() => window.__writes.map(([c, d]) => [c, d.content || d.description || d.message || '', d.mood || '', d.moodSecondary || '', d.pointsAmount]));
+        const log = sent.find(w => w[0] === 'reflective_logs');
+        assert.deepEqual(log.slice(1, 4), ['Learned: คำนวณขนาดยาเด็กตามน้ำหนัก\nHard: การปัดเศษ mL', '😓', '😊'], 'Today saved as one entry, labelled lines, both moods');
+        assert.ok(sent.some(w => w[0] === 'learning_path_entries'), 'the Note saved');
+        const noteSub = sent.find(w => w[0] === 'submissions' && w[1].startsWith('Paracetamol'));
+        assert.equal(noteSub[4], 0, 'the Note sent with today’s entry does not earn a second +0.1');
+        assert.ok(!sent.some(w => w[0] === 'admin_notifications'), 'an empty Message is not sent');
+        const hero = await page.evaluate(() => ({ discs: [...document.querySelectorAll('.dc-mdd i')].map(i => i.textContent), quote: document.querySelector('.dc-quote').innerText,
+            bold: [...document.querySelectorAll('.dc-quote b')].map(b => b.textContent), ring: getComputedStyle(document.querySelector('.dc-mdd i')).boxShadow,
+            rows: ['dc-t-learned', 'dc-t-hard', 'dc-note-content'].map(id => document.getElementById(id).value) }));
+        s = await state();
+        assert.deepEqual([s.done, s.day, s.bar], [true, false, false], 'today done: Today rows + mood circles give way to the quote, nothing left to send');
+        assert.deepEqual(hero.discs, ['😓', '😊']);
+        assert.match(hero.ring, /rgb\(74, 222, 128\)/, 'the discs carry the green (no separate ✓)');
+        assert.deepEqual(hero.bold, ['Learned', 'Hard']); assert.match(hero.quote, /คำนวณขนาดยาเด็ก/);
+        assert.deepEqual(hero.rows, ['', '', ''], 'sent parts are cleared');
+        if (process.env.QA_SHOT) await page.locator('#rl-reflection-pane').screenshot({ path: process.env.QA_SHOT + '/journal-c3.png' });
+
+        // ---- 4. Message admin with 📎 today's entry; then a failed send keeps the text and turns the row red
+        await page.fill('#dc-feedback-message', 'อยากได้โจทย์คำนวณยาเด็กเพิ่มครับ');
+        await page.click('.dc-clip');
+        s = await state();
+        assert.deepEqual([s.send, s.what], ['Send 1 ↗', '✉️']);
+        await page.click('#dc-send');
+        await page.waitForFunction(() => document.querySelector('.dc-sendbar').hidden);
+        const msg = await page.evaluate(() => window.__writes.filter(w => w[0] === 'admin_notifications').map(w => w[1]));
+        assert.equal(msg.length, 1); assert.equal(msg[0].type, 'journal_feedback'); assert.match(msg[0].attachment.content, /^Learned: /, '📎 attaches today’s entry');
+        await page.evaluate(() => { window.__fail.admin_notifications = true; });
+        await page.fill('#dc-feedback-message', 'ลองอีกครั้ง');
+        await page.click('#dc-send');
+        await page.waitForFunction(() => !document.getElementById('dc-send').disabled);
+        const failed = await page.evaluate(() => ({ err: document.getElementById('dc-feedback').classList.contains('dc-err'), kept: document.getElementById('dc-feedback-message').value, status: document.getElementById('dc-feedback-status').textContent }));
+        assert.deepEqual([failed.err, failed.kept], [true, 'ลองอีกครั้ง'], 'not sent → red row, draft kept');
+        assert.match(failed.status, /retained/);
+
+        // ---- 5. 💬 timeline: mentor reply as a bubble, 🎁 to collect (one / all), quiet ✓ once collected
         await page.evaluate(() => {
             const ts = d => ({ toDate: () => new Date(Date.now() - d * 86400000) });
-            reflectiveLogsCache = [
-                { id: 'r1', content: 'ได้ฝึกซักประวัติผู้ป่วยเบาหวาน', mood: 'happy', timestamp: ts(1), adminComment: 'ดีมาก ลองเพิ่มเรื่องการปรับยา', adminBonus: 0.2, pointsClaimed: false },
-                { id: 'r0', content: 'วันนี้ฝึก inhaler', mood: 'happy', timestamp: ts(0) },   // today → the day panel dims
-            ];
+            reflectiveLogsCache = reflectiveLogsCache.concat([{ id: 'r1', content: 'ได้ฝึกซักประวัติผู้ป่วยเบาหวาน', mood: '😊', timestamp: ts(2), adminComment: 'ดีมาก ลองเพิ่มเรื่องการปรับยา', adminBonus: 0.2, pointsClaimed: false }]);
             renderReflectiveLogs();
         });
         const feed = await page.evaluate(() => {
             const area = document.getElementById('rl-history-area'), btn = [...area.querySelectorAll('button.rl-pill')].find(b => /รับ/.test(b.innerText));
             btn.scrollIntoView({ block: 'center' });
             const r = btn.getBoundingClientRect(), hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-            return { inFeed: !!area.closest('#dc-feed'), inDay: !!area.closest('#dc-day'), shown: getComputedStyle(area).display, btn: btn.innerText.trim(), clickable: btn.contains(hit),
-                     comment: /ดีมาก ลองเพิ่มเรื่องการปรับยา/.test(area.innerText), dayDim: document.getElementById('dc-day').style.opacity };
+            return { inFeed: !!area.closest('#dc-feed'), btn: btn.innerText.trim(), clickable: btn.contains(hit), bubble: (area.querySelector('.rl-bub') || {}).innerText || '',
+                all: (document.getElementById('rl-claim-all') || {}).innerText, dot: (document.getElementById('rl-claim-dot') || {}).innerText, glow: !!area.querySelector('.rl-glow') };
         });
-        assert.deepEqual([feed.inFeed, feed.inDay, feed.shown], [true, false, 'block'], 'history lives in 💬 Feedback, visible without a submit');
-        assert.ok(feed.comment && /^🎁 รับ$/.test(feed.btn), 'mentor comment + the inline 🎁 รับ pill (Thai visible): ' + feed.btn);
-        const chip = await page.evaluate(() => ({ all: (document.getElementById('rl-claim-all') || {}).innerText, foot: document.querySelector('#rl-history-list .rl-ft').innerText.replace(/\s+/g, ' '), full: !!document.querySelector('#rl-history-list button:not(.rl-pill)'), glow: !!document.querySelector('#rl-history-list .rl-glow'), dot: (document.getElementById('rl-claim-dot') || {}).innerText }));
-        assert.equal(chip.all, '🎁 +0.2 · รับ · 받기', 'one waiting → the title chip says the amount'); assert.match(chip.foot, /\+0\.2/); assert.equal(chip.full, false, 'no full-width button any more'); assert.equal(chip.glow, true);
-        assert.equal(chip.dot, '🎁 +0.2', 'the Mission header cue');
-        assert.equal(feed.dayDim, '0.5', 'today done → the entry panel dims (unchanged rule)');
-        assert.ok(feed.clickable, 'the 🎁 รับ pill is NOT under the dimmed, click-blocked panel');
-        // two waiting → "รับทั้งหมด" with the SUM; collected → a quiet ✓, the chip and the cue are gone
-        await page.evaluate(() => { reflectiveLogsCache = reflectiveLogsCache.concat([{ id: 'r2', content: 'x', mood: 'happy', timestamp: { toDate: () => new Date(Date.now() - 2 * 86400000) }, adminComment: 'ok', adminBonus: 0.1, pointsClaimed: false }]); renderReflectiveLogs(); });
+        assert.ok(feed.inFeed && feed.clickable, '🎁 รับ sits in 💬 and can be tapped');
+        assert.equal(feed.btn, '🎁 รับ'); assert.match(feed.bubble, /ดีมาก ลองเพิ่มเรื่องการปรับยา/, 'the mentor reply is a bubble');
+        assert.deepEqual([feed.all, feed.dot, feed.glow], ['🎁 +0.2 · รับ · 받기', '🎁 +0.2', true]);
+        await page.evaluate(() => { reflectiveLogsCache = reflectiveLogsCache.concat([{ id: 'r2', content: 'x', mood: '😐', timestamp: { toDate: () => new Date(Date.now() - 3 * 86400000) }, adminComment: 'ok', adminBonus: 0.1, pointsClaimed: false }]); renderReflectiveLogs(); });
         assert.equal(await page.evaluate(() => document.getElementById('rl-claim-all').innerText), '🎁 +0.3 · รับทั้งหมด · 모두 받기');
-        if (process.env.QA_SHOT) await page.locator('#dc-feed').screenshot({ path: process.env.QA_SHOT + '/journal-bonus.png' });
         await page.evaluate(() => { reflectiveLogsCache.forEach(l => { if (l.adminBonus) l.pointsClaimed = true; }); renderReflectiveLogs(); });
         const after = await page.evaluate(() => ({ chip: !!document.getElementById('rl-claim-all'), pills: document.querySelectorAll('#rl-history-list .rl-pill').length, ok: document.querySelectorAll('#rl-history-list .rl-ok').length, dot: getComputedStyle(document.getElementById('rl-claim-dot')).display }));
         assert.deepEqual(after, { chip: false, pills: 0, ok: 2, dot: 'none' }, 'collected: ✓ +x on each, nothing left to press');
 
-        // ---- 4. the old "tab" callers open the matching fold
-        await page.evaluate(() => toggleJournalNoteFields());
-        assert.equal(await page.evaluate(() => document.getElementById('dc-note').open), true, 'the Note fold button / selectJournalTab("note") opens 🎓 Note');
-        await page.evaluate(() => selectJournalTab('feedback'));
-        assert.equal(await page.evaluate(() => document.getElementById('dc-feedback').open), true, 'selectJournalTab("feedback") opens ✉️ Message admin');
-        for (const id of ['lp-note-title', 'dc-note-content', 'dc-note-submit', 'dc-feedback-message', 'dc-feedback-attach', 'dc-feedback-submit', 'rl-submit-btn', 'rl-content'])
-            assert.equal(await page.locator('#' + id).count(), 1, 'kept: #' + id);
-        assert.ok(await page.locator('#dc-note-submit').isVisible() && await page.locator('#dc-feedback-submit').isVisible(), 'Save note and Send to Admin reachable once their fold is open');
+        // ---- 6. a day whose +0.1 came from a Note alone: Today is closed (unchanged rule) and the hero says why
+        await page.evaluate(() => { reflectiveLogsCache = []; window.myReflectiveLogsCache = []; window.myLpEntriesCache = [{ id: 'n1', title: 'x', createdAt: { toDate: () => new Date() } }]; renderReflectiveLogs(); renderDRStatus(); });
+        s = await state();
+        const lock = await page.evaluate(() => getComputedStyle(document.querySelector('.dc-lock')).display);
+        assert.deepEqual([s.day, s.done, lock !== 'none'], [false, false, true], 'note-only day: Today closed, the hero says the +0.1 came from the Note');
+        await page.evaluate(() => { window.myLpEntriesCache = []; renderReflectiveLogs(); renderDRStatus(); });
+        s = await state();
+        assert.deepEqual([s.day, s.done, s.ask], [true, false, false], 'back to an open day (the mood picked earlier is kept)');
 
-        // ---- 5. phone width: nothing sticks out
-        assert.ok(await page.evaluate(() => { const p = document.getElementById('rl-reflection-pane'); return p.scrollWidth <= p.clientWidth + 1; }), 'no sideways overflow at 412 px');
-        if (process.env.QA_SHOT) {
-            await page.evaluate(() => { document.getElementById('dc-note').open = false; document.getElementById('dc-feedback').open = false; document.getElementById('dc-day').style.opacity = '1'; });
-            await page.locator('#rl-reflection-pane').screenshot({ path: process.env.QA_SHOT + '/journal-a.png' });
-        }
+        // ---- 7. old callers + kept ids
+        await page.evaluate(() => toggleJournalNoteFields());
+        assert.equal(await page.evaluate(() => document.activeElement.id), 'dc-note-content', 'the Note fold button / selectJournalTab("note") focuses the Note row');
+        await page.evaluate(() => selectJournalTab('feedback'));
+        assert.equal(await page.evaluate(() => document.activeElement.id), 'dc-feedback-message');
+        for (const id of ['lp-note-title', 'dc-note-content', 'dc-note-submit', 'dc-feedback-message', 'dc-feedback-attach', 'dc-feedback-submit', 'rl-submit-btn', 'rl-content', 'rl-mood', 'rl-summarize-btn'])
+            assert.equal(await page.locator('#' + id).count(), 1, 'kept: #' + id);
+
+        // ---- 8. phone width: nothing sticks out
+        assert.ok(await page.evaluate(() => { const p = document.getElementById('rl-reflection-pane'); return p.scrollWidth <= p.clientWidth + 1; }), 'no sideways overflow at 390 px');
+        if (process.env.QA_SHOT) { await page.evaluate(() => document.activeElement.blur()); await page.locator('#rl-reflection-pane').screenshot({ path: process.env.QA_SHOT + '/journal-c1.png' }); }
         assert.deepEqual(errors, [], 'no page errors: ' + errors.join(' | '));
         await ctx.close();
-        console.log('journal-one-page-qa: all checks passed');
+        console.log('journal-one-page-qa: all checks passed' + (dialogs.length ? ' (dialogs: ' + dialogs.join(' | ') + ')' : ''));
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
