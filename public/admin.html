@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.426)</title>
+    <title>Nika Admin (V102.427)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -43653,12 +43653,19 @@ They can connect again from LINE.
                     ? `Generating visual via ${modelLabel || 'selected model'}`
                     : (imageMetaEl.textContent || '');
             }
+            // V102.427: the pill counts up while generating (Generating 0:12) and keeps the total once done (Ready · 0:42)
+            const clock = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+            const secs = () => Math.round((Date.now() - (window._ccGenStart || Date.now())) / 1000);
+            clearInterval(window._ccGenTick);
+            if (isLoading) window._ccGenStart = Date.now();
             if (statusEl) {
                 statusEl.className = 'alabasta-genmage-status-pill ' + (isLoading ? 'is-loading' : 'is-ready');
                 statusEl.innerHTML = isLoading
-                    ? '<i class="fa-solid fa-spinner fa-spin"></i> Generating'
-                    : '<i class="fa-solid fa-circle-check"></i> Ready';
+                    ? '<i class="fa-solid fa-spinner fa-spin"></i> Generating <span class="cc-gen-time" style="font-variant-numeric:tabular-nums">0:00</span>'
+                    : '<i class="fa-solid fa-circle-check"></i> Ready' + (window._ccGenStart ? ' · ' + clock(secs()) : '');
+                if (isLoading) window._ccGenTick = setInterval(() => { const t = statusEl.querySelector('.cc-gen-time'); if (t) t.textContent = clock(secs()); }, 1000);
             }
+            if (!isLoading) window._ccGenStart = 0;
             if (downloadEl) {
                 downloadEl.style.pointerEvents = isLoading ? 'none' : 'auto';
                 downloadEl.style.opacity = isLoading ? '0.55' : '1';
