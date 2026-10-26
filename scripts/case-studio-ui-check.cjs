@@ -101,7 +101,10 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         assert.equal(await page.evaluate(()=>document.querySelector('.alabasta-casecard-details').open),false,'and the other way round');
         await page.evaluate(()=>{ document.getElementById('alabasta-case-card-step-2').open = false; });
         assert.equal(await page.locator('#cs-model-lbl + .cs-seg button').count(),6,'five Gemini / GPT chips + Grok Imagine');
-        assert.equal(await page.locator('#cs-model-lbl + .cs-seg button[data-value="or/x-ai/grok-imagine-image-2.0"] .cs-logo[data-owner="grok"]').count(),1,'Grok chip + its logo');
+        // V102.429 style 5: the models sit in one pill per maker, the logo once at its start (no logo inside a chip)
+        assert.deepEqual(await page.locator('#cs-model-lbl + .cs-seg > .cs-maker').evaluateAll(gs=>gs.map(g=>[g.dataset.owner, g.firstElementChild.matches('.cs-logo[data-owner="'+g.dataset.owner+'"]'), [...g.querySelectorAll('button')].map(b=>b.textContent.trim().replace(/\s*★$/,''))])),
+            [['gemini',true,['2.1','2 Lite','Pro']],['openai',true,['Flare','Sunburst']],['grok',true,['Grok 2.0']]],'Gemini · OpenAI · Grok, one logo each');
+        assert.equal(await page.locator('#cs-model-lbl + .cs-seg button .cs-logo').count(),0,'no logo repeated inside the chips');
         // layout rail: Infographic (default) | Minimal; the HTML-overlay mode forces minimal and locks the rail
         assert.equal(await page.locator('#cs-layout-lbl').innerText(),'Template');
         assert.deepEqual(await page.locator('#cs-layout-lbl + .cs-seg button').evaluateAll(els=>els.map(e=>e.dataset.value)),['infographic','lifestyle','symptoms','selfcare','minimal'],'five templates');
@@ -138,8 +141,10 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
 
         assert.equal(await page.locator('#case-studio-image-model, #case-studio-mode').evaluateAll(els=>els.every(el=>el.offsetParent===null)),true,'no dropdowns');
         assert.deepEqual(await page.evaluate(()=>[...document.querySelectorAll('#cs-model-lbl + .cs-seg button[aria-checked=true]')].map(c=>c.dataset.value)),await page.evaluate(()=>[document.getElementById('case-studio-image-model').value]),'exactly the active model is checked');
-        assert.equal(await page.locator('#cs-model-lbl + .cs-seg button[aria-checked=true]').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(242, 179, 90)','the active chip is amber');
-        assert.equal(await page.locator('#cs-model-lbl + .cs-seg button[data-value^="as/gemini"] .cs-logo').first().evaluate(el=>getComputedStyle(el).backgroundImage.includes('gemini-spark-color.svg')),true,'owner logo on the Nano Banana chips');
+        assert.deepEqual(await page.locator('#cs-model-lbl + .cs-seg button[aria-checked=true]').evaluate(el=>[getComputedStyle(el).backgroundColor,getComputedStyle(el).color]),['rgb(30, 27, 46)','rgb(255, 255, 255)'],'the active chip is a small dark capsule');
+        assert.equal(await page.locator('#cs-model-lbl + .cs-seg button:not([aria-checked=true])').first().evaluate(el=>getComputedStyle(el).backgroundColor),'rgba(0, 0, 0, 0)','the others are plain text on the light pill (no dark console)');
+        assert.equal(await page.locator('.cs-maker[data-owner="gemini"] > .cs-logo').evaluate(el=>getComputedStyle(el).backgroundImage.includes('gemini-spark-color.svg')),true,'the Gemini pill carries its logo');
+        assert.equal(await page.locator('.cs-maker[data-owner="openai"] > .cs-logo').evaluate(el=>getComputedStyle(el).backgroundImage.includes('openai-blossom-black.svg')),true,'OpenAI logo in black on the light pill');
         await page.locator('#cs-mode-lbl + .cs-seg button[data-value="html-overlay"]').click();
         assert.equal(await page.evaluate(()=>localStorage.getItem('test-mode')),'html-overlay','the mode chip drives the mode');
         await page.locator('#cs-mode-lbl + .cs-seg button[data-value="ai"]').click();

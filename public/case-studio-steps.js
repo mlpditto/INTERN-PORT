@@ -49,11 +49,22 @@ document.addEventListener('DOMContentLoaded', () => {
         ['selfcare', '✅ Self-care', 'Six plain-language self-care tiles (3x2); the advice is written by the model — review it'],
         ['minimal', '✨ Minimal', 'Icons and a short title only']
     ], { sel: layout });
-    seg(modeRail, [['ai', '🖼️ AI image', 'AI draws the whole image'], ['html-overlay', '🧩 Illustration + HTML', 'AI draws the illustration; the title and tags are real HTML text']], { sel: mode });
+    seg(modeRail, [['ai', 'AI image', 'AI image — AI draws the whole image'], ['html-overlay', 'HTML', 'Illustration + HTML — AI draws the illustration; the title and tags are real HTML text']], { sel: mode });
     // V102.417 lean: one single line of short names (the logo says the family — Gemini ◆ 2.1 · 2 Lite · Pro, OpenAI Flare · Sunburst, Grok; the full name is the tooltip)
     const fullName = Object.fromEntries(chips.map(chip => [chip.dataset.value, chip.textContent.trim()]));
     const SHORT = { 'as/gemini-nano-banana-2.1': '2.1', 'as/gemini-3.1-flash-lite-image': '2 Lite', 'as/gemini-3-pro-image': 'Pro', 'gpt-image-2.5-flare': 'Flare', 'gpt-image-2.5-sunburst': 'Sunburst', 'or/x-ai/grok-imagine-image-2.0': 'Grok 2.0' };
     seg(modelRail, chips.map(chip => [chip.dataset.value, SHORT[chip.dataset.value] || chip.textContent.trim(), chip.textContent.trim() + ' (' + chip.dataset.value + ')']), { sel: model, logos: true });
+    // V102.429 (style 5, mockup pick 2026-10-26): one logo per maker, that maker's models as plain chips beside it (Gemini · OpenAI · Grok)
+    [...modelRail.querySelectorAll('button')].forEach(b => {
+        const logo = b.querySelector('.cs-logo'), owner = logo ? logo.dataset.owner : '';
+        let group = modelRail.lastElementChild;
+        if (!group || !group.classList.contains('cs-maker') || group.dataset.owner !== owner) {
+            group = document.createElement('span'); group.className = 'cs-maker'; group.dataset.owner = owner;
+            if (logo) group.append(logo);
+            modelRail.append(group);
+        } else if (logo) logo.remove();
+        group.append(b);
+    });
     modeRail.parentElement.classList.add('cs-mode-inline');   // the Mode switch sits on the "Image" heading row
     // only one fold open at a time (Prompt | Source & advanced details) — opening one closes the other, so the left column never doubles in height
     const folds = [byId('step-2'), find('.alabasta-casecard-details')];
