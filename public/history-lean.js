@@ -74,14 +74,24 @@ window.historyLean = (() => {
         const h = hueOf(type);
         return '<span class="hl-lead"><span class="hl-disc" style="background:hsl(' + h + ',85%,93%);border:1px solid hsl(' + h + ',60%,84%)">' + esc(emoji) + '</span></span>';
     }
+    // V101.215: a mentor's bonus on a Journal row is the intern's to collect — until then it waits as a 🎁 pill (tap = claim here) and is NOT in the pt
+    function bonusWaiting(s) {
+        const id = s.submissionType === 'reflective' && s.metadata && s.metadata.sourceId;
+        const log = id && (window.myReflectiveLogsCache || []).find(l => l.id === id);
+        return log && Number(log.adminBonus) > 0 && log.adminComment && log.pointsClaimed !== true ? Math.round(Number(log.adminBonus) * 100) / 100 : 0;
+    }
+    const ptOf = s => (parseFloat(s.score) || 0) + Math.max(0, (parseFloat(s.adminBonus) || 0) - bonusWaiting(s));
     function valuesHtml(s) {
-        const pts = (parseFloat(s.score) || 0) + (parseFloat(s.adminBonus) || 0);
+        const pts = ptOf(s);
+        const waiting = bonusWaiting(s);
         const showPt = s.submissionType === 'quiz' ? Number.isFinite(pts) : pts !== 0;
         const b = beri(s.id);
-        if (!showPt && !b) return '<span class="hl-val" aria-hidden="true"></span>';   // V101.113: keeps the column
+        const U = window.uiText || (en => en);
+        const claim = waiting ? '<button type="button" class="hl-claim" onclick="event.stopPropagation(); this.disabled = true; claimReflectivePoints(\'' + esc(s.metadata.sourceId) + '\')" title="' + U('Claim +' + waiting + '|รับโบนัส +' + waiting + '|보너스 +' + waiting + ' 받기') + '" aria-label="' + U('Claim bonus|รับโบนัส|보너스 받기') + '">🎁 +' + waiting.toFixed(2) + '</button>' : '';
+        if (!showPt && !b && !claim) return '<span class="hl-val" aria-hidden="true"></span>';   // V101.113: keeps the column
         const sign = n => (n < 0 ? '−' : '+') + Math.abs(n).toFixed(2);
         return '<span class="hl-val">' +
-            (showPt ? '<span class="hl-pt" title="Points">' + sign(pts) + '<small>pt</small></span>' : '') +
+            claim + (showPt ? '<span class="hl-pt" title="Points">' + sign(pts) + '<small>pt</small></span>' : '') +
             (b ? '<span class="hl-br" title="Beri">🪙 <b>' + (b > 0 ? '+' : '−') + Math.abs(b) + '</b></span>' : '') + '</span>';
     }
     function pillHtml(s) {
@@ -200,7 +210,7 @@ window.historyLean = (() => {
         if (!root) return;
         try { window.activityRewards?.start?.(); } catch (e) { /* rewards are optional here */ }
         const all = getUnifiedAllItems(), filtered = getFilteredUnifiedItems();
-        const pts = filtered.reduce((n, s) => n + (parseFloat(s.score) || 0) + (parseFloat(s.adminBonus) || 0), 0);
+        const pts = filtered.reduce((n, s) => n + ptOf(s), 0);
         // V101.165: the month's "Other adjustments" (admin corrections, out-of-hours ×0.95 …) are folded into the pill —
         // the number shown is entries + adjustments; the pill is a button that opens the adjustment list (activity-rewards.js).
         const adj = (window.activityRewards && window.activityRewards.adjustmentsPoints) ? window.activityRewards.adjustmentsPoints() : null;
@@ -260,6 +270,8 @@ window.historyLean = (() => {
     window.openCaseInsights = () => switchCaseTab('systems');
     // beri_ledger arrives after the first paint — repaint once when it lands (debounced)
     let timer;
+    // V101.215: the Journal logs arrive / change (a claim flips pointsClaimed) → the 🎁 pills follow
+    window.addEventListener('reflective-logs-updated', () => { clearTimeout(timer); timer = setTimeout(() => { if (document.getElementById('unified-timeline')) renderUnifiedHistory(); }, 150); });
     window.addEventListener('rewards-updated', () => { clearTimeout(timer); timer = setTimeout(() => { if (document.getElementById('unified-timeline')) renderUnifiedHistory(); }, 150); });
 
     return { render, renderChrome, rowHtml, caseKey, titleOf };
