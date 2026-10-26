@@ -14,10 +14,20 @@
     var BKK = 7 * 3600e3, DONE = ['ok', 'quiz', 'codex', 'hist'];
     var S = { list: null, loading: false, armed: false, tries: 0, cur: null, lang: 'en', more: false, sig: '' };
     var T = {
-        en: { kicker: 'Article', min: 'min', more: 'Read more', less: 'Show less', got: 'Got it', save: 'Save', saved: 'Saved', mute: 'Don’t pop up articles', rerun: 'For new interns', close: 'Close' },
-        th: { kicker: 'บทความ', min: 'นาที', more: 'อ่านต่อ', less: 'ย่อ', got: 'รับทราบ', save: 'เก็บไว้', saved: 'เก็บแล้ว', mute: 'ไม่ต้องเด้งบทความ', rerun: 'สำหรับน้องใหม่', close: 'ปิด' },
-        ko: { kicker: '아티클', min: '분', more: '더 보기', less: '접기', got: '확인', save: '저장', saved: '저장됨', mute: '아티클 팝업 끄기', rerun: '신규 인턴용', close: '닫기' }
+        en: { kicker: 'Article', min: 'min', more: 'Read more', less: 'Show less', got: 'Got it', save: 'Save', saved: 'Saved', mute: 'Don’t pop up articles', rerun: 'For new interns', close: 'Close',
+            read: 'Read', anyq: 'Any Q?', askSub: 'Goes to the article’s author · your name is not shown', ask: 'A question', wrong: 'Wrong / out of date', add: 'Please add',
+            phAsk: 'What would you like to ask?', phWrong: 'Which part looks wrong or out of date?', phAdd: 'What should the article add?', hint: 'Replies show up in History', send: 'Send', sending: 'Sending…', fail: 'Could not send — your text is kept. Try again.' },
+        th: { kicker: 'บทความ', min: 'นาที', more: 'อ่านต่อ', less: 'ย่อ', got: 'รับทราบ', save: 'เก็บไว้', saved: 'เก็บแล้ว', mute: 'ไม่ต้องเด้งบทความ', rerun: 'สำหรับน้องใหม่', close: 'ปิด',
+            read: 'อ่านแล้ว', anyq: 'Any Q?', askSub: 'ส่งถึงผู้เขียนบทความ · ไม่แสดงชื่อคุณ', ask: 'สงสัย', wrong: 'ข้อมูลผิด/ล้าสมัย', add: 'อยากให้เพิ่ม',
+            phAsk: 'อยากถามอะไร?', phWrong: 'ส่วนไหนดูผิดหรือล้าสมัย?', phAdd: 'อยากให้บทความเพิ่มเรื่องอะไร?', hint: 'ตอบกลับดูได้ใน History', send: 'ส่ง', sending: 'กำลังส่ง…', fail: 'ส่งไม่สำเร็จ ข้อความยังอยู่ ลองอีกครั้ง' },
+        ko: { kicker: '아티클', min: '분', more: '더 보기', less: '접기', got: '확인', save: '저장', saved: '저장됨', mute: '아티클 팝업 끄기', rerun: '신규 인턴용', close: '닫기',
+            read: '읽음', anyq: 'Any Q?', askSub: '글쓴이에게 전달 · 이름은 표시되지 않아요', ask: '질문', wrong: '틀림/오래됨', add: '추가 요청',
+            phAsk: '무엇이 궁금한가요?', phWrong: '어느 부분이 틀리거나 오래되었나요?', phAdd: '어떤 내용을 더하면 좋을까요?', hint: '답변은 History에서 볼 수 있어요', send: '보내기', sending: '보내는 중…', fail: '보내지 못했어요. 글은 남아 있어요. 다시 시도하세요.' }
     };
+    // V101.212 (owner's pick, mockup-article-questions.html): 👍 Got it = read at once, and the button turns into 💬 Any Q? for 7 s (a thin line
+    // under it shrinks); a tap opens a small form — ❓ a question · ⚠️ wrong / out of date · 💡 please add, up to 300 characters — that writes
+    // article_questions/{id}. The admin side never shows who asked (the uid is kept only to send the reply back). Then a "Complete" moment.
+    var ANYQ_MS = 7000, QMAX = 300, KINDS = [['ask', '❓'], ['wrong', '⚠️'], ['add', '💡']];
     var esc = function (v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
     var msOf = function (t) { return t == null ? null : typeof t === 'number' ? t : t.toMillis ? t.toMillis() : t instanceof Date ? t.getTime() : (Date.parse(t) || null); };
 
@@ -154,12 +164,26 @@
             '.art-link.codex{border-color:#bfdbfe;background:#eff6ff;color:#1d4ed8}.art-link b{font-weight:800;color:#b45309}' +
             '#art-sheet .foot{display:flex;align-items:center;gap:8px;margin-top:6px}#art-sheet .bm{width:44px;height:44px;min-height:0;margin:0;padding:0;border-radius:12px;border:0;background:#f1f5f9;font-size:17px;cursor:pointer;flex:none}#art-sheet .bm[aria-pressed="true"]{background:#fef3c7}#art-sheet .bm.mute{opacity:.8}' +
             '#art-sheet .ok{flex:none;width:auto;height:44px;min-height:0;margin:0;padding:0 18px;border-radius:999px;border:0;background:#16a34a;color:#fff;font:800 14px/1 Kanit,sans-serif;cursor:pointer;box-shadow:0 4px 10px rgba(22,163,74,.25);white-space:nowrap}#art-sheet button:focus{outline:none}#art-sheet button:focus-visible{outline:2px solid #a5b4fc;outline-offset:2px}' +
-            
+            // V101.212: after Got it — "✓ Read" + the indigo 💬 Any Q? whose bottom line shrinks over 7 s
+            '#art-sheet .rd{flex:none;font:800 13px/1 Kanit,sans-serif;color:#16a34a;white-space:nowrap}' +
+            '#art-sheet .anyq{position:relative;overflow:hidden;flex:none;width:auto;height:44px;min-height:0;margin:0;padding:0 18px;border-radius:999px;border:0;background:#4f46e5;color:#fff;font:800 14px/1 Kanit,sans-serif;cursor:pointer;box-shadow:0 4px 10px rgba(79,70,229,.28);white-space:nowrap;animation:artPop .2s ease-out}' +
+            '#art-sheet .anyq::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.75);transform-origin:left;animation:artShrink ' + ANYQ_MS + 'ms linear forwards}' +
+            '@keyframes artShrink{from{transform:scaleX(1)}to{transform:scaleX(0)}}@keyframes artPop{from{transform:scale(.9);opacity:.4}to{transform:none;opacity:1}}' +
+            // the Any Q? form
+            '#art-sheet .aq-h{display:flex;align-items:center;gap:10px;margin:2px 0 2px}#art-sheet .aq-h b{flex:1;font:800 19px/1.3 Kanit,sans-serif;color:#1e293b}#art-sheet .aq-sub{font:400 12.5px/1.4 Kanit,sans-serif;color:#94a3b8;margin:0 0 12px}' +
+            '#art-sheet .aq-k{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}#art-sheet .aq-k button{min-height:0;margin:0;width:auto;border:1.5px solid #e2e8f0;background:#fff;color:#475569;font:700 13px/1 Kanit,sans-serif;padding:9px 12px;border-radius:999px;cursor:pointer}' +
+            '#art-sheet .aq-k button[aria-pressed="true"]{border-color:#818cf8;background:#eef2ff;color:#3730a3}#art-sheet .aq-k button[data-k="wrong"][aria-pressed="true"]{border-color:#f59e0b;background:#fffbeb;color:#92400e}' +
+            '#art-sheet .aq-t{position:relative}#art-sheet .aq-t textarea{display:block;width:100%;box-sizing:border-box;min-height:96px;margin:0;padding:12px 12px 22px;border:1.5px solid #e2e8f0;border-radius:14px;font:400 16px/1.5 Kanit,sans-serif;color:#1e293b;resize:vertical}' +
+            '#art-sheet .aq-t textarea:focus{outline:none;border-color:#818cf8}#art-sheet .aq-n{position:absolute;right:10px;bottom:6px;font:600 11px/1 Kanit,sans-serif;color:#94a3b8;pointer-events:none}' +
+            '#art-sheet .aq-f{display:flex;align-items:center;gap:8px;margin-top:10px}#art-sheet .aq-f span{flex:1;font:400 12px/1.3 Kanit,sans-serif;color:#94a3b8}#art-sheet .aq-f .anyq{animation:none}#art-sheet .aq-f .anyq::after{display:none}#art-sheet .aq-f .anyq:disabled{background:#c7d2fe;box-shadow:none;cursor:default}' +
+            '#art-sheet .aq-e{margin:8px 0 0;font:600 12.5px/1.4 Kanit,sans-serif;color:#b91c1c}#art-sheet .aq-e:empty{display:none}' +
+            '@media (prefers-reduced-motion: reduce){#art-sheet .anyq{animation:none}}' +
+
             '.hl-pill.art-ok{background:#dcfce7;color:#166534}.hl-pill.art-new{background:#eef2ff;color:#4361ee}.art-hist{padding:2px 0 6px}.art-hist .art-top{display:flex;justify-content:flex-end;margin:0 0 6px}.art-hist .art-links{margin:8px 0 2px}';
         document.head.appendChild(s);
     }
     function busy() {
-        if (document.getElementById('art-back') || document.getElementById('fbr-back')) return true;
+        if (document.getElementById('art-back') || document.getElementById('fbr-back') || document.getElementById('cm-back')) return true;
         var g = document.getElementById('internGuideOverlay'); if (g && g.classList.contains('open')) return true;
         return Array.prototype.some.call(document.querySelectorAll('.modal'), function (m) { var d = m.style.display; return d === 'flex' || d === 'block' || m.classList.contains('open') || m.classList.contains('show'); });
     }
@@ -178,6 +202,7 @@
     function render() {
         var c = S.cur, a = c.a, tx = textOf(a, S.lang), t = T[S.lang] || T.en, have = langs(a), saved = !!((me().articleSeen || {})[a.id] || {}).saved;
         var sh = document.getElementById('art-sheet'); if (!sh) return;
+        if (S.ask) return renderAsk(sh, t);
         var info = (c.kind === 'rerun' ? '🔁 ' + t.rerun : t.kicker) + ' · ' + (a.readMin || 1) + ' ' + t.min;
         sh.innerHTML = '<div class="band"><span class="cov" title="' + esc(info) + '" aria-label="' + esc(info) + '">' + esc((a.cover && a.cover.emoji) || '📰') + (c.kind === 'rerun' ? '<small>🔁</small>' : '') + '</span>' +
             (have.length > 1 ? langBtn(have, tx.lang, 'internArticles.lang()') : '') +
@@ -187,14 +212,72 @@
             '<div class="foot"><button type="button" class="bm" onclick="internArticles.save()" aria-pressed="' + saved + '" title="' + (saved ? t.saved : t.save) + '" aria-label="' + (saved ? t.saved : t.save) + '">🔖</button>' +
             '<button type="button" class="bm mute" onclick="internArticles.mute()" title="' + t.mute + '" aria-label="' + t.mute + '">🔕</button>' +
             '<button type="button" class="more" id="art-more" onclick="internArticles.toggleMore()">' + (S.more ? t.less + ' ▴' : t.more + ' ▾') + '</button>' +
-            '<button type="button" class="ok" onclick="internArticles.close(\'ok\')">👍 ' + t.got + '</button></div>';
+            (S.got ? '<span class="rd">✓ ' + t.read + '</span><button type="button" class="anyq" onclick="internArticles.anyQ()">💬 ' + t.anyq + '</button>'
+                : '<button type="button" class="ok" onclick="internArticles.gotIt()">👍 ' + t.got + '</button>') + '</div>';
         // a short body needs no "Read more"
         var el = document.getElementById('art-text'), mb = document.getElementById('art-more');
         if (el && mb && !S.more && el.scrollHeight <= el.clientHeight + 2) mb.style.visibility = 'hidden';
     }
+    function renderAsk(sh, t) {
+        var q = S.ask, ph = { ask: t.phAsk, wrong: t.phWrong, add: t.phAdd }[q.kind];
+        sh.innerHTML = '<div class="aq-h"><b id="art-title">💬 ' + t.anyq + '</b><button type="button" class="x" onclick="internArticles.close(\'ok\')" aria-label="' + t.close + '">✕</button></div>' +
+            '<p class="aq-sub">' + t.askSub + '</p>' +
+            '<div class="aq-k" role="group">' + KINDS.map(function (k) { return '<button type="button" data-k="' + k[0] + '" aria-pressed="' + (q.kind === k[0]) + '" onclick="internArticles.askKind(\'' + k[0] + '\')">' + k[1] + ' ' + t[k[0]] + '</button>'; }).join('') + '</div>' +
+            '<div class="aq-t"><textarea id="art-q" maxlength="' + QMAX + '" rows="3" placeholder="' + esc(ph) + '" aria-label="' + esc(ph) + '"></textarea><span class="aq-n" id="art-qn"></span></div>' +
+            '<div class="aq-f"><span>' + t.hint + '</span><button type="button" class="anyq" id="art-qs" onclick="internArticles.askSend()">💬 ' + (q.busy ? t.sending : t.send) + '</button></div>' +
+            '<p class="aq-e" id="art-qe" role="alert">' + (q.err ? esc(t.fail) : '') + '</p>';
+        var ta = document.getElementById('art-q');
+        ta.value = q.text;
+        ta.oninput = function () { q.text = ta.value; q.err = false; askCount(); var e = document.getElementById('art-qe'); if (e) e.textContent = ''; };
+        askCount();
+        ta.focus();
+    }
+    function askCount() {
+        var q = S.ask, n = document.getElementById('art-qn'), b = document.getElementById('art-qs'); if (!q) return;
+        if (n) n.textContent = q.text.length + ' / ' + QMAX;
+        if (b) b.disabled = q.busy || !q.text.trim();
+    }
+    // 👍 Got it: read now; the button becomes 💬 Any Q? for 7 s, then the sheet closes by itself (unless the form was opened)
+    function gotIt() {
+        var c = S.cur; if (!c || S.got) return;
+        S.got = true;
+        markRead(c.a.id, 'ok');
+        render();
+        var b = document.querySelector('#art-sheet .anyq'); if (b) b.focus();
+        S.gotTimer = setTimeout(function () { if (S.cur === c && !S.ask) close('ok'); }, ANYQ_MS);
+    }
+    function anyQ() {
+        if (!S.cur) return;
+        clearTimeout(S.gotTimer);
+        S.ask = { kind: 'ask', text: '', busy: false, err: false };
+        render();
+    }
+    function askSend() {
+        var c = S.cur, q = S.ask, text = q ? q.text.trim() : '';
+        if (!c || !q || q.busy || !text) return Promise.resolve(false);
+        if (typeof requireRegistered === 'function' && !requireRegistered()) return Promise.resolve(false);
+        q.busy = true; q.err = false; render();
+        var authReady = typeof ensureFirebaseAuthReady === 'function' ? ensureFirebaseAuthReady(10000) : Promise.resolve(window.firebase && firebase.auth && firebase.auth().currentUser);
+        return Promise.resolve(authReady).then(function (u) {
+            if (!u || !window.db || blocked()) throw new Error('not signed in');
+            return window.db.collection('article_questions').add({
+                articleId: c.a.id, articleTitle: String(textOf(c.a, 'en').title || '').slice(0, 300), kind: q.kind, text: text.slice(0, QMAX), lang: S.lang,
+                authUid: u.uid, userId: uid(), status: 'open', createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }).then(function () {
+            if (S.cur === c) close('ok');
+            if (typeof window.completeMoment === 'function') window.completeMoment();
+            else if (typeof showToast === 'function') showToast('✓ Complete');
+            return true;
+        }).catch(function (e) {
+            console.warn('article question:', e && e.message);
+            if (S.ask === q) { q.busy = false; q.err = true; render(); }
+            return false;
+        });
+    }
     function show(c) {
         css();
-        S.cur = c; S.lang = uiLang(); S.more = false;
+        S.cur = c; S.lang = uiLang(); S.more = false; S.got = false; S.ask = null;
         var back = document.createElement('div'); back.id = 'art-back'; back.onclick = function () { close('x'); };
         var sh = document.createElement('div'); sh.id = 'art-sheet'; sh.className = 'lang-no-toggle'; sh.setAttribute('role', 'dialog'); sh.setAttribute('aria-modal', 'true'); sh.setAttribute('aria-labelledby', 'art-title');
         document.body.appendChild(back); document.body.appendChild(sh);
@@ -209,7 +292,7 @@
     function onKey(e) { if (e.key === 'Escape') close('x'); }
     function close(act) {
         var c = S.cur; if (!c) return Promise.resolve();
-        S.cur = null;
+        S.cur = null; clearTimeout(S.gotTimer); S.got = false; S.ask = null;
         ['art-back', 'art-sheet'].forEach(function (id) { var el = document.getElementById(id); if (el) el.remove(); });
         document.removeEventListener('keydown', onKey);
         var p = act === 'x' ? (isDone((me().articleSeen || {})[c.a.id]) ? Promise.resolve() : setSeen(c.a.id, { act: 'x' })) : markRead(c.a.id, act);
@@ -348,6 +431,8 @@
         },
         historyItems: function () { return historyItems(S.list, me(), Date.now()); },
         detailHtml: detailHtml, pillHtml: pillHtml, discHtml: discHtml, listen: listen, stopListen: stopListen, close: close, histLang: histLang,
+        gotIt: gotIt, anyQ: anyQ, askSend: askSend,
+        askKind: function (k) { if (!S.ask || S.ask.busy) return; S.ask.kind = k; render(); },
         lang: function (l) { var a = S.cur && S.cur.a, have = a ? langs(a) : []; S.lang = l || (have.length ? nextLang(have, textOf(a, S.lang).lang) : S.lang); render(); },
         toggleMore: function () { S.more = !S.more; render(); },
         save: function () {

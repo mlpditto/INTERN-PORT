@@ -129,7 +129,9 @@ const D = 864e5, BKK = 7 * 3600e3;
       window.myUserDoc.articlePopDay = '2000-01-01'; internArticles._later();
       out.nextDay = !!document.getElementById('art-sheet');
       document.querySelector('#art-sheet .ok').click(); await wait(50);
-      out.got = [writes[writes.length - 1][2].articleSeen.a1.act, !!document.getElementById('art-sheet')];
+      // V101.212: read at once; the sheet stays for the 7 s 💬 Any Q? window (articles-anyq-qa.cjs covers it), closed here by hand
+      out.got = [writes[writes.length - 1][2].articleSeen.a1.act, !!document.querySelector('#art-sheet .anyq')];
+      internArticles.close('ok'); await wait(20);
       window.myUserDoc.articlePopDay = '2000-01-01'; internArticles._later(); out.afterRead = !!document.getElementById('art-sheet');
       // the quiz link: opens the quiz, +1 Beri once
       const before = txs.length;
@@ -185,7 +187,7 @@ const D = 864e5, BKK = 7 * 3600e3;
     assert.deepEqual(r.saved, ['true', true], '🔖 saves');
     assert.deepEqual(r.esc, [false, false, 'x', 1], 'Esc closes it as "closed without reading", and gives the feedback reminder its turn');
     assert.equal(r.sameDay, false, 'not again the same day'); assert.equal(r.nextDay, true, 'unread → back on the next day');
-    assert.deepEqual(r.got, ['ok', false], '✓ Got it = read'); assert.equal(r.afterRead, false, 'a read article never pops up again');
+    assert.deepEqual(r.got, ['ok', true], '✓ Got it = read, and 💬 Any Q? takes its place'); assert.equal(r.afterRead, false, 'a read article never pops up again');
     assert.deepEqual(r.beri, ['users/U1:{"inc":1}', 'beri_ledger/article_quiz__a1_U1:"article_quiz/1/a1_U1"'], '+1 Beri with a ledger row, only once: ' + JSON.stringify(r.beri));
     assert.ok(r.hist, 'the article is a History row');
     assert.deepEqual(r.hist, ['3 inhaler mistakes we see every week', 'art-closed', false, true], 'History row: title, the icon disc carries the state (closed), no 🗑 menu, a 📰 chip');

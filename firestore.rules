@@ -242,6 +242,29 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // 📰 Article ▸ 💬 Any Q? (V101.212): an intern asks about an article, reports it wrong / out of date, or asks for more.
+    // Created by the intern (bounded, owned, status 'open'); read back by its asker (their History) and by admins; only admins
+    // answer or close it. The admin screens never show who asked — authUid / userId are kept only to send the reply back.
+    match /article_questions/{questionId} {
+      function validArticleQuestion() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['articleId', 'articleTitle', 'kind', 'text', 'lang', 'authUid', 'userId', 'status', 'createdAt'])
+          && d.keys().hasAll(['articleId', 'articleTitle', 'kind', 'text', 'lang', 'authUid', 'userId', 'status', 'createdAt'])
+          && d.authUid == request.auth.uid
+          && (d.userId == request.auth.uid || hasAuthLinkToUserId(d.userId))
+          && d.articleId is string && d.articleId.size() > 0 && d.articleId.size() <= 200
+          && exists(/databases/$(database)/documents/articles/$(d.articleId))
+          && d.articleTitle is string && d.articleTitle.size() <= 300
+          && d.kind in ['ask', 'wrong', 'add']
+          && d.text is string && d.text.size() <= 300 && d.text.matches('[\\s\\S]*[^\\s][\\s\\S]*')
+          && d.lang in ['en', 'th', 'ko']
+          && d.status == 'open' && d.createdAt == request.time;
+      }
+      allow create: if isSignedIn() && validArticleQuestion();
+      allow read: if isAdmin() || (isSignedIn() && resource.data.authUid == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
     // Announcements with a date — a webinar, a training day (V98.61). Read by any
     // eligible audience; new social events start private to the creator and admin.
     // Older audience rules described targetGroups as presentation, not
