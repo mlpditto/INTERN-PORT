@@ -12,7 +12,7 @@
 (function () {
     'use strict';
     var BKK = 7 * 3600e3, DONE = ['ok', 'quiz', 'codex', 'hist'];
-    var S = { list: null, loading: false, armed: false, tries: 0, cur: null, lang: 'en', more: false, sig: '' };
+    var S = { list: null, loading: false, armed: false, tries: 0, cur: null, lang: 'en', more: false, sig: '', qs: [], qsUnsub: null };
     var T = {
         en: { kicker: 'Article', min: 'min', more: 'Read more', less: 'Show less', got: 'Got it', save: 'Save', saved: 'Saved', mute: 'Don’t pop up articles', rerun: 'For new interns', close: 'Close',
             read: 'Read', anyq: 'Any Q?', askSub: 'Goes to the article’s author · your name is not shown', ask: 'A question', wrong: 'Wrong / out of date', add: 'Please add',
@@ -74,16 +74,21 @@
     function langBtn(have, l, onclick) { return '<button type="button" class="lng" data-lang="' + l + '" aria-label="Language: ' + l.toUpperCase() + ' (tap for ' + nextLang(have, l).toUpperCase() + ')" onclick="' + onclick + '">' + l.toUpperCase() + '</button>'; }
     function uiLang() { var b = document.body; return b && b.classList.contains('lang-th-on') ? 'th' : b && b.classList.contains('lang-kr-on') ? 'ko' : 'en'; }
     // History rows: every article this intern can see now (live / rerun) or has already seen
-    function historyItems(list, me, now) {
+    // V101.213: + the intern's own 💬 Any Q? questions on it (qs = their article_questions docs). A reply moves the row up to the reply's time
+    // and lights the row's "new" dot for a day (reviewedAt); the questions + replies are listed under the article when it is opened.
+    function historyItems(list, me, now, qs) {
         var seen = (me && me.articleSeen) || {}, out = [];
         (list || []).forEach(function (a) {
-            var s = seen[a.id], k = kindOf(a, me || {}, now);
-            if (!k && !s) return;
+            var s = seen[a.id], k = kindOf(a, me || {}, now), qa = (qs || []).filter(function (q) { return q.articleId === a.id; }).sort(function (x, y) { return (msOf(x.createdAt) || 0) - (msOf(y.createdAt) || 0); });
+            if (!k && !s && !qa.length) return;
             var st = isDone(s) ? 'read' : s && s.act === 'x' ? 'closed' : 'new';
             var t = (s && msOf(s.at)) || (k === 'rerun' ? Math.max(msOf(a.startAt), joinedMs(me) || 0) : msOf(a.startAt));
-            out.push({ id: 'art_' + a.id, submissionType: 'article', title: textOf(a, uiLang()).title || 'Article', status: 'article', score: 0, noDelete: true,
-                timestamp: { toMillis: function () { return t; }, toDate: function () { return new Date(t); }, seconds: Math.floor(t / 1000) },
-                metadata: { articleId: a.id, emoji: (a.cover && a.cover.emoji) || '📰', state: st, saved: !!(s && s.saved) } });
+            var rep = qa.reduce(function (m, q) { return q.status === 'answered' ? Math.max(m, msOf(q.repliedAt) || 0) : m; }, 0);
+            if (rep > t) t = rep;
+            var stamp = function (ms) { return { toMillis: function () { return ms; }, toDate: function () { return new Date(ms); }, seconds: Math.floor(ms / 1000) }; };
+            out.push(Object.assign({ id: 'art_' + a.id, submissionType: 'article', title: textOf(a, uiLang()).title || 'Article', status: 'article', score: 0, noDelete: true, timestamp: stamp(t),
+                metadata: { articleId: a.id, emoji: (a.cover && a.cover.emoji) || '📰', state: st, saved: !!(s && s.saved), qa: qa.map(function (q) { return { kind: q.kind, text: q.text, status: q.status, reply: q.reply || '' }; }) } },
+                rep ? { reviewedAt: stamp(rep) } : {}));
         });
         return out;
     }
@@ -179,7 +184,10 @@
             '#art-sheet .aq-e{margin:8px 0 0;font:600 12.5px/1.4 Kanit,sans-serif;color:#b91c1c}#art-sheet .aq-e:empty{display:none}' +
             '@media (prefers-reduced-motion: reduce){#art-sheet .anyq{animation:none}}' +
 
-            '.hl-pill.art-ok{background:#dcfce7;color:#166534}.hl-pill.art-new{background:#eef2ff;color:#4361ee}.art-hist{padding:2px 0 6px}.art-hist .art-top{display:flex;justify-content:flex-end;margin:0 0 6px}.art-hist .art-links{margin:8px 0 2px}';
+            '.hl-pill.art-ok{background:#dcfce7;color:#166534}.hl-pill.art-new{background:#eef2ff;color:#4361ee}.art-hist{padding:2px 0 6px}.art-hist .art-top{display:flex;justify-content:flex-end;margin:0 0 6px}.art-hist .art-links{margin:8px 0 2px}' +
+            // V101.213: the intern's 💬 questions under the article in History, the admin's reply as a green bubble
+            '.art-qa{margin:10px 0 2px;padding-top:8px;border-top:1px dashed #e2e8f0;font:400 13px/1.45 Kanit,sans-serif;color:#334155}.art-qa>b{display:block;font-weight:800;font-size:12.5px;color:#4338ca;margin-bottom:4px}' +
+            '.art-qa .q{padding:5px 0;overflow-wrap:anywhere}.art-qa .q small{display:block;color:#94a3b8;font-size:11.5px}.art-qa .r{margin-top:4px;background:#ecfdf5;color:#065f46;border-radius:4px 12px 12px 12px;padding:5px 10px;white-space:pre-wrap}';
         document.head.appendChild(s);
     }
     function busy() {
@@ -310,7 +318,27 @@
     }
 
     // ---- History
-    function sig() { return JSON.stringify(historyItems(S.list, me(), Date.now()).map(function (i) { return i.id + i.metadata.state + i.metadata.saved; })); }
+    function sig() { return JSON.stringify(historyItems(S.list, me(), Date.now(), S.qs).map(function (i) { return i.id + i.metadata.state + i.metadata.saved + i.metadata.qa.map(function (q) { return q.status + q.reply.length; }).join(','); })); }
+    // V101.213: the intern's own questions (the rules let them read only these, so the query must say authUid == me)
+    function listenMine() {
+        if (S.qsUnsub || blocked() || !window.db) return;
+        var ready = typeof ensureFirebaseAuthReady === 'function' ? ensureFirebaseAuthReady(10000) : Promise.resolve(window.firebase && firebase.auth && firebase.auth().currentUser);
+        Promise.resolve(ready).then(function (u) {
+            if (!u || S.qsUnsub) return;
+            S.qsUnsub = window.db.collection('article_questions').where('authUid', '==', u.uid).onSnapshot(function (snap) {
+                S.qs = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+                refreshHistory(false);
+            }, function (e) { console.warn('article questions:', e && e.message); });
+        }).catch(function (e) { console.warn('article questions:', e && e.message); });
+    }
+    var QK = { ask: '❓', wrong: '⚠️', add: '💡' };
+    function qaHtml(s) {
+        var qa = (s.metadata || {}).qa || []; if (!qa.length) return '';
+        var L = { en: ['Your questions', 'Waiting for a reply', 'Closed'], th: ['คำถามของคุณ', 'รอคำตอบ', 'ปิดแล้ว'], ko: ['내 질문', '답변 대기 중', '닫힘'] }[uiLang()];
+        return '<div class="art-qa"><b>💬 ' + L[0] + '</b>' + qa.map(function (q) {
+            return '<div class="q"><span>' + (QK[q.kind] || '❓') + ' ' + esc(q.text) + '</span>' + (q.status === 'answered' ? '<div class="r">↩ ' + esc(q.reply) + '</div>' : '<small>' + (q.status === 'closed' ? L[2] : '⏳ ' + L[1]) + '</small>') + '</div>';
+        }).join('') + '</div>';
+    }
     function refreshHistory(force) {
         var s = sig();
         if (!force && s === S.sig) return;
@@ -404,7 +432,7 @@
         var tx = textOf(a, uiLang()), have = langs(a);
         // V101.193: the sheet's language pill here too when the article has more than one language — a tap swaps the body in place (V101.202: one pill, cycles)
         var lng = have.length > 1 ? '<div class="art-top">' + langBtn(have, tx.lang, 'internArticles.histLang(this)') + '</div>' : '';
-        return '<div class="art-hist lang-no-toggle" data-art="' + esc(a.id) + '">' + lng + '<div class="art-md">' + md(tx.body) + '</div>' + linksHtml(a) + '</div>';
+        return '<div class="art-hist lang-no-toggle" data-art="' + esc(a.id) + '">' + lng + '<div class="art-md">' + md(tx.body) + '</div>' + linksHtml(a) + qaHtml(s) + '</div>';
     }
     function histLang(btn, l) {
         var box = btn.closest('.art-hist'), a = box && find(box.dataset.art); if (!a) return;
@@ -426,10 +454,10 @@
     window.internArticles = {
         // called from the users/{uid} snapshot in index.html
         onUserDoc: function () {
-            if (!S.armed) { S.armed = true; if (!blocked()) setTimeout(load, 2500); }
+            if (!S.armed) { S.armed = true; if (!blocked()) setTimeout(function () { load(); listenMine(); }, 2500); }
             else refreshHistory(false);
         },
-        historyItems: function () { return historyItems(S.list, me(), Date.now()); },
+        historyItems: function () { return historyItems(S.list, me(), Date.now(), S.qs); },
         detailHtml: detailHtml, pillHtml: pillHtml, discHtml: discHtml, listen: listen, stopListen: stopListen, close: close, histLang: histLang,
         gotIt: gotIt, anyQ: anyQ, askSend: askSend,
         askKind: function (k) { if (!S.ask || S.ask.busy) return; S.ask.kind = k; render(); },
