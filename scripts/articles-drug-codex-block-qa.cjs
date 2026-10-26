@@ -58,6 +58,7 @@ assert.ok(idx.includes('id="dc-detail-articles"') && idx.includes('function code
       const sh = document.getElementById('art-sheet');
       out.sheet = [!!sh, sh && sh.querySelector('h3').textContent, document.getElementById('drugCodexDetailModal').style.display, sh && [...sh.querySelectorAll('.art-link')].map(b => b.textContent)];
       sh.querySelector('.ok').click(); await wait(300);
+      if (document.querySelector('#art-sheet .anyq')) internArticles.close('ok');   // V101.212: Got it keeps the sheet 7 s for 💬 Any Q? (articles-anyq-qa.cjs) — closed by hand here
       out.read = [!!document.getElementById('art-sheet'), (window.myUserDoc.articleSeen.a1 || {}).act, writes.length > 0];
       dcOpenDetail('d1'); await wait(50);
       out.after = [...box.querySelectorAll('.dx-art')].map(b => b.textContent.replace(/\s+/g, ' ').trim());
