@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.440)</title>
+    <title>Nika Admin (V102.444)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -8735,7 +8735,7 @@
                         <!-- V102.75: reads every shop that has no logo yet, shows what it found, saves only the ones you tick -->
                         <button id="rl-bulk-btn" class="magic-btn" onclick="rlOpenBulkLogos()" title="Look for a logo on each shop's page, then pick which to save" style="display:none; background:linear-gradient(135deg, #6366f1, #a855f7); padding:10px 18px; border-radius:14px; font-weight:900;">🖼️ Fetch missing logos <span id="rl-bulk-count"></span></button>
                         <!-- V102.245: Jev suggests a category for every shop that has none (lavender = Jev's colour); you tick what to save -->
-                        <button id="rl-cat-btn" class="magic-btn" onclick="rlOpenCategories()" title="Jev suggests a category for each shop that has none — you tick what to save" style="display:none; background:#ede9fe; color:#5b21b6; border:1px solid #c4b5fd; padding:10px 18px; border-radius:14px; font-weight:900;">⚡ Categories <span id="rl-cat-count"></span></button>
+                        <button id="rl-cat-btn" class="magic-btn jev-btn" onclick="rlOpenCategories()" title="Jev suggests a category for each shop that has none — you tick what to save" style="display:none; padding:10px 18px; border-radius:14px; font-weight:900;"><img class="jev-mark" src="assets/logos/jev-60.png" alt="Jev" width="20" height="20" style="width:20px;height:20px"> Categories <span id="rl-cat-count"></span></button>
                         <button class="magic-btn" onclick="openReviewLinkModal()" style="background:linear-gradient(135deg, #ea580c, #c2410c); padding:10px 22px; border-radius:14px; font-weight:900;">➕ Add Link</button>
                     </div>
                 </div>
@@ -8746,6 +8746,16 @@
                      rendering blank — same lang-toggle.js EN-default Thai-hiding trap this file
                      already has 20+ prior fix-comments for, missed on this specific container. -->
                 <!-- V102.128: `all:unset` on these buttons sidesteps the global `button{width:100%}` rule (known trap in this file). -->
+    <style>
+        /* V102.444 (owner): everything Jev does carries Jev's logo + colours (near-black + teal) so you can see where Jev is asked */
+        .jev-mark { width:1.15em; height:1.15em; border-radius:26%; vertical-align:-0.2em; flex:none; }
+        .jev-chip { display:inline-flex; align-items:center; gap:5px; margin:3px 4px 0 0; padding:2px 9px 2px 4px; border-radius:999px; font-size:0.72em; font-weight:800; }
+        .jev-chip.dup { background:#060d0d; color:#4fe0c0; border:1px solid #1f564b; }
+        .jev-chip.diff { background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; }
+        .jev-chip.unsure { background:#fff; color:#92400e; border:1px solid #fcd34d; }
+        .jev-btn { background:#060d0d !important; color:#4fe0c0 !important; border:1px solid #1f564b !important; display:inline-flex; align-items:center; gap:7px; }
+    </style>
+    <script>window.jevMarkHtml = function (px) { return '<img class="jev-mark" src="assets/logos/jev-60.png" alt="Jev" width="' + (px || 16) + '" height="' + (px || 16) + '" style="width:' + (px || 16) + 'px;height:' + (px || 16) + 'px">'; };</script>
                 <style>
                     #review-links-list .rl-open { all:unset; cursor:pointer; display:inline-flex; flex-shrink:0; border-radius:50%; }
                     #review-links-list .rl-name { all:unset; cursor:pointer; display:block; min-width:0; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:800; color:#334155; font-size:0.9em; }
@@ -32193,7 +32203,7 @@ ${JSON.stringify(sourceObj)}`;
                 );
                 if (guardrail.risky) {
                     const pct = Math.round(guardrail.probability * 100);
-                    if (!confirm(`⚠️ "${doc.name}" scored ${pct}% likely to contain an AI-manipulation attempt rather than genuine study content. Generate anyway?`)) return;
+                    if (!confirm(`⚠️ Jev guardrail: "${doc.name}" scored ${pct}% likely to contain an AI-manipulation attempt rather than genuine study content. Generate anyway?`)) return;
                 }
 
                 // Determine if content is likely binary/junk and needs warning
@@ -36151,14 +36161,14 @@ RULES:
         }
         function quizCompareJevPaint(m, r) {
             const pct = x => (typeof x === 'number' ? Math.round(x * 100) : null);
-            const v = r.verdict === 'dup' ? { t: 'Jev ✓ ' + pct(r.sameFact) + '%', bg: '#ede9fe', fg: '#5b21b6', tip: 'Jev: the same fact is tested — answering one gives away the other' }
-                : r.verdict === 'different' ? { t: 'Jev ✗', bg: '#f1f5f9', fg: '#64748b', tip: 'Jev: different facts — the wording overlaps but the question does not' }
-                    : { t: 'Jev ?', bg: '#fff', fg: '#92400e', tip: 'Jev is not sure — read both questions' };
+            const v = r.verdict === 'dup' ? { t: 'Jev ✓ ' + pct(r.sameFact) + '%', cls: 'dup', tip: 'Jev: the same fact is tested — answering one gives away the other' }
+                : r.verdict === 'different' ? { t: 'Jev ✗', cls: 'diff', tip: 'Jev: different facts — the wording overlaps but the question does not' }
+                    : { t: 'Jev ?', cls: 'unsure', tip: 'Jev is not sure — read both questions' };
             const tip = v.tip + ' · same fact ' + pct(r.sameFact) + '%' + (r.sameTopic == null ? '' : ' · same topic ' + pct(r.sameTopic) + '%');
             [[m.a, m.b], [m.b, m.a]].forEach(([x, y]) => {
                 const el = document.querySelector(`.qc-jev[data-jev="${x.quizIdx}-${x.qIndex}-${y.quizIdx}-${y.qIndex}"]`);
                 if (!el) return;
-                el.innerHTML = `<span title="${escapeHtml(tip)}" style="display:inline-flex; align-items:center; margin:3px 4px 0 0; padding:2px 8px; border-radius:999px; font-size:0.72em; font-weight:800; background:${v.bg}; color:${v.fg}; border:1px solid ${v.fg}33;">${escapeHtml(v.t)}</span>`;
+                el.innerHTML = `<span class="jev-chip ${v.cls}" title="${escapeHtml(tip)}">${jevMarkHtml(14)}${escapeHtml(v.t.replace(/^Jev /, ''))}</span>`;
             });
         }
 
@@ -38527,10 +38537,10 @@ RULES:
                 const chips = r.status === 'ok' ? r.options.map(o => {
                     const c = RL_CATEGORIES.find(x => x[0] === o.key) || [o.key, '', o.key];
                     const on = r.pick === o.key, low = (r.confidence == null || r.confidence < 0.8);
-                    const col = on ? (low ? '#b45309' : '#7c3aed') : '#94a3b8';
+                    const col = on ? (low ? '#b45309' : '#0f9d8a') : '#94a3b8';
                     return '<button type="button" onclick="rlCatPick(' + i + ', &quot;' + o.key + '&quot;)" ' + (busy ? 'disabled ' : '') + 'style="width:auto; min-height:0; margin:0; padding:3px 9px 3px 6px; border-radius:999px; display:inline-flex; align-items:center; gap:4px; font-size:0.74em; font-weight:800; cursor:pointer; border:1px solid ' + col + '55; background:' + (on ? (low ? '#fffbeb' : '#ede9fe') : '#fff') + '; color:' + col + ';">' + (on ? rlCatDial(o.p, col) : '') + c[1] + ' ' + escapeHtml(c[2]) + ' ' + Math.round(o.p * 100) + '%</button>';
                 }).join(' ') : '';
-                const status = { wait: 'In queue', run: 'Asking Jev…', saved: 'Saved ✓', none: escapeHtml(r.note || 'No answer'), error: escapeHtml(r.note || 'Failed') }[r.status] || '';
+                const status = { wait: 'In queue', run: jevMarkHtml(12) + ' Asking Jev…', saved: 'Saved ✓', none: escapeHtml(r.note || 'No answer'), error: escapeHtml(r.note || 'Failed') }[r.status] || '';
                 const color = r.status === 'saved' ? '#15803d' : (r.status === 'none' || r.status === 'error') ? '#b91c1c' : '#64748b';
                 return '<div style="display:flex; align-items:center; gap:10px; padding:8px 4px; border-bottom:1px solid #f1f5f9;">' +
                     '<input type="checkbox" onchange="rlCatToggle(' + i + ', this.checked)" ' + (r.checked ? 'checked ' : '') + (r.status !== 'ok' || st.applying ? 'disabled ' : '') + 'style="width:16px; height:16px; margin:0; padding:0; flex-shrink:0;">' +
@@ -38538,11 +38548,11 @@ RULES:
                     (chips ? '<div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">' + chips + '</div>' : '<div style="font-size:0.74em; color:' + color + ';">' + status + '</div>') + '</div></div>';
             }).join('');
             st.el.innerHTML = '<div style="background:#fff; border-radius:16px; width:100%; max-width:560px; max-height:90vh; display:flex; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,0.3);">' +
-                '<div style="padding:16px 18px 8px;"><div style="font-weight:900; color:#334155;">⚡ Categories</div><div style="font-size:0.74em; color:#64748b; margin-top:4px;">' + st.rows.filter(r => r.status === 'ok').length + ' suggested of ' + st.rows.length + ' · ' + picked + ' ticked</div></div>' +
+                '<div style="padding:16px 18px 8px;"><div style="font-weight:900; color:#334155; display:flex; align-items:center; gap:8px;">' + jevMarkHtml(22) + ' Categories <span style="font-weight:800; font-size:0.72em; color:#0f766e; background:#ecfdf5; border:1px solid #99f6e4; border-radius:999px; padding:1px 8px;">by Jev</span></div><div style="font-size:0.74em; color:#64748b; margin-top:4px;">' + st.rows.filter(r => r.status === 'ok').length + ' suggested of ' + st.rows.length + ' · ' + picked + ' ticked</div></div>' +
                 '<div style="overflow-y:auto; padding:0 14px; flex:1;">' + rowHtml + '</div>' +
                 '<div style="display:flex; align-items:center; gap:8px; padding:12px 18px; border-top:1px solid #f1f5f9;"><span style="flex:1;"></span>' +
                 '<button type="button" onclick="rlCatClose()" ' + (st.applying ? 'disabled ' : '') + 'style="' + btnBase + ' border:1px solid #e2e8f0; background:#fff; color:#64748b;">' + (busy ? 'Cancel' : 'Close') + '</button>' +
-                '<button type="button" onclick="rlCatApply()" ' + (busy || !picked ? 'disabled ' : '') + 'style="' + btnBase + ' border:none; background:#7c3aed; color:#fff;">Save ' + (picked || '') + '</button></div></div>';
+                '<button type="button" onclick="rlCatApply()" ' + (busy || !picked ? 'disabled ' : '') + 'style="' + btnBase + ' border:none; background:#060d0d; color:#4fe0c0;">Save ' + (picked || '') + '</button></div></div>';
         }
         function rlCatToggle(i, on) { if (rlCat && rlCat.rows[i]) { rlCat.rows[i].checked = !!on; rlCatPaint(); } }
         function rlCatPick(i, key) { const r = rlCat && rlCat.rows[i]; if (r && r.status === 'ok') { r.pick = key; r.checked = true; rlCatPaint(); } }

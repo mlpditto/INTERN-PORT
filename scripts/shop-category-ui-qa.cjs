@@ -31,7 +31,8 @@ const ctx = {
         ] } };
     } }) },
 };
-vm.createContext(ctx);
+ctx.window = {}; vm.createContext(ctx);
+vm.runInContext((html.match(/window\.jevMarkHtml = function[\s\S]*?\};/) || [''])[0] + '\nthis.jevMarkHtml = window.jevMarkHtml;', ctx);   // V102.444: the real Jev-mark helper
 vm.runInContext(RL + '\nvar rlCat = null;\n' + ['function rlUncategorized()', 'function rlCatDial(', 'function rlCatPaint()', 'function rlCatToggle(', 'function rlCatPick(', 'function rlCatClose()'].map(grab).join('\n') + '\n' + grab('async function rlOpenCategories()') + '\n' + grab('async function rlCatApply()') + '\nvar _st = () => rlCat;', ctx);
 
 (async () => {
@@ -46,7 +47,8 @@ vm.runInContext(RL + '\nvar rlCat = null;\n' + ['function rlUncategorized()', 'f
     assert.ok(rows[2].status === 'none', 'no answer → clear row');
     let out = el.innerHTML;
     assert.ok(/Noodles 100%/.test(out) && /Drinks 47%/.test(out) && /Dessert 30%/.test(out), 'top-3 chips with percentages');
-    assert.ok(/color:#b45309/.test(out) && /color:#7c3aed/.test(out), 'amber for the doubtful pick, lavender (Jev) for the confident one');
+    assert.ok(/color:#b45309/.test(out) && /color:#0f9d8a/.test(out), 'amber for the doubtful pick, Jev teal for the confident one (V102.444)');
+    assert.ok(/jev-60\.png/.test(out) && /by Jev/.test(out) && /background:#060d0d; color:#4fe0c0;">Save 1/.test(out), 'the dialog wears Jev\'s logo, "by Jev" and the Jev-coloured Save');
     assert.ok(/<svg width="16"/.test(out), 'the Jev dial is drawn');
     assert.ok(/Save 1/.test(out) && /2 suggested of 3/.test(out) && /1 ticked/.test(out), 'footer counts');
     assert.ok(!/Boom/.test(out) && !/Has one/.test(out), 'a shop that already has a category is not listed');
@@ -74,6 +76,7 @@ vm.runInContext(RL + '\nvar rlCat = null;\n' + ['function rlUncategorized()', 'f
     vm.runInContext('rlCatClose()', ctx);
 
     // wiring in the page source
+    assert.ok(/id="rl-cat-btn" class="magic-btn jev-btn"/.test(html) && /jev-60\.png/.test(html.slice(html.indexOf('id="rl-cat-btn"'), html.indexOf('id="rl-cat-btn"') + 700)), 'the button is a Jev button (logo)');
     assert.ok(/id="rl-cat-btn"/.test(html) && /rlUpdateBulkBtn[\s\S]{0,700}rl-cat-btn/.test(html), 'the ⚡ Categories button and its live count');
     assert.ok(/httpsCallable\('jevClassifyShops'\)/.test(html));
     console.log('PASS: ⚡ Categories — confident ticked / doubtful unticked + amber, pick changes, only ticked saved, failures shown, shops with a category skipped');
