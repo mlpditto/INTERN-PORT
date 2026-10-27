@@ -56,6 +56,7 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         });
         for (const [start,end] of [
             ['        function setAlabastaCaseCardImageLoadingState(', '        async function populateAlabastaCaseCardModal('],
+            ['        // V102.438 (owner): the medicine dispensed', '        async function rebuildAlabastaCaseCardPromptFromInputs('],
             ['        async function saveAlabastaCaseCardScaffold()', '        // V94.32 Phase 3 escalation: HTML overlay'],
             ['        // V102.425: the case id sits', '        async function _renderCaseCardHtmlComposite('],
             ['        async function generateAlabastaCaseCardImage()', '        function buildAlabastaPoneglyphDraft']
@@ -211,6 +212,16 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         assert.ok(/ids\.safeSummary\.dataset\.auto = payload\.safeSummary;[\s\S]{0,300}consentEl\.checked = !!\(caseItem\.privacyConsent && caseItem\.privacyConsent\.details\)/.test(html), 'populate mirrors privacyConsent on the box');
         assert.equal(await page.locator('#alabasta-case-card-step-1 #alabasta-case-card-consent').count(), 1, 'the box sits in the summary card');
         assert.match(await page.locator('.cs-consent').innerText(), /Patient agreed/);
+        // V102.438: the dispensed medicine has its own field under the summary
+        assert.equal(await page.locator('#alabasta-case-card-step-1 #alabasta-case-card-dispensed').count(), 1, 'the Dispensed field sits in the summary card');
+        assert.match(await page.locator('.cs-disp').innerText(), /Dispensed/);
+        const rb0 = await page.evaluate(() => rebuilds);
+        await page.locator('#alabasta-case-card-dispensed').fill('ibuprofen 400 mg');
+        await page.locator('#alabasta-case-card-dispensed').blur();
+        await page.waitForFunction(n => rebuilds > n, rb0);
+        assert.ok(/caseVisualDispensed: alabastaCaseCardDispensed\(\)/.test(html), 'saved on the case');
+        assert.ok(/dispEl\.value = String\(caseItem\.caseVisualDispensed \|\| ''\)/.test(html), 'populate restores it');
+        assert.ok(/### DISPENSED MEDICINE ###[\s\S]{0,400}no brand, no price, no pharmacy name/.test(html), 'the prompt names it, generic only');
         await page.evaluate(() => { window.consentCalls = []; window.onCaseCardConsentChange = async v => { consentCalls.push(v); return v; }; });
         await page.locator('#alabasta-case-card-consent').check();
         await page.waitForFunction(() => consentCalls.length === 1);
