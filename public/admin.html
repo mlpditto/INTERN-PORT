@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.439)</title>
+    <title>Nika Admin (V102.442)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -765,6 +765,10 @@
         .glc-ep .glc-edit { grid-column:1 / -1; display:grid; grid-template-columns:1fr 1fr; gap:6px; padding-top:4px; }
         .glc-ep .glc-edit input, .glc-ep .glc-edit textarea { width:100%; box-sizing:border-box; border:1px solid #e2e8f0; border-radius:8px; padding:5px 8px; font-size:0.78em; font-family:inherit; }
         .glc-ep .glc-edit textarea { grid-column:1 / -1; min-height:48px; resize:vertical; }
+        .glc-ep .glc-edit [data-f="hashtags"], .glc-ep .glc-edit .glc-post-row { grid-column:1 / -1; }
+        .glc-ep .glc-edit .glc-post-row { display:flex; align-items:center; gap:8px; }
+        .glc-ep .glc-edit .glc-post-row button { border:1px solid #c4b5fd; background:#f5f3ff; color:#6d28d9; border-radius:10px; padding:4px 10px; font-size:0.78em; font-weight:800; cursor:pointer; }
+        .glc-ep .glc-edit .glc-post-row small { color:#64748b; font-size:0.72em; }
         .glc-ep .glc-ask { display:inline-flex; align-items:center; gap:6px; font-size:0.74em; font-weight:800; color:#9a3412; background:#fff7ed; border:1px solid #fdba74; border-radius:999px; padding:3px 6px 3px 10px; }
         .glc-ep .glc-ask button { padding:3px 8px; border-radius:8px; }
         .glc-cost { font-size:0.74em; font-weight:800; color:#9a3412; background:#fff7ed; border:1px solid #fdba74; padding:2px 10px; border-radius:999px; white-space:nowrap; }
@@ -22106,6 +22110,7 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
                     + '<span class="glc-dot" title="' + (e.status === 'done' ? 'Rendered · ' + e.seconds + ' s · $' + Number(e.costUsd || 0).toFixed(2) : e.status === 'rendering' ? 'Rendering…' : e.status === 'failed' ? 'Failed — ▶ to try again' : 'Planned — not rendered, nothing paid') + '"></span>'
                     + (window._glcClips && window._glcClips[e.n] ? '<button type="button" onclick="glcShowClip(' + e.n + ')" title="Show EP' + String(e.n).padStart(2, '0') + ' in the preview' + (e.clipUrl ? '' : ' — rendered, not saved yet') + '" aria-label="Show episode ' + e.n + '">👁</button>' : '')   // V102.316
                     + '<button type="button" onclick="glcCopyEpisode(' + e.n + ')" title="Copy this episode (title · objective · fact · narration · visual) · คัดลอกตอนนี้ · 이 에피소드 복사" aria-label="Copy episode ' + e.n + '">⧉</button>'   // V102.305
+                    + (e.post ? '<button type="button" onclick="glcCopyPost(' + e.n + ')" title="Copy the post caption + hashtags · คัดลอกแคปชัน + แฮชแท็ก" aria-label="Copy post caption ' + e.n + '">📣</button>' : '')
                     + '<button type="button" onclick="glcToggleEdit(' + e.n + ')" title="Edit the 5 fields" aria-label="Edit episode ' + e.n + '"' + (busy ? ' disabled' : '') + '>✏️</button>'
                     + '<button type="button" onclick="glcAskRender(' + e.n + ')" title="' + (e.status === 'done' ? 'Re-render' : 'Render') + ' this episode · ' + window.glcSeconds() + ' s ≈ $' + (window.glcSeconds() * window.glcUsd()).toFixed(2) + '" aria-label="Render episode ' + e.n + '"' + (busy || window._glcBatch ? ' disabled' : '') + '>' + (busy ? '⏳' : e.status === 'done' ? '🔁' : '▶') + '</button>'
                     + '</div>';
@@ -22153,6 +22158,9 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
                 + '<input data-f="readingTh" value="' + esc(e.readingTh || '') + '" placeholder="คำอ่านชื่อยา (เฉพาะเสียง) Warfarin=วอร์ฟาริน, INR=ไอเอ็นอาร์" aria-label="Drug-name readings for the Thai voice" title="Only the 🔊 Thai voice uses these — the caption on screen keeps the English names">'
                 + '<small class="glc-cap-count" role="status"></small>'
                 + '<textarea data-f="visual" placeholder="🎨 Visual prompt" aria-label="Visual prompt">' + esc(e.visual) + '</textarea>'
+                + '<textarea data-f="post" placeholder="📣 แคปชันโพสต์ (ไทย) — IG / TikTok / Reels" aria-label="Post caption">' + esc(e.post || '') + '</textarea>'
+                + '<input data-f="hashtags" value="' + esc(e.hashtags || '') + '" placeholder="# แฮชแท็ก — #pharmacy #เภสัชกร" aria-label="Hashtags">'
+                + '<div class="glc-post-row"><button type="button" id="glc-dp-' + n + '" onclick="glcDraftPost(' + n + ')" title="Draft the post caption + hashtags from this episode (you edit, then Done)">✨ ร่างแคปชัน + แฮชแท็ก</button><small class="glc-post-note" role="status"></small></div>'
                 + '<div style="grid-column:1 / -1; display:flex; justify-content:flex-end; gap:6px;"><button type="button" onclick="glcSaveEdit(' + n + ')" style="border:none; background:#10b981; color:#fff; border-radius:10px; padding:5px 12px; cursor:pointer; font-size:0.8em; font-weight:800;">Done</button></div>';
             row.appendChild(box);
             window.glcCapCount(box.querySelector('[data-f="captionTh"]'), n);
@@ -22173,7 +22181,52 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
             const e = window._glcSeries && window._glcSeries.episodes[n - 1];
             if (!row || !e) return;
             row.querySelectorAll('.glc-edit [data-f]').forEach(el => { e[el.dataset.f] = el.value.trim(); });
+            if (e.hashtags) e.hashtags = window.glcHashtags(e.hashtags);   // V102.442
             window.glcRenderEpisodes();
+        };
+
+        // V102.442 · K1 (owner): a social post for each episode — a Thai caption + hashtags, drafted by the text AI from the episode, edited in ✏️, copied with 📣.
+        // Front-end only: the two fields ride with the episode (clip_series) like the Thai caption does.
+        window.glcHashtags = function(raw) {
+            const seen = new Set(), out = [];
+            String(raw || '').split(/[\s,]+/).forEach(w => {
+                const t = w.replace(/^#+/, '').replace(/[^0-9A-Za-z_\u0E00-\u0E7F]/g, '');
+                if (!t || seen.has(t.toLowerCase()) || out.length >= 10) return;
+                seen.add(t.toLowerCase()); out.push('#' + t);
+            });
+            return out.join(' ');
+        };
+        window.glcPostText = function(e) { return [String(e.post || '').trim(), window.glcHashtags(e.hashtags)].filter(Boolean).join('\n\n'); };
+        window.glcCopyPost = function(n) {
+            const e = window._glcSeries && window._glcSeries.episodes[n - 1]; if (!e || !e.post) return;
+            window.glcCopyText(window.glcPostText(e), 'Copied the post caption ✓ · คัดลอกแคปชันแล้ว');
+        };
+        window.glcDraftPost = async function(n) {
+            const box = document.querySelector('#glc-ep-' + n + ' .glc-edit'), e = window._glcSeries && window._glcSeries.episodes[n - 1];
+            if (!box || !e) return;
+            const val = f => { const el = box.querySelector('[data-f="' + f + '"]'); return el ? el.value.trim() : String(e[f] || ''); };
+            const note = box.querySelector('.glc-post-note'), btn = box.querySelector('.glc-post-row button');
+            const prompt = 'Write a short social post (Instagram / TikTok / Reels) in THAI for a 9:16 pharmacy teaching clip, plus hashtags.\n'
+                + 'Episode: ' + val('title') + (val('titleTh') ? ' · ' + val('titleTh') : '') + '\nObjective: ' + val('objective') + '\nKey fact: ' + val('fact')
+                + '\nWhat the clip says: ' + (val('captionTh') || val('narration')) + (val('caution') ? '\nClinician must double-check: ' + val('caution') : '') + '\n\n'
+                + 'Rules: the caption is 2–4 short Thai lines, ≤ 220 characters in all, friendly and clear, a hook first; keep drug names in English; use ONLY the facts above — no new dose, number or claim; no diagnosis or personal advice. '
+                + 'Hashtags: 6 to 8, a mix of Thai and English, no spaces inside a tag.\n'
+                + 'Return ONLY JSON: {"post":"the Thai caption","hashtags":["#tag","#tag"]}';
+            const model = window.getAIDesignEnhancerModel ? window.getAIDesignEnhancerModel() : 'gemini-3.5-flash';
+            const stop = window.gmBusy ? window.gmBusy(btn, 'กำลังร่าง…') : () => {};
+            if (note) note.textContent = '';
+            try {
+                const res = await window.callUniversalAI(model, prompt, true, null, '', { feature: 'clip_caption' });
+                const j = window.safeJsonParse(res && res.text);
+                const post = j && typeof j.post === 'string' ? j.post.trim() : '';
+                if (!post) throw new Error('the model sent back no caption');
+                const tags = window.glcHashtags(Array.isArray(j.hashtags) ? j.hashtags.join(' ') : j.hashtags);
+                const pEl = box.querySelector('[data-f="post"]'), hEl = box.querySelector('[data-f="hashtags"]');
+                if (pEl) pEl.value = post; if (hEl) hEl.value = tags;
+                if (note) note.textContent = '✨ ร่างแล้ว — ตรวจแล้วกด Done';
+            } catch (err) {
+                if (note) note.textContent = '✨ ร่างไม่สำเร็จ: ' + ((err && err.message) || err);
+            } finally { stop(); }
         };
 
         // ▶ — inline cost ask in the row's action area (the browser swallows a native confirm() after awaits).
