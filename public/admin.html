@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.451)</title>
+    <title>Nika Admin (V102.452)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -4493,6 +4493,8 @@
         #groupSelectModal .gs-card-contact header { background:color-mix(in srgb, #10b981 12%, var(--bg-card, white)); }
         #groupSelectModal .gs-card-work header { background:color-mix(in srgb, #f59e0b 14%, var(--bg-card, white)); }
         #groupSelectModal .gs-card-social header { background:color-mix(in srgb, #a855f7 12%, var(--bg-card, white)); }
+        .u-worklink { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; background:#e0f2fe; border:1px solid #7dd3fc; font-size:11px; text-decoration:none; vertical-align:middle; margin-left:2px; }   /* V102.452 */
+        .u-worklink:hover { background:#bae6fd; }
         #groupSelectModal .gs-card-share header { background:color-mix(in srgb, #0ea5e9 12%, var(--bg-card, white)); }   /* V102.451 */
         #groupSelectModal .gs-card-share .gs-read-value a { color:#0369a1; font-weight:700; word-break:break-all; }
         #groupSelectModal .gs-profile-card h3 { width:100%; font-size:14px; margin:0 0 4px; }
@@ -54485,7 +54487,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 <div style="display:flex; align-items:center; gap:10px;">
                                     ${avatarWithDot(d.id, d.pictureUrl, group, ignored)}
                                     <div style="min-width:0;">
-                                        <div style="font-weight:bold; line-height:1.25;">${d.displayName}${(() => { const n = String(d.nickname || '').trim(); return n && n !== '-' && n.toLowerCase() !== String(d.displayName || '').trim().toLowerCase() ? ` <span style="font-weight:600; font-size:0.85em; color:var(--text-sub);">· ${escapeHtml(n)}</span>` : ''; })()}${d.googleLink && d.googleLink.uid ? ` <span title="Google connected · ${escapeHtml(d.googleLink.email || '')}" aria-label="Google connected" style="display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; background:#fff; border:1px solid #e2e8f0; vertical-align:middle; cursor:help;">${googleGSvg(11)}</span>` : ''}${ignored ? ' <span title="Hidden from boards (⋯ to show)" aria-label="Hidden from boards">🙈</span>' : ''}${userFloodMarkHtml(d)}${userGroupTagHtml(d)}</div>
+                                        <div style="font-weight:bold; line-height:1.25;">${d.displayName}${(() => { const n = String(d.nickname || '').trim(); return n && n !== '-' && n.toLowerCase() !== String(d.displayName || '').trim().toLowerCase() ? ` <span style="font-weight:600; font-size:0.85em; color:var(--text-sub);">· ${escapeHtml(n)}</span>` : ''; })()}${d.googleLink && d.googleLink.uid ? ` <span title="Google connected · ${escapeHtml(d.googleLink.email || '')}" aria-label="Google connected" style="display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; background:#fff; border:1px solid #e2e8f0; vertical-align:middle; cursor:help;">${googleGSvg(11)}</span>` : ''}${ignored ? ' <span title="Hidden from boards (⋯ to show)" aria-label="Hidden from boards">🙈</span>' : ''}${userFloodMarkHtml(d)}${userGroupTagHtml(d)}${userWorkLinkHtml(d)}</div>
                                         ${certNameDisplay}
                                         ${(_badgesHtml || _logsHtml) ? `<div style="display:flex; align-items:center; gap:6px; margin-top:2px; font-size:0.78em; color:var(--text-sub);">${_badgesHtml}${_logsHtml}</div>` : ''}
                                     </div>
@@ -57478,6 +57480,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // is unambiguous; LINE has no such rule (personal ids and @official ids resolve
         // differently) so a LINE value is never turned into a link, only shown.
         // A value containing a space is a name, not a handle — left as text.
+        // V102.452: 🔗 after the group chips when the user has a work link (users.workLink) — one click opens it in a new tab. Only http(s) is linked.
+        function userWorkLinkHtml(d) {
+            const u = String((d && d.workLink) || '').trim();
+            if (!/^https?:\/\//i.test(u)) return '';
+            return ` <a href="${escapeHtml(u)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="u-worklink" title="Work link — open in a new tab · ${escapeHtml(u)}" aria-label="Open work link">🔗</a>`;
+        }
+
         function socialHref(kind, value) {
             const v = String(value || '').trim();
             if (!v) return '';
