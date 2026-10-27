@@ -311,7 +311,7 @@
             m.addEventListener('click', e => { if (e.target === m) close(); });
         }
         const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-        m.innerHTML = '<div class="glc-player-box"><div class="glc-player-hd"><b>' + esc(item.name) + '</b><button type="button" class="x" aria-label="Close">✕</button></div>'
+        m.innerHTML = '<div class="glc-player-box"><div class="glc-player-hd"><b>' + esc(item.name) + '</b>' + (item.note ? '<small>' + esc(item.note) + '</small>' : '') + '<button type="button" class="x" aria-label="Close">✕</button></div>'
             + '<span class="glc-vwrap"><video class="glc-video" controls playsinline autoplay src="' + esc(item.url) + '"></video><div class="glc-cc-band" hidden></div></span>'
             + (list.length ? '<div class="glc-player-ft"><button type="button" class="glc-cc" aria-pressed="true" title="Thai captions on / off">CC ไทย</button><button type="button" class="glc-voice" aria-pressed="false" title="Thai voice (Gemini TTS) instead of the clip\'s own audio">🔊 เสียงไทย</button><span class="glc-voice-rail"></span><button type="button" class="glc-burn" title="Download the MP4 with the Thai captions burned in (for LINE / TikTok)">⬇ MP4 + ซับ</button><small class="glc-burn-st" role="status"></small></div>' : '')
             + '</div>';

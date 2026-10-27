@@ -179,9 +179,12 @@ const rail = await page.evaluate(() => [...document.querySelectorAll('#glc-voice
             const r = mgwPlayClip({}, 0);
             const m = document.getElementById('glc-player');
             const out = { keepTab, r, shown: !!m && !m.hidden, src: m.querySelector('video').getAttribute('src'), name: m.querySelector('.glc-player-hd b').textContent, cc: !!m.querySelector('.glc-cc'), voice: !!m.querySelector('.glc-voice'), burn: !!m.querySelector('.glc-burn'), band: m.querySelector('.glc-cc-band').textContent };
+            out.note = (m.querySelector('.glc-player-hd small') || {}).textContent || '';   // V102.450: an unchecked clip says so in the player
             m.querySelector('.x').click(); out.closed = m.hidden;
+            window._mgwGalleryRendered[0].reviewed = true; mgwPlayClip({}, 0); out.noteChecked = !document.querySelector('#glc-player .glc-player-hd small'); document.querySelector('#glc-player .x').click();
             return out;
         });
+        assert.equal(pl.note, '⚠️ not medically checked', 'the player flags an unchecked clip'); assert.equal(pl.noteChecked, true, '...and says nothing for a checked one');
         assert.deepEqual([pl.keepTab, pl.r, pl.shown], [true, false, true], '▶ opens the in-app player (ctrl-click keeps the new tab)');
         assert.deepEqual([pl.src, pl.name, pl.cc, pl.voice, pl.burn, pl.band, pl.closed], ['https://storage.test/EP01.mp4', 'EP01 · T', true, true, true, 'ทานยา Elobixibat วันละครั้งก่อนอาหารเช้า', true], 'player: the clip, its name, CC, 🔊, ⬇ MP4 + ซับ, the band; ✕ closes');
 
