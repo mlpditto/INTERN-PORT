@@ -46,6 +46,7 @@ const { chromium } = require('playwright');
             window.calls = []; window.writes = []; window.docCount = 0; window.writeFail = false;
             window.callUniversalAI = (...args) => { calls.push(args); return new Promise((resolve, reject) => { window.aiResolve = resolve; window.aiReject = reject; }); };
             window.firebase = { firestore: { FieldValue: { serverTimestamp: () => 'SERVER_TIMESTAMP' } } };
+            window.auth = { currentUser: { email: 'qa-admin@example.com' } };   // V102.455: curation.by reads admin.html's global `auth`
             window.db = { collection: name => { if (name !== 'quizzes') throw Error('Unexpected collection'); return { doc: requestedId => {
                 const id = requestedId || 'copy-' + ++docCount;
                 return { id, get: async () => ({ exists: true, data: () => structuredClone(fixture) }), set: async data => { writes.push({ id, data: structuredClone(data) }); if (writeFail) throw Error('Simulated uncertain write'); } };
@@ -242,6 +243,7 @@ const { chromium } = require('playwright');
         assert.equal(copy.targetGroup, 'Interns'); assert.equal(copy.totalPoints, 1.4);
         assert.equal(copy.curation.sourceQuizId, 'source-quiz');
         assert.deepEqual(copy.curation.originalQuestionNumbers, [2,3,4,5,6,7,8,9,10,14]);
+        assert.deepEqual([copy.curation.by, copy.curation.at], ['qa-admin@example.com', 'SERVER_TIMESTAMP'], 'V102.455: Save as new records who + when');
         const original = await page.evaluate(() => original);
         assert.deepEqual(copy.questions, copy.curation.originalQuestionNumbers.map(id => original.questions[id - 1]));
         assert.deepEqual(copy.materials, original.materials); assert.deepEqual(copy.blueprint, original.blueprint);
@@ -369,6 +371,7 @@ const { chromium } = require('playwright');
         const applied = await page.evaluate(() => records);
         const current = applied['source-quiz'], backup = applied[current.curation.backupQuizId];
         assert.equal(current.questions.length, 10); assert.equal(current.isActive, false);
+        assert.deepEqual([current.curation.by, current.curation.at], ['qa-admin@example.com', 'SERVER_TIMESTAMP'], 'V102.455: Apply records who + when');
         assert.deepEqual(backup.questions, original.questions); assert.equal(backup.isActive, false);
         assert.equal(backup.curationBackup.sourceQuizId, 'source-quiz');
         assert.equal(current.lastAiAnalysis, undefined); assert.equal(current.lastAiAudit, undefined); assert.equal(current.translations, undefined);
@@ -438,6 +441,7 @@ const { chromium } = require('playwright');
         assert.equal(removedQuiz.targetGroup, original.targetGroup); assert.equal(removedQuiz.totalPoints, original.totalPoints);
         assert.equal(removedQuiz.translations, undefined);
         assert.deepEqual(removedQuiz.curation.originalQuestionNumbers, [11, 12, 13, 14]);
+        assert.deepEqual([keptQuiz.curation.by, keptQuiz.curation.at, removedQuiz.curation.by, removedQuiz.curation.at], ['qa-admin@example.com', 'SERVER_TIMESTAMP', 'qa-admin@example.com', 'SERVER_TIMESTAMP'], 'V102.455: Split records who + when on both quizzes');
         assert.equal(await page.evaluate(() => atomicWrites), 3, 'split retry creates no duplicate quizzes');
         await close();
         // V102.285: the AI marks Q13 and Q14 for removal, Q13 is pinned Must keep → the pin wins (priority snap), Remove · 2 = Q12, Q14,
