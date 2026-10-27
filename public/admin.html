@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.453)</title>
+    <title>Nika Admin (V102.454)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -5479,6 +5479,11 @@
         #reflectiveReviewModal .reflective-review-footer { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px 24px; flex-shrink:0; padding-top:14px; margin-top:14px; border-top:1px solid rgba(148,163,184,0.24); }
         #reflectiveReviewModal .reflective-bonus-chip.ai-pick::after { content:'AI'; margin-left:4px; padding:0 4px; border-radius:5px; background:#7c3aed; color:#fff; font-size:0.78em; vertical-align:1px; }
         #reflectiveReviewModal .reflective-review-actions { flex:1 1 300px; align-items:center; justify-content:flex-end; border:0; padding:0; margin:0; }
+        #reflectiveReviewModal #reflective-grammar-score:empty { display:none; }   /* V102.454: an empty score badge takes no wrapped line */
+        #reflectiveReviewModal .rr-guard-ban { display:flex; align-items:center; gap:8px; font-size:0.8em; color:#78350f; background:#fffbeb; border:1px solid #fde68a; padding:6px 8px; border-radius:10px; line-height:1.3; }   /* V102.454 */
+        #reflectiveReviewModal .rr-guard-ban img { width:18px; height:18px; border-radius:5px; flex:0 0 auto; }
+        #reflectiveReviewModal .rr-guard-ban span { flex:1 1 auto; min-width:0; } #reflectiveReviewModal .rr-guard-ban b { font-weight:900; }
+        #reflectiveReviewModal .rr-guard-ban button { flex:0 0 auto; width:auto; min-height:0; margin:0; padding:3px 9px; border-radius:8px; border:1px solid #fcd34d; background:#fff; color:#b45309; font-weight:800; font-size:inherit; cursor:pointer; }
         #reflective-grammar-card:has(.rr-grammar-optout) #rr-grammar-model-row { display:none !important; } /* V102.118: whole row (tabs + rail); text-ai-chips.css forces display:flex !important */
         #reflectiveReviewModal .reflective-review-save-btn { flex:0 1 auto; padding:12px 20px; box-shadow:none; }
         #reflectiveReviewModal .reflective-review-cancel-btn { flex:0 0 auto; padding:12px 16px; background:transparent !important; color:#475569; border:1px solid #cbd5e1; }
@@ -14967,8 +14972,8 @@
                         <div style="display:flex; align-items:center; gap:8px;">
                             <!-- V94.18: Phase 3 model picker. Applies to the next grammar call (AI Suggest or Retry).
                                  V102.118: same vendor-first row as the Model row above (tabs + the registry rail, which replaces the two chips below). -->
-                            <span class="rr-mini-label" title="The model that analyses the intern's writing — separate from the reply model">Analysis model</span><!-- V102.381 -->
-                            <div class="audit-model-row rr-model-row" id="rr-grammar-model-row"><div class="audit-providers" id="rr-grammar-providers" role="group" aria-label="Browse model providers"></div><div class="reflective-grammar-model-rail lang-no-toggle" role="group" aria-label="Grammar Model">
+                            <!-- V102.454 (lean A): the V102.381 "Analysis model" caption is the row's tooltip now — the ✍️ Writing Analysis title already says what it is for -->
+                            <div class="audit-model-row rr-model-row" id="rr-grammar-model-row" title="Analysis model — analyses the intern's writing, separate from the reply model"><div class="audit-providers" id="rr-grammar-providers" role="group" aria-label="Browse model providers"></div><div class="reflective-grammar-model-rail lang-no-toggle" role="group" aria-label="Grammar Model">
                                 <button type="button" class="reflective-grammar-model-chip active" data-value="gemini-3.6-flash" onclick="selectGrammarModel(this)" title="Gemini 3.6 Flash">3.6</button>
                             </div><input type="hidden" id="ai-model-grammar" value="gemini-3.6-flash"></div>
                             <span id="reflective-grammar-score" style="font-size:0.72em; font-weight:900; padding:3px 10px; border-radius:999px; border:1px solid transparent;"></span>
@@ -24075,12 +24080,10 @@ Respond ONLY with valid JSON (no markdown, no code fences, no preamble):
             const content = document.getElementById('reflective-grammar-content');
             const badge = document.getElementById('reflective-grammar-score');
             if (!card || !content) return;
-            if (badge) {
-                badge.textContent = '🛡';
-                badge.style.cssText = 'font-size:0.72em; font-weight:900; padding:3px 10px; border-radius:999px; background:#fffbeb; color:#b45309; border:1px solid #fcd34d;';
-            }
+            if (badge) { badge.textContent = ''; badge.style.cssText = ''; }   // V102.454: no 🛡 pill — the banner below already says it
             const pct = typeof probability === 'number' ? Math.round(probability * 100) : '?';
-            content.innerHTML = `<div style="font-size:0.82em; color:#78350f; background:#fffbeb; border-left:3px solid #f59e0b; padding:8px 11px; border-radius:0 8px 8px 0; line-height:1.5;">Guardrail flagged this text as ${pct}% likely to contain AI-manipulation instructions — skipped the automatic grammar check.<div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:6px; font-size:0.85em;"><button type="button" onclick="runGrammarOnly(this, true)" style="background:#ffffff; border:1px solid #fcd34d; color:#b45309; padding:3px 10px; border-radius:8px; font-weight:700; cursor:pointer;"><i class="fa-solid fa-shield-halved"></i> Run anyway</button></div></div>`;
+            // V102.454 (lean A): one line — Jev mark · "91% manipulation risk · grammar skipped" · Run anyway; the full sentence is the tooltip
+            content.innerHTML = `<div class="rr-guard-ban" title="Jev guardrail flagged this text as ${pct}% likely to contain AI-manipulation instructions — the automatic grammar check was skipped"><img src="assets/logos/jev-60.png" alt="Jev" width="18" height="18"><span><b>${pct}%</b> manipulation risk · grammar skipped</span><button type="button" onclick="runGrammarOnly(this, true)">Run anyway</button></div>`;
             card.style.display = '';
         }
 
