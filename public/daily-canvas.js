@@ -13,8 +13,9 @@ document.addEventListener('DOMContentLoaded', function () {
     // the hero shows it as a quote with the mood discs turned green. Save handlers, ids and rules are unchanged.
     const hero = document.createElement('div');
     hero.id = 'dc-hero'; hero.className = 'dc-hero lang-no-toggle';
-    hero.innerHTML = '<div class="dc-bar"><span class="dc-title">📓 Journal</span><span class="dc-fire" hidden></span><span class="dc-mdd" title="Today sent · ส่งแล้ววันนี้" hidden></span><span class="dc-date"></span></div>'
-        + '<p class="dc-ask">How do you feel today?</p><div class="dc-quote" hidden></div><p class="dc-lock" hidden>🎓 Today’s +0.1 came from your Note · ส่ง Journal ได้อีกครั้งพรุ่งนี้</p><span class="dc-pts" hidden>+0.1</span>';
+    // V101.215 (lean): no second "Journal" title (the Mission tab says it) — the mood question is the bar's title, until a mood is picked
+    hero.innerHTML = '<div class="dc-bar"><p class="dc-ask">How do you feel today?</p><span class="dc-fire" hidden></span><span class="dc-mdd" title="Today sent · ส่งแล้ววันนี้" hidden></span><span class="dc-date"></span></div>'
+        + '<div class="dc-quote" hidden></div><p class="dc-lock" hidden>🎓 Today’s +0.1 came from your Note · ส่ง Journal ได้อีกครั้งพรุ่งนี้</p><span class="dc-pts" hidden>+0.1</span>';
     // "Mon 26 Oct" built from parts: ICU builds differ on the comma (Linux Chromium / LINE WebView give "Mon, 26 Oct")
     const dp = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Bangkok' }).formatToParts(new Date()).map(p => [p.type, p.value]));
     hero.querySelector('.dc-date').textContent = dp.weekday + ' ' + dp.day + ' ' + dp.month;
@@ -27,7 +28,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const grow = ta => { ta.style.height = 'auto'; if (ta.value && ta.scrollHeight) ta.style.height = ta.scrollHeight + 'px'; };   // empty or hidden → natural one row
     const PARTS = [['learned', 'Learned', 'ได้เรียนรู้อะไร'], ['hard', 'Hard', 'ติดอะไร'], ['next', 'Next', 'จะทำอะไรต่อ']];
     const rows = document.createElement('div'); rows.className = 'dc-rows lang-no-toggle';
-    PARTS.forEach(([k, label, ph]) => rows.append(row('dc-t', '<label class="dc-lb" for="dc-t-' + k + '">' + label + '</label><textarea id="dc-t-' + k + '" rows="1" placeholder="' + ph + '"></textarea>')));
+    PARTS.forEach(([k, label, ph]) => rows.append(row('dc-t', '<label class="dc-lb" for="dc-t-' + k + '">' + label + '</label><textarea id="dc-t-' + k + '" rows="1" placeholder="' + label + ' · ' + ph + '"></textarea>')));
     day.prepend(rows);
     const today = PARTS.map(([k]) => byId('dc-t-' + k));
     const content = byId('rl-content');
@@ -81,7 +82,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const msg = document.createElement('section');
     msg.id = 'dc-feedback'; msg.className = 'dc-panel lang-no-toggle';
     pane.append(msg);
-    msg.append(row('dc-ic', '<span class="dc-i" aria-hidden="true">✉️</span><textarea id="dc-feedback-message" rows="1" maxlength="4000" aria-label="Message to admin" placeholder="Need help or a suggestion?"></textarea>'
+    msg.append(row('dc-ic', '<span class="dc-i" aria-hidden="true">✉️</span><textarea id="dc-feedback-message" rows="1" maxlength="4000" aria-label="Message to admin" placeholder="Help or an idea?"></textarea>'
         + '<label class="dc-ib dc-clip" title="Attach today’s entry · แนบบันทึกวันนี้"><input type="checkbox" id="dc-feedback-attach" aria-label="Attach today’s entry">📎</label>'));
     msg.insertAdjacentHTML('beforeend', '<p id="dc-feedback-status" role="status"></p>');
     const msgTa = byId('dc-feedback-message'), attach = byId('dc-feedback-attach');
@@ -135,6 +136,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const log = todaysLog(), noteDay = !log && typeof hasSubmittedDRToday === 'function' && hasSubmittedDRToday();
         hero.classList.toggle('dc-done', !!log);
         day.hidden = !!log || noteDay;
+        feed.hidden = !byId('rl-history-list').children.length;   // V101.215: nothing to show yet → no empty 💬 section
         picker.hidden = day.hidden;
         hero.querySelector('.dc-ask').hidden = day.hidden || !!mood();
         hero.querySelector('.dc-lock').hidden = !noteDay;
