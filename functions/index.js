@@ -225,18 +225,20 @@ exports.findShopLogo = onCall({ secrets: ['OPENROUTER_API_KEY'], timeoutSeconds:
 
 // V102.245: Jev suggests the category of Explore shops that have none (admin Categories button). One Choice question per shop (~$0.00002), the shop's own page title
 // + description are added when readable; suggest-only - the admin ticks what to save. Honors the same kill switch as jevCompare (quiz_dup_scores/_config).
-exports.jevClassifyShops = onCall({ secrets: ['OPENROUTER_API_KEY'], timeoutSeconds: 120, memory: '512MiB' }, async (request) => {
+exports.jevClassifyShops = onCall({ secrets: ['OPENROUTER_API_KEY', 'JEV_AI_API_KEY'], timeoutSeconds: 120, memory: '512MiB' }, async (request) => {
     requireAdminCallable(request);
     const db = admin.firestore();
     const cfg = await db.collection('quiz_dup_scores').doc('_config').get();
     if (cfg.exists && cfg.data().enabled === false) return { enabled: false, results: [] };
+    const jevMod = require('./jev');
+    const provider = jevMod.providerOf(cfg.exists ? cfg.data().provider : null);   // V102.449: Jev AI's own API by default; quiz_dup_scores/_config.provider = 'openrouter' goes back
     const shops = request.data && request.data.shops;
     const sc = require('./shop-category');
     if (!Array.isArray(shops) || !shops.length || shops.length > sc.MAX_SHOPS) throw new HttpsError('invalid-argument', '1-' + sc.MAX_SHOPS + ' shops');
     const out = await sc.classifyShops(shops.map(x => ({ id: String((x && x.id) || ''), title: String((x && x.title) || ''), url: String((x && x.url) || '') })), {
-        apiKey: process.env.OPENROUTER_API_KEY, fetch: (u, o) => fetch(u, o), provider: 'openrouter', readIdentity: require('./link-logo').readPageIdentity,
+        apiKey: jevApiKey(provider), fetch: (u, o) => fetch(u, o), provider, readIdentity: require('./link-logo').readPageIdentity,
     });
-    recordAiUsage('openrouter', require('./jev').JEV_MODEL, out.inputTokens, true, 'jev_shop_category', { inputTokens: out.inputTokens, outputTokens: 0 });
+    recordAiUsage(provider, jevMod.JEV_MODEL, out.inputTokens, true, 'jev_shop_category', { inputTokens: out.inputTokens, outputTokens: 0 });
     return { enabled: true, results: out.results };
 });
 
@@ -5042,15 +5044,17 @@ async function groupUrgentFeedback(db) {
 // Admin-only, suggest-only (the page shows a chip next to the n-gram %, nothing is written because of it).
 // Answers are cached by content hash in quiz_dup_scores (client-closed: no rule = no access), so re-opening a
 // comparison costs nothing. Config doc quiz_dup_scores/_config: { enabled: false } = kill switch; { provider: 'typesafe' } = go straight
-// to TypeSafe instead of OpenRouter (default) — that needs a JEV_API_KEY secret added to this function's list and a redeploy.
+// to TypeSafe instead — that needs a JEV_API_KEY secret added to this function's list and a redeploy. Default (V102.449): Jev AI's own API
+// (JEV_AI_API_KEY); { provider: 'openrouter' } is the way back, no deploy.
 const jev = require("./jev");
-exports.jevCompare = onCall({ secrets: ["OPENROUTER_API_KEY"], timeoutSeconds: 120, memory: "256MiB" }, async (request) => {
+function jevApiKey(provider) { return provider === "typesafe" ? process.env.JEV_API_KEY : provider === "jev" ? process.env.JEV_AI_API_KEY : process.env.OPENROUTER_API_KEY; }
+exports.jevCompare = onCall({ secrets: ["OPENROUTER_API_KEY", "JEV_AI_API_KEY"], timeoutSeconds: 120, memory: "256MiB" }, async (request) => {
     requireAdminCallable(request);
     const db = admin.firestore();
     const cfg = await db.collection("quiz_dup_scores").doc("_config").get();
     if (cfg.exists && cfg.data().enabled === false) return { enabled: false, results: [] };
     const provider = jev.providerOf(cfg.exists ? cfg.data().provider : null);
-    const apiKey = provider === "typesafe" ? process.env.JEV_API_KEY : process.env.OPENROUTER_API_KEY;
+    const apiKey = jevApiKey(provider);
     if (!apiKey) throw new HttpsError("failed-precondition", "No API key configured for provider " + provider);
     const pairs = request.data && request.data.pairs;
     if (!Array.isArray(pairs) || !pairs.length || pairs.length > jev.MAX_PAIRS) throw new HttpsError("invalid-argument", "1-" + jev.MAX_PAIRS + " pairs");

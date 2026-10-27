@@ -5,14 +5,16 @@
 // Evaluation + prompts: memory project_typesafe_jev_eval (2026-09-22: smoke 6/6, control 16/16).
 const crypto = require('crypto');
 
-// Two transports, ONE request / response shape (OpenRouter's /v1/systemone is TypeSafe-compatible; it adds id, provider, usage.cost).
-// Same price either way: $0.042 per M input tokens, output free. OpenRouter is the default: it reuses the OPENROUTER_API_KEY secret
-// and bills inside the OpenRouter account. 'typesafe' goes straight to TypeSafe (needs its own JEV_API_KEY secret on the function).
+// Three transports, ONE request / response shape (OpenRouter's /v1/systemone is TypeSafe-compatible; it adds id, provider, usage.cost).
+// V102.449 (owner): 'jev' is the default now — Jev AI's own API (jev-ai.pro, secret JEV_AI_API_KEY, the account with the token balance).
+// 'openrouter' (OPENROUTER_API_KEY, billed inside the OpenRouter account) stays as the way back: set quiz_dup_scores/_config.provider to
+// 'openrouter' — no deploy needed. 'typesafe' goes straight to TypeSafe (needs its own JEV_API_KEY secret on the function).
 const PROVIDERS = {
+    jev: { url: 'https://jev-ai.pro/api/v1/systemone', headers: {} },
     openrouter: { url: 'https://openrouter.ai/api/v1/systemone', headers: { 'X-Title': 'INTERN-PORT' } },
     typesafe: { url: 'https://api.typesafe.ai/v1/systemone', headers: {} },
 };
-const DEFAULT_PROVIDER = 'openrouter';
+const DEFAULT_PROVIDER = 'jev';
 const providerOf = name => (PROVIDERS[name] ? name : DEFAULT_PROVIDER);
 const JEV_MODEL = 'jev-latest';
 const MAX_PAIRS = 60;
@@ -78,12 +80,12 @@ async function askJev(state, apiKey, fetchImpl, provider) {
         sameFact: num(json && json.answers && json.answers.same_fact && json.answers.same_fact.noul),
         sameTopic: num(json && json.answers && json.answers.same_topic && json.answers.same_topic.noul),
         inputTokens: num(json && json.usage && json.usage.input_tokens) || 0,
-        cost: num(json && json.usage && json.usage.cost) || 0,   // USD, only OpenRouter reports it
+        cost: num(json && json.usage && json.usage.cost) || 0,   // USD, only OpenRouter reports it (Jev AI bills tokens: see its dashboard)
         servedBy: typeof (json && json.model) === 'string' ? json.model.slice(0, 60) : null,
     };
 }
 
-// deps: { apiKey, provider ('openrouter' | 'typesafe'), fetch, readCache(keys) → { key: {sameFact, sameTopic} }, writeCache(entries) }
+// deps: { apiKey, provider ('jev' | 'openrouter' | 'typesafe'), fetch, readCache(keys) → { key: {sameFact, sameTopic} }, writeCache(entries) }
 // Returns one entry per input pair, in order: { key, sameFact, sameTopic, verdict, cached } or { key, error: true }.
 async function compareBatch(pairs, deps) {
     if (!Array.isArray(pairs) || !pairs.length) return { results: [], inputTokens: 0, cost: 0, calls: 0 };

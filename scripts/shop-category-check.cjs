@@ -54,8 +54,8 @@ const ans = (choice, probs, conf) => ({ answer: { type: 'choice', choice, probab
 
     // wiring
     const fn = idx.slice(idx.indexOf('exports.jevClassifyShops'));
-    assert.ok(/exports\.jevClassifyShops = onCall\(\{ secrets: \['OPENROUTER_API_KEY'\]/.test(idx), 'declares the OpenRouter secret');
+    assert.ok(/exports\.jevClassifyShops = onCall\(\{ secrets: \['OPENROUTER_API_KEY', 'JEV_AI_API_KEY'\]/.test(idx), 'declares the OpenRouter + Jev AI secrets');
     assert.ok(fn.indexOf('requireAdminCallable(request)') > 0 && fn.indexOf('requireAdminCallable(request)') < fn.indexOf('classifyShops('), 'admin gate first');
-    assert.ok(/enabled === false/.test(fn) && /readIdentity: require\('\.\/link-logo'\)\.readPageIdentity/.test(fn) && /recordAiUsage\('openrouter'/.test(fn), 'kill switch, guarded page reader, usage logged');
+    assert.ok(/enabled === false/.test(fn) && /readIdentity: require\('\.\/link-logo'\)\.readPageIdentity/.test(fn) && /recordAiUsage\(provider, jevMod\.JEV_MODEL/.test(fn) && /providerOf\(cfg\.exists \? cfg\.data\(\)\.provider : null\)/.test(fn) && /apiKey: jevApiKey\(provider\)/.test(fn), 'kill switch, guarded page reader, usage logged under the provider that served (default Jev AI)');
     console.log('PASS: shop-category — one Choice per shop, page identity best-effort, low confidence passed through, failures isolated, admin-only wiring');
 })().catch(e => { console.error(e); process.exit(1); });
