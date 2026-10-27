@@ -31,7 +31,7 @@ const internFns = ['function populateBirthdaySelects(', 'function setBirthdaySel
 
 // ---------------------------------------------------------------- admin: the REAL profile cards + gs* functions + export
 const bodyStart = adm.indexOf('<div id="gs-profile-body"');
-const healthStart = adm.indexOf('<section class="gs-profile-card gs-card-health">');
+const healthStart = adm.indexOf('<section class="gs-profile-card gs-card-share">');   // V102.451: the 🔗 Work link card is the last one now
 assert.ok(bodyStart > 0 && healthStart > bodyStart);
 const profileHtml = adm.slice(bodyStart, adm.indexOf('</section>', healthStart) + 10) + '</div>';
 const exportStart = adm.indexOf('<div id="piExportModal"');
@@ -202,24 +202,24 @@ const admFns = ['function gsFoldCards(', 'function gsBodyClick(', 'function gsEd
                 document.querySelectorAll('.gs-profile-card').forEach(c => c.classList.add('gs-folded'));
                 gsRefreshProfileCards();
             });
-            assert.equal(await page.$$eval('#gs-profile-body .gs-profile-card', e => e.length), 5, 'five cards (Personal, Contact, Education, Social, Health)');
-            assert.deepEqual(await folded(), [true, true, true, true, true]);
+            assert.equal(await page.$$eval('#gs-profile-body .gs-profile-card', e => e.length), 6, 'six cards (Personal, Contact, Education, Social, Health, Work link)');
+            assert.deepEqual(await folded(), [true, true, true, true, true, true]);
             assert.equal(await shown('.gs-card-basic .gs-card-fields'), false, 'a folded card shows only its header');
             assert.equal(await page.$eval('.gs-card-basic .gs-prev-line', e => e.textContent), 'สมชาย ใจดี · ชัย', 'preview: name · nickname');
             assert.equal(await page.$eval('.gs-card-contact .gs-prev-line', e => e.textContent), '081-234-5678 · s@x.com');
             assert.equal(await page.$eval('.gs-card-social .gs-prev-line', e => e.textContent), 'Not provided', 'no socials → "Not provided"');
             assert.equal(await shown('.gs-card-basic .gs-copy-card') && await shown('.gs-card-basic .gs-edit-card'), true, 'header keeps 📋 and ✏️ so a copy needs no unfolding');
             await page.click('.gs-card-contact > header h3');
-            assert.deepEqual(await folded(), [true, false, true, true, true], 'header click opens that card');
+            assert.deepEqual(await folded(), [true, false, true, true, true, true], 'header click opens that card');
             assert.equal(await shown('.gs-card-contact .gs-prev-line'), false, 'preview hides while open');
             await page.click('.gs-card-basic > header h3');
-            assert.deepEqual(await folded(), [false, false, true, true, true], 'V102.296: opening another keeps the first open (no accordion)');
+            assert.deepEqual(await folded(), [false, false, true, true, true, true], 'V102.296: opening another keeps the first open (no accordion)');
             await page.click('.gs-card-basic > header h3'); await page.click('.gs-card-contact > header h3');
-            assert.deepEqual(await folded(), [true, true, true, true, true], 'clicking an open header folds that card');
+            assert.deepEqual(await folded(), [true, true, true, true, true, true], 'clicking an open header folds that card');
             await page.click('.gs-card-contact .gs-copy-card');
-            assert.deepEqual(await folded(), [true, true, true, true, true], 'a header BUTTON does not toggle');
+            assert.deepEqual(await folded(), [true, true, true, true, true, true], 'a header BUTTON does not toggle');
             await page.click('.gs-card-health .gs-edit-card');
-            assert.deepEqual(await folded(), [true, true, true, true, false], '✏️ unfolds its card, nothing else moves');
+            assert.deepEqual(await folded(), [true, true, true, true, false, true], '✏️ unfolds its card, nothing else moves');
             await page.click('.gs-card-health .gs-edit-card');   // done editing
 
             // Health chip + empty fields listed
@@ -236,12 +236,17 @@ const admFns = ['function gsFoldCards(', 'function gsBodyClick(', 'function gsEd
 
             // changed-only writes
             await page.evaluate(() => {
-                const ids = ['gs-birthplace', 'gs-ref-name-1', 'gs-ref-phone-1', 'gs-ref-name-2', 'gs-ref-phone-2', 'gs-allergies', 'gs-conditions', 'gs-hospital'];
+                const ids = ['gs-birthplace', 'gs-ref-name-1', 'gs-ref-phone-1', 'gs-ref-name-2', 'gs-ref-phone-2', 'gs-allergies', 'gs-conditions', 'gs-hospital', 'gs-work-link'];
                 gsSnap = { fields: Object.fromEntries(ids.map(i => [i, document.getElementById(i).value.trim()])) };
             });
             assert.deepEqual(await page.evaluate(() => gsNewFieldWrites()), {}, 'nothing changed → nothing written (no empty health maps stamped on everyone)');
             await set('gs-birthplace', 'Khon Kaen'); await set('gs-hospital', '');
             assert.deepEqual(await page.evaluate(() => gsNewFieldWrites()), { birthPlace: 'Khon Kaen', 'health.hospitalizations': '' }, 'only the changed ones, health as dot paths');
+            await set('gs-work-link', 'https://drive.google.com/drive/folders/x'); await page.evaluate(() => gsRefreshProfileCards());
+            assert.deepEqual(await page.evaluate(() => gsNewFieldWrites()), { birthPlace: 'Khon Kaen', 'health.hospitalizations': '', workLink: 'https://drive.google.com/drive/folders/x' }, 'V102.451: the work link rides the same changed-only write');
+            assert.deepEqual(await page.$eval('.gs-card-share .gs-read-value a', a => [a.href, a.target, a.rel]), ['https://drive.google.com/drive/folders/x', '_blank', 'noopener noreferrer'], 'an http(s) work link opens in a new tab');
+            await set('gs-work-link', 'javascript:alert(1)'); await page.evaluate(() => gsRefreshProfileCards());
+            assert.equal(await page.$('.gs-card-share .gs-read-value a'), null, 'a non-http value is never a link');
 
             // ---------------------------------------------------- 📇 Personal data
             const full = { id: 'u1', fullName: 'A Full', nickname: 'a', phone: '081', group: 'G1', birthPlace: 'X', refName1: 'Mae', refPhone1: '089', health: { allergies: 'shrimp', conditions: '-', hospitalizations: '-' } };

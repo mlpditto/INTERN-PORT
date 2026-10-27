@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.450)</title>
+    <title>Nika Admin (V102.451)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -4493,6 +4493,8 @@
         #groupSelectModal .gs-card-contact header { background:color-mix(in srgb, #10b981 12%, var(--bg-card, white)); }
         #groupSelectModal .gs-card-work header { background:color-mix(in srgb, #f59e0b 14%, var(--bg-card, white)); }
         #groupSelectModal .gs-card-social header { background:color-mix(in srgb, #a855f7 12%, var(--bg-card, white)); }
+        #groupSelectModal .gs-card-share header { background:color-mix(in srgb, #0ea5e9 12%, var(--bg-card, white)); }   /* V102.451 */
+        #groupSelectModal .gs-card-share .gs-read-value a { color:#0369a1; font-weight:700; word-break:break-all; }
         #groupSelectModal .gs-profile-card h3 { width:100%; font-size:14px; margin:0 0 4px; }
         #groupSelectModal .gs-profile-card button { width:auto; min-height:44px; padding:6px 10px; margin:0; font-size:12px; border:1px solid #dfe5ef; border-radius:8px; background:var(--bg-card, white); color:var(--text-main); }
         #groupSelectModal .gs-card-fields { display:grid; gap:14px; padding:14px; }
@@ -15594,6 +15596,10 @@
 <div class="gs-card-field"><label for="gs-conditions" data-gs-en="🫀 Chronic conditions" data-gs-th="🫀 โรคประจำตัว">🫀 Chronic conditions</label><div class="gs-value-row"><span class="gs-read-value"></span><button type="button" class="gs-copy-field" aria-label="Copy 🫀 chronic conditions" data-th-aria-label="Copy 🫀 โรคประจำตัว" onclick="gsCopyProfile(this, false)">Copy</button></div><input type="text" id="gs-conditions" hidden></div>
 <div class="gs-card-field"><label for="gs-hospital" data-gs-en="🏥 Hospital stays" data-gs-th="🏥 ประวัติพักรักษาตัว">🏥 Hospital stays</label><div class="gs-value-row"><span class="gs-read-value"></span><button type="button" class="gs-copy-field" aria-label="Copy 🏥 hospital stays" data-th-aria-label="Copy 🏥 ประวัติพักรักษาตัว" onclick="gsCopyProfile(this, false)">Copy</button></div><input type="text" id="gs-hospital" hidden></div>
 </div><div class="gs-lock" id="gs-health-lock"></div></section>
+<!-- V102.451: one shared-work link per user (users.workLink) — a Drive folder or any http(s) page; the read view opens it in a new tab -->
+<section class="gs-profile-card gs-card-share"><header><h3 data-gs-en="🔗 Work link" data-gs-th="🔗 ลิงก์ผลงาน">🔗 Work link</h3><button type="button" class="gs-copy-card" onclick="gsCopyProfile(this, true)" title="Copy card" aria-label="Copy card"><span aria-hidden="true">📋</span></button><button type="button" class="gs-edit-card" aria-expanded="false" onclick="gsEditProfileCard(this)" title="Edit" aria-label="Edit"><span aria-hidden="true">✏️</span></button></header><div class="gs-card-fields">
+<div class="gs-card-field"><label for="gs-work-link" data-gs-en="Shared work (Drive folder…)" data-gs-th="ผลงานที่แชร์ (โฟลเดอร์ Drive…)">Shared work (Drive folder…)</label><div class="gs-value-row"><span class="gs-read-value"></span><button type="button" class="gs-copy-field" aria-label="Copy work link" data-th-aria-label="Copy ลิงก์ผลงาน" onclick="gsCopyProfile(this, false)">Copy</button></div><input type="url" id="gs-work-link" placeholder="https://drive.google.com/…" hidden></div>
+</div></section>
 </div></div>
             <section class="gs-inline-group lang-no-toggle" aria-label="User group">
                 <!-- V102.214: no separate "User group" block — the main chip in the header opens the picker; its Main / Also in switch decides whether a pick changes the group or adds a membership. Extra pairs ride after the chip (× removes). -->
@@ -39433,6 +39439,11 @@ They can connect again from LINE.
                 const value = row.querySelector('input').value.trim();
                 const age = row.querySelector('input').id === 'gs-birthday' ? gsAgeText(value) : '';   // V102.290: age against today, next to the birthday
                 row.querySelector('.gs-read-value').textContent = (value || gsText('Not provided', 'ยังไม่ได้ระบุ')) + age;
+                if (row.querySelector('input').id === 'gs-work-link' && /^https?:\/\//i.test(value)) {   // V102.451: only an http(s) value becomes a link
+                    const a = document.createElement('a');
+                    a.href = value; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = value;
+                    row.querySelector('.gs-read-value').replaceChildren(a);
+                }
                 row.querySelector('.gs-copy-field').hidden = !value;
                 row.classList.toggle('gs-empty-field', !value); // V102.62: hidden in read mode
             });
@@ -39447,14 +39458,14 @@ They can connect again from LINE.
             });
             // V102.280: a one-line preview on a folded card, and the Health status chip
             const val = id => ((document.getElementById(id) || {}).value || '').trim();
-            const PREVIEW = { 'gs-card-basic': ['gs-fullname-th', 'gs-cert-nickname', 'gs-birthday'], 'gs-card-contact': ['gs-tel', 'gs-email'], 'gs-card-work': ['gs-institute'], 'gs-card-social': ['gs-social-facebook', 'gs-social-line', 'gs-social-instagram', 'gs-social-tiktok'] };
+            const PREVIEW = { 'gs-card-basic': ['gs-fullname-th', 'gs-cert-nickname', 'gs-birthday'], 'gs-card-contact': ['gs-tel', 'gs-email'], 'gs-card-work': ['gs-institute'], 'gs-card-social': ['gs-social-facebook', 'gs-social-line', 'gs-social-instagram', 'gs-social-tiktok'], 'gs-card-share': ['gs-work-link'] };
             document.querySelectorAll('.gs-profile-card').forEach(card => {
                 const key = Object.keys(PREVIEW).find(k => card.classList.contains(k));
                 if (!key) return;
                 let line = card.querySelector('.gs-prev-line');
                 if (!line) { line = document.createElement('span'); line.className = 'gs-prev-line'; card.querySelector('header h3').after(line); }
                 const parts = PREVIEW[key].map(val).filter(Boolean);
-                line.textContent = (key === 'gs-card-social' ? parts.slice(0, 1) : parts).join(' · ') || gsText('Not provided', 'ยังไม่ได้ระบุ');
+                line.textContent = (key === 'gs-card-social' ? parts.slice(0, 1) : key === 'gs-card-share' ? parts.map(u => u.replace(/^https?:\/\//i, '').split('/')[0]) : parts).join(' · ') || gsText('Not provided', 'ยังไม่ได้ระบุ');
             });
             const hs = document.getElementById('gs-health-status');
             if (hs) {
@@ -39466,7 +39477,7 @@ They can connect again from LINE.
         // V102.280: only the new fields the admin actually changed are written, so saving never stamps empty health maps on everyone.
         function gsNewFieldWrites() {
             const out = {};
-            const map = { 'gs-birthplace': 'birthPlace', 'gs-ref-name-1': 'refName1', 'gs-ref-phone-1': 'refPhone1', 'gs-ref-name-2': 'refName2', 'gs-ref-phone-2': 'refPhone2',
+            const map = { 'gs-birthplace': 'birthPlace', 'gs-ref-name-1': 'refName1', 'gs-ref-phone-1': 'refPhone1', 'gs-ref-name-2': 'refName2', 'gs-ref-phone-2': 'refPhone2', 'gs-work-link': 'workLink',
                 'gs-allergies': 'health.allergies', 'gs-conditions': 'health.conditions', 'gs-hospital': 'health.hospitalizations' };
             Object.entries(map).forEach(([id, key]) => {
                 const v = (document.getElementById(id).value || '').trim();
@@ -40172,6 +40183,7 @@ They can connect again from LINE.
             document.getElementById('gs-address-idcard').value = user?.addressIdCard || '';   // V102.159
             // V102.280: birthplace, reference persons, health (users.health.* + health.consentAt)
             document.getElementById('gs-birthplace').value = user?.birthPlace || '';
+            document.getElementById('gs-work-link').value = user?.workLink || '';   // V102.451
             ['1', '2'].forEach(n => {
                 document.getElementById('gs-ref-name-' + n).value = user?.['refName' + n] || '';
                 document.getElementById('gs-ref-phone-' + n).value = user?.['refPhone' + n] || '';
