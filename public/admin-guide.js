@@ -38,6 +38,7 @@
         '#adminGuideOverlay .ag-body h2{display:none}' +
         '#adminGuideOverlay .ag-body h3{margin:16px 0 6px;font-size:1em}' +
         '#adminGuideOverlay .ag-body table{border-collapse:collapse;width:100%;margin:8px 0;font-size:.92em}' +
+        '#adminGuideOverlay .ag-body img{display:block;max-width:100%;height:auto;margin:10px 0;border:1px solid var(--border-color,#e2e8f0);border-radius:10px}' +
         '#adminGuideOverlay .ag-body th,#adminGuideOverlay .ag-body td{border:1px solid var(--border-color,#e2e8f0);padding:6px 8px;text-align:left;vertical-align:top}' +
         '#adminGuideOverlay .ag-body th{background:var(--col-bg,#f1f5f9)}' +
         '#adminGuideOverlay .ag-body code{background:var(--col-bg,#f1f5f9);padding:1px 5px;border-radius:5px}' +

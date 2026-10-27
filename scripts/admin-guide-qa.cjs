@@ -26,6 +26,21 @@ assert.equal(sectionsEn.length, sections.length, 'EN and TH guides have the same
 assert.equal(mdKo.split(/\r?\n/).filter(l => /^## /.test(l)).length, sections.length, 'KO guide has the same number of sections');
 for (const label of ['Send Login Link', 'Create', 'Archive', 'Logout']) assert.ok(mdKo.includes(label), 'KO guide names "' + label + '"');
 assert.ok(/<button id="btn-admin-guide"[^>]*>📖<\/button>/.test(admin), 'the header button is 📖');
+// V102.449: section 6 = Jev (where it is in the app, how to use it, the guardrail) in all three languages, with its three pictures.
+{
+    const IMGS = ['jev-compare.png', 'jev-categories.png', 'jev-guardrail.png'];
+    for (const [name, doc] of [['TH', md], ['EN', mdEn], ['KO', mdKo]]) {
+        const s6 = doc.split(/\r?\n## 6\. /)[1];
+        assert.ok(s6 && /Jev/.test(s6.split(/\r?\n## /)[0]), name + ' guide has section 6 about Jev');
+        for (const f of IMGS) assert.ok(s6.includes('](assets/guide/' + f + ')'), name + ' guide shows ' + f);
+        for (const label of ['Compare', 'Categories', 'Gourmet World', 'PDF', 'Reflective Review', 'Assignments']) assert.ok(s6.includes(label), name + ' Jev section names "' + label + '"');
+        assert.ok(/60/.test(s6) && /70%/.test(s6) && /80%/.test(s6), name + ' Jev section states the real thresholds (60 pairs · 70% guardrail · 80% pre-ticked)');
+    }
+    for (const f of IMGS) { const st = fs.statSync('public/assets/guide/' + f); assert.ok(st.size > 20000 && st.size < 400000, f + ' exists and is a sensible size: ' + st.size); }
+    // the guide only names Jev places that exist in admin.html
+    for (const needle of ['id="rl-cat-btn"', 'openQuizCompareModal()', 'Gourmet World', 'openPdfToQuizModal()', 'quizCompareJevPaint', 'jev-chip']) assert.ok(admin.includes(needle), 'admin.html has ' + needle);
+    assert.ok(/ag-body img\{[^}]*max-width:100%/.test(js), 'guide pictures never overflow the modal');
+}
 for (const label of ['Send Login Link', 'Create', 'Archive', 'Logout']) assert.ok(mdEn.includes(label), 'EN guide names "' + label + '"');
 
 const harness = `<!doctype html><meta charset="utf-8"><title>Nika Admin (V9.9)</title>
