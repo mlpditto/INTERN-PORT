@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.448)</title>
+    <title>Nika Admin (V102.446)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -3343,6 +3343,13 @@
             border-top:1px solid rgba(221,214,254,0.55);
         }
 
+        .alabasta-casecard-meta:empty { display:none; }   /* V102.446 */
+        /* V102.446 (owner): when the image is ready the PNG button wears a green frame and pulses a few times (and the arrow nods) — a tap invites; the pulse stops once pressed */
+        #alabastaCaseCardModal #alabasta-case-card-image-download.is-ready-dl { border:2px solid #22c55e !important; box-shadow:0 0 0 0 rgba(34,197,94,.55); animation:ccDlPulse 1.6s ease-out 5; }
+        #alabastaCaseCardModal #alabasta-case-card-image-download.is-ready-dl i { animation:ccDlNudge 1.6s ease-in-out 5; }
+        @keyframes ccDlPulse { 0% { box-shadow:0 0 0 0 rgba(34,197,94,.55); } 70% { box-shadow:0 0 0 11px rgba(34,197,94,0); } 100% { box-shadow:0 0 0 0 rgba(34,197,94,0); } }
+        @keyframes ccDlNudge { 0%, 60%, 100% { transform:translateY(0); } 30% { transform:translateY(3px); } }
+        @media (prefers-reduced-motion: reduce) { #alabastaCaseCardModal #alabasta-case-card-image-download.is-ready-dl, #alabastaCaseCardModal #alabasta-case-card-image-download.is-ready-dl i { animation:none; } }
         .alabasta-casecard-meta {
             font-size:0.8em;
             color:#64748b;
@@ -17517,7 +17524,7 @@
 
             </div></div>
             <div class="alabasta-casecard-footer">
-                <div id="alabasta-case-card-meta" class="alabasta-casecard-meta">No identifiers should appear in the safe summary or image prompt. · 안전 요약이나 이미지 프롬프트에 식별 정보가 나타나지 않아야 합니다.</div>
+                <div id="alabasta-case-card-meta" class="alabasta-casecard-meta"></div>
                 <div class="alabasta-casecard-actions">
                     <div class="alabasta-casecard-action-group final" aria-label="Final actions">
                         <button type="button" class="btn-sm alabasta-casecard-btn muted" onclick="closeAlabastaCaseCardModal()">Close · 닫기</button>
@@ -43798,7 +43805,7 @@ They can connect again from LINE.
             if (imageEl && isLoading) imageEl.removeAttribute('src');
             if (imageMetaEl) {
                 imageMetaEl.textContent = isLoading
-                    ? `Generating visual via ${modelLabel || 'selected model'}`
+                    ? ''   // V102.446: the GENERATING pill (with its clock) is the one statement
                     : (imageMetaEl.textContent || '');
             }
             // V102.427: the pill counts up while generating (Generating 0:12) and keeps the total once done (Ready · 0:42)
@@ -43807,6 +43814,7 @@ They can connect again from LINE.
             clearInterval(window._ccGenTick);
             if (isLoading) window._ccGenStart = Date.now();
             if (statusEl) {
+                statusEl.style.display = isLoading ? 'none' : '';   // V102.446: while generating, the button says it (with the clock)
                 statusEl.className = 'alabasta-genmage-status-pill ' + (isLoading ? 'is-loading' : 'is-ready');
                 statusEl.innerHTML = isLoading
                     ? '<i class="fa-solid fa-spinner fa-spin"></i> Generating <span class="cc-gen-time" style="font-variant-numeric:tabular-nums">0:00</span>'
@@ -43815,6 +43823,7 @@ They can connect again from LINE.
             }
             if (!isLoading) window._ccGenStart = 0;
             if (downloadEl) {
+                if (isLoading) downloadEl.classList.remove('is-ready-dl');   // V102.446
                 downloadEl.style.pointerEvents = isLoading ? 'none' : 'auto';
                 downloadEl.style.opacity = isLoading ? '0.55' : '1';
             }
@@ -43881,7 +43890,7 @@ They can connect again from LINE.
             if (ids.meta) ids.meta.textContent = 'Converting anonymized summary to English for GenMage prompt...';
             if (ids.imageWrap) ids.imageWrap.style.display = 'none';
             if (ids.image) ids.image.src = '';
-            if (ids.imageDownload) ids.imageDownload.href = '#';
+            if (ids.imageDownload) { ids.imageDownload.href = '#'; ids.imageDownload.classList.remove('is-ready-dl'); }   // V102.446
             if (ids.imageMeta) ids.imageMeta.textContent = '';
             if (ids.imageStatus) {
                 ids.imageStatus.className = 'alabasta-genmage-status-pill';
@@ -43930,7 +43939,7 @@ They can connect again from LINE.
             const imageStatusEl = document.getElementById('alabasta-case-card-image-status');
             const genBtn = document.getElementById('alabasta-case-card-generate-btn');
             const saveBtn = document.getElementById('alabasta-case-card-save-btn');
-            if (metaEl) metaEl.textContent = 'No identifiers should appear in the safe summary or image prompt.';
+            if (metaEl) metaEl.textContent = '';   // V102.446: said once, under the summary
             if (imageWrap) imageWrap.style.display = 'none';
             if (imageStageEl) imageStageEl.classList.remove('is-loading');
             if (imageEl) imageEl.src = '';
@@ -44218,7 +44227,7 @@ They can connect again from LINE.
             try {
                 if (genBtn) {
                     genBtn.disabled = true;
-                    genBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating <span class="cc-gen-btn-time" style="font-variant-numeric:tabular-nums">0:00</span>';   // V102.439: the header button counts too
+                    genBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating <span class="cc-gen-btn-time" style="font-variant-numeric:tabular-nums">0:00</span>';   // V102.439 / V102.446: the one place for "Generating" + its clock
                 }
                 const modelLabelMap = {
                     'as/gemini-nano-banana-2.1': 'Nano Banana 2.1',
@@ -44229,7 +44238,7 @@ They can connect again from LINE.
                     'or/x-ai/grok-imagine-image-2.0': 'Grok Imagine 2.0'
                 };
                 setAlabastaCaseCardImageLoadingState(true, modelLabelMap[selectedModel] || selectedModel);
-                if (metaEl) metaEl.textContent = `GenMage is generating via ${modelLabelMap[selectedModel] || selectedModel}...`;
+                if (metaEl) metaEl.textContent = '';   // V102.446: the pill + caption under the image already say it
 
                 const imageResponse = await window.callUniversalAI(
                     selectedModel,
@@ -44288,6 +44297,7 @@ They can connect again from LINE.
                 if (idBadge) { idBadge.textContent = caseItem.caseId ? '#' + caseItem.caseId : ''; idBadge.hidden = !caseItem.caseId; }
                 if (imageWrap) imageWrap.style.display = 'block';
                 setAlabastaCaseCardImageLoadingState(false, model || selectedModel);
+                if (dlEl) { dlEl.classList.add('is-ready-dl'); dlEl.addEventListener('click', () => dlEl.classList.remove('is-ready-dl'), { once: true }); }   // V102.446: ready → green frame + pulse until pressed
                 // V102.443 (owner): the pill keeps the real cost of this image when the provider reported one (Ready · 0:25 · $0.04)
                 const imgCost = imageResponse && imageResponse.raw && imageResponse.raw.usage && imageResponse.raw.usage.costUsd;
                 const costPill = document.getElementById('alabasta-case-card-image-status');
@@ -44305,7 +44315,7 @@ They can connect again from LINE.
                 // V92.42: removed redundant "Generated image is ready" footer line —
                 // the READY pill in the toolbar already conveys this. Keep footer meta as
                 // the static privacy reminder so users always see why this modal exists.
-                if (metaEl) metaEl.textContent = 'No identifiers should appear in the safe summary or image prompt.';
+                if (metaEl) metaEl.textContent = '';   // V102.446: said once, under the summary
                 // V92.44: surface step ④ in the sticky nav, collapse Advanced Draft Details,
                 // and observe the new image-wrap so the chip can light up when scrolled into view.
                 if (typeof revealAlabastaCaseCardStep4 === 'function') revealAlabastaCaseCardStep4();
