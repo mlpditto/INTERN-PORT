@@ -72,6 +72,9 @@
     // V101.202 (owner): one language pill, like the app's EN / KR / TH button — it shows the language on screen; a tap moves to the next one the article has
     function nextLang(have, l) { return have[(have.indexOf(l) + 1) % have.length]; }
     function langBtn(have, l, onclick) { return '<button type="button" class="lng" data-lang="' + l + '" aria-label="Language: ' + l.toUpperCase() + ' (tap for ' + nextLang(have, l).toUpperCase() + ')" onclick="' + onclick + '">' + l.toUpperCase() + '</button>'; }
+    // V101.217 (owner): the 💬 Any Q? form carries one flag chip too (🇬🇧 → 🇹🇭 → 🇰🇷), like the Guide — its labels exist in all three languages whatever the article has
+    var FLAGS = { en: '🇬🇧', th: '🇹🇭', ko: '🇰🇷' }, LNAME = { en: 'English', th: 'ไทย', ko: '한국어' }, LORDER = ['en', 'th', 'ko'];
+    function flagBtn(l) { var n = LORDER[(LORDER.indexOf(l) + 1) % LORDER.length]; return '<button type="button" class="lng fl" data-lang="' + l + '" title="' + LNAME[l] + '" aria-label="Language: ' + LNAME[l] + ' (tap for ' + LNAME[n] + ')" onclick="internArticles.askLang()">' + FLAGS[l] + '</button>'; }
     function uiLang() { var b = document.body; return b && b.classList.contains('lang-th-on') ? 'th' : b && b.classList.contains('lang-kr-on') ? 'ko' : 'en'; }
     // History rows: every article this intern can see now (live / rerun) or has already seen
     // V101.213: + the intern's own 💬 Any Q? questions on it (qs = their article_questions docs). A reply moves the row up to the reply's time
@@ -175,7 +178,7 @@
             '#art-sheet .anyq::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.75);transform-origin:left;animation:artShrink ' + ANYQ_MS + 'ms linear forwards}' +
             '@keyframes artShrink{from{transform:scaleX(1)}to{transform:scaleX(0)}}@keyframes artPop{from{transform:scale(.9);opacity:.4}to{transform:none;opacity:1}}' +
             // the Any Q? form
-            '#art-sheet .aq-h{display:flex;align-items:center;gap:10px;margin:2px 0 2px}#art-sheet .aq-h b{flex:1;font:800 19px/1.3 Kanit,sans-serif;color:#1e293b}#art-sheet .aq-sub{font:400 12.5px/1.4 Kanit,sans-serif;color:#94a3b8;margin:0 0 12px}' +
+            '#art-sheet .aq-h{display:flex;align-items:center;gap:10px;margin:2px 0 2px}#art-sheet .aq-h .lng{font-size:16px;padding:5px 9px}#art-sheet .aq-h b{flex:1;font:800 19px/1.3 Kanit,sans-serif;color:#1e293b}#art-sheet .aq-sub{font:400 12.5px/1.4 Kanit,sans-serif;color:#94a3b8;margin:0 0 12px}' +
             '#art-sheet .aq-k{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}#art-sheet .aq-k button{min-height:0;margin:0;width:auto;border:1.5px solid #e2e8f0;background:#fff;color:#475569;font:700 13px/1 Kanit,sans-serif;padding:9px 12px;border-radius:999px;cursor:pointer}' +
             '#art-sheet .aq-k button[aria-pressed="true"]{border-color:#818cf8;background:#eef2ff;color:#3730a3}#art-sheet .aq-k button[data-k="wrong"][aria-pressed="true"]{border-color:#f59e0b;background:#fffbeb;color:#92400e}' +
             '#art-sheet .aq-t{position:relative}#art-sheet .aq-t textarea{display:block;width:100%;box-sizing:border-box;min-height:96px;margin:0;padding:12px 12px 22px;border:1.5px solid #e2e8f0;border-radius:14px;font:400 16px/1.5 Kanit,sans-serif;color:#1e293b;resize:vertical}' +
@@ -228,7 +231,7 @@
     }
     function renderAsk(sh, t) {
         var q = S.ask, ph = { ask: t.phAsk, wrong: t.phWrong, add: t.phAdd }[q.kind];
-        sh.innerHTML = '<div class="aq-h"><b id="art-title">💬 ' + t.anyq + '</b><button type="button" class="x" onclick="internArticles.close(\'ok\')" aria-label="' + t.close + '">✕</button></div>' +
+        sh.innerHTML = '<div class="aq-h"><b id="art-title">💬 ' + t.anyq + '</b>' + flagBtn(S.lang) + '<button type="button" class="x" onclick="internArticles.close(\'ok\')" aria-label="' + t.close + '">✕</button></div>' +
             '<p class="aq-sub">' + t.askSub + '</p>' +
             '<div class="aq-k" role="group">' + KINDS.map(function (k) { return '<button type="button" data-k="' + k[0] + '" aria-pressed="' + (q.kind === k[0]) + '" onclick="internArticles.askKind(\'' + k[0] + '\')">' + k[1] + ' ' + t[k[0]] + '</button>'; }).join('') + '</div>' +
             '<div class="aq-t"><textarea id="art-q" maxlength="' + QMAX + '" rows="3" placeholder="' + esc(ph) + '" aria-label="' + esc(ph) + '"></textarea><span class="aq-n" id="art-qn"></span></div>' +
@@ -460,6 +463,7 @@
         historyItems: function () { return historyItems(S.list, me(), Date.now(), S.qs); },
         detailHtml: detailHtml, pillHtml: pillHtml, discHtml: discHtml, listen: listen, stopListen: stopListen, close: close, histLang: histLang,
         gotIt: gotIt, anyQ: anyQ, askSend: askSend,
+        askLang: function () { if (!S.ask || S.ask.busy) return; S.lang = LORDER[(LORDER.indexOf(S.lang) + 1) % LORDER.length]; render(); },
         askKind: function (k) { if (!S.ask || S.ask.busy) return; S.ask.kind = k; render(); },
         lang: function (l) { var a = S.cur && S.cur.a, have = a ? langs(a) : []; S.lang = l || (have.length ? nextLang(have, textOf(a, S.lang).lang) : S.lang); render(); },
         toggleMore: function () { S.more = !S.more; render(); },
