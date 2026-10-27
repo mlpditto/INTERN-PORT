@@ -216,7 +216,7 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
             calls.length = 0;
             await glcRenderEpisode(2);
             out.veoCalls = calls.filter(c => c.opts.feature === 'clip_render').map(c => ({ model: c.model, video: c.opts.video }));
-            // V102.451 · C1: real (provider reported) vs estimate (seconds × price); legacy clips have no kind
+            // V102.453 · C1: real (provider reported) vs estimate (seconds × price); legacy clips have no kind
             out.c1 = {
                 kinds: [window._glcSeries.episodes[0].costKind, window._glcSeries.episodes[1].costKind],
                 fmt: [glcCostFmt({ costUsd: 0.3721, costKind: 'real' }), glcCostFmt({ costUsd: 0.8, costKind: 'est' }), glcCostFmt({ costUsd: 0.4 }), glcCostFmt({})],
@@ -275,7 +275,7 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
             { model: 'as/gemini-omni-1.1-flash', video: { state: 'poll', interactionId: 'int-1' } }
         ], 'submit then poll with the interaction id');
         assert.deepEqual(r.renderPrompt, { narration: true, visual: true, noText: true, vertical: true }, 'the clip prompt carries narration + visual, forbids on-screen text');
-        assert.deepEqual(r.ep1, { status: 'done', dotTitle: 'Rendered · 8 s · ≈ $0.80', btn: '🔁' }, 'EP01 done, re-render offered (V102.451: Omni reports no cost, so an estimate wears ≈)');
+        assert.deepEqual(r.ep1, { status: 'done', dotTitle: 'Rendered · 8 s · ≈ $0.80', btn: '🔁' }, 'EP01 done, re-render offered (V102.453: Omni reports no cost, so an estimate wears ≈)');
         assert.equal(r.countAfter, '10 · 1 done');
         assert.deepEqual(r.video, { tag: 'VIDEO', src: 'data:video/mp4;base6', controls: true, playsinline: true }, 'portrait <video> in the preview');
         assert.deepEqual(r.clipActions, ['Thai captions on / off', 'Download MP4', "Thai voice (Gemini TTS) instead of the clip's own audio", 'Kore · เล่าเรื่อง', 'Charon · สงบ', 'Achird · เป็นกันเอง', 'Download the MP4 with the Thai captions burned in (for LINE / TikTok)', 'Delete this clip — MP4 + gallery entry (asks first)'], 'V102.354: CC ไทย · MP4 · 🔊 เสียงไทย · V102.366: 3 voice chips · ⬇ MP4 + ซับ · ✓ In gallery (a chip) · 🗑 = delete');

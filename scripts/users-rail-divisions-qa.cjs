@@ -7,7 +7,16 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const html = fs.readFileSync('public/admin.html', 'utf8').replace(/\r\n/g, '\n');
 assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(html));
 assert.ok(html.includes('<div id="user-subgroup-row" class="lang-no-toggle" hidden></div>'), 'the sub-row exists, hidden, language-toggle-proof');
-assert.ok(html.includes('${userFloodMarkHtml(d)}${userGroupTagHtml(d)}</div>'), 'the table row prints the tag after the name');
+assert.ok(html.includes('${userFloodMarkHtml(d)}${userGroupTagHtml(d)}${userWorkLinkHtml(d)}</div>'), 'the table row prints the tag after the name (V102.452: then the 🔗 work link)');
+{   // V102.452: the 🔗 helper on its own — http(s) only, escaped, opens in a new tab without the row's click
+    const vm = require('node:vm'), ctx = vm.createContext({});
+    const cut = m => { const i = html.indexOf(m); let k = html.indexOf('{', i), n = 0; for (; k < html.length; k++) { if (html[k] === '{') n++; else if (html[k] === '}' && !--n) break; } return html.slice(i, k + 1); };
+    vm.runInContext(cut('function escapeHtml(') + '\n' + cut('function userWorkLinkHtml('), ctx);
+    assert.equal(ctx.userWorkLinkHtml({}), '', 'no link → nothing');
+    assert.equal(ctx.userWorkLinkHtml({ workLink: 'javascript:alert(1)' }), '', 'a non-http value is never a link');
+    const a = ctx.userWorkLinkHtml({ workLink: ' https://drive.google.com/drive/folders/x?a=1&b="2" ' });
+    assert.ok(a.includes('href="https://drive.google.com/drive/folders/x?a=1&amp;b=&quot;2&quot;"') && a.includes('target="_blank"') && a.includes('rel="noopener noreferrer"') && a.includes('onclick="event.stopPropagation()"') && a.includes('>🔗</a>'), a);
+}
 assert.ok(!html.includes("color: '#4f46e5', active: inGroups"), 'division chips no longer all share one colour');
 
 function grabFn(marker) {
