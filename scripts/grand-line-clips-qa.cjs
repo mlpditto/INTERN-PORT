@@ -161,7 +161,9 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
             glcSaveEdit(3);
             out.ep3Post = { post: window._glcSeries.episodes[2].post, tags: window._glcSeries.episodes[2].hashtags };
             out.postBtns = [3, 4].map(n => !!$('#glc-ep-' + n + ' .glc-a button[onclick^="glcCopyPost"]'));
-            window.__clip.length = 0; glcCopyPost(3); await new Promise(r => setTimeout(r, 20)); out.copyPost = window.__clip[0];
+            window.__clip.length = 0; glcCopyPost(3); await new Promise(r => setTimeout(r, 20));
+            out.copyGate = { asked: !!document.querySelector('.glc-gate'), copiedBefore: window.__clip.length, text: txt(document.querySelector('.glc-gate') || document.body).slice(0, 80) };   // V102.450
+            document.querySelector('.glc-gate [data-a="go"]').click(); await new Promise(r => setTimeout(r, 20)); out.copyPost = window.__clip[0];
             out.row3After = txt($('#glc-ep-3 .glc-t')); out.ep3Visual = window._glcSeries.episodes[2].visual; out.editClosed = !$('#glc-ep-3 .glc-edit');
             // V102.345: a render saves itself → Storage + series doc stubs go in BEFORE the render (nothing leaves the page)
             const io = {};
@@ -187,6 +189,23 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
             out.previewText = txt($('#design-preview-container'));
             out.put = io.put; out.set = io.set && { name: io.set.name, id: io.set.id, merge: io.set.o && io.set.o.merge, topic: io.set.d.topic, n: io.set.d.episodes.length, ep1: io.set.d.episodes[0], ep3Title: io.set.d.episodes[2].title, createdAt: io.set.d.createdAt, updatedAt: io.set.d.updatedAt, aspect: io.set.d.aspectRatio };
             out.saveBtn = txt($('#glc-save-btn'));
+            // ---- V102.450 · M2: "medically checked" — chip, 🩺 toggle, inline warning (never a block) before MP4 / ⬇ MP4 + ซับ / 📣, persisted, cleared by an edit
+            const m2 = out.m2 = {}, ep1 = () => window._glcSeries.episodes[0], gate = () => document.querySelector('.glc-gate');
+            let dl = 0; HTMLAnchorElement.prototype.click = function () { dl++; };
+            m2.chipNot = txt($('#glc-ep-1 .glc-f .glc-nrv')); m2.noChipPlanned = !document.querySelector('#glc-ep-5 .glc-nrv, #glc-ep-5 .glc-rvd');
+            glcDownloadClip(); m2.asked = !!gate(); m2.dlAfterAsk = dl;
+            gate().querySelector('[data-a="cancel"]').click(); m2.cancel = { gone: !gate(), dl, reviewed: ep1().reviewed || null };
+            { const burn = document.getElementById('glc-burn-btn'); m2.hasBurn = !!burn; if (burn) { burn.click(); m2.burnAsked = !!gate(); m2.burnStillIdle = !burn.disabled; gate().querySelector('[data-a="cancel"]').click(); } }   // ⬇ MP4 + ซับ asks too
+            glcDownloadClip(); gate().querySelector('[data-a="go"]').click(); m2.goOn = { dl, reviewed: ep1().reviewed || null };
+            glcDownloadClip(); gate().querySelector('[data-a="check"]').click(); await new Promise(r => setTimeout(r, 30));
+            m2.checked = { dl, by: ep1().reviewed && ep1().reviewed.by, chip: txt($('#glc-ep-1 .glc-f .glc-rvd')), saved: !!(io.set && io.set.d.episodes[0].reviewed), pressed: $('#glc-ep-1 .glc-rv').getAttribute('aria-pressed') };
+            glcDownloadClip(); m2.noAskWhenChecked = { asked: !!gate(), dl };
+            glcToggleReviewed(1); await new Promise(r => setTimeout(r, 30)); m2.undone = { reviewed: ep1().reviewed || null, chip: txt($('#glc-ep-1 .glc-f .glc-nrv')), saved: io.set.d.episodes[0].reviewed || null };
+            glcToggleReviewed(1); glcToggleEdit(1); $('#glc-ep-1 .glc-edit [data-f="fact"]').value = 'A changed fact'; glcSaveEdit(1); m2.editClears = { reviewed: ep1().reviewed || null };
+            glcToggleReviewed(1); glcToggleEdit(1); glcSaveEdit(1); m2.noChangeKeeps = { reviewed: !!ep1().reviewed };   // opening ✏️ and pressing Done without a change keeps it
+            glcToggleReviewed(1);
+            window._mgwGallery = [{ type: 'clip', id: 'S#1', n: 1, name: 'EP01', url: 'https://x/a.mp4', reviewed: true }, { type: 'clip', id: 'S#2', n: 2, name: 'EP02', url: 'https://x/b.mp4', reviewed: false }];
+            m2.tiles = window._mgwGallery.map((it, i) => mgwClipTileHtml(it, i)).map(h => (/✓ Checked/.test(h) ? 'checked' : '') + (/⚠️ Not checked/.test(h) ? 'not' : ''));
             // 7. back to Nano Banana → the pane is the image pane again
             selectDesignEngine(chips[0]);
             out.btnBack = txt($('#btn-generate-design')); out.cardBack = $('#glc-episodes-card').style.display; out.placeholderBack = $('#design-prompt').placeholder;
@@ -223,7 +242,18 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
         assert.equal(r.draft.post, 'ยา Warfarin กินพลาดทำไง?\nอ่านก่อนตัดสินใจ'); assert.match(r.draft.note, /ร่างแล้ว/);
         assert.equal(r.draft.tags, '#warfarin #pharmacy #เภสัชกร #bad #tag', 'hashtags: # added, duplicates (any case) and symbols dropped, a space splits a tag');
         assert.deepEqual(r.ep3Post, { post: 'ยา Warfarin กินพลาดทำไง?\nอ่านก่อนตัดสินใจ', tags: '#warfarin #pharmacy #เภสัชกร #bad #tag' }, 'Done keeps both on the episode');
+        const m2 = r.m2;
+        assert.equal(m2.chipNot, '⚠️ Not checked', 'a rendered, unchecked episode wears the amber chip'); assert.equal(m2.noChipPlanned, true, 'a planned episode (no clip yet) shows nothing');
+        assert.deepEqual([m2.asked, m2.dlAfterAsk], [true, 0], 'MP4 download asks first, nothing downloaded yet');
+        assert.equal(m2.hasBurn, true, '⬇ MP4 + ซับ is on the preview'); assert.deepEqual([m2.burnAsked, m2.burnStillIdle], [true, true], '⬇ MP4 + ซับ asks first and does not start');
+        assert.deepEqual(m2.cancel, { gone: true, dl: 0, reviewed: null }, 'Cancel: nothing happens'); assert.deepEqual(m2.goOn, { dl: 1, reviewed: null }, 'Go on anyway: downloads, still unchecked');
+        assert.equal(m2.checked.dl, 2); assert.equal(m2.checked.chip.startsWith('✓ Checked'), true); assert.equal(m2.checked.pressed, 'true'); assert.equal(m2.checked.saved, true, '✓ Checked — go on: downloads, marks checked and saves it to the series');
+        assert.ok(m2.checked.by, 'who checked is kept (' + m2.checked.by + ')'); assert.deepEqual(m2.noAskWhenChecked, { asked: false, dl: 3 }, 'a checked episode downloads straight away');
+        assert.deepEqual(m2.undone, { reviewed: null, chip: '⚠️ Not checked', saved: null }, '🩺 again undoes it (and saves)');
+        assert.deepEqual(m2.editClears, { reviewed: null }, 'editing the episode clears the check'); assert.deepEqual(m2.noChangeKeeps, { reviewed: true }, 'Done without a change keeps it');
+        assert.deepEqual(m2.tiles, ['checked', 'not'], 'the gallery tiles show checked / not checked');
         assert.deepEqual(r.postBtns, [true, false], '📣 copy only on an episode that has a caption');
+        assert.deepEqual([r.copyGate.asked, r.copyGate.copiedBefore], [true, 0], 'V102.450 · M2: an unchecked episode asks before its caption is copied'); assert.match(r.copyGate.text, /EP03 is not medically checked yet/);
         assert.equal(r.copyPost, 'ยา Warfarin กินพลาดทำไง?\nอ่านก่อนตัดสินใจ\n\n#warfarin #pharmacy #เภสัชกร #bad #tag', 'copied = caption, a blank line, the hashtags');
         assert.equal(r.planAsksCaution, true, 'the planner is asked for a caution per episode');
         assert.deepEqual(r.cautions, [['glc-ep-2', '⚠️ Verify the renal dose adjustment', 'Medical caution — check before publishing: Verify the renal dose adjustment']], 'a ⚠️ chip only on the episode that has a caution (empty ones draw nothing)');

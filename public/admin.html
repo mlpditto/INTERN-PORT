@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.449)</title>
+    <title>Nika Admin (V102.450)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -754,6 +754,16 @@
         .glc-ep .glc-t small { font-weight:600; color:#94a3b8; margin-left:6px; }
         .glc-ep .glc-f { display:flex; gap:6px; overflow:hidden; margin-top:3px; }
         .glc-ep .glc-f span.glc-cau { color:#92400e; background:#fffbeb; border-color:#fde68a; }
+        /* V102.450 · M2 (owner): "medically checked" per episode — a green ✓ / amber ⚠️ chip, a 🩺 toggle, and an inline warning (never a block) before a clip or its caption leaves the app */
+        .glc-ep .glc-f span.glc-rvd { color:#047857; background:#ecfdf5; border-color:#6ee7b7; }
+        .glc-ep .glc-f span.glc-nrv { color:#b45309; background:#fffbeb; border-color:#fcd34d; }
+        .glc-ep .glc-f span.glc-rvd, .glc-ep .glc-f span.glc-nrv { flex:none; max-width:none; overflow:visible; text-overflow:clip; white-space:nowrap; }   /* the state is never cut short */
+        .glc-ep .glc-a button.glc-rv.on { background:#d1fae5; border-color:#34d399; }
+        .glc-gate { display:flex; flex-direction:column; gap:6px; margin:8px 0 0; padding:10px 12px; border:1px solid #fcd34d; border-radius:12px; background:#fffbeb; color:#92400e; font-size:0.82em; line-height:1.4; flex-basis:100%; }
+        .glc-gate small { color:#a16207; }
+        .glc-gate span { display:flex; gap:6px; flex-wrap:wrap; }
+        .glc-gate button { width:auto; min-height:0; margin:0; padding:5px 12px; border-radius:10px; border:1px solid #cbd5e1; background:#fff; color:#475569; font-weight:800; font-size:inherit; cursor:pointer; }
+        .glc-gate button.ok { background:#10b981; border-color:#10b981; color:#fff; }
         .glc-ep .glc-f span { font-size:0.7em; color:#475569; background:#f8fafc; border:1px solid #eef2f7; border-radius:999px; padding:2px 8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:220px; }
         .glc-ep .glc-a { display:flex; gap:6px; align-items:center; }
         .glc-ep .glc-a button { border:1px solid #e2e8f0; background:#fff; border-radius:10px; padding:5px 9px; cursor:pointer; font-size:0.8em; font-family:inherit; }
@@ -22169,6 +22179,7 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
                     + '<span title="Objective: ' + esc(e.objective) + '">🎯 ' + esc(e.objective) + '</span>'
                     + '<span title="Key fact: ' + esc(e.fact) + '">💡 ' + esc(e.fact) + '</span>'
                     + (e.caution ? '<span class="glc-cau" title="Medical caution — check before publishing: ' + esc(e.caution) + '">⚠️ ' + esc(e.caution) + '</span>' : '')
+                    + (e.reviewed ? '<span class="glc-rvd" title="Medically checked' + (e.reviewed.by ? ' by ' + esc(e.reviewed.by) : '') + '">✓ Checked' + (e.reviewed.at ? ' · ' + esc(new Date(e.reviewed.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })) : '') + '</span>' : (e.status === 'done' || e.clipUrl) ? '<span class="glc-nrv" title="Not medically checked yet — tap 🩺 when you have checked it">⚠️ Not checked</span>' : '')
                     + '<span title="Narration (spoken, English): ' + esc(e.narration) + '">🗣 ' + esc(e.narration) + '</span>'
                     + '<span title="Visual prompt (sent to the video model): ' + esc(e.visual) + '">🎨 ' + esc(e.visual) + '</span>'
                     + '</div></div>'
@@ -22177,6 +22188,7 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
                     + (window._glcClips && window._glcClips[e.n] ? '<button type="button" onclick="glcShowClip(' + e.n + ')" title="Show EP' + String(e.n).padStart(2, '0') + ' in the preview' + (e.clipUrl ? '' : ' — rendered, not saved yet') + '" aria-label="Show episode ' + e.n + '">👁</button>' : '')   // V102.316
                     + '<button type="button" onclick="glcCopyEpisode(' + e.n + ')" title="Copy this episode (title · objective · fact · narration · visual) · คัดลอกตอนนี้ · 이 에피소드 복사" aria-label="Copy episode ' + e.n + '">⧉</button>'   // V102.305
                     + (e.post ? '<button type="button" onclick="glcCopyPost(' + e.n + ')" title="Copy the post caption + hashtags · คัดลอกแคปชัน + แฮชแท็ก" aria-label="Copy post caption ' + e.n + '">📣</button>' : '')
+                    + '<button type="button" class="glc-rv' + (e.reviewed ? ' on' : '') + '" onclick="glcToggleReviewed(' + e.n + ')" title="' + (e.reviewed ? 'Medically checked — tap to undo' : 'Mark as medically checked') + ' · ตรวจทางการแพทย์แล้ว" aria-pressed="' + (e.reviewed ? 'true' : 'false') + '" aria-label="Medically checked, episode ' + e.n + '">🩺</button>'
                     + '<button type="button" onclick="glcToggleEdit(' + e.n + ')" title="Edit the 5 fields" aria-label="Edit episode ' + e.n + '"' + (busy ? ' disabled' : '') + '>✏️</button>'
                     + '<button type="button" onclick="glcAskRender(' + e.n + ')" title="' + (e.status === 'done' ? 'Re-render' : 'Render') + ' this episode · ' + window.glcSeconds() + ' s ≈ $' + (window.glcSeconds() * window.glcUsd()).toFixed(2) + '" aria-label="Render episode ' + e.n + '"' + (busy || window._glcBatch ? ' disabled' : '') + '>' + (busy ? '⏳' : e.status === 'done' ? '🔁' : '▶') + '</button>'
                     + '</div>';
@@ -22246,9 +22258,43 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
             const row = document.getElementById('glc-ep-' + n);
             const e = window._glcSeries && window._glcSeries.episodes[n - 1];
             if (!row || !e) return;
+            const before = JSON.stringify(['title', 'titleTh', 'objective', 'fact', 'caution', 'narration', 'captionTh', 'readingTh', 'visual', 'post', 'hashtags'].map(f => e[f] || ''));
             row.querySelectorAll('.glc-edit [data-f]').forEach(el => { e[el.dataset.f] = el.value.trim(); });
             if (e.hashtags) e.hashtags = window.glcHashtags(e.hashtags);   // V102.442
+            if (e.reviewed && JSON.stringify(['title', 'titleTh', 'objective', 'fact', 'caution', 'narration', 'captionTh', 'readingTh', 'visual', 'post', 'hashtags'].map(f => e[f] || '')) !== before) { e.reviewed = null; window.glcPersistEpisodes(); }   // V102.450: edited → not checked any more
             window.glcRenderEpisodes();
+        };
+
+        // V102.450 · M2 (owner): "medically checked" — { by, at } on the episode. Editing the episode clears it (what was checked has changed).
+        // Kept clips persist it at once (the series doc already exists); before the first clip it rides with the first save, like the captions.
+        window.glcPersistEpisodes = function() {
+            const s = window._glcSeries;
+            if (!s || !s.id || !window.db) return Promise.resolve(false);
+            return db.collection('clip_series').doc(s.id).set({ episodes: s.episodes.map(x => ({ ...x })), updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true })
+                .then(() => true).catch(err => { console.error('[grand-line-clips] reviewed not saved:', err); showToast('Could not save the checked mark: ' + ((err && err.message) || err), 'warning'); return false; });
+        };
+        window.glcToggleReviewed = function(n) {
+            const e = window._glcSeries && window._glcSeries.episodes[n - 1]; if (!e) return;
+            e.reviewed = e.reviewed ? null : { by: (typeof ALLOWED_EMAIL !== 'undefined' && ALLOWED_EMAIL) || 'admin', at: new Date().toISOString() };
+            window.glcRenderEpisodes();
+            window.glcPersistEpisodes();
+        };
+        // The warning is inline and never blocks: Cancel / Export anyway / ✓ Checked — go on. run() is what the admin asked for.
+        window.glcGate = function(n, anchor, run) {
+            const e = window._glcSeries && window._glcSeries.episodes[n - 1];
+            if (!e || e.reviewed || !anchor) return run();
+            document.querySelectorAll('.glc-gate').forEach(x => x.remove());
+            const esc = window.dxaEscapeHtml || (x => String(x));
+            const box = document.createElement('div'); box.className = 'glc-gate'; box.setAttribute('role', 'alert');
+            box.innerHTML = '<b>⚠️ ' + window.glcEp(n) + ' is not medically checked yet · ยังไม่ได้ตรวจทางการแพทย์</b>' + (e.caution ? '<small>' + esc(e.caution) + '</small>' : '')
+                + '<span><button type="button" data-a="cancel">Cancel</button><button type="button" data-a="go">Go on anyway</button><button type="button" class="ok" data-a="check">✓ Checked — go on</button></span>';
+            box.addEventListener('click', ev => {
+                const a = ev.target.closest('button') && ev.target.closest('button').dataset.a; if (!a) return;
+                box.remove();
+                if (a === 'check') { e.reviewed = { by: (typeof ALLOWED_EMAIL !== 'undefined' && ALLOWED_EMAIL) || 'admin', at: new Date().toISOString() }; window.glcPersistEpisodes(); window.glcRenderEpisodes(); }
+                if (a !== 'cancel') run();
+            });
+            anchor.insertAdjacentElement('afterend', box);
         };
 
         // V102.442 · K1 (owner): a social post for each episode — a Thai caption + hashtags, drafted by the text AI from the episode, edited in ✏️, copied with 📣.
@@ -22265,7 +22311,8 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
         window.glcPostText = function(e) { return [String(e.post || '').trim(), window.glcHashtags(e.hashtags)].filter(Boolean).join('\n\n'); };
         window.glcCopyPost = function(n) {
             const e = window._glcSeries && window._glcSeries.episodes[n - 1]; if (!e || !e.post) return;
-            window.glcCopyText(window.glcPostText(e), 'Copied the post caption ✓ · คัดลอกแคปชันแล้ว');
+            const a = document.getElementById('glc-a-' + n);
+            window.glcGate(n, a && a.parentElement && a.parentElement.querySelector('.glc-f') || a, () => window.glcCopyText(window.glcPostText(e), 'Copied the post caption ✓ · คัดลอกแคปชันแล้ว'));   // V102.450
         };
         window.glcDraftPost = async function(n) {
             const box = document.querySelector('#glc-ep-' + n + ' .glc-edit'), e = window._glcSeries && window._glcSeries.episodes[n - 1];
@@ -22400,16 +22447,24 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
                 window.GlcCaptions.ensureFont();
                 const $ = id => document.getElementById(id);
                 window.GlcCaptions.mount({ video: $('generated-clip'), band: $('glc-cc-band'), ccBtn: $('glc-cc-btn'), voiceBtn: $('glc-voice-btn'), burnBtn: $('glc-burn-btn'),
-                    statusEl: $('glc-burn-st'), src: c.dataUrl || e.clipUrl, caption: e.captionTh, reading: e.readingTh || '', seconds: c.seconds, fileBase: window.glcEp(c.n), voiceRail: $('glc-voice-rail') });   // V102.366: + readings, voice chips
+                    statusEl: $('glc-burn-st'), src: c.dataUrl || e.clipUrl, caption: e.captionTh, reading: e.readingTh || '', seconds: c.seconds, fileBase: window.glcEp(c.n), voiceRail: $('glc-voice-rail') });
+                const burn = $('glc-burn-btn');   // V102.450: ⬇ MP4 + ซับ asks first while the episode is not checked
+                if (burn) burn.addEventListener('click', ev => {
+                    if (ev.__glcPass || (window._glcSeries.episodes[c.n - 1] || {}).reviewed) return;
+                    ev.stopImmediatePropagation(); ev.preventDefault();
+                    window.glcGate(c.n, document.getElementById('glc-clip-actions'), () => { const again = new MouseEvent('click', { bubbles: true, cancelable: true }); again.__glcPass = true; burn.dispatchEvent(again); });
+                }, true);   // V102.366: + readings, voice chips
             }
         };
         window.glcDownloadClip = function() {
             const c = window._glcClip;
             if (!c) return;
-            const a = document.createElement('a');
-            a.href = c.dataUrl;
-            a.download = 'EP' + String(c.n).padStart(2, '0') + '.mp4';
-            document.body.appendChild(a); a.click(); a.remove();
+            window.glcGate(c.n, document.getElementById('glc-clip-actions'), () => {   // V102.450: unchecked → an inline warning first
+                const a = document.createElement('a');
+                a.href = c.dataUrl;
+                a.download = 'EP' + String(c.n).padStart(2, '0') + '.mp4';
+                document.body.appendChild(a); a.click(); a.remove();
+            });
         };
         // V102.345: the card's save state — ✓ In gallery once kept; ↻ Retry save when the automatic upload failed.
         window.glcSaveStateHtml = function(e) {
@@ -52841,7 +52896,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         clips.push({ type: 'clip', id: doc.id + '#' + n, seriesId: doc.id, n: n,
                             name: 'EP' + String(n).padStart(2, '0') + ' · ' + (e.title || d.topic || ''), url: e.clipUrl,
                             caption: e.captionTh || '', reading: e.readingTh || '', seconds: Number(e.seconds) || 0, costUsd: Number(e.costUsd) || 0,
-                            model: d.clipModel || '', renderedAt: e.renderedAt || '' });
+                            model: d.clipModel || '', renderedAt: e.renderedAt || '', reviewed: !!e.reviewed });
                     });
                 });
                 clips.sort(function (a, b) { return String(b.renderedAt).localeCompare(String(a.renderedAt)); });
@@ -52912,7 +52967,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 + '<span class="ar">9:16</span><span class="play" aria-hidden="true">▶</span>' + (it.seconds ? '<span class="dur">0:' + String(it.seconds).padStart(2, '0') + '</span>' : '') + '</a>'
                 + '<div class="bd"><div class="nm" title="' + dxaEscapeHtml(it.name) + '">' + dxaEscapeHtml(it.name) + '</div>'
                 + (it.caption ? '<div class="cap">' + dxaEscapeHtml(it.caption) + '</div>' : '')
-                + '<div class="rw"><span class="bg">🎬 Clip</span><span class="bt"><button type="button" onclick="mgwDownloadGalleryItem(' + i + ')" title="Download MP4">⬇</button>'
+                + '<div class="rw"><span class="bg">🎬 Clip</span>' + (it.reviewed ? '<span class="bg" style="background:#d1fae5;color:#047857" title="Medically checked">✓ Checked</span>' : '<span class="bg" style="background:#fef3c7;color:#b45309" title="Not medically checked yet — open the episode in Grand Line Clips and tap 🩺">⚠️ Not checked</span>') + '<span class="bt"><button type="button" onclick="mgwDownloadGalleryItem(' + i + ')" title="Download MP4">⬇</button>'
                 + '<button type="button" class="del" onclick="mgwAskDeleteClip(' + i + ')" title="Delete clip — MP4 + gallery entry" aria-label="Delete clip">🗑</button></span></div>'
                 + (meta ? '<div class="meta">' + dxaEscapeHtml(meta) + '</div>' : '') + '</div></div>';
         }
@@ -52920,7 +52975,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function mgwPlayClip(ev, i) {
             const it = (window._mgwGalleryRendered || [])[i];
             if (!it || !window.GlcCaptions || (ev && (ev.ctrlKey || ev.metaKey || ev.button === 1))) return true;
-            window.GlcCaptions.openPlayer({ url: it.url, caption: it.caption, reading: it.reading || '', seconds: it.seconds || 8, name: it.name, fileBase: 'EP' + String(it.n).padStart(2, '0') });
+            window.GlcCaptions.openPlayer({ url: it.url, caption: it.caption, reading: it.reading || '', seconds: it.seconds || 8, name: it.name + (it.reviewed ? '' : '  ⚠️ not medically checked'), fileBase: 'EP' + String(it.n).padStart(2, '0') });
             return false;
         }
         // V102.345: delete asks inside the tile (not a browser popup), then glcDeleteSavedClip removes the MP4 + gallery entry
