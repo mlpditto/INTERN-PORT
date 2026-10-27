@@ -43,6 +43,35 @@
     function selectedIds(s) { return [...s.keep].sort((a, b) => a - b); }
     // V102.455: who curated — the signed-in admin (admin.html's `auth` = adminApp.auth()); stamped with `at` on every curation write
     const curatedBy = () => (typeof auth !== 'undefined' && auth && auth.currentUser && auth.currentUser.email) || 'admin';
+    // V102.456: "is the stored quiz what the editor shows?" — only the fields the editor reads back (getQuizFormData), compared the way
+    // addQuestionUI → getQuizFormData round-trips them: empty = missing, numbers as text, arrays joined (tags ['a','b'] = 'a,b', correct [2] = 2),
+    // type / timer / correct get the editor's defaults, and `correct` only counts where the editor reads it (choice, flashcard). Fields the
+    // editor never shows (written by import / merge / AI) no longer block Apply — the old whole-object check did, with no edit made.
+    const CORRECT_TYPES = ['choice', 'flashcard'];
+    function looseValue(v) {
+        if (v == null) return '';
+        if (Array.isArray(v)) return v.map(looseValue).join(',');
+        if (typeof v === 'object') return fingerprint(v);
+        return String(v).replace(/\s+/g, ' ').trim();
+    }
+    function editorDiff(stored, editor) {
+        const out = [];
+        for (let i = 0; i < Math.max(stored.length, editor.length); i++) {
+            const a = stored[i] || {}, b = editor[i];
+            if (!b || !stored[i]) { out.push({ id: i + 1, fields: [b ? 'not in the saved quiz' : 'not in the editor'] }); continue; }
+            const type = b.type || 'choice';
+            const fields = Object.keys(b).filter(key => {
+                if (key === 'correct' && !CORRECT_TYPES.includes(type)) return false;
+                let was = a[key];
+                if (key === 'type') was = was || 'choice';
+                if (key === 'timer') was = parseInt(was) || 60;
+                if (key === 'correct' && looseValue(was) === '') was = 0;
+                return looseValue(was) !== looseValue(b[key]);
+            });
+            if (fields.length) out.push({ id: i + 1, fields });
+        }
+        return out;
+    }
     function fingerprint(value) {
         return JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item)
             ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
@@ -641,7 +670,12 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
         const baseline = await s.serverBaseline;
         if (baseline?.error) throw new Error('Could not verify the original quiz. Close Curate and retry online.');
         if (!baseline?.exists || fingerprint(baseline.data) !== fingerprint(original)) throw new Error('The stored quiz changed since Curate opened. Close it and review the latest version.');
-        if (fingerprint(original.questions) !== fingerprint(s.source.form.questions)) throw new Error('Save the editor questions first, then reopen Curate before applying to this quiz.');
+        const diff = editorDiff(Array.isArray(original.questions) ? original.questions : [], s.source.form.questions);   // V102.456: editor fields only, named
+        if (diff.length) {
+            console.warn('[curate] editor ≠ saved quiz:', diff.map(d => 'Q' + d.id + ' (' + d.fields.join(', ') + ')').join('; '));
+            throw new Error(diff.slice(0, 5).map(d => 'Q' + d.id + ' (' + d.fields.join(', ') + ')').join(', ') + (diff.length > 5 ? ' and ' + (diff.length - 5) + ' more' : '')
+                + ' differ from the saved quiz. Save the editor first, then reopen Curate before applying to this quiz.');
+        }
         if (original.isActive !== false) throw new Error('This quiz is active. Save as new quiz, or deactivate it before applying.');
         const [attempts, sessions] = await Promise.all([
             db.collection('quiz_attempts').where('quizId', '==', ref.id).get({ source: 'server' }),

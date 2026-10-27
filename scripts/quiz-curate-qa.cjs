@@ -354,6 +354,20 @@ const { chromium } = require('playwright');
         await open(); await suggest(result());
         await page.evaluate(() => records['source-quiz'].title = 'Concurrent edit'); await apply();
         assert.match(await feedback(), /stored quiz changed/); await close();
+        // V102.456: a quiz last written by import / merge / AI stores fields the editor never shows, and values in another shape —
+        // no edit was made, so Apply must reach the confirm step (it used to stop at "Save the editor questions first").
+        await page.evaluate(() => { records['source-quiz'] = structuredClone(stored); records['source-quiz'].questions = stored.questions.map((q, i) => {
+            const x = { ...q, aiAudit: { score: 4 }, source: 'json-import', timer: String(q.timer), tags: [q.tags], explanation: q.explanation + '  ' };
+            delete x.content; if (Array.isArray(q.correct)) x.correct = q.correct[0]; return x; }); });
+        await open(); await suggest(result()); await apply();
+        assert.match(await confirmText(), /Q11, Q12, Q13, Q14/, 'extra / reshaped stored fields are not an editor change: ' + await feedback());
+        await confirmCancel(); assert.equal(await page.evaluate(() => atomicWrites), 0); await close();
+        // …while a real unsaved edit still blocks, and the message names the question + field
+        await page.evaluate(() => { records['source-quiz'] = structuredClone(stored); fixture.questions[3].q += ' (edited, not saved)'; });
+        await open(); await suggest(result()); await apply();
+        assert.match(await feedback(), /Q4 \(q\) differ from the saved quiz\. Save the editor first/, 'a real edit names Q4: ' + await feedback());
+        assert.equal(await page.evaluate(() => atomicWrites), 0); await close();
+        await page.evaluate(() => { fixture = structuredClone(original); });
         await page.evaluate(() => records['source-quiz'] = structuredClone(stored));
         await open(); await suggest(result());
         await apply(); assert.match(await confirmText(), /Q11, Q12, Q13, Q14/);
