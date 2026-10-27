@@ -216,6 +216,14 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
             calls.length = 0;
             await glcRenderEpisode(2);
             out.veoCalls = calls.filter(c => c.opts.feature === 'clip_render').map(c => ({ model: c.model, video: c.opts.video }));
+            // V102.451 · C1: real (provider reported) vs estimate (seconds × price); legacy clips have no kind
+            out.c1 = {
+                kinds: [window._glcSeries.episodes[0].costKind, window._glcSeries.episodes[1].costKind],
+                fmt: [glcCostFmt({ costUsd: 0.3721, costKind: 'real' }), glcCostFmt({ costUsd: 0.8, costKind: 'est' }), glcCostFmt({ costUsd: 0.4 }), glcCostFmt({})],
+                note: [glcCostNote({ costKind: 'real' }), glcCostNote({ costKind: 'est' }), glcCostNote({})],
+                sum: [glcCostSum([{ costUsd: 0.3721, costKind: 'real' }, { costUsd: 0.25 }]).text, glcCostSum([{ costUsd: 0.37, costKind: 'real' }, { costUsd: 0.8, costKind: 'est' }]).text, glcCostSum([{ costUsd: 0.8, costKind: 'est' }]).text, glcCostSum([]).text],
+                tile: [mgwClipTileHtml({ type: 'clip', id: 'a#1', name: 'EP01', url: 'https://x/1.mp4', model: 'm', costUsd: 0.8, costKind: 'est', seconds: 8 }, 0), mgwClipTileHtml({ type: 'clip', id: 'a#2', name: 'EP02', url: 'https://x/2.mp4', model: 'm', costUsd: 0.37, costKind: 'real', seconds: 8 }, 1)].map(h => /≈ \$0\.80/.test(h) ? 'est' : /· \$0\.37/.test(h) ? 'real' : '?'),
+            };
             out.veoEp2 = { status: $('#glc-ep-2').dataset.status, dotTitle: $('#glc-ep-2 .glc-dot').title, costUsd: window._glcSeries.episodes[1].costUsd, model: window._glcClip.model };
             out.veoPreview = txt($('#design-preview-container'));
             selectDesignEngine(chips[0]);
@@ -267,12 +275,12 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
             { model: 'as/gemini-omni-1.1-flash', video: { state: 'poll', interactionId: 'int-1' } }
         ], 'submit then poll with the interaction id');
         assert.deepEqual(r.renderPrompt, { narration: true, visual: true, noText: true, vertical: true }, 'the clip prompt carries narration + visual, forbids on-screen text');
-        assert.deepEqual(r.ep1, { status: 'done', dotTitle: 'Rendered · 8 s · $0.80', btn: '🔁' }, 'EP01 done, re-render offered');
+        assert.deepEqual(r.ep1, { status: 'done', dotTitle: 'Rendered · 8 s · ≈ $0.80', btn: '🔁' }, 'EP01 done, re-render offered (V102.451: Omni reports no cost, so an estimate wears ≈)');
         assert.equal(r.countAfter, '10 · 1 done');
         assert.deepEqual(r.video, { tag: 'VIDEO', src: 'data:video/mp4;base6', controls: true, playsinline: true }, 'portrait <video> in the preview');
         assert.deepEqual(r.clipActions, ['Thai captions on / off', 'Download MP4', "Thai voice (Gemini TTS) instead of the clip's own audio", 'Kore · เล่าเรื่อง', 'Charon · สงบ', 'Achird · เป็นกันเอง', 'Download the MP4 with the Thai captions burned in (for LINE / TikTok)', 'Delete this clip — MP4 + gallery entry (asks first)'], 'V102.354: CC ไทย · MP4 · 🔊 เสียงไทย · V102.366: 3 voice chips · ⬇ MP4 + ซับ · ✓ In gallery (a chip) · 🗑 = delete');
         assert.equal(r.designActionsHidden, 'none', 'the image pill stays hidden for a clip');
-        assert.match(r.previewText, /EP01 · Episode 1 title8 s · 720p · 9:16 · audio ongemini-omni-1\.1-flash · \d+ s · \$0\.80คำบรรยาย 1/, 'preview meta + Thai caption');
+        assert.match(r.previewText, /EP01 · Episode 1 title8 s · 720p · 9:16 · audio ongemini-omni-1\.1-flash · \d+ s · ≈ \$0\.80คำบรรยาย 1/, 'preview meta + Thai caption');
         assert.deepEqual(r.put, { path: 'teach-clips/S1/EP01.mp4', type: 'video/mp4', size: 12, meta: { contentType: 'video/mp4' } }, 'MP4 lands in teach-clips/{seriesId}/EP01.mp4');
         assert.equal(r.set.name, 'clip_series'); assert.equal(r.set.id, 'S1'); assert.equal(r.set.merge, true); assert.equal(r.set.n, 10); assert.equal(r.set.aspect, '9:16');
         assert.equal(r.set.topic, 'warfarin counselling for new patients'); assert.equal(r.set.ep3Title, 'Missed dose rule', 'the edited row is what gets saved');
@@ -285,7 +293,12 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
             { model: 'or/google/veo-3.1-lite', video: { aspectRatio: '9:16', resolution: '720p', seconds: 8, state: 'submit' } },
             { model: 'or/google/veo-3.1-lite', video: { state: 'poll', interactionId: 'int-1' } }
         ], 'EP02 submits and polls on the Veo engine');
-        assert.deepEqual(r.veoEp2, { status: 'done', dotTitle: 'Rendered · 8 s · $0.37', costUsd: 0.37, model: 'google/veo-3.1-lite' }, 'the proxy\'s catalogue cost wins over the estimate');
+        assert.deepEqual(r.c1.kinds, ['est', 'real'], 'C1: Omni (no cost reported) is stored as an estimate, Veo (provider cost) as real');
+        assert.deepEqual(r.c1.fmt, ['$0.37', '≈ $0.80', '$0.40', '$0.00'], 'real = plain $, an estimate wears ≈, older clips (no kind) show as before');
+        assert.ok(/real cost reported by the provider/.test(r.c1.note[0]) && /estimate: seconds × the engine price/.test(r.c1.note[1]) && /not recorded/.test(r.c1.note[2]), 'each kind explains itself');
+        assert.deepEqual(r.c1.sum, ['$0.62', '$0.37 + ≈ $0.80', '≈ $0.80', '$0.00'], 'totals keep real and estimated apart');
+        assert.deepEqual(r.c1.tile, ['est', 'real'], 'the Gallery tiles show ≈ for an estimate');
+        assert.deepEqual(r.veoEp2, { status: 'done', dotTitle: 'Rendered · 8 s · $0.37', costUsd: 0.37, model: 'google/veo-3.1-lite' }, 'the proxy\'s provider cost wins over the estimate, and carries no ≈');
         assert.match(r.veoPreview, /google\/veo-3\.1-lite · \d+ s · \$0\.37/, 'preview meta names the engine and the real cost');
         assert.deepEqual(dialogs, [], 'no native dialog opened');
         const mine = errs.filter(e => /glc|Grand Line|clip/i.test(e));
