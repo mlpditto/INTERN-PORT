@@ -87,7 +87,9 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         assert.equal(await page.locator('.case-studio-settings h4').innerText(), 'Image');
         assert.equal(lean.modeAbs, 'absolute'); assert.equal(lean.modeOnHeading, true, 'Mode sits on the Image heading row');
         assert.deepEqual(lean.tplLabels, ['📊 Case', '🍽️ Lifestyle', '🫃 Symptoms', '✅ Self-care', '✨ Minimal'], 'short labels');
-        // V102.428 lean A: Close · Save draft · Generate live on the one-line header (no footer); the modal fits the screen, nothing to scroll
+        // V102.428 lean A: Save draft · Generate live on the one-line header (no footer); the modal fits the screen, nothing to scroll
+        // V102.435: no text Close button (✕ is the one way out)
+        assert.deepEqual(await page.evaluate(()=>({ btn: !!document.querySelector('.alabasta-casecard-header [onclick="closeAlabastaCaseCardModal()"]') || !!document.querySelector('.alabasta-casecard-action-group [onclick="closeAlabastaCaseCardModal()"]'), x: !!document.querySelector('#alabastaCaseCardModal .close-modal[onclick="closeAlabastaCaseCardModal()"]') })), { btn: false, x: true }, 'Close button gone, ✕ stays');
         assert.deepEqual([lean.genInHeader, lean.genInView, lean.footShown, lean.shellScrolls], [true, true, false, false], 'actions on the header, no footer, the modal does not scroll: ' + JSON.stringify(lean));
         assert.deepEqual(await page.locator('#cs-model-lbl + .cs-seg button').evaluateAll(els=>els.map(e=>e.textContent.trim().replace(/\s*★$/,''))),['2.1','2 Lite','Pro','Flare','Sunburst','Grok 2.0'],'short model names');
         assert.ok((await page.locator('#cs-model-lbl + .cs-seg button[data-value="as/gemini-nano-banana-2.1"]').getAttribute('title')).includes('Nano Banana 2.1'),'the full name stays in the tooltip');
