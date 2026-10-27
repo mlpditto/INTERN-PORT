@@ -126,7 +126,30 @@ document.addEventListener('DOMContentLoaded', () => {
     idChip.className = 'cs-idc'; idChip.hidden = true;
     header.querySelector('.alabasta-casecard-title').after(idChip);
     const idBadge = byId('id-badge');
-    const syncId = () => { idChip.textContent = idBadge.textContent; idChip.hidden = idBadge.hidden || !idBadge.textContent; };
+    // V102.447 (owner): the intern who sent the case — their LINE picture (or an initial) sits beside the case number
+    const avatar = document.createElement('span');
+    avatar.className = 'cs-av'; avatar.hidden = true;
+    idChip.before(avatar);
+    const caseUser = () => {
+        try {
+            const c = typeof getAlabastaCaseById === 'function' ? getAlabastaCaseById(byId('id').value) : null;
+            return c ? ((typeof usersData !== 'undefined' && Array.isArray(usersData) ? usersData : []).find(u => u && u.id === c.userId) || { displayName: c.displayName || '' }) : null;
+        } catch (e) { return null; }
+    };
+    const paintAvatar = () => {
+        const u = idChip.hidden ? null : caseUser(), name = u && String(u.displayName || '').trim();
+        avatar.hidden = !u || (!u.pictureUrl && !name);
+        if (avatar.hidden) { avatar.replaceChildren(); return; }
+        avatar.title = name || '';
+        const initial = document.createElement('span'); initial.textContent = [...(name || '?')][0] || '?';
+        if (u.pictureUrl) {
+            const img = document.createElement('img');
+            img.src = u.pictureUrl; img.alt = ''; img.referrerPolicy = 'no-referrer'; img.loading = 'lazy';
+            img.onerror = () => avatar.replaceChildren(initial);
+            avatar.replaceChildren(img);
+        } else avatar.replaceChildren(initial);
+    };
+    const syncId = () => { idChip.textContent = idBadge.textContent; idChip.hidden = idBadge.hidden || !idBadge.textContent; paintAvatar(); };
     new MutationObserver(syncId).observe(idBadge, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
     header.append(actions);
     inputs.append(byId('meta'));
