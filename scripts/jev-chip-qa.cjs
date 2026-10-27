@@ -6,6 +6,7 @@ function grab(head) {
     let d = 0;
     for (let k = html.indexOf('{', i); k < html.length; k++) { if (html[k] === '{') d++; else if (html[k] === '}' && --d === 0) return html.slice(i, k + 1); }
 }
+const jevHelperSrc = (html.match(/window\.jevMarkHtml = function[\s\S]*?\};/) || [''])[0]; if (!jevHelperSrc) throw new Error('missing jevMarkHtml');
 const placeholders = {};
 const doc = {
     querySelector: sel => { const m = /data-jev="([^"]+)"/.exec(sel); return m && placeholders[m[1]] ? placeholders[m[1]] : null; },
@@ -20,7 +21,8 @@ const run = async (callable) => {
         quizCompareStripMd: s => String(s || '').replace(/[#*_`>\[\]()]/g, '').trim(),
         adminApp: { functions: () => ({ httpsCallable: name => async arg => { calls.push({ name, arg }); return callable(arg); } }) },
     };
-    vm.createContext(ctx);
+    ctx.window = {}; vm.createContext(ctx);
+    vm.runInContext(jevHelperSrc + '\nthis.jevMarkHtml = window.jevMarkHtml;', ctx);   // V102.444: the chip wears Jev's logo
     vm.runInContext('let quizCompareJevRun = 0;\n' + grab('async function quizCompareJev(') + '\n' + grab('function quizCompareJevPaint('), ctx);
     const usable = [
         { shortTitle: 'A', questions: [{ q: 'What is **X**?', options: ['1', '2'] }, { q: 'Second?', options: [] }] },
@@ -40,12 +42,13 @@ const run = async (callable) => {
     assert.strictEqual(r.calls.length, 1); assert.strictEqual(r.calls[0].name, 'jevCompare');
     assert.strictEqual(r.calls[0].arg.pairs[0].a.stem, 'Second?', 'strongest n-gram match first');
     assert.strictEqual(JSON.stringify(r.calls[0].arg.pairs[1].a), JSON.stringify({ quiz: 'A', stem: 'What is X?', options: ['1', '2'] }), 'markdown stripped, title + options sent');
-    assert.ok(/Jev ✓ 92%/.test(r.placeholders['0-1-1-1'].innerHTML) && /Jev ✓ 92%/.test(r.placeholders['1-1-0-1'].innerHTML), 'strongest pair: dup chip on BOTH sides');
-    assert.ok(/Jev ✗/.test(r.placeholders['0-0-1-0'].innerHTML) && /Jev ✗/.test(r.placeholders['1-0-0-0'].innerHTML), 'weaker pair: "different" chip on both sides');
+    assert.ok(/✓ 92%/.test(r.placeholders['0-1-1-1'].innerHTML) && /✓ 92%/.test(r.placeholders['1-1-0-1'].innerHTML), 'strongest pair: dup chip on BOTH sides');
+    assert.ok(/class="jev-chip dup"/.test(r.placeholders['0-1-1-1'].innerHTML) && /jev-60\.png/.test(r.placeholders['0-1-1-1'].innerHTML), 'V102.444: Jev colours + logo on the dup chip');
+    assert.ok(/✗</.test(r.placeholders['0-0-1-0'].innerHTML) && /✗</.test(r.placeholders['1-0-0-0'].innerHTML) && /jev-chip diff/.test(r.placeholders['0-0-1-0'].innerHTML), 'weaker pair: "different" chip on both sides');
     // dup verdict wording + tooltip
     r = await run(() => ({ data: { enabled: true, results: [{ verdict: 'dup', sameFact: 0.92, sameTopic: 0.9 }, { verdict: 'unsure', sameFact: 0.5, sameTopic: null }] } }));
-    assert.ok(/Jev ✓ 92%/.test(r.placeholders['0-1-1-1'].innerHTML) && /same fact 92%/.test(r.placeholders['0-1-1-1'].innerHTML), 'dup chip: ' + r.placeholders['0-1-1-1'].innerHTML);
-    assert.ok(/Jev \?/.test(r.placeholders['0-0-1-0'].innerHTML) && !/same topic/.test(r.placeholders['0-0-1-0'].innerHTML), 'unsure chip, no topic when null');
+    assert.ok(/✓ 92%/.test(r.placeholders['0-1-1-1'].innerHTML) && /same fact 92%/.test(r.placeholders['0-1-1-1'].innerHTML), 'dup chip: ' + r.placeholders['0-1-1-1'].innerHTML);
+    assert.ok(/jev-chip unsure[\s\S]*\?</.test(r.placeholders['0-0-1-0'].innerHTML) && !/same topic/.test(r.placeholders['0-0-1-0'].innerHTML), 'unsure chip, no topic when null');
     // kill switch / error entries / thrown error → nothing painted, nothing thrown
     for (const cb of [() => ({ data: { enabled: false, results: [] } }), () => ({ data: { enabled: true, results: [{ error: true }, { error: true }] } }), () => { throw new Error('permission-denied'); }]) {
         r = await run(cb);
