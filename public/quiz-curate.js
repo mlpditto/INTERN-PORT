@@ -41,6 +41,8 @@
         return Number.isInteger(value) && value >= 1 && value <= s.source.form.questions.length ? value : null;
     }
     function selectedIds(s) { return [...s.keep].sort((a, b) => a - b); }
+    // V102.455: who curated — the signed-in admin (admin.html's `auth` = adminApp.auth()); stamped with `at` on every curation write
+    const curatedBy = () => (typeof auth !== 'undefined' && auth && auth.currentUser && auth.currentUser.email) || 'admin';
     function fingerprint(value) {
         return JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item)
             ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
@@ -676,13 +678,13 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
                 questions: removed.map(id => s.source.form.questions[id - 1]), isActive: false, isTemplate: true,
                 startTime: null, deadline: null, createdAt: timestamp, updatedAt: timestamp,
                 curation: { sourceQuizId: ref.id, backupQuizId: operation.backupRef.id, originalCount: s.source.form.questions.length,
-                    originalQuestionNumbers: removed, model: s.model, strategy: s.mode, operation: 'split-removed' } });
+                    originalQuestionNumbers: removed, model: s.model, strategy: s.mode, operation: 'split-removed', by: curatedBy(), at: timestamp } });
             tx.update(ref, { ...s.source.form, questions: ids.map(id => s.source.form.questions[id - 1]),
                 startTime: convertDate(s.source.form.startTime), deadline: convertDate(s.source.form.deadline),
                 deadlineFloor: firebase.firestore.FieldValue.delete(), translations: firebase.firestore.FieldValue.delete(),
                 lastAiAnalysis: firebase.firestore.FieldValue.delete(), lastAiAudit: firebase.firestore.FieldValue.delete(),
                 updatedAt: timestamp, curation: { sourceQuizId: ref.id, backupQuizId: preserveVersion ? operation.backupRef.id : null, applyOperationId: operation.backupRef.id,
-                    originalCount: s.source.form.questions.length, originalQuestionNumbers: ids, model: s.model, strategy: s.mode,
+                    originalCount: s.source.form.questions.length, originalQuestionNumbers: ids, model: s.model, strategy: s.mode, by: curatedBy(), at: timestamp,
                     ...(split ? { operation: 'split-kept', splitQuizId: operation.newRef.id } : {}) } });
         });
         return true;
@@ -718,7 +720,7 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
             const copy = { ...form, title: form.title + ' (Curated ' + ids.length + ')',
                 questions: ids.map(id => form.questions[id - 1]), isActive: false, isTemplate: true,
                 startTime: null, deadline: null, createdAt: timestamp, updatedAt: timestamp,
-                curation: { sourceQuizId: s.source.sourceId, originalCount: form.questions.length, originalQuestionNumbers: ids, model: s.model, strategy: s.mode } };
+                curation: { sourceQuizId: s.source.sourceId, originalCount: form.questions.length, originalQuestionNumbers: ids, model: s.model, strategy: s.mode, by: curatedBy(), at: timestamp } };
             await s.docRef.set(copy);
             s.saved = true; s.message = 'Saved as a new inactive quiz. Original ' + form.questions.length + ' questions preserved.';
             showToast('Curated quiz saved. Find it in the quiz list.');
