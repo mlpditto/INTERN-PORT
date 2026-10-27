@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.217)</title>
+    <title>Internship Portfolio (V101.218)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.216">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -1011,6 +1011,26 @@
         .quiz-side { display:flex; flex-direction:column; align-items:center; gap:6px; flex:none; }
         /* V101.188: "Details" is a ▾ under the ☁️ download (or under 🔗 when there is nothing to download); the <summary> is hidden */
         .quiz-mission-details > summary { display:none !important; }   /* beats quiz-cover.css's startable summary rule */
+        /* V101.218 (owner): tap a quiz card = a summary sheet first (no questions shown); ▶ on the card still starts it at once */
+        .assignment-card.qz-previewable { cursor:pointer; }
+        #quizPreviewSheet { position:fixed; inset:0; z-index:10010; display:none; align-items:flex-end; justify-content:center; background:rgba(15,23,42,.45); }
+        #quizPreviewSheet.open { display:flex; }
+        #quizPreviewSheet .qzp { width:100%; max-width:440px; max-height:86vh; overflow:auto; box-sizing:border-box; padding:16px 16px calc(16px + env(safe-area-inset-bottom)); border-radius:22px 22px 0 0; background:#fff; color:#1e293b; box-shadow:0 -10px 40px rgba(15,23,42,.25); text-align:left; animation:qzpUp .22s ease-out; }
+        @keyframes qzpUp { from { transform:translateY(24px); opacity:0; } to { transform:none; opacity:1; } }
+        @media (prefers-reduced-motion: reduce) { #quizPreviewSheet .qzp { animation:none; } }
+        #quizPreviewSheet .qzp-head { display:flex; align-items:center; gap:12px; }
+        #quizPreviewSheet .qzp-cover { flex:none; width:52px; height:52px; border-radius:14px; background:#eef2ff; display:grid; place-items:center; font-size:1.5em; overflow:hidden; }
+        #quizPreviewSheet .qzp-cover img { width:100%; height:100%; object-fit:cover; display:block; }
+        #quizPreviewSheet .qzp-title { flex:1; min-width:0; font-weight:800; font-size:1.08em; line-height:1.25; overflow-wrap:anywhere; }
+        #quizPreviewSheet .qzp-x { flex:none; width:34px; min-width:34px; height:34px; min-height:0; margin:0; padding:0; border:none; border-radius:50%; background:#f1f5f9; color:#64748b; font-size:1.1em; cursor:pointer; }
+        #quizPreviewSheet .qzp-desc { margin:10px 2px 0; color:#64748b; font-style:italic; font-size:.92em; line-height:1.45; }
+        #quizPreviewSheet .qzp-chips { display:flex; flex-wrap:wrap; gap:7px; margin:14px 0 10px; }
+        #quizPreviewSheet .qzp-chip { display:inline-flex; align-items:center; gap:5px; padding:5px 11px; border-radius:999px; background:#f1f5f9; color:#334155; font-weight:700; font-size:.82em; white-space:nowrap; }
+        #quizPreviewSheet .qzp-chip.tag { background:#eef2ff; color:#4338ca; }
+        #quizPreviewSheet .qzp-chip.mine { background:#ecfdf5; color:#047857; border:1px solid #6ee7b7; }
+        #quizPreviewSheet .qzp-note { margin:0 2px 14px; color:#94a3b8; font-size:.78em; }
+        #quizPreviewSheet .qzp-foot { display:flex; gap:10px; align-items:center; justify-content:flex-end; }
+        #quizPreviewSheet .qzp-start { flex:1; width:auto; margin:0; padding:12px 18px; border:none; border-radius:14px; background:linear-gradient(135deg,#16a34a,#22c55e); color:#fff; font-weight:800; font-size:1em; cursor:pointer; }
         .quiz-details-toggle { width:32px; height:32px; min-height:auto; padding:0; border-radius:9px; border:1px solid #e2e8f0; background:#f1f5f9; color:#64748b; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
         .quiz-details-toggle svg { width:16px; height:16px; transition:transform .18s ease; }
         .quiz-details-toggle[aria-expanded="true"] { background:#e0e7ff; color:#3730a3; border-color:#c7d2fe; }
@@ -11694,6 +11714,7 @@
                 if (item.type === 'quiz') QuizCover.decorate(card, item.data, card.querySelector('.assign-header[onclick]') !== null);
                 if (card._materialRibbon) attachQuizMaterialRibbon(card, card._materialRibbon); // V102.21
                 attachQuizDetailsToggle(card); // V101.188
+                if (item.type === 'quiz' && !card.querySelector('.assign-header[onclick]')) attachQuizPreview(card, item.data); // V101.218: tap the card = a summary first
                 assignmentContainer.appendChild(card);
             });
 
@@ -12544,6 +12565,64 @@
             btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
             btn.onclick = event => { event.stopPropagation(); details.open = !details.open; btn.setAttribute('aria-expanded', details.open ? 'true' : 'false'); };
             side.append(btn);
+        }
+        // V101.218 (owner): "tap the quiz to look at it before starting" — a SUMMARY only (counts, time, tags, files, your best score);
+        // the questions stay hidden until the quiz starts. ▶ on the card / its cover still starts straight away.
+        function qzpTimeText(q) {
+            const qs = Array.isArray(q.questions) ? q.questions : [];
+            const secs = q.timerMode === 'total_time' ? (q.totalTimer || 300) : qs.reduce(function (s, x) { return s + ((x && x.timer) || 60); }, 0);
+            const min = Math.max(1, Math.round(secs / 60));
+            return '⏱ ' + (min >= 60 ? (Math.round(min / 6) / 10) + ' h' : min + ' min');
+        }
+        function qzPreview(quizId, card) {
+            const q = (quizzesCache || []).find(function (x) { return x.id === quizId; });
+            if (!q) return;
+            let sheet = document.getElementById('quizPreviewSheet');
+            if (!sheet) {
+                sheet = document.createElement('div'); sheet.id = 'quizPreviewSheet'; sheet.className = 'lang-no-toggle';
+                sheet.setAttribute('role', 'dialog'); sheet.setAttribute('aria-modal', 'true');
+                sheet.addEventListener('click', function (e) { if (e.target === sheet) qzPreviewClose(); });
+                document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && sheet.classList.contains('open')) qzPreviewClose(); });
+                document.body.appendChild(sheet);
+            }
+            const e = escapeHtml, n = Array.isArray(q.questions) ? q.questions.length : 0;
+            const chips = [];
+            chips.push('<span class="qzp-chip" title="Questions · จำนวนข้อ">📝 ' + n + (n === 1 ? ' question' : ' questions') + '</span>');
+            chips.push('<span class="qzp-chip" title="Time · เวลา' + (q.timerMode === 'total_time' ? ' (รวมทั้งชุด)' : ' (รวมทุกข้อ)') + '">' + qzpTimeText(q) + '</span>');
+            if (q.totalPoints) chips.push('<span class="qzp-chip" title="Points · คะแนนเต็ม">🎯 ' + e(String(q.totalPoints)) + ' pts</span>');
+            if (q.quizType === 'read_only') chips.push('<span class="qzp-chip" title="Learning mode · โหมดเรียนรู้">📖 Learning</span>');
+            const dl = q.deadline && q.deadline.toDate ? q.deadline.toDate() : null;
+            if (dl) chips.push('<span class="qzp-chip" title="Deadline · กำหนดส่ง">⏰ ' + e(dl.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })) + '</span>');
+            const mats = (Array.isArray(q.materials) ? q.materials : []).filter(function (m) { return m && /^https?:\/\//i.test(String(m.url || '').trim()); });
+            if (mats.length) chips.push('<span class="qzp-chip" title="Files · เอกสารประกอบ">📎 ' + mats.length + (mats.length === 1 ? ' file' : ' files') + '</span>');
+            const taken = card && card.querySelector('.quiz-done-count');
+            if (taken) chips.push('<span class="qzp-chip" title="People who did it · จำนวนคนที่ทำแล้ว">👥 ' + e(taken.textContent.replace(/\D/g, '') || '') + '</span>');
+            const att = quizAttemptsCache && quizAttemptsCache[q.id];
+            if (att && att.totalQuestions > 0 && typeof att.correctCount === 'number' && att.status && att.status !== 'none' && att.status !== 'started')
+                chips.push('<span class="qzp-chip mine" title="Your result · ผลของคุณ">✓ ' + Math.round(att.correctCount / att.totalQuestions * 100) + '%</span>');
+            const tags = quizTagList(q).filter(function (t) { return !QB_MARKER_TAG.test(t); }).slice(0, 4);
+            tags.forEach(function (t) { chips.push('<span class="qzp-chip tag">#' + e(t) + '</span>'); });
+            const desc = String(q.description || '').trim();
+            const cta = card && card.querySelector('.assign-footer .btn-quiz-cta[onclick^="confirmRunQuiz("]');
+            const cover = /^https:\/\//i.test(String(q.coverUrl || '')) ? '<img alt="" src="' + e(q.coverUrl) + '" onerror="this.remove()">' : '📝';
+            sheet.innerHTML = '<div class="qzp" role="document"><div class="qzp-head"><span class="qzp-cover">' + cover + '</span><div class="qzp-title">' + e(q.title || 'Quiz') + '</div>'
+                + '<button type="button" class="qzp-x" aria-label="Close" onclick="qzPreviewClose()">✕</button></div>'
+                + (desc ? '<div class="qzp-desc">“' + e(desc.length > 160 ? desc.slice(0, 157) + '…' : desc) + '”</div>' : '')
+                + '<div class="qzp-chips">' + chips.join('') + '</div>'
+                + '<div class="qzp-note">The questions appear when you start. <span class="lang-th">ข้อสอบจะแสดงตอนเริ่มทำ</span></div>'
+                + '<div class="qzp-foot">' + (cta ? '<button type="button" class="qzp-start" aria-label="Start this quiz">▶ Start</button>' : '') + '</div></div>';
+            const start = sheet.querySelector('.qzp-start');
+            if (start) start.onclick = function () { qzPreviewClose(); cta.click(); };   // the card's own button: every rule (unlock score, window, resume) still applies
+            sheet.classList.add('open');
+        }
+        function qzPreviewClose() { const s = document.getElementById('quizPreviewSheet'); if (s) s.classList.remove('open'); }
+        function attachQuizPreview(card, q) {
+            if (!q || !q.id) return;
+            card.classList.add('qz-previewable');
+            card.addEventListener('click', function (e) {
+                if (e.target.closest('button, a, summary, details, input, select, textarea, label, .quiz-side, .assign-footer, .quiz-cover-thumb')) return;
+                qzPreview(q.id, card);
+            });
         }
         function attachQuizMaterialRibbon(card, html) {
             const header = html && card.querySelector('.assign-header'), first = header && header.firstElementChild;
