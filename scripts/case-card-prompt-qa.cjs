@@ -10,7 +10,7 @@ ctx.document = { getElementById: id => ctx.els[id] || null };
 ctx.translateAlabastaSummaryToEnglish = async s => s;
 vm.runInContext(cut('        function alabastaEnglishOnly(', '        function buildSafeAlabastaCaseVisualPayload(')
     + cut('        function buildAlabastaCaseCardPrompt(', '        // V92.48: localStorage key')
-    + cut('        async function rebuildAlabastaCaseCardPromptFromInputs(', '        async function refineAlabastaCaseCardPromptWithSelectedModel(')
+    + cut('        // V102.438 (owner): the medicine dispensed', '        async function refineAlabastaCaseCardPromptWithSelectedModel(')
     + '\nthis.eo = alabastaEnglishOnly; this.build = buildAlabastaCaseCardPrompt; this.rebuild = rebuildAlabastaCaseCardPromptFromInputs;', ctx);
 
 assert.equal(ctx.eo('GI / ระบบทางเดินอาหาร'), 'GI');
@@ -97,6 +97,14 @@ assert.ok(!ctx.build({ ...payload, textContent: { title: 'Medical Case Brief', s
     assert.ok(/function getCaseCardLayout\(\) \{\s*\n\s*if \(getCaseCardCompositeMode\(\) === 'html-overlay'\) return 'minimal';/.test(html), 'the HTML-overlay mode is always minimal');
     assert.ok(html.includes('grok-imagine/.test(selectedModel)') && html.includes("aspectRatio: _CASECARD_WIDE.includes(getCaseCardLayout()) ? '16:9' : '4:3'"), 'Grok Imagine goes through the Image API: 16:9 for the wide templates, 4:3 otherwise');
     assert.ok(html.includes("const _CASECARD_WIDE = ['lifestyle', 'symptoms', 'selfcare'];") && html.includes("const _CASECARD_TEMPLATES = ['infographic', 'lifestyle', 'symptoms', 'selfcare', 'minimal'];"), 'the template lists');
+    // V102.438: the dispensed medicine is written onto the prompt, sanitised (no quotes / line breaks), and absent when empty
+    const els0 = ctx.els;
+    ctx.els = { ...els0, 'alabasta-case-card-dispensed': { value: '  ibuprofen "400"\n mg  ' } };
+    const withDisp = await ctx.rebuild({ quiet: true });
+    assert.ok(withDisp.includes('line "Dispensed: ibuprofen 400 mg"') && /no brand, no price, no pharmacy name/.test(withDisp), 'the prompt carries one clean Dispensed line');
+    ctx.els = { ...els0, 'alabasta-case-card-dispensed': { value: '' } };
+    assert.ok(!/DISPENSED MEDICINE/.test(await ctx.rebuild({ quiet: true })), 'nothing is added when the field is empty');
+    ctx.els = els0;
     assert.ok(html.includes('data-value="or/x-ai/grok-imagine-image-2.0"') && html.includes("'gpt-image-2.5-sunburst', 'or/x-ai/grok-imagine-image-2.0']"), 'the Grok chip is a valid saved model');
     console.log('PASS: Case Card — infographic (default) / minimal; no person, no age / occupation text, English only; the real rebuild path; Grok Imagine wiring.');
 })().catch(e => { console.error(e); process.exit(1); });

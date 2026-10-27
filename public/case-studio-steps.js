@@ -191,6 +191,13 @@ document.addEventListener('DOMContentLoaded', () => {
     consentRow.title = 'Tick only when the patient agreed to share the workplace name and exact dates. Saved on this case; the summary is rebuilt from the original note.';
     consentRow.innerHTML = '<input type="checkbox" id="alabasta-case-card-consent"><span>Patient agreed · workplace + dates may appear</span>';
     byId('step-1').querySelector('.alabasta-casecard-note').after(consentRow);
+    // V102.438 (owner): the medicine that was dispensed, in its own field — typed by the admin, saved on the case, and written onto the card
+    const dispRow = document.createElement('label');
+    dispRow.className = 'cs-disp';
+    dispRow.title = 'The medicine dispensed to the patient (generic name). Saved on this case and shown on the card; leave empty to show none.';
+    dispRow.innerHTML = '<span>💊 Dispensed</span><input type="text" id="alabasta-case-card-dispensed" maxlength="80" autocomplete="off" placeholder="Generic name + strength · e.g. ibuprofen 400 mg">';
+    consentRow.after(dispRow);
+    dispRow.querySelector('input').onchange = () => run(() => rebuildAlabastaCaseCardPromptFromInputs({ quiet: true }));
     const consentBox = consentRow.querySelector('input');
     consentBox.onchange = () => {
         const want = consentBox.checked;

@@ -43533,6 +43533,11 @@ They can connect again from LINE.
             }
         }
 
+        // V102.438 (owner): the medicine dispensed — one line, quotes / line breaks removed, 80 characters
+        function alabastaCaseCardDispensed() {
+            return String((document.getElementById('alabasta-case-card-dispensed') || {}).value || '').replace(/["\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+        }
+
         async function rebuildAlabastaCaseCardPromptFromInputs(options = {}) {
             const safeSummaryEl = document.getElementById('alabasta-case-card-safe-summary');
             const taxonomyEl = document.getElementById('alabasta-case-card-taxonomy');
@@ -43563,7 +43568,9 @@ They can connect again from LINE.
                     subtitle: tagsEn.slice(0, 3).join(' / ')
                 }
             };
-            const prompt = buildAlabastaCaseCardPrompt(payload);
+            let prompt = buildAlabastaCaseCardPrompt(payload);
+            const dispensed = alabastaCaseCardDispensed();   // V102.438
+            if (dispensed) prompt += '\n\n### DISPENSED MEDICINE ###\nShow exactly one clearly labelled line "Dispensed: ' + dispensed + '" (for example inside the recommendations area or as a small footer chip). Use this generic drug name as written; no brand, no price, no pharmacy name, and no dose advice beyond it.';
             promptEl.value = prompt;
             if (metaEl && !options.quiet) metaEl.textContent = 'Ready — review the summary, pick a model, then generate.';
             return prompt;
@@ -43736,6 +43743,8 @@ They can connect again from LINE.
             const consentEl = document.getElementById('alabasta-case-card-consent');   // V102.414
             if (consentEl) consentEl.checked = !!(caseItem.privacyConsent && caseItem.privacyConsent.details);
             if (window.renderCaseCardAdvanced) window.renderCaseCardAdvanced();   // V102.403: Category chips + readable brief
+            const dispEl = document.getElementById('alabasta-case-card-dispensed');   // V102.438
+            if (dispEl) dispEl.value = String(caseItem.caseVisualDispensed || '');
             if (ids.prompt) ids.prompt.value = '';
             if (ids.meta) ids.meta.textContent = 'Converting anonymized summary to English for GenMage prompt...';
             if (ids.imageWrap) ids.imageWrap.style.display = 'none';
@@ -43873,6 +43882,7 @@ They can connect again from LINE.
                     caseVisualMode: payload.visualMode,
                     caseVisualSafeSummary: safeSummary,
                     caseVisualPrompt: prompt,
+                    caseVisualDispensed: alabastaCaseCardDispensed(),   // V102.438
                     caseVisualPayload: {
                         primarySystemKey: payload.primarySystemKey,
                         primarySystemLabel: payload.primarySystemLabel,
