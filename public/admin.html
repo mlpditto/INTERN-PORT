@@ -765,6 +765,10 @@
         .glc-ep .glc-edit { grid-column:1 / -1; display:grid; grid-template-columns:1fr 1fr; gap:6px; padding-top:4px; }
         .glc-ep .glc-edit input, .glc-ep .glc-edit textarea { width:100%; box-sizing:border-box; border:1px solid #e2e8f0; border-radius:8px; padding:5px 8px; font-size:0.78em; font-family:inherit; }
         .glc-ep .glc-edit textarea { grid-column:1 / -1; min-height:48px; resize:vertical; }
+        .glc-ep .glc-edit [data-f="hashtags"], .glc-ep .glc-edit .glc-post-row { grid-column:1 / -1; }
+        .glc-ep .glc-edit .glc-post-row { display:flex; align-items:center; gap:8px; }
+        .glc-ep .glc-edit .glc-post-row button { border:1px solid #c4b5fd; background:#f5f3ff; color:#6d28d9; border-radius:10px; padding:4px 10px; font-size:0.78em; font-weight:800; cursor:pointer; }
+        .glc-ep .glc-edit .glc-post-row small { color:#64748b; font-size:0.72em; }
         .glc-ep .glc-ask { display:inline-flex; align-items:center; gap:6px; font-size:0.74em; font-weight:800; color:#9a3412; background:#fff7ed; border:1px solid #fdba74; border-radius:999px; padding:3px 6px 3px 10px; }
         .glc-ep .glc-ask button { padding:3px 8px; border-radius:8px; }
         .glc-cost { font-size:0.74em; font-weight:800; color:#9a3412; background:#fff7ed; border:1px solid #fdba74; padding:2px 10px; border-radius:999px; white-space:nowrap; }
@@ -3408,6 +3412,11 @@
             letter-spacing: 0.04em;
         }
 
+        /* V102.440: HN + patient name are editable (changes are logged on the case) */
+        #editCaseNoteModal .ecn-in { display:block; width:100%; margin-top:4px; padding:0 0 2px; border:0; border-bottom:1px dashed #d97706; border-radius:0; background:transparent; color:#1f2937; font:inherit; font-weight:800; outline:none; }
+        #editCaseNoteModal .ecn-in:focus { border-bottom:2px solid #ea580c; }
+        #editCaseNoteModal .ecn-hist { margin-top:6px; font-size:0.78em; color:#6b7280; line-height:1.5; }
+        #editCaseNoteModal .ecn-hist b { color:#92400e; }
         /* V91.88: numbered step badge for Edit Case Note section labels —
            reinforces the workflow order indicated by step numbers on section labels. */
         .cs-step-num {
@@ -15708,7 +15717,7 @@
                 </div>
                 <div style="background:#fff; border:1px solid #fde68a; border-radius:14px; padding:10px 12px;">
                     <div style="font-size:0.72em; color:#a16207; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;"><span data-ecn="en">HN / Ref</span><span data-ecn="sep"> · </span><span data-ecn="ko">참조</span><span data-ecn="sep2"> · </span><span data-ecn="th">HN / อ้างอิง</span></div>
-                    <div id="edit-case-note-ref" style="margin-top:4px; color:#1f2937; font-weight:800; word-break:break-word;">-</div>
+                    <input type="text" id="edit-case-note-ref" class="ecn-in" maxlength="40" autocomplete="off" aria-label="HN / Ref" placeholder="-">
                 </div>
                 <div style="background:#fff; border:1px solid #fde68a; border-radius:14px; padding:10px 12px;">
                     <div style="font-size:0.72em; color:#a16207; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;"><span data-ecn="en">Disease</span><span data-ecn="sep"> · </span><span data-ecn="ko">질병</span><span data-ecn="sep2"> · </span><span data-ecn="th">โรค</span></div>
@@ -15716,7 +15725,7 @@
                 </div>
                 <div style="background:#fff; border:1px solid #fde68a; border-radius:14px; padding:10px 12px;">
                     <div style="font-size:0.72em; color:#a16207; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;"><span data-ecn="en">Customer</span><span data-ecn="sep"> · </span><span data-ecn="ko">환자</span><span data-ecn="sep2"> · </span><span data-ecn="th">ผู้ป่วย</span></div>
-                    <div id="edit-case-note-customer" style="margin-top:4px; color:#1f2937; font-weight:800; word-break:break-word;">-</div>
+                    <input type="text" id="edit-case-note-customer" class="ecn-in" maxlength="80" autocomplete="off" aria-label="Patient" placeholder="-">
                 </div>
                 <div style="background:#fff; border:1px solid #fde68a; border-radius:14px; padding:10px 12px;">
                     <div style="font-size:0.72em; color:#a16207; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;"><span data-ecn="en">Score</span><span data-ecn="sep"> · </span><span data-ecn="ko">점수</span><span data-ecn="sep2"> · </span><span data-ecn="th">คะแนน</span></div>
@@ -15817,7 +15826,7 @@
             <div id="edit-case-note-translation-preview" style="display:none; margin-top:8px; padding:10px 14px; border-radius:14px; border:1.5px dashed #fcd34d; background:#fffbeb; font-size:0.92em; line-height:1.5;"></div>
 
             <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:14px; flex-wrap:wrap;">
-                <div id="edit-case-note-meta" style="font-size:0.8em; color:#6b7280;"></div>
+                <div><div id="edit-case-note-meta" style="font-size:0.8em; color:#6b7280;"></div><div id="edit-case-note-history" class="ecn-hist" hidden></div></div>
                 <div style="display:flex; gap:10px; flex-wrap:wrap;">
                     <button type="button" class="btn-sm" onclick="closeEditCaseNoteModal()" style="min-width:120px; background:#e5e7eb; color:#374151; border:none; border-radius:12px; padding:10px 16px; font-weight:800;"><span data-ecn="en">Cancel</span><span data-ecn="sep"> · </span><span data-ecn="ko">취소</span><span data-ecn="sep2"> · </span><span data-ecn="th">ยกเลิก</span></button>
                     <button type="button" id="edit-case-note-save-btn" class="btn-sm" onclick="saveEditedCaseNote()" style="min-width:170px; background:linear-gradient(135deg,#f59e0b,#ea580c); color:white; border:none; border-radius:12px; padding:10px 18px; font-weight:900; box-shadow:0 8px 20px rgba(234,88,12,0.22);"><i class="fa-solid fa-save"></i> <span data-ecn="en">Save Changes</span><span data-ecn="sep"> · </span><span data-ecn="ko">변경 저장</span><span data-ecn="sep2"> · </span><span data-ecn="th">บันทึกการเปลี่ยนแปลง</span></button>
@@ -22106,6 +22115,7 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
                     + '<span class="glc-dot" title="' + (e.status === 'done' ? 'Rendered · ' + e.seconds + ' s · $' + Number(e.costUsd || 0).toFixed(2) : e.status === 'rendering' ? 'Rendering…' : e.status === 'failed' ? 'Failed — ▶ to try again' : 'Planned — not rendered, nothing paid') + '"></span>'
                     + (window._glcClips && window._glcClips[e.n] ? '<button type="button" onclick="glcShowClip(' + e.n + ')" title="Show EP' + String(e.n).padStart(2, '0') + ' in the preview' + (e.clipUrl ? '' : ' — rendered, not saved yet') + '" aria-label="Show episode ' + e.n + '">👁</button>' : '')   // V102.316
                     + '<button type="button" onclick="glcCopyEpisode(' + e.n + ')" title="Copy this episode (title · objective · fact · narration · visual) · คัดลอกตอนนี้ · 이 에피소드 복사" aria-label="Copy episode ' + e.n + '">⧉</button>'   // V102.305
+                    + (e.post ? '<button type="button" onclick="glcCopyPost(' + e.n + ')" title="Copy the post caption + hashtags · คัดลอกแคปชัน + แฮชแท็ก" aria-label="Copy post caption ' + e.n + '">📣</button>' : '')
                     + '<button type="button" onclick="glcToggleEdit(' + e.n + ')" title="Edit the 5 fields" aria-label="Edit episode ' + e.n + '"' + (busy ? ' disabled' : '') + '>✏️</button>'
                     + '<button type="button" onclick="glcAskRender(' + e.n + ')" title="' + (e.status === 'done' ? 'Re-render' : 'Render') + ' this episode · ' + window.glcSeconds() + ' s ≈ $' + (window.glcSeconds() * window.glcUsd()).toFixed(2) + '" aria-label="Render episode ' + e.n + '"' + (busy || window._glcBatch ? ' disabled' : '') + '>' + (busy ? '⏳' : e.status === 'done' ? '🔁' : '▶') + '</button>'
                     + '</div>';
@@ -22153,6 +22163,9 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
                 + '<input data-f="readingTh" value="' + esc(e.readingTh || '') + '" placeholder="คำอ่านชื่อยา (เฉพาะเสียง) Warfarin=วอร์ฟาริน, INR=ไอเอ็นอาร์" aria-label="Drug-name readings for the Thai voice" title="Only the 🔊 Thai voice uses these — the caption on screen keeps the English names">'
                 + '<small class="glc-cap-count" role="status"></small>'
                 + '<textarea data-f="visual" placeholder="🎨 Visual prompt" aria-label="Visual prompt">' + esc(e.visual) + '</textarea>'
+                + '<textarea data-f="post" placeholder="📣 แคปชันโพสต์ (ไทย) — IG / TikTok / Reels" aria-label="Post caption">' + esc(e.post || '') + '</textarea>'
+                + '<input data-f="hashtags" value="' + esc(e.hashtags || '') + '" placeholder="# แฮชแท็ก — #pharmacy #เภสัชกร" aria-label="Hashtags">'
+                + '<div class="glc-post-row"><button type="button" id="glc-dp-' + n + '" onclick="glcDraftPost(' + n + ')" title="Draft the post caption + hashtags from this episode (you edit, then Done)">✨ ร่างแคปชัน + แฮชแท็ก</button><small class="glc-post-note" role="status"></small></div>'
                 + '<div style="grid-column:1 / -1; display:flex; justify-content:flex-end; gap:6px;"><button type="button" onclick="glcSaveEdit(' + n + ')" style="border:none; background:#10b981; color:#fff; border-radius:10px; padding:5px 12px; cursor:pointer; font-size:0.8em; font-weight:800;">Done</button></div>';
             row.appendChild(box);
             window.glcCapCount(box.querySelector('[data-f="captionTh"]'), n);
@@ -22173,7 +22186,52 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
             const e = window._glcSeries && window._glcSeries.episodes[n - 1];
             if (!row || !e) return;
             row.querySelectorAll('.glc-edit [data-f]').forEach(el => { e[el.dataset.f] = el.value.trim(); });
+            if (e.hashtags) e.hashtags = window.glcHashtags(e.hashtags);   // V102.442
             window.glcRenderEpisodes();
+        };
+
+        // V102.442 · K1 (owner): a social post for each episode — a Thai caption + hashtags, drafted by the text AI from the episode, edited in ✏️, copied with 📣.
+        // Front-end only: the two fields ride with the episode (clip_series) like the Thai caption does.
+        window.glcHashtags = function(raw) {
+            const seen = new Set(), out = [];
+            String(raw || '').split(/[\s,]+/).forEach(w => {
+                const t = w.replace(/^#+/, '').replace(/[^0-9A-Za-z_\u0E00-\u0E7F]/g, '');
+                if (!t || seen.has(t.toLowerCase()) || out.length >= 10) return;
+                seen.add(t.toLowerCase()); out.push('#' + t);
+            });
+            return out.join(' ');
+        };
+        window.glcPostText = function(e) { return [String(e.post || '').trim(), window.glcHashtags(e.hashtags)].filter(Boolean).join('\n\n'); };
+        window.glcCopyPost = function(n) {
+            const e = window._glcSeries && window._glcSeries.episodes[n - 1]; if (!e || !e.post) return;
+            window.glcCopyText(window.glcPostText(e), 'Copied the post caption ✓ · คัดลอกแคปชันแล้ว');
+        };
+        window.glcDraftPost = async function(n) {
+            const box = document.querySelector('#glc-ep-' + n + ' .glc-edit'), e = window._glcSeries && window._glcSeries.episodes[n - 1];
+            if (!box || !e) return;
+            const val = f => { const el = box.querySelector('[data-f="' + f + '"]'); return el ? el.value.trim() : String(e[f] || ''); };
+            const note = box.querySelector('.glc-post-note'), btn = box.querySelector('.glc-post-row button');
+            const prompt = 'Write a short social post (Instagram / TikTok / Reels) in THAI for a 9:16 pharmacy teaching clip, plus hashtags.\n'
+                + 'Episode: ' + val('title') + (val('titleTh') ? ' · ' + val('titleTh') : '') + '\nObjective: ' + val('objective') + '\nKey fact: ' + val('fact')
+                + '\nWhat the clip says: ' + (val('captionTh') || val('narration')) + (val('caution') ? '\nClinician must double-check: ' + val('caution') : '') + '\n\n'
+                + 'Rules: the caption is 2–4 short Thai lines, ≤ 220 characters in all, friendly and clear, a hook first; keep drug names in English; use ONLY the facts above — no new dose, number or claim; no diagnosis or personal advice. '
+                + 'Hashtags: 6 to 8, a mix of Thai and English, no spaces inside a tag.\n'
+                + 'Return ONLY JSON: {"post":"the Thai caption","hashtags":["#tag","#tag"]}';
+            const model = window.getAIDesignEnhancerModel ? window.getAIDesignEnhancerModel() : 'gemini-3.5-flash';
+            const stop = window.gmBusy ? window.gmBusy(btn, 'กำลังร่าง…') : () => {};
+            if (note) note.textContent = '';
+            try {
+                const res = await window.callUniversalAI(model, prompt, true, null, '', { feature: 'clip_caption' });
+                const j = window.safeJsonParse(res && res.text);
+                const post = j && typeof j.post === 'string' ? j.post.trim() : '';
+                if (!post) throw new Error('the model sent back no caption');
+                const tags = window.glcHashtags(Array.isArray(j.hashtags) ? j.hashtags.join(' ') : j.hashtags);
+                const pEl = box.querySelector('[data-f="post"]'), hEl = box.querySelector('[data-f="hashtags"]');
+                if (pEl) pEl.value = post; if (hEl) hEl.value = tags;
+                if (note) note.textContent = '✨ ร่างแล้ว — ตรวจแล้วกด Done';
+            } catch (err) {
+                if (note) note.textContent = '✨ ร่างไม่สำเร็จ: ' + ((err && err.message) || err);
+            } finally { stop(); }
         };
 
         // ▶ — inline cost ask in the row's action area (the browser swallows a native confirm() after awaits).
@@ -41175,7 +41233,7 @@ They can connect again from LINE.
             pop.setAttribute('aria-label', `Badges of ${u.displayName || ''}`);
             const held = BADGE_STATS_DEFS.filter(d => userBadgeTier(u, d.id)).length;
             pop.innerHTML = `<span aria-hidden="true" style="position:absolute; right:12px; bottom:4px; font-size:3.4em; font-weight:900; line-height:1; letter-spacing:-1px; color:var(--text-main); opacity:0.07; pointer-events:none; user-select:none;">${held}/${BADGE_STATS_DEFS.length}</span>
-                <button type="button" data-uid="${escapeHtml(uid)}" onclick="openBoardExportFor(this.dataset.uid)" title="Export all badges as a PNG card with the LINE photo" aria-label="Export badge board" style="position:absolute; z-index:2; right:10px; bottom:8px; width:26px; height:26px; min-height:0; margin:0; padding:0; border:1px solid #ddd6fe; border-radius:50%; background:#f5f3ff; color:#6d28d9; font-size:13px; font-weight:800; cursor:pointer;">⬇</button><div style="position:relative; display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:8px 4px;">${cells}</div>`
+                <button type="button" data-uid="${escapeHtml(uid)}" onclick="openBoardExportFor(this.dataset.uid)" title="Export all badges as a PNG card with the LINE photo" aria-label="Export badge board" style="position:absolute; z-index:2; left:10px; bottom:8px; width:26px; height:26px; min-height:0; margin:0; padding:0; border:1px solid #ddd6fe; border-radius:50%; background:#f5f3ff; color:#6d28d9; font-size:13px; font-weight:800; cursor:pointer;">⬇</button><div style="position:relative; display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:8px 4px;">${cells}</div>`
                 + userMemoriesStripHtml(u);
             pop.hidden = false;
             window._userBadgesPopTrigger = trig;
@@ -42822,7 +42880,9 @@ They can connect again from LINE.
             const translationEl = document.getElementById('edit-case-note-translation-preview');
             if (noteEl) noteEl.value = '';
             if (idEl) idEl.value = '';
-            if (customerEl) customerEl.textContent = '-';
+            if (customerEl) customerEl.value = '';
+            const refClr = document.getElementById('edit-case-note-ref'); if (refClr) refClr.value = '';
+            const histClr = document.getElementById('edit-case-note-history'); if (histClr) { histClr.hidden = true; histClr.innerHTML = ''; }
             if (scoreEl) scoreEl.textContent = '0.00 pts';
             // V97.11: clear any translation left over from the previous case so it
             // can't be mistaken for this one's.
@@ -42958,6 +43018,16 @@ They can connect again from LINE.
             } catch (e) { console.error('[editCaseNo]', e); showToast('Could not change Case No.: ' + (e && e.message ? e.message : 'error')); }
         }
 
+        // V102.440 (owner): HN / patient edits are logged on the case (editHistory, the last 20): what changed, from → to, who, when
+        const ECN_FIELDS = { caseId: 'HN', customer: 'Patient' };
+        function renderEditCaseHistory(caseItem) {
+            const el = document.getElementById('edit-case-note-history');
+            if (!el) return;
+            const list = (Array.isArray(caseItem && caseItem.editHistory) ? caseItem.editHistory : []).filter(h => h && ECN_FIELDS[h.field]).slice(-5).reverse();
+            el.hidden = !list.length;
+            el.innerHTML = list.map(h => '<div>🕘 <b>' + escapeHtml(ECN_FIELDS[h.field]) + '</b> ' + escapeHtml(h.from || '—') + ' → ' + escapeHtml(h.to || '—') + ' · ' + escapeHtml(String(h.by || '').split('@')[0]) + ' · ' + escapeHtml(new Date(h.at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })) + '</div>').join('');
+        }
+
         function editCaseNote(caseDocId) {
             const caseItem = casesData.find(c => c.id === caseDocId);
             if (!caseItem) {
@@ -42978,9 +43048,10 @@ They can connect again from LINE.
             initEditCaseTaxonomyOptions();
             if (idEl) idEl.value = caseDocId;
             if (userEl) userEl.textContent = caseItem.displayName || caseItem.userId || '-';
-            if (refEl) refEl.textContent = caseItem.caseId || '-';
+            if (refEl) refEl.value = caseItem.caseId || '';
             if (diseaseEl) diseaseEl.textContent = caseItem.disease || '-';
-            if (customerEl) customerEl.textContent = caseItem.customer || '-';
+            if (customerEl) customerEl.value = caseItem.customer || '';
+            renderEditCaseHistory(caseItem);
             if (scoreEl) scoreEl.textContent = `${Number(caseItem.adminBonus || 0).toFixed(2)} pts`;
             if (noteEl) {
                 noteEl.value = String(caseItem.note || '');
@@ -43045,7 +43116,7 @@ They can connect again from LINE.
         async function copyEditCaseNoteData() {
             const id = document.getElementById('edit-case-note-id')?.value || '';
             if (!id) { alert('No case loaded'); return; }
-            const grab = elId => document.getElementById(elId)?.textContent.trim() || '-';
+            const grab = elId => { const e = document.getElementById(elId); return ((e && (e.value !== undefined && e.tagName === 'INPUT' ? e.value : e.textContent)) || '').trim() || '-'; };
             const tags = (window.editCaseTaxonomyState?.selectedTags || []).join(', ');
             const text = [
                 `User: ${grab('edit-case-note-user')}`,
@@ -44456,12 +44527,29 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const diseaseLabel = `${taxonomyEntry.label} ${taxonomyEntry.koLabel}`;
             const taxonomySummary = `${diseaseLabel}${symptomTags.length ? ` - ${symptomTags.join(', ')}` : ''}`;
 
+            // V102.440 (owner): HN + patient name may be corrected here; every change is logged (editHistory)
+            const caseNow = casesData.find(c => c.id === caseDocId) || {};
+            const refIn = document.getElementById('edit-case-note-ref'), custIn = document.getElementById('edit-case-note-customer');
+            const nextHn = refIn ? refIn.value.replace(/\s+/g, ' ').trim().slice(0, 40) : String(caseNow.caseId || '');
+            const nextCust = custIn ? custIn.value.replace(/\s+/g, ' ').trim().slice(0, 80) : String(caseNow.customer || '');
+            const oldHn = String(caseNow.caseId || ''), oldCust = String(caseNow.customer || '');
+            if (!nextHn) { alert('HN / Ref cannot be empty.'); return; }
+            const editedAt = Date.now(), editor = ALLOWED_EMAIL || 'admin';
+            const logged = [];
+            if (nextHn !== oldHn) logged.push({ field: 'caseId', from: oldHn, to: nextHn, by: editor, at: editedAt });
+            if (nextCust !== oldCust) logged.push({ field: 'customer', from: oldCust, to: nextCust, by: editor, at: editedAt });
+            const editHistory = logged.length ? [...(Array.isArray(caseNow.editHistory) ? caseNow.editHistory : []), ...logged].slice(-20) : null;
+
             const originalHtml = saveBtn.innerHTML;
             try {
                 saveBtn.disabled = true;
                 saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
 
-                await db.collection('cases').doc(caseDocId).update({
+                const batch = db.batch();
+                batch.update(db.collection('cases').doc(caseDocId), {
+                    ...(nextHn !== oldHn ? { caseId: nextHn, caseIdPrev: oldHn } : {}),
+                    ...(nextCust !== oldCust ? { customer: nextCust } : {}),
+                    ...(editHistory ? { editHistory } : {}),
                     note: nextNote,
                     disease: diseaseLabel,
                     diseaseSystemKey: taxonomyEntry.key,
@@ -44473,11 +44561,21 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     adminUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     adminReviewedBy: ALLOWED_EMAIL || 'admin'
                 });
+                // the intern's History copy follows the new HN (same mirror as the ✎ Case No. button)
+                if (nextHn !== oldHn) {
+                    const mirror = { 'metadata.caseId': nextHn };
+                    if (diseaseLabel) mirror.title = nextHn + ' - ' + diseaseLabel;
+                    await stageSubmissionMirror(batch, caseDocId, mirror);
+                }
+                await batch.commit();
 
                 const idx = casesData.findIndex(c => c.id === caseDocId);
                 if (idx !== -1) {
                     casesData[idx] = {
                         ...casesData[idx],
+                        ...(nextHn !== oldHn ? { caseId: nextHn, caseIdPrev: oldHn } : {}),
+                        ...(nextCust !== oldCust ? { customer: nextCust } : {}),
+                        ...(editHistory ? { editHistory } : {}),
                         note: nextNote,
                         disease: diseaseLabel,
                         diseaseSystemKey: taxonomyEntry.key,
