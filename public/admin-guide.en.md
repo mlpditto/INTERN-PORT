@@ -120,3 +120,49 @@ The **Admin Portal** page has 3 ways in — use any one:
 | `Admin required` when pressing some buttons | Log out → log in again → if it still shows, tell the system owner (the account has no server-side permission yet) |
 | 🔮 button says "not loaded yet" | Refresh the page |
 | Numbers / lists look old | Refresh (Ctrl+F5) — after a version change the browser may still use old files; check the version number next to the Nika name |
+
+---
+
+## 6. 🧠 Jev — the AI helper
+
+**Jev** is a small AI that answers short questions such as “do these two questions test the same fact?” or “which category is this shop?”. You can always recognise it by its **logo (a dark square with a teal J)** and the dark + teal colours.
+
+> **Jev only suggests.** It never saves, deletes or scores anything on its own — you decide, you tick, you press Save.
+
+### Where Jev is in the app
+
+| Where | What Jev does | What you do |
+|---|---|---|
+| 📦 **Assignments** → tick 2+ quizzes → **🔍 Compare** | Puts a **chip** next to each “≈ %” match: **✓ 92%** = same fact · **✗** = different · **?** = not sure | Read both questions and decide which to keep or edit |
+| 📦 **Assignments** → 🔗 **Gourmet World** → **Categories (n)** | Suggests a category for every shop that has none | Tick the ones you agree with → **Save** |
+| **Quiz editor → PDF** (import questions) and **Reflective Review → AI suggestion** | A silent **guardrail**: checks the text for “ignore your instructions…” tricks before it goes to another AI | Only if it warns you: choose **Cancel** (stop) or **OK** (continue) |
+
+### 🔍 Compare — duplicate questions
+
+![Compare: the Compare button (1) and the Jev chips (2)](assets/guide/jev-compare.png)
+
+1. In **Assignments**, tick two or more quizzes and press **🔍 Compare** (1).
+2. Every pair of similar questions shows the plain “≈ %” (word overlap). A moment later **Jev adds its own chip** (2) to the **60 strongest matches**:
+   - **✓ 92%** (dark + teal) — the questions test the **same fact**; answering one gives away the other
+   - **✗** (grey) — **different** facts, even if the wording is similar
+   - **?** (yellow edge) — Jev is **not sure**: read both questions yourself
+3. No chip? Jev is switched off or did not answer — the “≈ %” still works on its own.
+
+### ⚡ Categories — shops without a category
+
+![Categories: the Jev button (1) and its list (2)](assets/guide/jev-categories.png)
+
+1. The **Categories (n)** button (1) appears only when some shops have no category (n = how many).
+2. Jev shows up to three guesses per shop with a %. **Confident answers (80% or more) are already ticked; doubtful ones are not** and are shown in amber (2).
+3. Tap another chip to change a guess, tick the shops you agree with, press **Save**. Only the ticked ones are saved.
+
+### 🛡️ Guardrail — when Jev warns you
+
+![The Jev guardrail pop-up](assets/guide/jev-guardrail.png)
+
+Before a PDF's text (or an intern's reflection) goes to another AI, Jev checks that the text is **study content, not an instruction aimed at the AI**. If it scores 70% or more you get this pop-up: **Cancel** stops, **OK** goes on anyway. In Reflective Review, a flagged text simply skips the AI grammar check. If Jev cannot answer, nothing is blocked — the work continues as before.
+
+### Cost and where to look
+
+- Jev runs on the **Jev AI** account (tokens). One comparison or one shop costs roughly 300–600 tokens; the balance is on the Jev AI dashboard (**Token account**).
+- **For the technical admin:** in Firestore, `quiz_dup_scores/_config` → `{ enabled: false }` turns Compare chips and Categories off; `{ provider: "openrouter" }` sends the same questions through OpenRouter instead (no deploy needed).
