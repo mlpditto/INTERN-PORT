@@ -78,7 +78,7 @@ const ok = (content, finish = 'stop', usage = { prompt_tokens: 100, completion_t
     // T4 — success contract
     check('T4 success: status 200', g.status, 200);
     check('T4 success: {text, model, finishReason, jsonValid}', JSON.stringify([g.resBody.text, g.resBody.model, g.resBody.finishReason, g.resBody.jsonValid]), '["{\\"issues\\":[]}","x-ai/grok-4.7","stop",true]');
-    check('T4 success: usage split incl. reasoning tokens', JSON.stringify(g.resBody.usage), '{"inputTokens":100,"outputTokens":40,"thinkingTokens":12,"totalTokens":140}');
+    check('T4 success: usage split incl. reasoning tokens', JSON.stringify(g.resBody.usage), '{"inputTokens":100,"outputTokens":40,"thinkingTokens":12,"totalTokens":140,"costUsd":null}');
     const fenced = await call({ model: 'x-ai/grok-4.7', isJson: true, reply: ok('Here you go:\n```json\n{"a":1}\n```') });
     check('T4 success: fenced JSON is cleaned, not rejected', `${fenced.status}|${fenced.resBody.text}`, '200|{"a":1}');
 

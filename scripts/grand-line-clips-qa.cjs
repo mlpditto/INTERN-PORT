@@ -122,6 +122,7 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
             const episodes = Array.from({ length: 10 }, (_, i) => ({ n: i + 1, title: 'Episode ' + (i + 1) + ' title', titleTh: 'ตอนที่ ' + (i + 1), objective: 'Objective ' + (i + 1), fact: 'Fact ' + (i + 1), caution: i === 1 ? 'Verify the renal dose adjustment' : '', narration: 'Spoken line ' + (i + 1), captionTh: 'คำบรรยาย ' + (i + 1), visual: 'Visual ' + (i + 1) + ' scene' }));
             window.callUniversalAI = async (model, prompt, isJson, vision, key, opts) => {
                 calls.push({ model, prompt, isJson, opts });
+                if (opts.feature === 'clip_caption') return { text: JSON.stringify({ post: 'ยา Warfarin กินพลาดทำไง?\nอ่านก่อนตัดสินใจ', hashtags: ['#warfarin', 'pharmacy', '#เภสัชกร', '#Warfarin', 'bad tag!'] }) };   // V102.442
                 if (opts.feature === 'clip_plan') return { text: '```json\n' + JSON.stringify({ episodes }) + '\n```', model: 'gemini-3.6-flash' };
                 if (opts.feature === 'clip_render' && opts.video.state === 'submit') return { text: '', raw: { pending: true, interactionId: 'int-1', status: 'in_progress' } };
                 if (opts.feature === 'clip_render' && opts.video.state === 'poll' && /veo/.test(model)) return { text: '', raw: { videoDataUrl: 'data:video/mp4;base64,AAAAIGZ0eXBpc29t', seconds: 8, model: 'google/veo-3.1-lite', costUsd: 0.37, interactionId: 'int-1' } };
@@ -155,7 +156,12 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
             out.editFields = [...document.querySelectorAll('#glc-ep-3 .glc-edit [data-f]')].map(el => el.dataset.f);
             $('#glc-ep-3 .glc-edit [data-f="title"]').value = 'Missed dose rule';
             $('#glc-ep-3 .glc-edit [data-f="visual"]').value = 'Clock face flipping day to night';
+            await glcDraftPost(3);   // V102.442 · K1: ✨ draft fills the two fields (nothing is saved until Done)
+            out.draft = { post: $('#glc-ep-3 .glc-edit [data-f="post"]').value, tags: $('#glc-ep-3 .glc-edit [data-f="hashtags"]').value, note: txt($('#glc-ep-3 .glc-post-note')), call: calls.filter(c => c.opts.feature === 'clip_caption').map(c => ({ isJson: c.isJson, facts: /Key fact: Fact 3/.test(c.prompt) && /no new dose, number or claim/.test(c.prompt) && /THAI/.test(c.prompt) })), savedBefore: window._glcSeries.episodes[2].post || '' };
             glcSaveEdit(3);
+            out.ep3Post = { post: window._glcSeries.episodes[2].post, tags: window._glcSeries.episodes[2].hashtags };
+            out.postBtns = [3, 4].map(n => !!$('#glc-ep-' + n + ' .glc-a button[onclick^="glcCopyPost"]'));
+            window.__clip.length = 0; glcCopyPost(3); await new Promise(r => setTimeout(r, 20)); out.copyPost = window.__clip[0];
             out.row3After = txt($('#glc-ep-3 .glc-t')); out.ep3Visual = window._glcSeries.episodes[2].visual; out.editClosed = !$('#glc-ep-3 .glc-edit');
             // V102.345: a render saves itself → Storage + series doc stubs go in BEFORE the render (nothing leaves the page)
             const io = {};
@@ -211,7 +217,14 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
         assert.deepEqual(r.statuses, Array(10).fill('planned'));
         assert.deepEqual(r.steps, ['① Plan · free ✓', '② ▶ Render one at a time · paid', '💰 $0.00 / ≈ $8.00 series'], 'V102.314: the two tiers + the series total before any click'); assert.equal(r.count, '10'); assert.equal(r.cost, 'Omni Flash · 8 s · ≈ $0.80 / clip · $8.00 all', 'cost before any click');
         assert.equal(r.row3, 'Episode 3 titleตอนที่ 3'); assert.deepEqual(r.row3chips, ['🎯 Objective 3', '💡 Fact 3', '🗣 Spoken line 3', '🎨 Visual 3 scene']);
-        assert.deepEqual(r.editFields, ['title', 'titleTh', 'objective', 'fact', 'caution', 'narration', 'captionTh', 'readingTh', 'visual'], 'in-place edit has the 9 fields (V102.366: + readingTh; V102.436: + caution)');
+        assert.deepEqual(r.editFields, ['title', 'titleTh', 'objective', 'fact', 'caution', 'narration', 'captionTh', 'readingTh', 'visual', 'post', 'hashtags'], 'in-place edit has the 11 fields (V102.366: + readingTh; V102.436: + caution; V102.442: + post, hashtags)');
+        assert.deepEqual(r.draft.call, [{ isJson: true, facts: true }], 'one JSON call, asking for a Thai caption from the episode facts only');
+        assert.equal(r.draft.savedBefore, '', 'the draft only fills the fields — nothing is saved until Done');
+        assert.equal(r.draft.post, 'ยา Warfarin กินพลาดทำไง?\nอ่านก่อนตัดสินใจ'); assert.match(r.draft.note, /ร่างแล้ว/);
+        assert.equal(r.draft.tags, '#warfarin #pharmacy #เภสัชกร #bad #tag', 'hashtags: # added, duplicates (any case) and symbols dropped, a space splits a tag');
+        assert.deepEqual(r.ep3Post, { post: 'ยา Warfarin กินพลาดทำไง?\nอ่านก่อนตัดสินใจ', tags: '#warfarin #pharmacy #เภสัชกร #bad #tag' }, 'Done keeps both on the episode');
+        assert.deepEqual(r.postBtns, [true, false], '📣 copy only on an episode that has a caption');
+        assert.equal(r.copyPost, 'ยา Warfarin กินพลาดทำไง?\nอ่านก่อนตัดสินใจ\n\n#warfarin #pharmacy #เภสัชกร #bad #tag', 'copied = caption, a blank line, the hashtags');
         assert.equal(r.planAsksCaution, true, 'the planner is asked for a caution per episode');
         assert.deepEqual(r.cautions, [['glc-ep-2', '⚠️ Verify the renal dose adjustment', 'Medical caution — check before publishing: Verify the renal dose adjustment']], 'a ⚠️ chip only on the episode that has a caution (empty ones draw nothing)');
         assert.match(r.copyEp2, /\n💡 Fact 2\n⚠️ Verify the renal dose adjustment\n🗣 /, 'the copied episode carries the caution'); assert.ok(!/⚠️/.test(r.copyEp), 'no ⚠️ line without a caution');
