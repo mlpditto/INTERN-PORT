@@ -36,11 +36,11 @@ const memCache = () => { const m = {}; return { m, readCache: async keys => Obje
     const r2 = await jev.compareBatch(pairs, deps);
     assert.strictEqual(log.length, 2, 'cached: no new API call');
     assert.ok(r2.results.every(r => r.cached), 'all from cache');
-    assert.ok(log.every(l => l.auth === 'Bearer SECRET-KEY' && l.url === 'https://openrouter.ai/api/v1/systemone' && l.body.model === 'jev-latest'), 'OpenRouter is the default transport');
+    assert.ok(log.every(l => l.auth === 'Bearer SECRET-KEY' && l.url === 'https://openrouter.ai/api/v1/systemone' && l.body.model === 'jev-latest'), 'OpenRouter still works as a transport (the way back)');
     assert.ok(Math.abs(r1.cost - 0.0000084) < 1e-12, 'usage.cost summed from the response: ' + r1.cost);
     assert.ok(!JSON.stringify(r1).includes('SECRET-KEY'), 'the key never appears in a result');
 
-    // transports: same body, different URL; unknown / missing provider falls back to OpenRouter; the model that served is cached
+    // transports: same body, different URL; unknown / missing provider falls back to Jev AI's own API (V102.449); the model that served is cached
     const logT = [];
     const cT = memCache();
     const rT = await jev.compareBatch([{ a: side('t1'), b: side('t2') }], { apiKey: 'K2', provider: 'typesafe', fetch: mkFetch(() => ({ sf: 0.9 }), logT), ...cT });
@@ -48,8 +48,9 @@ const memCache = () => { const m = {}; return { m, readCache: async keys => Obje
     assert.strictEqual(Object.values(cT.m)[0] && Object.keys(cT.m).length, 1);
     const logD = [];
     await jev.compareBatch([{ a: side('d1'), b: side('d2') }], { apiKey: 'K3', provider: 'nonsense', fetch: mkFetch(() => ({ sf: 0.9 }), logD), ...memCache() });
-    assert.strictEqual(logD[0].url, 'https://openrouter.ai/api/v1/systemone', 'unknown provider → OpenRouter');
-    assert.strictEqual(jev.providerOf(undefined), 'openrouter');
+    assert.strictEqual(logD[0].url, 'https://jev-ai.pro/api/v1/systemone', 'unknown provider → Jev AI (the default since V102.449)');
+    assert.strictEqual(logD[0].auth, 'Bearer K3');
+    assert.strictEqual(jev.providerOf(undefined), 'jev'); assert.strictEqual(jev.providerOf('jev'), 'jev'); assert.strictEqual(jev.providerOf('openrouter'), 'openrouter', 'the way back is one config value');
     assert.strictEqual(Object.keys(logT[0].body).sort().join(), Object.keys(logD[0].body).sort().join(), 'the two transports send the same body shape');
 
     // one pair failing does not sink the batch, and an error is not cached
@@ -69,7 +70,8 @@ const memCache = () => { const m = {}; return { m, readCache: async keys => Obje
     assert.deepStrictEqual((await jev.compareBatch([], deps)).results, []);
 
     // wiring in index.js: admin only, secret, kill switch, usage log, cache collection
-    assert.ok(/exports\.jevCompare = onCall\(\{ secrets: \["OPENROUTER_API_KEY"\]/.test(idx), 'callable declares the OpenRouter secret only (a missing JEV_API_KEY would fail the deploy)');
+    assert.ok(/exports\.jevCompare = onCall\(\{ secrets: \["OPENROUTER_API_KEY", "JEV_AI_API_KEY"\]/.test(idx), 'callable declares the OpenRouter + Jev AI secrets (both exist; a missing JEV_API_KEY would fail the deploy)');
+    assert.ok(/function jevApiKey\(provider\) \{ return provider === "typesafe" \? process\.env\.JEV_API_KEY : provider === "jev" \? process\.env\.JEV_AI_API_KEY : process\.env\.OPENROUTER_API_KEY; \}/.test(idx), 'each provider reads its own key');
     const fnSrc = idx.slice(idx.indexOf('exports.jevCompare'));
     assert.ok(fnSrc.indexOf('requireAdminCallable(request)') > 0 && fnSrc.indexOf('requireAdminCallable(request)') < fnSrc.indexOf('compareBatch'), 'admin gate before any work');
     assert.ok(/quiz_dup_scores"\)\.doc\("_config"\)/.test(fnSrc) && /enabled === false/.test(fnSrc), 'kill switch');
