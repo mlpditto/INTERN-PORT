@@ -28,6 +28,16 @@ const plain = o => JSON.parse(JSON.stringify(o));
     await ctx.recordAiUsage('openrouter', 'm', 5, true, 'f', { costUsd: 0 });
     assert.equal(plain(record).totalCostUsd, 0, 'a real $0 is kept');
 
+    // Clips Phase 5: an ESTIMATE (Omni video) is booked in its own field, never as the real cost
+    await ctx.recordAiUsage('gemini-aistudio', 'gemini-omni-1.1-flash', 47527, true, 'clip_video', { estCostUsd: 0.8 });
+    r = plain(record); m = Object.values(r.models)[0];
+    assert.equal(r.totalEstCostUsd, 0.8, 'est: the day total'); assert.equal(m.estCostUsd, 0.8, 'est: per model'); assert.equal(r.features.clip_video.estCostUsd, 0.8, 'est: per feature'); assert.equal(r.providers['gemini-aistudio'].estCostUsd, 0.8, 'est: per provider');
+    assert.ok(!('totalCostUsd' in r) && !('costUsd' in m) && !('costUsd' in r.features.clip_video), 'an estimate never shows up as the real cost');
+    for (const bad of [null, undefined, 'x', NaN, -1]) { await ctx.recordAiUsage('gemini-aistudio', 'm', 5, true, 'f', { estCostUsd: bad }); assert.ok(!('totalEstCostUsd' in plain(record)), 'no est field for ' + String(bad)); }
+    // the proxy: OpenRouter video hands its real cost to the ledger, Omni its seconds × price as an estimate
+    assert.ok(/usage: \{ inputTokens: null, outputTokens: null, totalTokens: null, costUsd: Number\.isFinite\(cost\) \? cost : null \}/.test(source), 'OpenRouter video → usage.costUsd');
+    assert.ok(/const OMNI_USD_PER_SECOND = 0\.10;/.test(source) && /estCostUsd: Math\.round\(omniSeconds \* OMNI_USD_PER_SECOND \* 10000\) \/ 10000/.test(source), 'Omni video → usage.estCostUsd');
+
     // the proxy hands the cost over on the OpenRouter chat paths (text + image)
     assert.ok(/thinkingTokens: orThink, totalTokens: response\.data\.usage\?\.total_tokens \?\? null, costUsd: response\.data\.usage\?\.cost \?\? null/.test(source), 'text path');
     assert.ok(/usage: \{ costUsd: response\.data\.usage\?\.cost \?\? null, totalTokens: response\.data\.usage\?\.total_tokens \?\? null \}   \/\/ V102\.443/.test(source), 'chat image path');

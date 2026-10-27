@@ -499,26 +499,30 @@ async function recordAiUsage(provider, model, tokens, isAdmin, feature, usage = 
         // V102.443: the real cost (USD) when the provider reported one (OpenRouter's usage.cost) — never a guess, and a missing value adds nothing
         const cost = usage && typeof usage.costUsd === "number" && Number.isFinite(usage.costUsd) && usage.costUsd >= 0 ? usage.costUsd : null;
         const costInc = cost === null ? {} : { costUsd: inc(cost) };
+        // Clips Phase 5: a provider that reports no cost (Gemini Omni video) is booked as an ESTIMATE in its own field — never mixed into the real costUsd
+        const est = usage && typeof usage.estCostUsd === "number" && Number.isFinite(usage.estCostUsd) && usage.estCostUsd >= 0 ? usage.estCostUsd : null;
+        const estInc = est === null ? {} : { estCostUsd: inc(est) };
         await admin.firestore().collection("ai_usage").doc(day).set({
             date: day,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             totalTokens: inc(t),
             totalCount: inc(1),
             ...(cost === null ? {} : { totalCostUsd: inc(cost) }),
+            ...(est === null ? {} : { totalEstCostUsd: inc(est) }),
             hours: { [new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', hourCycle: 'h23' })]: {
                 tokens: inc(t), count: inc(1),
                 models: { [Buffer.from(prov + ':' + (model || 'unknown')).toString('base64url')]: { model: model || 'unknown', tokens: inc(t), count: inc(1) } },
-                features: { [feat]: { tokens: inc(t), count: inc(1), ...costInc } }
+                features: { [feat]: { tokens: inc(t), count: inc(1), ...costInc, ...estInc } }
             } },
             models: { [Buffer.from(prov + ':' + (model || 'unknown')).toString('base64url')]: {
-                model: model || 'unknown', provider: prov, tokens: inc(t), count: inc(1), ...costInc,
+                model: model || 'unknown', provider: prov, tokens: inc(t), count: inc(1), ...costInc, ...estInc,
                 ...(Number.isFinite(usage.inputTokens) && Number.isFinite(usage.outputTokens) ? {
                     inputTokens: inc(usage.inputTokens), outputTokens: inc(usage.outputTokens), detailedCount: inc(1)
                 } : {})
             } },
-            providers: { [prov]: { tokens: inc(t), count: inc(1), ...costInc } },
+            providers: { [prov]: { tokens: inc(t), count: inc(1), ...costInc, ...estInc } },
             roles: { [role]: { tokens: inc(t), count: inc(1) } },
-            features: { [feat]: { tokens: inc(t), count: inc(1), ...costInc } }
+            features: { [feat]: { tokens: inc(t), count: inc(1), ...costInc, ...estInc } }
         }, { merge: true });
     } catch (e) {
         console.warn("recordAiUsage failed:", e && e.message);
@@ -856,6 +860,7 @@ exports.fetchLinkText = onRequest({ cors: true, timeoutSeconds: 60, memory: "256
 // the MP4 comes back inline as base64 or, with delivery "uri", as a files/{id}:download URL).
 const OMNI_VIDEO_MODEL = "gemini-omni-1.1-flash";
 const OMNI_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
+const OMNI_USD_PER_SECOND = 0.10;   // Clips Phase 5 · documented 720p price; the API reports no cost, so ai_usage books seconds × this as estCostUsd (admin.html's glcUsd uses the same figure)
 function omniVideoBody(prompt, video) {
     const v = video || {};
     const aspect = v.aspectRatio === "16:9" ? "16:9" : "9:16";
@@ -1346,7 +1351,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 seconds: Math.min(OR_VIDEO_MODELS[model] || 8, Math.max(4, Math.round(Number(video.seconds) || 8))),
                 costUsd: Number.isFinite(cost) ? cost : null,
                 tokens: 0,
-                usage: { inputTokens: null, outputTokens: null, totalTokens: null },
+                usage: { inputTokens: null, outputTokens: null, totalTokens: null, costUsd: Number.isFinite(cost) ? cost : null },   // Clips Phase 5
                 latencyMs: Date.now() - startedAt,
                 interactionId: data.id || video.interactionId || null,
                 model
@@ -1406,11 +1411,12 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             }
             const u = data.usage || {};
             const totalTokens = Number(u.total_tokens ?? u.totalTokens ?? u.total_token_count) || 0;
+            const omniSeconds = Math.min(10, Math.max(4, Math.round(Number(video.seconds) || 8)));
             return res.json({
                 videoDataUrl: `data:${mime};base64,${b64}`,
-                seconds: Math.min(10, Math.max(4, Math.round(Number(video.seconds) || 8))),
+                seconds: omniSeconds,
                 tokens: totalTokens,
-                usage: { inputTokens: Number(u.input_tokens ?? u.inputTokens) || null, outputTokens: Number(u.output_tokens ?? u.outputTokens) || null, totalTokens: totalTokens || null },
+                usage: { inputTokens: Number(u.input_tokens ?? u.inputTokens) || null, outputTokens: Number(u.output_tokens ?? u.outputTokens) || null, totalTokens: totalTokens || null, estCostUsd: Math.round(omniSeconds * OMNI_USD_PER_SECOND * 10000) / 10000 },   // Clips Phase 5
                 latencyMs: Date.now() - startedAt,
                 interactionId: data.id || video.interactionId || null,
                 model: OMNI_VIDEO_MODEL
