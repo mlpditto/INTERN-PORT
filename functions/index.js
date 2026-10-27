@@ -494,25 +494,29 @@ async function recordAiUsage(provider, model, tokens, isAdmin, feature, usage = 
         // map-key path safety) and length-capped, mirroring recordAiEval's clean().
         // Callers that don't tag fall into "untagged" — itself a signal to tag more.
         const feat = String(feature || "untagged").replace(/[~*/\[\].]/g, "_").slice(0, 60) || "untagged";
+        // V102.443: the real cost (USD) when the provider reported one (OpenRouter's usage.cost) — never a guess, and a missing value adds nothing
+        const cost = usage && typeof usage.costUsd === "number" && Number.isFinite(usage.costUsd) && usage.costUsd >= 0 ? usage.costUsd : null;
+        const costInc = cost === null ? {} : { costUsd: inc(cost) };
         await admin.firestore().collection("ai_usage").doc(day).set({
             date: day,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             totalTokens: inc(t),
             totalCount: inc(1),
+            ...(cost === null ? {} : { totalCostUsd: inc(cost) }),
             hours: { [new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', hourCycle: 'h23' })]: {
                 tokens: inc(t), count: inc(1),
                 models: { [Buffer.from(prov + ':' + (model || 'unknown')).toString('base64url')]: { model: model || 'unknown', tokens: inc(t), count: inc(1) } },
-                features: { [feat]: { tokens: inc(t), count: inc(1) } }
+                features: { [feat]: { tokens: inc(t), count: inc(1), ...costInc } }
             } },
             models: { [Buffer.from(prov + ':' + (model || 'unknown')).toString('base64url')]: {
-                model: model || 'unknown', provider: prov, tokens: inc(t), count: inc(1),
+                model: model || 'unknown', provider: prov, tokens: inc(t), count: inc(1), ...costInc,
                 ...(Number.isFinite(usage.inputTokens) && Number.isFinite(usage.outputTokens) ? {
                     inputTokens: inc(usage.inputTokens), outputTokens: inc(usage.outputTokens), detailedCount: inc(1)
                 } : {})
             } },
-            providers: { [prov]: { tokens: inc(t), count: inc(1) } },
+            providers: { [prov]: { tokens: inc(t), count: inc(1), ...costInc } },
             roles: { [role]: { tokens: inc(t), count: inc(1) } },
-            features: { [feat]: { tokens: inc(t), count: inc(1) } }
+            features: { [feat]: { tokens: inc(t), count: inc(1), ...costInc } }
         }, { merge: true });
     } catch (e) {
         console.warn("recordAiUsage failed:", e && e.message);
@@ -1651,7 +1655,8 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                     imageDataUrl,
                     text: message.content || "",
                     tokens: response.data.usage?.total_tokens || 0,
-                    model: orModel
+                    model: orModel,
+                    usage: { costUsd: response.data.usage?.cost ?? null, totalTokens: response.data.usage?.total_tokens ?? null }   // V102.443
                 });
             }
 
@@ -1693,7 +1698,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 jsonValid: orJsonValid,
                 // V101.28: same shape as modern-ai.js so ai_usage gets in/out split for OpenRouter too.
                 usage: { inputTokens: response.data.usage?.prompt_tokens ?? null, outputTokens: orOut,
-                    thinkingTokens: orThink, totalTokens: response.data.usage?.total_tokens ?? null }
+                    thinkingTokens: orThink, totalTokens: response.data.usage?.total_tokens ?? null, costUsd: response.data.usage?.cost ?? null }
             });
         }
 
