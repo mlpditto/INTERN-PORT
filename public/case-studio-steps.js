@@ -118,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const status = document.createElement('div');
     status.className = 'case-studio-workflow-status'; status.setAttribute('role', 'status');
     preview.prepend(settings);
-    // V102.428 (lean A, mockup pick 2026-10-26): ONE screen, no scroll. The header is one line (title · case # · privacy · Close /
+    // V102.428 (lean A, mockup pick 2026-10-26): ONE screen, no scroll. The header is one line (title · case # · privacy · ✕ /
     // Save draft / Generate), so the footer goes; its message line moves under the summary. The status line lives in the bar on
     // the image and only speaks when the image is stale (the pill already says Generating / Ready).
     const header = find('.alabasta-casecard-header');
@@ -292,8 +292,8 @@ document.addEventListener('DOMContentLoaded', () => {
         words(); fit();
     };
     summary.addEventListener('input', () => { edited = true; words(); });
-    const close = actions.querySelector('[onclick="closeAlabastaCaseCardModal()"]');
-    close.textContent = 'Close'; close.title = 'ปิดหน้าต่าง';
+    // V102.435 (owner): the text Close button duplicated the ✕ (same handler) — the header keeps ✕ only
+    actions.querySelector('[onclick="closeAlabastaCaseCardModal()"]').remove();
     find('.close-modal').title = 'ปิดหน้าต่าง';
     find('.casecard-inline-tools button').title = 'สร้างพรอมป์ต์ใหม่จากสรุปปัจจุบัน';
     find('.casecard-inline-tools button:nth-child(2)').title = 'คัดลอกพรอมป์ต์';
