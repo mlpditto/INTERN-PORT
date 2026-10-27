@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.218)</title>
+    <title>Internship Portfolio (V101.219)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.216">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -5266,6 +5266,8 @@
 
                         <!-- Work Form -->
                         <div id="work-form-section" class="form-section" style="display:none;">
+                            <!-- V101.219: the admin may already hold this intern's work link (users.workLink, admin V102.451) — say so here, one tap opens it -->
+                            <div id="u-work-sent" class="lang-no-toggle" hidden style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:14px; padding:10px 12px; border:1px solid #86efac; border-radius:10px; background:#f0fdf4; color:#166534; font-size:0.85em; font-weight:700;"></div>
                             <div style="margin-bottom:16px;">
                                 <label style="font-size:0.85em; font-weight:700; color:#28a745; display:block; margin-bottom:6px;">
                                     📌 Work Title / 작업 제목 *
@@ -25466,6 +25468,7 @@ async function archiveDoneCard(cardId) {
             });
             document.getElementById('case-form-section').style.display = type === 'case' ? 'block' : 'none';
             document.getElementById('work-form-section').style.display = type === 'work' ? 'block' : 'none';
+            if (type === 'work') renderWorkLinkSent();
             const linkSection = document.getElementById('explore-link-form-section');
             if (linkSection) {
                 linkSection.style.display = type === 'explore_link' ? 'block' : 'none';
@@ -25473,6 +25476,23 @@ async function archiveDoneCard(cardId) {
                 // preserving whatever was already picked this session (defaults line_man).
                 if (type === 'explore_link') slSetType(document.getElementById('sl-type').value || 'line_man');
             }
+        }
+
+        // V101.219: ✅ "work link already sent" when users.workLink is an http(s) link; nothing otherwise
+        function renderWorkLinkSent() {
+            const box = document.getElementById('u-work-sent');
+            if (!box) return;
+            const u = String(((typeof myOwnRow === 'function' ? myOwnRow() : window.myUserDoc) || {}).workLink || '').trim();
+            box.hidden = !/^https?:\/\//i.test(u);
+            box.style.display = box.hidden ? 'none' : 'flex';
+            box.replaceChildren();
+            if (box.hidden) return;
+            const t = document.createElement('span');
+            t.textContent = '✅ Work link already sent · ส่ง Work link แล้ว · 작업 링크 제출됨';
+            const a = document.createElement('a');
+            a.href = u; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = '🔗 Open ↗'; a.title = u;
+            a.style.cssText = 'margin-left:auto; color:#0369a1; text-decoration:none; white-space:nowrap;';
+            box.append(t, a);
         }
 
         function updateCaseSymptoms() {
