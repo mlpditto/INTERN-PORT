@@ -139,6 +139,15 @@ assert.ok(ruleKeys, 'firestore.rules has the article_questions block');
         await page.click('#art-sheet .foot .anyq');
         const th = await page.evaluate(() => ({ kinds: [...document.querySelectorAll('#art-sheet .aq-k button')].map(b => b.innerText.trim()), noToggle: document.getElementById('art-sheet').classList.contains('lang-no-toggle'), sub: document.querySelector('#art-sheet .aq-sub').innerText }));
         assert.deepEqual(th.kinds, ['❓ สงสัย', '⚠️ ข้อมูลผิด/ล้าสมัย', '💡 อยากให้เพิ่ม']); assert.ok(th.noToggle); assert.match(th.sub, /ไม่แสดงชื่อ/);
+        // V101.217: the flag chip — 🇹🇭 now → 🇰🇷 → 🇬🇧, labels follow, the typed text and the picked kind stay
+        await page.fill('#art-q', 'ขอบคุณครับ'); await page.click('#art-sheet .aq-k [data-k="add"]');
+        const fl = async () => page.evaluate(() => ({ chip: document.querySelector('#art-sheet .aq-h .lng').textContent, kinds: [...document.querySelectorAll('#art-sheet .aq-k button')].map(b => b.innerText.trim()), text: document.getElementById('art-q').value, kind: document.querySelector('#art-sheet .aq-k [aria-pressed="true"]').dataset.k, ph: document.getElementById('art-q').placeholder }));
+        assert.equal((await fl()).chip, '🇹🇭');
+        await page.click('#art-sheet .aq-h .lng');
+        let f2 = await fl(); assert.deepEqual([f2.chip, f2.kinds, f2.text, f2.kind], ['🇰🇷', ['❓ 질문', '⚠️ 틀림/오래됨', '💡 추가 요청'], 'ขอบคุณครับ', 'add'], 'Korean: labels follow, text + kind stay');
+        await page.click('#art-sheet .aq-h .lng');
+        f2 = await fl(); assert.deepEqual([f2.chip, f2.kinds, f2.text, f2.kind], ['🇬🇧', ['❓ A question', '⚠️ Wrong / out of date', '💡 Please add'], 'ขอบคุณครับ', 'add'], 'English: labels follow, text + kind stay');
+        assert.equal(await page.$eval('#art-sheet .aq-h .lng', b => b.getAttribute('aria-label')), 'Language: English (tap for ไทย)');
         await page.evaluate(() => internArticles.close('ok'));
 
         // ---- 7. reduced motion: only ✓ + a message
