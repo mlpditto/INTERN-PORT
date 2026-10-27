@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.439)</title>
+    <title>Nika Admin (V102.443)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -44156,6 +44156,13 @@ They can connect again from LINE.
                 if (idBadge) { idBadge.textContent = caseItem.caseId ? '#' + caseItem.caseId : ''; idBadge.hidden = !caseItem.caseId; }
                 if (imageWrap) imageWrap.style.display = 'block';
                 setAlabastaCaseCardImageLoadingState(false, model || selectedModel);
+                // V102.443 (owner): the pill keeps the real cost of this image when the provider reported one (Ready · 0:25 · $0.04)
+                const imgCost = imageResponse && imageResponse.raw && imageResponse.raw.usage && imageResponse.raw.usage.costUsd;
+                const costPill = document.getElementById('alabasta-case-card-image-status');
+                if (costPill && typeof imgCost === 'number' && Number.isFinite(imgCost) && imgCost >= 0) {
+                    costPill.insertAdjacentHTML('beforeend', ' · <span class="cc-gen-cost" style="font-variant-numeric:tabular-nums">$' + String(Number(imgCost.toFixed(3))) + '</span>');
+                    costPill.title = 'Real cost of this image: $' + imgCost.toFixed(4);
+                }
                 if (imageMetaEl) imageMetaEl.textContent = `Generated with ${model || selectedModel}${compositedNote}`;
                 // V102.426: every card is kept in the Codex Gallery at once (a failed upload only says so — the image + PNG are unaffected)
                 if (typeof saveCaseCardToGallery === 'function') {
