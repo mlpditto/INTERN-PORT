@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.432)</title>
+    <title>Nika Admin (V102.436)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -753,6 +753,7 @@
         .glc-ep .glc-t { font-weight:800; color:#334155; font-size:0.88em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .glc-ep .glc-t small { font-weight:600; color:#94a3b8; margin-left:6px; }
         .glc-ep .glc-f { display:flex; gap:6px; overflow:hidden; margin-top:3px; }
+        .glc-ep .glc-f span.glc-cau { color:#92400e; background:#fffbeb; border-color:#fde68a; }
         .glc-ep .glc-f span { font-size:0.7em; color:#475569; background:#f8fafc; border:1px solid #eef2f7; border-radius:999px; padding:2px 8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:220px; }
         .glc-ep .glc-a { display:flex; gap:6px; align-items:center; }
         .glc-ep .glc-a button { border:1px solid #e2e8f0; background:#fff; border-radius:10px; padding:5px 9px; cursor:pointer; font-size:0.8em; font-family:inherit; }
@@ -22040,7 +22041,7 @@ Visual style for every clip: ${style}
 Characters: ${window.GM_STYLE_SAFE}
 
 Return ONLY valid JSON of this exact shape:
-{"episodes":[{"n":1,"title":"short English title","titleTh":"ชื่อตอนภาษาไทยสั้น ๆ","objective":"what the viewer can do after (English, ≤ 12 words)","fact":"the one key fact, clinically correct (English, ≤ 20 words)","narration":"the spoken English line, natural, ≤ 25 words","captionTh":"คำบรรยายภาษาไทย 1 บรรทัดสำหรับโพสต์","visual":"English prompt for a video model: scene, subject, motion, camera, mood — consistent style across episodes, NO on-screen text"}]}
+{"episodes":[{"n":1,"title":"short English title","titleTh":"ชื่อตอนภาษาไทยสั้น ๆ","objective":"what the viewer can do after (English, ≤ 12 words)","fact":"the one key fact, clinically correct (English, ≤ 20 words)","caution":"what a clinician should double-check before this clip is published: any dose, indication, contraindication, interaction or number it states or implies (English, ≤ 15 words; empty string if none)","narration":"the spoken English line, natural, ≤ 25 words","captionTh":"คำบรรยายภาษาไทย 1 บรรทัดสำหรับโพสต์","visual":"English prompt for a video model: scene, subject, motion, camera, mood — consistent style across episodes, NO on-screen text"}]}
 ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' + N + ', in a sensible learning order.'} Keep drug names, doses and targets correct for Thailand practice.`;
             const stopBusy = window.gmBusy(btn, 'Planning…');
             try {
@@ -22054,6 +22055,7 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
                     titleTh: String(e.titleTh || '').trim(),
                     objective: String(e.objective || '').trim(),
                     fact: String(e.fact || '').trim(),
+                    caution: String(e.caution || '').trim(),   // V102.436: what to verify before publishing (⚠️ chip)
                     narration: String(e.narration || '').trim(),
                     captionTh: String(e.captionTh || '').trim(),
                     visual: String(e.visual || '').trim(),
@@ -22096,6 +22098,7 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
                     + '<div class="glc-f">'
                     + '<span title="Objective: ' + esc(e.objective) + '">🎯 ' + esc(e.objective) + '</span>'
                     + '<span title="Key fact: ' + esc(e.fact) + '">💡 ' + esc(e.fact) + '</span>'
+                    + (e.caution ? '<span class="glc-cau" title="Medical caution — check before publishing: ' + esc(e.caution) + '">⚠️ ' + esc(e.caution) + '</span>' : '')
                     + '<span title="Narration (spoken, English): ' + esc(e.narration) + '">🗣 ' + esc(e.narration) + '</span>'
                     + '<span title="Visual prompt (sent to the video model): ' + esc(e.visual) + '">🎨 ' + esc(e.visual) + '</span>'
                     + '</div></div>'
@@ -22115,7 +22118,7 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
         // V102.305: ⧉ — one episode, or the whole plan, as plain text (title · ชื่อไทย · 🎯 objective · 💡 fact · 🗣 narration · 🎨 visual)
         window.glcEpisodeText = function(e) {
             return 'EP' + String(e.n).padStart(2, '0') + ' · ' + (e.title || '') + (e.titleTh ? ' · ' + e.titleTh : '')
-                + '\n🎯 ' + (e.objective || '') + '\n💡 ' + (e.fact || '') + '\n🗣 ' + (e.narration || '') + '\n🎨 ' + (e.visual || '');
+                + '\n🎯 ' + (e.objective || '') + '\n💡 ' + (e.fact || '') + (e.caution ? '\n⚠️ ' + e.caution : '') + '\n🗣 ' + (e.narration || '') + '\n🎨 ' + (e.visual || '');
         };
         window.glcCopyText = async function(text, msg) {
             try { await navigator.clipboard.writeText(text); showToast(msg, 'success'); }
@@ -22144,6 +22147,7 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
                 + '<input data-f="titleTh" value="' + esc(e.titleTh) + '" placeholder="ชื่อตอน (ไทย)" aria-label="Thai title">'
                 + '<input data-f="objective" value="' + esc(e.objective) + '" placeholder="🎯 Objective" aria-label="Objective">'
                 + '<input data-f="fact" value="' + esc(e.fact) + '" placeholder="💡 Key fact" aria-label="Key fact">'
+                + '<input data-f="caution" value="' + esc(e.caution || '') + '" placeholder="⚠️ Medical caution — what to verify before publishing" aria-label="Medical caution">'
                 + '<input data-f="narration" value="' + esc(e.narration) + '" placeholder="🗣 Narration (spoken, EN)" aria-label="Narration">'
                 + '<input data-f="captionTh" value="' + esc(e.captionTh) + '" placeholder="คำบรรยายไทย" aria-label="Thai caption" oninput="glcCapCount(this,' + n + ')">'
                 + '<input data-f="readingTh" value="' + esc(e.readingTh || '') + '" placeholder="คำอ่านชื่อยา (เฉพาะเสียง) Warfarin=วอร์ฟาริน, INR=ไอเอ็นอาร์" aria-label="Drug-name readings for the Thai voice" title="Only the 🔊 Thai voice uses these — the caption on screen keeps the English names">'
@@ -22194,6 +22198,7 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
                     ? 'Spoken narration (Thai, natural Thai pronunciation and tones, calm teacher voice, clear; say it exactly as written — keep the drug names, numbers and units, do not translate): "' + e.narration + '"'
                     : 'Spoken narration (English, calm teacher voice, clear): "' + e.narration + '"'),
                 'Key fact the scene must support: ' + e.fact,
+                'Medical safety: show or say no drug dose, number or clinical claim beyond the key fact and the narration above; if unsure, leave it out of the picture.',   // V102.436
                 'No on-screen text, captions, letters or logos. No real brand packaging. Smooth continuous camera, phone-screen framing.'
             ].join('\n');
         };
