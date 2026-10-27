@@ -119,7 +119,7 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
             out.placeholderClip = $('#design-prompt').placeholder; out.cardClipNoPlan = $('#glc-episodes-card').style.display;
             // 2. stub the AI + record every call
             const calls = []; window.__calls = calls;
-            const episodes = Array.from({ length: 10 }, (_, i) => ({ n: i + 1, title: 'Episode ' + (i + 1) + ' title', titleTh: 'ตอนที่ ' + (i + 1), objective: 'Objective ' + (i + 1), fact: 'Fact ' + (i + 1), narration: 'Spoken line ' + (i + 1), captionTh: 'คำบรรยาย ' + (i + 1), visual: 'Visual ' + (i + 1) + ' scene' }));
+            const episodes = Array.from({ length: 10 }, (_, i) => ({ n: i + 1, title: 'Episode ' + (i + 1) + ' title', titleTh: 'ตอนที่ ' + (i + 1), objective: 'Objective ' + (i + 1), fact: 'Fact ' + (i + 1), caution: i === 1 ? 'Verify the renal dose adjustment' : '', narration: 'Spoken line ' + (i + 1), captionTh: 'คำบรรยาย ' + (i + 1), visual: 'Visual ' + (i + 1) + ' scene' }));
             window.callUniversalAI = async (model, prompt, isJson, vision, key, opts) => {
                 calls.push({ model, prompt, isJson, opts });
                 if (opts.feature === 'clip_plan') return { text: '```json\n' + JSON.stringify({ episodes }) + '\n```', model: 'gemini-3.6-flash' };
@@ -138,12 +138,17 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
             out.cardAfterPlan = $('#glc-episodes-card').style.display;
             out.statuses = [...document.querySelectorAll('#glc-episodes-list .glc-ep')].map(e => e.dataset.status);
             out.count = txt($('#glc-episodes-count')); out.cost = txt($('#glc-cost-pill')); out.steps = [...document.querySelectorAll('#glc-steps .glc-step')].map(txt);   // V102.314
+            out.cautions = [...document.querySelectorAll('#glc-episodes-list .glc-cau')].map(el => [el.closest('.glc-ep').id, txt(el), el.title]);   // V102.436
+            out.planAsksCaution = /"caution":"what a clinician should double-check/.test(calls[0].prompt);
             out.row3 = txt($('#glc-ep-3 .glc-t')); out.row3chips = [...document.querySelectorAll('#glc-ep-3 .glc-f span')].map(txt);
             out.btnAfterPlan = txt($('#btn-generate-design'));
             // V102.305: ⧉ copies one episode / the whole plan as text
             window.__clip = []; Object.defineProperty(navigator, 'clipboard', { value: { writeText: t => { window.__clip.push(t); return Promise.resolve(); } }, configurable: true });
             out.copyBtns = document.querySelectorAll('#glc-episodes-list .glc-a button[onclick^="glcCopyEpisode"]').length + '/' + document.querySelectorAll('#glc-copy-plan').length;
             glcCopyEpisode(1); await new Promise(r => setTimeout(r, 20)); out.copyEp = window.__clip[0];
+            glcCopyEpisode(2); await new Promise(r => setTimeout(r, 20)); out.copyEp2 = window.__clip[1];   // V102.436: the ⚠️ line rides along when there is one
+            window.__clip.length = 1;
+            out.promptSafety = [glcEpisodePrompt(window._glcSeries.episodes[1]), glcEpisodePrompt(window._glcSeries.episodes[0])].map(p => /Medical safety: show or say no drug dose, number or clinical claim beyond the key fact and the narration above/.test(p));
             glcCopyPlan(); await new Promise(r => setTimeout(r, 20)); out.copyPlan = window.__clip[1];
             // 4. edit EP03 in place
             glcToggleEdit(3);
@@ -206,7 +211,11 @@ assert.ok(fn.indexOf('callerIsAdmin && provider !== "typhoon"') < branchAt, 'the
         assert.deepEqual(r.statuses, Array(10).fill('planned'));
         assert.deepEqual(r.steps, ['① Plan · free ✓', '② ▶ Render one at a time · paid', '💰 $0.00 / ≈ $8.00 series'], 'V102.314: the two tiers + the series total before any click'); assert.equal(r.count, '10'); assert.equal(r.cost, 'Omni Flash · 8 s · ≈ $0.80 / clip · $8.00 all', 'cost before any click');
         assert.equal(r.row3, 'Episode 3 titleตอนที่ 3'); assert.deepEqual(r.row3chips, ['🎯 Objective 3', '💡 Fact 3', '🗣 Spoken line 3', '🎨 Visual 3 scene']);
-        assert.deepEqual(r.editFields, ['title', 'titleTh', 'objective', 'fact', 'narration', 'captionTh', 'readingTh', 'visual'], 'in-place edit has the 8 fields (V102.366: + readingTh)');
+        assert.deepEqual(r.editFields, ['title', 'titleTh', 'objective', 'fact', 'caution', 'narration', 'captionTh', 'readingTh', 'visual'], 'in-place edit has the 9 fields (V102.366: + readingTh; V102.436: + caution)');
+        assert.equal(r.planAsksCaution, true, 'the planner is asked for a caution per episode');
+        assert.deepEqual(r.cautions, [['glc-ep-2', '⚠️ Verify the renal dose adjustment', 'Medical caution — check before publishing: Verify the renal dose adjustment']], 'a ⚠️ chip only on the episode that has a caution (empty ones draw nothing)');
+        assert.match(r.copyEp2, /\n💡 Fact 2\n⚠️ Verify the renal dose adjustment\n🗣 /, 'the copied episode carries the caution'); assert.ok(!/⚠️/.test(r.copyEp), 'no ⚠️ line without a caution');
+        assert.deepEqual(r.promptSafety, [true, true], 'every render prompt says: no dose / number / claim beyond the key fact and the narration');
         assert.deepEqual([r.row3After, r.ep3Visual, r.editClosed], ['Missed dose ruleตอนที่ 3', 'Clock face flipping day to night', true], 'Done writes the row back');
         assert.equal(r.ask, '≈ $0.80 · 8 sRender✕', 'inline cost ask, no native dialog'); assert.ok(r.askHasRender);
         assert.equal(r.duringStatus, 'rendering'); assert.match(r.duringPreview, /Rendering EP01…Omni Flash · 9:16 · 8 s/);
