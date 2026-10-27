@@ -61,12 +61,23 @@ assert.ok(!/role="tab"|dc-tabs|createElement\('details'\)/.test(js), 'no tabs, n
         const layout = await page.evaluate(() => {
             const pane = document.getElementById('rl-reflection-pane');
             return { kids: [...pane.children].map(e => e.id || e.className), folds: pane.querySelectorAll('details:not(#rl-note-fields details)').length, tabs: pane.querySelectorAll('[role="tab"]').length,
-                title: pane.querySelector('.dc-title').textContent, labels: [...pane.querySelectorAll('.dc-lb')].map(l => l.textContent),
+                title: pane.querySelector('.dc-title') ? 'has .dc-title' : pane.querySelector('.dc-bar .dc-ask').textContent, labels: [...pane.querySelectorAll('.dc-lb')].map(l => l.textContent),
                 pickerInHero: !!document.getElementById('mood-picker').closest('#dc-hero'), date: pane.querySelector('.dc-date').textContent };
         });
         assert.deepEqual(layout.kids, ['dc-hero', 'dc-day', 'dc-note', 'dc-feedback', 'dc-sendbar lang-no-toggle', 'dc-feed'], 'hero · Today · Note · Message · Send · 💬: ' + layout.kids);
-        assert.deepEqual([layout.folds, layout.tabs, layout.title], [0, 0, '📓 Journal'], 'no folds, no tabs');
+        assert.deepEqual([layout.folds, layout.tabs, layout.title], [0, 0, 'How do you feel today?'], 'no folds, no tabs; no second "Journal" title — the mood question is the bar title (V101.215)');
         assert.deepEqual(layout.labels, ['Learned', 'Hard', 'Next']);
+        const lean = await page.evaluate(() => {
+            const vis = el => !!el && !el.closest('[hidden]') && getComputedStyle(el).display !== 'none';
+            return { ph: ['dc-t-learned', 'dc-t-hard', 'dc-t-next', 'dc-feedback-message'].map(id => document.getElementById(id).placeholder), labelVisible: [...document.querySelectorAll('.dc-lb')].some(l => l.getBoundingClientRect().width > 2),
+                feed: vis(document.getElementById('dc-feed')), counter: vis(document.getElementById('ln-counter')) };
+        });
+        assert.deepEqual(lean.ph, ['Learned · ได้เรียนรู้อะไร', 'Hard · ติดอะไร', 'Next · จะทำอะไรต่อ', 'Help or an idea?'], 'one text per row: the label rides in the placeholder (V101.215)');
+        assert.equal(lean.labelVisible, false, 'no label column (the <label> stays for screen readers)');
+        assert.equal(lean.feed, false, 'an empty 💬 section is not drawn'); assert.equal(lean.counter, false, '0/90 hidden while the Note row is idle');
+        await page.focus('#dc-note-content');
+        assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('ln-counter')).display !== 'none'), true, '0/90 shows while the Note row is in use');
+        await page.evaluate(() => document.activeElement.blur());
         assert.ok(layout.pickerInHero, 'the mood circles sit in the hero');
         assert.equal(layout.date, 'Mon 26 Oct');
         let s = await state();
