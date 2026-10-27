@@ -94,7 +94,7 @@ const NAGER_JP = [{ date: '2026-02-11', name: 'Foundation Day', localName: 'å»ºå
       // V102.277 lean + colour: one-line cells, colour by kind, weekend tint, counts in the header, the day's items inline
       out.lean = (() => {
         const cs = cells(), has = cs.filter(c => c.classList.contains('has')), det = cal().querySelector('.hol-det');
-        const dows = cs.map((c, i) => (new Date(Date.UTC(ty, tm - 1, i + 1)).getUTCDay()));
+        const dows = cs.map((c, i) => (new Date(Date.UTC(S.cal.y, S.cal.m, i + 1)).getUTCDay()));   // the month on screen: the Soon pill moves to next month in the last days of a month (t+5 crosses it)
         return {
           maxH: Math.max(...cs.map(c => c.offsetHeight)), oneLine: cs.every(c => c.querySelector('b').getBoundingClientRect().top <= c.getBoundingClientRect().top + 14 && (!c.querySelector('span') || !c.querySelector('span').textContent || Math.abs(c.querySelector('span').getBoundingClientRect().top - c.querySelector('b').getBoundingClientRect().top) < 8)),
           kinds: has.map(c => [...c.classList].filter(x => /^k-/.test(x)).join('')).filter(Boolean).length === has.length,
