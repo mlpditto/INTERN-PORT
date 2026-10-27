@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.452)</title>
+    <title>Nika Admin (V102.453)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -22053,14 +22053,23 @@ RULES:
             });
         };
         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', window.glcPaintGhosts); else window.glcPaintGhosts();
+        // V102.453 · C1 (owner): a clip's cost is REAL (the provider reported it) or an ESTIMATE (seconds × the engine's price). It is stored as
+        // costKind 'real' | 'est'; clips saved before this have none ('' = shown as before, plain $). An estimate always wears "≈".
+        window.glcCostFmt = function(e) { const v = Number(e && e.costUsd || 0); return (e && e.costKind === 'est' ? '≈ ' : '') + '$' + v.toFixed(2); };
+        window.glcCostNote = function(e) { return e && e.costKind === 'real' ? 'real cost reported by the provider' : e && e.costKind === 'est' ? 'estimate: seconds × the engine price (the provider did not report a cost)' : 'cost source not recorded (rendered before V102.453)'; };
+        // { real, est, text } of a list of episodes: "$0.77" when everything is real, "$0.37 + ≈ $0.80" when some are estimated
+        window.glcCostSum = function(list) {
+            let real = 0, est = 0; list.forEach(e => { const v = Number(e && e.costUsd || 0); if (e && e.costKind === 'est') est += v; else real += v; });
+            return { real, est, text: est > 0 ? (real > 0 ? '$' + real.toFixed(2) + ' + ' : '') + '≈ $' + est.toFixed(2) : '$' + real.toFixed(2) };
+        };
         // V102.314: ① the plan is text only (free) · ② every ▶ is a paid render · 💰 what the whole series costs, before any click
         window.glcStepsHtml = function(s) {
             const E = window.glcEngineOf(window.glcEngine()) || { seconds: window.GLC_SECONDS, usd: window.GLC_USD_PER_SECOND };
             const n = s.episodes.length, done = s.episodes.filter(e => e.status === 'done');
-            const spent = done.reduce((t, e) => t + Number(e.costUsd || 0), 0);
+            const spent = window.glcCostSum(done);   // V102.453
             return '<span class="glc-step done" title="The Enhancer model wrote the plan — text only, no clip cost">① Plan · free ✓</span>'
                 + '<span class="glc-step' + (done.length === n ? ' done' : '') + '" title="Each ▶ asks first, then renders ONE clip — you pay per clip that comes back">② ▶ Render one at a time · paid' + (done.length ? ' · ' + done.length + '/' + n : '') + '</span>'
-                + '<span class="glc-step" title="Rendered so far / the whole series at this engine\'s price">💰 $' + spent.toFixed(2) + ' / ≈ $' + (E.seconds * E.usd * n).toFixed(2) + ' series</span>';
+                + '<span class="glc-step" title="Rendered so far (real cost, or ≈ an estimate where the provider reported none) / the whole series at this engine\'s price">💰 ' + spent.text + ' / ≈ $' + (E.seconds * E.usd * n).toFixed(2) + ' series</span>';
         };
         window._glcSeries = null;           // { id, topic, model, episodes: [...] }
         window._glcClip = null;             // the clip in the preview: { n, dataUrl, seconds, model, ms }
@@ -22193,7 +22202,7 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
                     + '<span title="Visual prompt (sent to the video model): ' + esc(e.visual) + '">🎨 ' + esc(e.visual) + '</span>'
                     + '</div></div>'
                     + '<div class="glc-a" id="glc-a-' + e.n + '">'
-                    + '<span class="glc-dot" title="' + (e.status === 'done' ? 'Rendered · ' + e.seconds + ' s · $' + Number(e.costUsd || 0).toFixed(2) : e.status === 'rendering' ? 'Rendering…' : e.status === 'failed' ? 'Failed — ▶ to try again' : 'Planned — not rendered, nothing paid') + '"></span>'
+                    + '<span class="glc-dot" title="' + (e.status === 'done' ? 'Rendered · ' + e.seconds + ' s · ' + window.glcCostFmt(e) : e.status === 'rendering' ? 'Rendering…' : e.status === 'failed' ? 'Failed — ▶ to try again' : 'Planned — not rendered, nothing paid') + '"></span>'
                     + (window._glcClips && window._glcClips[e.n] ? '<button type="button" onclick="glcShowClip(' + e.n + ')" title="Show EP' + String(e.n).padStart(2, '0') + ' in the preview' + (e.clipUrl ? '' : ' — rendered, not saved yet') + '" aria-label="Show episode ' + e.n + '">👁</button>' : '')   // V102.316
                     + '<button type="button" onclick="glcCopyEpisode(' + e.n + ')" title="Copy this episode (title · objective · fact · narration · visual) · คัดลอกตอนนี้ · 이 에피소드 복사" aria-label="Copy episode ' + e.n + '">⧉</button>'   // V102.305
                     + (e.post ? '<button type="button" onclick="glcCopyPost(' + e.n + ')" title="Copy the post caption + hashtags · คัดลอกแคปชัน + แฮชแท็ก" aria-label="Copy post caption ' + e.n + '">📣</button>' : '')
@@ -22411,7 +22420,9 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
                 const seconds = Number(raw.seconds) || secs;
                 e.status = 'done';
                 e.seconds = seconds;
-                e.costUsd = Number.isFinite(Number(raw.costUsd)) && raw.costUsd !== null ? Math.round(Number(raw.costUsd) * 100) / 100 : Math.round(seconds * window.glcUsd(engine) * 100) / 100;
+                const realCost = Number.isFinite(Number(raw.costUsd)) && raw.costUsd !== null;   // V102.453 · C1: what the provider reported, or our estimate
+                e.costUsd = realCost ? Math.round(Number(raw.costUsd) * 10000) / 10000 : Math.round(seconds * window.glcUsd(engine) * 100) / 100;
+                e.costKind = realCost ? 'real' : 'est';
                 window._glcClip = { n, dataUrl, seconds, model: raw.model || engine, ms: Date.now() - t0, polls };
                 (window._glcClips = window._glcClips || {})[n] = window._glcClip;   // V102.316: a batch never overwrites an unsaved paid clip
                 window.glcShowClip();
@@ -22441,7 +22452,7 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
                 + '<span class="glc-vwrap"><video id="generated-clip" class="glc-video" controls playsinline src="' + c.dataUrl + '"></video><div class="glc-cc-band" id="glc-cc-band" hidden></div></span>'   /* V102.353: Thai caption band */
                 + '<div style="font-size:0.82em; color:#64748b; max-width:260px; line-height:1.6;">'
                 + '<div style="font-weight:900; color:#334155; font-size:1.05em;">EP' + String(c.n).padStart(2, '0') + ' · ' + esc(e.title || '') + '</div>'
-                + c.seconds + ' s · ' + (/heygen/i.test(String(c.model)) ? '768p' : '720p') + ' · 9:16 · audio on<br>' /* V102.350: HeyGen has no 720p */ + esc(String(c.model).replace(/^as\//, '')) + ' · ' + Math.round(c.ms / 1000) + ' s · $' + Number(e.costUsd || 0).toFixed(2)
+                + c.seconds + ' s · ' + (/heygen/i.test(String(c.model)) ? '768p' : '720p') + ' · 9:16 · audio on<br>' /* V102.350: HeyGen has no 720p */ + esc(String(c.model).replace(/^as\//, '')) + ' · ' + Math.round(c.ms / 1000) + ' s · <span title="' + esc(window.glcCostNote(e)) + '">' + window.glcCostFmt(e) + '</span>'
                 + (e.captionTh ? '<div style="margin-top:8px; color:#334155;">' + esc(e.captionTh) + '</div>' : '')
                 + '<div id="glc-clip-actions" style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; align-items:center;">'
                 + (e.captionTh && window.GlcCaptions ? '<button type="button" class="glc-cc" id="glc-cc-btn" aria-pressed="true" title="Thai captions on / off">CC ไทย</button>' : '')
@@ -22491,7 +22502,7 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
                     + '<span><button type="button" class="btn-sm" onclick="glcShowClip()">Cancel</button><button type="button" class="btn-sm go" onclick="this.disabled=true; glcDeleteSavedClip(window._glcSeries.id, ' + c.n + ')">🗑 Delete</button></span></div>';
                 return;
             }
-            if (e && !e.clipUrl) { e.status = 'planned'; e.seconds = 0; e.costUsd = 0; }
+            if (e && !e.clipUrl) { e.status = 'planned'; e.seconds = 0; e.costUsd = 0; delete e.costKind; }
             if (c && window._glcClips) delete window._glcClips[c.n];   // V102.316
             window._glcClip = null;
             const previewContainer = document.getElementById('design-preview-container');
@@ -22531,7 +22542,7 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
                     if (del) { del.title = 'Delete this clip — MP4 + gallery entry (asks first)'; del.setAttribute('aria-label', 'Delete clip'); }
                     btn.outerHTML = window.glcSaveStateHtml(e);
                 }
-                showToast('🎬 ' + window.glcEp(c.n) + ' saved to Codex Gallery · $' + Number(e.costUsd || 0).toFixed(2), 'success');
+                showToast('🎬 ' + window.glcEp(c.n) + ' saved to Codex Gallery · ' + window.glcCostFmt(e), 'success');
                 if (window._mgwGallery) mgwLoadCodexGallery();   // the gallery shows it without another Load
                 window.glcRenderEpisodes();
                 return true;
@@ -22556,7 +22567,7 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
                     try { await app.storage().ref(ep.storagePath).delete(); }
                     catch (err) { if (!err || err.code !== 'storage/object-not-found') throw err; }   // already gone = fine
                 }
-                const reset = x => { delete x.clipUrl; delete x.storagePath; delete x.renderedAt; x.status = 'planned'; x.seconds = 0; x.costUsd = 0; };
+                const reset = x => { delete x.clipUrl; delete x.storagePath; delete x.renderedAt; x.status = 'planned'; x.seconds = 0; x.costUsd = 0; delete x.costKind; };
                 if (ep) { reset(ep); await ref.set({ episodes: eps, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true }); }
                 const s = window._glcSeries, me = s && s.id === seriesId && s.episodes[n - 1];
                 if (me) {
@@ -22692,7 +22703,7 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
             const per = E.seconds * E.usd, sel = Array.from(window._glcSel).sort((a, b) => a - b), unsaved = window.glcUnsaved();
             let html = '';
             if (B) {
-                html = '<span>⏳ Rendering ' + window.glcEp(B.current) + ' · ' + B.done + ' of ' + B.total + ' done · spent $' + B.spent.toFixed(2) + ' of ≈ $' + (B.total * per).toFixed(2) + '</span><span class="sp"></span>'
+                html = '<span>⏳ Rendering ' + window.glcEp(B.current) + ' · ' + B.done + ' of ' + B.total + ' done · spent ' + window.glcCostSum(B.eps).text + ' of ≈ $' + (B.total * per).toFixed(2) + '</span><span class="sp"></span>'
                     + '<button type="button" class="stop" onclick="glcStopBatch()"' + (B.stop ? ' disabled' : '') + '>' + (B.stop ? 'Stopping after this one…' : '⏹ Stop after this one') + '</button>';
             } else if (sel.length && window._glcSelAsk) {
                 html = '<span>Render ' + sel.length + ' clip' + (sel.length === 1 ? '' : 's') + ' · ' + E.label + ' · <b>≈ $' + (sel.length * per).toFixed(2) + '</b> · you pay per clip that comes back</span><span class="sp"></span>'
@@ -22712,7 +22723,7 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
             const queue = Array.from(window._glcSel).sort((a, b) => a - b);
             if (!queue.length || window._glcBatch) return;
             window._glcSelAsk = false;
-            const B = window._glcBatch = { total: queue.length, done: 0, spent: 0, current: queue[0], stop: false };
+            const B = window._glcBatch = { total: queue.length, done: 0, eps: [], current: queue[0], stop: false };
             try {
                 for (const n of queue) {
                     if (B.stop) break;
@@ -22720,12 +22731,12 @@ ${N === 1 ? 'Exactly 1 episode, n = 1.' : 'Exactly ' + N + ' episodes, n = 1..' 
                     await window.glcRenderEpisode(n);
                     const e = window._glcSeries && window._glcSeries.episodes[n - 1];
                     if (!e || e.status !== 'done') { showToast(window.glcEp(n) + ' failed — the rest were not rendered', 'error'); break; }
-                    window._glcSel.delete(n); B.done++; B.spent += Number(e.costUsd || 0);
+                    window._glcSel.delete(n); B.done++; B.eps.push(e);
                 }
             } finally {
                 window._glcBatch = null;
                 const unsavedN = window.glcUnsaved().length;   // V102.345: renders save themselves; only failed uploads remain
-                showToast('🎬 ' + B.done + ' of ' + B.total + ' rendered · $' + B.spent.toFixed(2) + (B.done ? (unsavedN ? ' — ' + unsavedN + ' not saved, press 💾 Save all' : ' — in Codex Gallery') : ''), B.done && !unsavedN ? 'success' : 'warning');
+                showToast('🎬 ' + B.done + ' of ' + B.total + ' rendered · ' + window.glcCostSum(B.eps).text + (B.done ? (unsavedN ? ' — ' + unsavedN + ' not saved, press 💾 Save all' : ' — in Codex Gallery') : ''), B.done && !unsavedN ? 'success' : 'warning');
                 window.glcRenderEpisodes();
             }
         };
@@ -52910,7 +52921,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         const n = Number(e.n) || i + 1;
                         clips.push({ type: 'clip', id: doc.id + '#' + n, seriesId: doc.id, n: n,
                             name: 'EP' + String(n).padStart(2, '0') + ' · ' + (e.title || d.topic || ''), url: e.clipUrl,
-                            caption: e.captionTh || '', reading: e.readingTh || '', seconds: Number(e.seconds) || 0, costUsd: Number(e.costUsd) || 0,
+                            caption: e.captionTh || '', reading: e.readingTh || '', seconds: Number(e.seconds) || 0, costUsd: Number(e.costUsd) || 0, costKind: e.costKind || '',
                             model: d.clipModel || '', renderedAt: e.renderedAt || '', reviewed: !!e.reviewed });
                     });
                 });
@@ -52974,7 +52985,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
         // V102.345: a kept clip — first frame (#t=0.1) + ▶ opens the MP4 in a new tab · 9:16 · duration · EPnn · title · Thai caption · ⬇ · 🗑
         function mgwClipTileHtml(it, i) {
-            const meta = [String(it.model || '').replace(/^(as|or)\//, '').replace(/^google\//, ''), it.seconds ? it.seconds + ' s' : '', it.costUsd ? '$' + it.costUsd.toFixed(2) : '',
+            const meta = [String(it.model || '').replace(/^(as|or)\//, '').replace(/^google\//, ''), it.seconds ? it.seconds + ' s' : '', it.costUsd ? window.glcCostFmt(it) : '',
                 it.renderedAt ? new Date(it.renderedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : ''].filter(Boolean).join(' · ');
             return '<div class="mgw-clip-tile" data-clip="' + dxaEscapeHtml(it.id) + '">'
                 + '<a class="pv" href="' + dxaEscapeHtml(it.url) + '" target="_blank" rel="noopener noreferrer" title="Play" onclick="return mgwPlayClip(event, ' + i + ')">'
