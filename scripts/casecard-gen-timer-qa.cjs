@@ -6,7 +6,7 @@ const end = html.slice(i).search(/\r?\n {8}\}\r?\n/); assert.ok(end > 0);
 const src = html.slice(i, i + end + 10);
 
 let now = 1_000_000, ticks = [];
-const pill = { className: '', innerHTML: '', querySelector: () => { const m = pill.innerHTML.match(/cc-gen-time[^>]*>([^<]*)</); return m ? { set textContent(v) { pill.innerHTML = pill.innerHTML.replace(/(cc-gen-time[^>]*>)[^<]*/, '$1' + v); } } : null; } };
+const pill = { className: '', innerHTML: '', style: {}, querySelector: () => { const m = pill.innerHTML.match(/cc-gen-time[^>]*>([^<]*)</); return m ? { set textContent(v) { pill.innerHTML = pill.innerHTML.replace(/(cc-gen-time[^>]*>)[^<]*/, '$1' + v); } } : null; } };
 const els = { 'alabasta-case-card-image-status': pill };
 // V102.439: the header Generate button shows the same clock (its own span, set by the generate flow)
 const btn = { txt: '0:00' };
@@ -20,11 +20,13 @@ const text = () => pill.innerHTML.replace(/<[^>]+>/g, '').trim();
 
 ctx.set(true, 'GPT Image 2.5 Sunburst');
 assert.equal(text(), 'Generating 0:00', 'starts at 0:00');
+assert.equal(pill.style.display, 'none', 'V102.446: the pill stays out of the way while generating (the Generate button carries the clock)');
 tick(12); assert.equal(text(), 'Generating 0:12', 'counts up each second');
 tick(53); assert.equal(text(), 'Generating 1:05', 'minutes:seconds past a minute');
 assert.equal(btn.txt, '1:05', 'the header button counts with the pill');
 ctx.set(false, 'GPT Image 2.5 Sunburst');
 assert.equal(text(), 'Ready · 1:05', 'done → Ready keeps the total');
+assert.equal(pill.style.display, '', 'and the pill is back');
 assert.equal(ticks.filter(Boolean).length, 0, 'the counter stops');
 tick(5); assert.equal(text(), 'Ready · 1:05', 'and no longer changes');
 ctx.set(true, 'x'); tick(3); assert.equal(text(), 'Generating 0:03', 'a second run starts from zero');
