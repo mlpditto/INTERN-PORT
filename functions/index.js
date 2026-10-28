@@ -2940,6 +2940,74 @@ async function pushLineFlex(tag, targets, buildFlex, logSuffix) {
 }
 
 // ============================================================
+// watchLineQuota — a daily look at the Noti OA's OWN quota numbers (V102.479)
+// ------------------------------------------------------------
+// The line_usage/{month} counter above only sees pushes made through pushLineFlex; anything sent from OA Manager or another tool
+// never reaches it (scripts/owner-status.cjs says as much), and the OA's free plan stops at 300 a month (cap hit 2026-08-27).
+// LINE's Messaging API reports the number that is actually enforced: GET /v2/bot/message/quota ({type:'limited'|'none', value})
+// and /quota/consumption ({totalUsage}) — the same figures the line-bot MCP's get_message_quota shows.
+//   - writes them under line_usage/{month}.api (limit, used, tier, projected, runOutDay, checkedAt) for the dashboard chip + owner-status
+//   - mails the owner when the tier goes UP for the month (watch → critical → full), once per tier (alert.lastMailedTier)
+//   - NEVER pushes to LINE: the alert must not spend the quota it guards, and the digest is not a reliable daily message anyway
+//     (group only since V98.09, silent on quiet days)
+// Never throws: an API failure is recorded as api.error and nothing is mailed; a mail failure leaves lastMailedTier alone so the next
+// day tries again.
+async function runWatchLineQuota(deps) {
+    const d = deps || {};
+    const http = d.axios || axios, token = d.token !== undefined ? d.token : process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    const db = d.db || admin.firestore(), FV = d.FieldValue || admin.firestore.FieldValue, mail = d.sendMail || sendAdminMail;
+    const { month, day, daysInMonth } = lineQuota.bangkokDayInfo(d.now || new Date());
+    const ref = db.collection('line_usage').doc(month);
+    let limit, used;
+    try {
+        if (!token) throw new Error('LINE_CHANNEL_ACCESS_TOKEN not set');
+        const opts = { headers: { Authorization: 'Bearer ' + token }, timeout: 8000 };
+        const [q, c] = await Promise.all([
+            http.get('https://api.line.me/v2/bot/message/quota', opts),
+            http.get('https://api.line.me/v2/bot/message/quota/consumption', opts)
+        ]);
+        limit = q && q.data && q.data.type === 'limited' ? Number(q.data.value) : null;
+        used = Number(c && c.data && c.data.totalUsage);
+        if (!isFinite(used)) throw new Error('quota consumption missing in the reply');
+    } catch (e) {
+        const msg = String((e && e.response && e.response.data && e.response.data.message) || (e && e.message) || 'unknown').slice(0, 200);
+        console.warn('[watchLineQuota] LINE quota API failed:', msg);
+        try { await ref.set({ api: { error: msg, errorAt: FV.serverTimestamp() } }, { merge: true }); } catch (_) { /* observability only */ }
+        return { ok: false, error: msg };
+    }
+    const info = lineQuota.quotaTier({ limit, used, dayOfMonth: day, daysInMonth });
+    let counter = null, byTag = {}, lastMailed = 'ok';
+    try {
+        const snap = await ref.get();
+        const cd = snap && snap.exists ? (snap.data() || {}) : {};
+        if (cd.total != null) counter = Number(cd.total) || 0;
+        byTag = cd.byTag || {};
+        lastMailed = (cd.alert && cd.alert.lastMailedTier) || 'ok';
+    } catch (e) { console.warn('[watchLineQuota] counter read failed:', e && e.message); }
+    await ref.set({ month, api: { limit, used, pct: info.pct, perDay: info.perDay, projected: info.projected, runOutDay: info.runOutDay, tier: info.tier, checkedAt: FV.serverTimestamp(), error: null } }, { merge: true });
+    let mailed = false;
+    if (lineQuota.tierRank(info.tier) > lineQuota.tierRank(lastMailed)) {
+        try {
+            const m = lineQuota.quotaMail({ month, day, limit, used, counter, byTag, pct: info.pct, perDay: info.perDay, projected: info.projected, runOutDay: info.runOutDay, tier: info.tier });
+            await mail('INTERN-PORT LINE', m.subject, m.text);
+            await ref.set({ alert: { lastMailedTier: info.tier, lastMailedAt: FV.serverTimestamp() } }, { merge: true });
+            mailed = true;
+        } catch (e) { console.error('[watchLineQuota] mail failed — will try again tomorrow:', e && e.message); }
+    }
+    console.log(`[watchLineQuota] ${month} LINE ${used}/${limit == null ? 'unlimited' : limit} tier=${info.tier} counter=${counter}${mailed ? ' MAILED' : ''}`);
+    return { ok: true, tier: info.tier, used, limit, counter, mailed };
+}
+
+exports.watchLineQuota = onSchedule({
+    schedule: '0 7 * * *',
+    timeZone: 'Asia/Bangkok',
+    region: 'us-central1',
+    secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'GMAIL_APP_PASSWORD']
+}, async (event) => {
+    await runWatchLineQuota();
+});
+
+// ============================================================
 // notifyQuizSubmitted  (opt-in per-submission admin/group push)
 // ------------------------------------------------------------
 // Caller: public/index.html submitQuiz(), fire-and-forget after the
@@ -4669,6 +4737,7 @@ function floodAlertText(where, s, lat, lon) {
 // an App Password kept in the GMAIL_APP_PASSWORD secret (the account is also the sender).
 const FLOOD_MAIL = 'medlifeplus@gmail.com';
 const { floodTier, pushReading } = require('./flood-tier');
+const lineQuota = require('./line-quota');   // V102.479: watchLineQuota (the Noti OA's monthly push quota)
 const FLOOD_TIER_ICON = { 1: '🟡', 2: '🟠', 3: '🔴', 4: '🚨' };
 const FLOOD_TIER_HEAD = {
     1: 'ระดับ 1 แจ้งเตือน — น้ำอาจถึงเกณฑ์เฝ้าระวังภายใน ~12 ชม. ติดตามต่อ',
