@@ -24,7 +24,7 @@ const toasts = [];
 const sharedWindow = {};
 new Function('window', read('public/codex-vision.js'))(sharedWindow);
 const ctx = {
-    document: { getElementById: mk }, dxSubmitState, dcSubmitState, URL: { createObjectURL: () => 'blob:x', revokeObjectURL: () => {} },
+    document: { getElementById: mk }, ddSyncSubmitGroups: () => {}, dxSubmitState, dcSubmitState, URL: { createObjectURL: () => 'blob:x', revokeObjectURL: () => {} },
     PRODUCT_PHOTO_MAX_INPUT: 12 * 1024 * 1024, PRODUCT_PHOTO_MAX_UPLOAD: 2 * 1024 * 1024, PRODUCT_AI_PROXY_URL: 'https://proxy',
     showToast: m => toasts.push(m), _productSha256Hex: async () => 'abc123', firebase: { storage: null },
     resizeProductPhoto: async () => ({ blob: { size: 1000 }, width: 10, height: 10 }), blobToBase64: async () => 'b64', ensureFirebaseAuthReady: async () => ({ getIdToken: async () => 't' }), fetch: null

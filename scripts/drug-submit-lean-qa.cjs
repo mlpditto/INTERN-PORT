@@ -12,7 +12,7 @@ assert.ok(!idx.includes('Separate each name with a comma'), 'the Brand hint (it 
 
 const KINDS = [
     { k: 'dc', modal: 'drugCodexSubmitModal', open: "dcOpenSubmit('new', { from: 'submit-new' }); dcSetBackLabel();", title: 'Drug', swap: 'Disease', first: 'dc-s-genericName', area: 'dc-s-indication', notes: 'dc-s-internNotes', hints: 2 },
-    { k: 'dx', modal: 'diseaseCodexSubmitModal', open: "dxOpenSubmit('new', { from: 'submit-new' }); dxSetBackLabel();", title: 'Disease', swap: 'Drug', first: 'dx-s-diseaseName', area: 'dx-s-symptoms', notes: 'dx-s-internNotes', hints: 2 },
+    { k: 'dx', modal: 'diseaseCodexSubmitModal', open: "dxOpenSubmit('new', { from: 'submit-new' }); dxSetBackLabel();", title: 'Disease', swap: 'Drug', first: 'dx-s-diseaseName', area: 'dx-s-epidemiology', notes: 'dx-s-internNotes', hints: 2 },
 ];
 
 async function open(browser) {
