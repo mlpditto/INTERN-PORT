@@ -106,6 +106,32 @@ const GOOD = { q: 'ผู้ป่วยหอบกำเริบ ยาตั
         // 7 · the ledger label for the intern-side Beri payout
         assert.equal(await page.evaluate(() => BERI_LEDGER_SOURCE_LABEL.quiz_rank), '🏅 Rank quiz');
 
+        // ---- V102.473: the AI may ask back ONCE per card; one tap on an answer drafts straight away
+        const ASK = { ask: 'ต้องการเทียบอะไร?', choices: ['ปีที่ค้นพบของยาแต่ละ generation (ใช้ชนิด Ordering)', 'เลือก cephalosporin ที่เหมาะกับผู้ป่วยแพ้ penicillin', '  '] };
+        const stOf = () => page.evaluate(() => { const it = document.querySelectorAll('.quiz-q-item')[1]; return { st: it.querySelector('.rk-ai-st').textContent, chips: [...it.querySelectorAll('.rk-ai-st .rk-chb')].map(b => b.textContent), text: it.querySelector('.q-text').value, asked: it.dataset.rkAsked }; });
+        await page.evaluate(() => { const it = document.querySelectorAll('.quiz-q-item')[1]; it.querySelector('.q-text').value = ''; });
+        await draft('เรียงปีการคิดค้นยา Penicillin Cephalosporin', ASK);
+        let a = await stOf(); const askCall = await page.evaluate(() => __calls[0]);
+        assert.match(askCall.prompt, /do NOT draft/); assert.match(askCall.prompt, /"ask":"one short clarifying question in Thai"/); assert.ok(!/Do not ask anything back/.test(askCall.prompt), 'the first round may ask');
+        assert.match(a.st, /ต้องการเทียบอะไร/); assert.equal(a.chips.length, 2, 'blank choices are dropped, the others become chips'); assert.equal(a.asked, '1'); assert.equal(a.text, '', 'asking leaves the card untouched');
+        assert.equal(await page.evaluate(() => document.querySelectorAll('.quiz-q-item').length), 2);
+        assert.equal(await page.evaluate(() => document.querySelectorAll('.quiz-q-item')[1].querySelectorAll('.rk-ai-st .lang-th').length), 0, 'the AI Thai text is shielded from lang-toggle (it would be hidden in EN mode)');
+        // a tap → topic + the answer, second call, told not to ask again; the card is filled
+        await page.evaluate(g => { window.__goodDraft = g; window.__reply = g; window.__calls.length = 0; document.querySelectorAll('.quiz-q-item')[1].querySelector('.rk-chb').click(); }, GOOD);
+        await page.waitForFunction(() => __calls.length === 1 && !document.querySelectorAll('.quiz-q-item')[1].querySelector('.rk-ai button').disabled);
+        const second = await page.evaluate(() => __calls[0]);
+        assert.match(second.prompt, /Subject: เรียงปีการคิดค้นยา Penicillin Cephalosporin — ปีที่ค้นพบของยาแต่ละ generation/); assert.match(second.prompt, /Do not ask anything back/); assert.ok(!/do NOT draft/.test(second.prompt));
+        c = await card(); assert.equal(c.text, GOOD.q, 'the answer led to a draft'); assert.equal(c.note, true);
+        // a fresh card may ask again; the SECOND round never shows chips — an ask there is an unusable draft
+        await draft('x', ASK); assert.equal((await stOf()).chips.length, 2);
+        await draft('x', ASK); a = await stOf(); assert.deepEqual(a.chips, [], 'no second question'); assert.match(a.st, /too few options/);
+        // orderings of ONE list are refused with a pointer to the Ordering type; the card stays as it was
+        const LISTY = { q: 'ข้อใดเรียงลำดับถูก', accepted: ['Penicillin, Streptomycin, Cephalosporin, Erythromycin, Vancomycin, 1. Penicillin → Streptomycin → Cephalosporin → Erythromycin → Vancomycin, extra'], options: ['Penicillin, Streptomycin, Cephalosporin, Erythromycin', 'Streptomycin, Penicillin, Cephalosporin, Vancomycin', 'Penicillin, Cephalosporin, Streptomycin, Vancomycin'], tiers: [0, 2, 1], unsafe: [0, 0, 0], why: ['ok', 'no', 'meh'] };
+        await draft('x', LISTY); a = await stOf(); assert.match(a.st, /orderings of one list/); assert.match(a.st, /Ordering type/);
+        // an over-long "accepted answer" is dropped as noise, the short ones stay
+        await draft('asthma first-line', { ...GOOD, accepted: ['salbutamol', 'albuterol, '.repeat(8), 'Ventolin'] });
+        c = await card(); assert.deepEqual(c.q.accepted, ['salbutamol', 'Ventolin'], 'accepted answers over 60 characters are dropped');
+
         const mine = errors.filter(e => /rank|Rank|addQuestionUI|getQuizFormData/.test(e)); assert.deepEqual(mine, [], 'no errors: ' + mine.join(' | '));
         console.log('PASS: Rank ✨ Draft — prompt contract, filled in place (position, timer, tags kept), AI-draft note drops on a level / ⚠ edit, best-first reshuffled with levels attached, bad draft / error / no topic leave the card untouched, 6-option cap, ledger label');
     } finally { await browser.close(); }
