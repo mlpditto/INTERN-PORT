@@ -4,8 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.473)</title>
-    <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
+    <title>Nika Admin (V102.475)</title>
+    <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
+    <link rel="stylesheet" href="drug-toolbar.css?v=V102.475">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
     <link rel="stylesheet" href="mypath-ui.css?v=V102.143">
@@ -16604,9 +16605,13 @@
             <div id="dxa-view-published">
                 <div class="dca-toolbar">
                     <input type="text" id="dxa-search" placeholder="Search by name, Thai name, ICD-10, or category…" oninput="dxaSearch()">
-                    <button type="button" class="dca-ai-draft-btn" onclick="dxaAutoDraftToggle()" title="Generate a starting draft with AI · admin verifies before save">🤖 AI Auto-Draft</button>
+                    <span class="ai-cap ai-cap-list">
+                        <button type="button" class="dca-ai-draft-btn aic-seg" onclick="dxaAutoDraftToggle()" title="Generate a starting draft with AI · admin verifies before save">🤖 AI Auto-Draft</button>
+                        <button type="button" id="dxa-ai-model-toggle" class="dxa-form-model-toggle" onclick="dxaToggleListModelRail()" aria-expanded="false" aria-controls="dxa-ai-models" title="Model for Auto-Draft — click to change"><span class="aic-two"><small>Auto-Draft model</small><span class="aic-row"><span class="dxa-model-logo" aria-hidden="true"></span><span id="dxa-ai-model-name">…</span><i class="fa-solid fa-chevron-down dxa-chev" aria-hidden="true"></i></span></span></button>
+                    </span>
                     <button type="button" class="dca-add-btn" onclick="dxaAddNew()">+ Add Disease</button>
                 </div>
+                <div id="dxa-ai-models" class="audit-toolbar lang-no-toggle dxa-form-model-rail" role="group" aria-label="Model for Auto-Draft" hidden></div>
 
                 <!-- V94.84 Phase 3: AI auto-draft input row. Hidden until 🤖 button clicked.
                      Enter disease name + pick model → calls window.callUniversalAI in JSON mode →
@@ -16660,12 +16665,14 @@
                     <span id="dxa-form-status-chip" class="dxa-status-chip" style="display:none;"></span>
                     <span id="dxa-form-doc-id" class="dxa-doc-id"></span>
                     <div class="dxa-form-actions">
-                        <button type="button" id="dxa-form-ai-fill-btn" class="dca-ai-draft-btn" style="display:none;" onclick="dxaAiFillEmptyFields()" title="AI fill empty fields — uses what is already in the form as its source" aria-label="AI fill empty fields">🤖</button>
-                        <button type="button" id="dxa-form-ai-review-btn" class="dca-ai-review-btn" style="display:none;" onclick="dxaAiReviewDraft()" title="AI Review — checks the entered disease data for factual / safety / consistency issues" aria-label="AI Review">🔍</button>
-                        <button type="button" id="dxa-form-copy-btn" class="dca-form-copy-btn" onclick="dxaCopyDiseaseAsMarkdown('all', this)" title="Copy this disease entry as Markdown (current form state)">📋</button>
+                        <span class="ai-cap" id="dxa-ai-cap" hidden><span class="sh" aria-hidden="true"></span>
+                        <button type="button" id="dxa-form-ai-fill-btn" class="dca-ai-draft-btn aic-seg" style="display:none;" onclick="dxaAiFillEmptyFields()" title="AI fill empty fields — uses what is already in the form as its source" aria-label="AI fill empty fields">🤖</button>
+                        <button type="button" id="dxa-form-ai-review-btn" class="dca-ai-review-btn aic-seg" style="display:none;" onclick="dxaAiReviewDraft()" title="AI Review — checks the entered disease data for factual / safety / consistency issues" aria-label="AI Review">🔍</button>
                         <div id="dxa-form-model-wrap" class="dxa-form-model-wrap" style="display:none;">
-                            <button type="button" id="dxa-form-model-toggle" class="dxa-form-model-toggle" onclick="dxaToggleFormModelRail()" aria-expanded="false" aria-controls="dxa-form-model-rail" title="Text model for AI fill · AI Review · AI ICD — tap to change"><span class="dxa-model-logo" aria-hidden="true"></span><span id="dxa-form-model-name">…</span><i class="fa-solid fa-chevron-down dxa-chev" aria-hidden="true"></i></button>
+                            <button type="button" id="dxa-form-model-toggle" class="dxa-form-model-toggle" onclick="dxaToggleFormModelRail()" aria-expanded="false" aria-controls="dxa-form-model-rail" title="Text model for AI fill · AI Review · AI ICD — tap to change"><span class="aic-two"><small>Fill and review</small><span class="aic-row"><span class="dxa-model-logo" aria-hidden="true"></span><span id="dxa-form-model-name">…</span><i class="fa-solid fa-chevron-down dxa-chev" aria-hidden="true"></i></span></span></button>
                         </div>
+                        </span>
+                        <button type="button" id="dxa-form-copy-btn" class="dca-form-copy-btn" onclick="dxaCopyDiseaseAsMarkdown('all', this)" title="Copy this disease entry as Markdown (current form state)">📋</button>
                         <!-- V102.132: ⓘ opens Updated / Contributors / the per-field authorship key (was two permanent rows) -->
                         <button type="button" id="dxa-form-info-toggle" class="dxa-form-info" onclick="dxaToggleFormMore()" aria-expanded="false" aria-controls="dxa-form-more" title="Updated · contributors · who wrote which field">ⓘ</button>
                     </div>
@@ -50211,7 +50218,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const selectedModel = window.dcaSelectedToolbarModel?.() || DCA_AI_FALLBACK_MODEL;
 
             if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
-            if (btn) { btn.disabled = true; btn.textContent = '⏳'; btn.title = 'Filling ' + emptyKeys.length + ' field' + (emptyKeys.length === 1 ? '' : 's') + '…'; }
+            if (btn) window.aiCapBusy(btn, 'Filling ' + emptyKeys.length + ' field' + (emptyKeys.length === 1 ? '' : 's') + '…');   // V102.475: flipping ⏳ + elapsed time
 
             const prompt = dcaBuildAiFillPrompt(current, emptyKeys);
 
@@ -50289,7 +50296,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     errEl.textContent = 'AI fill failed: ' + (err && err.message ? err.message : 'unknown error');
                 }
             } finally {
-                if (btn) { btn.disabled = false; btn.textContent = '🤖'; }
+                if (btn) window.aiCapEnd(btn, '🤖', errEl);
             }
         }
 
@@ -50428,7 +50435,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const selectedModel = (opts && opts.other && window.dcaAiTrail && window.dcaAiTrail.other()) || window.dcaSelectedToolbarModel?.() || DCA_AI_FALLBACK_MODEL;
 
             if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
-            if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+            if (btn) window.aiCapBusy(btn);   // V102.475
 
             // V96.95: field-completeness context for the score rubric (deterministic,
             // same field set the prompt reviews — excludes the genericName anchor).
@@ -50526,7 +50533,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 console.error('[drug-codex] AI review failed:', err);
                 if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'AI Review failed: ' + (err && err.message ? err.message : 'unknown error'); }
             } finally {
-                if (btn) { btn.disabled = false; btn.textContent = '🔍'; }
+                if (btn) window.aiCapEnd(btn, '🔍', errEl);
             }
         }
 
@@ -51088,6 +51095,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 if (hidden) hidden.value = el.dataset.value;
             }
             try { localStorage.setItem(DXA_AI_LS_KEY, el.dataset.value); } catch (_) {}
+            dxaRenderListModelChip();   // V102.475
+            const cap = document.getElementById('dxa-ai-cap'); if (cap && !cap.hidden) dxaRenderFormModelRail();
         }
 
         function dxaSyncAutoDraftChipFromStorage() {
@@ -51103,6 +51112,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (!target) return;
             chips.forEach(c => c.classList.toggle('active', c === target));
             hidden.value = target.dataset.value;
+            dxaRenderListModelChip();   // V102.475
         }
 
         async function dxaAutoDraftGo() {
@@ -51774,6 +51784,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // Toggle the two AI buttons in the disease form header. Shown on Edit +
         // Review-draft; hidden on Add New (auto-draft already covers blank forms).
         function dxaShowAiButtons() {
+            const cap = document.getElementById('dxa-ai-cap'); if (cap) cap.hidden = false;   // V102.475
             const b = document.getElementById('dxa-form-ai-fill-btn');
             if (b) { b.style.display = 'inline-flex'; b.disabled = false; b.textContent = '🤖'; }
             const r = document.getElementById('dxa-form-ai-review-btn');
@@ -51781,6 +51792,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dxaRenderFormModelRail();
         }
         function dxaHideAiButtons() {
+            const cap = document.getElementById('dxa-ai-cap'); if (cap) cap.hidden = true;   // V102.475
             const b = document.getElementById('dxa-form-ai-fill-btn');
             if (b) { b.style.display = 'none'; b.disabled = false; b.textContent = '🤖'; }
             const r = document.getElementById('dxa-form-ai-review-btn');
@@ -51813,7 +51825,29 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             document.getElementById('dxa-ai-model-val').value = btn.dataset.value;
             window.syncRegistryModelSelect?.('dxa-ai-model-val');
             dxaRenderFormModelRail();   // redraws the rail, the chip label + logo, and closes the rail
+            dxaRenderListModelChip();   // V102.475: the list page chip shows the same model
         }
+        // V102.475: the Auto-Draft model chip on the list page (split off the 🤖 AI Auto-Draft button) — same hidden input (#dxa-ai-model-val) as the form chip and the panel rail.
+        function dxaRenderListModelChip() {
+            const chip = document.getElementById('dxa-ai-model-toggle'), rail = document.getElementById('dxa-ai-models');
+            if (!chip || !rail || typeof window.textAIChipContents !== 'function') return;
+            const selected = textAIModel('dxa-ai-model-val');
+            rail.innerHTML = window.providerModelRailHtml
+                ? window.providerModelRailHtml('dxa-list-model-pick', selected, 'dxaPickFormModel(this)')
+                : '<div class="text-ai-chips" role="group" aria-label="AI model">' + window.textAIChipContents(selected, 'dxaPickFormModel(this)') + '</div>';
+            rail.hidden = true; chip.setAttribute('aria-expanded', 'false');
+            const chosen = (window.TEXT_AI_MODELS || []).find(m => m.id === selected);
+            const name = document.getElementById('dxa-ai-model-name'), logo = chip.querySelector('.dxa-model-logo');
+            if (name) name.textContent = chosen ? (chosen.short || chosen.label) : selected;
+            if (logo) logo.innerHTML = window.aiModelLogoHtml ? window.aiModelLogoHtml(selected) : '';
+        }
+        function dxaToggleListModelRail(force) {
+            const rail = document.getElementById('dxa-ai-models'), chip = document.getElementById('dxa-ai-model-toggle');
+            if (!rail || !chip) return;
+            const open = typeof force === 'boolean' ? force : rail.hidden;
+            rail.hidden = !open; chip.setAttribute('aria-expanded', String(open));
+        }
+        document.addEventListener('DOMContentLoaded', () => setTimeout(dxaRenderListModelChip, 0));
         // V102.132: ⓘ details panel (Updated · Contributors · authorship key)
         function dxaSetMore(open) {
             const more = document.getElementById('dxa-form-more'), btn = document.getElementById('dxa-form-info-toggle');
@@ -52009,7 +52043,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
             const selectedModel = dxaTextModel(); // V101.35: the visible rail, not a silent localStorage read
             if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
-            if (btn) { btn.disabled = true; btn.textContent = '⏳'; btn.title = 'Filling ' + emptyKeys.length + ' field' + (emptyKeys.length === 1 ? '' : 's') + '…'; }
+            if (btn) window.aiCapBusy(btn, 'Filling ' + emptyKeys.length + ' field' + (emptyKeys.length === 1 ? '' : 's') + '…');   // V102.475
             const prompt = dxaBuildAiFillPrompt(current, emptyKeys);
             try {
                 const resp = await window.callUniversalAI(selectedModel, prompt, true, null, '', { feature: 'disease_aifill' });
@@ -52057,7 +52091,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 console.error('[disease-codex] AI fill failed:', err);
                 if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'AI fill failed: ' + (err && err.message ? err.message : 'unknown error'); }
             } finally {
-                if (btn) { btn.disabled = false; btn.textContent = '🤖'; }
+                if (btn) window.aiCapEnd(btn, '🤖', errEl);
             }
         }
 
@@ -52148,7 +52182,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // V102.389: { other: true } = the 🔁 in the review panel → a model from a different provider than the filler / earlier checkers (the rail is left alone)
             const selectedModel = (opts && opts.other && window.dxaAiTrail && window.dxaAiTrail.other()) || dxaTextModel(); // V101.35: the visible rail, not a silent localStorage read
             if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
-            if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+            if (btn) window.aiCapBusy(btn);   // V102.475
             const prompt = dxaBuildReviewPrompt(current, filledLines, internContext);
             try {
                 const resp = await window.callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768, feature: 'disease_ai_review' });
@@ -52194,7 +52228,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 console.error('[disease-codex] AI review failed:', err);
                 if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'AI Review failed: ' + (err && err.message ? err.message : 'unknown error'); }
             } finally {
-                if (btn) { btn.disabled = false; btn.textContent = '🔍'; }
+                if (btn) window.aiCapEnd(btn, '🔍', errEl);
             }
         }
 
@@ -75412,7 +75446,8 @@ Summarize in English in 3–5 concise lines:
     })();
     </script>
 <script src="history-review.js?v=V99.88"></script>
-<script src="drug-toolbar.js?v=V102.328"></script>
+<script src="ai-capsule.js?v=V102.475"></script>
+<script src="drug-toolbar.js?v=V102.475"></script>
 <script src="drug-form-ui.js?v=V102.135"></script>
 <script src="drug-list-ui.js?v=V102.136"></script>
 <script src="mypath-ui.js?v=V102.391"></script>
