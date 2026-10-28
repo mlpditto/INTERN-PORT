@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.460)</title>
+    <title>Nika Admin (V102.461)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -41022,6 +41022,65 @@ They can connect again from LINE.
             });
         }
 
+        // V102.461: "⬇ All (ZIP)" on an event's stamp list — every stamped person's "+ name & person" PNG in one file.
+        // A store-only ZIP written by hand (PNG is already compressed, so nothing is gained by deflating): no library to load.
+        const ZIP_CRC = (() => { const T = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; T[n] = c >>> 0; } return T; })();
+        function zipCrc32(u8) { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = ZIP_CRC[(c ^ u8[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+        function zipStore(files) {   // files: [{ name, data: Uint8Array }] → Blob
+            const enc = new TextEncoder(), parts = [], central = [];
+            let off = 0;
+            files.forEach(f => {
+                const name = enc.encode(f.name), crc = zipCrc32(f.data), n = f.data.length;
+                const h = new DataView(new ArrayBuffer(30));
+                h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(8, 0, true);   // 0x0800 = UTF-8 names, 0 = stored
+                h.setUint16(10, 0, true); h.setUint16(12, 0x21, true); h.setUint32(14, crc, true); h.setUint32(18, n, true); h.setUint32(22, n, true); h.setUint16(26, name.length, true); h.setUint16(28, 0, true);
+                parts.push(h.buffer, name, f.data);
+                const c = new DataView(new ArrayBuffer(46));
+                c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true); c.setUint16(10, 0, true);
+                c.setUint16(12, 0, true); c.setUint16(14, 0x21, true); c.setUint32(16, crc, true); c.setUint32(20, n, true); c.setUint32(24, n, true); c.setUint16(28, name.length, true);
+                c.setUint32(42, off, true);
+                central.push(c.buffer, name);
+                off += 30 + name.length + n;
+            });
+            const cdSize = central.reduce((s, x) => s + (x.byteLength !== undefined ? x.byteLength : x.length), 0);
+            const e = new DataView(new ArrayBuffer(22));
+            e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, cdSize, true); e.setUint32(16, off, true);
+            return new Blob([...parts, ...central, e.buffer], { type: 'application/zip' });
+        }
+
+        let evZipBusy = false;
+        async function evExportAllStamps(eventId, btn) {
+            const ev = eventsCache.find(x => x.id === eventId);
+            const stamps = eventStampsCache.filter(s => s.eventId === eventId);
+            if (!ev || !stamps.length || evZipBusy) return;
+            evZipBusy = true;
+            const label = btn ? btn.textContent : '';
+            const files = [], used = new Set();
+            let noPhoto = 0;
+            try {
+                for (let i = 0; i < stamps.length; i++) {
+                    if (btn) btn.textContent = '⏳ ' + (i + 1) + '/' + stamps.length;
+                    const s = stamps[i], u = (usersData || []).find(x => x.id === s.userId) || {};
+                    const st = { kind: 'stamp', badge: s.badge || ev.badge, eventDate: s.eventDate || ev.eventDate, title: s.title || ev.title || '', person: u.displayName || s.displayName || '', avatar8: u.avatar8 || '', pictureUrl: u.pictureUrl || '', avatar: u.avatar8 ? '8bit' : (u.pictureUrl ? 'photo' : 'none'), layout: 'person' };
+                    let blob;
+                    try { blob = await badgeExportPng(st); }
+                    catch (err) { if (st.avatar !== 'photo') throw err; noPhoto++; st.avatar = 'none'; blob = await badgeExportPng(st); }   // a LINE photo that will not load → the badge without the face, not a failed batch
+                    let name = badgeExportFileName(st);
+                    for (let k = 2; used.has(name); k++) name = badgeExportFileName(st).replace(/\.png$/, '-' + k + '.png');
+                    used.add(name);
+                    files.push({ name, data: new Uint8Array(await blob.arrayBuffer()) });
+                }
+                const slug = String(ev.title || 'event').toLowerCase().replace(/[^a-z0-9฀-๿]+/g, '-').replace(/^-+|-+$/g, '') || 'event';
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(zipStore(files));
+                a.download = slug + '-' + (ev.eventDate || '') + '.zip';
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+                showToast(files.length + ' badges zipped' + (noPhoto ? ' · ' + noPhoto + ' without a photo (it would not load)' : ''));
+            } catch (e) { alert('Could not zip the badges: ' + e.message); }
+            finally { evZipBusy = false; if (btn) btn.textContent = label; }
+        }
+
         function openBadgeExport(st) {
             closeUserBadgesPop();
             badgeExportState = st;
@@ -65146,6 +65205,7 @@ Save it anyway?`;
                     <span><b>${stamps.length}</b> stamped${code ? ` · <b style="font-family:ui-monospace, monospace; letter-spacing:2px; color:#7a5600;" title="Claim code — works on the event day only">${escapeHtml(code)}</b>` : ''}</span>
                     <span style="flex:1;"></span>
                     <button type="button" class="grp-chip" style="--c:#7c3aed; padding:2px 9px;" onclick="evOpenGivePicker('${e.id}')" title="Give the stamp to any active user">🎁 Give to…</button>
+                    ${stamps.length ? `<button type="button" class="grp-chip" style="--c:#0f766e; padding:2px 9px;" onclick="evExportAllStamps('${e.id}', this)" title="Download every stamped person's badge (name &amp; person) as one ZIP">⬇ All (ZIP)</button>` : ''}
                     <button type="button" class="grp-chip" style="--c:#64748b; padding:2px 8px;" onclick="openEventBlankExport('${e.id}')" title="Export this event stamp blank (no person) as PNG" aria-label="Export blank stamp as PNG">⬇</button>
                 </div>
                 <div style="display:flex; flex-wrap:wrap; align-items:center; gap:2px; margin-top:6px;" title="Green = you gave it · gold = used the code · dashed grey = asked to join, no stamp yet">${chips.join('')}</div>
