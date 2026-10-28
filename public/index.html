@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.226)</title>
+    <title>Internship Portfolio (V101.227)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.216">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -1028,6 +1028,13 @@
         #quizPreviewSheet .qzp-chip { display:inline-flex; align-items:center; gap:5px; padding:5px 11px; border-radius:999px; background:#f1f5f9; color:#334155; font-weight:700; font-size:.82em; white-space:nowrap; }
         #quizPreviewSheet .qzp-chip.tag { background:#eef2ff; color:#4338ca; }
         #quizPreviewSheet .qzp-chip.mine { background:#ecfdf5; color:#047857; border:1px solid #6ee7b7; }
+        #quizPreviewSheet .qzp-cd { font-variant-numeric: tabular-nums; }
+        #quizPreviewSheet .qzp-cd[hidden] { display:none; }
+        #quizPreviewSheet .qzp-cd[data-tier="red"] { background:#dc2626; color:#fff; box-shadow:0 1px 4px rgba(220,38,38,.35); }
+        #quizPreviewSheet .qzp-cd[data-tier="amber"] { background:#fef3c7; color:#92400e; border:1px solid #f59e0b; }
+        #quizPreviewSheet .qzp-cd[data-pulse="1"] { animation: qzCdPulse 1.6s ease-in-out infinite; }
+        @keyframes qzCdPulse { 0%, 100% { opacity: 1; } 50% { opacity: .72; } }
+        @media (prefers-reduced-motion: reduce) { #quizPreviewSheet .qzp-cd[data-pulse="1"], .quiz-cta-countdown { animation: none !important; } }
         #quizPreviewSheet .qzp-note { margin:0 2px 14px; color:#94a3b8; font-size:.78em; }
         #quizPreviewSheet .qzp-foot { display:flex; gap:10px; align-items:center; justify-content:flex-end; }
         #quizPreviewSheet .qzp-start { flex:1; width:auto; margin:0; padding:12px 18px; border:none; border-radius:14px; background:linear-gradient(135deg,#16a34a,#22c55e); color:#fff; font-weight:800; font-size:1em; cursor:pointer; }
@@ -2461,7 +2468,7 @@
 <script src="monthly-progress.js?v=V101.79"></script><link rel="stylesheet" href="monthly-progress.css?v=V101.39">
 <script src="assigned-goals.js?v=V100.30"></script><link rel="stylesheet" href="assigned-goals.css?v=V100.30">
 <link rel="stylesheet" href="quiz-user-focus.css?v=V101.223"><script defer src="rank-quiz.js?v=V101.222"></script><script defer src="quiz-term-highlight.js?v=V101.207"></script><script defer src="quiz-feedback-lang.js?v=V101.96"></script><script defer src="quiz-feedback-ai.js?v=V101.96"></script><script defer src="quiz-feedback-remind.js?v=V101.176"></script>
-<link rel="stylesheet" href="quiz-cover.css?v=V101.188">
+<link rel="stylesheet" href="quiz-cover.css?v=V101.227">
 <link rel="stylesheet" href="case-insight-rail.css?v=V101.59">
 <script src="quiz-cover.js?v=V101.188"></script>
 <script src="activity-rewards.js?v=V101.84"></script><link rel="stylesheet" href="activity-rewards.css?v=V101.43">
@@ -12823,7 +12830,8 @@
             if (q.totalPoints) chips.push('<span class="qzp-chip" title="Points · คะแนนเต็ม · 만점">🎯 ' + e(String(q.totalPoints)) + ' pts</span>');
             if (q.quizType === 'read_only') chips.push('<span class="qzp-chip" title="Learning mode · โหมดเรียนรู้ · 학습 모드">📖 Learning</span>');
             const dl = q.deadline && q.deadline.toDate ? q.deadline.toDate() : null;
-            if (dl) chips.push('<span class="qzp-chip" title="Deadline · กำหนดส่ง · 마감">⏰ ' + e(dl.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })) + '</span>');
+            if (dl) chips.push('<span class="qzp-chip" title="Deadline · กำหนดส่ง · 마감">⏰ ' + e(dl.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })) + '</span>')
+            { const att0 = quizAttemptsCache && quizAttemptsCache[q.id]; if (dl && dl.getTime() > Date.now() && (!att0 || !att0.status || att0.status === 'none')) chips.push('<span class="qzp-chip qzp-cd" data-dead="' + dl.getTime() + '" hidden></span>'); }   // V101.227: ticks like the card chip;
             const mats = (Array.isArray(q.materials) ? q.materials : []).filter(function (m) { return m && /^https?:\/\//i.test(String(m.url || '').trim()); });
             if (mats.length) chips.push('<span class="qzp-chip" title="Files · เอกสารประกอบ · 자료">📎 ' + mats.length + (mats.length === 1 ? ' file' : ' files') + '</span>');
             const taken = card && card.querySelector('.quiz-done-count');
@@ -24323,6 +24331,24 @@
             }
         }
 
+        // V101.227: the words of the deadline chip for `diff` ms left. >72 h → no chip; 24–72 h amber "N d H h"; under 24 h red "H h M m", under an hour "N m",
+        // under a minute "<1 m". No seconds on purpose (no jitter, no per-second repaint). The aria text spells it out; pulse only under 3 h.
+        function qzCountdownInfo(diff) {
+            const H = 3600000, D = 24 * H;
+            if (!(diff > 0) || diff > 3 * D) return { tier: 'none', text: '', aria: '', pulse: false };
+            const U = window.uiText || (s => String(s).split('|')[0]);
+            const d = Math.floor(diff / D), h = Math.floor((diff % D) / H), m = Math.floor((diff % H) / 60000);
+            if (diff >= D) return { tier: 'amber', pulse: false, text: '⏳ ' + U(`Closes in ${d} d ${h} h|เหลือ ${d} วัน ${h} ชม.|${d}일 ${h}시간 남음`),
+                aria: U(`Closes in ${d} days ${h} hours|เหลือเวลา ${d} วัน ${h} ชั่วโมง|마감까지 ${d}일 ${h}시간`) };
+            const hh = Math.floor(diff / H);
+            if (hh >= 1) return { tier: 'red', pulse: diff <= 3 * H, text: '⏰ ' + U(`Closes in ${hh} h ${m} m|เหลือ ${hh} ชม. ${m} น.|${hh}시간 ${m}분 남음`),
+                aria: U(`Closes in ${hh} hours ${m} minutes|เหลือเวลา ${hh} ชั่วโมง ${m} นาที|마감까지 ${hh}시간 ${m}분`) };
+            if (m >= 1) return { tier: 'red', pulse: true, text: '⏰ ' + U(`Closes in ${m} m|เหลือ ${m} น.|${m}분 남음`),
+                aria: U(`Closes in ${m} minutes|เหลือเวลา ${m} นาที|마감까지 ${m}분`) };
+            return { tier: 'red', pulse: true, text: '⏰ ' + U('Closes in <1 m|เหลือไม่ถึง 1 น.|1분 미만 남음'), aria: U('Closes in under a minute|เหลือเวลาไม่ถึงหนึ่งนาที|마감까지 1분 미만') };
+        }
+        window.qzCountdownInfo = qzCountdownInfo;
+
         function checkExpiry() {
             const now = Date.now();
 
@@ -24338,47 +24364,34 @@
                 }
             });
 
-            // Quiz CTA countdown (V96.65 in-button; V96.70 urgency tiers). Colour,
-            // icon, format, the parent button's gradient, and a left stripe on the
-            // whole card all escalate as the deadline nears. Language-neutral text,
-            // so no lang-toggle concern. On expiry the card re-renders to the orange
-            // "ทำเลทได้เลย" CTA on the next data tick; until then reset the chrome.
+            // Quiz deadline countdown (V96.65 in-button; V96.70 tiers; V101.227 chip). One chip per quiz card (the cover meta line, or inside the Start
+            // button when the card keeps its footer) plus one on the preview sheet. Red under 24 h, amber 24–72 h, nothing beyond 3 days; the words change with
+            // the UI language on the next tick (uiLang), the text is written only when it changed (no repaint every second), and the button gradient / left
+            // stripe of the card follow the same tiers.
             const CTA_BLUE = 'linear-gradient(135deg, #4361ee 0%, #4cc9f0 100%)';
             const CTA_AMBER = 'linear-gradient(135deg, #f39c12 0%, #e67e22 100%)';
             const CTA_RED = 'linear-gradient(135deg, #e24b4a 0%, #a32d2d 100%)';
-            document.querySelectorAll('.quiz-cta-countdown').forEach(el => {
+            document.querySelectorAll('.quiz-cta-countdown, .qzp-cd').forEach(el => {
                 const diff = parseInt(el.dataset.dead) - now;
                 const btn = el.closest('.btn-quiz-cta');
                 const card = el.closest('.assignment-card');
                 if (diff <= 0) {
+                    el._qzSig = '';
+                    el.hidden = false; delete el.dataset.tier; delete el.dataset.pulse; el.removeAttribute('aria-label');
                     el.textContent = el.classList.contains('quiz-cover-deadline') ? '⏱ Late' : ''; el.style.animation = '';
                     if (card) card.style.boxShadow = '';
                     return;
                 }
-                const h = Math.floor(diff / 3600000);
-                const m = Math.floor((diff % 3600000) / 60000);
-                const s = Math.floor((diff % 60000) / 1000);
-                // V96.74: one distinct emoji per tier (was 3 FA icons, hourglass +
-                // fire each repeated). calm 🗓️ · notice ⏳ · urgent ⏰ · crunch ⚡ · final 🔥
-                let emoji = '🗓️', text = `${h}h ${m}m`, color = '', blink = false;
-                let btnBg = CTA_BLUE, btnRing = '', stripe = '';
-                if (diff <= 300000) {              // < 5m — final
-                    emoji = '🔥'; text = `${m}:${s < 10 ? '0' : ''}${s}`; color = '#fff'; blink = true;
-                    btnBg = CTA_RED; stripe = '#a32d2d';
-                } else if (diff <= 3600000) {      // < 1h — crunch
-                    emoji = '⚡'; text = `${m}m`; color = '#fff'; blink = true;
-                    btnBg = CTA_RED; stripe = '#a32d2d';
-                } else if (diff <= 10800000) {     // 1–3h — urgent
-                    emoji = '⏰'; color = '#fff'; btnBg = CTA_AMBER; stripe = '#e67e22';
-                } else if (diff <= 43200000) {     // 3–12h — notice
-                    emoji = '⏳'; color = '#fcd34d'; btnRing = 'inset 0 0 0 2px #f59e0b'; stripe = '#f59e0b';
+                const c = qzCountdownInfo(diff);
+                const sig = c.tier + '|' + c.text + '|' + c.pulse + '|' + window.uiLang();
+                if (el._qzSig !== sig) {
+                    el._qzSig = sig;
+                    el.textContent = c.text; el.dataset.tier = c.tier; el.hidden = c.tier === 'none';
+                    if (c.pulse) el.dataset.pulse = '1'; else delete el.dataset.pulse;
+                    if (c.aria) { el.setAttribute('aria-label', c.aria); el.setAttribute('role', 'timer'); } else { el.removeAttribute('aria-label'); el.removeAttribute('role'); }
                 }
-                el.innerHTML = `${emoji} ${text}`;
-                el.style.color = color;
-                el.style.opacity = color ? '1' : '0.85';
-                el.style.animation = blink ? 'ctaUrgentPulse 1.1s ease-in-out infinite' : '';
-                if (btn) { btn.style.background = btnBg; btn.style.boxShadow = btnRing; }
-                if (card) card.style.boxShadow = stripe ? `inset 4px 0 0 ${stripe}` : '';
+                if (btn) { btn.style.background = c.tier === 'red' ? CTA_RED : c.tier === 'amber' ? CTA_AMBER : CTA_BLUE; btn.style.boxShadow = ''; el.style.color = c.tier === 'none' ? '' : '#fff'; }
+                if (card) card.style.boxShadow = c.tier === 'red' ? 'inset 4px 0 0 #dc2626' : c.tier === 'amber' ? 'inset 4px 0 0 #f59e0b' : '';
             });
 
             // Timer

@@ -9,6 +9,7 @@ Intern: home ▸ Mission ▸ a quiz card ▸ Start.
 ## Scripts that drive it
 
 - `quiz-cover-fold-qa` — corner fold on a not-started cover; ▶ pulses twice; "nobody yet" gold
+- `quiz-deadline-chip-qa` — deadline chip on the quiz card + preview sheet: red <24 h (pulse last 3 h), amber 24–72 h, none beyond 3 days; EN/TH/KO; no DOM writes while unchanged
 - `quiz-card-details-toggle-qa` — "✦ Be the first" call; Details is a ▾ button
 - `quiz-done-count-qa` — "👥 n" did it + your own avatar only (live users rule applied)
 - `quiz-material-ribbon-qa` — pre-quiz materials ribbon on the cover, floating list for several

@@ -149,11 +149,10 @@
             S.loaded = true;
         }).catch(function (e) { S.err = (e && e.message) || 'Could not load the articles.'; }).then(function () { S.loading = false; render(); });
     }
+    // V102.481 (owner): the newest article is on top — by the day it goes (went) live, whatever its status; the status chips above still filter
     function sorted(now) {
-        var rank = { live: 0, scheduled: 1, draft: 2, ended: 3 };
         return S.list.filter(function (a) { return (S.filter === 'all' || status(a, now) === S.filter) && (!S.tag || (a.tags || []).indexOf(S.tag) >= 0); }).sort(function (x, y) {
-            var a = status(x, now), b = status(y, now);
-            return rank[a] - rank[b] || (a === 'ended' ? (y.endAt || 0) - (x.endAt || 0) : (x.startAt || 0) - (y.startAt || 0));
+            return ((y.startAt || 0) - (x.startAt || 0)) || ((msOf(y.createdAt) || 0) - (msOf(x.createdAt) || 0)) || String((x.title || {}).en || '').localeCompare(String((y.title || {}).en || ''));
         });
     }
     function editorEmail() {
