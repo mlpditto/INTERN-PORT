@@ -49,7 +49,7 @@ check('browse: Grok tab shows only the Grok trial chip', chipEls.filter(c => !c.
 check('css: Grok tab colour', css.includes('.audit-provider[data-provider="Grok"]{color:#d4d4d8}'), true);
 check('css: Ollama tab is a logo (V102.82), not a name tab', css.includes('.text-ai-logo[data-owner="ollama"]{background-image:url(assets/logos/ollama-white.svg)}') && !css.includes('[data-provider="Ollama"]'), true);
 check('browse: Ollama is a trial-only text tab after Grok and Kimi', tabs.map(t => t[0]).slice(-3).join('|'), 'Grok|Kimi|Ollama');
-check('css: OpenRouter grape border survives the toolbar button rule (V102.14)', css.includes('.audit-toolbar .text-ai-chips>button[data-value^="or/"]:not([aria-pressed="true"]){border-color:var(--or-grape)}'), true);
+check('css: the toolbar no longer paints an OpenRouter grape border (V102.487 lean rail: a violet dot instead)', css.includes('.audit-toolbar .text-ai-chips>button[data-value^="or/"]:not([aria-pressed="true"]){border-color:var(--or-grape)}'), false);
 check('admin cache-busts audit-toolbar.css', /audit-toolbar\.css\?v=V\d+\.\d+/.test(admin) && !/audit-toolbar\.css\?v=V100\.12/.test(admin), true);
 
 let fail = 0;

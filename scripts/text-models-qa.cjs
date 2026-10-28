@@ -48,8 +48,8 @@ const { chromium } = require('playwright');
                 for (const value of ['as/gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gpt-6-luna']) {
                     await rail.locator(`[data-value="${value}"]`).evaluate(b => b.click());
                     assert.equal(await rail.locator('.active').count(), 1);
-                    assert.equal(await rail.locator('[aria-pressed="true"]').count(), 1);
-                    assert.equal(await rail.locator('[aria-pressed="true"]').getAttribute('data-value'), value);
+                    assert.equal(await rail.locator('[data-value][aria-pressed="true"]').count(), 1);   // V102.487: the vendor tab is pressed too
+                    assert.equal(await rail.locator('[data-value][aria-pressed="true"]').getAttribute('data-value'), value);
                     assert.equal(await page.locator('#' + id).inputValue(), value);
                     // V102.13: the pick is the vendor colour, solid, white name (was the one amber) — still exactly one
                     // (the rail sits in a closed popover here, so a lift/transform would not read).
@@ -64,13 +64,13 @@ const { chromium } = require('playwright');
         for (const id of controls) {
             const rail = page.locator(`[data-model-input="${id}"]`);
             assert.equal(await rail.count(), 1, id);
-            assert.deepEqual(await rail.locator('button').evaluateAll(bs => bs.map(b => b.dataset.value)), ids, id);
+            assert.deepEqual(await rail.locator('button[data-value]').evaluateAll(bs => bs.map(b => b.dataset.value)), ids, id);   // V102.487: vendor tabs are buttons too
             for (const model of ids) {
                 await rail.locator(`button[data-value="${model}"]`).evaluate(b => b.click());
                 assert.equal(await page.locator('#' + id).inputValue(), model, id);
-                assert.equal(await rail.locator('[aria-pressed="true"]').count(), 1, id);
+                assert.equal(await rail.locator('[data-value][aria-pressed="true"]').count(), 1, id);
             }
-            assert(await rail.locator('button').evaluateAll(bs => bs.every(b => /[ก-๙]/.test(b.title))), id);
+            assert(await rail.locator('button[data-value]').evaluateAll(bs => bs.every(b => /[ก-๙]/.test(b.title))), id);
         }
         // data-native-model selects are compact: full catalog + persisted choice, no chip rail.
         for (const [id, key] of [['alabasta-case-card-refine-model', 'ai_default_casecard_refine_model']]) {
