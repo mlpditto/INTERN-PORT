@@ -172,7 +172,7 @@ function checkScheduler() {
     try {
         const jobs = JSON.parse(gcloud(['scheduler', 'jobs', 'list', '--location', REGION, '--project', PROJECT, '--format=json(name,state,status,lastAttemptTime)']));
         const off = jobs.filter(j => j.state !== 'ENABLED').map(j => j.name.split('/').pop());
-        const failing = jobs.filter(j => j.status && j.status.code).map(j => j.name.split('/').pop().replace(/^firebase-schedule-|-us-central1$/g, ''));
+        const failing = jobs.filter(j => j.status && j.status.code && j.lastAttemptTime).map(j => j.name.split('/').pop().replace(/^firebase-schedule-|-us-central1$/g, ''));
         add('SCHED', `Scheduled jobs (${jobs.length})`, off.length || failing.length ? WARN : OK,
             [off.length && 'not enabled: ' + off.join(', '), failing.length && 'last run failed: ' + failing.join(', ')].filter(Boolean).join(' · ') || 'all enabled, last runs OK');
     } catch (_) {
