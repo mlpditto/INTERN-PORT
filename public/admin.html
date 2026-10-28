@@ -70553,7 +70553,16 @@ ${window.clinicalAngleBlock ? window.clinicalAngleBlock() : ''}${steerBlock}
         };
 
         window._compareModelMeta = function(modelId) {
-            const current = window.TEXT_AI_MODELS.find(m => m.id === modelId);
+            // V102.486: textAIModelInfo also knows the trial models (Kimi, Grok, Ollama), so their badge names the model instead of falling back to "AI"
+            // The proxy echoes the provider's own model name (Gemini's `modelVersion`, e.g. "gemini-4-argon-001"), not our catalogue id ("as/gemini-4-argon"):
+            // match on the catalogue id without its route prefix, longest first, so "-lite" / "-001" suffixes still name the right model.
+            const current = window.textAIModelInfo(modelId) || (() => {
+                const echoed = String(modelId || '').toLowerCase().replace(/^(as|or)\//, '');
+                return window.TEXT_AI_MODELS
+                    .map(x => ({ x, bare: x.id.toLowerCase().replace(/^(as|or)\//, '') }))
+                    .sort((a, b) => b.bare.length - a.bare.length)
+                    .find(({ bare }) => echoed === bare || echoed.startsWith(bare + '-'))?.x;
+            })();
             if (current) return { label: current.label, emoji: '✦', color: '#d97706' };
             const m = String(modelId || '').toLowerCase();
             if (m.includes('mimo')) return { label: 'MiMo', emoji: '📱', color: '#f97316' };
