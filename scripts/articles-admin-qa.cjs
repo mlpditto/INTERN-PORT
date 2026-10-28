@@ -187,7 +187,7 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
     assert.deepEqual(r.add.slice(0, 3), ['add', 'articles', 'scheduled'], '📅 Schedule adds an articles doc with status scheduled');
     assert.deepEqual(r.add[3], { en: '3 inhaler mistakes' }); assert.deepEqual(r.add[4], { divisions: ['RSU'], groups: ['INTERN 1'] }); assert.deepEqual(r.add[5], ['quiz:q1', 'codex:d1']);
     assert.equal(r.add[6], 'any'); assert.equal(r.add[7], true); assert.deepEqual([r.add[8], r.add[9]], ['TS', 'TS'], 'createdAt + updatedAt are server timestamps'); assert.deepEqual(r.add[10], { emoji: '🫁' });
-    assert.equal(r.afterAdd[0], 'new1'); assert.match(r.afterSave, /Saved/, 'after 📅 Schedule the status line says Saved: ' + r.afterSave); assert.equal(r.afterAdd[1], 4, 'the new article joins the list'); assert.deepEqual(r.afterAdd[2], ['🗑', '↩ Back to draft', '💾 Save']);
+    assert.equal(r.afterAdd[0], 'new1'); assert.match(r.afterSave, /Saved/, 'after 📅 Schedule the status line says Saved: ' + r.afterSave); assert.equal(r.afterAdd[1], 4, 'the new article joins the list'); assert.deepEqual(r.afterAdd[2], ['🗑', '↩ Back to draft', '✓ Saved'], 'after Schedule the pressed button reads ✓ Saved (green) until the next edit');
     assert.deepEqual(r.update, ['update', 'new1', 'draft', false], '↩ Back to draft updates the same doc (createdAt untouched)');
     assert.deepEqual(r.thDraft, { en: 'Draft one', th: 'ร่าง' }, 'a draft may be saved with any language');
     assert.deepEqual(r.armed, ['Delete?', true], 'the first 🗑 tap only arms the button'); assert.deepEqual(r.deleted, ['delete', 'a3', false, false], 'the second deletes and closes the editor');
