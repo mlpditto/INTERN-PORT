@@ -14,6 +14,7 @@
 | **SMOKE-ADMIN** | Try admin V102.46 → V102.48 (language button, feedback labels, issues) and check the ❌ quiz | ⬜ open | 2 |
 | **RIVER** | River flow C.2 / C.13 / C.29B (V101.56): functions deployed 2026-10-03 and first run OK (`C.2=2186 C.13=2500 C.29B=2382`); remaining: merge #1565 so the card shows it, then look at it on a phone in LINE | ⬜ open — merge + phone check | 2 |
 | **DEADLINE-ALERTS** | Quiz deadline LINE alerts (admin V102.480): deploy `firestore:rules` and `functions:notifyQuizDeadlines` after merge; then watch the first day of `line_usage` | ⬜ open — after merge | 2 |
+| **LINE-WATCH** | Deploy `watchLineQuota` (daily LINE quota check + mail when the tier rises) | ⬜ open — code merged, not deployed | 2 |
 | **CLOUD** | Finish the Claude Code on the web setup at claude.ai/code | ⬜ optional | 3 |
 | FN | Every exported Cloud Function is deployed and ACTIVE | ✅ *script* (25/25 on 2026-09-30) | — |
 | RULES | `firestore.rules` / `storage.rules` identical to live | ✅ *script* | — |
@@ -88,6 +89,11 @@ Both issues were **closed on 2026-09-30** at the owner's request (by Claude Code
 3. Admin → Quiz Engine → tick 2+ quizzes → Compare: each ≈% badge gets a lilac chip — `Jev ✓ 92%` = same fact, `Jev ✗` = different, `Jev ?` = not sure. Hover for the numbers. Nothing is written because of a chip. Cost shows in OpenRouter → Activity.
 4. Kill switch: `quiz_dup_scores/_config` → `{ enabled: false }` (console). To go straight to TypeSafe instead: `{ provider: 'typesafe' }` AND add `JEV_API_KEY` to the function's `secrets` list (set the secret first), then redeploy.
 
+### LINE-WATCH — deploy the daily LINE quota check
+**Why:** the dashboard chip and this script only knew the project's own counter, which misses anything sent outside the app; LINE's own count is what the 300/month cap enforces (hit 2026-08-27). `watchLineQuota` reads it every day at 07:00 (Bangkok), stores it under `line_usage/{month}.api` and **emails you** when the tier rises (🟡 watch → 🟠 critical → 🔴 full, once per tier per month). It never sends a LINE push.
+**Steps (owner only — functions never auto-deploy):** `FUNCTIONS_DISCOVERY_TIMEOUT=300 firebase deploy --only functions:watchLineQuota --project intern-port-edfa7 --non-interactive` (needs the existing `LINE_CHANNEL_ACCESS_TOKEN` and `GMAIL_APP_PASSWORD` secrets — nothing new to set).
+**Verify:** `node scripts/owner-status.cjs` after the first 07:00 run (or run the scheduler job once in the console): the LINE row switches to "LINE says N/300 … our counter M". A first run at tier ok mails nothing. Then mark this row ✅ with the date.
+
 ### CLOUD — Claude Code on the web (optional)
 At claude.ai/code:
 1. Install the Claude GitHub App on `INTERN-PORT` **and** `INTERN-PORT-claude-memory`, then attach the memory repo to sessions.
@@ -102,7 +108,7 @@ First test: a cloud task that runs `bash scripts/run-qa.sh`.
   - Rules: `firebase deploy --only firestore:rules`.
   - The script turns 🔴 on any function or rules drift.
 - **Internship hours (V102.49).** To add an intern: User Hub → ⋯ → **⏱ Internship hours…** → goal, then the name exactly as in the time clock (time.mlp-int.work). The two LINE channels sit under different providers, so the link is the name, not a LINE id. ⚠ on the hours bar = name not found or shared by two people; tap it to fix. Totals refresh nightly at 00:15 (`syncInternHours`), reading project `in-out-dashboard` as `367076866368-compute@developer.gserviceaccount.com` (Cloud Datastore Viewer there — removing that role stops the sync).
-- **LINE quota.** The Noti OA has 300 pushes a month, shared by every notification. Only the daily digest, per-intern quiz scores and flood alerts (on a rise to High, max 1/place/day) push. The `line_usage` counter undercounts, so trust the 429s in the function logs.
+- **LINE quota.** The Noti OA has 300 pushes a month, shared by every notification. Only the daily digest, per-intern quiz scores and flood alerts (on a rise to High, max 1/place/day) push. The `line_usage` counter undercounts (it misses anything sent outside the app); once `watchLineQuota` is deployed LINE's own number shows in `owner-status` and on the dashboard chip — until then trust the 429s in the function logs.
 
 ## 4. Done
 | ID | Item | When |
