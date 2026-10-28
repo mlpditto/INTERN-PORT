@@ -106,10 +106,10 @@ const QUIZ_ANS = [null, ['albuterol', '0,2,3,1'], ['ยาพ่นอะไร�
         // a retake / second device: the ledger row exists → silent "done", nothing written
         await page.evaluate(() => { window.__sets.length = 0; window.__ledgerExists = true; delete rankBeri["QR:1"]; }); await page.evaluate(() => rankAwardBeri(1));
         assert.deepEqual([(await page.evaluate(() => window.__sets)).length, await page.evaluate(() => rankBeri["QR:1"].state)], [0, "done"]);
-        // cap: 9 earned today + 2 would pass 10 → skipped, chip says so
-        await page.evaluate(() => { window.__ledgerExists = false; window.__daily = { rankAmount: 9 }; delete rankBeri["QR:1"]; currentStep = 2; });
+        // cap: 49 earned today + 2 would pass 50 → skipped, chip says so
+        await page.evaluate(() => { window.__ledgerExists = false; window.__daily = { rankAmount: 49 }; delete rankBeri["QR:1"]; currentStep = 2; });
         await page.evaluate(() => { userAnswers[2] = ["x", "0,1,2,3", "m:0"]; rankAwardBeri(2); }); await page.waitForTimeout(100);
-        assert.deepEqual([(await page.evaluate(() => window.__sets)).length, await page.evaluate(() => rankBeri["QR:2"].state)], [0, "cap"], "★5 = +2 does not fit under the cap of 10 → skipped, not trimmed");
+        assert.deepEqual([(await page.evaluate(() => window.__sets)).length, await page.evaluate(() => rankBeri["QR:2"].state)], [0, "cap"], "★5 = +2 does not fit under the cap of 50 → skipped, not trimmed");
         // practice mode, an unsettled ★3 and a ★5 on a different quiz id
         await page.evaluate(() => { for (const k of Object.keys(rankBeri)) delete rankBeri[k]; window.__daily = {}; isPracticeMode = true; rankAwardBeri(2); });
         assert.equal((await page.evaluate(() => window.__sets)).length, 0, "practice mode never pays");
