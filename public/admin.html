@@ -3623,6 +3623,18 @@
         .crai-fu { flex: none !important; }
         .crai-f > .crai-c + i { margin-left: auto; }
         #caseReviewScoreModal .crai-finds { margin-top: 10px; }
+        /* V102.465: Rank question in the Quiz Editor — tier chips + ⚠ + why on each option row */
+        .q-opt-row.rk-row { flex-wrap: wrap; }
+        .q-opt-row.rk-row .correct-circle-label { pointer-events: none; }
+        .q-opt-row.rk-row .q-correct-check { display: none; }
+        .rk-meta { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-left: 44px; }
+        .rk-meta .rk-t, .rk-meta .rk-u { width: auto; min-height: 0; padding: 2px 11px; border: 1px solid #334155; border-radius: 999px; background: #0f172a; color: #94a3b8; font-size: 0.72em; font-weight: 800; cursor: pointer; }
+        .rk-meta .rk-t.t0[aria-pressed="true"] { background: #16a34a; border-color: #16a34a; color: #fff; }
+        .rk-meta .rk-t.t1[aria-pressed="true"] { background: #d97706; border-color: #d97706; color: #fff; }
+        .rk-meta .rk-t.t2[aria-pressed="true"] { background: #64748b; border-color: #64748b; color: #fff; }
+        .rk-meta .rk-u[aria-pressed="true"] { background: #dc2626; border-color: #dc2626; color: #fff; }
+        .rk-meta .rk-why { flex: 1 1 140px; min-width: 0; margin: 0; padding: 4px 10px; border: 1px solid #334155; border-radius: 10px; background: #0f172a; color: #e2e8f0; font-size: 0.8em; }
+        .q-rank-extra input { width: 100%; padding: 8px 12px; border: 1px solid #334155; border-radius: 10px; background: #0f172a; color: #f1f5f9; font-size: 0.85em; }
         /* V102.388: Dashboard 🚀 Up next — five quizzes that could go live next (up-next.js). One grid, never scrolls sideways: 5 across, 2 columns on a phone. */
         #upnext-card[hidden] { display: none; }
         #upnext-card { margin: 10px 0 14px; padding: 10px 12px; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; }
@@ -8091,6 +8103,7 @@
 <script src="dxa-ai-trail.js?v=V102.389"></script>
 <script src="case-review-ai.js?v=V102.423"></script>
 <script src="up-next.js?v=V102.393"></script>
+<script src="rank-quiz.js?v=V102.465"></script>
     <script src="peds-dosing.js?v=V102.80"></script>
     <script src="bronchodilator-seed.js?v=V102.220"></script>
     <link rel="stylesheet" href="text-ai-chips.css?v=V102.463">
@@ -14808,6 +14821,7 @@
                             <div class="glass-toggle-item" data-value="short_answer" onclick="toolbarSetQType(this,'short_answer')" title="Short answer" data-th-title="ตอบสั้น" data-kr-title="단답형" style="padding:4px 10px; border-radius:8px; font-size:1.1em; cursor:pointer;">📝</div>
                             <div class="glass-toggle-item" data-value="ordering" onclick="toolbarSetQType(this,'ordering')" title="Ordering" data-th-title="เรียงลำดับ" data-kr-title="순서 배열" style="padding:4px 10px; border-radius:8px; font-size:1.1em; cursor:pointer;">🔢</div>
                             <div class="glass-toggle-item" data-value="flashcard" onclick="toolbarSetQType(this,'flashcard')" title="Flashcard" data-th-title="แฟลชการ์ด" data-kr-title="플래시카드" style="padding:4px 10px; border-radius:8px; font-size:1.1em; cursor:pointer;">⚡</div>
+                            <div class="glass-toggle-item" data-value="rank" onclick="toolbarSetQType(this,'rank')" title="Rank" data-th-title="จัดอันดับ" data-kr-title="순위" style="padding:4px 10px; border-radius:8px; font-size:1.1em; cursor:pointer;">🏅</div>
                         </div>
                         
                         <span style="color:#e2e8f0; margin:0 5px;">|</span>
@@ -27065,7 +27079,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 // maps over question.options, so an ordering question authored
                 // here reached the intern with nothing to order, and its grader
                 // (target.length > 0) scored it 0 every time.
-                if (qType === 'choice' || qType === 'ordering' || qType === 'flashcard' || qType === 'short_answer') {
+                if (qType === 'choice' || qType === 'ordering' || qType === 'flashcard' || qType === 'short_answer' || qType === 'rank') {
                     opts = [...item.querySelectorAll('.q-opt')].map(i => i.value);
                 }
                 // Flashcard shares the correct-checkbox UI with choice, but
@@ -27093,6 +27107,17 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 const qPrimer = qPrimerEl ? (qPrimerEl.value || '').trim() : '';
                 const qTerms = window.QuizTermAI ? window.QuizTermAI.read(item) : [];   // V102.405: AI-marked drug / disease / lab terms (quiz-term-ai.js)
                 questions.push({ q: qText, content: qContent, type: qType, options: opts, correct, timer, tags: qTags, explanation: qExplanation, ...(qPrimer ? { primer: qPrimer } : {}), ...(qTerms.length ? { terms: qTerms } : {}) });
+                // V102.465: Rank = typed answer first, then rank the options. tiers 0 Best · 1 OK · 2 Avoid (-1 = not picked yet, saveQuiz blocks it); correct = the Best options
+                if (qType === 'rank') {
+                    const metas = [...item.querySelectorAll('.q-opt-row')].map(r => r.querySelector('.rk-meta'));
+                    const tiers = metas.map(m => { const v = m ? parseInt(m.dataset.tier, 10) : NaN; return v >= 0 && v <= 2 ? v : -1; });
+                    Object.assign(questions[questions.length - 1], {
+                        accepted: ((item.querySelector('.q-rk-accepted') || {}).value || '').split(',').map(s => s.trim()).filter(Boolean),
+                        tiers, unsafe: metas.map(m => (m && m.querySelector('.rk-u[aria-pressed="true"]')) ? 1 : 0),
+                        why: metas.map(m => { const w = m && m.querySelector('.rk-why'); return w ? w.value.trim() : ''; }),
+                        correct: tiers.reduce((a, v, i) => (v === 0 ? a.concat(i) : a), [])
+                    });
+                }
             });
 
             // V98.27: per-quiz Beri speed rewards. '' (blank) → null = use global
@@ -27380,6 +27405,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                     <div class="glass-toggle-item ${qType === 'short_answer' ? 'active' : ''}" data-value="short_answer"></div>
                     <div class="glass-toggle-item ${qType === 'ordering' ? 'active' : ''}" data-value="ordering"></div>
                     <div class="glass-toggle-item ${qType === 'flashcard' ? 'active' : ''}" data-value="flashcard"></div>
+                    <div class="glass-toggle-item ${qType === 'rank' ? 'active' : ''}" data-value="rank"></div>
                 </div>
                 <div style="background:#1e293b; border:1px solid #334155; border-radius:24px; padding:20px; box-shadow:0 8px 30px rgba(0,0,0,0.2);">
                     <!-- Main Text Area + Markdown Preview (Phase 1, V91.35) -->
@@ -27437,7 +27463,8 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 </div>
 
                 <!-- Options / Answers Section -->
-                <div class="options-container" style="display:${qType === 'choice' ? 'flex' : 'none'}; flex-direction:column; gap:10px; margin-bottom:15px;">
+                <div class="q-rank-extra" style="display:${qType === 'rank' ? 'block' : 'none'}; margin-bottom:10px;"><input type="text" class="q-rk-accepted" maxlength="200" placeholder="Best answer as interns may type it — comma-separated (salbutamol, albuterol)" value="${escapeHtml(((data && Array.isArray(data.accepted)) ? data.accepted : []).join(', '))}" oninput="triggerAutoSave()"></div>
+                <div class="options-container" style="display:${(qType === 'choice' || qType === 'rank') ? 'flex' : 'none'}; flex-direction:column; gap:10px; margin-bottom:15px;">
                     ${options.map((opt, i) => {
                         const isSelected = correct.includes(i);
                         return `
@@ -27510,6 +27537,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             `;
             container.appendChild(div);
 
+            if (qType === 'rank') { rankDecorate(div, data); toggleQType(div.querySelector('.q-type')); }   // V102.465: tier rows + actions for a saved / restored Rank question
             // Sync text value
             if (data) div.querySelector('.q-text').value = data.q;
             // Initial markdown preview render (Phase 1 V91.35, extended Phase 2 V91.36)
@@ -28439,10 +28467,11 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 if (type === 'short_answer') explain = "(Short text response)";
                 else if (type === 'ordering') explain = "(Order from Top to Bottom)";
                 else if (type === 'flashcard') explain = "(True/False selection)";
+                else if (type === 'rank') explain = "(Interns type first, then rank — tier every option)";
                 label.innerText = `Question Content: ${explain}`;
             }
 
-            optCont.style.display = (type === 'choice' || type === 'ordering' || type === 'flashcard' || type === 'short_answer') ? 'flex' : 'none';
+            optCont.style.display = (type === 'choice' || type === 'ordering' || type === 'flashcard' || type === 'short_answer' || type === 'rank') ? 'flex' : 'none';
 
             // Flashcard: Only 2 options (True/False)
             if (type === 'flashcard') {
@@ -28468,6 +28497,12 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                         </div>
                     `;
                 }
+            } else if (type === 'rank') {
+                while (optCont.querySelectorAll('.q-opt-row').length < 4) addOption(el);
+                if (typeActions) {
+                    typeActions.innerHTML = `<button type="button" class="btn-sm" onclick="addOption(this)" style="width:auto; padding:5px 15px; background:#e9f5ff; color:#007bff; border:1px solid #b8daff; border-radius:10px;"><i class="fa-solid fa-plus"></i> Option</button>
+                        <small style="color:#94a3b8; font-weight:700;">Tier each option: Best · OK · Avoid</small>`;
+                }
             } else if (type === 'short_answer') {
                 if (typeActions) {
                     typeActions.innerHTML = `
@@ -28485,6 +28520,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 }
             }
 
+            rankDecorate(item);
             updatePollUI();
         }
 
@@ -28771,6 +28807,41 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             }
         }
 
+        // V102.465: Rank question (rank-quiz.js) — every option row carries Best / OK / Avoid chips, a ⚠ unsafe toggle and a one-line why. No tier is pre-picked.
+        function rankMetaHtml(tier, unsafe, why) {
+            const tiers = [['Best', 0], ['OK', 1], ['Avoid', 2]];
+            return '<div class="rk-meta" data-tier="' + (tier >= 0 && tier <= 2 ? tier : '') + '">'
+                + tiers.map(([l, n]) => '<button type="button" class="rk-t t' + n + '" data-t="' + n + '" aria-pressed="' + (tier === n) + '" onclick="rankPick(this,' + n + ')">' + l + '</button>').join('')
+                + '<button type="button" class="rk-u" aria-pressed="' + (unsafe ? 'true' : 'false') + '" onclick="rankUnsafe(this)" title="Unsafe — could hurt the patient. Ranking it above a Best option is a safety miss.">⚠</button>'
+                + '<input type="text" class="rk-why" maxlength="160" placeholder="Why" value="' + escapeHtml(why || '') + '" oninput="triggerAutoSave()"></div>';
+        }
+        function rankDecorate(item, data) {   // idempotent: adds the tier rows when the question is Rank, removes them when it is not
+            const isRank = item.querySelector('.q-type').value === 'rank';
+            const ex = item.querySelector('.q-rank-extra'); if (ex) ex.style.display = isRank ? 'block' : 'none';
+            item.querySelectorAll('.q-opt-row').forEach((row, i) => {
+                const meta = row.querySelector('.rk-meta');
+                if (!isRank) { if (meta) meta.remove(); row.classList.remove('rk-row'); return; }
+                row.classList.add('rk-row');
+                if (!meta) row.insertAdjacentHTML('beforeend', rankMetaHtml(data && Array.isArray(data.tiers) ? Number(data.tiers[i]) : -1, data && Array.isArray(data.unsafe) && Number(data.unsafe[i]), data && Array.isArray(data.why) ? data.why[i] : ''));
+            });
+        }
+        window.rankPick = function(btn, tier) {
+            const meta = btn.closest('.rk-meta');
+            meta.dataset.tier = String(tier);
+            meta.querySelectorAll('.rk-t').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.t) === tier)));
+            triggerAutoSave();
+        };
+        window.rankUnsafe = function(btn) { btn.setAttribute('aria-pressed', String(btn.getAttribute('aria-pressed') !== 'true')); triggerAutoSave(); };
+        // '' when a Rank question can be saved, else what to fix (an unpicked tier shows as -1)
+        window.rankProblem = function(q) {
+            const tiers = Array.isArray(q.tiers) ? q.tiers : [];
+            if (tiers.some(v => !(v >= 0 && v <= 2))) return 'pick Best / OK / Avoid for every option';
+            if (!q.options || q.options.length < 2 || q.options.length > 6) return 'use 2–6 options';
+            if (!tiers.includes(0)) return 'at least one option must be Best';
+            if (window.RankQuiz && !window.RankQuiz.valid(q)) return 'use at least two different levels (e.g. Best and Avoid)';
+            return '';
+        };
+
         function toggleOptionCorrect(el) {
             const row = el.closest('.q-opt-row');
             if (el.checked) row.classList.add('is-correct');
@@ -28785,6 +28856,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const count = container.querySelectorAll('.q-opt-row').length;
             const qId = item.dataset.qId;
 
+            if (item.querySelector('.q-type').value === 'rank' && count >= 6) { showToast('Rank: up to 6 options'); return; }
             // Add Option Row
             const row = document.createElement('div');
             row.className = 'q-opt-row';
@@ -28803,6 +28875,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 `;
             container.appendChild(row);
             updateOptionNumbers(item);
+            if (item.querySelector('.q-type').value === 'rank') rankDecorate(item);
             updateQuizPagination(); // Refresh navigation colors
         }
 
@@ -29901,6 +29974,16 @@ ${JSON.stringify(sourceObj)}`;
             if (missingKeyNums.length > 0) {
                 alert(`⚠️ Cannot save — question ${missingKeyNums.join(', ')} ${missingKeyNums.length > 1 ? 'have' : 'has'} no correct answer marked.\n\nEvery graded choice question needs an answer key. Mark the correct answer, then save again.`);
                 quizQPageIndex = missingKeyNums[0] - 1;
+                updateQuizPagination();
+                return;
+            }
+
+            // V102.465: a Rank question needs every option tiered, a Best, and two different levels
+            const rankBad = [];
+            formData.questions.forEach((q, i) => { if (q.type === 'rank' && isQuestionComplete(q)) { const why = window.rankProblem(q); if (why) rankBad.push({ i, msg: 'Q' + (i + 1) + ': ' + why }); } });
+            if (rankBad.length > 0) {
+                alert('⚠️ Cannot save — Rank question needs fixing:\n\n' + rankBad.map(b => b.msg).join('\n'));
+                quizQPageIndex = rankBad[0].i;
                 updateQuizPagination();
                 return;
             }
@@ -31194,6 +31277,7 @@ ${JSON.stringify(sourceObj)}`;
                         const isManuallyCorrect = !!(att.manualCorrect && att.manualCorrect[i] === true);
                         let isCorrect = false;
                         let partialFrac = null; // V95.73: non-null only for partial-credit multi-answer
+                        const rankSc = (q.type === 'rank' && window.RankQuiz) ? window.RankQuiz.score(q, studentAns) : null;   // V102.465
                         if (isChoice) {
                             const target = q.correct;
                             const tAns = Array.isArray(target) ? target : (target !== undefined && target !== null ? [target] : []);
@@ -31204,6 +31288,7 @@ ${JSON.stringify(sourceObj)}`;
                             isCorrect = isCorrect || isManuallyCorrect;
                         } else {
                             isCorrect = !!((att.gradedAnswers && att.gradedAnswers[i]) || isManuallyCorrect);
+                            if (rankSc) { partialFrac = rankSc.credit; isCorrect = rankSc.credit >= 0.95 || isManuallyCorrect; }   // V102.465
                         }
 
                         const qCount = Math.max(1, (quiz.questions || []).length);
@@ -31257,6 +31342,14 @@ ${JSON.stringify(sourceObj)}`;
                             correctAnsText = `<span style="color:#666;">(Subjective Answer)</span>`;
                         }
 
+                        if (rankSc) {   // V102.465: typed answer · the order they chose (with each option's level) · stars; the key = options best → worst
+                            const lv = ['Best', 'OK', 'Avoid'], tierOf = ix => Math.min(2, Math.max(0, Number((q.tiers || [])[ix]) || 0));
+                            const nm = ix => window.renderMdInline(q.options[ix] || '-');
+                            studentAnsText = '<div><i>' + escapeHtml(rankSc.typed || '(nothing typed)') + '</i></div>' + (rankSc.order
+                                ? '<ol style="margin:4px 0 0 18px; padding:0;">' + rankSc.order.map(ix => '<li>' + nm(ix) + ' <small style="color:#64748b;">· ' + lv[tierOf(ix)] + ((q.unsafe || [])[ix] ? ' ⚠' : '') + '</small></li>').join('') + '</ol><div style="margin-top:4px; font-weight:800; color:#b45309;">' + '★'.repeat(rankSc.stars) + '☆'.repeat(5 - rankSc.stars) + (rankSc.safetyMiss ? ' ⚠️ safety miss' : '') + '</div>'
+                                : ' <span style="color:#999;">(not ranked)</span>');
+                            correctAnsText = '<ol style="margin:0 0 0 18px; padding:0;">' + (q.options || []).map((_, ix) => ix).sort((a, b) => tierOf(a) - tierOf(b)).map(ix => '<li>' + nm(ix) + ' <small>· ' + lv[tierOf(ix)] + '</small></li>').join('') + '</ol>';
+                        }
                         // V95.73: amber "partial" state when 0 < fraction < 1 (and not full / manual).
                         const isPartial = partialFrac !== null && partialFrac > 0 && partialFrac < 1 && !isCorrect;
                         const cardBg = isCorrect ? '#d4edda' : (isPartial ? '#fff3cd' : '#f8d7da');
@@ -31286,7 +31379,7 @@ ${JSON.stringify(sourceObj)}`;
                             <div class="lang-no-toggle" style="border:2px solid ${cardBorder}; padding:15px; margin-bottom:15px; border-radius:12px; background:${cardBg}; border-left:8px solid ${cardBorder}; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
                                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; flex-wrap: wrap; gap:8px;">
                                     <b style="font-size:1.1em; flex:1; min-width:200px; word-wrap: break-word; overflow-wrap: break-word; white-space: normal;">${cardIcon} Q${i + 1}: ${window.renderMdInline(q.q)} ${durationHtml}${activeDurationHtml}${answerChangesHtml}${firstLatencyHtml}</b>
-                                    <span class="badge" style="background:#6c757d; font-size:0.7em; padding:2px 8px; margin-left:8px; flex-shrink:0;">${isChoice ? 'Choice' : 'Short Answer'}</span>${partialBadgeHtml}
+                                    <span class="badge" style="background:#6c757d; font-size:0.7em; padding:2px 8px; margin-left:8px; flex-shrink:0;">${isChoice ? 'Choice' : (rankSc ? 'Rank' : 'Short Answer')}</span>${partialBadgeHtml}
                                 </div>
                                 <div style="display:flex; flex-direction:column; gap:8px;">
                                     ${sameAsCorrect ? `<div title="The answer matches the correct answer" style="padding:10px; border-radius:8px; background:#d1e7dd; border:1px solid #badbcc; color:#0f5132; font-size:0.95em;"><span style="color:#157347; font-weight:bold; margin-right:8px;">Student = Correct:</span><span style="font-weight:500;">${studentAnsText}</span></div>` : `<div style="padding:10px; border-radius:8px; background:rgba(255,255,255,0.6); border:1px solid rgba(0,0,0,0.05); font-size:0.95em;">
@@ -34041,6 +34134,8 @@ ${JSON.stringify(sourceObj)}`;
                     } else {
                         autoFraction = choiceAnswerMatches(tAns, userAns) ? 1 : 0;
                     }
+                } else if (q.type === 'rank' && window.RankQuiz) {
+                    autoFraction = window.RankQuiz.score(q, userAns).credit;   // V102.465: typed answer + ranking (0..1), same function the intern app grades with
                 } else {
                     autoFraction = (att.gradedAnswers && att.gradedAnswers[i]) ? 1 : 0;
                 }

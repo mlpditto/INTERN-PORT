@@ -115,9 +115,9 @@ const cy = el => { const r = el.getBoundingClientRect(); return Math.round(r.top
         // V102.323 (toolbar D): emoji on every chip, the word only on the chosen one; quiet AI tools icon-only; + and 🏷 without words
         const words = sel => page.$$eval(sel, es => es.map(e => e.innerText.replace(/\s+/g, ' ').trim()));
         assert.deepEqual(await words('#quiz-type-toggle .glass-toggle-item'), ['🎯 MCQ', '📖', '🩺'], 'quiz type: word on the chosen chip only');
-        assert.deepEqual(await words('#toolbar-q-type-toggle .glass-toggle-item'), ['✅', '📝', '🔢 Order', '⚡'], 'answer type: word on the chosen chip only');
+        assert.deepEqual(await words('#toolbar-q-type-toggle .glass-toggle-item'), ['✅', '📝', '🔢 Order', '⚡', '🏅'], 'answer type: word on the chosen chip only');
         assert.deepEqual(await words('.qe-timer-mode .glass-toggle-item'), ['⏱ Per Q', '⏲️'], 'timer: word on the chosen chip only');
-        assert.deepEqual(await page.$$eval('#toolbar-q-type-toggle .glass-toggle-item', es => es.map(e => e.getAttribute('aria-label'))), ['Multiple choice', 'Short answer', 'Ordering', 'Flashcard'], 'answer type chips keep their names for screen readers');
+        assert.deepEqual(await page.$$eval('#toolbar-q-type-toggle .glass-toggle-item', es => es.map(e => e.getAttribute('aria-label'))), ['Multiple choice', 'Short answer', 'Ordering', 'Flashcard', 'Rank'], 'answer type chips keep their names for screen readers');
         // V102.358: the quiet tools show their word again (owner: the row has room) — still slate, name also in aria-label
         const quiet = await page.$$eval('#quiz-editor-review-actions .qe-tool.qe-quiet', bs => bs.map(b => [b.innerText.replace(/\s+/g, ' ').trim(), parseFloat(getComputedStyle(b).width) > 40, b.getAttribute('aria-label')]));
         assert.deepEqual(quiet, [['PDF', true, 'Import from PDF'], ['Generate', true, 'Generate more questions'], ['Curate', true, 'Curate a new set'], ['Translate', true, 'Translate this question']], 'quiet tools icon + word: ' + JSON.stringify(quiet));
