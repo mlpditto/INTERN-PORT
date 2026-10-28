@@ -581,30 +581,45 @@ const QuizCover = (() => {
             cover.append(img);
         }
         if (canStart) {
-            const play = document.createElement('span'); play.className = 'quiz-cover-play'; play.textContent = '▶'; play.setAttribute('aria-hidden', 'true'); cover.append(play);
+            // V101.228: when the card hides its footer (single Start button) the deadline chip takes over the ▶ — the orange orb on the cover only stays on cards that keep their footer.
+            const chipMode = start.parentElement.children.length === 1;
+            let play = null;
+            if (!chipMode) { play = document.createElement('span'); play.className = 'quiz-cover-play'; play.textContent = '▶'; play.setAttribute('aria-hidden', 'true'); cover.append(play); }
+            let pulseTarget = play;
             // V101.181: corner fold marks a quiz the intern has not started (only that branch renders the 👥 stack).
             // It stays hidden until settleFresh() knows the 👥 count, so it appears once, already in its final colour.
             if (card.querySelector('.quiz-avatar-stack')) {
                 const fold = document.createElement('span'); fold.className = 'quiz-cover-fold'; fold.setAttribute('aria-hidden', 'true'); cover.prepend(fold);
                 card.classList.add('quiz-cover-fresh');
                 labelFresh(cover, 'new');
-                pulseOnFirstView(play);
             }
-            const footer = start.parentElement;
-            if (footer.children.length === 1) {
+            if (chipMode) {
                 card.classList.add('quiz-cover-startable');
-                const countdown = start.querySelector('.quiz-cta-countdown[data-dead]');
+                let chip = start.querySelector('.quiz-cta-countdown[data-dead]');
                 const meta = header.querySelector('.quiz-mission-meta') || header.querySelector('.assign-info');
-                if (countdown) {
-                    countdown.classList.add('quiz-cover-deadline');
-                    countdown.title = 'เวลาที่เหลือก่อนถึงกำหนดส่ง';
-                    meta.append(countdown);
-                } else if (quiz.deadline?.toDate?.() < new Date()) {
-                    const late = document.createElement('span'); late.className = 'quiz-cover-deadline';
-                    late.textContent = '⏱ Late'; late.title = 'เลยกำหนดส่งแล้ว ยังเริ่มทำได้'; meta.append(late);
+                if (chip) {
+                    chip.classList.add('quiz-cover-deadline');
+                    chip.title = 'เวลาที่เหลือก่อนถึงกำหนดส่ง';
+                } else {
+                    chip = document.createElement('span'); chip.className = 'quiz-cover-deadline';
+                    if (quiz.deadline?.toDate?.() < new Date()) { chip.textContent = '⏱ Late'; chip.title = 'เลยกำหนดส่งแล้ว ยังเริ่มทำได้'; }
+                    else { chip.textContent = 'Start'; chip.dataset.tier = 'plain'; chip.title = 'Start quiz'; }
                 }
+                // the chip is the Start control: the whole pill (and its 44px hit area) starts the quiz; the cover button stays the keyboard / screen-reader path
+                chip.onclick = event => { event.stopPropagation(); start.click(); };
+                meta.append(chip);
+                sweepWhenVisible(chip);
+                pulseTarget = chip;
             }
+            if (card.querySelector('.quiz-avatar-stack') && pulseTarget) pulseOnFirstView(pulseTarget);
         }
+    }
+    // V101.228: the glass sheen sweeps three times each time a chip scrolls into view (CSS reads .qcc-in), so a long quiz list never animates offscreen.
+    let sheenIO;
+    function sweepWhenVisible(chip) {
+        if (!('IntersectionObserver' in window)) return;
+        sheenIO = sheenIO || new IntersectionObserver(entries => entries.forEach(e => e.target.classList.toggle('qcc-in', e.isIntersecting)), { threshold: 0.6 });
+        sheenIO.observe(chip);
     }
     // V101.181: EN · TH · KR. The cover button's aria-label carries the state too — tooltips never show on a phone.
     const FRESH_LABEL = {
