@@ -117,15 +117,15 @@
         if (!built.all.length) { host.hidden = true; host.innerHTML = ''; return; }
         host.hidden = false;
         const chip = (k, label, title) => `<button type="button" class="un-chip" data-un="${k}" aria-pressed="${filter === k}" title="${title}">${label}</button>`;
-        host.innerHTML = '<div class="un-head"><span class="un-title">🚀 Up next</span>'
-            + '<span class="un-rail">' + chip('all', 'All', 'All') + chip('ask', '💬', 'Asked for by interns · อินเทิร์นอยากทำ') + chip('fresh', '🌱', 'Inactive, not run yet · ยังไม่เคยเปิด') + '</span></div>'
+        host.innerHTML = '<div class="un-head"><span class="un-title" title="Requests from interns first, then quizzes nobody has run yet · คำขอจากน้องก่อน แล้วควิซที่ยังไม่เคยเปิด">🚀 Up next</span>'
+            + '<span class="un-rail">' + chip('all', 'All', 'All') + chip('ask', '💬 Asked', 'Asked for by interns · อินเทิร์นอยากทำ') + chip('fresh', '🌱 New', 'Inactive, not run yet · ยังไม่เคยเปิด') + '</span></div>'
             + '<div class="un-strip">' + list.map((x, i) => {
                 const topic = x.kind === 'topic', live = x.kind === 'live';
-                const act = topic ? `<button type="button" class="un-go un-new" data-i="${i}" title="Create a quiz on this topic · สร้าง Quiz หัวข้อนี้" aria-label="Create">＋</button>`
-                    : live ? `<button type="button" class="un-go un-open" data-i="${i}" title="Already live — open it · เปิดอยู่แล้ว ดู Quiz" aria-label="Open">↗</button>`
-                        : `<button type="button" class="un-go" data-i="${i}" title="Go live · เปิด Quiz" aria-label="Go live">▶</button>`;
-                const cap = x.cap === 'none' ? '<small class="un-cap">no similar quiz yet</small>' : x.cap ? `<small class="un-cap">“${esc(x.cap)}”</small>` : '';
-                return `<div class="un-tile" title="${esc(x.title)}"><div class="un-top"><span class="un-src">${x.src}</span>${x.n ? `<span class="un-n" title="Interns who asked">👥 ${x.n}</span>` : ''}</div><b>${esc(x.title)}</b>${cap}<div class="un-bot">${act}</div></div>`;
+                const act = topic ? `<button type="button" class="un-go un-new" data-i="${i}" title="Create a quiz · สร้างใหม่" aria-label="Create">＋</button>`
+                    : live ? `<button type="button" class="un-go un-open" data-i="${i}" title="Live already — open · เปิดอยู่แล้ว ดู" aria-label="Open">↗</button>`
+                        : `<button type="button" class="un-go" data-i="${i}" title="Go live · เปิดใช้งาน" aria-label="Go live">▶</button>`;
+                const cap = x.cap === 'none' ? '<small class="un-cap un-none">No quiz yet · create</small>' : x.cap ? `<small class="un-cap">“${esc(x.cap)}”</small>` : '';
+                return `<div class="un-tile ${topic ? 'un-do un-do-new' : live ? 'un-live' : 'un-do un-do-go'}" title="${esc(x.title)}"><div class="un-top"><span class="un-src">${x.src}</span>${x.n ? `<span class="un-n${x.n >= 2 ? ' hot' : ''}" title="Interns who asked">👥 ${x.n}</span>` : ''}</div><b>${esc(x.title)}</b>${cap}<div class="un-bot">${act}</div></div>`;
             }).join('') + '</div>';
         host._list = list;
     }
