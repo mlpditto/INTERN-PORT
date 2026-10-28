@@ -95,7 +95,7 @@
         var go = document.getElementById('fbr-go'); if (go) go.focus();
     }
     function busy() {
-        if (document.getElementById('fbr-back') || document.getElementById('art-back')) return true;   // V101.176: + the 📰 article popup (articles.js calls check() when it closes)
+        if (document.getElementById('fbr-back') || document.getElementById('art-back') || document.getElementById('ord-back')) return true;   // V101.176: + the 📰 article popup (articles.js calls check() when it closes)
         return Array.prototype.some.call(document.querySelectorAll('.modal'), function (m) { return m.style.display === 'flex' || m.classList.contains('open') || m.classList.contains('show'); });
     }
     function check() {
@@ -108,6 +108,7 @@
             var list = pending(typeof quizAttemptsCache !== 'undefined' ? quizAttemptsCache : {}, typeof quizzesCache !== 'undefined' ? quizzesCache : []);
             var d = decide(load(uid), list.length, today);
             save(uid, d.state);
+            if (d.show && window.owedRemind && owedRemind.holds()) return;   // V101.228: the 'still to do' sheet has today's popup slot
             if (d.show && !busy()) show(list, uid, d.state, today);
         } catch (e) { console.warn('fbRemind:', e); }
     }
