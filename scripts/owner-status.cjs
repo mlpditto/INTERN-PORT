@@ -148,8 +148,21 @@ async function checkLineQuota() {
     try {
         const doc = await getJson(`https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents/line_usage/${month}`, true);
         const total = Number(((doc.fields || {}).total || {}).integerValue || 0);
+        // V102.479: watchLineQuota (daily 07:00) stores LINE's OWN numbers under line_usage/{month}.api — the figures LINE enforces. Fresh (< 36 h) → report those.
+        const api = ((((doc.fields || {}).api || {}).mapValue || {}).fields) || {};
+        const num = x => (x && x.integerValue != null) ? Number(x.integerValue) : (x && x.doubleValue != null) ? Number(x.doubleValue) : null;
+        const apiUsed = num(api.used), apiLimit = num(api.limit), apiAt = api.checkedAt && api.checkedAt.timestampValue ? Date.parse(api.checkedAt.timestampValue) : 0;
+        if (apiUsed != null && apiLimit > 0 && apiAt && Date.now() - apiAt < 36 * 3600e3) {
+            const tier = (api.tier || {}).stringValue || 'ok', projected = num(api.projected), runOut = num(api.runOutDay), perDay = num(api.perDay);
+            const apct = Math.round(apiUsed / apiLimit * 100);
+            const status = (tier === 'critical' || tier === 'full' || apct >= 90) ? BAD : (tier === 'watch' || apct >= 70) ? WARN : OK;
+            add('LINE', `LINE pushes ${month} (cap ${apiLimit}, LINE's own count)`, status,
+                `LINE says ${apiUsed}/${apiLimit} (${apct}%)${perDay != null ? ` · ${perDay}/day` : ''}${projected ? ` → ~${projected} by month end` : ''}${runOut ? ` · full on day ${runOut}` : ''} · our counter ${total} (drift ${apiUsed - total}: sent outside the app) · checked ${new Date(apiAt).toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })} ICT`);
+            rows[rows.length - 1].line = { used: apiUsed, limit: apiLimit, pct: apct, tier, projected, runOutDay: runOut, counter: total, checkedAt: new Date(apiAt).toISOString() };
+            return;
+        }
         const pct = Math.round(total / LINE_MONTHLY_CAP * 100);
-        add('LINE', `LINE pushes ${month} (cap ${LINE_MONTHLY_CAP})`, pct >= 90 ? BAD : pct >= 70 ? WARN : OK, `${total} counted (${pct}%) — the counter undercounts; LINE's 429s in the function logs are the truth`);
+        add('LINE', `LINE pushes ${month} (cap ${LINE_MONTHLY_CAP})`, pct >= 90 ? BAD : pct >= 70 ? WARN : OK, `${total} counted (${pct}%) — the counter undercounts; LINE's 429s in the function logs are the truth${(api.error || {}).stringValue ? ' · the daily LINE check failed: ' + api.error.stringValue : ' · (watchLineQuota not deployed or has not run yet — then LINE\'s own number appears here)'}`);
     } catch (e) {
         add('LINE', `LINE pushes ${month}`, e.message === 'HTTP 404' ? OK : NA, e.message === 'HTTP 404' ? 'no pushes counted yet this month' : "can't check (" + e.message + ')');
     }
@@ -159,7 +172,7 @@ function checkScheduler() {
     try {
         const jobs = JSON.parse(gcloud(['scheduler', 'jobs', 'list', '--location', REGION, '--project', PROJECT, '--format=json(name,state,status,lastAttemptTime)']));
         const off = jobs.filter(j => j.state !== 'ENABLED').map(j => j.name.split('/').pop());
-        const failing = jobs.filter(j => j.status && j.status.code).map(j => j.name.split('/').pop().replace(/^firebase-schedule-|-us-central1$/g, ''));
+        const failing = jobs.filter(j => j.status && j.status.code && j.lastAttemptTime).map(j => j.name.split('/').pop().replace(/^firebase-schedule-|-us-central1$/g, ''));
         add('SCHED', `Scheduled jobs (${jobs.length})`, off.length || failing.length ? WARN : OK,
             [off.length && 'not enabled: ' + off.join(', '), failing.length && 'last run failed: ' + failing.join(', ')].filter(Boolean).join(' · ') || 'all enabled, last runs OK');
     } catch (_) {

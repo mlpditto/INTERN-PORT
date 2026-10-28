@@ -9,6 +9,7 @@ Admin: Assignments ▸ Quiz Engine.
 ## Scripts that drive it
 
 - `quiz-row-lean-qa` — row = title + badges, icon chips line, actions
+- `quiz-deadline-check` — LINE deadline alerts (`notifyQuizDeadlines`): T-24 h group bubble, T-3 h personal bubble to interns who have not submitted, quiet hours 22:00–07:00, idempotent markers, daily cap, quota guard, truthful Beri line; the digest shares `scanQuizPending`
 - `quiz-chips-fit-qa` — chips fold into "+n" only when the line has no room
 - `quiz-tools-rail-qa` — row tools as one icon grid > 1100 px, ⋯ below
 - `quiz-list-phone-qa` — phone rows are cards; desktop one card + header
@@ -27,7 +28,12 @@ Admin: Assignments ▸ Quiz Engine.
 - `coverage-supplements-qa` — Supplements is a system before Other
 - `empty-quiz-sweep-qa` — blank quizzes older than 12 h deleted once per session, logged
 
+## Deadline alerts (LINE)
+
+Hourly `notifyQuizDeadlines` (functions/quiz-deadline.js is the pure part). For every ACTIVE quiz with a deadline in the next 24 h: ONE bubble to the LINE group (counts only, never names), then — 3 h before — one personal bubble per intern who has NOT submitted (same cohort and "done" rules as the 16:00 digest, through the shared `scanQuizPending`). On by default; the quiz editor chip **Deadline alert (LINE)** (`quizzes.notifyDeadline === false`) opts one quiz out. Nothing goes out 22:00–07:00 (an 08:00 deadline is chased at 21:00 the evening before). Personal pushes stop at 15 per Bangkok day and when `line_usage` for the month is ≥ 90 % of 300; the group bubble stops at 300. Markers live in `quiz_deadline_alerts/{quizId_deadlineSec}` (moving the deadline re-arms; written only after a successful push) and `_cap_{YYYY-MM-DD}`. Pushes are tagged `quizDeadlineGroup` / `quizDeadlineDM` in the dashboard quota card.
+
 ## What usually lies
 
 - **Known local failures.** `empty-quiz-sweep-qa` fails on a CRLF checkout (the vm slice compares line endings); `quiz-chips-fit-qa` and `quiz-filters-lean-qa` are load-timing flakes. All three pass on CI — re-run alone before suspecting a change.
 - The list is rendered by `renderQuizzesNow` from fixture quizzes; a fixture without `isActive` / `deadline` lands in Templates and the Live assertions find nothing.
+- The Beri line in the deadline bubble is the tier really on offer inside the last 24 h (20 % of `deadlineBeriMax`, default 5 → +1, nothing under 6 h) — the full "+5" only exists 48 h out.

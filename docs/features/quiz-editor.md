@@ -9,6 +9,7 @@ Admin: Quiz Engine ▸ Edit / ＋ New quiz.
 ## Scripts that drive it
 
 - `quiz-editor-lean-b1-qa` — header status pill, Points / Beri as − n +
+- `quiz-deadline-editor-qa` — the Deadline alert (LINE) chip: ON for new / legacy quizzes, OFF reads back `notifyDeadline:false`, independent of Notify LINE every submit
 - `quiz-editor-toolbar-lean-qa` — one strip: answer type | this question | whole quiz
 - `quiz-editor-toolbar-handlers-qa` — 🐑 clone and answer-type handlers do not throw
 - `bulk-paste-head-qa` — one-row Bulk Paste header + progress ring
