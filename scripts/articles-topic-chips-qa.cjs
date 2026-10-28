@@ -84,7 +84,7 @@ assert.ok(/match \/disease_codex_drafts\/\{draftId\} \{[\s\S]*?allow create: if 
       return out;
     });
     assert.deepEqual(r.flags, [['🇬🇧', 'English', 'Required to schedule'], ['🇹🇭', 'Thai', 'Thai version'], ['🇰🇷', 'Korean', 'Empty — interns see EN']].map((x, i) => i === 2 ? [x[0], x[1], x[2]] : x).slice(0, 3).map((x, i) => i === 2 ? ['🇰🇷 → 🇬🇧', 'Korean', 'Empty — interns see EN'] : x), 'flags (the letters live in aria-label / title): ' + JSON.stringify(r.flags));
-    assert.deepEqual(r.rowFlags, [['🇬🇧', 'EN'], ['🇹🇭', 'TH'], ['🇰🇷', 'KO']], 'the list rows too: ' + JSON.stringify(r.rowFlags));
+    assert.deepEqual(r.rowFlags, [['🇬🇧', 'EN'], ['🇹🇭', 'TH'], ['🇰🇷', 'KO — not written yet']], 'the list rows too (a missing language says so): ' + JSON.stringify(r.rowFlags));
     assert.deepEqual(r.row0, [['🩺 Disease', '💊 Drug', '🔗 Quiz'], 'art-xr', ['', '', '']], 'the chip row sits right under the title: ' + JSON.stringify(r.row0));
     assert.deepEqual(r.dxDraft, ['disease_codex_drafts', 'pending', 'admin1', 'a@x.test', 'a1', 'Myofascial Pain Syndrome (MPS) 💡', 'Myofascial Pain Syndrome', 'กลุ่มอาการปวดกล้ามเนื้อและพังผืด', ['MPS'], false, true, 'TS', '', true], 'an EMPTY draft with just the topic: ' + JSON.stringify(r.dxDraft));
     assert.deepEqual(r.dxArt, ['update', 'articles', 'a1', { dx: { draftId: 'd9', publishedId: '', name: 'Myofascial Pain Syndrome' } }], 'the article remembers it');
