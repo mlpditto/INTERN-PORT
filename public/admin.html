@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.477)</title>
+    <title>Nika Admin (V102.478)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.475">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -8153,12 +8153,12 @@
     <script src="lang-toggle.js?v=V102.46"></script>
     <script src="admin-guide.js?v=V102.449" defer></script>
 <link rel="stylesheet" href="audit-toolbar.css?v=V102.268">
-<link rel="stylesheet" href="quiz-curate.css?v=V102.285">
+<link rel="stylesheet" href="quiz-curate.css?v=V102.478">
 <script src="quiz-revision.js?v=V100.07"></script>
 <script src="ai-usage-overview.js?v=V102.147"></script>
 <link rel="stylesheet" href="ai-usage-overview.css?v=V102.147">
 <script src="quiz-curate-history.js?v=V100.08"></script>
-<script src="quiz-curate.js?v=V102.456"></script>
+<script src="quiz-curate.js?v=V102.478"></script>
 <link rel="stylesheet" href="quiz-merge.css?v=V101.29">
 <script src="quiz-merge.js?v=V101.29"></script>
 <script src="quiz-compare-cleanup.js?v=V100.47"></script>
@@ -19592,9 +19592,10 @@
                 // the suggested titles too, not just the analysis text + per-question items.
                 window._aiAnalysisSuggestedTitles = result.suggestedTitles || null;
                 // V96.51: quality signal — one 'suggested' per proposed item, tagged by model.
-                if (result.items && result.items.length && typeof recordAiEval === 'function') {
+                const _offered = (result.items || []).filter(it => !(it && it._shapeInvalid && String(it._shapeInvalid).indexOf(window.RANK_UNUSABLE) === 0)).length;   // V102.478: a refused Rank rewrite was never offered
+                if (_offered && typeof recordAiEval === 'function') {
                     const _m = window._compareModelMeta ? window._compareModelMeta(aiModel || selectedModel).label : (aiModel || selectedModel || 'AI');
-                    recordAiEval('quiz_improve', _m, 'suggested', result.items.length);
+                    recordAiEval('quiz_improve', _m, 'suggested', _offered);
                 }
                 // V97.39: auto-save the analysis to the quiz doc so it survives a page
                 // refresh and can be reopened later via 🕑 Last without spending tokens
@@ -21160,6 +21161,19 @@ RULES:
             medium: 'MEDIUM — apply a fact to a short situation (a patient, a prescription, a formulation): one decision from one or two given data points; distractors plausible.',
             hard: 'HARD — multi-step analysis: combine several data points, weigh alternatives, include calculations and select-all where the format allows; distractors are near-misses a weaker candidate would pick. Harder by reasoning, never by rarer vocabulary.'
         };
+        // V102.478: the "existing questions" block of Expand / Regenerate — a Rank question is described as a ranking (stem + options with their levels);
+        // a quiz with no Rank question gets exactly the old "Q1: stem" lines. The note keeps the NEW questions as plain choice questions (the schema below is choice-only).
+        window.sqmExistingQs = function (questions) {
+            return (Array.isArray(questions) ? questions : []).map((q, i) => {
+                if (!q || q.type !== 'rank') return 'Q' + (i + 1) + ': ' + (q && q.q);
+                const opts = (Array.isArray(q.options) ? q.options : []).map((o, k) => o + ' — ' + window.rankLevelName(q, k) + (Number((q.unsafe || [])[k]) ? ' ⚠' : '')).join(' | ');
+                return 'Q' + (i + 1) + ' [RANKING QUESTION]: ' + q.q + '\n    options with their level: ' + opts;
+            }).join('\n');
+        };
+        window.sqmRankNote = function (questions) {
+            return (Array.isArray(questions) ? questions : []).some(q => q && q.type === 'rank')
+                ? '\n                - Questions marked [RANKING QUESTION] are best-to-worst ranking items (each option has a level). Do NOT copy that format: write the new questions as ordinary multiple-choice questions exactly as the JSON SCHEMA below ("type": "choice"), using the ranking questions only as topic context.' : '';
+        };
         window.sqmLevelLine = function(styleKey, diff) {
             const lv = ['easy', 'medium', 'hard'].includes(diff) ? diff : 'easy';
             const style = (window.SQM_EXAM_STYLES || {})[styleKey] || {};
@@ -21344,7 +21358,7 @@ RULES:
             const examStyleLines = examStyle.prompt(n, (document.getElementById('suggest-scope') || {}).value || 'clinical');
             
             const formData = getQuizFormData();
-            const existingQs = formData.questions.map((q, i) => `Q${i+1}: ${q.q}`).join('\n');
+            const existingQs = window.sqmExistingQs(formData.questions);
             const quizTitle = document.getElementById('quiz-title').value;
             
             const detectLanguage = (text) => {
@@ -21398,7 +21412,7 @@ RULES:
                 ${examStyleLines}
                 - Include real-world scenarios, critical thinking, and application
                 - Distractors must be conceptually plausible but clearly incorrect
-                - Each question should have educational value beyond the existing ones
+                - Each question should have educational value beyond the existing ones${window.sqmRankNote(formData.questions)}
 
                 --- IMPROVEMENT STRATEGIES ---
                 - Transform factual recall into application scenarios
@@ -21449,7 +21463,7 @@ RULES:
 
         window.regenerateSuggestions = async function(focusType) {
             const formData = getQuizFormData();
-            const existingQs = formData.questions.map((q, i) => `Q${i+1}: ${q.q}`).join('\n');
+            const existingQs = window.sqmExistingQs(formData.questions);
             const quizTitle = document.getElementById('quiz-title').value;
             const n = 3;
             
@@ -21495,7 +21509,7 @@ RULES:
             - Cognitive-level mix across the ${n} questions (Thai Pharmacy Council exam blueprint, recall:interpretation:problem-solving = 3:8:4): mostly INTERPRETATION (apply given patient/case data to reach an answer), some PROBLEM-SOLVING (multi-step clinical reasoning), at most 1 in 5 pure RECALL
             - Include real-world scenarios and critical thinking
             - Distractors must be conceptually plausible but clearly incorrect
-            - Each question should have educational value beyond the existing ones
+            - Each question should have educational value beyond the existing ones${window.sqmRankNote(formData.questions)}
 
             JSON SCHEMA (a JSON object whose "questions" array holds all ${n} questions):
             {"questions": [
@@ -25215,6 +25229,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
 
         window.aiEnhanceQuestion = async function(btn) {
             const item = btn.closest('.quiz-q-item');
+            if (window.rankAiToolBlocked(item, 'Magic enhance')) return;   // V102.478: it rebuilds the option rows — that would wipe a Rank card's levels
             const questionTextarea = item.querySelector('.q-text');
             const optionTextareas = item.querySelectorAll('.q-opt');
             const correctChecks = item.querySelectorAll('.q-correct-check');
@@ -25427,6 +25442,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             if (menu) menu.style.display = 'none';
             const ctx = window._qImproveCtx(item);
             if (!ctx.question) return alert('Please fill in the question first.');
+            if (['findanswer', 'polish', 'distractors'].includes(action) && window.rankAiToolBlocked(item, action === 'polish' ? 'Polish' : action === 'distractors' ? 'Distractors' : 'Find answer')) return;   // V102.478
             const model = window._qImproveModel(item);
             try {
                 window._qImproveChipBusy(chip, true);
@@ -28031,11 +28047,12 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 // onto the student handout; it belongs only in the with-answers
                 // Guideline line below.
                 const isOrdering = qType === 'ordering';
+                const isRank = qType === 'rank';   // V102.478: no single correct option — the handout prints a levels line instead of ticks
                 const hideOptionList = mode === 'questions_only' || qType === 'short_answer';
                 const options = hideOptionList ? [] : opts.map((opt, oi) => ({
                     prefix: `${String.fromCharCode(65 + (oi % 26))}.`,
                     text: `${normalizePdfText(opt) || '-'}`,
-                    correct: mode === 'with_answers' && !isOrdering && isCorrectIndex(q, oi)
+                    correct: mode === 'with_answers' && !isOrdering && !isRank && isCorrectIndex(q, oi)
                 }));
                 let guideline = '';
                 if (mode === 'with_answers' && opts.length > 0) {
@@ -28048,6 +28065,11 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                     }
                 }
 
+                if (mode === 'with_answers' && isRank && opts.length > 0) {
+                    const L = k => opts.map((_, i) => i).filter(i => Number((q.tiers || [])[i]) === k).map(i => String.fromCharCode(65 + (i % 26))).join(', ') || '–';
+                    const unsafe = opts.map((_, i) => i).filter(i => Number((q.unsafe || [])[i])).map(i => String.fromCharCode(65 + (i % 26))).join(', ');
+                    guideline = 'Ranking key — Best: ' + L(0) + ' · OK: ' + L(1) + ' · Avoid: ' + L(2) + (unsafe ? ' · ⚠ unsafe: ' + unsafe : '');
+                }
                 // V96.72: a short_answer question prints no choices, so on a handout
                 // there was nothing under it to write on. Give it ruled lines — but
                 // only where no answer key is shown, so the instructor copy keeps its
@@ -28924,6 +28946,12 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const tp = item.querySelector('.q-rk-topic'); if (tp) tp.value = (a.topic + ' — ' + a.choices[i]).slice(0, 300);
             window.rankAiDraft(item.querySelector('.rk-ai .aic-seg'));
         };
+        window.rankAiToolBlocked = function (item, what) {
+            const t = item && item.querySelector && item.querySelector('.q-type');
+            if (!t || t.value !== 'rank') return false;
+            showToast('Rank question — ' + what + ' is for choice questions. Use ✨ Draft in this card, or Review ▸ Specialist.');
+            return true;
+        };
         window.rankAiModel = function () {
             let m = ''; try { m = localStorage.getItem('rankAiModel') || ''; } catch (e) { /* none */ }
             return (m && window.textAIModelInfo && window.textAIModelInfo(m)) ? m : textAIModel('ai-analyzer-model-val');
@@ -29217,7 +29245,8 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 choice:       { icon: '🔘', label: 'Choice' },
                 ordering:     { icon: '📋', label: 'Ordering' },
                 flashcard:    { icon: '🎴', label: 'Flashcard' },
-                short_answer: { icon: '✍️', label: 'Short Answer' }
+                short_answer: { icon: '✍️', label: 'Short Answer' },
+                rank:         { icon: '🏅', label: 'Rank' }
             };
             const typeChipsHtml = Object.keys(_bxTypeCounts).sort().map(t => {
                 const meta = _bxTypeMeta[t] || { icon: '❓', label: t };
@@ -68074,7 +68103,7 @@ Recommended Review: X days`;
                     const target = (Array.isArray(q.correct) ? q.correct : [q.correct]).map(String);
                     const userAns = e.answers[i];
                     const userArr = (Array.isArray(userAns) ? userAns : [userAns]).map(String);
-                    const ok = target.some(t => userArr.includes(t));
+                    const ok = (q.type === 'rank' && window.RankQuiz) ? window.RankQuiz.score(q, userAns).credit >= 0.8 : target.some(t => userArr.includes(t));   // V102.478: Rank = ★4 and up
                     return `<span title="Q${i+1}: ${(q.q||'').slice(0,60)}" style="display:inline-block;padding:2px 5px;border-radius:5px;font-size:0.7em;font-weight:700;background:${ok?'#dcfce7':'#fef2f2'};color:${ok?'#16a34a':'#dc2626'};cursor:default;">${ok?'✅':'❌'} Q${i+1}</span>`;
                 }).join(' ');
                 perQHtml = `<div style="font-size:0.7em;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.3px;margin:10px 0 5px;">Per Question</div>
@@ -72294,6 +72323,12 @@ RULES:
                 population: uniq(pick(raw && raw.population, 'population')).slice(0, 1)
             };
         };
+        // V102.478: a Rank question reaches the tagging model as a ranking question with its options (they name the drugs / conditions); any other type is the bare stem, as before
+        window.qatQuestionText = function (x) {
+            const stem = String((x && x.q) || '').slice(0, 160);
+            if (!x || x.type !== 'rank') return stem;
+            return stem + ' [ranking question — options: ' + (Array.isArray(x.options) ? x.options : []).slice(0, 6).map(o => String(o == null ? '' : o).slice(0, 40)).join(' | ') + ']';
+        };
         window.qatBuildPrompt = function (quizzes) {
             const v = window.QUIZ_TAG_VOCAB;
             const topics = Object.entries(v.topic).map(([k, list]) => `${k}: ${list.join(' | ')}`).join('\n');
@@ -72302,7 +72337,7 @@ RULES:
                 title: String(q.title || q.shortTitle || '').slice(0, 200),
                 description: String(q.description || '').slice(0, 300),
                 currentTags: window.stripQuizMarkerTags(window.quizTagList(q)).slice(0, 12),
-                questions: (Array.isArray(q.questions) ? q.questions : []).slice(0, 6).map(x => String((x && x.q) || '').slice(0, 160))
+                questions: (Array.isArray(q.questions) ? q.questions : []).slice(0, 6).map(x => window.qatQuestionText(x))
             }));
             return `You tag pharmacy-education quizzes with a FIXED vocabulary. Use the exact spelling below; never invent tags.
 
@@ -72317,7 +72352,7 @@ For each quiz choose:
 - topics: 1 to 3 TOPIC tags (from any system's list) that the quiz is mainly about.
 - skill: exactly one SKILL tag for the main kind of knowledge tested. Non-pharmacy subjects use "General Knowledge".
 - population: [] unless the quiz clearly focuses on children, older adults, or pregnancy/lactation.
-Quiz text may be Thai or English.
+Quiz text may be Thai or English.${quizzes.some(q => (Array.isArray(q.questions) ? q.questions : []).slice(0, 6).some(x => x && x.type === 'rank')) ? '\nQuestions marked [ranking question] ask the intern to rank the listed options from best to worst; tag them by the clinical subject those options and the stem are about.' : ''}
 
 Return JSON only: {"results":[{"id":"<id>","system":"<key>","topics":["..."],"skill":"...","population":[]}]}
 
