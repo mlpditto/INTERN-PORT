@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.481)</title>
+    <title>Nika Admin (V102.482)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.475">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -37946,17 +37946,27 @@ RULES:
                     const snap = await db.collection('line_usage').doc(month).get();
                     const d = snap.exists ? (snap.data() || {}) : {};
                     const total = Number(d.total || 0);
+                    // V102.479: LINE's OWN number (watchLineQuota, 07:00 daily: GET /v2/bot/message/quota + /consumption) beats the project's counter
+                    // while it is fresh — the counter only sees pushes made through pushLineFlex, so anything sent from OA Manager never reaches it.
+                    const api = d.api || {};
+                    const apiAt = api.checkedAt && typeof api.checkedAt.toMillis === 'function' ? api.checkedAt.toMillis() : (api.checkedAt && api.checkedAt.seconds ? api.checkedAt.seconds * 1000 : 0);
+                    const apiFresh = Number(api.limit) > 0 && Number.isFinite(Number(api.used)) && api.used !== null && !!apiAt && (Date.now() - apiAt) < 36 * 3600e3;
+                    const shown = apiFresh ? Number(api.used) : total;
+                    const cap = apiFresh ? Number(api.limit) : LINE_MONTHLY_QUOTA;
 
-                    const pct = Math.min(100, Math.round((total / LINE_MONTHLY_QUOTA) * 100));
-                    const color = pct >= 90 ? '#dc2626' : (pct >= 70 ? '#f59e0b' : '#22c55e');
+                    const pct = Math.min(100, Math.round((shown / cap) * 100));
+                    let color = pct >= 90 ? '#dc2626' : (pct >= 70 ? '#f59e0b' : '#22c55e');
+                    // the colour follows the WORSE of the percentage and the server's tier (a pace that projects past the limit is amber before 70 %)
+                    if (apiFresh && (api.tier === 'critical' || api.tier === 'full')) color = '#dc2626';
+                    else if (apiFresh && api.tier === 'watch' && color === '#22c55e') color = '#f59e0b';
 
                     const countEl = document.getElementById('line-usage-count');
                     if (countEl) {
-                        countEl.textContent = `${total}/${LINE_MONTHLY_QUOTA}`;
+                        countEl.textContent = `${shown}/${cap}`;
                         countEl.style.color = color;
                     }
                     const chipN = document.getElementById('line-usage-chip-n');   // V102.163: the toolbar chip shows the same number in the same colour
-                    if (chipN) { chipN.textContent = `${total}/${LINE_MONTHLY_QUOTA}`; chipN.style.color = color; }
+                    if (chipN) { chipN.textContent = `${shown}/${cap}`; chipN.style.color = color; }
                     const bar = document.getElementById('line-usage-bar');
                     if (bar) { bar.style.width = pct + '%'; bar.style.background = color; }
 
@@ -37965,7 +37975,7 @@ RULES:
                     // at LINE — refusing before spending the call is cheaper and clearer.
                     // V97.64: the flag has to outlive this call — the Send button now lives
                     // inside the preview box, which renders long after loadLineUsage ran.
-                    const atCap = total >= LINE_MONTHLY_QUOTA;
+                    const atCap = shown >= cap;
                     window._lineDigestAtCap = atCap;
                     const sendBtn = document.getElementById('line-digest-now-btn');
                     if (sendBtn) {
@@ -37983,7 +37993,7 @@ RULES:
                         .sort((a, b) => Number(byTag[b]) - Number(byTag[a]))
                         .map(k => `${LINE_TAG_LABELS[k] || k} ${byTag[k]}`);
                     const breakdown = document.getElementById('line-usage-breakdown');
-                    if (breakdown) breakdown.textContent = parts.join(' · ');
+                    if (breakdown) breakdown.textContent = (apiFresh ? [`LINE ${shown}`, `counted ${total}`] : []).concat(parts).join(' · ');   // V102.479: LINE's number first, then the project's own counter and its split
 
                     // Near the cap what the admin needs is the headroom, not a scolding —
                     // so lead with how many pushes are actually left. Below that, the only
@@ -37991,7 +38001,7 @@ RULES:
                     const note = document.getElementById('line-usage-note');
                     if (note) {
                         if (pct >= 90) {
-                            const left = Math.max(0, LINE_MONTHLY_QUOTA - total);
+                            const left = Math.max(0, cap - shown);
                             note.textContent = `⚠️ ${left} left this month — go easy on new pushes ใกล้เต็มโควตาแล้ว`;
                         } else {
                             note.textContent = 'Successful pushes only นับเฉพาะข้อความที่ส่งสำเร็จ'
@@ -37999,6 +38009,10 @@ RULES:
                                     ? ' · counting started mid-month เริ่มนับกลางเดือน'
                                     : '');
                         }
+                    }
+                    // V102.479: the pace, when the server says it matters — what the month will end at and the day it would run out
+                    if (note && apiFresh && (api.tier === 'watch' || api.tier === 'critical') && Number(api.projected) > 0) {
+                        note.textContent += ` · คาดว่าสิ้นเดือน ~${api.projected}${api.runOutDay ? ` · จะเต็มวันที่ ${api.runOutDay}` : ''}`;
                     }
                     panel.style.display = 'block';
                 } catch (e) {
