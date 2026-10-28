@@ -14,6 +14,7 @@ const RANK = { type: 'rank', q: 'ผู้ป่วยหอบกำเริ�
 const CH = { type: 'choice', q: 'Plain choice', options: ['a', 'b'], correct: [0] };
 const QUIZ = { id: 'QR', title: 'Asthma', shortTitle: 'Asthma', quizType: 'standard', totalPoints: 3, questions: [CH, RANK, { ...RANK, accepted: ['zzz'] }] };
 
+const QUIZ_ANS = [null, ['albuterol', '0,2,3,1'], ['ยาพ่นอะไรสักอย่าง', '0,1,2,3']];
 (async () => {
     const browser = await chromium.launch();
     try {
@@ -85,6 +86,37 @@ const QUIZ = { id: 'QR', title: 'Asthma', shortTitle: 'Asthma', quizType: 'stand
         // 5 · what the attempt stores is what the scorer reads back (the joined string)
         const back = await page.evaluate(() => { const a = userAnswers.map(x => Array.isArray(x) ? x.join('\n---\n') : x); return [RankQuiz.score(currentQuiz.questions[1], a[1]).stars, RankQuiz.score(currentQuiz.questions[2], a[2]).stars]; });
         assert.deepEqual(back, [4, 5], 'joined answers re-score identically (Q2: perfect order + self-matched best answer = ★5)');
+
+        // 6 · Beri: ★4 = +1, ★5 = +2 once per question (ledger = dedupe), a daily cap, none in practice mode, none for ★3 or less
+        await page.evaluate((QUIZ_ANS) => {
+            window.__sets = []; window.__ledgerExists = false; window.__daily = {}; window.myRegistered = true;
+            firebase = { firestore: { FieldValue: { increment: n => ({ inc: n }), serverTimestamp: () => "TS" } } };
+            window.db = { collection: () => ({ doc: id => ({ id }) }), runTransaction: async fn => fn({ get: async ref => (typeof ref === "function" ? { exists: window.__ledgerExists } : { exists: true, data: () => window.__daily }), set: (ref, data) => window.__sets.push([typeof ref === "function" ? "ledger" : ref.id, data]) }) };
+            for (const k of Object.keys(rankBeri)) delete rankBeri[k];
+            userAnswers = QUIZ_ANS.map(x => x); currentStep = 1; renderQuizStep(false); clearInterval(quizTimerInterval);
+        }, QUIZ_ANS);
+        await page.evaluate(() => rankAwardBeri(1)); await page.waitForTimeout(100);
+        let sets = await page.evaluate(() => window.__sets);
+        assert.equal(sets.length, 3, "★4 on Q2 (matched typed answer) → one daily row, one user row, one ledger row");
+        const led = sets.find(x => x[0] === "ledger")[1], usr = sets.find(x => x[0] === "u1")[1];
+        assert.deepEqual([led.source, led.amount, led.refId, usr.beri.inc], ["quiz_rank", 1, "QR_u1_1", 1]);
+        assert.equal(sets.find(x => /^u1_/.test(x[0]))[1].rankAmount.inc, 1);
+        assert.match(await page.locator(".rk-rew").textContent(), /🪙 \+1 Beri/, "the chip shows after the credit");
+        await page.evaluate(() => rankAwardBeri(1)); assert.equal((await page.evaluate(() => window.__sets)).length, 3, "asking again in the same session pays nothing more");
+        // a retake / second device: the ledger row exists → silent "done", nothing written
+        await page.evaluate(() => { window.__sets.length = 0; window.__ledgerExists = true; delete rankBeri["QR:1"]; }); await page.evaluate(() => rankAwardBeri(1));
+        assert.deepEqual([(await page.evaluate(() => window.__sets)).length, await page.evaluate(() => rankBeri["QR:1"].state)], [0, "done"]);
+        // cap: 9 earned today + 2 would pass 10 → skipped, chip says so
+        await page.evaluate(() => { window.__ledgerExists = false; window.__daily = { rankAmount: 9 }; delete rankBeri["QR:1"]; currentStep = 2; });
+        await page.evaluate(() => { userAnswers[2] = ["x", "0,1,2,3", "m:0"]; rankAwardBeri(2); }); await page.waitForTimeout(100);
+        assert.deepEqual([(await page.evaluate(() => window.__sets)).length, await page.evaluate(() => rankBeri["QR:2"].state)], [0, "cap"], "★5 = +2 does not fit under the cap of 10 → skipped, not trimmed");
+        // practice mode, an unsettled ★3 and a ★5 on a different quiz id
+        await page.evaluate(() => { for (const k of Object.keys(rankBeri)) delete rankBeri[k]; window.__daily = {}; isPracticeMode = true; rankAwardBeri(2); });
+        assert.equal((await page.evaluate(() => window.__sets)).length, 0, "practice mode never pays");
+        await page.evaluate(() => { isPracticeMode = false; userAnswers[2] = ["x", "3,2,1,0"]; rankAwardBeri(2); });
+        assert.equal((await page.evaluate(() => window.__sets)).length, 0, "a ★1 pays nothing");
+        await page.evaluate(() => { userAnswers[2] = ["x", "0,1,2,3", "m:0"]; rankAwardBeri(2); }); await page.waitForTimeout(100);
+        sets = await page.evaluate(() => window.__sets); assert.equal(sets.find(x => x[0] === "ledger")[1].amount, 2, "★5 pays +2");
 
         const mine = errors.filter(e => /rank|Rank|rk[A-Z]/.test(e)); assert.deepEqual(mine, [], 'no Rank errors: ' + mine.join(' | '));
         console.log('PASS: Rank question in the intern runner — typed answer locks, options shuffled, tap order + reset, ★ reveal with tier key and red misplaced, self-match, answered state, saved parts');
