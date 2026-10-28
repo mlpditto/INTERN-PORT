@@ -132,6 +132,42 @@ const GOOD = { q: 'ผู้ป่วยหอบกำเริบ ยาตั
         await draft('asthma first-line', { ...GOOD, accepted: ['salbutamol', 'albuterol, '.repeat(8), 'Ventolin'] });
         c = await card(); assert.deepEqual(c.q.accepted, ['salbutamol', 'Ventolin'], 'accepted answers over 60 characters are dropped');
 
+        // ---- V102.476: lean capsule [✨ Draft │ model ⌄]; the animation lives in the capsule, the model is visible and per card
+        await page.evaluate(() => { try { localStorage.removeItem('rankAiModel'); } catch (e) {} const c = document.getElementById('quiz-questions-container'); c.innerHTML = ''; addQuestionUI({ type: 'choice', q: 'First question', options: ['a', 'b'], correct: [0], timer: 30 }); addQuestionUI({ type: 'rank', q: '', options: ['', '', '', ''], tiers: [-1, -1, -1, -1], timer: 45 }); });
+        const cap = () => page.evaluate(() => { const it = document.querySelectorAll('.quiz-q-item')[1], c = it.querySelector('.rk-cap'), s = c.querySelector('.aic-seg'); return { cap: c.className, state: c.dataset.aiState || '', seg: s.textContent.trim(), tm: !!s.querySelector('.aic-tm'), dis: s.disabled, st: it.querySelector('.rk-ai-st').textContent, model: it.querySelector('.rk-mdl').textContent.trim(), val: it.querySelector('.rk-model-val').value, rail: !it.querySelector('.rk-rail').hidden, expanded: it.querySelector('.rk-mdl').getAttribute('aria-expanded'), h: Math.round(c.getBoundingClientRect().height) }; });
+        let k = await cap();
+        assert.match(k.cap, /ai-cap/); assert.equal(k.seg, '✨ Draft'); assert.equal(k.state, ''); assert.equal(k.st, '', 'no status text while idle'); assert.ok(k.model.length > 2 && k.val, 'the model is on the chip: ' + k.model); assert.ok(k.h <= 34, 'lean: one line, 32px (' + k.h + ')');
+        const textModel = await page.evaluate(() => textAIModel('ai-analyzer-model-val')); assert.equal(k.val, textModel, 'default = the Settings text model');
+        // the model rail: opens under the row, a pick changes THIS card's model, is remembered, and the next draft uses it
+        await page.evaluate(() => document.querySelectorAll('.quiz-q-item')[1].querySelector('.rk-mdl').click());
+        k = await cap(); assert.equal(k.rail, true); assert.equal(k.expanded, 'true');
+        const other = await page.evaluate(cur => { const b = [...document.querySelectorAll('.quiz-q-item')[1].querySelectorAll('.rk-rail .text-ai-chips button')].find(x => x.dataset.value && x.dataset.value !== cur && !/^(ol\/|or\/)/.test(x.dataset.value)); b.click(); return b.dataset.value; }, textModel);
+        k = await cap(); assert.equal(k.val, other, 'a pick sets the card model'); assert.equal(k.rail, false, '…and closes the rail'); assert.equal(await page.evaluate(() => localStorage.getItem('rankAiModel')), other, '…and is remembered');
+        await draft('asthma first-line', GOOD);
+        assert.equal(await page.evaluate(() => __calls[0].model), other, 'the draft runs with the picked model');
+        // a fresh Rank card starts from the remembered model
+        await page.evaluate(() => addQuestionUI({ type: 'rank', q: '', options: ['', '', '', ''], tiers: [-1, -1, -1, -1] }));
+        assert.equal(await page.evaluate(() => [...document.querySelectorAll('.quiz-q-item')].pop().querySelector('.rk-model-val').value), other, 'remembered across cards');
+        // running: the capsule animates (flip + timer + shimmer state), no text beside it; then the new card flashes ✓ and returns
+        await page.evaluate(() => { document.getElementById('quiz-questions-container').innerHTML = ''; addQuestionUI({ type: 'choice', q: 'First question', options: ['a', 'b'], correct: [0], timer: 30 }); addQuestionUI({ type: 'rank', q: '', options: ['', '', '', ''], tiers: [-1, -1, -1, -1] }); });
+        await page.evaluate(g => {
+            const real = window.callUniversalAI; window.__realAI = real; window.__calls.length = 0;
+            window.callUniversalAI = async (model, prompt) => { window.__calls.push({ model, prompt }); await new Promise(r => { window.__release = r; }); return { text: JSON.stringify(g) }; };
+            const it = document.querySelectorAll('.quiz-q-item')[1]; it.querySelector('.q-rk-topic').value = 'asthma first-line'; it.querySelector('.rk-cap .aic-seg').click();
+        }, GOOD);
+        await page.waitForFunction(() => document.querySelectorAll('.quiz-q-item')[1].querySelector('.rk-cap').dataset.aiState === 'run');
+        k = await cap(); assert.deepEqual([k.state, k.tm, k.dis, k.st], ['run', true, true, ''], 'running: flip + timer, disabled, nothing written beside it');
+        await page.evaluate(() => window.__release());
+        await page.waitForFunction(() => { const c = document.querySelectorAll('.quiz-q-item')[1].querySelector('.rk-cap'); return c && c.dataset.aiState === 'done'; });
+        k = await cap(); assert.equal(k.seg, '✓'); assert.equal(k.state, 'done');
+        await page.waitForFunction(() => { const c = document.querySelectorAll('.quiz-q-item')[1].querySelector('.rk-cap'); return c && !c.dataset.aiState; }, null, { timeout: 5000 });
+        assert.equal((await cap()).seg, '✨ Draft', 'back to idle');
+        // an error returns straight to idle with the message on its own line
+        await page.evaluate(() => { window.callUniversalAI = async () => { throw new Error('model said no'); }; const it = document.querySelectorAll('.quiz-q-item')[1]; it.querySelector('.q-rk-topic').value = 'x'; it.querySelector('.rk-cap .aic-seg').click(); });
+        await page.waitForFunction(() => /model said no/.test(document.querySelectorAll('.quiz-q-item')[1].querySelector('.rk-ai-st').textContent));
+        k = await cap(); assert.deepEqual([k.state, k.seg, k.dis], ['', '✨ Draft', false], 'error: no ✓, icon back, enabled');
+        await page.evaluate(() => { window.callUniversalAI = window.__realAI; });
+
         const mine = errors.filter(e => /rank|Rank|addQuestionUI|getQuizFormData/.test(e)); assert.deepEqual(mine, [], 'no errors: ' + mine.join(' | '));
         console.log('PASS: Rank ✨ Draft — prompt contract, filled in place (position, timer, tags kept), AI-draft note drops on a level / ⚠ edit, best-first reshuffled with levels attached, bad draft / error / no topic leave the card untouched, 6-option cap, ledger label');
     } finally { await browser.close(); }
