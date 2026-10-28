@@ -113,10 +113,17 @@ const tick = page => page.evaluate(() => new Promise(r => setTimeout(r, 0)));
         assert.equal(await page.evaluate(() => [audios.length, spoken.length].join('|')), before, 'shuffle does not play');
         assert.equal(await page.evaluate(() => lastA.paused), true, 'shuffle stops the clip');
         assert.doesNotMatch(await card.getAttribute('class'), /speaking/);
+        // V101.229: the chip shows the flag of the language that is on — it follows the toggle
+        const flagNow = () => page.locator('#qsc-lang-chips button').innerText();
+        assert.equal(await flagNow(), '🇺🇸', 'English opens with the English flag');
         // Korean toggle repaints the rule + buttons
         await page.locator('#qsc-lang-chips button').click();
+        assert.equal(await flagNow(), '🇰🇷', 'Korean shows the Korean flag');
         assert.match(await page.locator('#qsc-key').innerText(), /나가기·새로고침 금지/);
         assert.deepEqual(await page.evaluate(() => [document.getElementById('qsc-confirm').textContent, document.getElementById('qsc-confirm').getAttribute('aria-label'), document.getElementById('qsc-cancel').textContent, document.getElementById('qsc-cancel').getAttribute('aria-label')]), ['▶', '시작', '✕', '취소'], 'V101.14: icon-only buttons, the word is the accessible name');
+        await page.locator('#qsc-lang-chips button').click();
+        assert.equal(await flagNow(), '🇺🇸', 'toggling back returns the English flag');
+        await page.locator('#qsc-lang-chips button').click();
         // rule + buttons fit at 390 px
         const foot = await page.evaluate(() => { const f = document.querySelector('.qsc-foot'), c = document.querySelector('#quizStartConfirmModal .modal-content').getBoundingClientRect(); const ys = [...f.children].map(e => Math.round(e.getBoundingClientRect().top)); return { rows: new Set(ys.map(y => Math.round(y / 20))).size <= 2, fits: [...f.children].every(e => e.getBoundingClientRect().right <= c.right + 1) }; });
         assert.deepEqual(foot, { rows: true, fits: true });
