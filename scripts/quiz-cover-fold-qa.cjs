@@ -59,7 +59,7 @@ const INDEX = require('url').pathToFileURL(path.join(process.cwd(), 'public/inde
             await new Promise(res => setTimeout(res, 400));
             const out = {};
             host.querySelectorAll('.assignment-card').forEach(c => {
-                const cover = c.querySelector('.quiz-cover-thumb'), fold = c.querySelector('.quiz-cover-fold'), play = c.querySelector('.quiz-cover-play');
+                const cover = c.querySelector('.quiz-cover-thumb'), fold = c.querySelector('.quiz-cover-fold'), play = c.querySelector('.quiz-cover-deadline') || c.querySelector('.quiz-cover-play'); // V101.228: the deadline / Start chip carries the ▶ and its first-view pulse
                 out[c.dataset.qa] = {
                     fold: !!fold, foldColor: fold ? getComputedStyle(fold).backgroundColor : '', foldW: fold ? fold.getBoundingClientRect().width : 0,
                     foldOpacity: fold ? getComputedStyle(fold).opacity : '', star: fold ? getComputedStyle(fold, '::after').content : '',
@@ -81,7 +81,7 @@ const INDEX = require('url').pathToFileURL(path.join(process.cwd(), 'public/inde
             assert.equal(o[id].pulseCount, '2', id + ': pulse runs twice, never loops');
         }
         assert.equal(o.requested.fold, false, 'an attempted quiz gets no fold');
-        assert.equal(o.requested.pulse, 'none', 'attempted ▶ stays still');
+        assert.notEqual(o.requested.pulse, 'quizPlayPulse', 'attempted ▶ never gets the first-view pulse (its chip may sweep)');
         assert.equal(o.fresh1.foldColor, 'rgb(249, 115, 22)', 'someone did it → coral fold');
         assert.equal(o.fresh1.star, 'none', 'no ★ on the coral fold');
         assert.equal(o.fresh1.glow, 'none');
