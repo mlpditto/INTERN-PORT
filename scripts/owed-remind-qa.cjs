@@ -1,6 +1,6 @@
 // V101.228: 🔔 "still to do" sheet on open (public/owed-remind.js) — the REAL script inside the REAL index.html on a 390 px phone (Bangkok clock fixed),
 // with the real articles.js, quiz-feedback-remind.js and knowthyself-nudge.js next to it. Pure rules (pending / inPeriod / decide / others / afternoon),
-// Journal + Case only from 12:00 but an unread article any hour, the sheet (EN / TH / KO, rows, "+n more", fits 390 px, 44 px targets), Later /
+// Journal + Case only from 16:00 on weekdays but an unread article any hour, the sheet (EN / TH / KO, rows, "+n more", fits 390 px, 44 px targets), Later /
 // backdrop / Esc, once a day, three Laters stop it until something is done, rows go to the item, the chime (played · locked → "tap anywhere" ·
 // muted · once a day), and the ONE-popup-a-day precedence: the sheet holds the slot (📰 popup, feedback reminder and Know thyself stay quiet), gives
 // way when one of them already showed today, waits behind a modal, and changes nothing outside the internship period.
@@ -51,27 +51,27 @@ const D = 864e5;
     const pure = await page.evaluate(() => {
       const R = owedRemind, arts = [{ id: 'a1', title: 'A1' }, { id: 'a2', title: 'A2' }];
       return {
-        morning: R.pending({ journal: true, case: true, articles: arts, afternoon: false }).map(r => r.k),
-        noon: R.pending({ journal: true, case: true, articles: arts, afternoon: true }).map(r => r.k),
-        done: R.pending({ journal: false, case: true, articles: [], afternoon: true }).map(r => r.k),
-        unknown: R.pending({ journal: null, case: null, articles: [], afternoon: true }).length,
+        morning: R.pending({ journal: true, case: true, articles: arts, daily: false }).map(r => r.k),
+        noon: R.pending({ journal: true, case: true, articles: arts, daily: true }).map(r => r.k),
+        done: R.pending({ journal: false, case: true, articles: [], daily: true }).map(r => r.k),
+        unknown: R.pending({ journal: null, case: null, articles: [], daily: true }).length,
         inP: [R.inPeriod({ endDate: '2026-12-31' }, '2026-10-16'), R.inPeriod({ endDate: '2026-10-15' }, '2026-10-16'), R.inPeriod({ endDate: '2026-10-16' }, '2026-10-16'), R.inPeriod({ endDate: '2026-12-31', startDate: '2026-11-01' }, '2026-10-16'), R.inPeriod({}, '2026-10-16'), R.inPeriod({ endDate: '2026-12-31', notAnInternship: true }, '2026-10-16')],
-        hours: [R.afternoon(11), R.afternoon(12), R.afternoon(23)],
+        hours: [R.dailyDue(11, 'Wed'), R.dailyDue(12, 'Wed'), R.dailyDue(15, 'Wed'), R.dailyDue(16, 'Wed'), R.dailyDue(23, 'Fri'), R.dailyDue(16, 'Sat'), R.dailyDue(20, 'Sun'), R.dailyDue(16, 'Mon')],
         dec: [R.decide(null, 2, 'T').show, R.decide({ day: 'T', later: 0, n: 2 }, 2, 'T').show, R.decide({ day: 'Y', later: 3, n: 2 }, 2, 'T').show, R.decide({ day: 'Y', later: 3, n: 2 }, 1, 'T').show, R.decide({ day: 'Y', later: 3, n: 2 }, 1, 'T').state.later, R.decide(null, 0, 'T').show, R.decide({ day: 'Y', later: 2, n: 2 }, 2, 'T').show],
         others: [R.others({ art: 'T' }, 'T'), R.others({ fb: 'T' }, 'T'), R.others({ kt: 'T' }, 'T'), R.others({ art: 'Y', fb: 'Y', kt: '' }, 'T')]
       };
     });
-    assert.deepEqual(pure.morning, ['article', 'article'], 'before 12:00 only the articles count');
-    assert.deepEqual(pure.noon, ['journal', 'case', 'article', 'article'], 'from 12:00 Journal + Case first, then the articles');
+    assert.deepEqual(pure.morning, ['article', 'article'], 'Journal / Case not due (before 16:00 or a weekend): only the articles count');
+    assert.deepEqual(pure.noon, ['journal', 'case', 'article', 'article'], 'when due, Journal + Case first, then the articles');
     assert.deepEqual(pure.done, ['case'], 'a sent Journal is not owed');
     assert.equal(pure.unknown, 0, 'a cache that has not loaded is not "owed"');
     assert.deepEqual(pure.inP, [true, false, true, false, false, false], 'internship period gate: ' + pure.inP);
-    assert.deepEqual(pure.hours, [false, true, true]);
+    assert.deepEqual(pure.hours, [false, false, false, true, true, false, false, true], '16:00 Bangkok, Mon–Fri only: ' + pure.hours);
     assert.deepEqual(pure.dec, [true, false, false, true, 0, false, true], 'decide: first look · once a day · 3 Laters stop it · done resets · nothing owed: ' + pure.dec);
     assert.deepEqual(pure.others, [true, true, true, false]);
 
     // ---- real page state: an intern inside the internship period, Journal + Case not sent, two unread articles
-    const T0 = Date.parse('2026-10-21T14:00:00+07:00');
+    const T0 = Date.parse('2026-10-21T18:00:00+07:00');   // Wednesday 18:00 Bangkok
     async function setup({ now, arts, me, state }) {
       await page.clock.setFixedTime(now);
       await page.evaluate(({ now, arts, me, D, state }) => {
@@ -100,7 +100,7 @@ const D = 864e5;
     fs.mkdirSync(process.env.OWED_PNG || 'C:/Users/HP/AppData/Local/Temp/remind_png', { recursive: true });
     await page.screenshot({ path: (process.env.OWED_PNG || 'C:/Users/HP/AppData/Local/Temp/remind_png') + '/final_before.png' });   // the same Home with no sheet
     await page.evaluate(() => owedRemind.check());
-    assert.deepEqual(await rows(), ['journal', 'case', 'article:a1', 'article:a2'], 'afternoon rows: ' + await rows());
+    assert.deepEqual(await rows(), ['journal', 'case', 'article:a1', 'article:a2'], 'weekday evening rows: ' + await rows());
     let txt = await sheetText();
     assert.match(txt, /4 things waiting for you/, txt);
     assert.match(txt, /Journal not sent today/); assert.match(txt, /EN a1/); assert.match(txt, /Write Journal/); assert.match(txt, /Once a day/); assert.match(txt, /Sound on/);
@@ -174,6 +174,20 @@ const D = 864e5;
     await page.evaluate(() => owedRemind.check());
     assert.equal(await sheetText(), null, 'morning with nothing to read: no sheet');
     assert.equal(await page.evaluate(() => owedRemind.holds()), false);
+    // Journal / Case from 16:00 Bangkok, never on Sat / Sun; articles any time
+    for (const [label, iso, want] of [['15:59 Wed', '2026-10-21T15:59:00+07:00', ['article:a1']], ['16:00 Wed', '2026-10-21T16:00:00+07:00', ['journal', 'case', 'article:a1']], ['18:00 Sat', '2026-10-24T18:00:00+07:00', ['article:a1']], ['20:00 Sun', '2026-10-25T20:00:00+07:00', ['article:a1']], ['16:00 Mon', '2026-10-26T16:00:00+07:00', ['journal', 'case', 'article:a1']]]) {
+      await setup({ now: Date.parse(iso), arts: [{ id: 'a1' }] });
+      await page.evaluate(() => owedRemind.check());
+      assert.deepEqual(await rows(), want, label + ': ' + await rows());
+      await close();
+    }
+    await setup({ now: Date.parse('2026-10-24T18:00:00+07:00'), arts: [] });
+    await page.evaluate(() => owedRemind.check());
+    assert.equal(await sheetText(), null, 'Saturday with nothing to read: no sheet');
+    assert.equal(await page.evaluate(() => owedRemind.holds()), false);
+    await setup({ now: Date.parse('2026-10-21T15:59:00+07:00'), arts: [] });
+    await page.evaluate(() => owedRemind.check());
+    assert.equal(await sheetText(), null, 'before 16:00 with nothing to read: no sheet');
     // a Journal already sent → only the Case row at 14:00
     await setup({ now: T0, arts: [] });
     await page.evaluate((t) => { window.myReflectiveLogsCache = [{ timestamp: { toDate: () => new Date(t) } }]; }, T0 - 3600e3);

@@ -1,7 +1,8 @@
 // V101.228: "still to do" bottom sheet when the app opens (owner's pick A, mockup remind_png/A_sheet): Journal / Case not sent today + 📰 articles
 // not read yet, with a short chime. Defaults (the owner did not answer the 7 questions, so the recommended ones):
-// • Journal + Case count as owed every day (the Schedule's own `schDailyTiles`), but only from 12:00 Bangkok — no nagging at 09:00. An unread
-//   article counts at any hour (live or "for new interns", not muted — the same articles the 📰 popup would pick). Quizzes closing soon are NOT here
+// • Journal + Case count as owed on weekdays (the Schedule's own `schDailyTiles`), but only from 16:00 Bangkok (owner's pick from the journal history:
+//   nobody sends before noon, median 19:00, 90% before 21:00) and never on Sat / Sun Bangkok (almost nobody sends then — the rows are skipped, the
+//   simplest rule). An unread article counts at any hour, weekend included (live or "for new interns", not muted — the same articles the 📰 popup would pick). Quizzes closing soon are NOT here
 //   (the red/amber chip and the LINE alert cover them); the daily check-in is not here either (it runs on open by itself).
 // • Once a Bangkok day, first open that qualifies; "Later" (button / backdrop / Esc) three times in a row stops it until an item is done (the
 //   owed count drops). Only inside the internship period (users.endDate; notAnInternship / admin preview / unregistered = never). Per device.
@@ -11,7 +12,7 @@
 // • Rows go straight to the item (Journal tab / Case form / the article sheet — closing that = read). No new Firestore writes, no new rules.
 // • Chime: a 2-note WebAudio ding made in code (no asset), once a day, ON by default, 🔔/🔕 on the sheet (saved on the device), vibrate 120 ms
 //   where supported. Browsers / LINE LIFF may keep audio locked until a tap: then a hint says "Tap anywhere" and the chime plays on the first tap.
-// Pure part (pending / inPeriod / decide / afternoon) is exposed for the test; the DOM part is lazy.
+// Pure part (pending / inPeriod / decide / dailyDue) is exposed for the test; the DOM part is lazy.
 (function () {
     'use strict';
     var KEY = 'owedRemind:', MUTE = 'owedRemind.mute', MAX_LATER = 3, ART_ROWS = 3, MAX_ROWS = 5, armed = false, tries = 0;
@@ -26,14 +27,15 @@
     function lang() { var b = document.body; return b && b.classList.contains('lang-th-on') ? 'th' : b && b.classList.contains('lang-kr-on') ? 'ko' : 'en'; }
     function bkk(d) { return (d || new Date()).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }); }
     function bkkHour(d) { return Number((d || new Date()).toLocaleString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', hour12: false })) % 24; }
+    function bkkWeekday(d) { return (d || new Date()).toLocaleDateString('en-US', { timeZone: 'Asia/Bangkok', weekday: 'short' }); }
     function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
     // ---- pure rules (exposed for the test)
-    // in: { journal: true|false|null (owed / done / not loaded yet), case: same, articles: [{id,title}], afternoon: bool } → ordered rows
+    // in: { journal: true|false|null (owed / done / not loaded yet), case: same, articles: [{id,title}], daily: bool } → ordered rows
     function pending(inp) {
         inp = inp || {}; var out = [];
-        if (inp.afternoon && inp.journal === true) out.push({ k: 'journal' });
-        if (inp.afternoon && inp.case === true) out.push({ k: 'case' });
+        if (inp.daily && inp.journal === true) out.push({ k: 'journal' });
+        if (inp.daily && inp.case === true) out.push({ k: 'case' });
         (inp.articles || []).forEach(function (a) { out.push({ k: 'article', id: a.id, title: a.title }); });
         return out;
     }
@@ -43,7 +45,8 @@
         var e = String(me.endDate).slice(0, 10), s = me.startDate ? String(me.startDate).slice(0, 10) : '';
         return today <= e && (!s || today >= s);
     }
-    function afternoon(hour) { return hour >= 12; }
+    // Journal / Case rows: from 16:00 Bangkok, Mon–Fri only (wd = 'Mon'…'Sun' in Bangkok)
+    function dailyDue(hour, wd) { return hour >= 16 && wd !== 'Sat' && wd !== 'Sun'; }
     // state {day, later, n, chime} → {show, state}. count = owed rows now, today = Bangkok date string.
     function decide(state, count, today) {
         var st = { day: (state && state.day) || '', later: (state && state.later) || 0, n: state && typeof state.n === 'number' ? state.n : count, chime: (state && state.chime) || '' };
@@ -70,7 +73,7 @@
         var pas = typeof profileActivityState !== 'undefined' ? profileActivityState : {};
         function owed(kind, key) { var t = tiles.filter(function (x) { return x.kind === kind; })[0]; return t && pas[key] === 'ready' ? !t.done : null; }
         var arts = window.internArticles && typeof internArticles.owed === 'function' ? internArticles.owed() : [];
-        return { journal: owed('j', 'logs'), case: owed('c', 'cases'), articles: arts, afternoon: afternoon(bkkHour()) };
+        return { journal: owed('j', 'logs'), case: owed('c', 'cases'), articles: arts, daily: dailyDue(bkkHour(), bkkWeekday()) };
     }
     function ctx() {
         if (blocked() || !window.myUserDoc) return null;
@@ -206,7 +209,7 @@
     // what the sheet would do right now: { c, list, d } or null
     function plan() {
         var c = ctx(); if (!c) return null;
-        var g = gather(), list = pending({ journal: g.journal, case: g.case, articles: g.articles || [], afternoon: g.afternoon });
+        var g = gather(), list = pending({ journal: g.journal, case: g.case, articles: g.articles || [], daily: g.daily });
         var d = decide(load(c.u), list.length, c.today);
         return { c: c, list: list, d: d, wait: g.articles === null, others: others(otherDays(c.u), c.today) };
     }
@@ -231,5 +234,5 @@
     }
     // armed from the users/{uid} snapshot, once per page load; waits a moment so the caches and the 📰 list have loaded
     function arm() { if (armed) return; armed = true; setTimeout(check, 3000); }
-    window.owedRemind = { arm: arm, check: check, holds: holds, pending: pending, inPeriod: inPeriod, afternoon: afternoon, decide: decide, others: others, chime: chime, MAX_LATER: MAX_LATER };
+    window.owedRemind = { arm: arm, check: check, holds: holds, pending: pending, inPeriod: inPeriod, dailyDue: dailyDue, decide: decide, others: others, chime: chime, MAX_LATER: MAX_LATER };
 })();

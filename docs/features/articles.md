@@ -17,7 +17,7 @@ Admin: Dashboard ▸ 📰 Articles. Intern: the daily popup, History row, Codex 
 - `articles-link-hint-qa` — after Save, a "… is in the Disease Codex — link?" banner
 - `articles-draft-all-qa` — 🩺 Draft all: one draft per article in neither Codex, press again to stop
 - `articles-tags-qa` — 🏷 tags: editor chip field with suggestions, row chips (3 + n), tap a chip to filter the list, saved as `tags[]`
-- `owed-remind-qa` — 🔔 "still to do" sheet on open (`owed-remind.js`): Journal / Case not sent today (from 12:00 Bangkok) + unread 📰 articles (any hour), chime once a day with a 🔔/🔕 toggle and a "tap anywhere" path when audio is locked; it holds the day's ONE popup slot (the 📰 popup, feedback reminder and Know thyself stay quiet while it is pending / shown, and it gives way if one of them already showed today)
+- `owed-remind-qa` — 🔔 "still to do" sheet on open (`owed-remind.js`): Journal / Case not sent today (from 16:00 Bangkok, Mon–Fri only) + unread 📰 articles (any hour, weekends too), chime once a day with a 🔔/🔕 toggle and a "tap anywhere" path when audio is locked; it holds the day's ONE popup slot (the 📰 popup, feedback reminder and Know thyself stay quiet while it is pending / shown, and it gives way if one of them already showed today)
 
 ## What usually lies
 
