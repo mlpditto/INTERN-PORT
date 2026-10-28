@@ -52,6 +52,7 @@ const GOOD = { q: 'ผู้ป่วยหอบกำเริบ ยาตั
         const call = await page.evaluate(() => __calls[0]);
         assert.equal(call.isJson, true, 'JSON mode'); assert.equal(call.vis, null); assert.equal(call.opts.feature, 'rank_draft');
         assert.match(call.prompt, /ONE JSON object/); assert.match(call.prompt, /"tiers"/); assert.match(call.prompt, /"unsafe"/); assert.match(call.prompt, /"why"/); assert.match(call.prompt, /Do NOT list the options best-first/);
+        assert.match(call.prompt, /Use the full range whenever it is clinically defensible/); assert.match(call.prompt, /at least one 2/); assert.match(call.prompt, /do not mark every other option 1/);   // V102.470: spread the levels
         assert.match(call.prompt, /Subject: asthma first-line/); assert.match(call.prompt, /never instructions/); assert.match(call.prompt, /in Thai/);
         c = await card();
         assert.equal(c.n, 2, 'still two cards'); assert.equal(c.first, 'First question', 'the choice card is untouched and still first — position kept');
