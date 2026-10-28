@@ -87,7 +87,7 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
       out.open = [document.getElementById('createMenuModal').style.display, document.getElementById('articlesModal').style.display];
       out.counts = qa('.art-rail button').map(b => b.dataset.filter + ':' + b.querySelector('b').textContent);
       out.rows = qa('.art-row').map(b => b.querySelector('.art-st').className.replace('art-st ', '') + ':' + b.querySelector('.art-t').textContent);
-      out.langsLive = qa('.art-row')[0].querySelectorAll('.art-lg.off').length;
+      out.langsLive = qa('.art-row').find(b => b.querySelector('.art-t').textContent === 'Live one').querySelectorAll('.art-lg.off').length;
       Articles.filter('live'); out.liveOnly = qa('.art-row').map(b => b.querySelector('.art-t').textContent); Articles.filter('all');
       // new article: defaults, typing, preview
       q('.art-new').click();
@@ -170,7 +170,7 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
     assert.equal(r.rowAfterEvent, true, 'the Article row sits right after Event');
     assert.deepEqual(r.open, ['none', 'block'], 'tapping it closes ➕ Create and opens 📰 Articles');
     assert.deepEqual(r.counts, ['all:3', 'draft:1', 'scheduled:0', 'live:1', 'ended:1'], 'status chips with counts: ' + r.counts);
-    assert.deepEqual(r.rows, ['live:Live one', 'draft:Draft one', 'ended:Old one'], 'list order: live → scheduled → draft → ended');
+    assert.deepEqual(r.rows, ['draft:Draft one', 'live:Live one', 'ended:Old one'], 'list order: newest first by the day it goes live (draft starts in 5 days, live started yesterday, ended 9 days ago), whatever the status');
     assert.equal(r.langsLive, 1, 'the missing KO version is struck through');
     assert.deepEqual(r.liveOnly, ['Live one'], 'the Live chip filters');
     assert.deepEqual(r.def.slice(0, 2), [true, true], '＋ New fills a window'); assert.deepEqual(r.def[2], ['🗑', 'Save draft', '📅 Schedule'], 'V102.338: 🗑 is a quiet icon (two taps), Schedule is the primary');
