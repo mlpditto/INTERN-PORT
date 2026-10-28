@@ -45,6 +45,10 @@
     ];
     // V101.57: Gemini called directly (Vertex, or AI Studio `as/`) is billed to the Google Cloud
     // billing account; `or/google/…` is billed by OpenRouter. The chip shows it (text-ai-chips.css).
+    // V102.463: the chips that READ THAI IN A PICTURE get a Thai-flag border (text-ai-chips.css). Only models measured with Thai image text
+    // (2026-09-25 smoke: exact Thai transcription incl. a hard set; Gemma 4 probe 2026-10-15) — an untested model stays plain, and Luna 6 invents Thai (0/3).
+    window.THAI_IMAGE_OK = ['gemini-3.8-flash', 'as/gemini-3.5-flash-lite', 'or/google/gemma-4-26b-a4b-it', 'claude-opus-5-5'];
+    window.readsThaiImage = id => window.THAI_IMAGE_OK.indexOf(String(id || '')) >= 0;
     window.isGoogleBilledModel = id => /^(gemini-|as\/)/.test(String(id || ''));
     // V101.70: DeepSeek V4 Pro takes text only (OpenRouter input_modalities ["text"]), so image features hide it.
     // V4.1 Flash lists ["text","image"] and read Thai 2/3 in the 2026-09-25 smoke — it stays.
@@ -85,8 +89,8 @@
     window.textAIChipContents = (value, action = '', filter = null, extra = []) => [...(filter ? models.filter(filter) : models), ...extra].map(m => {
         const owner = LOGO_OWNERS[m.label.split(' ')[0]];
         const logo = owner ? `<span class="text-ai-logo" data-owner="${owner}" aria-hidden="true"></span>` : '';
-        const google = window.isGoogleBilledModel(m.id);
-        return `<button type="button" class="glass-toggle-item${m.id === value ? ' active' : ''}" data-value="${m.id}"${owner ? ` data-vendor="${owner}"` : ''}${google ? ' data-bill="google"' : ''} aria-label="${m.label}" aria-pressed="${m.id === value}" title="${m.label} · ${m.id}${google ? ' · แถบสีใต้ชื่อ = ค่าใช้จ่ายเรียกเก็บผ่านบัญชี Google Cloud' : ''} — ${m.hint}"${action ? ` onclick="${action}"` : ''}>${logo}${m.short}</button>`;
+        const google = window.isGoogleBilledModel(m.id), thai = window.readsThaiImage(m.id);
+        return `<button type="button" class="glass-toggle-item${m.id === value ? ' active' : ''}" data-value="${m.id}"${owner ? ` data-vendor="${owner}"` : ''}${google ? ' data-bill="google"' : ''}${thai ? ' data-thai="1"' : ''} aria-label="${m.label}" aria-pressed="${m.id === value}" title="${m.label} · ${m.id}${thai ? ' · 🇹🇭 อ่านภาษาไทยในรูปได้ (ทดสอบแล้ว)' : ''}${google ? ' · แถบสีใต้ชื่อ = ค่าใช้จ่ายเรียกเก็บผ่านบัญชี Google Cloud' : ''} — ${m.hint}"${action ? ` onclick="${action}"` : ''}>${logo}${m.short}</button>`;
     }).join('');
     window.textAIChipsHtml = (id, value, action, extra = []) => `<div class="text-ai-chips lang-no-toggle" role="group" aria-label="AI model"${id ? ` id="${id}"` : ''}>${window.textAIChipContents(value, action, null, extra)}</div>`;
     window.syncRegistryModelSelect = function (id) {

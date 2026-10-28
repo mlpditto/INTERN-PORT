@@ -54,7 +54,8 @@ const modelB = cut('        window._compareModelB = function', '        window.g
         const haiku = await look('#b button[aria-label="Claude Haiku 5.5"]');
         assert.deepEqual([haiku.vendor, haiku.border, haiku.bar.split('|')[0]], ['claude', 'rgb(227, 165, 140)', 'rgb(217, 119, 87)'], 'Claude clay border + bar');
         const flash = await look('#b button[aria-label="Gemini 3.8 Flash"]');
-        assert.deepEqual([flash.vendor, flash.border], ['gemini', 'rgb(174, 203, 250)'], 'Gemini blue border');
+        // V102.463: Flash 3.8 reads Thai in pictures → Thai-flag border (drawn as background bands, the border colour itself is transparent)
+        assert.deepEqual([flash.vendor, flash.border], ['gemini', 'rgba(0, 0, 0, 0)'], 'Gemini Thai-flag border');
         assert.match(flash.bar, /rgb\(66, 133, 244\)/, 'Gemini keeps the Google-bill rainbow bar');
         const sonnet = await look('#b button[aria-label="Claude Sonnet 5.5"]');
         assert.deepEqual([sonnet.bg, sonnet.img, sonnet.color], ['rgb(217, 119, 87)', 'none', 'rgb(255, 255, 255)'], 'picked Claude = clay solid, white name (no amber)');
