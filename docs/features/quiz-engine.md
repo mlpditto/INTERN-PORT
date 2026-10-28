@@ -37,3 +37,11 @@ Hourly `notifyQuizDeadlines` (functions/quiz-deadline.js is the pure part). For 
 - **Known local failures.** `empty-quiz-sweep-qa` fails on a CRLF checkout (the vm slice compares line endings); `quiz-chips-fit-qa` and `quiz-filters-lean-qa` are load-timing flakes. All three pass on CI — re-run alone before suspecting a change.
 - The list is rendered by `renderQuizzesNow` from fixture quizzes; a fixture without `isActive` / `deadline` lands in Templates and the Live assertions find nothing.
 - The Beri line in the deadline bubble is the tier really on offer inside the last 24 h (20 % of `deadlineBeriMax`, default 5 → +1, nothing under 6 h) — the full "+5" only exists 48 h out.
+
+## Rank questions — order mode and tier-box mode (V101.231)
+
+One question type `rank`, two ways to answer, chosen per question by `mode` (admin Quiz Editor chips **Order | Tier-box**; a saved question without `mode` is Order).
+- **Order** (no `mode`): the intern types an answer, then taps the options best → worst; credit = 0.2 typed + 0.8 ranking (first pick best ½ + pairs in order ½, pairs inside one level ignored).
+- **Tier-box** (`mode:'tier'`): the intern puts EACH option in Best / OK / Avoid — one tap per row, nothing pre-selected, Lock waits for every row; the answer is `typed ⏐ t0,t1,… ⏐ m:n` with `t_i` = the level chosen for option i in the ORIGINAL option order. Credit = 0.2 typed + 0.8 × mean over all options (exact 1 · one level off ½ · Best↔Avoid 0); an option flagged ⚠ unsafe that is not put in Avoid caps the credit at 0.6 (≤ ★3). Same stars (≥95 ★5 · ≥80 ★4 · ≥60 ★3 · ≥40 ★2).
+- **Reveal timing**: practice (incl. ONE-TIME first-time practice) reveals each Rank question right after its lock; a counted quiz shows only the locked state and reveals everything after Submit. The typed answer’s “Did your answer mean one of these?” is asked once before Submit’s confirm for every locked question the typed answer did not auto-match (skipped = none). Rank Beri (★4 +1, ★5 +2, 50/day cap) is paid at Submit through the ledger row that is also the dedupe record.
+- Pure scoring lives in `public/rank-quiz.js` (`score/parse/phase/pack/valid`, tier mode dispatches on `q.mode`); QA `rank-quiz-qa`, `rank-tier-qa`, `rank-quiz-runner-qa`.

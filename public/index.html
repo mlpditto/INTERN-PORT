@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.230)</title>
+    <title>Internship Portfolio (V101.231)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.216">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -2467,7 +2467,7 @@
 <script src="internship-progress.js?v=V101.184"></script><link rel="stylesheet" href="internship-progress.css?v=V101.184">
 <script src="monthly-progress.js?v=V101.79"></script><link rel="stylesheet" href="monthly-progress.css?v=V101.39">
 <script src="assigned-goals.js?v=V100.30"></script><link rel="stylesheet" href="assigned-goals.css?v=V100.30">
-<link rel="stylesheet" href="quiz-user-focus.css?v=V101.223"><script defer src="rank-quiz.js?v=V101.222"></script><script defer src="quiz-term-highlight.js?v=V101.207"></script><script defer src="quiz-feedback-lang.js?v=V101.96"></script><script defer src="quiz-feedback-ai.js?v=V101.96"></script><script defer src="quiz-feedback-remind.js?v=V101.176"></script><script defer src="owed-remind.js?v=V101.228"></script>
+<link rel="stylesheet" href="quiz-user-focus.css?v=V101.231"><script defer src="rank-quiz.js?v=V101.231"></script><script defer src="quiz-term-highlight.js?v=V101.207"></script><script defer src="quiz-feedback-lang.js?v=V101.96"></script><script defer src="quiz-feedback-ai.js?v=V101.96"></script><script defer src="quiz-feedback-remind.js?v=V101.176"></script><script defer src="owed-remind.js?v=V101.228"></script>
 <link rel="stylesheet" href="quiz-cover.css?v=V101.227">
 <link rel="stylesheet" href="case-insight-rail.css?v=V101.59">
 <script src="quiz-cover.js?v=V101.188"></script>
@@ -13892,7 +13892,7 @@
         function quizStepIsAnswered(idx) {
             const a = (typeof userAnswers !== 'undefined' && userAnswers) ? userAnswers[idx] : undefined;
             const rq = currentQuiz && currentQuiz.questions && currentQuiz.questions[idx];
-            if (rq && rq.type === 'rank' && window.RankQuiz) return window.RankQuiz.phase(a, (rq.options || []).length) === 'reveal';   // V101.222: Rank counts once the ranking is locked
+            if (rq && rq.type === 'rank' && window.RankQuiz) return window.RankQuiz.phase(a, (rq.options || []).length, rq.mode) === 'reveal';   // V101.222: Rank counts once the ranking is locked (V101.231: or, in tier mode, the tiers)
             if (a === null || a === undefined) return false;
             if (Array.isArray(a)) return a.some(v => (typeof v === 'string' ? v.trim() !== '' : v !== null && v !== undefined));
             if (typeof a === 'string') return a.trim() !== '';
@@ -13929,6 +13929,7 @@
                     console.error('renderQuizStep: no currentQuiz');
                     return;
                 }
+                { const qm0 = document.getElementById('quizModal'); if (qm0) qm0.classList.remove('rk-on'); }   // V101.231: lean Rank hides the shared footer; every render starts with it back
                 { const ps0 = document.getElementById('btn-quiz-primer-start'); if (ps0) ps0.style.display = 'none'; const bd0 = document.getElementById('quiz-q-type-badge'); if (bd0) bd0.removeAttribute('title'); }   // V101.141: the Read-first page's Start slot / badge hover
 
                 // 🔥 V80: Read-only Learning Mode UI
@@ -14286,31 +14287,76 @@
                     (pos ? '<span class="me' + (bad.has(i) ? ' bad' : '') + '">you #' + pos + '</span>' : '') + '</div>';
             }).join('');
         }
+        // ===== V101.231: lean Rank runner (v2) — quiz-user-focus.css. Icon-first short labels (full words in aria-label + title; TH / KO labels are DRAFTS needing a native check), the actions sit on ONE row with ‹ and Next
+        // (Submit instead of Next on the last question), the shared #quiz-run-footer is hidden on a Rank step (#quizModal.rk-on, cleared at the top of renderQuizStep so primer pages and other types keep it). =====
+        const RK_LOCK = '<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path fill="currentColor" d="M7 10V8a5 5 0 0 1 10 0v2h1a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h1zm2 0h6V8a3 3 0 0 0-6 0v2z"/></svg>';
+        const RKT_NAME = [['Best', 'ดีที่สุด · 최선'], ['OK', 'พอใช้ · 괜찮음'], ['Avoid', 'เลี่ยง · 피함']];
+        const rktTitle = x => RKT_NAME[x][0] + ' · ' + RKT_NAME[x][1];
+        function rankNavHtml(mid, grow) {
+            const last = currentStep >= currentQuiz.questions.length - 1, st = grow ? ' style="flex:1"' : '';
+            const prev = currentStep > 0 ? '<button type="button" class="rk-b rk-prev" aria-label="Previous question" title="Previous question · ข้อก่อนหน้า · 이전 문제" onclick="prevQuizStep()">‹</button>' : '';
+            const next = last
+                ? '<button type="button" id="rk-submit" class="rk-b rk-sub" aria-label="Submit quiz" title="Submit quiz · ส่งคำตอบ · 제출" onclick="submitQuiz()"' + st + '>Submit<span class="lang-th"> ส่ง</span><span class="lang-kr"> 제출</span> ✓</button>'
+                : '<button type="button" id="rk-next" class="rk-b rk-next" aria-label="Next question" title="Next question · ถัดไป · 다음" onclick="nextQuizStep()"' + st + '>Next<span class="lang-th"> ถัดไป</span><span class="lang-kr"> 다음</span> ›</button>';
+            return '<div class="rk-nav">' + prev + (mid || '') + next + '</div>';
+        }
+        function rankLockBtn(cls, label, aria, onclick, disabled) {
+            return '<button type="button" class="rk-b rk-go ' + cls + '" aria-label="' + aria + '" title="' + aria + '" onclick="' + onclick + '"' + (disabled ? ' disabled' : '') + '>' + RK_LOCK + label + '</button>';
+        }
+        const RK_LOCK_LBL = 'Lock<span class="lang-th"> ล็อก</span><span class="lang-kr"> 잠금</span>';
+        // the key for a Rank question in tier mode, best tier first; with the learner's tiers each row carries "you: X ✓ / ½ / ✗" (exact / one tier off / Best↔Avoid)
+        function rankTierKeyRows(q, opts, tiers, whys) {
+            const marks = tiers ? window.RankQuiz.tierMarks(q, tiers) : null;
+            const idx = opts.map((_, i) => i).sort((a, b) => (Number((q.tiers || [])[a]) || 0) - (Number((q.tiers || [])[b]) || 0) || a - b);
+            return idx.map(i => {
+                const tt = Math.min(2, Math.max(0, Number((q.tiers || [])[i]) || 0)), c = RK_TIER[tt];
+                const why = (whys && whys[i]) ? '<small>' + rkEsc(whys[i]) + '</small>' : '';
+                const me = marks ? '<span class="me ' + marks[i] + '" title="' + rkEsc(rktTitle(tiers[i])) + '"><span class="y">you: </span>' + RKT_NAME[tiers[i]][0] + ' ' + (marks[i] === 'ex' ? '✓' : marks[i] === 'ad' ? '½' : '✗') + '</span>' : '';
+                return '<div class="rk-key" style="--c:' + c[1] + ';--bg:' + c[2] + '"><span class="t">' + c[0] + '</span><span class="x">' + (Number((q.unsafe || [])[i]) ? '⚠️ ' : '') + opts[i] + why + '</span>' + me + '</div>';
+            }).join('');
+        }
+        // a counted quiz (not practice, not a poll) reveals Rank answers only after Submit; practice / ONE-TIME first-time practice reveal each question right after its lock, as before
+        function rankDeferred() { return !!currentQuiz && !isPracticeMode && currentQuiz.isPoll !== true; }
         function rankStepHtml(question) {
-            const q = currentQuiz.questions[currentStep], opts = question.options || q.options || [], n = opts.length, ans = userAnswers[currentStep];
-            const ph = window.RankQuiz.phase(ans, n), a = window.RankQuiz.parse(ans, n), key = rkKey();
+            const q = currentQuiz.questions[currentStep], opts = question.options || q.options || [], n = opts.length, ans = userAnswers[currentStep], tier = q.mode === 'tier';
+            const R = window.RankQuiz, ph = R.phase(ans, n, q.mode), a = R.parse(ans, n, q.mode), key = rkKey();
+            const modal = document.getElementById('quizModal'); if (modal) modal.classList.add('rk-on');
             if (ph === 'type') {
-                return '<div class="rk"><div class="rk-hint">✍️ Type your answer first — one try, no options yet</div>' +
+                return '<div class="rk"><div class="rk-hint" title="Type your answer first — one try, no options yet">✍️ Type first — one try</div><div class="rk-inw">' +
                     '<input id="rk-typed" class="rk-in" maxlength="120" autocomplete="off" placeholder="Your answer" value="' + rkEsc(rankDraft[key] || '') + '" oninput="rankTyped(this)" onkeydown="if(event.key===\'Enter\'){rankLockTyped();}">' +
-                    '<button id="rk-lock" type="button" class="rk-lock" onclick="rankLockTyped()"' + ((rankDraft[key] || '').trim() ? '' : ' disabled') + '>Lock in &amp; see options</button></div>';
+                    '<button id="rk-lock" type="button" class="rk-lock" aria-label="Lock in &amp; see options" title="Lock in &amp; see options · ล็อกคำตอบ · 잠그기" onclick="rankLockTyped()"' + ((rankDraft[key] || '').trim() ? '' : ' disabled') + '>' + RK_LOCK + '</button></div>' +
+                    rankNavHtml('', true) + '</div>';
             }
             if (ph === 'rank') {
-                const pick = rankPick[key] || [], display = shuffleMap[currentStep] || opts.map((_, i) => i);
-                return '<div class="rk"><span class="rk-mine">🔒 Your answer: ' + rkEsc(a.typed) + '</span><div class="rk-hint" style="margin-top:0">📝 Tap in order — best first</div>' +
-                    '<div class="rk-end"><span>BEST</span><span>WORST</span></div>' +
-                    display.map(i => { const p = pick.indexOf(i); return '<button type="button" class="rk-opt' + (p >= 0 ? ' on' : '') + '" onclick="rankTap(' + i + ')"><span class="n">' + (p >= 0 ? p + 1 : '') + '</span><span class="lang-no-toggle">' + opts[i] + '</span></button>'; }).join('') +
-                    '<div class="rk-row"><button type="button" class="rk-reset" onclick="rankReset()">Reset</button><button type="button" class="rk-go" onclick="rankLockOrder()"' + (pick.length === n ? '' : ' disabled') + '>Lock order</button></div></div>';
+                const display = shuffleMap[currentStep] || opts.map((_, i) => i), top = '<div class="rk-top"><span class="rk-mine">🔒 Your answer: ' + rkEsc(a.typed) + '</span><span class="rk-hint">' + (tier ? '📝 A tier for each' : '📝 Tap best first') + '</span></div>';
+                if (tier) {
+                    const pick = rankTierPick[key] || [], done = pick.filter(x => x === 0 || x === 1 || x === 2).length;
+                    return '<div class="rk">' + top + display.map(i => '<div class="rk-trow" data-a="' + (pick[i] === undefined ? '' : pick[i]) + '"><span class="x lang-no-toggle">' + opts[i] + '</span><span class="rk-seg">' +
+                        [0, 1, 2].map(tt => '<button type="button" data-t="' + tt + '" class="' + (pick[i] === tt ? 'on' : '') + '" aria-pressed="' + (pick[i] === tt) + '" title="' + rkEsc(rktTitle(tt)) + '" onclick="rankTierSet(' + i + ',' + tt + ')">' + RKT_NAME[tt][0] + '</button>').join('') + '</span></div>').join('') +
+                        rankNavHtml('<span class="rk-cnt"><b>' + done + '</b>/' + n + '</span><button type="button" class="rk-b rk-reset" aria-label="Reset" title="Reset · ล้าง · 초기화" onclick="rankTierReset()">↺</button>' +
+                            rankLockBtn('', RK_LOCK_LBL, 'Lock tiers · ล็อกคำตอบ · 잠금', 'rankTierLock()', done !== n) + '<span class="rk-sp"></span>') + '</div>';
+                }
+                const pick = rankPick[key] || [];
+                return '<div class="rk">' + top + display.map(i => { const p = pick.indexOf(i); const tg = p === 0 ? ' data-tg="BEST"' : (p === n - 1 && n > 1 ? ' data-tg="WORST"' : ''); return '<button type="button" class="rk-opt' + (p >= 0 ? ' on' : '') + '"' + tg + ' onclick="rankTap(' + i + ')"><span class="n">' + (p >= 0 ? p + 1 : '') + '</span><span class="x lang-no-toggle">' + opts[i] + '</span></button>'; }).join('') +
+                    rankNavHtml('<span class="rk-cnt"><b>' + pick.length + '</b>/' + n + '</span><button type="button" class="rk-b rk-reset" aria-label="Reset" title="Reset · ล้าง · 초기화" onclick="rankReset()">↺</button>' +
+                        rankLockBtn('', RK_LOCK_LBL, 'Lock order · ล็อกลำดับ · 순서 잠금', 'rankLockOrder()', pick.length !== n) + '<span class="rk-sp"></span>') + '</div>';
             }
-            const s = window.RankQuiz.score(q, ans), whys = question.why || q.why;
+            if (rankDeferred()) {   // V101.231 (owner): a real quiz reveals nothing per question — the key, ★, points and Beri come after Submit; going back to this question shows the same locked state
+                return '<div class="rk"><div class="rk-done" role="status">✓ ' + (tier ? 'Tiers' : 'Order') + ' locked — answers show after you submit<span class="lang-th"> · ล็อกแล้ว เฉลยหลังส่ง</span><span class="lang-kr"> · 잠금 완료, 제출 후 공개</span></div>' + rankNavHtml('') + '</div>';
+            }
+            const s = R.score(q, ans), whys = question.why || q.why;
             const pts = isPracticeMode ? 'Practice — no points' : '🎯 +' + (computeQuizScore(s.credit, currentQuiz.questions.length, currentQuiz.totalPoints) * (typeof currentQuizMultiplier === 'number' ? currentQuizMultiplier : 1)).toFixed(2) + ' pts';
             let match = '';
             if (s.matched === 'auto') match = '<div class="rk-chip">✓ Your answer matched the best answer</div>';
-            else if (a.match == null) match = '<div class="rk-ask"><b>Did your answer mean one of these?</b><div>' + opts.map((o, i) => '<button type="button" onclick="rankSelfMatch(' + i + ')"><span class="lang-no-toggle">' + o + '</span></button>').join('') + '<button type="button" class="none" onclick="rankSelfMatch(-1)">None</button></div></div>';
+            else if (a.match == null) match = '<div class="rk-ask"><b>Did your answer mean one of these?</b>' + opts.map((o, i) => '<button type="button" onclick="rankSelfMatch(' + i + ')"><span class="lang-no-toggle">' + o + '</span></button>').join('') + '<button type="button" class="none" onclick="rankSelfMatch(-1)">None</button></div>';
             else if (a.match >= 0) match = '<div class="rk-chip soft">Your answer ≈ <span class="lang-no-toggle">' + opts[a.match] + '</span></div>';
-            return '<div class="rk"><div class="rk-star"><b>' + rankStars(s.stars) + '</b></div><div class="rk-rew"><span>' + pts + '</span>' + rankBeriChip() + '</div>' + match +
-                (s.safetyMiss ? '<div class="rk-warn">⚠️ An unsafe option was ranked above a best one — ★3 at most</div>' : '') +
-                '<div class="lang-no-toggle">' + rankKeyRows(q, opts, a.order, whys) + '</div>' +
-                '<div class="rk-note">Typed answer ' + (s.free === 1 ? '✓' : s.free ? '½' : '✗') + ' · Best first ' + (s.top ? '✓' : '✗') + ' · ' + s.pairOk + '/' + s.pairTotal + ' pairs in order</div></div>';
+            const typedMark = s.free === 1 ? '✓' : s.free ? '½' : '✗';
+            const note = tier ? 'Typed ' + typedMark + ' · tiers ' + s.exact + '/' + s.n + ' exact' + (s.adjacent ? ' · ' + s.adjacent + ' adjacent' : '') + (s.off ? ' · ' + s.off + ' off' : '')
+                : 'Typed ' + typedMark + ' · Best ' + (s.top ? '✓' : '✗') + ' · ' + s.pairOk + '/' + s.pairTotal;
+            return '<div class="rk"><div class="rk-rt"><div class="rk-star"><b>' + rankStars(s.stars) + '</b></div><div class="rk-rew"><span>' + pts + '</span>' + rankBeriChip() + '</div></div>' + match +
+                (s.safetyMiss ? '<div class="rk-warn">⚠️ ' + (tier ? 'An unsafe option was not put in Avoid' : 'An unsafe option was ranked above a best one') + ' — ★3 at most</div>' : '') +
+                '<div class="lang-no-toggle">' + (tier ? rankTierKeyRows(q, opts, a.tiers, whys) : rankKeyRows(q, opts, a.order, whys)) + '</div>' +
+                rankNavHtml('<span class="rk-note">' + note + '</span>') + '</div>';
         }
         function rankBeriChip() {
             const b = rankBeri[rkKey()];
@@ -14335,6 +14381,22 @@
             renderQuizStep(true);
         }
         function rankReset() { rankPick[rkKey()] = []; renderQuizStep(true); }
+        // ===== V101.231: Rank "tier-box" mode — the intern puts EACH option in Best / OK / Avoid (one tap per option) instead of ordering them. Same type, question.mode === 'tier'.
+        // userAnswers[step] = [typed, "0,1,1,2,0" (tier chosen for option i, ORIGINAL option order), "m:<option>"]; rows show in the shuffled order, nothing is pre-selected, Lock waits for every row. rank-quiz.js scores it.
+        const rankTierPick = {};
+        function rankTierSet(i, tt) {   // one tap sets the tier of one option; tapping the chosen chip again clears it
+            const key = rkKey(), pick = rankTierPick[key] = rankTierPick[key] || [];
+            pick[i] = pick[i] === tt ? undefined : tt;
+            renderQuizStep(true);
+        }
+        function rankTierReset() { rankTierPick[rkKey()] = []; renderQuizStep(true); }
+        function rankTierLock() {
+            const q = currentQuiz.questions[currentStep], n = (q.options || []).length, a = window.RankQuiz.parse(userAnswers[currentStep], n, 'tier'), pick = rankTierPick[rkKey()] || [];
+            const tiers = Array.from({ length: n }, (_, i) => pick[i]);
+            if (!a.locked || !tiers.every(x => x === 0 || x === 1 || x === 2)) return;
+            userAnswers[currentStep] = [a.typed, tiers.join(',')]; rankSave(); renderQuizStep(true);
+            if (window.RankQuiz.score(q, userAnswers[currentStep]).matched === 'auto') rankAwardBeri(currentStep);
+        }
         function rankLockOrder() {
             const q = currentQuiz.questions[currentStep], pick = rankPick[rkKey()] || [], a = window.RankQuiz.parse(userAnswers[currentStep], (q.options || []).length);
             if (pick.length !== (q.options || []).length || !a.locked) return;
@@ -14342,9 +14404,9 @@
             if (window.RankQuiz.score(q, userAnswers[currentStep]).matched === 'auto') rankAwardBeri(currentStep);
         }
         function rankSelfMatch(i) {
-            const q = currentQuiz.questions[currentStep], a = window.RankQuiz.parse(userAnswers[currentStep], (q.options || []).length);
-            if (!a.order) return;
-            userAnswers[currentStep] = [a.typed, a.order.join(','), 'm:' + (i < 0 ? '-' : i)]; rankSave(); renderQuizStep(true);
+            const q = currentQuiz.questions[currentStep], a = window.RankQuiz.parse(userAnswers[currentStep], (q.options || []).length, q.mode), locked = a.order || a.tiers;
+            if (!locked) return;
+            userAnswers[currentStep] = [a.typed, locked.join(','), 'm:' + (i < 0 ? '-' : i)]; rankSave(); renderQuizStep(true);
             rankAwardBeri(currentStep);
         }
         // ===== V101.223: Beri for a Rank question — ★4 = +1, ★5 = +2; first attempt only; at most RANK_DAILY_BERI_CAP a Bangkok day =====
@@ -14355,6 +14417,7 @@
         async function rankAwardBeri(step, quiet) {
             const q = currentQuiz && currentQuiz.questions && currentQuiz.questions[step];
             if (!q || q.type !== 'rank' || !window.RankQuiz || isPracticeMode || currentQuiz.isPoll === true || !userId || window.myRegistered === false) return;
+            if (!quiet && rankDeferred()) return;   // V101.231: a real quiz pays at Submit (rankAwardBeri(i, true) in submitQuiz) — not while the answers are hidden
             const s = window.RankQuiz.score(q, userAnswers[step]), amount = RANK_BERI[s.stars] || 0, key = currentQuiz.id + ':' + step;
             if (!amount || s.phase !== 'reveal' || rankBeri[key]) return;
             rankBeri[key] = { state: 'pending' };
@@ -14610,7 +14673,7 @@
                         userAnsText = question.options[userAns] || '-';
                     }
                 } else if (isRank) {
-                    userAnsText = '<div class="lang-no-toggle"><span style="color:#f59e0b;font-weight:800;letter-spacing:2px">' + '★'.repeat(rk.stars) + '</span> <i>“' + rkEsc(rk.typed) + '”</i>' + (rk.order ? '<br>' + rk.order.map((idx, i) => (i + 1) + '. ' + question.options[idx]).join('<br>') : '') + '</div>';
+                    userAnsText = '<div class="lang-no-toggle"><span style="color:#f59e0b;font-weight:800;letter-spacing:2px">' + '★'.repeat(rk.stars) + '</span> <i>“' + rkEsc(rk.typed) + '”</i>' + (rk.order ? '<br>' + rk.order.map((idx, i) => (i + 1) + '. ' + question.options[idx]).join('<br>') : '') + (rk.tiers ? '<br>' + rk.tiers.map((tt, i) => question.options[i] + ' → ' + RKT_NAME[tt][0]).join('<br>') : '') + '</div>';   // V101.231: tier mode lists the tier chosen per option
                 } else if (isOrdering) {
                     userAnsText = Array.isArray(userAns) ? userAns.map((idx, i) => `${i + 1}. ${question.options[idx]}`).join('<br>') : '-';
                 } else {
@@ -14636,7 +14699,7 @@
                         const targetArr = Array.isArray(question.correct) ? question.correct : [question.correct];
                         correctAnsText = `<div style="margin-top:5px; color:#155724; font-size:0.9em;"><b>Correct<span class="lang-th"> เฉลย</span>:</b> <span class="lang-no-toggle">${targetArr.map(idx => question.options[idx]).join(', ')}</span></div>`;
                     } else if (isRank) {
-                        correctAnsText = '<div style="margin-top:5px;font-size:0.9em;"><b>Best → worst<span class="lang-th"> ดีที่สุด → แย่ที่สุด</span><span class="lang-kr"> 최고 → 최저</span>:</b></div><div class="lang-no-toggle">' + rankKeyRows(question, question.options || [], rk.order, question.why) + '</div>';
+                        correctAnsText = '<div style="margin-top:5px;font-size:0.9em;"><b>Best → worst<span class="lang-th"> ดีที่สุด → แย่ที่สุด</span><span class="lang-kr"> 최고 → 최저</span>:</b></div><div class="lang-no-toggle">' + (question.mode === 'tier' ? rankTierKeyRows(question, question.options || [], rk.tiers, question.why) : rankKeyRows(question, question.options || [], rk.order, question.why)) + '</div>';
                     } else if (isOrdering) {
                         const target = question.correct || question.options.map((_, i) => i);
                         correctAnsText = `<div style="margin-top:5px; color:#155724; font-size:0.9em;"><b>Correct order<span class="lang-th"> ลำดับที่ถูก</span>:</b><br><span class="lang-no-toggle">${target.map((idx, i) => `${i + 1}. ${question.options[idx]}`).join('<br>')}</span></div>`;
@@ -14825,15 +14888,46 @@
         }
 
         let isSubmittingQuiz = false;
+        // V101.231: a real quiz hides the key until Submit, so the self-match of a typed answer that matched no accepted alias is asked here, once — the typed part is 20% of a Rank question's credit.
+        // Skipping a question (or Continue with it untouched) scores that typed answer as "none".
+        function rankPendingMatches() {
+            if (!currentQuiz || !rankDeferred() || !window.RankQuiz) return [];
+            return currentQuiz.questions.map((q, i) => i).filter(i => {
+                const q = currentQuiz.questions[i]; if (!q || q.type !== 'rank' || !window.RankQuiz.valid(q)) return false;
+                const a = window.RankQuiz.parse(userAnswers[i], (q.options || []).length, q.mode);
+                return !!(a.order || a.tiers) && a.match == null && !window.RankQuiz.autoMatch(a.typed, q.accepted);
+            });
+        }
+        function rankMatchSheet(idxs) {
+            return new Promise(resolve => {
+                const pick = {}, old = document.getElementById('rk-match-sheet'); if (old) old.remove();
+                const ov = document.createElement('div'); ov.id = 'rk-match-sheet'; ov.className = 'rk-sheet'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
+                const paint = () => {
+                    ov.innerHTML = '<div class="rk-card rk"><div class="rk-sh-h">Did your answer mean one of these?<span class="lang-th"> คำตอบที่พิมพ์ ตรงกับข้อใด?</span><span class="lang-kr"> 입력한 답은 어느 것인가요?</span></div><div class="rk-sh-s">It counts toward your score. Skip = none.</div>' +
+                        idxs.map(i => { const q = currentQuiz.questions[i], a = window.RankQuiz.parse(userAnswers[i], (q.options || []).length, q.mode);
+                            return '<div class="rk-sh-q"><div class="rk-sh-t">Q' + (i + 1) + ' · <i>“' + rkEsc(a.typed) + '”</i></div><div class="rk-ask">' + (q.options || []).map((o, k) => '<button type="button" class="' + (pick[i] === k ? 'on' : '') + '" data-q="' + i + '" data-o="' + k + '"><span class="lang-no-toggle">' + o + '</span></button>').join('') +
+                                '<button type="button" class="none' + (pick[i] === -1 ? ' on' : '') + '" data-q="' + i + '" data-o="-1">None</button></div></div>'; }).join('') +
+                        '<div class="rk-nav"><button type="button" class="rk-b rk-next" id="rk-match-go" style="flex:1">Continue ›</button></div></div>';
+                    ov.querySelectorAll('.rk-ask button').forEach(b => { b.onclick = () => { pick[Number(b.dataset.q)] = Number(b.dataset.o); paint(); }; });
+                    ov.querySelector('#rk-match-go').onclick = () => {
+                        idxs.forEach(i => { const q = currentQuiz.questions[i], a = window.RankQuiz.parse(userAnswers[i], (q.options || []).length, q.mode), m = pick[i] == null ? -1 : pick[i]; userAnswers[i] = [a.typed, (a.order || a.tiers).join(','), 'm:' + (m < 0 ? '-' : m)]; });
+                        rankSave(); ov.remove(); resolve();
+                    };
+                };
+                paint(); document.body.appendChild(ov);
+            });
+        }
         async function submitQuiz() {
             if (isSubmittingQuiz) return;
+            { const pend = rankPendingMatches(); if (pend.length) { isSubmittingQuiz = true; clearInterval(quizTimerInterval); await rankMatchSheet(pend); isSubmittingQuiz = false; } }   // V101.231
             isSubmittingQuiz = true;
 
             recordStepDuration(); // V86.14
             stopCheatDetector();
             clearInterval(quizTimerInterval);
 
-            const hasEmptyAnswers = userAnswers.some(a => {
+            const hasEmptyAnswers = userAnswers.some((a, qi) => {
+                if (currentQuiz.questions[qi] && currentQuiz.questions[qi].type === 'rank' && !quizStepIsAnswered(qi)) return true;   // V101.231: a Rank question counts once its ranking / tiers are locked
                 if (a === null) return true;
                 if (Array.isArray(a) && a.length === 0) return true; // Multi-choice but none selected
                 return false;

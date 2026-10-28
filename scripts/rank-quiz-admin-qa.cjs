@@ -41,7 +41,15 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         });
         // an unpicked tier is -1 and blocks saving (before anything is typed in the other rows' chips)
         await page.evaluate(() => { const it = document.querySelector('.quiz-q-item'); const set = (el, v) => { el.value = v; }; set(it.querySelector('.q-text'), 'Q'); it.querySelectorAll('.q-opt').forEach((o, i) => { o.value = 'opt ' + i; }); });
+        // V102.484: a NEW Rank card has no answer mode picked (no pre-selected default) — Save asks for it first
+        assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('.quiz-q-item .rk-md')].map(b => b.dataset.m + ':' + b.getAttribute('aria-pressed'))), ['order:false', 'tier:false'], 'neither mode is pre-selected');
         let q = await page.evaluate(() => getQuizFormData().questions[0]);
+        assert.equal(q.mode, '', 'nothing chosen → mode "" (not order, not tier)');
+        assert.equal(await page.evaluate(q => window.rankProblem(q), q), 'choose how interns answer — Order or Tier-box');
+        await page.evaluate(() => { document.getElementById('quiz-title').value = 'Rank test'; window.__alerts.length = 0; }); await page.evaluate(() => saveQuiz());
+        assert.ok(/Q1: choose how interns answer/.test((await page.evaluate(() => window.__alerts)).join('|')), 'saveQuiz blocks a Rank question with no mode chosen');
+        await page.evaluate(() => document.querySelector('.quiz-q-item .rk-md[data-m="order"]').click());
+        q = await page.evaluate(() => getQuizFormData().questions[0]); assert.ok(!('mode' in q), 'Order = no mode field (the old shape)');
         assert.deepEqual(q.tiers, [-1, -1, -1, -1]);
         assert.equal(await page.evaluate(q => window.rankProblem(q), q), 'pick Best / OK / Avoid for every option');
         await page.evaluate(() => { document.getElementById('quiz-title').value = 'Rank test'; window.__alerts.length = 0; });
@@ -71,6 +79,17 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         await page.evaluate(() => { const m = document.querySelectorAll('.quiz-q-item .rk-meta'); m[1].querySelector('.rk-t[data-t="1"]').click(); m[2].querySelector('.rk-t[data-t="1"]').click(); m[3].querySelector('.rk-t[data-t="2"]').click(); });
         assert.deepEqual((await page.evaluate(() => getQuizFormData().questions[0])).tiers, [0, 1, 1, 2]);
 
+        // ---- V102.484 Tier-box mode: the chip writes mode:'tier'; a ⚠ option must be Avoid; a saved question reads back as its mode
+        await page.evaluate(() => document.querySelector('.quiz-q-item .rk-md[data-m="tier"]').click());
+        q = await page.evaluate(() => getQuizFormData().questions[0]); assert.equal(q.mode, 'tier'); assert.deepEqual(q.tiers, [0, 1, 1, 2]);
+        assert.equal(await page.evaluate(q => window.rankProblem(q), q), '', 'tier mode with the ⚠ option on Avoid is fine');
+        assert.match(await page.evaluate(q => window.rankProblem(q), { ...q, unsafe: [0, 1, 0, 0] }), /⚠ unsafe option must be level Avoid/);
+        assert.deepEqual(await page.evaluate(() => [window.rankModeOf({ type: 'rank', mode: 'tier' }), window.rankModeOf({ type: 'rank' }), window.rankModeOf({ type: 'rank', mode: '' }), window.rankModeOf({ type: 'choice' }), window.rankModeOf(undefined)]), ['tier', 'order', '', '', ''], 'a saved Rank question without a mode reads as Order');
+        const rvT = await page.evaluate(q => window.rankReviewText({ ...q, mode: "tier" }, ["albuterol", "0,1,1,1"]), q);
+        assert.match(rvT.studentText, /Theophylline ⚠ → OK/); assert.match(rvT.studentText, /unsafe option not put in Avoid/); assert.ok(rvT.credit <= 0.6);
+        assert.match((await page.evaluate(q => window.rankReviewText({ ...q, mode: 'tier' }, ['x']), q)).studentText, /tiers not finished/);
+        await page.evaluate(() => document.querySelector('.quiz-q-item .rk-md[data-m="order"]').click());
+        q = await page.evaluate(() => getQuizFormData().questions[0]); assert.ok(!('mode' in q));
         // ---- the option cap and the way back to another type
         await page.evaluate(() => { const b = document.querySelector('.quiz-q-item .q-type-actions button'); addOption(b); addOption(b); addOption(b); });
         assert.equal(await page.evaluate(() => document.querySelectorAll('.quiz-q-item .q-opt-row').length), 6, 'capped at 6 options');
