@@ -26,10 +26,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     const model = document.createElement('button'); model.type = 'button'; model.id = 'dt-model-toggle'; model.className = 'dt-model';
     model.setAttribute('aria-expanded', 'false'); model.setAttribute('aria-controls', 'dt-models'); model.title = 'Text model for AI fill and AI Review — click to change';
-    model.innerHTML = '<span class="dt-model-logo" aria-hidden="true"></span><span id="dt-model-name"></span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>';
+    // V102.475: the model chip is the last segment of the AI capsule; the caption says what it drives
+    model.innerHTML = '<span class="aic-two"><small>Fill and review</small><span class="aic-row"><span class="dt-model-logo" aria-hidden="true"></span><span id="dt-model-name"></span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span></span>';
     const info = document.createElement('button'); info.type = 'button'; info.id = 'dt-info-toggle'; info.className = 'dt-info';
     info.setAttribute('aria-expanded', 'false'); info.setAttribute('aria-controls', 'dt-more'); info.title = 'Updated · contributors · AI history'; info.textContent = 'ⓘ';
-    actions.append(byId('dca-form-ai-fill-btn'), byId('dca-form-ai-review-btn'), byId('dca-form-copy-btn'), model, info);
+    // V102.475 (owner pick A2): 🤖 fill · 🔍 review · model = ONE capsule; 📋 copy and ⓘ stay beside it. Same ids / handlers; ai-capsule.js animates the busy / done states.
+    const cap = document.createElement('span'); cap.className = 'ai-cap dt-cap'; cap.id = 'dt-ai-cap';
+    const shimmer = document.createElement('span'); shimmer.className = 'sh'; shimmer.setAttribute('aria-hidden', 'true');
+    [byId('dca-form-ai-fill-btn'), byId('dca-form-ai-review-btn')].forEach(b => b.classList.add('aic-seg'));
+    cap.append(shimmer, byId('dca-form-ai-fill-btn'), byId('dca-form-ai-review-btn'), model);
+    actions.append(cap, byId('dca-form-copy-btn'), info);
     head.append(modeLabel, byId('dca-form-status-chip'), byId('dca-form-ai-badge'), docId, actions);
     titleRow.replaceWith(head);
     const rail = document.createElement('div'); rail.id = 'dt-models'; rail.className = 'dt-rail audit-toolbar lang-no-toggle'; rail.hidden = true;
@@ -61,11 +67,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const adChip = document.createElement('button'); adChip.type = 'button'; adChip.id = 'dca-ai-model-toggle'; adChip.className = 'dt-model dca-ai-model';
     adChip.setAttribute('aria-expanded', 'false'); adChip.setAttribute('aria-controls', 'dca-ai-models');
     adChip.title = 'Model for Auto-Draft — click to change'; adChip.dataset.thTitle = 'โมเดลที่ใช้ร่างข้อมูลยา — กดเพื่อเปลี่ยน'; adChip.dataset.krTitle = '초안 작성 모델 — 눌러서 변경';
-    adChip.innerHTML = '<span class="dt-model-logo" aria-hidden="true"></span><span class="dca-ai-model-name"></span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>';
-    byId('dca-ai-name').after(adChip);
+    adChip.innerHTML = '<span class="aic-two"><small>Auto-Draft model</small><span class="aic-row"><span class="dt-model-logo" aria-hidden="true"></span><span class="dca-ai-model-name"></span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span></span>';
+    // V102.475 (owner pick A2): the Auto-Draft model chip rides on the list page, split off the 🤖 AI Auto-Draft button, so the model is visible
+    // without opening the panel; its rail opens right under the toolbar row. Same value (#dca-ai-model-val) and pick handler.
+    const autoBtn = modal.querySelector('#dca-view-published .dca-toolbar button[onclick^="dcaAutoDraftToggle"]');
+    const listCap = document.createElement('span'); listCap.className = 'ai-cap ai-cap-list'; autoBtn.before(listCap);
+    autoBtn.classList.add('aic-seg'); listCap.append(autoBtn, adChip);
     const adRail = document.createElement('div'); adRail.id = 'dca-ai-models'; adRail.className = 'dt-rail audit-toolbar lang-no-toggle'; adRail.hidden = true;
     adRail.setAttribute('role', 'group'); adRail.setAttribute('aria-label', 'AI model for Auto-Draft');
-    byId('dca-ai-name').parentElement.after(adRail);
+    modal.querySelector('#dca-view-published .dca-toolbar').after(adRail);
     adChip.addEventListener('click', () => toggle(adRail, adChip));
     function drawRail(selected) {
         const action = 'dcaSelectAutoDraftModel(this)';

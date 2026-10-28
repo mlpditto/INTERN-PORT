@@ -46,9 +46,12 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
         // one line: name · chip · Generate; old rail hidden; short title; no Clear in the hint
         const line = await page.evaluate(() => {
             const cy = el => { const r = el.getBoundingClientRect(); return Math.round(r.top + r.height / 2); };
-            return [cy(document.getElementById('dca-ai-name')), cy(document.getElementById('dca-ai-model-toggle')), cy(document.getElementById('dca-ai-go-btn'))];
+            return [cy(document.getElementById('dca-ai-name')), cy(document.getElementById('dca-ai-go-btn'))];
         });
-        assert.ok(Math.max(...line) - Math.min(...line) <= 4, 'name · chip · Generate on one line: ' + line);
+        assert.ok(Math.max(...line) - Math.min(...line) <= 4, 'name · Generate on one line: ' + line);
+        // V102.475 (owner pick A2): the model chip moved out of the panel — it is the right segment of the split 🤖 AI Auto-Draft capsule on the list page
+        assert.equal(await page.$eval('#dca-ai-model-toggle', e => !!e.closest('.ai-cap-list') && !e.closest('#dca-ai-input-row')), true, 'the chip sits in the list-page capsule, not in the panel');
+        assert.equal(await page.$eval('.ai-cap-list > button.aic-seg', e => /AI Auto-Draft/.test(e.textContent)), true);
         assert.equal(await page.$eval('#dca-ai-chip-rail', e => getComputedStyle(e).display), 'none', 'the 17-chip rail is hidden');
         assert.equal(await page.$eval('.dca-ai-input-row-title', e => e.textContent.trim()), '🤖 AI Auto-Draft');
         assert.match(await page.$eval('#dca-ai-go-btn', e => e.textContent), /✨ Generate/);

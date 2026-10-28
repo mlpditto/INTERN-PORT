@@ -39,7 +39,10 @@ const cut = (from, to) => { const a = html.indexOf(from), b = html.indexOf(to, a
         });
 
         // ---- structure / icon-only / one row ----
-        assert.deepEqual(await page.locator('.dxa-form-actions > *').evaluateAll(es => es.map(e => e.id)), ['dxa-form-ai-fill-btn', 'dxa-form-ai-review-btn', 'dxa-form-copy-btn', 'dxa-form-model-wrap', 'dxa-form-info-toggle']);
+        assert.deepEqual(await page.locator('.dxa-form-actions > *').evaluateAll(es => es.map(e => e.id)), ['dxa-ai-cap', 'dxa-form-copy-btn', 'dxa-form-info-toggle']);
+        // V102.475 (owner pick A2): fill · review · model are ONE capsule; copy and ⓘ stay beside it
+        assert.deepEqual(await page.locator('#dxa-ai-cap > :not(.sh)').evaluateAll(es => es.map(e => e.id)), ['dxa-form-ai-fill-btn', 'dxa-form-ai-review-btn', 'dxa-form-model-wrap']);
+        assert.equal(await page.locator('#dxa-form-model-toggle small').innerText(), 'Fill and review');
         assert.deepEqual(await page.locator('#dxa-form-ai-fill-btn, #dxa-form-ai-review-btn').allInnerTexts(), ['🤖', '🔍']);
         await page.evaluate(() => { dxaHideAiButtons(); dxaShowAiButtons(); });
         assert.deepEqual(await page.locator('#dxa-form-ai-fill-btn, #dxa-form-ai-review-btn').allInnerTexts(), ['🤖', '🔍'], 'labels the code writes back stay icon-only');

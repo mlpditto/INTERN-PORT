@@ -44,7 +44,10 @@ const cut = (from, to) => { const a = html.indexOf(from), b = html.indexOf(to, a
         // ---- structure: one row, the old toolbar / provenance rows are gone ----
         const order = await page.locator('.dt-head > *').evaluateAll(es => es.map(e => e.id || e.className.split(' ')[0]));
         assert.deepEqual(order, ['dca-form-mode-label', 'dca-form-status-chip', 'dca-form-ai-badge', 'dca-form-doc-id', 'dt-actions']);
-        assert.deepEqual(await page.locator('.dt-actions > *').evaluateAll(es => es.map(e => e.id)), ['dca-form-ai-fill-btn', 'dca-form-ai-review-btn', 'dca-form-copy-btn', 'dt-model-toggle', 'dt-info-toggle']);
+        assert.deepEqual(await page.locator('.dt-actions > *').evaluateAll(es => es.map(e => e.id)), ['dt-ai-cap', 'dca-form-copy-btn', 'dt-info-toggle']);
+        // V102.475 (owner pick A2): fill · review · model are ONE capsule; copy and ⓘ stay beside it
+        assert.deepEqual(await page.locator('#dt-ai-cap > :not(.sh)').evaluateAll(es => es.map(e => e.id)), ['dca-form-ai-fill-btn', 'dca-form-ai-review-btn', 'dt-model-toggle']);
+        assert.equal(await page.locator('#dt-model-toggle small').innerText(), 'Fill and review');
         assert.equal(await page.locator('.dt-ai-toolbar, .dt-provenance').count(), 0);
         const g = await page.evaluate(() => { const h = document.querySelector('.dt-head').getBoundingClientRect(), tabs = document.getElementById('dca-form-tabs').getBoundingClientRect(), a = document.querySelector('.dt-actions').getBoundingClientRect(), n = document.getElementById('dca-form-mode-label').getBoundingClientRect(); return { headH: Math.round(h.height), toTabs: Math.round(tabs.top - h.top), sameRow: Math.abs(a.top - n.top) < 20 }; });
         assert.ok(g.headH <= 50 && g.sameRow, 'one row: ' + JSON.stringify(g));
