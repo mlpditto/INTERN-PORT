@@ -73,7 +73,7 @@
 
     // ---- B · the sheet
     function busy() {
-        if (document.getElementById('art-back') || document.getElementById('fbr-back') || document.getElementById('cm-back') || document.getElementById('kt-back')) return true;
+        if (document.getElementById('art-back') || document.getElementById('fbr-back') || document.getElementById('cm-back') || document.getElementById('kt-back') || document.getElementById('ord-back')) return true;
         var g = document.getElementById('internGuideOverlay'); if (g && g.classList.contains('open')) return true;
         return Array.prototype.some.call(document.querySelectorAll('.modal'), function (m) { var d = m.style.display; return d === 'flex' || d === 'block' || m.classList.contains('open') || m.classList.contains('show'); });
     }
@@ -106,6 +106,7 @@
             if (blocked() || !window.myUserDoc) return;
             var u = uid(), st = load(u), today = bkk();
             if (!decideB(me(), st, today, me().articlePopDay || '', fbDay(u))) return;
+            if (window.owedRemind && owedRemind.holds()) return;   // V101.228: the 'still to do' sheet has today's popup slot
             if (busy()) { if (tries++ < 20) setTimeout(check, 3000); return; }
             showB(st, today);
         } catch (e) { console.warn('ktNudge:', e); }
