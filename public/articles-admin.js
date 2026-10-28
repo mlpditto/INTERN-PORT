@@ -169,7 +169,7 @@
         var p = a.id ? db.collection('articles').doc(a.id).update(doc) : (doc.createdAt = ts, doc.createdBy = doc.updatedBy, db.collection('articles').add(doc));
         return p.then(function (ref) {
             if (!a.id && ref) a.id = ref.id;
-            a.status = st; S.base = JSON.stringify(a); S.savedAt = Date.now();
+            a.status = st; S.base = JSON.stringify(a); S.savedAt = Date.now(); S.savedVia = schedule ? 'p' : 's';   // V102.474: the pressed button turns green until the next edit
             var i = S.list.findIndex(function (x) { return x.id === a.id; });
             var copy = fromDoc(a.id, Object.assign({}, doc, { startAt: a.startAt, endAt: a.endAt, dx: a.dx, dc: a.dc }));
             if (i >= 0) S.list[i] = copy; else S.list.push(copy);
@@ -296,6 +296,7 @@
             '.art-pk .opts{max-height:170px;overflow:auto;display:flex;flex-direction:column}.art-pk .opts button{all:unset;cursor:pointer;padding:5px 8px;border-radius:7px;font-size:13px}.art-pk .opts button:hover{background:#eef2ff}' +
             '.art-err{color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:6px 10px;font-size:12.5px;font-weight:700}' +
             '.art-btns{display:flex;gap:8px;align-items:center}.art-btns button{min-height:0;margin:0;width:auto;padding:8px 14px;border-radius:12px;font-weight:800;font-size:13px;border:1px solid #e2e8f0;color:#475569;background:#fff;cursor:pointer}' +
+            '.art-btns .ok,.art-btns .p.ok{background:#16a34a;color:#fff;border-color:#16a34a;animation:art-pop .35s ease}@keyframes art-pop{0%{transform:scale(.96)}60%{transform:scale(1.05)}100%{transform:scale(1)}}@media (prefers-reduced-motion:reduce){.art-btns .ok{animation:none}}' +
             '.art-btns .p{background:#4361ee;color:#fff;border-color:#4361ee}.art-btns .del{margin-right:auto;color:#b91c1c}.art-btns .del.arm{background:#dc2626;color:#fff;border-color:#dc2626}.art-btns button:disabled{opacity:.55;cursor:default}' +
             '.art-row{border-left-width:4px}.art-row.st-live{border-left-color:#22c55e}.art-row.st-scheduled{border-left-color:#3b82f6}.art-row.st-draft{border-left-color:#cbd5e1}.art-row.st-ended{border-left-color:#e2e8f0}.art-rr{font-size:14px}' +
             '.art-stl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:2px 0 4px;font-size:12.5px;color:#475569}.art-stl .art-st{font-size:12.5px;padding:3px 11px}.art-save{margin-left:auto;font-size:11.5px;color:#94a3b8}.art-save.dirty{color:#b45309;font-weight:800}' +
@@ -424,6 +425,13 @@
         var mins = S.savedAt ? Math.max(0, Math.round((now - S.savedAt) / 60000)) : -1;
         var save = dirty ? '<span class="art-save dirty">● Unsaved</span>' : mins >= 0 ? '<span class="art-save">Saved' + (mins ? ' · ' + mins + ' min ago' : '') + '</span>' : '';
         return '<div class="art-stl" id="art-stl"><span class="art-st ' + st + '">' + { draft: 'Draft', scheduled: 'Scheduled', live: 'Live', ended: 'Ended' }[st] + '</span><span>' + msg + '</span>' + save + '</div>';
+    }
+    // V102.474: Save turns green ("✓ Saved") once it has gone through and stays green until the next edit; the pressed button is the one that turns
+    function btnsHtml(a) {
+        var clean = !!S.savedAt && JSON.stringify(a) === S.base, okP = clean && S.savedVia === 'p', okS = clean && S.savedVia === 's', dis = S.saving ? ' disabled' : '';
+        return '<div class="art-btns" id="art-btns"><button type="button" class="del' + (S.del ? ' arm' : '') + '" onclick="Articles.remove()" title="' + (a.id ? 'Delete (tap twice)' : 'Discard') + '" aria-label="Delete">' + (S.del ? 'Delete?' : '🗑') + '</button>' +
+            '<button type="button"' + (okS ? ' class="ok"' : '') + ' onclick="Articles.save(false)"' + dis + '>' + (okS ? '✓ Saved' : a.status === 'scheduled' ? '↩ Back to draft' : 'Save draft') + '</button>' +
+            '<button type="button" class="p' + (okP ? ' ok' : '') + '" onclick="Articles.save(true)"' + dis + '>' + (S.saving ? 'Saving…' : okP ? '✓ Saved' : a.status === 'scheduled' ? '💾 Save' : '📅 Schedule') + '</button></div>';
     }
     function whenWhoSummary(a) {
         var aud = a.audience.divisions.concat(a.audience.groups);
@@ -594,9 +602,7 @@
                 '<div class="art-ln">' + (a.links || []).map(function (l, i) { return '<span class="art-lk ' + l.kind + '">' + (LINK_ICON[l.kind] || '💊 ') + esc(l.label) + '<button type="button" aria-label="Remove link" onclick="Articles.dropLink(' + i + ')">✕</button></span>'; }).join('') +
                 chip('＋ Quiz', S.pick === 'quiz', 'Articles.openPick(\'quiz\')', '', ' art-add') + chip('＋ Codex', S.pick === 'codex', 'Articles.openPick(\'codex\')', '', ' art-add') + chip('＋ Disease', S.pick === 'disease', 'Articles.openPick(\'disease\')', ' title="Link a published Disease Codex entry"', ' art-add') + dxChipHtml(a) + dcChipHtml(a) + '</div>' + pickerHtml(), (a.links || []).length > 0 || !!S.pick),
             S.err ? '<div class="art-err" role="alert">⚠️ ' + esc(S.err) + '</div>' : '',
-            '<div class="art-btns"><button type="button" class="del' + (S.del ? ' arm' : '') + '" onclick="Articles.remove()" title="' + (a.id ? 'Delete (tap twice)' : 'Discard') + '" aria-label="Delete">' + (S.del ? 'Delete?' : '🗑') + '</button>' +
-            (a.status === 'scheduled' ? '<button type="button" onclick="Articles.save(false)"' + (S.saving ? ' disabled' : '') + '>↩ Back to draft</button>' : '<button type="button" onclick="Articles.save(false)"' + (S.saving ? ' disabled' : '') + '>Save draft</button>') +
-            '<button type="button" class="p" onclick="Articles.save(true)"' + (S.saving ? ' disabled' : '') + '>' + (S.saving ? 'Saving…' : a.status === 'scheduled' ? '💾 Save' : '📅 Schedule') + '</button></div>'
+            btnsHtml(a)
         ];
         return '<div class="art-ed" data-status="' + st + '">' + lines.join('') + '</div>';
     }
@@ -811,6 +817,7 @@
         var pv = document.querySelector('#art-body .art-pv'); if (pv) pv.outerHTML = previewHtml();
         fitPv();
         var sl = document.getElementById('art-stl'); if (sl) sl.outerHTML = statusLine(a, Date.now());
+        var bt = document.getElementById('art-btns'); if (bt) bt.outerHTML = btnsHtml(a);   // V102.474
         var aiEl = document.querySelector('#art-body .art-ai'); if (aiEl && !S.aiBusy) aiEl.outerHTML = aiHtml(a);   // V102.433: "✨ Draft from 🔗" appears as soon as a link is typed
         var tiEl = document.getElementById('art-title'); if (tiEl) tiEl.placeholder = 'Title (' + S.lang.toUpperCase() + ')' + (aiLinks(a).length ? ' — optional, taken from the page' : '');
         var w = document.getElementById('art-warn'); if (w) { var mm = mismatch(a, S.lang), NAME = { en: 'English', th: 'Thai', ko: 'Korean' }; w.innerHTML = mm ? '<div class="art-warn" role="status">⚠️ This looks like ' + NAME[mm] + ', not ' + NAME[S.lang] + (((a.title || {})[mm] || (a.body || {})[mm]) ? '' : '<button type="button" onclick="Articles.moveLang(\'' + S.lang + '\',\'' + mm + '\')">Move to ' + mm.toUpperCase() + '</button>') + '</div>' : ''; }
