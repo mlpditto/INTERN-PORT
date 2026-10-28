@@ -7,7 +7,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const html = fs.readFileSync('public/admin.html', 'utf8').replace(/\r\n/g, '\n'), rules = fs.readFileSync('firestore.rules', 'utf8').replace(/\r\n/g, '\n');
 assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(html));
 assert.ok(/<script src="holidays-admin\.js\?v=V102\.\d+"><\/script>/.test(html), 'the module is loaded');
-assert.ok(/<div class="hol-grid"><div class="hol-left">\s*<h2 style="margin-top:0;">📣 New Event<\/h2>/.test(html) && /<\/div><div class="hol-right" id="hol-panel"><\/div><\/div>\s*<\/div>\s*<!-- 1\. Kanban Task Form -->/.test(html), 'Event form left, Holidays panel right, no switch');
+assert.ok(/<div class="hol-grid"><div class="hol-left">\s*<div class="evf-head"><h2>📣 New Event<\/h2>/.test(html) && /<\/div><div class="hol-right" id="hol-panel"><\/div><\/div>\s*<\/div>\s*<!-- 1\. Kanban Task Form -->/.test(html), 'Event form left, Holidays panel right, no switch');
 assert.ok(/Holidays\.init\(\);/.test(html) && /Holidays\.boot\(\);/.test(html), 'init with the Event tab, boot after login');
 assert.ok(/match \/holidays\/\{holidayId\} \{\s*allow read: if isSignedIn\(\);\s*allow write: if isAdmin\(\);\s*\}/.test(rules), 'rule: read = signed in, write = admin');
 const TH = JSON.parse(fs.readFileSync('public/th-holidays.json', 'utf8')), OBS = JSON.parse(fs.readFileSync('public/observances.json', 'utf8'));
