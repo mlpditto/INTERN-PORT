@@ -3016,6 +3016,29 @@ function eligibleForQuiz(quizData, users) {
     return users.filter(u => targetGroup === 'Public' || u.group === targetGroup);
 }
 
+// Who still owes a quiz. Shared by the digest and the deadline alerts so the two
+// can never disagree about "pending". Attempt ids are prefixed with the quiz id,
+// so a documentId range read returns exactly this quiz's attempts. The upper
+// bound is the quiz id + ` (0x60), the character right after _ (0x5F), so every
+// quizId_* doc id sorts inside the range. Practice runs and non-submitted
+// statuses do not count as done. No eligible users = no attempt read at all.
+async function scanQuizPending(db, quizId, quizData, activeUsers) {
+    const eligible = eligibleForQuiz(quizData, activeUsers);
+    if (!eligible.length) return { eligible: eligible, doneIds: new Set(), missing: [] };
+    const attemptSnap = await db.collection('quiz_attempts')
+        .where(admin.firestore.FieldPath.documentId(), '>=', `${quizId}_`)
+        .where(admin.firestore.FieldPath.documentId(), '<', quizId + '`')
+        .get();
+    const doneIds = new Set();
+    attemptSnap.forEach(aDoc => {
+        const a = aDoc.data() || {};
+        if (a.isPractice === true) return;
+        if (!QUIZ_SUBMITTED_STATUSES.includes(a.status)) return;
+        doneIds.add(splitAttemptId(aDoc.id).userId);
+    });
+    return { eligible: eligible, doneIds: doneIds, missing: eligible.filter(u => !doneIds.has(u.id)) };
+}
+
 // ============================================================
 // pushQuizScoreToIntern  (the 1-on-1 half of notifyQuizSubmitted)
 // ------------------------------------------------------------
@@ -3617,26 +3640,12 @@ async function runQuizDigest(kind, options) {
             if (!deadlineMs || isNaN(deadlineMs) || deadlineMs <= now.toMillis()) continue;
 
             // V97.51 (A): active cohort only — see NOTIFY_ACTIVE_DAYS.
-            const eligible = eligibleForQuiz(q, activeUsers);
+            const scan = await scanQuizPending(db, qDoc.id, q, activeUsers);
+            const eligible = scan.eligible;
             if (!eligible.length) continue;
+            const doneIds = scan.doneIds;
 
-            // Attempt ids are prefixed with the quiz id, so a documentId
-            // range read returns exactly this quiz's attempts. The upper
-            // bound is the quiz id + ` (0x60), the character right after
-            // _ (0x5F), so every quizId_* doc id sorts inside the range.
-            const attemptSnap = await db.collection('quiz_attempts')
-                .where(admin.firestore.FieldPath.documentId(), '>=', `${qDoc.id}_`)
-                .where(admin.firestore.FieldPath.documentId(), '<', qDoc.id + '`')
-                .get();
-            const doneIds = new Set();
-            attemptSnap.forEach(aDoc => {
-                const a = aDoc.data() || {};
-                if (a.isPractice === true) return;
-                if (!QUIZ_SUBMITTED_STATUSES.includes(a.status)) return;
-                doneIds.add(splitAttemptId(aDoc.id).userId);
-            });
-
-            const missing = eligible.filter(u => !doneIds.has(u.id));
+            const missing = scan.missing;
             if (!missing.length) continue;
             // doneIds counts every submitter; intersect with the active cohort so
             // "done/total" can't read like 9/6 once the denominator is narrowed.
@@ -4176,6 +4185,189 @@ exports.notifyQuizDigestEvening = onSchedule({
     secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID']
 }, async (event) => {
     await runQuizDigest('scheduled', { windowHours: 6, windowLabel: '16:00 → 22:00' });
+});
+
+// ============================================================
+// notifyQuizDeadlines  (hourly — quizzes closing within 24 h)
+// ------------------------------------------------------------
+// T-24 h: ONE bubble to the LINE group listing every quiz closing soon.
+// T-3 h:  a personal bubble to each intern who still has NOT submitted.
+// Timing, copy and bubble validation are pure and live in quiz-deadline.js.
+//
+// Defaults (owner decision 2026-10-24): on for every active quiz that has a
+// deadline; opt out per quiz with quizzes.notifyDeadline === false. Personal
+// pushes are capped per Bangkok day and skipped once the month's LINE quota is
+// critical. Nothing goes out 22:00–07:00.
+//
+// Idempotency: quiz_deadline_alerts/{quizId_deadlineSec} — the deadline is in the
+// id, so moving a deadline re-arms the alert. Markers are written only AFTER a
+// successful push, so a transient failure retries on the next hourly run until
+// the quiz closes. quiz_deadline_alerts/_cap_{YYYY-MM-DD} counts the day's
+// personal pushes.
+// ============================================================
+const quizDeadline = require('./quiz-deadline');
+const DEADLINE_LINE_MONTHLY_QUOTA = 300;
+const DEADLINE_QUOTA_CRITICAL = 0.9;      // personal pushes stop at 90 % of the month
+const DEADLINE_DAILY_PERSONAL_CAP = 15;   // hard cap per Bangkok day
+// Permanent per-user failures — the marker is written anyway so it is not retried hourly.
+const DEADLINE_FINAL_CODES = ['no-friend', 'invalid-user', 'invalid'];
+
+function deadlineMsOf(q) {
+    if (q.deadline && typeof q.deadline.toMillis === 'function') return q.deadline.toMillis();
+    return q.deadline ? Date.parse(q.deadline) : NaN;
+}
+
+async function runQuizDeadlines(nowMs) {
+    if (!process.env.LINE_CHANNEL_ACCESS_TOKEN) {
+        console.warn('[notifyQuizDeadlines] LINE_CHANNEL_ACCESS_TOKEN missing — skipping');
+        return { reason: 'token-missing' };
+    }
+    const db = admin.firestore();
+    const alerts = db.collection('quiz_deadline_alerts');
+    const FV = admin.firestore.FieldValue;
+
+    // 1. which quizzes are due for what
+    const quizSnap = await db.collection('quizzes').where('isActive', '==', true).get();
+    const due = [];
+    for (const qDoc of quizSnap.docs) {
+        const q = qDoc.data() || {};
+        if (q.notifyDeadline === false || q.isPoll === true) continue;
+        const deadlineMs = deadlineMsOf(q);
+        const plan = quizDeadline.planDeadline(nowMs, deadlineMs);
+        if (!plan.group && !plan.personal) continue;
+        const mid = quizDeadline.markerId(qDoc.id, deadlineMs);
+        const mDoc = await alerts.doc(mid).get();
+        const marker = mDoc.exists ? (mDoc.data() || {}) : {};
+        due.push({ id: qDoc.id, q: q, deadlineMs: deadlineMs, plan: plan, mid: mid, marker: marker });
+    }
+    const wantGroup = due.filter(d => d.plan.group && !d.marker.groupAt);
+    const wantPersonal = due.filter(d => d.plan.personal);
+    if (!wantGroup.length && !wantPersonal.length) return { due: 0 };
+
+    // 2. quota
+    const month = new Date(nowMs).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }).slice(0, 7);
+    const day = new Date(nowMs).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+    let used = 0;
+    try {
+        const u = await db.collection('line_usage').doc(month).get();
+        used = u.exists ? Number((u.data() || {}).total) || 0 : 0;
+    } catch (e) { console.warn('[notifyQuizDeadlines] quota read failed:', e.message); }
+    const quotaFull = used >= DEADLINE_LINE_MONTHLY_QUOTA;
+    const quotaCritical = used >= DEADLINE_LINE_MONTHLY_QUOTA * DEADLINE_QUOTA_CRITICAL;
+
+    // 3. cohort (same definition as the digest) + per-user language / opt-out
+    const activeCutoffMs = nowMs - NOTIFY_ACTIVE_DAYS * 24 * 60 * 60 * 1000;
+    const users = [];
+    const userMeta = new Map();
+    (await db.collection('users').get()).forEach(doc => {
+        const u = doc.data() || {};
+        const lastSeenMs = userLastSeenMs(u);
+        users.push({
+            id: doc.id,
+            name: digestCleanName(String(u.displayName || '').trim() || doc.id.slice(0, 8)).slice(0, 40),
+            group: u.group || 'Public',
+            active: Number.isFinite(lastSeenMs) && lastSeenMs >= activeCutoffMs,
+            ignored: u.isIgnored === true
+        });
+        userMeta.set(doc.id, {
+            lang: LINE_LANGS.includes(u.preferredLanguage) ? u.preferredLanguage : 'en',
+            optOut: u.lineNotifyOptOut === true
+        });
+    });
+    const cohort = activeCohort(users);
+    const summary = { group: 0, personal: 0, skipped: '' };
+
+    // 4. group bubble — one per run
+    if (wantGroup.length) {
+        const items = [];
+        for (const d of wantGroup) {
+            const scan = await scanQuizPending(db, d.id, d.q, cohort);
+            if (!scan.missing.length) continue;           // everyone is done — nothing to chase
+            items.push({
+                quizId: d.id, mid: d.mid, name: digestQuizName(d.q, 60), deadlineMs: d.deadlineMs,
+                done: scan.eligible.length - scan.missing.length, total: scan.eligible.length,
+                deadlineBeriMax: typeof d.q.deadlineBeriMax === 'number' ? d.q.deadlineBeriMax : null
+            });
+        }
+        items.sort((x, y) => x.deadlineMs - y.deadlineMs);
+        const targets = resolveLineTargets('notifyQuizDeadlines').filter(t => !t.withScores);
+        if (items.length && targets.length && !quotaFull) {
+            const flex = quizDeadline.buildGroupFlex(items, nowMs);
+            const problems = quizDeadline.validateFlex(flex);
+            if (problems.length) {
+                console.error('[notifyQuizDeadlines] group bubble invalid, not sent: ' + problems.join('; '));
+            } else {
+                const res = await pushLineFlex('quizDeadlineGroup', targets, () => flex, `quizzes=${items.length}`);
+                if (res.some(r => r.ok)) {
+                    summary.group = items.length;
+                    for (const it of items) await alerts.doc(it.mid).set({ quizId: it.quizId, deadlineMs: it.deadlineMs, groupAt: FV.serverTimestamp() }, { merge: true });
+                }
+            }
+        }
+    }
+
+    // 5. personal bubbles — only to interns who still owe the quiz
+    if (wantPersonal.length) {
+        if (quotaCritical) {
+            summary.skipped = 'quota-critical';
+            console.warn(`[notifyQuizDeadlines] LINE quota ${used}/${DEADLINE_LINE_MONTHLY_QUOTA} — personal pushes skipped`);
+        } else {
+            const capRef = alerts.doc('_cap_' + day);
+            const capDoc = await capRef.get();
+            let left = DEADLINE_DAILY_PERSONAL_CAP - (capDoc.exists ? Number((capDoc.data() || {}).personal) || 0 : 0);
+            const byUser = new Map();                      // uid -> [{ item, mid }]
+            for (const d of wantPersonal) {
+                const scan = await scanQuizPending(db, d.id, d.q, cohort);
+                const sent = new Set(Array.isArray(d.marker.personalSent) ? d.marker.personalSent : []);
+                const item = {
+                    quizId: d.id, name: digestQuizName(d.q, 60), deadlineMs: d.deadlineMs,
+                    deadlineBeriMax: typeof d.q.deadlineBeriMax === 'number' ? d.q.deadlineBeriMax : null
+                };
+                for (const u of scan.missing) {
+                    if (sent.has(u.id) || !u.id.startsWith('U')) continue;
+                    const meta = userMeta.get(u.id) || {};
+                    if (meta.optOut) continue;
+                    if (!byUser.has(u.id)) byUser.set(u.id, []);
+                    byUser.get(u.id).push({ item: item, mid: d.mid });
+                }
+            }
+            // soonest-closing first, so the cap never drops the most urgent
+            const queue = [...byUser.entries()].sort((a, b) =>
+                Math.min(...a[1].map(x => x.item.deadlineMs)) - Math.min(...b[1].map(x => x.item.deadlineMs)));
+            let pushed = 0;
+            for (const [uid, rows] of queue) {
+                if (left <= 0) { summary.skipped = 'daily-cap'; break; }
+                rows.sort((a, b) => a.item.deadlineMs - b.item.deadlineMs);
+                const lang = (userMeta.get(uid) || {}).lang || 'en';
+                const flex = quizDeadline.buildPersonalFlex(rows.map(r => r.item), nowMs, lang);
+                const problems = quizDeadline.validateFlex(flex);
+                if (problems.length) { console.error('[notifyQuizDeadlines] personal bubble invalid: ' + problems.join('; ')); continue; }
+                const res = await pushLineFlex('quizDeadlineDM', [{ to: uid, label: 'intern', withScores: false }], () => flex, `quizzes=${rows.length}`);
+                const r = res[0] || {};
+                if (r.ok) { left--; pushed++; }
+                if (r.ok || DEADLINE_FINAL_CODES.includes(r.code)) {
+                    for (const row of rows) {
+                        await alerts.doc(row.mid).set({ quizId: row.item.quizId, deadlineMs: row.item.deadlineMs, personalSent: FV.arrayUnion(uid), personalAt: FV.serverTimestamp() }, { merge: true });
+                    }
+                }
+                if (r.code === 'rate-limit' || r.code === 'token') { summary.skipped = r.code; break; }
+            }
+            summary.personal = pushed;
+            if (pushed) await capRef.set({ day: day, personal: FV.increment(pushed) }, { merge: true });
+        }
+    }
+    console.log(`[notifyQuizDeadlines] group=${summary.group} personal=${summary.personal} skipped=${summary.skipped || '-'} quota=${used}/${DEADLINE_LINE_MONTHLY_QUOTA}`);
+    return summary;
+}
+
+exports.notifyQuizDeadlines = onSchedule({
+    schedule: '0 * * * *',
+    timeZone: 'Asia/Bangkok',
+    region: 'us-central1',
+    timeoutSeconds: 300,
+    secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID']
+}, async (event) => {
+    await runQuizDeadlines(Date.now());
 });
 
 // Preview for the admin send flow. A separate endpoint rather than a flag on

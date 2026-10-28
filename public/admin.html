@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.478)</title>
+    <title>Nika Admin (V102.480)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.475">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -14724,6 +14724,9 @@
                                     <label class="logic-chip" style="background:rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.3); color:#22d3ee;" title="OFF (normal): an active quiz already announces two milestones to the LINE group by itself — the first intern to submit, and when everyone eligible has finished. ON: announce EVERY submission instead — one message per intern, so only use it on quizzes worth watching live (the OA's monthly message quota is shared with the case and digest pushes).">
                                         <input type="checkbox" id="quiz-notify-group"> <span>Notify LINE every submit</span>
                                     </label>
+                                    <label class="logic-chip" style="background:rgba(220,38,38,0.1); border:1px solid rgba(220,38,38,0.3); color:#f87171;" title="ON (default): once the quiz has a Deadline, LINE alerts the intern group when it closes within 24 h, then messages each intern who has not submitted yet 3 h before. Nothing is sent 22:00–07:00. Personal messages stop when the month's LINE quota is critical or the daily cap is reached. Turn OFF for a quiz that should close quietly.">
+                                        <input type="checkbox" id="quiz-notify-deadline" checked> <span>Deadline alert (LINE)</span>
+                                    </label>
                                 </div>
                                 <style>
                                     .logic-chip { display:flex; align-items:center; gap:6px; cursor:pointer; padding:6px 12px; border-radius:10px; font-size:0.75em; font-weight:700; transition:all 0.2s; user-select:none; }
@@ -26574,6 +26577,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             document.getElementById('quiz-shuffle-choices').checked = q.shuffleChoices !== undefined ? q.shuffleChoices : true;
             { const pc = document.getElementById('quiz-partial-credit'); if (pc) pc.checked = !!q.partialCredit; }
             { const ng = document.getElementById('quiz-notify-group'); if (ng) ng.checked = !!q.notifyGroup; }
+            { const nd = document.getElementById('quiz-notify-deadline'); if (nd) nd.checked = q.notifyDeadline !== false; }
             toggleTimerModeUI();
             toggleHomeworkUI();
             // Load assigned users
@@ -26672,6 +26676,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             document.getElementById('quiz-shuffle-choices').checked = true;
             { const pc = document.getElementById('quiz-partial-credit'); if (pc) pc.checked = false; }
             { const ng = document.getElementById('quiz-notify-group'); if (ng) ng.checked = false; }
+            { const nd = document.getElementById('quiz-notify-deadline'); if (nd) nd.checked = true; }
             toggleTimerModeUI();
             toggleHomeworkUI();
             document.getElementById('quiz-type').value = "standard";
@@ -27098,6 +27103,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const partialCredit = document.getElementById('quiz-partial-credit')?.checked || false;
             // V97.47: opt-in instant LINE push on submit (notifyQuizSubmitted).
             const notifyGroup = document.getElementById('quiz-notify-group')?.checked || false;
+            const notifyDeadline = document.getElementById('quiz-notify-deadline')?.checked !== false;
             const quizType = document.getElementById('quiz-type').value;
             const feedbackLimit = parseInt(document.getElementById('quiz-feedback-limit').value) || 280;
             const caseContent = document.getElementById('quiz-case-content').value;
@@ -27181,7 +27187,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const deadlineBeriMax = (_dbV && _dbV.value !== '') ? Math.max(0, parseInt(_dbV.value, 10) || 0) : null;
 
             return {
-                title, shortTitle, targetGroup, unlockScore, description, tags, tagList, materials, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, partialCredit, notifyGroup, quizType, feedbackLimit, caseContent, questions, blueprint,
+                title, shortTitle, targetGroup, unlockScore, description, tags, tagList, materials, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, partialCredit, notifyGroup, notifyDeadline, quizType, feedbackLimit, caseContent, questions, blueprint,
                 earlyBirdBeriFirst, deadlineBeriMax, coverUrl: QuizCover.value(), coverStyle: QuizCover.style(), coverBadge: QuizCover.badge(),
                 startTime: document.getElementById('quiz-start-time').value,
                 deadline: document.getElementById('quiz-deadline').value
@@ -30194,6 +30200,7 @@ ${JSON.stringify(sourceObj)}`;
                 shuffleChoices: formData.shuffleChoices !== undefined ? formData.shuffleChoices : true,
                 partialCredit: formData.partialCredit || false,
                 notifyGroup: formData.notifyGroup || false,
+                notifyDeadline: formData.notifyDeadline !== false,
                 quizType: formData.quizType || 'standard',
                 feedbackLimit: formData.feedbackLimit || 280,
                 earlyBirdBeriFirst: (formData.earlyBirdBeriFirst === null || formData.earlyBirdBeriFirst === undefined) ? null : formData.earlyBirdBeriFirst,
@@ -37916,7 +37923,10 @@ RULES:
                 notifyQuizDigestManual: 'manual',
                 notifyQuizSubmitted: 'milestone',
                 notifyAdminOnNewCase: 'case',
-                notifyQuizReminder: 'reminder'
+                notifyQuizReminder: 'reminder',
+                // V102.480: deadline alerts (T-24 h group bubble, T-3 h personal) carry their own tags.
+                quizDeadlineGroup: 'deadline group',
+                quizDeadlineDM: 'deadline 1:1'
             };
             // V102.163: the LINE card folds under the toolbar chip. Open = load fresh numbers; outside click / Esc closes.
             window.toggleLineUsagePop = function (force) {

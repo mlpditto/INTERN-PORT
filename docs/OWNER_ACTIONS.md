@@ -13,6 +13,7 @@
 | **SMOKE-LIFF** | Try the new intern features in LINE on a phone | ⬜ open | 2 |
 | **SMOKE-ADMIN** | Try admin V102.46 → V102.48 (language button, feedback labels, issues) and check the ❌ quiz | ⬜ open | 2 |
 | **RIVER** | River flow C.2 / C.13 / C.29B (V101.56): functions deployed 2026-10-03 and first run OK (`C.2=2186 C.13=2500 C.29B=2382`); remaining: merge #1565 so the card shows it, then look at it on a phone in LINE | ⬜ open — merge + phone check | 2 |
+| **DEADLINE-ALERTS** | Quiz deadline LINE alerts (admin V102.480): deploy `firestore:rules` and `functions:notifyQuizDeadlines` after merge; then watch the first day of `line_usage` | ⬜ open — after merge | 2 |
 | **CLOUD** | Finish the Claude Code on the web setup at claude.ai/code | ⬜ optional | 3 |
 | FN | Every exported Cloud Function is deployed and ACTIVE | ✅ *script* (25/25 on 2026-09-30) | — |
 | RULES | `firestore.rules` / `storage.rules` identical to live | ✅ *script* | — |
@@ -22,6 +23,11 @@
 | TTL | Firestore TTL on `learning_path_entries.deleteAt` | ✅ *script* — active (the comment above `notifyPurgeDigest` still says "until then"; it is on) | — |
 
 ## 2. Actions in priority order
+
+### DEADLINE-ALERTS — quiz deadline LINE alerts (after the PR is merged)
+**What it does:** every hour `notifyQuizDeadlines` looks at active quizzes with a deadline in the next 24 h. One bubble to the LINE group at about T-24 h, then a personal bubble at T-3 h to each intern who has not submitted. On for every quiz with a deadline; the quiz editor chip **Deadline alert (LINE)** turns one off. Quiet hours 22:00–07:00; max 15 personal pushes a day; personal pushes stop at 270/300 for the month.
+**Deploy (owner, nothing auto-deploys):** `firebase deploy --only firestore:rules` then `firebase deploy --only functions:notifyQuizDeadlines,functions:notifyQuizDigest,functions:notifyQuizDigestEvening,functions:sendQuizDigestNow,functions:previewQuizDigest` (the digest callers share the refactored pending scan).
+**Verify:** the dashboard LINE chip lists `deadline group` / `deadline 1:1` under this month; open a quiz closing tomorrow and watch the next 07:00–21:00 hourly run. Cost: a group push may count once per group member on LINE's side — check the first day against `line_usage`.
 
 ### PREPAY — AI Studio billing, Postpay → Prepay (by 2026-10-12)
 **Why:** Google moves the Gemini API in AI Studio to prepaid credits. After the deadline, paid calls on the `GEMINI_API_KEY` secret stop. That key serves the `gemini-aistudio` provider in `callAIProxy`, which does the image generation.
