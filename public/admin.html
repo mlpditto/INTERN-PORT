@@ -31157,6 +31157,96 @@ ${JSON.stringify(sourceObj)}`;
 
         // V100.99: review-card Copy button. The text is prebuilt into data-copy by the
         // card renderer (URI-encoded so quotes/newlines survive the attribute).
+        // Review lean (V102.485): ONE place that decides what a question card IS — skipped / typed (Rank typed but not ranked) /
+        // correct / partial / wrong / review (a free-text answer nobody has graded yet). The chip rail, the compact bars and the
+        // later skipped / comparison cards all read this, so the five words never drift apart.
+        window.rvStatusOf = function (c) {
+            if (c.isRank) {
+                const typed = String((c.rankSc && c.rankSc.typed) || '').trim();
+                const ordered = !!(c.rankSc && c.rankSc.order && c.rankSc.order.length);
+                if (c.isCorrect) return 'correct';
+                if (!ordered) return typed ? 'typed' : 'skipped';
+                return c.isPartial ? 'partial' : 'wrong';
+            }
+            if (c.isChoice) {
+                if (c.isCorrect) return 'correct';
+                if (c.isPartial) return 'partial';
+                return parseStoredChoiceAnswer(c.studentAns).length ? 'wrong' : 'skipped';
+            }
+            if (c.isCorrect) return 'correct';
+            const a = c.studentAns;
+            const has = Array.isArray(a) ? a.some(x => String(x || '').trim() !== '') : String(a == null ? '' : a).trim() !== '';
+            if (!has) return 'skipped';
+            return c.graded === false ? 'wrong' : 'review';
+        };
+        window.rvStatusLabel = function (state, frac) {
+            return state === 'skipped' ? 'Skipped' : state === 'typed' ? 'Typed · not ranked' : state === 'correct' ? 'Correct'
+                : state === 'partial' ? 'Partial ' + Math.round((Number(frac) || 0) * 100) + '%' : state === 'review' ? 'Needs review' : 'Wrong';
+        };
+        // the orange dot on 💾: the typed override differs from what is saved
+        window.rvScoreDirty = function (input) {
+            const dot = input && input.parentElement && input.parentElement.querySelector('.rv-dirty');
+            if (dot) dot.hidden = String(input.value || '').trim() === String(input.dataset.init || '').trim();
+        };
+        window.copyReviewKey = async function (btn) {
+            const text = decodeURIComponent((btn && btn.dataset.copy) || '');
+            if (!text) return;
+            try {
+                await navigator.clipboard.writeText(text);
+                if (typeof showToast === 'function') showToast('📋 Correct ranking copied', 'success');
+                const orig = btn.textContent;
+                btn.textContent = '✓ Copied';
+                setTimeout(() => { btn.textContent = orig; }, 1500);
+            } catch (e) {
+                prompt('Copy this text manually (Ctrl+C):', text);
+            }
+        };
+        // filter + which question cards are open; kept per attempt so the re-render after Mark correct / Save score does not undo them
+        window._rvUi = window._rvUi || null;
+        window.rvSyncUi = function () {
+            const root = document.getElementById('reviewQuizOverlay'); if (!root) return;
+            const ws = [...root.querySelectorAll('.rv-q')], vis = ws.filter(w => w.dataset.rvHide !== '1');
+            const x = root.querySelector('.rv-xall');
+            if (x) {
+                const allOpen = vis.length > 0 && vis.every(w => w.dataset.rvOpen === '1');
+                x.textContent = allOpen ? '⊟ Collapse all' : '⊞ Expand all';
+                x.setAttribute('aria-label', allOpen ? 'Collapse all questions' : 'Expand all questions');
+            }
+            ws.forEach(w => { const b = w.querySelector('.rv-bar'); if (b) b.setAttribute('aria-expanded', w.dataset.rvOpen === '1' ? 'true' : 'false'); });
+        };
+        window.rvSetFilter = function (key) {
+            const root = document.getElementById('reviewQuizOverlay'); if (!root) return;
+            if (window._rvUi) window._rvUi.filter = key;
+            root.querySelectorAll('.rv-q').forEach(w => {
+                const s = w.dataset.rvState, rk = w.dataset.rvRank === '1';
+                const show = key === 'all' || (key === 'rank' ? rk : key === 'inc' ? (s === 'skipped' || s === 'typed') : s === key);
+                w.dataset.rvHide = show ? '0' : '1';
+            });
+            root.querySelectorAll('#rv-rail .rv-chip[data-f]').forEach(b => b.setAttribute('aria-pressed', b.dataset.f === key ? 'true' : 'false'));
+            window.rvSyncUi();
+        };
+        window.rvToggleQ = function (el) {
+            const w = el && el.closest ? el.closest('.rv-q') : null; if (!w) return;
+            const open = w.dataset.rvOpen !== '1';
+            w.dataset.rvOpen = open ? '1' : '0';
+            if (window._rvUi) window._rvUi.open[w.dataset.rvI] = open;
+            window.rvSyncUi();
+        };
+        window.rvExpandAll = function () {
+            const root = document.getElementById('reviewQuizOverlay'); if (!root) return;
+            const vis = [...root.querySelectorAll('.rv-q')].filter(w => w.dataset.rvHide !== '1');
+            const allOpen = vis.length > 0 && vis.every(w => w.dataset.rvOpen === '1');
+            vis.forEach(w => { w.dataset.rvOpen = allOpen ? '0' : '1'; if (window._rvUi) window._rvUi.open[w.dataset.rvI] = !allOpen; });
+            window.rvSyncUi();
+        };
+        window.rvApplyUi = function (attemptId) {
+            const root = document.getElementById('reviewQuizOverlay'); if (!root) return;
+            if (!window._rvUi || window._rvUi.id !== attemptId) window._rvUi = { id: attemptId, filter: 'all', open: {} };
+            const u = window._rvUi;
+            root.querySelectorAll('.rv-q').forEach(w => { if (Object.prototype.hasOwnProperty.call(u.open, w.dataset.rvI)) w.dataset.rvOpen = u.open[w.dataset.rvI] ? '1' : '0'; });
+            window.rvSetFilter(u.filter || 'all');
+        };
+
         window.copyReviewQuestion = async function(btn) {
             const text = decodeURIComponent((btn && btn.dataset.copy) || '');
             if (!text) return;
@@ -31324,7 +31414,10 @@ ${JSON.stringify(sourceObj)}`;
                 // Lean review: the two summary cards are detail panels behind one strip of status chips. A Moderate / High reading
                 // opens its panel on its own — a risk signal is never hidden behind a click.
                 const cheatOpen = cheatRisk === 'Moderate' || cheatRisk === 'High';
-                const timingOpen = telemetryLevel === 'Moderate' || telemetryLevel === 'High';
+                // a Moderate reading whose ONLY flag is "Low active ratio" is already on the strip as its own ⚠ chip (below), so its
+                // detail card may stay folded; any other flag, or a High reading, still opens the card by itself.
+                const rvLowActive = telemetryFlags.find(f => /^Low active ratio/.test(f));
+                const timingOpen = telemetryLevel === 'High' || (telemetryLevel === 'Moderate' && telemetryFlags.some(f => !/^Low active ratio/.test(f)));
                 const sigTone = (lvl) => lvl === 'High' ? ['#fef2f2', '#b91c1c', '#fecaca'] : (lvl === 'Moderate' ? ['#fffbeb', '#b45309', '#fcd34d'] : ['#f0fdf4', '#166534', '#bbf7d0']);
                 const sigChip = (id, icon, label, value, lvl, open, tip) => {
                     const t = sigTone(lvl);
@@ -31334,7 +31427,9 @@ ${JSON.stringify(sourceObj)}`;
                     <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:0 0 14px;">
                         ${sigChip('rv-sig-cheat', '🛡', 'Cheat', cheatCount ? `${cheatRisk} · ${cheatCount}` : 'None', cheatRisk, cheatOpen, 'Cheat monitoring — browser events recorded during the quiz session')}
                         ${telemetrySummaryHtml ? sigChip('rv-sig-timing', '⏱', 'Timing', telemetryLevel, telemetryLevel, timingOpen, 'Timing & answer behavior — profile ' + String(timingProfileName || 'exam').toUpperCase()) : ''}
-                        ${telemetryQuestionCount ? `<span style="font-size:0.8em; color:#64748b; font-weight:700;">${telemetryQuestionCount} questions · ${String(timingProfileName || 'exam').toUpperCase()}</span>` : ''}
+                        ${telemetryQuestionCount ? `<span class="rv-meta" style="font-size:0.8em; color:#64748b; font-weight:700;">${telemetryQuestionCount} questions · ${String(timingProfileName || 'exam').toUpperCase()}</span>` : ''}
+                        <span class="lang-no-toggle" title="Points the answers earned out of the quiz total — what the Actual button approves" style="font-size:0.8em; color:#334155; font-weight:800; white-space:nowrap;"><!--rv-pts--></span>
+                        ${rvLowActive && telemetrySummaryHtml ? `<button type="button" class="rv-flag lang-no-toggle" onclick="toggleReviewSignal('rv-sig-timing', document.querySelector('[aria-controls=rv-sig-timing]'))" title="Active screen time was low compared with the time spent — open the Timing details">⚠ Low active (${Math.round(activeRatio * 100)}%)</button>` : ''}
                     </div>
                     <div id="rv-sig-cheat" ${cheatOpen ? '' : 'hidden'}>${cheatSummaryHtml}</div>
                     ${telemetrySummaryHtml ? `<div id="rv-sig-timing" ${timingOpen ? '' : 'hidden'}>${telemetrySummaryHtml}</div>` : ''}`;
@@ -31465,6 +31560,8 @@ ${JSON.stringify(sourceObj)}`;
                         </div>`;
                 } else {
                     // Standard quiz questions
+                    const rvCardsStart = cardsHtml.length;
+                    const rvStates = [];
                     (quiz.questions || []).forEach((q, i) => {
                         const studentAns = quizAttemptAnswers(att)[i];
                         const isChoice = (q.type || 'choice') === 'choice';
@@ -31552,6 +31649,19 @@ ${JSON.stringify(sourceObj)}`;
                         const cardBg = isCorrect ? '#d4edda' : (isPartial ? '#fff3cd' : '#f8d7da');
                         const cardBorder = isCorrect ? '#28a745' : (isPartial ? '#f59e0b' : '#dc3545');
                         const cardIcon = isCorrect ? '&#10004;' : (isPartial ? '&#9680;' : '&#10006;');
+                        // Review lean: the card's status (one helper), its compact bar, the fold button and the Rank "Copy key"
+                        const rvState = window.rvStatusOf({ isChoice, isRank: !!rankSc, rankSc, studentAns, isCorrect, isPartial, graded: att.gradedAnswers ? att.gradedAnswers[i] : undefined });
+                        const rvEarned = manualScoreValue !== '' ? Number(manualScoreValue) : (isCorrect ? pointsPerQuestion : (isPartial ? partialFrac * pointsPerQuestion : 0));
+                        const rvColor = { skipped: '#94a3b8', typed: '#94a3b8', correct: '#28a745', partial: '#f59e0b', wrong: '#dc3545', review: '#4361ee' }[rvState];
+                        const rvOpen = !(rankSc && (rvState === 'skipped' || rvState === 'typed'));   // a skipped / typed-not-ranked Rank card has nothing to decide: folded to one line
+                        rvStates.push({ state: rvState, rank: !!rankSc, open: rvOpen });
+                        const rvBar = `<div class="rv-bar lang-no-toggle" role="button" tabindex="0" aria-expanded="false" onclick="rvToggleQ(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();rvToggleQ(this)}" style="--rv-c:${rvColor};"><b class="rv-bq">Q${i + 1}</b><span class="rv-bs">${escapeHtml(String(q.q == null ? '' : q.q).replace(/\s+/g, ' ').trim())}</span><span class="rv-bt rv-bt-${rvState}">${window.rvStatusLabel(rvState, partialFrac)}</span><span class="rv-bp">${rvEarned.toFixed(2)} / ${pointsPerQuestion.toFixed(2)}</span><span class="rv-bc" aria-hidden="true">▸</span></div>`;
+                        const rvFold = `<button type="button" class="rv-fold" onclick="rvToggleQ(this)" title="Fold this question to one line" aria-label="Fold this question">▴</button>`;
+                        const rvTier = ix => Math.min(2, Math.max(0, Number((q.tiers || [])[ix]) || 0));
+                        const rvKeyText = rankSc
+                            ? `Q${i + 1} key (best → worst):\n` + (q.options || []).map((_, ix) => ix).sort((a, b) => rvTier(a) - rvTier(b)).map((ix, k) => `${k + 1}. ${String(q.options[ix] == null ? '' : q.options[ix]).trim()} — ${['Best', 'OK', 'Avoid'][rvTier(ix)]}${(q.unsafe || [])[ix] ? ' ⚠' : ''}`).join('\n')
+                            : '';
+                        const rvCopyKeyBtn = rankSc ? `<button type="button" class="rv-copykey" data-copy="${encodeURIComponent(rvKeyText)}" onclick="copyReviewKey(this)" title="Copy the correct ranking (to paste into feedback)" aria-label="Copy the correct ranking">📋 Copy key</button>` : '';
                         const partialBadgeHtml = isPartial
                             ? `<span class="badge" style="background:#f59e0b; font-size:0.7em; padding:2px 8px; margin-left:6px; flex-shrink:0;">Partial ${Math.round(partialFrac * 100)}%</span>`
                             : '';
@@ -31573,9 +31683,9 @@ ${JSON.stringify(sourceObj)}`;
                         const copyPayload = encodeURIComponent(copyLines.join('\n'));
 
                         cardsHtml += `
-                            <div class="lang-no-toggle" style="border:2px solid ${cardBorder}; padding:15px; margin-bottom:15px; border-radius:12px; background:${cardBg}; border-left:8px solid ${cardBorder}; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                            <div class="rv-q" data-rv-i="${i}" data-rv-state="${rvState}" data-rv-rank="${rankSc ? 1 : 0}" data-rv-open="${rvOpen ? 1 : 0}" data-rv-hide="0">${rvBar}<div class="lang-no-toggle rv-card" style="border:2px solid ${cardBorder}; padding:15px; margin-bottom:15px; border-radius:12px; background:${cardBg}; border-left:8px solid ${cardBorder}; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
                                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; flex-wrap: wrap; gap:8px;">
-                                    <b style="font-size:1.1em; flex:1; min-width:200px; word-wrap: break-word; overflow-wrap: break-word; white-space: normal;">${cardIcon} Q${i + 1}: ${window.renderMdInline(q.q)} ${durationHtml}${activeDurationHtml}${answerChangesHtml}${firstLatencyHtml}</b>
+                                    <b style="font-size:1.1em; flex:1; min-width:200px; word-wrap: break-word; overflow-wrap: break-word; white-space: normal;">${rvFold}${cardIcon} Q${i + 1}: ${window.renderMdInline(q.q)} ${durationHtml}${activeDurationHtml}${answerChangesHtml}${firstLatencyHtml}</b>
                                     <span class="badge" style="background:#6c757d; font-size:0.7em; padding:2px 8px; margin-left:8px; flex-shrink:0;">${isChoice ? 'Choice' : (rankSc ? (q.mode === 'tier' ? 'Rank · tiers' : 'Rank') : 'Short Answer')}</span>${partialBadgeHtml}
                                 </div>
                                 <div style="display:flex; flex-direction:column; gap:8px;">
@@ -31584,27 +31694,27 @@ ${JSON.stringify(sourceObj)}`;
                                         <span style="color:#333;">${studentAnsText}</span>
                                     </div>
                                     <div style="padding:10px; border-radius:8px; background:#d1e7dd; border:1px solid #badbcc; color:#0f5132; font-size:0.95em;">
-                                        <span style="color:#157347; font-weight:bold; display:inline-block; width:65px;">Correct:</span> 
+                                        <span style="color:#157347; font-weight:bold; display:inline-block; width:65px;">Correct:</span>${rvCopyKeyBtn} 
                                         <span style="font-weight:500;">${correctAnsText}</span>
                                     </div>`}
                                 </div>
-                                <div style="margin-top:12px; padding-top:10px; border-top:1px solid rgba(0,0,0,0.05); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                                <div style="margin-top:8px; padding-top:6px; border-top:1px solid rgba(0,0,0,0.05); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px 8px;">
                                     <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                                         <label title="Mark as Correct / Graded" style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.9em; color:#444;">
                                             <input type="checkbox" aria-label="Mark as Correct / Graded" style="width:18px; height:18px; margin:0;" onchange="manualCorrectAns('${attemptId}', ${i}, this.checked)" ${isManuallyCorrect ? 'checked' : ''}> 
                                         </label>
-                                        ${!isChoice ? `<button class="btn-sm" onclick="aiEvaluateShortAnswer(this, '${attemptId}', ${i})" title="AI Evaluate" aria-label="AI Evaluate" style="background:#8b5cf6; color:white; border:none; border-radius:20px; padding:4px 12px; font-size:0.85em; font-weight:bold;"><i class="fa-solid fa-microchip-ai"></i></button>` : ''}
-                                        <div title="Q Score" style="display:flex; align-items:center; gap:6px; background:#fff; border:1px solid #d1d5db; border-radius:20px; padding:4px 8px;">
+                                        ${!isChoice ? `<button class="btn-sm rv-ctl" onclick="aiEvaluateShortAnswer(this, '${attemptId}', ${i})" title="AI Evaluate" aria-label="AI Evaluate" style="background:#8b5cf6; color:white; border:none; border-radius:20px; padding:2px 10px; font-size:0.85em; font-weight:bold;"><i class="fa-solid fa-microchip-ai"></i></button>` : ''}
+                                        <div title="Q Score" style="display:flex; align-items:center; gap:6px; background:#fff; border:1px solid #d1d5db; border-radius:20px; padding:1px 6px;">
                                             <i class="fa-solid fa-star-half-stroke" aria-hidden="true" style="font-size:0.9em; color:#475569;"></i>
-                                            <input id="manual-score-${attemptId}-${i}" aria-label="Q Score" type="number" step="0.01" min="0" max="${pointsPerQuestion.toFixed(2)}" value="${manualScoreValue}" placeholder="auto" style="width:78px; border:1px solid #cbd5e1; border-radius:8px; padding:4px 6px; font-size:0.85em;">
-                                            <button type="button" title="Save Q Score" aria-label="Save Q Score" onclick="manualSetQuestionScore('${attemptId}', ${i})" style="background:#0ea5e9; color:white; border:none; border-radius:14px; padding:4px 10px; font-size:0.8em; font-weight:700; cursor:pointer;"><i class="fa-solid fa-floppy-disk"></i></button>
+                                            <input id="manual-score-${attemptId}-${i}" aria-label="Q Score" type="number" step="0.01" min="0" max="${pointsPerQuestion.toFixed(2)}" value="${manualScoreValue}" data-init="${manualScoreValue}" oninput="rvScoreDirty(this)" placeholder="auto" style="width:64px; border:1px solid #cbd5e1; border-radius:8px; padding:2px 6px; font-size:0.85em;">
+                                            <button type="button" title="Save Q Score" aria-label="Save Q Score" onclick="manualSetQuestionScore('${attemptId}', ${i})" class="rv-ctl" style="position:relative; background:#0ea5e9; color:white; border:none; border-radius:14px; padding:3px 10px; font-size:0.8em; font-weight:700; cursor:pointer;"><i class="fa-solid fa-floppy-disk"></i><i class="rv-dirty" hidden title="Not saved yet" style="position:absolute; top:-3px; right:-3px; width:9px; height:9px; border-radius:50%; background:#f97316; border:2px solid #fff;"></i></button>
                                         </div>
                                     </div>
                                     <div style="display:flex; align-items:center; gap:6px;">
-                                    <button type="button" data-copy="${copyPayload}" onclick="copyReviewQuestion(this)" title="Copy question + options (no answer)" aria-label="Copy question + options (no answer)" style="background:rgba(67,97,238,0.1); border:1px solid rgba(67,97,238,0.3); padding:4px 12px; border-radius:20px; color:#4361ee; cursor:pointer; font-size:0.85em; font-weight:600; display:flex; align-items:center; gap:6px; transition:all 0.2s;" onmouseover="this.style.background='rgba(67,97,238,0.2)'" onmouseout="this.style.background='rgba(67,97,238,0.1)'">
+                                    <button type="button" data-copy="${copyPayload}" onclick="copyReviewQuestion(this)" title="Copy question + options (no answer)" aria-label="Copy question + options (no answer)" class="rv-ctl" style="background:rgba(67,97,238,0.1); border:1px solid rgba(67,97,238,0.3); padding:2px 10px; border-radius:20px; color:#4361ee; cursor:pointer; font-size:0.85em; font-weight:600; display:flex; align-items:center; gap:6px; transition:all 0.2s;" onmouseover="this.style.background='rgba(67,97,238,0.2)'" onmouseout="this.style.background='rgba(67,97,238,0.1)'">
                                         <i class="fa-regular fa-copy"></i>
                                     </button>
-                                    <button type="button" onclick="document.getElementById('review-full-${attemptId}-${i}').style.display = document.getElementById('review-full-${attemptId}-${i}').style.display === 'none' ? 'block' : 'none'" title="See Full Question" aria-label="See Full Question" style="background:rgba(67,97,238,0.1); border:1px solid rgba(67,97,238,0.3); padding:4px 12px; border-radius:20px; color:#4361ee; cursor:pointer; font-size:0.85em; font-weight:600; display:flex; align-items:center; gap:6px; transition:all 0.2s;" onmouseover="this.style.background='rgba(67,97,238,0.2)'" onmouseout="this.style.background='rgba(67,97,238,0.1)'">
+                                    <button type="button" onclick="document.getElementById('review-full-${attemptId}-${i}').style.display = document.getElementById('review-full-${attemptId}-${i}').style.display === 'none' ? 'block' : 'none'" title="See Full Question" aria-label="See Full Question" class="rv-ctl" style="background:rgba(67,97,238,0.1); border:1px solid rgba(67,97,238,0.3); padding:2px 10px; border-radius:20px; color:#4361ee; cursor:pointer; font-size:0.85em; font-weight:600; display:flex; align-items:center; gap:6px; transition:all 0.2s;" onmouseover="this.style.background='rgba(67,97,238,0.2)'" onmouseout="this.style.background='rgba(67,97,238,0.1)'">
                                         <i class="fa-solid fa-list-ul"></i>
                                     </button>
                                     </div>
@@ -31622,8 +31732,17 @@ ${JSON.stringify(sourceObj)}`;
                                         }).join('')}
                                     </div>` : ''}
                                 </div>
-                            </div>`;
+                            </div></div>`;
                     });
+                    // chip rail: counts per status, zero-count chips hidden; shown when it has something to filter by, or a card starts folded
+                    const rvCount = k => rvStates.filter(s => k === 'all' ? true : k === 'rank' ? s.rank : k === 'inc' ? (s.state === 'skipped' || s.state === 'typed') : s.state === k).length;
+                    const rvDefs = [['all', 'All'], ['rank', 'Rank'], ['inc', 'Incomplete'], ['partial', 'Partial'], ['wrong', 'Wrong'], ['correct', 'Correct'], ['review', 'Needs review']].filter(d => d[0] === 'all' || rvCount(d[0]) > 0);
+                    if (rvStates.length && (rvDefs.length - 1 >= 2 || rvStates.some(s => !s.open))) {
+                        const rvRail = `<div id="rv-rail" class="lang-no-toggle" data-attempt="${attemptId}" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:0 0 12px;">`
+                            + rvDefs.map(d => `<button type="button" class="rv-chip" data-f="${d[0]}" aria-pressed="false" onclick="rvSetFilter('${d[0]}')">${d[1]} <b>${rvCount(d[0])}</b></button>`).join('')
+                            + `<span style="flex:1"></span><button type="button" class="rv-chip rv-xall" onclick="rvExpandAll()">⊞ Expand all</button></div>`;
+                        cardsHtml = cardsHtml.slice(0, rvCardsStart) + rvRail + cardsHtml.slice(rvCardsStart);
+                    }
                 }
 
                 const fallbackCorrect = Number(att.correctCount || 0);
@@ -31642,6 +31761,27 @@ ${JSON.stringify(sourceObj)}`;
                         ? recalculatedForApproval.score
                         : fallbackActualPoints);
                 const actualApproveLabel = `${actualApprovePoints.toFixed(2)} pts`;
+                cardsHtml = cardsHtml.split('<!--rv-pts-->').join(`${actualApprovePoints.toFixed(2)} / ${Number(quiz.totalPoints || 1).toFixed(2)} pts`);
+                const rvStyleHtml = '<style>'
+                    + '#reviewQuizOverlay .rv-q[data-rv-hide="1"]{display:none}'
+                    + '#reviewQuizOverlay .rv-q[data-rv-open="0"]>.rv-card{display:none}'
+                    + '#reviewQuizOverlay .rv-q[data-rv-open="1"]>.rv-bar{display:none}'
+                    + '#reviewQuizOverlay .rv-bar{display:flex;align-items:center;gap:10px;min-height:40px;padding:6px 12px;margin:0 0 8px;border:1px solid #e2e8f0;border-left:6px solid var(--rv-c,#94a3b8);border-radius:10px;background:#fff;cursor:pointer;font-size:0.9em}'
+                    + '#reviewQuizOverlay .rv-bq{font-weight:800;color:#334155;white-space:nowrap}'
+                    + '#reviewQuizOverlay .rv-bs{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#0f172a;font-weight:600}'
+                    + '#reviewQuizOverlay .rv-bt{font-size:0.78em;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap;background:#fee2e2;color:#991b1b}'
+                    + '#reviewQuizOverlay .rv-bt-correct{background:#dcfce7;color:#166534}#reviewQuizOverlay .rv-bt-partial{background:#fef3c7;color:#92400e}'
+                    + '#reviewQuizOverlay .rv-bt-skipped,#reviewQuizOverlay .rv-bt-typed{background:#e2e8f0;color:#475569}#reviewQuizOverlay .rv-bt-review{background:#e0e7ff;color:#3730a3}'
+                    + '#reviewQuizOverlay .rv-bp{color:#475569;font-variant-numeric:tabular-nums;white-space:nowrap}#reviewQuizOverlay .rv-bc{color:#64748b}'
+                    + '#reviewQuizOverlay .rv-chip{width:auto;min-height:0;margin:0;padding:4px 11px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-weight:700;font-size:0.8em;cursor:pointer;position:relative;display:inline-flex;gap:5px;align-items:center}'
+                    + '#reviewQuizOverlay .rv-chip[aria-pressed="true"]{background:#4361ee;border-color:#4361ee;color:#fff}'
+                    + '#reviewQuizOverlay .rv-flag{width:auto;min-height:0;margin:0;display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-weight:700;font-size:0.8em;cursor:pointer;position:relative}'
+                    + '#reviewQuizOverlay .rv-fold{display:inline-block;vertical-align:middle;width:auto;min-height:0;margin:0 8px 0 0;padding:0 8px;height:24px;line-height:22px;border-radius:8px;border:1px solid rgba(0,0,0,.15);background:rgba(255,255,255,.6);cursor:pointer;color:#475569;position:relative;font-size:0.8em}'
+                    + '@media (max-width:600px){#reviewQuizOverlay .rv-meta{display:none}}'
+                    + '#reviewQuizOverlay .rv-copykey{float:right;width:auto;min-height:0;margin:-2px 0 0 8px;padding:2px 10px;border-radius:999px;border:1px solid #86efac;background:#fff;color:#166534;font-weight:700;font-size:0.8em;cursor:pointer;position:relative}'
+                    + '#reviewQuizOverlay .rv-ctl{position:relative}'
+                    + '#reviewQuizOverlay .rv-ctl::after,#reviewQuizOverlay .rv-chip::after,#reviewQuizOverlay .rv-fold::after,#reviewQuizOverlay .rv-copykey::after,#reviewQuizOverlay .rv-flag::after{content:"";position:absolute;inset:-7px -3px}'
+                    + '</style>';
 
                 // V92.50: when reopening an already-approved attempt (e.g. from User Hub History),
                 // disable the approve buttons so admins can't accidentally double-credit. Read-only
@@ -31711,11 +31851,12 @@ ${JSON.stringify(sourceObj)}`;
                         <div style="flex:1;overflow-y:auto;padding:20px;">
                             ${(quiz.questions || []).some(qq => qq.type === 'short_answer' || qq.type === 'tweetstorm') ? `<span class="lang-no-toggle">Short-answer AI model</span>
                             ${textAIChipsHtml('', normalizeTextAIModel(localStorage.getItem('ai_short_answer_model')), "selectStoredTextAIModel(this, 'ai_short_answer_model')")}` : ''}
-                            ${cardsHtml}
+                            ${rvStyleHtml}${cardsHtml}
                         </div>
                     </div>`;
                 overlay.addEventListener('click', function(e) { if (e.target === overlay) closeReviewOverlay(); });
                 document.body.appendChild(overlay);
+                if (window.rvApplyUi) window.rvApplyUi(attemptId);
 
             } catch (e) {
                 console.error("Error reviewing quiz attempt:", e);
