@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.224)</title>
+    <title>Internship Portfolio (V101.225)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.216">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -3489,6 +3489,16 @@
                 #drugCodexDetailModal .dc-detail-section, #diseaseCodexDetailModal .dc-detail-section { scroll-margin-top: var(--dc-head-h, 120px); }
                 .dc-sec-chip.active { background: #3b82f6; border-color: #3b82f6; color: #fff; }
                 .dc-head-grp { display: inline-flex; align-items: stretch; height: 34px; }
+                /* V101.225: copy (whole entry in the head, one section in each summary), a section rail you can reach with a mouse too */
+                .dc-detail-copy, .dc-sec-copy { width: 34px; min-height: 0; height: 34px; padding: 0; border: 1px solid #c7d2fe; border-radius: 999px; background: #eef2ff; font-size: 15px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex: none; color: #334155; }
+                .dc-sec-copy { width: 28px; height: 28px; font-size: 13px; margin-left: auto; margin-right: 10px; background: #fff; border-color: #e2e8f0; }
+                .dc-detail-copy:hover, .dc-sec-copy:hover { background: #dbeafe; }
+                .dc-detail-copy.ok, .dc-sec-copy.ok { background: #16a34a; border-color: #16a34a; color: #fff; font-weight: 800; }
+                .dc-detail-copy:focus-visible, .dc-sec-copy:focus-visible, .dc-sec-rail .dc-rail-arrow:focus-visible { outline: 2px solid #3b82f6; outline-offset: 1px; }
+                .dc-sec-rail .dc-rail-arrow { position: sticky; width: 28px; min-height: 0; height: 28px; flex: none; padding: 0; border: 1px solid #cbd5e1; border-radius: 999px; background: #fff; color: #334155; font-size: 16px; line-height: 1; font-weight: 800; cursor: pointer; z-index: 2; box-shadow: 0 0 8px 6px #fff; align-self: center; }
+                .dc-sec-rail .dc-rail-arrow.l { left: 0; margin-right: -28px; }
+                .dc-sec-rail .dc-rail-arrow.r { right: 0; margin-left: -28px; }
+                .dc-sec-rail .dc-rail-arrow[hidden] { display: none; }
                 .dc-head-grp .dc-lang-chip { height: 100%; border-radius: 999px 0 0 999px; border-color: #c7d2fe; background: #eef2ff; }
                 .dc-head-grp .dc-detail-suggest-btn { margin: 0; border: 1px solid #c7d2fe; border-left: 0; border-radius: 0 999px 999px 0; background: #eef2ff; width: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
                 /* V101.03: icon-only jump rail (Disease detail) — one row, 44px targets, name in the tooltip */
@@ -3734,6 +3744,19 @@
                 .dc-discussion-send:disabled {
                     background: #cbd5e1; cursor: wait;
                 }
+                /* V101.225: Send is one round icon button — grey until there is text, spinner while sending, green ✓ when it is posted */
+                .dc-discussion-form { align-items: flex-end; }
+                .dc-discussion-send { width: 40px; height: 40px; min-height: 0; padding: 0; border-radius: 50%; flex: none; display: inline-flex; align-items: center; justify-content: center; font-size: 16px; background: #2563eb; color: #fff; transition: background .2s, transform .15s; }
+                .dc-discussion-send:hover:not(:disabled) { background: #1d4ed8; transform: translateY(-1px); }
+                .dc-discussion-send:active:not(:disabled) { transform: scale(.94); }
+                .dc-discussion-send:disabled { background: #e2e8f0; color: #94a3b8; cursor: default; }
+                .dc-discussion-send[data-s="busy"] { background: #2563eb; color: #fff; cursor: progress; }
+                .dc-discussion-send[data-s="ok"] { background: #16a34a; color: #fff; }
+                .dc-discussion-send:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
+                .dc-send-ic { display: block; font-weight: 900; font-size: 18px; line-height: 1; }
+                .dc-send-spin { animation: dc-send-rot 1s linear infinite; }
+                @keyframes dc-send-rot { to { transform: rotate(360deg); } }
+                @media (prefers-reduced-motion: reduce) { .dc-discussion-send { transition: none; } .dc-discussion-send .dc-send-spin { animation: none; } }
                 .dc-discussion-signin-hint {
                     text-align: center; padding: 10px;
                     color: #94a3b8; font-size: 0.82em;
@@ -5492,6 +5515,7 @@
                     </div>
                     <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
                         <span class="dc-head-grp lang-no-toggle"><div id="dc-detail-lang" class="dc-lang-wrap lang-no-toggle"></div><button type="button" class="dc-detail-suggest-btn" onclick="dcSuggestEdit()" title="Suggest edit — send an edit request to the admin" data-th-title="ส่งคำขอแก้ไขให้ admin" data-kr-title="관리자에게 수정 요청 보내기" aria-label="Suggest edit">✨</button></span>
+                        <button type="button" class="dc-detail-copy" onclick="dcCopyDetail(this,'drug')" title="Copy this entry · คัดลอกทั้งรายการ · 전체 복사" data-th-title="คัดลอกทั้งรายการ" data-kr-title="전체 복사" aria-label="Copy this entry">📋</button>
                         <button type="button" class="dc-detail-close" onclick="dcCloseDetail()" aria-label="Close">×</button>
                     </div>
                 </div>
@@ -5525,6 +5549,7 @@
                         <!-- V101.03: 🌐 language chip + its popover, filled by dxRenderLangChip(); replaces the 6-flag bar.
                              V101.201: one pill with ✨ (as on the Drug entry, V101.199). -->
                         <span class="dc-head-grp lang-no-toggle"><div id="dx-detail-lang" class="dc-lang-wrap lang-no-toggle"></div><button type="button" class="dc-detail-suggest-btn" onclick="dxSuggestEdit()" title="Suggest edit — send an edit request to the admin" data-th-title="ส่งคำขอแก้ไขให้ admin" data-kr-title="관리자에게 수정 요청 보내기" aria-label="Suggest edit">✨</button></span>
+                        <button type="button" class="dc-detail-copy" onclick="dcCopyDetail(this,'disease')" title="Copy this entry · คัดลอกทั้งรายการ · 전체 복사" data-th-title="คัดลอกทั้งรายการ" data-kr-title="전체 복사" aria-label="Copy this entry">📋</button>
                         <button type="button" class="dc-detail-close" onclick="dxCloseDetail()" aria-label="Close">×</button>
                     </div>
                 </div>
@@ -19282,7 +19307,7 @@
                     .map(([label, v]) => `
                         <div class="dc-detail-field">
                             ${filled.length > 1 ? `<div class="dc-detail-field-label dc-cat-label">${escapeHtml(label)}</div>` : ''}
-                            <div class="dc-detail-field-value">${dxRenderFieldValue(v)}</div>
+                            <div class="dc-detail-field-value" data-raw="${escapeHtml(String(v))}">${dxRenderFieldValue(v)}</div>
                         </div>`).join('');
                 if (!fieldsHtml) return '';
                 return `
@@ -20537,7 +20562,7 @@
                     .map(([label, v, cat]) => `
                         <div class="dc-detail-field">
                             <div class="dc-detail-field-label dc-cat-label${cat ? ' dc-field-' + cat : ''}">${escapeHtml(label)}</div>
-                            <div class="dc-detail-field-value">${dcRenderFieldValue(v)}</div>
+                            <div class="dc-detail-field-value" data-raw="${escapeHtml(String(v))}">${dcRenderFieldValue(v)}</div>
                         </div>`).join('');
                 if (!fieldsHtml) return '';  // Hide empty sections entirely.
                 return `
@@ -20591,6 +20616,41 @@
         // Shared by Drug (dcRenderDetail) and Disease (dxRenderDetail).
         // V101.03: opts.iconOnly — one row of the sections' leading emoji (name in the tooltip);
         // the full-label chips repeated the accordion headers right under them.
+        // V101.225: copy — the whole entry (head) or one section (its 📋), as Markdown in the language on screen. The Markdown the author wrote rides on
+        // each field value (data-raw); a section without fields (peds, references, visual) falls back to its visible text.
+        function dcCopyText(text, btn) {
+            const done = ok => {
+                if (btn) { btn.classList.toggle('ok', ok); const old = btn.dataset.copyIcon || (btn.dataset.copyIcon = btn.textContent); if (ok) { btn.textContent = '✓'; clearTimeout(btn._cpT); btn._cpT = setTimeout(() => { btn.classList.remove('ok'); btn.textContent = old; }, 1500); } }
+                if (typeof showToast === 'function') showToast(ok ? 'Copied · คัดลอกแล้ว · 복사됨' : 'Could not copy — select the text instead · คัดลอกไม่ได้ · 복사 실패');
+            };
+            const fallback = () => { try { const ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0'; document.body.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); return ok; } catch (e) { return false; } };
+            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => done(true), () => done(fallback())); else done(fallback());
+        }
+        function dcSectionText(sec) {
+            const clean = s => String(s || '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+            const sum = sec.querySelector('summary'); let title = '';
+            if (sum) { const c = sum.cloneNode(true); c.querySelectorAll('.dc-sec-copy, #dc-discussion-count').forEach(x => x.remove()); title = c.textContent.replace(/\s+/g, ' ').trim(); }
+            const fields = [...sec.querySelectorAll('.dc-detail-field')];
+            const body = fields.length ? fields.map(f => {
+                const lab = f.querySelector('.dc-detail-field-label'), val = f.querySelector('.dc-detail-field-value');
+                const v = val ? (val.dataset.raw != null ? val.dataset.raw : val.textContent) : '';   // textContent: a closed <details> has no innerText
+                return (lab ? '**' + lab.textContent.trim() + '**\n' : '') + clean(v);
+            }).join('\n\n') : [...(sec.querySelector('.dc-detail-section-body') || sec).children].map(c => clean(c.textContent)).filter(Boolean).join('\n');
+            return '## ' + title + '\n\n' + body;
+        }
+        function dcDetailText(modal, onlyKey) {
+            if (!modal) return '';
+            const name = ((modal.querySelector('.dc-detail-name') || {}).textContent || '').trim();
+            const chips = [...modal.querySelectorAll('.dc-detail-head .dc-detail-chip')].map(c => c.textContent.trim()).filter(Boolean).join(' · ');
+            const secs = [...modal.querySelectorAll('.dc-detail-section')].filter(s => s.getAttribute('data-section-key') !== 'discussion' && (!onlyKey || s.getAttribute('data-section-key') === onlyKey));
+            const parts = onlyKey ? [] : ['# ' + name + (chips ? '\n' + chips : '')];
+            secs.forEach(s => parts.push(dcSectionText(s)));
+            return parts.join('\n\n');
+        }
+        window.dcCopyDetail = function (btn, kind) {
+            const modal = document.getElementById(kind === 'disease' ? 'diseaseCodexDetailModal' : 'drugCodexDetailModal');
+            dcCopyText(dcDetailText(modal), btn);
+        };
         function codexBuildSectionRail(bodyEl, opts = {}) {
             if (!bodyEl) return;
             const secs = [...bodyEl.querySelectorAll('.dc-detail-section')];
@@ -20621,6 +20681,40 @@
                 target.scrollIntoView({ behavior: 'smooth', block: 'start' });
             });
             secs[0].open = true; // content-first; the rest stay collapsed
+            // V101.225: the rail scrolls sideways, but a mouse has no scrollbar here — so ‹ › arrows (shown only while there is more on that side),
+            // the wheel scrolls it sideways, and the chips beyond the edge are reachable. Touch still swipes.
+            const mkArrow = dir => {
+                const a = document.createElement('button'); a.type = 'button'; a.className = 'dc-rail-arrow ' + dir; a.hidden = true; a.textContent = dir === 'l' ? '‹' : '›';
+                a.setAttribute('aria-label', dir === 'l' ? 'Scroll sections left' : 'Scroll sections right');
+                a.addEventListener('click', e => { e.stopPropagation(); rail.scrollBy({ left: (dir === 'l' ? -1 : 1) * Math.max(120, rail.clientWidth * 0.6), behavior: 'smooth' }); });
+                return a;
+            };
+            const aL = mkArrow('l'), aR = mkArrow('r'); rail.prepend(aL); rail.append(aR);
+            const sync = () => { const max = rail.scrollWidth - rail.clientWidth; aL.hidden = max <= 2 || rail.scrollLeft <= 2; aR.hidden = max <= 2 || rail.scrollLeft >= max - 2; };
+            rail.addEventListener('scroll', sync, { passive: true });
+            if (window.ResizeObserver) new ResizeObserver(sync).observe(rail); else setTimeout(sync, 300);
+            rail.addEventListener('wheel', e => {
+                if (rail.scrollWidth - rail.clientWidth <= 2 || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+                const atStart = rail.scrollLeft <= 0, atEnd = rail.scrollLeft >= rail.scrollWidth - rail.clientWidth - 1;
+                if ((e.deltaY < 0 && atStart) || (e.deltaY > 0 && atEnd)) return;
+                rail.scrollLeft += e.deltaY; e.preventDefault();
+            }, { passive: false });
+            requestAnimationFrame(sync);
+            // V101.225: a 📋 in each section header copies just that section (the chips above were read before this, so their labels are untouched)
+            secs.forEach(s => {
+                if (s.getAttribute('data-section-key') === 'discussion') return;
+                const sum = s.querySelector('summary'); if (!sum || sum.querySelector('.dc-sec-copy')) return;
+                const b = document.createElement('button'); b.type = 'button'; b.className = 'dc-sec-copy'; b.textContent = '📋'; b.title = 'Copy this section · คัดลอกหัวข้อนี้ · 이 항목 복사'; b.setAttribute('aria-label', 'Copy this section');
+                sum.insertBefore(b, sum.querySelector('#dc-discussion-count'));
+            });
+            if (!bodyEl._dcCopy) {
+                bodyEl._dcCopy = true;
+                bodyEl.addEventListener('click', e => {
+                    const b = e.target.closest('.dc-sec-copy'); if (!b) return;
+                    e.preventDefault(); e.stopPropagation();   // a summary toggles its section — a copy must not
+                    const sec = b.closest('.dc-detail-section'); dcCopyText(dcSectionText(sec), b);
+                });
+            }
         }
 
         // V95.82: make clinical sub-labels (Adult:/Absolute:/Relative:/Common:/
@@ -21267,8 +21361,28 @@
                 <div class="dc-discussion-form">
                     <textarea id="dc-discussion-input" class="dc-discussion-input" rows="1"
                               placeholder="Ask or share something about this drug…" data-th-placeholder="ถามหรือแชร์เกี่ยวกับยานี้" data-kr-placeholder="이 약에 대해 질문하거나 공유하세요" maxlength="1000"></textarea>
-                    <button type="button" class="dc-discussion-send" onclick="dcDiscussionSend()">Send ส่ง</button>
+                    <button type="button" class="dc-discussion-send" id="dc-discussion-send" onclick="dcDiscussionSend()" disabled title="Send ส่ง 보내기 (Ctrl+Enter)" aria-label="Send ส่ง 보내기"><svg class="dc-send-ic dc-send-plane" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3.4 20.4 21 12 3.4 3.6 3.3 10.1 15 12 3.3 13.9z" fill="currentColor"/></svg></button>
                 </div>`;
+            const ta = wrap.querySelector('#dc-discussion-input');
+            if (ta) {
+                ta.addEventListener('input', () => dcDiscussionSync(ta));
+                ta.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); dcDiscussionSend(); } });
+            }
+        }
+        // V101.225: the send button follows the text (grey while empty), the box grows with it, and the three states are one button
+        function dcDiscussionSync(ta) {
+            const b = document.getElementById('dc-discussion-send'); if (!ta) return;
+            ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+            if (b && !b.dataset.s) b.disabled = !String(ta.value || '').trim();
+        }
+        function dcSendState(btn, s) {
+            if (!btn) return;
+            const ta = document.getElementById('dc-discussion-input');
+            clearTimeout(btn._sT);
+            if (s === 'busy') { btn.dataset.s = 'busy'; btn.disabled = true; btn.innerHTML = '<svg class="dc-send-ic dc-send-spin" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="40 20"/></svg>'; return; }
+            if (s === 'ok') { btn.dataset.s = 'ok'; btn.disabled = true; btn.innerHTML = '<span class="dc-send-ic" aria-hidden="true">✓</span>'; btn._sT = setTimeout(() => dcSendState(btn, 'idle'), 1200); return; }
+            delete btn.dataset.s; btn.innerHTML = '<svg class="dc-send-ic dc-send-plane" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3.4 20.4 21 12 3.4 3.6 3.3 10.1 15 12 3.3 13.9z" fill="currentColor"/></svg>';
+            btn.disabled = !(ta && String(ta.value || '').trim());
         }
 
         async function dcDiscussionSend() {
@@ -21282,7 +21396,7 @@
             // Optimistic UI — clear input immediately so user feels feedback.
             const originalText = input.value;
             input.value = '';
-            if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '⏳'; }
+            dcDiscussionSync(input); dcSendState(sendBtn, 'busy');
             try {
                 await window.db.collection('drug_codex').doc(drugId)
                     .collection('comments').add({
@@ -21297,9 +21411,9 @@
                 // Restore the unsent text so the user doesn't lose what they typed.
                 input.value = originalText;
                 alert('Could not post the comment: ' + (err && err.message ? err.message : 'unknown error'));
-            } finally {
-                if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'ส่ง'; }
+                dcDiscussionSync(input); dcSendState(sendBtn, 'idle'); return;
             }
+            dcSendState(sendBtn, 'ok');
         }
 
         async function dcDiscussionDelete(commentId, btn) {
