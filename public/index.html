@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.220)</title>
+    <title>Internship Portfolio (V101.221)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.216">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -7403,6 +7403,7 @@
                     evStampsQueueNew();
                     renderEventMemories();
                     schRefreshOpenPane();
+                    evAutoStamps();
                 }, e => { handleFirestoreListenerError('event stamps listener', e); achievementSourceReady('stamps'); });
             }).catch(() => { evStampsStarted = false; achievementSourceReady('stamps'); });
         }
@@ -7457,15 +7458,39 @@
             const [myAv, myAvPx] = mine ? evMyAvatar() : ['', false];
             const line = (txt, color) => `<div style="display:flex; align-items:center; gap:8px; margin-top:6px; padding-top:6px; border-top:1px dashed #e9d5ff;">${eventBadgeSvgHtml(e.badge, myAv, 34, '', myAvPx)}<span style="flex:1; font-size:0.68em; font-weight:700; color:${color};">${txt}</span></div>`;
             if (mine) return line('🎟️ Event stamp received — see Achievements ▸ Memories', '#15803d');
-            if (!joined) return line('🏅 This event has a badge — tap Join to be able to get it', '#6d28d9');
+            if (!joined) return line('🏅 This event has a badge — tap Join and it is yours on the event day', '#6d28d9');
             const today = getBangkokDateTimeParts().dateKey;
-            if (e.eventDate > today) return line('🏅 On the day, enter the code shown at the event to get the badge', '#6d28d9');
+            if (e.eventDate > today) return line('🏅 You joined — the badge arrives by itself on the event day', '#6d28d9');
             if (e.eventDate < today) return line('🏅 The code was for the event day — ask the admin if you were there', '#94a3b8');
             return line('At the event? Enter the code for your badge', '#6d28d9')
                 + `<div style="display:flex; gap:6px; margin-top:6px;">
                     <input id="ev-code-${e.id}" type="text" autocomplete="off" autocapitalize="characters" maxlength="6" placeholder="CODE" aria-label="Event code" style="flex:1; min-width:0; border:2px solid #e9d5ff; border-radius:10px; padding:6px 10px; font-weight:900; letter-spacing:3px; text-transform:uppercase; font-size:0.9em; box-sizing:border-box;">
                     <button type="button" onclick="evClaimStamp('${e.id}')" style="width:auto; min-height:0; padding:0 14px; border:none; border-bottom:4px solid #5b21b6; background:#7c3aed; color:#fff; border-radius:10px; font-weight:900; font-size:0.78em; cursor:pointer;">CLAIM</button>
                 </div>`;
+        }
+
+        // The badge for a joined event arrives by itself from the event day (rules: via 'join'). One try per event per page load.
+        const evAutoTried = new Set();
+        async function evAutoStamps() {
+            if (!evStampsLoaded || !schEventsCache || !userId) return;
+            const today = getBangkokDateTimeParts().dateKey;
+            for (const e of schEventsCache) {
+                const interestId = schMyEventInterests[e.id];
+                if (!e.badge || e.kind === 'social' || !interestId || !e.eventDate || e.eventDate > today) continue;
+                if (myEventStamps.some(s => s.eventId === e.id) || evAutoTried.has(e.id)) continue;
+                evAutoTried.add(e.id);
+                try {
+                    const authUser = await ensureFirebaseAuthReady(10000);
+                    if (!authUser) { evAutoTried.delete(e.id); continue; }
+                    await db.collection('event_stamps').doc(e.id + '_' + userId).set({
+                        eventId: e.id, userId, authUid: authUser.uid,
+                        displayName: (typeof userProfile !== 'undefined' && userProfile.displayName) || '',
+                        title: e.title || '', eventDate: e.eventDate || '', badge: e.badge,
+                        via: 'join', interestId,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                } catch (err) { console.warn('[event stamp] auto claim skipped:', err && err.code || err); }   // joined too late / rules not live yet → the code box stays as the fallback
+            }
         }
 
         async function evClaimStamp(eventId) {
@@ -15637,7 +15662,7 @@
             if (schEventsUnsub) return;
             schEventsCache = schEventsCache || [];
             const snapshots=new Map();
-            const receive=(key,s)=>{snapshots.set(key,s.docs.map(d=>({id:d.id,...d.data()})));schEventsCache=[...new Map([...snapshots.values()].flat().map(e=>[e.id,e])).values()];schRefreshOpenPane();};
+            const receive=(key,s)=>{snapshots.set(key,s.docs.map(d=>({id:d.id,...d.data()})));schEventsCache=[...new Map([...snapshots.values()].flat().map(e=>[e.id,e])).values()];schRefreshOpenPane();evAutoStamps();};
             const publicOff=db.collection('events').where('targetGroups','array-contains-any',[...new Set([myGroup,'__public__'])]).onSnapshot(s=>receive('audience',s),e=>handleFirestoreListenerError('events listener',e));
             const ownOff=db.collection('events').where('createdByUid','==',firebase.auth().currentUser.uid).onSnapshot(s=>receive('own',s),e=>handleFirestoreListenerError('own events listener',e));
             schEventsUnsub=()=>{publicOff();ownOff();};
@@ -15647,6 +15672,7 @@
                     s.docs.forEach(d => { m[d.data().eventId] = d.id; });
                     schMyEventInterests = m;
                     schRefreshOpenPane();
+                    evAutoStamps();
                 }, e => handleFirestoreListenerError('event interests listener', e));
         }
 
