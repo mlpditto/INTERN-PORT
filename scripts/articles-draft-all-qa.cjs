@@ -41,6 +41,8 @@ assert.ok(aj.includes("var DA = { busy: false, stop: false, prog: '' };") && aj.
       const btn = () => q('.art-da-all');
       const hd = q('.art-h').innerHTML;
       out.head = [!!btn(), btn().textContent.replace(/\s+/g, ' ').trim(), btn().disabled, hd.indexOf('art-tr-all') < hd.indexOf('art-da-all') && hd.indexOf('art-da-all') < hd.indexOf('art-new'), btn().getAttribute('title')];
+      // V102.489: the two buttons sit side by side (the shared .art-tr-all auto margin used to float Translate all to the middle)
+      { const t = q('.art-tr-all:not(.art-da-all)').getBoundingClientRect(), d = btn().getBoundingClientRect(); out.gap = [Math.round(d.left - t.right), Math.round(t.height) === Math.round(d.height)]; }
       // cancel at the confirm → nothing
       const calls = []; window.dxaDraftFromArticle = async a => { calls.push(a.name); await wait(20); if (a.name === 'Dengue') throw new Error('"Dengue" is already in the Codex'); return { draftId: 'dx_' + a.id, model: 'm' }; };
       window.confirm = () => false; await Articles.draftAll(); out.cancel = [calls.length];
@@ -65,6 +67,7 @@ assert.ok(aj.includes("var DA = { busy: false, stop: false, prog: '' };") && aj.
     assert.deepEqual(r.jobs, ['a1', 'a4'], 'candidates: saved + titled + in neither Codex + linked to neither (dx, 🩺 link, 💊 link, dc, no title are skipped): ' + JSON.stringify(r.jobs));
     assert.deepEqual(r.head.slice(0, 4), [true, '🩺 Draft all 2', false, true], 'the button sits between Translate all and ＋ New with the count: ' + JSON.stringify(r.head));
     assert.match(r.head[4], /^Draft a Disease Codex entry from each of the 2 article\(s\)/);
+    assert.ok(r.gap[0] >= 0 && r.gap[0] <= 20, 'Translate all and Draft all are next to each other (flex gap 10 + margin 8): ' + JSON.stringify(r.gap));
     assert.deepEqual(r.cancel, [0], 'cancelling the confirm drafts nothing');
     assert.deepEqual(r.run[0], ['Hordeolum', 'Dengue'], 'one at a time, list order: ' + JSON.stringify(r.run));
     assert.deepEqual(r.run[1], ['🩺 1/2 · stop', true], 'progress label while busy: ' + JSON.stringify(r.run[1]));
