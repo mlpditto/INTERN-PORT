@@ -21,7 +21,7 @@ function grab(src, marker) {
     for (; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}' && --d === 0) break; }
     return src.slice(i, k + 1);
 }
-const tbStart = html.indexOf('<div id="kanban-toolbar"');
+const tbStart = html.indexOf('<div class="stat-chips"');   // V102.459: the search + LINE chip moved into the chip row
 const markup = html.slice(tbStart, wsAt);
 const code = ['window.toggleLineUsagePop = function', 'window.loadLineUsage = async function'].map(m => grab(html, m)).join(';\n');
 const consts = html.match(/const LINE_MONTHLY_QUOTA = \d+;/)[0] + html.match(/const LINE_COUNT_START_MONTH = '[^']+';/)[0] + grab(html, 'const LINE_TAG_LABELS = ').replace(/^const LINE_TAG_LABELS = /, 'const LINE_TAG_LABELS = ') + ';';
