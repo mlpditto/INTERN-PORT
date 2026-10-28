@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.461)</title>
+    <title>Nika Admin (V102.462)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -4393,6 +4393,11 @@
         .evf-tl { flex:none; font-size:0.66em; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:#94a3b8; }   /* V102.458: Start / End captions */
         .evf-ic { width:24px; height:24px; flex:none; display:grid; place-items:center; border-radius:50%; background:rgba(255,255,255,.85); border:1px solid #e2e8f0; font-size:12px; }
         .evf-badge { margin-top:6px; padding:6px 8px; border-radius:12px; background:rgba(251,191,36,.16); border:1px solid rgba(245,197,66,.5); }
+        .evf-head { display:flex; align-items:center; gap:8px; }   /* V102.462: Post sits top-right, inline with the heading */
+        .evf-head h2 { margin:0; flex:1; }
+        #ev-draft-state { font-size:0.68em; color:#94a3b8; }
+        .evf-post:disabled { opacity:.45; cursor:not-allowed; box-shadow:none; }   /* V102.462 */
+        .evf-link { width:auto; min-height:0; margin:0 0 0 4px; padding:2px 4px; border:0; background:none; color:#64748b; font:inherit; font-size:0.74em; font-weight:800; text-decoration:underline; cursor:pointer; }
         .evf-post { width:auto; min-height:0; padding:6px 18px; border:0; border-radius:999px; font-weight:800; font-size:0.8em; color:#fff; cursor:pointer; background:linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 55%), #7c3aed; box-shadow:0 6px 14px rgba(124,58,237,.35); }
         .evs-box { margin-top:6px; padding:6px 8px; border-radius:12px; background:rgba(255,251,235,.7); border:1px solid rgba(245,224,168,.8); }
         .evs-av { position:relative; width:26px; height:26px; min-height:0; padding:0; margin:0; border-radius:50%; border:2px solid #22c55e; background:#e2e8f0; overflow:visible; cursor:pointer; display:inline-grid; place-items:center; font-size:10px; font-weight:800; color:#475569; }
@@ -13693,9 +13698,11 @@
                      one place. -->
                 <div id="form-event-container" style="display:none;">
                     <div class="hol-grid"><div class="hol-left">
-                    <h2 style="margin-top:0;">📣 New Event</h2>
+                    <div class="evf-head"><h2>📣 New Event</h2>
+                        <span id="ev-draft-state"></span>
+                        <button onclick="postEventNow()" class="evf-post" disabled>Post</button></div>
                     <div class="evf">
-                <input type="text" id="ev-title" oninput="saveEventDraft()" placeholder="Title — e.g. MPS Science webinar">
+                <input type="text" id="ev-title" oninput="saveEventDraft()" placeholder="Title">
                 <!-- V98.66: the date shows the weekday + abbreviated month under it (#ev-when) — a bare
                      "09 / 08 / 2026" was read as 9 Aug by a Thai reader when 8 Sep was meant.
                      lang="en-GB" nudges Chrome to DD/MM and a 24h clock; the preview is the guard. -->
@@ -13705,16 +13712,15 @@
                     <span class="evf-tl">End</span><input type="time" id="ev-end" aria-label="End time" lang="en-GB" step="300" style="flex:1 1 84px;" oninput="saveEventDraft(); renderEventWhen();"></div>
                 <div id="ev-when" style="font-size:0.72em; font-weight:700; color:#7c3aed; min-height:0; margin:3px 0 0 30px;"></div>
                 <div class="evf-r"><span class="evf-ic" title="Place — opens Google Maps">📍</span>
-                    <input type="text" id="ev-location" oninput="saveEventDraft()" placeholder="Place — opens Google Maps">
+                    <input type="text" id="ev-location" oninput="saveEventDraft()" placeholder="Place">
                     <span class="evf-ic" title="How to join">🔗</span>
-                    <input type="text" id="ev-join" oninput="saveEventDraft()" placeholder="Link, ON24, room…"></div>
-                <div class="evf-r"><textarea id="ev-desc" rows="1" oninput="saveEventDraft()" placeholder="Details (optional)" style="resize:vertical;"></textarea></div>
+                    <input type="text" id="ev-join" oninput="saveEventDraft()" placeholder="Link / room"></div>
+                <div class="evf-r"><textarea id="ev-desc" rows="1" oninput="saveEventDraft()" placeholder="Details" style="resize:vertical;"></textarea></div>
                 <!-- V102.54: optional Event Stamp (filled by renderEventBadgeForm) -->
                 <div id="ev-badge" class="lang-no-toggle"></div>
                 <input type="file" id="ev-badge-file" accept="image/*" onchange="evBadgeUpload(this)" style="display:none;">
                 <div id="ev-groups" class="evf-r"></div>
-                <div class="evf-r"><button onclick="postEventNow()" class="evf-post">Post event</button>
-                    <span id="ev-draft-state" style="font-size:0.68em; color:#94a3b8;"></span>
+                <div class="evf-r" style="margin-top:0;">
                     <div id="ev-msg" style="flex:1 1 100%; font-size:0.74em; font-weight:700; min-height:0;"></div></div>
             </div>
                     <!-- V98.65: lang-no-toggle — these rows render ADMIN-TYPED titles, join channels and
@@ -65073,7 +65079,7 @@ Save it anyway?`;
         // ---- V98.61: events -------------------------------------------------------
         const EVENT_GROUPS = ['EXTERN', 'INTERN', 'Junior', 'Pharmacists', 'Public'];
         let eventsCache = [], eventInterestsCache = {};   // eventId -> [interest]
-        let evSelectedGroups = new Set(EVENT_GROUPS);
+        let evSelectedGroups = new Set();   // V102.462: nobody is pre-selected — the audience is a choice
 
         // ---- V102.54: Event Stamps --------------------------------------------------
         // An official event may carry a badge (events.badge = { template, face, imageUrl }).
@@ -65305,8 +65311,30 @@ Save it anyway?`;
             const box = document.getElementById('ev-groups');
             if (!box) return;
             // V102.64: one liquid-glass chip per group, in that group's colour; selected = solid.
+            const all = EVENT_GROUPS.every(g => evSelectedGroups.has(g));
             box.innerHTML = '<span class="evf-ic" title="Who sees it">👥</span>'
-                + EVENT_GROUPS.map(g => `<button type="button" class="grp-chip${evSelectedGroups.has(g) ? ' on' : ''}" style="--c:${getGroupColor(g)};" aria-pressed="${evSelectedGroups.has(g)}" onclick="toggleEventGroup('${g}')">${g}</button>`).join('');
+                + EVENT_GROUPS.map(g => `<button type="button" class="grp-chip${evSelectedGroups.has(g) ? ' on' : ''}" style="--c:${getGroupColor(g)};" aria-pressed="${evSelectedGroups.has(g)}" onclick="toggleEventGroup('${g}')">${evSelectedGroups.has(g) ? '✓ ' : ''}${g}</button>`).join('')
+                + (all ? '' : `<button type="button" class="evf-link" onclick="evSetGroups(true)">All</button>`)
+                + (evSelectedGroups.size ? `<button type="button" class="evf-link" onclick="evSetGroups(false)">Clear</button>` : '');
+            evSyncPost();
+        }
+
+        function evSetGroups(on) {   // V102.462: the two ends of the chip row in one tap
+            evSelectedGroups = new Set(on ? EVENT_GROUPS : []);
+            renderEventGroupChips();
+            saveEventDraft();
+        }
+
+        // V102.462: Post waits for what it needs, and says what is missing (postEventNow still checks on click)
+        function evSyncPost() {
+            const btn = document.querySelector('#form-event-container .evf-post');
+            if (!btn) return;
+            const missing = [];
+            if (!((document.getElementById('ev-title') || {}).value || '').trim()) missing.push('a title');
+            if (!(document.getElementById('ev-date') || {}).value) missing.push('a date');
+            if (!evSelectedGroups.size) missing.push('who sees it');
+            btn.disabled = missing.length > 0;
+            btn.title = missing.length ? 'Needs ' + missing.join(' · ') : 'Post event';
         }
 
         function toggleEventGroup(g) {
@@ -65330,7 +65358,8 @@ Save it anyway?`;
                 d.badge = evBadge;
                 localStorage.setItem(EV_DRAFT_KEY, JSON.stringify(d));
                 const s = document.getElementById('ev-draft-state');
-                if (s) s.textContent = 'Draft saved';
+                if (s) s.textContent = 'Saved';
+                evSyncPost();
             } catch (e) { /* private mode or quota — a lost draft must never block posting */ }
         }
 
@@ -65345,7 +65374,7 @@ Save it anyway?`;
                 if (Array.isArray(d.groups) && d.groups.length) evSelectedGroups = new Set(d.groups);
                 if (d.badge && typeof d.badge === 'object' && EVENT_ART[d.badge.template]) evBadge = { ...EV_BADGE_DEFAULT, ...d.badge };
                 const s = document.getElementById('ev-draft-state');
-                if (s) s.textContent = any ? 'Draft restored' : '';
+                if (s) s.textContent = any ? 'Restored' : '';
                 return any;
             } catch (e) { return false; }
         }
@@ -65384,7 +65413,7 @@ Save it anyway?`;
         }
 
         function openEventsModal() {
-            evSelectedGroups = new Set(EVENT_GROUPS);
+            evSelectedGroups = new Set();
             EV_FIELDS.forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
             document.getElementById('ev-msg').textContent = '';
             evBadge = { ...EV_BADGE_DEFAULT };
@@ -65454,6 +65483,8 @@ Save it anyway?`;
                 ['ev-title', 'ev-start', 'ev-end', 'ev-location', 'ev-join', 'ev-desc']
                     .forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
                 evBadge = { ...EV_BADGE_DEFAULT };
+                evSelectedGroups = new Set();   // the next event starts from an empty audience too
+                renderEventGroupChips();
                 renderEventWhen();
                 clearEventDraft();
                 // V98.62: say it in the modal, not only in a toast that can be missed —
