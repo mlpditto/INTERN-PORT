@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.229)</title>
+    <title>Internship Portfolio (V101.230)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.216">
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
@@ -24332,13 +24332,15 @@
             }
         }
 
-        // V101.227: the words of the deadline chip for `diff` ms left. >72 h → no chip; 24–72 h amber "N d H h"; under 24 h red "H h M m", under an hour "N m",
+        // V101.227: the words of the deadline chip for `diff` ms left. V101.228: >72 h → 'calm' (📅, shown only on the quiz-card Start chip — the preview sheet and the in-button countdown keep hiding it); 24–72 h amber "N d H h"; under 24 h red "H h M m", under an hour "N m",
         // under a minute "<1 m". No seconds on purpose (no jitter, no per-second repaint). The aria text spells it out; pulse only under 3 h.
         function qzCountdownInfo(diff) {
             const H = 3600000, D = 24 * H;
-            if (!(diff > 0) || diff > 3 * D) return { tier: 'none', text: '', aria: '', pulse: false };
+            if (!(diff > 0)) return { tier: 'none', text: '', aria: '', pulse: false };
             const U = window.uiText || (s => String(s).split('|')[0]);
             const d = Math.floor(diff / D), h = Math.floor((diff % D) / H), m = Math.floor((diff % H) / 60000);
+            if (diff > 3 * D) return { tier: 'calm', pulse: false, text: '📅 ' + U(`Closes in ${d} d ${h} h|เหลือ ${d} วัน ${h} ชม.|${d}일 ${h}시간 남음`),
+                aria: U(`Closes in ${d} days ${h} hours|เหลือเวลา ${d} วัน ${h} ชั่วโมง|마감까지 ${d}일 ${h}시간`) };
             if (diff >= D) return { tier: 'amber', pulse: false, text: '⏳ ' + U(`Closes in ${d} d ${h} h|เหลือ ${d} วัน ${h} ชม.|${d}일 ${h}시간 남음`),
                 aria: U(`Closes in ${d} days ${h} hours|เหลือเวลา ${d} วัน ${h} ชั่วโมง|마감까지 ${d}일 ${h}시간`) };
             const hh = Math.floor(diff / H);
@@ -24387,11 +24389,11 @@
                 const sig = c.tier + '|' + c.text + '|' + c.pulse + '|' + window.uiLang();
                 if (el._qzSig !== sig) {
                     el._qzSig = sig;
-                    el.textContent = c.text; el.dataset.tier = c.tier; el.hidden = c.tier === 'none';
+                    el.textContent = c.text; el.dataset.tier = c.tier; el.hidden = c.tier === 'none' || (c.tier === 'calm' && !el.classList.contains('quiz-cover-deadline'));
                     if (c.pulse) el.dataset.pulse = '1'; else delete el.dataset.pulse;
                     if (c.aria) { el.setAttribute('aria-label', c.aria); el.setAttribute('role', 'timer'); } else { el.removeAttribute('aria-label'); el.removeAttribute('role'); }
                 }
-                if (btn) { btn.style.background = c.tier === 'red' ? CTA_RED : c.tier === 'amber' ? CTA_AMBER : CTA_BLUE; btn.style.boxShadow = ''; el.style.color = c.tier === 'none' ? '' : '#fff'; }
+                if (btn) { btn.style.background = c.tier === 'red' ? CTA_RED : c.tier === 'amber' ? CTA_AMBER : CTA_BLUE; btn.style.boxShadow = ''; el.style.color = c.tier === 'none' || c.tier === 'calm' ? '' : '#fff'; }
                 if (card) card.style.boxShadow = c.tier === 'red' ? 'inset 4px 0 0 #dc2626' : c.tier === 'amber' ? 'inset 4px 0 0 #f59e0b' : '';
             });
 

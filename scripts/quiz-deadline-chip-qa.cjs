@@ -1,4 +1,4 @@
-// V101.227 — intern quiz deadline countdown chip: red under 24 h ("⏰ Closes in 5 h 20 m"), amber 24–72 h ("⏳ Closes in 2 d 4 h"), nothing beyond 3 days;
+// V101.227 — intern quiz deadline countdown chip: red under 24 h ("⏰ Closes in 5 h 20 m"), amber 24–72 h ("⏳ Closes in 2 d 4 h"), calm 📅 beyond 3 days;
 // words follow the UI language (EN / ไทย / 한국어); text rewritten only when it changed; card gets a left stripe in the same tier; the preview sheet chip ticks too.
 // Real index.html qzCountdownInfo + checkExpiry on a 390px touch phone with the real quiz-cover.css; fake db.
 const assert = require('node:assert/strict');
@@ -20,7 +20,7 @@ const INDEX = require('url').pathToFileURL(path.join(process.cwd(), 'public/inde
     const r = await page.evaluate(async () => {
         const H = 3600e3, D = 24 * H, out = {};
         const info = ms => qzCountdownInfo(ms);
-        out.none = [info(3 * D + 1).tier, info(0).tier, info(-5).tier];
+        out.none = [info(0).tier, info(-5).tier]; out.calm = info(3 * D + 1); out.calm90 = info(90 * D + 5 * H).text;
         out.edge72 = info(3 * D).tier;
         out.amber = info(2 * D + 4 * H + 30000);
         out.amberEdge = info(D).tier;
@@ -41,7 +41,7 @@ const INDEX = require('url').pathToFileURL(path.join(process.cwd(), 'public/inde
         host.querySelectorAll('.assignment-card').forEach(c => QuizCover.decorate(c, { title: c.dataset.qa }, false));
         checkExpiry();
         const q = (id) => host.querySelector(`[data-qa="${id}"] .quiz-cover-deadline, [data-qa="${id}"] .quiz-cta-countdown`);
-        const snap = id => { const el = q(id); const cs = getComputedStyle(el); return { text: el.textContent, tier: el.dataset.tier || '', hidden: cs.display === 'none', bg: cs.backgroundColor, aria: el.getAttribute('aria-label') || '', stripe: el.closest('.assignment-card').style.boxShadow }; };
+        const snap = id => { const el = q(id); const cs = getComputedStyle(el); return { text: el.textContent, tier: el.dataset.tier || '', hidden: cs.display === 'none', bg: cs.backgroundColor, bgi: cs.backgroundImage, aria: el.getAttribute('aria-label') || '', stripe: el.closest('.assignment-card').style.boxShadow }; };
         out.red = Object.assign(out.red, {}); out.dom = { red: snap('red'), amber: snap('amber'), far: snap('far'), late: snap('late') };
         // text is not rewritten while unchanged
         const el = q('red'); let writes = 0; const mo = new MutationObserver(m => { writes += m.length; }); mo.observe(el, { childList: true, characterData: true, subtree: true, attributes: true });
@@ -53,7 +53,7 @@ const INDEX = require('url').pathToFileURL(path.join(process.cwd(), 'public/inde
         window.uiLang = prev;
         return out;
     });
-    assert.deepEqual(r.none, ['none', 'none', 'none']);
+    assert.deepEqual(r.none, ['none', 'none']); assert.equal(r.calm.tier, 'calm', 'beyond 72 h → calm tier (V101.228)'); assert.match(r.calm.text, /^📅 .*3 d 0 h$/); assert.match(r.calm90, /90 d 5 h$/);
     assert.equal(r.edge72, 'amber', 'exactly 72 h is still amber');
     assert.equal(r.amberEdge, 'amber', 'exactly 24 h flips to amber, under it to red');
     assert.equal(r.redEdge, 'red');
@@ -61,13 +61,13 @@ const INDEX = require('url').pathToFileURL(path.join(process.cwd(), 'public/inde
     assert.equal(r.red.tier, 'red'); assert.match(r.red.text, /^⏰ .*5 h 20 m$/);
     assert.deepEqual(r.pulse, [true, false, true, false], 'pulse only within the last 3 h');
     assert.match(r.minutes, /7 m$/); assert.match(r.lt1, /<1 m$/);
-    assert.equal(r.dom.red.tier, 'red'); assert.equal(r.dom.red.hidden, false); assert.equal(r.dom.red.bg, 'rgb(220, 38, 38)'); assert.match(r.dom.red.aria, /5 hours 20 minutes/); assert.match(r.dom.red.stripe, /rgb\(220, 38, 38\)/);
-    assert.equal(r.dom.amber.tier, 'amber'); assert.equal(r.dom.amber.hidden, false); assert.equal(r.dom.amber.bg, 'rgb(254, 243, 199)'); assert.match(r.dom.amber.stripe, /rgb\(245, 158, 11\)/);
-    assert.equal(r.dom.far.tier, 'none'); assert.equal(r.dom.far.hidden, true, 'beyond 3 days: no chip at all'); assert.equal(r.dom.far.stripe, '');
+    assert.equal(r.dom.red.tier, 'red'); assert.equal(r.dom.red.hidden, false); assert.match(r.dom.red.bgi, /rgb\(220, 38, 38\)/, 'red glass'); assert.match(r.dom.red.bgi, /rgb\(190, 24, 93\)/); assert.match(r.dom.red.aria, /5 hours 20 minutes/); assert.match(r.dom.red.stripe, /rgb\(220, 38, 38\)/);
+    assert.equal(r.dom.amber.tier, 'amber'); assert.equal(r.dom.amber.hidden, false); assert.match(r.dom.amber.bgi, /rgba\(253, 224, 71/, 'amber glass'); assert.match(r.dom.amber.stripe, /rgb\(245, 158, 11\)/);
+    assert.equal(r.dom.far.tier, 'calm'); assert.equal(r.dom.far.hidden, false, 'beyond 3 days: the calm 📅 chip is the Start button'); assert.match(r.dom.far.text, /^📅 .*[45] d/); assert.equal(r.dom.far.stripe, '', 'calm has no card stripe');
     assert.match(r.dom.late.text, /Late/); assert.equal(r.dom.late.stripe, '');
     assert.equal(r.writesWhenSame, 0, 'unchanged tick must not touch the DOM');
     assert.match(r.th, /เหลือ 5 ชม\. 20 น\./); assert.match(r.thAmber, /เหลือ 2 วัน 4 ชม\./); assert.match(r.ko, /5시간 20분 남음/);
     assert.deepEqual(errors, [], 'no page errors: ' + errors.join(' | '));
     await browser.close();
-    console.log('PASS: quiz deadline chip — red <24 h with pulse only in the last 3 h, amber 24–72 h, none beyond 3 days, EN/ไทย/한국어 on the next tick, no DOM writes while unchanged, card stripe follows the tier, expired → Late');
+    console.log('PASS: quiz deadline chip — red <24 h with pulse only in the last 3 h, amber 24–72 h, calm 📅 chip beyond 3 days, EN/ไทย/한국어 on the next tick, no DOM writes while unchanged, card stripe follows the tier, expired → Late');
 })().catch(e => { console.error(e); process.exit(1); });
