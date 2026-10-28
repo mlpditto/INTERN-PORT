@@ -126,6 +126,11 @@ function page() { return (async () => {
         assert.ok(!geo.scrollX && !geo.pageX, name + ': no sideways scroll');
         assert.deepEqual(geo.go, ['＋', '▶', '▶', '↗', '▶'], name + ': ＋ for the unmatched topic, ▶ for inactive quizzes, ↗ for a live one');
         if (name === 'desktop') {
+            // V102.464: the chips carry words; every tile says what to DO — green edge ▶, violet edge ＋, a quiet already-live tile — and 2+ askers stand out
+            assert.equal(await page.$$eval('#upnext-card .un-chip', e => e.map(x => x.textContent).join('|')), 'All|💬 Asked|🌱 New', 'chips are labelled');
+            const kinds = await page.$$eval('#upnext-card .un-tile', ts => ts.map(t => [t.classList.contains('un-do-new'), t.classList.contains('un-do-go'), t.classList.contains('un-live'), !!t.querySelector('.un-new'), !!t.querySelector('.un-open'), t.querySelector('.un-n') ? t.querySelector('.un-n').classList.contains('hot') === (Number(t.querySelector('.un-n').textContent.replace(/\D/g, '')) >= 2) : true]));
+            assert.ok(kinds.every(k => k[0] === k[3] && k[2] === k[4] && (k[0] + k[1] + k[2]) === 1 && k[5]), 'tile class follows its button (＋ violet · ▶ green · ↗ quiet) and 👥 ≥ 2 is marked: ' + JSON.stringify(kinds));
+            assert.ok(kinds.some(k => k[0]) || kinds.some(k => k[1]), 'at least one actionable tile');
             assert.equal(await page.$$eval('#upnext-card .un-chip', e => e.map(x => x.getAttribute('aria-pressed')).join()), 'true,false,false');
             // chips
             await page.click('.un-chip[data-un="ask"]');
