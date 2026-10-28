@@ -271,7 +271,7 @@
             '.art-tile{width:36px;height:36px;border-radius:11px;background:linear-gradient(135deg,#dbeafe,#e0f2fe);display:grid;place-items:center;font-size:19px}.art-t{font-weight:800;font-size:13.5px;line-height:1.3;color:#1e293b;word-break:break-word}' +
             '.art-meta{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:4px;font-size:11.5px;color:#64748b}' +
             '.art-st{padding:1px 8px;border-radius:999px;font-weight:800;font-size:11px}.art-st.live{background:#dcfce7;color:#166534}.art-st.scheduled{background:#eff6ff;color:#1d4ed8}.art-st.draft{background:#f1f5f9;color:#475569}.art-st.ended{background:#f8fafc;color:#94a3b8;border:1px solid #e2e8f0}' +
-            '.art-lg{font-weight:800;font-size:10px;padding:1px 5px;border-radius:5px;background:#eef2ff;color:#4338ca}.art-lg.off{background:#f8fafc;color:#cbd5e1;text-decoration:line-through}' +
+            '.art-lg{font-weight:800;font-size:10px;padding:1px 5px;border-radius:5px;background:#eef2ff;color:#4338ca}.art-lg.off{background:#f8fafc;color:#cbd5e1;opacity:.35;filter:grayscale(1)}' +
             '.art-ed{border:1px solid #e2e8f0;border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:9px;min-width:0}.art-empty{color:#94a3b8;text-align:center;padding:40px 10px;border:1px dashed #e2e8f0;border-radius:16px}' +
             '.art-ln{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.art-ml{font-size:11px;font-weight:800;color:#94a3b8;min-width:64px}' +
             '.art-c{min-height:0!important;margin:0!important;width:auto!important;padding:5px 10px;border-radius:999px;border:1px solid #e2e8f0;font-size:12px;font-weight:800;color:#64748b;background:#fff;display:inline-flex;gap:5px;align-items:center;cursor:pointer}' +
@@ -368,7 +368,7 @@
         var st = status(a, now), have = langsOf(a), aud = (a.audience.divisions || []).concat(a.audience.groups || []);
         return '<button type="button" class="art-row st-' + st + (S.cur && S.cur.id === a.id ? ' sel' : '') + (st === 'ended' ? ' ended' : '') + '" onclick="Articles.edit(\'' + esc(a.id) + '\')">' +
             '<span class="art-tile">' + esc(a.cover.emoji) + '</span><span style="min-width:0"><span class="art-t">' + esc(title(a)) + '</span><span class="art-meta"><span class="art-st ' + st + '">' + esc(stLabel(a, now)) + '</span>' +
-            LANGS.map(function (l) { return '<span class="art-lg' + (have.indexOf(l[0]) < 0 ? ' off' : '') + '" title="' + l[1] + '">' + FLAG[l[0]] + '</span>'; }).join('') + qChipsHtml(a) + rowTagsHtml(a) +
+            LANGS.map(function (l) { return '<span class="art-lg' + (have.indexOf(l[0]) < 0 ? ' off' : '') + '" title="' + l[1] + (have.indexOf(l[0]) < 0 ? ' — not written yet' : '') + '">' + FLAG[l[0]] + '</span>'; }).join('') + qChipsHtml(a) + rowTagsHtml(a) +
             (aud.length ? '<span title="Audience">' + esc(aud.join(' · ')) + '</span>' : '') + (a.rerun === 'off' ? '' : '<span class="art-rr" title="Also sent to interns who join later">🔁</span>') + '</span></span></button>';
     }
     // V102.371: the 🩺 chip says where the article stands in the Disease Codex
@@ -925,7 +925,8 @@
             if (urls.length > MAX_LINKS) { S.err = '✨ Up to ' + MAX_LINKS + ' links can be read — this article has ' + urls.length + '.'; render(); return Promise.resolve(); }
             if (urls.length) { topic = linkTextOut(topic); notes = linkTextOut(notes); }   // the links go in as page text, never as bare URLs
             if (!tr && !topic && !urls.length && !img) { S.err = '✨ needs a title (a few words are enough) or a link to draft from.'; render(); return Promise.resolve(); }
-            var wantShort = !tr && (!topic || topic.length > SHORT_TITLE);   // V102.434: the model also proposes a short headline
+            var titleOff = !tr && !!topic && (function () { var sc = scriptOf(topic); return !!sc && sc !== L; })();   // V102.466: a typed title in ANOTHER language (Thai title, EN draft) follows the draft language
+            var wantShort = !tr && (!topic || topic.length > SHORT_TITLE || titleOff);   // V102.434: the model also proposes a short headline
             S.aiBusy = true; S.err = ''; S.aiNote = ''; S.titleSug = null; render();
             var t0 = Date.now(), pageTitle = '';
             return (urls.length ? readLinks(urls) : Promise.resolve([])).then(function (pages) {
@@ -949,7 +950,7 @@
                     var sm = wantShort ? txt.match(/^\s*TITLE:\s*([^\n]*)\n\s*-{3,}\s*\n([\s\S]*)$/i) : null;
                     var short = sm ? sm[1].replace(/^["“'‘]+|["”'’.]+$/g, '').trim().slice(0, SHORT_TITLE + 10) : '';
                     a.body[L] = sm ? sm[2].trim() : txt;
-                    if (!topic) a.title[L] = short || pageTitle || a.title[L] || '';   // an empty (or link-only) title is filled: the short one, else the page's own
+                    if (!topic || (titleOff && short)) a.title[L] = short || pageTitle || a.title[L] || '';   // an empty (or link-only) title is filled: the short one, else the page's own
                     else if (short && short.length < topic.length) S.titleSug = { cur: a, L: L, text: short };   // a typed long title is only OFFERED a shorter one
                 }
                 S.aiNote = '✨ ' + modelName(model) + ' · ' + Math.max(1, Math.round((Date.now() - t0) / 1000)) + ' s' + (r.domains.length ? ' · 🔗 ' + r.domains.join(', ') : '') + (img ? ' · 🖼 — check every number against the picture, then save' : ' — read it, then save');

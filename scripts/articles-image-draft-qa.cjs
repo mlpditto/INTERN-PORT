@@ -68,6 +68,14 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         const k = await page.evaluate(() => ({ m: __ai[0].model, p: __ai[0].prompt, t: Articles._S.cur.title.en }));
         assert.equal(k.m, 'typhoon-vision'); assert.match(k.p, /Topic: Stroke day\./); assert.equal(k.t, 'Stroke day');
 
+        // 4b · a typed title in another language follows the draft language (Thai title + EN draft → the model's EN headline); a title already in the draft language is kept
+        await page.evaluate(() => { Articles.edit(null); });
+        await paste('art-bodyta', 'image'); await page.waitForSelector('.art-img img');
+        await page.evaluate(() => { document.getElementById('art-title').value = 'บทบาทเภสัชกรดูแลการใช้ยาละลายลิ่มเลือด'; Articles.text('title', 'บทบาทเภสัชกรดูแลการใช้ยาละลายลิ่มเลือด'); __ai.length = 0; Articles.ai(); });
+        await page.waitForFunction(() => !Articles._S.aiBusy);
+        const tl = await page.evaluate(() => ({ title: Articles._S.cur.title.en, ask: /first line "TITLE: "/.test(__ai[0].prompt), sug: !!Articles._S.titleSug }));
+        assert.equal(tl.ask, true, 'the model is asked for a headline in the draft language'); assert.equal(tl.title, 'Stroke: pharmacist checklist', 'Thai title in an EN draft → replaced by the EN headline'); assert.equal(tl.sug, false);
+
         // 5 · ✕ removes it; without a picture and without a title, today's message returns; no visionData is sent for a normal draft
         await page.click('.art-img .x');
         assert.equal(await page.locator('.art-img').count(), 0); assert.equal(await page.evaluate(() => Articles._S.img), null);
@@ -81,6 +89,11 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.equal(await paste('art-title', 'image'), true); await page.waitForSelector('.art-img img');
         await page.evaluate(() => Articles.edit(null));
         assert.equal(await page.locator('.art-img').count(), 0, 'a new article starts without the picture');
+
+        // 7 · the list row: a language the article does not have yet is a faded, grey flag with a tooltip (Korean missing here)
+        await page.evaluate(() => { const S = Articles._S; S.list = [{ id: 'a1', title: { en: 'Elobixibat', th: 'เอโลบิซิแบต' }, body: { en: 'x', th: 'y' }, status: 'live', cover: { emoji: '📰' }, audience: { divisions: [], groups: [] }, links: [], tags: [], startAt: Date.now() - 1e6, endAt: Date.now() + 1e9 }]; Articles.edit(null); });
+        const fl = await page.evaluate(() => [...document.querySelectorAll('#art-list .art-lg, .art-list .art-lg, #articlesModal .art-lg')].map(e => [e.classList.contains('off'), e.title, getComputedStyle(e).opacity]));
+        assert.ok(fl.some(f => f[0] && /Korean|KO|한/i.test(f[1]) && /not written yet/.test(f[1]) && Number(f[2]) < 0.5), 'missing language → faded flag + tooltip: ' + JSON.stringify(fl));
 
         const mine = errors.filter(e => /articles|imgHtml|imgOk|imgFromBlob|visionModel|aiHtml/i.test(e));
         assert.deepEqual(mine, [], 'no errors from the Articles code: ' + mine.join(' | '));
