@@ -51,4 +51,8 @@ assert.ok(R.valid(Q) && !R.valid({ ...Q, tiers: [1, 1, 1, 1] }) && !R.valid({ ..
 assert.deepEqual(R.misplaced(Q, [0, 2, 1, 3]), [], 'a perfect (tier-wise) order marks nothing');
 assert.deepEqual(R.misplaced(Q, [0, 2, 3, 1]).sort(), [1, 3], 'Theophylline above Ipratropium → those two');
 assert.deepEqual(R.misplaced(Q, null), []);
+// ---- V101.231: tier-box mode is dispatched on q.mode only — an old question / answer is untouched (the full set of tier cases is in rank-tier-qa)
+assert.equal(R.score({ ...Q, mode: 'tier', tiers: [0, 1, 1, 2] }, ans('albuterol', [0, 1, 1, 2])).credit, 1, 'tier mode reads part 2 as one level per option');
+assert.equal(R.score({ ...Q, mode: '' }, ans('albuterol', [0, 2, 1, 3])).credit, 1, 'mode "" (nothing chosen in the editor) is still the order mode');
+assert.ok(R.isTier({ mode: 'tier' }) && !R.isTier(Q));
 console.log('rank-quiz-qa: all assertions passed');
