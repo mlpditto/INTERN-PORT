@@ -375,8 +375,26 @@ service cloud.firestore {
           && d.title == evDoc(d.eventId).title
           && d.eventDate == evDoc(d.eventId).eventDate;
       }
+      // Auto stamp: whoever tapped Join on or before the event day gets it from the event day (Bangkok) on, no code needed.
+      function dayStart(d) { return timestamp.value(d.eventDate + 'T00:00:00Z') - duration.value(7, 'h'); }
+      function joinClaimOk(d) {
+        return d.keys().hasOnly(['eventId', 'userId', 'authUid', 'displayName', 'title', 'eventDate', 'badge', 'via', 'interestId', 'createdAt'])
+          && d.via == 'join'
+          && d.authUid == request.auth.uid
+          && d.createdAt == request.time
+          && stampId == d.eventId + '_' + d.userId
+          && request.time >= dayStart(d)
+          && exists(/databases/$(database)/documents/event_interests/$(d.interestId))
+          && evInterest(d.interestId).eventId == d.eventId
+          && evInterest(d.interestId).authUid == request.auth.uid
+          && evInterest(d.interestId).userId == d.userId
+          && evInterest(d.interestId).createdAt < dayStart(d) + duration.value(24, 'h')
+          && d.badge == evDoc(d.eventId).badge
+          && d.title == evDoc(d.eventId).title
+          && d.eventDate == evDoc(d.eventId).eventDate;
+      }
       allow read: if isSignedIn();
-      allow create: if isAdmin() || (isSignedIn() && codeClaimOk(request.resource.data));
+      allow create: if isAdmin() || (isSignedIn() && (codeClaimOk(request.resource.data) || joinClaimOk(request.resource.data)));
       allow update: if false;
       allow delete: if isAdmin();
     }
