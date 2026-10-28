@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.476)</title>
+    <title>Nika Admin (V102.477)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.475">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -19266,7 +19266,9 @@
         };
 
         function buildQuizAnalyzePrompt(questions, tags, auditNote) {
-            const qList = questions.map((q, i) => `Q${i+1} (${q.type}): ${q.q}\nOptions: ${q.options ? q.options.join(', ') : 'N/A'}`).join('\n\n');
+            const hasRank = questions.some(q => q.type === 'rank');   // V102.477: a Rank question is described as a ranking (levels), never as a multi-answer choice
+            const qList = questions.map((q, i) => q.type === 'rank' ? window.rankPromptText(q, `Q${i+1}`) : `Q${i+1} (${q.type}): ${q.q}\nOptions: ${q.options ? q.options.join(', ') : 'N/A'}`).join('\n\n');
+            const rankBlock = hasRank ? '\n\n' + window.RANK_PROMPT_NOTE + '\n' + window.RANK_IMPROVE_RULES + '\nFor each rank source question the improvedQuestion is exactly this shape (instead of the choice example in the OUTPUT FORMAT below):\n' + window.RANK_IMPROVED_SHAPE + '\n' : '';
             const tagStr = Array.isArray(tags) ? tags.join(', ') : (tags || '');
             // V96.49 Phase 2-full: when launched from the Quality Audit "Suggest fix",
             // inject the audit's weakest dimension + Thai reviewer note so the rewrite
@@ -19315,6 +19317,7 @@
 
                 Questions list:
                 ${qList}
+                ${rankBlock}
                 ${auditBlock}
                 ⚠️ TITLE RULE for "suggestedTitles" (the most common mistake — read carefully):
                 "suggestedTitles" must name the QUIZ ITSELF by its subject matter — the title a learner sees on the quiz card. It is NOT a title for this analysis report. Derive it from what the questions actually test, anchored to the Quiz tags above.
@@ -19573,7 +19576,7 @@
                 // to disable Apply/Add for just that item instead of the whole batch.
                 window._aiAnalysisItems.forEach(it => {
                     if (it && it.improvedQuestion) {
-                        const shapeCheck = window._validateAiQuestionShape(it.improvedQuestion);
+                        const shapeCheck = window._validateAiQuestionShape(it.improvedQuestion, formData.questions[Math.max(0, Math.min(it.qNumber !== undefined ? it.qNumber - 1 : (it.index !== undefined ? it.index : 0), formData.questions.length - 1))]);
                         it._shapeInvalid = shapeCheck.ok ? null : shapeCheck.error;
                     }
                 });
@@ -19656,7 +19659,7 @@
                                                     </button>
                                                 </div>
                                             </div>
-                                            ${shapeInvalid ? `<div style="font-size:0.85em; color:#b91c1c; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.22); border-radius:8px; padding:6px 8px; margin-bottom:8px;"><i class="fa-solid fa-triangle-exclamation"></i> Malformed AI output: ${escapeHtml(shapeInvalid)}</div>` : ''}
+                                            ${shapeInvalid ? `<div style="font-size:0.85em; color:#b91c1c; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.22); border-radius:8px; padding:6px 8px; margin-bottom:8px;"><i class="fa-solid fa-triangle-exclamation"></i> ${shapeInvalid.indexOf(window.RANK_UNUSABLE) === 0 ? '' : 'Malformed AI output: '}${escapeHtml(shapeInvalid)}</div>` : ''}
                                             <div style="font-size:0.88em; color:#4a5568; margin-bottom:6px; line-height: 1.5;">❗ ${item.issue}</div>
                                             ${window._aiIssuePeerChipsHtml(item.issue, qIdx + 1, formData.questions, arrIdx)}
                                             <div id="ai-suggestion-text-${arrIdx}" style="font-size:0.88em; color:#4361ee; line-height: 1.5; border-left:2px solid #c7d2fe; padding-left:8px;">💡 ${item.suggestion}</div>
@@ -20110,6 +20113,7 @@
                         : '\n\nNote: no blueprint set — judge each Q on absolute merit; for "bloomLevel" use detected demand only.\n';
 
                     const qList = formData.questions.map((q, i) => {
+                        if (q.type === 'rank') return window.rankPromptText(q, `Q${i + 1}`) + '\n  read first: ' + (q.primer && String(q.primer).trim() ? String(q.primer).replace(/\s+/g, ' ').trim().slice(0, 900) : '(none)');   // V102.477: levels, not a single key
                         const optsList = (q.options || []).map((o, oi) => `    ${String.fromCharCode(65 + oi)}. ${o}`).join('\n');
                         const correctIdx = Array.isArray(q.correct) ? q.correct : [q.correct];
                         const correctLabels = correctIdx.map(c => String.fromCharCode(65 + c)).join(',');
@@ -20124,6 +20128,7 @@ ${window.auditRubricText()}
 ${blueprintBlock}
 QUESTIONS:
 ${qList}
+${formData.questions.some(q => q.type === 'rank') ? '\n' + window.RANK_AUDIT_NOTE + '\n' : ''}
 
 OUTPUT FORMAT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
 {
@@ -21748,6 +21753,7 @@ RULES:
                 if (bp.bloomLevel) bpLines.push(`- intended Bloom level: ${bp.bloomLevel}`);
                 if (bp.learningObjective) bpLines.push(`- learning objective: ${bp.learningObjective}`);
                 const qList = items.map((q, i) => {
+                    if (q.type === 'rank') return window.rankPromptText(q, `Q${i + 1}`);   // V102.477
                     const optsList = (q.options || []).map((o, oi) => `    ${String.fromCharCode(65 + oi)}. ${o}`).join('\n');
                     const keys = (Array.isArray(q.correct) ? q.correct : [q.correct]).map(c => String.fromCharCode(65 + Number(c))).join(',');
                     return `Q${i + 1} (${q.type || 'choice'}): ${q.q}\n${optsList}\n  correct: ${keys}`;
@@ -21759,6 +21765,7 @@ ${window.auditRubricText()}
 ${bpLines.length ? `\nBLUEPRINT CONTEXT (admin's stated intent — judge each Q against this):\n${bpLines.join('\n')}\n` : '\nNote: no blueprint set — judge each Q on absolute merit; for "bloomLevel" use detected demand only.\n'}
 QUESTIONS:
 ${qList}
+${items.some(q => q.type === 'rank') ? '\n' + window.RANK_AUDIT_NOTE + '\n' : ''}
 
 OUTPUT FORMAT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
 {
@@ -70104,6 +70111,15 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             const currentTimer = Number(currentQ && currentQ.timer) || 60;
             const improvedTimer = Number(improvedQ && improvedQ.timer) || 60;
 
+            if (currentType === 'rank' && (improvedType === 'rank' || improvedType === '')) {   // V102.477: a Rank question has levels, not a correct answer
+                const J = a => JSON.stringify((Array.isArray(a) ? a : []).map(Number)), acc = a => JSON.stringify((Array.isArray(a) ? a : []).map(normalizeAiCompareText).filter(Boolean));
+                if (currentText !== improvedText) diffs.push('Text Reworded');
+                if (JSON.stringify(currentOptions) !== JSON.stringify(improvedOptions)) diffs.push('Options Balanced');
+                if ((Array.isArray(improvedQ && improvedQ.tiers) && J(currentQ && currentQ.tiers) !== J(improvedQ.tiers)) || (Array.isArray(improvedQ && improvedQ.unsafe) && J(currentQ && currentQ.unsafe) !== J(improvedQ.unsafe))) diffs.push('Levels changed');
+                if (Array.isArray(improvedQ && improvedQ.accepted) && acc(currentQ && currentQ.accepted) !== acc(improvedQ.accepted)) diffs.push('Accepted answers');
+                if (currentTimer !== improvedTimer) diffs.push('Timer Adjusted');
+                return { diffs, hasMeaningfulDiff: diffs.length > 0 };
+            }
             if (currentText !== improvedText) diffs.push('Text Reworded');
             if (JSON.stringify(currentOptions) !== JSON.stringify(improvedOptions)) diffs.push('Options Balanced');
             if (JSON.stringify(currentCorrect) !== JSON.stringify(improvedCorrect)) diffs.push('Logical Fix');
@@ -70120,9 +70136,86 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         // literal schema-key fragments ("correct", "[1]", "timer", "60", "explanation")
         // instead of stopping at the real answer choices — safeJsonParse alone can't
         // catch this because the JSON parses fine, it's just semantically corrupt.
-        window._validateAiQuestionShape = function(q) {
+        // V102.477: the Review tools (Specialist rewrite, Quality Audit, single-question regenerate / 2-model compare / merge) know the Rank question.
+        // A Rank question has NO single correct option — the key is the LEVEL of every option — so it is described to the models as a ranking, a rewrite must stay
+        // a Rank question (same fields), and anything that comes back as another type, or with unusable levels, is never offered as an applicable rewrite.
+        window.RANK_UNUSABLE = 'AI did not return a usable Rank question — kept as is';
+        window.RANK_PROMPT_NOTE = 'RANK QUESTIONS (type "rank"): the intern first TYPES an answer with no options on screen, then RANKS every option from best to worst. There is no single correct option — each option has a LEVEL: 0 = BEST, 1 = OK (acceptable), 2 = AVOID. Options on the same level can swap places freely. "unsafe" = 1 marks an option that could harm the patient if it were ranked above a BEST option. "accepted" lists the ways an intern may type the BEST answer (Thai, English, generic, brand).';
+        window.RANK_AUDIT_NOTE = 'RANK QUESTIONS (type "rank") are ranking questions: the intern types an answer first, then ranks all options best → worst. The LEVELS (BEST / OK / AVOID, UNSAFE flag) are the key, NOT a single correct option, and several options share a level on purpose. Do NOT penalise "multiple correct answers" or a missing single key for them; judge instead whether the levels are clinically defensible, the options plausible and clearly separable, the stem short and the flags right.';
+        window.RANK_IMPROVED_SHAPE = '{"q":"<<<short stem, max 120 characters>>>","type":"rank","accepted":["<<<2-5 ways an intern may type the BEST answer>>>"],"options":["<<<4-5 plausible options, NOT listed best-first>>>"],"tiers":[<<<one number per option: 0 best, 1 acceptable, 2 avoid>>>],"unsafe":[<<<one number per option: 1 only if ranking it above a BEST option could harm the patient, else 0>>>],"why":["<<<one line per option, max 60 characters>>>"],"timer":60,"explanation":"<<<learner-facing rationale>>>"}';
+        window.RANK_IMPROVE_RULES = 'FOR A RANK SOURCE QUESTION the improved question MUST stay type "rank" with exactly the fields shown (never convert it to "choice", never add a "correct" field): every array is as long as "options"; at least one BEST (0) and at least two different levels; 3 to 6 options; keep the topic and the clinical logic of the levels unless the finding says they are wrong; do NOT list the options best-first (mix the order); the stem stays short (max 120 characters).';
+        window.rankLevelName = function (q, i) {
+            const t = Number(((q && q.tiers) || [])[i]);
+            return t === 0 ? 'BEST' : t === 1 ? 'OK' : t === 2 ? 'AVOID' : 'UNSET';
+        };
+        // one Rank question as the models should read it: stem, accepted answers, every option with its level / UNSAFE flag / why
+        window.rankPromptText = function (q, label) {
+            const opts = Array.isArray(q.options) ? q.options : [];
+            const lines = opts.map((o, i) => '    ' + String.fromCharCode(65 + i) + '. ' + o + ' — ' + window.rankLevelName(q, i) + (Number(((q.unsafe || [])[i])) ? ' ⚠ UNSAFE' : '') + (String(((q.why || [])[i]) || '').trim() ? ' — why: ' + String(q.why[i]).trim() : ''));
+            return label + ' (rank — ranking question): ' + (q.q || '') + '\n  accepted answers: ' + ((q.accepted || []).join(', ') || '(none)') + '\n  options, with their level:\n' + lines.join('\n');
+        };
+        // the improved Rank question must be usable as it stands: 3–6 filled options, one valid level per option, ≥1 Best, ≥2 levels (the editor's own rule)
+        window._rankImprovementCheck = function (q) {
+            const bad = why => ({ ok: false, error: window.RANK_UNUSABLE + (why ? ' (' + why + ')' : '') });
+            const opts = Array.isArray(q.options) ? q.options.map(o => String(o == null ? '' : o).trim()) : [];
+            if (opts.length < 3 || opts.length > 6 || opts.some(o => !o)) return bad('needs 3 to 6 filled options');
+            const tiers = Array.isArray(q.tiers) ? q.tiers.map(Number) : [];
+            if (tiers.length !== opts.length || tiers.some(v => !Number.isInteger(v) || v < 0 || v > 2)) return bad('levels missing — one level 0, 1 or 2 per option');
+            if ((q.unsafe != null && (!Array.isArray(q.unsafe) || q.unsafe.length !== opts.length)) || (q.why != null && (!Array.isArray(q.why) || q.why.length !== opts.length))) return bad('unsafe / why must be one per option');
+            const rq = { type: 'rank', q: String(q.q || '').trim(), options: opts, tiers, accepted: Array.isArray(q.accepted) ? q.accepted : [], unsafe: Array.isArray(q.unsafe) ? q.unsafe : [], why: Array.isArray(q.why) ? q.why : [] };
+            if (!rq.q) return bad('no question text');
+            const why = typeof window.rankProblem === 'function' ? window.rankProblem(rq) : '';
+            if (why) return bad(why);
+            if (window.RankQuiz && !window.RankQuiz.valid(rq)) return bad('no Best option or a single level');
+            return { ok: true };
+        };
+        // the Rank question as the editor card wants it, from an AI improvement: its own rank fields ONLY (never mixed with the old levels), the old card's other fields kept
+        window.rankNormalizeImprovement = function (improvedQ, currentQ) {
+            const o = (Array.isArray(improvedQ.options) ? improvedQ.options : []).map(x => String(x == null ? '' : x).trim()), n = o.length;
+            const arr = a => (Array.isArray(a) ? a.slice(0, n) : []);
+            const tiers = arr(improvedQ.tiers).map(Number);
+            const unsafe = arr(improvedQ.unsafe).map(v => (Number(v) ? 1 : 0)); while (unsafe.length < n) unsafe.push(0);
+            const why = arr(improvedQ.why).map(v => String(v == null ? '' : v).trim()); while (why.length < n) why.push('');
+            const accepted = (Array.isArray(improvedQ.accepted) ? improvedQ.accepted : (currentQ.accepted || [])).map(s => String(s || '').trim()).filter(Boolean).slice(0, 6);
+            return { ...currentQ, type: 'rank', q: String(improvedQ.q || '').trim(), accepted, options: o, tiers, unsafe, why,
+                correct: tiers.reduce((a, v, i) => (v === 0 ? a.concat(i) : a), []),
+                timer: Number(improvedQ.timer) || Number(currentQ.timer) || 60,
+                explanation: improvedQ.explanation !== undefined ? improvedQ.explanation : currentQ.explanation };
+        };
+        // an option row of the compare cards for a Rank question: a level chip (Best green / OK amber / Avoid grey) and ⚠ instead of the ✅ ticks of a choice question
+        window._rankOptRowHtml = function (q, i, bodyHtml) {
+            const t = Number(((q && q.tiers) || [])[i]), pal = t === 0 ? ['#15803d', 'rgba(34,197,94,0.12)', 'rgba(34,197,94,0.35)', 'Best'] : t === 1 ? ['#b45309', 'rgba(245,158,11,0.12)', 'rgba(245,158,11,0.4)', 'OK'] : t === 2 ? ['#475569', 'rgba(100,116,139,0.12)', 'rgba(100,116,139,0.35)', 'Avoid'] : ['#94a3b8', 'rgba(255,255,255,0.5)', 'rgba(0,0,0,0.08)', '—'];
+            const unsafe = Number(((q && q.unsafe) || [])[i]);
+            return '<div class="rk-cmp-row" style="padding:6px 12px; margin:4px 0; border-radius:10px; font-size:0.85em; background:' + pal[1] + '; border:1px solid ' + pal[2] + '; display:flex; align-items:center; gap:10px;">' +
+                '<span class="rk-cmp-lv" style="flex:none; min-width:46px; text-align:center; font-size:0.78em; font-weight:800; padding:1px 8px; border-radius:999px; color:' + pal[0] + '; border:1px solid ' + pal[2] + '; background:#fff;">' + pal[3] + '</span>' +
+                '<span style="flex:1; color:#334155; font-weight:600;">' + bodyHtml + '</span>' + (unsafe ? '<span title="Unsafe — could harm the patient if ranked above a Best option" style="flex:none;">⚠️</span>' : '') + '</div>';
+        };
+        window._rankAcceptedHtml = function (q) {
+            const acc = (Array.isArray(q && q.accepted) ? q.accepted : []).filter(Boolean);
+            return '<div class="rk-cmp-acc" style="font-size:0.75em; color:#64748b; margin-top:6px;">Accepted answers: <b>' + (acc.length ? acc.map(escapeHtml).join(', ') : '—') + '</b></div>';
+        };
+        window._buildRankImprovePrompt = function (originalQ, issue, suggestion, adminSteer) {
+            const steer = String(adminSteer || '').trim().slice(0, 500);
+            const steerBlock = steer ? '\nADMIN STEER — HIGHEST PRIORITY. Follow it literally, even when it asks for a smaller, narrower or easier question:\n<<<' + steer + '>>>\n' : '';
+            return 'Based on this ranking question and the identified issue, provide a DIFFERENT and BETTER improved version.\n\n' + window.RANK_PROMPT_NOTE + '\n\n' +
+                'CRITICAL REQUIREMENTS:\n1. Keep it a Rank question: a short clinical situation (max 120 characters) whose options are genuinely plausible, clearly separable choices judged best to worst for the patient.\n2. LEVELS: 0 = BEST, 1 = acceptable, 2 = avoid; use the full range whenever it is clinically defensible (typically one or two BEST/OK and at least one AVOID); mark "unsafe" only for an option that could harm the patient if ranked above a BEST option.\n3. No joke answers, no "all of the above"; do NOT list the options best-first (mix the order); 3 to 6 options; "accepted" = 2-5 ways an intern may type the BEST answer.\n4. Write every field in the SAME language as the original question text (drug names stay in English). "explanation" is shown to LEARNERS after they submit — concise teaching, not critique; "suggestion" is admin-facing.\n' +
+                (window.clinicalAngleBlock ? window.clinicalAngleBlock() : '') + steerBlock + '\n' +
+                'Question to improve: ' + JSON.stringify(originalQ) + '\nIdentified Issue: ' + (issue || '') + '\nPrevious Suggestion: ' + (suggestion || '') + '\n\n' + window.RANK_IMPROVE_RULES +
+                '\n\nOutput ONLY a JSON object representing the improved question, exactly this shape (plus an admin-facing "suggestion" field: a brief explanation of what changed):\n' + window.RANK_IMPROVED_SHAPE;
+        };
+        window._buildRankMergePrompt = function (a, b, instruction) {
+            return 'You are merging TWO versions of the SAME ranking question into ONE. Version A is the question as it stands today, written by a human; Version B is an AI rewrite.\n\n' + window.RANK_PROMPT_NOTE +
+                '\n\nVERSION A — ORIGINAL:\n' + JSON.stringify(a) + '\n\nVERSION B — IMPROVED:\n' + JSON.stringify(b) +
+                (instruction ? '\n\nADMIN\'S MERGE INSTRUCTION — highest priority, follow it literally:\n' + instruction + '\n' : '') +
+                '\n\nDEFAULT MERGE POLICY: keep A\'s wording and terminology where it reads naturally; take B\'s clinical depth and more plausible options where they raise difficulty; drop any giveaway or joke option.\n\n' + window.RANK_IMPROVE_RULES +
+                ' Write every field in the same language as VERSION A. The result must differ from BOTH A and B.\n\nOUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY, exactly this shape plus a one-line admin-facing "suggestion" (what you took from A and what from B):\n' + window.RANK_IMPROVED_SHAPE;
+        };
+        window._validateAiQuestionShape = function(q, src) {
             if (!q || typeof q !== 'object') return { ok: false, error: 'AI response is not an object.' };
-            const type = q.type || 'choice';
+            const srcRank = !!(src && src.type === 'rank');   // V102.477: a Rank source must come back as a usable Rank question, nothing else
+            const type = q.type || (srcRank ? 'rank' : 'choice');
+            if (srcRank && type !== 'rank') return { ok: false, error: window.RANK_UNUSABLE + ' (it came back as "' + type + '")' };
+            if (type === 'rank') return (src && !srcRank) ? { ok: false, error: 'AI changed the question type to Rank.' } : window._rankImprovementCheck(q);
             if (type !== 'choice') return { ok: true };
             const options = Array.isArray(q.options) ? q.options : null;
             if (!options || options.length < 2) {
@@ -70215,6 +70308,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         // "no, keep the stem, just fix the distractors". Placed before it, the model reads
         // the requirements last and follows those instead.
         window._buildSingleQImprovePrompt = function(originalQ, issue, suggestion, adminSteer) {
+            if (originalQ && originalQ.type === 'rank') return window._buildRankImprovePrompt(originalQ, issue, suggestion, adminSteer);   // V102.477
             const steer = String(adminSteer || '').trim().slice(0, 500);
             const steerBlock = steer ? `
                 ADMIN STEER — HIGHEST PRIORITY. This overrides any CRITICAL REQUIREMENT above that contradicts it, including the instruction to increase difficulty. Follow it literally, even when it asks for a smaller, narrower or easier change than the requirements do:
@@ -70328,7 +70422,7 @@ ${window.clinicalAngleBlock ? window.clinicalAngleBlock() : ''}${steerBlock}
                         if (candidate) {
                             // V100.89: valid JSON can still be a semantically corrupt question
                             // (schema leakage into "options") — retry the same as a parse failure.
-                            const shapeCheck = window._validateAiQuestionShape(candidate);
+                            const shapeCheck = window._validateAiQuestionShape(candidate, originalQ);
                             if (shapeCheck.ok) { parsed = candidate; break; }
                             shapeError = shapeCheck.error;
                             console.warn('[generateAiProposalB] attempt', attempt, 'malformed question shape:', shapeError);
@@ -70376,7 +70470,7 @@ ${window.clinicalAngleBlock ? window.clinicalAngleBlock() : ''}${steerBlock}
                 const instruction = window._compareInstruction(item);
                 if (btn) { btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังผสม…'; btn.disabled = true; }
 
-                const prompt = `You are merging TWO versions of the SAME multiple-choice question into ONE. Version A is the question as it stands today, written by a human; Version B is an AI rewrite of it. Produce a single question that takes the strongest parts of each — not a copy of either.
+                const prompt = (originalQ.type === 'rank') ? window._buildRankMergePrompt(originalQ, item.improvedQuestion, instruction) : `You are merging TWO versions of the SAME multiple-choice question into ONE. Version A is the question as it stands today, written by a human; Version B is an AI rewrite of it. Produce a single question that takes the strongest parts of each — not a copy of either.
 
 VERSION A — ORIGINAL:
 ${JSON.stringify(originalQ)}
@@ -70414,7 +70508,7 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
                         // point at the wrong choice. Also catches schema leakage into "options"
                         // (V100.89) — either way, reject rather than apply a broken question, and
                         // retry the same as a parse failure.
-                        const shapeCheck = window._validateAiQuestionShape(candidate);
+                        const shapeCheck = window._validateAiQuestionShape(candidate, originalQ);
                         if (shapeCheck.ok) { parsed = candidate; break; }
                         shapeError = shapeCheck.error;
                         console.warn('[mergeAiVersions] attempt', attempt, 'malformed question shape:', shapeError);
@@ -70642,6 +70736,7 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
         // Copy ALL Improved (below) can build the exact same per-question text without
         // duplicating the format (A) B) C) prefixes, answer key, explanation).
         window._compareQText = function(q, full) {
+            if (q && q.type === 'rank') return window.rankPromptText(q, 'Rank') + (full && String(q.explanation || '').trim() ? '\n\nคำอธิบาย: ' + String(q.explanation).trim() : '');   // V102.477
             const opts = Array.isArray(q.options) ? q.options : [];
             let text = (q.q || '') + (opts.length ? '\n' + opts.map((o, i) => String.fromCharCode(65 + i) + ') ' + o).join('\n') : '');
             if (full) {
@@ -70707,11 +70802,13 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
 
         window._renderCompareCol = function(q, o) {
             const isImproved = o.kind === 'improved';
+            const isRankQ = q.type === 'rank' || (!q.type && o.originalRef && o.originalRef.type === 'rank');   // V102.477
             const optionsHtml = (q.options || []).map((opt, i) => {
                 const isCorrect = q.correct && q.correct.includes(i);
                 const body = isImproved
                     ? (window._renderAddDiff((o.originalRef && o.originalRef.options && o.originalRef.options[i]) || '', opt || '') || '<span style="opacity:0.4; font-style:italic;">(empty)</span>')
                     : (escapeHtml(opt || '') || '<span style="opacity:0.4; font-style:italic;">(empty)</span>');
+                if (isRankQ) return window._rankOptRowHtml(q, i, body);
                 return `<div style="padding:6px 12px; margin:4px 0; border-radius:10px; font-size:0.85em; background:${isCorrect ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.5)'}; border:1px solid ${isCorrect ? 'rgba(34,197,94,0.2)' : 'rgba(0,0,0,0.05)'}; display:flex; align-items:center; gap:8px;">
                     <span style="font-size:1.1em;">${isCorrect ? '✅' : '⚪'}</span>
                     <span style="color:${isCorrect ? '#15803d' : '#475569'}; font-weight:${isCorrect ? '700' : '500'};">${body}</span>
@@ -70747,7 +70844,7 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
                 </div>
                 <div style="background:rgba(255,255,255,0.85); border:1.5px solid rgba(0,0,0,0.05); border-top:none; border-radius:0 0 16px 16px; padding:18px; flex:1; box-shadow:0 10px 30px rgba(0,0,0,0.05); display:flex; flex-direction:column;">
                     <div style="font-weight:700; color:#1e293b; margin-bottom:14px; font-size:1.02em; line-height:1.5;">${stemHtml}</div>
-                    <div style="margin-bottom:10px;">${optionsHtml || '<div style="color:#94a3b8; font-style:italic;">No options provided</div>'}</div>
+                    <div style="margin-bottom:10px;">${optionsHtml || '<div style="color:#94a3b8; font-style:italic;">No options provided</div>'}${isRankQ ? window._rankAcceptedHtml(q) : ''}</div>
                     <div style="font-size:0.72em; color:#64748b; display:flex; gap:14px; align-items:center; padding-top:10px; margin-top:auto; border-top:1px dashed #e2e8f0;"><span>⏱️ <b>${q.timer || 60}s</b></span><span>📊 <b>${(q.options || []).length}</b> Options</span>${footer}</div>
                 </div>
             </div>`;
@@ -71270,6 +71367,7 @@ RULES:
 
                 const renderQInner = (q, label, color, qIdxNum, side) => {
                     const otherOpts = side === 'original' ? (improvedQ.options || []) : (currentQ.options || []);
+                    const isRankQ = q.type === 'rank' || (!q.type && currentQ.type === 'rank');   // V102.477
                     const optionsHtml = (q.options || []).map((opt, i) => {
                         const isCorrect = q.correct && q.correct.includes(i);
                         const otherOpt = otherOpts[i] || '';
@@ -71278,6 +71376,7 @@ RULES:
                             side === 'original' ? otherOpt : (opt || '')
                         );
                         const optHtml = renderDiffSide(optDiff, side) || '<span style="opacity:0.4; font-style:italic;">(empty)</span>';
+                        if (isRankQ) return window._rankOptRowHtml(q, i, optHtml);
                         return `<div style="padding:6px 12px; margin:4px 0; border-radius:10px; font-size:0.85em; background:${isCorrect ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.5)'}; border:1px solid ${isCorrect ? 'rgba(34,197,94,0.2)' : 'rgba(0,0,0,0.05)'}; display:flex; align-items:center; gap:8px;">
                             <span style="font-size:1.1em;">${isCorrect ? '✅' : '⚪'}</span>
                             <span style="color:${isCorrect ? '#15803d' : '#475569'}; font-weight:${isCorrect ? '700' : '500'};">${optHtml}</span>
@@ -71295,7 +71394,7 @@ RULES:
                             </div>
                             <div style="background:rgba(255,255,255,0.8); backdrop-filter:blur(10px); border:1.5px solid rgba(0,0,0,0.05); border-top:none; border-radius:0 0 16px 16px; padding:20px; flex:1; box-shadow:0 10px 30px rgba(0,0,0,0.05);">
                                 <div style="font-weight:700; color:#1e293b; margin-bottom:15px; font-size:1.05em; line-height:1.5;">${stemHtml}</div>
-                                <div style="margin-bottom:15px;">${optionsHtml || '<div style="color:#94a3b8; font-style:italic;">No options provided</div>'}</div>
+                                <div style="margin-bottom:15px;">${optionsHtml || '<div style="color:#94a3b8; font-style:italic;">No options provided</div>'}${isRankQ ? window._rankAcceptedHtml(q) : ''}</div>
                                 <div style="font-size:0.75em; color:#64748b; display:flex; gap:15px; padding-top:10px; border-top:1px dashed #e2e8f0;">
                                     <span>⏱️ <b>${q.timer || 60}s</b></span>
                                     <span>📊 <b>${(q.options || []).length}</b> Options</span>
@@ -71312,7 +71411,7 @@ RULES:
                 // window._validateAiQuestionShape) can reach here still flagged via
                 // item._shapeInvalid. Re-check live too, so regenerate/Model B/merge
                 // results (already validated at generation) and batch items share one gate.
-                const shapeCheck = window._validateAiQuestionShape(improvedQ);
+                const shapeCheck = window._validateAiQuestionShape(improvedQ, currentQ);
                 const canApplyImprovement = diffState.hasMeaningfulDiff && shapeCheck.ok;
                 // V97.28: free in-set duplication pass — runs on every open, zero tokens,
                 // silent when clean. Stored on window so the Add-as-New guard can read it.
@@ -71324,10 +71423,10 @@ RULES:
                 ];
                 window._compareDupHits = window.scanQuizSetDup(index, dupCandidates);
                 const dupChipsHtml = window._quizSetDupChipsHtml(window._compareDupHits);
-                const _diffIcon = { 'Text Reworded': ['✍️', 'Text reworded'], 'Options Balanced': ['🔢', 'Options balanced'], 'Logical Fix': ['🎯', 'Logical fix — the correct answer changed'] };
+                const _diffIcon = { 'Text Reworded': ['✍️', 'Text reworded'], 'Options Balanced': ['🔢', 'Options balanced'], 'Logical Fix': ['🎯', 'Logical fix — the correct answer changed'], 'Levels changed': ['🎚️', 'Levels changed — Best / OK / Avoid or ⚠ flags'], 'Accepted answers': ['🔤', 'Accepted answers changed'] };
                 const diffHtml = diffs.map(d => { const ic = _diffIcon[d]; return `<span title="${ic ? ic[1] : d}" aria-label="${ic ? ic[1] : d}" style="background:rgba(99,102,241,0.1); color:#4338ca; padding:3px 8px; border-radius:20px; font-size:0.8em; font-weight:800; border:1px solid rgba(99,102,241,0.2);">${ic ? ic[0] : d}</span>`; }).join('');
                 const statusHtml = !shapeCheck.ok
-                    ? `<span style="background:rgba(239,68,68,0.10); color:#b91c1c; padding:6px 12px; border-radius:20px; font-size:0.75em; font-weight:800; border:1px solid rgba(239,68,68,0.22);">⚠️ Malformed AI output</span><span style="color:#64748b; font-size:0.75em;">${escapeHtml(shapeCheck.error)} — please regenerate.</span>`
+                    ? `<span style="background:rgba(239,68,68,0.10); color:#b91c1c; padding:6px 12px; border-radius:20px; font-size:0.75em; font-weight:800; border:1px solid rgba(239,68,68,0.22);">⚠️ ${shapeCheck.error && shapeCheck.error.indexOf(window.RANK_UNUSABLE) === 0 ? escapeHtml(shapeCheck.error) : 'Malformed AI output'}</span><span style="color:#64748b; font-size:0.75em;">${escapeHtml(shapeCheck.error)} — please regenerate.</span>`
                     : canApplyImprovement
                         ? diffHtml
                         : '<span style="background:rgba(239,68,68,0.10); color:#b91c1c; padding:6px 12px; border-radius:20px; font-size:0.75em; font-weight:800; border:1px solid rgba(239,68,68,0.22);">No meaningful difference detected</span><span style="color:#64748b; font-size:0.75em;">Please regenerate before applying this fix.</span>';
@@ -71504,6 +71603,7 @@ RULES:
             const currentQ = allQs[index] || {};
             const baseType = currentQ.type || 'choice';
             const improvedType = (typeof improvedQ.type === 'string' && improvedQ.type.trim()) ? improvedQ.type.trim() : baseType;
+            if (improvedType === 'rank') return { improvedQ: window.rankNormalizeImprovement(improvedQ, currentQ), allQs };   // V102.477
             const improvedOptions = Array.isArray(improvedQ.options)
                 ? improvedQ.options.map(opt => String(opt == null ? '' : opt))
                 : (Array.isArray(currentQ.options) ? currentQ.options.map(opt => String(opt == null ? '' : opt)) : []);
@@ -71582,7 +71682,7 @@ RULES:
                 // V100.89: the write point itself, so every entry path (Compare modal's
                 // Apply, the analysis list's direct Fix button, 2-model B, Merge) is
                 // guarded the same way regardless of which one was used to get here.
-                const shapeCheck = window._validateAiQuestionShape(improvedQ);
+                const shapeCheck = window._validateAiQuestionShape(improvedQ, allQs[index]);
                 if (!shapeCheck.ok) {
                     alert('This AI suggestion is malformed and was not applied: ' + shapeCheck.error + '\n\nPlease regenerate.');
                     return false;
@@ -71646,7 +71746,7 @@ RULES:
                 const { improvedQ, allQs } = getImprovedQuestionPayload(index, improvedArg);
                 // V100.89: same write-point guard as applySingleAiFix — this is a separate
                 // insert path (new question, not a replace), so it needs its own check.
-                const shapeCheck = window._validateAiQuestionShape(improvedQ);
+                const shapeCheck = window._validateAiQuestionShape(improvedQ, allQs[index]);
                 if (!shapeCheck.ok) {
                     return alert('This AI suggestion is malformed and was not added: ' + shapeCheck.error + '\n\nPlease regenerate.');
                 }
@@ -72709,7 +72809,7 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
                 if (!newSuggestion) throw new Error('AI returned invalid JSON. First 200 chars: ' + String(resultJson || '').slice(0, 200));
                 // V100.89: safeJsonParse can succeed on JSON that's syntactically valid but
                 // semantically corrupt (e.g. schema field names leaking into "options").
-                const shapeCheck = window._validateAiQuestionShape(newSuggestion);
+                const shapeCheck = window._validateAiQuestionShape(newSuggestion, originalQ);
                 if (!shapeCheck.ok) throw new Error('AI returned malformed question data: ' + shapeCheck.error);
                 const diffState = window.getAiImprovementDiffState(originalQ, newSuggestion);
                 if (!diffState.hasMeaningfulDiff) {
