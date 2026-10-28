@@ -64,6 +64,16 @@
         var a = live[0] || rerun[0];
         return a ? { a: a, kind: live[0] ? 'live' : 'rerun' } : null;
     }
+    // V101.228: every article this intern still has to read (live first, newest; then the old ones for new interns, oldest first) — the 'still to do' sheet lists them; null until the list has loaded; muted = none
+    function owed(list, me, now) {
+        if (!list || !me) return null;
+        if (me.articlesMuted) return [];
+        var seen = me.articleSeen || {}, live = [], rerun = [];
+        list.forEach(function (a) { if (isDone(seen[a.id])) return; var k = kindOf(a, me, now); if (k === 'live') live.push(a); else if (k === 'rerun') rerun.push(a); });
+        live.sort(function (x, y) { return msOf(y.startAt) - msOf(x.startAt); });
+        rerun.sort(function (x, y) { return msOf(x.startAt) - msOf(y.startAt); });
+        return live.concat(rerun).map(function (a) { return { id: a.id, title: textOf(a, uiLang()).title }; });
+    }
     function langs(a) { return ['en', 'th', 'ko'].filter(function (l) { return String((a.title || {})[l] || '').trim() && String((a.body || {})[l] || '').trim(); }); }
     function textOf(a, lang) {
         var have = langs(a), l = have.indexOf(lang) >= 0 ? lang : have.indexOf('en') >= 0 ? 'en' : (have[0] || 'en');
@@ -194,7 +204,7 @@
         document.head.appendChild(s);
     }
     function busy() {
-        if (document.getElementById('art-back') || document.getElementById('fbr-back') || document.getElementById('cm-back')) return true;
+        if (document.getElementById('art-back') || document.getElementById('fbr-back') || document.getElementById('cm-back') || document.getElementById('ord-back')) return true;
         var g = document.getElementById('internGuideOverlay'); if (g && g.classList.contains('open')) return true;
         return Array.prototype.some.call(document.querySelectorAll('.modal'), function (m) { var d = m.style.display; return d === 'flex' || d === 'block' || m.classList.contains('open') || m.classList.contains('show'); });
     }
@@ -316,6 +326,7 @@
         if (blocked() || S.cur) return;
         var c = pick(S.list, me(), Date.now());
         if (!c) return;
+        if (window.owedRemind && owedRemind.holds()) return;   // V101.228: the 'still to do' sheet has today's popup slot — this article is a row in it
         if (busy()) { if (S.tries++ < 30) setTimeout(later, 2000); return; }
         show(c);
     }
@@ -461,6 +472,7 @@
             else refreshHistory(false);
         },
         historyItems: function () { return historyItems(S.list, me(), Date.now(), S.qs); },
+        owed: function () { return owed(S.list, me(), Date.now()); },
         detailHtml: detailHtml, pillHtml: pillHtml, discHtml: discHtml, listen: listen, stopListen: stopListen, close: close, histLang: histLang,
         gotIt: gotIt, anyQ: anyQ, askSend: askSend,
         askLang: function () { if (!S.ask || S.ask.busy) return; S.lang = LORDER[(LORDER.indexOf(S.lang) + 1) % LORDER.length]; render(); },
@@ -502,6 +514,6 @@
             if (S.cur) close('codex'); else markRead(articleId, 'codex');
             if (typeof dxOpenLinkedDrug === 'function') dxOpenLinkedDrug(drugId);
         },
-        _S: S, _pick: pick, _kindOf: kindOf, _audienceOk: audienceOk, _historyItems: historyItems, _textOf: textOf, _bkkDay: bkkDay, _isDone: isDone, _later: later, _show: show, _award: awardQuizBeri
+        _S: S, _pick: pick, _owed: owed, _kindOf: kindOf, _audienceOk: audienceOk, _historyItems: historyItems, _textOf: textOf, _bkkDay: bkkDay, _isDone: isDone, _later: later, _show: show, _award: awardQuizBeri
     };
 })();
