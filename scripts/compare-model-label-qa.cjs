@@ -23,6 +23,11 @@ assert.strictEqual(meta('or/moonshotai/kimi-k3.1-pro').label, 'Kimi K3.1 Pro', '
 assert.strictEqual(meta('or/x-ai/grok-4.7').label, 'Grok 4.7', 'Grok trial model keeps its name');
 assert.strictEqual(meta('ol/local').label, 'Ollama local', 'Ollama trial model keeps its name');
 assert.strictEqual(meta('gpt-6.1-sol').label, 'GPT 6.1 Sol', 'catalog model unchanged');
+// the proxy echoes the provider's own name (Gemini modelVersion), not the catalogue id
+assert.strictEqual(meta('gemini-4-argon').label, 'Gemini 4 Argon', 'Argon echoed without its as/ prefix');
+assert.strictEqual(meta('gemini-4-argon-001').label, 'Gemini 4 Argon', 'Argon with a version suffix');
+assert.strictEqual(meta('gemini-3.5-flash-lite-002').label, 'Gemini 3.5 Flash-Lite', 'longest catalogue id wins (Flash-Lite, not Flash)');
+assert.strictEqual(meta('gemini-3.5-flash').label, 'Flash', 'a legacy id outside the catalogue keeps its old label');
 assert.strictEqual(meta('some-unknown-model').label, 'AI', 'unknown ids still fall back to AI');
 assert.strictEqual(meta(undefined).label, 'AI', 'no id falls back to AI');
 console.log('compare-model-label-qa: PASS');
