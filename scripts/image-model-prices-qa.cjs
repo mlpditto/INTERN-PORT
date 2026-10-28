@@ -1,5 +1,6 @@
 // V102.488 Phase 2: price on the image-model chips (Case Card rail + Quiz cover rail), one table in image-model-prices.js.
-// Chip = [vendor logo] model name · faint price, one line; a model with no known price shows nothing.
+// Chip = model name · faint price, one line; a model with no known price shows nothing.
+// The Case Card rail is vendor-first: vendor logos, then only that vendor's models.
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
@@ -33,31 +34,45 @@ assert(cover.includes('window.imagePriceHtml ? window.imagePriceHtml(model.id)')
             await page.addStyleTag({ path: pub('text-ai-chips.css') });
             await page.addStyleTag({ path: pub('audit-toolbar.css') });
             await page.addStyleTag({ content: chipCss });
-            const heights = async () => page.locator('#alabasta-case-card-quick-rail button').evaluateAll(bs => bs.map(b => Math.round(b.getBoundingClientRect().height)));
+            const heights = async () => page.locator('#alabasta-case-card-quick-rail button[data-value]:not([hidden])').evaluateAll(bs => bs.map(b => Math.round(b.getBoundingClientRect().height)));
             const before = await heights();
             await page.addStyleTag({ path: pub('image-model-prices.css') });
             await page.addScriptTag({ path: pub('image-model-prices.js') });
             await page.evaluate(() => window.paintImageChips());
             await page.evaluate(() => window.paintImageChips());   // idempotent
-            const chips = await page.locator('#alabasta-case-card-quick-rail button').evaluateAll(bs => bs.map(b => ({
-                id: b.dataset.value, price: (b.querySelector('.gm-price') || {}).textContent || '', prices: b.querySelectorAll('.gm-price').length,
-                logo: (b.querySelector('.text-ai-logo') || {}).dataset ? b.querySelector('.text-ai-logo').dataset.owner : '', logos: b.querySelectorAll('.text-ai-logo').length, title: b.title
-            })));
-            const by = id => chips.find(c => c.id === id);
-            assert.equal(by('as/gemini-nano-banana-2.1').price, '$0.03');
-            assert.equal(by('as/gemini-nano-banana-2.1').logo, 'gemini');
-            assert.equal(by('as/gemini-3-pro-image').price, '≈$0.13');
-            assert.equal(by('gpt-image-2.5-sunburst').logo, 'openai');
-            assert.equal(by('or/x-ai/grok-imagine-image-2.0').logo, 'grok');
-            for (const id of ['gpt-image-2.5-flare', 'or/x-ai/grok-imagine-image-2.0']) { assert.equal(by(id).prices, 0, id + ': unknown price shows nothing'); assert(!/\?/.test(by(id).title.split('—').pop()), id + ' no ? in the tooltip'); }
-            assert(chips.every(c => c.logos === 1 && c.prices <= 1), 'one logo, at most one price, even after painting twice');
-            assert(/ประมาณ/.test(by('as/gemini-3.1-flash-lite-image').title), 'estimate says so in the tooltip');
-            // same line, same height as before the price was added (the chip is one line)
+            const rail = page.locator('#alabasta-case-card-quick-rail');
+            const shown = async () => rail.locator('button[data-value]').evaluateAll(bs => bs.filter(b => b.offsetParent !== null).map(b => b.dataset.value));
+            const price = async id => rail.locator(`button[data-value="${id}"] .gm-price`).evaluateAll(es => es.map(e => e.textContent));
+
+            // vendor-first: one icon per vendor, opens on the picked model's vendor
+            assert.equal(await rail.locator('.gm-vendors').count(), 1, 'one vendor bar');
+            assert.deepEqual(await rail.locator('.gm-vendor').evaluateAll(bs => bs.map(b => b.dataset.vendor)), ['gemini', 'openai', 'grok']);
+            assert.equal(await rail.locator('.gm-vendor[aria-pressed="true"]').getAttribute('data-vendor'), 'gemini');
+            assert.deepEqual(await shown(), ['as/gemini-nano-banana-2.1', 'as/gemini-3.1-flash-lite-image', 'as/gemini-3-pro-image'], 'Gemini models only');
+            assert.equal(await rail.locator('button[data-value]').count(), 6, 'all six chips stay in the DOM');
+            assert.equal(await rail.locator('button[data-value] .text-ai-logo').count(), 0, 'no per-chip logo (the vendor icon carries it)');
+            await rail.locator('.gm-vendor[data-vendor="openai"]').click();
+            assert.deepEqual(await shown(), ['gpt-image-2.5-flare', 'gpt-image-2.5-sunburst'], 'OpenAI models only');
+            assert.equal((await page.locator('#alabasta-case-card-quick-rail button.active').getAttribute('data-value')), 'as/gemini-nano-banana-2.1', 'browsing a vendor does not change the model');
+            await rail.locator('.gm-vendor[data-vendor="grok"]').click();
+            assert.deepEqual(await shown(), ['or/x-ai/grok-imagine-image-2.0']);
+            // the page code moves `.active` (syncAlabastaCaseCardQuickRail): the vendor follows the picked model
+            await page.evaluate(() => document.querySelectorAll('#alabasta-case-card-quick-rail button[data-value]').forEach(c => c.classList.toggle('active', c.dataset.value === 'gpt-image-2.5-sunburst')));
+            await page.waitForFunction(() => document.querySelector('.gm-vendor[aria-pressed="true"]').dataset.vendor === 'openai');
+            assert.deepEqual(await shown(), ['gpt-image-2.5-flare', 'gpt-image-2.5-sunburst']);
+
+            // prices: from the table; unknown = nothing; idempotent; tooltip says "estimate"
+            assert.deepEqual(await price('as/gemini-nano-banana-2.1'), ['$0.03']);
+            assert.deepEqual(await price('as/gemini-3-pro-image'), ['≈$0.13']);
+            assert.deepEqual(await price('gpt-image-2.5-sunburst'), ['≈$0.04–0.08']);
+            for (const id of ['gpt-image-2.5-flare', 'or/x-ai/grok-imagine-image-2.0']) {
+                assert.deepEqual(await price(id), [], id + ': unknown price shows nothing');
+                assert(!(await rail.locator(`button[data-value="${id}"]`).getAttribute('title')).includes('ต่อรูป'), id + ' tooltip names no price');
+            }
+            assert(/ประมาณ/.test(await rail.locator('button[data-value="as/gemini-3.1-flash-lite-image"]').getAttribute('title')), 'estimate says so in the tooltip');
+            // one line, same height as before
             const after = await heights();
-            assert.deepEqual(after.map(h => h <= before[0] + 2), after.map(() => true), 'chips keep their height @' + width + ' ' + JSON.stringify([before[0], after]));
-            // the picked chip shows a white mark for the black OpenAI blossom
-            await page.locator('#alabasta-case-card-quick-rail button[data-value="gpt-image-2.5-sunburst"]').evaluate(b => { document.querySelectorAll('#alabasta-case-card-quick-rail button').forEach(x => x.classList.remove('active')); b.classList.add('active'); });
-            assert.match(await page.locator('#alabasta-case-card-quick-rail button.active .text-ai-logo').evaluate(e => getComputedStyle(e).filter), /brightness\(0\)|invert/, 'picked chip: OpenAI mark turns white');
+            assert(after.every(h => h <= before[0] + 2), 'chips keep their height @' + width + ' ' + JSON.stringify([before, after]));
             assert.deepEqual(errors, [], 'no page errors');
             await page.close();
         }
