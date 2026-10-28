@@ -101,6 +101,19 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.deepEqual(g.half, { correctCount: 0, score: 0 }, 'an unfinished rank answer earns nothing');
         assert.deepEqual(g.manual, { correctCount: 1, score: 1 }, 'the manual override still grants full credit');
 
+        // ---- the "Incorrect Questions Review" PDF: a Rank answer reads as stars + typed answer + order, the key by level; under ★4 is "incorrect"
+        const pdfSrc = require('node:fs').readFileSync('public/admin.html', 'utf8');
+        assert.ok(pdfSrc.includes('window.rankReviewText(q, studentAns)') && pdfSrc.includes('isCorrect = rkv.credit >= 0.8;') && pdfSrc.includes('studentText = rkv.studentText; correctText = rkv.correctText;'), 'exportIncorrectToPDF uses rankReviewText');
+        const rv = await page.evaluate(() => {
+            const RQ = { type: 'rank', q: 'x', accepted: ['salbutamol', 'albuterol'], options: ['Salbutamol พ่น', 'Ipratropium พ่น', 'Prednisolone กิน', 'Theophylline'], tiers: [0, 1, 1, 2], unsafe: [0, 0, 0, 1] };
+            return { good: rankReviewText(RQ, RankQuiz.pack('albuterol', [0, 2, 3, 1])), bad: rankReviewText(RQ, RankQuiz.pack('albuterol', [3, 2, 1, 0])), half: rankReviewText(RQ, 'x'), none: rankReviewText(RQ, undefined) };
+        });
+        assert.ok(rv.good.credit >= 0.8 && rv.good.credit < 0.95, 'a ★4 answer is not listed as incorrect (credit ' + rv.good.credit + ')');
+        assert.equal(rv.good.studentText, '★★★★☆  ·  “albuterol”  ·  Salbutamol พ่น › Prednisolone กิน › Theophylline ⚠ › Ipratropium พ่น');
+        assert.equal(rv.good.correctText, 'Best: Salbutamol พ่น  ›  OK: Ipratropium พ่น / Prednisolone กิน  ›  Avoid: Theophylline ⚠');
+        assert.ok(rv.bad.credit < 0.8 && rv.bad.studentText.startsWith('★☆☆☆☆  ·  “albuterol”  ·  Theophylline ⚠ ›') && /unsafe option above a best one/.test(rv.bad.studentText), 'a reversed order is incorrect and flags the safety miss');
+        assert.equal(rv.half.studentText, '“x” (ranking not finished)'); assert.equal(rv.none.studentText, 'None'); assert.equal(rv.none.credit, 0);
+
         const mine = errors.filter(e => /rank|Rank|addQuestionUI|toggleQType|getQuizFormData|calculateAttemptScoring|saveQuiz|addOption/.test(e));
         assert.deepEqual(mine, [], 'no errors from the editor code: ' + mine.join(' | '));
         console.log('PASS: Quiz Editor Rank question — 4 untiered rows with no pre-picked tier, getQuizFormData fields (tiers / unsafe / why / accepted / correct), saveQuiz blocks untiered / all-Best, 6-option cap, switching type clears the tier rows, saved question round-trips, admin re-grading (0.92 + manual override)');

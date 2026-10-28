@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.470)</title>
+    <title>Nika Admin (V102.472)</title>
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.328">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
     <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
@@ -28849,6 +28849,17 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         };
         window.rankUnsafe = function(btn) { rankAiNoteOff(btn); btn.setAttribute('aria-pressed', String(btn.getAttribute('aria-pressed') !== 'true')); triggerAutoSave(); };
         // '' when a Rank question can be saved, else what to fix (an unpicked tier shows as -1)
+        // V102.469: how a Rank answer reads in the "Incorrect Questions Review" PDF — stars + typed answer + the learner's order, against the key by level; credit < 0.8 (under ★4) is "incorrect"
+        window.rankReviewText = function(q, ans) {
+            const s = window.RankQuiz.score(q, ans), opts = q.options || [], nm = i => String(opts[i] == null ? '' : opts[i]) + (Number((q.unsafe || [])[i]) ? ' ⚠' : '');
+            const stars = s.order ? '★'.repeat(s.stars) + '☆'.repeat(5 - s.stars) : '';
+            const typed = s.typed ? '“' + s.typed + '”' : '';
+            const studentText = s.order ? [stars, typed, s.order.map(nm).join(' › ')].filter(Boolean).join('  ·  ') + (s.safetyMiss ? '  ·  ⚠ unsafe option above a best one' : '') : (typed ? typed + ' (ranking not finished)' : 'None');
+            const LV = ['Best', 'OK', 'Avoid'], by = [[], [], []];
+            opts.forEach((_, i) => by[Math.min(2, Math.max(0, Number((q.tiers || [])[i]) || 0))].push(nm(i)));
+            const correctText = by.map((g, k) => g.length ? LV[k] + ': ' + g.join(' / ') : '').filter(Boolean).join('  ›  ');
+            return { credit: s.credit, studentText, correctText };
+        };
         window.rankProblem = function(q) {
             const tiers = Array.isArray(q.tiers) ? q.tiers : [];
             if (tiers.some(v => !(v >= 0 && v <= 2))) return 'pick Best / OK / Avoid for every option';
@@ -31759,10 +31770,13 @@ ${JSON.stringify(sourceObj)}`;
                     const isChoice = (q.type || 'choice') === 'choice';
                     const isManuallyCorrect = !!(att.manualCorrect && att.manualCorrect[i] === true);
 
+                    const rkv = (q.type === 'rank' && window.RankQuiz) ? window.rankReviewText(q, studentAns) : null;   // V102.469
                     let isCorrect = false;
                     if (isChoice) {
                         const target = q.correct;
                         isCorrect = choiceAnswerMatches(target, studentAns); // V101.96
+                    } else if (rkv) {
+                        isCorrect = rkv.credit >= 0.8;   // ★4 and up counts as right, like the intern's own review
                     } else {
                         isCorrect = !!((att.gradedAnswers && att.gradedAnswers[i]) || isManuallyCorrect);
                     }
@@ -31777,6 +31791,8 @@ ${JSON.stringify(sourceObj)}`;
                         const cIdx = parseInt(q.correct);
                         correctText = isNaN(cIdx) ? "N/A" : ((q.options && q.options[cIdx]) || "N/A");
                         if (!isNaN(cIdx)) correctText += ` (Choice ${cIdx + 1})`;
+                    } else if (rkv) {
+                        studentText = rkv.studentText; correctText = rkv.correctText;   // V102.469: Rank — stars, typed answer, order vs the key by level
                     } else {
                         studentText = Array.isArray(studentAns) ? studentAns.join(", ") : (studentAns || "None");
                         correctText = "(Refer to answer key)";
@@ -71889,18 +71905,18 @@ RULES:
             const r = window.quizTagCompletenessFrom(document.getElementById('quiz-system-select')?.value || '', document.getElementById('quiz-tags')?.value || '');
             if (r.complete) return Promise.resolve(true);
             return new Promise(resolve => {
-                window._qtx = { action, resolve, missing: r.missing, prop: null, error: '' };
+                window._qtx = { action, resolve, missing: r.missing, prop: null, error: '', model: window.qtxModel() };
                 qtxRender('ask');
             });
         };
         // One quiz → vocabulary proposal, from the editor's current content. Shared
         // by the dialog's Fix with AI and the editor's ✨ AI Suggest button.
-        window.suggestEditorVocabTags = async function () {
+        window.suggestEditorVocabTags = async function (modelOverride) {
             const fd = getQuizFormData();
             if (!fd.title && !(fd.questions || []).length) throw new Error('Add a title or questions first.');
             if (typeof window.callUniversalAI !== 'function') throw new Error('AI engine not ready — try again in a moment.');
             const quiz = { id: 'editor', title: fd.title, shortTitle: fd.shortTitle, description: fd.description, tags: fd.tags, questions: fd.questions };
-            const model = document.getElementById('ai-tagging-model-val')?.value || 'gemini-3.5-flash';
+            const model = modelOverride || document.getElementById('ai-tagging-model-val')?.value || 'gemini-3.5-flash';
             const res = await window.callUniversalAI(model, window.qatBuildPrompt([quiz]), true, null, '', { feature: 'quiz_tagging' });
             const parsed = window.safeJsonParse(res && res.text);
             const list = parsed && Array.isArray(parsed.results) ? parsed.results : [];
@@ -71969,9 +71985,9 @@ RULES:
             if (choice === 'ai') {
                 qtxRender('busy');
                 try {
-                    const prop = await window.suggestEditorVocabTags();
+                    const prop = await window.suggestEditorVocabTags(st.model);
                     if (window._qtx !== st) return; // closed while waiting
-                    st.prop = prop;
+                    st.prop = prop; st.usedModel = st.model;
                     qtxRender('result');
                 } catch (e) {
                     if (window._qtx !== st) return;
@@ -71998,9 +72014,27 @@ RULES:
             if (op === 'system') st.prop.system = value;
             qtxRender('result');
         };
+        // V102.471: the Save-time "AI suggests" dialog names its model and lets the admin pick one — local first (Ollama on this computer: nothing leaves it), remembered
+        window.QTX_MODELS = [['ol/local', 'Ollama · local', 'Runs on this computer — nothing leaves it'], ['gemini-3.8-flash', 'Flash 3.8', 'Gemini 3.8 Flash'], ['gemini-3.6-flash', 'Flash 3.6', 'Gemini 3.6 Flash'], ['gpt-4o-mini', '4o mini', 'GPT-4o mini']];
+        window.qtxModel = function () { let m = ''; try { m = localStorage.getItem('quizTagAiModel') || ''; } catch (e) { /* none */ } return window.QTX_MODELS.some(x => x[0] === m) ? m : window.QTX_MODELS[0][0]; };
+        window.qtxModelName = id => ((window.QTX_MODELS.find(x => x[0] === id) || [])[1]) || String(id || '');
+        function qtxModelRow(sel) {
+            return '<div role="group" aria-label="AI model" style="display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:0 0 12px;"><span style="font-size:0.78em; font-weight:800; color:#64748b;">✨ Model</span>' +
+                window.QTX_MODELS.map(x => '<button type="button" onclick="qtxPick(\'' + x[0] + '\')" aria-pressed="' + (x[0] === sel) + '" title="' + escapeHtml(x[2]) + '" style="width:auto; min-height:0; padding:3px 10px; border-radius:999px; font-size:0.78em; font-weight:800; cursor:pointer; border:1px solid ' + (x[0] === sel ? '#4f46e5' : '#cbd5e1') + '; background:' + (x[0] === sel ? '#4f46e5' : '#fff') + '; color:' + (x[0] === sel ? '#fff' : '#475569') + ';">' + escapeHtml(x[1]) + '</button>').join('') + '</div>';
+        }
+        // a pick is remembered; on the result / error view it runs again with that model (the proposal is replaced)
+        window.qtxPick = function (id) {
+            const st = window._qtx;
+            if (!st || !window.QTX_MODELS.some(x => x[0] === id)) return;
+            try { localStorage.setItem('quizTagAiModel', id); } catch (e) { /* none */ }
+            st.model = id;
+            if (st.view === 'result' || st.view === 'error') return window.qtxChoose('ai');
+            qtxRender(st.view || 'ask');
+        };
         function qtxRender(view) {
             const st = window._qtx;
             if (!st) return;
+            st.view = view;
             const el = qtxOverlay();
             const names = { system: 'System', topic: 'Topic', skill: 'Skill' };
             const btn = (choice, label, primary) => `<button type="button" onclick="qtxChoose('${choice}')" style="width:auto; min-height:0; padding:8px 14px; border-radius:9px; font-weight:800; font-size:0.85em; cursor:pointer; ${primary ? 'background:#4f46e5; color:#fff; border:none;' : 'background:#fff; color:#334155; border:1px solid #cbd5e1;'}">${label}</button>`;
@@ -72015,16 +72049,18 @@ RULES:
                         ${sys && sys !== '__none' ? chip(escapeHtml(sys), '#dcfce7', '#166534') : ''}
                         ${st.missing.map(k => chip('+ ' + names[k], '#fff', '#b91c1c', '').replace('background:#fff;', 'background:#fff; border:1px dashed #fca5a5;')).join('')}
                     </div>
+                    ${qtxModelRow(st.model)}
                     <div style="display:flex; flex-wrap:wrap; gap:8px;">
                         ${btn('ai', '✨ Fix with AI', true)}${btn('pick', '✋ Pick myself')}${btn('anyway', `${escapeHtml(st.action)} anyway`)}${btn('cancel', 'Cancel')}
                     </div>`;
             } else if (view === 'busy') {
                 body = `<h3 id="qtx-title" style="margin:0 0 10px; font-size:1.05em; color:#1e293b;">✨ AI is reading this quiz…</h3>
-                    <p style="margin:0 0 14px; font-size:0.85em; color:#64748b;"><i class="fa-solid fa-spinner fa-spin"></i> ${escapeHtml(document.getElementById('ai-tagging-model-val')?.value || 'gemini-3.5-flash')}</p>
+                    <p style="margin:0 0 14px; font-size:0.85em; color:#64748b;"><i class="fa-solid fa-spinner fa-spin"></i> ${escapeHtml(window.qtxModelName(st.model))}</p>
                     <div style="display:flex; gap:8px;">${btn('back', 'Back')}</div>`;
             } else if (view === 'error') {
                 body = `<h3 id="qtx-title" style="margin:0 0 6px; font-size:1.05em; color:#b91c1c;">AI could not suggest tags</h3>
                     <p style="margin:0 0 14px; font-size:0.8em; color:#64748b; word-break:break-word;">${escapeHtml(st.error)}</p>
+                    ${qtxModelRow(st.model)}
                     <div style="display:flex; flex-wrap:wrap; gap:8px;">${btn('ai', '↻ Try again', true)}${btn('back', 'Back')}</div>`;
             } else {
                 const p = st.prop;
@@ -72037,9 +72073,10 @@ RULES:
                 const sysSel = `<select onchange="qtxEdit('system','',this.value)" style="width:auto; min-height:0; padding:3px 6px; border:1px solid #86efac; border-radius:999px; font-size:0.8em; background:#dcfce7; color:#166534;"><option value="">System —</option>${Object.keys(v.topic).map(k => `<option value="${k}"${k === p.system ? ' selected' : ''}>${escapeHtml(k)}</option>`).join('')}</select>`;
                 const aiHint = p.aiSystem && p.aiSystem !== p.system ? `<button type="button" onclick="qtxEdit('system','',${JSON.stringify(p.aiSystem).replace(/"/g, '&quot;')})" title="Use the AI system" style="width:auto; min-height:0; padding:3px 9px; border:1px dashed #f59e0b; border-radius:999px; background:#fffbeb; color:#92400e; font-size:0.8em; cursor:pointer;">AI → ${escapeHtml(p.aiSystem)}</button>` : '';
                 const after = window.quizTagCompletenessFrom(p.system, [...window.quizTagList({ tags: document.getElementById('quiz-tags')?.value || '' }), ...p.add.topic, ...p.add.skill]);
-                body = `<h3 id="qtx-title" style="margin:0 0 4px; font-size:1.05em; color:#1e293b;">✨ AI suggests</h3>
+                body = `<h3 id="qtx-title" style="margin:0 0 4px; font-size:1.05em; color:#1e293b;">✨ AI suggests <span style="font-size:0.72em; font-weight:700; color:#64748b;">· ${escapeHtml(window.qtxModelName(st.usedModel || st.model))}</span></h3>
                     <p style="margin:0 0 10px; font-size:0.85em; color:#64748b;">Tap × to remove · existing tags are kept · ${after.complete ? '<b style="color:#15803d;">complete</b>' : '<b style="color:#b45309;">still missing ' + after.missing.map(k => names[k]).join(', ') + '</b>'}</p>
                     <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:14px;">${sysSel}${aiHint}${chips || '<span style="font-size:0.8em; color:#94a3b8;">No new tags</span>'}${addSel}</div>
+                    ${qtxModelRow(st.usedModel || st.model)}
                     <div style="display:flex; flex-wrap:wrap; gap:8px;">${btn('applysave', `Apply &amp; ${escapeHtml(lowerAction)}`, true)}${btn('apply', 'Apply only')}${btn('back', 'Back')}</div>`;
             }
             el.innerHTML = `<div style="background:#fff; border-radius:16px; padding:20px; max-width:480px; width:100%; max-height:90vh; overflow:auto; box-shadow:0 20px 50px rgba(0,0,0,0.35);">${body}</div>`;
