@@ -14,12 +14,16 @@ Intern: home ▸ Mission ▸ a quiz card ▸ Start.
 - `quiz-done-count-qa` — "👥 n" did it + your own avatar only (live users rule applied)
 - `quiz-material-ribbon-qa` — pre-quiz materials ribbon on the cover, floating list for several
 - `quiz-start-confirm-qa` — lean start card: quote card is the read-aloud button, one rule, Cancel / Start
+- `rank-quiz-runner-qa` — Rank (order mode) in the real runner: type → lock → tap order → reveal; a COUNTED quiz shows only “✓ Order locked — answers show after you submit” (key, ★, points, Beri wait for Submit; the typed answer’s self-match is asked once before Submit’s confirm), PRACTICE reveals at once; lean action row ‹ · n/N · ↺ · 🔒 Lock · Next (Submit on the last question), the shared footer hidden on Rank steps only, hit areas ≥ 40–44 px
+- `rank-tier-qa` — Rank TIER-BOX mode (`mode:'tier'`): each option gets Best / OK / Avoid (nothing pre-selected, Lock waits for every row, stored in option order); scoring exact 1 · one level off ½ · Best↔Avoid 0, ⚠ not in Avoid caps ★3; DDD-1 Q2 = 0.72 ★3 / 0.92 ★4
 - `quiz-primer-qa` — per-question Read first page before the timer starts
 - `quiz-run-lean-qa` — lean runner: one progress row, language capsule, answer layout
 - `quiz-term-highlight-qa` — drugs / classes / conditions / doses / labs wrapped in the question text
 - `quiz-browse-tags-check` — intern Browse tag chips (qbTag* helpers with a DOM stub)
 
 ## What usually lies
+
+- Rank reveal timing: a counted quiz (not practice, not a poll) reveals Rank answers only after Submit — so `rankAwardBeri` returns early unless called quiet (`rankAwardBeri(i, true)` from `submitQuiz`); a QA that calls it without `true` sees nothing paid. The Rank step hides the shared footer with `#quizModal.rk-on`, cleared at the top of every `renderQuizStep` — a Rank test that renders another step must expect the footer back.
 
 - Never show other interns' faces: `quiz-done-count-qa` applies the live `users` rule to the fake db — a stub that returns every user hides a real privacy regression.
 - Reduce Motion: the pulse / breathe animations must not run under `prefers-reduced-motion`; emulate it in the page context or the animation assertion flips.

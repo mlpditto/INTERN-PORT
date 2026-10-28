@@ -26,3 +26,7 @@ Admin: Quiz Engine ▸ Edit / ＋ New quiz.
 
 - The toolbar swaps icons on `<i>` children that emoji buttons do not have — a stubbed button fixture must use the real markup or the clone handler cannot regress.
 - The "correct answer is never sent" check reads the prompt string; add new prompt fields to the same assertion.
+
+## Rank card — answer mode (V102.484)
+
+The Rank card has **Interns answer by [Order] [Tier-box]**. A new card has neither selected and Save asks you to choose; a saved Rank question without a mode reads as Order. Order saves no `mode` field (the old shape); Tier-box saves `mode:'tier'`. Levels (Best / OK / Avoid), ⚠ and “why” per option are the same in both modes — in Tier-box mode a ⚠ option must be level Avoid (Save blocks otherwise). The Review / PDF text, the attempt review card and re-grading read the mode: a Tier-box answer lists the level the learner gave each option next to the key; “typed, not ranked” (Order) / “tiers not locked” (Tier-box) is shown apart from “nothing typed”. QA: `rank-quiz-admin-qa`, `rank-tier-qa`.
