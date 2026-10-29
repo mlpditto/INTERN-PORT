@@ -66,7 +66,7 @@ for (const id of ['lp-gen-btn', 'lp-path-toggle-btn', 'lp-path-subtitle', 'lp-pa
         await p.locator('#lp-providers .audit-provider[data-provider="Claude"]').click();
         await p.locator('#lp-model-row .text-ai-chips > button:not([hidden])', { hasText: 'Sonnet 5.5' }).click();
         assert.equal(await p.evaluate(() => resolveTrialTextAIModel(document.getElementById('lp-ai-model').value)), await p.evaluate(() => TEXT_AI_MODELS.find(m => /Sonnet 5.5/.test(m.label)).id));
-        assert.equal(await p.evaluate(() => document.querySelectorAll('#lp-model-row .text-ai-chips > button').length), 17 + 3, '17 catalogue chips (V102.365: + Gemini 4 Argon; V102.268: + Muse Spark Open; V102.242: + Gemma 4 26B A4B) + Grok + Kimi + Ollama trial chips');
+        assert.equal(await p.evaluate(() => document.querySelectorAll('#lp-model-row .text-ai-chips > button').length), 18 + 3, '18 catalogue chips (V102.518: + Qwen 3.8 Omni Flash; V102.365: + Gemini 4 Argon; V102.268: + Muse Spark Open; V102.242: + Gemma 4 26B A4B) + Grok + Kimi + Ollama trial chips');
         assert.equal(await p.evaluate(() => localStorage.getItem('ai_lp_trial_model')), null, 'a catalogue pick clears the trial pick');
         await p.locator('#lp-providers .audit-provider[data-provider="Ollama"]').click();
         await p.locator('#lp-model-row .text-ai-chips > button:not([hidden])').click();
