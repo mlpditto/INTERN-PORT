@@ -8,7 +8,8 @@
         'as/gemini-3.1-flash-lite-image': { shown: '≈$0.04', est: true, note: 'ประมาณจากราคาต่อ token ใน OpenRouter' },
         'as/gemini-3-pro-image': { shown: '≈$0.13', est: true, note: 'ประมาณจากราคาต่อ token ใน OpenRouter' },
         'gpt-image-2.5-sunburst': { shown: '≈$0.04–0.08', est: true, note: 'ประมาณตามเรตของ Image 2' },
-        'or/openai/gpt-5.4-image-2': { shown: '$0.04–0.08', note: 'GPT-5.4 Image 2' }
+        'or/openai/gpt-5.4-image-2': { shown: '$0.04–0.08', note: 'GPT-5.4 Image 2' },
+        'or/openai/gpt-image-2.5-flare': { shown: '≈$0.03–0.06', est: true, note: 'GPT Image 2.5 Flare — รุ่นเร็ว ประมาณจากเรต image_output ของ OpenRouter' }   // V102.518
         // no entry = price not known yet (GPT Image 2.5 Flare, Grok Imagine Quality, Seedream 5.0 Lite): the chip shows no price
     };
     const VENDORS = [['gemini', 'Gemini', /gemini/], ['openai', 'OpenAI', /gpt-/], ['grok', 'Grok', /grok/]];

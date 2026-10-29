@@ -6,7 +6,8 @@ const QuizCover = (() => {
     // (POST /api/v1/images, aspect_ratio 3:4) — Seedream 5.0 Lite and Muse Image output images only.
     const AI_MODELS = [
         { id: 'as/gemini-nano-banana-2.1', logo: 'gemini', ref: true, label: 'Nano Banana 2.1', ariaLabel: 'Nano Banana 2.1 (recommended)', titleTh: 'Nano Banana 2.1 · Google AI Studio · แนะนำ' },
-        { id: 'or/openai/gpt-5.4-image-2', logo: 'openai', label: 'Image 2', ariaLabel: 'GPT Image 2 via OpenRouter', titleTh: 'GPT-5.4 Image 2 · ผ่าน OpenRouter' },
+        // V102.518: GPT Image 2.5 Flare (the fast tier of GPT Image 2.5, OpenRouter 2026-09-09) replaces GPT Image 2 on the cover — the Image API like Seedream, 3:4
+        { id: 'or/openai/gpt-image-2.5-flare', logo: 'openai', label: 'Image 2.5 Flare', imageApi: true, ariaLabel: 'GPT Image 2.5 Flare via OpenRouter', titleTh: 'GPT Image 2.5 Flare · รุ่นเร็วของ GPT Image 2.5 · ผ่าน OpenRouter · GPT Image 2.5의 빠른 버전 · OpenRouter 경유' },
         { id: 'or/bytedance-seed/seedream-5-0-lite', label: 'Seedream 5.0 Lite', imageApi: true, ariaLabel: 'ByteDance Seedream 5.0 Lite via OpenRouter', titleTh: 'ByteDance Seed: Seedream 5.0 Lite · ผ่าน OpenRouter' },
         // V102.419: Grok Imagine Quality (the Beri reward picture already uses it) — the Image API, about a minute; like Seedream it can be asked for 3:4 and the cover is cropped to the collection's 3:4; `fallback:false` = it is never tried AUTOMATICALLY when another model is content-blocked (slow, needs OpenRouter credit) — only when picked
         { id: 'or/x-ai/grok-imagine-image-quality', logo: 'grok', label: 'Grok Imagine Quality', imageApi: true, fallback: false, ariaLabel: 'xAI Grok Imagine Quality via OpenRouter', titleTh: 'xAI Grok Imagine Quality · ผ่าน OpenRouter · ราว 1 นาที · OpenRouter 경유 · 약 1분' }

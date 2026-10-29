@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.517)</title>
+    <title>Nika Admin (V102.518)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -8283,7 +8283,7 @@
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <!-- V93.08: cache-bust on taxonomy.js for the LP Firestore overlay rollout -->
     <script src="ai-model-registry.js?v=V102.365"></script>
-    <script src="ai-model-ui.js?v=V102.515"></script>
+    <script src="ai-model-ui.js?v=V102.518"></script>
     <script src="ollama-local.js?v=V102.109"></script>
 <script src="case-dup.js?v=V102.401"></script>
 <script src="case-article.js?v=V102.395"></script>
@@ -10641,6 +10641,38 @@ document.addEventListener('DOMContentLoaded',function(){var d=new Date().toLocal
                 }
             }
 
+            // V102.518: Gemini 3.8 TTS request for POST /v1beta/interactions (ai.google.dev/gemini-api/docs/speech-generation): one user_input whose text
+            // items carry a speech_metadata annotation (style, and speaker for dialogue); speech_config = [{voice}] or {speakers:[{speaker, voice}]}.
+            // Dialogue turns are the transcript's "Speaker 1:" / "Speaker 2:" lines (the Polish preset writes them that way); a transcript without
+            // labels is one turn for Speaker 1. response_format asks for audio/wav (24 kHz, RIFF header), which resolveTtsAudioPayload already handles.
+            window.laboonGeminiTtsBody = function (model, transcript, o) {
+                o = o || {};
+                const style = String(o.style || '').trim();
+                const ann = extra => [Object.assign({ type: 'speech_metadata' }, style ? { style } : {}, extra || {})];
+                const text = String(transcript || '').trim();
+                if (!o.dialogue) {
+                    return { model, input: [{ type: 'user_input', content: [{ type: 'text', text, annotations: ann() }] }],
+                        response_format: { type: 'audio', mime_type: 'audio/wav' }, generation_config: { speech_config: [{ voice: o.voice || 'Kore' }] } };
+                }
+                const turns = []; let cur = null;
+                text.split('\n').forEach(line => {
+                    const m = line.match(/^\s*speaker\s*([12])\s*:\s*(.*)$/i);
+                    if (m) { cur = { speaker: 'Speaker ' + m[1], text: m[2].trim() }; turns.push(cur); }
+                    else if (cur && line.trim()) cur.text += (cur.text ? '\n' : '') + line.trim();
+                });
+                if (!turns.length) turns.push({ speaker: 'Speaker 1', text });
+                return { model, input: [{ type: 'user_input', content: turns.map(t => ({ type: 'text', text: t.text, annotations: ann({ speaker: t.speaker }) })) }],
+                    response_format: { type: 'audio', mime_type: 'audio/wav' },
+                    generation_config: { speech_config: { speakers: [{ speaker: 'Speaker 1', voice: o.voice1 || 'Kore' }, { speaker: 'Speaker 2', voice: o.voice2 || 'Puck' }] } } };
+            };
+            // The audio block of an Interactions reply: the last {type:'audio', data} inside steps[].content[] (model_output) or outputs[].
+            window.laboonGeminiTtsAudio = function (data) {
+                const blocks = [];
+                ((data && data.steps) || []).forEach(st => { if (!st.type || st.type === 'model_output') ((st && st.content) || []).forEach(c => blocks.push(c)); });
+                ((data && data.outputs) || []).forEach(c => blocks.push(c));
+                const a = blocks.filter(c => c && c.type === 'audio' && c.data).pop();
+                return a ? { data: a.data, mimeType: a.mime_type || a.mimeType || 'audio/wav' } : null;
+            };
             function buildTtsPrompt(transcript, styleNotes) {
                 return [
                     'Synthesize natural speech from the transcript below.',
@@ -10672,6 +10704,8 @@ document.addEventListener('DOMContentLoaded',function(){var d=new Date().toLocal
                         notes: 'Current Gemini preview flow may still return PCM/WAV even if MP3 is requested.'
                     },
                     models: [
+                        // V102.518: GA model (2026-09-22) — 130+ languages incl. Thai, voice design; WAV 24 kHz via the Interactions API (laboonGeminiTtsBody). $0.50 / 1M text + $9 / 1M audio tokens ≈ $0.00225 per 10 s until 2026-12-31, then double.
+                        { value: 'gemini-3.8-flash-tts', label: 'Gemini 3.8 Flash TTS', description: 'GA · 130+ languages incl. Thai · voice design · WAV 24 kHz (Interactions API).', costBadge: 'GA · paid', costTone: 'amber', costHint: '$0.50 / 1M text tokens + $9 / 1M audio tokens (≈ $0.00225 per 10 s) until 2026-12-31, then double.' },
                         { value: 'gemini-2.5-flash-preview-tts', label: 'Gemini 2.5 Flash Preview TTS', description: 'Balanced quality and speed.', costBadge: 'Balanced cost', costTone: 'amber', costHint: 'Good default hosted choice when you need speed and stable quality.' },
                         { value: 'gemini-2.5-pro-preview-tts', label: 'Gemini 2.5 Pro Preview TTS', description: 'Higher-quality long-form narration and podcast option.', costBadge: 'Premium cost', costTone: 'rose', costHint: 'Use for premium podcast quality, not for free-first defaults.' },
                         { value: 'gemini-3.1-flash-tts-preview', label: 'Gemini 3.1 Flash TTS Preview', description: 'Newest preview tier — fastest current Gemini API TTS.', costBadge: 'Preview', costTone: 'amber', costHint: 'Preview model on the 3.1 family. Quality and pricing may shift.' }
@@ -12821,11 +12855,22 @@ document.addEventListener('DOMContentLoaded',function(){var d=new Date().toLocal
                         const geminiKey = window.GEMINI_API_KEY || localStorage.getItem('ai_gemini_key') || '';
                         if (!geminiKey) throw new Error('Gemini API Key is missing.');
 
+                        const v1 = document.getElementById('tts-voice-s1')?.value || 'Kore';
+                        const v2 = document.getElementById('tts-voice-s2')?.value || 'Puck';
+                        if (/^gemini-3\.8-/.test(selectedModel)) {
+                            // V102.518: Gemini 3.8 TTS speaks through the Interactions API (the generateContent speech shape below is the 2.5 / 3.1 preview path).
+                            // The transcript IS the text; the style goes in a speech_metadata annotation; "Speaker 1:" / "Speaker 2:" lines become turns. WAV 24 kHz back.
+                            const body = window.laboonGeminiTtsBody(selectedModel, transcript, { style: styleEl.value.trim(), dialogue: isDialogue, voice, voice1: v1, voice2: v2 });
+                            const r = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey }, body: JSON.stringify(body) });
+                            const d = await r.json();
+                            if (!r.ok) throw new Error(d?.error?.message || `Gemini Error ${r.status}`);
+                            const part = window.laboonGeminiTtsAudio(d);
+                            if (!part) throw new Error('No audio data returned by Gemini.');
+                            audioDataBase64 = part.data; returnedAudioMime = part.mimeType;
+                        } else {
                         const prompt = buildTtsPrompt(transcript, styleEl.value.trim());
                         let speechConfig;
                         if (isDialogue) {
-                            const v1 = document.getElementById('tts-voice-s1')?.value || 'Kore';
-                            const v2 = document.getElementById('tts-voice-s2')?.value || 'Puck';
                             speechConfig = {
                                 languageCode: languageElD?.value || 'th-TH',
                                 multiSpeakerVoiceConfig: {
@@ -12858,6 +12903,7 @@ document.addEventListener('DOMContentLoaded',function(){var d=new Date().toLocal
                         if (!audioPart || !audioPart.inlineData?.data) throw new Error('No audio data returned by Gemini.');
                         audioDataBase64 = audioPart.inlineData.data;
                         returnedAudioMime = audioPart.inlineData?.mimeType || '';
+                        }   // V102.518: end of the 2.5 / 3.1 generateContent path
 
                     } else if (selectedEngine === 'omnivoice') {
                         // V93.32 Phase 1B: free path via @gradio/client → public HF Space k2-fsa/OmniVoice.
@@ -72804,7 +72850,7 @@ RULES:
             ['claude-haiku-5-5', 'Haiku 5.5', 'Claude Haiku 5.5', 'claude'], ['claude-sonnet-5-5', 'Sonnet 5.5', 'Claude Sonnet 5.5', 'claude'],
             ['or/x-ai/grok-4.7', 'Grok 4.7', 'Grok 4.7 (via OpenRouter)', 'grok'],
             ['or/deepseek/deepseek-v4.1-flash-1017', 'Flash V4.1', 'DeepSeek V4.1 Flash (via OpenRouter)', 'deepseek'], ['or/deepseek/deepseek-v4-pro-0813', 'Pro V4', 'DeepSeek V4 Pro (via OpenRouter)', 'deepseek'],
-            ['or/qwen/qwen3.8-flash', 'Flash 3.8', 'Qwen 3.8 Flash (via OpenRouter)', 'qwen'], ['or/qwen/qwen3.8-max-0902', 'Max 3.8', 'Qwen 3.8 Max (via OpenRouter)', 'qwen']
+            ['or/qwen/qwen3.8-flash', 'Flash 3.8', 'Qwen 3.8 Flash (via OpenRouter)', 'qwen'], ['or/qwen/qwen3.8-omni-flash', 'Omni Flash 3.8', 'Qwen 3.8 Omni Flash (via OpenRouter)', 'qwen'], ['or/qwen/qwen3.8-max-0902', 'Max 3.8', 'Qwen 3.8 Max (via OpenRouter)', 'qwen']
         ];
         // [vendor, name, logo file (assets/logos), dark disc behind a white logo]
         window.QTX_VENDORS = [['ollama', 'Ollama', 'ollama-white.svg', true], ['gemini', 'Gemini', 'gemini-spark-color.svg'], ['gpt', 'GPT', 'openai-blossom-black.svg'], ['claude', 'Claude', 'claude-spark-clay.svg'],
