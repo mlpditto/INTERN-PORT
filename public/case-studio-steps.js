@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
     seg(modeRail, [['ai', 'AI image', 'AI image — AI draws the whole image'], ['html-overlay', 'HTML', 'Illustration + HTML — AI draws the illustration; the title and tags are real HTML text']], { sel: mode });
     // V102.417 lean: one single line of short names (the logo says the family — Gemini ◆ 2.1 · 2 Lite · Pro, OpenAI Flare · Sunburst, Grok; the full name is the tooltip)
     const fullName = Object.fromEntries(chips.map(chip => [chip.dataset.value, chip.textContent.trim()]));
-    const SHORT = { 'as/gemini-nano-banana-2.1': '2.1', 'as/gemini-3.1-flash-lite-image': '2 Lite', 'as/gemini-3-pro-image': 'Pro', 'gpt-image-2.5-flare': 'Flare', 'gpt-image-2.5-sunburst': 'Sunburst', 'or/x-ai/grok-imagine-image-2.0': 'Grok 2.0' };
+    const SHORT = { 'as/gemini-nano-banana-2.1': '2.1', 'as/gemini-3.1-flash-lite-image': '2 Lite', 'as/gemini-3-pro-image': 'Pro', 'gpt-image-2.5-flare': 'Flare', 'gpt-image-2.5-sunburst': 'Sunburst', 'or/x-ai/grok-imagine-image-quality': 'Grok 2.0' };
     seg(modelRail, chips.map(chip => [chip.dataset.value, SHORT[chip.dataset.value] || chip.textContent.trim(), chip.textContent.trim() + ' (' + chip.dataset.value + ')']), { sel: model, logos: true });
     // V102.429 (style 5, mockup pick 2026-10-26): one logo per maker, that maker's models as plain chips beside it (Gemini · OpenAI · Grok)
     [...modelRail.querySelectorAll('button')].forEach(b => {
@@ -82,7 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'as/gemini-3-pro-image': 'High quality · slower and pricier',
         'as/gemini-nano-banana-2.1': 'Good all-round · fast enough',
         'as/gemini-3.1-flash-lite-image': 'Fastest of the Google models · lower quality',
-        'or/x-ai/grok-imagine-image-2.0': 'About 1 minute · needs OpenRouter credit'
+        'or/x-ai/grok-imagine-image-quality': 'About 1 minute · needs OpenRouter credit'
     };
     const SUGGEST = { infographic: 'gpt-image-2.5-sunburst', lifestyle: 'as/gemini-nano-banana-2.1', symptoms: 'as/gemini-3-pro-image', selfcare: 'gpt-image-2.5-flare', minimal: 'as/gemini-nano-banana-2.1' };
     const hintEl = document.createElement('div');

@@ -105,6 +105,6 @@ assert.ok(!ctx.build({ ...payload, textContent: { title: 'Medical Case Brief', s
     ctx.els = { ...els0, 'alabasta-case-card-dispensed': { value: '' } };
     assert.ok(!/DISPENSED MEDICINE/.test(await ctx.rebuild({ quiet: true })), 'nothing is added when the field is empty');
     ctx.els = els0;
-    assert.ok(html.includes('data-value="or/x-ai/grok-imagine-image-2.0"') && html.includes("'gpt-image-2.5-sunburst', 'or/x-ai/grok-imagine-image-2.0']"), 'the Grok chip is a valid saved model');
+    assert.ok(html.includes('data-value="or/x-ai/grok-imagine-image-quality"') && html.includes("'gpt-image-2.5-sunburst', 'or/x-ai/grok-imagine-image-quality']"), 'the Grok chip is a valid saved model');
     console.log('PASS: Case Card — infographic (default) / minimal; no person, no age / occupation text, English only; the real rebuild path; Grok Imagine wiring.');
 })().catch(e => { console.error(e); process.exit(1); });

@@ -252,11 +252,11 @@ const { chromium } = require('playwright');
         await close();
 
         await open(); await suggest(result());
-        await page.locator('[data-model="gpt-5.6-terra"]').click();
+        await page.locator('[data-model="gpt-6.1-terra"]').click();
         assert(await saveDisabled(), 'changing model requires a fresh proposal');
         assert.equal(await page.locator('#curate-suggest').innerText(), '✦ Suggest');
         await suggest(result());
-        assert.equal(await page.evaluate(() => calls.at(-1)[0]), 'gpt-5.6-terra');
+        assert.equal(await page.evaluate(() => calls.at(-1)[0]), 'gpt-6.1-terra');
         await close();
 
         // API error, missing key, auth failure, uncertain writes, and idempotent retry.

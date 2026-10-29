@@ -11,7 +11,7 @@
         // billed by OpenRouter (isGoogleBilledModel is false for or/google/). Phase 0 probe 2026-10-15: Thai from an image exact, JSON + Thai quiz JSON + Thai translation pass, ~4 s, ~$0.00005 per quiz item.
         { id: 'or/google/gemma-4-26b-a4b-it', label: 'Gemini Gemma 4 26B A4B', short: 'Gemma 4 26B', hint: 'Gemma 4 ของ Google เร็วและประหยัดมาก อ่านภาษาไทยจากรูปได้ ผ่าน OpenRouter 구글 Gemma 4, 매우 빠르고 저렴, OpenRouter 경유' },
         { id: 'gpt-6-luna', label: 'GPT 6 Luna', short: 'Luna 6', hint: 'GPT รุ่นประหยัด ค่าเริ่มต้นสำหรับงานทั่วไป' },
-        { id: 'gpt-5.6-terra', label: 'GPT 5.6 Terra', short: 'Terra 5.6', hint: 'GPT สำหรับงานวิเคราะห์ที่ซับซ้อนขึ้น' },
+        { id: 'gpt-6.1-terra', label: 'GPT 6.1 Terra', short: 'Terra 6.1', hint: 'GPT สำหรับงานวิเคราะห์ที่ซับซ้อนขึ้น (รับภาพ · ราคา $1/$5 ต่อล้านโทเค็น)' },   // V102.516: 5.6 Terra → 6.1 Terra (2026-10-26, half the price)
         { id: 'gpt-6.1-sol', label: 'GPT 6.1 Sol', short: 'Sol 6.1', hint: 'GPT สำหรับงานที่ต้องการรายละเอียดมากขึ้น' },
         { id: 'gpt-6-astra', label: 'GPT 6 Astra', short: 'Astra 6', hint: 'GPT รุ่นใหญ่ ใช้เมื่อต้องการความสามารถสูง' },
         { id: 'claude-haiku-5-5', label: 'Claude Haiku 5.5', short: 'Haiku 5.5', hint: 'Claude รุ่นประหยัด สำหรับงานสั้น' },
@@ -56,7 +56,8 @@
     // V101.64: GPT-6 Luna/Sol replace 5.6, DeepSeek V4 Pro moves to its 0813 GA snapshot — saved picks move to their successor, not to the default.
     // V102.61: Claude Sonnet 5 → Sonnet 5.5.
     const RETIRED_TEXT_AI_MODELS = { 'gpt-5.6-luna': 'gpt-6-luna', 'gpt-5.6-sol': 'gpt-6.1-sol', 'or/deepseek/deepseek-v4-pro': 'or/deepseek/deepseek-v4-pro-0813', 'claude-sonnet-5': 'claude-sonnet-5-5',
-        'claude-haiku-4-5': 'claude-haiku-5-5', 'gpt-6-sol': 'gpt-6.1-sol', 'or/deepseek/deepseek-v4.1-flash': 'or/deepseek/deepseek-v4.1-flash-1017' };   // V102.365: Haiku 4.5 → 5.5 · Sol 6 → 6.1 · DeepSeek Flash → the 1017 snapshot
+        'claude-haiku-4-5': 'claude-haiku-5-5', 'gpt-6-sol': 'gpt-6.1-sol', 'or/deepseek/deepseek-v4.1-flash': 'or/deepseek/deepseek-v4.1-flash-1017',
+        'gpt-5.6-terra': 'gpt-6.1-terra' };   // V102.516: Terra 5.6 → 6.1   // V102.365: Haiku 4.5 → 5.5 · Sol 6 → 6.1 · DeepSeek Flash → the 1017 snapshot
     window.normalizeTextAIModel = value => { value = RETIRED_TEXT_AI_MODELS[value] || value; return models.some(m => m.id === value) ? value : 'gpt-6-luna'; };
     // A trial id stays as-is where a caller explicitly picked it; anything else normalises as before.
     window.resolveTrialTextAIModel = value => trialModels.some(m => m.id === value) ? value : window.normalizeTextAIModel(value);

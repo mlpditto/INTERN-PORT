@@ -51,10 +51,10 @@ for (const id of ['ai-model-review', 'ai-model-grammar', 'rr-providers', 'rr-gra
         let p = await open(1000);
         for (const row of ['rr-providers', 'rr-grammar-providers']) assert.deepEqual(await tabs(p, row), ['Gemini', 'GPT', 'Claude', 'Qwen', 'DeepSeek', 'Muse', 'Grok', 'Kimi', 'Ollama'], row + ' tabs');
         assert.equal(await openTab(p, 'rr-providers'), 'GPT', 'review default is Luna → GPT tab');
-        assert.deepEqual(await visibleChips(p, 'rr-model-row'), ['Luna 6', 'Terra 5.6', 'Sol 6.1', 'Astra 6'], 'only GPT chips, names only');
+        assert.deepEqual(await visibleChips(p, 'rr-model-row'), ['Luna 6', 'Terra 6.1', 'Sol 6.1', 'Astra 6'], 'only GPT chips, names only');
         // the markup's stale `gemini-3.5-flash` default is not a catalogue id, so the registry normalises it to Luna (pre-existing, V94.18 → V101.64)
         assert.equal(await openTab(p, 'rr-grammar-providers'), 'GPT', 'grammar default normalises to Luna → GPT tab');
-        assert.deepEqual(await visibleChips(p, 'rr-grammar-model-row'), ['Luna 6', 'Terra 5.6', 'Sol 6.1', 'Astra 6']);
+        assert.deepEqual(await visibleChips(p, 'rr-grammar-model-row'), ['Luna 6', 'Terra 6.1', 'Sol 6.1', 'Astra 6']);
         assert.equal(await p.locator('#rr-model-row .text-ai-chips .text-ai-logo').evaluateAll(ns => ns.filter(n => getComputedStyle(n).display !== 'none').length), 0, 'chips carry no logo (the tab does)');
         assert.equal(await p.locator('#rr-providers .audit-provider[data-provider="Ollama"] .text-ai-logo').evaluate(n => getComputedStyle(n).backgroundImage.includes('ollama-white.svg') && getComputedStyle(n).filter.includes('invert')), true, 'Ollama tab is the inverted white mark');
         const geo = await p.evaluate(() => { const r = s => document.querySelector(s).getBoundingClientRect(); return { row: r('#rr-model-row'), label: r('.reflective-review-feedback .rr-row:nth-of-type(2) .rr-mini-label'), tabs: r('#rr-providers'), chips: r('#rr-model-row .text-ai-chips') }; });

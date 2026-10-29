@@ -39,7 +39,7 @@ const dir = path.join(__dirname, '..', 'public');
     const headBox = await pg.locator('label[for="edit-case-note-text"]').boundingBox(), trBox = await pg.locator('#edit-case-note-translate-btn').boundingBox();
     assert.ok(Math.abs(headBox.y - trBox.y) < 20, 'Translate is on the title row');
     assert.equal(await pg.inputValue('#case-note-ai-model'), 'gpt-6-luna');
-    assert.deepEqual(await pg.locator('.ecn-model-row .text-ai-chips > button:visible').allInnerTexts(), ['Luna 6', 'Terra 5.6', 'Sol 6.1', 'Astra 6'], "the picked model's vendor only");
+    assert.deepEqual(await pg.locator('.ecn-model-row .text-ai-chips > button:visible').allInnerTexts(), ['Luna 6', 'Terra 6.1', 'Sol 6.1', 'Astra 6'], "the picked model's vendor only");
     await pg.locator('#ecn-providers .audit-provider').nth(2).click();
     const chips = await pg.locator('.ecn-model-row .text-ai-chips > button:visible').allInnerTexts();
     assert.ok(chips.length >= 2 && !chips.includes('Luna 6'), 'another vendor tab shows its own chips: ' + chips);

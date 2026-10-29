@@ -85,15 +85,15 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         p = await page.evaluate(() => prompts[prompts.length - 1].prompt);
         assert.equal(p.includes('misspelled or garbled'), false, 'used once, then cleared');
 
-        // V102.419: Grok Imagine 2.0 — a chip of its own, the Image API at 3:4, and the vote counts for it (key = the id with / and . turned into _)
-        await page.locator('[data-model-chip][data-value="or/x-ai/grok-imagine-image-2.0"]').click();
+        // V102.419: Grok Imagine Quality — a chip of its own, the Image API at 3:4, and the vote counts for it (key = the id with / and . turned into _)
+        await page.locator('[data-model-chip][data-value="or/x-ai/grok-imagine-image-quality"]').click();
         await gen();
         const gp = await page.evaluate(() => prompts[prompts.length - 1]);
-        assert.equal(gp.model, 'or/x-ai/grok-imagine-image-2.0');
+        assert.equal(gp.model, 'or/x-ai/grok-imagine-image-quality');
         assert.deepEqual(gp.opts, { feature: 'quiz_cover', imageApi: true, aspectRatio: '3:4' }, 'the Image API at the collection\'s 3:4');
         await page.locator('[data-apply]').click();
         await page.waitForFunction(() => QuizCover.value() === 'https://example.com/ai.webp');
-        assert.deepEqual(JSON.parse(JSON.stringify((await last()).data)).tally, { 'or_x-ai_grok-imagine-image-2_0': { up: { inc: 1 } } }, 'the vote is for Grok');
+        assert.deepEqual(JSON.parse(JSON.stringify((await last()).data)).tally, { 'or_x-ai_grok-imagine-image-quality': { up: { inc: 1 } } }, 'the vote is for Grok');
         await page.evaluate(() => { QuizCover.set(''); });
         await page.locator('[data-model-chip][data-value="or/openai/gpt-5.4-image-2"]').click();
         await gen();
