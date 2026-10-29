@@ -683,7 +683,8 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
             throw new Error(diff.slice(0, 5).map(d => 'Q' + d.id + ' (' + d.fields.join(', ') + ')').join(', ') + (diff.length > 5 ? ' and ' + (diff.length - 5) + ' more' : '')
                 + ' differ from the saved quiz. Save the editor first, then reopen Curate before applying to this quiz.');
         }
-        if (original.isActive !== false) throw new Error('This quiz is active. Save as new quiz, or deactivate it before applying.');
+        // V102.513 (owner): an active quiz is no longer refused — the confirm says it will be deactivated first, and the same transaction writes isActive:false
+        const deactivate = original.isActive !== false;
         const [attempts, sessions] = await Promise.all([
             db.collection('quiz_attempts').where('quizId', '==', ref.id).get({ source: 'server' }),
             db.collection('exam_sessions').where('examId', '==', ref.id).get({ source: 'server' })
@@ -699,7 +700,9 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
         const confirmation = split
             ? 'Split into two quizzes: ' + s.source.form.title + '\n\nOriginal keeps ' + ids.length + ': ' + ids.map(id => 'Q' + id).join(', ') + '\nNew inactive quiz receives ' + removed.length + ': ' + removed.map(id => 'Q' + id).join(', ') + '\n\nA Before Split backup will preserve all ' + s.source.form.questions.length + ' questions. Current editor settings will be saved; each resulting quiz retains the current total points.\n\nยืนยันแยก Keep ไว้ชุดเดิม และย้าย Remove ไปชุดใหม่ พร้อมสำเนาก่อนแยก?'
             : 'Apply to current quiz: ' + s.source.form.title + '\n\nRemove: ' + removed.map(id => 'Q' + id).join(', ') + '\n' + s.source.form.questions.length + ' → ' + ids.length + ' questions.\n\nCurrent editor settings will also be saved. ' + backupMessage + '\n\nยืนยันตัดข้อที่ระบุออกจากชุดเดิม และบันทึกการตั้งค่าปัจจุบัน?';
-        if (!await confirmInDialog(s, confirmation, split ? 'Confirm split' : 'Confirm · remove ' + removed.length) || state !== s) return false;
+        const lead = deactivate ? '⚠️ This quiz is ACTIVE — it will be deactivated first (interns can no longer open it).\n\n' : '';
+        if (!await confirmInDialog(s, lead + confirmation, split ? (deactivate ? 'Deactivate · split' : 'Confirm split') : (deactivate ? 'Deactivate · remove ' : 'Confirm · remove ') + removed.length) || state !== s) return false;
+        s.deactivated = deactivate;
         operation.createBackup = createBackup;
         if (!operation.backupRef) operation.backupRef = db.collection('quizzes').doc();
         if (split && !operation.newRef) operation.newRef = db.collection('quizzes').doc();
@@ -720,7 +723,7 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
                 startTime: null, deadline: null, createdAt: timestamp, updatedAt: timestamp,
                 curation: { sourceQuizId: ref.id, backupQuizId: operation.backupRef.id, originalCount: s.source.form.questions.length,
                     originalQuestionNumbers: removed, model: s.model, strategy: s.mode, operation: 'split-removed', by: curatedBy(), at: timestamp } });
-            tx.update(ref, { ...s.source.form, questions: ids.map(id => s.source.form.questions[id - 1]),
+            tx.update(ref, { ...s.source.form, ...(deactivate ? { isActive: false } : {}), questions: ids.map(id => s.source.form.questions[id - 1]),
                 startTime: convertDate(s.source.form.startTime), deadline: convertDate(s.source.form.deadline),
                 deadlineFloor: firebase.firestore.FieldValue.delete(), translations: firebase.firestore.FieldValue.delete(),
                 lastAiAnalysis: firebase.firestore.FieldValue.delete(), lastAiAudit: firebase.firestore.FieldValue.delete(),
@@ -752,7 +755,7 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
                 s.saved = true; s.message = split ? 'Split complete: original keeps ' + ids.length + ', new inactive quiz contains ' + (form.questions.length - ids.length) + '. Before Split backup is in the quiz list.' : 'Applied ' + ids.length + ' questions. Backup: ' + (form.title || 'Quiz') + ' (Before Curate), in the quiz list.';
                 try { localStorage.removeItem('quiz_draft'); } catch (error) { console.warn('Curate saved; local draft cleanup unavailable:', error); }
                 if (document.getElementById('quizManageModal')) forceHideModal('quizManageModal');
-                showToast(split || s.applyOperation?.createBackup ? 'Quiz updated. An inactive backup is available in the quiz list.' : 'Quiz updated without a backup quiz. Existing history is preserved.');
+                showToast((s.deactivated ? 'Quiz deactivated. ' : '') + (split || s.applyOperation?.createBackup ? 'Quiz updated. An inactive backup is available in the quiz list.' : 'Quiz updated without a backup quiz. Existing history is preserved.'));
                 if (!split) dialog.close();
                 return;
             }
