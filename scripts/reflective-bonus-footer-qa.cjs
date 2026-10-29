@@ -42,10 +42,11 @@ const ADMIN = pathToFileURL(path.resolve('public/admin.html')).href;
         await page.evaluate(async () => { reflectiveLogsCache = window.reflectiveLogsCache = window.__logs; await reviewReflective('L1'); });
         await page.waitForTimeout(400);
 
-        const r = await page.evaluate(() => {
+        const r = await page.evaluate(async () => {
             const m = document.getElementById('reflectiveReviewModal'), cs = e => getComputedStyle(e);
             window._rrBonusTouched = false;
             showReflectiveBonusSuggestion(0.2, 'names a concrete problem');
+            await new Promise(res => setTimeout(res, 350));   // the chips transition box-shadow (0.15 s)
             const chips = [...m.querySelectorAll('#reflective-bonus-chips .reflective-bonus-chip')];
             const ai = chips.find(c => c.classList.contains('ai-pick'));
             const badge = m.querySelector('.focus-pill-badge');
@@ -54,7 +55,7 @@ const ADMIN = pathToFileURL(path.resolve('public/admin.html')).href;
                 inFooter: !!m.querySelector('.reflective-review-footer .rr-foot-bonus #reflective-bonus-chips') && !!m.querySelector('.reflective-review-footer #reflective-review-bonus'),
                 panel: m.querySelectorAll('.reflective-review-bonus-panel, .rr-bonus-line, .suggestion-apply').length,
                 value: document.getElementById('reflective-review-bonus').value,
-                ai: ai && [ai.dataset.value, ai.classList.contains('active'), getComputedStyle(ai, '::after').content],
+                ai: ai && [ai.dataset.value, ai.classList.contains('active'), getComputedStyle(ai, '::after').content, getComputedStyle(ai).boxShadow.includes('249, 115, 22')],
                 reason: [cs(m.querySelector('#reflective-bonus-suggestion')).display, m.querySelector('#reflective-bonus-suggestion').textContent.replace(/\s+/g, ' ').trim()],
                 rewrite: cs(m.querySelector('#reflective-rewrite-chips')).display,
                 badge: badge && cs(badge).backgroundColor,
@@ -66,12 +67,30 @@ const ADMIN = pathToFileURL(path.resolve('public/admin.html')).href;
         assert.ok(r.inFooter && r.panel === 0, 'bonus chips + number sit in the footer; no Bonus card / Apply button: ' + JSON.stringify(r));
         assert.ok(r.sameRowAsSave, 'bonus is on the Save row at 1526 px');
         assert.equal(r.value, '0.2', 'AI pick auto-applied while the admin has not picked');
-        assert.deepEqual(r.ai, ['0.2', true, '"💡"'], 'the AI chip is ringed with 💡 and active: ' + JSON.stringify(r.ai));
+        assert.deepEqual(r.ai, ['0.2', true, 'none', true], 'V102.496: the AI chip is active and ringed (no badge — the 💡 beside the control carries the reason): ' + JSON.stringify(r.ai));
         assert.deepEqual(r.reason, ['flex', '💡 0.2 · names a concrete problem'], 'reason beside the chips');
         assert.equal(r.rewrite, 'none', 'rewrite chips hidden while all disabled (empty editor)');
         assert.equal(r.badge, 'rgb(100, 116, 139)', 'Focus count badge is slate, not red');
         assert.deepEqual(r.tr, ['🌐', 'Translate', 'absolute', true], '🌐 icon in the reflection card corner');
         assert.deepEqual(r.orph, ['', 'Orphan images'], 'Orphan images is icon-only, named by aria-label');
+
+        // V102.496: the bar lives in the header row — segmented Bonus, 💡 reason popover, Save & Score = ✅ icon, no Cancel button (✕ closes)
+        const d = await page.evaluate(() => {
+            const m = document.getElementById('reflectiveReviewModal'), cs = e => getComputedStyle(e), hdr = m.querySelector('.reflective-liquid-header');
+            const save = m.querySelector('.reflective-review-save-btn'), sug = m.querySelector('#reflective-bonus-suggestion'), txt = sug.querySelector('.suggestion-text'), x = m.querySelector('.reflective-close-btn');
+            const before = cs(txt).display; sug.focus(); const focused = cs(txt).display; sug.blur();
+            const chips = m.querySelector('#reflective-bonus-chips');
+            return { inHeader: !!hdr.querySelector('.reflective-review-footer #reflective-bonus-chips') && !!hdr.querySelector('#reflective-review-bonus') && !!hdr.querySelector('.reflective-review-save-btn'),
+                footerBelow: !!m.querySelector('.reflective-review-shell ~ .reflective-review-footer'),
+                save: [save.textContent.trim(), save.getAttribute('aria-label'), save.title], cancel: m.querySelectorAll('.reflective-review-cancel-btn').length,
+                x: [x.getAttribute('aria-label'), x.title], pop: [before, focused], seg: [cs(chips).gap, cs(chips).borderTopWidth], hdrH: Math.round(hdr.getBoundingClientRect().height) };
+        });
+        assert.ok(d.inHeader && !d.footerBelow, 'bonus + Save sit in the header row, nothing is left below: ' + JSON.stringify(d));
+        assert.deepEqual(d.save, ['✅', 'Save & Score', 'Save & Score (Ctrl/⌘ + Enter)'], 'Save & Score is an icon, named by aria-label / tooltip');
+        assert.equal(d.cancel, 0, 'no Cancel button — the ✕ is Cancel'); assert.deepEqual(d.x, ['Close review modal', 'Cancel (Esc)']);
+        assert.deepEqual(d.pop, ['none', 'block'], 'the AI reason is a popover on the 💡 (hidden until hover / focus / tap)');
+        assert.deepEqual(d.seg, ['0px', '1px'], 'the chips form one segmented control');
+        assert.ok(d.hdrH <= 70, 'one header row at 1526 px: ' + d.hdrH);
 
         // chips: tap 0.5 = the admin's pick, tap the AI chip = apply it
         const vals = await page.evaluate(() => { const c = v => document.querySelector('#reflective-bonus-chips [data-value="' + v + '"]'); c('0.5').click(); const a = document.getElementById('reflective-review-bonus').value; c('0.2').click(); return [a, document.getElementById('reflective-review-bonus').value]; });
