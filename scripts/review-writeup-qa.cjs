@@ -1,6 +1,6 @@
 // V102.507–508 / V101.244: 📰 in the quiz Review header (right after the PDF icon) = a PERSONAL review for this one intern — the REAL reviewQuiz()
 // in public/admin.html (file://, network blocked, Firebase = self-returning Proxy, fake attempt doc, stubbed callUniversalAI + db).
-// Checks: the button sits next to PDF, icon-only with EN + TH + KO tooltips; the first click opens the panel under the header and drafts at once;
+// Checks: the button sits next to PDF, icon-only with EN + TH + KO tooltips; the click opens the panel under the header and runs NO AI (V102.511) — ✨ drafts;
 // the prompt carries the wrong / partial questions (stem, the pick, the key, the explanation) and NO name, id or picture, and asks for
 // a formal, impersonal bullet summary grouped by concept (no pronouns / particles / praise), not a per-question key; the draft lands in the textarea, nothing is written until Send;
 // Send writes quiz_attempts.adminComment (+At/+By) and nothing else; ✨ asks before replacing text; the language chip changes the prompt;
@@ -107,14 +107,18 @@ const waitIdle = page => page.waitForFunction(() => !document.getElementById('rv
       const panel = page.locator('#rv-writeup');
       assert.equal(await panel.count(), 1, 'the panel is in the overlay'); assert.equal(await panel.isHidden(), true, 'folded until the click');
       assert.equal(await page.locator('#rv-writeup-text').inputValue(), '', 'empty box: no earlier review');
+      assert.equal((await panel.locator('span').first().innerText()).trim(), '📰 Personal review', 'V102.511: the panel title carries no name');
       await btn.click();
       assert.equal(await panel.isVisible(), true, 'the panel opens under the header');
       assert.equal(await btn.getAttribute('aria-expanded'), 'true');
       assert.equal(await panel.evaluate(p => p.getBoundingClientRect().top >= document.querySelector('#reviewQuizOverlay > div > div').getBoundingClientRect().bottom - 1), true, 'under the header row');
+      assert.equal(await page.evaluate(() => window.__prompts.length), 0, 'V102.511: opening the panel runs no AI');
+      assert.equal(await page.locator('#rv-writeup-note').innerText(), 'Pick the language and model, then ✨', 'the empty panel says what to do');
+      await page.locator('#rv-writeup-draft').click();
       assert.equal(await page.locator('#rv-writeup-draft').isDisabled(), true, 'busy while the AI drafts');
       await waitIdle(page);
       const p = await page.evaluate(() => window.__prompts);
-      assert.equal(p.length, 1, 'one AI call on the first open');
+      assert.equal(p.length, 1, 'one AI call, only after ✨');
       const pr = p[0].prompt;
       for (const s of ['Which advantage of the 24/4 regimen', 'Less weight gain', 'Shorter hormone-free interval reduces withdrawal symptoms', 'A shorter HFI blunts hormone withdrawal', 'Rank progestins', 'Second-generation progestins', 'Migraine with aura', 'No precautions', 'Estrogen is contraindicated',
         'concise academic review in Thai', 'Contraceptive Knowledge', 'starting with "• "', 'grouped by concept', 'Do NOT go question by question', 'do NOT mention scores', 'no pronouns or forms of address', 'ครับ / ค่ะ / นะ', 'no praise or encouragement', 'headed "Read more" (in Thai)', '2–4 specific sources', 'no URLs, no invented sources', 'in English (Latin script)', 'never transliterate', 'in **double asterisks**', 'and the **…** marks'])
@@ -172,7 +176,7 @@ const waitIdle = page => page.waitForFunction(() => !document.getElementById('rv
     {
       const { page, ctx } = await open(browser, { width: 1280, height: 900, quiz: mkQuiz(), attempt: mkAttempt() });
       await page.evaluate(() => { window.callUniversalAI = async () => { throw new Error('proxy down'); }; });
-      await page.locator('#rv-writeup-btn').click(); await waitIdle(page);
+      await page.locator('#rv-writeup-btn').click(); await page.locator('#rv-writeup-draft').click(); await waitIdle(page);
       assert.equal(await page.locator('#rv-writeup-note').innerText(), '✨ proxy down');
       assert.equal(await page.locator('#rv-writeup-text').inputValue(), '');
       await page.locator('#rv-writeup-send').click(); await page.waitForTimeout(100);
@@ -186,7 +190,8 @@ const waitIdle = page => page.waitForFunction(() => !document.getElementById('rv
       const { page, ctx } = await open(browser, { width: 1280, height: 900, quiz: mkQuiz(), attempt: att });
       assert.equal(await page.locator('#rv-writeup-text').inputValue(), 'รีวิวเดิม\nบรรทัดสอง', 'the box shows the review already sent');
       await page.locator('#rv-writeup-btn').click(); await page.waitForTimeout(150);
-      assert.equal(await page.evaluate(() => window.__prompts.length), 0, 'no AI call when the box already has text');
+      assert.equal(await page.evaluate(() => window.__prompts.length), 0, 'no AI call on open (and none implied by the old text)');
+      assert.equal(await page.locator('#rv-writeup-note').innerText(), '', 'no hint when the box already has text');
       await ctx.close();
     }
     // ---- 4. all correct → dimmed, tooltip says why, no panel, click does nothing
@@ -210,13 +215,13 @@ const waitIdle = page => page.waitForFunction(() => !document.getElementById('rv
       assert(hdr.sw <= hdr.cw + 1, 'no horizontal overflow in the header at 390 px: ' + JSON.stringify(hdr));
       const b = await page.locator('#rv-writeup-btn').boundingBox();
       assert(b && b.x >= 0 && b.x + b.width <= 390, 'the button is on screen: ' + JSON.stringify(b));
-      await page.locator('#rv-writeup-btn').click(); await waitIdle(page);
+      await page.locator('#rv-writeup-btn').click(); await page.locator('#rv-writeup-draft').click(); await waitIdle(page);
       const pb = await page.locator('#rv-writeup').evaluate(p => ({ sw: p.scrollWidth, cw: p.clientWidth, r: p.getBoundingClientRect().right }));
       assert(pb.sw <= pb.cw + 1 && pb.r <= 390, 'the panel fits 390 px: ' + JSON.stringify(pb));
       assert.equal(await page.locator('#rv-writeup-text').inputValue(), DRAFT);
       assert.deepEqual(errs.filter(e => !noise(e)), [], 'no page errors: ' + errs);
       await ctx.close();
     }
-    console.log('PASS: review 📰 personal write-up — next to PDF, EN + TH + KO tooltips, panel under the header, one academic bullet-style prompt from the wrong answers (no name), draft in the box, Send = quiz_attempts.adminComment only, ✨ asks first, language chip, prefill without auto-draft, all-correct dimmed, 390 px fits; intern side escapes + pre-wrap; Articles.fromMistakes gone');
+    console.log('PASS: review 📰 personal write-up — next to PDF, EN + TH + KO tooltips, panel under the header (no AI until ✨), one academic bullet-style prompt from the wrong answers (no name), draft in the box, Send = quiz_attempts.adminComment only, ✨ asks first, language chip, prefill without auto-draft, all-correct dimmed, 390 px fits; intern side escapes + pre-wrap; Articles.fromMistakes gone');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
