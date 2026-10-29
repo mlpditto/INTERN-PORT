@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         const badge = byId('rl-streak-badge'), n = ((badge || {}).textContent || '').match(/\d+/), fire = hero.querySelector('.dc-fire');
         fire.hidden = !(n && badge.style.display !== 'none');
-        fire.textContent = n ? '🔥 ' + n[0] : '';
+        fire.textContent = n ? (document.documentElement.classList.contains('hw') ? '🎃 ' : '🔥 ') + n[0] : '';   // V101.235: Halloween season
         refresh();
     }
 
@@ -170,6 +170,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!authUser) throw new Error('Sign in required');
             await db.collection('admin_notifications').add({ type: 'journal_feedback', authUid: authUser.uid, userId, userName: userProfile.displayName || '', message, attachment, read: false, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
             status.textContent = '✓ Sent to Admin';
+            msg.classList.add('dc-sent');   // V101.234: the row stays darker until the next keystroke, so the send is not a pale line you can miss
             if (msgTa.value.trim() === message) msgTa.value = '';
             if (attach.checked === attached) attach.checked = false;
             return true;
@@ -204,6 +205,7 @@ document.addEventListener('DOMContentLoaded', function () {
     note.addEventListener('focusin', refresh);
     note.addEventListener('focusout', () => setTimeout(refresh, 150));
     attach.addEventListener('change', refresh);
+    msgTa.addEventListener('input', () => msg.classList.remove('dc-sent'));
     picker.addEventListener('click', () => setTimeout(() => { hero.querySelector('.dc-ask').hidden = day.hidden || !!mood(); refresh(); }));
     // re-read today's state whenever the entries list or the daily status is redrawn (both follow the Firestore listeners)
     new MutationObserver(sync).observe(byId('rl-history-list') || feed, { childList: true });
