@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.506)</title>
+    <title>Nika Admin (V102.507)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -5564,6 +5564,14 @@
         #reflectiveReviewModal :is(.reflective-review-feedback, #reflective-grammar-card) .text-ai-chips { flex:1 1 auto; padding:0 !important; gap:3px !important; background:transparent; border:0; }
         #reflectiveReviewModal :is(.reflective-review-feedback, #reflective-grammar-card) .text-ai-chips > button.glass-toggle-item { min-height:24px; padding:2px 7px; font-size:10.5px; font-weight:800; border-radius:8px; background:#f8fafc; border-color:#e2e8f0; color:#334155; }
         #reflectiveReviewModal :is(.reflective-review-feedback, #reflective-grammar-card) .text-ai-chips > button.glass-toggle-item:hover { border-color:#f59e0b; }
+        /* V102.507: the 📰 personal-review panel in the quiz Review reuses the light rail */
+        #rv-writeup[hidden] { display:none !important; }   /* the inline display:flex would otherwise beat the hidden attribute */
+        #rv-writeup .text-ai-chips { flex:1 1 auto; padding:0 !important; gap:3px !important; background:transparent; border:0; }
+        #rv-writeup .text-ai-chips > button.glass-toggle-item { min-height:24px; padding:2px 7px; font-size:10.5px; font-weight:800; border-radius:8px; background:#f8fafc; border-color:#e2e8f0; color:#334155; }
+        #rv-writeup .text-ai-chips > button.glass-toggle-item:hover { border-color:#f59e0b; }
+        #rv-writeup .rv-lang { width:30px; height:26px; min-height:0; padding:0; margin:0; border-radius:8px; border:1px solid #e2e8f0; background:#fff; font-size:15px; line-height:1; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+        #rv-writeup .rv-lang[aria-pressed="true"] { border-color:#f59e0b; background:#fef3c7; }
+        #rv-writeup .rv-lang img.emoji { width:18px; height:18px; }
         /* V101.49: light rail — black OpenAI Blossom; OpenRouter chips keep the Grape border. */
         #reflectiveReviewModal :is(.reflective-review-feedback, #reflective-grammar-card) .text-ai-logo[data-owner="openai"] { background-image:url(assets/logos/openai-blossom-black.svg); }
         #reflectiveReviewModal :is(.reflective-review-feedback, #reflective-grammar-card) .text-ai-chips > button.glass-toggle-item[data-value^="or/"] { border-color:#8b5cf6; }
@@ -8302,7 +8310,7 @@
 <script src="quiz-cover.js?v=V102.495"></script>
 <script src="clip-captions.js?v=V102.366"></script>
 <script src="holidays-admin.js?v=V102.330"></script>
-<script src="articles-admin.js?v=V102.506"></script>
+<script src="articles-admin.js?v=V102.507"></script>
 <link rel="stylesheet" href="quiz-qimage.css?v=V101.03">
 <script src="quiz-qimage.js?v=V101.03"></script>
 <link rel="stylesheet" href="quiz-more-popover.css?v=V100.47">
@@ -31441,12 +31449,73 @@ ${JSON.stringify(sourceObj)}`;
             } else { picked = Array.isArray(ans) ? ans.join(' / ') : String(ans == null ? '' : ans); correct = '(written answer — no fixed key)'; }
             return { q: String(q.q || '').trim(), picked, correct, explanation: String(q.explanation || '').trim() };
         };
-        // 📰 in the Review header → Articles.fromMistakes: an AI draft in the Article editor, unsaved; the admin reads it and saves
-        function reviewWrongToArticle() {
-            const src = window._reviewWrongForArticle;
-            if (!src || !src.items.length) return;
-            if (!window.Articles || typeof Articles.fromMistakes !== 'function') return alert('Articles is not available on this page.');
-            Articles.fromMistakes(src);
+        // V102.507: 📰 in the Review header = a PERSONAL review for this one intern (owner 2026-10-29: not the daily Articles feed).
+        // The panel opens under the header; AI drafts ONE connected narrative from the wrong answers (what they picked, why it is the wrong
+        // idea, the concept to keep) — not a per-question key; the admin edits; Send writes quiz_attempts.adminComment, which the intern
+        // already sees as the "Admin Feedback" card on the quiz result and in History. The prompt carries the first name only — never the id or picture.
+        function rvWriteupToggle() {
+            const p = document.getElementById('rv-writeup'), b = document.getElementById('rv-writeup-btn');
+            if (!p) return;
+            const open = p.hasAttribute('hidden');
+            if (open) p.removeAttribute('hidden'); else p.setAttribute('hidden', '');
+            if (b) b.setAttribute('aria-expanded', String(open));
+            const ta = document.getElementById('rv-writeup-text');
+            if (open && ta && !ta.value.trim()) rvWriteupDraft();   // first open on an empty box = draft now; ✨ redrafts
+        }
+        function rvWriteupLang() {
+            const on = document.querySelector('#rv-writeup-lang .rv-lang[aria-pressed="true"]');
+            return (on && on.dataset.lang) || localStorage.getItem('ai_review_writeup_lang') || 'th';
+        }
+        function rvWriteupPickLang(btn) {
+            localStorage.setItem('ai_review_writeup_lang', btn.dataset.lang);
+            btn.parentElement.querySelectorAll('.rv-lang').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+        }
+        async function rvWriteupDraft() {
+            const src = window._reviewWrongForWriteup, ta = document.getElementById('rv-writeup-text');
+            const note = document.getElementById('rv-writeup-note'), btn = document.getElementById('rv-writeup-draft');
+            if (!src || !src.items.length || !ta) return;
+            if (ta.value.trim() && !confirm('Replace the text in the box with a new AI draft?')) return;
+            if (typeof window.callUniversalAI !== 'function') return alert('AI is not available on this page.');
+            const model = normalizeTextAIModel(localStorage.getItem('ai_review_writeup_model'));
+            const langName = { th: 'Thai', en: 'English', ko: 'Korean' }[rvWriteupLang()] || 'Thai';
+            const cut = (v, n) => { v = String(v == null ? '' : v).replace(/\s+/g, ' ').trim(); return v.length > n ? v.slice(0, n) + '…' : v; };
+            const qs = src.items.slice(0, 20).map((it, i) => `${i + 1}. Question: ${cut(it.q, 600)}\n   Picked (wrong): ${cut(it.picked, 300)}\n   Correct: ${cut(it.correct, 300)}${it.explanation ? `\n   Explanation: ${cut(it.explanation, 500)}` : ''}`).join('\n');
+            const prompt = `You are a warm, expert pharmacy mentor writing to ONE intern after a quiz. Write a short personal review in ${langName} (under 900 characters) addressed to ${cut(src.firstName, 40) || 'the intern'} about the quiz "${cut(src.quizTitle, 120)}".
+Walk through what went wrong as ONE connected narrative: for each mistake say what they chose, why that is the wrong idea, and the concept to keep in mind — group related mistakes together. Do NOT go question by question, do NOT number the questions, do NOT quote the answer key verbatim, do NOT mention scores or points. Close with one encouraging line.
+Then add a short section headed "Read more" (in ${langName}) listing 2–4 specific things worth reading on the concepts missed — a guideline or textbook chapter, a drug-class monograph, a named review topic — names only, no URLs, no invented sources.
+Plain text only: no markdown, no headings other than the Read-more line, no "Dear …" line.
+
+--- QUIZ: ${cut(src.quizTitle, 120)} — questions answered wrongly ---
+${qs}`;
+            const t0 = Date.now();
+            if (btn) btn.disabled = true;
+            if (note) note.textContent = '✨ Drafting from ' + src.items.length + ' wrong answer' + (src.items.length > 1 ? 's' : '') + '…';
+            try {
+                const resp = await window.callUniversalAI(model, prompt, false, null, '', { feature: 'review_writeup' });
+                const txt = String(resp && typeof resp === 'object' ? (resp.text || resp.outputText || resp.response || '') : (resp || '')).trim();
+                if (!txt) throw new Error('the model sent back nothing.');
+                ta.value = txt;
+                if (note) note.textContent = '✨ ' + model + ' · ' + Math.max(1, Math.round((Date.now() - t0) / 1000)) + ' s — read it, edit, then Send';
+            } catch (e) {
+                if (note) note.textContent = '✨ ' + ((e && e.message) || 'AI draft failed');
+            } finally { if (btn) btn.disabled = false; }
+        }
+        async function rvWriteupSend(attemptId) {
+            const ta = document.getElementById('rv-writeup-text'), btn = document.getElementById('rv-writeup-send'), note = document.getElementById('rv-writeup-note');
+            const text = ta ? ta.value.trim() : '';
+            if (!text) return alert('Nothing to send — draft or write the review first.');
+            if (btn) btn.disabled = true;
+            try {
+                await db.collection('quiz_attempts').doc(attemptId).update({
+                    adminComment: text,
+                    adminCommentAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    adminCommentBy: ALLOWED_EMAIL || 'admin'
+                });
+                if (note) note.textContent = '✓ Sent — on their quiz result and History';
+                showToast('📰 Personal review sent');
+            } catch (e) {
+                alert('Send failed: ' + ((e && e.message) || e));
+            } finally { if (btn) btn.disabled = false; }
         }
 
         async function reviewQuiz(attemptId) {
@@ -31588,7 +31657,7 @@ ${JSON.stringify(sourceObj)}`;
                     <div id="rv-sig-cheat" ${cheatOpen ? '' : 'hidden'}>${cheatSummaryHtml}</div>
                     ${telemetrySummaryHtml ? `<div id="rv-sig-timing" ${timingOpen ? '' : 'hidden'}>${telemetrySummaryHtml}</div>` : ''}`;
                 let cardsHtml = signalsHtml;
-                const rvWrongItems = [];   // V102.506: the wrong / partly-wrong questions as plain text, for 📰 Article from wrong answers (no learner data)
+                const rvWrongItems = [];   // V102.506: the wrong / partly-wrong questions as plain text, for the 📰 personal review (no learner id / picture)
 
                 // V92.62 Phase 4.c: exam-session attempts (written by exam-session.html Phase 4.a
                 // with isExamSession:true + votedQuestions[]) get a different review path —
@@ -31971,7 +32040,22 @@ ${JSON.stringify(sourceObj)}`;
                     ? `<button onclick="adminOpenQuizDownloads('${escapeHtml(quiz.id)}')" class="rv-ib" style="${rvIconBtn}" title="Open this quiz's links / documents (${_reviewLinks.length})" data-th-title="โหลดลิงก์/เอกสารของ Quiz นี้" aria-label="Materials"><i class="fa-solid fa-paperclip"></i></button>`
                     : '';
 
-                window._reviewWrongForArticle = { quizTitle: String(quiz.title || quiz.shortTitle || ''), items: rvWrongItems };
+                const rvFirstName = String(att.displayName || '').trim().split(/\s+/)[0] || '';
+                window._reviewWrongForWriteup = { quizTitle: String(quiz.title || quiz.shortTitle || ''), firstName: rvFirstName, items: rvWrongItems };
+                const rvWriteupLangSaved = localStorage.getItem('ai_review_writeup_lang') || 'th';
+                const rvWriteupHtml = `<div id="rv-writeup" hidden class="lang-no-toggle" style="padding:10px 16px;border-bottom:1px solid #fde68a;background:#fffbeb;display:flex;flex-direction:column;gap:8px;">
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                            <span style="font-weight:800;color:#92400e;font-size:0.9em;white-space:nowrap;">📰 Personal review → ${escapeHtml(rvFirstName || att.displayName || 'intern')}</span>
+                            <span id="rv-writeup-lang" role="group" aria-label="Language of the review" style="display:inline-flex;gap:4px;">${[['th', '🇹🇭', 'Thai'], ['en', '🇺🇸', 'English'], ['ko', '🇰🇷', 'Korean']].map(([l, f, n]) => `<button type="button" class="rv-lang" data-lang="${l}" aria-pressed="${l === rvWriteupLangSaved}" title="${n}" aria-label="${n}" onclick="rvWriteupPickLang(this)">${f}</button>`).join('')}</span>
+                            ${textAIChipsHtml('rv-writeup-model', normalizeTextAIModel(localStorage.getItem('ai_review_writeup_model')), "selectStoredTextAIModel(this, 'ai_review_writeup_model')")}
+                            <span id="rv-writeup-note" style="font-size:0.78em;color:#78716c;margin-left:auto;"></span>
+                        </div>
+                        <textarea id="rv-writeup-text" rows="7" placeholder="What they got wrong and why — one short review for this intern, AI-drafted, yours to edit before it goes out" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #fcd34d;border-radius:10px;font-size:0.92em;line-height:1.5;resize:vertical;background:#fff;font-family:inherit;">${escapeHtml(att.adminComment || '')}</textarea>
+                        <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;">
+                            <button type="button" id="rv-writeup-draft" onclick="rvWriteupDraft()" class="rv-ib" style="${rvIconBtn}" title="Draft again with AI (replaces the text in the box)" data-th-title="ให้ AI ร่างใหม่ (แทนที่ข้อความในกล่อง)" data-kr-title="AI로 다시 초안 작성 (상자의 텍스트를 대체)" aria-label="Draft with AI">✨</button>
+                            <button type="button" id="rv-writeup-send" onclick="rvWriteupSend('${attemptId}')" style="width:auto;min-height:0;margin:0;background:#f59e0b;color:#fff;border:1.5px solid #d97706;padding:7px 14px;border-radius:10px;font-weight:800;cursor:pointer;" title="Send — it shows on their quiz result and in History" data-th-title="ส่ง — ขึ้นในผลควิซและ History ของเขา" data-kr-title="보내기 — 퀴즈 결과와 History에 표시됩니다">📨 Send</button>
+                        </div>
+                    </div>`;
 
                 // Create overlay directly on document.body
                 const overlay = document.createElement('div');
@@ -32002,13 +32086,14 @@ ${JSON.stringify(sourceObj)}`;
                                 <button onclick="openTimingRiskConfigModal()" class="rv-ib" style="${rvIconBtn}" title="Timing Config" aria-label="Timing config">⚙</button>
                                 <button onclick="exportIncorrectToPDF()" class="rv-ib" style="${rvIconBtn}" title="Export the incorrect answers to PDF" aria-label="Export PDF"><i class="fa-solid fa-file-pdf"></i></button>
                                 ${rvWrongItems.length
-                                    ? `<button type="button" id="rv-wrong-article" onclick="reviewWrongToArticle()" class="rv-ib" style="${rvIconBtn}" title="Draft a learning article from the ${rvWrongItems.length} wrong answer${rvWrongItems.length > 1 ? 's' : ''} with AI — opens unsaved in Articles, nothing is published" data-th-title="ร่างบทความเรียนรู้จากข้อที่ตอบผิด ${rvWrongItems.length} ข้อด้วย AI — เปิดใน Articles แบบยังไม่บันทึก ไม่เผยแพร่เอง" aria-label="Article from wrong answers"><i class="fa-solid fa-newspaper"></i></button>`
-                                    : `<button type="button" id="rv-wrong-article" aria-disabled="true" class="rv-ib" style="${rvIconBtn}opacity:.4;cursor:not-allowed;" title="No wrong answers in this attempt — nothing to write an article from" data-th-title="ไม่มีข้อที่ตอบผิดในรอบนี้ — ยังสร้างบทความไม่ได้" aria-label="Article from wrong answers (none wrong)"><i class="fa-solid fa-newspaper"></i></button>`}
+                                    ? `<button type="button" id="rv-writeup-btn" onclick="rvWriteupToggle()" class="rv-ib" style="${rvIconBtn}" aria-expanded="false" aria-controls="rv-writeup" title="Personal review for ${escapeHtml(rvFirstName || 'this intern')} — AI drafts from the ${rvWrongItems.length} wrong answer${rvWrongItems.length > 1 ? 's' : ''}, you edit, Send puts it on their quiz result and History" data-th-title="รีวิวส่วนตัวสำหรับ ${escapeHtml(rvFirstName || 'intern คนนี้')} — AI ร่างจากข้อที่ผิด ${rvWrongItems.length} ข้อ แก้ได้ก่อนส่ง ขึ้นในผลควิซและ History ของเขา" data-kr-title="${escapeHtml(rvFirstName || '이 인턴')}을 위한 개인 리뷰 — 틀린 ${rvWrongItems.length}문항으로 AI가 초안을 쓰고, 수정 후 보내면 퀴즈 결과와 History에 표시됩니다" aria-label="Personal review from wrong answers"><i class="fa-solid fa-newspaper"></i></button>`
+                                    : `<button type="button" id="rv-writeup-btn" aria-disabled="true" class="rv-ib" style="${rvIconBtn}opacity:.4;cursor:not-allowed;" title="No wrong answers in this attempt — nothing to review" data-th-title="ไม่มีข้อที่ตอบผิดในรอบนี้ — ไม่มีอะไรต้องรีวิว" data-kr-title="이번 시도에는 틀린 문항이 없습니다 — 리뷰할 내용이 없습니다" aria-label="Personal review from wrong answers (none wrong)"><i class="fa-solid fa-newspaper"></i></button>`}
                                 <button ${isAlreadyApproved ? 'disabled' : `onclick="approveQuizAttempt('${attemptId}')"`} style="${approveBtnStyle || 'width:auto;min-height:0;margin:0;background:#fff;color:#166534;border:1.5px solid #16a34a;padding:7px 12px;border-radius:10px;cursor:pointer;font-weight:800;font-size:0.82em;white-space:nowrap;'}" title="${isAlreadyApproved ? 'Already approved — cannot re-approve' : '🍎 Manten Manten no Mi — approve at 100%'}">🍎 Full marks 100%</button>
                                 <button ${isAlreadyApproved ? 'disabled' : `onclick="approveQuizAttemptActual('${attemptId}')"`} style="${approveBtnStyle || 'width:auto;min-height:0;margin:0;background:#fff;color:#1d4ed8;border:1.5px solid #2563eb;padding:7px 12px;border-radius:10px;cursor:pointer;font-weight:800;font-size:0.82em;white-space:nowrap;'}" title="${isAlreadyApproved ? 'Already approved — cannot re-approve' : '🍇 Shōjiki Shōjiki no Mi — approve at the actual score'}">🍇 Actual ${actualApproveLabel}</button>
                                 <button onclick="closeReviewOverlay()" class="rv-ib" style="${rvIconBtn}" title="Close" aria-label="Close">✕</button>
                             </div>
                         </div>
+                        ${rvWrongItems.length ? rvWriteupHtml : ''}
                         <div style="flex:1;overflow-y:auto;padding:20px;">
                             ${(quiz.questions || []).some(qq => qq.type === 'short_answer' || qq.type === 'tweetstorm') ? `<span class="lang-no-toggle">Short-answer AI model</span>
                             ${textAIChipsHtml('', normalizeTextAIModel(localStorage.getItem('ai_short_answer_model')), "selectStoredTextAIModel(this, 'ai_short_answer_model')")}` : ''}
@@ -32018,6 +32103,7 @@ ${JSON.stringify(sourceObj)}`;
                 overlay.addEventListener('click', function(e) { if (e.target === overlay) closeReviewOverlay(); });
                 document.body.appendChild(overlay);
                 if (window.rvApplyUi) window.rvApplyUi(attemptId);
+                { const fl = document.getElementById('rv-writeup-lang'); if (fl && window.twemoji) twemoji.parse(fl, { folder: 'svg', ext: '.svg' }); }   // V100.79: flag emoji render as letters on Windows
 
             } catch (e) {
                 console.error("Error reviewing quiz attempt:", e);

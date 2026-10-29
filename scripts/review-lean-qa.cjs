@@ -49,7 +49,7 @@ async function open(browser, { quiz, attempt, cheat }) {
       const tops = await hdr.locator('button').evaluateAll(bs => bs.map(b => Math.round(b.getBoundingClientRect().top)));
       assert(Math.max(...tops) - Math.min(...tops) <= 6, 'header buttons share a row: ' + tops);
       const labels = await hdr.locator('button').evaluateAll(bs => bs.map(b => (b.getAttribute('aria-label') || b.innerText).trim()));
-      assert.deepEqual(labels, ['Feedback', 'Timing config', 'Export PDF', 'Article from wrong answers (none wrong)', '🍎 Full marks 100%', '🍇 Actual 1.00 pts', 'Close'], 'buttons: ' + labels);
+      assert.deepEqual(labels, ['Feedback', 'Timing config', 'Export PDF', 'Personal review from wrong answers (none wrong)', '🍎 Full marks 100%', '🍇 Actual 1.00 pts', 'Close'], 'buttons: ' + labels);
       // Manten / Shōjiki live in the tooltip only
       const headText = await hdr.innerText();
       assert(!/Manten|Shōjiki/.test(headText), 'fruit names are not on the buttons');

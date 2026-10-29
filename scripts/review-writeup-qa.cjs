@@ -1,0 +1,186 @@
+// V102.507 / V101.244: 📰 in the quiz Review header (right after the PDF icon) = a PERSONAL review for this one intern — the REAL reviewQuiz()
+// in public/admin.html (file://, network blocked, Firebase = self-returning Proxy, fake attempt doc, stubbed callUniversalAI + db).
+// Checks: the button sits next to PDF, icon-only with EN + TH + KO tooltips; the first click opens the panel under the header and drafts at once;
+// the prompt carries the wrong / partial questions (stem, the pick, the key, the explanation) and the FIRST name only — never the user id,
+// picture or surname — and asks for one narrative, not a per-question key; the draft lands in the textarea, nothing is written until Send;
+// Send writes quiz_attempts.adminComment (+At/+By) and nothing else; ✨ asks before replacing text; the language chip changes the prompt;
+// an existing adminComment prefills the box and does NOT auto-draft; an all-correct attempt gets a dimmed button and no panel; phone 390 px fits.
+// Static: the intern's result card + History row escape the comment and keep line breaks; Articles.fromMistakes is gone.
+const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict');
+const { pathToFileURL } = require('node:url');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const ADMIN = pathToFileURL(path.resolve('public/admin.html')).href;
+const html = fs.readFileSync('public/admin.html', 'utf8'), aj = fs.readFileSync('public/articles-admin.js', 'utf8');
+const idx = fs.readFileSync('public/index.html', 'utf8'), hcss = fs.readFileSync('public/history-compact.css', 'utf8');
+
+// ---- static
+assert.ok(!aj.includes('fromMistakes'), 'Articles.fromMistakes removed — the 📰 is not an Articles feature');
+assert.ok(!html.includes('_reviewWrongForArticle') && !html.includes('reviewWrongToArticle'), 'no leftover Articles hand-off in admin.html');
+assert.match(html, /<script src="articles-admin\.js\?v=V102\.(50[7-9]|5[1-9]\d|[6-9]\d\d)"><\/script>/, 'articles-admin.js cache-busted');
+assert.ok(idx.includes('white-space:pre-wrap;">${escapeHtml(attempt.adminComment)}</div>'), 'intern result card: escaped + pre-wrap');
+assert.ok(idx.includes('position:relative; white-space:pre-wrap;">') && idx.includes('</i>${escapeHtml(item.adminComment)}'), 'intern History row: escaped + pre-wrap');
+assert.ok(!idx.includes('"${attempt.adminComment}"') && !idx.includes('${item.adminComment}\n'), 'no raw adminComment left in index.html');
+assert.ok(/\.history-compact \.hl-comment \{[^}]*white-space:pre-wrap;/.test(hcss), 'history-lean comment keeps line breaks');
+assert.match(idx, /history-compact\.css\?v=V101\.(24[4-9]|2[5-9]\d|[3-9]\d\d)/, 'history-compact.css cache-busted');
+
+const mkQuiz = () => ({
+  id: 'q1', title: 'Contraceptive Knowledge', shortTitle: 'Contra', quizType: 'standard', totalPoints: 1.5,
+  questions: [
+    { type: 'choice', q: 'Which advantage of the 24/4 regimen is best supported?', options: ['Less weight gain', 'Shorter hormone-free interval reduces withdrawal symptoms'], correct: 1, explanation: 'A shorter HFI blunts hormone withdrawal symptoms.' },
+    { type: 'choice', q: 'Postpartum breastfeeding smoker wants a daily pill — which?', options: ['Combined pill', 'Progestin-only pill'], correct: 1 },
+    { type: 'choice', q: 'Rank progestins by androgenic activity', options: ['Cyproterone > LNG > Drospirenone', 'Levonorgestrel > Norgestimate > Desogestrel'], correct: 1, explanation: 'Second-generation progestins are the most androgenic.' },
+    { type: 'choice', q: 'Migraine with aura and spironolactone — drospirenone safety point?', options: ['Estrogen is contraindicated; check potassium', 'No precautions'], correct: 0 },
+    { type: 'choice', q: 'Skipped question', options: ['A', 'B'], correct: 0 },
+  ],
+});
+const mkAttempt = () => ({
+  quizId: 'q1', userId: 'u-secret-77', displayName: 'Bew Sample', pictureUrl: 'https://example.test/bew.png', status: 'pending', correctCount: 2, totalQuestions: 5,
+  answers: [0, 1, 0, 1, null], durations: [11, 9, 54, 69, 3],
+});
+const DRAFT = 'สวัสดี Bew\nเรื่อง HFI สั้น…\n\nสู้ ๆ นะ';
+
+async function open(browser, { width, height, quiz, attempt, dialogs = 'dismiss' }) {
+  const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
+  const page = await ctx.newPage();
+  const errs = []; page.on('pageerror', e => errs.push(e.message));
+  await page.addInitScript(() => {
+    const P = new Proxy(function () {}, { get: (t, k) => (k === Symbol.toPrimitive ? undefined : (k === 'then' ? () => P : P)), apply: () => P, construct: () => P });
+    window.firebase = P; window.mermaid = P;
+  });
+  await page.route('**/*', r => (r.request().url().startsWith('file:') ? r.continue() : r.abort()));
+  await page.goto(ADMIN, { waitUntil: 'load' }); await page.waitForTimeout(400);
+  page.on('dialog', d => { page.__dialogs = (page.__dialogs || []).concat(d.message()); dialogs === 'accept' ? d.accept() : d.dismiss(); });
+  await page.evaluate(({ quiz, attempt }) => {
+    [...document.querySelectorAll('body > *')].filter(e => /Admin Portal/.test(e.innerText || '')).forEach(e => e.style.setProperty('display', 'none', 'important'));
+    const g = document.getElementById('adminGuideOverlay'); if (g) g.remove();
+    attempt.cheatMonitoring = {}; attempt.timestamp = { toDate: () => new Date(), toMillis: () => Date.now() };
+    window.__att = attempt; window.__writes = []; window.__prompts = []; window.__toasts = [];
+    const ref = (c, id) => ({ id, get: async () => ({ exists: true, data: () => window.__att }),
+      set: async d => { window.__writes.push(['set', c, id, Object.keys(d)]); },
+      update: async d => { window.__writes.push(['update', c, id, Object.keys(d).sort(), typeof d.adminComment === 'string' ? d.adminComment : null, typeof d.adminCommentBy === 'string' ? d.adminCommentBy : null]); } });
+    window.db = { collection: c => ({ doc: id => ref(c, id), add: async d => { window.__writes.push(['add', c, Object.keys(d)]); return { id: 'x' }; }, get: async () => ({ docs: [] }) }) };
+    window.quizzesData = [quiz]; window.usersData = [];
+    window.renderMdInline = window.renderMdInline || (t => String(t == null ? '' : t));
+    window.showToast = (m) => { window.__toasts.push(String(m)); };
+    window.callUniversalAI = async (model, prompt, json, img, sys, opts) => { window.__prompts.push({ model, prompt, json, img, opts }); await new Promise(r => setTimeout(r, 60)); return { text: 'สวัสดี Bew\nเรื่อง HFI สั้น…\n\nสู้ ๆ นะ' }; };
+    localStorage.removeItem('ai_review_writeup_lang'); localStorage.removeItem('ai_review_writeup_model');
+  }, { quiz, attempt });
+  await page.evaluate(() => reviewQuiz('a1')); await page.waitForTimeout(400);
+  assert.equal(await page.locator('#reviewQuizOverlay').count(), 1, 'overlay renders');
+  return { page, ctx, errs };
+}
+const noise = e => /ServiceWorker|browseAuditProvider|providerModelRailHtml|reading 'auth'|db\.collection is not a function/.test(e);
+const waitIdle = page => page.waitForFunction(() => !document.getElementById('rv-writeup-draft').disabled);
+
+(async () => {
+  const browser = await chromium.launch();
+  try {
+    // ---- 1. desktop: the button, the panel, the prompt, Send
+    {
+      const { page, ctx, errs } = await open(browser, { width: 1280, height: 900, quiz: mkQuiz(), attempt: mkAttempt() });
+      const btn = page.locator('#rv-writeup-btn');
+      assert.equal(await btn.count(), 1, 'one 📰 button');
+      assert.equal(await btn.evaluate(b => b.previousElementSibling && b.previousElementSibling.getAttribute('aria-label')), 'Export PDF', 'it sits right after the PDF icon');
+      assert.equal((await btn.innerText()).trim(), '', 'icon only — the words are in the tooltip');
+      assert.equal(await btn.getAttribute('aria-disabled'), null);
+      assert.equal(await btn.getAttribute('aria-expanded'), 'false');
+      assert.match(await btn.getAttribute('title'), /Personal review for Bew — AI drafts from the 3 wrong answers.*quiz result and History/, 'EN tooltip: ' + await btn.getAttribute('title'));
+      assert.match(await btn.getAttribute('data-th-title'), /รีวิวส่วนตัวสำหรับ Bew.*3 ข้อ/, 'TH tooltip');
+      assert.match(await btn.getAttribute('data-kr-title'), /Bew.*3문항/, 'KO tooltip');
+      const box = await btn.boundingBox(), pdf = await page.locator('#reviewQuizOverlay [aria-label="Export PDF"]').boundingBox();
+      assert.equal(Math.round(box.width), Math.round(pdf.width), 'same size as the PDF icon'); assert.equal(Math.round(box.height), Math.round(pdf.height));
+      const panel = page.locator('#rv-writeup');
+      assert.equal(await panel.count(), 1, 'the panel is in the overlay'); assert.equal(await panel.isHidden(), true, 'folded until the click');
+      assert.equal(await page.locator('#rv-writeup-text').inputValue(), '', 'empty box: no earlier review');
+      await btn.click();
+      assert.equal(await panel.isVisible(), true, 'the panel opens under the header');
+      assert.equal(await btn.getAttribute('aria-expanded'), 'true');
+      assert.equal(await panel.evaluate(p => p.getBoundingClientRect().top >= document.querySelector('#reviewQuizOverlay > div > div').getBoundingClientRect().bottom - 1), true, 'under the header row');
+      assert.equal(await page.locator('#rv-writeup-draft').isDisabled(), true, 'busy while the AI drafts');
+      await waitIdle(page);
+      const p = await page.evaluate(() => window.__prompts);
+      assert.equal(p.length, 1, 'one AI call on the first open');
+      const pr = p[0].prompt;
+      for (const s of ['Which advantage of the 24/4 regimen', 'Less weight gain', 'Shorter hormone-free interval reduces withdrawal symptoms', 'A shorter HFI blunts hormone withdrawal', 'Rank progestins', 'Second-generation progestins', 'Migraine with aura', 'No precautions', 'Estrogen is contraindicated',
+        'addressed to Bew', 'in Thai', 'Contraceptive Knowledge', 'ONE connected narrative', 'Do NOT go question by question', 'do NOT mention scores', 'headed "Read more" (in Thai)', '2–4 specific things worth reading', 'no URLs, no invented sources'])
+        assert(pr.includes(s), 'the prompt carries: ' + s);
+      for (const s of ['Postpartum breastfeeding', 'Skipped question', 'u-secret-77', 'example.test', 'Sample', 'article', 'popup'])
+        assert(!pr.includes(s), 'the prompt must not carry: ' + s);
+      assert.equal(p[0].opts.feature, 'review_writeup', 'its own AI feature tag');
+      assert.equal(await page.locator('#rv-writeup-text').inputValue(), DRAFT, 'the draft lands in the box, line breaks kept');
+      assert.match(await page.locator('#rv-writeup-note').innerText(), /^✨ gpt-6-luna · \d+ s — read it, edit, then Send$/, 'note: model + seconds');
+      assert.deepEqual(await page.evaluate(() => window.__writes), [], 'nothing written before Send');
+      assert.equal(await page.locator('#articlesModal:visible').count(), 0, 'the Article editor stays closed');
+      // the language chip → the prompt
+      assert.equal(await page.locator('#rv-writeup-lang .rv-lang[aria-pressed="true"]').getAttribute('data-lang'), 'th', 'Thai by default');
+      await page.locator('#rv-writeup-lang .rv-lang[data-lang="en"]').click();
+      assert.equal(await page.evaluate(() => localStorage.getItem('ai_review_writeup_lang')), 'en', 'the pick is remembered');
+      // ✨ with text in the box asks first; the dismissed confirm = no call
+      await page.locator('#rv-writeup-draft').click(); await page.waitForTimeout(150);
+      assert.equal(await page.evaluate(() => window.__prompts.length), 1, 'dismissed confirm → no second AI call');
+      assert.match(page.__dialogs.pop(), /Replace the text in the box/, 'the confirm wording');
+      await page.evaluate(() => { window.confirm = () => true; });
+      await page.locator('#rv-writeup-draft').click(); await waitIdle(page);
+      const p2 = await page.evaluate(() => window.__prompts);
+      assert.equal(p2.length, 2, 'accepted confirm → a new draft'); assert(p2[1].prompt.includes('in English'), 'the English chip reached the prompt');
+      // edit, then Send
+      await page.locator('#rv-writeup-text').fill(DRAFT + '\nแก้โดยแอดมิน');
+      await page.locator('#rv-writeup-send').click(); await page.waitForTimeout(150);
+      assert.deepEqual(await page.evaluate(() => window.__writes), [['update', 'quiz_attempts', 'a1', ['adminComment', 'adminCommentAt', 'adminCommentBy'], DRAFT + '\nแก้โดยแอดมิน', 'medlifeplus@gmail.com']], 'Send = one update of adminComment on the attempt, nothing else');
+      assert.match(await page.locator('#rv-writeup-note').innerText(), /✓ Sent/); assert.deepEqual(await page.evaluate(() => window.__toasts), ['📰 Personal review sent']);
+      await btn.click(); assert.equal(await panel.isHidden(), true, 'the button folds the panel again'); assert.equal(await btn.getAttribute('aria-expanded'), 'false');
+      assert.deepEqual(errs.filter(e => !noise(e)), [], 'no page errors: ' + errs);
+      await ctx.close();
+    }
+    // ---- 2. AI failure → the note says so, the box stays empty, nothing written; Send on an empty box refuses
+    {
+      const { page, ctx } = await open(browser, { width: 1280, height: 900, quiz: mkQuiz(), attempt: mkAttempt() });
+      await page.evaluate(() => { window.callUniversalAI = async () => { throw new Error('proxy down'); }; });
+      await page.locator('#rv-writeup-btn').click(); await waitIdle(page);
+      assert.equal(await page.locator('#rv-writeup-note').innerText(), '✨ proxy down');
+      assert.equal(await page.locator('#rv-writeup-text').inputValue(), '');
+      await page.locator('#rv-writeup-send').click(); await page.waitForTimeout(100);
+      assert.match(page.__dialogs.pop(), /Nothing to send/, 'empty Send refuses');
+      assert.deepEqual(await page.evaluate(() => window.__writes), []);
+      await ctx.close();
+    }
+    // ---- 3. an earlier review on the attempt → prefilled, no auto-draft
+    {
+      const att = mkAttempt(); att.adminComment = 'รีวิวเดิม\nบรรทัดสอง';
+      const { page, ctx } = await open(browser, { width: 1280, height: 900, quiz: mkQuiz(), attempt: att });
+      assert.equal(await page.locator('#rv-writeup-text').inputValue(), 'รีวิวเดิม\nบรรทัดสอง', 'the box shows the review already sent');
+      await page.locator('#rv-writeup-btn').click(); await page.waitForTimeout(150);
+      assert.equal(await page.evaluate(() => window.__prompts.length), 0, 'no AI call when the box already has text');
+      await ctx.close();
+    }
+    // ---- 4. all correct → dimmed, tooltip says why, no panel, click does nothing
+    {
+      const att = mkAttempt(); att.answers = [1, 1, 1, 0, 0];
+      const { page, ctx } = await open(browser, { width: 1280, height: 900, quiz: mkQuiz(), attempt: att });
+      const btn = page.locator('#rv-writeup-btn');
+      assert.equal(await btn.getAttribute('aria-disabled'), 'true');
+      assert.match(await btn.getAttribute('title'), /No wrong answers/);
+      assert.match(await btn.getAttribute('data-th-title'), /ไม่มีข้อที่ตอบผิด/);
+      assert(Number(await btn.evaluate(b => getComputedStyle(b).opacity)) < 0.6, 'dimmed');
+      assert.equal(await page.locator('#rv-writeup').count(), 0, 'no panel in the overlay');
+      await btn.click({ force: true }); await page.waitForTimeout(150);
+      assert.equal(await page.evaluate(() => window.__prompts.length), 0, 'no AI call');
+      await ctx.close();
+    }
+    // ---- 5. phone: the header wraps without sideways scroll; the panel fits the width
+    {
+      const { page, ctx, errs } = await open(browser, { width: 390, height: 844, quiz: mkQuiz(), attempt: mkAttempt() });
+      const hdr = await page.evaluate(() => { const h = document.querySelector('#reviewQuizOverlay > div > div'); return { sw: h.scrollWidth, cw: h.clientWidth }; });
+      assert(hdr.sw <= hdr.cw + 1, 'no horizontal overflow in the header at 390 px: ' + JSON.stringify(hdr));
+      const b = await page.locator('#rv-writeup-btn').boundingBox();
+      assert(b && b.x >= 0 && b.x + b.width <= 390, 'the button is on screen: ' + JSON.stringify(b));
+      await page.locator('#rv-writeup-btn').click(); await waitIdle(page);
+      const pb = await page.locator('#rv-writeup').evaluate(p => ({ sw: p.scrollWidth, cw: p.clientWidth, r: p.getBoundingClientRect().right }));
+      assert(pb.sw <= pb.cw + 1 && pb.r <= 390, 'the panel fits 390 px: ' + JSON.stringify(pb));
+      assert.equal(await page.locator('#rv-writeup-text').inputValue(), DRAFT);
+      assert.deepEqual(errs.filter(e => !noise(e)), [], 'no page errors: ' + errs);
+      await ctx.close();
+    }
+    console.log('PASS: review 📰 personal write-up — next to PDF, EN + TH + KO tooltips, panel under the header, one narrative prompt from the wrong answers + first name only, draft in the box, Send = quiz_attempts.adminComment only, ✨ asks first, language chip, prefill without auto-draft, all-correct dimmed, 390 px fits; intern side escapes + pre-wrap; Articles.fromMistakes gone');
+  } finally { await browser.close(); }
+})().catch(e => { console.error(e); process.exitCode = 1; });
