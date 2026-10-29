@@ -23,7 +23,7 @@ const BODY = '<div id="a"><input type="hidden" id="research-model-select" value=
 
             // vendor-first: opens on the picked model's vendor, the other vendors stay in the DOM but hidden
             assert.deepEqual(await shown(a), ['or/deepseek/deepseek-v4.1-flash-1017', 'or/deepseek/deepseek-v4-pro-0813'], 'DeepSeek models only @' + width);
-            assert.equal(await a.locator(':scope > button[data-value]').count(), 17, 'all 17 chips stay in the DOM');
+            assert.equal(await a.locator(':scope > button[data-value]').count(), 18, 'all 18 chips stay in the DOM');   // V102.518: + Qwen Omni Flash
             assert.equal(await a.locator('.mr-vendor[aria-pressed="true"]').getAttribute('data-provider'), 'DeepSeek');
             // V102.515 design B: the chips sit right after the pressed icon (flex order), show no vendor word and no logo; aria-label keeps the full name
             const seats = async () => a.evaluate(r => { const items = [...r.querySelectorAll('.mr-vendor, :scope > button[data-value]:not([hidden])')].sort((x, y) => Number(x.style.order || 0) - Number(y.style.order || 0)); return items.map(e => e.classList.contains('mr-vendor') ? '[' + e.dataset.provider + ']' : e.textContent.trim().replace(/\s+/g, ' ')); });

@@ -101,14 +101,14 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.equal(await page.locator('[data-model-chip]').count(), 4, 'Four supported image models are available (V102.419: + Grok Imagine Quality)');   // V102.315: Muse Image left (no OpenRouter provider) // V101.53: + Seedream 5.0 Lite, Muse Image; V101.61: OpenRouter Nano Banana 2.1 removed
         assert.equal(await page.locator('[data-model-chip].active').count(), 1);
         // V102.419: Grok Imagine Quality is the last chip; it goes through the Image API like Seedream (3:4) and its mark is a logo, not a cell of text
-        assert.deepEqual(await page.locator('[data-model-chip]').evaluateAll(els => els.map(e => e.dataset.value)), ['as/gemini-nano-banana-2.1', 'or/openai/gpt-5.4-image-2', 'or/bytedance-seed/seedream-5-0-lite', 'or/x-ai/grok-imagine-image-quality']);
+        assert.deepEqual(await page.locator('[data-model-chip]').evaluateAll(els => els.map(e => e.dataset.value)), ['as/gemini-nano-banana-2.1', 'or/openai/gpt-image-2.5-flare', 'or/bytedance-seed/seedream-5-0-lite', 'or/x-ai/grok-imagine-image-quality']);
         assert.equal(await page.locator('[data-model-chip][data-value="or/x-ai/grok-imagine-image-quality"] .text-ai-logo[data-owner="grok"]').count(), 1, 'Grok logo');
         assert.ok(/fallback: false/.test(require('fs').readFileSync('public/quiz-cover.js', 'utf8')) && /filter\(m => m\.fallback !== false \|\| m\.id === model\)/.test(require('fs').readFileSync('public/quiz-cover.js', 'utf8')), 'Grok is never tried automatically as a fallback — only when picked');
         assert.match(await page.locator('[data-model-chip][data-value="or/x-ai/grok-imagine-image-quality"]').getAttribute('title'), /Grok Imagine Quality.*1 นาที/);
         assert.equal(await page.locator('[data-model-chip].active').getAttribute('data-value'), 'as/gemini-nano-banana-2.1');
-        await page.locator('[data-model-chip][data-value="or/openai/gpt-5.4-image-2"]').click();
-        assert.equal(await page.locator('[data-model-chip].active').getAttribute('data-value'), 'or/openai/gpt-5.4-image-2');
-        assert.equal(await page.evaluate(() => localStorage.getItem('quiz_cover_ai_model')), 'or/openai/gpt-5.4-image-2');
+        await page.locator('[data-model-chip][data-value="or/openai/gpt-image-2.5-flare"]').click();
+        assert.equal(await page.locator('[data-model-chip].active').getAttribute('data-value'), 'or/openai/gpt-image-2.5-flare');
+        assert.equal(await page.evaluate(() => localStorage.getItem('quiz_cover_ai_model')), 'or/openai/gpt-image-2.5-flare');
         await page.locator('[data-generate]').click();
         await page.waitForFunction(() => !QuizCover.isBusy());
         assert.equal(await page.locator('.quiz-cover-ai-preview').isVisible(), true);
@@ -117,7 +117,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.match(await page.evaluate(() => aiArgs[1]), /Cardiology/);
         assert.match(await page.evaluate(() => aiArgs[1]), /Blue pastel/);
         assert.match(await page.evaluate(() => aiArgs[1]), /established INTERN-PORT quiz cover collection/);
-        assert.equal(await page.evaluate(() => aiArgs[0]), 'or/openai/gpt-5.4-image-2');
+        assert.equal(await page.evaluate(() => aiArgs[0]), 'or/openai/gpt-image-2.5-flare');
         assert.equal(await page.evaluate(() => aiArgs[5].feature), 'quiz_cover');
         // V101.90: style chips (V102.18: nine — + Comics / Manga / Movie poster); Clay is the default and keeps the pre-V101.90 prompt byte-for-byte.
         assert.equal(await page.locator('[data-style-chip]').count(), 9);
@@ -221,7 +221,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         await page.locator('[data-generate]').click();
         await page.waitForFunction(() => !QuizCover.isBusy());
         assert.equal(await page.evaluate(() => calls.length), 3, 'Every model tried once');
-        assert.match(await page.locator('#quiz-cover-editor [role=status]').innerText(), /^Generate failed: Seedream 5\.0 Lite blocked this topic; Nano Banana 2.1, Image 2 also failed/);
+        assert.match(await page.locator('#quiz-cover-editor [role=status]').innerText(), /^Generate failed: Seedream 5\.0 Lite blocked this topic; Nano Banana 2.1, Image 2.5 Flare also failed/);
         assert.equal(await page.locator('.quiz-cover-ai-preview').isVisible(), false);
         // Switching quiz invalidates an in-flight result, including its busy state.
         await page.evaluate(() => {

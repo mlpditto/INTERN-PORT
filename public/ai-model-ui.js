@@ -20,6 +20,8 @@
         { id: 'claude-opus-5-5', label: 'Claude Opus 5.5', short: 'Opus 5.5', hint: 'Claude รุ่นใหญ่ ถูกกว่า Fable สำหรับงานวิเคราะห์ที่ซับซ้อน' },
         { id: 'claude-fable-5-1', label: 'Claude Fable 5.1', short: 'Fable 5.1', hint: 'Claude สำหรับงานที่ต้องการรายละเอียดมากขึ้น' },
         { id: 'or/qwen/qwen3.8-flash', label: 'Qwen 3.8 Flash', short: 'Qwen Flash 3.8', hint: 'Qwen รุ่นประหยัด ภาษาไทยดี ผ่าน OpenRouter' },
+        // V102.518: Qwen 3.8 Omni Flash (OpenRouter 2026-09-21, $0.15/$0.47 per MTok, 1M ctx, text + image + audio + video in) — the cheap multimodal chip
+        { id: 'or/qwen/qwen3.8-omni-flash', label: 'Qwen 3.8 Omni Flash', short: 'Qwen Omni Flash 3.8', hint: 'Qwen รุ่น Omni รับภาพ เสียง และวิดีโอ ราคาประหยัด ผ่าน OpenRouter · Qwen 3.8 Omni Flash, 이미지·오디오·비디오 입력, 저렴한 요금, OpenRouter 경유' },
         { id: 'or/qwen/qwen3.8-max-0902', label: 'Qwen 3.8 Max', short: 'Qwen Max 3.8', hint: 'Qwen รุ่นใหญ่ ภาษาไทยดี สำหรับคัดและเปรียบเทียบข้อสอบ ผ่าน OpenRouter' },
         { id: 'or/deepseek/deepseek-v4.1-flash-1017', label: 'DeepSeek V4.1 Flash', short: 'DeepSeek Flash V4.1', hint: 'DeepSeek รุ่นประหยัด ผ่าน OpenRouter' },
         { id: 'or/deepseek/deepseek-v4-pro-0813', label: 'DeepSeek V4 Pro', short: 'DeepSeek Pro V4', hint: 'DeepSeek รุ่นใหญ่ เหมาะกับงานวิเคราะห์ ผ่าน OpenRouter' },
