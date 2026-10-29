@@ -20,6 +20,7 @@ Admin: Quiz Engine ▸ Edit / ＋ New quiz.
 - `quiz-cover-check` — AI cover 3:4 normalisation (letterbox wide, crop tall)
 - `quiz-cover-ref-qa` — 🧬 reference strip: ≤ 2 ticked covers
 - `quiz-primer-ai-qa` — ✨ Read first draft never sends the correct answer
+- `primer-model-rail-qa` — Read first model picker = the page's vendor-first rail per question (V102.509, was a <select>): hidden `input.q-primer-model` bound by `addQuestionUI` via `bindRegistryModelInput`, pick remembered under `ai_primer_model`, ✨ sends it
 - `quiz-system-select-check` — every CASE_SYSTEMS key has an intern icon + select option
 
 ## What usually lies
