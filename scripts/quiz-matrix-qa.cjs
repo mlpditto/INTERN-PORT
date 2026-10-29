@@ -18,7 +18,7 @@ assert.ok(/renderQuizSystemFilterBar\(activeCount \+ inactiveCount\);\s*if \(win
 assert.ok(!/#qmx-card[^{]*\{[^}]*overflow-x\s*:\s*(auto|scroll)/.test(admin), 'no sideways scroll');
 
 const H = 3600 * 1000, NOW = 1e12;
-const ctx = { window: {}, document: { addEventListener() {}, getElementById: () => null }, localStorage: { getItem: () => null, setItem() {} }, console, Math, Date, Set, Map, Array, String, Number, JSON, Object, Infinity };
+const ctx = { window: {}, document: { addEventListener() {}, getElementById: () => null }, localStorage: { getItem: () => null, setItem() {} }, console, Math, Date, Set, Map, Array, String, Number, JSON, Object, Infinity, URL };
 ctx.window = ctx; vm.createContext(ctx); vm.runInContext(js, ctx);
 const ts = (msv) => ({ toMillis: () => msv });
 
@@ -28,8 +28,8 @@ const U = [
     { id: 'st', group: 'staff', on: true }, // staff never counted
 ];
 const Q = [
-    { id: 'q1', title: 'Closes in 10 h, 1/3 done', isActive: true, targetGroup: 'A', deadline: ts(NOW + 10 * H) },
-    { id: 'q2', title: 'Closes in 5 d, 0/4', isActive: true, targetGroup: 'Public', deadline: ts(NOW + 120 * H) },
+    { id: 'q1', title: 'Closes in 10 h, 1/3 done', coverUrl: 'https://x.test/c.png', isActive: true, targetGroup: 'A', deadline: ts(NOW + 10 * H) },
+    { id: 'q2', title: 'Closes in 5 d, 0/4', coverUrl: 'http://x.test/insecure.png', isActive: true, targetGroup: 'Public', deadline: ts(NOW + 120 * H) },
     { id: 'q3', title: 'Closes in 20 h, 3/3', isActive: true, targetGroup: 'A', deadline: ts(NOW + 20 * H) },
     { id: 'q4', title: 'No deadline, 2/3', shortTitle: 'Q4 short', isActive: true, targetGroup: 'A' },
     { id: 'q5', title: 'Assigned b+d only, both done, 48 h', isActive: true, assignedUsers: ['b', 'd'], deadline: ts(NOW + 48 * H) },
@@ -56,7 +56,7 @@ assert.equal(r.total, 7, 'live only: ended / paused / poll / template / config /
 assert.deepEqual(ids(r), { do: ['q1', 'q6'], plan: ['q2'], watch: ['q7', 'q3', 'q5'], fine: ['q4'] }, JSON.stringify(ids(r)));
 const q1 = r.quads.do[0];
 assert.deepEqual([q1.done, q1.total], [1, 3], 'q1: started / practice / past intern / staff do not count; a repeat counts once');
-assert.equal(r.quads.fine[0].title, 'Q4 short', 'shortTitle shown when set');
+assert.equal(r.quads.fine[0].title, 'Q4 short', 'shortTitle shown when set'); assert.equal(r.quads.fine[0].full, 'No deadline, 2/3', 'V102.503: the full title rides along when it differs'); assert.equal(r.quads.do[0].full, '', 'no shortTitle → no second line'); assert.equal(r.quads.do[0].cover, 'https://x.test/c.png'); assert.equal(r.quads.plan[0].cover, '', 'only https covers');
 assert.deepEqual([r.quads.fine[0].done, r.quads.fine[0].total], [2, 3], 'a dismissed attempt is not done');
 assert.deepEqual([r.quads.watch[2].done, r.quads.watch[2].total], [2, 2], 'assignedUsers beat the group');
 assert.deepEqual([r.quads.do[1].done, r.quads.do[1].total], [1, 4], 'a comma list of groups targets both');
@@ -126,6 +126,7 @@ assert.equal(ctx.quizMatrixBuild([], [], [], { now: NOW, hours: 72, share: 50, i
         assert.ok(admin.includes('<div id="quiz-dash"><div id="upnext-card" class="lang-no-toggle" hidden></div><div id="qmx-card" class="lang-no-toggle" hidden></div></div>'), 'both halves inside #quiz-dash');
         for (const [name, width] of [['wide', 1280], ['narrow', 390]]) {
             const page = await browser.newPage({ viewport: { width, height: 900 } });
+            await page.route('https://x.test/**', r => r.fulfill({ contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64') }));
             await page.goto(require('node:url').pathToFileURL(require('node:path').resolve('public/quiz-matrix.js')).href);
             await page.setContent(`<!doctype html><meta charset="utf-8"><style>${css}</style><div style="padding:12px"><div id="quiz-dash"><div id="upnext-card" class="lang-no-toggle" hidden></div><div id="qmx-card" class="lang-no-toggle" hidden></div></div></div>`);
             await page.evaluate(([q, u, a, now]) => {
@@ -154,6 +155,17 @@ assert.equal(ctx.quizMatrixBuild([], [], [], { now: NOW, hours: 72, share: 50, i
             });
             assert.equal(g.scroll, false, name + ': no sideways scroll');
             assert.ok(g.emptyH < 40, name + ': the empty box is one header line, got ' + g.emptyH);
+            // V102.503: a wide box shows the cover + full title under the short name; a narrow one only the short name
+            await page.waitForFunction((wide) => { const i = document.querySelector('#qmx-card .qmx-cov'); return i && (!wide || (i.complete && i.naturalWidth > 0)); }, name === 'wide');
+            const cv = await page.evaluate(() => {
+                const it = document.querySelector('#qmx-card .qmx-item[data-id="q4"]'), q1 = document.querySelector('#qmx-card .qmx-item[data-id="q1"]');
+                return { full: getComputedStyle(it.querySelector('.qmx-full')).display, fullText: it.querySelector('.qmx-full').textContent, name: it.querySelector('.qmx-name').textContent,
+                    cov: getComputedStyle(q1.querySelector('.qmx-cov')).display, covW: q1.querySelector('.qmx-cov').getBoundingClientRect().width, noCov: !document.querySelector('#qmx-card .qmx-item[data-id="q2"] .qmx-cov') };
+            });
+            assert.deepEqual([cv.name, cv.fullText], ['Q4 short', 'No deadline, 2/3'], name + ': short name + full title');
+            assert.ok(cv.noCov, name + ': an http:// cover is not shown');
+            if (name === 'wide') { assert.notEqual(cv.full, 'none', 'wide: full title shown'); assert.equal(cv.cov, 'block', 'wide: cover shown'); assert.equal(Math.round(cv.covW), 40); }
+            else { assert.equal(cv.full, 'none', 'narrow: full title hidden'); assert.equal(cv.cov, 'none', 'narrow: cover hidden'); }
             if (name === 'wide') {
                 assert.equal(g.dashBorder, '1px', 'wide: #quiz-dash is the card'); assert.equal(g.upBorder, '0px', 'wide: the halves lose their own frame');
                 assert.ok(Math.abs(g.up.top - g.mx.top) < 2 && g.up.right <= g.mx.left, 'wide: Up next left, grid right, same top');
