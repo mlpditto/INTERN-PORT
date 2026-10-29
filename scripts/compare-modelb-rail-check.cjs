@@ -86,7 +86,7 @@ const modelB = cut('        window._compareModelB = function', '        window.g
         assert.equal(await page.evaluate(() => window._compareModelB()), 'gpt-6.1-sol', 'retired ids still move to their successor');
 
         // Qwen / DeepSeek logos also show on other flat rails (settings etc.)
-        assert.equal(await page.evaluate(() => (textAIChipsHtml('', 'gpt-6-luna', '').match(/data-owner="(qwen|deepseek)"/g) || []).length), 4);
+        assert.equal(await page.evaluate(() => (textAIChipsHtml('', 'gpt-6-luna', '').match(/data-owner="(qwen|deepseek)"/g) || []).length), 5);   // V102.518: + Qwen 3.8 Omni Flash
         assert.equal(await page.evaluate(() => /grok/.test(textAIChipsHtml('', 'gpt-6-luna', ''))), false, 'Grok stays opt-in');
         assert.deepEqual(errors, []);
         console.log('PASS: Model B rail — Qwen/DeepSeek/Grok logos, Grok offered + kept, retired ids migrate, Grok opt-in elsewhere, OpenRouter tint/bar/glyph, vendor themes (tint/border/bar, solid pick) incl. audit toolbar');

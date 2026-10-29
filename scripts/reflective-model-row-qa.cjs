@@ -65,7 +65,7 @@ for (const id of ['ai-model-review', 'ai-model-grammar', 'rr-providers', 'rr-gra
 
         // picking a tab shows that provider's chips; picking a chip sets the select and the registry pref
         await p.locator('#rr-providers .audit-provider[data-provider="Qwen"]').click();
-        assert.deepEqual(await visibleChips(p, 'rr-model-row'), ['Qwen Flash 3.8', 'Qwen Max 3.8']);
+        assert.deepEqual(await visibleChips(p, 'rr-model-row'), ['Qwen Flash 3.8', 'Qwen Omni Flash 3.8', 'Qwen Max 3.8']);
         await p.locator('#rr-model-row .text-ai-chips > button:not([hidden])', { hasText: 'Qwen Flash 3.8' }).click();
         assert.equal(await p.locator('#ai-model-review').inputValue(), 'or/qwen/qwen3.8-flash');
         assert.equal(await p.locator('#rr-model-row .text-ai-chips [aria-pressed="true"]').count(), 1);
