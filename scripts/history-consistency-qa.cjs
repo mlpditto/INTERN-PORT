@@ -70,6 +70,12 @@ async function open(browser) {
             filterUnifiedHistory('case');
             out.chipCase = [...document.querySelectorAll('#unified-type-filters .hl-chip')].map(b => b.textContent.replace(/\s+/g, ' ').trim());
             out.sub = [...document.querySelectorAll('#unified-case-systems .hl-chip')].map(b => b.textContent.replace(/\s+/g, ' ').trim());
+            // V101.233: the ⏳ count follows the chosen type — it used to say 1 under a type with nothing pending
+            out.pendScope = [...document.querySelectorAll('#unified-type-filters .hl-chip[data-filter]')].map(b => b.dataset.filter).filter(k => k !== 'all').map(k => {
+                filterUnifiedHistory(k);
+                const w = document.querySelector('#unified-type-filters .hl-warn');
+                return [k, w ? Number(w.textContent.replace(/\D/g, '')) : 0, items.filter(s => s.submissionType === k && (s.status === 'pending' || s.status === 'รอตรวจ')).length];
+            });
             filterUnifiedHistory('all');
             // 3) touch targets (this context is a touch phone → pointer:coarse)
             const chip = document.querySelector('#unified-type-filters .hl-chip'), ib = document.querySelector('.hl-tools .hl-ib');
@@ -96,6 +102,7 @@ async function open(browser) {
         assert.ok(r.titles.includes('Acromegaly: Spotting the Subtle Signs'), 'the admin emoji at the end of the article title stays out of the list: ' + r.titles);
         assert.deepEqual(r.pillsEn, ['⏳ Pending'], 'EN pills (V101.206: the article row has no pill — its disc carries the state): ' + r.pillsEn); assert.deepEqual(r.pillsTh, ['⏳ รอตรวจ'], 'TH pills: ' + r.pillsTh);
         assert.ok(/^\d{1,2} [A-Z][a-z]{2}$/.test(r.dateEn[0]) && /ต\.ค\.|พ\.ย\.|ก\.ย\./.test(r.dateTh[0]) && /월 \d{1,2}일/.test(r.dateKr[0]), 'row dates follow the language: ' + [r.dateEn[0], r.dateTh[0], r.dateKr[0]]);
+        assert.ok(r.pendScope.length > 0 && r.pendScope.every(x => x[1] === x[2]), 'the ⏳ count equals the pending items of the chosen type: ' + JSON.stringify(r.pendScope));
         assert.equal(r.discAria, 'Cardiovascular · case 1', 'the case disc has a real accessible name: ' + r.discAria);
         assert.equal(r.matAria, '2 files to download', '📎 says what it is: ' + r.matAria);
         assert.equal(r.rowAria, true, 'rows keep role / tabindex / aria-expanded');

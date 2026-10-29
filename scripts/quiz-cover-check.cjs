@@ -71,6 +71,12 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         });
         await page.waitForFunction(() => QuizCover.value() === 'https://example.com/new.webp');
         await page.locator('[data-remove]').click(); assert.equal(await page.evaluate(() => QuizCover.value()), '');
+        // V102.494: Generate is icon-only and sits on the style row, right of the 3:4 note (the line it used to take is gone)
+        { const g = await page.locator('#quiz-cover-editor .quiz-cover-style-row [data-generate]').boundingBox(), l = await page.locator('#quiz-cover-editor .quiz-cover-lock').boundingBox();
+          assert.equal(await page.locator('#quiz-cover-editor [data-generate]').count(), 1);
+          assert.equal((await page.locator('[data-generate]').innerText()).trim(), '✨', 'icon only, no word');
+          assert.equal(await page.locator('[data-generate]').getAttribute('aria-label'), 'Generate cover with AI');
+          assert.ok(g.x >= l.x + l.width - 1 && Math.abs((g.y + g.height / 2) - (l.y + l.height / 2)) < 12, 'Generate sits right of 3:4 on the same row: ' + JSON.stringify([g, l])); }
         // AI generation stays a preview until accepted; no production API calls.
         const admin = fs.readFileSync('public/admin.html', 'utf8');
         const picker = admin.match(/        function pickAiImageFromResponse\(resp\) \{[\s\S]*?\n        \}/)[0];

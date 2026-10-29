@@ -242,7 +242,9 @@ window.historyLean = (() => {
                 const onK = unifiedCurrentFilter === k;
                 html += chip(k, T[k].e + (onK ? ' ' + T[k].n : '') + ' <b>' + (counts[k] || 0) + '</b>', T[k].n, onK, "filterUnifiedHistory('" + k + "')");
             });
-            const pend = all.filter(pending).length;
+            // V101.233: the ⏳ count follows the chosen type (and disease system) — it said 1 under 📰 Article while "Nothing pending review!" showed, because the pending one was a different type
+            const scope = all.filter(s => (unifiedCurrentFilter === 'all' || s.submissionType === unifiedCurrentFilter) && !(unifiedCurrentFilter === 'case' && window.unifiedCaseSystem && caseKey(s) !== window.unifiedCaseSystem));
+            const pend = scope.filter(pending).length;
             if (pend || unifiedCurrentStatus === 'pending') {
                 const on = unifiedCurrentStatus === 'pending';
                 html += '<button type="button" class="hl-chip hl-warn' + (on ? ' on' : '') + '" aria-pressed="' + on + '" title="Pending review" onclick="filterUnifiedStatus(\'' + (on ? 'all' : 'pending') + '\')">⏳ <b>' + pend + '</b></button>';
