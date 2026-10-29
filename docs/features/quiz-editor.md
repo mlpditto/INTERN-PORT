@@ -21,7 +21,7 @@ Admin: Quiz Engine ▸ Edit / ＋ New quiz.
 - `quiz-cover-ref-qa` — 🧬 reference strip: ≤ 2 ticked covers
 - `quiz-primer-ai-qa` — ✨ Read first draft never sends the correct answer
 - `primer-model-rail-qa` — Read first model picker = the page's vendor-first rail per question (V102.509, was a <select>): hidden `input.q-primer-model` bound by `addQuestionUI` via `bindRegistryModelInput`, pick remembered under `ai_primer_model`, ✨ sends it
-- `primer-review-all-qa` — 📖 All (V102.512): every question's Read first in one popup, local duplicate check (bold terms with bracket aliases, identical lines), Repeated-only filter, term chips, ✎ Qn jumps the pager and focuses the box, Esc closes; V102.517: cards never widen past the popup (grid minmax(0,1fr)), a quiz with no Read first shows one line + ✨ All
+- `primer-review-all-qa` — 📖 All (V102.512): every question's Read first in one popup, local duplicate check (bold terms with bracket aliases, identical lines), Repeated-only filter, term chips, ✎ Qn jumps the pager and focuses the box, Esc closes; V102.519: compact header (4 Q · 🔤 · ⚠️ in n Q · ≡), pills ⚪ / ⚠️ n / ✅, strip for empty ones + ✨ All, all-empty state, two columns when wide, cards never widen
 - `quiz-system-select-check` — every CASE_SYSTEMS key has an intern icon + select option
 
 ## What usually lies

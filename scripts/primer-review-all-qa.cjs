@@ -48,14 +48,19 @@ const P3 = '**ศัพท์สำคัญ**\n- **HPO axis** — hypothalamic-
 
         // header
         const sum = (await ov.locator('.pra-sum').innerText()).replace(/\s+/g, ' ');
-        assert.match(sum, /^E4 sample · 4 questions · 4 terms · 1 repeated in 3 questions · 1 identical line$/, 'header counts: ' + sum);
-        const cards = await ov.locator('.pra-card').evaluateAll(cs => cs.map(c => ({ q: c.dataset.q, dup: c.classList.contains('has-dup'), pill: c.querySelector('.pra-pill').textContent.trim(), marks: [...c.querySelectorAll('mark.pra-dup')].map(m => m.querySelector('strong').textContent + '|' + m.querySelector('i').textContent), eq: [...c.querySelectorAll('.pra-eq')].map(e => e.textContent), empty: !!c.querySelector('.pra-empty'), stem: c.querySelector('.pra-stem').textContent })));
+        assert.match(sum, /^E4 sample · 4 Q · 🔤 4 · ⚠️ 1 in 3 Q · ≡ 1$/, 'header counts (compact): ' + sum);
+        const cards = await ov.locator('.pra-card').evaluateAll(cs => cs.map(c => ({ q: c.dataset.q, dup: c.classList.contains('has-dup'), pill: c.querySelector('.pra-pill').textContent.trim(), pillTitle: c.querySelector('.pra-pill').title, marks: [...c.querySelectorAll('mark.pra-dup')].map(m => m.querySelector('strong').textContent + '|' + m.querySelector('i').textContent), eq: [...c.querySelectorAll('.pra-eq')].map(e => e.textContent), empty: c.classList.contains('is-empty') && !c.querySelector('.pra-md'), stem: c.querySelector('.pra-stem').textContent })));
         assert.deepEqual(cards.map(c => [c.q, c.dup, c.pill, c.marks, c.eq, c.empty]), [
-            ['0', true, '1 term repeated', ['Estetrol (E4)|Q2 Q3'], [], false],
-            ['1', true, '1 term repeated · 1 line identical', ['E4 (Estetrol)|Q1 Q3'], ['= Q3'], false],
-            ['2', true, '1 term repeated · 1 line identical', ['Estetrol (E4)|Q1 Q2'], ['= Q2'], false],
-            ['3', false, 'no Read first', [], [], true],
+            ['0', true, '⚠️ 1', ['Estetrol (E4)|Q2 Q3'], [], false],
+            ['1', true, '⚠️ 2', ['E4 (Estetrol)|Q1 Q3'], ['= Q3'], false],
+            ['2', true, '⚠️ 2', ['Estetrol (E4)|Q1 Q2'], ['= Q2'], false],
+            ['3', false, '⚪', [], [], true],
         ], 'cards: ' + JSON.stringify(cards));
+        assert.equal(cards[1].pillTitle, '1 term repeated · 1 line identical', 'V102.517: the breakdown lives in the pill tooltip');
+        // V102.517: some questions still empty → a strip above the cards with ✨ All
+        assert.equal((await ov.locator('.pra-strip').innerText()).replace(/\s+/g, ' ').trim(), '⚪ 1 of 4 empty ✨ All', 'the strip counts the empty ones');
+        assert.equal(await ov.locator('.pra-none').count(), 0, 'no empty state while some have a Read first');
+        assert.equal(await ov.locator('.pra-chip[data-f="dup"]').isDisabled(), false, 'Repeated only is live when something repeats');
         assert.ok(!cards[0].marks.some(m => /ศัพท์สำคัญ|ความรู้พื้นฐาน/.test(m)), 'bold headings are not terms');
         assert.equal(cards[3].stem, 'Empty one?');
         const chips = await ov.locator('.pra-tchip').evaluateAll(cs => cs.map(c => c.textContent.replace(/\s+/g, ' ').trim()));
@@ -77,26 +82,33 @@ const P3 = '**ศัพท์สำคัญ**\n- **HPO axis** — hypothalamic-
         const after = await page.evaluate(() => ({ idx: quizQPageIndex, shown: [...document.querySelectorAll('.quiz-q-item')].map(it => it.style.display !== 'none'), focused: document.activeElement && document.activeElement.classList.contains('q-primer') && document.activeElement.closest('.quiz-q-item') === document.querySelectorAll('.quiz-q-item')[2] }));
         assert.equal(after.idx, 2); assert.deepEqual(after.shown, [false, false, true, false], 'only Q3 is on the page'); assert.equal(after.focused, true, 'its Read first box has the focus');
 
-        // V102.517: a long stem must not widen the card past the popup (the ✎ button used to be clipped)
-        await page.evaluate(() => _qPrimerReviewAll());
-        { const geo = await page.evaluate(() => { const body = document.querySelector('#praOverlay .pra-body').getBoundingClientRect(); return [...document.querySelectorAll('#praOverlay .pra-card')].map(c => { const r = c.getBoundingClientRect(), g = c.querySelector('.pra-go').getBoundingClientRect(); return [Math.round(r.right - body.right), Math.round(g.right - body.right)]; }); });
-          assert(geo.every(([c, g]) => c <= 0 && g <= 0), 'every card and its ✎ button end inside the popup body: ' + JSON.stringify(geo)); }
-        await page.keyboard.press('Escape');
-        // V102.517: a quiz with no Read first at all → one line + a ✨ All button that closes the popup and starts the run
-        await page.evaluate(() => { document.querySelectorAll('.quiz-q-item .q-primer').forEach(t => { t.value = ''; }); window.__all = []; window._qPrimerDraftAll = b => { window.__all.push(b.className); }; _qPrimerReviewAll(); });
-        assert.equal(await page.locator('#praOverlay .pra-card').count(), 0, 'no cards when nothing has a Read first');
-        assert.match(await page.locator('#praOverlay .pra-none').innerText(), /No question has a Read first yet/);
-        assert.match((await page.locator('#praOverlay .pra-sum').innerText()).replace(/\s+/g, ' '), /4 questions · 0 terms · 0 repeated in 0 questions · 0 identical lines/);
-        await page.locator('#praOverlay .pra-none .pra-go').evaluate(b => b.click());
-        assert.equal(await page.locator('#praOverlay').count(), 0, 'the empty-state button closes the popup');
-        assert.deepEqual(await page.evaluate(() => window.__all), ['q-primer-ai q-primer-all'], 'and hands the first question\'s ✨ All button to the runner');
-        await page.evaluate(() => { document.querySelectorAll('.quiz-q-item .q-primer').forEach((t, i) => { t.value = i === 3 ? '' : '**x** y'; }); });
+        // V102.517: a card header never pushes the pill / ✎ out — a very long stem gets the ellipsis, at 390 px too
+        await page.setViewportSize({ width: 390, height: 800 });
+        await page.evaluate(() => { document.querySelectorAll('.quiz-q-item')[0].querySelector('.q-text').value = 'A very long question stem that keeps going and going about combined oral contraceptives and their hepatic effects so that it certainly cannot fit in one line of the card header'; _qPrimerReviewAll(); });
+        { const g = await page.locator('#praOverlay .pra-card[data-q="0"]').evaluate(c => { const r = c.getBoundingClientRect(), go = c.querySelector('.pra-go').getBoundingClientRect(), pill = c.querySelector('.pra-pill').getBoundingClientRect(), stem = c.querySelector('.pra-stem'); return { fits: go.right <= r.right + 0.5 && pill.width > 10 && go.width > 10, clipped: stem.scrollWidth > stem.clientWidth }; });
+          assert.equal(g.fits, true, 'pill + ✎ stay inside the card at 390 px'); assert.equal(g.clipped, true, 'the long stem is the one that gives way'); }
+        await page.evaluate(() => _praClose()); await page.setViewportSize({ width: 1200, height: 900 });
+        // V102.517: no Read first anywhere → one message + ✨ All (which runs the first row's ✨ All) instead of empty cards
+        await page.evaluate(() => { document.querySelectorAll('.quiz-q-item .q-primer').forEach(t => { t.value = ''; }); window.__all = null; window._qPrimerDraftAll = b => { window.__all = b.className; }; _qPrimerReviewAll(); });
+        assert.equal(await page.locator('#praOverlay .pra-card').count(), 0, 'no cards');
+        assert.match((await page.locator('#praOverlay .pra-sum').innerText()).replace(/\s+/g, ' '), /4 Q · ⚪ none yet$/, 'the header says so instead of zeros');
+        assert.equal(await page.locator('#praOverlay .pra-chip[data-f="dup"]').isDisabled(), true, 'Repeated only is disabled');
+        assert.equal((await page.locator('#praOverlay .pra-none-t').innerText()).trim(), '📖 No Read first yet');
+        assert.equal((await page.locator('#praOverlay .pra-none .pra-all').innerText()).trim(), '✨ All · 4');
+        await page.locator('#praOverlay .pra-none .pra-all').evaluate(b => b.click());
+        assert.equal(await page.locator('#praOverlay').count(), 0, 'the popup closes'); assert.match(await page.evaluate(() => window.__all), /q-primer-all/, 'and the first row\'s ✨ All runs');
+        await page.evaluate(() => { _qPrimerReviewAll(); }); await page.locator('#praOverlay .pra-none .pra-chip').evaluate(b => b.click()); assert.equal(await page.locator('#praOverlay').count(), 0, '✎ Write by hand closes');
+        // V102.517 compact: ✎ is icon-only with the question in its label; two columns at ≥ 900 px, one below
+        await page.evaluate(() => { document.querySelectorAll('.quiz-q-item .q-primer')[0].value = '**A** x'; _qPrimerReviewAll(); });
+        assert.deepEqual(await page.locator('#praOverlay .pra-card[data-q="0"] .pra-go').evaluate(b => [b.textContent.trim(), b.getAttribute('aria-label')]), ['✎', 'Edit Q1'], 'icon-only ✎ with an accessible name');
+        assert.equal(await page.locator('#praOverlay .pra-body').evaluate(b => getComputedStyle(b).gridTemplateColumns.split(' ').length), 2, 'two columns on a wide popup');
+        await page.evaluate(() => _praClose());
         // Esc closes
         await page.evaluate(() => _qPrimerReviewAll()); assert.equal(await page.locator('#praOverlay').count(), 1);
         await page.keyboard.press('Escape'); assert.equal(await page.locator('#praOverlay').count(), 0, 'Esc closes');
 
         const noise = e => /ServiceWorker|mermaid is not defined|reading 'auth'|db\.collection|firebase/.test(e);
         assert.deepEqual(errors.filter(e => !noise(e)), [], 'no page errors: ' + errors);
-        console.log('PASS: 📖 All Read first popup — cards never widen past the popup, empty quiz = one line + ✨ All (V102.517); after ✨ All with EN/TH/KO tooltips, reads the editor as it is, header counts, alias-aware repeated terms (headings excluded) with Qn marks, identical lines = Qn, empty box shown, Repeated-only filter, term chip outline, ✎ Qn jumps + focuses, Esc closes');
+        console.log('PASS: 📖 All Read first popup — after ✨ All with EN/TH/KO tooltips, reads the editor as it is, header counts, alias-aware repeated terms (headings excluded) with Qn marks, identical lines = Qn, short pills with the breakdown on hover, strip for missing ones, all-empty state with ✨ All, header never overflows, Repeated-only filter, term chip outline, ✎ Qn jumps + focuses, Esc closes');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
