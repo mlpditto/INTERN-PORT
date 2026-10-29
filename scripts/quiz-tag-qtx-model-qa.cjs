@@ -28,7 +28,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.deepEqual(setup.kinds, [true, true, true], 'the fixture tags are in the vocabulary');
         const view = () => page.evaluate(() => { const o = document.getElementById('qtx-overlay'); return { title: (o.querySelector('#qtx-title') || {}).textContent, pressed: [...o.querySelectorAll('[aria-label="AI model"] button')].map(b => b.textContent + (b.getAttribute('aria-pressed') === 'true' ? '*' : '')), vendors: [...o.querySelectorAll('[aria-label="AI vendor"] button')].map(b => b.getAttribute('aria-label') + (b.getAttribute('aria-pressed') === 'true' ? '*' : '') + (b.title.includes('in use') ? '·' : '')), sub: o.textContent.replace(/\s+/g, ' ') }; });
         const vendor = name => page.evaluate(n => document.querySelector('#qtx-overlay [aria-label="AI vendor"] button[aria-label="' + n + '"]').click(), name);
-        const click = txt => page.evaluate(t => [...document.querySelectorAll('#qtx-overlay button')].find(b => b.textContent.trim().startsWith(t)).click(), txt);
+        const click = txt => page.evaluate(t => [...document.querySelectorAll('#qtx-overlay button')].find(b => (b.textContent.trim() || b.getAttribute('aria-label') || '').startsWith(t)).click(), txt);
 
         // 1 · opens with the model row, LOCAL FIRST and selected when nothing is remembered
         await page.evaluate(() => { window.__done = null; confirmQuizEditorTags('Save').then(v => { window.__done = v; }); });
@@ -46,7 +46,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.equal(await page.evaluate(() => localStorage.getItem('quizTagAiModel')), 'gemini-3.8-flash'); assert.equal(await page.evaluate(() => __calls.length), 0, 'no AI call from a mere pick');
 
         // 3 · Fix with AI runs the picked model; the result names it and keeps the row
-        await click('✨ Fix with AI'); await page.waitForFunction(() => /AI suggests/.test((document.querySelector('#qtx-overlay #qtx-title') || {}).textContent || ''));
+        await click('Fix with AI'); await page.waitForFunction(() => /AI suggests/.test((document.querySelector('#qtx-overlay #qtx-title') || {}).textContent || ''));
         assert.deepEqual(await page.evaluate(() => __calls), ['gemini-3.8-flash']);
         v = await view(); assert.match(v.title, /AI suggests\s*·\s*Gemini Flash 3\.8/); assert.deepEqual(v.pressed, ['Flash 3.8*', 'Lite 3.5', 'Argon 4']);
         assert.ok(/Allergic Rhinitis/.test(v.sub) && /Geriatrics/.test(v.sub), 'the suggestion is shown');
@@ -67,10 +67,36 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
         // 5 · a local failure lands on the error view WITH the model row; picking another model tries again straight away
         await page.evaluate(() => { __fail['ol/local'] = true; });
-        await click('Back'); await click('✨ Fix with AI'); await page.waitForFunction(() => /could not suggest/.test((document.querySelector('#qtx-overlay #qtx-title') || {}).textContent || ''));
+        await click('Back'); await click('Fix with AI'); await page.waitForFunction(() => /could not suggest/.test((document.querySelector('#qtx-overlay #qtx-title') || {}).textContent || ''));
         v = await view(); assert.match(v.sub, /Ollama is not reachable/); assert.equal(v.pressed[0], 'Ollama · local*', 'error view shows the model that failed');
         await vendor('Gemini'); await click('Lite 3.5'); await page.waitForFunction(() => /AI suggests/.test((document.querySelector('#qtx-overlay #qtx-title') || {}).textContent || ''));
         assert.equal((await page.evaluate(() => __calls)).slice(-1)[0], 'as/gemini-3.5-flash-lite'); v = await view(); assert.match(v.title, /Gemini Lite 3\.5/);
+
+        // 5b · V102.505: model first — the strip sits right under the title, above the chips; after an edit a model tap asks before replacing (EN only)
+        const order = await page.evaluate(() => { const o = document.getElementById('qtx-overlay'), m = o.querySelector('.qtx-model'), t = o.querySelector('#qtx-title'), s = o.querySelector('select'); const g = o.querySelector('[aria-label="AI model"]'); return [m.contains(t) && m.contains(o.querySelector('[aria-label="AI vendor"]')), !!(g.compareDocumentPosition(s) & 4)]; });
+        assert.deepEqual(order, [true, true], 'title + vendor logos share one line; the models sit above the chips');
+        const n0 = await page.evaluate(() => __calls.length);
+        await page.evaluate(() => document.querySelector('#qtx-overlay button[aria-label^="Remove"]').click());
+        assert.ok(await page.evaluate(() => !!document.querySelector('#qtx-overlay [aria-label="Edited"]')), 'an edit is marked (a dot by the title)');
+        await vendor('Claude'); await click('Haiku 5.5');
+        const warn = await page.evaluate(() => (document.querySelector('#qtx-overlay .qtx-warn') || {}).innerText || '');
+        assert.equal(warn.trim(), 'Replace your edits?', 'one short English line, the rest are icons'); assert.ok(!/[฀-๿]/.test(warn), 'the warning is English only');
+        assert.ok(await page.evaluate(() => !!document.querySelector('#qtx-overlay .qtx-warn button[aria-label="Run again with Claude Haiku 5.5"]') && !!document.querySelector('#qtx-overlay .qtx-warn button[aria-label="Keep my edits"]')), 'icon buttons name the model in their label');
+        assert.equal(await page.evaluate(() => [...document.querySelectorAll('#qtx-overlay [aria-label="AI model"] button')].find(b => b.textContent === 'Haiku 5.5').style.borderColor), 'rgb(217, 119, 6)', 'the pending model is outlined amber');
+        assert.equal(await page.evaluate(() => __calls.length), n0, 'an edited proposal is not replaced by a model tap'); assert.equal(await page.evaluate(() => localStorage.getItem('quizTagAiModel')), 'as/gemini-3.5-flash-lite', 'nothing stored before confirming');
+        await click('Keep my edits');
+        assert.equal(await page.evaluate(() => !!document.querySelector('#qtx-overlay .qtx-warn')), false, 'Keep my edits closes the warning'); assert.equal(await page.evaluate(() => __calls.length), n0, 'and runs nothing');
+        assert.ok(await page.evaluate(() => !!document.querySelector('#qtx-overlay [aria-label="Edited"]')), 'the edits are still there');
+        assert.deepEqual((await view()).pressed, ['Flash 3.8', 'Lite 3.5*', 'Argon 4'], 'Keep my edits goes back to the vendor in use');
+        await vendor('Claude'); await click('Haiku 5.5'); await click('Run again');
+        await page.waitForFunction((n) => __calls.length === n + 1 && /AI suggests/.test((document.querySelector('#qtx-overlay #qtx-title') || {}).textContent || ''), n0);
+        assert.equal((await page.evaluate(() => __calls)).slice(-1)[0], 'claude-haiku-5-5'); v = await view(); assert.match(v.title, /Claude Haiku 5\.5/);
+        assert.ok(await page.evaluate(() => !document.querySelector('#qtx-overlay [aria-label="Edited"]')), 'a fresh proposal has no edits');
+        // style D: icon-only footer, Back · Apply only · Apply & save (main action last), no visible title words
+        assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#qtx-overlay button[aria-label]')].filter(b => b.querySelector('i.fa-solid')).map(b => b.getAttribute('aria-label') + (b.textContent.trim() ? '+text' : ''))), ['Back', 'Apply only (no save yet)', 'Apply & save'], 'footer order, no text on the buttons');
+        assert.deepEqual(await page.evaluate(() => { const h = document.querySelector('#qtx-overlay #qtx-title'), sr = h.querySelector('span'); return [h.firstChild.textContent, sr.getBoundingClientRect().width <= 1, h.title]; }), ['✨', true, 'AI suggests · Claude Haiku 5.5'], 'the title is an icon; its words are in the tooltip (and for screen readers)');
+        await vendor('Gemini'); await click('Lite 3.5');   // no edits → runs straight away, as before
+        await page.waitForFunction((n) => __calls.length === n + 2 && /Gemini Lite 3\.5/.test((document.querySelector('#qtx-overlay #qtx-title') || {}).textContent || ''), n0);
 
         // 6 · the last pick is remembered for the next dialog; Apply still works
         await click('Apply only'); await page.waitForFunction(() => window.__done === false);   // Apply only = write the tags, do not save yet
