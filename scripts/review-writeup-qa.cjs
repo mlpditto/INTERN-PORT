@@ -1,8 +1,8 @@
 // V102.507–508 / V101.244: 📰 in the quiz Review header (right after the PDF icon) = a PERSONAL review for this one intern — the REAL reviewQuiz()
 // in public/admin.html (file://, network blocked, Firebase = self-returning Proxy, fake attempt doc, stubbed callUniversalAI + db).
 // Checks: the button sits next to PDF, icon-only with EN + TH + KO tooltips; the first click opens the panel under the header and drafts at once;
-// the prompt carries the wrong / partial questions (stem, the pick, the key, the explanation) and the FIRST name only — never the user id,
-// picture or surname — and asks for one narrative, not a per-question key; the draft lands in the textarea, nothing is written until Send;
+// the prompt carries the wrong / partial questions (stem, the pick, the key, the explanation) and NO name, id or picture, and asks for
+// a formal, impersonal bullet summary grouped by concept (no pronouns / particles / praise), not a per-question key; the draft lands in the textarea, nothing is written until Send;
 // Send writes quiz_attempts.adminComment (+At/+By) and nothing else; ✨ asks before replacing text; the language chip changes the prompt;
 // an existing adminComment prefills the box and does NOT auto-draft; an all-correct attempt gets a dimmed button and no panel; phone 390 px fits.
 // Static: the intern's result card + History row escape the comment and keep line breaks; Articles.fromMistakes is gone.
@@ -62,7 +62,7 @@ async function open(browser, { width, height, quiz, attempt, dialogs = 'dismiss'
     window.quizzesData = [quiz]; window.usersData = [];
     window.renderMdInline = window.renderMdInline || (t => String(t == null ? '' : t));
     window.showToast = (m) => { window.__toasts.push(String(m)); };
-    window.callUniversalAI = async (model, prompt, json, img, sys, opts) => { window.__prompts.push({ model, prompt, json, img, opts }); await new Promise(r => setTimeout(r, 60)); return { text: 'สวัสดี Bew\nเรื่อง HFI สั้น…\n\nสู้ ๆ นะ' }; };
+    window.callUniversalAI = async (model, prompt, json, img, sys, opts) => { window.__prompts.push({ model, prompt, json, img, opts }); await new Promise(r => setTimeout(r, 400)); return { text: 'สวัสดี Bew\nเรื่อง HFI สั้น…\n\nสู้ ๆ นะ' }; };   // slow enough for the busy-state assertion
     localStorage.removeItem('ai_review_writeup_lang'); localStorage.removeItem('ai_review_writeup_model');
   }, { quiz, attempt });
   await page.evaluate(() => reviewQuiz('a1')); await page.waitForTimeout(400);
@@ -102,10 +102,10 @@ const waitIdle = page => page.waitForFunction(() => !document.getElementById('rv
       assert.equal(p.length, 1, 'one AI call on the first open');
       const pr = p[0].prompt;
       for (const s of ['Which advantage of the 24/4 regimen', 'Less weight gain', 'Shorter hormone-free interval reduces withdrawal symptoms', 'A shorter HFI blunts hormone withdrawal', 'Rank progestins', 'Second-generation progestins', 'Migraine with aura', 'No precautions', 'Estrogen is contraindicated',
-        'addressed to Bew', 'in Thai', 'Contraceptive Knowledge', 'ONE connected narrative', 'Do NOT go question by question', 'do NOT mention scores', 'headed "Read more" (in Thai)', '2–4 specific things worth reading', 'no URLs, no invented sources'])
+        'concise academic review in Thai', 'Contraceptive Knowledge', 'starting with "• "', 'grouped by concept', 'Do NOT go question by question', 'do NOT mention scores', 'no pronouns or forms of address', 'ครับ / ค่ะ / นะ', 'no praise or encouragement', 'headed "Read more" (in Thai)', '2–4 specific sources', 'no URLs, no invented sources'])
         assert(pr.includes(s), 'the prompt carries: ' + s);
-      for (const s of ['Postpartum breastfeeding', 'Skipped question', 'u-secret-77', 'example.test', 'Sample', 'article', 'popup'])
-        assert(!pr.includes(s), 'the prompt must not carry: ' + s);
+      for (const s of ['Postpartum breastfeeding', 'Skipped question', 'u-secret-77', 'example.test', 'Bew', 'Sample', 'article', 'popup', 'warm', 'narrative'])
+        assert(!new RegExp('(^|[^A-Za-z])' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^A-Za-z]|$)', 'i').test(pr), 'the prompt must not carry: ' + s);   // whole word: "particles" is not "article"
       assert.equal(p[0].opts.feature, 'review_writeup', 'its own AI feature tag');
       assert.equal(await page.locator('#rv-writeup-text').inputValue(), DRAFT, 'the draft lands in the box, line breaks kept');
       assert.match(await page.locator('#rv-writeup-note').innerText(), /^✨ gpt-6-luna · \d+ s — read it, edit, then Send$/, 'note: model + seconds');
@@ -202,6 +202,6 @@ const waitIdle = page => page.waitForFunction(() => !document.getElementById('rv
       assert.deepEqual(errs.filter(e => !noise(e)), [], 'no page errors: ' + errs);
       await ctx.close();
     }
-    console.log('PASS: review 📰 personal write-up — next to PDF, EN + TH + KO tooltips, panel under the header, one narrative prompt from the wrong answers + first name only, draft in the box, Send = quiz_attempts.adminComment only, ✨ asks first, language chip, prefill without auto-draft, all-correct dimmed, 390 px fits; intern side escapes + pre-wrap; Articles.fromMistakes gone');
+    console.log('PASS: review 📰 personal write-up — next to PDF, EN + TH + KO tooltips, panel under the header, one academic bullet-style prompt from the wrong answers (no name), draft in the box, Send = quiz_attempts.adminComment only, ✨ asks first, language chip, prefill without auto-draft, all-correct dimmed, 390 px fits; intern side escapes + pre-wrap; Articles.fromMistakes gone');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

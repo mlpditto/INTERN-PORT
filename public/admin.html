@@ -31452,7 +31452,8 @@ ${JSON.stringify(sourceObj)}`;
         // V102.507: 📰 in the Review header = a PERSONAL review for this one intern (owner 2026-10-29: not the daily Articles feed).
         // The panel opens under the header; AI drafts ONE connected narrative from the wrong answers (what they picked, why it is the wrong
         // idea, the concept to keep) — not a per-question key; the admin edits; Send writes quiz_attempts.adminComment, which the intern
-        // already sees as the "Admin Feedback" card on the quiz result and in History. The prompt carries the first name only — never the id or picture.
+        // already sees as the "Admin Feedback" card on the quiz result and in History. The prompt carries the questions only — no name, id or picture.
+        // V102.508 (owner, after the first live draft): academic register, short bullets grouped by concept, no pronouns / particles / praise.
         function rvWriteupToggle() {
             const p = document.getElementById('rv-writeup'), b = document.getElementById('rv-writeup-btn');
             if (!p) return;
@@ -31480,10 +31481,11 @@ ${JSON.stringify(sourceObj)}`;
             const langName = { th: 'Thai', en: 'English', ko: 'Korean' }[rvWriteupLang()] || 'Thai';
             const cut = (v, n) => { v = String(v == null ? '' : v).replace(/\s+/g, ' ').trim(); return v.length > n ? v.slice(0, n) + '…' : v; };
             const qs = src.items.slice(0, 20).map((it, i) => `${i + 1}. Question: ${cut(it.q, 600)}\n   Picked (wrong): ${cut(it.picked, 300)}\n   Correct: ${cut(it.correct, 300)}${it.explanation ? `\n   Explanation: ${cut(it.explanation, 500)}` : ''}`).join('\n');
-            const prompt = `You are a warm, expert pharmacy mentor writing to ONE intern after a quiz. Write a short personal review in ${langName} (under 900 characters) addressed to ${cut(src.firstName, 40) || 'the intern'} about the quiz "${cut(src.quizTitle, 120)}".
-Walk through what went wrong as ONE connected narrative: for each mistake say what they chose, why that is the wrong idea, and the concept to keep in mind — group related mistakes together. Do NOT go question by question, do NOT number the questions, do NOT quote the answer key verbatim, do NOT mention scores or points. Close with one encouraging line.
-Then add a short section headed "Read more" (in ${langName}) listing 2–4 specific things worth reading on the concepts missed — a guideline or textbook chapter, a drug-class monograph, a named review topic — names only, no URLs, no invented sources.
-Plain text only: no markdown, no headings other than the Read-more line, no "Dear …" line.
+            const prompt = `Write a concise academic review in ${langName} (under 1000 characters) of the quiz "${cut(src.quizTitle, 120)}" for one pharmacy intern, based ONLY on the questions below that were answered wrongly.
+Form: one short topic line, then bullet points — each on its own line starting with "• ", one line each, grouped by concept — each stating the misconception and the correct principle with its reason. Do NOT go question by question, do NOT number the questions, do NOT quote the answer key verbatim, do NOT mention scores or points.
+Register: formal, impersonal, textbook style — no greeting, no praise or encouragement, no pronouns or forms of address for the reader or the writer (no "you", "I", "we", no names, no particles such as ครับ / ค่ะ / นะ).
+Then a short section headed "Read more" (in ${langName}) listing 2–4 specific sources worth reading on the concepts missed — a guideline, a textbook chapter, a drug-class monograph — names only, no URLs, no invented sources.
+Plain text only: no markdown beyond the "• " bullets, no bold, no headings other than the topic line and the Read-more line.
 
 --- QUIZ: ${cut(src.quizTitle, 120)} — questions answered wrongly ---
 ${qs}`;
@@ -32040,8 +32042,8 @@ ${qs}`;
                     ? `<button onclick="adminOpenQuizDownloads('${escapeHtml(quiz.id)}')" class="rv-ib" style="${rvIconBtn}" title="Open this quiz's links / documents (${_reviewLinks.length})" data-th-title="โหลดลิงก์/เอกสารของ Quiz นี้" aria-label="Materials"><i class="fa-solid fa-paperclip"></i></button>`
                     : '';
 
-                const rvFirstName = String(att.displayName || '').trim().split(/\s+/)[0] || '';
-                window._reviewWrongForWriteup = { quizTitle: String(quiz.title || quiz.shortTitle || ''), firstName: rvFirstName, items: rvWrongItems };
+                const rvFirstName = String(att.displayName || '').trim().split(/\s+/)[0] || '';   // panel header only — never in the prompt
+                window._reviewWrongForWriteup = { quizTitle: String(quiz.title || quiz.shortTitle || ''), items: rvWrongItems };
                 const rvWriteupLangSaved = localStorage.getItem('ai_review_writeup_lang') || 'th';
                 const rvWriteupModelId = 'ai-review-writeup-model-' + Date.now();   // V102.508: one hidden input per open; bindRegistryModelInput builds the vendor-first rail after it
                 const rvWriteupHtml = `<div id="rv-writeup" hidden class="lang-no-toggle" style="padding:10px 16px;border-bottom:1px solid #fde68a;background:#fffbeb;display:flex;flex-direction:column;gap:8px;">
