@@ -6,7 +6,7 @@ assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(admin));
 const grab = marker => { const i = admin.indexOf(marker); assert.ok(i >= 0, marker); let d = 0, k = admin.indexOf('{', admin.indexOf(')', i)); for (; k < admin.length; k++) { if (admin[k] === '{') d++; else if (admin[k] === '}' && --d === 0) break; } return admin.slice(i, k + 1); };
 const fns = [grab('window._qImproveCtx = function'), grab('window._qPrimerDraft = async function'), grab('window._qImproveShowPanel = function'), grab('window._qImproveActionBar = function'), grab('window._qImproveRemovePanel = function'), grab('window._qPrimerModelSelect = function'), grab('window._qPrimerDraftAll = async function')].join(';\n');
 const boxStart = admin.indexOf('<div class="q-primer-row"'), box = admin.slice(boxStart, admin.indexOf('</div>', admin.indexOf('</textarea>', boxStart)) + 6).replace(/\$\{data && data\.primer \? String\(data\.primer\)\.replace\(\/<\/g, '&lt;'\) : ''\}/, '');
-assert.ok(box.includes('${window._qPrimerModelSelect()}'), 'a model select sits in the label row, before the icon buttons');
+assert.ok(box.includes('${window._qPrimerModelSelect()}'), 'the model input sits in the label row, before the icon buttons (V102.509: a hidden input the vendor-first rail binds to)');
 assert.ok(box.includes("_qPrimerDraft(this, 'full')") && box.includes("_qPrimerDraft(this, 'terms')") && box.includes('_qPrimerDraftAll(this)'), 'two icon buttons + ✨ All in the Read first label row');
 assert.ok(/aria-label="Draft Read first with AI">✨</.test(box) && /The correct answer is NOT sent/.test(box), '✨ with an accessible name + the promise in the hover');
 
@@ -31,7 +31,7 @@ assert.ok(/aria-label="Draft Read first with AI">✨</.test(box) && /The correct
                 box + '<div class="options-actions"></div></div>'; document.body.append(tb);
             new Function('let _qPrimerAllRunning = false, _qPrimerAllStop = false; ' + fns + '; window._qPrimerDraft = window._qPrimerDraft; window._qPrimerModelSelect = window._qPrimerModelSelect; window._qPrimerDraftAll = window._qPrimerDraftAll;').call(window);
             document.querySelector('.quiz-q-item').outerHTML = document.querySelector('.quiz-q-item').outerHTML.replace('${window._qPrimerModelSelect()}', window._qPrimerModelSelect());
-            out.options = [...document.querySelectorAll('.q-primer-model option')].map(o => o.textContent); out.firstPick = document.querySelector('.q-primer-model').value;
+            const mi0 = document.querySelector('.q-primer-model'); out.inputKind = mi0.tagName + '/' + mi0.type + '/' + (mi0.id.startsWith('q-primer-model-') ? 'id' : 'noid'); out.firstPick = mi0.value;
             const item = document.querySelector('.quiz-q-item'), ta = item.querySelector('.q-primer'), [full, terms] = item.querySelectorAll('.q-primer-ai');
             // 0) the select defaults to the toolbar model; picking another one is what the draft uses (and is remembered)
             const sel = item.querySelector('.q-primer-model'); sel.value = 'claude-sonnet-5-5'; sel.dispatchEvent(new Event('change'));
@@ -68,7 +68,7 @@ assert.ok(/aria-label="Draft Read first with AI">✨</.test(box) && /The correct
         assert.ok(!/คำตอบที่ถูก|correct|ข้อ 2/.test(pFull.replace('ห้ามระบุ ห้ามบอกใบ้ หรือเปรียบเทียบว่าตัวเลือกใดถูก/ผิด', '')), 'NO answer key in the prompt (no "correct answer", no index of the ticked option)');
         assert.ok(/ไม่มีการระบุคำตอบ/.test(pFull) && /ห้ามเฉลย/.test(pFull), 'the prompt forbids giving the answer away');
         assert.ok(/อภิธานศัพท์/.test(pTerms) && !/ความรู้พื้นฐานที่ต้องมี/.test(pTerms), 'terms-only mode asks for the glossary only');
-        assert.deepEqual(r.options, ['Luna 6', 'Sonnet 5.5', 'Sol 6']); assert.equal(r.firstPick, 'gpt-6.1-sol', 'first time the select follows the toolbar model'); assert.equal(r.remembered, 'claude-sonnet-5-5', 'a pick is remembered in this browser');
+        assert.equal(r.inputKind, 'INPUT/hidden/id', 'V102.509: a hidden input with an id — the vendor-first rail binds to it on the real page'); assert.equal(r.firstPick, 'gpt-6.1-sol', 'first time the input follows the toolbar model'); assert.equal(r.remembered, 'claude-sonnet-5-5', 'a pick is remembered in this browser');
         assert.deepEqual([...new Set(r.models)], ['claude-sonnet-5-5'], 'the draft uses the model picked in the select'); assert.deepEqual([...new Set(r.feats)], ['question_primer']);
         assert.match(r.filled, /LABA/); assert.equal(r.btnBack, true);
         assert.match(r.leakToast, /repeats a correct option/); assert.match(r.leakFilled, /Salmeterol/, 'still filled — the admin decides');

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.508)</title>
+    <title>Nika Admin (V102.509)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -5572,6 +5572,11 @@
         #rv-writeup .rv-lang { width:30px; height:26px; min-height:0; padding:0; margin:0; border-radius:8px; border:1px solid #e2e8f0; background:#fff; font-size:15px; line-height:1; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
         #rv-writeup .rv-lang[aria-pressed="true"] { border-color:#f59e0b; background:#fef3c7; }
         #rv-writeup .rv-lang img.emoji { width:18px; height:18px; }
+        /* V102.509: the Read first model picker is the page's vendor-first rail (was a <select>, #1784) — light, amber like its row */
+        .q-primer-row .text-ai-chips { flex:1 1 auto; padding:0 !important; gap:3px !important; background:transparent; border:0; text-transform:none; letter-spacing:0; }
+        .q-primer-row .text-ai-chips > button.glass-toggle-item { min-height:24px; padding:2px 7px; font-size:10.5px; font-weight:800; border-radius:8px; background:#fff; border-color:#fde68a; color:#78350f; }
+        .q-primer-row .text-ai-chips > button.glass-toggle-item:hover { border-color:#f59e0b; }
+        .q-primer-row .mr-vendor { width:26px; height:26px; }
         /* V101.49: light rail — black OpenAI Blossom; OpenRouter chips keep the Grape border. */
         #reflectiveReviewModal :is(.reflective-review-feedback, #reflective-grammar-card) .text-ai-logo[data-owner="openai"] { background-image:url(assets/logos/openai-blossom-black.svg); }
         #reflectiveReviewModal :is(.reflective-review-feedback, #reflective-grammar-card) .text-ai-chips > button.glass-toggle-item[data-value^="or/"] { border-color:#8b5cf6; }
@@ -25795,14 +25800,16 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         // V102.224: ✨ in the "Read first" box — AI drafts the page the learner reads BEFORE the timer. The CORRECT ANSWER IS NEVER SENT (only the stem + the options, unmarked),
         // so the draft cannot lean on it; a draft that still names a correct option verbatim is flagged. 'full' = background + key terms, 'terms' = glossary lines only.
         // An empty box is filled; a filled one gets the replace/cancel panel (same pattern as the Explanation draft). Nothing is saved until the quiz is.
-        // The model for the draft: a small select in the Read first label row (short names), remembered in this browser; the first time it follows the quiz editor's toolbar model.
+        // The model for the draft: V102.509 — the page's vendor-first rail in the Read first label row (vendor icons, then that vendor's chips; owner
+        // 2026-10-29, replacing the #1784 <select>): a hidden input.q-primer-model that addQuestionUI binds with bindRegistryModelInput once the row is in
+        // the DOM; the pick is remembered under ai_primer_model; the first time it follows the quiz editor's toolbar model. _qPrimerDraft reads its .value.
+        window._qPrimerModelSeq = window._qPrimerModelSeq || 0;
         window._qPrimerModelSelect = function() {
             let picked = '';
             try { picked = localStorage.getItem('ai_primer_model') || ''; } catch (_) { /* storage blocked */ }
             if (!picked) { const tb = document.getElementById('toolbar-ai-translate-model'); picked = (tb && tb.value) || ''; }
             picked = window.normalizeTextAIModel(picked);
-            return '<select class="q-primer-model" aria-label="AI model for the Read first draft" title="AI model for the draft" onchange="try{localStorage.setItem(\'ai_primer_model\', this.value)}catch(e){}" style="max-width:130px; padding:4px 6px; border-radius:8px; border:1px solid #fde68a; background:#fff; color:#78350f; font:700 12px inherit; font-family:inherit;">' +
-                window.TEXT_AI_MODELS.map(m => '<option value="' + m.id + '"' + (m.id === picked ? ' selected' : '') + '>' + m.short + '</option>').join('') + '</select>';
+            return '<input type="hidden" class="q-primer-model" id="q-primer-model-' + (++window._qPrimerModelSeq) + '" value="' + escapeHtml(picked) + '" onchange="try{localStorage.setItem(\'ai_primer_model\', this.value)}catch(e){}">';
         };
         window._qPrimerDraft = async function(btn, mode, modelOverride, silent) {
             const item = btn.closest('.quiz-q-item'), ctx = window._qImproveCtx(item), ta = item && item.querySelector('.q-primer');
@@ -27744,6 +27751,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 </div>
             `;
             container.appendChild(div);
+            { const mi = div.querySelector('input.q-primer-model'); if (mi && window.bindRegistryModelInput) window.bindRegistryModelInput(mi.id, 'ai_primer_model'); }   // V102.509: Read first model = vendor-first rail (ai-model-ui.js)
 
             if (qType === 'rank') { rankDecorate(div, data); toggleQType(div.querySelector('.q-type')); }   // V102.465: tier rows + actions for a saved / restored Rank question
             // Sync text value
