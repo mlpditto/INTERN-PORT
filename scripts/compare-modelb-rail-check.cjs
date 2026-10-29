@@ -39,24 +39,27 @@ const modelB = cut('        window._compareModelB = function', '        window.g
         // V102.12: OpenRouter theme — grape tint + grape border + Grape→Volt bar + corner glyph.
         const orLook = sel => page.locator(sel).evaluate(b => { const s = getComputedStyle(b), a = getComputedStyle(b, '::after'), z = getComputedStyle(b, '::before'); return { bg: s.backgroundColor, img: s.backgroundImage, border: s.borderTopColor, bar: a.backgroundImage, glyph: z.backgroundImage }; });
         const qwen = await orLook('#b button[aria-label="Qwen 3.8 Flash"]');
-        assert.match(qwen.img, /rgba\(118, 36, 244, 0\.1\)/, 'grape tint');
-        assert.equal(qwen.border, 'rgb(118, 36, 244)', 'grape border');
-        assert.match(qwen.bar, /rgb\(118, 36, 244\).*rgb\(200, 255, 0\)/, 'Grape→Volt bar');
-        assert.match(qwen.glyph, /glyph-grape\.svg/, 'corner glyph');
+        // V102.487 lean rail: no tint, no border, no corner glyph — one violet dot after the name says "via OpenRouter".
+        assert.equal(qwen.img, 'none', 'no grape tint');
+        assert.equal(await page.locator('#b button[aria-label="Qwen 3.8 Flash"]').evaluate(b => getComputedStyle(b).borderTopWidth), '0px', 'no chip border');
+        assert.equal(await page.locator('#b button[aria-label="Qwen 3.8 Flash"]').evaluate(b => getComputedStyle(b, '::after').backgroundColor), 'rgb(118, 36, 244)', 'violet OpenRouter dot');
+        assert.equal(qwen.glyph, 'none', 'no corner glyph');
         // V102.13: vendor themes — unpicked tint + border + bar in the vendor colour; picked = vendor colour solid, white name + logo.
         const look = sel => page.locator(sel).evaluate(b => { const s = getComputedStyle(b), a = getComputedStyle(b, '::after'), l = b.querySelector('.text-ai-logo'), ls = l && getComputedStyle(l); return { vendor: b.dataset.vendor, bg: s.backgroundColor, img: s.backgroundImage, border: s.borderTopColor, color: s.color, bar: a.backgroundColor + '|' + a.backgroundImage, logo: ls ? ls.backgroundImage.replace(/^.*\//, '') + '|' + ls.filter : '' }; });
         const pick = async label => { await page.locator(`#b button[aria-label="${label}"]`).click(); return look(`#b button[aria-label="${label}"]`); };
         await page.locator('#b button[aria-label="Claude Sonnet 5.5"]').click();
         const luna = await look('#b button[aria-label="GPT 6 Luna"]');
         assert.equal(luna.vendor, 'openai');
-        assert.match(luna.img, /rgba\(13, 13, 13, 0\.05\)/, 'GPT ink tint');
-        assert.deepEqual([luna.border, luna.bar.split('|')[0]], ['rgb(13, 13, 13)', 'rgb(13, 13, 13)'], 'GPT ink border + bar');
+        assert.equal(luna.img, 'none', 'no GPT ink tint');
+        assert.equal(luna.bar.split('|')[0], 'rgba(0, 0, 0, 0)', 'no GPT bar');
         const haiku = await look('#b button[aria-label="Claude Haiku 5.5"]');
-        assert.deepEqual([haiku.vendor, haiku.border, haiku.bar.split('|')[0]], ['claude', 'rgb(227, 165, 140)', 'rgb(217, 119, 87)'], 'Claude clay border + bar');
+        assert.deepEqual([haiku.vendor, haiku.bar.split('|')[0]], ['claude', 'rgba(0, 0, 0, 0)'], 'Claude: no clay border or bar');
         const flash = await look('#b button[aria-label="Gemini 3.8 Flash"]');
         // V102.463: Flash 3.8 reads Thai in pictures → Thai-flag border (drawn as background bands, the border colour itself is transparent)
-        assert.deepEqual([flash.vendor, flash.border], ['gemini', 'rgba(0, 0, 0, 0)'], 'Gemini Thai-flag border');
-        assert.match(flash.bar, /rgb\(66, 133, 244\)/, 'Gemini keeps the Google-bill rainbow bar');
+        // V102.487: the Thai cue is a faint flag-colour wash behind the name; the Google bill is a blue dot
+        assert.equal(flash.vendor, 'gemini');
+        assert.match(flash.img, /rgba\(165, 25, 49/, 'Gemini Thai-flag wash');
+        assert.equal(flash.bar.split('|')[0], 'rgb(66, 133, 244)', 'Gemini keeps the Google-bill blue dot');
         const sonnet = await look('#b button[aria-label="Claude Sonnet 5.5"]');
         assert.deepEqual([sonnet.bg, sonnet.img, sonnet.color], ['rgb(217, 119, 87)', 'none', 'rgb(255, 255, 255)'], 'picked Claude = clay solid, white name (no amber)');
         assert.match(sonnet.logo, /invert\(1\)/, 'white Claude mark');
@@ -67,12 +70,11 @@ const modelB = cut('        window._compareModelB = function', '        window.g
         assert.match(flashOn.img, /rgb\(66, 133, 244\).*rgb\(155, 114, 203\)/, 'picked Gemini = blue→purple');
         const picked = await pick('Qwen 3.8 Max');
         assert.deepEqual([picked.bg, picked.color], ['rgb(118, 36, 244)', 'rgb(255, 255, 255)'], 'picked OpenRouter = grape solid');
-        assert.match(picked.bar, /rgb\(200, 255, 0\)/, 'Volt bar on the grape pick');
-        assert.match(await page.locator('#b button[aria-label="Qwen 3.8 Max"]').evaluate(b => getComputedStyle(b, '::before').backgroundImage), /glyph-grape\.svg/, 'picked chip keeps the glyph');
+        assert.equal(await page.locator('#b button[aria-label="Qwen 3.8 Max"]').evaluate(b => getComputedStyle(b, '::after').backgroundColor), 'rgb(118, 36, 244)', 'picked chip keeps its dot');
         // the audit toolbar and Curate paint their own amber pick — the vendor colour must still win there
         await page.evaluate(() => { const w = document.createElement('div'); w.className = 'audit-toolbar'; w.id = 'at'; w.innerHTML = textAIChipsHtml('', 'claude-opus-5-5', ''); document.body.append(w); });
         assert.deepEqual(await page.locator('#at button[aria-pressed="true"]').evaluate(b => [getComputedStyle(b).backgroundColor, getComputedStyle(b).color]), ['rgb(217, 119, 87)', 'rgb(255, 255, 255)'], 'audit toolbar pick uses the vendor colour');
-        assert.equal(await page.locator('#at button[aria-label="Qwen 3.8 Flash"]').evaluate(b => getComputedStyle(b).borderTopColor), 'rgb(118, 36, 244)', 'V102.14: audit toolbar OpenRouter border is grape (was olive)');
+        assert.equal(await page.locator('#at button[aria-label="Qwen 3.8 Flash"]').evaluate(b => getComputedStyle(b, '::after').backgroundColor), 'rgb(118, 36, 244)', 'V102.487: audit toolbar OpenRouter chip carries the violet dot');
         await page.evaluate(() => document.getElementById('at').remove());
 
         // picking Grok is kept (trial ids used to normalise back to Luna)
