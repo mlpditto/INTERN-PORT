@@ -39,7 +39,7 @@ assert.ok(/aria-label="Draft Read first with AI">✨</.test(box) && /The correct
             // 1) empty box → filled, nothing about the answer was sent
             reply = { primer: '**LABA** = long-acting beta-agonist (≥12 h).\n\n- **LAMA** — long-acting muscarinic antagonist' };
             await window._qPrimerDraft(full, 'full');
-            out.filled = ta.value; out.btnBack = full.innerHTML === '✨' && !full.disabled;
+            out.filled = ta.value; out.btnBack = full.innerHTML === '✨' && !full.disabled; out.draftToast = out.toasts[out.toasts.length - 1];
             // 2) the correct option named verbatim → flagged
             ta.value = ''; reply = { primer: 'Salmeterol is the example everyone knows.' };
             await window._qPrimerDraft(full, 'full'); out.leakToast = out.toasts[out.toasts.length - 1]; out.leakFilled = ta.value;
@@ -70,13 +70,13 @@ assert.ok(/aria-label="Draft Read first with AI">✨</.test(box) && /The correct
         assert.ok(/อภิธานศัพท์/.test(pTerms) && !/ความรู้พื้นฐานที่ต้องมี/.test(pTerms), 'terms-only mode asks for the glossary only');
         assert.equal(r.inputKind, 'INPUT/hidden/id', 'V102.509: a hidden input with an id — the vendor-first rail binds to it on the real page'); assert.equal(r.firstPick, 'gpt-6.1-sol', 'first time the input follows the toolbar model'); assert.equal(r.remembered, 'claude-sonnet-5-5', 'a pick is remembered in this browser');
         assert.deepEqual([...new Set(r.models)], ['claude-sonnet-5-5'], 'the draft uses the model picked in the select'); assert.deepEqual([...new Set(r.feats)], ['question_primer']);
-        assert.match(r.filled, /LABA/); assert.equal(r.btnBack, true);
+        assert.match(r.filled, /LABA/); assert.equal(r.btnBack, true); assert.match(r.draftToast, /^✨ Read first drafted · \d+ s$/, 'V102.514: the single draft says how long it took: ' + r.draftToast);
         assert.match(r.leakToast, /repeats a correct option/); assert.match(r.leakFilled, /Salmeterol/, 'still filled — the admin decides');
         assert.equal(r.panel, true); assert.equal(r.untouched, 'My own text', 'a filled box is not overwritten until ✓'); assert.equal(r.applied, 'New draft text'); assert.equal(r.panelGone, true);
         assert.match(r.failToast, /failed: boom/); assert.equal(r.failBtn, true); assert.equal(r.sentWithoutQuestion, 0, 'no question → nothing sent to the AI');
         assert.deepEqual(r.allSent, ['What is a LAMA?', 'What is SABA?'], '✨ All sends only the questions with text and no Read first: ' + JSON.stringify(r.allSent));
         assert.deepEqual(r.allValues, ['New draft text', 'Background text', 'Already written', 'Background text'], 'the two empty ones are filled, the written ones untouched (the first still holds step 3), the one with no text skipped');
-        assert.deepEqual(r.allToasts, ['✨ Read first drafted for 2/2 · save the quiz to keep them'], 'one toast for the whole run: ' + JSON.stringify(r.allToasts)); assert.equal(r.allBtnBack, true, 'the ✨ All button comes back');
+        assert.equal(r.allToasts.length, 1, 'one toast for the whole run: ' + JSON.stringify(r.allToasts)); assert.match(r.allToasts[0], /^✨ Read first drafted for 2\/2 · \d+ s · save the quiz to keep them$/, 'V102.514: the toast carries the total time: ' + r.allToasts[0]); assert.equal(r.allBtnBack, true, 'the ✨ All button comes back');
         assert.equal(r.allDeclined, 0, 'Cancel on the confirm sends nothing');
         assert.deepEqual(errors, [], 'no page errors: ' + errors.join(' | '));
         console.log('PASS: Read first ✨ — drafts from stem + unmarked options only (no answer key), terms-only mode, leak flag, fills an empty box / asks before replacing, failure restores the button');

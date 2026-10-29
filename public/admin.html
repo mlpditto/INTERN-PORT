@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.513)</title>
+    <title>Nika Admin (V102.514)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -25942,7 +25942,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 '',
                 'OUTPUT RAW JSON เท่านั้น ห้าม code fence: {"primer":"..."}'
             ].join('\n');
-            const html0 = btn.innerHTML;
+            const html0 = btn.innerHTML, t0 = Date.now();   // V102.514 (owner): say how long the AI took
             btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
             try {
                 const res = await window.callUniversalAI(modelOverride || ((item.querySelector('.q-primer-model') || {}).value) || window._qImproveModel(item), prompt, true, null, ctx.quickApiKey, { feature: 'question_primer' });
@@ -25951,10 +25951,10 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 const text = data.primer.trim();
                 const low = text.toLowerCase();
                 const leaks = ctx.correctIndices.map(i => String(ctx.options[i] || '').trim()).filter(t => t.length >= 4 && low.includes(t.toLowerCase()));
-                const warn = leaks.length ? ' — ⚠️ it repeats a correct option, check it' : '';
+                const warn = leaks.length ? ' — ⚠️ it repeats a correct option, check it' : '', took = ' · ' + Math.max(1, Math.round((Date.now() - t0) / 1000)) + ' s';
                 const existing = (ta.value || '').trim();
-                if (!existing) { ta.value = text; if (!silent) showToast('✨ Read first drafted' + warn); return leaks.length ? 'leak' : 'ok'; }
-                const applyFn = () => { ta.value = text; showToast('✨ Read first replaced' + warn); };
+                if (!existing) { ta.value = text; if (!silent) showToast('✨ Read first drafted' + took + warn); return leaks.length ? 'leak' : 'ok'; }
+                const applyFn = () => { ta.value = text; showToast('✨ Read first replaced' + took + warn); };
                 // V102.360: Current | New side by side, both rendered (the raw **term** markdown was hard to compare)
                 const md = s => (typeof window.renderMd === 'function') ? window.renderMd(s) : '<div style="white-space:pre-wrap;">' + escapeHtml(s) + '</div>';
                 const col = (label, c, body) => '<div class="q-primer-cmp"><div style="font-size:0.78em; font-weight:800; color:' + c + '; margin-bottom:4px;">' + label + '</div><div class="q-primer-cmp-body">' + body + '</div></div>';
@@ -25983,19 +25983,24 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             if (!todo.length) { showToast('Every question already has a Read first (or has no question text yet)'); return; }
             if (!confirm(`Draft a Read first for ${todo.length} question(s) that have none?\nModel: ${model}\n\nOne at a time — keep this window open. Press the button again to stop.`)) return;
             _qPrimerAllRunning = true; _qPrimerAllStop = false;
-            const html0 = btn.innerHTML;
-            let done = 0, failed = 0, leaks = 0, i = 0;
+            const html0 = btn.innerHTML, t0 = Date.now();
+            // V102.514 (owner): the button counts the time the AI has used — "⏳ 4/10 · 0:47" — and the toast gives the total
+            const fmt = ms => { const sec = Math.round(ms / 1000); return sec < 60 ? sec + ' s' : Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); };
+            let done = 0, failed = 0, leaks = 0, i = 0, pos = '';
+            const paint = () => { if (_qPrimerAllRunning && !_qPrimerAllStop) btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${pos} · ${fmt(Date.now() - t0)}`; };
+            const tick = setInterval(paint, 1000);
             try {
                 for (; i < todo.length; i++) {
                     if (_qPrimerAllStop) break;
-                    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${i + 1}/${todo.length}`;
+                    pos = `${i + 1}/${todo.length}`; paint();
                     const item = todo[i], rowBtn = item.querySelector('.q-primer-ai') || btn;
                     const r = await window._qPrimerDraft(rowBtn, 'full', model, true);
                     if (r === 'ok' || r === 'leak') { done++; if (r === 'leak') leaks++; } else failed++;
                 }
             } finally {
+                clearInterval(tick);
                 _qPrimerAllRunning = false; _qPrimerAllStop = false; btn.innerHTML = html0;
-                showToast(`✨ Read first drafted for ${done}/${todo.length}${failed ? ` (${failed} failed)` : ''}${i < todo.length ? ' — stopped' : ''}${leaks ? ` · ⚠️ ${leaks} repeat a correct option, check them` : ''} · save the quiz to keep them`);
+                showToast(`✨ Read first drafted for ${done}/${todo.length}${failed ? ` (${failed} failed)` : ''}${i < todo.length ? ' — stopped' : ''} · ${fmt(Date.now() - t0)}${leaks ? ` · ⚠️ ${leaks} repeat a correct option, check them` : ''} · save the quiz to keep them`);
             }
         };
 
