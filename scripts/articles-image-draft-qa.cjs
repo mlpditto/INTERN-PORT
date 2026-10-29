@@ -36,16 +36,16 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
         // 1 · plain text paste is left alone
         assert.equal(await paste('art-bodyta', 'text'), false, 'a text paste is not intercepted');
-        assert.equal(await page.evaluate(() => Articles._S.img), null);
+        assert.deepEqual(await page.evaluate(() => Articles._S.imgs), []);
         assert.equal(await page.locator('.art-img').count(), 0);
 
         // 2 · a picture paste: intercepted, thumbnail row appears, text untouched, picture shrunk to ≤ 1600 px JPEG
         assert.equal(await paste('art-bodyta', 'image'), true, 'an image paste is taken over');
         await page.waitForSelector('.art-img img');
-        const im = await page.evaluate(() => ({ mime: Articles._S.img.mime, b64: Articles._S.img.b64.length, src: document.querySelector('.art-img img').src.slice(0, 23), row: document.querySelector('.art-img').innerText, body: document.getElementById('art-bodyta').value, w: 0 }));
+        const im = await page.evaluate(() => ({ mime: Articles._S.imgs[0].mime, b64: Articles._S.imgs[0].b64.length, src: document.querySelector('.art-img img').src.slice(0, 23), row: document.querySelector('.art-img').innerText, body: document.getElementById('art-bodyta').value, w: 0 }));
         assert.equal(im.mime, 'image/jpeg'); assert.ok(im.b64 > 100, 'base64 kept'); assert.equal(im.src, 'data:image/jpeg;base64,');
         assert.match(im.row, /Draft reads this picture · /); assert.equal(im.body, '', 'nothing was typed into the body by the paste');
-        const dim = await page.evaluate(() => new Promise(r => { const i = new Image(); i.onload = () => r([i.naturalWidth, i.naturalHeight]); i.src = Articles._S.img.src; }));
+        const dim = await page.evaluate(() => new Promise(r => { const i = new Image(); i.onload = () => r([i.naturalWidth, i.naturalHeight]); i.src = Articles._S.imgs[0].src; }));
         assert.deepEqual(dim, [1600, 800], 'shrunk to 1600 px on the long side, ratio kept');
         const btn = await page.evaluate(() => document.querySelector('#art-body .art-ai .go').textContent.trim());
         assert.equal(btn, '✨ Draft');
@@ -78,7 +78,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
         // 5 · ✕ removes it; without a picture and without a title, today's message returns; no visionData is sent for a normal draft
         await page.click('.art-img .x');
-        assert.equal(await page.locator('.art-img').count(), 0); assert.equal(await page.evaluate(() => Articles._S.img), null);
+        assert.equal(await page.locator('.art-img').count(), 0); assert.deepEqual(await page.evaluate(() => Articles._S.imgs), []);
         await page.evaluate(() => { __ai.length = 0; Articles.edit(null); Articles.ai(); });
         assert.match(await page.evaluate(() => Articles._S.err), /needs a title \(a few words are enough\) or a link/);
         await page.evaluate(() => { document.getElementById('art-title').value = 'Inhalers'; Articles.text('title', 'Inhalers'); Articles.ai(); });
@@ -95,9 +95,61 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         const fl = await page.evaluate(() => [...document.querySelectorAll('#art-list .art-lg, .art-list .art-lg, #articlesModal .art-lg')].map(e => [e.classList.contains('off'), e.title, getComputedStyle(e).opacity]));
         assert.ok(fl.some(f => f[0] && /Korean|KO|한/i.test(f[1]) && /not written yet/.test(f[1]) && Number(f[2]) < 0.5), 'missing language → faded flag + tooltip: ' + JSON.stringify(fl));
 
+        // 8 · V102.487 several pictures: paste + drop ADD, ✕ removes one, 6th refused, ONE request carries them stitched in order
+        const dropFiles = n => page.evaluate(async n => {
+            const dt = new DataTransfer();
+            for (let i = 0; i < n; i++) { const c = document.createElement('canvas'); c.width = 1200; c.height = 1600; const g = c.getContext('2d'); g.fillStyle = ['#e11d48', '#16a34a', '#2563eb', '#f59e0b', '#7c3aed', '#0f172a'][i % 6]; g.fillRect(0, 0, 1200, 1600); const b = await new Promise(r => c.toBlob(r, 'image/png')); dt.items.add(new File([b], 'd' + i + '.png', { type: 'image/png' })); }
+            const ev = new Event('drop', { bubbles: true, cancelable: true }); ev.dataTransfer = dt; document.getElementById('art-bodyta').dispatchEvent(ev); return ev.defaultPrevented;
+        }, n);
+        await page.evaluate(() => { localStorage.removeItem('ai_default_codex_vision_model'); Articles.edit(null); });
+        await paste('art-bodyta', 'image'); await page.waitForFunction(() => Articles._S.imgs.length === 1);
+        assert.equal(await dropFiles(2), true, 'a file drop is taken over'); await page.waitForFunction(() => Articles._S.imgs.length === 3);
+        assert.equal(await page.locator('.art-img .th').count(), 3, 'three thumbnails'); assert.equal(await page.locator('.art-img .th .x').count(), 3, 'an ✕ on each');
+        assert.match(await page.locator('.art-img .t').innerText(), /these 3 pictures · /);
+        const barH = await page.evaluate(() => document.querySelector('.art-img').getBoundingClientRect().height);
+        assert.ok(barH < 60, 'the bar stays one line on desktop: ' + barH);
+        const before = await page.evaluate(() => Articles._S.imgs.map(i => i.b64.slice(-40)));
+        await page.locator('.art-img .th .x').nth(1).click();
+        const after = await page.evaluate(() => Articles._S.imgs.map(i => i.b64.slice(-40)));
+        assert.deepEqual(after, [before[0], before[2]], 'removed exactly the one clicked, order kept'); assert.equal(await page.locator('.art-img .th').count(), 2);
+        // cap: fill to 5, the 6th is refused with an inline message and nothing is added
+        await dropFiles(3); await page.waitForFunction(() => Articles._S.imgs.length === 5);
+        await dropFiles(1); await page.waitForTimeout(300);
+        assert.equal(await page.evaluate(() => Articles._S.imgs.length), 5, 'the 6th is not added');
+        assert.match(await page.evaluate(() => document.getElementById('articlesModal').innerText), /Up to 5 pictures per draft/);
+        await page.locator('.art-img .th .x').nth(0).click(); assert.equal(await page.evaluate(() => Articles._S.err), '', 'removing clears the message');
+        assert.equal(await page.evaluate(() => Articles._S.imgs.length), 4);
+        // Draft: ONE request, the vision data is a single stitched JPEG (2 columns x 2 rows), the prompt names the 4 numbered pictures
+        const sent = await page.evaluate(() => Articles._S.imgs.map(i => i.b64));
+        await page.evaluate(() => { __ai.length = 0; Articles.ai(); }); await page.waitForFunction(() => !Articles._S.aiBusy);
+        const q = await page.evaluate(() => ({ n: __ai.length, m: __ai[0].model, mime: __ai[0].vis.image_mimetype, b64: __ai[0].vis.image_base64, p: __ai[0].prompt, note: Articles._S.aiNote, err: Articles._S.err }));
+        assert.equal(q.err, ''); assert.equal(q.n, 1, 'one request for all the pictures'); assert.equal(q.m, 'gemini-3.8-flash'); assert.equal(q.mime, 'image/jpeg');
+        assert.match(q.p, /ONLY on the attached picture — one sheet of 4 pictures of the SAME subject, numbered 1 to 4/); assert.match(q.note, /🖼 ×4 — check every number against the pictures/);
+        const px = (b, pts) => page.evaluate(([b, pts]) => new Promise(r => { const i = new Image(); i.onload = () => { const c = document.createElement('canvas'); c.width = i.naturalWidth; c.height = i.naturalHeight; const g = c.getContext('2d'); g.drawImage(i, 0, 0); r({ w: i.naturalWidth, h: i.naturalHeight, c: pts.map(([x, y]) => [...g.getImageData(x, y, 1, 1).data].slice(0, 3)) }); }; i.src = 'data:image/jpeg;base64,' + b; }), [b, pts]);
+        const sheet = await px(q.b64, [[600, 800], [1900, 800], [600, 2500], [1900, 2500]]);
+        assert.deepEqual([sheet.w, sheet.h], [2 * 1300 + 3 * 12, 2 * 1733 + 3 * 12], 'a 2 x 2 sheet of the 4 pictures');
+        const cols = [];
+        for (const b of sent) cols.push((await px(b, [[400, 500]])).c[0]);
+        const near = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 40);
+        sheet.c.forEach((c, i) => assert.ok(near(c, cols[i]), 'cell ' + (i + 1) + ' holds picture ' + (i + 1) + ' (order added): ' + JSON.stringify([c, cols[i]])));
+        // a single picture still goes as it is (no stitching)
+        await page.evaluate(() => { Articles._S.imgs = Articles._S.imgs.slice(0, 1); __ai.length = 0; Articles.ai(); }); await page.waitForFunction(() => !Articles._S.aiBusy);
+        assert.equal(await page.evaluate(() => __ai[0].vis.image_base64 === Articles._S.imgs[0].b64), true, 'one picture is sent unchanged');
+        // a text-only drafting model (DeepSeek V4 Pro) never receives pictures: the picture draft always uses the vision model, as today
+        await page.evaluate(() => { Articles._S.model = 'deepseek-v4-pro'; __ai.length = 0; Articles.ai(); }); await page.waitForFunction(() => !Articles._S.aiBusy);
+        assert.equal(await page.evaluate(() => __ai[0].model), 'gemini-3.8-flash', 'a text-only model never receives pictures');
+        // 390 px: the bar wraps, no horizontal overflow
+        await page.setViewportSize({ width: 390, height: 900 });
+        await page.evaluate(() => { Articles._S.imgs = []; }); await dropFiles(5); await page.waitForFunction(() => Articles._S.imgs.length === 5);
+        const ov = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, right: document.querySelector('.art-img').getBoundingClientRect().right, vw: innerWidth }));
+        assert.ok(ov.sw <= ov.cw && ov.right <= ov.vw, 'no horizontal overflow at 390 px: ' + JSON.stringify(ov));
+        if (process.env.QA_SHOT) await page.locator('#articlesModal').screenshot({ path: process.env.QA_SHOT + '/article-multi-image-390.png' });
+        await page.setViewportSize({ width: 1360, height: 950 });
+        if (process.env.QA_SHOT) await page.locator('#articlesModal').screenshot({ path: process.env.QA_SHOT + '/article-multi-image.png' });
+
         const mine = errors.filter(e => /articles|imgHtml|imgOk|imgFromBlob|visionModel|aiHtml/i.test(e));
         assert.deepEqual(mine, [], 'no errors from the Articles code: ' + mine.join(' | '));
         if (process.env.QA_SHOT) { await page.evaluate(() => { Articles.edit(null); }); await paste('art-bodyta', 'image'); await page.waitForSelector('.art-img img'); await page.locator('#articlesModal').screenshot({ path: process.env.QA_SHOT + '/article-image-draft.png' }); }
-        console.log('PASS: Articles ✨ Draft from a pasted picture — text paste untouched, picture shrunk to 1600 px JPEG + thumbnail row, vision model + visionData + picture prompt, title from the model, ✕ and article switch drop it, normal drafts send no image');
+        console.log('PASS: Articles ✨ Draft from pasted / dropped pictures (1 to 5, ✕ each, cap, one stitched request) — text paste untouched, picture shrunk to 1600 px JPEG + thumbnail row, vision model + visionData + picture prompt, title from the model, ✕ and article switch drop it, normal drafts send no image');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
