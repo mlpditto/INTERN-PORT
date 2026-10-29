@@ -126,12 +126,18 @@ assert.ok(!/role="tab"|dc-tabs|createElement\('details'\)/.test(js), 'no tabs, n
         await page.click('.dc-clip');
         s = await state();
         assert.deepEqual([s.send, s.what], ['Send 1 ↗', '✉️']);
+        // V101.234: the 📎 toggle reads as ON (solid violet), not a barely different lavender
+        assert.equal(await page.$eval('.dc-clip', e => [e.classList.contains('on'), getComputedStyle(e).backgroundColor]).then(x => x.join('|')), 'true|rgb(109, 40, 217)', '📎 on = solid violet');
         await page.click('#dc-send');
         await page.waitForFunction(() => document.querySelector('.dc-sendbar').hidden);
+        await page.waitForTimeout(500);   // the rows transition their background
+        // V101.234: after a send the Message row is a deeper lavender with a bold status line, until the next keystroke
+        assert.deepEqual(await page.evaluate(() => [document.getElementById('dc-feedback').classList.contains('dc-sent'), getComputedStyle(document.querySelector('#dc-feedback .dc-row')).backgroundColor, getComputedStyle(document.getElementById('dc-feedback-status')).fontWeight]), [true, 'rgb(237, 233, 254)', '800'], 'sent state is visible');
         const msg = await page.evaluate(() => window.__writes.filter(w => w[0] === 'admin_notifications').map(w => w[1]));
         assert.equal(msg.length, 1); assert.equal(msg[0].type, 'journal_feedback'); assert.match(msg[0].attachment.content, /^Learned: /, '📎 attaches today’s entry');
         await page.evaluate(() => { window.__fail.admin_notifications = true; });
         await page.fill('#dc-feedback-message', 'ลองอีกครั้ง');
+        assert.equal(await page.evaluate(() => document.getElementById('dc-feedback').classList.contains('dc-sent')), false, 'typing again clears the sent state');
         await page.click('#dc-send');
         await page.waitForFunction(() => !document.getElementById('dc-send').disabled);
         const failed = await page.evaluate(() => ({ err: document.getElementById('dc-feedback').classList.contains('dc-err'), kept: document.getElementById('dc-feedback-message').value, status: document.getElementById('dc-feedback-status').textContent }));

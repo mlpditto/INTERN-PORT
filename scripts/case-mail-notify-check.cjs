@@ -21,6 +21,7 @@ const context = {
     HttpsError: class HttpsError extends Error { constructor(code, msg) { super(msg); this.code = code; } },
     admin: { firestore: () => ({ collection: () => ({ doc: () => ({ get: async () => ({ exists: !!CASE, data: () => CASE }) }) }) }) },
     process: { env: {} },
+    CASE_LINE_PUSH: true,   // V102.496: the switch declared above the function in index.js; true = the LINE path these cases cover (the 'off' case is below)
     axios: { post: async (url, body, opts) => { pushes.push({ to: body.to, alt: body.messages[0].altText }); return { data: {} }; } },
     sendAdminMail: async (fromName, subject, text, html) => { mails.push({ fromName, subject, text, html }); if (mailFail) throw new Error('smtp down'); }
 };
@@ -51,6 +52,12 @@ const LINE = { LINE_CHANNEL_ACCESS_TOKEN: 't', ADMIN_LINE_USER_ID: 'U123', ADMIN
     assert.ok(!/HN \/ Ref|ผู้ป่วย:|ระบบ:/.test(mails[0].text) && mails[0].text.includes('Note: (no note)'), 'sparse case: ' + mails[0].text);
     r = await call(LINE, { displayName: 'C' });
     assert.equal(mails[0].subject, '🩺 Case ใหม่ · C · Untitled');
+
+    // 2b. V102.496 CASE_LINE_PUSH off (the shipped value): no LINE push at all, the mail still goes
+    context.CASE_LINE_PUSH = false;
+    r = await call(LINE, FULL);
+    assert.deepEqual([r.ok, r.pushed, r.pushedCount, r.mailed, pushes.length, mails.length, Array.from(r.results, x => x.target + ':' + x.ok)], [true, false, 0, true, 0, 1, ['mail:true']], JSON.stringify(r));
+    context.CASE_LINE_PUSH = true;
 
     // 3. no LINE token: no push, the mail still goes, the call is ok
     r = await call({ GMAIL_APP_PASSWORD: 'p' }, FULL);
