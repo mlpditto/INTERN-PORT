@@ -39,7 +39,7 @@ assert.ok(/e\.key === 'Enter' && \(e\.ctrlKey \|\| e\.metaKey\)[^\n]*saveBeriRew
 // ---- admin: ✨ Grok Imagine in the image well (V102.122) ----
 assert.ok(admin.includes('id="br-pic-ai"') && admin.includes('onclick="event.stopPropagation(); brGenImage()"'), 'sparkle button in the well, does not open the file picker');
 const gen = slice(admin, 'async function brGenImage() {', '\n        }\n');
-assert.ok(admin.includes("const BR_IMAGE_MODEL = 'or/x-ai/grok-imagine-image-2.0';"), 'xAI Grok Imagine Image 2.0 via OpenRouter');
+assert.ok(admin.includes("const BR_IMAGE_MODEL = 'or/x-ai/grok-imagine-image-quality';"), 'xAI Grok Imagine Image Quality via OpenRouter');
 assert.ok(gen.includes("{ feature: 'beri_reward_image', imageApi: true, aspectRatio: '4:3', maxOutputTokens: 1024 }"), 'Image API path (Seedream/Muse), 4:3, its own ai_usage feature');
 assert.ok(gen.includes("if (!name) { alert('Type the reward name first") && gen.includes('no text, no watermark, no people'), 'prompt from name + description');
 assert.ok(gen.includes("brPendingFile = new File([blob], 'grok-imagine.png'") && gen.includes('brShowImage(URL.createObjectURL(blob))'), 'result becomes the pending file → uploaded on Save like a picked photo');

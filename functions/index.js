@@ -914,7 +914,7 @@ function omniStatus(data) {
 // POST /api/v1/videos → 202 { id, polling_url, status } · GET /api/v1/videos/{id} → { status, unsigned_urls[], usage.cost }
 // · GET /api/v1/videos/{id}/content?index=0 (Authorization) → the MP4. Only the four models the admin can pick.
 const OR_VIDEO_BASE = "https://openrouter.ai/api/v1/videos";
-const OR_VIDEO_MODELS = { "google/veo-3.1-lite": 8, "kwaivgi/kling-v3.0-std": 15, "heygen/heygen-video-1": 15, "bytedance/seedance-2.0-fast": 15 };
+const OR_VIDEO_MODELS = { "google/veo-3.1-lite": 8, "kwaivgi/kling-v3.0-std": 15, "heygen/heygen-video-1": 15, "bytedance/seedance-2.5": 15 };
 // Per-model limits from the OpenRouter model pages (checked 2026-10-21): HeyGen Video 1 renders 480p / 768p / 2K only — no
 // 720p, which it rejected — and 5–15 s. Everyone else keeps 480p / 720p / 1080p and a 4 s floor.
 const OR_VIDEO_RES = { "heygen/heygen-video-1": ["480p", "768p", "2K"] };
@@ -1315,7 +1315,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             });
         }
 
-        // --- 🎬 Grand Line Clips: OpenRouter video (admin V102.306) — Veo 3.1 Lite · Kling 3.0 Std · HeyGen Video 1 · Seedance 2.0 Fast ---
+        // --- 🎬 Grand Line Clips: OpenRouter video (admin V102.306) — Veo 3.1 Lite · Kling 3.0 Std · HeyGen Video 1 · Seedance 2.5 ---
         // Same two calls as Omni below: submit → { pending, interactionId } · poll → { pending } or the clip. Submit is a plain
         // axios.post (a retried submit would be a second paid render); the MP4 is fetched here because the content URL needs the key.
         if (provider === "openrouter" && generationOptions && generationOptions.video && OR_VIDEO_MODELS[String(model || "")]) {

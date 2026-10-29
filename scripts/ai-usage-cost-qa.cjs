@@ -10,7 +10,7 @@ const ctx = { admin, Buffer, console }; vm.createContext(ctx); vm.runInContext(s
 const plain = o => JSON.parse(JSON.stringify(o));
 
 (async () => {
-    await ctx.recordAiUsage('openrouter', 'x-ai/grok-imagine-image-2.0', 0, true, 'casecard_image', { costUsd: 0.042 });
+    await ctx.recordAiUsage('openrouter', 'x-ai/grok-imagine-image-quality', 0, true, 'casecard_image', { costUsd: 0.042 });
     let r = plain(record), m = Object.values(r.models)[0];
     assert.equal(r.totalCostUsd, 0.042, 'the day total');
     assert.equal(m.costUsd, 0.042, 'per model');

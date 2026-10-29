@@ -40,7 +40,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         v = await view(); assert.deepEqual(v.pressed, ['Flash 3.8', 'Lite 3.5', 'Argon 4'], 'Gemini models'); assert.deepEqual(v.vendors.slice(0, 2), ['Ollama·', 'Gemini*'], 'the dot stays on the vendor in use');
         assert.equal(await page.evaluate(() => localStorage.getItem('quizTagAiModel')), null, 'browsing a vendor stores nothing'); assert.equal(await page.evaluate(() => __calls.length), 0);
         await vendor('Claude'); v = await view(); assert.deepEqual(v.pressed, ['Haiku 5.5', 'Sonnet 5.5']); await vendor('Grok'); v = await view(); assert.deepEqual(v.pressed, ['Grok 4.7']);
-        await vendor('DeepSeek'); v = await view(); assert.deepEqual(v.pressed, ['Flash V4.1', 'Pro V4']); await vendor('Qwen'); v = await view(); assert.deepEqual(v.pressed, ['Flash 3.8', 'Max 3.8']); await vendor('GPT'); v = await view(); assert.deepEqual(v.pressed, ['Luna 6', 'Terra 5.6']);
+        await vendor('DeepSeek'); v = await view(); assert.deepEqual(v.pressed, ['Flash V4.1', 'Pro V4']); await vendor('Qwen'); v = await view(); assert.deepEqual(v.pressed, ['Flash 3.8', 'Max 3.8']); await vendor('GPT'); v = await view(); assert.deepEqual(v.pressed, ['Luna 6', 'Terra 6.1']);
         await vendor('Gemini'); await click('Flash 3.8');
         v = await view(); assert.deepEqual(v.pressed, ['Flash 3.8*', 'Lite 3.5', 'Argon 4']); assert.deepEqual(v.vendors.slice(0, 2), ['Ollama', 'Gemini*·'], 'the pick moves the in-use dot'); assert.match(v.title, /Tags incomplete/);
         assert.equal(await page.evaluate(() => localStorage.getItem('quizTagAiModel')), 'gemini-3.8-flash'); assert.equal(await page.evaluate(() => __calls.length), 0, 'no AI call from a mere pick');
