@@ -134,8 +134,10 @@ assert.ok(!/role="tab"|dc-tabs|createElement\('details'\)/.test(js), 'no tabs, n
         await page.click('#dc-send');
         await page.waitForFunction(() => document.querySelector('.dc-sendbar').hidden);
         await page.waitForTimeout(500);   // the rows transition their background
-        // V101.234: after a send the Message row is a deeper lavender with a bold status line, until the next keystroke
-        assert.deepEqual(await page.evaluate(() => [document.getElementById('dc-feedback').classList.contains('dc-sent'), getComputedStyle(document.querySelector('#dc-feedback .dc-row')).backgroundColor, getComputedStyle(document.getElementById('dc-feedback-status')).fontWeight]), [true, 'rgb(237, 233, 254)', '800'], 'sent state is visible');
+        // V101.241: after a send — the ✉️ counter reads 1, a one-word toast in the app language, no pale status line (the full phrase is screen-reader only); the row tints briefly
+        const fx = await page.evaluate(() => ({ cnt: document.querySelector('#dc-feedback .dc-cnt').textContent, cntHidden: document.querySelector('#dc-feedback .dc-cnt').hidden, toast: (document.querySelector('.dc-toast') || {}).textContent, status: document.getElementById('dc-feedback-status').textContent, sr: document.getElementById('dc-sent-sr').textContent, tinted: document.getElementById('dc-feedback').classList.contains('dc-sent') }));
+        assert.deepEqual([fx.cnt, fx.cntHidden, fx.toast, fx.status, fx.sr, fx.tinted], ['1', false, '✓ Sent', '', 'Sent to Admin', true], 'sent feedback: ' + JSON.stringify(fx));
+        assert.deepEqual(await page.evaluate(() => { const b = document.body, r = []; for (const [kr, th] of [[1, 0], [0, 1], [1, 1], [0, 0]]) { b.classList.toggle('lang-kr-on', !!kr); b.classList.toggle('lang-th-on', !!th); r.push(dcSentWord()); } return r; }), ['전송됨', 'ส่งแล้ว', '전송됨 · ส่งแล้ว', 'Sent'], 'the toast word follows the app language (KR · TH · both · EN)');
         const msg = await page.evaluate(() => window.__writes.filter(w => w[0] === 'admin_notifications').map(w => w[1]));
         assert.equal(msg.length, 1); assert.equal(msg[0].type, 'journal_feedback'); assert.match(msg[0].attachment.content, /^Learned: /, '📎 attaches today’s entry');
         await page.evaluate(() => { window.__fail.admin_notifications = true; });
@@ -146,6 +148,7 @@ assert.ok(!/role="tab"|dc-tabs|createElement\('details'\)/.test(js), 'no tabs, n
         const failed = await page.evaluate(() => ({ err: document.getElementById('dc-feedback').classList.contains('dc-err'), kept: document.getElementById('dc-feedback-message').value, status: document.getElementById('dc-feedback-status').textContent }));
         assert.deepEqual([failed.err, failed.kept], [true, 'ลองอีกครั้ง'], 'not sent → red row, draft kept');
         assert.match(failed.status, /retained/);
+        assert.equal(await page.evaluate(() => document.querySelector('#dc-feedback .dc-cnt').textContent), '1', 'a failed send is not counted');
 
         // ---- 5. 💬 timeline: mentor reply as a bubble, 🎁 to collect (one / all), quiet ✓ once collected
         await page.evaluate(() => {

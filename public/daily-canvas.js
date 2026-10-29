@@ -160,6 +160,29 @@ document.addEventListener('DOMContentLoaded', function () {
         refresh();
     }
 
+    // ---- V101.241: "sent" feedback with almost no text: ✉️ flies up and back · the number on it = messages sent today (this device) bounces +1 · a one-word toast
+    const WORD = { en: 'Sent', kr: '전송됨', th: 'ส่งแล้ว' }, FULL = { en: 'Sent to Admin', kr: '관리자에게 전송됨', th: 'ส่งถึง admin แล้ว' };
+    const langKey = () => { const b = document.body, kr = b.classList.contains('lang-kr-on'), th = b.classList.contains('lang-th-on'); return kr && th ? ['kr', 'th'] : kr ? ['kr'] : th ? ['th'] : ['en']; };
+    const sentWord = () => langKey().map(k => WORD[k]).join(' · '), sentFull = () => langKey().map(k => FULL[k]).join(' · ');
+    window.dcSentWord = sentWord;
+    const cntKey = () => 'dcSentMsgs:' + (typeof userId !== 'undefined' ? userId : '') + ':' + toDateKey(new Date());
+    const sentToday = () => { try { return parseInt(localStorage.getItem(cntKey()) || '0', 10) || 0; } catch (e) { return 0; } };
+    const msgIcon = msg.querySelector('.dc-i');
+    const badge = document.createElement('em'); badge.className = 'dc-cnt'; badge.hidden = true; msgIcon.append(badge);
+    const plus = document.createElement('span'); plus.className = 'dc-plus1'; plus.textContent = '+1'; plus.setAttribute('aria-hidden', 'true'); msgIcon.append(plus);
+    const srSent = document.createElement('span'); srSent.className = 'dc-sr'; srSent.id = 'dc-sent-sr'; srSent.setAttribute('role', 'status'); msg.append(srSent);
+    function paintCount() { const n = sentToday(); badge.hidden = !n; badge.textContent = n > 99 ? '99+' : String(n || ''); badge.title = ''; }
+    const replay = (el, cls) => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
+    function sentFx() {
+        try { localStorage.setItem(cntKey(), String(sentToday() + 1)); } catch (e) { /* private mode: the counter just does not persist */ }
+        paintCount(); replay(msgIcon, 'dc-fly'); replay(badge, 'dc-bump'); replay(plus, 'dc-go1');
+        msg.classList.add('dc-sent'); setTimeout(() => msg.classList.remove('dc-sent'), 1500);
+        srSent.textContent = ''; setTimeout(() => { srSent.textContent = sentFull(); }, 30);
+        const old = document.querySelector('.dc-toast'); if (old) old.remove();
+        const toast = document.createElement('div'); toast.className = 'dc-toast'; toast.setAttribute('aria-hidden', 'true'); toast.textContent = '✓ ' + sentWord(); document.body.append(toast);
+        requestAnimationFrame(() => toast.classList.add('on')); setTimeout(() => { toast.classList.remove('on'); setTimeout(() => toast.remove(), 300); }, 2000);
+    }
+    paintCount();
     async function sendMessage() {
         const status = byId('dc-feedback-status'), message = msgTa.value.trim();
         const attached = attach.checked, log = todaysLog();
@@ -171,8 +194,8 @@ document.addEventListener('DOMContentLoaded', function () {
             const authUser = await ensureFirebaseAuthReady(10000);
             if (!authUser) throw new Error('Sign in required');
             await db.collection('admin_notifications').add({ type: 'journal_feedback', authUid: authUser.uid, userId, userName: userProfile.displayName || '', message, attachment, read: false, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
-            status.textContent = '✓ Sent to Admin';
-            msg.classList.add('dc-sent');   // V101.234: the row stays darker until the next keystroke, so the send is not a pale line you can miss
+            status.textContent = '';
+            sentFx();   // V101.241: the ✉️ flies up and back, the counter on it goes +1, a one-word toast in the language you chose
             if (msgTa.value.trim() === message) msgTa.value = '';
             if (attach.checked === attached) attach.checked = false;
             return true;
