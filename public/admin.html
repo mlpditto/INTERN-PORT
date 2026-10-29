@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.505)</title>
+    <title>Nika Admin (V102.506)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -8302,7 +8302,7 @@
 <script src="quiz-cover.js?v=V102.495"></script>
 <script src="clip-captions.js?v=V102.366"></script>
 <script src="holidays-admin.js?v=V102.330"></script>
-<script src="articles-admin.js?v=V102.489"></script>
+<script src="articles-admin.js?v=V102.506"></script>
 <link rel="stylesheet" href="quiz-qimage.css?v=V101.03">
 <script src="quiz-qimage.js?v=V101.03"></script>
 <link rel="stylesheet" href="quiz-more-popover.css?v=V100.47">
@@ -31430,6 +31430,25 @@ ${JSON.stringify(sourceObj)}`;
             }
         };
 
+        // V102.506: one wrong question as plain text for the article prompt — the question, what was picked, the key, the explanation. Never who answered.
+        window.rvWrongItemOf = function (q, ans, isChoice, isRank) {
+            const opt = i => String((q.options || [])[i] == null ? '' : q.options[i]).trim();
+            let picked, correct;
+            if (isRank && window.rankReviewText) { const t = window.rankReviewText(q, ans); picked = t.studentText; correct = t.correctText; }
+            else if (isChoice) {
+                picked = parseStoredChoiceAnswer(ans).map(opt).join(' + ') || '(no answer)';
+                correct = (Array.isArray(q.correct) ? q.correct : [q.correct]).map(Number).filter(n => Number.isFinite(n)).map(opt).join(' + ');
+            } else { picked = Array.isArray(ans) ? ans.join(' / ') : String(ans == null ? '' : ans); correct = '(written answer — no fixed key)'; }
+            return { q: String(q.q || '').trim(), picked, correct, explanation: String(q.explanation || '').trim() };
+        };
+        // 📰 in the Review header → Articles.fromMistakes: an AI draft in the Article editor, unsaved; the admin reads it and saves
+        function reviewWrongToArticle() {
+            const src = window._reviewWrongForArticle;
+            if (!src || !src.items.length) return;
+            if (!window.Articles || typeof Articles.fromMistakes !== 'function') return alert('Articles is not available on this page.');
+            Articles.fromMistakes(src);
+        }
+
         async function reviewQuiz(attemptId) {
             try {
                 // Remove any existing overlay first
@@ -31569,6 +31588,7 @@ ${JSON.stringify(sourceObj)}`;
                     <div id="rv-sig-cheat" ${cheatOpen ? '' : 'hidden'}>${cheatSummaryHtml}</div>
                     ${telemetrySummaryHtml ? `<div id="rv-sig-timing" ${timingOpen ? '' : 'hidden'}>${telemetrySummaryHtml}</div>` : ''}`;
                 let cardsHtml = signalsHtml;
+                const rvWrongItems = [];   // V102.506: the wrong / partly-wrong questions as plain text, for 📰 Article from wrong answers (no learner data)
 
                 // V92.62 Phase 4.c: exam-session attempts (written by exam-session.html Phase 4.a
                 // with isExamSession:true + votedQuestions[]) get a different review path —
@@ -31790,6 +31810,7 @@ ${JSON.stringify(sourceObj)}`;
                         const rvColor = { skipped: '#94a3b8', typed: '#94a3b8', correct: '#28a745', partial: '#f59e0b', wrong: '#dc3545', review: '#4361ee' }[rvState];
                         const rvOpen = !(rankSc && (rvState === 'skipped' || rvState === 'typed'));   // a skipped / typed-not-ranked Rank card has nothing to decide: folded to one line
                         rvStates.push({ state: rvState, rank: !!rankSc, open: rvOpen });
+                        if (rvState === 'wrong' || rvState === 'partial') rvWrongItems.push(window.rvWrongItemOf(q, studentAns, isChoice, !!rankSc));
                         const rvBar = `<div class="rv-bar lang-no-toggle" role="button" tabindex="0" aria-expanded="false" onclick="rvToggleQ(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();rvToggleQ(this)}" style="--rv-c:${rvColor};"><b class="rv-bq">Q${i + 1}</b><span class="rv-bs">${escapeHtml(String(q.q == null ? '' : q.q).replace(/\s+/g, ' ').trim())}</span><span class="rv-bt rv-bt-${rvState}">${window.rvStatusLabel(rvState, partialFrac)}</span><span class="rv-bp">${rvEarned.toFixed(2)} / ${pointsPerQuestion.toFixed(2)}</span><span class="rv-bc" aria-hidden="true">▸</span></div>`;
                         const rvFold = `<button type="button" class="rv-fold" onclick="rvToggleQ(this)" title="Fold this question to one line" aria-label="Fold this question">▴</button>`;
                         const rvTier = ix => Math.min(2, Math.max(0, Number((q.tiers || [])[ix]) || 0));
@@ -31950,6 +31971,8 @@ ${JSON.stringify(sourceObj)}`;
                     ? `<button onclick="adminOpenQuizDownloads('${escapeHtml(quiz.id)}')" class="rv-ib" style="${rvIconBtn}" title="Open this quiz's links / documents (${_reviewLinks.length})" data-th-title="โหลดลิงก์/เอกสารของ Quiz นี้" aria-label="Materials"><i class="fa-solid fa-paperclip"></i></button>`
                     : '';
 
+                window._reviewWrongForArticle = { quizTitle: String(quiz.title || quiz.shortTitle || ''), items: rvWrongItems };
+
                 // Create overlay directly on document.body
                 const overlay = document.createElement('div');
                 overlay.id = 'reviewQuizOverlay';
@@ -31978,6 +32001,9 @@ ${JSON.stringify(sourceObj)}`;
                                 <button onclick="document.getElementById('quizFeedbackPanelModal').style.zIndex=100000; showQuizFeedbackPanel(window._reviewCurrentQuizId, window._reviewCurrentUserId)" class="rv-ib" style="${rvIconBtn}" title="See this user's feedback on this quiz" data-th-title="ดู feedback ของ user นี้สำหรับ quiz นี้" aria-label="Feedback">⭐</button>
                                 <button onclick="openTimingRiskConfigModal()" class="rv-ib" style="${rvIconBtn}" title="Timing Config" aria-label="Timing config">⚙</button>
                                 <button onclick="exportIncorrectToPDF()" class="rv-ib" style="${rvIconBtn}" title="Export the incorrect answers to PDF" aria-label="Export PDF"><i class="fa-solid fa-file-pdf"></i></button>
+                                ${rvWrongItems.length
+                                    ? `<button type="button" id="rv-wrong-article" onclick="reviewWrongToArticle()" class="rv-ib" style="${rvIconBtn}" title="Draft a learning article from the ${rvWrongItems.length} wrong answer${rvWrongItems.length > 1 ? 's' : ''} with AI — opens unsaved in Articles, nothing is published" data-th-title="ร่างบทความเรียนรู้จากข้อที่ตอบผิด ${rvWrongItems.length} ข้อด้วย AI — เปิดใน Articles แบบยังไม่บันทึก ไม่เผยแพร่เอง" aria-label="Article from wrong answers"><i class="fa-solid fa-newspaper"></i></button>`
+                                    : `<button type="button" id="rv-wrong-article" aria-disabled="true" class="rv-ib" style="${rvIconBtn}opacity:.4;cursor:not-allowed;" title="No wrong answers in this attempt — nothing to write an article from" data-th-title="ไม่มีข้อที่ตอบผิดในรอบนี้ — ยังสร้างบทความไม่ได้" aria-label="Article from wrong answers (none wrong)"><i class="fa-solid fa-newspaper"></i></button>`}
                                 <button ${isAlreadyApproved ? 'disabled' : `onclick="approveQuizAttempt('${attemptId}')"`} style="${approveBtnStyle || 'width:auto;min-height:0;margin:0;background:#fff;color:#166534;border:1.5px solid #16a34a;padding:7px 12px;border-radius:10px;cursor:pointer;font-weight:800;font-size:0.82em;white-space:nowrap;'}" title="${isAlreadyApproved ? 'Already approved — cannot re-approve' : '🍎 Manten Manten no Mi — approve at 100%'}">🍎 Full marks 100%</button>
                                 <button ${isAlreadyApproved ? 'disabled' : `onclick="approveQuizAttemptActual('${attemptId}')"`} style="${approveBtnStyle || 'width:auto;min-height:0;margin:0;background:#fff;color:#1d4ed8;border:1.5px solid #2563eb;padding:7px 12px;border-radius:10px;cursor:pointer;font-weight:800;font-size:0.82em;white-space:nowrap;'}" title="${isAlreadyApproved ? 'Already approved — cannot re-approve' : '🍇 Shōjiki Shōjiki no Mi — approve at the actual score'}">🍇 Actual ${actualApproveLabel}</button>
                                 <button onclick="closeReviewOverlay()" class="rv-ib" style="${rvIconBtn}" title="Close" aria-label="Close">✕</button>
