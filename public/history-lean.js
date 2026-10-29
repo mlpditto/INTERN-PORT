@@ -162,7 +162,7 @@ window.historyLean = (() => {
         } else if (type !== 'quiz' && type !== 'work' && type !== 'explore_link' && type !== 'content_review') {
             body = renderTypeDetailHtml(s);   // journal / quest / note / product keep their own detail
         }
-        if (s.adminComment) body += '<div class="hl-comment">💬 ' + esc(s.adminComment) + '</div>';
+        if (s.adminComment) body += '<div class="hl-comment">💬 ' + esc(s.adminComment).replace(/\*\*([^*\n]{1,200}?)\*\*/g, '<strong class="adm-key">$1</strong>') + '</div>';   // V101.245: **…** = the must-get-right phrase
         return body + actionsHtml(s, ctx);
     }
     function rowHtml(s, ctx) {
