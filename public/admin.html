@@ -5605,6 +5605,15 @@
         .pra-md mark.pra-dup i { font-style:normal; font-size:0.72em; font-weight:800; color:#b45309; margin-left:4px; vertical-align:super; }
         .pra-md .pra-eq { font-size:0.72em; font-weight:800; color:#c2410c; margin-left:6px; white-space:nowrap; background:#fff7ed; border:1px solid #fdba74; border-radius:999px; padding:0 6px; }
         .pra-empty { padding:10px 14px; color:#94a3b8; font-size:0.85em; font-style:italic; }
+        /* V102.517 (review of the live popup): the stem shrinks with an ellipsis, the pill and ✎ never do; an all-empty quiz collapses to one message */
+        .pra-card header > .pra-qn, .pra-card header > .pra-pill, .pra-card header > .pra-go { flex:0 0 auto; }
+        .pra-chip:disabled { opacity:.45; cursor:default; }
+        .pra-all { min-height:0; width:auto; margin:0; padding:6px 14px; border-radius:10px; border:1.5px solid #d97706; background:#f59e0b; color:#fff; font-size:0.85em; font-weight:800; cursor:pointer; white-space:nowrap; }
+        .pra-none { margin:8px 0; padding:26px 20px; text-align:center; border:1.5px dashed #fde68a; border-radius:14px; background:#fffbeb; }
+        .pra-none-t { font-weight:800; color:#92400e; font-size:1em; } .pra-none-s { color:#64748b; font-size:0.85em; margin:6px 0 14px; }
+        .pra-none-a { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+        .pra-strip { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 12px; border:1px dashed #fde68a; border-radius:10px; background:#fffbeb; color:#92400e; font-size:0.85em; font-weight:700; }
+        .pra-strip .pra-all { margin-left:auto; padding:4px 10px; font-size:0.8em; }
         /* V101.49: light rail — black OpenAI Blossom; OpenRouter chips keep the Grape border. */
         #reflectiveReviewModal :is(.reflective-review-feedback, #reflective-grammar-card) .text-ai-logo[data-owner="openai"] { background-image:url(assets/logos/openai-blossom-black.svg); }
         #reflectiveReviewModal :is(.reflective-review-feedback, #reflective-grammar-card) .text-ai-chips > button.glass-toggle-item[data-value^="or/"] { border-color:#8b5cf6; }
@@ -25927,27 +25936,40 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             };
             const cards = qs.map((x, i) => {
                 const nd = new Set(A.groups.filter(g => g.qs.length > 1 && g.qs.includes(i)).map(g => g.i)).size, nl = Object.keys(A.lines).filter(k => A.lines[k].length > 1 && A.lines[k].includes(i)).length;
-                const pill = !x.primer.trim() ? '<span class="pra-pill none">no Read first</span>' : (nd || nl) ? '<span class="pra-pill warn">' + (nd ? nd + ' term' + (nd > 1 ? 's' : '') + ' repeated' : '') + (nd && nl ? ' · ' : '') + (nl ? nl + ' line' + (nl > 1 ? 's' : '') + ' identical' : '') + '</span>' : '<span class="pra-pill ok">unique</span>';
+                const detail = (nd ? nd + ' term' + (nd > 1 ? 's' : '') + ' repeated' : '') + (nd && nl ? ' · ' : '') + (nl ? nl + ' line' + (nl > 1 ? 's' : '') + ' identical' : '');
+                const pill = !x.primer.trim() ? '<span class="pra-pill none" title="No Read first yet">empty</span>' : (nd || nl) ? '<span class="pra-pill warn" title="' + detail + '">repeats ' + (nd + nl) + '</span>' : '<span class="pra-pill ok" title="No term or line shared with another question">unique</span>';   // V102.517: short pills, the breakdown on hover
                 return '<section class="pra-card' + ((nd || nl) ? ' has-dup' : '') + '" data-q="' + i + '"><header><span class="pra-qn">Q' + (i + 1) + '</span><span class="pra-stem" title="' + escapeHtml(x.q) + '">' + escapeHtml(x.q.slice(0, 120)) + (x.q.length > 120 ? '…' : '') + '</span>' + pill +
                     '<button type="button" class="pra-go" onclick="_praGo(' + i + ')" title="Edit this question\'s Read first">✎ Q' + (i + 1) + '</button></header>' +
-                    (x.primer.trim() ? '<div class="pra-md lang-no-toggle">' + md(x.primer, i) + '</div>' : '<div class="pra-empty">— this question has no Read first yet</div>') + '</section>';
+                    (x.primer.trim() ? '<div class="pra-md lang-no-toggle">' + md(x.primer, i) + '</div>' : '<div class="pra-empty">— no Read first yet</div>') + '</section>';
             }).join('');
             const dupG = A.groups.filter(g => g.qs.length > 1).sort((a, b) => b.qs.length - a.qs.length), qDup = cards.split('class="pra-card has-dup"').length - 1, eqLines = Object.keys(A.lines).filter(k => A.lines[k].length > 1).length;
             const chips = dupG.slice(0, 8).map(g => '<button type="button" class="pra-tchip" data-g="' + g.i + '" aria-pressed="false" onclick="_praTerm(this)" title="' + escapeHtml([...g.forms].join(' / ')) + '"><b>' + escapeHtml(g.label) + '</b> ×' + g.qs.length + '<span>' + qref(g.qs) + '</span></button>').join('');
             const title = String((document.getElementById('quiz-title') || {}).value || '').trim();
+            // V102.517: no Read first anywhere → one message + ✨ All instead of n empty cards; some missing → a strip above the cards
+            const emptyN = qs.filter(x => !x.primer.trim()).length, allEmpty = emptyN === qs.length;
+            const allBtn = '<button type="button" class="pra-all" onclick="_praDraftAll()" title="Draft a Read first for every question that has none — the ✨ All run of the first question row, with its model" data-th-title="ให้ AI ร่าง Read first ให้ทุกข้อที่ยังว่าง (รัน ✨ All ของข้อแรก ใช้โมเดลที่เลือกไว้)" data-kr-title="비어 있는 모든 문항에 Read first 초안 작성 (첫 문항의 ✨ All 실행)">✨ All</button>';
+            const body = allEmpty
+                ? '<div class="pra-none"><div class="pra-none-t">No question has a Read first yet</div><div class="pra-none-s">✨ All drafts one for every question with the model picked in the Read first row — or close this and write them yourself.</div><div class="pra-none-a">' + allBtn.replace('>✨ All<', '>✨ All — draft for ' + qs.length + ' question' + (qs.length === 1 ? '' : 's') + '<') + '<button type="button" class="pra-chip" onclick="_praClose()">Close · write by hand</button></div></div>'
+                : (emptyN ? '<div class="pra-strip">' + emptyN + ' of ' + qs.length + ' still ' + (emptyN === 1 ? 'has' : 'have') + ' no Read first' + allBtn + '</div>' : '') + cards;
             const old = document.getElementById('praOverlay'); if (old) old.remove();
             const ov = document.createElement('div'); ov.id = 'praOverlay';
             ov.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:100000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);';
             ov.innerHTML = '<div class="pra" role="dialog" aria-label="Read first of every question">' +
-                '<div class="pra-hd"><h3>📖 Read first · all questions</h3><span class="pra-sum">' + (title ? '<b>' + escapeHtml(title) + '</b> · ' : '') + qs.length + ' questions · ' + A.groups.length + ' terms · <b>' + dupG.length + ' repeated</b> in ' + qDup + ' question' + (qDup === 1 ? '' : 's') + ' · ' + eqLines + ' identical line' + (eqLines === 1 ? '' : 's') + '</span>' +
-                '<span class="pra-chips"><button type="button" class="pra-chip" data-f="all" aria-pressed="true" onclick="_praFilter(\'all\')">All</button><button type="button" class="pra-chip" data-f="dup" aria-pressed="false" onclick="_praFilter(\'dup\')">Repeated only</button><button type="button" class="pra-x" onclick="_praClose()" title="Close" aria-label="Close">✕</button></span></div>' +
+                '<div class="pra-hd"><h3>📖 Read first · all questions</h3><span class="pra-sum">' + (title ? '<b>' + escapeHtml(title) + '</b> · ' : '') + qs.length + ' questions · ' + (allEmpty ? 'no Read first yet' : A.groups.length + ' terms · <b>' + dupG.length + ' repeated</b> in ' + qDup + ' question' + (qDup === 1 ? '' : 's') + ' · ' + eqLines + ' identical line' + (eqLines === 1 ? '' : 's')) + '</span>' +
+                '<span class="pra-chips"><button type="button" class="pra-chip" data-f="all" aria-pressed="true" onclick="_praFilter(\'all\')">All</button><button type="button" class="pra-chip" data-f="dup" aria-pressed="false" onclick="_praFilter(\'dup\')"' + (dupG.length ? '' : ' disabled title="Nothing is repeated yet"') + '>Repeated only</button><button type="button" class="pra-x" onclick="_praClose()" title="Close" aria-label="Close">✕</button></span></div>' +
                 (chips ? '<div class="pra-terms"><span class="lab">Repeated most</span>' + chips + '</div>' : '') +
-                '<div class="pra-body">' + (qs.some(x => x.primer.trim()) ? cards : '<div class="pra-none">No question has a Read first yet — nothing to compare.<br><button type="button" class="pra-go" onclick="_praDraftAll()" title="Close this and run ✨ All: one Read first per question, one at a time">✨ All — draft one for every question</button></div>') + '</div></div>';
+                '<div class="pra-body">' + body + '</div></div>';
             ov.addEventListener('click', e => { if (e.target === ov) window._praClose(); });
             document.body.appendChild(ov);
             document.addEventListener('keydown', window._praEsc);
         };
         window._praEsc = function (e) { if (e.key === 'Escape') window._praClose(); };
+        // V102.517: ✨ All from the popup = the first question row's ✨ All (its model, its confirm, its progress on that button)
+        window._praDraftAll = function () {
+            const b = document.querySelector('#quiz-questions-container .quiz-q-item .q-primer-all');
+            window._praClose();
+            if (b) b.click(); else showToast('Add a question first');
+        };
         window._praClose = function () { const ov = document.getElementById('praOverlay'); if (ov) ov.remove(); document.removeEventListener('keydown', window._praEsc); };
         window._praFilter = function (f) {
             document.querySelectorAll('#praOverlay .pra-chip').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.f === f)));
