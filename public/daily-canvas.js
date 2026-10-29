@@ -95,6 +95,7 @@ document.addEventListener('DOMContentLoaded', function () {
         + '<button type="button" id="dc-note-submit" class="dc-ghost" tabindex="-1" aria-hidden="true">Save note</button><button type="button" id="dc-feedback-submit" class="dc-ghost" tabindex="-1" aria-hidden="true">Send</button>';
     const submitBtn = byId('rl-submit-btn'); submitBtn.classList.add('dc-ghost'); submitBtn.tabIndex = -1; bar.append(submitBtn);   // the +0.1 float rises from here
     const send = byId('dc-send');
+    msg.querySelector('.dc-row').append(send);   // V101.239: the one Send sits INSIDE the Message row, right of the 📎 (the bar below keeps only the +0.1 float's anchor)
     const feed = document.createElement('section');
     feed.id = 'dc-feed'; feed.className = 'dc-panel dc-feed lang-no-toggle';   // entries + the กดรับ button are Thai
     feed.innerHTML = '<div class="dc-sec-t" title="Feedback"><span aria-hidden="true">💬</span></div>';
@@ -121,12 +122,13 @@ document.addEventListener('DOMContentLoaded', function () {
         note.classList.toggle('on', f.note || note.contains(document.activeElement) || !!byId('lp-note-title').value.trim() || (window._lpNoteTags || []).length > 0);
         msg.classList.toggle('on', f.msg);
         attach.parentElement.classList.toggle('on', attach.checked);
-        bar.hidden = n === 0 && !busy;
+        bar.hidden = n === 0 && !busy; send.hidden = n === 0 && !busy;
         const needMood = f.today && !mood();
         picker.classList.toggle('dc-need', needMood);
         const what = bar.querySelector('.dc-what');
         what.textContent = (f.today ? '📝' : '') + (f.note ? '🎓' : '') + (f.msg ? '✉️' : '');
         what.title = [f.today && 'Today', f.note && 'Note', f.msg && 'Message admin'].filter(Boolean).join(' + ');
+        send.title = 'Send: ' + what.title; send.setAttribute('aria-label', 'Send ' + n + ' (' + what.title + ')');
         if (!busy) send.textContent = needMood ? 'Pick a mood' : 'Send ' + n + ' ↗';
         send.disabled = busy || needMood;
     }
