@@ -315,13 +315,13 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
                 }
             }
         }
-        // V102.157: the AI cover is normalised to 3:4 — a wider image is LETTERBOXED (nothing cut at the sides, white bands top/bottom),
+        // V102.157: the AI cover is normalised to 3:4 — a wider image keeps its full width (nothing cut at the sides; V102.495: the bands top/bottom are filled from the picture's edge, no longer white),
         // a taller one keeps the 60:40 crop, an already-3:4 one passes through untouched.
         const shaped = await page.evaluate(async () => {
             const make = (w, h) => new Promise(res => { const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
                 x.fillStyle = '#ff0000'; x.fillRect(0, 0, w, h); x.fillStyle = '#0000ff'; x.fillRect(0, 0, 8, h); x.fillRect(w - 8, 0, 8, h); c.toBlob(res, 'image/png'); });   // 8px bands: a 1px line gets blended by WebP chroma subsampling
             const size = async blob => { const b = await createImageBitmap(blob); const c = document.createElement('canvas'); c.width = b.width; c.height = b.height; const x = c.getContext('2d'); x.drawImage(b, 0, 0);
-                const px = (X, Y) => Array.from(x.getImageData(X, Y, 1, 1).data).slice(0, 3).join(','); return { w: b.width, h: b.height, tl: px(0, 0), mid: px(Math.floor(b.width / 2), Math.floor(b.height / 2)), left: px(3, Math.floor(b.height / 2)), right: px(b.width - 4, Math.floor(b.height / 2)) }; };
+                const px = (X, Y) => Array.from(x.getImageData(X, Y, 1, 1).data).slice(0, 3).join(','); return { w: b.width, h: b.height, tl: px(0, 0), mid: px(Math.floor(b.width / 2), Math.floor(b.height / 2)), bl: px(0, b.height - 1), topMid: px(Math.floor(b.width / 2), 2), botMid: px(Math.floor(b.width / 2), b.height - 3), left: px(3, Math.floor(b.height / 2)), right: px(b.width - 4, Math.floor(b.height / 2)) }; };
             const wide = await QuizCover._cropToCover(await make(400, 300));
             const tall = await QuizCover._cropToCover(await make(300, 600));
             const same = await make(300, 400); const kept = await QuizCover._cropToCover(same);
@@ -329,13 +329,14 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         });
         const near = (got, want) => got.split(',').every((v, i) => Math.abs(+v - want[i]) <= 3);   // WebP 0.92 shifts a channel by a point or two
         assert.deepEqual([shaped.wide.w, shaped.wide.h], [400, 533], 'wide (4:3) → 3:4 by adding height, full width kept');
-        assert.ok(near(shaped.wide.tl, [255, 255, 255]), 'white band above the picture: ' + shaped.wide.tl);
+        assert.ok(!near(shaped.wide.tl, [255, 255, 255]) && !near(shaped.wide.bl, [255, 255, 255]) && !near(shaped.wide.topMid, [255, 255, 255]) && !near(shaped.wide.botMid, [255, 255, 255]), 'V102.495: the bars above and below are filled from the edge, not white: ' + [shaped.wide.tl, shaped.wide.topMid, shaped.wide.bl, shaped.wide.botMid]);
+        assert.ok(near(shaped.wide.topMid, [255, 0, 0]) && near(shaped.wide.botMid, [255, 0, 0]), 'the filled bars carry the picture colour: ' + shaped.wide.topMid + ' / ' + shaped.wide.botMid);
         assert.ok(near(shaped.wide.mid, [255, 0, 0]), 'the picture sits in the middle: ' + shaped.wide.mid);
         assert.ok(near(shaped.wide.left, [0, 0, 255]) && near(shaped.wide.right, [0, 0, 255]), 'both edge columns survive (the title used to lose its first and last letters): ' + shaped.wide.left + ' / ' + shaped.wide.right);
         assert.deepEqual([shaped.tall.w, shaped.tall.h], [300, 400], 'tall (1:2) → 3:4 by cropping height (as before)');
         assert.ok(near(shaped.tall.tl, [0, 0, 255]) || near(shaped.tall.tl, [255, 0, 0]), 'no white band on a cropped image: ' + shaped.tall.tl);
         assert.equal(shaped.kept, true, 'an already-3:4 image is returned as is');
-        console.log('PASS: AI cover 3:4 normalisation — wide images letterboxed (edges kept), tall images cropped, 3:4 untouched.');
+        console.log('PASS: AI cover 3:4 normalisation — wide images filled from their own edge (nothing cut, no white), tall images cropped, 3:4 untouched.');
         console.log('PASS: AI title validation, preview, accept, discard, invalid response, content-filter fallback, stale generation and responsive layout.');
         console.log('PASS: cover load/remove/upload with mocked storage, unsafe URL rejection, locked/collapsed protection, mobile deadline, keyboard start.');
     } finally { await browser.close(); }

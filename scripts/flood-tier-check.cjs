@@ -66,7 +66,7 @@ const job = src.slice(src.indexOf('exports.checkFloodAlerts'), src.indexOf('Quiz
 assert.ok(!/lastEmailSlot|floodEarlyWarning/.test(src), 'the old 08:00 / 16:00 rule is gone');
 assert.ok(job.includes("floodTier(s, prev.gauge, now)") && job.includes('pushReading(prev.gauge, now'), 'rate comes from the stored readings, current reading excluded');
 assert.ok(job.includes("if (docId === '_site') {") && job.includes('const base = prev.tierDay === today ? (prev.tierSent || 0) : 0;') && job.includes('if (w.tier > base) {'), 'site only; fires on escalation, once per tier per day');
-assert.ok(job.includes('if (w.tier >= 3 && !rosePushed && target && target.to)'), 'LINE from tier 3, never twice in one run');
+assert.ok(job.includes('if (FLOOD_LINE_PUSH && w.tier >= 3 && !rosePushed && target && target.to)'), 'LINE from tier 3, never twice in one run');
 assert.ok(job.includes("update.tierSent = w.tier") && job.includes('if (sent)'), 'a failed send is retried next hour');
 assert.ok(job.includes("db.collection('flood_gauge_log').doc(today)"), 'calibration log, one field an hour');
 assert.ok(!/flood_gauge_log/.test(fs.readFileSync('firestore.rules', 'utf8')), 'log has no client rule (closed, admin SDK only)');
