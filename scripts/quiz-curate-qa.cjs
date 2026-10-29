@@ -344,12 +344,17 @@ const { chromium } = require('playwright');
         const confirmText = () => page.locator('#curate-confirm-text').innerText();
         const confirmOk = async () => { await page.locator('#curate-confirm-ok').click(); };
         const confirmCancel = async () => { await page.locator('#curate-confirm-cancel').click(); };
-        for (const flag of ['active']) {
-            await page.evaluate(flag => { records['source-quiz'] = structuredClone(stored); records['source-quiz'].isActive = flag === 'active'; hasAttempts = flag === 'attempts'; hasSessions = flag === 'sessions'; }, flag);
-            await open(); await suggest(result()); await apply();
-            assert.match(await feedback(), flag === 'active' ? /quiz is active/ : /attempts or exam sessions/);
-            assert.equal(await page.evaluate(() => atomicWrites), 0); await close();
-        }
+        // V102.513: an active quiz is not refused — the confirm leads with the deactivation; Cancel writes nothing, Confirm deactivates in the same transaction
+        await page.evaluate(() => { records['source-quiz'] = structuredClone(stored); records['source-quiz'].isActive = true; hasAttempts = false; hasSessions = false; });
+        await open(); await suggest(result()); await apply();
+        assert.match(await confirmText(), /^⚠️ This quiz is ACTIVE — it will be deactivated first/, 'active quiz: the confirm leads with the deactivation: ' + await confirmText());
+        assert.match(await confirmText(), /Remove: Q11, Q12, Q13, Q14/); assert.equal(await page.locator('#curate-confirm-ok').innerText(), 'Deactivate · remove 4');
+        await confirmCancel(); assert.match(await feedback(), /cancelled/); assert.equal(await page.evaluate(() => atomicWrites), 0); await close();
+        await page.evaluate(() => { records['source-quiz'] = structuredClone(stored); records['source-quiz'].isActive = true; });
+        await open(); await suggest(result()); await apply(); await confirmOk();
+        await page.waitForFunction(() => !document.getElementById('quiz-curate-dialog').open);
+        { const r = await page.evaluate(() => records), cur = r['source-quiz']; assert.equal(cur.isActive, false, 'deactivated in the same write'); assert.equal(cur.questions.length, 10); assert(await page.evaluate(() => atomicWrites) >= 1, 'one transaction ran'); }
+        await page.evaluate(() => { records = { 'source-quiz': structuredClone(stored) }; atomicWrites = 0; });
         await page.evaluate(() => { records['source-quiz'] = structuredClone(stored); hasAttempts = false; hasSessions = false; });
         await open(); await suggest(result());
         await page.evaluate(() => records['source-quiz'].title = 'Concurrent edit'); await apply();
@@ -432,7 +437,9 @@ const { chromium } = require('playwright');
         for (const flag of ['active', 'attempts', 'sessions']) {
             await page.evaluate(flag => { records['source-quiz'].isActive = flag === 'active'; hasAttempts = flag === 'attempts'; hasSessions = flag === 'sessions'; }, flag);
             await open(); await suggest(result()); await split();
-            assert.match(await feedback(), flag === 'active' ? /quiz is active/ : /attempts or exam sessions/); await close();
+            if (flag === 'active') { assert.match(await confirmText(), /deactivated first/); assert.equal(await page.locator('#curate-confirm-ok').innerText(), 'Deactivate · split'); await confirmCancel(); assert.equal(await page.evaluate(() => atomicWrites), 0); }   // V102.513
+            else assert.match(await feedback(), /attempts or exam sessions/);
+            await close();
         }
         await page.evaluate(() => { hasSessions = false; records['source-quiz'] = structuredClone(stored); });
         await open(); await suggest(result());
