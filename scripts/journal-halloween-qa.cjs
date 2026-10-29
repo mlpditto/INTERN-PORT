@@ -49,13 +49,18 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
     
             // the writing-progress card is hidden until the script fills it — show it with a body so its colours can be read
             await page.evaluate(() => { window.WritingProgress = { render() {} }; window.renderMyWritingProfile = () => {}; const c = document.getElementById('my-writing-profile'); c.style.setProperty('display', 'block', 'important'); document.getElementById('mwp-body').innerHTML = '<div class="wp"><div class="wp-head"><b>Writing progress</b></div><span class="wp-chip fire">1d</span><div class="hm"><button class="hm-c wd l2"><i class="hm-n">3</i></button></div></div>'; });
-            const r = await page.evaluate(() => {
+            const r = await page.evaluate(async () => {
                 document.getElementById('my-writing-profile').style.display = 'block';   // writing-progress.js hides the card again between renders
                 const cs = (e, p, ps) => getComputedStyle(e, ps)[p];
                 const pane = document.getElementById('pane-mission-reflection'), wp = document.getElementById('my-writing-profile'), area = document.getElementById('rl-integrated-area');
                 const chip = document.getElementById('mission-lang-chip'), bar = document.querySelector('.mission-tabs-bar'), canvas = document.querySelector('.daily-canvas'), hero = document.querySelector('.dc-hero');
+                // V101.240: KR+TH — the tab labels carry BOTH the Thai and the Korean word, and the chip is a pill with two flags
+                document.body.classList.add('lang-kr-on', 'lang-th-on'); chip.setAttribute('data-two', ''); chip.textContent = '🇰🇷🇹🇭'; await new Promise(res => setTimeout(res, 500));   // buttons transition their size
+                const lab = id => [...document.querySelectorAll('#' + id + ' > span')].filter(s => !s.classList.contains('lang-no-toggle')).map(s => s.innerText.replace(/\s+/g, ' ').trim()).join(' ');
+                const kt = { quiz: lab('mtab-quiz'), journal: lab('mtab-reflection'), explore: lab('mtab-explore'), chipW: Math.round(chip.getBoundingClientRect().width), ls: cs(chip, 'letterSpacing') };
+                document.body.classList.remove('lang-kr-on', 'lang-th-on'); chip.removeAttribute('data-two'); chip.textContent = '🇬🇧';
                 const flags = [chip.textContent]; for (let i = 0; i < 4; i++) { chip.click(); flags.push(chip.textContent + '|' + chip.getAttribute('aria-label')); }
-                return { hw: document.documentElement.classList.contains('hw'), below: wp.getBoundingClientRect().top >= area.getBoundingClientRect().bottom - 1, flex: cs(pane, 'display'),
+                return { kt, hw: document.documentElement.classList.contains('hw'), below: wp.getBoundingClientRect().top >= area.getBoundingClientRect().bottom - 1, flex: cs(pane, 'display'),
                     bar: cs(bar, 'backgroundImage').includes('repeating-linear-gradient'), barBorder: cs(bar, 'borderBottomStyle'), canvasBorder: cs(canvas, 'borderTopColor'), ghost: cs(hero, 'content', '::after'),
                     wpBg: cs(wp, 'backgroundColor'), wpBorder: cs(wp, 'borderTopStyle'), wpTape: cs(wp, 'content', '::before'), heat: cs(document.querySelector('#my-writing-profile .hm-c.l2'), 'backgroundColor'), heatN: cs(document.querySelector('#my-writing-profile .hm-n'), 'color'), flags };
             });
@@ -71,6 +76,8 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
             assert.ok(r.ghost.includes('👻'), 'the ghost floats on the hero');
             assert.deepEqual([r.wpBg, r.wpBorder], ['rgb(28, 15, 54)', 'dashed'], 'Writing progress is midnight'); assert.ok(r.wpTape.includes('"'), 'hazard tape strip');
             assert.deepEqual([r.heat, r.heatN], ['rgb(234, 88, 12)', 'rgb(255, 255, 255)'], 'heatmap level 2 is pumpkin orange with white digits');
+            assert.deepEqual([r.kt.quiz, r.kt.journal, r.kt.explore], ['Quiz แบบทดสอบ 퀴즈', 'Journal บันทึก 저널', 'Explore สำรวจ 탐색'], 'KR+TH shows the Thai AND the Korean word on every tab: ' + JSON.stringify(r.kt));
+            assert.ok(r.kt.chipW >= 44 && r.kt.ls === 'normal', 'the KR+TH chip is a pill with room for two flags: ' + JSON.stringify(r.kt));
             assert.ok(r.below && r.flex === 'flex', 'Writing progress is below the writing part: ' + JSON.stringify([r.below, r.flex]));
             assert.deepEqual(r.flags, FLAGS, 'one chip cycles EN → KR → TH → K·T → EN: ' + r.flags);
         }
