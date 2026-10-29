@@ -18,6 +18,7 @@
         { k: 'fine', icon: '✅', en: 'On track', th: 'เรียบร้อย', tip: 'Time left and most have submitted' }
     ];
     const ms = (t) => !t ? 0 : t.toMillis ? t.toMillis() : t.seconds ? t.seconds * 1000 : (new Date(t).getTime() || 0);
+    const safeCover = (v) => { try { const u = new URL(v); return u.protocol === 'https:' ? u.href : ''; } catch (e) { return ''; } };   // V102.503: same rule as quiz-cover.js
     const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
     // opts = { now, hours, share, isActive(u) } → { quads: { do: [...], plan, watch, fine }, total }
@@ -42,7 +43,8 @@
             const total = eligible.length, pct = total ? done / total : 1;
             const urgent = !!dead && dead - now <= win, important = total > 0 && pct < share;
             const k = important ? (urgent ? 'do' : 'plan') : (urgent ? 'watch' : 'fine');
-            quads[k].push({ id: q.id, title: String(q.shortTitle || q.title || q.id), dead, done, total, pct });
+            const full = String(q.title || '').trim(), title = String(q.shortTitle || full || q.id);
+            quads[k].push({ id: q.id, title, full: full && full !== title ? full : '', cover: safeCover(q.coverUrl), dead, done, total, pct });
         });
         // soonest-closing first (no deadline last), then the lowest share
         Object.values(quads).forEach(l => l.sort((a, b) => (a.dead || Infinity) - (b.dead || Infinity) || a.pct - b.pct));
@@ -67,8 +69,9 @@
                 const list = r.quads[d.k];
                 return `<div class="qmx-q qmx-${d.k}${list.length ? '' : ' is-empty'}"><div class="qmx-qh" title="${d.tip}"><span>${d.icon} ${d.en}</span><b>${list.length}</b><small>${d.th}</small></div>`
                     + (list.length ? list.map(x => `<button type="button" class="qmx-item" data-id="${esc(x.id)}" title="${esc(x.title)} — ${x.done}/${x.total} submitted · open Participants">`
-                        + `<span class="qmx-name">${esc(x.title)}</span><span class="qmx-meta">${x.total ? `${x.done}/${x.total} · ${Math.round(x.pct * 100)}%` : 'no one targeted'}`
-                        + (x.dead ? ` · <span class="quiz-countdown" data-short="1" data-deadline="${new Date(x.dead).toISOString()}"></span>` : ' · no deadline') + '</span></button>').join('')
+                        + (x.cover ? `<img class="qmx-cov" src="${esc(x.cover)}" alt="" loading="lazy" onerror="this.remove()">` : '')
+                        + `<span class="qmx-txt"><span class="qmx-name">${esc(x.title)}</span>${x.full ? `<span class="qmx-full">${esc(x.full)}</span>` : ''}<span class="qmx-meta">${x.total ? `${x.done}/${x.total} · ${Math.round(x.pct * 100)}%` : 'no one targeted'}`
+                        + (x.dead ? ` · <span class="quiz-countdown" data-short="1" data-deadline="${new Date(x.dead).toISOString()}"></span>` : ' · no deadline') + '</span></span></button>').join('')
                         : '') + '</div>';   // V102.501: an empty box is just its header line
             }).join('') + '</div>';
         if (typeof window.updateQuizCountdown === 'function') window.updateQuizCountdown();
