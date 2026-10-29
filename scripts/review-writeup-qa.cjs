@@ -17,7 +17,11 @@ const idx = fs.readFileSync('public/index.html', 'utf8'), hcss = fs.readFileSync
 assert.ok(!aj.includes('fromMistakes'), 'Articles.fromMistakes removed — the 📰 is not an Articles feature');
 assert.ok(!html.includes('_reviewWrongForArticle') && !html.includes('reviewWrongToArticle'), 'no leftover Articles hand-off in admin.html');
 assert.match(html, /<script src="articles-admin\.js\?v=V102\.(50[7-9]|5[1-9]\d|[6-9]\d\d)"><\/script>/, 'articles-admin.js cache-busted');
-assert.ok(idx.includes('white-space:pre-wrap;">${fmtAdminNote(attempt.adminComment)}</div>'), 'intern result card: fmtAdminNote (escaped, **bold** highlighted) + pre-wrap');
+assert.ok(idx.includes('<div class="qan-body">${fmtAdminNote(attempt.adminComment)}</div>'), 'intern result card: fmtAdminNote (escaped, **bold** highlighted)');
+assert.ok(/\.qr-admin-note \{[^}]*background:#fffdf8;[^}]*color:#1f2937/.test(idx) && /\.qr-admin-note \.qan-body \{[^}]*white-space:pre-wrap/.test(idx), 'V101.246: the card is pale with dark text and keeps line breaks');
+assert.ok(!idx.includes('<div style="background:var(--primary); color:white; padding:15px; border-radius:12px; margin-bottom:20px; box-shadow:0 4px 15px rgba(67,97,238,0.2)'), 'the solid blue card is gone');
+{ const hw = fs.readFileSync('public/halloween.css', 'utf8'); assert.ok(/html\.hw \.qr-admin-note \{[^}]*dashed #fb923c/.test(hw) && hw.includes('html.hw .qr-admin-note::after { content: "🎃"'), 'halloween.css dresses the card in season only'); }
+assert.match(idx, /halloween\.css\?v=V101\.(24[6-9]|2[5-9]\d|[3-9]\d\d)/, 'halloween.css cache-busted');
 assert.ok(idx.includes('position:relative; white-space:pre-wrap;">') && idx.includes('</i>${fmtAdminNote(item.adminComment)}'), 'intern History row: fmtAdminNote + pre-wrap');
 assert.ok(!idx.includes('"${attempt.adminComment}"') && !idx.includes('${item.adminComment}\n'), 'no raw adminComment left in index.html');
 assert.ok(/\.history-compact \.hl-comment \{[^}]*white-space:pre-wrap;/.test(hcss), 'history-lean comment keeps line breaks');
