@@ -25,7 +25,14 @@ const BODY = '<div id="a"><input type="hidden" id="research-model-select" value=
             assert.deepEqual(await shown(a), ['or/deepseek/deepseek-v4.1-flash-1017', 'or/deepseek/deepseek-v4-pro-0813'], 'DeepSeek models only @' + width);
             assert.equal(await a.locator(':scope > button[data-value]').count(), 17, 'all 17 chips stay in the DOM');
             assert.equal(await a.locator('.mr-vendor[aria-pressed="true"]').getAttribute('data-provider'), 'DeepSeek');
+            // V102.515 design B: the chips sit right after the pressed icon (flex order), show no vendor word and no logo; aria-label keeps the full name
+            const seats = async () => a.evaluate(r => { const items = [...r.querySelectorAll('.mr-vendor, :scope > button[data-value]:not([hidden])')].sort((x, y) => Number(x.style.order || 0) - Number(y.style.order || 0)); return items.map(e => e.classList.contains('mr-vendor') ? '[' + e.dataset.provider + ']' : e.textContent.trim().replace(/\s+/g, ' ')); });
+            assert.deepEqual(await seats(), ['[Gemini]', '[GPT]', '[Claude]', '[Qwen]', '[DeepSeek]', 'Flash V4.1', 'Pro V4', '[Muse]'], 'DeepSeek chips follow the DeepSeek icon, no vendor word');
+            assert.equal(await a.locator('button[data-value="or/deepseek/deepseek-v4-pro-0813"]').getAttribute('aria-label'), 'DeepSeek V4 Pro', 'aria-label keeps the full name');
+            assert.equal(await a.evaluate(r => getComputedStyle(r.querySelector('.mr-vendors')).display), 'contents', 'the icon bar is display:contents');
+            assert.equal(await a.evaluate(r => getComputedStyle(r.querySelector('button[data-value="or/deepseek/deepseek-v4-pro-0813"] .text-ai-logo')).display), 'none', 'no logo inside the chip');
             await a.locator('.mr-vendor[data-provider="Gemini"]').click();
+            assert.deepEqual(await seats(), ['[Gemini]', 'Lite 3.5', 'Flash 3.8', 'Argon 4', 'Gemma 4 26B', '[GPT]', '[Claude]', '[Qwen]', '[DeepSeek]', '[Muse]'], 'after tapping Gemini its chips follow the Gemini icon');
             assert.deepEqual(await shown(a), ['as/gemini-3.5-flash-lite', 'gemini-3.8-flash', 'as/gemini-4-argon', 'or/google/gemma-4-26b-a4b-it'], 'Gemini models only');
             // picking a chip keeps the registry behaviour (one pressed chip, value stored)
             await a.locator('button[data-value="gemini-3.8-flash"]').click();
