@@ -142,6 +142,7 @@ const waitIdle = page => page.waitForFunction(() => !document.getElementById('rv
       assert(shown.length >= 1 && shown.every(c => c[0] === pressed[0]), 'only the pressed vendor\'s chips show: ' + JSON.stringify(shown));
       assert.equal(shown.filter(c => c[1]).map(c => c[2]).join(), 'gpt-6-luna', 'the active chip is the default model');
       const hiddenN = await rail.locator(':scope > button[hidden]').count(); assert(hiddenN > shown.length, 'the other vendors\' chips are hidden, not gone: ' + hiddenN);
+      { const seat = await rail.evaluate(r => { const on = r.querySelector('.mr-vendor[aria-pressed="true"]'), c = r.querySelector(':scope > button:not([hidden])'); return [on.style.order, c.style.order]; }); assert.equal(Number(seat[1]), Number(seat[0]) + 1, 'V102.515: the chips are seated right after the pressed icon: ' + seat); }
       const other = vendors.find(v => v[1] !== 'true')[0];
       await rail.locator('.mr-vendor[data-provider="' + other + '"]').click();
       const shown2 = await rail.locator(':scope > button:not([hidden])').evaluateAll(bs => bs.map(b => [b.getAttribute('aria-label').split(' ')[0], b.dataset.value]));

@@ -93,16 +93,22 @@
         return `<button type="button" class="glass-toggle-item${m.id === value ? ' active' : ''}" data-value="${m.id}"${owner ? ` data-vendor="${owner}"` : ''}${google ? ' data-bill="google"' : ''}${thai ? ' data-thai="1"' : ''} aria-label="${m.label}" aria-pressed="${m.id === value}" title="${m.label} · ${m.id}${thai ? ' · พื้นสีธงไทย = อ่านภาษาไทยในรูปได้ (ทดสอบแล้ว)' : ''}${google ? ' · จุดสีฟ้า = ค่าใช้จ่ายเรียกเก็บผ่านบัญชี Google Cloud' : ''} — ${m.hint}"${action ? ` onclick="${action}"` : ''}>${logo}${m.short}</button>`;
     }).join('');
     window.textAIChipsHtml = (id, value, action, extra = []) => `<div class="text-ai-chips lang-no-toggle" role="group" aria-label="AI model"${id ? ` id="${id}"` : ''}>${window.textAIChipContents(value, action, null, extra)}</div>`;
-    // V102.487 vendor-first rail: vendor icons first, only that vendor's models below (the other chips stay in the DOM, hidden).
+    // V102.487 vendor-first rail: vendor icons first, only that vendor's models (the other chips stay in the DOM, hidden).
+    // V102.515 (owner, design B): the vendor's chips sit RIGHT AFTER its icon — the icon bar is display:contents so icons and chips share the
+    // rail's flex line, and flex `order` seats the chips behind the pressed icon (icon i → order 2i, chips → 2k+1). Chips stay direct children,
+    // so every `.text-ai-chips > button` rule and query keeps working. Chips carry no vendor word — the icon says it (aria-label keeps the full name).
     // Rails that already carry their own provider tabs (.audit-providers / .cmp-vendors) and the AI Settings modal keep their layout.
     const vendorOf = b => (b.getAttribute('aria-label') || '').split(' ')[0];
     function showVendor(rail, vendor) {
-        rail.querySelectorAll('.mr-vendor').forEach(v => v.setAttribute('aria-pressed', String(v.dataset.provider === vendor)));
-        rail.querySelectorAll(':scope > button').forEach(b => { b.hidden = vendorOf(b) !== vendor; });
+        const icons = [...rail.querySelectorAll('.mr-vendor')];
+        icons.forEach((v, i) => { v.setAttribute('aria-pressed', String(v.dataset.provider === vendor)); v.style.order = i * 2; });
+        const k = Math.max(0, icons.findIndex(v => v.dataset.provider === vendor));
+        rail.querySelectorAll(':scope > button').forEach(b => { b.hidden = vendorOf(b) !== vendor; b.style.order = k * 2 + 1; });
     }
     function vendorFirst(rail) {
         const chips = [...rail.querySelectorAll(':scope > button')];
         const vendors = [...new Set(chips.map(vendorOf))];
+        chips.forEach(b => { const v = vendorOf(b); b.childNodes.forEach(n => { if (n.nodeType === 3 && n.textContent.trim().indexOf(v + ' ') === 0) n.textContent = n.textContent.replace(v + ' ', ''); }); });   // "DeepSeek Flash V4.1" → "Flash V4.1"
         const logo = {}; chips.forEach(b => { const o = b.dataset.vendor; if (o && !logo[vendorOf(b)]) logo[vendorOf(b)] = o; });
         const bar = document.createElement('span');
         bar.className = 'mr-vendors'; bar.setAttribute('role', 'group'); bar.setAttribute('aria-label', 'Model vendor');

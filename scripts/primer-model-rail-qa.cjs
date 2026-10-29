@@ -35,7 +35,8 @@ assert.ok(admin.includes("window.bindRegistryModelInput(mi.id, 'ai_primer_model'
                 const vendors = [...rail.querySelectorAll('.mr-vendors .mr-vendor')].map(v => [v.dataset.provider, v.getAttribute('aria-pressed')]);
                 const shown = [...rail.querySelectorAll(':scope > button:not([hidden])')].map(b => [b.getAttribute('aria-label').split(' ')[0], b.dataset.value, b.classList.contains('active')]);
                 const hidden = rail.querySelectorAll(':scope > button[hidden]').length;
-                return { value: input.value, inRow: !!row.querySelector('label .text-ai-chips'), vendors, shown, hidden, select: !!row.querySelector('select') };
+                const on = rail.querySelector('.mr-vendor[aria-pressed="true"]'), first = rail.querySelector(':scope > button:not([hidden])');
+                return { value: input.value, inRow: !!row.querySelector('label .text-ai-chips'), vendors, shown, hidden, select: !!row.querySelector('select'), seated: !!on && !!first && Number(first.style.order) === Number(on.style.order) + 1 };
             };
             out.r1 = read(rows[0]); out.r2 = read(rows[1]);
             // pick another vendor, then its first chip, in row 1
@@ -64,6 +65,7 @@ assert.ok(admin.includes("window.bindRegistryModelInput(mi.id, 'ai_primer_model'
             assert(x.shown.length >= 1 && x.shown.every(c => c[0] === v), k + ': only that vendor\'s chips show: ' + JSON.stringify(x.shown));
             assert.equal(x.shown.filter(c => c[2]).map(c => c[1]).join(), 'gpt-6-luna', k + ': the active chip = the input value');
             assert(x.hidden > 0, k + ': the other chips are hidden, not removed');
+            assert.equal(x.seated, true, k + ': V102.515 — the chips sit right after the pressed icon');
         }
         assert.equal(r.afterPick.value, r.picked, 'the row input follows the chip');
         assert.equal(r.remembered, r.picked, 'the pick is remembered under ai_primer_model');
