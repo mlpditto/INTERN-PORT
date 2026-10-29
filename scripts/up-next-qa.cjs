@@ -82,13 +82,25 @@ ctx.safeJsonParse = JSON.parse;
     let m = await ctx.upNextMatchAi(Q, F5, call);
     assert.equal(calls.length, 1); assert.equal(calls[0][0], 'as/gemini-3.5-flash-lite', 'the cheap model'); assert.equal(calls[0][2], true, 'JSON mode');
     assert.ok(!/asthma/i.test(calls[0][1].split('TOPICS:')[1].split('QUIZZES:')[0]), 'a topic the text match already placed is not sent'); assert.ok(!/userId|u1/.test(calls[0][1]), 'no user ids in the prompt');
-    assert.deepEqual(JSON.parse(JSON.stringify(m)), { ids: { 'ยาปฏิชีวนะ': 'live' }, done: true }, 'only valid, strong, in-range pairs are kept (the prompt numbers topics 0..: ' + JSON.stringify(m));
+    assert.deepEqual(JSON.parse(JSON.stringify(m)), { ids: { 'ยาปฏิชีวนะ': 'live' }, rel: {}, done: true }, 'only valid, strong, in-range pairs are kept (the prompt numbers topics 0..: ' + JSON.stringify(m));
     await ctx.upNextMatchAi(Q, F5, call); assert.equal(calls.length, 1, 'same day + same set → the cache answers');
     await ctx.upNextMatchAi(Q.concat([{ id: 'new', title: 'Another quiz', isActive: false }]), F5, call); assert.equal(calls.length, 2, 'a changed quiz set asks again');
-    assert.deepEqual(JSON.parse(JSON.stringify(await ctx.upNextMatchAi(Q, [{ userId: 'a', nextTopic: 'asthma', timestamp: ts(1) }], call))), { ids: {}, done: true }); assert.equal(calls.length, 2, 'nothing left for the model → no call');
+    assert.deepEqual(JSON.parse(JSON.stringify(await ctx.upNextMatchAi(Q, [{ userId: 'a', nextTopic: 'asthma', timestamp: ts(1) }], call))), { ids: {}, rel: {}, done: true }); assert.equal(calls.length, 2, 'nothing left for the model → no call');
     answer = 'not json at all'; ctx.safeJsonParse = () => null;
-    assert.deepEqual(JSON.parse(JSON.stringify(await ctx.upNextMatchAi(Q, [{ userId: 'z', nextTopic: 'โรคหัวใจ', timestamp: ts(9) }], call))), { ids: {}, done: true }, 'unparsable answer → no pairs');
+    assert.deepEqual(JSON.parse(JSON.stringify(await ctx.upNextMatchAi(Q, [{ userId: 'z', nextTopic: 'โรคหัวใจ', timestamp: ts(9) }], call))), { ids: {}, rel: {}, done: true }, 'unparsable answer → no pairs');
     assert.equal(calls.length, 3);
+    // V102.499: a topic with no strong match gets up to 3 RELATED quizzes (valid, distinct, in range), never one that was strongly matched
+    ctx.safeJsonParse = JSON.parse; answer = '{"m":[],"r":[{"t":0,"q":[1,2,2,99]},{"t":1,"q":[0]}]}';
+    const SK = [{ userId: 's1', nextTopic: 'ยาทาโรคผิวหนัง', timestamp: ts(10) }, { userId: 's2', nextTopic: 'โรคตา', timestamp: ts(5) }];
+    const before = calls.length;
+    const rr = JSON.parse(JSON.stringify(await ctx.upNextMatchAi(Q, SK, call)));
+    assert.equal(calls.length, before + 1); assert.match(calls[calls.length - 1][1], /r: for a topic that has NO strong match/, 'the prompt asks for related quizzes');
+    assert.deepEqual(rr, { ids: {}, rel: { 'ยาทาโรคผิวหนัง': ['asthma', 'warf'], 'โรคตา': ['live'] }, done: true }, 'out-of-range / duplicate numbers dropped: ' + JSON.stringify(rr));
+    const built = build(Q, SK, rr);
+    const skin = built.asked.find(x => x.title === 'ยาทาโรคผิวหนัง');
+    assert.deepEqual([skin.kind, skin.rel.map(r => [r.id, r.title, r.live])], ['topic', [['asthma', 'Asthma — GINA step-up', false], ['warf', 'Warfarin interactions', false]]], 'the topic tile carries its related quizzes: ' + JSON.stringify(skin));
+    assert.equal(built.asked.find(x => x.title === 'โรคตา').rel[0].live, true, 'a live related quiz is marked live');
+    assert.deepEqual(build(Q, SK, { ids: {}, rel: {}, done: true }).asked.map(x => x.rel.length), [0, 0], 'no related list → the old "No quiz yet" caption');
     await assert.rejects(ctx.upNextMatchAi(Q, [{ userId: 'y', nextTopic: 'โรคตับ', timestamp: ts(9) }], async () => { throw new Error('proxy down'); }), /proxy down/, 'a failing call rejects (the strip catches it and keeps the text-only version)');
 })().then(page).catch(e => { console.error(e); process.exit(1); });
 
@@ -105,6 +117,7 @@ function page() { return (async () => {
             window.confirm = m => { window.calls.push(['confirm', m]); return window.confirmAnswer; };
             window.toggleQuizStatus = (id, cur) => window.calls.push(['toggle', id, cur]);
             window.openQuizModal = (id) => window.calls.push(id ? ['open', id] : ['open']);
+            window.callUniversalAI = async () => ({ text: '{"m":[],"r":[{"t":0,"q":[1,2]}]}' });   // V102.499: the model lists two related quizzes for the first unmatched topic
             window.showToast = (m) => window.calls.push(['toast', m]);
             window.db = { collection: () => ({ orderBy: () => ({ limit: () => ({ get: () => Promise.resolve({ docs: [] }) }) }) }) };
         });
@@ -125,6 +138,14 @@ function page() { return (async () => {
         assert.equal(geo.cols, expectCols, name + ': ' + expectCols + ' columns: ' + JSON.stringify(geo));
         assert.ok(!geo.scrollX && !geo.pageX, name + ': no sideways scroll');
         assert.deepEqual(geo.go, ['＋', '▶', '▶', '↗', '▶'], name + ': ＋ for the unmatched topic, ▶ for inactive quizzes, ↗ for a live one');
+        // V102.499: the unmatched topic shows its related quizzes as chips (no "No quiz yet" line), and a chip opens that quiz
+        await page.waitForSelector('#upnext-card .un-rel');
+        const relUi = await page.evaluate(() => ({ chips: [...document.querySelectorAll('#upnext-card .un-rel')].map(b => [b.dataset.rel, b.textContent.trim()]), head: !!document.querySelector('#upnext-card .un-relh'), none: !!document.querySelector('#upnext-card .un-none'), tileTop: document.querySelector('#upnext-card .un-rel').closest('.un-tile').getBoundingClientRect().top >= 0 }));
+        assert.deepEqual(relUi.chips, [['asthma', '⏸ Asthma — GINA step-up'], ['warf', '⏸ Warfarin interactions']], name + ': related chips: ' + JSON.stringify(relUi));
+        assert.ok(relUi.head && !relUi.none, name + ': "≈ Related" heading replaces "No quiz yet"');
+        await page.evaluate(() => { window.calls.length = 0; });
+        await page.click('#upnext-card .un-rel[data-rel="warf"]');
+        assert.deepEqual(await page.evaluate(() => window.calls), [['open', 'warf']], name + ': a related chip opens that quiz in the editor (no confirm, nothing goes live)');
         if (name === 'desktop') {
             // V102.464: the chips carry words; every tile says what to DO — green edge ▶, violet edge ＋, a quiet already-live tile — and 2+ askers stand out
             assert.equal(await page.$$eval('#upnext-card .un-chip', e => e.map(x => x.textContent).join('|')), 'All|💬 Asked|🌱 New', 'chips are labelled');
