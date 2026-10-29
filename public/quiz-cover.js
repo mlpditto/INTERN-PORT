@@ -352,6 +352,7 @@ const QuizCover = (() => {
     // 2:3), which left side bands in the 3:4 frame. A taller image loses more from the top than the
     // bottom (60:40) to protect the title band in the bottom 25%; a wider one is cropped evenly.
     // Admin uploads are not touched. Already-3:4 images (±1%) are returned unchanged.
+    // V102.495: the bands that letterboxing left are now filled from the picture's own top / bottom edge (see below), so the cover is full-bleed.
     // V102.157: a WIDER image (square / landscape — Image 2 and Nano Banana ignore the 3:4 ask) is no longer cropped at the sides:
     // the title the model paints across the full width was losing its first and last letters ("icrosoft Copilo"). It is letterboxed
     // onto a white 3:4 canvas instead, vertically centred; the list thumbs already show covers with object-fit:contain on a light
@@ -369,8 +370,15 @@ const QuizCover = (() => {
         } else {
             const H = Math.round(w / COVER_RATIO), ctx = canvas.getContext('2d');
             canvas.width = w; canvas.height = H;
+            // V102.495: no white bands — the bars above and below are the picture's own top / bottom edge, stretched and softly blurred, so the cover is full-bleed and nothing is cut
+            const y0 = Math.round((H - h) / 2), strip = Math.max(2, Math.round(h * 0.015)), blur = Math.max(2, Math.round(w * 0.012)), pad = blur * 3;
             ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, H);
-            ctx.drawImage(bitmap, 0, Math.round((H - h) / 2));
+            ctx.save();
+            if ('filter' in ctx) ctx.filter = 'blur(' + blur + 'px)';
+            ctx.drawImage(bitmap, 0, 0, w, strip, -pad, -pad, w + pad * 2, y0 + pad + strip);
+            ctx.drawImage(bitmap, 0, h - strip, w, strip, -pad, y0 + h - strip, w + pad * 2, H - (y0 + h) + strip + pad);
+            ctx.restore();
+            ctx.drawImage(bitmap, 0, y0);
         }
         bitmap.close();
         const out = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', 0.92));
