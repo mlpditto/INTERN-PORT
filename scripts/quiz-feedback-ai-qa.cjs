@@ -12,6 +12,7 @@ const ai = fs.readFileSync('public/quiz-feedback-ai.js', 'utf8');
 assert.ok(ai.includes("provider: 'typhoon'") && ai.includes('intern_quiz_next_topics'), 'typhoon only (interns may not use other providers), feature-tagged');
 assert.ok(!/userId|displayName|userProfile|comment/.test(ai.replace(/\/\/.*$/gm, '')), 'the request code never reads names / ids / comments');
 
+const pickFb = async (page, l) => { for (let i = 0; i < 3; i++) { if (await page.evaluate(() => fbLang.current()) === l) return; await page.locator('.fb-lang button').click(); } };   // V101.237: the language chip cycles TH → EN → KR
 (async () => {
     const browser = await chromium.launch();
     try {
@@ -37,6 +38,7 @@ assert.ok(!/userId|displayName|userProfile|comment/.test(ai.replace(/\/\/.*$/gm,
             return r.abort();
         });
         await page.goto(INDEX, { waitUntil: 'load' });
+        await page.evaluate(() => window.fbLang && fbLang.setDefault('en'));   // V101.237: the sheet opens in Thai; these checks were written in English
         await page.evaluate(() => {
             document.getElementById('main-app').style.setProperty('display', 'block', 'important');
             const ov = document.getElementById('loading-overlay'); if (ov) ov.style.setProperty('display', 'none', 'important');
@@ -96,20 +98,20 @@ assert.ok(!/userId|displayName|userProfile|comment/.test(ai.replace(/\/\/.*$/gm,
 
         // ---- the language capsule re-asks, in that language; cached per quiz + language
         const n1 = reqs.length;
-        await page.locator('.fb-lang button[data-l="ko"]').click();
+        await pickFb(page, 'ko');
         await settle();
         assert.deepEqual(await chips(), ['비염 치료', '항히스타민제', '천식 단계별 치료', '만성 부비동염'], 'Korean chips');
         assert.equal(reqs.length, n1 + 1);
         assert.ok(/in Korean\./.test(reqs[n1].body.prompt));
         assert.equal(await page.locator('#fb-topic-chip-rail .fb-mark').getAttribute('title'), '추천 주제');
-        await page.locator('.fb-lang button[data-l="th"]').click();
+        await pickFb(page, 'th');
         await settle();
         assert.deepEqual(await chips(), ['การรักษาจมูกอักเสบ', 'ยาแก้แพ้', 'หอบหืด', 'ไซนัสอักเสบ'], 'Thai chips');
-        await page.locator('.fb-lang button[data-l="en"]').click();
+        await pickFb(page, 'en');
         await settle();
         assert.equal(reqs.length, n1 + 2, 'going back to English comes from the cache (no third request)');
         assert.equal((await chips())[0], 'Rhinitis treatment');
-        await page.locator('.fb-lang button[data-l="en"]').click();
+        await pickFb(page, 'en');
         assert.equal(reqs.length, n1 + 2, 'tapping the language already shown asks nothing');
 
         // ---- failures fall back to the popular-tag chips (no ✨, no alert)
