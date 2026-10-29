@@ -102,7 +102,7 @@ const waitIdle = page => page.waitForFunction(() => !document.getElementById('rv
       assert.equal(p.length, 1, 'one AI call on the first open');
       const pr = p[0].prompt;
       for (const s of ['Which advantage of the 24/4 regimen', 'Less weight gain', 'Shorter hormone-free interval reduces withdrawal symptoms', 'A shorter HFI blunts hormone withdrawal', 'Rank progestins', 'Second-generation progestins', 'Migraine with aura', 'No precautions', 'Estrogen is contraindicated',
-        'addressed to Bew', 'in Thai', 'Contraceptive Knowledge', 'ONE connected narrative', 'Do NOT go question by question', 'do NOT mention scores'])
+        'addressed to Bew', 'in Thai', 'Contraceptive Knowledge', 'ONE connected narrative', 'Do NOT go question by question', 'do NOT mention scores', 'headed "Read more" (in Thai)', '2–4 specific things worth reading', 'no URLs, no invented sources'])
         assert(pr.includes(s), 'the prompt carries: ' + s);
       for (const s of ['Postpartum breastfeeding', 'Skipped question', 'u-secret-77', 'example.test', 'Sample', 'article', 'popup'])
         assert(!pr.includes(s), 'the prompt must not carry: ' + s);
