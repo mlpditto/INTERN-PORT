@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.242)</title>
+    <title>Internship Portfolio (V101.243)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.234">
     <link rel="stylesheet" href="halloween.css?v=V101.235">
     <script>/* V101.235: 20 Oct – 2 Nov (Bangkok) the Journal wears Halloween (halloween.css), then it goes back on its own */(function () { try { var d = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }).slice(5); if (d >= '10-20' && d <= '11-02') document.documentElement.classList.add('hw'); } catch (e) { /* none */ } })();</script>
@@ -12030,6 +12030,7 @@
         let accumulatedTime = 0; // 🔥 Added for V77.24 Carrying over time
         let stepStartTimestamp = Date.now(); // V86.14: Track duration per question
         let primerSeen = []; // V101.138: questions whose "Read first" page was already passed in this run
+        let answerChecked = []; // V101.243: practice quizzes (quiz.instantAnswer) — questions whose answer was already checked (locked, key shown)
         let durationsPerQuestion = [];
         let lastBonusTime = 0;   // 🔥 V81.3: Track bonus for UI display
         // V96.26: per-question "frozen" remaining time — [step] => seconds left when
@@ -12350,6 +12351,7 @@
                     durationsPerQuestion = new Array(currentQuiz.questions.length).fill(0);
                     stepTimeRemaining = new Array(currentQuiz.questions.length).fill(null);
                     primerSeen = [];
+                    answerChecked = [];   // V101.243
                     stepStartTimestamp = Date.now();
                     // The auto-save joins multi-select (ordering) answers with "\n---\n";
                     // reverse that here so userAnswers holds real arrays again.
@@ -12382,6 +12384,7 @@
                 durationsPerQuestion = new Array(currentQuiz.questions.length).fill(0); // V86.14
                 stepTimeRemaining = new Array(currentQuiz.questions.length).fill(null);
                 primerSeen = [];
+                answerChecked = [];   // V101.243
                 stepStartTimestamp = Date.now();
                 userAnswers = new Array(currentQuiz.questions.length).fill(null);
                 // 🔥 V78.1: Timer initialization based on mode
@@ -12404,6 +12407,7 @@
                 durationsPerQuestion = new Array(currentQuiz.questions ? currentQuiz.questions.length : 1).fill(0); // V86.14
                 stepTimeRemaining = new Array(currentQuiz.questions ? currentQuiz.questions.length : 1).fill(null);
                 primerSeen = [];
+                answerChecked = [];   // V101.243
                 stepStartTimestamp = Date.now();
                 userAnswers = new Array(currentQuiz.questions ? currentQuiz.questions.length : 1).fill(null);
                 // 🔥 V78.1: Timer initialization based on mode
@@ -13999,7 +14003,8 @@
                 // <=0) has nothing left to count down — skip starting the interval so
                 // revisiting it doesn't immediately re-fire the "time's up" alert loop.
                 // The question still renders normally below; it's just frozen at 0s.
-                if (isTotalTimeMode || timeLeftForStep > 0) {
+                // V101.243: a checked practice question is done — its own clock stays stopped while the explanation is read (a total-time quiz keeps running)
+                if ((isTotalTimeMode || timeLeftForStep > 0) && !(!isTotalTimeMode && quizStepChecked(currentStep))) {
                     quizTimerInterval = setInterval(() => {
                         timeLeftForStep--;
                         updateTimerUI();
@@ -14032,6 +14037,9 @@
                     // 🔥 V78: Use shuffleMap to display options in shuffled order
                     const sMap = shuffleMap[currentStep]; // [displayPos] => originalIndex
                     const displayOrder = sMap || question.options.map((_, i) => i); // Fallback to original order
+                    // V101.243: practice quiz — once checked the choice locks, the key turns green (✓) and a wrong pick red (✗)
+                    const locked = quizStepChecked(currentStep);
+                    const keySet = locked ? quizCorrectSet(currentStep) : null;
 
                     inputHtml = `
                     <div class="qt-choice-list" style="display:flex; flex-direction:column; gap:10px;">
@@ -14041,18 +14049,22 @@
                         const isChecked = isMulti
                             ? (userAnswers[currentStep] || []).includes(origIdx)
                             : userAnswers[currentStep] === origIdx;
+                        const isKey = locked && keySet.includes(origIdx), isMiss = locked && isChecked && !isKey;
+                        const bg = isKey ? '#ecfdf5' : isMiss ? '#fef2f2' : isChecked ? '#f0f7ff' : '#fff';
+                        const bd = isKey ? '#22c55e' : isMiss ? '#ef4444' : isChecked ? '#4361ee' : '#ddd';
 
                         return `
-                                <label style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid #ddd; border-radius:8px; cursor:pointer; background:${isChecked ? '#f0f7ff' : '#fff'}; border-color:${isChecked ? '#4361ee' : '#ddd'}; white-space: pre-wrap;">
+                                <label style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid #ddd; border-radius:8px; cursor:${locked ? 'default' : 'pointer'}; background:${bg}; border-color:${bd}; white-space: pre-wrap;">
                                     <input type="${isMulti ? 'checkbox' : 'radio'}" name="q-opt" value="${displayIdx}"
-                                        ${isChecked ? 'checked' : ''}
+                                        ${isChecked ? 'checked' : ''} ${locked ? 'disabled' : ''}
                                         onchange="handleChoiceChange(${currentStep}, ${displayIdx}, ${isMulti})"
                                         style="width:auto; margin:0; padding:0; flex:0 0 auto;">
-                                    <span style="flex:1 1 auto; min-width:0; text-align:left;">${opt}</span>
+                                    <span style="flex:1 1 auto; min-width:0; text-align:left;">${opt}</span>${isKey ? '<b class="qz-mark" style="color:#16a34a;">✓</b>' : isMiss ? '<b class="qz-mark" style="color:#dc2626;">✗</b>' : ''}
                                 </label>
                             `;
                     }).join('')}
                     </div>
+                    ${quizInstantAnswerHtml(currentStep, question)}
                 `;
                 } else if (qType === 'ordering') {
                     // Initialize as empty array for ordering
@@ -14206,7 +14218,40 @@
             }
         }
 
+        // V101.243: practice quizzes (admin ticks quiz.instantAnswer) — on a choice question that has a key, the intern presses
+        // ✓ Check: the choice locks, the key turns green, a wrong pick red, and the explanation shows. Scoring is unchanged (submit
+        // grades userAnswers as always); a graded run cannot be resumed after leaving, so the checked set lives only in this run.
+        function quizInstantOn(step) {
+            const q = currentQuiz && currentQuiz.questions && currentQuiz.questions[step];
+            if (!q || currentQuiz.instantAnswer !== true || currentQuiz.isPoll === true || (q.type || 'choice') !== 'choice') return false;
+            return quizCorrectSet(step).length > 0;
+        }
+        function quizCorrectSet(step) {
+            const c = currentQuiz.questions[step].correct;
+            return (Array.isArray(c) ? c : (c === undefined || c === null ? [] : [c])).map(Number);
+        }
+        function quizStepChecked(step) { return quizInstantOn(step) && answerChecked[step] === true; }
+        function quizStepAnswered(step) { const a = userAnswers[step]; return Array.isArray(a) ? a.length > 0 : (a !== null && a !== undefined); }
+        function quizInstantAnswerHtml(step, question) {
+            if (!quizInstantOn(step)) return '';
+            if (!answerChecked[step]) {
+                return `<button type="button" id="qz-check" onclick="checkQuizAnswer()" ${quizStepAnswered(step) ? '' : 'disabled'} title="Check this answer · ตรวจคำตอบข้อนี้" style="width:auto; min-height:0; margin:12px 0 0; padding:9px 18px; border:none; border-radius:10px; background:#16a34a; color:#fff; font-weight:800; font-size:0.92em; cursor:pointer;">✓ Check · ตรวจคำตอบ</button>`;
+            }
+            const key = quizCorrectSet(step), a = userAnswers[step], mine = (Array.isArray(a) ? a : [a]).map(Number);
+            const right = key.length === mine.length && key.every(v => mine.includes(v));
+            const expl = question.explanation && String(question.explanation).trim() ? `<div class="md-render" style="margin-top:6px; font-weight:400;">${window.renderMd(question.explanation)}</div>` : '';
+            return `<div class="qz-verdict" style="margin-top:12px; padding:10px 12px; border-radius:10px; border-left:4px solid ${right ? '#16a34a' : '#dc2626'}; background:${right ? '#f0fdf4' : '#fef2f2'}; color:${right ? '#166534' : '#991b1b'}; font-weight:800; font-size:0.92em;">`
+                + (right ? '✓ Correct · ถูกต้อง' : '✗ Not quite · ยังไม่ถูก — the green one is the answer · ข้อสีเขียวคือคำตอบ') + expl + '</div>';
+        }
+        function checkQuizAnswer() {
+            if (!currentQuiz || !quizInstantOn(currentStep) || !quizStepAnswered(currentStep)) return;
+            answerChecked[currentStep] = true;
+            if (currentQuiz.timerMode !== 'total_time') clearInterval(quizTimerInterval);
+            renderQuizStep(true);
+        }
+
         function handleChoiceChange(step, displayIdx, isMulti) {
+            if (quizStepChecked(step)) return;   // V101.243: a checked practice answer is locked
             // 🔥 V78: Convert displayIdx back to originalIdx using shuffleMap
             const sMap = shuffleMap[step];
             const originalIdx = sMap ? sMap[displayIdx] : displayIdx;
@@ -14220,6 +14265,7 @@
                 userAnswers[step] = originalIdx;
             }
             renderQuizStepUIOnly();
+            { const cb = document.getElementById('qz-check'); if (cb) cb.disabled = !quizStepAnswered(step); }   // V101.243
         }
 
         function renderQuizStepUIOnly() {

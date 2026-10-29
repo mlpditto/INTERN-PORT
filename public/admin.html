@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.501)</title>
+    <title>Nika Admin (V102.502)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -14843,6 +14843,10 @@ document.addEventListener('DOMContentLoaded',function(){var d=new Date().toLocal
                                     <label class="logic-chip" style="background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); color:#fbbf24;" title="Multi-answer questions award partial points: (correct − wrong) / total correct, min 0. Single-answer unaffected.">
                                         <input type="checkbox" id="quiz-partial-credit"> <span>Partial Credit (multi-answer)</span>
                                     </label>
+                                    <!-- V102.502: practice quizzes — the intern presses ✓ Check after each choice question and sees right/wrong + the explanation right away -->
+                                    <label class="logic-chip" style="background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.3); color:#4ade80;" title="Practice: after each choice question the intern presses ✓ Check and sees right / wrong, the answer and the explanation straight away (the choice then locks). Leave OFF for exam sets — it shows the key. · ฝึก: เฉลยทีละข้อระหว่างทำ">
+                                        <input type="checkbox" id="quiz-instant-answer"> <span>🎓 Practice — answer after each question</span>
+                                    </label>
                                     <label class="logic-chip" style="background:rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.3); color:#22d3ee;" title="OFF (normal): an active quiz already announces two milestones to the LINE group by itself — the first intern to submit, and when everyone eligible has finished. ON: announce EVERY submission instead — one message per intern, so only use it on quizzes worth watching live (the OA's monthly message quota is shared with the case and digest pushes).">
                                         <input type="checkbox" id="quiz-notify-group"> <span>Notify LINE every submit</span>
                                     </label>
@@ -26698,6 +26702,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             document.getElementById('quiz-total-timer').value = q.totalTimer || 300;
             document.getElementById('quiz-shuffle-choices').checked = q.shuffleChoices !== undefined ? q.shuffleChoices : true;
             { const pc = document.getElementById('quiz-partial-credit'); if (pc) pc.checked = !!q.partialCredit; }
+            { const ia = document.getElementById('quiz-instant-answer'); if (ia) ia.checked = q.instantAnswer === true; }   // V102.502
             { const ng = document.getElementById('quiz-notify-group'); if (ng) ng.checked = !!q.notifyGroup; }
             { const nd = document.getElementById('quiz-notify-deadline'); if (nd) nd.checked = q.notifyDeadline !== false; }
             toggleTimerModeUI();
@@ -26797,6 +26802,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             document.getElementById('quiz-total-timer').value = 300;
             document.getElementById('quiz-shuffle-choices').checked = true;
             { const pc = document.getElementById('quiz-partial-credit'); if (pc) pc.checked = false; }
+            { const ia = document.getElementById('quiz-instant-answer'); if (ia) ia.checked = false; }   // V102.502
             { const ng = document.getElementById('quiz-notify-group'); if (ng) ng.checked = false; }
             { const nd = document.getElementById('quiz-notify-deadline'); if (nd) nd.checked = true; }
             toggleTimerModeUI();
@@ -27223,6 +27229,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const totalTimer = parseInt(document.getElementById('quiz-total-timer').value) || 300;
             const shuffleChoices = document.getElementById('quiz-shuffle-choices').checked;
             const partialCredit = document.getElementById('quiz-partial-credit')?.checked || false;
+            const instantAnswer = document.getElementById('quiz-instant-answer')?.checked || false;   // V102.502: practice — answer after each question
             // V97.47: opt-in instant LINE push on submit (notifyQuizSubmitted).
             const notifyGroup = document.getElementById('quiz-notify-group')?.checked || false;
             const notifyDeadline = document.getElementById('quiz-notify-deadline')?.checked !== false;
@@ -27310,7 +27317,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const deadlineBeriMax = (_dbV && _dbV.value !== '') ? Math.max(0, parseInt(_dbV.value, 10) || 0) : null;
 
             return {
-                title, shortTitle, targetGroup, unlockScore, description, tags, tagList, materials, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, partialCredit, notifyGroup, notifyDeadline, quizType, feedbackLimit, caseContent, questions, blueprint,
+                title, shortTitle, targetGroup, unlockScore, description, tags, tagList, materials, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, partialCredit, instantAnswer, notifyGroup, notifyDeadline, quizType, feedbackLimit, caseContent, questions, blueprint,
                 earlyBirdBeriFirst, deadlineBeriMax, coverUrl: QuizCover.value(), coverStyle: QuizCover.style(), coverBadge: QuizCover.badge(),
                 startTime: document.getElementById('quiz-start-time').value,
                 deadline: document.getElementById('quiz-deadline').value
@@ -30331,6 +30338,7 @@ ${JSON.stringify(sourceObj)}`;
                 totalTimer: formData.totalTimer || 300,
                 shuffleChoices: formData.shuffleChoices !== undefined ? formData.shuffleChoices : true,
                 partialCredit: formData.partialCredit || false,
+                instantAnswer: formData.instantAnswer === true,   // V102.502
                 notifyGroup: formData.notifyGroup || false,
                 notifyDeadline: formData.notifyDeadline !== false,
                 quizType: formData.quizType || 'standard',
