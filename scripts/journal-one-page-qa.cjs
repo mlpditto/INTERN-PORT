@@ -126,6 +126,9 @@ assert.ok(!/role="tab"|dc-tabs|createElement\('details'\)/.test(js), 'no tabs, n
         await page.click('.dc-clip');
         s = await state();
         assert.deepEqual([s.send, s.what], ['Send 1 ↗', '✉️']);
+        // V101.239: the one Send sits inline in the Message row, right of the 📎 (not on a row of its own below)
+        const inl = await page.evaluate(() => { const c = document.querySelector('.dc-clip').getBoundingClientRect(), b = document.getElementById('dc-send').getBoundingClientRect(), row = document.querySelector('#dc-feedback .dc-row').getBoundingClientRect(); return { inRow: !!document.getElementById('dc-send').closest('#dc-feedback .dc-row'), right: b.left >= c.right - 1, sameLine: Math.abs((b.top + b.height / 2) - (c.top + c.height / 2)) < 20, fits: b.right <= row.right + 1 && document.documentElement.scrollWidth <= innerWidth + 1 }; });
+        assert.deepEqual(inl, { inRow: true, right: true, sameLine: true, fits: true }, 'Send is inline beside the 📎: ' + JSON.stringify(inl));
         // V101.234: the 📎 toggle reads as ON (solid violet), not a barely different lavender
         assert.equal(await page.$eval('.dc-clip', e => [e.classList.contains('on'), getComputedStyle(e).backgroundColor]).then(x => x.join('|')), 'true|rgb(109, 40, 217)', '📎 on = solid violet');
         await page.click('#dc-send');
