@@ -65,11 +65,11 @@
             + '<span class="qmx-rail" title="Important = fewer than this share have submitted · สำคัญ = คนส่งน้อยกว่า">👥 &lt; ' + SHARES.map(p => chip('p', p, p + '%', p === share)).join('') + '</span></div>'
             + '<div class="qmx-grid">' + QUADS.map(d => {
                 const list = r.quads[d.k];
-                return `<div class="qmx-q qmx-${d.k}"><div class="qmx-qh" title="${d.tip}"><span>${d.icon} ${d.en}</span><b>${list.length}</b><small>${d.th}</small></div>`
+                return `<div class="qmx-q qmx-${d.k}${list.length ? '' : ' is-empty'}"><div class="qmx-qh" title="${d.tip}"><span>${d.icon} ${d.en}</span><b>${list.length}</b><small>${d.th}</small></div>`
                     + (list.length ? list.map(x => `<button type="button" class="qmx-item" data-id="${esc(x.id)}" title="${esc(x.title)} — ${x.done}/${x.total} submitted · open Participants">`
                         + `<span class="qmx-name">${esc(x.title)}</span><span class="qmx-meta">${x.total ? `${x.done}/${x.total} · ${Math.round(x.pct * 100)}%` : 'no one targeted'}`
                         + (x.dead ? ` · <span class="quiz-countdown" data-short="1" data-deadline="${new Date(x.dead).toISOString()}"></span>` : ' · no deadline') + '</span></button>').join('')
-                        : '<small class="qmx-empty">—</small>') + '</div>';
+                        : '') + '</div>';   // V102.501: an empty box is just its header line
             }).join('') + '</div>';
         if (typeof window.updateQuizCountdown === 'function') window.updateQuizCountdown();
     }

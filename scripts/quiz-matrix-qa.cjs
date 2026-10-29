@@ -120,6 +120,56 @@ assert.equal(ctx.quizMatrixBuild([], [], [], { now: NOW, hours: 72, share: 50, i
             if (name === 'phone') await page.screenshot({ path: process.env.QMX_SHOT || 'output/quiz-matrix-phone.png', fullPage: true }).catch(() => {});
             await page.close();
         }
+        // Part 3 (V102.501): #quiz-dash — ≥1100 px ONE card, Up next rows on the left, the grid on the right; narrower = stacked;
+        // a hidden half lets the other take the whole card; an empty box is just its header line
+        const upJs = fs.readFileSync('public/up-next.js', 'utf8');
+        assert.ok(admin.includes('<div id="quiz-dash"><div id="upnext-card" class="lang-no-toggle" hidden></div><div id="qmx-card" class="lang-no-toggle" hidden></div></div>'), 'both halves inside #quiz-dash');
+        for (const [name, width] of [['wide', 1280], ['narrow', 390]]) {
+            const page = await browser.newPage({ viewport: { width, height: 900 } });
+            await page.goto(require('node:url').pathToFileURL(require('node:path').resolve('public/quiz-matrix.js')).href);
+            await page.setContent(`<!doctype html><meta charset="utf-8"><style>${css}</style><div style="padding:12px"><div id="quiz-dash"><div id="upnext-card" class="lang-no-toggle" hidden></div><div id="qmx-card" class="lang-no-toggle" hidden></div></div></div>`);
+            await page.evaluate(([q, u, a, now]) => {
+                const shift = Date.now() - now;
+                window.quizzesData = q.map(x => x.deadline ? { ...x, deadline: { toMillis: () => x.deadline + shift } } : x)
+                    .concat([{ id: 'p1', title: 'Paused one', isActive: false }, { id: 'p2', title: 'Paused two', isActive: false }, { id: 'p3', title: 'Paused three', isActive: false }]);
+                window.usersData = u; window.quizAttemptsAllCache = a; window.hwIsActiveUser = (x) => x.on;
+                window.escapeHtml = s => String(s); window.showQuizParticipants = () => {};
+                window.db = { collection: () => ({ orderBy: () => ({ limit: () => ({ get: () => Promise.resolve({ docs: [] }) }) }) }) };
+            }, [Q.map(x => x.deadline ? { ...x, deadline: x.deadline.toMillis() } : x), U, A, NOW]);
+            await page.evaluate(() => localStorage.setItem('qmx', '{"h":168,"p":70}'));   // 7 d / 70 % leaves ✅ On track empty
+            await page.addScriptTag({ content: js });
+            await page.addScriptTag({ content: upJs });
+            await page.evaluate(() => { window.quizMatrix.refresh(); window.upNext.refresh(); });
+            await page.waitForFunction(() => document.querySelectorAll('#upnext-card .un-tile').length >= 3);
+            const g = await page.evaluate(() => {
+                const r = (s) => document.querySelector(s).getBoundingClientRect();
+                const cs = (s) => getComputedStyle(document.querySelector(s));
+                const tiles = [...document.querySelectorAll('#upnext-card .un-tile')].map(e => e.getBoundingClientRect());
+                return {
+                    up: r('#upnext-card'), mx: r('#qmx-card'), dashBorder: cs('#quiz-dash').borderTopWidth, upBorder: cs('#upnext-card').borderTopWidth,
+                    tileCols: new Set(tiles.map(t => Math.round(t.left))).size, tileH: Math.max(...tiles.map(t => t.height)),
+                    scroll: document.documentElement.scrollWidth > window.innerWidth,
+                    emptyH: document.querySelector('#qmx-card .qmx-q.is-empty').getBoundingClientRect().height
+                };
+            });
+            assert.equal(g.scroll, false, name + ': no sideways scroll');
+            assert.ok(g.emptyH < 40, name + ': the empty box is one header line, got ' + g.emptyH);
+            if (name === 'wide') {
+                assert.equal(g.dashBorder, '1px', 'wide: #quiz-dash is the card'); assert.equal(g.upBorder, '0px', 'wide: the halves lose their own frame');
+                assert.ok(Math.abs(g.up.top - g.mx.top) < 2 && g.up.right <= g.mx.left, 'wide: Up next left, grid right, same top');
+                assert.ok(g.mx.width > g.up.width, 'wide: the grid gets the wider half (2 : 3)');
+                assert.equal(g.tileCols, 1, 'wide: Up next is one row per topic'); assert.ok(g.tileH < 46, 'wide: rows are one line tall, got ' + g.tileH);
+                await page.evaluate(() => { document.getElementById('upnext-card').hidden = true; });
+                const solo = await page.evaluate(() => [document.getElementById('qmx-card').getBoundingClientRect().width, document.getElementById('quiz-dash').getBoundingClientRect().width]);
+                assert.ok(solo[0] > solo[1] - 40, 'wide: Up next hidden → the grid takes the whole card');
+                await page.evaluate(() => { document.getElementById('qmx-card').hidden = true; });
+                assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('quiz-dash')).borderTopWidth), '0px', 'wide: both hidden → no empty card');
+            } else {
+                assert.equal(g.dashBorder, '0px', 'narrow: no outer card'); assert.equal(g.upBorder, '1px', 'narrow: two cards as before');
+                assert.ok(g.mx.top >= g.up.bottom, 'narrow: stacked, Up next first'); assert.equal(g.tileCols, 2, 'narrow: Up next tiles 2 across as before');
+            }
+            await page.close();
+        }
     } finally { await browser.close(); }
     console.log('quiz-matrix-qa: all checks passed');
 })().catch(e => { console.error(e); process.exit(1); });
