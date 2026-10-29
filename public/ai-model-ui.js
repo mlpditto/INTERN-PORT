@@ -90,9 +90,27 @@
         const owner = LOGO_OWNERS[m.label.split(' ')[0]];
         const logo = owner ? `<span class="text-ai-logo" data-owner="${owner}" aria-hidden="true"></span>` : '';
         const google = window.isGoogleBilledModel(m.id), thai = window.readsThaiImage(m.id);
-        return `<button type="button" class="glass-toggle-item${m.id === value ? ' active' : ''}" data-value="${m.id}"${owner ? ` data-vendor="${owner}"` : ''}${google ? ' data-bill="google"' : ''}${thai ? ' data-thai="1"' : ''} aria-label="${m.label}" aria-pressed="${m.id === value}" title="${m.label} · ${m.id}${thai ? ' · 🇹🇭 อ่านภาษาไทยในรูปได้ (ทดสอบแล้ว)' : ''}${google ? ' · แถบสีใต้ชื่อ = ค่าใช้จ่ายเรียกเก็บผ่านบัญชี Google Cloud' : ''} — ${m.hint}"${action ? ` onclick="${action}"` : ''}>${logo}${m.short}</button>`;
+        return `<button type="button" class="glass-toggle-item${m.id === value ? ' active' : ''}" data-value="${m.id}"${owner ? ` data-vendor="${owner}"` : ''}${google ? ' data-bill="google"' : ''}${thai ? ' data-thai="1"' : ''} aria-label="${m.label}" aria-pressed="${m.id === value}" title="${m.label} · ${m.id}${thai ? ' · พื้นสีธงไทย = อ่านภาษาไทยในรูปได้ (ทดสอบแล้ว)' : ''}${google ? ' · จุดสีฟ้า = ค่าใช้จ่ายเรียกเก็บผ่านบัญชี Google Cloud' : ''} — ${m.hint}"${action ? ` onclick="${action}"` : ''}>${logo}${m.short}</button>`;
     }).join('');
     window.textAIChipsHtml = (id, value, action, extra = []) => `<div class="text-ai-chips lang-no-toggle" role="group" aria-label="AI model"${id ? ` id="${id}"` : ''}>${window.textAIChipContents(value, action, null, extra)}</div>`;
+    // V102.487 vendor-first rail: vendor icons first, only that vendor's models below (the other chips stay in the DOM, hidden).
+    // Rails that already carry their own provider tabs (.audit-providers / .cmp-vendors) and the AI Settings modal keep their layout.
+    const vendorOf = b => (b.getAttribute('aria-label') || '').split(' ')[0];
+    function showVendor(rail, vendor) {
+        rail.querySelectorAll('.mr-vendor').forEach(v => v.setAttribute('aria-pressed', String(v.dataset.provider === vendor)));
+        rail.querySelectorAll(':scope > button').forEach(b => { b.hidden = vendorOf(b) !== vendor; });
+    }
+    function vendorFirst(rail) {
+        const chips = [...rail.querySelectorAll(':scope > button')];
+        const vendors = [...new Set(chips.map(vendorOf))];
+        const logo = {}; chips.forEach(b => { const o = b.dataset.vendor; if (o && !logo[vendorOf(b)]) logo[vendorOf(b)] = o; });
+        const bar = document.createElement('span');
+        bar.className = 'mr-vendors'; bar.setAttribute('role', 'group'); bar.setAttribute('aria-label', 'Model vendor');
+        bar.innerHTML = vendors.map(v => `<button type="button" class="mr-vendor" data-provider="${v}" aria-pressed="false" aria-label="${v}" title="${v}">${logo[v] ? `<span class="text-ai-logo" data-owner="${logo[v]}" aria-hidden="true"></span>` : v}</button>`).join('');
+        bar.addEventListener('click', e => { const v = e.target.closest('.mr-vendor'); if (v) showVendor(rail, v.dataset.provider); });
+        rail.prepend(bar);
+        rail.dataset.vendorFirst = '1';
+    }
     window.syncRegistryModelSelect = function (id) {
         const input = document.getElementById(id);
         if (!input) return;
@@ -103,6 +121,7 @@
             b.classList.toggle('active', on);
             b.setAttribute('aria-pressed', String(on));
         });
+        if (binding?.rail.dataset?.vendorFirst) showVendor(binding.rail, vendorOf(binding.rail.querySelector('[data-value="' + input.value + '"]') || document.body));
         const pref = preferences[id];
         if (pref) {
             const select = document.getElementById(pref[0]);
@@ -151,6 +170,7 @@
             };
         });
         if (input.tagName === 'SELECT') input.style.display = 'none';
+        if (!host.parentElement.querySelector('.audit-providers, .cmp-vendors') && !host.closest('#aiKeysModal')) vendorFirst(host);
         bindings.set(id, { rail: host, key });
         input.addEventListener('change', () => window.syncRegistryModelSelect(id));
         window.syncRegistryModelSelect(id);
