@@ -3,8 +3,8 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.241)</title>
-    <link rel="stylesheet" href="daily-canvas.css?v=V101.241">
+    <title>Internship Portfolio (V101.242)</title>
+    <link rel="stylesheet" href="daily-canvas.css?v=V101.234">
     <link rel="stylesheet" href="halloween.css?v=V101.235">
     <script>/* V101.235: 20 Oct – 2 Nov (Bangkok) the Journal wears Halloween (halloween.css), then it goes back on its own */(function () { try { var d = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }).slice(5); if (d >= '10-20' && d <= '11-02') document.documentElement.classList.add('hw'); } catch (e) { /* none */ } })();</script>
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
@@ -1412,6 +1412,12 @@
         /* V101.35: lean — icon beside the label on one compact row; count badges sit inline */
         .mission-tabs-bar { padding: 6px 10px; gap: 6px; align-items: center; }
         /* V101.235: Writing progress sits BELOW the writing part (it used to push the Journal down) — the pane is a column and the card takes order 2 */
+        /* V101.242: quiz answer review B3 — a grid of question numbers over one question card at a time */
+        .qz-rv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(42px, 1fr)); gap: 6px; margin: 0 0 14px; }
+        .qz-rv-n { width: auto; min-height: 38px; margin: 0; padding: 0; border: 0; border-radius: 10px; font-weight: 900; font-size: 14px; color: #fff; cursor: pointer; }
+        .qz-rv-n.ok { background: #22c55e; } .qz-rv-n.bad { background: #ef4444; } .qz-rv-n.all { background: #e2e8f0; color: #475569; }
+        .qz-rv-n.cur { box-shadow: 0 0 0 3px #fff, 0 0 0 5px #4361ee; }
+        .qz-rv-card[hidden] { display: none; }
         #pane-mission-reflection.active { display: flex; flex-direction: column; }
         #pane-mission-reflection #my-writing-profile { order: 2; margin: 0 !important; }
         #pane-mission-reflection #rl-integrated-area { margin-bottom: 14px !important; }
@@ -14621,6 +14627,7 @@
                 : '<span>You<span class="lang-th"> คุณเลือก</span></span>';
             const _youHtml = `<span style="margin-left:auto; display:inline-flex; align-items:center; gap:5px; font-size:0.72em; font-weight:700; color:#475569; background:rgba(255,255,255,0.7); padding:1px 8px 1px ${_mePic ? '3px' : '8px'}; border-radius:99px;">${_youAvatar}${_youName}</span>`;
 
+            const _reviewCards = [], _reviewOk = [];   // V101.242: B3 — one card at a time, a number grid on top
             q.questions.forEach((question, i) => {
                 const userAns = attempt.answers[i];
                 const isChoice = (question.type || 'choice') === 'choice';
@@ -14738,8 +14745,9 @@
                         </div>${correctAnsText}`;
                 }
 
-                html += `
-                    <div style="background:${bg}; border:1px solid ${border}; padding:15px; border-radius:10px; margin-bottom:15px;">
+                _reviewOk[i] = !!isCorrect;
+                _reviewCards[i] = `
+                    <div class="qz-rv-card" data-rv="${i}" style="background:${bg}; border:1px solid ${border}; padding:15px; border-radius:10px; margin-bottom:15px;">
                         <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
                             <b style="color:#333;">Q ${i + 1}</b>
                             ${icon}
@@ -14752,10 +14760,31 @@
                 `;
             });
 
+            // V101.242: B3 — a grid of question numbers (green = right, red = wrong; with the key withheld every wrong or unanswered one is red, a right one stays neutral),
+            // the picked question's card below it, ▤ shows the old long list. A quiz of one or two questions keeps the plain list.
+            if (_reviewCards.length > 2) {
+                const firstBad = _reviewOk.findIndex(v => !v);
+                html += '<div class="qz-rv" data-rv-cur="' + (firstBad >= 0 ? firstBad : 0) + '"><div class="qz-rv-grid" role="group" aria-label="Questions">' +
+                    _reviewOk.map((ok, i) => '<button type="button" class="qz-rv-n ' + (ok ? 'ok' : 'bad') + '" data-rv="' + i + '" onclick="qzReviewPick(' + i + ')" aria-label="Q ' + (i + 1) + (ok ? ' correct' : ' wrong') + '">' + (i + 1) + '</button>').join('') +
+                    '<button type="button" class="qz-rv-n all" data-rv="all" onclick="qzReviewPick(\'all\')" title="All questions · ทั้งหมด" aria-label="All questions">▤</button></div>' +
+                    _reviewCards.join('') + '</div>';
+            } else html += _reviewCards.join('');
+
             // V95.42: left-align the review — .modal-content centers everything,
             // which makes long clinical vignettes hard to read (ragged left edge).
             quizResultContainer.innerHTML = `<div style="text-align:left;">${html}</div>`;
+            if (quizResultContainer.querySelector('.qz-rv')) qzReviewPick(Number(quizResultContainer.querySelector('.qz-rv').dataset.rvCur) || 0);
         }
+
+        // V101.242: pick one question of the review (or 'all'); the grid marks the current one
+        function qzReviewPick(i) {
+            const root = document.querySelector('#quiz-result-container .qz-rv'); if (!root) return;
+            root.dataset.rvCur = String(i);
+            root.querySelectorAll('.qz-rv-card').forEach(c => { c.hidden = i !== 'all' && c.dataset.rv !== String(i); });
+            root.querySelectorAll('.qz-rv-n').forEach(b => b.classList.toggle('cur', b.dataset.rv === String(i)));
+            const cur = i === 'all' ? null : root.querySelector('.qz-rv-card:not([hidden])'); if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+        window.qzReviewPick = qzReviewPick;
 
         function refreshTweetstormUI() {
             const container = document.getElementById('read-only-tweetstorm-container') || document.getElementById('tweetstorm-container');
