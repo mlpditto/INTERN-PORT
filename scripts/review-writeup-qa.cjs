@@ -17,11 +17,26 @@ const idx = fs.readFileSync('public/index.html', 'utf8'), hcss = fs.readFileSync
 assert.ok(!aj.includes('fromMistakes'), 'Articles.fromMistakes removed — the 📰 is not an Articles feature');
 assert.ok(!html.includes('_reviewWrongForArticle') && !html.includes('reviewWrongToArticle'), 'no leftover Articles hand-off in admin.html');
 assert.match(html, /<script src="articles-admin\.js\?v=V102\.(50[7-9]|5[1-9]\d|[6-9]\d\d)"><\/script>/, 'articles-admin.js cache-busted');
-assert.ok(idx.includes('white-space:pre-wrap;">${escapeHtml(attempt.adminComment)}</div>'), 'intern result card: escaped + pre-wrap');
-assert.ok(idx.includes('position:relative; white-space:pre-wrap;">') && idx.includes('</i>${escapeHtml(item.adminComment)}'), 'intern History row: escaped + pre-wrap');
+assert.ok(idx.includes('<div class="qan-body">${fmtAdminNote(attempt.adminComment)}</div>'), 'intern result card: fmtAdminNote (escaped, **bold** highlighted)');
+assert.ok(/\.qr-admin-note \{[^}]*background:#fffdf8;[^}]*color:#1f2937/.test(idx) && /\.qr-admin-note \.qan-body \{[^}]*white-space:pre-wrap/.test(idx), 'V101.246: the card is pale with dark text and keeps line breaks');
+assert.ok(!idx.includes('<div style="background:var(--primary); color:white; padding:15px; border-radius:12px; margin-bottom:20px; box-shadow:0 4px 15px rgba(67,97,238,0.2)'), 'the solid blue card is gone');
+{ const hw = fs.readFileSync('public/halloween.css', 'utf8'); assert.ok(/html\.hw \.qr-admin-note \{[^}]*dashed #fb923c/.test(hw) && hw.includes('html.hw .qr-admin-note::after { content: "🎃"'), 'halloween.css dresses the card in season only'); }
+assert.match(idx, /halloween\.css\?v=V101\.(24[6-9]|2[5-9]\d|[3-9]\d\d)/, 'halloween.css cache-busted');
+assert.ok(idx.includes('position:relative; white-space:pre-wrap;">') && idx.includes('</i>${fmtAdminNote(item.adminComment)}'), 'intern History row: fmtAdminNote + pre-wrap');
 assert.ok(!idx.includes('"${attempt.adminComment}"') && !idx.includes('${item.adminComment}\n'), 'no raw adminComment left in index.html');
 assert.ok(/\.history-compact \.hl-comment \{[^}]*white-space:pre-wrap;/.test(hcss), 'history-lean comment keeps line breaks');
 assert.match(idx, /history-compact\.css\?v=V101\.(24[4-9]|2[5-9]\d|[3-9]\d\d)/, 'history-compact.css cache-busted');
+// V101.245: **…** → <strong class="adm-key"> after escaping — the same regex in index.html and history-lean.js; everything else stays text
+{
+  const line = (idx.match(/window\.fmtAdminNote = .*$/m) || [])[0]; assert.ok(line, 'fmtAdminNote defined in index.html');
+  const escapeHtml = t => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const fmt = new Function('escapeHtml', 'const window = {}; ' + line + ' return window.fmtAdminNote;')(escapeHtml);
+  assert.equal(fmt('• x **ต้องตรวจ potassium** <b>y</b>\n**a** and **b**'), '• x <strong class="adm-key">ต้องตรวจ potassium</strong> &lt;b&gt;y&lt;/b&gt;\n<strong class="adm-key">a</strong> and <strong class="adm-key">b</strong>', 'bold marks become highlighted strong, HTML is escaped, newlines kept');
+  assert.equal(fmt('**unclosed and 2*3'), '**unclosed and 2*3', 'stray asterisks stay as typed');
+  assert.ok(fs.readFileSync('public/history-lean.js', 'utf8').includes('esc(s.adminComment).replace(/\\*\\*([^*\\n]{1,200}?)\\*\\*/g, \'<strong class="adm-key">$1</strong>\')'), 'history-lean.js applies the same bold rule');
+  assert.ok(/\.adm-key \{[^}]*background:#fef3c7/.test(idx), 'the .adm-key highlight style exists');
+  assert.match(idx, /history-lean\.js\?v=V101\.(24[5-9]|2[5-9]\d|[3-9]\d\d)/, 'history-lean.js cache-busted');
+}
 
 const mkQuiz = () => ({
   id: 'q1', title: 'Contraceptive Knowledge', shortTitle: 'Contra', quizType: 'standard', totalPoints: 1.5,
@@ -102,7 +117,7 @@ const waitIdle = page => page.waitForFunction(() => !document.getElementById('rv
       assert.equal(p.length, 1, 'one AI call on the first open');
       const pr = p[0].prompt;
       for (const s of ['Which advantage of the 24/4 regimen', 'Less weight gain', 'Shorter hormone-free interval reduces withdrawal symptoms', 'A shorter HFI blunts hormone withdrawal', 'Rank progestins', 'Second-generation progestins', 'Migraine with aura', 'No precautions', 'Estrogen is contraindicated',
-        'concise academic review in Thai', 'Contraceptive Knowledge', 'starting with "• "', 'grouped by concept', 'Do NOT go question by question', 'do NOT mention scores', 'no pronouns or forms of address', 'ครับ / ค่ะ / นะ', 'no praise or encouragement', 'headed "Read more" (in Thai)', '2–4 specific sources', 'no URLs, no invented sources'])
+        'concise academic review in Thai', 'Contraceptive Knowledge', 'starting with "• "', 'grouped by concept', 'Do NOT go question by question', 'do NOT mention scores', 'no pronouns or forms of address', 'ครับ / ค่ะ / นะ', 'no praise or encouragement', 'headed "Read more" (in Thai)', '2–4 specific sources', 'no URLs, no invented sources', 'in English (Latin script)', 'never transliterate', 'in **double asterisks**', 'and the **…** marks'])
         assert(pr.includes(s), 'the prompt carries: ' + s);
       for (const s of ['Postpartum breastfeeding', 'Skipped question', 'u-secret-77', 'example.test', 'Bew', 'Sample', 'article', 'popup', 'warm', 'narrative'])
         assert(!new RegExp('(^|[^A-Za-z])' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^A-Za-z]|$)', 'i').test(pr), 'the prompt must not carry: ' + s);   // whole word: "particles" is not "article"
