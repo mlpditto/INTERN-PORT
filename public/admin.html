@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.516)</title>
+    <title>Nika Admin (V102.517)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -5590,8 +5590,10 @@
         .pra-terms .lab { color:#b45309; font-weight:800; margin-right:4px; }
         .pra-tchip { min-height:0; width:auto; margin:0; padding:2px 8px; border-radius:999px; border:1px solid #fde68a; background:#fff; color:#78350f; font-size:0.95em; cursor:pointer; }
         .pra-tchip[aria-pressed="true"] { background:#fde68a; } .pra-tchip span { color:#94a3b8; margin-left:4px; }
-        .pra-body { padding:12px 16px; display:grid; gap:10px; overflow:auto; }
-        .pra-card { border:1px solid #e2e8f0; border-radius:12px; background:#fff; } .pra-card.has-dup { border-color:#fde68a; } .pra-card[hidden] { display:none; }
+        .pra-body { padding:12px 16px; display:grid; grid-template-columns:minmax(0, 1fr); gap:10px; overflow:auto; }   /* V102.517: minmax(0,1fr) — a long stem no longer widens the card past the popup (the ✎ button was clipped) */
+        .pra-card { border:1px solid #e2e8f0; border-radius:12px; background:#fff; min-width:0; } .pra-card.has-dup { border-color:#fde68a; } .pra-card[hidden] { display:none; }
+        .pra-none { padding:22px 16px; text-align:center; color:#64748b; font-size:0.9em; line-height:1.7; }   /* V102.517: a quiz with no Read first at all gets one line + ✨ All, not ten empty cards */
+        .pra-none .pra-go { margin-top:6px; font-size:0.85em; padding:6px 12px; border-color:#f59e0b; background:#fffbeb; color:#92400e; }
         .pra-card header { display:flex; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid #f1f5f9; background:#fafafa; border-radius:12px 12px 0 0; }
         .pra-qn { font-weight:900; color:#4361ee; font-size:0.85em; white-space:nowrap; }
         .pra-stem { font-size:0.85em; color:#334155; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -25894,7 +25896,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 '<div class="pra-hd"><h3>📖 Read first · all questions</h3><span class="pra-sum">' + (title ? '<b>' + escapeHtml(title) + '</b> · ' : '') + qs.length + ' questions · ' + A.groups.length + ' terms · <b>' + dupG.length + ' repeated</b> in ' + qDup + ' question' + (qDup === 1 ? '' : 's') + ' · ' + eqLines + ' identical line' + (eqLines === 1 ? '' : 's') + '</span>' +
                 '<span class="pra-chips"><button type="button" class="pra-chip" data-f="all" aria-pressed="true" onclick="_praFilter(\'all\')">All</button><button type="button" class="pra-chip" data-f="dup" aria-pressed="false" onclick="_praFilter(\'dup\')">Repeated only</button><button type="button" class="pra-x" onclick="_praClose()" title="Close" aria-label="Close">✕</button></span></div>' +
                 (chips ? '<div class="pra-terms"><span class="lab">Repeated most</span>' + chips + '</div>' : '') +
-                '<div class="pra-body">' + cards + '</div></div>';
+                '<div class="pra-body">' + (qs.some(x => x.primer.trim()) ? cards : '<div class="pra-none">No question has a Read first yet — nothing to compare.<br><button type="button" class="pra-go" onclick="_praDraftAll()" title="Close this and run ✨ All: one Read first per question, one at a time">✨ All — draft one for every question</button></div>') + '</div></div>';
             ov.addEventListener('click', e => { if (e.target === ov) window._praClose(); });
             document.body.appendChild(ov);
             document.addEventListener('keydown', window._praEsc);
@@ -25909,6 +25911,12 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const on = btn.getAttribute('aria-pressed') !== 'true';
             document.querySelectorAll('#praOverlay .pra-tchip').forEach(c => c.setAttribute('aria-pressed', String(on && c === btn)));
             document.querySelectorAll('#praOverlay mark.pra-dup').forEach(m => m.classList.toggle('on', on && m.dataset.g === btn.dataset.g));
+        };
+        // V102.517: from the empty popup straight into ✨ All (the first question's button carries the chosen model)
+        window._praDraftAll = function () {
+            window._praClose();
+            const b = document.querySelector('#quiz-questions-container .quiz-q-item .q-primer-all');
+            if (b && typeof window._qPrimerDraftAll === 'function') window._qPrimerDraftAll(b);
         };
         window._praGo = function (i) {
             window._praClose();
