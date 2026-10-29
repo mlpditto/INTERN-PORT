@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.507)</title>
+    <title>Nika Admin (V102.508)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -8250,7 +8250,7 @@
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <!-- V93.08: cache-bust on taxonomy.js for the LP Firestore overlay rollout -->
     <script src="ai-model-registry.js?v=V102.365"></script>
-    <script src="ai-model-ui.js?v=V102.487"></script>
+    <script src="ai-model-ui.js?v=V102.508"></script>
     <script src="ollama-local.js?v=V102.109"></script>
 <script src="case-dup.js?v=V102.401"></script>
 <script src="case-article.js?v=V102.395"></script>
@@ -32043,11 +32043,12 @@ ${qs}`;
                 const rvFirstName = String(att.displayName || '').trim().split(/\s+/)[0] || '';
                 window._reviewWrongForWriteup = { quizTitle: String(quiz.title || quiz.shortTitle || ''), firstName: rvFirstName, items: rvWrongItems };
                 const rvWriteupLangSaved = localStorage.getItem('ai_review_writeup_lang') || 'th';
+                const rvWriteupModelId = 'ai-review-writeup-model-' + Date.now();   // V102.508: one hidden input per open; bindRegistryModelInput builds the vendor-first rail after it
                 const rvWriteupHtml = `<div id="rv-writeup" hidden class="lang-no-toggle" style="padding:10px 16px;border-bottom:1px solid #fde68a;background:#fffbeb;display:flex;flex-direction:column;gap:8px;">
                         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                             <span style="font-weight:800;color:#92400e;font-size:0.9em;white-space:nowrap;">📰 Personal review → ${escapeHtml(rvFirstName || att.displayName || 'intern')}</span>
                             <span id="rv-writeup-lang" role="group" aria-label="Language of the review" style="display:inline-flex;gap:4px;">${[['th', '🇹🇭', 'Thai'], ['en', '🇺🇸', 'English'], ['ko', '🇰🇷', 'Korean']].map(([l, f, n]) => `<button type="button" class="rv-lang" data-lang="${l}" aria-pressed="${l === rvWriteupLangSaved}" title="${n}" aria-label="${n}" onclick="rvWriteupPickLang(this)">${f}</button>`).join('')}</span>
-                            ${textAIChipsHtml('rv-writeup-model', normalizeTextAIModel(localStorage.getItem('ai_review_writeup_model')), "selectStoredTextAIModel(this, 'ai_review_writeup_model')")}
+                            <input type="hidden" id="${rvWriteupModelId}" value="${normalizeTextAIModel(localStorage.getItem('ai_review_writeup_model'))}">
                             <span id="rv-writeup-note" style="font-size:0.78em;color:#78716c;margin-left:auto;"></span>
                         </div>
                         <textarea id="rv-writeup-text" rows="7" placeholder="What they got wrong and why — one short review for this intern, AI-drafted, yours to edit before it goes out" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #fcd34d;border-radius:10px;font-size:0.92em;line-height:1.5;resize:vertical;background:#fff;font-family:inherit;">${escapeHtml(att.adminComment || '')}</textarea>
@@ -32104,6 +32105,7 @@ ${qs}`;
                 document.body.appendChild(overlay);
                 if (window.rvApplyUi) window.rvApplyUi(attemptId);
                 { const fl = document.getElementById('rv-writeup-lang'); if (fl && window.twemoji) twemoji.parse(fl, { folder: 'svg', ext: '.svg' }); }   // V100.79: flag emoji render as letters on Windows
+                if (rvWrongItems.length && window.bindRegistryModelInput) window.bindRegistryModelInput(rvWriteupModelId, 'ai_review_writeup_model');   // V102.508: vendor icons first, then that vendor's chips (ai-model-ui.js V102.487 rail)
 
             } catch (e) {
                 console.error("Error reviewing quiz attempt:", e);

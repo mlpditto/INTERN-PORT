@@ -203,5 +203,7 @@
         const description = document.getElementById('model-desc-box');
         if (description) description.hidden = true;
     };
+    // V102.508: a rail built after load (the Review 📰 panel) gets the same bound, vendor-first rail as the page's own inputs.
+    window.bindRegistryModelInput = (id, key) => bind(id, null, key);
     document.addEventListener('DOMContentLoaded', window.initRegistryModelSelectors);
 })();
