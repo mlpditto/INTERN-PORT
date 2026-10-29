@@ -13,7 +13,7 @@ Admin: Kanban ▸ a quiz attempt ▸ Review; Quiz Engine row ▸ 👥 Participan
 - `pending-multi-recount-qa` — two-answer questions recounted correctly in the pending table
 - `choice-rescore-check` — seven admin paths score a joined multi-answer correctly
 - `quiz-practice-review-qa` — practice attempts keep practiceAnswers; Review / PDF use them
-- `review-writeup-qa` — 📰 personal review for THIS intern (V102.507): panel under the Review header, AI drafts one narrative from the wrong answers (first name only in the prompt) and ends with a 2–4 item "Read more" list (names, no URLs), ✨ asks before replacing, Send = `quiz_attempts.adminComment` only; intern side escapes + keeps line breaks
+- `review-writeup-qa` — 📰 personal review for THIS intern (V102.507): panel under the Review header, AI drafts a formal bullet summary grouped by concept from the wrong answers (no name in the prompt, no pronouns / particles / praise) and ends with a 2–4 item "Read more" list (names, no URLs), ✨ asks before replacing, Send = `quiz_attempts.adminComment` only; intern side escapes + keeps line breaks
 - `quiz-participants-score-qa` — one-time practice attempt shows a score and joins the average
 - `participants-header-qa` — lean Participants header: title, Avg, "need 10+"
 - `participants-division-avg-qa` — 🏷️ division, ⏱ total + ⌀ per question, amber slow pill

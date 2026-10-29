@@ -1,8 +1,8 @@
-// V102.507 / V101.244: 📰 in the quiz Review header (right after the PDF icon) = a PERSONAL review for this one intern — the REAL reviewQuiz()
+// V102.507–508 / V101.244: 📰 in the quiz Review header (right after the PDF icon) = a PERSONAL review for this one intern — the REAL reviewQuiz()
 // in public/admin.html (file://, network blocked, Firebase = self-returning Proxy, fake attempt doc, stubbed callUniversalAI + db).
 // Checks: the button sits next to PDF, icon-only with EN + TH + KO tooltips; the first click opens the panel under the header and drafts at once;
-// the prompt carries the wrong / partial questions (stem, the pick, the key, the explanation) and the FIRST name only — never the user id,
-// picture or surname — and asks for one narrative, not a per-question key; the draft lands in the textarea, nothing is written until Send;
+// the prompt carries the wrong / partial questions (stem, the pick, the key, the explanation) and NO name, id or picture, and asks for
+// a formal, impersonal bullet summary grouped by concept (no pronouns / particles / praise), not a per-question key; the draft lands in the textarea, nothing is written until Send;
 // Send writes quiz_attempts.adminComment (+At/+By) and nothing else; ✨ asks before replacing text; the language chip changes the prompt;
 // an existing adminComment prefills the box and does NOT auto-draft; an all-correct attempt gets a dimmed button and no panel; phone 390 px fits.
 // Static: the intern's result card + History row escape the comment and keep line breaks; Articles.fromMistakes is gone.
@@ -62,7 +62,7 @@ async function open(browser, { width, height, quiz, attempt, dialogs = 'dismiss'
     window.quizzesData = [quiz]; window.usersData = [];
     window.renderMdInline = window.renderMdInline || (t => String(t == null ? '' : t));
     window.showToast = (m) => { window.__toasts.push(String(m)); };
-    window.callUniversalAI = async (model, prompt, json, img, sys, opts) => { window.__prompts.push({ model, prompt, json, img, opts }); await new Promise(r => setTimeout(r, 60)); return { text: 'สวัสดี Bew\nเรื่อง HFI สั้น…\n\nสู้ ๆ นะ' }; };
+    window.callUniversalAI = async (model, prompt, json, img, sys, opts) => { window.__prompts.push({ model, prompt, json, img, opts }); await new Promise(r => setTimeout(r, 400)); return { text: 'สวัสดี Bew\nเรื่อง HFI สั้น…\n\nสู้ ๆ นะ' }; };   // slow enough for the busy-state assertion
     localStorage.removeItem('ai_review_writeup_lang'); localStorage.removeItem('ai_review_writeup_model');
   }, { quiz, attempt });
   await page.evaluate(() => reviewQuiz('a1')); await page.waitForTimeout(400);
@@ -102,15 +102,35 @@ const waitIdle = page => page.waitForFunction(() => !document.getElementById('rv
       assert.equal(p.length, 1, 'one AI call on the first open');
       const pr = p[0].prompt;
       for (const s of ['Which advantage of the 24/4 regimen', 'Less weight gain', 'Shorter hormone-free interval reduces withdrawal symptoms', 'A shorter HFI blunts hormone withdrawal', 'Rank progestins', 'Second-generation progestins', 'Migraine with aura', 'No precautions', 'Estrogen is contraindicated',
-        'addressed to Bew', 'in Thai', 'Contraceptive Knowledge', 'ONE connected narrative', 'Do NOT go question by question', 'do NOT mention scores', 'headed "Read more" (in Thai)', '2–4 specific things worth reading', 'no URLs, no invented sources'])
+        'concise academic review in Thai', 'Contraceptive Knowledge', 'starting with "• "', 'grouped by concept', 'Do NOT go question by question', 'do NOT mention scores', 'no pronouns or forms of address', 'ครับ / ค่ะ / นะ', 'no praise or encouragement', 'headed "Read more" (in Thai)', '2–4 specific sources', 'no URLs, no invented sources'])
         assert(pr.includes(s), 'the prompt carries: ' + s);
-      for (const s of ['Postpartum breastfeeding', 'Skipped question', 'u-secret-77', 'example.test', 'Sample', 'article', 'popup'])
-        assert(!pr.includes(s), 'the prompt must not carry: ' + s);
+      for (const s of ['Postpartum breastfeeding', 'Skipped question', 'u-secret-77', 'example.test', 'Bew', 'Sample', 'article', 'popup', 'warm', 'narrative'])
+        assert(!new RegExp('(^|[^A-Za-z])' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^A-Za-z]|$)', 'i').test(pr), 'the prompt must not carry: ' + s);   // whole word: "particles" is not "article"
       assert.equal(p[0].opts.feature, 'review_writeup', 'its own AI feature tag');
       assert.equal(await page.locator('#rv-writeup-text').inputValue(), DRAFT, 'the draft lands in the box, line breaks kept');
       assert.match(await page.locator('#rv-writeup-note').innerText(), /^✨ gpt-6-luna · \d+ s — read it, edit, then Send$/, 'note: model + seconds');
+      assert.equal(await page.locator('#rv-writeup input[type=hidden][id^=ai-review-writeup-model-]').inputValue(), 'gpt-6-luna', 'the hidden model input carries the default');
       assert.deepEqual(await page.evaluate(() => window.__writes), [], 'nothing written before Send');
       assert.equal(await page.locator('#articlesModal:visible').count(), 0, 'the Article editor stays closed');
+      // the model rail = the page's vendor-first rail (V102.487): vendor icons, then only that vendor's chips
+      const rail = page.locator('#rv-writeup .text-ai-chips');
+      assert.equal(await rail.count(), 1, 'one model rail in the panel');
+      const vendors = await rail.locator('.mr-vendors .mr-vendor').evaluateAll(bs => bs.map(b => [b.dataset.provider, b.getAttribute('aria-pressed')]));
+      assert(vendors.length >= 5, 'vendor icons: ' + JSON.stringify(vendors));
+      const pressed = vendors.filter(v => v[1] === 'true').map(v => v[0]);
+      assert.equal(pressed.length, 1, 'exactly one vendor pressed: ' + pressed);
+      const shown = await rail.locator(':scope > button:not([hidden])').evaluateAll(bs => bs.map(b => [b.getAttribute('aria-label').split(' ')[0], b.classList.contains('active'), b.dataset.value]));
+      assert(shown.length >= 1 && shown.every(c => c[0] === pressed[0]), 'only the pressed vendor\'s chips show: ' + JSON.stringify(shown));
+      assert.equal(shown.filter(c => c[1]).map(c => c[2]).join(), 'gpt-6-luna', 'the active chip is the default model');
+      const hiddenN = await rail.locator(':scope > button[hidden]').count(); assert(hiddenN > shown.length, 'the other vendors\' chips are hidden, not gone: ' + hiddenN);
+      const other = vendors.find(v => v[1] !== 'true')[0];
+      await rail.locator('.mr-vendor[data-provider="' + other + '"]').click();
+      const shown2 = await rail.locator(':scope > button:not([hidden])').evaluateAll(bs => bs.map(b => [b.getAttribute('aria-label').split(' ')[0], b.dataset.value]));
+      assert(shown2.length >= 1 && shown2.every(c => c[0] === other), 'another vendor icon shows its chips: ' + JSON.stringify(shown2));
+      await rail.locator(':scope > button:not([hidden])').first().click();
+      const pickedModel = shown2[0][1];
+      assert.equal(await page.evaluate(() => localStorage.getItem('ai_review_writeup_model')), pickedModel, 'the pick is remembered');
+      assert.equal(await rail.locator(':scope > button.active').getAttribute('data-value'), pickedModel, 'the picked chip is active');
       // the language chip → the prompt
       assert.equal(await page.locator('#rv-writeup-lang .rv-lang[aria-pressed="true"]').getAttribute('data-lang'), 'th', 'Thai by default');
       await page.locator('#rv-writeup-lang .rv-lang[data-lang="en"]').click();
@@ -123,6 +143,7 @@ const waitIdle = page => page.waitForFunction(() => !document.getElementById('rv
       await page.locator('#rv-writeup-draft').click(); await waitIdle(page);
       const p2 = await page.evaluate(() => window.__prompts);
       assert.equal(p2.length, 2, 'accepted confirm → a new draft'); assert(p2[1].prompt.includes('in English'), 'the English chip reached the prompt');
+      assert.equal(p2[1].model, pickedModel, 'the picked model is the one called');
       // edit, then Send
       await page.locator('#rv-writeup-text').fill(DRAFT + '\nแก้โดยแอดมิน');
       await page.locator('#rv-writeup-send').click(); await page.waitForTimeout(150);
@@ -181,6 +202,6 @@ const waitIdle = page => page.waitForFunction(() => !document.getElementById('rv
       assert.deepEqual(errs.filter(e => !noise(e)), [], 'no page errors: ' + errs);
       await ctx.close();
     }
-    console.log('PASS: review 📰 personal write-up — next to PDF, EN + TH + KO tooltips, panel under the header, one narrative prompt from the wrong answers + first name only, draft in the box, Send = quiz_attempts.adminComment only, ✨ asks first, language chip, prefill without auto-draft, all-correct dimmed, 390 px fits; intern side escapes + pre-wrap; Articles.fromMistakes gone');
+    console.log('PASS: review 📰 personal write-up — next to PDF, EN + TH + KO tooltips, panel under the header, one academic bullet-style prompt from the wrong answers (no name), draft in the box, Send = quiz_attempts.adminComment only, ✨ asks first, language chip, prefill without auto-draft, all-correct dimmed, 390 px fits; intern side escapes + pre-wrap; Articles.fromMistakes gone');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
